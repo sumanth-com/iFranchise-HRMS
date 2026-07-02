@@ -1,0 +1,42 @@
+# iFranchise HRMS — Authentication Configuration Assumptions
+#
+# This file documents auth settings for invite-only employee onboarding.
+# The authoritative local settings are in ../config.toml.
+# Production values must be mirrored in the Supabase Dashboard.
+
+[assumptions]
+signup_enabled = false
+anonymous_signin_enabled = false
+employee_provisioning = "admin_invite_only"
+
+[employee_onboarding]
+# Employees are created exclusively via the service role:
+#   supabase.auth.admin.inviteUserByEmail({ email, options })
+# Self-service registration is disabled.
+method = "inviteUserByEmail"
+require_email_confirmation = true
+require_secure_password = true
+
+[session]
+jwt_expiry_seconds = 3600
+refresh_token_rotation = true
+
+[redirects]
+# Must match NEXT_PUBLIC_APP_URL in the Next.js application.
+site_url = "env(NEXT_PUBLIC_APP_URL)"
+allowed_redirect_urls = ["env(NEXT_PUBLIC_APP_URL)"]
+
+[password_policy]
+minimum_length = 12
+require_mixed_case = true
+require_digits = true
+require_symbols = true
+
+[notes]
+production_checklist = """
+1. Disable public signup in Supabase Dashboard > Authentication > Providers > Email.
+2. Confirm email templates for invite and password reset flows.
+3. Restrict service role key to server-side usage only.
+4. Configure custom SMTP for production email delivery.
+5. Enable MFA for admin accounts in a future security migration.
+"""

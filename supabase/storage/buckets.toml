@@ -1,0 +1,30 @@
+# Storage bucket reference
+#
+# Buckets are created via migration:
+#   supabase/migrations/20260702130600_storage_buckets.sql
+#
+# Placeholder policies are defined via migration:
+#   supabase/migrations/20260702130700_storage_policies.sql
+#
+# Buckets:
+#   - employee-documents        (private, 50 MB, documents + images)
+#   - employee-profile-images   (private, 5 MB, images only)
+#   - company-assets            (private, 10 MB, images + PDF + SVG)
+#
+# All authenticated access policies are intentionally denied (AND false).
+# Replace placeholders in future HRMS module migrations.
+
+[buckets.employee-documents]
+id = "employee-documents"
+public = false
+file_size_limit = 52428800
+
+[buckets.employee-profile-images]
+id = "employee-profile-images"
+public = false
+file_size_limit = 5242880
+
+[buckets.company-assets]
+id = "company-assets"
+public = false
+file_size_limit = 10485760
