@@ -114,6 +114,36 @@ export function EmployeeTable({
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
+  const branchItems = useMemo(
+    () => [
+      { value: "", label: "All branches" },
+      ...branches.map((branch) => ({ value: branch.id, label: branch.label })),
+    ],
+    [branches],
+  );
+
+  const departmentItems = useMemo(
+    () => [
+      { value: "", label: "All departments" },
+      ...departments.map((department) => ({
+        value: department.id,
+        label: department.label,
+      })),
+    ],
+    [departments],
+  );
+
+  const employmentStatusItems = useMemo(
+    () => [
+      { value: "", label: "All statuses" },
+      ...Object.entries(EMPLOYMENT_STATUS_LABELS).map(([value, label]) => ({
+        value,
+        label,
+      })),
+    ],
+    [],
+  );
+
   const columns = useMemo<ColumnDef<EmployeeListItem>[]>(
     () => [
       {
@@ -185,12 +215,32 @@ export function EmployeeTable({
               }
             />
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => router.push(EMPLOYEE_ROUTES.detail(row.original.id))}>
+              <DropdownMenuItem
+                onClick={() =>
+                  router.push(
+                    EMPLOYEE_ROUTES.detail({
+                      employeeCode: row.original.employeeCode,
+                      firstName: row.original.firstName,
+                      lastName: row.original.lastName,
+                    }),
+                  )
+                }
+              >
                 <Eye className="size-4" />
                 View
               </DropdownMenuItem>
               {canEdit ? (
-                <DropdownMenuItem onClick={() => router.push(EMPLOYEE_ROUTES.edit(row.original.id))}>
+                <DropdownMenuItem
+                  onClick={() =>
+                    router.push(
+                      EMPLOYEE_ROUTES.edit({
+                        employeeCode: row.original.employeeCode,
+                        firstName: row.original.firstName,
+                        lastName: row.original.lastName,
+                      }),
+                    )
+                  }
+                >
                   <Pencil className="size-4" />
                   Edit
                 </DropdownMenuItem>
@@ -254,7 +304,7 @@ export function EmployeeTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="relative z-10 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-1 flex-col gap-3 sm:flex-row">
           <Input
             placeholder="Search by name, email, or code..."
@@ -270,6 +320,7 @@ export function EmployeeTable({
             }}
           />
           <Select
+            items={branchItems}
             value={branchId ?? ""}
             onValueChange={(value) =>
               updateParams({ branchId: value || undefined, page: "1" })
@@ -278,16 +329,16 @@ export function EmployeeTable({
             <SelectTrigger className="w-full sm:w-44">
               <SelectValue placeholder="All branches" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">All branches</SelectItem>
-              {branches.map((branch) => (
-                <SelectItem key={branch.id} value={branch.id}>
-                  {branch.label}
+            <SelectContent align="start" alignItemWithTrigger={false}>
+              {branchItems.map((item) => (
+                <SelectItem key={item.value || "all-branches"} value={item.value}>
+                  {item.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <Select
+            items={departmentItems}
             value={departmentId ?? ""}
             onValueChange={(value) =>
               updateParams({ departmentId: value || undefined, page: "1" })
@@ -296,16 +347,19 @@ export function EmployeeTable({
             <SelectTrigger className="w-full sm:w-44">
               <SelectValue placeholder="All departments" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">All departments</SelectItem>
-              {departments.map((department) => (
-                <SelectItem key={department.id} value={department.id}>
-                  {department.label}
+            <SelectContent align="start" alignItemWithTrigger={false}>
+              {departmentItems.map((item) => (
+                <SelectItem
+                  key={item.value || "all-departments"}
+                  value={item.value}
+                >
+                  {item.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <Select
+            items={employmentStatusItems}
             value={employmentStatus ?? ""}
             onValueChange={(value) =>
               updateParams({
@@ -317,11 +371,10 @@ export function EmployeeTable({
             <SelectTrigger className="w-full sm:w-44">
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">All statuses</SelectItem>
-              {Object.entries(EMPLOYMENT_STATUS_LABELS).map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
+            <SelectContent align="start" alignItemWithTrigger={false}>
+              {employmentStatusItems.map((item) => (
+                <SelectItem key={item.value || "all-statuses"} value={item.value}>
+                  {item.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -334,7 +387,7 @@ export function EmployeeTable({
         ) : null}
       </div>
 
-      <div className="rounded-lg border">
+      <div className="overflow-x-auto rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -407,7 +460,7 @@ export function EmployeeTable({
         </Table>
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
           Showing {employees.length === 0 ? 0 : (page - 1) * pageSize + 1}–
           {Math.min(page * pageSize, total)} of {total}

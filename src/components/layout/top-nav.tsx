@@ -35,7 +35,9 @@ export function TopNav() {
             <PanelLeftClose className="size-5" />
           )}
         </Button>
-        <BreadcrumbNav />
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <BreadcrumbNav />
+        </div>
       </div>
       <UserProfileDropdown />
     </header>

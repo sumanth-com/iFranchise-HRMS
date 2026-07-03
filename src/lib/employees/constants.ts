@@ -1,8 +1,13 @@
+import { buildEmployeeRouteRef } from "@/lib/employees/routing";
+import type { EmployeeRouteIdentity } from "@/types/employee";
+
 export const EMPLOYEE_ROUTES = {
   list: "/dashboard/employees",
   new: "/dashboard/employees/new",
-  detail: (id: string) => `/dashboard/employees/${id}`,
-  edit: (id: string) => `/dashboard/employees/${id}/edit`,
+  detail: (employee: EmployeeRouteIdentity) =>
+    `/dashboard/employees/${buildEmployeeRouteRef(employee)}`,
+  edit: (employee: EmployeeRouteIdentity) =>
+    `/dashboard/employees/${buildEmployeeRouteRef(employee)}/edit`,
 } as const;
 
 export const EMPLOYEE_STORAGE_BUCKETS = {
@@ -30,6 +35,7 @@ export const EMPLOYEE_TABS = [
   "attendance",
   "leave",
   "payroll",
+  "timeline",
 ] as const;
 
 export type EmployeeTab = (typeof EMPLOYEE_TABS)[number];

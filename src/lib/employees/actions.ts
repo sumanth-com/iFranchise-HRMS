@@ -8,9 +8,15 @@ import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
 import {
   getEmployeeById,
   getEmployeeAttendance,
+  getEmployeeAttendanceSummary,
+  getEmployeeBankAccounts,
+  getEmployeeLeaveBalances,
   getEmployeeLeaveRequests,
   getEmployeePayrollItems,
+  getEmployeeSalaryStructure,
+  getEmployeeTimeline,
 } from "@/lib/employees/services/employee-detail";
+import { resolveEmployeeFromRouteRef } from "@/lib/employees/services/employee-route-resolver";
 import {
   createEmployeeFromWizard,
   createSignedStorageUrl,
@@ -34,6 +40,7 @@ import type {
   EmployeeActionResult,
   EmployeeListParams,
   EmployeeListResult,
+  EmployeeRouteIdentity,
 } from "@/types/employee";
 import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
 
@@ -93,7 +100,7 @@ export async function getEmployeeLookupsAction(excludeEmployeeId?: string) {
 
 export async function createEmployeeAction(
   payload: unknown,
-): Promise<EmployeeActionResult<{ employeeId: string }>> {
+): Promise<EmployeeActionResult<EmployeeRouteIdentity>> {
   try {
     const profile = await requireServerPermission("employee.create");
     const parsed = employeeWizardSchema.parse(payload);
@@ -104,9 +111,22 @@ export async function createEmployeeAction(
       parsed,
     );
 
+    const employee = await getEmployeeById(supabase, employeeId);
+
+    if (!employee) {
+      throw new Error("Employee was created but could not be loaded");
+    }
+
     revalidatePath(EMPLOYEE_ROUTES.list);
 
-    return { success: true, data: { employeeId } };
+    return {
+      success: true,
+      data: {
+        employeeCode: employee.employeeCode,
+        firstName: employee.firstName,
+        lastName: employee.lastName,
+      },
+    };
   } catch (error) {
     return {
       success: false,
@@ -126,8 +146,14 @@ export async function updateEmployeeAction(
     const supabase = await getAuthenticatedSupabase();
     await updateEmployee(supabase, profile, employeeId, parsed);
 
+    const employee = await getEmployeeById(supabase, employeeId);
+
     revalidatePath(EMPLOYEE_ROUTES.list);
-    revalidatePath(EMPLOYEE_ROUTES.detail(employeeId));
+
+    if (employee) {
+      revalidatePath(EMPLOYEE_ROUTES.detail(employee));
+      revalidatePath(EMPLOYEE_ROUTES.edit(employee));
+    }
 
     return { success: true, data: undefined };
   } catch (error) {
@@ -253,20 +279,69 @@ export async function getSignedUrlAction(
   }
 }
 
-export async function getEmployeeDetailBundleAction(employeeId: string) {
+export async function getEmployeeDetailBundleAction(employeeRef: string) {
   const profile = await requireServerPermission("employee.view");
   const supabase = await getAuthenticatedSupabase();
 
-  const [employee, attendance, leaveRequests, payrollItems] = await Promise.all([
-    getEmployeeById(supabase, employeeId),
-    getEmployeeAttendance(supabase, employeeId),
-    getEmployeeLeaveRequests(supabase, employeeId),
-    getEmployeePayrollItems(supabase, employeeId),
+  const resolved = await resolveEmployeeFromRouteRef(
+    supabase,
+    profile.employee.organizationId,
+    employeeRef,
+  );
+
+  if (!resolved) {
+    return null;
+  }
+
+  const [
+    employeeResult,
+    attendanceResult,
+    leaveResult,
+    payrollResult,
+    bankAccountsResult,
+    leaveBalancesResult,
+    salaryStructureResult,
+    attendanceSummaryResult,
+    timelineResult,
+  ] = await Promise.allSettled([
+    getEmployeeById(supabase, resolved.id),
+    getEmployeeAttendance(supabase, resolved.id),
+    getEmployeeLeaveRequests(supabase, resolved.id),
+    getEmployeePayrollItems(supabase, resolved.id),
+    getEmployeeBankAccounts(supabase, resolved.id),
+    getEmployeeLeaveBalances(supabase, resolved.id),
+    getEmployeeSalaryStructure(supabase, resolved.id),
+    getEmployeeAttendanceSummary(supabase, resolved.id),
+    getEmployeeTimeline(supabase, resolved.id),
   ]);
+
+  const employee =
+    employeeResult.status === "fulfilled" ? employeeResult.value : null;
 
   if (!employee) {
     return null;
   }
+
+  const attendance =
+    attendanceResult.status === "fulfilled" ? attendanceResult.value : [];
+  const leaveRequests =
+    leaveResult.status === "fulfilled" ? leaveResult.value : [];
+  const payrollItems =
+    payrollResult.status === "fulfilled" ? payrollResult.value : [];
+  const bankAccounts =
+    bankAccountsResult.status === "fulfilled" ? bankAccountsResult.value : [];
+  const leaveBalances =
+    leaveBalancesResult.status === "fulfilled" ? leaveBalancesResult.value : [];
+  const salaryStructure =
+    salaryStructureResult.status === "fulfilled"
+      ? salaryStructureResult.value
+      : null;
+  const attendanceSummary =
+    attendanceSummaryResult.status === "fulfilled"
+      ? attendanceSummaryResult.value
+      : { totalRecords: 0, presentDays: 0, totalWorkHours: 0 };
+  const timeline =
+    timelineResult.status === "fulfilled" ? timelineResult.value : [];
 
   let profileImageUrl: string | null = null;
   if (employee.profile?.profileImageStoragePath) {
@@ -282,6 +357,11 @@ export async function getEmployeeDetailBundleAction(employeeId: string) {
     attendance,
     leaveRequests,
     payrollItems,
+    bankAccounts,
+    leaveBalances,
+    salaryStructure,
+    attendanceSummary,
+    timeline,
     profileImageUrl,
     permissionCodes: profile.permissionCodes,
   };
@@ -321,7 +401,11 @@ export async function uploadProfileImageAction(
       throw new Error(error.message);
     }
 
-    revalidatePath(EMPLOYEE_ROUTES.detail(employeeId));
+    const employee = await getEmployeeById(supabase, employeeId);
+
+    if (employee) {
+      revalidatePath(EMPLOYEE_ROUTES.detail(employee));
+    }
 
     return { success: true, data: storagePath };
   } catch (error) {

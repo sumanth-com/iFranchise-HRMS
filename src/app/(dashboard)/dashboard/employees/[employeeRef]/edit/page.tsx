@@ -1,27 +1,45 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { EmployeeEditForm } from "@/components/employees/employee-edit-form";
 import { buttonVariants } from "@/components/common/button";
 import { createClient } from "@/lib/supabase/server";
 import { getEmployeeById } from "@/lib/employees/services/employee-detail";
 import { getEmployeeLookups } from "@/lib/employees/services/employee-queries";
+import { resolveEmployeeFromRouteRef } from "@/lib/employees/services/employee-route-resolver";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
+import { buildEmployeeRouteRef, isEmployeeUuid } from "@/lib/employees/routing";
 import { requireServerPermission } from "@/lib/permissions/server";
 import { cn } from "@/lib/utils";
 
 type EmployeeEditPageProps = {
-  params: Promise<{ id: string }>;
+  params: Promise<{ employeeRef: string }>;
 };
 
 export default async function EmployeeEditPage({ params }: EmployeeEditPageProps) {
   const profile = await requireServerPermission("employee.edit");
-  const { id } = await params;
+  const { employeeRef } = await params;
   const supabase = await createClient();
 
+  const resolved = await resolveEmployeeFromRouteRef(
+    supabase,
+    profile.employee.organizationId,
+    employeeRef,
+  );
+
+  if (!resolved) {
+    notFound();
+  }
+
+  const canonicalRef = buildEmployeeRouteRef(resolved);
+
+  if (employeeRef !== canonicalRef || isEmployeeUuid(employeeRef)) {
+    redirect(EMPLOYEE_ROUTES.edit(resolved));
+  }
+
   const [employee, lookups] = await Promise.all([
-    getEmployeeById(supabase, id),
-    getEmployeeLookups(supabase, profile.employee.organizationId, id),
+    getEmployeeById(supabase, resolved.id),
+    getEmployeeLookups(supabase, profile.employee.organizationId, resolved.id),
   ]);
 
   if (!employee) {
@@ -39,7 +57,7 @@ export default async function EmployeeEditPage({ params }: EmployeeEditPageProps
           </p>
         </div>
         <Link
-          href={EMPLOYEE_ROUTES.detail(id)}
+          href={EMPLOYEE_ROUTES.detail(employee)}
           className={cn(buttonVariants({ variant: "outline" }))}
         >
           Cancel

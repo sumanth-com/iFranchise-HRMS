@@ -73,6 +73,12 @@ export type LookupOption = {
   code?: string;
 };
 
+export type EmployeeRouteIdentity = {
+  employeeCode: string;
+  firstName: string;
+  lastName: string;
+};
+
 export type EmployeeDetail = {
   id: string;
   organizationId: string;
@@ -151,6 +157,55 @@ export type EmployeeDocumentDetail = {
   documentTypeId: string;
   documentTypeName: string | null;
   createdAt: string;
+};
+
+export type EmployeeBankAccountDetail = {
+  id: string;
+  bankName: string;
+  accountHolderName: string;
+  accountNumber: string;
+  ifscCode: string | null;
+  branchName: string | null;
+  accountType: string;
+  isPrimary: boolean;
+};
+
+export type EmployeeLeaveBalanceDetail = {
+  id: string;
+  leaveTypeName: string;
+  leaveTypeCode: string;
+  balanceYear: number;
+  allocatedDays: number;
+  usedDays: number;
+  pendingDays: number;
+  balanceDays: number;
+};
+
+export type EmployeeSalaryStructureDetail = {
+  id: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  currencyCode: string;
+  basicSalary: number;
+  hraAmount: number;
+  transportAllowance: number;
+  otherAllowances: number;
+  grossSalary: number;
+  netSalary: number;
+  components: Record<string, unknown>;
+};
+
+export type EmployeeAttendanceSummary = {
+  totalRecords: number;
+  presentDays: number;
+  totalWorkHours: number;
+};
+
+export type EmployeeTimelineEvent = {
+  id: string;
+  event: string;
+  description: string;
+  occurredAt: string;
 };
 
 export type EmployeeWizardInput = {

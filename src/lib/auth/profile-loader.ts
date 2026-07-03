@@ -1,5 +1,6 @@
 import type {
   Employee,
+  EmploymentStatus,
   Organization,
   Permission,
   Role,
@@ -8,6 +9,12 @@ import type {
 import { createClient } from "@/lib/supabase/server";
 
 export type AuthSupabaseClient = Awaited<ReturnType<typeof createClient>>;
+
+/** Employment statuses that may sign in (must also have record status = active). */
+const LOGIN_ELIGIBLE_EMPLOYMENT_STATUSES: EmploymentStatus[] = [
+  "active",
+  "probation",
+];
 
 type EmployeeRow = {
   id: string;
@@ -105,7 +112,9 @@ export async function loadUserProfile(
 
   if (
     employeeRow.status !== "active" ||
-    employeeRow.employment_status !== "active"
+    !LOGIN_ELIGIBLE_EMPLOYMENT_STATUSES.includes(
+      employeeRow.employment_status,
+    )
   ) {
     return { success: false, error: "EMPLOYEE_INACTIVE" };
   }

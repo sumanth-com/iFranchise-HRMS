@@ -31,7 +31,7 @@ export function DataTable<T extends Record<string, unknown>>({
   emptyMessage = "No records to display.",
 }: DataTableProps<T>) {
   return (
-    <div className={cn("rounded-lg border", className)}>
+    <div className={cn("overflow-x-auto rounded-lg border", className)}>
       <Table>
         <TableHeader>
           <TableRow>

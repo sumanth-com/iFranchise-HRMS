@@ -165,7 +165,7 @@ export function EmployeeWizard({ lookups }: EmployeeWizardProps) {
       }
 
       toast.success("Employee created successfully");
-      router.push(EMPLOYEE_ROUTES.detail(result.data.employeeId));
+      router.push(EMPLOYEE_ROUTES.detail(result.data));
       router.refresh();
     });
   };

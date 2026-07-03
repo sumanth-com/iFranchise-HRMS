@@ -67,7 +67,13 @@ export function EmployeeEditForm({ employee, lookups }: EmployeeEditFormProps) {
       }
 
       toast.success("Employee updated successfully");
-      router.push(EMPLOYEE_ROUTES.detail(employee.id));
+      router.push(
+        EMPLOYEE_ROUTES.detail({
+          employeeCode: values.employeeCode,
+          firstName: values.firstName,
+          lastName: values.lastName,
+        }),
+      );
       router.refresh();
     });
   });
@@ -192,7 +198,7 @@ export function EmployeeEditForm({ employee, lookups }: EmployeeEditFormProps) {
         <Button
           type="button"
           variant="outline"
-          onClick={() => router.push(EMPLOYEE_ROUTES.detail(employee.id))}
+          onClick={() => router.push(EMPLOYEE_ROUTES.detail(employee))}
         >
           Cancel
         </Button>
