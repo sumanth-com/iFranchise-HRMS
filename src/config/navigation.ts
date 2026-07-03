@@ -1,8 +1,11 @@
 import {
   LayoutDashboard,
   Settings,
+  Users,
   type LucideIcon,
 } from "lucide-react";
+
+import type { NavigationItem } from "@/lib/auth/navigation";
 
 export type NavItem = {
   title: string;
@@ -11,16 +14,22 @@ export type NavItem = {
   disabled?: boolean;
 };
 
-export const mainNavItems: NavItem[] = [
+export const mainNavItems: NavigationItem[] = [
   {
     title: "Dashboard",
     href: "/",
     icon: LayoutDashboard,
   },
   {
+    title: "Employees",
+    href: "/dashboard/employees",
+    icon: Users,
+    permissions: ["employee.view"],
+  },
+  {
     title: "Settings",
     href: "/settings",
     icon: Settings,
-    disabled: true,
+    permissions: ["settings.view"],
   },
 ];

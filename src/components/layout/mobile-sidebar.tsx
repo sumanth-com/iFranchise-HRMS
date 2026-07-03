@@ -10,13 +10,14 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { mainNavItems } from "@/config/navigation";
+import { useNavigation } from "@/hooks/use-permissions";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { cn } from "@/lib/utils";
 
 export function MobileSidebar() {
   const pathname = usePathname();
   const { isMobileOpen, setMobileOpen } = useSidebar();
+  const navigation = useNavigation();
 
   return (
     <Sheet open={isMobileOpen} onOpenChange={setMobileOpen}>
@@ -25,7 +26,7 @@ export function MobileSidebar() {
           <SheetTitle>iFranchise HRMS</SheetTitle>
         </SheetHeader>
         <nav className="flex flex-col gap-1 p-2">
-          {mainNavItems.map((item) => {
+          {navigation.map((item) => {
             const isActive =
               pathname === item.href ||
               (item.href !== "/" && pathname.startsWith(item.href));

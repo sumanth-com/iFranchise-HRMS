@@ -144,7 +144,7 @@ DECLARE
   v_employment_type_id uuid := (v_constants ->> 'employment_full_time_id')::uuid;
   v_user_id uuid;
   v_employee_id uuid;
-  v_normalized_email citext := lower(trim(p_email));
+  v_normalized_email extensions.citext := lower(trim(p_email));
 BEGIN
   IF NOT hrms.is_master_data_seeded() THEN
     RAISE EXCEPTION 'Master data is not seeded. Run hrms seed migration first.'

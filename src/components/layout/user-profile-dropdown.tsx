@@ -13,9 +13,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/providers/auth-provider";
+
+function getInitials(firstName: string, lastName: string): string {
+  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+}
 
 export function UserProfileDropdown() {
   const { setTheme, resolvedTheme } = useTheme();
+  const { profile, isLoading, signOut } = useAuth();
+  const { employee, roles } = profile;
+  const displayName = `${employee.firstName} ${employee.lastName}`;
+  const primaryRole = roles[0]?.name ?? "User";
 
   return (
     <DropdownMenu>
@@ -23,18 +32,27 @@ export function UserProfileDropdown() {
         render={
           <Button variant="ghost" className="gap-2 px-2">
             <Avatar className="size-8">
-              <AvatarFallback>HR</AvatarFallback>
+              <AvatarFallback>
+                {getInitials(employee.firstName, employee.lastName)}
+              </AvatarFallback>
             </Avatar>
             <div className="hidden text-left sm:block">
-              <p className="text-sm font-medium leading-none">HR Admin</p>
-              <p className="text-xs text-muted-foreground">admin@example.com</p>
+              <p className="text-sm font-medium leading-none">{displayName}</p>
+              <p className="text-xs text-muted-foreground">{employee.email}</p>
             </div>
             <ChevronDown className="size-4 text-muted-foreground" />
           </Button>
         }
       />
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>My Account</DropdownMenuLabel>
+        <DropdownMenuLabel>
+          <div className="flex flex-col gap-1">
+            <span>{displayName}</span>
+            <span className="text-xs font-normal text-muted-foreground">
+              {primaryRole}
+            </span>
+          </div>
+        </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled>
           <User className="size-4" />
@@ -57,7 +75,12 @@ export function UserProfileDropdown() {
           Toggle theme
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem disabled>
+        <DropdownMenuItem
+          disabled={isLoading}
+          onClick={() => {
+            void signOut();
+          }}
+        >
           <LogOut className="size-4" />
           Sign out
         </DropdownMenuItem>
