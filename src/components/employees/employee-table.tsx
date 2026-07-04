@@ -18,6 +18,7 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
+  UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -305,7 +306,7 @@ export function EmployeeTable({
   return (
     <div className="space-y-4">
       <div className="relative z-10 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-1 flex-col gap-3 sm:flex-row">
+        <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
           <Input
             placeholder="Search by name, email, or code..."
             defaultValue={search}
@@ -326,7 +327,7 @@ export function EmployeeTable({
               updateParams({ branchId: value || undefined, page: "1" })
             }
           >
-            <SelectTrigger className="w-full sm:w-44">
+            <SelectTrigger className="h-8 w-full min-w-0 sm:w-44">
               <SelectValue placeholder="All branches" />
             </SelectTrigger>
             <SelectContent align="start" alignItemWithTrigger={false}>
@@ -344,7 +345,7 @@ export function EmployeeTable({
               updateParams({ departmentId: value || undefined, page: "1" })
             }
           >
-            <SelectTrigger className="w-full sm:w-44">
+            <SelectTrigger className="h-8 w-full min-w-0 sm:w-44">
               <SelectValue placeholder="All departments" />
             </SelectTrigger>
             <SelectContent align="start" alignItemWithTrigger={false}>
@@ -368,7 +369,7 @@ export function EmployeeTable({
               })
             }
           >
-            <SelectTrigger className="w-full sm:w-44">
+            <SelectTrigger className="h-8 w-full min-w-0 sm:w-44">
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
             <SelectContent align="start" alignItemWithTrigger={false}>
@@ -381,7 +382,11 @@ export function EmployeeTable({
           </Select>
         </div>
         {canCreate ? (
-          <Link href={EMPLOYEE_ROUTES.new} className={cn(buttonVariants())}>
+          <Link
+            href={EMPLOYEE_ROUTES.new}
+            className={cn(buttonVariants(), "shrink-0")}
+          >
+            <UserPlus className="size-4" />
             Add Employee
           </Link>
         ) : null}
@@ -447,9 +452,28 @@ export function EmployeeTable({
               </TableRow>
             ) : (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow
+                  key={row.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() =>
+                    router.push(
+                      EMPLOYEE_ROUTES.detail({
+                        employeeCode: row.original.employeeCode,
+                        firstName: row.original.firstName,
+                        lastName: row.original.lastName,
+                      }),
+                    )
+                  }
+                >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell
+                      key={cell.id}
+                      onClick={
+                        cell.column.id === "actions"
+                          ? (event) => event.stopPropagation()
+                          : undefined
+                      }
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}

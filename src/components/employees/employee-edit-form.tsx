@@ -17,7 +17,11 @@ import {
   SelectValue,
 } from "@/components/common/select";
 import { updateEmployeeAction } from "@/lib/employees/actions";
-import { EMPLOYEE_ROUTES, EMPLOYMENT_STATUS_LABELS } from "@/lib/employees/constants";
+import {
+  DESIGNATION_OTHER_VALUE,
+  EMPLOYEE_ROUTES,
+  EMPLOYMENT_STATUS_LABELS,
+} from "@/lib/employees/constants";
 import {
   employeeUpdateSchema,
   type EmployeeUpdateInput,
@@ -39,6 +43,32 @@ export function EmployeeEditForm({ employee, lookups }: EmployeeEditFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
+  const branchItems = lookups.branches.map((item) => ({
+    value: item.id,
+    label: item.label,
+  }));
+
+  const departmentItems = [
+    { value: "none", label: "None" },
+    ...lookups.departments.map((item) => ({
+      value: item.id,
+      label: item.label,
+    })),
+  ];
+
+  const designationItems = [
+    { value: "none", label: "None" },
+    ...lookups.designations.map((item) => ({
+      value: item.id,
+      label: item.label,
+    })),
+    { value: DESIGNATION_OTHER_VALUE, label: "Others" },
+  ];
+
+  const employmentStatusItems = Object.entries(EMPLOYMENT_STATUS_LABELS).map(
+    ([value, label]) => ({ value, label }),
+  );
+
   const form = useForm<EmployeeUpdateInput>({
     resolver: zodResolver(employeeUpdateSchema),
     defaultValues: {
@@ -50,6 +80,7 @@ export function EmployeeEditForm({ employee, lookups }: EmployeeEditFormProps) {
       branchId: employee.branchId,
       departmentId: employee.departmentId ?? "",
       designationId: employee.designationId ?? "",
+      customDesignationTitle: "",
       employmentTypeId: employee.employmentTypeId ?? "",
       reportingManagerId: employee.reportingManagerId ?? "",
       employmentStatus: employee.employmentStatus,
@@ -57,6 +88,9 @@ export function EmployeeEditForm({ employee, lookups }: EmployeeEditFormProps) {
       dateOfLeaving: employee.dateOfLeaving ?? "",
     },
   });
+
+  const designationSelectValue = form.watch("designationId") || "none";
+  const isOtherDesignation = designationSelectValue === DESIGNATION_OTHER_VALUE;
 
   const onSubmit = form.handleSubmit((values) => {
     startTransition(async () => {
@@ -104,15 +138,16 @@ export function EmployeeEditForm({ employee, lookups }: EmployeeEditFormProps) {
         <div className="space-y-2">
           <Label>Branch</Label>
           <Select
+            items={branchItems}
             value={form.watch("branchId")}
             onValueChange={(value) => form.setValue("branchId", value ?? "")}
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select branch" />
             </SelectTrigger>
-            <SelectContent>
-              {lookups.branches.map((item) => (
-                <SelectItem key={item.id} value={item.id}>
+            <SelectContent align="start" alignItemWithTrigger={false}>
+              {branchItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
                   {item.label}
                 </SelectItem>
               ))}
@@ -122,6 +157,7 @@ export function EmployeeEditForm({ employee, lookups }: EmployeeEditFormProps) {
         <div className="space-y-2">
           <Label>Department</Label>
           <Select
+            items={departmentItems}
             value={form.watch("departmentId") || "none"}
             onValueChange={(value) =>
               form.setValue("departmentId", value === "none" ? "" : value ?? "")
@@ -130,10 +166,9 @@ export function EmployeeEditForm({ employee, lookups }: EmployeeEditFormProps) {
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select department" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">None</SelectItem>
-              {lookups.departments.map((item) => (
-                <SelectItem key={item.id} value={item.id}>
+            <SelectContent align="start" alignItemWithTrigger={false}>
+              {departmentItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
                   {item.label}
                 </SelectItem>
               ))}
@@ -143,27 +178,47 @@ export function EmployeeEditForm({ employee, lookups }: EmployeeEditFormProps) {
         <div className="space-y-2">
           <Label>Designation</Label>
           <Select
-            value={form.watch("designationId") || "none"}
-            onValueChange={(value) =>
-              form.setValue("designationId", value === "none" ? "" : value ?? "")
-            }
+            items={designationItems}
+            value={designationSelectValue}
+            onValueChange={(value) => {
+              if (value === "none") {
+                form.setValue("designationId", "");
+                form.setValue("customDesignationTitle", "");
+                return;
+              }
+
+              if (value === DESIGNATION_OTHER_VALUE) {
+                form.setValue("designationId", DESIGNATION_OTHER_VALUE);
+                return;
+              }
+
+              form.setValue("designationId", value ?? "");
+              form.setValue("customDesignationTitle", "");
+            }}
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select designation" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">None</SelectItem>
-              {lookups.designations.map((item) => (
-                <SelectItem key={item.id} value={item.id}>
+            <SelectContent side="bottom" align="start" alignItemWithTrigger={false}>
+              {designationItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
                   {item.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+          {isOtherDesignation ? (
+            <Input
+              id="customDesignationTitle"
+              placeholder="Enter designation"
+              {...form.register("customDesignationTitle")}
+            />
+          ) : null}
         </div>
         <div className="space-y-2">
           <Label>Employment status</Label>
           <Select
+            items={employmentStatusItems}
             value={form.watch("employmentStatus")}
             onValueChange={(value) =>
               form.setValue(
@@ -175,10 +230,10 @@ export function EmployeeEditForm({ employee, lookups }: EmployeeEditFormProps) {
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select status" />
             </SelectTrigger>
-            <SelectContent>
-              {Object.entries(EMPLOYMENT_STATUS_LABELS).map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
+            <SelectContent align="start" alignItemWithTrigger={false}>
+              {employmentStatusItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
                 </SelectItem>
               ))}
             </SelectContent>

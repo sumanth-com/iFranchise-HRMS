@@ -25,6 +25,7 @@ import {
   updateEmployee,
   uploadEmployeeDocument,
   uploadProfileImage,
+  removeProfileImage,
 } from "@/lib/employees/services/employee-mutations";
 import {
   getEmployeeLookups,
@@ -413,6 +414,50 @@ export async function uploadProfileImageAction(
       success: false,
       message:
         error instanceof Error ? error.message : "Failed to upload profile image",
+    };
+  }
+}
+
+export async function removeProfileImageAction(
+  employeeId: string,
+): Promise<EmployeeActionResult<null>> {
+  try {
+    const profile = await requireServerPermission("employee_profile.edit");
+    const supabase = await getAuthenticatedSupabase();
+    const employee = await getEmployeeById(supabase, employeeId);
+
+    if (!employee) {
+      return { success: false, message: "Employee not found" };
+    }
+
+    const storagePath = employee.profile?.profileImageStoragePath;
+
+    if (storagePath) {
+      await removeProfileImage(supabase, storagePath);
+    }
+
+    const { error } = await supabase
+      .schema("hrms")
+      .from("employee_profiles")
+      .update({
+        profile_image_storage_path: null,
+        updated_by: profile.userId,
+      })
+      .eq("employee_id", employeeId)
+      .is("deleted_at", null);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    revalidatePath(EMPLOYEE_ROUTES.detail(employee));
+
+    return { success: true, data: null };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "Failed to remove profile image",
     };
   }
 }

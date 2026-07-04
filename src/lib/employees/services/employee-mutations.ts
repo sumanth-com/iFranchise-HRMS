@@ -1,10 +1,72 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
 import type { EmployeeUpdateInput, EmployeeWizardInputValidated } from "@/lib/validations/employee";
-import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
+import { EMPLOYEE_STORAGE_BUCKETS, DESIGNATION_OTHER_VALUE } from "@/lib/employees/constants";
 
 function emptyToNull(value?: string | null) {
   return value && value.trim().length > 0 ? value : null;
+}
+
+function slugifyDesignationCode(title: string): string {
+  const slug = title
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 24);
+
+  return slug || "OTHER";
+}
+
+export async function resolveOrCreateDesignation(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  userId: string,
+  title: string,
+): Promise<string> {
+  const trimmedTitle = title.trim();
+  if (!trimmedTitle) {
+    throw new Error("Designation is required");
+  }
+
+  const { data: existingRows, error: findError } = await supabase
+    .schema("hrms")
+    .from("designations")
+    .select("id, title")
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .eq("status", "active");
+
+  if (findError) {
+    throw new Error(findError.message);
+  }
+
+  const existing = (existingRows ?? []).find(
+    (row) => row.title.trim().toLowerCase() === trimmedTitle.toLowerCase(),
+  );
+
+  if (existing) {
+    return existing.id;
+  }
+
+  const { data: created, error: createError } = await supabase
+    .schema("hrms")
+    .from("designations")
+    .insert({
+      organization_id: organizationId,
+      title: trimmedTitle,
+      code: `${slugifyDesignationCode(trimmedTitle)}_${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+      created_by: userId,
+      updated_by: userId,
+    })
+    .select("id")
+    .single();
+
+  if (createError || !created) {
+    throw new Error(createError?.message ?? "Failed to create designation");
+  }
+
+  return created.id;
 }
 
 export async function createEmployeeFromWizard(
@@ -148,13 +210,24 @@ export async function updateEmployee(
 ) {
   const userId = profile.userId;
 
+  let designationId = emptyToNull(input.designationId);
+
+  if (input.designationId === DESIGNATION_OTHER_VALUE) {
+    designationId = await resolveOrCreateDesignation(
+      supabase,
+      profile.employee.organizationId,
+      userId,
+      input.customDesignationTitle ?? "",
+    );
+  }
+
   const { error } = await supabase
     .schema("hrms")
     .from("employees")
     .update({
       branch_id: input.branchId,
       department_id: emptyToNull(input.departmentId),
-      designation_id: emptyToNull(input.designationId),
+      designation_id: designationId,
       employment_type_id: emptyToNull(input.employmentTypeId),
       reporting_manager_id: emptyToNull(input.reportingManagerId),
       employee_code: input.employeeCode.trim(),
@@ -251,6 +324,19 @@ export async function uploadProfileImage(
   }
 
   return storagePath;
+}
+
+export async function removeProfileImage(
+  supabase: AuthSupabaseClient,
+  storagePath: string,
+): Promise<void> {
+  const { error } = await supabase.storage
+    .from(EMPLOYEE_STORAGE_BUCKETS.profileImages)
+    .remove([storagePath]);
+
+  if (error) {
+    throw new Error(error.message);
+  }
 }
 
 export async function createSignedStorageUrl(

@@ -2,17 +2,27 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { format } from "date-fns";
-import { Pencil } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { differenceInMonths, format } from "date-fns";
+import {
+  Calendar,
+  Camera,
+  Palmtree,
+  Pencil,
+  Rocket,
+  Trash2,
+} from "lucide-react";
+import { toast } from "sonner";
 
 import { EmployeeAvatar } from "@/components/employees/employee-avatar";
 import { EmploymentStatusBadge } from "@/components/employees/employment-status-badge";
-import { buttonVariants } from "@/components/common/button";
+import { Button, buttonVariants } from "@/components/common/button";
 import { EmptyState } from "@/components/common/empty-state";
 import {
   DataTable,
   type DataTableColumn,
 } from "@/components/common/data-table";
+import { uploadProfileImageAction, removeProfileImageAction } from "@/lib/employees/actions";
 import { EMPLOYEE_ROUTES, EMPLOYEE_TABS, type EmployeeTab } from "@/lib/employees/constants";
 import type {
   EmployeeAttendanceSummary,
@@ -21,6 +31,8 @@ import type {
   EmployeeLeaveBalanceDetail,
   EmployeeSalaryStructureDetail,
   EmployeeTimelineEvent,
+  GenderType,
+  MaritalStatus,
 } from "@/types/employee";
 import { cn } from "@/lib/utils";
 import { hasPermission } from "@/lib/permissions/utils";
@@ -46,11 +58,351 @@ function resolveActiveTab(tabParam: string | null): EmployeeTab {
   return "overview";
 }
 
+function formatBirthday(value: string | null | undefined): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return format(date, "do MMMM");
+}
+
 function formatDisplayDate(value: string | null | undefined): string {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return format(date, "MMM d, yyyy");
+}
+
+function getNamePrefix(
+  gender: GenderType | null | undefined,
+  maritalStatus: MaritalStatus | null | undefined,
+): string {
+  if (gender === "male") return "Mr.";
+  if (gender === "female") {
+    return maritalStatus === "married" ? "Mrs." : "Miss";
+  }
+  return "";
+}
+
+function getTenure(dateOfJoining: string | null | undefined): string {
+  if (!dateOfJoining) return "—";
+  const start = new Date(dateOfJoining);
+  if (Number.isNaN(start.getTime())) return "—";
+
+  const months = differenceInMonths(new Date(), start);
+  if (months < 1) return "Less than 1 month";
+  if (months < 12) return `${months} month${months === 1 ? "" : "s"}`;
+
+  const years = Math.floor(months / 12);
+  const remainingMonths = months % 12;
+  if (remainingMonths === 0) return `${years} year${years === 1 ? "" : "s"}`;
+  return `${years} yr ${remainingMonths} mo`;
+}
+
+function getAttendanceRate(summary: EmployeeAttendanceSummary): string {
+  if (summary.totalRecords <= 0) return "—";
+  return `${Math.round((summary.presentDays / summary.totalRecords) * 100)}%`;
+}
+
+function formatIndianPhone(phone: string | null | undefined): string {
+  if (!phone?.trim()) return "—";
+
+  const digits = phone.replace(/\D/g, "");
+  if (!digits) return "—";
+
+  let localNumber = digits;
+  if (digits.startsWith("91") && digits.length >= 12) {
+    localNumber = digits.slice(-10);
+  } else if (digits.length > 10) {
+    localNumber = digits.slice(-10);
+  }
+
+  if (localNumber.length !== 10) {
+    return phone.trim();
+  }
+
+  return `(+91) ${localNumber.slice(0, 4)} ${localNumber.slice(4, 7)} ${localNumber.slice(7)}`;
+}
+
+function formatDisplayLabel(value: string | null | undefined): string {
+  if (!value?.trim()) return "—";
+
+  return value
+    .split(/[\s_]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function OverviewDetailRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="grid grid-cols-[minmax(9rem,11rem)_1fr] items-center gap-x-8 border-b border-border/50 px-5 py-3.5 last:border-b-0">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <div className="min-w-0 text-right text-sm font-medium text-foreground">
+        <div className="flex flex-wrap justify-end gap-2">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function InsightCard({
+  icon: Icon,
+  title,
+  description,
+  accentClassName,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+  accentClassName: string;
+}) {
+  return (
+    <div className="rounded-xl border bg-card p-4">
+      <div className="flex items-start gap-3">
+        <div
+          className={cn(
+            "flex size-9 shrink-0 items-center justify-center rounded-full",
+            accentClassName,
+          )}
+        >
+          <Icon className="size-4" />
+        </div>
+        <div className="min-w-0 space-y-1">
+          <p className="text-sm font-semibold">{title}</p>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatBlock({
+  icon: Icon,
+  value,
+  label,
+  accentClassName,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  value: string;
+  label: string;
+  accentClassName: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border bg-muted/20 p-4">
+      <div
+        className={cn(
+          "flex size-10 shrink-0 items-center justify-center rounded-full",
+          accentClassName,
+        )}
+      >
+        <Icon className="size-4" />
+      </div>
+      <div>
+        <p className="text-lg font-semibold leading-none">{value}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+function ProfileHeaderImage({
+  employeeId,
+  firstName,
+  lastName,
+  imageUrl: initialUrl,
+  canEdit,
+}: {
+  employeeId: string;
+  firstName: string;
+  lastName: string;
+  imageUrl: string | null;
+  canEdit: boolean;
+}) {
+  const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [imageUrl, setImageUrl] = useState(initialUrl);
+  const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    setImageUrl(initialUrl);
+  }, [initialUrl]);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      return;
+    }
+
+    const preview = URL.createObjectURL(file);
+    setImageUrl(preview);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    startTransition(async () => {
+      const result = await uploadProfileImageAction(employeeId, formData);
+      if (!result.success) {
+        toast.error(result.message);
+        setImageUrl(initialUrl);
+        return;
+      }
+
+      toast.success("Profile photo updated");
+      router.refresh();
+    });
+
+    event.target.value = "";
+  };
+
+  const handleRemove = () => {
+    startTransition(async () => {
+      const result = await removeProfileImageAction(employeeId);
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+
+      setImageUrl(null);
+      toast.success("Profile photo removed");
+      router.refresh();
+    });
+  };
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="group relative size-24 overflow-hidden rounded-full border-4 border-card bg-muted shadow-sm sm:size-28">
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={`${firstName} ${lastName}`}
+            className="size-full object-cover"
+          />
+        ) : (
+          <div className="flex size-full items-center justify-center bg-muted">
+            <EmployeeAvatar
+              firstName={firstName}
+              lastName={lastName}
+              signedUrl={imageUrl}
+              className="size-full text-2xl"
+            />
+          </div>
+        )}
+        {canEdit ? (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            <div className="absolute inset-0 flex items-center justify-center gap-1 bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isPending}
+                className="flex size-8 items-center justify-center rounded-full bg-white/90 text-foreground hover:bg-white disabled:cursor-not-allowed"
+                aria-label="Upload profile photo"
+              >
+                <Camera className="size-4" />
+              </button>
+              {imageUrl ? (
+                <button
+                  type="button"
+                  onClick={handleRemove}
+                  disabled={isPending}
+                  className="flex size-8 items-center justify-center rounded-full bg-white/90 text-destructive hover:bg-white disabled:cursor-not-allowed"
+                  aria-label="Remove profile photo"
+                >
+                  <Trash2 className="size-4" />
+                </button>
+              ) : null}
+            </div>
+          </>
+        ) : null}
+      </div>
+      {canEdit ? (
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isPending}
+          >
+            <Camera className="size-3.5" />
+            Upload
+          </Button>
+          {imageUrl ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleRemove}
+              disabled={isPending}
+            >
+              <Trash2 className="size-3.5" />
+              Remove
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function OverviewInfoRow({
+  label,
+  value,
+  href,
+  valueClassName,
+}: {
+  label: string;
+  value: string;
+  href?: string;
+  valueClassName?: string;
+}) {
+  return (
+    <OverviewDetailRow label={label}>
+      {href ? (
+        <a
+          href={href}
+          className={cn("inline-block text-primary hover:underline", valueClassName)}
+        >
+          {value}
+        </a>
+      ) : (
+        <span className={cn("inline-block whitespace-nowrap", valueClassName)}>
+          {value}
+        </span>
+      )}
+    </OverviewDetailRow>
+  );
+}
+
+function SnapshotRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-border/50 px-4 py-3.5 last:border-b-0">
+      <span className="shrink-0 text-sm text-muted-foreground">{label}</span>
+      <div className="min-w-0 text-right text-sm font-medium text-foreground">
+        <span className="inline-block whitespace-nowrap">{value}</span>
+      </div>
+    </div>
+  );
 }
 
 export function EmployeeDetailView({
@@ -70,6 +422,7 @@ export function EmployeeDetailView({
   const router = useRouter();
   const activeTab = resolveActiveTab(searchParams.get("tab"));
   const canEdit = hasPermission(permissionCodes, "employee.edit");
+  const canEditProfile = hasPermission(permissionCodes, "employee_profile.edit");
   const statutory = salaryStructure?.components ?? {};
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("en-IN", {
@@ -84,93 +437,199 @@ export function EmployeeDetailView({
     router.replace(`${EMPLOYEE_ROUTES.detail(employee)}?${params.toString()}`);
   };
 
+  const fullName = `${employee.firstName} ${employee.lastName}`;
+  const namePrefix = getNamePrefix(
+    employee.profile?.gender,
+    employee.profile?.maritalStatus,
+  );
+  const displayName = namePrefix ? `${namePrefix} ${fullName}` : fullName;
+  const roleSubtitle = [employee.designationTitle, employee.branchName]
+    .filter(Boolean)
+    .join(" at ");
+  const bio = employee.profile?.bio?.trim();
+  const attendanceRate = getAttendanceRate(attendanceSummary);
+  const tenure = getTenure(employee.dateOfJoining);
+  const probationEnd =
+    typeof statutory.probation_end_date === "string"
+      ? statutory.probation_end_date
+      : null;
+  const primaryEmergencyContact =
+    employee.emergencyContacts.find((contact) => contact.isPrimary) ??
+    employee.emergencyContacts[0];
+  const emergencyContactPhone = formatIndianPhone(primaryEmergencyContact?.phone);
+  const employeePhone = formatIndianPhone(employee.phone);
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 rounded-xl border bg-card p-6 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-4">
-          <EmployeeAvatar
-            firstName={employee.firstName}
-            lastName={employee.lastName}
-            signedUrl={profileImageUrl}
-            className="size-16"
-          />
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {employee.firstName} {employee.lastName}
-            </h1>
-            <p className="break-all text-sm text-muted-foreground">
-              {employee.employeeCode} · {employee.email}
-            </p>
-            <div className="mt-2">
-              <EmploymentStatusBadge status={employee.employmentStatus} />
+    <div className="space-y-0">
+      <div className="overflow-hidden rounded-xl border bg-card">
+        <div className="h-32 w-full bg-black sm:h-36" />
+        <div className="px-5 pb-5 sm:px-6">
+          <div className="-mt-12 mb-5 flex justify-center sm:-mt-14">
+            <ProfileHeaderImage
+              employeeId={employee.id}
+              firstName={employee.firstName}
+              lastName={employee.lastName}
+              imageUrl={profileImageUrl}
+              canEdit={canEditProfile}
+            />
+          </div>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0 space-y-1 text-left">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-semibold tracking-tight">{displayName}</h1>
+                <EmploymentStatusBadge status={employee.employmentStatus} />
+              </div>
+              {roleSubtitle ? (
+                <p className="text-sm text-muted-foreground">{roleSubtitle}</p>
+              ) : null}
             </div>
+            {canEdit ? (
+              <Link
+                href={EMPLOYEE_ROUTES.edit(employee)}
+                className={cn(buttonVariants({ variant: "outline" }), "shrink-0")}
+              >
+                <Pencil className="size-4" />
+                Edit employee
+              </Link>
+            ) : null}
           </div>
         </div>
-        {canEdit ? (
-          <Link
-            href={EMPLOYEE_ROUTES.edit(employee)}
-            className={cn(buttonVariants({ variant: "outline" }))}
-          >
-            <Pencil className="size-4" />
-            Edit employee
-          </Link>
-        ) : null}
       </div>
 
-      <div className="-mx-1 overflow-x-auto border-b pb-2">
-        <div className="flex min-w-max gap-2 px-1">
-          {EMPLOYEE_TABS.map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setTab(tab)}
-              className={cn(
-                "shrink-0 rounded-md px-3 py-1.5 text-sm capitalize transition-colors",
-                activeTab === tab
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted",
-              )}
-            >
-              {tab}
-            </button>
-          ))}
+      <div className="mt-6 border-b">
+        <div className="-mx-1 overflow-x-auto">
+          <div className="flex min-w-max gap-6 px-1">
+            {EMPLOYEE_TABS.map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setTab(tab)}
+                className={cn(
+                  "shrink-0 border-b-2 px-1 py-3 text-sm capitalize transition-colors",
+                  activeTab === tab
+                    ? "border-teal-700 font-medium text-teal-800 dark:border-teal-500 dark:text-teal-400"
+                    : "border-transparent text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
+      <div className="pt-6">
       {activeTab === "overview" ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <InfoCard label="Department" value={employee.departmentName ?? "—"} />
-          <InfoCard label="Designation" value={employee.designationTitle ?? "—"} />
-          <InfoCard label="Branch" value={employee.branchName ?? "—"} />
-          <InfoCard label="Employment type" value={employee.employmentTypeName ?? "—"} />
-          <InfoCard
-            label="Reporting manager"
-            value={employee.reportingManagerName ?? "—"}
-          />
-          <InfoCard
-            label="Date of joining"
-            value={formatDisplayDate(employee.dateOfJoining)}
-          />
-          <InfoCard
-            label="Probation end"
-            value={formatDisplayDate(
-              typeof statutory.probation_end_date === "string"
-                ? statutory.probation_end_date
-                : null,
-            )}
-          />
-          <InfoCard
-            label="Earned leave balance"
-            value={
-              leaveBalances.length > 0
-                ? `${leaveBalances[0].balanceDays} day(s)`
-                : "—"
-            }
-          />
-          <InfoCard
-            label="Attendance summary"
-            value={`${attendanceSummary.presentDays} present / ${attendanceSummary.totalRecords} recorded`}
-          />
+        <div className="space-y-6">
+          {bio ? (
+            <section className="space-y-3">
+              <p className="text-sm leading-relaxed text-muted-foreground">{bio}</p>
+            </section>
+          ) : (
+            <section className="space-y-3">
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {fullName} is part of the {employee.departmentName ?? "organization"} team
+                {employee.designationTitle ? ` as ${employee.designationTitle}` : ""}.
+                {employee.dateOfJoining
+                  ? ` Joined on ${formatDisplayDate(employee.dateOfJoining)}.`
+                  : ""}
+              </p>
+            </section>
+          )}
+
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(380px,28rem)] lg:items-stretch">
+            <section className="flex h-full flex-col space-y-3">
+              <h2 className="text-base font-semibold">Employee Information</h2>
+              <div className="flex flex-1 flex-col overflow-hidden rounded-xl border bg-card">
+                <OverviewInfoRow label="Employee code" value={employee.employeeCode} />
+                <OverviewInfoRow label="Name" value={fullName} />
+                <OverviewInfoRow
+                  label="Email"
+                  value={employee.email}
+                  href={`mailto:${employee.email}`}
+                />
+                <OverviewInfoRow
+                  label="Phone number"
+                  value={employeePhone}
+                  valueClassName="tabular-nums tracking-wide"
+                />
+                <OverviewInfoRow
+                  label="Emergency contact"
+                  value={emergencyContactPhone}
+                  valueClassName="tabular-nums tracking-wide"
+                />
+                <OverviewInfoRow
+                  label="Gender"
+                  value={formatDisplayLabel(employee.profile?.gender)}
+                />
+                <OverviewInfoRow
+                  label="Birthday"
+                  value={formatBirthday(employee.profile?.dateOfBirth)}
+                />
+                <OverviewInfoRow
+                  label="Department"
+                  value={employee.departmentName ?? "—"}
+                />
+                <OverviewInfoRow label="Branch" value={employee.branchName ?? "—"} />
+                <OverviewInfoRow
+                  label="Employment type"
+                  value={formatDisplayLabel(employee.employmentTypeName)}
+                />
+                <OverviewInfoRow
+                  label="Reporting manager"
+                  value={employee.reportingManagerName ?? "—"}
+                />
+              </div>
+            </section>
+
+            <aside className="flex h-full flex-col gap-6">
+              <section className="flex flex-col space-y-3">
+                <h2 className="text-base font-semibold">Profile insights</h2>
+                <div className="overflow-hidden rounded-xl border bg-card">
+                  <div className="space-y-3 p-4">
+                    <StatBlock
+                      icon={Calendar}
+                      value={formatDisplayDate(employee.dateOfJoining)}
+                      label="Date of joining"
+                      accentClassName="bg-blue-500/10 text-blue-700 dark:text-blue-300"
+                    />
+                    <InsightCard
+                      icon={Rocket}
+                      title="Attendance record"
+                      description={`${attendanceSummary.presentDays} present days out of ${attendanceSummary.totalRecords} recorded.`}
+                      accentClassName="bg-blue-500/10 text-blue-700 dark:text-blue-300"
+                    />
+                    <InsightCard
+                      icon={Palmtree}
+                      title="Leave balance"
+                      description={
+                        leaveBalances.length > 0
+                          ? `${leaveBalances[0].balanceDays} earned leave day(s) currently available.`
+                          : "No leave balance configured yet."
+                      }
+                      accentClassName="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <section className="flex min-h-0 flex-1 flex-col space-y-3">
+                <h2 className="text-base font-semibold">Employment snapshot</h2>
+                <div className="flex flex-1 flex-col overflow-hidden rounded-xl border bg-card">
+                  <SnapshotRow label="Tenure" value={tenure} />
+                  <SnapshotRow label="Attendance rate" value={attendanceRate} />
+                  <SnapshotRow
+                    label="Employment status"
+                    value={<EmploymentStatusBadge status={employee.employmentStatus} />}
+                  />
+                  <SnapshotRow
+                    label="Probation ends"
+                    value={formatDisplayDate(probationEnd)}
+                  />
+                </div>
+              </section>
+            </aside>
+          </div>
         </div>
       ) : null}
 
@@ -470,6 +929,7 @@ export function EmployeeDetailView({
           />
         )
       ) : null}
+      </div>
     </div>
   );
 }

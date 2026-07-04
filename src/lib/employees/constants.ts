@@ -15,6 +15,8 @@ export const EMPLOYEE_STORAGE_BUCKETS = {
   profileImages: "employee-profile-images",
 } as const;
 
+export const DESIGNATION_OTHER_VALUE = "others" as const;
+
 export const EMPLOYMENT_STATUS_LABELS: Record<string, string> = {
   draft: "Draft",
   probation: "Probation",

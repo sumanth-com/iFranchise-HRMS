@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { DESIGNATION_OTHER_VALUE } from "@/lib/employees/constants";
 import type { EmploymentStatus } from "@/types/auth";
 
 export const employmentStatusSchema = z.enum([
@@ -117,21 +118,40 @@ export const employeeWizardSchema = z.object({
   documents: z.array(employeeDocumentItemSchema).default([]),
 });
 
-export const employeeUpdateSchema = z.object({
-  employeeCode: z.string().min(1).max(50),
-  firstName: z.string().min(1).max(100),
-  lastName: z.string().min(1).max(100),
-  email: z.string().email(),
-  phone: z.string().max(30).optional().or(z.literal("")),
-  branchId: z.string().uuid(),
-  departmentId: z.string().uuid().optional().or(z.literal("")),
-  designationId: z.string().uuid().optional().or(z.literal("")),
-  employmentTypeId: z.string().uuid().optional().or(z.literal("")),
-  reportingManagerId: z.string().uuid().optional().or(z.literal("")),
-  employmentStatus: employmentStatusSchema,
-  dateOfJoining: z.string().optional().or(z.literal("")),
-  dateOfLeaving: z.string().optional().or(z.literal("")),
-});
+export const employeeUpdateSchema = z
+  .object({
+    employeeCode: z.string().min(1).max(50),
+    firstName: z.string().min(1).max(100),
+    lastName: z.string().min(1).max(100),
+    email: z.string().email(),
+    phone: z.string().max(30).optional().or(z.literal("")),
+    branchId: z.string().uuid(),
+    departmentId: z.string().uuid().optional().or(z.literal("")),
+    designationId: z
+      .string()
+      .uuid()
+      .optional()
+      .or(z.literal(""))
+      .or(z.literal(DESIGNATION_OTHER_VALUE)),
+    customDesignationTitle: z.string().max(100).optional().or(z.literal("")),
+    employmentTypeId: z.string().uuid().optional().or(z.literal("")),
+    reportingManagerId: z.string().uuid().optional().or(z.literal("")),
+    employmentStatus: employmentStatusSchema,
+    dateOfJoining: z.string().optional().or(z.literal("")),
+    dateOfLeaving: z.string().optional().or(z.literal("")),
+  })
+  .superRefine((data, ctx) => {
+    if (
+      data.designationId === DESIGNATION_OTHER_VALUE &&
+      !data.customDesignationTitle?.trim()
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Enter a designation",
+        path: ["customDesignationTitle"],
+      });
+    }
+  });
 
 export type EmployeeListParamsInput = z.infer<typeof employeeListParamsSchema>;
 export type EmployeeWizardInputValidated = z.infer<typeof employeeWizardSchema>;
