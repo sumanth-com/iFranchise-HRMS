@@ -1,4 +1,7 @@
 import {
+  Banknote,
+  CalendarCheck,
+  CalendarDays,
   LayoutDashboard,
   Settings,
   Users,
@@ -25,6 +28,24 @@ export const mainNavItems: NavigationItem[] = [
     href: "/dashboard/employees",
     icon: Users,
     permissions: ["employee.view"],
+  },
+  {
+    title: "Attendance",
+    href: "/dashboard/attendance",
+    icon: CalendarCheck,
+    permissions: ["attendance.view"],
+  },
+  {
+    title: "Leave",
+    href: "/dashboard/leave",
+    icon: CalendarDays,
+    permissions: ["leave.view"],
+  },
+  {
+    title: "Payroll",
+    href: "/dashboard/payroll",
+    icon: Banknote,
+    permissions: ["payroll.view"],
   },
   {
     title: "Settings",

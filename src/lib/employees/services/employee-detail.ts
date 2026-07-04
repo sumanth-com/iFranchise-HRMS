@@ -252,14 +252,121 @@ export async function getEmployeeLeaveRequests(
   const { data, error } = await supabase
     .schema("hrms")
     .from("leave_requests")
-    .select("id, start_date, end_date, total_days, leave_status, reason")
+    .select(
+      "id, start_date, end_date, total_days, leave_status, reason, applied_at, leave_types:leave_type_id (name, code)",
+    )
     .eq("employee_id", employeeId)
     .is("deleted_at", null)
-    .order("start_date", { ascending: false })
+    .order("applied_at", { ascending: false })
     .limit(20);
 
   if (error) throw new Error(error.message);
-  return data ?? [];
+
+  return (data ?? []).map((row) => {
+    const leaveType = unwrapRelation(
+      row.leave_types as
+        | { name: string; code: string }
+        | { name: string; code: string }[]
+        | null,
+    );
+
+    return {
+      id: row.id,
+      leaveTypeName: leaveType?.name ?? "Leave",
+      startDate: row.start_date,
+      endDate: row.end_date,
+      totalDays: Number(row.total_days),
+      leaveStatus: row.leave_status,
+      appliedAt: row.applied_at,
+      reason: row.reason,
+    };
+  });
+}
+
+export async function getEmployeeLeaveApprovals(
+  supabase: AuthSupabaseClient,
+  employeeId: string,
+) {
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("leave_approvals")
+    .select(
+      `
+      id,
+      approval_level,
+      approval_status,
+      comments,
+      acted_at,
+      leave_requests!inner (
+        id,
+        start_date,
+        end_date,
+        leave_status,
+        employee_id
+      ),
+      approver:approver_employee_id (
+        first_name,
+        last_name,
+        employee_code
+      )
+    `,
+    )
+    .eq("leave_requests.employee_id", employeeId)
+    .is("deleted_at", null)
+    .order("acted_at", { ascending: false })
+    .limit(30);
+
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((row) => {
+    const leaveRequest = unwrapRelation(
+      row.leave_requests as
+        | {
+            id: string;
+            start_date: string;
+            end_date: string;
+            leave_status: string;
+          }
+        | {
+            id: string;
+            start_date: string;
+            end_date: string;
+            leave_status: string;
+          }[]
+        | null,
+    );
+    const approver = unwrapRelation(
+      row.approver as
+        | {
+            first_name: string;
+            last_name: string;
+            employee_code: string | null;
+          }
+        | {
+            first_name: string;
+            last_name: string;
+            employee_code: string | null;
+          }[]
+        | null,
+    );
+
+    const approverName = approver
+      ? [approver.first_name, approver.last_name].filter(Boolean).join(" ")
+      : "—";
+
+    return {
+      id: row.id,
+      leaveRequestId: leaveRequest?.id ?? "",
+      approvalLevel: row.approval_level,
+      approvalStatus: row.approval_status,
+      approverName,
+      comments: row.comments,
+      actedAt: row.acted_at,
+      leaveStartDate: leaveRequest?.start_date ?? "",
+      leaveEndDate: leaveRequest?.end_date ?? "",
+      leaveStatus: leaveRequest?.leave_status ?? "",
+    };
+  });
 }
 
 export async function getEmployeePayrollItems(

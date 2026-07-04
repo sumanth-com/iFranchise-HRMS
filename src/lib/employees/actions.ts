@@ -12,6 +12,7 @@ import {
   getEmployeeBankAccounts,
   getEmployeeLeaveBalances,
   getEmployeeLeaveRequests,
+  getEmployeeLeaveApprovals,
   getEmployeePayrollItems,
   getEmployeeSalaryStructure,
   getEmployeeTimeline,
@@ -298,6 +299,7 @@ export async function getEmployeeDetailBundleAction(employeeRef: string) {
     employeeResult,
     attendanceResult,
     leaveResult,
+    leaveApprovalsResult,
     payrollResult,
     bankAccountsResult,
     leaveBalancesResult,
@@ -308,6 +310,7 @@ export async function getEmployeeDetailBundleAction(employeeRef: string) {
     getEmployeeById(supabase, resolved.id),
     getEmployeeAttendance(supabase, resolved.id),
     getEmployeeLeaveRequests(supabase, resolved.id),
+    getEmployeeLeaveApprovals(supabase, resolved.id),
     getEmployeePayrollItems(supabase, resolved.id),
     getEmployeeBankAccounts(supabase, resolved.id),
     getEmployeeLeaveBalances(supabase, resolved.id),
@@ -327,6 +330,10 @@ export async function getEmployeeDetailBundleAction(employeeRef: string) {
     attendanceResult.status === "fulfilled" ? attendanceResult.value : [];
   const leaveRequests =
     leaveResult.status === "fulfilled" ? leaveResult.value : [];
+  const leaveApprovals =
+    leaveApprovalsResult.status === "fulfilled"
+      ? leaveApprovalsResult.value
+      : [];
   const payrollItems =
     payrollResult.status === "fulfilled" ? payrollResult.value : [];
   const bankAccounts =
@@ -357,6 +364,7 @@ export async function getEmployeeDetailBundleAction(employeeRef: string) {
     employee,
     attendance,
     leaveRequests,
+    leaveApprovals,
     payrollItems,
     bankAccounts,
     leaveBalances,

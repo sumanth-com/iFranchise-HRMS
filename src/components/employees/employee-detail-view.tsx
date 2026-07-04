@@ -23,25 +23,31 @@ import {
   type DataTableColumn,
 } from "@/components/common/data-table";
 import { uploadProfileImageAction, removeProfileImageAction } from "@/lib/employees/actions";
+import { LeaveStatusBadge } from "@/components/leave/leave-status-badge";
 import { EMPLOYEE_ROUTES, EMPLOYEE_TABS, type EmployeeTab } from "@/lib/employees/constants";
+import { LEAVE_ROUTES } from "@/lib/leave/constants";
 import type {
   EmployeeAttendanceSummary,
   EmployeeBankAccountDetail,
   EmployeeDetail,
+  EmployeeLeaveApprovalDetail,
   EmployeeLeaveBalanceDetail,
+  EmployeeLeaveRequestDetail,
   EmployeeSalaryStructureDetail,
   EmployeeTimelineEvent,
   GenderType,
   MaritalStatus,
 } from "@/types/employee";
 import { cn } from "@/lib/utils";
+import type { LeaveStatus } from "@/types/leave";
 import { hasPermission } from "@/lib/permissions/utils";
 
 type EmployeeDetailViewProps = {
   employee: EmployeeDetail;
   profileImageUrl: string | null;
   attendance: Array<Record<string, unknown>>;
-  leaveRequests: Array<Record<string, unknown>>;
+  leaveRequests: EmployeeLeaveRequestDetail[];
+  leaveApprovals: EmployeeLeaveApprovalDetail[];
   payrollItems: Array<Record<string, unknown>>;
   bankAccounts: EmployeeBankAccountDetail[];
   leaveBalances: EmployeeLeaveBalanceDetail[];
@@ -410,6 +416,7 @@ export function EmployeeDetailView({
   profileImageUrl,
   attendance,
   leaveRequests,
+  leaveApprovals,
   payrollItems,
   bankAccounts,
   leaveBalances,
@@ -793,6 +800,20 @@ export function EmployeeDetailView({
 
       {activeTab === "leave" ? (
         <div className="space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              Leave balances, recent requests, and approval history.
+            </p>
+            {hasPermission(permissionCodes, "leave.create") ? (
+              <Link
+                href={`${LEAVE_ROUTES.new}?employeeId=${employee.id}`}
+                className={cn(buttonVariants({ size: "sm" }))}
+              >
+                Request leave
+              </Link>
+            ) : null}
+          </div>
+
           <section className="space-y-3">
             <h2 className="text-sm font-medium">Leave balances</h2>
             {leaveBalances.length > 0 ? (
@@ -802,6 +823,7 @@ export function EmployeeDetailView({
                   { key: "balanceYear", header: "Year" },
                   { key: "allocatedDays", header: "Allocated" },
                   { key: "usedDays", header: "Used" },
+                  { key: "pendingDays", header: "Pending" },
                   { key: "balanceDays", header: "Balance" },
                 ]}
                 data={leaveBalances as unknown as Array<Record<string, unknown>>}
@@ -815,19 +837,104 @@ export function EmployeeDetailView({
               />
             )}
           </section>
+
           <section className="space-y-3">
-            <h2 className="text-sm font-medium">Leave requests</h2>
-            <SimpleTable
-              columns={[
-                { key: "start_date", header: "Start" },
-                { key: "end_date", header: "End" },
-                { key: "total_days", header: "Days" },
-                { key: "leave_status", header: "Status" },
-              ]}
-              data={leaveRequests}
-              emptyTitle="No leave requests"
-              emptyDescription="Leave history will appear here once requests exist."
-            />
+            <h2 className="text-sm font-medium">Recent requests</h2>
+            {leaveRequests.length > 0 ? (
+              <div className="overflow-x-auto rounded-lg border">
+                <table className="w-full text-sm">
+                  <thead className="border-b bg-muted/40">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left font-medium">Leave type</th>
+                      <th className="px-4 py-2.5 text-left font-medium">Start</th>
+                      <th className="px-4 py-2.5 text-left font-medium">End</th>
+                      <th className="px-4 py-2.5 text-left font-medium">Days</th>
+                      <th className="px-4 py-2.5 text-left font-medium">Applied</th>
+                      <th className="px-4 py-2.5 text-left font-medium">Status</th>
+                      <th className="px-4 py-2.5 text-right font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leaveRequests.map((request) => (
+                      <tr key={request.id} className="border-b last:border-0">
+                        <td className="px-4 py-3">{request.leaveTypeName}</td>
+                        <td className="px-4 py-3">{formatDisplayDate(request.startDate)}</td>
+                        <td className="px-4 py-3">{formatDisplayDate(request.endDate)}</td>
+                        <td className="px-4 py-3">{request.totalDays}</td>
+                        <td className="px-4 py-3">{formatDisplayDate(request.appliedAt)}</td>
+                        <td className="px-4 py-3">
+                          <LeaveStatusBadge status={request.leaveStatus as LeaveStatus} />
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {hasPermission(permissionCodes, "leave.view") ? (
+                            <Link
+                              href={LEAVE_ROUTES.detail(request.id)}
+                              className={cn(
+                                buttonVariants({ variant: "ghost", size: "sm" }),
+                                "h-8",
+                              )}
+                            >
+                              View
+                            </Link>
+                          ) : null}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState
+                title="No leave requests"
+                description="Leave history will appear here once requests exist."
+              />
+            )}
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-sm font-medium">Approval history</h2>
+            {leaveApprovals.length > 0 ? (
+              <div className="overflow-x-auto rounded-lg border">
+                <table className="w-full text-sm">
+                  <thead className="border-b bg-muted/40">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left font-medium">Level</th>
+                      <th className="px-4 py-2.5 text-left font-medium">Approver</th>
+                      <th className="px-4 py-2.5 text-left font-medium">Leave period</th>
+                      <th className="px-4 py-2.5 text-left font-medium">Status</th>
+                      <th className="px-4 py-2.5 text-left font-medium">Acted on</th>
+                      <th className="px-4 py-2.5 text-left font-medium">Comments</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leaveApprovals.map((approval) => (
+                      <tr key={approval.id} className="border-b last:border-0">
+                        <td className="px-4 py-3">L{approval.approvalLevel}</td>
+                        <td className="px-4 py-3">{approval.approverName}</td>
+                        <td className="px-4 py-3">
+                          {formatDisplayDate(approval.leaveStartDate)} –{" "}
+                          {formatDisplayDate(approval.leaveEndDate)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <LeaveStatusBadge
+                            status={approval.approvalStatus as LeaveStatus}
+                          />
+                        </td>
+                        <td className="px-4 py-3">{formatDisplayDate(approval.actedAt)}</td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {approval.comments ?? "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState
+                title="No approval history"
+                description="Approval steps will appear here once leave requests are processed."
+              />
+            )}
           </section>
         </div>
       ) : null}

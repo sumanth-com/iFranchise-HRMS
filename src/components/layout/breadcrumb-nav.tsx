@@ -66,6 +66,122 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
     return items;
   }
 
+  if (segments[0] === "dashboard" && segments[1] === "attendance") {
+    const items: BreadcrumbItemConfig[] = [
+      { label: "Dashboard", href: "/" },
+      { label: "Attendance", href: "/dashboard/attendance" },
+    ];
+
+    if (segments[2] === "new") {
+      items.push({ label: "Add attendance", href: pathname });
+      return items;
+    }
+
+    if (segments[2]) {
+      const attendanceHref = `/dashboard/attendance/${segments[2]}`;
+
+      if (segments[3] === "edit") {
+        items.push({ label: "Attendance details", href: attendanceHref });
+        items.push({ label: "Edit", href: pathname });
+        return items;
+      }
+
+      items.push({ label: "Attendance details", href: pathname });
+      return items;
+    }
+
+    return items;
+  }
+
+  if (segments[0] === "dashboard" && segments[1] === "payroll") {
+    const items: BreadcrumbItemConfig[] = [
+      { label: "Dashboard", href: "/" },
+      { label: "Payroll", href: "/dashboard/payroll" },
+    ];
+
+    const sectionLabels: Record<string, string> = {
+      run: "Run Payroll",
+      history: "Payroll History",
+      "salary-structures": "Salary Structure",
+      revisions: "Salary Revisions",
+      bonuses: "Bonuses",
+      reimbursements: "Reimbursements",
+      payslips: "Payslips",
+      settings: "Settings",
+    };
+
+    if (!segments[2]) {
+      return items;
+    }
+
+    if (segments[2] === "salary-structures") {
+      items.push({
+        label: sectionLabels["salary-structures"],
+        href: "/dashboard/payroll/salary-structures",
+      });
+      if (segments[3] === "new") {
+        items.push({ label: "New", href: pathname });
+      }
+      return items;
+    }
+
+    if (segments[2] === "payslips") {
+      items.push({
+        label: sectionLabels.payslips,
+        href: "/dashboard/payroll/payslips",
+      });
+      if (segments[3]) {
+        items.push({ label: "Payslip details", href: pathname });
+      }
+      return items;
+    }
+
+    if (sectionLabels[segments[2]]) {
+      items.push({
+        label: sectionLabels[segments[2]],
+        href: `/dashboard/payroll/${segments[2]}`,
+      });
+      return items;
+    }
+
+    items.push({ label: "Payroll details", href: pathname });
+    return items;
+  }
+
+  if (segments[0] === "dashboard" && segments[1] === "leave") {
+    const items: BreadcrumbItemConfig[] = [
+      { label: "Dashboard", href: "/" },
+      { label: "Leave", href: "/dashboard/leave" },
+    ];
+
+    if (segments[2] === "new") {
+      items.push({ label: "New request", href: pathname });
+      return items;
+    }
+
+    if (segments[2] === "balances") {
+      items.push({ label: "Balances", href: pathname });
+      return items;
+    }
+
+    if (segments[2] === "calendar") {
+      items.push({ label: "Calendar", href: pathname });
+      return items;
+    }
+
+    if (segments[2] === "settings") {
+      items.push({ label: "Settings", href: pathname });
+      return items;
+    }
+
+    if (segments[2]) {
+      items.push({ label: "Leave details", href: pathname });
+      return items;
+    }
+
+    return items;
+  }
+
   return segments.map((segment, index) => ({
     label: formatSegment(segment),
     href: `/${segments.slice(0, index + 1).join("/")}`,

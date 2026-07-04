@@ -67,6 +67,7 @@ export default async function EmployeeDetailPage({
           profileImageUrl={bundle.profileImageUrl}
           attendance={bundle.attendance}
           leaveRequests={bundle.leaveRequests}
+          leaveApprovals={bundle.leaveApprovals}
           payrollItems={bundle.payrollItems}
           bankAccounts={bundle.bankAccounts}
           leaveBalances={bundle.leaveBalances}

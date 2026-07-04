@@ -181,6 +181,30 @@ export type EmployeeLeaveBalanceDetail = {
   balanceDays: number;
 };
 
+export type EmployeeLeaveRequestDetail = {
+  id: string;
+  leaveTypeName: string;
+  startDate: string;
+  endDate: string;
+  totalDays: number;
+  leaveStatus: string;
+  appliedAt: string | null;
+  reason: string | null;
+};
+
+export type EmployeeLeaveApprovalDetail = {
+  id: string;
+  leaveRequestId: string;
+  approvalLevel: number;
+  approvalStatus: string;
+  approverName: string;
+  comments: string | null;
+  actedAt: string | null;
+  leaveStartDate: string;
+  leaveEndDate: string;
+  leaveStatus: string;
+};
+
 export type EmployeeSalaryStructureDetail = {
   id: string;
   effectiveFrom: string;
