@@ -546,6 +546,34 @@ export async function approvePromotionStep(
         updated_by: profile.userId,
       })
       .eq("id", promotionId);
+
+    if (!nextPending) {
+      const { data: promotion } = await fromHrms(supabase, "performance_promotions")
+        .select("employee_id, recommended_salary")
+        .eq("id", promotionId)
+        .maybeSingle();
+
+      if (promotion?.employee_id) {
+        const { autoGenerateLetterForEmployee } = await import(
+          "@/lib/documents/services/document-mutations"
+        );
+        await autoGenerateLetterForEmployee(supabase, profile, {
+          employeeId: promotion.employee_id,
+          letterType: "promotion_letter",
+          salaryOverride:
+            promotion.recommended_salary != null
+              ? new Intl.NumberFormat("en-IN", {
+                  style: "currency",
+                  currency: "INR",
+                  maximumFractionDigits: 0,
+                }).format(Number(promotion.recommended_salary))
+              : null,
+          sourceModule: "performance",
+          sourceRecordId: promotionId,
+          publishNow: true,
+        });
+      }
+    }
   }
 }
 

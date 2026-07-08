@@ -25,6 +25,7 @@ import {
 import { uploadProfileImageAction, removeProfileImageAction } from "@/lib/employees/actions";
 import { LeaveStatusBadge } from "@/components/leave/leave-status-badge";
 import { EMPLOYEE_ROUTES, EMPLOYEE_TABS, type EmployeeTab } from "@/lib/employees/constants";
+import { ASSIGNMENT_STATUS_LABELS } from "@/lib/assets/constants";
 import { LEAVE_ROUTES } from "@/lib/leave/constants";
 import type {
   EmployeeAttendanceSummary,
@@ -38,6 +39,7 @@ import type {
   GenderType,
   MaritalStatus,
 } from "@/types/employee";
+import type { AssetAssignmentItem } from "@/types/assets";
 import { cn } from "@/lib/utils";
 import type { LeaveStatus } from "@/types/leave";
 import { hasPermission } from "@/lib/permissions/utils";
@@ -54,6 +56,7 @@ type EmployeeDetailViewProps = {
   salaryStructure: EmployeeSalaryStructureDetail | null;
   attendanceSummary: EmployeeAttendanceSummary;
   timeline: EmployeeTimelineEvent[];
+  assets: AssetAssignmentItem[];
   permissionCodes: string[];
 };
 
@@ -423,6 +426,7 @@ export function EmployeeDetailView({
   salaryStructure,
   attendanceSummary,
   timeline,
+  assets,
   permissionCodes,
 }: EmployeeDetailViewProps) {
   const searchParams = useSearchParams();
@@ -750,6 +754,40 @@ export function EmployeeDetailView({
           </div>
         ) : (
           <EmptyState title="No documents" description="No documents uploaded for this employee." />
+        )
+      ) : null}
+
+      {activeTab === "assets" ? (
+        assets.length > 0 ? (
+          <div className="space-y-3">
+            {assets.map((assignment) => (
+              <div
+                key={assignment.id}
+                className="flex flex-col gap-1 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <p className="font-medium">
+                    {assignment.assetCode} — {assignment.assetName}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {assignment.categoryName ?? "Asset"} · Assigned{" "}
+                    {formatDisplayDate(assignment.assignedDate)}
+                    {assignment.returnedDate
+                      ? ` · Returned ${formatDisplayDate(assignment.returnedDate)}`
+                      : ""}
+                  </p>
+                </div>
+                <span className="text-sm text-muted-foreground">
+                  {ASSIGNMENT_STATUS_LABELS[assignment.assignmentStatus]}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="No assets assigned"
+            description="Company assets assigned to this employee will appear here."
+          />
         )
       ) : null}
 

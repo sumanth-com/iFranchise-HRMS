@@ -17,6 +17,7 @@ import {
   getEmployeeSalaryStructure,
   getEmployeeTimeline,
 } from "@/lib/employees/services/employee-detail";
+import { listEmployeeAssets } from "@/lib/assets/services/asset-queries";
 import { resolveEmployeeFromRouteRef } from "@/lib/employees/services/employee-route-resolver";
 import {
   createEmployeeFromWizard,
@@ -306,6 +307,7 @@ export async function getEmployeeDetailBundleAction(employeeRef: string) {
     salaryStructureResult,
     attendanceSummaryResult,
     timelineResult,
+    assetsResult,
   ] = await Promise.allSettled([
     getEmployeeById(supabase, resolved.id),
     getEmployeeAttendance(supabase, resolved.id),
@@ -317,6 +319,7 @@ export async function getEmployeeDetailBundleAction(employeeRef: string) {
     getEmployeeSalaryStructure(supabase, resolved.id),
     getEmployeeAttendanceSummary(supabase, resolved.id),
     getEmployeeTimeline(supabase, resolved.id),
+    listEmployeeAssets(supabase, profile.employee.organizationId, resolved.id),
   ]);
 
   const employee =
@@ -350,6 +353,7 @@ export async function getEmployeeDetailBundleAction(employeeRef: string) {
       : { totalRecords: 0, presentDays: 0, totalWorkHours: 0 };
   const timeline =
     timelineResult.status === "fulfilled" ? timelineResult.value : [];
+  const assets = assetsResult.status === "fulfilled" ? assetsResult.value : [];
 
   let profileImageUrl: string | null = null;
   if (employee.profile?.profileImageStoragePath) {
@@ -371,6 +375,7 @@ export async function getEmployeeDetailBundleAction(employeeRef: string) {
     salaryStructure,
     attendanceSummary,
     timeline,
+    assets,
     profileImageUrl,
     permissionCodes: profile.permissionCodes,
   };

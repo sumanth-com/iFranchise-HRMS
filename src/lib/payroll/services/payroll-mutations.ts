@@ -1048,6 +1048,23 @@ export async function createSalaryRevision(
     .single();
 
   if (error) throw new Error(error.message);
+
+  const { autoGenerateLetterForEmployee } = await import(
+    "@/lib/documents/services/document-mutations"
+  );
+  await autoGenerateLetterForEmployee(supabase, profile, {
+    employeeId: parsed.employeeId,
+    letterType: "salary_revision_letter",
+    salaryOverride: new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(parsed.grossSalary),
+    sourceModule: "payroll",
+    sourceRecordId: data.id,
+    publishNow: true,
+  });
+
   return data.id;
 }
 

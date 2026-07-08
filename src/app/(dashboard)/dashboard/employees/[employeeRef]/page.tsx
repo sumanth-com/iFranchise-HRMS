@@ -74,6 +74,7 @@ export default async function EmployeeDetailPage({
           salaryStructure={bundle.salaryStructure}
           attendanceSummary={bundle.attendanceSummary}
           timeline={bundle.timeline}
+          assets={bundle.assets}
           permissionCodes={bundle.permissionCodes}
         />
       </Suspense>

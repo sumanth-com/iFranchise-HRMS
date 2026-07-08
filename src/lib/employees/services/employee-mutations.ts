@@ -178,6 +178,7 @@ export async function createEmployeeFromWizard(
       .from("employee_documents")
       .insert(
         documents.map((doc) => ({
+          organization_id: organizationId,
           employee_id: employeeId,
           document_type_id: doc.documentTypeId,
           title: doc.title.trim(),
@@ -186,6 +187,8 @@ export async function createEmployeeFromWizard(
           mime_type: doc.mimeType,
           file_size_bytes: doc.fileSizeBytes,
           document_status: "pending",
+          source: "upload",
+          is_official: false,
           issued_date: emptyToNull(doc.issuedDate),
           expiry_date: emptyToNull(doc.expiryDate),
           status: "active",

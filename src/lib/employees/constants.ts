@@ -34,6 +34,7 @@ export const EMPLOYEE_TABS = [
   "address",
   "emergency",
   "documents",
+  "assets",
   "attendance",
   "leave",
   "payroll",

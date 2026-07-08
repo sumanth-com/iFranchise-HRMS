@@ -679,6 +679,38 @@ export async function updateOfferStatus(
       "Offer accepted",
       `${candidateName} accepted the offer${employeeId ? " and employee record was created" : ""}.`,
     );
+
+    if (employeeId) {
+      const { autoGenerateLetterForEmployee } = await import(
+        "@/lib/documents/services/document-mutations"
+      );
+      const salaryText =
+        offer.salary != null
+          ? new Intl.NumberFormat("en-IN", {
+              style: "currency",
+              currency: "INR",
+              maximumFractionDigits: 0,
+            }).format(Number(offer.salary))
+          : null;
+
+      await autoGenerateLetterForEmployee(supabase, profile, {
+        employeeId,
+        letterType: "offer_letter",
+        salaryOverride: salaryText,
+        sourceModule: "recruitment",
+        sourceRecordId: input.offerId,
+        publishNow: true,
+      });
+
+      await autoGenerateLetterForEmployee(supabase, profile, {
+        employeeId,
+        letterType: "appointment_letter",
+        salaryOverride: salaryText,
+        sourceModule: "recruitment",
+        sourceRecordId: input.offerId,
+        publishNow: true,
+      });
+    }
   }
 
   if (input.offerStatus === "rejected") {
