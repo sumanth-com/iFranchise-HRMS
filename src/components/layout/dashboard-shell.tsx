@@ -17,9 +17,15 @@ export function DashboardShell({ children }: DashboardShellProps) {
       <div className="flex h-screen overflow-hidden bg-background">
         <Sidebar />
         <MobileSidebar />
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <TopNav />
-          <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
+          {/*
+            Overflow is owned by ModuleShell / PageScroll children so
+            sticky module headers never fight page content.
+          */}
+          <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
+            {children}
+          </main>
         </div>
       </div>
     </SidebarProvider>

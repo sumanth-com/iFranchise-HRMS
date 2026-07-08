@@ -442,11 +442,21 @@ export async function listBonuses(
     bonusStatus?: string;
     bonusType?: string;
     employeeId?: string;
+    departmentId?: string;
   },
 ): Promise<BonusListResult> {
   const parsed = bonusListParamsSchema.parse(params);
-  const { page, pageSize, search, month, year, bonusStatus, bonusType, employeeId } =
-    parsed;
+  const {
+    page,
+    pageSize,
+    search,
+    month,
+    year,
+    bonusStatus,
+    bonusType,
+    employeeId,
+    departmentId,
+  } = parsed;
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
   const organizationId = profile.employee.organizationId;
@@ -463,11 +473,23 @@ export async function listBonuses(
         bonus_month,
         bonus_status,
         reason,
+        remarks,
+        attachment_path,
         created_at,
         employees:employee_id!inner (
           employee_code,
           first_name,
+          last_name,
+          department_id,
+          departments:department_id (name)
+        ),
+        approver:approver_employee_id (
+          first_name,
           last_name
+        ),
+        bonus_approvals (
+          approval_level,
+          approval_status
         )
       `,
       { count: "exact" },
@@ -476,6 +498,7 @@ export async function listBonuses(
     .is("deleted_at", null);
 
   if (employeeId) query = query.eq("employee_id", employeeId);
+  if (departmentId) query = query.eq("employees.department_id", departmentId);
   if (bonusStatus) query = query.eq("bonus_status", bonusStatus);
   if (bonusType) query = query.eq("bonus_type", bonusType);
   if (month && year) {
@@ -484,7 +507,7 @@ export async function listBonuses(
 
   if (search) {
     query = query.or(
-      `reason.ilike.%${search}%,employees.first_name.ilike.%${search}%,employees.last_name.ilike.%${search}%`,
+      `reason.ilike.%${search}%,remarks.ilike.%${search}%,employees.first_name.ilike.%${search}%,employees.last_name.ilike.%${search}%,employees.employee_code.ilike.%${search}%`,
     );
   }
 
@@ -496,6 +519,23 @@ export async function listBonuses(
   return {
     data: (data ?? []).map((row) => {
       const employee = unwrapRelation(row.employees);
+      const department = employee
+        ? unwrapRelation(
+            employee.departments as { name: string } | { name: string }[] | null,
+          )
+        : null;
+      const approver = unwrapRelation(
+        row.approver as
+          | { first_name: string; last_name: string }
+          | { first_name: string; last_name: string }[]
+          | null,
+      );
+      const approvals = (row.bonus_approvals ?? []) as Array<{
+        approval_level: number;
+        approval_status: string;
+      }>;
+      const pendingApproval = approvals.find((item) => item.approval_status === "pending");
+
       return {
         id: row.id,
         employeeId: row.employee_id,
@@ -503,11 +543,18 @@ export async function listBonuses(
         employeeName: employee
           ? `${employee.first_name} ${employee.last_name}`
           : "",
+        departmentName: department?.name ?? null,
         bonusType: row.bonus_type,
         amount: Number(row.amount),
         bonusMonth: row.bonus_month,
         bonusStatus: row.bonus_status,
         reason: row.reason,
+        remarks: row.remarks,
+        attachmentPath: row.attachment_path,
+        approverName: approver
+          ? `${approver.first_name} ${approver.last_name}`
+          : null,
+        approvalLevel: pendingApproval?.approval_level ?? null,
         createdAt: row.created_at,
       };
     }),

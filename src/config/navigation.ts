@@ -1,9 +1,11 @@
 import {
   Banknote,
+  BriefcaseBusiness,
   CalendarCheck,
   CalendarDays,
   LayoutDashboard,
   Settings,
+  Target,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -46,6 +48,18 @@ export const mainNavItems: NavigationItem[] = [
     href: "/dashboard/payroll",
     icon: Banknote,
     permissions: ["payroll.view"],
+  },
+  {
+    title: "Performance",
+    href: "/dashboard/performance",
+    icon: Target,
+    permissions: ["performance.view"],
+  },
+  {
+    title: "Recruitment",
+    href: "/dashboard/recruitment",
+    icon: BriefcaseBusiness,
+    permissions: ["recruitment.view"],
   },
   {
     title: "Settings",

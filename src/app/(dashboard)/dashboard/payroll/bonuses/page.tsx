@@ -24,10 +24,13 @@ export default async function BonusesPage({ searchParams }: BonusesPageProps) {
   const params = bonusListParamsSchema.parse({
     page: rawParams.page,
     pageSize: rawParams.pageSize,
-    month: rawParams.month ?? now.getMonth() + 1,
-    year: rawParams.year ?? now.getFullYear(),
+    search: typeof rawParams.search === "string" ? rawParams.search : undefined,
+    month: rawParams.month ? Number(rawParams.month) : undefined,
+    year: rawParams.year ? Number(rawParams.year) : now.getFullYear(),
     bonusStatus: rawParams.bonusStatus,
     bonusType: rawParams.bonusType,
+    employeeId: rawParams.employeeId,
+    departmentId: rawParams.departmentId,
   });
 
   const [result, lookups] = await Promise.all([
@@ -36,11 +39,11 @@ export default async function BonusesPage({ searchParams }: BonusesPageProps) {
   ]);
 
   return (
-    <>
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Bonuses</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Manage festival, performance, referral, and special bonuses.
+          Manage festival, performance, retention, joining, annual, and special bonuses with approval workflow.
         </p>
       </div>
       {canCreateBonus(profile.permissionCodes) ? (
@@ -48,8 +51,20 @@ export default async function BonusesPage({ searchParams }: BonusesPageProps) {
       ) : null}
       <BonusTable
         records={result.data}
+        total={result.total}
+        page={result.page}
+        pageSize={result.pageSize}
+        employees={lookups.employees}
+        departments={lookups.departments}
+        search={params.search}
+        month={params.month}
+        year={params.year}
+        bonusStatus={params.bonusStatus}
+        bonusType={params.bonusType}
+        employeeId={params.employeeId}
+        departmentId={params.departmentId}
         canApprove={canApproveBonus(profile.permissionCodes)}
       />
-    </>
+    </div>
   );
 }

@@ -10,7 +10,15 @@ export type PayrollStatus =
 
 export type ApprovalStatus = "pending" | "approved" | "rejected" | "skipped";
 
-export type BonusType = "festival" | "performance" | "referral" | "special";
+export type BonusType =
+  | "festival"
+  | "performance"
+  | "referral"
+  | "retention"
+  | "joining"
+  | "special"
+  | "annual"
+  | "other";
 export type BonusStatus = "pending" | "approved" | "rejected" | "paid" | "cancelled";
 
 export type ReimbursementCategory =
@@ -268,11 +276,16 @@ export type BonusItem = {
   employeeId: string;
   employeeCode: string;
   employeeName: string;
+  departmentName: string | null;
   bonusType: BonusType;
   amount: number;
   bonusMonth: string;
   bonusStatus: BonusStatus;
   reason: string | null;
+  remarks: string | null;
+  attachmentPath: string | null;
+  approverName: string | null;
+  approvalLevel: number | null;
   createdAt: string;
 };
 

@@ -28,6 +28,10 @@ import {
   rejectPayrollRun,
 } from "@/lib/payroll/services/payroll-mutations";
 import {
+  getPayrollSettings,
+  savePayrollSettings,
+} from "@/lib/payroll/services/payroll-settings";
+import {
   getPayrollLookups,
   getPayrollSummary,
   listBonuses,
@@ -47,10 +51,11 @@ import {
   reimbursementFormSchema,
   reimbursementListParamsSchema,
   salaryRevisionFormSchema,
+  salaryRevisionListParamsSchema,
   salaryStructureFormSchema,
   salaryStructureListParamsSchema,
-  salaryRevisionListParamsSchema,
 } from "@/lib/validations/payroll";
+import { payrollSettingsSchema } from "@/lib/validations/payroll-settings";
 import type {
   BonusListResult,
   PayrollActionResult,
@@ -66,6 +71,7 @@ import type {
   SalaryRevisionListResult,
   SalaryStructureListResult,
 } from "@/types/payroll";
+import type { PayrollSettingsRecord } from "@/types/payroll-settings";
 
 async function getAuthenticatedSupabase() {
   return createClient();
@@ -457,4 +463,68 @@ export async function fetchSalaryRevisionsAction(
     profile,
     salaryRevisionListParamsSchema.parse(params),
   );
+}
+
+export async function fetchPayrollSettingsAction(): Promise<PayrollSettingsRecord> {
+  const profile = await requireServerPermission("payroll.view");
+  const supabase = await getAuthenticatedSupabase();
+  return getPayrollSettings(supabase, profile.employee.organizationId);
+}
+
+export async function savePayrollSettingsAction(
+  input: unknown,
+): Promise<PayrollActionResult<PayrollSettingsRecord>> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "settings.manage",
+      "payroll.edit",
+      "payroll.approve",
+    ]);
+    const supabase = await getAuthenticatedSupabase();
+    payrollSettingsSchema.parse(input);
+    const data = await savePayrollSettings(supabase, profile, input);
+    revalidatePath(PAYROLL_ROUTES.settings);
+    return { success: true, data };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "Failed to save payroll settings",
+    };
+  }
+}
+
+export async function uploadBonusAttachmentAction(
+  formData: FormData,
+): Promise<PayrollActionResult<string>> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "bonus.create",
+      "payroll.create",
+    ]);
+    const file = formData.get("file");
+    if (!(file instanceof File)) {
+      return { success: false, message: "No file provided" };
+    }
+
+    const supabase = await getAuthenticatedSupabase();
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const storagePath = `${profile.employee.organizationId}/bonuses/${crypto.randomUUID()}-${sanitizedName}`;
+
+    const { error } = await supabase.storage
+      .from("employee-documents")
+      .upload(storagePath, file, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: file.type,
+      });
+
+    if (error) throw new Error(error.message);
+    return { success: true, data: storagePath };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to upload attachment",
+    };
+  }
 }

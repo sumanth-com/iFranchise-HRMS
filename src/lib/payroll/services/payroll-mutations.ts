@@ -820,11 +820,14 @@ export async function createBonus(
     employeeId: string;
     bonusType: string;
     amount: number;
-    bonusMonth: string;
+    bonusMonth: number;
+    bonusYear: number;
     reason?: string;
+    remarks?: string;
+    attachmentPath?: string;
   },
 ): Promise<string> {
-  const bonusMonth = input.bonusMonth.slice(0, 7) + "-01";
+  const bonusMonth = getPayrollMonthDate(input.bonusMonth, input.bonusYear);
 
   const { data, error } = await supabase
     .schema("hrms")
@@ -836,6 +839,8 @@ export async function createBonus(
       amount: input.amount,
       bonus_month: bonusMonth,
       reason: input.reason ?? null,
+      remarks: input.remarks ?? null,
+      attachment_path: input.attachmentPath ?? null,
       created_by: profile.userId,
       updated_by: profile.userId,
     })
@@ -843,27 +848,109 @@ export async function createBonus(
     .single();
 
   if (error) throw new Error(error.message);
+
+  await initializeBonusApprovals(supabase, profile, data.id);
   return data.id;
+}
+
+async function initializeBonusApprovals(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  bonusId: string,
+) {
+  const levels = [1, 2, 3];
+  for (const level of levels) {
+    const { error } = await supabase.schema("hrms").from("bonus_approvals").insert({
+      bonus_id: bonusId,
+      approval_level: level,
+      approval_status: "pending",
+      created_by: profile.userId,
+      updated_by: profile.userId,
+    });
+
+    if (error) throw new Error(error.message);
+  }
 }
 
 export async function approveBonus(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   bonusId: string,
+  comments?: string,
 ): Promise<void> {
-  const { error } = await supabase
+  const { data: bonus, error: bonusError } = await supabase
     .schema("hrms")
     .from("employee_bonuses")
+    .select("id, bonus_status, organization_id")
+    .eq("id", bonusId)
+    .is("deleted_at", null)
+    .single();
+
+  if (bonusError || !bonus) throw new Error("Bonus not found.");
+  if (bonus.bonus_status === "approved" || bonus.bonus_status === "paid") {
+    throw new Error("Bonus is already approved.");
+  }
+
+  const { data: approvals, error: approvalsError } = await supabase
+    .schema("hrms")
+    .from("bonus_approvals")
+    .select("id, approval_level, approval_status")
+    .eq("bonus_id", bonusId)
+    .is("deleted_at", null)
+    .order("approval_level", { ascending: true });
+
+  if (approvalsError) throw new Error(approvalsError.message);
+
+  const pending = (approvals ?? []).find((row) => row.approval_status === "pending");
+
+  if (!pending) {
+    await supabase
+      .schema("hrms")
+      .from("employee_bonuses")
+      .update({
+        bonus_status: "approved",
+        approved_by: profile.userId,
+        approved_at: new Date().toISOString(),
+        approver_employee_id: profile.employee.id,
+        updated_by: profile.userId,
+      })
+      .eq("id", bonusId);
+    return;
+  }
+
+  const { error: approveError } = await supabase
+    .schema("hrms")
+    .from("bonus_approvals")
     .update({
-      bonus_status: "approved",
-      approved_by: profile.userId,
-      approved_at: new Date().toISOString(),
+      approval_status: "approved",
+      comments: comments ?? null,
+      acted_at: new Date().toISOString(),
+      approver_employee_id: profile.employee.id,
       updated_by: profile.userId,
     })
-    .eq("id", bonusId)
-    .eq("organization_id", profile.employee.organizationId);
+    .eq("id", pending.id);
 
-  if (error) throw new Error(error.message);
+  if (approveError) throw new Error(approveError.message);
+
+  const remaining = (approvals ?? []).filter(
+    (row) => row.id !== pending.id && row.approval_status === "pending",
+  );
+
+  if (remaining.length === 0) {
+    const { error } = await supabase
+      .schema("hrms")
+      .from("employee_bonuses")
+      .update({
+        bonus_status: "approved",
+        approved_by: profile.userId,
+        approved_at: new Date().toISOString(),
+        approver_employee_id: profile.employee.id,
+        updated_by: profile.userId,
+      })
+      .eq("id", bonusId);
+
+    if (error) throw new Error(error.message);
+  }
 }
 
 export async function createReimbursement(

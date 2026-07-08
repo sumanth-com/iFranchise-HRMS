@@ -6,6 +6,11 @@ export { Input } from "@/components/common/input";
 export { LoadingSpinner } from "@/components/common/loading-spinner";
 export { Modal } from "@/components/common/modal";
 export {
+  ModuleShell,
+  PageScroll,
+  StickyPageActions,
+} from "@/components/common/sticky-layout";
+export {
   Select,
   SelectContent,
   SelectGroup,

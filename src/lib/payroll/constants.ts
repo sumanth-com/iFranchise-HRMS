@@ -36,8 +36,26 @@ export const BONUS_TYPE_LABELS: Record<BonusType, string> = {
   festival: "Festival Bonus",
   performance: "Performance Bonus",
   referral: "Referral Bonus",
+  retention: "Retention Bonus",
+  joining: "Joining Bonus",
   special: "Special Bonus",
+  annual: "Annual Bonus",
+  other: "Other",
 };
+
+export const BONUS_APPROVAL_LEVEL_LABELS: Record<number, string> = {
+  1: "HR Review",
+  2: "Finance Review",
+  3: "Super Admin Approval",
+};
+
+export const BONUS_WORKFLOW_STEPS = [
+  "HR Creates Bonus",
+  "Finance Reviews",
+  "Super Admin Approves",
+  "Payroll Includes Bonus",
+  "Appears in Payslip",
+] as const;
 
 export const BONUS_STATUS_LABELS: Record<BonusStatus, string> = {
   pending: "Pending",

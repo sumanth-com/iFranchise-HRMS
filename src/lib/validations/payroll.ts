@@ -119,10 +119,22 @@ export const salaryStructureFormSchema = z
 
 export const bonusFormSchema = z.object({
   employeeId: z.string().uuid(),
-  bonusType: z.enum(["festival", "performance", "referral", "special"]),
+  bonusType: z.enum([
+    "festival",
+    "performance",
+    "referral",
+    "retention",
+    "joining",
+    "special",
+    "annual",
+    "other",
+  ]),
   amount: z.coerce.number().positive(),
-  bonusMonth: z.string().min(1),
+  bonusMonth: z.coerce.number().int().min(1).max(12),
+  bonusYear: z.coerce.number().int().min(2000).max(2100),
   reason: z.string().trim().max(500).optional(),
+  remarks: z.string().trim().max(500).optional(),
+  attachmentPath: z.string().trim().max(500).optional(),
 });
 
 export const reimbursementFormSchema = z.object({
@@ -196,9 +208,19 @@ export const bonusListParamsSchema = z.object({
     .enum(["pending", "approved", "rejected", "paid", "cancelled"])
     .optional(),
   bonusType: z
-    .enum(["festival", "performance", "referral", "special"])
+    .enum([
+      "festival",
+      "performance",
+      "referral",
+      "retention",
+      "joining",
+      "special",
+      "annual",
+      "other",
+    ])
     .optional(),
   employeeId: z.string().uuid().optional(),
+  departmentId: z.string().uuid().optional(),
 });
 
 export const reimbursementListParamsSchema = z.object({

@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import {
   DataTable,
   EmptyState,
+  PageScroll,
   type DataTableColumn,
 } from "@/components/common";
 
@@ -24,7 +25,7 @@ const columns: DataTableColumn<PlaceholderRecord>[] = [
 
 export default function DashboardPage() {
   return (
-    <div className="space-y-6">
+    <PageScroll>
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="text-sm text-muted-foreground">
@@ -62,6 +63,6 @@ export default function DashboardPage() {
           <DataTable columns={columns} data={placeholderData} />
         )}
       </div>
-    </div>
+    </PageScroll>
   );
 }

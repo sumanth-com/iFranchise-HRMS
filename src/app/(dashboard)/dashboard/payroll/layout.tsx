@@ -1,3 +1,4 @@
+import { ModuleShell } from "@/components/common/sticky-layout";
 import { PayrollSubNav } from "@/components/payroll/payroll-sub-nav";
 
 export default function PayrollLayout({
@@ -5,10 +6,5 @@ export default function PayrollLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <div className="space-y-6">
-      <PayrollSubNav />
-      {children}
-    </div>
-  );
+  return <ModuleShell header={<PayrollSubNav />}>{children}</ModuleShell>;
 }

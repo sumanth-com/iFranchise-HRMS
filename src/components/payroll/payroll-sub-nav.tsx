@@ -10,7 +10,7 @@ export function PayrollSubNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex flex-wrap gap-1 rounded-lg border bg-card p-1">
+    <nav className="flex flex-wrap gap-1 rounded-lg border bg-card p-1 shadow-sm">
       {PAYROLL_SUB_NAV.map((item) => {
         const isActive =
           item.href === "/dashboard/payroll"
