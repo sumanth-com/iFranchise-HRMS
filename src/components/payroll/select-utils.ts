@@ -5,6 +5,21 @@ export type SelectItemOption = {
   label: string;
 };
 
+export function toLookupSelectItems(options: LookupOption[]): SelectItemOption[] {
+  return options.map((option) => ({
+    value: option.id,
+    label: option.code ? `${option.label} (${option.code})` : option.label,
+  }));
+}
+
+export function withSelectOption(
+  items: SelectItemOption[],
+  option: SelectItemOption,
+  position: "start" | "end" = "start",
+): SelectItemOption[] {
+  return position === "start" ? [option, ...items] : [...items, option];
+}
+
 export function toEmployeeSelectItems(employees: LookupOption[]): SelectItemOption[] {
   return employees.map((employee) => ({
     value: employee.id,

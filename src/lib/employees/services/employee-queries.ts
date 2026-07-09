@@ -174,93 +174,12 @@ export async function suggestNextEmployeeCode(
   return `EMP-${String(next).padStart(4, "0")}`;
 }
 
-export async function getBranches(
-  supabase: AuthSupabaseClient,
-  organizationId: string,
-): Promise<LookupOption[]> {
-  const { data, error } = await supabase
-    .schema("hrms")
-    .from("branches")
-    .select("id, name, code")
-    .eq("organization_id", organizationId)
-    .is("deleted_at", null)
-    .eq("status", "active")
-    .order("name");
-
-  if (error) throw new Error(error.message);
-
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    label: row.name,
-    code: row.code,
-  }));
-}
-
-export async function getDepartments(
-  supabase: AuthSupabaseClient,
-  organizationId: string,
-): Promise<LookupOption[]> {
-  const { data, error } = await supabase
-    .schema("hrms")
-    .from("departments")
-    .select("id, name, code")
-    .eq("organization_id", organizationId)
-    .is("deleted_at", null)
-    .eq("status", "active")
-    .order("name");
-
-  if (error) throw new Error(error.message);
-
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    label: row.name,
-    code: row.code,
-  }));
-}
-
-export async function getDesignations(
-  supabase: AuthSupabaseClient,
-  organizationId: string,
-): Promise<LookupOption[]> {
-  const { data, error } = await supabase
-    .schema("hrms")
-    .from("designations")
-    .select("id, title, code")
-    .eq("organization_id", organizationId)
-    .is("deleted_at", null)
-    .eq("status", "active")
-    .order("title");
-
-  if (error) throw new Error(error.message);
-
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    label: row.title,
-    code: row.code,
-  }));
-}
-
-export async function getEmploymentTypes(
-  supabase: AuthSupabaseClient,
-  organizationId: string,
-): Promise<LookupOption[]> {
-  const { data, error } = await supabase
-    .schema("hrms")
-    .from("employment_types")
-    .select("id, name, code")
-    .eq("organization_id", organizationId)
-    .is("deleted_at", null)
-    .eq("status", "active")
-    .order("name");
-
-  if (error) throw new Error(error.message);
-
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    label: row.name,
-    code: row.code,
-  }));
-}
+export {
+  getBranches,
+  getDepartments,
+  getDesignations,
+  getEmploymentTypes,
+} from "@/lib/organization/services/org-lookups";
 
 export async function getManagers(
   supabase: AuthSupabaseClient,
@@ -318,21 +237,18 @@ export async function getEmployeeLookups(
   organizationId: string,
   excludeEmployeeId?: string,
 ) {
-  const [branches, departments, designations, employmentTypes, managers, documentTypes] =
-    await Promise.all([
-      getBranches(supabase, organizationId),
-      getDepartments(supabase, organizationId),
-      getDesignations(supabase, organizationId),
-      getEmploymentTypes(supabase, organizationId),
-      getManagers(supabase, organizationId, excludeEmployeeId),
-      getDocumentTypes(supabase, organizationId),
-    ]);
+  const { getOrganizationLookups } = await import("@/lib/organization/services/org-lookups");
+  const [orgLookups, managers, documentTypes] = await Promise.all([
+    getOrganizationLookups(supabase, organizationId, excludeEmployeeId),
+    getManagers(supabase, organizationId, excludeEmployeeId),
+    getDocumentTypes(supabase, organizationId),
+  ]);
 
   return {
-    branches,
-    departments,
-    designations,
-    employmentTypes,
+    branches: orgLookups.branches,
+    departments: orgLookups.departments,
+    designations: orgLookups.designations,
+    employmentTypes: orgLookups.employmentTypes,
     managers,
     documentTypes,
   };

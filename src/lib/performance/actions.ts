@@ -373,11 +373,12 @@ export async function savePerformanceSettingsAction(
   input: unknown,
 ): Promise<PerformanceActionResult<PerformanceSettingsRecord>> {
   try {
-    const profile = await requireServerPermission("performance.settings");
+    const profile = await requireServerAnyPermission(["performance.settings", "settings.edit"]);
     const supabase = await getAuthenticatedSupabase();
     const parsed = performanceSettingsSchema.parse(input);
     const data = await savePerformanceSettings(supabase, profile, parsed);
     revalidatePath(PERFORMANCE_ROUTES.settings);
+    revalidatePath("/dashboard/company-settings");
     return { success: true, data };
   } catch (error) {
     return {

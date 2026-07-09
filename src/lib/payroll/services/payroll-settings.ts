@@ -252,15 +252,24 @@ export async function getPayrollSettings(
   supabase: AuthSupabaseClient,
   organizationId: string,
 ): Promise<PayrollSettingsRecord> {
-  const { data, error } = await supabase
-    .schema("hrms")
-    .from("organization_settings")
-    .select(
-      "settings, payroll_cycle, currency_code, fiscal_year_start_month, created_at, updated_at, created_by, updated_by",
-    )
-    .eq("organization_id", organizationId)
-    .is("deleted_at", null)
-    .maybeSingle();
+  const [{ data, error }, { data: org }] = await Promise.all([
+    supabase
+      .schema("hrms")
+      .from("organization_settings")
+      .select(
+        "settings, payroll_cycle, currency_code, fiscal_year_start_month, created_at, updated_at, created_by, updated_by",
+      )
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    supabase
+      .schema("hrms")
+      .from("organizations")
+      .select("name, logo_storage_path")
+      .eq("id", organizationId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+  ]);
 
   if (error) throw new Error(error.message);
 
@@ -271,6 +280,13 @@ export async function getPayrollSettings(
     currency: data?.currency_code,
     financial_year_start_month: data?.fiscal_year_start_month,
   });
+
+  if (org?.name) {
+    settings.payslip.companyName = org.name;
+  }
+  if (org?.logo_storage_path) {
+    settings.payslip.companyLogoPath = org.logo_storage_path;
+  }
 
   const [createdByName, updatedByName] = await Promise.all([
     resolveUserName(supabase, data?.created_by ?? null),

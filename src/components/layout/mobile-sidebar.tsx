@@ -26,28 +26,36 @@ export function MobileSidebar() {
           <SheetTitle>iFranchise HRMS</SheetTitle>
         </SheetHeader>
         <nav className="flex flex-col gap-1 p-2">
-          {navigation.map((item) => {
+          {navigation.map((item, index) => {
             const isActive =
               pathname === item.href ||
               (item.href !== "/" && pathname.startsWith(item.href));
             const Icon = item.icon;
+            const prevSection = index > 0 ? navigation[index - 1]?.section : undefined;
+            const showSection = item.section && item.section !== prevSection;
 
             return (
-              <Link
-                key={item.href}
-                href={item.disabled ? "#" : item.href}
-                onClick={() => setMobileOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  item.disabled && "pointer-events-none opacity-50",
-                )}
-              >
-                <Icon className="size-4 shrink-0" />
-                <span>{item.title}</span>
-              </Link>
+              <div key={item.href}>
+                {showSection ? (
+                  <p className="mb-1 mt-3 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground first:mt-0">
+                    {item.section}
+                  </p>
+                ) : null}
+                <Link
+                  href={item.disabled ? "#" : item.href}
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    item.disabled && "pointer-events-none opacity-50",
+                  )}
+                >
+                  <Icon className="size-4 shrink-0" />
+                  <span>{item.title}</span>
+                </Link>
+              </div>
             );
           })}
         </nav>

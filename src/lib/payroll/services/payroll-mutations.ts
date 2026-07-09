@@ -18,6 +18,7 @@ import {
   roundCurrency,
 } from "@/lib/payroll/services/payroll-utils";
 import { PAYROLL_ROUTES } from "@/lib/payroll/constants";
+import { notifyEmployee } from "@/lib/notifications/services/notification-service";
 import type { PayrollRunInput } from "@/lib/validations/payroll";
 import {
   salaryRevisionFormSchema,
@@ -707,28 +708,9 @@ export async function emailPayslip(
 
   if (error || !payslip) throw new Error("Payslip not found.");
 
-  const employee = unwrapRelation(
-    payslip.employees as
-      | { first_name: string; last_name: string; user_id: string | null }
-      | Array<{ first_name: string; last_name: string; user_id: string | null }>
-      | null,
-  );
   const payroll = unwrapRelation(
     payslip.payrolls as { payroll_month: string } | { payroll_month: string }[] | null,
   );
-
-  const { data: userRole } = await supabase
-    .schema("hrms")
-    .from("user_roles")
-    .select("user_id")
-    .eq("employee_id", payslip.employee_id)
-    .limit(1)
-    .maybeSingle();
-
-  const userId = userRole?.user_id ?? employee?.user_id;
-  if (!userId) {
-    throw new Error("Employee does not have a linked user account for email notification.");
-  }
 
   const monthLabel = payroll?.payroll_month
     ? new Date(payroll.payroll_month).toLocaleString("en-IN", {
@@ -737,20 +719,20 @@ export async function emailPayslip(
       })
     : "";
 
-  const { error: notifyError } = await supabase.schema("hrms").from("notifications").insert({
-    organization_id: profile.employee.organizationId,
-    user_id: userId,
-    employee_id: payslip.employee_id,
+  await notifyEmployee(supabase, {
+    organizationId: profile.employee.organizationId,
+    employeeId: payslip.employee_id,
     title: "Payslip available",
     message: `Your payslip for ${monthLabel} (${payslip.payslip_number}) is ready to view.`,
-    notification_type: "payslip",
-    notification_status: "unread",
-    action_url: PAYROLL_ROUTES.payslipDetail(payslipId),
-    status: "active",
-    created_by: profile.userId,
+    notificationType: "payslip_available",
+    module: "payroll",
+    priority: "medium",
+    actionUrl: PAYROLL_ROUTES.payslipDetail(payslipId),
+    sourceEventKey: `payslip_available:${payslipId}`,
+    templateKey: "payslip_available",
+    templateVariables: { month: monthLabel, payslipNumber: payslip.payslip_number },
+    createdBy: profile.userId,
   });
-
-  if (notifyError) throw new Error(notifyError.message);
 }
 
 export async function createSalaryStructure(

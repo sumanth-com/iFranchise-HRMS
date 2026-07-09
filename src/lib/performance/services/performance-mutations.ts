@@ -12,6 +12,8 @@ import {
   fromHrms,
   unwrapRelation,
 } from "@/lib/performance/services/performance-utils";
+import { PERFORMANCE_ROUTES } from "@/lib/performance/constants";
+import { notifyEmployee } from "@/lib/notifications/services/notification-service";
 import type { z } from "zod";
 
 const REVIEW_STAGES = ["self", "manager", "hr", "final"] as const;
@@ -549,7 +551,7 @@ export async function approvePromotionStep(
 
     if (!nextPending) {
       const { data: promotion } = await fromHrms(supabase, "performance_promotions")
-        .select("employee_id, recommended_salary")
+        .select("employee_id, recommended_salary, recommended_designation_id")
         .eq("id", promotionId)
         .maybeSingle();
 
@@ -571,6 +573,30 @@ export async function approvePromotionStep(
           sourceModule: "performance",
           sourceRecordId: promotionId,
           publishNow: true,
+        });
+
+        let designationLabel = "new role";
+        if (promotion.recommended_designation_id) {
+          const { data: designation } = await fromHrms(supabase, "designations")
+            .select("name")
+            .eq("id", promotion.recommended_designation_id)
+            .maybeSingle();
+          if (designation?.name) designationLabel = designation.name;
+        }
+
+        await notifyEmployee(supabase, {
+          organizationId: profile.employee.organizationId,
+          employeeId: promotion.employee_id,
+          title: "Promotion approved",
+          message: `Your promotion to ${designationLabel} has been approved.`,
+          notificationType: "promotion_approved",
+          module: "performance",
+          priority: "high",
+          actionUrl: PERFORMANCE_ROUTES.promotions,
+          sourceEventKey: `promotion_approved:${promotionId}`,
+          templateKey: "promotion_approved",
+          templateVariables: { designation: designationLabel },
+          createdBy: profile.userId,
         });
       }
     }

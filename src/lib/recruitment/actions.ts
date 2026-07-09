@@ -237,7 +237,7 @@ export async function updateRecruitmentSettingsAction(
   input: unknown,
 ): Promise<ActionResult<RecruitmentSettings>> {
   try {
-    const profile = await requireServerPermission("recruitment.edit");
+    const profile = await requireServerAnyPermission(["recruitment.edit", "settings.edit"]);
     const supabase = await getAuthenticatedSupabase();
     const parsed = recruitmentSettingsSchema.parse(input);
     const settings = await updateRecruitmentSettings(
@@ -246,6 +246,7 @@ export async function updateRecruitmentSettingsAction(
       parsed,
     );
     revalidatePath(RECRUITMENT_ROUTES.settings);
+    revalidatePath("/dashboard/company-settings");
     revalidateRecruitment();
     return { success: true, data: settings };
   } catch (error) {

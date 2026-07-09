@@ -148,7 +148,7 @@ export async function loadUserProfile(
   const { data: roleRows, error: rolesError } = await supabase
     .schema("hrms")
     .from("roles")
-    .select("id, name, code, is_system_role, status")
+    .select("id, name, code, is_system_role, parent_role_id, status")
     .in("id", roleIds)
     .is("deleted_at", null)
     .eq("status", "active");
@@ -165,11 +165,33 @@ export async function loadUserProfile(
     status: role.status,
   }));
 
+  const allRoleIds = new Set<string>(roleIds);
+  const { data: orgRoles } = await supabase
+    .schema("hrms")
+    .from("roles")
+    .select("id, parent_role_id")
+    .eq("organization_id", employeeRow.organization_id)
+    .is("deleted_at", null);
+
+  const parentMap = new Map(
+    (orgRoles ?? []).map((r) => [r.id, r.parent_role_id as string | null]),
+  );
+
+  for (const roleId of roleIds) {
+    let parentId = parentMap.get(roleId) ?? null;
+    const visited = new Set<string>();
+    while (parentId && !visited.has(parentId)) {
+      visited.add(parentId);
+      allRoleIds.add(parentId);
+      parentId = parentMap.get(parentId) ?? null;
+    }
+  }
+
   const { data: rolePermissionRows, error: permissionsError } = await supabase
     .schema("hrms")
     .from("role_permissions")
     .select("permission_id")
-    .in("role_id", roleIds)
+    .in("role_id", [...allRoleIds])
     .is("deleted_at", null)
     .eq("status", "active");
 

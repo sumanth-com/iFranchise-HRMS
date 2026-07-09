@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -9,13 +9,13 @@ import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
+import { LabeledSelect } from "@/components/payroll/payroll-select";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/common/select";
+  toEmployeeSelectItems,
+  toLookupSelectItems,
+  toSelectItems,
+  withSelectOption,
+} from "@/components/payroll/select-utils";
 import {
   createEmployeeAction,
   getEmployeeCodeSuggestionAction,
@@ -121,6 +121,25 @@ export function EmployeeWizard({ lookups }: EmployeeWizardProps) {
       }
     });
   }, [basicForm]);
+
+  const branchItems = useMemo(() => toLookupSelectItems(lookups.branches), [lookups.branches]);
+  const departmentItems = useMemo(
+    () => withSelectOption(toLookupSelectItems(lookups.departments), { value: "none", label: "None" }),
+    [lookups.departments],
+  );
+  const designationItems = useMemo(
+    () => withSelectOption(toLookupSelectItems(lookups.designations), { value: "none", label: "None" }),
+    [lookups.designations],
+  );
+  const employmentTypeItems = useMemo(
+    () => withSelectOption(toLookupSelectItems(lookups.employmentTypes), { value: "none", label: "None" }),
+    [lookups.employmentTypes],
+  );
+  const managerItems = useMemo(
+    () => withSelectOption(toEmployeeSelectItems(lookups.managers), { value: "none", label: "None" }),
+    [lookups.managers],
+  );
+  const employmentStatusItems = useMemo(() => toSelectItems(EMPLOYMENT_STATUS_LABELS), []);
 
   const goNext = async () => {
     if (step === 1) {
@@ -273,112 +292,61 @@ export function EmployeeWizard({ lookups }: EmployeeWizardProps) {
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label>Branch</Label>
-            <Select
+            <LabeledSelect
+              items={branchItems}
               value={employmentForm.watch("branchId")}
-              onValueChange={(value) => employmentForm.setValue("branchId", value ?? "")}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select branch" />
-              </SelectTrigger>
-              <SelectContent>
-                {lookups.branches.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onValueChange={(value) => employmentForm.setValue("branchId", value)}
+              placeholder="Select branch"
+            />
           </div>
           <div className="space-y-2">
             <Label>Department</Label>
-            <Select
+            <LabeledSelect
+              items={departmentItems}
               value={employmentForm.watch("departmentId") || "none"}
               onValueChange={(value) =>
-                employmentForm.setValue("departmentId", value === "none" ? "" : value ?? "")
+                employmentForm.setValue("departmentId", value === "none" ? "" : value)
               }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select department" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                {lookups.departments.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Select department"
+            />
           </div>
           <div className="space-y-2">
             <Label>Designation</Label>
-            <Select
+            <LabeledSelect
+              items={designationItems}
               value={employmentForm.watch("designationId") || "none"}
               onValueChange={(value) =>
-                employmentForm.setValue("designationId", value === "none" ? "" : value ?? "")
+                employmentForm.setValue("designationId", value === "none" ? "" : value)
               }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select designation" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                {lookups.designations.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Select designation"
+            />
           </div>
           <div className="space-y-2">
             <Label>Employment type</Label>
-            <Select
+            <LabeledSelect
+              items={employmentTypeItems}
               value={employmentForm.watch("employmentTypeId") || "none"}
               onValueChange={(value) =>
-                employmentForm.setValue("employmentTypeId", value === "none" ? "" : value ?? "")
+                employmentForm.setValue("employmentTypeId", value === "none" ? "" : value)
               }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select employment type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                {lookups.employmentTypes.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Select employment type"
+            />
           </div>
           <div className="space-y-2">
             <Label>Reporting manager</Label>
-            <Select
+            <LabeledSelect
+              items={managerItems}
               value={employmentForm.watch("reportingManagerId") || "none"}
               onValueChange={(value) =>
-                employmentForm.setValue(
-                  "reportingManagerId",
-                  value === "none" ? "" : value ?? "",
-                )
+                employmentForm.setValue("reportingManagerId", value === "none" ? "" : value)
               }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select manager" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                {lookups.managers.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Select manager"
+            />
           </div>
           <div className="space-y-2">
             <Label>Employment status</Label>
-            <Select
+            <LabeledSelect
+              items={employmentStatusItems}
               value={employmentForm.watch("employmentStatus")}
               onValueChange={(value) =>
                 employmentForm.setValue(
@@ -386,18 +354,8 @@ export function EmployeeWizard({ lookups }: EmployeeWizardProps) {
                   (value ?? "draft") as EmployeeWizardInputValidated["employment"]["employmentStatus"],
                 )
               }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(EMPLOYMENT_STATUS_LABELS).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Select status"
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="dateOfJoining">Date of joining</Label>

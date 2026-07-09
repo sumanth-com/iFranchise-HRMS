@@ -14,6 +14,8 @@ import {
 } from "@/lib/auth/errors";
 import { loadUserProfile } from "@/lib/auth/profile-loader";
 import { getRoleRedirectPath } from "@/lib/auth/redirect";
+import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
+import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
 import { siteConfig } from "@/config/site";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -61,6 +63,19 @@ export async function loginAction(
     });
 
   if (authError || !authData.user) {
+    const ctx = await getRequestAuditContext();
+    await writeApplicationAudit(supabase, {
+      organizationId: null,
+      module: "dashboard",
+      action: "login",
+      description: `Failed login attempt for ${email}`,
+      recordId: email,
+      eventStatus: "failed",
+      priority: "high",
+      reason: authError?.message,
+      ...ctx,
+    });
+
     return {
       success: false,
       error: mapSupabaseAuthError(authError?.message ?? ""),
@@ -88,6 +103,18 @@ export async function loginAction(
 
   await applyRememberMePreference(rememberMe);
 
+  const ctx = await getRequestAuditContext();
+  await writeApplicationAudit(supabase, {
+    organizationId: profileResult.profile.employee.organizationId,
+    module: "dashboard",
+    action: "login",
+    description: `User ${email} logged in successfully`,
+    recordId: authData.user.id,
+    priority: "medium",
+    ...ctx,
+    metadata: { email },
+  });
+
   return {
     success: true,
     redirectTo: getRoleRedirectPath(profileResult.profile.roles),
@@ -96,6 +123,29 @@ export async function loginAction(
 
 export async function logoutAction(): Promise<void> {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user?.id) {
+    const profileResult = user.email
+      ? await loadUserProfile(user.id, user.email, supabase)
+      : null;
+    const ctx = await getRequestAuditContext();
+    await writeApplicationAudit(supabase, {
+      organizationId:
+        profileResult && profileResult.success
+          ? profileResult.profile.employee.organizationId
+          : null,
+      module: "dashboard",
+      action: "logout",
+      description: `User ${user.email ?? user.id} logged out`,
+      recordId: user.id,
+      priority: "low",
+      ...ctx,
+    });
+  }
+
   await supabase.auth.signOut();
   redirect(`${AUTH_ROUTES.login}?signedOut=1`);
 }
@@ -130,6 +180,17 @@ export async function forgotPasswordAction(
       message: getAuthErrorMessage("SERVER_ERROR"),
     };
   }
+
+  const ctx = await getRequestAuditContext();
+  await writeApplicationAudit(supabase, {
+    organizationId: null,
+    module: "dashboard",
+    action: "password_reset",
+    description: `Password reset requested for ${parsed.data.email}`,
+    recordId: parsed.data.email,
+    priority: "high",
+    ...ctx,
+  });
 
   return {
     success: true,

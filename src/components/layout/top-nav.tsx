@@ -4,6 +4,7 @@ import { Menu, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 import { Button } from "@/components/common/button";
 import { BreadcrumbNav } from "@/components/layout/breadcrumb-nav";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { UserProfileDropdown } from "@/components/layout/user-profile-dropdown";
 import { useSidebar } from "@/hooks/use-sidebar";
 
@@ -39,7 +40,10 @@ export function TopNav() {
           <BreadcrumbNav />
         </div>
       </div>
-      <UserProfileDropdown />
+      <div className="flex items-center gap-1">
+        <NotificationBell />
+        <UserProfileDropdown />
+      </div>
     </header>
   );
 }

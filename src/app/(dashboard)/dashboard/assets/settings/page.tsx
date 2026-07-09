@@ -1,18 +1,7 @@
-import { AssetsSettingsForm } from "@/components/assets/assets-settings-form";
-import { canManageAssetSettings } from "@/lib/assets/constants";
-import { getAssetSettings } from "@/lib/assets/services/asset-settings";
-import { requireServerPermission } from "@/lib/permissions/server";
-import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
-export default async function AssetSettingsPage() {
-  const profile = await requireServerPermission("asset.view");
-  const supabase = await createClient();
-  const settings = await getAssetSettings(supabase, profile.employee.organizationId);
+import { COMPANY_SETTINGS_ROUTES } from "@/lib/company-settings/constants";
 
-  return (
-    <AssetsSettingsForm
-      settings={settings}
-      canEdit={canManageAssetSettings(profile.permissionCodes)}
-    />
-  );
+export default function AssetsSettingsPage() {
+  redirect(COMPANY_SETTINGS_ROUTES.section("working"));
 }

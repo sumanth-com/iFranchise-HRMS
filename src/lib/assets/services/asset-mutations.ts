@@ -2,7 +2,8 @@ import QRCode from "qrcode";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
-import { ASSET_IMAGE_BUCKET } from "@/lib/assets/constants";
+import { ASSET_IMAGE_BUCKET, ASSETS_ROUTES } from "@/lib/assets/constants";
+import { notifyEmployee } from "@/lib/notifications/services/notification-service";
 import {
   getAssetSettings,
   nextAssetCode,
@@ -232,6 +233,27 @@ export async function assignAsset(
     .eq("id", input.assetId);
 
   if (updateError) throw new Error(updateError.message);
+
+  const { data: assetRow } = await fromHrms(supabase, "assets")
+    .select("name")
+    .eq("id", input.assetId)
+    .maybeSingle();
+
+  await notifyEmployee(supabase, {
+    organizationId,
+    employeeId: input.employeeId,
+    title: "Asset assigned",
+    message: `Asset ${assetRow?.name ?? "item"} has been assigned to you.`,
+    notificationType: "asset_assigned",
+    module: "assets",
+    priority: "medium",
+    actionUrl: ASSETS_ROUTES.assignments,
+    sourceEventKey: `asset_assigned:${assignment.id}`,
+    templateKey: "asset_assigned",
+    templateVariables: { assetName: assetRow?.name ?? "Asset" },
+    createdBy: profile.userId,
+  });
+
   return assignment.id;
 }
 
@@ -243,7 +265,7 @@ export async function returnAsset(
   const organizationId = profile.employee.organizationId;
 
   const { data: assignment, error } = await fromHrms(supabase, "asset_assignments")
-    .select("id, asset_id, assignment_status")
+    .select("id, asset_id, employee_id, assignment_status")
     .eq("id", input.assignmentId)
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
@@ -280,6 +302,28 @@ export async function returnAsset(
     .eq("id", assignment.asset_id);
 
   if (assetError) throw new Error(assetError.message);
+
+  const { data: assetRow } = await fromHrms(supabase, "assets")
+    .select("name")
+    .eq("id", assignment.asset_id)
+    .maybeSingle();
+
+  if (assignment.employee_id) {
+    await notifyEmployee(supabase, {
+      organizationId,
+      employeeId: assignment.employee_id,
+      title: "Asset returned",
+      message: `Asset ${assetRow?.name ?? "item"} has been returned.`,
+      notificationType: "asset_returned",
+      module: "assets",
+      priority: "low",
+      actionUrl: ASSETS_ROUTES.assignments,
+      sourceEventKey: `asset_returned:${input.assignmentId}`,
+      templateKey: "asset_returned",
+      templateVariables: { assetName: assetRow?.name ?? "Asset" },
+      createdBy: profile.userId,
+    });
+  }
 }
 
 export async function transferAsset(

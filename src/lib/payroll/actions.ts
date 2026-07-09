@@ -476,6 +476,7 @@ export async function savePayrollSettingsAction(
 ): Promise<PayrollActionResult<PayrollSettingsRecord>> {
   try {
     const profile = await requireServerAnyPermission([
+      "settings.edit",
       "settings.manage",
       "payroll.edit",
       "payroll.approve",
@@ -484,6 +485,7 @@ export async function savePayrollSettingsAction(
     payrollSettingsSchema.parse(input);
     const data = await savePayrollSettings(supabase, profile, input);
     revalidatePath(PAYROLL_ROUTES.settings);
+    revalidatePath("/dashboard/company-settings");
     return { success: true, data };
   } catch (error) {
     return {

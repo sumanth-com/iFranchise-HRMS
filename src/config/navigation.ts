@@ -2,6 +2,7 @@ import {
   Banknote,
   BarChart3,
   BriefcaseBusiness,
+  Building2,
   CalendarCheck,
   CalendarDays,
   FileText,
@@ -9,6 +10,9 @@ import {
   LogOut,
   Package,
   Settings,
+  Shield,
+  Bell,
+  ScrollText,
   Target,
   Users,
   type LucideIcon,
@@ -21,6 +25,7 @@ export type NavItem = {
   href: string;
   icon: LucideIcon;
   disabled?: boolean;
+  section?: string;
 };
 
 export const mainNavItems: NavigationItem[] = [
@@ -90,9 +95,47 @@ export const mainNavItems: NavigationItem[] = [
     permissions: ["reports.view"],
   },
   {
-    title: "Settings",
-    href: "/settings",
+    title: "Organization",
+    href: "/dashboard/organization",
+    icon: Building2,
+    section: "Administration",
+    permissions: [
+      "organization.view",
+      "branch.view",
+      "department.view",
+      "designation.view",
+      "employment_type.view",
+      "holiday.view",
+      "work_location.view",
+      "shift_template.view",
+    ],
+  },
+  {
+    title: "Roles & Permissions",
+    href: "/dashboard/roles",
+    icon: Shield,
+    section: "Administration",
+    permissions: ["role.view", "permission.view", "user_role.view"],
+  },
+  {
+    title: "Notifications",
+    href: "/dashboard/notifications",
+    icon: Bell,
+    section: "Administration",
+    permissions: ["notifications.view", "notification.view"],
+  },
+  {
+    title: "Audit Logs",
+    href: "/dashboard/audit",
+    icon: ScrollText,
+    section: "Administration",
+    permissions: ["audit.view"],
+  },
+  {
+    title: "Company Settings",
+    href: "/dashboard/company-settings",
     icon: Settings,
+    section: "Administration",
     permissions: ["settings.view"],
   },
 ];

@@ -1,47 +1,10 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
 import { LEAVE_ROUTES } from "@/lib/leave/constants";
-
-async function getEmployeeUserId(
-  supabase: AuthSupabaseClient,
-  employeeId: string,
-): Promise<string | null> {
-  const { data, error } = await supabase
-    .schema("hrms")
-    .from("user_roles")
-    .select("user_id")
-    .eq("employee_id", employeeId)
-    .limit(1)
-    .maybeSingle();
-
-  if (error) throw new Error(error.message);
-  return data?.user_id ?? null;
-}
-
-async function createNotification(
-  supabase: AuthSupabaseClient,
-  organizationId: string,
-  userId: string,
-  employeeId: string,
-  title: string,
-  message: string,
-  notificationType: string,
-  actionUrl: string,
-) {
-  const { error } = await supabase.schema("hrms").from("notifications").insert({
-    organization_id: organizationId,
-    user_id: userId,
-    employee_id: employeeId,
-    title,
-    message,
-    notification_type: notificationType,
-    notification_status: "unread",
-    action_url: actionUrl,
-    status: "active",
-  });
-
-  if (error) throw new Error(error.message);
-}
+import { getEmployeeReportingManagerId } from "@/lib/leave/services/leave-queries";
+import {
+  notifyEmployee,
+} from "@/lib/notifications/services/notification-service";
 
 export async function notifyLeaveSubmitted(
   supabase: AuthSupabaseClient,
@@ -49,19 +12,38 @@ export async function notifyLeaveSubmitted(
   leaveRequestId: string,
   employeeId: string,
 ) {
-  const userId = await getEmployeeUserId(supabase, employeeId);
-  if (!userId) return;
+  const organizationId = profile.employee.organizationId;
 
-  await createNotification(
-    supabase,
-    profile.employee.organizationId,
-    userId,
+  await notifyEmployee(supabase, {
+    organizationId,
     employeeId,
-    "Leave request submitted",
-    "Your leave request has been submitted and is pending approval.",
-    "leave_submitted",
-    LEAVE_ROUTES.detail(leaveRequestId),
-  );
+    title: "Leave request submitted",
+    message: "Your leave request has been submitted and is pending approval.",
+    notificationType: "leave_submitted",
+    module: "leave",
+    priority: "medium",
+    actionUrl: LEAVE_ROUTES.detail(leaveRequestId),
+    sourceEventKey: `leave_submitted:${leaveRequestId}:${employeeId}`,
+    templateKey: "leave_submitted",
+    createdBy: profile.userId,
+  });
+
+  const managerId = await getEmployeeReportingManagerId(supabase, employeeId);
+  if (managerId && managerId !== employeeId) {
+    await notifyEmployee(supabase, {
+      organizationId,
+      employeeId: managerId,
+      title: "Leave request pending approval",
+      message: "A team member has submitted a leave request awaiting your approval.",
+      notificationType: "leave_submitted",
+      module: "leave",
+      priority: "high",
+      actionUrl: LEAVE_ROUTES.detail(leaveRequestId),
+      sourceEventKey: `leave_submitted_manager:${leaveRequestId}:${managerId}`,
+      templateKey: "leave_submitted",
+      createdBy: profile.userId,
+    });
+  }
 }
 
 export async function notifyLeaveApproved(
@@ -70,19 +52,19 @@ export async function notifyLeaveApproved(
   leaveRequestId: string,
   employeeId: string,
 ) {
-  const userId = await getEmployeeUserId(supabase, employeeId);
-  if (!userId) return;
-
-  await createNotification(
-    supabase,
-    profile.employee.organizationId,
-    userId,
+  await notifyEmployee(supabase, {
+    organizationId: profile.employee.organizationId,
     employeeId,
-    "Leave request approved",
-    "Your leave request has been approved.",
-    "leave_approved",
-    LEAVE_ROUTES.detail(leaveRequestId),
-  );
+    title: "Leave request approved",
+    message: "Your leave request has been approved.",
+    notificationType: "leave_approved",
+    module: "leave",
+    priority: "medium",
+    actionUrl: LEAVE_ROUTES.detail(leaveRequestId),
+    sourceEventKey: `leave_approved:${leaveRequestId}:${employeeId}`,
+    templateKey: "leave_approved",
+    createdBy: profile.userId,
+  });
 }
 
 export async function notifyLeaveRejected(
@@ -91,17 +73,17 @@ export async function notifyLeaveRejected(
   leaveRequestId: string,
   employeeId: string,
 ) {
-  const userId = await getEmployeeUserId(supabase, employeeId);
-  if (!userId) return;
-
-  await createNotification(
-    supabase,
-    profile.employee.organizationId,
-    userId,
+  await notifyEmployee(supabase, {
+    organizationId: profile.employee.organizationId,
     employeeId,
-    "Leave request rejected",
-    "Your leave request has been rejected.",
-    "leave_rejected",
-    LEAVE_ROUTES.detail(leaveRequestId),
-  );
+    title: "Leave request rejected",
+    message: "Your leave request has been rejected.",
+    notificationType: "leave_rejected",
+    module: "leave",
+    priority: "high",
+    actionUrl: LEAVE_ROUTES.detail(leaveRequestId),
+    sourceEventKey: `leave_rejected:${leaveRequestId}:${employeeId}`,
+    templateKey: "leave_rejected",
+    createdBy: profile.userId,
+  });
 }

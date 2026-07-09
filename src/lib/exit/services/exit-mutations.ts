@@ -1,5 +1,7 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
+import { EXIT_ROUTES } from "@/lib/exit/constants";
+import { notifyEmployee } from "@/lib/notifications/services/notification-service";
 import { returnAsset } from "@/lib/assets/services/asset-mutations";
 import { listEmployeeAssets } from "@/lib/assets/services/asset-queries";
 import { autoGenerateLetterForEmployee } from "@/lib/documents/services/document-mutations";
@@ -450,6 +452,20 @@ export async function decideResignation(
     "HR approved resignation",
     "Clearance checklist and asset return list created.",
   );
+
+  await notifyEmployee(supabase, {
+    organizationId,
+    employeeId: row.employee_id,
+    title: "Exit approved",
+    message: "Your exit request has been approved. Clearance process has started.",
+    notificationType: "exit_approved",
+    module: "exit",
+    priority: "high",
+    actionUrl: EXIT_ROUTES.clearance,
+    sourceEventKey: `exit_approved:${row.id}`,
+    templateKey: "exit_approved",
+    createdBy: profile.userId,
+  });
 }
 
 export async function withdrawResignation(
