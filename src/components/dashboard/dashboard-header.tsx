@@ -1,102 +1,117 @@
 "use client";
 
 import { format } from "date-fns";
-import { Plus, Search } from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
-
-import { Button } from "@/components/common/button";
-import { Input } from "@/components/common/input";
-import { NotificationBell } from "@/components/notifications/notification-bell";
-import { QUICK_ACTION_ITEMS } from "@/lib/dashboard/constants";
-import type { DashboardPermissions } from "@/types/dashboard";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  BriefcaseBusiness,
+  CalendarDays,
+  Clock3,
+  Plus,
+  Search,
+  UserPlus,
+  Wallet,
+} from "lucide-react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
-function getGreeting(hour: number) {
+import { Input } from "@/components/common/input";
+import { buttonVariants } from "@/components/common/button";
+import { DASHBOARD_QUICK_ACTIONS } from "@/lib/dashboard/constants";
+import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
+import { hasPermission } from "@/lib/permissions/utils";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/providers/auth-provider";
+
+const ACTION_ICONS = {
+  "Add Employee": UserPlus,
+  "Apply Leave": CalendarDays,
+  "Run Payroll": Wallet,
+  "Create Job Opening": BriefcaseBusiness,
+} as const;
+
+function greetingForHour(hour: number) {
   if (hour < 12) return "Good Morning";
   if (hour < 17) return "Good Afternoon";
   return "Good Evening";
 }
 
-type DashboardHeaderProps = {
-  userName: string;
-  permissions: DashboardPermissions;
-};
-
-export function DashboardHeader({ userName, permissions }: DashboardHeaderProps) {
+export function DashboardHeader() {
   const router = useRouter();
+  const { profile } = useAuth();
   const [now, setNow] = useState(() => new Date());
-  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 30_000);
-    return () => clearInterval(timer);
+    const id = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(id);
   }, []);
 
-  const quickActions = QUICK_ACTION_ITEMS.filter((item) => permissions[item.permission]);
+  const firstName = profile.employee.firstName;
+  const greeting = greetingForHour(now.getHours());
+  const permissionCodes = profile.permissionCodes;
 
-  function onSearch(event: FormEvent) {
+  const actions = useMemo(
+    () =>
+      DASHBOARD_QUICK_ACTIONS.filter((action) =>
+        hasPermission(permissionCodes, action.permission),
+      ),
+    [permissionCodes],
+  );
+
+  function onSearch(event: React.FormEvent) {
     event.preventDefault();
-    const query = search.trim();
-    if (!query) return;
-    if (permissions.employees) {
-      router.push(`/dashboard/employees?search=${encodeURIComponent(query)}`);
-      return;
-    }
-    router.push(`/dashboard/attendance?search=${encodeURIComponent(query)}`);
+    const term = query.trim();
+    if (!term) return;
+    router.push(`${EMPLOYEE_ROUTES.list}?search=${encodeURIComponent(term)}`);
   }
 
   return (
-    <header className="flex flex-col gap-3 border-b bg-card/50 px-1 pb-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
       <div className="min-w-0">
-        <h1 className="truncate text-lg font-semibold tracking-tight sm:text-xl">
-          {getGreeting(now.getHours())}, {userName}
+        <h1 className="truncate text-xl font-semibold tracking-tight md:text-2xl">
+          {greeting}, {firstName}
         </h1>
-        <p className="text-xs text-muted-foreground sm:text-sm">
-          {format(now, "EEEE, MMMM d, yyyy")} · {format(now, "h:mm a")}
-        </p>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <span>{format(now, "EEEE, d MMMM yyyy")}</span>
+          <span className="inline-flex items-center gap-1">
+            <Clock3 className="size-3.5" />
+            {format(now, "hh:mm a")}
+          </span>
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <form onSubmit={onSearch} className="relative min-w-[180px] flex-1 sm:max-w-xs">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <form onSubmit={onSearch} className="relative min-w-0 flex-1 sm:w-56 lg:w-64">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Quick search..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Quick search employees…"
             className="h-8 pl-8 text-sm"
-            aria-label="Quick search"
+            aria-label="Quick search employees"
           />
         </form>
 
-        <NotificationBell />
-
-        {quickActions.length > 0 ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" className="h-8 gap-1.5">
-                <Plus className="size-3.5" />
-                Quick Actions
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel>Quick Actions</DropdownMenuLabel>
-              {quickActions.map((action) => (
-                <DropdownMenuItem key={action.key} asChild>
-                  <Link href={action.href}>{action.label}</Link>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {actions.map((action) => {
+            const Icon = ACTION_ICONS[action.label as keyof typeof ACTION_ICONS] ?? Plus;
+            return (
+              <Link
+                key={action.href}
+                href={action.href}
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "sm" }),
+                  "h-8 gap-1.5 px-2.5 text-xs",
+                )}
+              >
+                <Icon className="size-3.5" />
+                <span className="hidden xl:inline">{action.label}</span>
+                <span className="xl:hidden">{action.label.split(" ")[0]}</span>
+              </Link>
+            );
+          })}
+        </div>
       </div>
-    </header>
+    </div>
   );
 }

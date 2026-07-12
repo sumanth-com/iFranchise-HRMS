@@ -8,6 +8,7 @@ import {
   AuditStatusBadge,
 } from "@/components/audit/audit-status-badge";
 import { AUDIT_ROUTES, formatAuditAction, formatAuditModule } from "@/lib/audit/constants";
+import { humanizeActivityDescription } from "@/lib/common/display-text";
 import type { AuditListItem } from "@/types/audit";
 
 export function AuditTimeline({ items }: { items: AuditListItem[] }) {
@@ -28,7 +29,12 @@ export function AuditTimeline({ items }: { items: AuditListItem[] }) {
           <div className="min-w-0 flex-1 rounded-xl border bg-card p-4 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <p className="font-medium">{item.description ?? formatAuditAction(item.action)}</p>
+                <p className="font-medium">
+                  {humanizeActivityDescription(
+                    item.description,
+                    formatAuditAction(item.action),
+                  )}
+                </p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {item.userName ?? "System"} · {formatAuditModule(item.module)} ·{" "}
                   {format(new Date(item.occurredAt), "MMM d, yyyy HH:mm:ss")}

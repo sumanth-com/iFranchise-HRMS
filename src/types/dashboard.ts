@@ -1,18 +1,39 @@
-import type { ChartSeriesItem } from "@/types/reports";
+export type DashboardChartItem = {
+  label: string;
+  value: number;
+};
 
-export type DashboardPermissions = {
-  employees: boolean;
-  attendance: boolean;
-  leave: boolean;
-  payroll: boolean;
-  performance: boolean;
-  recruitment: boolean;
-  documents: boolean;
-  assets: boolean;
-  exit: boolean;
-  reports: boolean;
-  audit: boolean;
-  organization: boolean;
+export type DashboardPersonEvent = {
+  id: string;
+  name: string;
+  date: string;
+  subtitle: string | null;
+  href: string;
+};
+
+export type DashboardActivityItem = {
+  id: string;
+  title: string;
+  description: string;
+  module: string;
+  occurredAt: string;
+  href: string | null;
+};
+
+export type DashboardTaskItem = {
+  id: string;
+  label: string;
+  count: number | null;
+  href: string;
+  urgency: "high" | "medium" | "low";
+};
+
+export type DashboardListItem = {
+  id: string;
+  primary: string;
+  secondary: string;
+  meta: string;
+  href: string;
 };
 
 export type DashboardKpis = {
@@ -30,95 +51,37 @@ export type DashboardKpis = {
 export type DashboardSecondaryMetrics = {
   attendancePercent: number;
   leaveUtilizationPercent: number;
-  payrollStatus: string | null;
-  upcomingBirthdays: number;
-  upcomingAnniversaries: number;
+  payrollStatus: string;
+  upcomingBirthdaysCount: number;
+  upcomingAnniversariesCount: number;
   probationEndingSoon: number;
   documentsExpiring: number;
   assetsPendingReturn: number;
 };
 
-export type DashboardActivityItem = {
-  id: string;
-  title: string;
-  subtitle: string;
-  occurredAt: string;
-  module: string;
-  href: string;
-};
-
-export type DashboardTaskItem = {
-  id: string;
-  title: string;
-  subtitle?: string;
-  priority: "low" | "medium" | "high" | "critical";
-  href: string;
-};
-
-export type DashboardEventItem = {
-  id: string;
-  title: string;
-  date: string;
-  type: "birthday" | "anniversary" | "interview" | "holiday";
-  subtitle?: string;
-  href: string;
-};
-
-export type DashboardListEmployee = {
-  id: string;
-  employeeCode: string;
-  name: string;
-  department: string;
-  joinedAt: string;
-  href: string;
-};
-
-export type DashboardLeaveRequest = {
-  id: string;
-  employeeName: string;
-  leaveType: string;
-  days: number;
-  status: string;
-  startDate: string;
-  href: string;
-};
-
-export type DashboardRecruitmentActivity = {
-  id: string;
-  title: string;
-  candidateName: string;
-  createdAt: string;
-  href: string;
-};
-
-export type DashboardPayrollRun = {
-  id: string;
-  month: string;
-  status: string;
-  net: number;
-  processedAt: string | null;
-  href: string;
+export type DashboardCharts = {
+  headcountByDepartment: DashboardChartItem[];
+  attendanceTrend7Days: DashboardChartItem[];
+  monthlyHiring: DashboardChartItem[];
+  monthlyAttrition: DashboardChartItem[];
+  leaveDistribution: DashboardChartItem[];
+  genderDistribution: DashboardChartItem[];
+  employmentTypeDistribution: DashboardChartItem[];
 };
 
 export type HrDashboardData = {
-  userName: string;
-  permissions: DashboardPermissions;
+  generatedAt: string;
   kpis: DashboardKpis;
   secondary: DashboardSecondaryMetrics;
+  charts: DashboardCharts;
   activities: DashboardActivityItem[];
   tasks: DashboardTaskItem[];
-  charts: {
-    headcountByDepartment: ChartSeriesItem[];
-    attendanceTrend7Day: ChartSeriesItem[];
-    monthlyHiring: ChartSeriesItem[];
-    monthlyAttrition: ChartSeriesItem[];
-    leaveDistribution: ChartSeriesItem[];
-    genderDistribution: ChartSeriesItem[];
-    employmentTypeDistribution: ChartSeriesItem[];
-  };
-  upcomingEvents: DashboardEventItem[];
-  recentEmployees: DashboardListEmployee[];
-  recentLeaveRequests: DashboardLeaveRequest[];
-  recentRecruitment: DashboardRecruitmentActivity[];
-  recentPayrollRuns: DashboardPayrollRun[];
+  upcomingBirthdays: DashboardPersonEvent[];
+  upcomingAnniversaries: DashboardPersonEvent[];
+  upcomingInterviews: DashboardListItem[];
+  upcomingHolidays: DashboardListItem[];
+  recentEmployees: DashboardListItem[];
+  recentLeaveRequests: DashboardListItem[];
+  recentRecruitment: DashboardListItem[];
+  recentPayrollRuns: DashboardListItem[];
 };

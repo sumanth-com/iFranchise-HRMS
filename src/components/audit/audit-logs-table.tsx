@@ -18,6 +18,7 @@ import {
   formatAuditAction,
   formatAuditModule,
 } from "@/lib/audit/constants";
+import { humanizeActivityDescription } from "@/lib/common/display-text";
 import type { AuditListItem, AuditListResult } from "@/types/audit";
 
 type Props = {
@@ -66,7 +67,11 @@ export function AuditLogsTable({ result, canExport, filters }: Props) {
         key: "description",
         header: "Description",
         className: "max-w-xs",
-        render: (row) => <span className="line-clamp-2 text-sm text-muted-foreground">{row.description ?? "—"}</span>,
+        render: (row) => (
+          <span className="line-clamp-2 text-sm text-muted-foreground">
+            {humanizeActivityDescription(row.description, "—")}
+          </span>
+        ),
       },
       { key: "ipAddress", header: "IP Address", render: (row) => row.ipAddress ?? "—" },
       { key: "deviceType", header: "Device", render: (row) => row.deviceType ?? "—" },

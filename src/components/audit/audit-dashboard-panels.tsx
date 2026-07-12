@@ -2,6 +2,7 @@ import { format } from "date-fns";
 
 import { ChartCard, BarRow } from "@/components/reports/report-chart-cards";
 import { formatAuditModule } from "@/lib/audit/constants";
+import { humanizeActivityDescription } from "@/lib/common/display-text";
 import type { AuditDashboardStats } from "@/types/audit";
 
 function seriesMax(items: { count: number }[]) {
@@ -65,7 +66,9 @@ export function AuditDashboardPanels({ stats }: { stats: AuditDashboardStats }) 
           <ul className="mt-3 space-y-3">
             {stats.recentChanges.map((item) => (
               <li key={item.id} className="border-b pb-3 last:border-0 last:pb-0">
-                <p className="text-sm font-medium">{item.description ?? item.action}</p>
+                <p className="text-sm font-medium">
+                  {humanizeActivityDescription(item.description, item.action)}
+                </p>
                 <p className="text-xs text-muted-foreground">
                   {formatAuditModule(item.module)} · {item.userName ?? "System"} ·{" "}
                   {format(new Date(item.occurredAt), "MMM d, h:mm a")}

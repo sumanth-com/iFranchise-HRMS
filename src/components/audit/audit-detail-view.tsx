@@ -5,6 +5,7 @@ import {
   AuditStatusBadge,
 } from "@/components/audit/audit-status-badge";
 import { formatAuditAction, formatAuditModule } from "@/lib/audit/constants";
+import { humanizeActivityDescription } from "@/lib/common/display-text";
 import type { AuditDetail } from "@/types/audit";
 
 function JsonBlock({ title, data }: { title: string; data: Record<string, unknown> | null }) {
@@ -26,7 +27,12 @@ export function AuditDetailView({ detail }: { detail: AuditDetail }) {
       <div className="rounded-xl border bg-card p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-xl font-semibold">{detail.description ?? formatAuditAction(detail.action)}</h2>
+            <h2 className="text-xl font-semibold">
+              {humanizeActivityDescription(
+                detail.description,
+                formatAuditAction(detail.action),
+              )}
+            </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {format(new Date(detail.occurredAt), "EEEE, MMMM d, yyyy 'at' HH:mm:ss")}
             </p>
