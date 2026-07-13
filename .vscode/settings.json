@@ -1,0 +1,13 @@
+{
+  "files.associations": {
+    ".env": "dotenv",
+    ".env.local": "dotenv",
+    ".env.example": "dotenv",
+    ".env.development": "dotenv",
+    ".env.production": "dotenv",
+    ".env.*": "dotenv"
+  },
+  "workbench.editor.languageDetection": false,
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
+}
