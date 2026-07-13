@@ -7,6 +7,7 @@ import {
   archiveDocument,
   createSignedDocumentUrl,
   createTemplate,
+  deleteCompanyLetter,
   deleteTemplate,
   generateCompanyLetter,
   publishLetter,
@@ -214,6 +215,24 @@ export async function publishLetterAction(letterId: string) {
     return {
       success: false as const,
       message: error instanceof Error ? error.message : "Failed to publish letter",
+    };
+  }
+}
+
+export async function deleteCompanyLetterAction(letterId: string) {
+  try {
+    const profile = await requireServerAnyPermission([
+      "documents.generate",
+      "documents.manage",
+    ]);
+    const supabase = await createClient();
+    await deleteCompanyLetter(supabase, profile, letterId);
+    revalidateDocuments();
+    return { success: true as const };
+  } catch (error) {
+    return {
+      success: false as const,
+      message: error instanceof Error ? error.message : "Failed to delete letter",
     };
   }
 }

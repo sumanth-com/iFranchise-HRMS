@@ -1,7 +1,9 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 import { useNavigation } from "@/hooks/use-permissions";
 import { useSidebar } from "@/hooks/use-sidebar";
@@ -11,6 +13,16 @@ export function Sidebar() {
   const pathname = usePathname();
   const { isCollapsed } = useSidebar();
   const navigation = useNavigation();
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    Administration: true,
+  });
+
+  function toggleSection(section: string) {
+    setOpenSections((current) => ({
+      ...current,
+      [section]: !(current[section] ?? true),
+    }));
+  }
 
   return (
     <aside
@@ -43,29 +55,43 @@ export function Sidebar() {
           const Icon = item.icon;
           const prevSection = index > 0 ? navigation[index - 1]?.section : undefined;
           const showSection = item.section && item.section !== prevSection && !isCollapsed;
+          const sectionOpen = item.section ? (openSections[item.section] ?? true) : true;
 
           return (
             <div key={item.href}>
               {showSection ? (
-                <p className="mb-1 mt-3 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground first:mt-0">
-                  {item.section}
-                </p>
+                <button
+                  type="button"
+                  onClick={() => toggleSection(item.section!)}
+                  className="mb-2 mt-4 flex w-full items-center justify-between border-t px-3 pt-4 text-left text-sm font-medium text-sidebar-foreground first:mt-0 first:border-t-0 first:pt-0"
+                >
+                  <span>{item.section}</span>
+                  <ChevronDown
+                    className={cn(
+                      "size-4 text-muted-foreground transition-transform",
+                      sectionOpen && "rotate-180",
+                    )}
+                  />
+                </button>
               ) : null}
-              <Link
-                href={item.disabled ? "#" : item.href}
-                aria-disabled={item.disabled}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  item.disabled && "pointer-events-none opacity-50",
-                  isCollapsed && "justify-center px-2",
-                )}
-              >
-                <Icon className="size-4 shrink-0" />
-                {!isCollapsed ? <span>{item.title}</span> : null}
-              </Link>
+              {sectionOpen ? (
+                <Link
+                  href={item.disabled ? "#" : item.href}
+                  aria-disabled={item.disabled}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    item.section && !isCollapsed && "ml-2",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    item.disabled && "pointer-events-none opacity-50",
+                    isCollapsed && "justify-center px-2",
+                  )}
+                >
+                  <Icon className="size-4 shrink-0" />
+                  {!isCollapsed ? <span>{item.title}</span> : null}
+                </Link>
+              ) : null}
             </div>
           );
         })}

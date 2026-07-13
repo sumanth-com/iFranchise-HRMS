@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -20,7 +20,6 @@ import {
   Layers,
   MoreHorizontal,
   Plus,
-  Search,
   SlidersHorizontal,
   User,
   UserCheck,
@@ -34,7 +33,6 @@ import {
   type LeaveAdvancedFilterValues,
 } from "@/components/leave/leave-advanced-filters-sheet";
 import { Button, buttonVariants } from "@/components/common/button";
-import { Input } from "@/components/common/input";
 import { Modal } from "@/components/common/modal";
 import { Label } from "@/components/ui/label";
 import {
@@ -60,6 +58,7 @@ import {
 import {
   approveLeaveRequestAction,
   cancelLeaveRequestAction,
+  fetchLeaveRequestsAction,
   rejectLeaveRequestAction,
 } from "@/lib/leave/actions";
 import {
@@ -67,7 +66,7 @@ import {
   LEAVE_STATUS_LABELS,
 } from "@/lib/leave/constants";
 import { formatLeaveDate } from "@/lib/leave/services/leave-utils";
-import type { LeaveListItem } from "@/types/leave";
+import type { LeaveListItem, LeaveListParams } from "@/types/leave";
 import type { LookupOption } from "@/types/employee";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -86,9 +85,11 @@ type LeaveTableProps = {
   branchId?: string;
   approverId?: string;
   reportingManagerId?: string;
+  employeeId?: string;
   leaveTypes: LookupOption[];
   departments: LookupOption[];
   branches: LookupOption[];
+  employees: LookupOption[];
   approvers: LookupOption[];
   managers: LookupOption[];
   canCreate: boolean;
@@ -106,7 +107,7 @@ const TABLE_HEAD_CLASS =
 const TABLE_CELL_CLASS = "relative align-middle";
 
 const FILTER_CONTROL_CLASS =
-  "h-9 w-full min-w-0 gap-2 [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-muted-foreground/70";
+  "h-10 w-full min-w-0 gap-2 rounded-lg [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-muted-foreground/70";
 
 const MONTH_ITEMS = [
   { value: "1", label: "January" },
@@ -175,11 +176,11 @@ function buildYearItems(currentYear: number) {
 }
 
 export function LeaveTable({
-  records,
-  total,
-  page,
-  pageSize,
-  search,
+  records: initialRecords,
+  total: initialTotal,
+  page: initialPage,
+  pageSize: initialPageSize,
+  search: initialSearch,
   month,
   year,
   leaveStatus,
@@ -188,9 +189,11 @@ export function LeaveTable({
   branchId,
   approverId,
   reportingManagerId,
+  employeeId,
   leaveTypes,
   departments,
   branches,
+  employees,
   approvers,
   managers,
   canCreate,
@@ -199,7 +202,6 @@ export function LeaveTable({
   canCancel,
 }: LeaveTableProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [approveTarget, setApproveTarget] = useState<LeaveListItem | null>(null);
@@ -208,29 +210,73 @@ export function LeaveTable({
   const [approveComments, setApproveComments] = useState("");
   const [rejectComments, setRejectComments] = useState("");
 
+  useEffect(() => {
+    if (window.location.search) {
+      window.history.replaceState(null, "", LEAVE_ROUTES.list);
+    }
+  }, []);
+
   const now = new Date();
-  const currentMonth = month ?? now.getMonth() + 1;
-  const currentYear = year ?? now.getFullYear();
+  const defaultMonth = month ?? now.getMonth() + 1;
+  const defaultYear = year ?? now.getFullYear();
+  const [tableState, setTableState] = useState({
+    records: initialRecords,
+    total: initialTotal,
+    page: initialPage,
+    pageSize: initialPageSize,
+  });
+  const [filters, setFilters] = useState<LeaveListParams>({
+    page: initialPage,
+    pageSize: initialPageSize,
+    search: initialSearch,
+    month: defaultMonth,
+    year: defaultYear,
+    leaveStatus: leaveStatus as LeaveListParams["leaveStatus"],
+    leaveTypeId,
+    departmentId,
+    branchId,
+    approverId,
+    reportingManagerId,
+    employeeId,
+  });
+  const currentMonth = filters.month ?? defaultMonth;
+  const currentYear = filters.year ?? defaultYear;
 
   const updateParams = useCallback(
     (updates: Record<string, string | undefined>) => {
-      const params = new URLSearchParams(searchParams.toString());
+      const nextFilters: LeaveListParams = {
+        ...filters,
+        page: updates.page ? Number(updates.page) : filters.page,
+        month: updates.month ? Number(updates.month) : filters.month,
+        year: updates.year ? Number(updates.year) : filters.year,
+      };
 
       Object.entries(updates).forEach(([key, value]) => {
-        if (!value) {
-          params.delete(key);
-        } else {
-          params.set(key, value);
-        }
+        if (["page", "month", "year"].includes(key)) return;
+        (nextFilters as Record<string, unknown>)[key] = value || undefined;
       });
 
-      startTransition(() => {
-        router.push(`${LEAVE_ROUTES.list}?${params.toString()}`);
+      setFilters(nextFilters);
+
+      startTransition(async () => {
+        const result = await fetchLeaveRequestsAction(nextFilters);
+        if (!result.success) {
+          toast.error(result.message);
+          return;
+        }
+
+        setTableState({
+          records: result.data.data,
+          total: result.data.total,
+          page: result.data.page,
+          pageSize: result.data.pageSize,
+        });
       });
     },
-    [router, searchParams, startTransition],
+    [filters],
   );
 
+  const { records, total, page, pageSize } = tableState;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const yearItems = useMemo(() => buildYearItems(currentYear), [currentYear]);
@@ -254,26 +300,40 @@ export function LeaveTable({
     [leaveTypes],
   );
 
+  const employeeItems = useMemo(
+    () => [
+      { value: "", label: "All employees" },
+      ...employees.map((employee) => ({
+        value: employee.id,
+        label: employee.code
+          ? `${employee.label} (${employee.code})`
+          : employee.label,
+      })),
+    ],
+    [employees],
+  );
+
   const advancedValues: LeaveAdvancedFilterValues = {
-    departmentId,
-    branchId,
-    reportingManagerId,
-    approverId,
+    departmentId: filters.departmentId,
+    branchId: filters.branchId,
+    reportingManagerId: filters.reportingManagerId,
+    approverId: filters.approverId,
   };
 
   const advancedFilterCount = [
-    departmentId,
-    branchId,
-    reportingManagerId,
-    approverId,
+    filters.departmentId,
+    filters.branchId,
+    filters.reportingManagerId,
+    filters.approverId,
   ].filter(Boolean).length;
 
   const isDefaultView =
     currentMonth === now.getMonth() + 1 &&
     currentYear === now.getFullYear() &&
-    !search &&
-    !leaveStatus &&
-    !leaveTypeId &&
+    !filters.search &&
+    !filters.employeeId &&
+    !filters.leaveStatus &&
+    !filters.leaveTypeId &&
     advancedFilterCount === 0;
 
   const hasActiveFilters = !isDefaultView;
@@ -495,26 +555,40 @@ export function LeaveTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between xl:gap-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <div className="relative w-full shrink-0 sm:w-[20rem]">
-            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground/70" />
-            <Input
-              placeholder="Name, code, or email..."
-              defaultValue={search}
-              className="h-9 pl-8"
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  updateParams({
-                    search: event.currentTarget.value || undefined,
-                    page: "1",
-                  });
-                }
-              }}
-            />
+      <div className="grid gap-2 lg:grid-cols-[minmax(15rem,1.35fr)_minmax(8rem,0.75fr)_minmax(6rem,0.55fr)_minmax(9rem,0.75fr)_minmax(10rem,0.9fr)_auto_auto_auto] lg:items-center">
+          <div className="min-w-0">
+            <Select
+              items={employeeItems}
+              value={filters.employeeId ?? ""}
+              onValueChange={(value) =>
+                updateParams({
+                  employeeId: value || undefined,
+                  search: undefined,
+                  departmentId: undefined,
+                  branchId: undefined,
+                  reportingManagerId: undefined,
+                  page: "1",
+                })
+              }
+            >
+              <SelectTrigger className={FILTER_CONTROL_CLASS}>
+                <SelectValue placeholder="All employees" />
+              </SelectTrigger>
+              <SelectContent
+                align="start"
+                alignItemWithTrigger={false}
+                className="min-w-[18rem] max-w-[24rem]"
+              >
+                {employeeItems.map((item) => (
+                  <SelectItem key={item.value || "all-employees"} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          <div className="w-full shrink-0 sm:w-[8rem]">
+          <div className="min-w-0">
             <Select
               items={MONTH_ITEMS}
               value={String(currentMonth)}
@@ -535,7 +609,7 @@ export function LeaveTable({
             </Select>
           </div>
 
-          <div className="w-full shrink-0 sm:w-[6rem]">
+          <div className="min-w-0">
             <Select
               items={yearItems}
               value={String(currentYear)}
@@ -556,10 +630,10 @@ export function LeaveTable({
             </Select>
           </div>
 
-          <div className="w-full shrink-0 sm:w-[8.25rem]">
+          <div className="min-w-0">
             <Select
               items={statusItems}
-              value={leaveStatus ?? ""}
+              value={filters.leaveStatus ?? ""}
               onValueChange={(value) =>
                 updateParams({ leaveStatus: value || undefined, page: "1" })
               }
@@ -577,10 +651,10 @@ export function LeaveTable({
             </Select>
           </div>
 
-          <div className="w-full shrink-0 sm:w-[11rem]">
+          <div className="min-w-0">
             <Select
               items={leaveTypeItems}
-              value={leaveTypeId ?? ""}
+              value={filters.leaveTypeId ?? ""}
               onValueChange={(value) =>
                 updateParams({ leaveTypeId: value || undefined, page: "1" })
               }
@@ -601,7 +675,7 @@ export function LeaveTable({
           <Button
             variant="outline"
             size="sm"
-            className="h-9 shrink-0 gap-1.5 whitespace-nowrap"
+            className="h-10 shrink-0 gap-1.5 whitespace-nowrap"
             onClick={() => setAdvancedOpen(true)}
           >
             <SlidersHorizontal className="size-3.5" />
@@ -612,18 +686,17 @@ export function LeaveTable({
               </span>
             ) : null}
           </Button>
-        </div>
-
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 lg:contents">
           {hasActiveFilters ? (
             <Button
               variant="outline"
               size="sm"
-              className="h-9 whitespace-nowrap"
+              className="h-10 whitespace-nowrap"
               disabled={isPending}
               onClick={() =>
                 updateParams({
                   search: undefined,
+                  employeeId: undefined,
                   leaveStatus: undefined,
                   leaveTypeId: undefined,
                   departmentId: undefined,
@@ -645,7 +718,7 @@ export function LeaveTable({
               href={LEAVE_ROUTES.new}
               className={cn(
                 buttonVariants(),
-                "h-9 whitespace-nowrap px-4",
+                "h-10 whitespace-nowrap px-4",
               )}
             >
               <Plus className="size-4" />

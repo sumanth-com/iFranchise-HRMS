@@ -13,6 +13,7 @@ import type { PayrollSummary } from "@/types/payroll";
 
 type PayrollSummaryCardsProps = {
   summary: PayrollSummary;
+  compact?: boolean;
 };
 
 const CARDS = [
@@ -60,28 +61,28 @@ const CARDS = [
   },
 ];
 
-export function PayrollSummaryCards({ summary }: PayrollSummaryCardsProps) {
+export function PayrollSummaryCards({ summary, compact = false }: PayrollSummaryCardsProps) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
       {CARDS.map((card) => {
         const Icon = card.icon;
         const value = summary[card.key];
         return (
           <div
             key={card.key}
-            className="rounded-xl border bg-card p-4 shadow-sm"
+            className="rounded-xl border bg-card p-3.5 shadow-sm"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   {PAYROLL_SUMMARY_LABELS[card.key]}
                 </p>
-                <p className="mt-2 text-2xl font-semibold tracking-tight">
+                <p className={compact ? "mt-1.5 text-xl font-semibold tracking-tight" : "mt-2 text-2xl font-semibold tracking-tight"}>
                   {card.format(value)}
                 </p>
               </div>
               <div className={`rounded-lg p-2 ${card.bg}`}>
-                <Icon className={`h-5 w-5 ${card.accent}`} />
+                <Icon className={`${compact ? "h-4 w-4" : "h-5 w-5"} ${card.accent}`} />
               </div>
             </div>
           </div>

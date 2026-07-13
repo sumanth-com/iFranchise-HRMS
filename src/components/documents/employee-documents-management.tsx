@@ -1,15 +1,16 @@
 "use client";
 
-import { format } from "date-fns";
 import {
-  Archive,
+  CircleUserRound,
   Download,
   Eye,
   FileUp,
   Loader2,
   RefreshCw,
+  Share2,
   ShieldCheck,
   ShieldX,
+  Trash2,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
@@ -18,6 +19,7 @@ import { Button } from "@/components/common/button";
 import { DataTable, type DataTableColumn } from "@/components/common/data-table";
 import { EmptyState } from "@/components/common/empty-state";
 import { Input } from "@/components/common/input";
+import { Modal } from "@/components/common/modal";
 import { DocumentUploadModal } from "@/components/documents/document-upload-modal";
 import { useDocumentFileActions } from "@/components/documents/use-document-actions";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
@@ -53,6 +55,9 @@ export function EmployeeDocumentsManagement({
   const [isPending, startTransition] = useTransition();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [replaceDoc, setReplaceDoc] = useState<EmployeeDocumentItem | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<EmployeeDocumentItem | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<EmployeeDocumentItem | null>(null);
   const actions = useDocumentFileActions(() => router.refresh());
 
   const canUpload = canUploadDocuments(permissionCodes);
@@ -71,15 +76,28 @@ export function EmployeeDocumentsManagement({
     });
   }
 
+  async function openPreview(row: EmployeeDocumentItem) {
+    setPreviewDoc(row);
+    setPreviewUrl(null);
+    const url = await actions.getSignedUrl(row.storagePath);
+    if (url) setPreviewUrl(url);
+    else setPreviewDoc(null);
+  }
+
   const columns = useMemo<DataTableColumn<EmployeeDocumentItem & Record<string, unknown>>[]>(
     () => [
       {
         key: "employeeCode",
         header: "Employee",
         render: (row) => (
-          <div>
-            <p className="font-medium">{row.employeeName}</p>
-            <p className="text-xs text-muted-foreground">{row.employeeCode}</p>
+          <div className="flex items-center gap-2.5">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <CircleUserRound className="size-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate font-medium">{row.employeeName}</p>
+              <p className="text-xs text-muted-foreground">{row.employeeCode}</p>
+            </div>
           </div>
         ),
       },
@@ -114,12 +132,6 @@ export function EmployeeDocumentsManagement({
         ),
       },
       {
-        key: "expiryDate",
-        header: "Expiry",
-        render: (row) =>
-          row.expiryDate ? format(new Date(row.expiryDate), "dd MMM yyyy") : "—",
-      },
-      {
         key: "actions",
         header: "Actions",
         render: (row) => (
@@ -127,18 +139,29 @@ export function EmployeeDocumentsManagement({
             <Button
               size="icon-sm"
               variant="ghost"
-              onClick={() => actions.openSigned(row.storagePath, "preview")}
-              aria-label="Preview"
+              onClick={() => void openPreview(row)}
+              aria-label="Preview document"
+              title="Preview document"
             >
               <Eye className="h-4 w-4" />
             </Button>
             <Button
               size="icon-sm"
               variant="ghost"
-              onClick={() => actions.openSigned(row.storagePath, "download")}
-              aria-label="Download"
+              onClick={() => void actions.download(row.storagePath, row.fileName)}
+              aria-label="Download document"
+              title="Download document"
             >
               <Download className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              onClick={() => void actions.share(row.storagePath, row.title)}
+              aria-label="Share document"
+              title="Share document"
+            >
+              <Share2 className="h-4 w-4" />
             </Button>
             {canUpload && !(row.isOfficial && selfOnly) ? (
               <Button
@@ -148,7 +171,8 @@ export function EmployeeDocumentsManagement({
                   setReplaceDoc(row);
                   setUploadOpen(true);
                 }}
-                aria-label="Replace"
+                aria-label="Replace document"
+                title="Replace document"
               >
                 <RefreshCw className="h-4 w-4" />
               </Button>
@@ -159,7 +183,8 @@ export function EmployeeDocumentsManagement({
                   size="icon-sm"
                   variant="ghost"
                   onClick={() => actions.verify(row.id, "verified")}
-                  aria-label="Verify"
+                  aria-label="Verify document"
+                  title="Verify document"
                 >
                   <ShieldCheck className="h-4 w-4 text-emerald-600" />
                 </Button>
@@ -167,7 +192,8 @@ export function EmployeeDocumentsManagement({
                   size="icon-sm"
                   variant="ghost"
                   onClick={() => actions.verify(row.id, "rejected")}
-                  aria-label="Reject"
+                  aria-label="Reject document"
+                  title="Reject document"
                 >
                   <ShieldX className="h-4 w-4 text-destructive" />
                 </Button>
@@ -176,11 +202,12 @@ export function EmployeeDocumentsManagement({
             {canDelete ? (
               <Button
                 size="icon-sm"
-                variant="ghost"
-                onClick={() => actions.archive(row.id)}
-                aria-label="Archive"
+                variant="destructive"
+                onClick={() => setDeleteTarget(row)}
+                aria-label="Delete document"
+                title="Delete document"
               >
-                <Archive className="h-4 w-4" />
+                <Trash2 className="h-4 w-4" />
               </Button>
             ) : null}
           </div>
@@ -212,7 +239,7 @@ export function EmployeeDocumentsManagement({
         ) : null}
       </div>
 
-      <div className="grid gap-3 rounded-xl border bg-card p-4 shadow-sm md:grid-cols-2 xl:grid-cols-5">
+      <div className="relative z-20 grid gap-3 rounded-xl border bg-card p-4 shadow-sm md:grid-cols-2 xl:grid-cols-5">
         <Input
           placeholder="Search title or file…"
           defaultValue={searchParams.get("search") ?? ""}
@@ -234,6 +261,7 @@ export function EmployeeDocumentsManagement({
               updateParams({ employeeId: value === "__all__" ? undefined : value })
             }
             placeholder="Employee"
+            contentClassName="min-w-72"
           />
         ) : null}
         {!selfOnly ? (
@@ -330,6 +358,81 @@ export function EmployeeDocumentsManagement({
         defaultTitle={replaceDoc?.title}
         lockEmployee={selfOnly || Boolean(replaceDoc)}
       />
+
+      <Modal
+        open={Boolean(previewDoc)}
+        onOpenChange={(next) => {
+          if (!next) {
+            setPreviewDoc(null);
+            setPreviewUrl(null);
+          }
+        }}
+        title={previewDoc?.title ?? "Document Preview"}
+        description={previewDoc ? `${previewDoc.employeeName} · ${previewDoc.documentTypeName}` : undefined}
+        contentClassName="sm:max-w-5xl"
+        footer={
+          previewDoc ? (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                onClick={() => void actions.share(previewDoc.storagePath, previewDoc.title)}
+              >
+                <Share2 className="mr-2 h-4 w-4" />
+                Share
+              </Button>
+              <Button onClick={() => void actions.download(previewDoc.storagePath, previewDoc.fileName)}>
+                <Download className="mr-2 h-4 w-4" />
+                Download
+              </Button>
+            </div>
+          ) : null
+        }
+      >
+        <div className="h-[70vh] overflow-hidden rounded-xl border bg-muted/30">
+          {previewUrl ? (
+            <iframe
+              src={previewUrl}
+              title={previewDoc?.title ?? "Document preview"}
+              className="h-full w-full bg-background"
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading preview…
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(deleteTarget)}
+        onOpenChange={(next) => !next && setDeleteTarget(null)}
+        title="Delete document?"
+        description="This will archive the document from the employee folder. You can upload a replacement later if needed."
+        footer={
+          <Button
+            variant="destructive"
+            disabled={actions.isPending}
+            onClick={() => {
+              if (!deleteTarget) return;
+              actions.archive(deleteTarget.id);
+              setDeleteTarget(null);
+            }}
+          >
+            {actions.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Delete Document
+          </Button>
+        }
+      >
+        {deleteTarget ? (
+          <div className="rounded-xl border bg-muted/30 p-4 text-sm">
+            <p className="font-medium">{deleteTarget.title}</p>
+            <p className="mt-1 text-muted-foreground">
+              {deleteTarget.employeeName} · {deleteTarget.fileName}
+            </p>
+          </div>
+        ) : null}
+      </Modal>
     </>
   );
 }

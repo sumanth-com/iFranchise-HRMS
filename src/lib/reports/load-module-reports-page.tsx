@@ -26,7 +26,6 @@ function parseFilters(
     dateFrom: firstString(raw.dateFrom) ?? fallback.dateFrom,
     dateTo: firstString(raw.dateTo) ?? fallback.dateTo,
     departmentId: firstString(raw.departmentId),
-    branchId: firstString(raw.branchId),
     designationId: firstString(raw.designationId),
     employeeId: firstString(raw.employeeId),
     status: firstString(raw.status),

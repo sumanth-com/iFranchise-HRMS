@@ -54,8 +54,7 @@ export type EmployeeListParams = {
   search?: string;
   sortBy?: EmployeeSortField;
   sortOrder?: "asc" | "desc";
-  branchId?: string;
-  departmentId?: string;
+  department?: string;
   employmentStatus?: EmploymentStatus;
 };
 

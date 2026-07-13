@@ -39,30 +39,32 @@ export function OrganizationSearch() {
       results.workLocations.length > 0);
 
   return (
-    <div className="rounded-xl border bg-card p-6 shadow-sm">
-      <h3 className="text-sm font-semibold">Global Search</h3>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Search departments, branches, designations, and work locations.
-      </p>
-      <form onSubmit={handleSearch} className="mt-4 flex gap-2">
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search organization..."
-          className="flex-1"
-        />
-        <Button type="submit" disabled={isPending}>
+    <div className="rounded-xl border bg-card p-4 shadow-sm">
+      <form onSubmit={handleSearch} className="flex flex-col gap-3 lg:flex-row lg:items-end">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-semibold">Global Search</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Search departments, branches, designations, and work locations.
+          </p>
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search organization..."
+            className="mt-2 h-9"
+          />
+        </div>
+        <Button type="submit" disabled={isPending} className="h-9 lg:w-28">
           <Search className="mr-2 h-4 w-4" />
           Search
         </Button>
       </form>
 
       {results && !hasResults ? (
-        <p className="mt-4 text-sm text-muted-foreground">No results found.</p>
+        <p className="mt-3 text-sm text-muted-foreground">No results found.</p>
       ) : null}
 
       {hasResults ? (
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {results!.departments.length > 0 ? (
             <div>
               <p className="text-xs font-medium uppercase text-muted-foreground">Departments</p>

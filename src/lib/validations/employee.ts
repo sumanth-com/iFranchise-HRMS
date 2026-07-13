@@ -45,8 +45,12 @@ export const employeeListParamsSchema = z.object({
     ])
     .default("employee_code"),
   sortOrder: z.enum(["asc", "desc"]).default("asc"),
-  branchId: z.string().uuid().optional(),
-  departmentId: z.string().uuid().optional(),
+  department: z
+    .string()
+    .trim()
+    .min(1)
+    .max(20)
+    .optional(),
   employmentStatus: employmentStatusSchema.optional(),
 });
 
@@ -139,6 +143,14 @@ export const employeeUpdateSchema = z
     employmentStatus: employmentStatusSchema,
     dateOfJoining: z.string().optional().or(z.literal("")),
     dateOfLeaving: z.string().optional().or(z.literal("")),
+    dateOfBirth: z.string().optional().or(z.literal("")),
+    gender: genderTypeSchema.optional(),
+    maritalStatus: maritalStatusSchema.optional(),
+    nationality: z.string().max(100).optional().or(z.literal("")),
+    bloodGroup: z.string().max(10).optional().or(z.literal("")),
+    personalEmail: z.string().email().optional().or(z.literal("")),
+    personalPhone: z.string().max(30).optional().or(z.literal("")),
+    bio: z.string().max(1000).optional().or(z.literal("")),
   })
   .superRefine((data, ctx) => {
     if (

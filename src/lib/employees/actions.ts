@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { requireServerPermission } from "@/lib/permissions/server";
-import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
+import { EMPLOYEE_ROUTES, PROFILE_IMAGE_MAX_BYTES } from "@/lib/employees/constants";
 import {
   getEmployeeById,
   getEmployeeAttendance,
@@ -391,6 +391,14 @@ export async function uploadProfileImageAction(
 
     if (!(file instanceof File)) {
       return { success: false, message: "No file provided" };
+    }
+
+    if (!file.type.startsWith("image/")) {
+      return { success: false, message: "Please select an image file" };
+    }
+
+    if (file.size > PROFILE_IMAGE_MAX_BYTES) {
+      return { success: false, message: "Profile image must be 15 MB or smaller" };
     }
 
     const supabase = await getAuthenticatedSupabase();

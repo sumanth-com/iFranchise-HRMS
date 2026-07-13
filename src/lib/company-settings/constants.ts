@@ -22,31 +22,6 @@ export const COMPANY_SETTINGS_SECTIONS: {
     description: "Legal identity, contact details, and regional preferences.",
   },
   {
-    id: "working",
-    title: "Working Configuration",
-    description: "Office hours, working days, breaks, and shift defaults.",
-  },
-  {
-    id: "leave",
-    title: "Leave Policies",
-    description: "Leave year, approvals, carry forward, and encashment rules.",
-  },
-  {
-    id: "payroll",
-    title: "Payroll Configuration",
-    description: "Payroll cycle, statutory deductions, and salary components.",
-  },
-  {
-    id: "recruitment",
-    title: "Recruitment Configuration",
-    description: "Numbering prefixes, hiring defaults, and auto onboarding.",
-  },
-  {
-    id: "performance",
-    title: "Performance Configuration",
-    description: "Review cycles, rating scales, and promotion eligibility.",
-  },
-  {
     id: "notifications",
     title: "Notification Configuration",
     description: "Email, in-app delivery, reminders, and digest settings.",

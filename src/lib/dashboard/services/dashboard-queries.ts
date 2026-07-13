@@ -5,7 +5,6 @@ import {
   parseISO,
   subDays,
   subMonths,
-  startOfMonth,
   differenceInYears,
 } from "date-fns";
 
@@ -14,7 +13,6 @@ import { getAttendanceSummary } from "@/lib/attendance/services/attendance-queri
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { ASSETS_ROUTES } from "@/lib/assets/constants";
 import { DOCUMENTS_ROUTES } from "@/lib/documents/constants";
-import { getDocumentsSummary, getExpiringSummary } from "@/lib/documents/services/document-queries";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
 import { EXIT_ROUTES } from "@/lib/exit/constants";
 import { getExitSummary } from "@/lib/exit/services/exit-queries";
@@ -138,6 +136,71 @@ function humanizeActivityDescription(
   return fallback || "System activity";
 }
 
+const PREFERRED_ACTIVITY_MODULES = new Set([
+  "employees",
+  "leave",
+  "recruitment",
+  "payroll",
+  "exit",
+  "attendance",
+]);
+
+const NOISE_ACTIVITY_PATTERN =
+  /notification|template|setting|preference|reminder|webhook|cron|seed|schema/i;
+
+function isMeaningfulActivity(row: {
+  module?: string | null;
+  action?: string | null;
+  description?: string | null;
+  table_name?: string | null;
+}): boolean {
+  const module = String(row.module ?? "").toLowerCase();
+  const action = String(row.action ?? "");
+  const description = String(row.description ?? "");
+  const tableName = String(row.table_name ?? "");
+
+  if (NOISE_ACTIVITY_PATTERN.test(module)) return false;
+  if (NOISE_ACTIVITY_PATTERN.test(action)) return false;
+  if (NOISE_ACTIVITY_PATTERN.test(description)) return false;
+  if (NOISE_ACTIVITY_PATTERN.test(tableName)) return false;
+
+  if (PREFERRED_ACTIVITY_MODULES.has(module)) return true;
+
+  // Allow generic create/update/approve/schedule/process/complete on core tables.
+  return /employee|leave|interview|payroll|offer|resign|exit|attend/i.test(
+    `${action} ${description} ${tableName}`,
+  );
+}
+
+function preferredActivityTitle(
+  action: string | null | undefined,
+  module: string | null | undefined,
+  tableName: string | null | undefined,
+): string {
+  const haystack = `${action ?? ""} ${module ?? ""} ${tableName ?? ""}`.toLowerCase();
+
+  if (/employee/.test(haystack) && /insert|create|add|onboard/.test(haystack)) {
+    return "Employee Added";
+  }
+  if (/employee/.test(haystack) && /update|edit/.test(haystack)) {
+    return "Employee Updated";
+  }
+  if (/leave/.test(haystack) && /approv/.test(haystack)) {
+    return "Leave Approved";
+  }
+  if (/interview/.test(haystack) && /schedul|create|insert/.test(haystack)) {
+    return "Interview Scheduled";
+  }
+  if (/payroll/.test(haystack) && /process|complete|paid|finalize|run/.test(haystack)) {
+    return "Payroll Processed";
+  }
+  if (/exit|resign|clearance/.test(haystack) && /complete|closed|done|final/.test(haystack)) {
+    return "Exit Completed";
+  }
+
+  return humanizeActivityTitle(action);
+}
+
 export async function getHrDashboardData(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -145,7 +208,6 @@ export async function getHrDashboardData(
   const organizationId = profile.employee.organizationId;
   const today = getTodayDateString();
   const todayDate = parseISO(today);
-  const monthStart = format(startOfMonth(todayDate), "yyyy-MM-dd");
   const sevenDaysAgo = format(subDays(todayDate, 6), "yyyy-MM-dd");
   const eventHorizon = addDays(todayDate, 30);
 
@@ -155,8 +217,6 @@ export async function getHrDashboardData(
     payroll,
     recruitment,
     hiring,
-    documents,
-    expiring,
     exitSummary,
     holidays,
     employeesRes,
@@ -175,8 +235,6 @@ export async function getHrDashboardData(
     getPayrollSummary(supabase, profile),
     getRecruitmentSummary(supabase, profile),
     getHiringAnalytics(supabase, profile),
-    getDocumentsSummary(supabase, profile),
-    getExpiringSummary(supabase, profile),
     getExitSummary(supabase, profile),
     listHolidays(supabase, organizationId, {
       year: todayDate.getFullYear(),
@@ -237,12 +295,12 @@ export async function getHrDashboardData(
       .order("created_at", { ascending: false })
       .limit(6),
     fromHrms(supabase, "audit_logs")
-      .select("id, occurred_at, module, action, description, table_name")
+      .select("id, occurred_at, module, action, description, table_name, user_id")
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
       .is("archived_at", null)
       .order("occurred_at", { ascending: false })
-      .limit(12),
+      .limit(40),
     fromHrms(supabase, "salary_structures")
       .select("employee_id, components, employees:employee_id!inner(organization_id)")
       .eq("employees.organization_id", organizationId)
@@ -376,10 +434,6 @@ export async function getHrDashboardData(
   upcomingBirthdays.sort((a, b) => a.date.localeCompare(b.date));
   upcomingAnniversaries.sort((a, b) => a.date.localeCompare(b.date));
 
-  const newJoinersThisMonth = activeEmployees.filter(
-    (e) => e.date_of_joining && e.date_of_joining >= monthStart && e.date_of_joining <= today,
-  ).length;
-
   const presentCount =
     attendance.presentToday + attendance.lateToday + attendance.halfDayToday;
   const attendancePercent =
@@ -394,85 +448,88 @@ export async function getHrDashboardData(
       ? "Pending"
       : "Not started";
 
-  const pendingApprovals =
-    leave.pendingRequests +
-    (recruitment.offersPending ?? 0) +
-    (exitSummary.pendingResignations ?? 0);
+  const payrollDue =
+    !currentPayroll?.status || currentPayroll.status === "draft" ? 1 : 0;
 
-  const tasks: DashboardTaskItem[] = [];
-  if (leave.pendingRequests > 0) {
-    tasks.push({
-      id: "leave-approvals",
-      label: `Approve ${leave.pendingRequests} leave request${leave.pendingRequests === 1 ? "" : "s"}`,
-      count: leave.pendingRequests,
-      href: LEAVE_ROUTES.list,
-      urgency: "high",
-    });
-  }
-  for (const interview of recruitment.upcomingInterviews.slice(0, 2)) {
-    const timeLabel = interview.interviewTime
-      ? ` at ${interview.interviewTime.slice(0, 5)}`
-      : "";
-    tasks.push({
-      id: `interview-${interview.id}`,
-      label: `Interview: ${interview.candidateName}${timeLabel}`,
-      count: null,
+  const interviewsToday = recruitment.upcomingInterviews.filter(
+    (interview) => interview.interviewDate === today,
+  ).length;
+
+  const offersPending = recruitment.offersPending ?? 0;
+
+  // Priority Tasks — actionable HR items only (no KPI duplicates).
+  const tasks: DashboardTaskItem[] = [
+    {
+      id: "interviews-today",
+      label: "Interviews Today",
+      count: interviewsToday,
       href: RECRUITMENT_ROUTES.interviews,
-      urgency: "medium",
-    });
-  }
-  if (!currentPayroll?.status || currentPayroll.status === "draft") {
-    tasks.push({
+      urgency: interviewsToday > 0 ? "medium" : "low",
+    },
+    {
+      id: "probation-ending",
+      label: "Employees Completing Probation",
+      count: probationEndingSoon,
+      href: EMPLOYEE_ROUTES.list,
+      urgency: probationEndingSoon > 0 ? "medium" : "low",
+    },
+    {
       id: "payroll-due",
-      label: "Payroll due this month",
-      count: null,
+      label: "Payroll Due This Month",
+      count: payrollDue,
       href: PAYROLL_ROUTES.run,
-      urgency: "high",
-    });
-  }
-  if (expiring.next7Days > 0 || documents.expiringSoon > 0) {
-    const count = expiring.next7Days || documents.expiringSoon;
-    tasks.push({
-      id: "docs-expiring",
-      label: `${count} document${count === 1 ? "" : "s"} expiring soon`,
-      count,
-      href: DOCUMENTS_ROUTES.expiring,
-      urgency: "medium",
-    });
-  }
-  if (exitSummary.pendingClearance > 0) {
-    tasks.push({
-      id: "exit-clearance",
-      label: "Exit clearance pending",
-      count: exitSummary.pendingClearance,
-      href: EXIT_ROUTES.clearance,
-      urgency: "high",
-    });
-  }
-  if (exitSummary.assetsPendingReturn > 0) {
-    tasks.push({
-      id: "assets-return",
-      label: "Assets pending return",
-      count: exitSummary.assetsPendingReturn,
-      href: EXIT_ROUTES.assetReturn,
-      urgency: "medium",
-    });
+      urgency: payrollDue > 0 ? "high" : "low",
+    },
+    {
+      id: "offers-pending",
+      label: "Pending Recruitment Offers",
+      count: offersPending,
+      href: RECRUITMENT_ROUTES.offers,
+      urgency: offersPending > 0 ? "medium" : "low",
+    },
+  ];
+
+  const auditRows = ((auditRes.data ?? []) as LooseRow[]).filter(isMeaningfulActivity);
+  const activityUserIds = [
+    ...new Set(
+      auditRows
+        .map((row) => row.user_id as string | null)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const activityUserMap = new Map<string, string>();
+  if (activityUserIds.length > 0) {
+    const { data: userRoles } = await supabase
+      .schema("hrms")
+      .from("user_roles")
+      .select(`user_id, employees:employee_id (first_name, last_name)`)
+      .eq("organization_id", organizationId)
+      .in("user_id", activityUserIds)
+      .is("deleted_at", null);
+
+    for (const row of userRoles ?? []) {
+      const employee = Array.isArray(row.employees) ? row.employees[0] : row.employees;
+      if (!row.user_id || !employee) continue;
+      activityUserMap.set(
+        row.user_id,
+        formatEmployeeName(employee.first_name, employee.last_name),
+      );
+    }
   }
 
-  const activities: DashboardActivityItem[] = ((auditRes.data ?? []) as LooseRow[]).map(
-    (row) => ({
-      id: row.id,
-      title: humanizeActivityTitle(row.action),
-      description: humanizeActivityDescription(
-        row.description,
-        row.module,
-        row.table_name,
-      ),
-      module: row.module ?? "system",
-      occurredAt: row.occurred_at,
-      href: moduleHref(row.module),
-    }),
-  );
+  const activities: DashboardActivityItem[] = auditRows.slice(0, 2).map((row) => ({
+    id: row.id,
+    title: preferredActivityTitle(row.action, row.module, row.table_name),
+    description: humanizeActivityDescription(
+      row.description,
+      row.module,
+      row.table_name,
+    ),
+    module: row.module ?? "system",
+    user: (row.user_id && activityUserMap.get(row.user_id)) || "System",
+    occurredAt: row.occurred_at,
+    href: moduleHref(row.module),
+  }));
 
   // Fallback activities from module recent feeds when audit is empty/restricted
   if (activities.length === 0) {
@@ -482,19 +539,21 @@ export async function getHrDashboardData(
         title: "Employee Added",
         description: formatEmployeeName(e.first_name, e.last_name),
         module: "employees",
+        user: "HR",
         occurredAt: e.date_of_joining
           ? `${e.date_of_joining}T00:00:00.000Z`
           : new Date().toISOString(),
         href: employeeHref(e),
       });
     }
-    for (const item of recruitment.recentActivity.slice(0, 3)) {
+    for (const item of recruitment.recentActivity.slice(0, 2)) {
       activities.push({
         id: item.id,
         title: stripIdsFromText(item.title) || "Recruitment update",
         description:
           stripIdsFromText(item.description ?? item.eventType) || "Recruitment activity",
         module: "recruitment",
+        user: "Recruitment",
         occurredAt: item.createdAt,
         href: RECRUITMENT_ROUTES.dashboard,
       });
@@ -582,11 +641,7 @@ export async function getHrDashboardData(
       presentToday: presentCount,
       onLeaveToday: attendance.onLeaveToday || leave.employeesOnLeaveToday || 0,
       absentToday: attendance.absentToday,
-      lateToday: attendance.lateToday,
-      newJoinersThisMonth,
-      employeesExiting: exitSummary.leavingThisMonth || exitSummary.noticePeriod || 0,
-      openRecruitments: recruitment.openPositions ?? 0,
-      pendingApprovals,
+      pendingLeaveApprovals: leave.pendingRequests,
     },
     secondary: {
       attendancePercent,
@@ -595,8 +650,11 @@ export async function getHrDashboardData(
       upcomingBirthdaysCount: upcomingBirthdays.length,
       upcomingAnniversariesCount: upcomingAnniversaries.length,
       probationEndingSoon,
-      documentsExpiring: documents.expiringSoon || expiring.next30Days || 0,
+      documentsExpiring: 0,
       assetsPendingReturn: exitSummary.assetsPendingReturn || 0,
+      interviewsToday,
+      birthdaysToday: upcomingBirthdays.filter((event) => event.date === today).length,
+      exitClearancePending: exitSummary.pendingClearance || 0,
     },
     charts: {
       headcountByDepartment: chartMaxSafe(
@@ -629,8 +687,8 @@ export async function getHrDashboardData(
         Array.from(typeMap.entries()).map(([label, value]) => ({ label, value })),
       ),
     },
-    activities: activities.slice(0, 10),
-    tasks: tasks.slice(0, 8),
+    activities: activities.slice(0, 2),
+    tasks,
     upcomingBirthdays: upcomingBirthdays.slice(0, 6),
     upcomingAnniversaries: upcomingAnniversaries.slice(0, 6),
     upcomingInterviews,

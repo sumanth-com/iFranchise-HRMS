@@ -15,6 +15,9 @@ export const EMPLOYEE_STORAGE_BUCKETS = {
   profileImages: "employee-profile-images",
 } as const;
 
+/** Max profile photo upload size (must match storage bucket limit). */
+export const PROFILE_IMAGE_MAX_BYTES = 15 * 1024 * 1024;
+
 export const DESIGNATION_OTHER_VALUE = "others" as const;
 
 export const EMPLOYMENT_STATUS_LABELS: Record<string, string> = {

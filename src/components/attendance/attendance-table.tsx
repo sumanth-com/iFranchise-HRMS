@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -162,10 +162,10 @@ const TABLE_HEAD_CLASS =
 const TABLE_CELL_CLASS = "relative align-middle";
 
 const FILTER_CONTROL_CLASS =
-  "h-9 w-full min-w-0 gap-2 [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-muted-foreground/70";
+  "h-10 w-full min-w-0 gap-2 rounded-lg [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-muted-foreground/70";
 const STATUS_FILTER_CLASS = cn(FILTER_CONTROL_CLASS, "w-full");
 const DATE_RANGE_CLASS =
-  "flex h-9 min-w-0 flex-[1.45] basis-[15rem] items-center gap-2 rounded-lg border border-input bg-background px-2.5";
+  "flex h-10 min-w-0 items-center gap-2 rounded-lg border border-input bg-background px-2.5";
 const DATE_INPUT_CLASS =
   "h-7 min-w-0 w-full border-0 bg-transparent p-0 pr-5 text-sm shadow-none focus-visible:ring-0 data-[empty]:text-muted-foreground [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:top-1/2 [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:m-0 [&::-webkit-calendar-picker-indicator]:size-3.5 [&::-webkit-calendar-picker-indicator]:-translate-y-1/2 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0";
 
@@ -188,13 +188,20 @@ export function AttendanceTable({
   canDelete,
 }: AttendanceTableProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const initialParams = useSearchParams();
+  const filterParamsRef = useRef(initialParams.toString());
   const [isPending, startTransition] = useTransition();
   const [deleteTarget, setDeleteTarget] = useState<AttendanceListItem | null>(null);
 
+  useEffect(() => {
+    if (window.location.search) {
+      window.history.replaceState(null, "", ATTENDANCE_ROUTES.list);
+    }
+  }, []);
+
   const updateParams = useCallback(
     (updates: Record<string, string | undefined>) => {
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(filterParamsRef.current);
 
       Object.entries(updates).forEach(([key, value]) => {
         if (!value) {
@@ -204,11 +211,19 @@ export function AttendanceTable({
         }
       });
 
+      filterParamsRef.current = params.toString();
+
       startTransition(() => {
-        router.push(`${ATTENDANCE_ROUTES.list}?${params.toString()}`);
+        const query = params.toString();
+        router.push(
+          query ? `${ATTENDANCE_ROUTES.list}?${query}` : ATTENDANCE_ROUTES.list,
+        );
+        window.setTimeout(() => {
+          window.history.replaceState(null, "", ATTENDANCE_ROUTES.list);
+        }, 0);
       });
     },
-    [router, searchParams, startTransition],
+    [router, startTransition],
   );
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -429,9 +444,8 @@ export function AttendanceTable({
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-2">
-        <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:gap-2.5">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 xl:flex-nowrap">
-            <div className="min-w-0 w-full flex-1 basis-[11rem] xl:min-w-[12rem]">
+        <div className="grid gap-2 lg:grid-cols-[minmax(15rem,1.4fr)_minmax(9rem,0.7fr)_minmax(17rem,1.25fr)_minmax(12rem,1fr)_auto] lg:items-center">
+            <div className="min-w-0">
               <Select
                 items={employeeItems}
                 value={employeeId ?? ""}
@@ -462,7 +476,7 @@ export function AttendanceTable({
               </Select>
             </div>
 
-            <div className="w-full shrink-0 sm:w-[8.25rem]">
+            <div className="min-w-0">
               <Select
                 items={statusItems}
                 value={attendanceStatus ?? ""}
@@ -518,7 +532,7 @@ export function AttendanceTable({
               </div>
             </div>
 
-            <div className="min-w-0 w-full flex-1 basis-[10rem] xl:min-w-[10.5rem]">
+            <div className="min-w-0">
               <Select
                 items={departmentItems}
                 value={departmentId ?? ""}
@@ -549,14 +563,13 @@ export function AttendanceTable({
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          <div className="flex shrink-0 items-center gap-2 self-end xl:self-auto">
+          <div className="flex items-center justify-end gap-2">
             {hasActiveFilters ? (
               <Button
                 variant="outline"
                 size="sm"
-                className="h-9 min-w-[8.5rem] whitespace-nowrap"
+                className="h-10 min-w-[8.5rem] whitespace-nowrap"
                 disabled={isPending}
                 onClick={() =>
                   updateParams({
@@ -580,7 +593,7 @@ export function AttendanceTable({
                 href={ATTENDANCE_ROUTES.new}
                 className={cn(
                   buttonVariants(),
-                  "h-9 min-w-[10.5rem] whitespace-nowrap px-4",
+                  "h-10 min-w-[10.5rem] whitespace-nowrap px-4",
                 )}
               >
                 <Plus className="size-4" />

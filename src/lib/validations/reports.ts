@@ -11,7 +11,6 @@ export const reportFiltersSchema = z.object({
   dateFrom: z.string().optional().or(z.literal("")),
   dateTo: z.string().optional().or(z.literal("")),
   departmentId: z.string().uuid().optional().or(z.literal("")),
-  branchId: z.string().uuid().optional().or(z.literal("")),
   designationId: z.string().uuid().optional().or(z.literal("")),
   employeeId: z.string().uuid().optional().or(z.literal("")),
   status: z.string().optional().or(z.literal("")),

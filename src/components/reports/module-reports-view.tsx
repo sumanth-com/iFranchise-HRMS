@@ -121,7 +121,6 @@ function downloadBase64(filename: string, mimeType: string, base64: string) {
 
 function showFiltersFor(key: ReportKey) {
   return {
-    branch: key.startsWith("hr_") || key.startsWith("attendance_") || key.startsWith("assets_"),
     designation: key.startsWith("hr_") || key.startsWith("performance_"),
     employee:
       key.startsWith("attendance_") ||
@@ -145,7 +144,6 @@ function buildFilters(
   dateFrom: string,
   dateTo: string,
   departmentId: string,
-  branchId: string,
   designationId: string,
   employeeId: string,
   status: string,
@@ -156,7 +154,6 @@ function buildFilters(
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
     departmentId: departmentId && departmentId !== ALL_OPTION.value ? departmentId : undefined,
-    branchId: branchId && branchId !== ALL_OPTION.value ? branchId : undefined,
     designationId:
       designationId && designationId !== ALL_OPTION.value ? designationId : undefined,
     employeeId: employeeId && employeeId !== ALL_OPTION.value ? employeeId : undefined,
@@ -200,7 +197,6 @@ export function ModuleReportsView({
   const [departmentId, setDepartmentId] = useState(
     defaultFilters?.departmentId ?? ALL_OPTION.value,
   );
-  const [branchId, setBranchId] = useState(defaultFilters?.branchId ?? ALL_OPTION.value);
   const [designationId, setDesignationId] = useState(
     defaultFilters?.designationId ?? ALL_OPTION.value,
   );
@@ -225,10 +221,6 @@ export function ModuleReportsView({
       ...lookups.departments.map((d) => ({ value: d.id, label: d.label })),
     ],
     [lookups.departments],
-  );
-  const branchItems = useMemo(
-    () => [ALL_OPTION, ...lookups.branches.map((b) => ({ value: b.id, label: b.label }))],
-    [lookups.branches],
   );
   const designationItems = useMemo(
     () => [
@@ -287,7 +279,6 @@ export function ModuleReportsView({
       dateFrom,
       dateTo,
       departmentId,
-      branchId,
       designationId,
       employeeId,
       status,
@@ -334,8 +325,8 @@ export function ModuleReportsView({
       </div>
 
       <section className="space-y-4 rounded-xl border bg-card p-5 shadow-sm">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="space-y-2 md:col-span-2">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="space-y-2">
             <Label>Report type</Label>
             <LabeledSelect
               items={reportItems}
@@ -345,6 +336,7 @@ export function ModuleReportsView({
                 setResult(null);
               }}
               placeholder="Select report"
+              contentClassName="min-w-72"
             />
           </div>
           <div className="space-y-2">
@@ -383,17 +375,6 @@ export function ModuleReportsView({
               placeholder="All statuses"
             />
           </div>
-          {filterVisibility.branch ? (
-            <div className="space-y-2">
-              <Label>Branch</Label>
-              <LabeledSelect
-                items={branchItems}
-                value={branchId}
-                onValueChange={setBranchId}
-                placeholder="All branches"
-              />
-            </div>
-          ) : null}
           {filterVisibility.designation ? (
             <div className="space-y-2">
               <Label>Designation</Label>

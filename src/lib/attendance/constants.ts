@@ -3,6 +3,7 @@ import type { AttendanceStatus } from "@/types/attendance";
 export const ATTENDANCE_ROUTES = {
   list: "/dashboard/attendance",
   new: "/dashboard/attendance/new",
+  settings: "/dashboard/attendance/settings",
   detail: (id: string) => `/dashboard/attendance/${id}`,
   edit: (id: string) => `/dashboard/attendance/${id}/edit`,
 } as const;

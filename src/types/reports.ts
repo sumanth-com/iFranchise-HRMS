@@ -14,7 +14,6 @@ export type ReportModuleKey =
 export type ReportKey =
   | "hr_employee_master"
   | "hr_department"
-  | "hr_branch"
   | "hr_designation"
   | "hr_joining"
   | "hr_probation"
@@ -66,7 +65,6 @@ export type ReportFilters = {
   dateFrom?: string;
   dateTo?: string;
   departmentId?: string;
-  branchId?: string;
   designationId?: string;
   employeeId?: string;
   status?: string;
@@ -121,7 +119,6 @@ export type ExecutiveDashboard = {
 
 export type ReportsLookups = {
   departments: { id: string; label: string }[];
-  branches: { id: string; label: string }[];
   designations: { id: string; label: string }[];
   employees: { id: string; label: string }[];
 };

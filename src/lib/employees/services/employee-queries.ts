@@ -49,13 +49,39 @@ export async function listEmployees(
     search,
     sortBy,
     sortOrder,
-    branchId,
-    departmentId,
+    department,
     employmentStatus,
   } = parseListParams(params);
 
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
+
+  let departmentId: string | undefined;
+  if (department) {
+    const { data: departmentRow, error: departmentError } = await supabase
+      .schema("hrms")
+      .from("departments")
+      .select("id")
+      .eq("organization_id", profile.employee.organizationId)
+      .ilike("code", department)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (departmentError) {
+      throw new Error(departmentError.message);
+    }
+
+    if (!departmentRow?.id) {
+      return {
+        data: [],
+        total: 0,
+        page,
+        pageSize,
+      };
+    }
+
+    departmentId = departmentRow.id;
+  }
 
   let query = supabase
     .schema("hrms")
@@ -88,10 +114,6 @@ export async function listEmployees(
     query = query.or(
       `first_name.ilike.${term},last_name.ilike.${term},email.ilike.${term},employee_code.ilike.${term}`,
     );
-  }
-
-  if (branchId) {
-    query = query.eq("branch_id", branchId);
   }
 
   if (departmentId) {

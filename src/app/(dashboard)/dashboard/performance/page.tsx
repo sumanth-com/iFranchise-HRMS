@@ -1,4 +1,3 @@
-import { KpiSummaryCards } from "@/components/performance/kpi-summary-cards";
 import { PerformanceDashboardPanels } from "@/components/performance/performance-dashboard-panels";
 import { PerformanceSummaryCards } from "@/components/performance/performance-summary-cards";
 import { createClient } from "@/lib/supabase/server";
@@ -11,7 +10,7 @@ export default async function PerformanceDashboardPage() {
   const summary = await getPerformanceSummary(supabase, profile);
 
   return (
-    <>
+    <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Performance</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -20,8 +19,7 @@ export default async function PerformanceDashboardPage() {
       </div>
 
       <PerformanceSummaryCards summary={summary} />
-      <KpiSummaryCards summary={summary} />
       <PerformanceDashboardPanels summary={summary} />
-    </>
+    </div>
   );
 }

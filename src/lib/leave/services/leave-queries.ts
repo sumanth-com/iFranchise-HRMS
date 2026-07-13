@@ -258,12 +258,14 @@ export async function listLeaveRequests(
 export async function getLeaveSummary(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
+  month?: number,
+  year?: number,
 ): Promise<LeaveSummary> {
   const organizationId = profile.employee.organizationId;
   const today = getTodayDateString();
-  const year = Number.parseInt(today.slice(0, 4), 10);
-  const month = Number.parseInt(today.slice(5, 7), 10);
-  const monthRange = getMonthDateRange(month, year);
+  const summaryYear = year ?? Number.parseInt(today.slice(0, 4), 10);
+  const summaryMonth = month ?? Number.parseInt(today.slice(5, 7), 10);
+  const monthRange = getMonthDateRange(summaryMonth, summaryYear);
 
   const [pendingResult, approvedResult, rejectedResult, onLeaveResult, balancesResult, upcomingResult] =
     await Promise.all([

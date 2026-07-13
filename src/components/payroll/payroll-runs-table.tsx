@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -28,11 +28,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PAYROLL_ROUTES, PAYROLL_STATUS_LABELS } from "@/lib/payroll/constants";
+import { fetchPayrollRunsAction } from "@/lib/payroll/actions";
 import {
   formatCurrency,
   formatPayrollMonthLabel,
 } from "@/lib/payroll/services/payroll-utils";
-import type { PayrollListItem, PayrollStatus } from "@/types/payroll";
+import type { PayrollListItem, PayrollListParams, PayrollStatus } from "@/types/payroll";
 
 const monthFilterItems = [
   { value: "all", label: "All months" },
@@ -61,35 +62,80 @@ type PayrollRunsTableProps = {
 };
 
 export function PayrollRunsTable({
-  records,
-  total,
-  page,
-  pageSize,
-  search = "",
-  month,
-  year,
-  payrollStatus,
+  records: initialRecords,
+  total: initialTotal,
+  page: initialPage,
+  pageSize: initialPageSize,
+  search: initialSearch = "",
+  month: initialMonth,
+  year: initialYear,
+  payrollStatus: initialPayrollStatus,
   showFilters = true,
   compact = false,
 }: PayrollRunsTableProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
+  const [tableState, setTableState] = useState({
+    records: initialRecords,
+    total: initialTotal,
+    page: initialPage,
+    pageSize: initialPageSize,
+  });
+  const [filters, setFilters] = useState<PayrollListParams>({
+    page: initialPage,
+    pageSize: initialPageSize,
+    search: initialSearch,
+    month: initialMonth,
+    year: initialYear,
+    payrollStatus: initialPayrollStatus,
+  });
+
+  useEffect(() => {
+    if (window.location.search) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
 
   const updateParams = useCallback(
     (updates: Record<string, string | undefined>) => {
-      const params = new URLSearchParams(searchParams.toString());
-      for (const [key, value] of Object.entries(updates)) {
-        if (!value) params.delete(key);
-        else params.set(key, value);
-      }
-      if (!updates.page) params.set("page", "1");
-      startTransition(() => {
-        router.push(`?${params.toString()}`);
+      const nextFilters: PayrollListParams = {
+        ...filters,
+        page: updates.page ? Number(updates.page) : 1,
+        month:
+          updates.month === undefined
+            ? filters.month
+            : updates.month
+              ? Number(updates.month)
+              : undefined,
+        year:
+          updates.year === undefined
+            ? filters.year
+            : updates.year
+              ? Number(updates.year)
+              : undefined,
+      };
+
+      Object.entries(updates).forEach(([key, value]) => {
+        if (["page", "month", "year"].includes(key)) return;
+        (nextFilters as Record<string, unknown>)[key] = value || undefined;
+      });
+
+      setFilters(nextFilters);
+
+      startTransition(async () => {
+        const result = await fetchPayrollRunsAction(nextFilters);
+        setTableState({
+          records: result.data,
+          total: result.total,
+          page: result.page,
+          pageSize: result.pageSize,
+        });
       });
     },
-    [router, searchParams, startTransition],
+    [filters],
   );
+
+  const { records, total, page, pageSize } = tableState;
 
   const columns = useMemo<ColumnDef<PayrollListItem>[]>(
     () => [
@@ -156,14 +202,14 @@ export function PayrollRunsTable({
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
-    <div className="space-y-4">
+    <div className={compact ? "space-y-3" : "space-y-4"}>
       {showFilters ? (
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <div className="relative sm:w-[20rem]">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search payroll runs..."
-              defaultValue={search}
+              defaultValue={filters.search ?? ""}
               className="pl-9"
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
@@ -177,7 +223,7 @@ export function PayrollRunsTable({
           <div className="sm:w-[9rem]">
             <LabeledSelect
               items={monthFilterItems}
-              value={month ? String(month) : "all"}
+              value={filters.month ? String(filters.month) : "all"}
               onValueChange={(value) =>
                 updateParams({ month: value !== "all" ? value : undefined })
               }
@@ -187,7 +233,7 @@ export function PayrollRunsTable({
           <div className="sm:w-[8rem]">
             <LabeledSelect
               items={yearFilterItems}
-              value={year ? String(year) : "all"}
+              value={filters.year ? String(filters.year) : "all"}
               onValueChange={(value) =>
                 updateParams({ year: value !== "all" ? value : undefined })
               }
@@ -197,7 +243,7 @@ export function PayrollRunsTable({
           <div className="sm:w-[11rem]">
             <LabeledSelect
               items={statusFilterItems}
-              value={payrollStatus ?? "all"}
+              value={filters.payrollStatus ?? "all"}
               onValueChange={(value) =>
                 updateParams({
                   payrollStatus:
@@ -217,7 +263,7 @@ export function PayrollRunsTable({
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id} className="h-11 whitespace-nowrap px-4">
+                    <TableHead key={header.id} className={compact ? "h-10 whitespace-nowrap px-3" : "h-11 whitespace-nowrap px-4"}>
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -240,7 +286,7 @@ export function PayrollRunsTable({
                     }
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} className="px-4 py-3">
+                      <TableCell key={cell.id} className={compact ? "px-3 py-2.5" : "px-4 py-3"}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </TableCell>
                     ))}
@@ -250,7 +296,7 @@ export function PayrollRunsTable({
                 <TableRow>
                   <TableCell
                     colSpan={columns.length}
-                    className="h-24 text-center text-muted-foreground"
+                    className={compact ? "h-20 text-center text-muted-foreground" : "h-24 text-center text-muted-foreground"}
                   >
                     No payroll runs found.
                   </TableCell>
@@ -271,7 +317,7 @@ export function PayrollRunsTable({
             <Button
               variant="outline"
               size="sm"
-              disabled={page <= 1}
+              disabled={page <= 1 || isPending}
               onClick={() => updateParams({ page: String(page - 1) })}
             >
               Previous
@@ -279,7 +325,7 @@ export function PayrollRunsTable({
             <Button
               variant="outline"
               size="sm"
-              disabled={page >= totalPages}
+              disabled={page >= totalPages || isPending}
               onClick={() => updateParams({ page: String(page + 1) })}
             >
               Next

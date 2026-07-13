@@ -86,11 +86,32 @@ export function EmployeeEditForm({ employee, lookups }: EmployeeEditFormProps) {
       employmentStatus: employee.employmentStatus,
       dateOfJoining: employee.dateOfJoining ?? "",
       dateOfLeaving: employee.dateOfLeaving ?? "",
+      dateOfBirth: employee.profile?.dateOfBirth ?? "",
+      gender: employee.profile?.gender ?? undefined,
+      maritalStatus: employee.profile?.maritalStatus ?? undefined,
+      nationality: employee.profile?.nationality ?? "",
+      bloodGroup: employee.profile?.bloodGroup ?? "",
+      personalEmail: employee.profile?.personalEmail ?? "",
+      personalPhone: employee.profile?.personalPhone ?? "",
+      bio: employee.profile?.bio ?? "",
     },
   });
 
   const designationSelectValue = form.watch("designationId") || "none";
   const isOtherDesignation = designationSelectValue === DESIGNATION_OTHER_VALUE;
+  const genderItems = [
+    { value: "male", label: "Male" },
+    { value: "female", label: "Female" },
+    { value: "other", label: "Other" },
+    { value: "prefer_not_to_say", label: "Prefer not to say" },
+  ];
+  const maritalStatusItems = [
+    { value: "single", label: "Single" },
+    { value: "married", label: "Married" },
+    { value: "divorced", label: "Divorced" },
+    { value: "widowed", label: "Widowed" },
+    { value: "other", label: "Other" },
+  ];
 
   const onSubmit = form.handleSubmit((values) => {
     startTransition(async () => {
@@ -246,6 +267,94 @@ export function EmployeeEditForm({ employee, lookups }: EmployeeEditFormProps) {
         <div className="space-y-2">
           <Label htmlFor="dateOfLeaving">Date of leaving</Label>
           <Input id="dateOfLeaving" type="date" {...form.register("dateOfLeaving")} />
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <h2 className="text-base font-semibold">Profile details</h2>
+          <p className="text-sm text-muted-foreground">
+            Update personal profile information shown on the Profile tab.
+          </p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="dateOfBirth">Date of birth</Label>
+            <Input id="dateOfBirth" type="date" {...form.register("dateOfBirth")} />
+          </div>
+          <div className="space-y-2">
+            <Label>Gender</Label>
+            <Select
+              items={genderItems}
+              value={form.watch("gender") ?? ""}
+              onValueChange={(value) =>
+                form.setValue(
+                  "gender",
+                  (value || undefined) as EmployeeUpdateInput["gender"],
+                )
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select gender" />
+              </SelectTrigger>
+              <SelectContent align="start" alignItemWithTrigger={false}>
+                {genderItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Marital status</Label>
+            <Select
+              items={maritalStatusItems}
+              value={form.watch("maritalStatus") ?? ""}
+              onValueChange={(value) =>
+                form.setValue(
+                  "maritalStatus",
+                  (value || undefined) as EmployeeUpdateInput["maritalStatus"],
+                )
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select marital status" />
+              </SelectTrigger>
+              <SelectContent align="start" alignItemWithTrigger={false}>
+                {maritalStatusItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="nationality">Nationality</Label>
+            <Input id="nationality" {...form.register("nationality")} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="bloodGroup">Blood group</Label>
+            <Input id="bloodGroup" {...form.register("bloodGroup")} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="personalEmail">Personal email</Label>
+            <Input id="personalEmail" type="email" {...form.register("personalEmail")} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="personalPhone">Personal phone</Label>
+            <Input id="personalPhone" {...form.register("personalPhone")} />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="bio">Bio</Label>
+            <textarea
+              id="bio"
+              rows={4}
+              className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+              {...form.register("bio")}
+            />
+          </div>
         </div>
       </div>
 

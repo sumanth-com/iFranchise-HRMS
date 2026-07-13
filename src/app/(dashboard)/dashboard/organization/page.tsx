@@ -12,16 +12,16 @@ export default async function OrganizationDashboardPage() {
   const stats = await getOrganizationDashboardStats(supabase, profile);
 
   return (
-    <>
+    <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Organization Management</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-0.5 text-sm text-muted-foreground">
           Central hub for company profile, branches, departments, and master data.
         </p>
       </div>
       <OrganizationSummaryCards stats={stats} />
       <OrganizationDashboardPanels stats={stats} />
       <OrganizationSearch />
-    </>
+    </div>
   );
 }

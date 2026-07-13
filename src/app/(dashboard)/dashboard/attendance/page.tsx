@@ -48,7 +48,7 @@ export default async function AttendancePage({ searchParams }: AttendancePagePro
   const [result, lookups, summary] = await Promise.all([
     listAttendance(supabase, profile, params),
     getAttendanceLookups(supabase, profile.employee.organizationId),
-    getAttendanceSummary(supabase, profile, today),
+    getAttendanceSummary(supabase, profile, params.dateFrom, params.dateTo),
   ]);
 
   return (

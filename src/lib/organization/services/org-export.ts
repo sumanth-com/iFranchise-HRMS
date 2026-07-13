@@ -52,7 +52,7 @@ export function exportBranches(items: BranchListItem[], format: OrgExportFormat)
     { key: "branchHeadName", header: "Branch Head" },
     { key: "status", header: "Status" },
   ];
-  const result = buildResult("hr_branch", "Branches", columns, items as Record<string, unknown>[]);
+  const result = buildResult("hr_department", "Branches", columns, items as Record<string, unknown>[]);
   return format === "excel" ? reportToExcelXml(result) : reportToCsv(result);
 }
 
@@ -105,7 +105,7 @@ export function exportWorkLocations(items: WorkLocationListItem[], format: OrgEx
     { key: "status", header: "Status" },
   ];
   const mapped = items.map((i) => ({ ...i, workingDays: i.workingDays.join(", ") }));
-  const result = buildResult("hr_branch", "Work Locations", columns, mapped as Record<string, unknown>[]);
+  const result = buildResult("hr_department", "Work Locations", columns, mapped as Record<string, unknown>[]);
   return format === "excel" ? reportToExcelXml(result) : reportToCsv(result);
 }
 

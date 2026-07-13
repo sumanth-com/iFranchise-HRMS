@@ -11,12 +11,12 @@ function seriesMax(items: { count: number }[]) {
 
 export function AuditDashboardPanels({ stats }: { stats: AuditDashboardStats }) {
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid gap-3 xl:grid-cols-4">
       <ChartCard title="Activity by Module" subtitle="Last 7 days">
         {stats.activityByModule.length === 0 ? (
           <p className="text-sm text-muted-foreground">No module activity yet.</p>
         ) : (
-          stats.activityByModule.slice(0, 10).map((item) => (
+          stats.activityByModule.slice(0, 5).map((item) => (
             <BarRow
               key={item.module}
               label={formatAuditModule(item.module)}
@@ -31,7 +31,7 @@ export function AuditDashboardPanels({ stats }: { stats: AuditDashboardStats }) 
         {stats.activityByUser.length === 0 ? (
           <p className="text-sm text-muted-foreground">No user activity today.</p>
         ) : (
-          stats.activityByUser.map((item) => (
+          stats.activityByUser.slice(0, 5).map((item) => (
             <BarRow
               key={item.userId}
               label={item.userName}
@@ -42,7 +42,7 @@ export function AuditDashboardPanels({ stats }: { stats: AuditDashboardStats }) 
         )}
       </ChartCard>
 
-      <ChartCard title="Activity Timeline" subtitle="Last 7 days" >
+      <ChartCard title="Activity Timeline" subtitle="Last 7 days">
         {stats.activityTimeline.every((d) => d.count === 0) ? (
           <p className="text-sm text-muted-foreground">No timeline data yet.</p>
         ) : (
@@ -58,14 +58,14 @@ export function AuditDashboardPanels({ stats }: { stats: AuditDashboardStats }) 
         )}
       </ChartCard>
 
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
+      <div className="rounded-2xl border bg-card p-4 shadow-sm">
         <h3 className="text-sm font-semibold">Recent Changes</h3>
         {stats.recentChanges.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">No recent audit entries.</p>
         ) : (
-          <ul className="mt-3 space-y-3">
-            {stats.recentChanges.map((item) => (
-              <li key={item.id} className="border-b pb-3 last:border-0 last:pb-0">
+          <ul className="mt-3 space-y-2">
+            {stats.recentChanges.slice(0, 5).map((item) => (
+              <li key={item.id} className="rounded-lg border bg-background px-3 py-2">
                 <p className="text-sm font-medium">
                   {humanizeActivityDescription(item.description, item.action)}
                 </p>

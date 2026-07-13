@@ -1,7 +1,14 @@
-import { redirect } from "next/navigation";
+import { ReportsSettingsForm } from "@/components/reports/reports-settings-form";
+import { canReportsSettings } from "@/lib/reports/constants";
+import { getReportsSettings } from "@/lib/reports/services/reports-settings";
+import { requireServerPermission } from "@/lib/permissions/server";
+import { createClient } from "@/lib/supabase/server";
 
-import { COMPANY_SETTINGS_ROUTES } from "@/lib/company-settings/constants";
+export default async function ReportsSettingsPage() {
+  const profile = await requireServerPermission("reports.view");
+  const supabase = await createClient();
+  const settings = await getReportsSettings(supabase, profile.employee.organizationId);
+  const canEdit = canReportsSettings(profile.permissionCodes);
 
-export default function ReportsSettingsPage() {
-  redirect(COMPANY_SETTINGS_ROUTES.section("profile"));
+  return <ReportsSettingsForm settings={settings} canEdit={canEdit} />;
 }

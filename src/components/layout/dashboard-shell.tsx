@@ -5,6 +5,7 @@ import { type ReactNode } from "react";
 import { MobileSidebar } from "@/components/layout/mobile-sidebar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopNav } from "@/components/layout/top-nav";
+import { DashboardUrlCleaner } from "@/components/layout/dashboard-url-cleaner";
 import { SidebarProvider } from "@/hooks/use-sidebar";
 
 type DashboardShellProps = {
@@ -14,6 +15,7 @@ type DashboardShellProps = {
 export function DashboardShell({ children }: DashboardShellProps) {
   return (
     <SidebarProvider>
+      <DashboardUrlCleaner />
       <div className="flex h-screen overflow-hidden bg-background">
         <Sidebar />
         <MobileSidebar />

@@ -393,42 +393,52 @@ export function ExportsSchedulesManagement({
       {canExport ? (
         <section className="space-y-3 rounded-xl border bg-card p-5 shadow-sm">
           <h2 className="text-sm font-medium">Quick export</h2>
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="min-w-[220px] flex-1 space-y-2">
+          <div className="grid items-stretch gap-3 lg:grid-cols-[minmax(16rem,24rem)_20rem]">
+            <div className="flex h-full flex-col justify-end space-y-2">
               <Label>Report</Label>
               <LabeledSelect
                 items={reportItems}
                 value={quickReportKey}
                 onValueChange={(value) => setQuickReportKey(value as ReportKey)}
+                triggerClassName="h-10 w-full"
+                contentClassName="min-w-80"
               />
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isPending}
-              onClick={() => onQuickExport("csv")}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              CSV
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isPending}
-              onClick={() => onQuickExport("excel")}
-            >
-              <FileSpreadsheet className="mr-2 h-4 w-4" />
-              Excel
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isPending}
-              onClick={() => onQuickExport("pdf")}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              PDF
-            </Button>
+            <div className="flex h-full flex-col justify-end space-y-2">
+              <Label>Export as</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-10 justify-center"
+                  disabled={isPending}
+                  onClick={() => onQuickExport("csv")}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  CSV
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-10 justify-center"
+                  disabled={isPending}
+                  onClick={() => onQuickExport("excel")}
+                >
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  Excel
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-10 justify-center"
+                  disabled={isPending}
+                  onClick={() => onQuickExport("pdf")}
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  PDF
+                </Button>
+              </div>
+            </div>
           </div>
         </section>
       ) : null}

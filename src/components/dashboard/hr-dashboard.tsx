@@ -1,17 +1,9 @@
-import { ErrorState, PageScroll } from "@/components/common";
+import { ErrorState } from "@/components/common";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import {
-  DashboardKpiRow,
-  DashboardSecondaryRow,
-} from "@/components/dashboard/dashboard-kpi-rows";
-import {
-  DashboardBottomLists,
-  DashboardChartsGrid,
-  DashboardEventsRow,
-  DashboardMiddleRow,
-  DashboardQuickAccess,
-} from "@/components/dashboard/dashboard-panels";
+import { DashboardKpiRow } from "@/components/dashboard/dashboard-kpi-rows";
+import { DashboardOperationsRow } from "@/components/dashboard/dashboard-panels";
 import type { HrDashboardData } from "@/types/dashboard";
+import { cn } from "@/lib/utils";
 
 type Props = {
   data: HrDashboardData;
@@ -19,31 +11,40 @@ type Props = {
   error?: string | null;
 };
 
-export function HrDashboard({ data, permissionCodes, error }: Props) {
+export function HrDashboard({ data, error }: Props) {
   if (error) {
     return (
-      <PageScroll>
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 md:p-5">
         <DashboardHeader />
         <ErrorState title="Unable to load dashboard" description={error} />
-      </PageScroll>
+      </div>
     );
   }
 
   return (
-    <PageScroll className="gap-3 pb-4 md:gap-3">
-      <DashboardHeader />
-      <DashboardKpiRow kpis={data.kpis} />
-      <DashboardSecondaryRow secondary={data.secondary} />
-      <DashboardMiddleRow activities={data.activities} tasks={data.tasks} />
-      <DashboardChartsGrid charts={data.charts} />
-      <DashboardQuickAccess permissionCodes={permissionCodes} />
-      <DashboardEventsRow
-        birthdays={data.upcomingBirthdays}
-        anniversaries={data.upcomingAnniversaries}
-        interviews={data.upcomingInterviews}
-        holidays={data.upcomingHolidays}
-      />
-      <DashboardBottomLists data={data} />
-    </PageScroll>
+    <div
+      className={cn(
+        "flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 md:gap-3 md:p-5 lg:overflow-hidden",
+      )}
+    >
+      <div className="shrink-0">
+        <DashboardHeader />
+      </div>
+
+      <section className="shrink-0" aria-label="Key performance indicators">
+        <DashboardKpiRow kpis={data.kpis} />
+      </section>
+
+      <section
+        className="flex min-h-0 flex-1 flex-col"
+        aria-label="Operations"
+      >
+        <DashboardOperationsRow
+          activities={data.activities}
+          tasks={data.tasks}
+          charts={data.charts}
+        />
+      </section>
+    </div>
   );
 }

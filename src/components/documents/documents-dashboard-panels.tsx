@@ -3,7 +3,6 @@ import {
   CheckCircle2,
   FilePlus2,
   FileText,
-  Upload,
 } from "lucide-react";
 
 import type { DocumentsSummary } from "@/types/documents";
@@ -37,33 +36,38 @@ const CARDS = [
     accent: "text-emerald-600",
     bg: "bg-emerald-500/10",
   },
-  {
-    key: "uploadedToday" as const,
-    label: "Uploaded Today",
-    icon: Upload,
-    accent: "text-violet-600",
-    bg: "bg-violet-500/10",
-  },
 ];
 
 export function DocumentsSummaryCards({ summary }: { summary: DocumentsSummary }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {CARDS.map((card) => {
         const Icon = card.icon;
         return (
-          <div key={card.key} className="rounded-xl border bg-card p-4 shadow-sm">
+          <div
+            key={card.key}
+            className="rounded-2xl border bg-gradient-to-br from-card via-card to-muted/30 p-4 shadow-sm"
+          >
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <div className="min-w-0">
+                <p className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   {card.label}
                 </p>
                 <p className="mt-2 text-2xl font-semibold tracking-tight">
                   {summary[card.key]}
                 </p>
+                <p className="mt-1 truncate text-xs text-muted-foreground">
+                  {card.key === "totalDocuments"
+                    ? `${summary.uploadedToday} uploaded today`
+                    : card.key === "pendingVerification"
+                      ? "Needs HR review"
+                      : card.key === "expiringSoon"
+                        ? "Renewal attention"
+                        : "Letters and templates"}
+                </p>
               </div>
-              <div className={`rounded-lg p-2 ${card.bg}`}>
-                <Icon className={`h-5 w-5 ${card.accent}`} />
+              <div className={`rounded-xl p-2.5 ${card.bg}`}>
+                <Icon className={`h-4 w-4 ${card.accent}`} />
               </div>
             </div>
           </div>
@@ -75,45 +79,67 @@ export function DocumentsSummaryCards({ summary }: { summary: DocumentsSummary }
 
 export function DocumentsDashboardPanels({ summary }: { summary: DocumentsSummary }) {
   const maxType = Math.max(1, ...summary.documentsByType.map((t) => t.count));
+  const documentTypes = summary.documentsByType.slice(0, 6);
+  const recentActivity = summary.recentActivity.slice(0, 4);
+  const recentUploads = summary.recentUploads.slice(0, 4);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-      <section className="rounded-xl border bg-card p-5 shadow-sm">
-        <div className="mb-4 flex items-center gap-2">
+    <div className="grid gap-3 xl:grid-cols-5">
+      <section className="rounded-2xl border bg-card p-4 shadow-sm xl:col-span-2">
+        <div className="mb-3 flex items-center gap-2">
           <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-medium">Documents by Type</h2>
+          <div>
+            <h2 className="text-sm font-semibold">Documents by type</h2>
+            <p className="text-xs text-muted-foreground">Most used document folders</p>
+          </div>
         </div>
-        <div className="space-y-3">
-          {summary.documentsByType.map((item) => (
-            <div key={item.typeCode}>
-              <div className="mb-1 flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">
-                  {item.typeName.replaceAll("_", " ")}
-                </span>
-                <span className="font-medium">{item.count}</span>
+        {summary.documentsByType.length === 0 ? (
+          <div className="flex h-40 items-center justify-center rounded-xl bg-muted/30 text-sm text-muted-foreground">
+            No document type data yet.
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {documentTypes.map((item) => (
+              <div key={item.typeCode}>
+                <div className="mb-1 flex items-center justify-between gap-2 text-xs">
+                  <span className="truncate font-medium">{item.typeName.replaceAll("_", " ")}</span>
+                  <span className="text-muted-foreground">{item.count}</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-primary to-cyan-400"
+                    style={{ width: `${(item.count / maxType) * 100}%` }}
+                  />
+                </div>
               </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-primary/70"
-                  style={{ width: `${(item.count / maxType) * 100}%` }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
 
-      <section className="rounded-xl border bg-card p-5 shadow-sm">
-        <h2 className="mb-4 text-sm font-medium">Recent Activity</h2>
-        <div className="space-y-3">
+      <section className="rounded-2xl border bg-card p-4 shadow-sm xl:col-span-3">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold">Recent activity</h2>
+            <p className="text-xs text-muted-foreground">Latest verification and document events</p>
+          </div>
+          {summary.recentActivity.length > recentActivity.length ? (
+            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+              Latest {recentActivity.length}
+            </span>
+          ) : null}
+        </div>
+        <div className="grid gap-2 md:grid-cols-2">
           {summary.recentActivity.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No recent activity.</p>
+            <div className="rounded-xl bg-muted/30 px-4 py-5 text-sm text-muted-foreground md:col-span-2">
+              No recent activity.
+            </div>
           ) : (
-            summary.recentActivity.map((item) => (
-              <div key={item.id} className="border-b pb-3 last:border-0 last:pb-0">
-                <p className="text-sm font-medium">{item.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  {item.action} · {item.employeeName} · {item.documentTypeName}
+            recentActivity.map((item) => (
+              <div key={item.id} className="rounded-xl border bg-background px-3 py-2">
+                <p className="truncate text-sm font-medium">{item.title}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {item.action} · {item.employeeName}
                 </p>
               </div>
             ))
@@ -121,19 +147,29 @@ export function DocumentsDashboardPanels({ summary }: { summary: DocumentsSummar
         </div>
       </section>
 
-      <section className="rounded-xl border bg-card p-5 shadow-sm">
-        <h2 className="mb-4 text-sm font-medium">Recent Uploads</h2>
-        <div className="space-y-3">
+      <section className="rounded-2xl border bg-card p-4 shadow-sm xl:col-span-5">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold">Recent uploads</h2>
+            <p className="text-xs text-muted-foreground">Newest employee documents added to the system</p>
+          </div>
+          <span className="rounded-full bg-violet-500/10 px-3 py-1 text-xs font-medium text-violet-700">
+            {summary.uploadedToday} today
+          </span>
+        </div>
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
           {summary.recentUploads.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No uploads yet.</p>
+            <div className="rounded-xl bg-muted/30 px-4 py-5 text-sm text-muted-foreground md:col-span-2 xl:col-span-4">
+              No uploads yet.
+            </div>
           ) : (
-            summary.recentUploads.map((item) => (
-              <div key={item.id} className="rounded-lg border px-3 py-2 text-sm">
+            recentUploads.map((item) => (
+              <div key={item.id} className="rounded-xl border bg-background px-3 py-2 text-sm">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium">{item.fileName}</span>
-                  <span className="text-xs text-muted-foreground">{item.documentTypeName}</span>
+                  <span className="truncate font-medium">{item.fileName}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">{item.documentTypeName}</span>
                 </div>
-                <p className="text-xs text-muted-foreground">{item.employeeName}</p>
+                <p className="truncate text-xs text-muted-foreground">{item.employeeName}</p>
               </div>
             ))
           )}

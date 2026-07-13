@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
+import { Pencil } from "lucide-react";
 
 import { EmployeeDetailView } from "@/components/employees/employee-detail-view";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
@@ -8,6 +9,7 @@ import { buttonVariants } from "@/components/common/button";
 import { getEmployeeDetailBundleAction } from "@/lib/employees/actions";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
 import { buildEmployeeRouteRef, isEmployeeUuid } from "@/lib/employees/routing";
+import { hasPermission } from "@/lib/permissions/utils";
 import { cn } from "@/lib/utils";
 
 type EmployeeDetailPageProps = {
@@ -46,14 +48,27 @@ export default async function EmployeeDetailPage({
     );
   }
 
+  const canEdit = hasPermission(bundle.permissionCodes, "employee.edit");
+
   return (
     <div className="space-y-6">
-      <Link
-        href={EMPLOYEE_ROUTES.list}
-        className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "px-0")}
-      >
-        ← Back to employees
-      </Link>
+      <div className="flex items-center justify-between gap-3">
+        <Link
+          href={EMPLOYEE_ROUTES.list}
+          className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "px-0")}
+        >
+          ← Back to employees
+        </Link>
+        {canEdit ? (
+          <Link
+            href={EMPLOYEE_ROUTES.edit(bundle.employee)}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "shrink-0")}
+          >
+            <Pencil className="size-4" />
+            Edit employee
+          </Link>
+        ) : null}
+      </div>
 
       <Suspense
         fallback={

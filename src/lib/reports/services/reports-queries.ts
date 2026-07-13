@@ -45,16 +45,13 @@ type EmployeeReportRow = {
   employmentStatus: string;
   dateOfJoining: string;
   dateOfLeaving: string;
-  branch: string;
   department: string;
   designation: string;
   departmentId: string | null;
-  branchId: string | null;
   designationId: string | null;
 };
 
 function mapEmployeeRow(row: ReportRowLoose): EmployeeReportRow {
-  const branch = unwrapRelation(row.branches);
   const dept = unwrapRelation(row.departments);
   const desig = unwrapRelation(row.designations);
   return {
@@ -64,11 +61,9 @@ function mapEmployeeRow(row: ReportRowLoose): EmployeeReportRow {
     employmentStatus: row.employment_status ?? "",
     dateOfJoining: row.date_of_joining ?? "",
     dateOfLeaving: row.date_of_leaving ?? "",
-    branch: branch?.name ?? "—",
     department: dept?.name ?? "—",
     designation: desig?.title ?? "—",
     departmentId: row.department_id ?? null,
-    branchId: row.branch_id ?? null,
     designationId: row.designation_id ?? null,
   };
 }
@@ -82,8 +77,7 @@ async function fetchEmployees(
     .select(
       `
       id, employee_code, first_name, last_name, email, employment_status,
-      date_of_joining, date_of_leaving, department_id, branch_id, designation_id,
-      branches:branch_id(name),
+      date_of_joining, date_of_leaving, department_id, designation_id,
       departments:department_id(name),
       designations:designation_id(title)
     `,
@@ -94,7 +88,6 @@ async function fetchEmployees(
     .limit(2000);
 
   if (filters.departmentId) query = query.eq("department_id", filters.departmentId);
-  if (filters.branchId) query = query.eq("branch_id", filters.branchId);
   if (filters.designationId) query = query.eq("designation_id", filters.designationId);
   if (filters.employeeId) query = query.eq("id", filters.employeeId);
   if (filters.status) query = query.eq("employment_status", filters.status);
@@ -109,13 +102,8 @@ export async function getReportsLookups(
   profile: UserProfile,
 ): Promise<ReportsLookups> {
   const organizationId = profile.employee.organizationId;
-  const [departments, branches, designations, employees] = await Promise.all([
+  const [departments, designations, employees] = await Promise.all([
     fromHrms(supabase, "departments")
-      .select("id, name")
-      .eq("organization_id", organizationId)
-      .is("deleted_at", null)
-      .order("name"),
-    fromHrms(supabase, "branches")
       .select("id, name")
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
@@ -135,7 +123,6 @@ export async function getReportsLookups(
   ]);
 
   if (departments.error) throw new Error(departments.error.message);
-  if (branches.error) throw new Error(branches.error.message);
   if (designations.error) throw new Error(designations.error.message);
   if (employees.error) throw new Error(employees.error.message);
 
@@ -143,10 +130,6 @@ export async function getReportsLookups(
     departments: (departments.data ?? []).map((d: ReportRowLoose) => ({
       id: d.id,
       label: d.name,
-    })),
-    branches: (branches.data ?? []).map((b: ReportRowLoose) => ({
-      id: b.id,
-      label: b.name,
     })),
     designations: (designations.data ?? []).map((d: ReportRowLoose) => ({
       id: d.id,
@@ -354,7 +337,6 @@ async function runHrReport(
         { key: "employeeName", header: "Name" },
         { key: "email", header: "Email" },
         { key: "department", header: "Department" },
-        { key: "branch", header: "Branch" },
         { key: "designation", header: "Designation" },
         { key: "employmentStatus", header: "Status" },
         { key: "dateOfJoining", header: "Joined" },
@@ -378,24 +360,6 @@ async function runHrReport(
         { key: "headcount", header: "Headcount" },
       ],
       Array.from(map.entries()).map(([department, headcount]) => ({ department, headcount })),
-    );
-  }
-
-  if (key === "hr_branch") {
-    const map = new Map<string, number>();
-    for (const e of employees.filter((x) =>
-      ["active", "probation", "on_leave"].includes(x.employmentStatus),
-    )) {
-      map.set(e.branch, (map.get(e.branch) ?? 0) + 1);
-    }
-    return buildResult(
-      key,
-      title,
-      [
-        { key: "branch", header: "Branch" },
-        { key: "headcount", header: "Headcount" },
-      ],
-      Array.from(map.entries()).map(([branch, headcount]) => ({ branch, headcount })),
     );
   }
 

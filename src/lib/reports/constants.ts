@@ -54,7 +54,6 @@ export const REPORT_DEFINITIONS: {
 }[] = [
   { key: "hr_employee_master", module: "hr", title: "Employee Master Report", description: "Active workforce roster with status and org structure." },
   { key: "hr_department", module: "hr", title: "Department Report", description: "Headcount by department." },
-  { key: "hr_branch", module: "hr", title: "Branch Report", description: "Headcount by branch." },
   { key: "hr_designation", module: "hr", title: "Designation Report", description: "Headcount by designation." },
   { key: "hr_joining", module: "hr", title: "Joining Report", description: "New joiners in the selected period." },
   { key: "hr_probation", module: "hr", title: "Probation Report", description: "Employees currently on probation." },

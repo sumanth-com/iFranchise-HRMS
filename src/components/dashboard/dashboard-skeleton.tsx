@@ -1,47 +1,34 @@
-import { PageScroll } from "@/components/common";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function TileSkeleton() {
-  return <Skeleton className="h-[62px] w-full rounded-lg" />;
+  return <Skeleton className="h-[4.5rem] w-full rounded-xl" />;
 }
 
-function PanelSkeleton({ className }: { className?: string }) {
-  return <Skeleton className={`h-40 w-full rounded-xl ${className ?? ""}`} />;
+function PanelSkeleton() {
+  return <Skeleton className="h-full min-h-[22rem] w-full rounded-xl" />;
 }
 
 export function DashboardSkeleton() {
   return (
-    <PageScroll className="gap-3">
-      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-        <div className="space-y-2">
-          <Skeleton className="h-7 w-56" />
-          <Skeleton className="h-3 w-72" />
-        </div>
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-4 md:p-5">
+      <div className="flex shrink-0 flex-col gap-2">
+        <Skeleton className="h-[7.25rem] w-full rounded-xl" />
         <div className="flex gap-2">
-          <Skeleton className="h-8 w-56" />
-          <Skeleton className="h-8 w-24" />
-          <Skeleton className="h-8 w-24" />
+          <Skeleton className="h-9 flex-1" />
+          <Skeleton className="h-9 w-28" />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9">
-        {Array.from({ length: 9 }).map((_, i) => (
+
+      <div className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, i) => (
           <TileSkeleton key={i} />
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <TileSkeleton key={i} />
-        ))}
+
+      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-2">
+        <PanelSkeleton />
+        <PanelSkeleton />
       </div>
-      <div className="grid gap-2 lg:grid-cols-[1.4fr_1fr]">
-        <PanelSkeleton className="h-56" />
-        <PanelSkeleton className="h-56" />
-      </div>
-      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <PanelSkeleton key={i} />
-        ))}
-      </div>
-    </PageScroll>
+    </div>
   );
 }

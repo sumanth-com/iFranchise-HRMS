@@ -1,7 +1,17 @@
-import { redirect } from "next/navigation";
+import { PayrollSettingsForm } from "@/components/payroll/payroll-settings-form";
+import { fetchPayrollSettingsAction } from "@/lib/payroll/actions";
+import { requireServerPermission } from "@/lib/permissions/server";
+import { hasAnyPermission } from "@/lib/permissions/utils";
 
-import { COMPANY_SETTINGS_ROUTES } from "@/lib/company-settings/constants";
+export default async function PayrollSettingsPage() {
+  const profile = await requireServerPermission("payroll.view");
+  const record = await fetchPayrollSettingsAction();
+  const canEdit = hasAnyPermission(profile.permissionCodes, [
+    "settings.edit",
+    "settings.manage",
+    "payroll.edit",
+    "payroll.approve",
+  ]);
 
-export default function PayrollSettingsPage() {
-  redirect(COMPANY_SETTINGS_ROUTES.section("payroll"));
+  return <PayrollSettingsForm record={record} canEdit={canEdit} />;
 }

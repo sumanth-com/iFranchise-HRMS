@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, LogIn, ShieldAlert, Users } from "lucide-react";
+import { Activity, AlertTriangle, LogIn, ShieldAlert } from "lucide-react";
 
 import type { AuditDashboardStats } from "@/types/audit";
 
@@ -11,35 +11,32 @@ const CARDS = [
 
 export function AuditSummaryCards({ stats }: { stats: AuditDashboardStats }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {CARDS.map((card) => {
         const Icon = card.icon;
         return (
-          <div key={card.key} className="rounded-xl border bg-card p-4 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
+          <div key={card.key} className="rounded-xl border bg-card p-3 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   {card.label}
                 </p>
-                <p className="mt-2 text-2xl font-semibold tracking-tight">{stats[card.key]}</p>
+                <p className="mt-1 text-xl font-semibold tracking-tight">{stats[card.key]}</p>
               </div>
-              <div className={`rounded-lg p-2 ${card.bg}`}>
-                <Icon className={`h-5 w-5 ${card.accent}`} />
+              <div className={`rounded-lg p-1.5 ${card.bg}`}>
+                <Icon className={`h-4 w-4 ${card.accent}`} />
               </div>
             </div>
           </div>
         );
       })}
-      <div className="rounded-xl border bg-card p-4 shadow-sm sm:col-span-2 xl:col-span-4">
-        <div className="flex items-center gap-2 text-sm font-semibold">
-          <Users className="size-4 text-muted-foreground" />
-          Top Active Users Today
-        </div>
+      <div className="rounded-xl border bg-card p-3 shadow-sm sm:col-span-2 xl:col-span-4">
+        <div className="text-sm font-semibold">Top Active Users Today</div>
         {stats.topActiveUsers.length === 0 ? (
           <p className="mt-2 text-sm text-muted-foreground">No activity recorded today.</p>
         ) : (
-          <ul className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-            {stats.topActiveUsers.map((user) => (
+          <ul className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+            {stats.topActiveUsers.slice(0, 5).map((user) => (
               <li key={user.userId} className="rounded-lg border px-3 py-2 text-sm">
                 <p className="font-medium">{user.userName}</p>
                 <p className="text-muted-foreground">{user.count} actions</p>

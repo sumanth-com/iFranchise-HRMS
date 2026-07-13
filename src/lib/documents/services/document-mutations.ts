@@ -533,6 +533,38 @@ export async function publishLetter(
   return documentId;
 }
 
+export async function deleteCompanyLetter(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  letterId: string,
+): Promise<void> {
+  if (isEmployeeScoped(profile)) {
+    throw new Error("Employees cannot delete company letters");
+  }
+
+  const organizationId = profile.employee.organizationId;
+  const { data: letter, error } = await fromHrms(supabase, "document_letters")
+    .select("id")
+    .eq("id", letterId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!letter) throw new Error("Letter not found");
+
+  const { error: updateError } = await fromHrms(supabase, "document_letters")
+    .update({
+      letter_status: "archived",
+      updated_by: profile.userId,
+    })
+    .eq("id", letterId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null);
+
+  if (updateError) throw new Error(updateError.message);
+}
+
 export async function createSignedDocumentUrl(
   supabase: AuthSupabaseClient,
   storagePath: string,

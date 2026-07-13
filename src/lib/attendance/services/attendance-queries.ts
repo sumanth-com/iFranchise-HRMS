@@ -208,9 +208,21 @@ export async function listAttendance(
 export async function getAttendanceSummary(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
-  date = getTodayDateString(),
+  dateFrom = getTodayDateString(),
+  dateTo = dateFrom,
 ): Promise<AttendanceSummary> {
   const organizationId = profile.employee.organizationId;
+  const fromDate = dateFrom <= dateTo ? dateFrom : dateTo;
+  const toDate = dateFrom <= dateTo ? dateTo : dateFrom;
+
+  const attendanceQuery = supabase
+    .schema("hrms")
+    .from("attendance")
+    .select("attendance_status")
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .gte("attendance_date", fromDate)
+    .lte("attendance_date", toDate);
 
   const [employeesResult, attendanceResult] = await Promise.all([
     supabase
@@ -220,13 +232,7 @@ export async function getAttendanceSummary(
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
       .in("employment_status", ["active", "probation", "on_leave"]),
-    supabase
-      .schema("hrms")
-      .from("attendance")
-      .select("attendance_status")
-      .eq("organization_id", organizationId)
-      .eq("attendance_date", date)
-      .is("deleted_at", null),
+    attendanceQuery,
   ]);
 
   if (employeesResult.error) {
@@ -268,7 +274,7 @@ export async function getAttendanceSummary(
   }
 
   return {
-    date,
+    date: fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`,
     ...counts,
     totalEmployees: employeesResult.count ?? 0,
   };

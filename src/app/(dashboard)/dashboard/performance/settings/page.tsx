@@ -1,7 +1,15 @@
-import { redirect } from "next/navigation";
+import { PerformanceSettingsForm } from "@/components/performance/performance-settings-form";
+import { fetchPerformanceSettingsAction } from "@/lib/performance/actions";
+import { requireServerPermission } from "@/lib/permissions/server";
+import { hasAnyPermission } from "@/lib/permissions/utils";
 
-import { COMPANY_SETTINGS_ROUTES } from "@/lib/company-settings/constants";
+export default async function PerformanceSettingsPage() {
+  const profile = await requireServerPermission("performance.view");
+  const record = await fetchPerformanceSettingsAction();
+  const canEdit = hasAnyPermission(profile.permissionCodes, [
+    "performance.settings",
+    "settings.edit",
+  ]);
 
-export default function PerformanceSettingsPage() {
-  redirect(COMPANY_SETTINGS_ROUTES.section("performance"));
+  return <PerformanceSettingsForm record={record} canEdit={canEdit} />;
 }

@@ -291,7 +291,11 @@ export async function listLetters(
 
   if (scopedEmployeeId) query = query.eq("employee_id", scopedEmployeeId);
   if (params.letterType) query = query.eq("letter_type", params.letterType);
-  if (params.letterStatus) query = query.eq("letter_status", params.letterStatus);
+  if (params.letterStatus) {
+    query = query.eq("letter_status", params.letterStatus);
+  } else {
+    query = query.neq("letter_status", "archived");
+  }
   if (params.search?.trim()) {
     const q = params.search.trim();
     query = query.or(`subject.ilike.%${q}%,letter_number.ilike.%${q}%`);

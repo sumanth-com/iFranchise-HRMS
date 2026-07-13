@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useTransition } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -62,10 +62,8 @@ type EmployeeTableProps = {
   search: string;
   sortBy: string;
   sortOrder: "asc" | "desc";
-  branchId?: string;
-  departmentId?: string;
+  department?: string;
   employmentStatus?: string;
-  branches: LookupOption[];
   departments: LookupOption[];
   canCreate: boolean;
   canEdit: boolean;
@@ -80,23 +78,28 @@ export function EmployeeTable({
   search,
   sortBy,
   sortOrder,
-  branchId,
-  departmentId,
+  department,
   employmentStatus,
-  branches,
   departments,
   canCreate,
   canEdit,
   canDelete,
 }: EmployeeTableProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const initialParams = useSearchParams();
+  const filterParamsRef = useRef(initialParams.toString());
   const [isPending, startTransition] = useTransition();
   const [deleteTarget, setDeleteTarget] = useState<EmployeeListItem | null>(null);
 
+  useEffect(() => {
+    if (window.location.search) {
+      window.history.replaceState(null, "", EMPLOYEE_ROUTES.list);
+    }
+  }, []);
+
   const updateParams = useCallback(
     (updates: Record<string, string | undefined>) => {
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(filterParamsRef.current);
 
       Object.entries(updates).forEach(([key, value]) => {
         if (!value) {
@@ -106,30 +109,30 @@ export function EmployeeTable({
         }
       });
 
+      filterParamsRef.current = params.toString();
+
       startTransition(() => {
-        router.push(`${EMPLOYEE_ROUTES.list}?${params.toString()}`);
+        const query = params.toString();
+        router.push(query ? `${EMPLOYEE_ROUTES.list}?${query}` : EMPLOYEE_ROUTES.list);
+        window.setTimeout(() => {
+          window.history.replaceState(null, "", EMPLOYEE_ROUTES.list);
+        }, 0);
       });
     },
-    [router, searchParams, startTransition],
+    [router, startTransition],
   );
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-  const branchItems = useMemo(
-    () => [
-      { value: "", label: "All branches" },
-      ...branches.map((branch) => ({ value: branch.id, label: branch.label })),
-    ],
-    [branches],
-  );
-
   const departmentItems = useMemo(
     () => [
       { value: "", label: "All departments" },
-      ...departments.map((department) => ({
-        value: department.id,
-        label: department.label,
-      })),
+      ...departments
+        .filter((item) => Boolean(item.code))
+        .map((item) => ({
+          value: item.code as string,
+          label: item.label,
+        })),
     ],
     [departments],
   );
@@ -182,11 +185,6 @@ export function EmployeeTable({
         accessorKey: "designationTitle",
         header: "Designation",
         cell: ({ row }) => row.original.designationTitle ?? "—",
-      },
-      {
-        accessorKey: "branchName",
-        header: "Branch",
-        cell: ({ row }) => row.original.branchName ?? "—",
       },
       {
         accessorKey: "employmentStatus",
@@ -321,28 +319,15 @@ export function EmployeeTable({
             }}
           />
           <Select
-            items={branchItems}
-            value={branchId ?? ""}
-            onValueChange={(value) =>
-              updateParams({ branchId: value || undefined, page: "1" })
-            }
-          >
-            <SelectTrigger className="h-8 w-full min-w-0 sm:w-44">
-              <SelectValue placeholder="All branches" />
-            </SelectTrigger>
-            <SelectContent align="start" alignItemWithTrigger={false}>
-              {branchItems.map((item) => (
-                <SelectItem key={item.value || "all-branches"} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
             items={departmentItems}
-            value={departmentId ?? ""}
+            value={department ?? ""}
             onValueChange={(value) =>
-              updateParams({ departmentId: value || undefined, page: "1" })
+              updateParams({
+                department: value || undefined,
+                departmentId: undefined,
+                branchId: undefined,
+                page: "1",
+              })
             }
           >
             <SelectTrigger className="h-8 w-full min-w-0 sm:w-44">
@@ -419,7 +404,6 @@ export function EmployeeTable({
               </TableHead>
               <TableHead>Department</TableHead>
               <TableHead>Designation</TableHead>
-              <TableHead>Branch</TableHead>
               <TableHead>
                 <button
                   type="button"
@@ -446,7 +430,7 @@ export function EmployeeTable({
           <TableBody>
             {table.getRowModel().rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                   No employees found.
                 </TableCell>
               </TableRow>

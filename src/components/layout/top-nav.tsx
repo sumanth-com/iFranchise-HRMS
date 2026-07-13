@@ -1,6 +1,7 @@
 "use client";
 
 import { Menu, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { usePathname } from "next/navigation";
 
 import { Button } from "@/components/common/button";
 import { BreadcrumbNav } from "@/components/layout/breadcrumb-nav";
@@ -9,7 +10,9 @@ import { UserProfileDropdown } from "@/components/layout/user-profile-dropdown";
 import { useSidebar } from "@/hooks/use-sidebar";
 
 export function TopNav() {
+  const pathname = usePathname();
   const { toggleCollapsed, isCollapsed, setMobileOpen } = useSidebar();
+  const isDashboardHome = pathname === "/";
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b bg-background px-4">
@@ -37,7 +40,11 @@ export function TopNav() {
           )}
         </Button>
         <div className="min-w-0 flex-1 overflow-hidden">
-          <BreadcrumbNav />
+          {isDashboardHome ? (
+            <p className="truncate text-sm font-semibold tracking-tight">Dashboard</p>
+          ) : (
+            <BreadcrumbNav />
+          )}
         </div>
       </div>
       <div className="flex items-center gap-1">

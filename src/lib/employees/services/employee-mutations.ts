@@ -1,7 +1,7 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
 import type { EmployeeUpdateInput, EmployeeWizardInputValidated } from "@/lib/validations/employee";
-import { EMPLOYEE_STORAGE_BUCKETS, DESIGNATION_OTHER_VALUE } from "@/lib/employees/constants";
+import { EMPLOYEE_STORAGE_BUCKETS, DESIGNATION_OTHER_VALUE, PROFILE_IMAGE_MAX_BYTES } from "@/lib/employees/constants";
 
 function emptyToNull(value?: string | null) {
   return value && value.trim().length > 0 ? value : null;
@@ -249,6 +249,27 @@ export async function updateEmployee(
   if (error) {
     throw new Error(error.message);
   }
+
+  const { error: profileError } = await supabase
+    .schema("hrms")
+    .from("employee_profiles")
+    .update({
+      date_of_birth: emptyToNull(input.dateOfBirth),
+      gender: input.gender ?? null,
+      marital_status: input.maritalStatus ?? null,
+      nationality: emptyToNull(input.nationality),
+      blood_group: emptyToNull(input.bloodGroup),
+      personal_email: emptyToNull(input.personalEmail)?.toLowerCase() ?? null,
+      personal_phone: emptyToNull(input.personalPhone),
+      bio: emptyToNull(input.bio),
+      updated_by: userId,
+    })
+    .eq("employee_id", employeeId)
+    .is("deleted_at", null);
+
+  if (profileError) {
+    throw new Error(profileError.message);
+  }
 }
 
 export async function softDeleteEmployee(
@@ -311,6 +332,10 @@ export async function uploadProfileImage(
   employeeId: string,
   file: File,
 ): Promise<string> {
+  if (file.size > PROFILE_IMAGE_MAX_BYTES) {
+    throw new Error("Profile image must be 15 MB or smaller");
+  }
+
   const extension = file.name.split(".").pop() ?? "jpg";
   const storagePath = `${organizationId}/${employeeId}/profile.${extension}`;
 

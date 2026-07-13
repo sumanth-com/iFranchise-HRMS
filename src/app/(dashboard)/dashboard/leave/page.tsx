@@ -43,7 +43,7 @@ export default async function LeavePage({ searchParams }: LeavePageProps) {
   const [result, lookups, summary] = await Promise.all([
     listLeaveRequests(supabase, profile, params),
     getLeaveLookups(supabase, profile.employee.organizationId),
-    getLeaveSummary(supabase, profile),
+    getLeaveSummary(supabase, profile, params.month, params.year),
   ]);
 
   return (
@@ -78,9 +78,11 @@ export default async function LeavePage({ searchParams }: LeavePageProps) {
           branchId={params.branchId}
           approverId={params.approverId}
           reportingManagerId={params.reportingManagerId}
+          employeeId={params.employeeId}
           leaveTypes={lookups.leaveTypes}
           departments={lookups.departments}
           branches={lookups.branches}
+          employees={lookups.employees}
           approvers={lookups.approvers}
           managers={lookups.managers}
           canCreate={hasPermission(profile.permissionCodes, "leave.create")}

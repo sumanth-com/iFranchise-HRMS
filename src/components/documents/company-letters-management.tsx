@@ -3,10 +3,13 @@
 import { format } from "date-fns";
 import {
   CheckCircle2,
+  CircleUserRound,
   Eye,
   FileText,
   Loader2,
   Plus,
+  Sparkles,
+  Trash2,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState, useTransition } from "react";
@@ -22,6 +25,7 @@ import { Modal } from "@/components/common/modal";
 import { Label } from "@/components/ui/label";
 import { EmployeeSelect, LabeledSelect } from "@/components/payroll/payroll-select";
 import {
+  deleteCompanyLetterAction,
   generateLetterAction,
   publishLetterAction,
 } from "@/lib/documents/actions";
@@ -60,6 +64,7 @@ export function CompanyLettersManagement({ result, lookups, permissionCodes }: P
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<LetterItem | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<LetterItem | null>(null);
   const canGenerate = canGenerateLetters(permissionCodes);
 
   const form = useForm<GenerateLetterInput>({
@@ -76,6 +81,10 @@ export function CompanyLettersManagement({ result, lookups, permissionCodes }: P
   });
 
   const letterType = form.watch("letterType");
+  const selectedTemplateId = form.watch("templateId");
+  const selectedTemplateName =
+    lookups.templates.find((template) => template.id === selectedTemplateId)?.label ??
+    "Default template";
   const templatesForType = lookups.templates.filter((t) => t.letterType === letterType);
 
   function updateParams(patch: Record<string, string | undefined>) {
@@ -103,7 +112,15 @@ export function CompanyLettersManagement({ result, lookups, permissionCodes }: P
           : "Letter generated (pending HR approval)",
       );
       setOpen(false);
-      form.reset();
+      form.reset({
+        employeeId: "",
+        letterType: "offer_letter",
+        templateId: null,
+        subject: null,
+        bodyHtml: undefined,
+        salaryOverride: null,
+        publishNow: false,
+      });
       router.refresh();
     });
   }
@@ -117,6 +134,23 @@ export function CompanyLettersManagement({ result, lookups, permissionCodes }: P
           return;
         }
         toast.success("Letter published to employee documents");
+        setPreview(null);
+        router.refresh();
+      });
+    },
+    [router],
+  );
+
+  const onDelete = useCallback(
+    (letterId: string) => {
+      startTransition(async () => {
+        const res = await deleteCompanyLetterAction(letterId);
+        if (!res.success) {
+          toast.error(res.message);
+          return;
+        }
+        toast.success("Letter deleted");
+        setDeleteTarget(null);
         setPreview(null);
         router.refresh();
       });
@@ -140,9 +174,14 @@ export function CompanyLettersManagement({ result, lookups, permissionCodes }: P
         key: "employeeName",
         header: "Employee",
         render: (row) => (
-          <div>
-            <p className="font-medium">{row.employeeName}</p>
-            <p className="text-xs text-muted-foreground">{row.employeeCode}</p>
+          <div className="flex items-center gap-2.5">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <CircleUserRound className="size-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate font-medium">{row.employeeName}</p>
+              <p className="text-xs text-muted-foreground">{row.employeeCode}</p>
+            </div>
           </div>
         ),
       },
@@ -170,7 +209,13 @@ export function CompanyLettersManagement({ result, lookups, permissionCodes }: P
         header: "Actions",
         render: (row) => (
           <div className="flex flex-wrap gap-1">
-            <Button size="icon-sm" variant="ghost" onClick={() => setPreview(row)} aria-label="Preview">
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              onClick={() => setPreview(row)}
+              aria-label="Preview letter"
+              title="Preview letter"
+            >
               <Eye className="h-4 w-4" />
             </Button>
             {canGenerate && row.letterStatus === "pending_approval" ? (
@@ -178,9 +223,21 @@ export function CompanyLettersManagement({ result, lookups, permissionCodes }: P
                 size="icon-sm"
                 variant="ghost"
                 onClick={() => onPublish(row.id)}
-                aria-label="Publish"
+                aria-label="Publish letter"
+                title="Publish letter"
               >
                 <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              </Button>
+            ) : null}
+            {canGenerate ? (
+              <Button
+                size="icon-sm"
+                variant="destructive"
+                onClick={() => setDeleteTarget(row)}
+                aria-label="Delete letter"
+                title="Delete letter"
+              >
+                <Trash2 className="h-4 w-4" />
               </Button>
             ) : null}
             {row.employeeDocumentId ? (
@@ -209,7 +266,7 @@ export function CompanyLettersManagement({ result, lookups, permissionCodes }: P
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Company Letters</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Generate professional letters, preview, approve, and store them in employee folders.
+            Generate, preview, approve, and store polished company letters in employee folders.
           </p>
         </div>
         {canGenerate ? (
@@ -220,7 +277,7 @@ export function CompanyLettersManagement({ result, lookups, permissionCodes }: P
         ) : null}
       </div>
 
-      <div className="grid gap-3 rounded-xl border bg-card p-4 shadow-sm md:grid-cols-2 xl:grid-cols-4">
+      <div className="relative z-20 grid gap-3 rounded-xl border bg-card p-4 shadow-sm md:grid-cols-2 xl:grid-cols-4">
         <Input
           placeholder="Search subject or number…"
           defaultValue={searchParams.get("search") ?? ""}
@@ -236,6 +293,7 @@ export function CompanyLettersManagement({ result, lookups, permissionCodes }: P
             updateParams({ employeeId: value === "__all__" ? undefined : value })
           }
           placeholder="All employees"
+          contentClassName="min-w-72"
         />
         <LabeledSelect
           items={[
@@ -250,10 +308,12 @@ export function CompanyLettersManagement({ result, lookups, permissionCodes }: P
         <LabeledSelect
           items={[
             { value: "__all__", label: "All statuses" },
-            ...Object.entries(LETTER_STATUS_LABELS).map(([value, label]) => ({
-              value,
-              label,
-            })),
+            ...Object.entries(LETTER_STATUS_LABELS)
+              .filter(([value]) => value !== "archived")
+              .map(([value, label]) => ({
+                value,
+                label,
+              })),
           ]}
           value={searchParams.get("letterStatus") || "__all__"}
           onValueChange={(value) =>
@@ -263,10 +323,22 @@ export function CompanyLettersManagement({ result, lookups, permissionCodes }: P
       </div>
 
       {result.data.length === 0 ? (
-        <EmptyState
-          title="No letters yet"
-          description="Generate an offer, appointment, promotion, or other company letter."
-        />
+        <div className="rounded-2xl border bg-gradient-to-br from-card via-card to-primary/5 p-10 text-center shadow-sm">
+          <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <FileText className="size-6" />
+          </div>
+          <h2 className="mt-4 text-lg font-semibold">No company letters yet</h2>
+          <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
+            Generate offer, appointment, promotion, appreciation, and settlement letters from
+            professional templates. Published letters are stored automatically in Employee Documents.
+          </p>
+          {canGenerate ? (
+            <Button className="mt-5" onClick={() => setOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Generate first letter
+            </Button>
+          ) : null}
+        </div>
       ) : (
         <DataTable columns={columns} data={result.data} />
       )}
@@ -299,35 +371,36 @@ export function CompanyLettersManagement({ result, lookups, permissionCodes }: P
         open={open}
         onOpenChange={setOpen}
         title="Generate Company Letter"
-        description="Auto-fills employee and company details from their profile."
-        contentClassName="sm:max-w-2xl"
+        description="Choose an employee, select a professional template, then generate or publish the letter."
+        contentClassName="sm:max-w-4xl"
         footer={
           <Button onClick={form.handleSubmit(onGenerate)} disabled={isPending}>
             {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-            Generate PDF
+            {form.watch("publishNow") ? "Generate & Publish" : "Generate for Approval"}
           </Button>
         }
       >
-        <form className="space-y-4" onSubmit={form.handleSubmit(onGenerate)}>
-          <div className="space-y-2">
-            <Label>Employee</Label>
-            <EmployeeSelect
-              employees={lookups.employees}
-              value={form.watch("employeeId")}
-              onValueChange={(value) => form.setValue("employeeId", value, { shouldValidate: true })}
-            />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+        <form className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]" onSubmit={form.handleSubmit(onGenerate)}>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Employee</Label>
+              <EmployeeSelect
+                employees={lookups.employees}
+                value={form.watch("employeeId")}
+                onValueChange={(value) => form.setValue("employeeId", value, { shouldValidate: true })}
+              />
+            </div>
             <div className="space-y-2">
               <Label>Letter Type</Label>
               <LabeledSelect
                 items={LETTER_TYPE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
                 value={letterType}
-                onValueChange={(value) =>
+                onValueChange={(value) => {
                   form.setValue("letterType", value as GenerateLetterInput["letterType"], {
                     shouldDirty: true,
-                  })
-                }
+                  });
+                  form.setValue("templateId", null, { shouldDirty: true });
+                }}
               />
             </div>
             <div className="space-y-2">
@@ -341,25 +414,56 @@ export function CompanyLettersManagement({ result, lookups, permissionCodes }: P
                 onValueChange={(value) =>
                   form.setValue("templateId", value === "__default__" ? null : value)
                 }
+                contentClassName="min-w-72"
               />
             </div>
+            <div className="space-y-2">
+              <Label>Salary Override (optional)</Label>
+              <Input
+                placeholder="Shown as {{salary}} when set"
+                {...form.register("salaryOverride")}
+              />
+            </div>
+            <label className="flex items-center gap-2 rounded-xl border bg-card px-3 py-2 text-sm">
+              <input
+                type="checkbox"
+                className="size-4 rounded border-input"
+                checked={Boolean(form.watch("publishNow"))}
+                onChange={(e) => form.setValue("publishNow", e.target.checked)}
+              />
+              Publish immediately and store in Employee Documents
+            </label>
           </div>
-          <div className="space-y-2">
-            <Label>Salary Override (optional)</Label>
-            <Input
-              placeholder="Shown as {{salary}} when set"
-              {...form.register("salaryOverride")}
-            />
+
+          <div className="rounded-2xl border bg-gradient-to-br from-card via-card to-primary/5 p-4">
+            <div className="flex items-start gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <Sparkles className="size-5" />
+              </span>
+              <div>
+                <h3 className="text-sm font-semibold">Letter workflow</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Employee and company placeholders are filled automatically from HRMS records.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 space-y-3 text-sm">
+              <div className="rounded-xl border bg-background p-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Template</p>
+                <p className="mt-1 font-medium">{selectedTemplateName}</p>
+              </div>
+              <div className="rounded-xl border bg-background p-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Output</p>
+                <p className="mt-1 font-medium">
+                  {form.watch("publishNow") ? "Published PDF in Employee Documents" : "Pending approval letter"}
+                </p>
+              </div>
+              <div className="rounded-xl border bg-background p-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Status</p>
+                <p className="mt-1 font-medium">Ready to generate</p>
+              </div>
+            </div>
           </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="size-4 rounded border-input"
-              checked={Boolean(form.watch("publishNow"))}
-              onChange={(e) => form.setValue("publishNow", e.target.checked)}
-            />
-            Publish immediately and store in Employee Documents
-          </label>
         </form>
       </Modal>
 
@@ -368,7 +472,7 @@ export function CompanyLettersManagement({ result, lookups, permissionCodes }: P
         onOpenChange={(next) => !next && setPreview(null)}
         title={preview?.subject ?? "Letter Preview"}
         description={preview?.letterNumber ?? undefined}
-        contentClassName="sm:max-w-3xl"
+        contentClassName="sm:max-w-4xl"
         showCancel
         footer={
           preview?.letterStatus === "pending_approval" && canGenerate ? (
@@ -379,10 +483,53 @@ export function CompanyLettersManagement({ result, lookups, permissionCodes }: P
         }
       >
         {preview ? (
-          <div
-            className="prose prose-sm max-w-none dark:prose-invert"
-            dangerouslySetInnerHTML={{ __html: preview.bodyHtml }}
-          />
+          <div className="rounded-2xl border bg-muted/30 p-4">
+            <div className="mx-auto max-w-3xl rounded-xl border bg-background p-8 shadow-sm">
+              <div className="mb-6 flex items-start justify-between gap-4 border-b pb-4">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    {LETTER_TYPE_LABELS[preview.letterType]}
+                  </p>
+                  <h2 className="mt-1 text-xl font-semibold">{preview.subject}</h2>
+                </div>
+                <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium">
+                  {LETTER_STATUS_LABELS[preview.letterStatus]}
+                </span>
+              </div>
+              <div
+                className="prose prose-sm max-w-none dark:prose-invert"
+                dangerouslySetInnerHTML={{ __html: preview.bodyHtml }}
+              />
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={Boolean(deleteTarget)}
+        onOpenChange={(next) => !next && setDeleteTarget(null)}
+        title="Delete company letter?"
+        description="This removes the letter from Company Letters. Published files can still be managed from Employee Documents."
+        footer={
+          <Button
+            variant="destructive"
+            disabled={isPending}
+            onClick={() => {
+              if (deleteTarget) onDelete(deleteTarget.id);
+            }}
+          >
+            {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Delete Letter
+          </Button>
+        }
+      >
+        {deleteTarget ? (
+          <div className="rounded-xl border bg-muted/30 p-4 text-sm">
+            <p className="font-medium">{deleteTarget.letterNumber ?? deleteTarget.subject}</p>
+            <p className="mt-1 text-muted-foreground">
+              {deleteTarget.employeeName} · {LETTER_TYPE_LABELS[deleteTarget.letterType]}
+            </p>
+          </div>
         ) : null}
       </Modal>
     </>

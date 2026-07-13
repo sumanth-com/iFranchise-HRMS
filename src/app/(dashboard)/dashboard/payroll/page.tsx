@@ -1,6 +1,7 @@
 import { PayrollMonthlyOverview } from "@/components/payroll/payroll-monthly-overview";
 import { PayrollRunsTable } from "@/components/payroll/payroll-runs-table";
 import { PayrollSummaryCards } from "@/components/payroll/payroll-summary-cards";
+import { PAYROLL_ROUTES } from "@/lib/payroll/constants";
 import { createClient } from "@/lib/supabase/server";
 import {
   getPayrollSummary,
@@ -8,6 +9,9 @@ import {
 } from "@/lib/payroll/services/payroll-queries";
 import { payrollListParamsSchema } from "@/lib/validations/payroll";
 import { requireServerPermission } from "@/lib/permissions/server";
+import Link from "next/link";
+import { buttonVariants } from "@/components/common/button";
+import { cn } from "@/lib/utils";
 
 type PayrollDashboardPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -34,35 +38,62 @@ export default async function PayrollDashboardPage({
   ]);
 
   return (
-    <>
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Payroll</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Monitor payroll runs, compensation, and employee payouts.
-        </p>
-      </div>
-
-      <PayrollSummaryCards summary={summary} />
-      <PayrollMonthlyOverview overview={summary.monthlyOverview} />
-
-      <section className="space-y-4">
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2 className="text-sm font-medium">Recent payroll runs</h2>
-          <p className="text-xs text-muted-foreground">
-            Latest payroll activity for the selected period
+          <h1 className="text-2xl font-semibold tracking-tight">Payroll</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Monitor payroll runs, compensation, and employee payouts.
           </p>
         </div>
-        <PayrollRunsTable
-          records={recentRuns.data}
-          total={recentRuns.total}
-          page={recentRuns.page}
-          pageSize={recentRuns.pageSize}
-          month={params.month}
-          year={params.year}
-          showFilters={false}
-          compact
-        />
-      </section>
-    </>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={PAYROLL_ROUTES.run}
+            className={cn(buttonVariants({ size: "sm" }), "h-9")}
+          >
+            Run Payroll
+          </Link>
+          <Link
+            href={PAYROLL_ROUTES.history}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9")}
+          >
+            View History
+          </Link>
+        </div>
+      </div>
+
+      <PayrollSummaryCards summary={summary} compact />
+
+      <div className="space-y-5">
+        <PayrollMonthlyOverview overview={summary.monthlyOverview} compact />
+
+        <section className="min-h-0 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold">Recent payroll runs</h2>
+              <p className="text-xs text-muted-foreground">
+                Latest payroll activity for the selected period
+              </p>
+            </div>
+            <Link
+              href={PAYROLL_ROUTES.history}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              View all
+            </Link>
+          </div>
+          <PayrollRunsTable
+            records={recentRuns.data}
+            total={recentRuns.total}
+            page={recentRuns.page}
+            pageSize={recentRuns.pageSize}
+            month={params.month}
+            year={params.year}
+            showFilters={false}
+            compact
+          />
+        </section>
+      </div>
+    </div>
   );
 }

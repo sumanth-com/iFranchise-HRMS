@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import {
@@ -10,26 +10,83 @@ import {
 } from "@/lib/documents/actions";
 
 export function useDocumentFileActions(onDone?: () => void) {
+  const [isFilePending, setIsFilePending] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  function openSigned(storagePath: string, mode: "preview" | "download") {
-    startTransition(async () => {
+  async function getSignedUrl(storagePath: string) {
+    setIsFilePending(true);
+    try {
       const result = await getDocumentSignedUrlAction(storagePath);
       if (!result.success || !result.data) {
         toast.error(result.message ?? "Unable to open file");
+        return null;
+      }
+      return result.data;
+    } finally {
+      setIsFilePending(false);
+    }
+  }
+
+  async function download(storagePath: string, fileName?: string) {
+    const url = await getSignedUrl(storagePath);
+    if (!url) return;
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Download failed");
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = fileName || "document";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(objectUrl);
+      toast.success("Download started");
+    } catch {
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = fileName || "document";
+      anchor.rel = "noopener noreferrer";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      toast.success("Download opened");
+    }
+  }
+
+  async function share(storagePath: string, title: string) {
+    const url = await getSignedUrl(storagePath);
+    if (!url) return;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title,
+          text: `Sharing document: ${title}`,
+          url,
+        });
         return;
       }
-      if (mode === "download") {
-        const anchor = document.createElement("a");
-        anchor.href = result.data;
-        anchor.download = "";
-        anchor.target = "_blank";
-        anchor.rel = "noopener noreferrer";
-        anchor.click();
-      } else {
-        window.open(result.data, "_blank", "noopener,noreferrer");
-      }
-    });
+
+      await navigator.clipboard.writeText(url);
+      toast.success("Share link copied");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      toast.error("Unable to share document");
+    }
+  }
+
+  async function openSigned(storagePath: string, mode: "preview" | "download") {
+    if (mode === "download") {
+      await download(storagePath);
+      return;
+    }
+
+    const url = await getSignedUrl(storagePath);
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
   }
 
   function archive(documentId: string) {
@@ -56,5 +113,13 @@ export function useDocumentFileActions(onDone?: () => void) {
     });
   }
 
-  return { isPending, openSigned, archive, verify };
+  return {
+    isPending: isPending || isFilePending,
+    getSignedUrl,
+    openSigned,
+    download,
+    share,
+    archive,
+    verify,
+  };
 }

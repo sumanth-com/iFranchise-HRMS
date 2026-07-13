@@ -16,6 +16,7 @@ export type DashboardActivityItem = {
   title: string;
   description: string;
   module: string;
+  user: string;
   occurredAt: string;
   href: string | null;
 };
@@ -36,16 +37,13 @@ export type DashboardListItem = {
   href: string;
 };
 
+/** Executive dashboard KPIs — workforce snapshot only (no Priority Task overlap). */
 export type DashboardKpis = {
   totalEmployees: number;
   presentToday: number;
   onLeaveToday: number;
   absentToday: number;
-  lateToday: number;
-  newJoinersThisMonth: number;
-  employeesExiting: number;
-  openRecruitments: number;
-  pendingApprovals: number;
+  pendingLeaveApprovals: number;
 };
 
 export type DashboardSecondaryMetrics = {
@@ -57,6 +55,9 @@ export type DashboardSecondaryMetrics = {
   probationEndingSoon: number;
   documentsExpiring: number;
   assetsPendingReturn: number;
+  interviewsToday: number;
+  birthdaysToday: number;
+  exitClearancePending: number;
 };
 
 export type DashboardCharts = {

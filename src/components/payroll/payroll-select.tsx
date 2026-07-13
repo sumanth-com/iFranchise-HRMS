@@ -49,6 +49,8 @@ type LabeledSelectProps = {
   placeholder?: string;
   disabled?: boolean;
   id?: string;
+  triggerClassName?: string;
+  contentClassName?: string;
 };
 
 export function LabeledSelect({
@@ -58,6 +60,8 @@ export function LabeledSelect({
   placeholder = "Select",
   disabled,
   id,
+  triggerClassName,
+  contentClassName,
 }: LabeledSelectProps) {
   return (
     <Select
@@ -68,10 +72,10 @@ export function LabeledSelect({
       }}
       disabled={disabled}
     >
-      <SelectTrigger id={id} className="h-8 w-full min-w-0">
+      <SelectTrigger id={id} className={triggerClassName ?? "h-8 w-full min-w-0"}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
-      <SelectContent align="start" alignItemWithTrigger={false}>
+      <SelectContent align="start" alignItemWithTrigger={false} className={contentClassName}>
         {items.map((item) => (
           <SelectItem key={item.value} value={item.value}>
             {item.label}

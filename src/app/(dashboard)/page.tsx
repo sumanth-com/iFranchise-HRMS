@@ -5,6 +5,50 @@ import { HrDashboard } from "@/components/dashboard/hr-dashboard";
 import { getHrDashboardData } from "@/lib/dashboard/services/dashboard-queries";
 import { requireAuthenticatedProfile } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
+import type { HrDashboardData } from "@/types/dashboard";
+
+const EMPTY_DASHBOARD: HrDashboardData = {
+  generatedAt: new Date().toISOString(),
+  kpis: {
+    totalEmployees: 0,
+    presentToday: 0,
+    onLeaveToday: 0,
+    absentToday: 0,
+    pendingLeaveApprovals: 0,
+  },
+  secondary: {
+    attendancePercent: 0,
+    leaveUtilizationPercent: 0,
+    payrollStatus: "—",
+    upcomingBirthdaysCount: 0,
+    upcomingAnniversariesCount: 0,
+    probationEndingSoon: 0,
+    documentsExpiring: 0,
+    assetsPendingReturn: 0,
+    interviewsToday: 0,
+    birthdaysToday: 0,
+    exitClearancePending: 0,
+  },
+  charts: {
+    headcountByDepartment: [],
+    attendanceTrend7Days: [],
+    monthlyHiring: [],
+    monthlyAttrition: [],
+    leaveDistribution: [],
+    genderDistribution: [],
+    employmentTypeDistribution: [],
+  },
+  activities: [],
+  tasks: [],
+  upcomingBirthdays: [],
+  upcomingAnniversaries: [],
+  upcomingInterviews: [],
+  upcomingHolidays: [],
+  recentEmployees: [],
+  recentLeaveRequests: [],
+  recentRecruitment: [],
+  recentPayrollRuns: [],
+};
 
 async function DashboardContent() {
   const profile = await requireAuthenticatedProfile();
@@ -20,49 +64,7 @@ async function DashboardContent() {
       error instanceof Error ? error.message : "Failed to load dashboard data.";
     return (
       <HrDashboard
-        data={{
-          generatedAt: new Date().toISOString(),
-          kpis: {
-            totalEmployees: 0,
-            presentToday: 0,
-            onLeaveToday: 0,
-            absentToday: 0,
-            lateToday: 0,
-            newJoinersThisMonth: 0,
-            employeesExiting: 0,
-            openRecruitments: 0,
-            pendingApprovals: 0,
-          },
-          secondary: {
-            attendancePercent: 0,
-            leaveUtilizationPercent: 0,
-            payrollStatus: "—",
-            upcomingBirthdaysCount: 0,
-            upcomingAnniversariesCount: 0,
-            probationEndingSoon: 0,
-            documentsExpiring: 0,
-            assetsPendingReturn: 0,
-          },
-          charts: {
-            headcountByDepartment: [],
-            attendanceTrend7Days: [],
-            monthlyHiring: [],
-            monthlyAttrition: [],
-            leaveDistribution: [],
-            genderDistribution: [],
-            employmentTypeDistribution: [],
-          },
-          activities: [],
-          tasks: [],
-          upcomingBirthdays: [],
-          upcomingAnniversaries: [],
-          upcomingInterviews: [],
-          upcomingHolidays: [],
-          recentEmployees: [],
-          recentLeaveRequests: [],
-          recentRecruitment: [],
-          recentPayrollRuns: [],
-        }}
+        data={EMPTY_DASHBOARD}
         permissionCodes={profile.permissionCodes}
         error={message}
       />
