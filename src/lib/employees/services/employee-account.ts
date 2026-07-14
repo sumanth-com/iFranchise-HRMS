@@ -372,8 +372,10 @@ export async function resendEmployeeInvitation(
     invitation_sent_at: now,
     updated_by: profile.userId,
   });
+
+  const updatedEmployee = { ...employee, user_id: authUserId };
   await notifyEmployeeAccount(
-    employee,
+    updatedEmployee,
     "employee_invitation_resent",
     "Employee account invitation resent",
     `Your ${siteConfig.name} account invitation was resent.`,
@@ -382,7 +384,7 @@ export async function resendEmployeeInvitation(
   await writeAccountAudit(
     supabase,
     profile,
-    employee,
+    updatedEmployee,
     "invitation_resent",
     `Invitation resent to ${fullName(employee)} (${employee.employee_code})`,
   );
