@@ -26,6 +26,7 @@ type EmployeeAccountRow = {
   first_name: string;
   last_name: string;
   email: string;
+  employment_status?: string;
   account_status: EmployeeAccountStatus;
   first_login_at: string | null;
   deleted_at: string | null;
@@ -45,7 +46,9 @@ function deriveNameFromEmail(email: string) {
   return { firstName, lastName };
 }
 
-const INVITE_REDIRECT_TO = `${siteConfig.url}${AUTH_ROUTES.login}`;
+const INVITE_REDIRECT_TO = `${siteConfig.url}${AUTH_ROUTES.callback}?next=${encodeURIComponent(
+  `${AUTH_ROUTES.resetPassword}?invite=1`,
+)}`;
 const RESET_REDIRECT_TO = `${siteConfig.url}${AUTH_ROUTES.callback}?next=${AUTH_ROUTES.resetPassword}`;
 
 function fullName(employee: Pick<EmployeeAccountRow, "first_name" | "last_name">) {
@@ -61,7 +64,7 @@ async function getEmployeeAccountRow(
     .schema("hrms")
     .from("employees")
     .select(
-      "id, organization_id, user_id, employee_code, first_name, last_name, email, account_status, first_login_at, deleted_at",
+      "id, organization_id, user_id, employee_code, first_name, last_name, email, employment_status, account_status, first_login_at, deleted_at",
     )
     .eq("id", employeeId)
     .eq("organization_id", organizationId)
@@ -577,41 +580,42 @@ export async function recordEmployeeSuccessfulLogin(
 
   if (error || !employee || employee.deleted_at) return;
 
+  const employeeRow = employee as EmployeeAccountRow;
   const now = new Date().toISOString();
-  const isFirstLogin = !employee.first_login_at;
+  const isFirstLogin = !employeeRow.first_login_at;
   const shouldActivate =
-    employee.account_status === "invited" || employee.account_status === "invitation_pending";
+    employeeRow.account_status === "invited" || employeeRow.account_status === "invitation_pending";
 
   const updates: Record<string, unknown> = {
     last_login_at: now,
   };
   if (isFirstLogin) updates.first_login_at = now;
+  if (employeeRow.employment_status === "draft") updates.employment_status = "active";
   if (shouldActivate) {
     updates.account_status = "active";
     updates.account_activated_at = now;
   }
 
-  await updateEmployeeAccountWithClient(supabase, employee.id, updates);
+  await updateEmployeeAccountWithClient(supabase, employeeRow.id, updates);
 
   if (shouldActivate) {
-    const row = employee as EmployeeAccountRow;
     await notifyEmployeeAccount(
-      { ...row, account_status: "active" },
+      { ...employeeRow, account_status: "active" },
       "employee_invitation_accepted",
       "Invitation accepted",
       `Welcome to ${siteConfig.name}. Your employee account is active.`,
       userId,
     );
     await writeApplicationAudit(supabase, {
-      organizationId: employee.organization_id,
+      organizationId: employeeRow.organization_id,
       module: "employees",
       action: "account_activated",
       description: `Invitation accepted and account activated for ${email}`,
-      recordId: employee.id,
+      recordId: employeeRow.id,
       priority: "medium",
       metadata: {
-        employeeId: employee.id,
-        employeeCode: employee.employee_code,
+        employeeId: employeeRow.id,
+        employeeCode: employeeRow.employee_code,
         email,
       },
     });

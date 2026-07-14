@@ -120,11 +120,22 @@ export async function loadUserProfile(
 
   if (
     employeeRow.status !== "active" ||
-    !LOGIN_ELIGIBLE_EMPLOYMENT_STATUSES.includes(
-      employeeRow.employment_status,
-    ) ||
     !LOGIN_ELIGIBLE_ACCOUNT_STATUSES.includes(
       employeeRow.account_status,
+    )
+  ) {
+    return { success: false, error: "EMPLOYEE_INACTIVE" };
+  }
+
+  const isInviteSetupEmployee =
+    employeeRow.employment_status === "draft" &&
+    (employeeRow.account_status === "invited" ||
+      employeeRow.account_status === "invitation_pending");
+
+  if (
+    !isInviteSetupEmployee &&
+    !LOGIN_ELIGIBLE_EMPLOYMENT_STATUSES.includes(
+      employeeRow.employment_status,
     )
   ) {
     return { success: false, error: "EMPLOYEE_INACTIVE" };

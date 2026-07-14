@@ -12,8 +12,7 @@ function isPublicRoute(pathname: string): boolean {
 function isAuthRoute(pathname: string): boolean {
   return (
     pathname === AUTH_ROUTES.login ||
-    pathname === AUTH_ROUTES.forgotPassword ||
-    pathname === AUTH_ROUTES.resetPassword
+    pathname === AUTH_ROUTES.forgotPassword
   );
 }
 

@@ -7,6 +7,7 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? AUTH_ROUTES.dashboard;
+  let email: string | null = null;
 
   if (code) {
     const supabase = await createClient();
@@ -17,8 +18,20 @@ export async function GET(request: NextRequest) {
       redirectUrl.searchParams.set("expired", "1");
       return NextResponse.redirect(redirectUrl);
     }
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    email = user?.email ?? null;
   }
 
   const redirectUrl = new URL(next, origin);
+  if (
+    email &&
+    redirectUrl.pathname === AUTH_ROUTES.resetPassword &&
+    !redirectUrl.searchParams.has("email")
+  ) {
+    redirectUrl.searchParams.set("email", email);
+  }
   return NextResponse.redirect(redirectUrl);
 }

@@ -27,6 +27,7 @@ export function ResetPasswordForm() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [signInHref, setSignInHref] = useState<string | null>(null);
   const isInviteSetup = searchParams.get("invite") === "1";
+  const invitedEmail = searchParams.get("email");
 
   const {
     register,
@@ -103,6 +104,13 @@ export function ResetPasswordForm() {
             : "Choose a new password for your account. It must meet the organization security policy."}
         </p>
       </div>
+
+      {isInviteSetup && invitedEmail ? (
+        <div className="rounded-xl border bg-muted/30 px-3 py-2 text-center text-sm">
+          <p className="text-xs text-muted-foreground">Activating account for</p>
+          <p className="font-medium text-foreground">{invitedEmail}</p>
+        </div>
+      ) : null}
 
       {formError ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
