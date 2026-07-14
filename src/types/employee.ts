@@ -22,6 +22,14 @@ export type AddressType = "current" | "permanent" | "work";
 
 export type DocumentStatus = "pending" | "verified" | "rejected" | "expired";
 
+export type EmployeeAccountStatus =
+  | "draft"
+  | "invited"
+  | "invitation_pending"
+  | "active"
+  | "inactive"
+  | "suspended";
+
 export type EmployeeListItem = {
   id: string;
   employeeCode: string;
@@ -39,6 +47,9 @@ export type EmployeeListItem = {
   designationId: string | null;
   designationTitle: string | null;
   profileImagePath: string | null;
+  accountStatus: EmployeeAccountStatus;
+  invitationSentAt: string | null;
+  lastLoginAt: string | null;
 };
 
 export type EmployeeListResult = {
@@ -46,6 +57,28 @@ export type EmployeeListResult = {
   total: number;
   page: number;
   pageSize: number;
+};
+
+export type EmployeeAccountProvisioningItem = {
+  id: string;
+  employeeCode: string;
+  fullName: string;
+  email: string;
+  accountStatus: EmployeeAccountStatus;
+  invitationSentAt: string | null;
+  lastLoginAt: string | null;
+};
+
+export type EmployeeAccountProvisioningSummary = {
+  draft: number;
+  invited: number;
+  invitationPending: number;
+  active: number;
+  inactive: number;
+  suspended: number;
+  readyToInvite: EmployeeAccountProvisioningItem[];
+  pendingInvitations: EmployeeAccountProvisioningItem[];
+  suspendedAccounts: EmployeeAccountProvisioningItem[];
 };
 
 export type EmployeeListParams = {
@@ -56,6 +89,7 @@ export type EmployeeListParams = {
   sortOrder?: "asc" | "desc";
   department?: string;
   employmentStatus?: EmploymentStatus;
+  accountStatus?: EmployeeAccountStatus;
 };
 
 export type EmployeeSortField =
@@ -64,7 +98,9 @@ export type EmployeeSortField =
   | "last_name"
   | "email"
   | "date_of_joining"
-  | "employment_status";
+  | "employment_status"
+  | "account_status"
+  | "last_login_at";
 
 export type LookupOption = {
   id: string;
@@ -96,6 +132,15 @@ export type EmployeeDetail = {
   dateOfJoining: string | null;
   dateOfLeaving: string | null;
   status: RecordStatus;
+  accountStatus: EmployeeAccountStatus;
+  invitationSentAt: string | null;
+  invitationCancelledAt: string | null;
+  firstLoginAt: string | null;
+  lastLoginAt: string | null;
+  passwordLastResetAt: string | null;
+  accountSuspendedAt: string | null;
+  accountDeactivatedAt: string | null;
+  accountActivatedAt: string | null;
   createdAt: string;
   updatedAt: string;
   branchName: string | null;

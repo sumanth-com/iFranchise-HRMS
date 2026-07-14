@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { DESIGNATION_OTHER_VALUE } from "@/lib/employees/constants";
 import type { EmploymentStatus } from "@/types/auth";
+import type { EmployeeAccountStatus } from "@/types/employee";
 
 export const employmentStatusSchema = z.enum([
   "draft",
@@ -12,6 +13,15 @@ export const employmentStatusSchema = z.enum([
   "terminated",
   "resigned",
 ] satisfies [EmploymentStatus, ...EmploymentStatus[]]);
+
+export const employeeAccountStatusSchema = z.enum([
+  "draft",
+  "invited",
+  "invitation_pending",
+  "active",
+  "inactive",
+  "suspended",
+] satisfies [EmployeeAccountStatus, ...EmployeeAccountStatus[]]);
 
 export const genderTypeSchema = z.enum([
   "male",
@@ -42,6 +52,8 @@ export const employeeListParamsSchema = z.object({
       "email",
       "date_of_joining",
       "employment_status",
+      "account_status",
+      "last_login_at",
     ])
     .default("employee_code"),
   sortOrder: z.enum(["asc", "desc"]).default("asc"),
@@ -52,6 +64,7 @@ export const employeeListParamsSchema = z.object({
     .max(20)
     .optional(),
   employmentStatus: employmentStatusSchema.optional(),
+  accountStatus: employeeAccountStatusSchema.optional(),
 });
 
 export const employeeBasicStepSchema = z.object({

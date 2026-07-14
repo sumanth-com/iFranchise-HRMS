@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Pencil } from "lucide-react";
 
 import { EmployeeDetailView } from "@/components/employees/employee-detail-view";
+import { EmployeeAccountStatusBadge } from "@/components/employees/employee-account-status-badge";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { buttonVariants } from "@/components/common/button";
 import { getEmployeeDetailBundleAction } from "@/lib/employees/actions";
@@ -59,15 +60,18 @@ export default async function EmployeeDetailPage({
         >
           ← Back to employees
         </Link>
-        {canEdit ? (
-          <Link
-            href={EMPLOYEE_ROUTES.edit(bundle.employee)}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "shrink-0")}
-          >
-            <Pencil className="size-4" />
-            Edit employee
-          </Link>
-        ) : null}
+        <div className="flex items-center gap-2">
+          <EmployeeAccountStatusBadge status={bundle.employee.accountStatus} />
+          {canEdit ? (
+            <Link
+              href={EMPLOYEE_ROUTES.edit(bundle.employee)}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "shrink-0")}
+            >
+              <Pencil className="size-4" />
+              Edit employee
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       <Suspense

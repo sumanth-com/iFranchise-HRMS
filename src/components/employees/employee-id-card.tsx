@@ -13,6 +13,8 @@ import {
 } from "@/lib/employees/actions";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
+import { EmployeeAccountStatusBadge } from "@/components/employees/employee-account-status-badge";
+import type { EmployeeAccountStatus } from "@/types/employee";
 
 type EmployeeIdCardProps = {
   employeeId: string;
@@ -22,6 +24,7 @@ type EmployeeIdCardProps = {
   designation: string | null;
   departmentName: string | null;
   employmentTypeName: string;
+  accountStatus: EmployeeAccountStatus;
   imageUrl: string | null;
   profilePath: string;
   canEdit: boolean;
@@ -36,6 +39,7 @@ export function EmployeeIdCard({
   designation,
   departmentName,
   employmentTypeName,
+  accountStatus,
   imageUrl: initialUrl,
   profilePath,
   canEdit,
@@ -258,9 +262,12 @@ export function EmployeeIdCard({
                 <p className="mt-2.5 font-mono text-[0.7rem] font-semibold tracking-[0.08em] text-neutral-600/90">
                   ID · {employeeCode}
                 </p>
-                <p className="mt-3 inline-flex w-fit rounded-full bg-white/70 px-2.5 py-1 text-[0.68rem] font-semibold tracking-wide text-neutral-600 shadow-sm ring-1 ring-black/5">
-                  {employmentTypeName}
-                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <p className="inline-flex w-fit rounded-full bg-white/70 px-2.5 py-1 text-[0.68rem] font-semibold tracking-wide text-neutral-600 shadow-sm ring-1 ring-black/5">
+                    {employmentTypeName}
+                  </p>
+                  <EmployeeAccountStatusBadge status={accountStatus} />
+                </div>
               </div>
             </div>
           </div>

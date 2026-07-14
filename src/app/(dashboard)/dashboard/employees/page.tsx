@@ -1,12 +1,15 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
+import { EmployeeAccountProvisioningPanel } from "@/components/employees/employee-account-provisioning-panel";
 import { EmployeeTable } from "@/components/employees/employee-table";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { createClient } from "@/lib/supabase/server";
+import { hasSupabaseServiceRoleEnv } from "@/lib/supabase/env";
 import { requireServerPermission } from "@/lib/permissions/server";
 import {
   getDepartments,
+  getEmployeeAccountProvisioningSummary,
   listEmployees,
 } from "@/lib/employees/services/employee-queries";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
@@ -62,6 +65,7 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
     const sortBy = firstString(rawParams.sortBy);
     const sortOrder = firstString(rawParams.sortOrder);
     const employmentStatus = firstString(rawParams.employmentStatus);
+    const accountStatus = firstString(rawParams.accountStatus);
 
     if (page) cleaned.set("page", page);
     if (pageSize) cleaned.set("pageSize", pageSize);
@@ -69,6 +73,7 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
     if (sortBy) cleaned.set("sortBy", sortBy);
     if (sortOrder) cleaned.set("sortOrder", sortOrder);
     if (employmentStatus) cleaned.set("employmentStatus", employmentStatus);
+    if (accountStatus) cleaned.set("accountStatus", accountStatus);
     if (departmentCode) cleaned.set("department", departmentCode);
 
     const query = cleaned.toString();
@@ -82,10 +87,23 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
     sortBy: rawParams.sortBy,
     sortOrder: rawParams.sortOrder,
     department: departmentCode,
-    employmentStatus: rawParams.employmentStatus,
+    employmentStatus: firstString(rawParams.employmentStatus),
+    accountStatus: firstString(rawParams.accountStatus),
   });
 
-  const result = await listEmployees(supabase, profile, params);
+  const [result, accountProvisioning] = await Promise.all([
+    listEmployees(supabase, profile, params),
+    getEmployeeAccountProvisioningSummary(supabase, profile),
+  ]);
+  const canInviteEmployee = hasPermission(profile.permissionCodes, "employee_account.invite");
+  const canCancelEmployeeInvitation = hasPermission(
+    profile.permissionCodes,
+    "employee_account.cancel_invitation",
+  );
+  const canActivateEmployeeAccount = hasPermission(
+    profile.permissionCodes,
+    "employee_account.activate",
+  );
 
   return (
     <div className="space-y-6">
@@ -95,6 +113,16 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
           Manage employee records, employment details, and related information.
         </p>
       </div>
+
+      {(canInviteEmployee || canCancelEmployeeInvitation || canActivateEmployeeAccount) ? (
+        <EmployeeAccountProvisioningPanel
+          summary={accountProvisioning}
+          canInvite={canInviteEmployee}
+          canCancelInvitation={canCancelEmployeeInvitation}
+          canActivate={canActivateEmployeeAccount}
+          inviteServiceReady={hasSupabaseServiceRoleEnv()}
+        />
+      ) : null}
 
       <Suspense
         fallback={
@@ -113,6 +141,7 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
           sortOrder={params.sortOrder}
           department={departmentCode}
           employmentStatus={params.employmentStatus}
+          accountStatus={params.accountStatus}
           departments={departments}
           canCreate={hasPermission(profile.permissionCodes, "employee.create")}
           canEdit={hasPermission(profile.permissionCodes, "employee.edit")}

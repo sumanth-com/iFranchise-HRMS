@@ -16,6 +16,7 @@ import { loadUserProfile } from "@/lib/auth/profile-loader";
 import { getRoleRedirectPath } from "@/lib/auth/redirect";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
+import { recordEmployeeSuccessfulLogin } from "@/lib/employees/services/employee-account";
 import { siteConfig } from "@/config/site";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -102,6 +103,7 @@ export async function loginAction(
   }
 
   await applyRememberMePreference(rememberMe);
+  await recordEmployeeSuccessfulLogin(supabase, authData.user.id, email);
 
   const ctx = await getRequestAuditContext();
   await writeApplicationAudit(supabase, {
@@ -242,8 +244,11 @@ export async function resetPasswordAction(
     };
   }
 
+  const email = user.email ?? "";
+  await supabase.auth.signOut();
+
   return {
     success: true,
-    redirectTo: AUTH_ROUTES.login,
+    redirectTo: `${AUTH_ROUTES.login}?passwordUpdated=1${email ? `&email=${encodeURIComponent(email)}` : ""}`,
   };
 }

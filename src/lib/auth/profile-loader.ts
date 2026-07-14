@@ -16,6 +16,12 @@ const LOGIN_ELIGIBLE_EMPLOYMENT_STATUSES: EmploymentStatus[] = [
   "probation",
 ];
 
+const LOGIN_ELIGIBLE_ACCOUNT_STATUSES = [
+  "active",
+  "invited",
+  "invitation_pending",
+] as const;
+
 type EmployeeRow = {
   id: string;
   organization_id: string;
@@ -25,6 +31,7 @@ type EmployeeRow = {
   last_name: string;
   email: string;
   employment_status: Employee["employmentStatus"];
+  account_status: NonNullable<Employee["accountStatus"]>;
   status: Employee["status"];
   deleted_at: string | null;
 };
@@ -48,6 +55,7 @@ function mapEmployee(row: EmployeeRow): Employee {
     lastName: row.last_name,
     email: row.email,
     employmentStatus: row.employment_status,
+    accountStatus: row.account_status,
     status: row.status,
   };
 }
@@ -97,7 +105,7 @@ export async function loadUserProfile(
     .schema("hrms")
     .from("employees")
     .select(
-      "id, organization_id, branch_id, employee_code, first_name, last_name, email, employment_status, status, deleted_at",
+      "id, organization_id, branch_id, employee_code, first_name, last_name, email, employment_status, account_status, status, deleted_at",
     )
     .eq("user_id", userId)
     .maybeSingle();
@@ -114,6 +122,9 @@ export async function loadUserProfile(
     employeeRow.status !== "active" ||
     !LOGIN_ELIGIBLE_EMPLOYMENT_STATUSES.includes(
       employeeRow.employment_status,
+    ) ||
+    !LOGIN_ELIGIBLE_ACCOUNT_STATUSES.includes(
+      employeeRow.account_status,
     )
   ) {
     return { success: false, error: "EMPLOYEE_INACTIVE" };

@@ -30,6 +30,16 @@ import {
   removeProfileImage,
 } from "@/lib/employees/services/employee-mutations";
 import {
+  activateEmployeeAccount,
+  cancelEmployeeInvitation,
+  deactivateEmployeeAccount,
+  inviteEmployeeByEmail,
+  resendEmployeeInvitation,
+  resetEmployeePassword,
+  sendEmployeeInvitation,
+  suspendEmployeeAccount,
+} from "@/lib/employees/services/employee-account";
+import {
   getEmployeeLookups,
   listEmployees,
   suggestNextEmployeeCode,
@@ -46,10 +56,25 @@ import type {
   EmployeeRouteIdentity,
 } from "@/types/employee";
 import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
+import { z } from "zod";
+
+const directInviteSchema = z.object({
+  email: z.string().email("Enter a valid company email"),
+});
 
 async function getAuthenticatedSupabase() {
   const supabase = await createClient();
   return supabase;
+}
+
+async function revalidateEmployeeAccountPaths(employeeId: string) {
+  const supabase = await getAuthenticatedSupabase();
+  const employee = await getEmployeeById(supabase, employeeId);
+  revalidatePath(EMPLOYEE_ROUTES.list);
+  if (employee) {
+    revalidatePath(EMPLOYEE_ROUTES.detail(employee));
+    revalidatePath(EMPLOYEE_ROUTES.edit(employee));
+  }
 }
 
 export async function fetchEmployeesAction(
@@ -184,6 +209,143 @@ export async function deleteEmployeeAction(
       success: false,
       message:
         error instanceof Error ? error.message : "Failed to delete employee",
+    };
+  }
+}
+
+export async function sendEmployeeInvitationAction(
+  employeeId: string,
+): Promise<EmployeeActionResult> {
+  try {
+    const profile = await requireServerPermission("employee_account.invite");
+    const supabase = await getAuthenticatedSupabase();
+    await sendEmployeeInvitation(supabase, profile, employeeId);
+    await revalidateEmployeeAccountPaths(employeeId);
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to send invitation",
+    };
+  }
+}
+
+export async function inviteEmployeeByEmailAction(
+  input: unknown,
+): Promise<EmployeeActionResult<{ employeeId: string }>> {
+  try {
+    const profile = await requireServerPermission("employee_account.invite");
+    const parsed = directInviteSchema.parse(input);
+    const supabase = await getAuthenticatedSupabase();
+    const employeeId = await inviteEmployeeByEmail(supabase, profile, parsed.email);
+    await revalidateEmployeeAccountPaths(employeeId);
+    return { success: true, data: { employeeId } };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to invite employee",
+    };
+  }
+}
+
+export async function resendEmployeeInvitationAction(
+  employeeId: string,
+): Promise<EmployeeActionResult> {
+  try {
+    const profile = await requireServerPermission("employee_account.invite");
+    const supabase = await getAuthenticatedSupabase();
+    await resendEmployeeInvitation(supabase, profile, employeeId);
+    await revalidateEmployeeAccountPaths(employeeId);
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to resend invitation",
+    };
+  }
+}
+
+export async function cancelEmployeeInvitationAction(
+  employeeId: string,
+): Promise<EmployeeActionResult> {
+  try {
+    const profile = await requireServerPermission("employee_account.cancel_invitation");
+    const supabase = await getAuthenticatedSupabase();
+    await cancelEmployeeInvitation(supabase, profile, employeeId);
+    await revalidateEmployeeAccountPaths(employeeId);
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to cancel invitation",
+    };
+  }
+}
+
+export async function resetEmployeePasswordAction(
+  employeeId: string,
+): Promise<EmployeeActionResult> {
+  try {
+    const profile = await requireServerPermission("employee_account.reset_password");
+    const supabase = await getAuthenticatedSupabase();
+    await resetEmployeePassword(supabase, profile, employeeId);
+    await revalidateEmployeeAccountPaths(employeeId);
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to reset password",
+    };
+  }
+}
+
+export async function suspendEmployeeAccountAction(
+  employeeId: string,
+): Promise<EmployeeActionResult> {
+  try {
+    const profile = await requireServerPermission("employee_account.suspend");
+    const supabase = await getAuthenticatedSupabase();
+    await suspendEmployeeAccount(supabase, profile, employeeId);
+    await revalidateEmployeeAccountPaths(employeeId);
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to suspend account",
+    };
+  }
+}
+
+export async function deactivateEmployeeAccountAction(
+  employeeId: string,
+): Promise<EmployeeActionResult> {
+  try {
+    const profile = await requireServerPermission("employee_account.deactivate");
+    const supabase = await getAuthenticatedSupabase();
+    await deactivateEmployeeAccount(supabase, profile, employeeId);
+    await revalidateEmployeeAccountPaths(employeeId);
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to deactivate account",
+    };
+  }
+}
+
+export async function activateEmployeeAccountAction(
+  employeeId: string,
+): Promise<EmployeeActionResult> {
+  try {
+    const profile = await requireServerPermission("employee_account.activate");
+    const supabase = await getAuthenticatedSupabase();
+    await activateEmployeeAccount(supabase, profile, employeeId);
+    await revalidateEmployeeAccountPaths(employeeId);
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to activate account",
     };
   }
 }

@@ -30,8 +30,18 @@ export const EMPLOYMENT_STATUS_LABELS: Record<string, string> = {
   resigned: "Resigned",
 };
 
+export const EMPLOYEE_ACCOUNT_STATUS_LABELS: Record<string, string> = {
+  draft: "Draft",
+  invited: "Invited",
+  invitation_pending: "Invitation Pending",
+  active: "Active",
+  inactive: "Inactive",
+  suspended: "Suspended",
+};
+
 export const EMPLOYEE_TABS = [
   "overview",
+  "account",
   "profile",
   "employment",
   "address",

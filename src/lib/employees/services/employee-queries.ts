@@ -1,6 +1,8 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
 import type {
+  EmployeeAccountProvisioningItem,
+  EmployeeAccountProvisioningSummary,
   EmployeeListParams,
   EmployeeListResult,
   EmployeeSortField,
@@ -20,6 +22,9 @@ type EmployeeRow = {
   branch_id: string;
   department_id: string | null;
   designation_id: string | null;
+  account_status: string;
+  invitation_sent_at: string | null;
+  last_login_at: string | null;
   branches: { name: string } | { name: string }[] | null;
   departments: { name: string } | { name: string }[] | null;
   designations: { title: string } | { title: string }[] | null;
@@ -27,6 +32,17 @@ type EmployeeRow = {
     | { profile_image_storage_path: string | null }
     | { profile_image_storage_path: string | null }[]
     | null;
+};
+
+type EmployeeAccountProvisioningRow = {
+  id: string;
+  employee_code: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  account_status: EmployeeAccountProvisioningItem["accountStatus"];
+  invitation_sent_at: string | null;
+  last_login_at: string | null;
 };
 
 function unwrapRelation<T>(value: T | T[] | null): T | null {
@@ -51,6 +67,7 @@ export async function listEmployees(
     sortOrder,
     department,
     employmentStatus,
+    accountStatus,
   } = parseListParams(params);
 
   const from = (page - 1) * pageSize;
@@ -99,6 +116,9 @@ export async function listEmployees(
         branch_id,
         department_id,
         designation_id,
+        account_status,
+        invitation_sent_at,
+        last_login_at,
         branches:branch_id (name),
         departments:department_id (name),
         designations:designation_id (title),
@@ -122,6 +142,10 @@ export async function listEmployees(
 
   if (employmentStatus) {
     query = query.eq("employment_status", employmentStatus);
+  }
+
+  if (accountStatus) {
+    query = query.eq("account_status", accountStatus);
   }
 
   const sortColumn = sortBy as EmployeeSortField;
@@ -160,6 +184,9 @@ export async function listEmployees(
         designationId: row.designation_id,
         designationTitle: designation?.title ?? null,
         profileImagePath: employeeProfile?.profile_image_storage_path ?? null,
+        accountStatus: row.account_status as EmployeeListResult["data"][number]["accountStatus"],
+        invitationSentAt: row.invitation_sent_at,
+        lastLoginAt: row.last_login_at,
       };
     }),
     total: count ?? 0,
@@ -194,6 +221,69 @@ export async function suggestNextEmployeeCode(
 
   const next = Number.parseInt(match[1], 10) + 1;
   return `EMP-${String(next).padStart(4, "0")}`;
+}
+
+function mapProvisioningItem(
+  row: EmployeeAccountProvisioningRow,
+): EmployeeAccountProvisioningItem {
+  return {
+    id: row.id,
+    employeeCode: row.employee_code,
+    fullName: `${row.first_name} ${row.last_name}`,
+    email: row.email,
+    accountStatus: row.account_status,
+    invitationSentAt: row.invitation_sent_at,
+    lastLoginAt: row.last_login_at,
+  };
+}
+
+export async function getEmployeeAccountProvisioningSummary(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+): Promise<EmployeeAccountProvisioningSummary> {
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("employees")
+    .select(
+      "id, employee_code, first_name, last_name, email, account_status, invitation_sent_at, last_login_at",
+    )
+    .eq("organization_id", profile.employee.organizationId)
+    .is("deleted_at", null)
+    .order("updated_at", { ascending: false })
+    .limit(500);
+
+  if (error) throw new Error(error.message);
+
+  const rows = (data ?? []) as EmployeeAccountProvisioningRow[];
+  const counts = {
+    draft: 0,
+    invited: 0,
+    invitationPending: 0,
+    active: 0,
+    inactive: 0,
+    suspended: 0,
+  };
+
+  for (const row of rows) {
+    if (row.account_status === "invitation_pending") counts.invitationPending += 1;
+    else counts[row.account_status] += 1;
+  }
+
+  return {
+    ...counts,
+    readyToInvite: rows
+      .filter((row) => row.account_status === "draft" || row.account_status === "invited")
+      .slice(0, 5)
+      .map(mapProvisioningItem),
+    pendingInvitations: rows
+      .filter((row) => row.account_status === "invitation_pending")
+      .slice(0, 5)
+      .map(mapProvisioningItem),
+    suspendedAccounts: rows
+      .filter((row) => row.account_status === "suspended")
+      .slice(0, 5)
+      .map(mapProvisioningItem),
+  };
 }
 
 export {

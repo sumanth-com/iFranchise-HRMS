@@ -5,6 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { differenceInMonths, format } from "date-fns";
 
 import { EmployeeIdCard } from "@/components/employees/employee-id-card";
+import {
+  EmployeeAccountStatusBadge,
+  EmployeeLoginStatusBadge,
+} from "@/components/employees/employee-account-status-badge";
+import { EmployeeAccountSection } from "@/components/employees/employee-account-section";
 import { EmploymentStatusBadge } from "@/components/employees/employment-status-badge";
 import { buttonVariants } from "@/components/common/button";
 import { EmptyState } from "@/components/common/empty-state";
@@ -289,6 +294,10 @@ export function EmployeeDetailView({
               <OverviewDetailRow label="Employment status">
                 <EmploymentStatusBadge status={employee.employmentStatus} />
               </OverviewDetailRow>
+              <OverviewDetailRow label="Account status">
+                <EmployeeAccountStatusBadge status={employee.accountStatus} />
+                <EmployeeLoginStatusBadge status={employee.accountStatus} />
+              </OverviewDetailRow>
               <OverviewInfoRow
                 label="Probation ends"
                 value={formatDisplayDate(probationEnd)}
@@ -305,12 +314,17 @@ export function EmployeeDetailView({
               designation={employee.designationTitle}
               departmentName={employee.departmentName}
               employmentTypeName={formatDisplayLabel(employee.employmentTypeName)}
+              accountStatus={employee.accountStatus}
               imageUrl={profileImageUrl}
               profilePath={`/e/${buildEmployeeRouteRef(employee)}`}
               canEdit={canEditProfile}
             />
           </aside>
         </div>
+      ) : null}
+
+      {activeTab === "account" ? (
+        <EmployeeAccountSection employee={employee} permissionCodes={permissionCodes} />
       ) : null}
 
       {activeTab === "profile" ? (

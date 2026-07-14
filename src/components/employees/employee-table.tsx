@@ -23,6 +23,10 @@ import {
 import { toast } from "sonner";
 
 import { EmploymentStatusBadge } from "@/components/employees/employment-status-badge";
+import {
+  EmployeeAccountStatusBadge,
+  EmployeeLoginStatusBadge,
+} from "@/components/employees/employee-account-status-badge";
 import { EmployeeAvatar } from "@/components/employees/employee-avatar";
 import { Button, buttonVariants } from "@/components/common/button";
 import { Input } from "@/components/common/input";
@@ -49,7 +53,11 @@ import {
 } from "@/components/ui/table";
 import { Modal } from "@/components/common/modal";
 import { deleteEmployeeAction } from "@/lib/employees/actions";
-import { EMPLOYEE_ROUTES, EMPLOYMENT_STATUS_LABELS } from "@/lib/employees/constants";
+import {
+  EMPLOYEE_ACCOUNT_STATUS_LABELS,
+  EMPLOYEE_ROUTES,
+  EMPLOYMENT_STATUS_LABELS,
+} from "@/lib/employees/constants";
 import type { EmployeeListItem, LookupOption } from "@/types/employee";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -64,6 +72,7 @@ type EmployeeTableProps = {
   sortOrder: "asc" | "desc";
   department?: string;
   employmentStatus?: string;
+  accountStatus?: string;
   departments: LookupOption[];
   canCreate: boolean;
   canEdit: boolean;
@@ -80,6 +89,7 @@ export function EmployeeTable({
   sortOrder,
   department,
   employmentStatus,
+  accountStatus,
   departments,
   canCreate,
   canEdit,
@@ -148,49 +158,74 @@ export function EmployeeTable({
     [],
   );
 
+  const accountStatusItems = useMemo(
+    () => [
+      { value: "", label: "All accounts" },
+      { value: "active", label: EMPLOYEE_ACCOUNT_STATUS_LABELS.active },
+      { value: "invitation_pending", label: "Pending Invitation" },
+      { value: "suspended", label: EMPLOYEE_ACCOUNT_STATUS_LABELS.suspended },
+      { value: "inactive", label: EMPLOYEE_ACCOUNT_STATUS_LABELS.inactive },
+    ],
+    [],
+  );
+
   const columns = useMemo<ColumnDef<EmployeeListItem>[]>(
     () => [
       {
-        id: "photo",
-        header: "",
+        id: "employee",
+        header: "Employee",
         cell: ({ row }) => (
-          <EmployeeAvatar
-            firstName={row.original.firstName}
-            lastName={row.original.lastName}
-            profileImagePath={row.original.profileImagePath}
-            className="size-9"
-          />
-        ),
-      },
-      {
-        accessorKey: "employeeCode",
-        header: "Code",
-      },
-      {
-        id: "fullName",
-        header: "Name",
-        cell: ({ row }) => (
-          <div>
-            <p className="font-medium">{row.original.fullName}</p>
-            <p className="text-xs text-muted-foreground">{row.original.email}</p>
+          <div className="flex min-w-[15rem] items-center gap-3">
+            <EmployeeAvatar
+              firstName={row.original.firstName}
+              lastName={row.original.lastName}
+              profileImagePath={row.original.profileImagePath}
+              className="size-9"
+            />
+            <div className="min-w-0">
+              <p className="truncate font-medium">{row.original.fullName}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {row.original.employeeCode} · {row.original.email}
+              </p>
+            </div>
           </div>
         ),
       },
       {
-        accessorKey: "departmentName",
-        header: "Department",
-        cell: ({ row }) => row.original.departmentName ?? "—",
-      },
-      {
-        accessorKey: "designationTitle",
-        header: "Designation",
-        cell: ({ row }) => row.original.designationTitle ?? "—",
+        id: "role",
+        header: "Department / Designation",
+        cell: ({ row }) => (
+          <div className="min-w-[12rem]">
+            <p className="truncate text-sm">{row.original.departmentName ?? "—"}</p>
+            <p className="truncate text-xs text-muted-foreground">
+              {row.original.designationTitle ?? "—"}
+            </p>
+          </div>
+        ),
       },
       {
         accessorKey: "employmentStatus",
-        header: "Status",
+        header: "Employee Status",
         cell: ({ row }) => (
           <EmploymentStatusBadge status={row.original.employmentStatus} />
+        ),
+      },
+      {
+        id: "account",
+        header: "Account",
+        cell: ({ row }) => (
+          <div className="min-w-[12rem] space-y-1">
+            <div className="flex flex-wrap gap-1.5">
+              <EmployeeAccountStatusBadge status={row.original.accountStatus} />
+              <EmployeeLoginStatusBadge status={row.original.accountStatus} />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Last login:{" "}
+              {row.original.lastLoginAt
+                ? format(new Date(row.original.lastLoginAt), "MMM d, yyyy")
+                : "—"}
+            </p>
+          </div>
         ),
       },
       {
@@ -365,6 +400,27 @@ export function EmployeeTable({
               ))}
             </SelectContent>
           </Select>
+          <Select
+            items={accountStatusItems}
+            value={accountStatus ?? ""}
+            onValueChange={(value) =>
+              updateParams({
+                accountStatus: value || undefined,
+                page: "1",
+              })
+            }
+          >
+            <SelectTrigger className="h-8 w-full min-w-0 sm:w-48">
+              <SelectValue placeholder="All accounts" />
+            </SelectTrigger>
+            <SelectContent align="start" alignItemWithTrigger={false}>
+              {accountStatusItems.map((item) => (
+                <SelectItem key={item.value || "all-accounts"} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         {canCreate ? (
           <Link
@@ -381,37 +437,35 @@ export function EmployeeTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead />
-              <TableHead>
-                <button
-                  type="button"
-                  className="inline-flex items-center font-medium"
-                  onClick={() => handleSort("employee_code")}
-                >
-                  Code
-                  {sortIcon("employee_code")}
-                </button>
-              </TableHead>
               <TableHead>
                 <button
                   type="button"
                   className="inline-flex items-center font-medium"
                   onClick={() => handleSort("first_name")}
                 >
-                  Name
+                  Employee
                   {sortIcon("first_name")}
                 </button>
               </TableHead>
-              <TableHead>Department</TableHead>
-              <TableHead>Designation</TableHead>
+              <TableHead>Department / Designation</TableHead>
               <TableHead>
                 <button
                   type="button"
                   className="inline-flex items-center font-medium"
                   onClick={() => handleSort("employment_status")}
                 >
-                  Status
+                  Employee Status
                   {sortIcon("employment_status")}
+                </button>
+              </TableHead>
+              <TableHead>
+                <button
+                  type="button"
+                  className="inline-flex items-center font-medium"
+                  onClick={() => handleSort("account_status")}
+                >
+                  Account
+                  {sortIcon("account_status")}
                 </button>
               </TableHead>
               <TableHead>
@@ -430,7 +484,7 @@ export function EmployeeTable({
           <TableBody>
             {table.getRowModel().rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                   No employees found.
                 </TableCell>
               </TableRow>

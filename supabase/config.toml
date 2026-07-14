@@ -64,6 +64,10 @@ max_frequency = "1s"
 otp_length = 6
 otp_expiry = 3600
 
+[auth.email.template.invite]
+subject = "You're invited to activate your iFranchise HRMS account"
+content_path = "./supabase/templates/invite.html"
+
 [auth.sms]
 enable_signup = false
 enable_confirmations = false

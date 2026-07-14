@@ -35,7 +35,7 @@ require_symbols = true
 [notes]
 production_checklist = """
 1. Disable public signup in Supabase Dashboard > Authentication > Providers > Email.
-2. Confirm email templates for invite and password reset flows.
+2. Mirror supabase/templates/invite.html into Supabase Dashboard > Authentication > Email Templates > Invite user.
 3. Restrict service role key to server-side usage only.
 4. Configure custom SMTP for production email delivery.
 5. Enable MFA for admin accounts in a future security migration.

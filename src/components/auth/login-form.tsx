@@ -2,16 +2,19 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { loginAction } from "@/lib/auth/actions";
+import { AUTH_ROUTES } from "@/lib/auth/constants";
 import { getAuthErrorMessage } from "@/lib/auth/errors";
+import { createClient } from "@/lib/supabase/client";
 import type { AuthErrorCode } from "@/types/auth";
 import { loginSchema, type LoginInput } from "@/lib/validations/auth";
 
@@ -28,19 +31,73 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [formError, setFormError] = useState<string | null>(null);
+  const [isInviteLinkPending, setInviteLinkPending] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "",
+      email: searchParams.get("email") ?? "",
       password: "",
       rememberMe: false,
     },
   });
+
+  useEffect(() => {
+    const email = searchParams.get("email");
+    if (email) setValue("email", email);
+  }, [searchParams, setValue]);
+
+  useEffect(() => {
+    const hash = window.location.hash.startsWith("#")
+      ? window.location.hash.slice(1)
+      : "";
+    if (!hash) return;
+
+    const hashParams = new URLSearchParams(hash);
+    const accessToken = hashParams.get("access_token");
+    const refreshToken = hashParams.get("refresh_token");
+    const type = hashParams.get("type");
+
+    if (!accessToken || !refreshToken) return;
+
+    setInviteLinkPending(true);
+    const supabase = createClient();
+
+    supabase.auth
+      .setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      })
+      .then(async ({ error }) => {
+        if (error) throw error;
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        const email = user?.email ?? searchParams.get("email") ?? "";
+        const target =
+          type === "invite" || type === "recovery"
+            ? `${AUTH_ROUTES.resetPassword}?${new URLSearchParams({
+                ...(type === "invite" ? { invite: "1" } : {}),
+                ...(email ? { email } : {}),
+              }).toString()}`
+            : AUTH_ROUTES.dashboard;
+
+        window.history.replaceState(null, "", window.location.pathname);
+        router.replace(target);
+      })
+      .catch(() => {
+        setFormError("Invitation link is invalid or expired. Ask HR to resend it.");
+        toast.error("Invitation link is invalid or expired");
+        window.history.replaceState(null, "", window.location.pathname);
+      })
+      .finally(() => setInviteLinkPending(false));
+  }, [router, searchParams]);
 
   const onSubmit = handleSubmit((data) => {
     setFormError(null);
@@ -70,6 +127,7 @@ export function LoginForm() {
 
   const expired = searchParams.get("expired") === "1";
   const signedOut = searchParams.get("signedOut") === "1";
+  const passwordUpdated = searchParams.get("passwordUpdated") === "1";
   const errorParam = searchParams.get("error");
   const profileError =
     errorParam &&
@@ -86,6 +144,13 @@ export function LoginForm() {
         </p>
       </div>
 
+      {isInviteLinkPending ? (
+        <div className="flex items-center justify-center gap-2 rounded-lg border bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          Preparing your account setup...
+        </div>
+      ) : null}
+
       {expired ? (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
           {getAuthErrorMessage("SESSION_EXPIRED")}
@@ -95,6 +160,12 @@ export function LoginForm() {
       {signedOut ? (
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-200">
           You have been signed out successfully.
+        </div>
+      ) : null}
+
+      {passwordUpdated ? (
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-200">
+          Password created successfully. Sign in with your company email and new password.
         </div>
       ) : null}
 
@@ -136,14 +207,25 @@ export function LoginForm() {
               Forgot password?
             </Link>
           </div>
-          <Input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            placeholder="••••••••"
-            disabled={isPending}
-            {...register("password")}
-          />
+          <div className="relative">
+            <Input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              autoComplete="current-password"
+              placeholder="••••••••"
+              disabled={isPending}
+              className="pr-10"
+              {...register("password")}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((value) => !value)}
+              className="absolute inset-y-0 right-2 flex items-center text-muted-foreground hover:text-foreground"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          </div>
           {errors.password ? (
             <p className="text-sm text-destructive">
               {errors.password.message}
