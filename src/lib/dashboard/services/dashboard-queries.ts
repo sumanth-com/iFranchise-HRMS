@@ -154,17 +154,17 @@ function isMeaningfulActivity(row: {
   description?: string | null;
   table_name?: string | null;
 }): boolean {
-  const module = String(row.module ?? "").toLowerCase();
+  const activityModule = String(row.module ?? "").toLowerCase();
   const action = String(row.action ?? "");
   const description = String(row.description ?? "");
   const tableName = String(row.table_name ?? "");
 
-  if (NOISE_ACTIVITY_PATTERN.test(module)) return false;
+  if (NOISE_ACTIVITY_PATTERN.test(activityModule)) return false;
   if (NOISE_ACTIVITY_PATTERN.test(action)) return false;
   if (NOISE_ACTIVITY_PATTERN.test(description)) return false;
   if (NOISE_ACTIVITY_PATTERN.test(tableName)) return false;
 
-  if (PREFERRED_ACTIVITY_MODULES.has(module)) return true;
+  if (PREFERRED_ACTIVITY_MODULES.has(activityModule)) return true;
 
   // Allow generic create/update/approve/schedule/process/complete on core tables.
   return /employee|leave|interview|payroll|offer|resign|exit|attend/i.test(
