@@ -7,7 +7,7 @@ export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   if (!hasSupabaseEnv()) {
-    return { supabaseResponse, user: null };
+    return { supabase: null, supabaseResponse, user: null };
   }
 
   try {
@@ -32,8 +32,8 @@ export async function updateSession(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
 
-    return { supabaseResponse, user };
+    return { supabase, supabaseResponse, user };
   } catch {
-    return { supabaseResponse, user: null };
+    return { supabase: null, supabaseResponse, user: null };
   }
 }

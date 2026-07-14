@@ -11,6 +11,8 @@ import {
 } from "@/lib/leave/services/leave-queries";
 import {
   notifyLeaveApproved,
+  notifyLeaveCancelled,
+  notifyLeaveManagerApproved,
   notifyLeaveRejected,
   notifyLeaveSubmitted,
 } from "@/lib/leave/services/leave-notifications";
@@ -350,6 +352,24 @@ export async function approveLeaveRequest(
   if (updateError) throw new Error(updateError.message);
 
   await finalizeApprovalIfComplete(supabase, profile, leaveRequestId);
+
+  const { data: afterRequest, error: afterError } = await supabase
+    .schema("hrms")
+    .from("leave_requests")
+    .select("leave_status, employee_id")
+    .eq("id", leaveRequestId)
+    .single();
+
+  if (afterError) throw new Error(afterError.message);
+
+  if (afterRequest.leave_status === "pending") {
+    await notifyLeaveManagerApproved(
+      supabase,
+      profile,
+      leaveRequestId,
+      afterRequest.employee_id,
+    );
+  }
 }
 
 export async function rejectLeaveRequest(
@@ -470,4 +490,16 @@ export async function cancelLeaveRequest(
     .eq("id", leaveRequestId);
 
   if (updateError) throw new Error(updateError.message);
+
+  const managerId = await getEmployeeReportingManagerId(
+    supabase,
+    request.employee_id,
+  );
+  await notifyLeaveCancelled(
+    supabase,
+    profile,
+    leaveRequestId,
+    request.employee_id,
+    managerId,
+  );
 }

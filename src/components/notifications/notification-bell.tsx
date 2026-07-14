@@ -3,7 +3,7 @@
 import { formatDistanceToNow } from "date-fns";
 import { Bell, Check, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
@@ -21,23 +21,52 @@ import {
   markAllNotificationsReadAction,
   markNotificationReadAction,
 } from "@/lib/notifications/actions";
-import { NOTIFICATIONS_ROUTES, formatNotificationModule } from "@/lib/notifications/constants";
+import { formatNotificationDisplayText, formatNotificationModule, getNotificationsRoutes } from "@/lib/notifications/constants";
+import {
+  attachNotificationSoundUnlock,
+  playNotificationSound,
+} from "@/lib/notifications/play-notification-sound";
+import { useAuth } from "@/providers/auth-provider";
 import { cn } from "@/lib/utils";
 import type { NotificationBellData } from "@/types/notifications";
 
 const POLL_INTERVAL_MS = 30_000;
 
 export function NotificationBell() {
-  const [data, setData] = useState<NotificationBellData>({ unreadCount: 0, items: [] });
+  const { portalHome } = useAuth();
+  const routes = useMemo(() => getNotificationsRoutes(portalHome), [portalHome]);
+  const [data, setData] = useState<NotificationBellData>({
+    unreadCount: 0,
+    items: [],
+    soundEnabled: true,
+    notificationSound: "classic",
+  });
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const knownIdsRef = useRef<Set<string>>(new Set());
+  const initializedRef = useRef(false);
 
   const refresh = useCallback(async () => {
     const res = await getNotificationBellDataAction();
-    if (res.success) setData(res.data);
+    if (!res.success) return;
+
+    const next = res.data;
+    if (initializedRef.current && next.soundEnabled) {
+      const hasNewUnread = next.items.some(
+        (item) => item.status === "unread" && !knownIdsRef.current.has(item.id),
+      );
+      if (hasNewUnread) playNotificationSound(next.notificationSound);
+    }
+
+    for (const item of next.items) {
+      knownIdsRef.current.add(item.id);
+    }
+    initializedRef.current = true;
+    setData(next);
   }, []);
 
   useEffect(() => {
+    attachNotificationSoundUnlock();
     void refresh();
     const timer = setInterval(() => void refresh(), POLL_INTERVAL_MS);
     return () => clearInterval(timer);
@@ -102,7 +131,9 @@ export function NotificationBell() {
                   <p className={cn("text-sm font-medium", item.status === "unread" && "text-foreground")}>
                     {item.title}
                   </p>
-                  <p className="line-clamp-2 text-xs text-muted-foreground">{item.message}</p>
+                  <p className="line-clamp-2 text-xs text-muted-foreground">
+                    {formatNotificationDisplayText(item.message)}
+                  </p>
                 </div>
                 {item.status === "unread" ? (
                   <Button
@@ -132,22 +163,20 @@ export function NotificationBell() {
                   </span>
                 </div>
               </div>
-              {item.actionUrl ? (
-                <Link
-                  href={item.actionUrl}
-                  className="text-xs font-medium text-primary hover:underline"
-                  onClick={() => setOpen(false)}
-                >
-                  View details
-                </Link>
-              ) : null}
+              <Link
+                href={`${routes.center}?id=${item.id}`}
+                className="text-xs font-medium text-primary hover:underline"
+                onClick={() => setOpen(false)}
+              >
+                View details
+              </Link>
             </DropdownMenuItem>
           ))
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           render={
-            <Link href={NOTIFICATIONS_ROUTES.center} className="w-full justify-center text-center">
+            <Link href={routes.center} className="w-full justify-center text-center">
               View all notifications
             </Link>
           }

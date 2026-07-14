@@ -1,5 +1,8 @@
 import { hasAnyPermission } from "@/lib/permissions/utils";
 import type { NotificationModule, NotificationPriority } from "@/types/notifications";
+import type { NotificationSoundTone } from "@/types/notifications";
+
+import { MANAGER_ROUTES } from "@/lib/manager/constants";
 
 export const NOTIFICATIONS_ROUTES = {
   dashboard: "/dashboard/notifications",
@@ -9,6 +12,37 @@ export const NOTIFICATIONS_ROUTES = {
   settings: "/dashboard/notifications/settings",
   preferences: "/dashboard/notifications/preferences",
 } as const;
+
+export const MANAGER_NOTIFICATIONS_ROUTES = {
+  dashboard: MANAGER_ROUTES.notifications,
+  center: MANAGER_ROUTES.notificationsCenter,
+  history: MANAGER_ROUTES.notificationsHistory,
+  preferences: `${MANAGER_ROUTES.settings}#notifications`,
+} as const;
+
+export type NotificationRouteSet = {
+  dashboard: string;
+  center: string;
+  history: string;
+  templates: string;
+  settings: string;
+  preferences: string;
+};
+
+export function getNotificationsRoutes(portalHome: string): NotificationRouteSet {
+  if (portalHome.startsWith("/manager")) {
+    return {
+      dashboard: MANAGER_NOTIFICATIONS_ROUTES.dashboard,
+      center: MANAGER_NOTIFICATIONS_ROUTES.center,
+      history: MANAGER_NOTIFICATIONS_ROUTES.history,
+      templates: NOTIFICATIONS_ROUTES.templates,
+      settings: NOTIFICATIONS_ROUTES.settings,
+      preferences: MANAGER_NOTIFICATIONS_ROUTES.preferences,
+    };
+  }
+
+  return NOTIFICATIONS_ROUTES;
+}
 
 export const NOTIFICATIONS_SUB_NAV = [
   { title: "Dashboard", href: NOTIFICATIONS_ROUTES.dashboard },
@@ -65,6 +99,44 @@ export const NOTIFICATION_CENTER_TABS = [
 
 export type NotificationCenterTab = (typeof NOTIFICATION_CENTER_TABS)[number]["value"];
 
+export const NOTIFICATION_SOUND_OPTIONS: {
+  value: NotificationSoundTone;
+  label: string;
+  description: string;
+  fileName: string;
+}[] = [
+  {
+    value: "classic",
+    label: "Classic Chime",
+    description: "Balanced tone for everyday alerts.",
+    fileName: "notification-classic.mp3",
+  },
+  {
+    value: "soft",
+    label: "Soft Ping",
+    description: "Gentle sound for low-distraction environments.",
+    fileName: "notification-soft.mp3",
+  },
+  {
+    value: "alert",
+    label: "Alert Bell",
+    description: "Louder tone for urgent notifications.",
+    fileName: "notification-alert.mp3",
+  },
+];
+
+export const DEFAULT_NOTIFICATION_SOUND: NotificationSoundTone = "classic";
+
+export function getNotificationSoundUrl(tone: NotificationSoundTone) {
+  const option = NOTIFICATION_SOUND_OPTIONS.find((item) => item.value === tone);
+  return `/sounds/${option?.fileName ?? NOTIFICATION_SOUND_OPTIONS[0]!.fileName}`;
+}
+
+export function parseNotificationSoundTone(value: string | null | undefined): NotificationSoundTone {
+  if (value === "soft" || value === "alert" || value === "classic") return value;
+  return DEFAULT_NOTIFICATION_SOUND;
+}
+
 export const DEFAULT_CHANNEL_SETTINGS = {
   inApp: true,
   email: true,
@@ -89,4 +161,23 @@ export function formatNotificationModule(module: NotificationModule) {
 
 export function formatNotificationPriority(priority: NotificationPriority) {
   return NOTIFICATION_PRIORITIES.find((p) => p.value === priority)?.label ?? priority;
+}
+
+const NOTIFICATION_MESSAGE_FALLBACKS: Record<string, string> = {
+  "Your performance review is due by {{dueDate}}.":
+    "A performance review is pending your action.",
+};
+
+export function formatNotificationDisplayText(text: string) {
+  const trimmed = text.trim();
+  if (NOTIFICATION_MESSAGE_FALLBACKS[trimmed]) {
+    return NOTIFICATION_MESSAGE_FALLBACKS[trimmed];
+  }
+  if (!/\{\{\w+\}\}/.test(text)) return text;
+
+  return text
+    .replace(/\{\{\w+\}\}/g, "")
+    .replace(/\sby\s*\./gi, ".")
+    .replace(/\s+/g, " ")
+    .trim();
 }

@@ -7,11 +7,13 @@ import { useState } from "react";
 
 import { useNavigation } from "@/hooks/use-permissions";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { useAuth } from "@/providers/auth-provider";
 import { cn } from "@/lib/utils";
 
 export function Sidebar() {
   const pathname = usePathname();
   const { isCollapsed } = useSidebar();
+  const { portalHome, portalLabel } = useAuth();
   const navigation = useNavigation();
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     Administration: true,
@@ -37,12 +39,12 @@ export function Sidebar() {
           isCollapsed && "justify-center px-2",
         )}
       >
-        <Link href="/" className="flex items-center gap-2 font-semibold">
+        <Link href={portalHome} className="flex items-center gap-2 font-semibold">
           <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-xs text-primary-foreground">
             IF
           </span>
           {!isCollapsed ? (
-            <span className="truncate text-sm">iFranchise HRMS</span>
+            <span className="truncate text-sm">{portalLabel}</span>
           ) : null}
         </Link>
       </div>
@@ -51,7 +53,7 @@ export function Sidebar() {
         {navigation.map((item, index) => {
           const isActive =
             pathname === item.href ||
-            (item.href !== "/" && pathname.startsWith(item.href));
+            (item.href !== portalHome && pathname.startsWith(item.href));
           const Icon = item.icon;
           const prevSection = index > 0 ? navigation[index - 1]?.section : undefined;
           const showSection = item.section && item.section !== prevSection && !isCollapsed;

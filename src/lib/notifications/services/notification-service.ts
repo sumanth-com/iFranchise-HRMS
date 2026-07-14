@@ -183,8 +183,13 @@ export async function createNotification(
     );
     if (template) {
       const vars = input.templateVariables ?? {};
-      title = applyTemplate(template.subject, vars);
-      message = applyTemplate(template.body_template, vars);
+      const templatedTitle = applyTemplate(template.subject, vars);
+      const templatedMessage = applyTemplate(template.body_template, vars);
+      const hasUnresolved = /\{\{\w+\}\}/.test(templatedMessage);
+      if (!hasUnresolved) {
+        title = templatedTitle;
+        message = templatedMessage;
+      }
     }
   }
 

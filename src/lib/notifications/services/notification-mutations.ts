@@ -187,6 +187,7 @@ export async function saveNotificationUserPreferences(
     receive_email: input.receiveEmail,
     receive_in_app: input.receiveInApp,
     mute_notifications: input.muteNotifications,
+    notification_sound: input.notificationSound,
     daily_digest: input.dailyDigest,
     weekly_digest: input.weeklyDigest,
     updated_by: profile.userId,

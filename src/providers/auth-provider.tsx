@@ -16,6 +16,8 @@ import { LOGOUT_BROADCAST_KEY, AUTH_ROUTES } from "@/lib/auth/constants";
 import { getAuthErrorMessage } from "@/lib/auth/errors";
 import { getSidebarNavigation } from "@/lib/auth/navigation";
 import { mainNavItems, type NavItem } from "@/config/navigation";
+import { managerNavItems } from "@/config/manager-navigation";
+import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { createClient } from "@/lib/supabase/client";
 import {
   hasAllPermissions,
@@ -30,6 +32,8 @@ type AuthContextValue = {
   permissionCodes: string[];
   roles: Role[];
   navigation: NavItem[];
+  portalHome: string;
+  portalLabel: string;
   isLoading: boolean;
   signOut: () => Promise<void>;
   hasPermission: (permission: string) => boolean;
@@ -41,12 +45,43 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+export type PortalVariant = "hr" | "manager";
+
+const PORTAL_CONFIG: Record<
+  PortalVariant,
+  { navItems: typeof mainNavItems; home: string; label: string }
+> = {
+  hr: {
+    navItems: mainNavItems,
+    home: "/",
+    label: "iFranchise HRMS",
+  },
+  manager: {
+    navItems: managerNavItems,
+    home: MANAGER_ROUTES.home,
+    label: "Manager Portal",
+  },
+};
+
 type AuthProviderProps = {
   children: ReactNode;
   initialProfile: UserProfile;
+  portalVariant?: PortalVariant;
+  portalHome?: string;
+  portalLabel?: string;
 };
 
-export function AuthProvider({ children, initialProfile }: AuthProviderProps) {
+export function AuthProvider({
+  children,
+  initialProfile,
+  portalVariant = "hr",
+  portalHome,
+  portalLabel,
+}: AuthProviderProps) {
+  const portalConfig = PORTAL_CONFIG[portalVariant];
+  const resolvedPortalHome = portalHome ?? portalConfig.home;
+  const resolvedPortalLabel = portalLabel ?? portalConfig.label;
+  const navItems = portalConfig.navItems;
   const router = useRouter();
   const [profile, setProfile] = useState(initialProfile);
   const [isLoading, setIsLoading] = useState(false);
@@ -56,8 +91,8 @@ export function AuthProvider({ children, initialProfile }: AuthProviderProps) {
   const roles = profile.roles;
 
   const navigation = useMemo(
-    () => getSidebarNavigation(mainNavItems, permissionCodes, roles),
-    [permissionCodes, roles],
+    () => getSidebarNavigation(navItems, permissionCodes, roles),
+    [navItems, permissionCodes, roles],
   );
 
   const performSignOut = useCallback(
@@ -125,6 +160,8 @@ export function AuthProvider({ children, initialProfile }: AuthProviderProps) {
       permissionCodes,
       roles,
       navigation,
+      portalHome: resolvedPortalHome,
+      portalLabel: resolvedPortalLabel,
       isLoading,
       signOut,
       refreshProfile,
@@ -141,6 +178,8 @@ export function AuthProvider({ children, initialProfile }: AuthProviderProps) {
       permissionCodes,
       roles,
       navigation,
+      resolvedPortalHome,
+      resolvedPortalLabel,
       isLoading,
       signOut,
       refreshProfile,

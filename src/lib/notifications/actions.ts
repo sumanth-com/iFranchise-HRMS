@@ -193,7 +193,7 @@ export async function getNotificationBellDataAction() {
     return {
       success: false as const,
       message: error instanceof Error ? error.message : "Failed to load notifications",
-      data: { unreadCount: 0, items: [] },
+      data: { unreadCount: 0, items: [], soundEnabled: false, notificationSound: "classic" },
     };
   }
 }

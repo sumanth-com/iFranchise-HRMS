@@ -90,6 +90,7 @@ async function fetchEmployees(
   if (filters.departmentId) query = query.eq("department_id", filters.departmentId);
   if (filters.designationId) query = query.eq("designation_id", filters.designationId);
   if (filters.employeeId) query = query.eq("id", filters.employeeId);
+  if (filters.teamEmployeeIds?.length) query = query.in("id", filters.teamEmployeeIds);
   if (filters.status) query = query.eq("employment_status", filters.status);
 
   const { data, error } = await query;
@@ -440,6 +441,7 @@ async function runAttendanceReport(
     .limit(3000);
 
   if (filters.employeeId) query = query.eq("employee_id", filters.employeeId);
+  if (filters.teamEmployeeIds?.length) query = query.in("employee_id", filters.teamEmployeeIds);
   if (filters.status) query = query.eq("attendance_status", filters.status);
 
   if (key === "attendance_late") query = query.eq("attendance_status", "late");
@@ -534,10 +536,10 @@ async function runLeaveReport(
         leave_types:leave_type_id(name)
       `,
       )
-      .eq("organization_id", organizationId)
       .is("deleted_at", null)
       .limit(3000);
     if (filters.employeeId) query = query.eq("employee_id", filters.employeeId);
+    if (filters.teamEmployeeIds?.length) query = query.in("employee_id", filters.teamEmployeeIds);
     const { data, error } = await query;
     if (error) throw new Error(error.message);
     const rows = ((data ?? []) as ReportRowLoose[])
@@ -580,7 +582,6 @@ async function runLeaveReport(
       leave_types:leave_type_id(name)
     `,
     )
-    .eq("organization_id", organizationId)
     .is("deleted_at", null)
     .gte("start_date", dateFrom)
     .lte("start_date", dateTo)
@@ -588,6 +589,7 @@ async function runLeaveReport(
     .limit(3000);
 
   if (filters.employeeId) query = query.eq("employee_id", filters.employeeId);
+  if (filters.teamEmployeeIds?.length) query = query.in("employee_id", filters.teamEmployeeIds);
   if (key === "leave_rejected") query = query.eq("leave_status", "rejected");
   if (key === "leave_pending") query = query.eq("leave_status", "pending");
   if (key === "leave_utilization" || key === "leave_trends") {
@@ -894,7 +896,7 @@ async function runPerformanceReport(
   const title = REPORT_KEY_LABELS[key];
 
   if (key === "performance_kpi") {
-    const { data, error } = await fromHrms(supabase, "performance_kpis")
+    let query = fromHrms(supabase, "performance_kpis")
       .select(
         `
         title, kpi_status, completion_percentage, current_value, target_value, end_date,
@@ -904,6 +906,9 @@ async function runPerformanceReport(
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
       .limit(2000);
+    if (filters.employeeId) query = query.eq("employee_id", filters.employeeId);
+    if (filters.teamEmployeeIds?.length) query = query.in("employee_id", filters.teamEmployeeIds);
+    const { data, error } = await query;
     if (error) throw new Error(error.message);
     return buildResult(
       key,
@@ -931,7 +936,7 @@ async function runPerformanceReport(
   }
 
   if (key === "performance_goals") {
-    const { data, error } = await fromHrms(supabase, "performance_goals")
+    let query = fromHrms(supabase, "performance_goals")
       .select(
         `
         title, goal_status, current_progress, target_date,
@@ -941,6 +946,9 @@ async function runPerformanceReport(
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
       .limit(2000);
+    if (filters.employeeId) query = query.eq("employee_id", filters.employeeId);
+    if (filters.teamEmployeeIds?.length) query = query.in("employee_id", filters.teamEmployeeIds);
+    const { data, error } = await query;
     if (error) throw new Error(error.message);
     return buildResult(
       key,
@@ -968,7 +976,7 @@ async function runPerformanceReport(
   }
 
   if (key === "performance_reviews") {
-    const { data, error } = await fromHrms(supabase, "performance_reviews")
+    let query = fromHrms(supabase, "performance_reviews")
       .select(
         `
         review_period, review_status, overall_rating, self_rating, manager_rating,
@@ -978,6 +986,9 @@ async function runPerformanceReport(
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
       .limit(2000);
+    if (filters.employeeId) query = query.eq("employee_id", filters.employeeId);
+    if (filters.teamEmployeeIds?.length) query = query.in("employee_id", filters.teamEmployeeIds);
+    const { data, error } = await query;
     if (error) throw new Error(error.message);
     return buildResult(
       key,
@@ -1006,7 +1017,7 @@ async function runPerformanceReport(
     );
   }
 
-  const { data, error } = await fromHrms(supabase, "performance_promotions")
+  let promoQuery = fromHrms(supabase, "performance_promotions")
     .select(
       `
       promotion_status, created_at, reason, current_salary, recommended_salary,
@@ -1017,6 +1028,9 @@ async function runPerformanceReport(
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
     .limit(1000);
+  if (filters.employeeId) promoQuery = promoQuery.eq("employee_id", filters.employeeId);
+  if (filters.teamEmployeeIds?.length) promoQuery = promoQuery.in("employee_id", filters.teamEmployeeIds);
+  const { data, error } = await promoQuery;
   if (error) throw new Error(error.message);
   return buildResult(
     key,
@@ -1054,6 +1068,55 @@ async function runRecruitmentReport(
   const title = REPORT_KEY_LABELS[key];
 
   if (key === "recruitment_funnel" || key === "recruitment_time_to_hire") {
+    if (filters.recruitmentDepartmentIds?.length) {
+      const { data: scopedCandidates, error: scopedError } = await fromHrms(
+        supabase,
+        "recruitment_candidates",
+      )
+        .select("stage, created_at, joined_at, job:job_opening_id!inner(department_id)")
+        .eq("organization_id", organizationId)
+        .in("job.department_id", filters.recruitmentDepartmentIds)
+        .is("deleted_at", null)
+        .is("archived_at", null);
+      if (scopedError) throw new Error(scopedError.message);
+      const rows = (scopedCandidates ?? []) as ReportRowLoose[];
+      if (key === "recruitment_funnel") {
+        const stageMap = new Map<string, number>();
+        for (const row of rows) {
+          stageMap.set(row.stage, (stageMap.get(row.stage) ?? 0) + 1);
+        }
+        return buildResult(
+          key,
+          title,
+          [
+            { key: "stage", header: "Stage" },
+            { key: "count", header: "Count" },
+          ],
+          Array.from(stageMap.entries()).map(([stage, count]) => ({ stage, count })),
+        );
+      }
+      const joined = rows.filter((row) => row.stage === "joined" && row.joined_at && row.created_at);
+      const averageTimeToHireDays =
+        joined.length > 0
+          ? Math.round(
+              joined.reduce((sum, row) => {
+                const start = new Date(row.created_at).getTime();
+                const end = new Date(row.joined_at).getTime();
+                return sum + Math.max(0, (end - start) / (1000 * 60 * 60 * 24));
+              }, 0) / joined.length,
+            )
+          : 0;
+      return buildResult(
+        key,
+        title,
+        [
+          { key: "metric", header: "Metric" },
+          { key: "value", header: "Value" },
+        ],
+        [{ metric: "Average Time to Hire (days)", value: averageTimeToHireDays }],
+      );
+    }
+
     const analytics = await getHiringAnalytics(supabase, profile);
     if (key === "recruitment_funnel") {
       return buildResult(
@@ -1093,6 +1156,9 @@ async function runRecruitmentReport(
     if (filters.status) query = query.eq("job_status", filters.status);
     else query = query.in("job_status", ["open", "on_hold", "draft"]);
     if (filters.departmentId) query = query.eq("department_id", filters.departmentId);
+    if (filters.recruitmentDepartmentIds?.length) {
+      query = query.in("department_id", filters.recruitmentDepartmentIds);
+    }
     const { data, error } = await query;
     if (error) throw new Error(error.message);
     return buildResult(
@@ -1156,7 +1222,7 @@ async function runRecruitmentReport(
     .select(
       `
       first_name, last_name, email, stage, source, created_at,
-      jobs:job_opening_id(title)
+      jobs:job_opening_id(title, department_id)
     `,
     )
     .eq("organization_id", organizationId)
@@ -1164,6 +1230,9 @@ async function runRecruitmentReport(
     .order("created_at", { ascending: false })
     .limit(2000);
   if (filters.status) query = query.eq("stage", filters.status);
+  if (filters.recruitmentDepartmentIds?.length) {
+    query = query.in("jobs.department_id", filters.recruitmentDepartmentIds);
+  }
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   return buildResult(

@@ -109,19 +109,29 @@ export function LoginForm() {
     }
 
     startTransition(async () => {
-      const result = await loginAction(formData);
+      try {
+        const result = await loginAction(formData);
 
-      if (!result.success) {
-        setFormError(result.message);
-        toast.error(result.message);
-        return;
+        if (!result.success) {
+          setFormError(result.message);
+          toast.error(result.message);
+          return;
+        }
+
+        const requestedRedirect = searchParams.get("redirectTo");
+        const redirectTo =
+          requestedRedirect && requestedRedirect !== "/"
+            ? requestedRedirect
+            : result.redirectTo;
+
+        toast.success("Signed in successfully");
+        router.push(redirectTo);
+        router.refresh();
+      } catch {
+        const message = getAuthErrorMessage("SERVER_ERROR");
+        setFormError(message);
+        toast.error(message);
       }
-
-      const redirectTo =
-        searchParams.get("redirectTo") ?? result.redirectTo;
-      toast.success("Signed in successfully");
-      router.push(redirectTo);
-      router.refresh();
     });
   });
 

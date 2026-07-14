@@ -13,7 +13,7 @@ import {
   mapSupabaseAuthError,
 } from "@/lib/auth/errors";
 import { loadUserProfile } from "@/lib/auth/profile-loader";
-import { getRoleRedirectPath } from "@/lib/auth/redirect";
+import { getAuthenticatedRedirectPath } from "@/lib/auth/redirect";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
 import { recordEmployeeSuccessfulLogin } from "@/lib/employees/services/employee-account";
@@ -40,87 +40,106 @@ async function applyRememberMePreference(rememberMe: boolean) {
 export async function loginAction(
   formData: FormData,
 ): Promise<AuthActionResult> {
-  const parsed = loginSchema.safeParse({
-    email: formData.get("email"),
-    password: formData.get("password"),
-    rememberMe: formData.get("rememberMe") === "on",
-  });
-
-  if (!parsed.success) {
-    return {
-      success: false,
-      error: "VALIDATION_ERROR",
-      message: getAuthErrorMessage("VALIDATION_ERROR"),
-    };
-  }
-
-  const { email, password, rememberMe } = parsed.data;
-  const supabase = await createClient();
-
-  const { data: authData, error: authError } =
-    await supabase.auth.signInWithPassword({
-      email,
-      password,
+  try {
+    const parsed = loginSchema.safeParse({
+      email: formData.get("email"),
+      password: formData.get("password"),
+      rememberMe: formData.get("rememberMe") === "on",
     });
 
-  if (authError || !authData.user) {
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: "VALIDATION_ERROR",
+        message: getAuthErrorMessage("VALIDATION_ERROR"),
+      };
+    }
+
+    const { email, password, rememberMe } = parsed.data;
+    const supabase = await createClient();
+
+    const { data: authData, error: authError } =
+      await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+    if (authError || !authData.user) {
+      const mappedError = mapSupabaseAuthError(authError?.message ?? "");
+      const ctx = await getRequestAuditContext();
+      await writeApplicationAudit(supabase, {
+        organizationId: null,
+        module: "dashboard",
+        action: "login",
+        description: `Failed login attempt for ${email}`,
+        recordId: email,
+        eventStatus: "failed",
+        priority: "high",
+        reason: authError?.message,
+        ...ctx,
+      });
+
+      if (process.env.NODE_ENV === "development" && authError?.message) {
+        console.error("[loginAction] Supabase auth error:", authError.message);
+      }
+
+      return {
+        success: false,
+        error: mappedError,
+        message: getAuthErrorMessage(mappedError),
+      };
+    }
+
+    const profileResult = await loadUserProfile(
+      authData.user.id,
+      email,
+      supabase,
+    );
+
+    if (!profileResult.success) {
+      await supabase.auth.signOut();
+      return {
+        success: false,
+        error: profileResult.error,
+        message: getAuthErrorMessage(profileResult.error),
+      };
+    }
+
+    await applyRememberMePreference(rememberMe);
+
+    try {
+      await recordEmployeeSuccessfulLogin(supabase, authData.user.id, email);
+    } catch (loginRecordError) {
+      console.error("[loginAction] Failed to record successful login:", loginRecordError);
+    }
+
     const ctx = await getRequestAuditContext();
     await writeApplicationAudit(supabase, {
-      organizationId: null,
+      organizationId: profileResult.profile.employee.organizationId,
       module: "dashboard",
       action: "login",
-      description: `Failed login attempt for ${email}`,
-      recordId: email,
-      eventStatus: "failed",
-      priority: "high",
-      reason: authError?.message,
+      description: `User ${email} logged in successfully`,
+      recordId: authData.user.id,
+      priority: "medium",
       ...ctx,
+      metadata: { email },
     });
 
     return {
-      success: false,
-      error: mapSupabaseAuthError(authError?.message ?? ""),
-      message:
-        mapSupabaseAuthError(authError?.message ?? "") === "INVALID_CREDENTIALS"
-          ? getAuthErrorMessage("INVALID_CREDENTIALS")
-          : getAuthErrorMessage("SERVER_ERROR"),
+      success: true,
+      redirectTo: getAuthenticatedRedirectPath(
+        profileResult.profile.roles,
+        profileResult.profile.permissionCodes,
+      ),
     };
-  }
-
-  const profileResult = await loadUserProfile(
-    authData.user.id,
-    email,
-    supabase,
-  );
-
-  if (!profileResult.success) {
-    await supabase.auth.signOut();
+  } catch (error) {
+    console.error("[loginAction] Unexpected failure:", error);
     return {
       success: false,
-      error: profileResult.error,
-      message: getAuthErrorMessage(profileResult.error),
+      error: "SERVER_ERROR",
+      message: getAuthErrorMessage("SERVER_ERROR"),
     };
   }
-
-  await applyRememberMePreference(rememberMe);
-  await recordEmployeeSuccessfulLogin(supabase, authData.user.id, email);
-
-  const ctx = await getRequestAuditContext();
-  await writeApplicationAudit(supabase, {
-    organizationId: profileResult.profile.employee.organizationId,
-    module: "dashboard",
-    action: "login",
-    description: `User ${email} logged in successfully`,
-    recordId: authData.user.id,
-    priority: "medium",
-    ...ctx,
-    metadata: { email },
-  });
-
-  return {
-    success: true,
-    redirectTo: getRoleRedirectPath(profileResult.profile.roles),
-  };
 }
 
 export async function logoutAction(): Promise<void> {

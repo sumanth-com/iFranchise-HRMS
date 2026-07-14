@@ -286,10 +286,40 @@ async function suggestEmployeeCodeForInvite(organizationId: string) {
   return `EMP-${String(Number.parseInt(match[1], 10) + 1).padStart(4, "0")}`;
 }
 
+export type InviteEmployeeByEmailOptions = {
+  reportingManagerId?: string;
+  departmentId?: string | null;
+  branchId?: string | null;
+};
+
+async function applyTeamInvitePlacement(
+  employeeId: string,
+  options: InviteEmployeeByEmailOptions,
+  actorUserId: string,
+) {
+  if (!options.reportingManagerId) return;
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .schema("hrms")
+    .from("employees")
+    .update({
+      reporting_manager_id: options.reportingManagerId,
+      ...(options.departmentId ? { department_id: options.departmentId } : {}),
+      ...(options.branchId ? { branch_id: options.branchId } : {}),
+      updated_by: actorUserId,
+    })
+    .eq("id", employeeId)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+}
+
 export async function inviteEmployeeByEmail(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   emailInput: string,
+  options: InviteEmployeeByEmailOptions = {},
 ) {
   const email = emailInput.trim().toLowerCase();
   const admin = createAdminClient();
@@ -309,6 +339,18 @@ export async function inviteEmployeeByEmail(
 
   if (existing) {
     const row = existing as EmployeeAccountRow;
+    if (
+      row.account_status === "active" &&
+      options.reportingManagerId &&
+      row.id !== options.reportingManagerId
+    ) {
+      throw new Error("This email already belongs to an active employee. Contact HR for changes.");
+    }
+
+    if (options.reportingManagerId) {
+      await applyTeamInvitePlacement(row.id, options, profile.userId);
+    }
+
     if (row.account_status === "invitation_pending") {
       await resendEmployeeInvitation(supabase, profile, row.id);
       return row.id;
@@ -327,7 +369,9 @@ export async function inviteEmployeeByEmail(
     .from("employees")
     .insert({
       organization_id: profile.employee.organizationId,
-      branch_id: profile.employee.branchId,
+      branch_id: options.branchId ?? profile.employee.branchId,
+      department_id: options.departmentId ?? null,
+      reporting_manager_id: options.reportingManagerId ?? null,
       employee_code: employeeCode,
       first_name: firstName,
       last_name: lastName,

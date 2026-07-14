@@ -11,6 +11,13 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useMemo } from "react";
 
 import { Button } from "@/components/common/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/common/select";
 import { LEAVE_CALENDAR_LEGEND } from "@/lib/leave/constants";
 import { expandDateRange, isWeekendDate } from "@/lib/leave/services/leave-utils";
 import type {
@@ -26,6 +33,12 @@ type LeaveCalendarViewProps = {
   month: number;
   year: number;
   onMonthChange: (month: number, year: number) => void;
+  /** When true, only days in the selected month are shown (empty cells for padding). */
+  currentMonthOnly?: boolean;
+  /** Show a year picker next to month navigation. */
+  showYearPicker?: boolean;
+  /** Hide the color legend under the calendar header. */
+  hideLegend?: boolean;
 };
 
 type DayCell = {
@@ -33,6 +46,8 @@ type DayCell = {
   dayNumber: number;
   isCurrentMonth: boolean;
 };
+
+type CalendarCell = DayCell | null;
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -65,17 +80,71 @@ function buildCalendarDays(month: number, year: number): DayCell[] {
   return days;
 }
 
+function buildCurrentMonthCalendarDays(month: number, year: number): CalendarCell[] {
+  const monthStart = startOfMonth(new Date(year, month - 1, 1));
+  const monthEnd = endOfMonth(monthStart);
+  const cells: CalendarCell[] = [];
+
+  for (let index = 0; index < getDay(monthStart); index += 1) {
+    cells.push(null);
+  }
+
+  let current = monthStart;
+  while (current <= monthEnd) {
+    cells.push({
+      date: format(current, "yyyy-MM-dd"),
+      dayNumber: current.getDate(),
+      isCurrentMonth: true,
+    });
+    current = addDays(current, 1);
+  }
+
+  while (cells.length % 7 !== 0) {
+    cells.push(null);
+  }
+
+  return cells;
+}
+
+function CalendarLegend() {
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+      {Object.entries(LEAVE_CALENDAR_LEGEND).map(([key, item]) => (
+        <span key={key} className="inline-flex items-center gap-1.5">
+          <span className={cn("size-2.5 rounded-full", item.className)} />
+          {item.label}
+        </span>
+      ))}
+      <span className="inline-flex items-center gap-1.5">
+        <span className="size-2.5 rounded-full bg-destructive/60" />
+        Rejected
+      </span>
+    </div>
+  );
+}
+
 export function LeaveCalendarView({
   leaves,
   holidays,
   month,
   year,
   onMonthChange,
+  currentMonthOnly = false,
+  showYearPicker = false,
+  hideLegend = false,
 }: LeaveCalendarViewProps) {
   const calendarDays = useMemo(
-    () => buildCalendarDays(month, year),
-    [month, year],
+    () =>
+      currentMonthOnly
+        ? buildCurrentMonthCalendarDays(month, year)
+        : buildCalendarDays(month, year),
+    [currentMonthOnly, month, year],
   );
+
+  const yearOptions = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    return Array.from({ length: 11 }, (_, index) => currentYear - 5 + index);
+  }, []);
 
   const holidayMap = useMemo(() => {
     const map = new Map<string, LeaveHolidayEntry>();
@@ -99,7 +168,7 @@ export function LeaveCalendarView({
     return map;
   }, [leaves]);
 
-  const monthLabel = format(new Date(year, month - 1, 1), "MMMM yyyy");
+  const monthLabel = format(new Date(year, month - 1, 1), "MMMM");
 
   const goToPreviousMonth = () => {
     if (month === 1) {
@@ -119,27 +188,37 @@ export function LeaveCalendarView({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="icon-sm" onClick={goToPreviousMonth}>
             <ChevronLeft className="size-4" />
           </Button>
-          <h2 className="min-w-[10rem] text-center text-lg font-semibold">
-            {monthLabel}
-          </h2>
+          <h2 className="min-w-[7rem] text-center text-lg font-semibold">{monthLabel}</h2>
           <Button variant="outline" size="icon-sm" onClick={goToNextMonth}>
             <ChevronRight className="size-4" />
           </Button>
+          {showYearPicker ? (
+            <Select
+              value={String(year)}
+              onValueChange={(value) => onMonthChange(month, Number(value))}
+            >
+              <SelectTrigger className="w-[6.5rem]" aria-label="Select year">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {yearOptions.map((optionYear) => (
+                  <SelectItem key={optionYear} value={String(optionYear)}>
+                    {optionYear}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <span className="text-sm text-muted-foreground">{year}</span>
+          )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 text-xs">
-          {Object.entries(LEAVE_CALENDAR_LEGEND).map(([key, item]) => (
-            <span key={key} className="inline-flex items-center gap-1.5">
-              <span className={cn("size-2.5 rounded-full", item.className)} />
-              {item.label}
-            </span>
-          ))}
-        </div>
+        {!hideLegend ? <CalendarLegend /> : null}
       </div>
 
       <div className="overflow-hidden rounded-xl border bg-card">
@@ -155,7 +234,16 @@ export function LeaveCalendarView({
         </div>
 
         <div className="grid grid-cols-7">
-          {calendarDays.map((day) => {
+          {calendarDays.map((day, index) => {
+            if (!day) {
+              return (
+                <div
+                  key={`empty-${index}`}
+                  className="min-h-28 border-b border-r bg-muted/10 last:border-r-0"
+                />
+              );
+            }
+
             const holiday = holidayMap.get(day.date);
             const dayLeaves = leavesByDate.get(day.date) ?? [];
             const isWeekend = isWeekendDate(day.date);
@@ -167,7 +255,7 @@ export function LeaveCalendarView({
                   "min-h-28 border-b border-r p-2 last:border-r-0",
                   !day.isCurrentMonth && "bg-muted/20 text-muted-foreground",
                   isWeekend && day.isCurrentMonth && "bg-muted/30",
-                  holiday && "bg-violet-500/5",
+                  holiday && day.isCurrentMonth && "bg-violet-500/5",
                 )}
               >
                 <div className="mb-2 flex items-center justify-between gap-1">

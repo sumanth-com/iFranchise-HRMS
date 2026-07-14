@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useTransition } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -52,13 +52,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Modal } from "@/components/common/modal";
-import { deleteEmployeeAction } from "@/lib/employees/actions";
+import { deleteEmployeeAction, fetchEmployeesAction } from "@/lib/employees/actions";
 import {
   EMPLOYEE_ACCOUNT_STATUS_LABELS,
   EMPLOYEE_ROUTES,
   EMPLOYMENT_STATUS_LABELS,
 } from "@/lib/employees/constants";
-import type { EmployeeListItem, LookupOption } from "@/types/employee";
+import type {
+  EmployeeListItem,
+  EmployeeListParams,
+  LookupOption,
+} from "@/types/employee";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -80,26 +84,40 @@ type EmployeeTableProps = {
 };
 
 export function EmployeeTable({
-  employees,
-  total,
-  page,
-  pageSize,
-  search,
-  sortBy,
-  sortOrder,
-  department,
-  employmentStatus,
-  accountStatus,
+  employees: initialEmployees,
+  total: initialTotal,
+  page: initialPage,
+  pageSize: initialPageSize,
+  search: initialSearch,
+  sortBy: initialSortBy,
+  sortOrder: initialSortOrder,
+  department: initialDepartment,
+  employmentStatus: initialEmploymentStatus,
+  accountStatus: initialAccountStatus,
   departments,
   canCreate,
   canEdit,
   canDelete,
 }: EmployeeTableProps) {
   const router = useRouter();
-  const initialParams = useSearchParams();
-  const filterParamsRef = useRef(initialParams.toString());
   const [isPending, startTransition] = useTransition();
   const [deleteTarget, setDeleteTarget] = useState<EmployeeListItem | null>(null);
+  const [tableState, setTableState] = useState({
+    employees: initialEmployees,
+    total: initialTotal,
+    page: initialPage,
+    pageSize: initialPageSize,
+  });
+  const [filters, setFilters] = useState<EmployeeListParams>({
+    page: initialPage,
+    pageSize: initialPageSize,
+    search: initialSearch || undefined,
+    sortBy: initialSortBy as EmployeeListParams["sortBy"],
+    sortOrder: initialSortOrder,
+    department: initialDepartment,
+    employmentStatus: initialEmploymentStatus as EmployeeListParams["employmentStatus"],
+    accountStatus: initialAccountStatus as EmployeeListParams["accountStatus"],
+  });
 
   useEffect(() => {
     if (window.location.search) {
@@ -109,29 +127,39 @@ export function EmployeeTable({
 
   const updateParams = useCallback(
     (updates: Record<string, string | undefined>) => {
-      const params = new URLSearchParams(filterParamsRef.current);
+      const nextFilters: EmployeeListParams = {
+        ...filters,
+        page: updates.page ? Number(updates.page) : filters.page,
+      };
 
       Object.entries(updates).forEach(([key, value]) => {
-        if (!value) {
-          params.delete(key);
-        } else {
-          params.set(key, value);
-        }
+        if (key === "page" || key === "departmentId" || key === "branchId") return;
+        (nextFilters as Record<string, unknown>)[key] = value || undefined;
       });
 
-      filterParamsRef.current = params.toString();
+      setFilters(nextFilters);
 
-      startTransition(() => {
-        const query = params.toString();
-        router.push(query ? `${EMPLOYEE_ROUTES.list}?${query}` : EMPLOYEE_ROUTES.list);
-        window.setTimeout(() => {
-          window.history.replaceState(null, "", EMPLOYEE_ROUTES.list);
-        }, 0);
+      startTransition(async () => {
+        const result = await fetchEmployeesAction(nextFilters);
+        if (!result.success) {
+          toast.error(result.message);
+          return;
+        }
+
+        setTableState({
+          employees: result.data.data,
+          total: result.data.total,
+          page: result.data.page,
+          pageSize: result.data.pageSize,
+        });
       });
     },
-    [router, startTransition],
+    [filters],
   );
 
+  const { employees, total, page, pageSize } = tableState;
+  const { search, sortBy, sortOrder, department, employmentStatus, accountStatus } =
+    filters;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const departmentItems = useMemo(
@@ -332,7 +360,16 @@ export function EmployeeTable({
 
       toast.success("Employee deleted successfully");
       setDeleteTarget(null);
-      router.refresh();
+
+      const refreshResult = await fetchEmployeesAction(filters);
+      if (refreshResult.success) {
+        setTableState({
+          employees: refreshResult.data.data,
+          total: refreshResult.data.total,
+          page: refreshResult.data.page,
+          pageSize: refreshResult.data.pageSize,
+        });
+      }
     });
   };
 
@@ -342,7 +379,7 @@ export function EmployeeTable({
         <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
           <Input
             placeholder="Search by name, email, or code..."
-            defaultValue={search}
+            defaultValue={search ?? ""}
             className="sm:max-w-xs"
             onKeyDown={(event) => {
               if (event.key === "Enter") {

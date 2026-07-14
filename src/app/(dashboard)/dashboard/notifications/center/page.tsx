@@ -1,4 +1,4 @@
-import { NotificationCenterTable } from "@/components/notifications/notification-center-table";
+import { NotificationCenterSplitView } from "@/components/notifications/notification-center-split-view";
 import { listNotifications } from "@/lib/notifications/services/notification-queries";
 import type { NotificationCenterTab } from "@/lib/notifications/constants";
 import { requireAuthenticatedProfile } from "@/lib/permissions/server";
@@ -10,6 +10,7 @@ type Props = {
     page?: string;
     pageSize?: string;
     search?: string;
+    id?: string;
   }>;
 };
 
@@ -30,13 +31,14 @@ export default async function NotificationCenterPage({ searchParams }: Props) {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Notification Center</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          View and manage all your notifications.
+          Select a notification on the left to read details on the right.
         </p>
       </div>
-      <NotificationCenterTable
+      <NotificationCenterSplitView
         result={result}
         tab={(params.tab as NotificationCenterTab) ?? "all"}
         search={params.search ?? ""}
+        selectedId={params.id}
       />
     </div>
   );

@@ -35,6 +35,7 @@ type Props = {
   tab: NotificationCenterTab;
   search: string;
   showRecipient?: boolean;
+  centerPath?: string;
 };
 
 export function NotificationCenterTable({
@@ -42,6 +43,7 @@ export function NotificationCenterTable({
   tab,
   search,
   showRecipient = false,
+  centerPath = NOTIFICATIONS_ROUTES.center,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -54,9 +56,9 @@ export function NotificationCenterTable({
         if (!value) params.delete(key);
         else params.set(key, value);
       }
-      router.push(`${NOTIFICATIONS_ROUTES.center}?${params.toString()}`);
+      router.push(`${centerPath}?${params.toString()}`);
     },
-    [router, searchParams],
+    [centerPath, router, searchParams],
   );
 
   const columns = useMemo<DataTableColumn<NotificationListItem>[]>(() => {

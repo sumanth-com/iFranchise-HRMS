@@ -19,6 +19,8 @@ export type NotificationChannel = "in_app" | "email" | "push";
 
 export type DeliveryStatus = "pending" | "delivered" | "failed" | "skipped";
 
+export type NotificationSoundTone = "classic" | "soft" | "alert";
+
 export type NotificationListItem = {
   id: string;
   type: string;
@@ -80,6 +82,7 @@ export type NotificationUserPreferences = {
   receiveEmail: boolean;
   receiveInApp: boolean;
   muteNotifications: boolean;
+  notificationSound: NotificationSoundTone;
   dailyDigest: boolean;
   weeklyDigest: boolean;
 };
@@ -98,6 +101,8 @@ export type NotificationBellItem = {
 export type NotificationBellData = {
   unreadCount: number;
   items: NotificationBellItem[];
+  soundEnabled: boolean;
+  notificationSound: NotificationSoundTone;
 };
 
 export type NotificationActionResult<T = void> =

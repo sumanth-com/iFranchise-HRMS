@@ -71,6 +71,10 @@ export type ReportFilters = {
   month?: number;
   year?: number;
   reportKey?: ReportKey;
+  /** When set, restricts employee-scoped reports to this team (manager portal). */
+  teamEmployeeIds?: string[];
+  /** When set, restricts recruitment reports to managed departments. */
+  recruitmentDepartmentIds?: string[];
 };
 
 export type ReportColumn = { key: string; header: string };

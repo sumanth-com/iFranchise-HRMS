@@ -1,6 +1,6 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
-import { canManageNotifications } from "@/lib/notifications/constants";
+import { canManageNotifications, parseNotificationSoundTone } from "@/lib/notifications/constants";
 import {
   notificationHistoryParamsSchema,
   notificationListParamsSchema,
@@ -251,7 +251,7 @@ export async function getNotificationBellData(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
 ): Promise<NotificationBellData> {
-  const [{ count: unreadCount }, { data }] = await Promise.all([
+  const [{ count: unreadCount }, { data }, preferences] = await Promise.all([
     supabase
       .schema("hrms")
       .from("notifications")
@@ -270,6 +270,7 @@ export async function getNotificationBellData(
       .neq("notification_status", "archived")
       .order("created_at", { ascending: false })
       .limit(8),
+    getNotificationUserPreferences(supabase, profile),
   ]);
 
   const items: NotificationBellItem[] = (data ?? []).map((row) => ({
@@ -283,7 +284,12 @@ export async function getNotificationBellData(
     createdAt: row.created_at,
   }));
 
-  return { unreadCount: unreadCount ?? 0, items };
+  return {
+    unreadCount: unreadCount ?? 0,
+    items,
+    soundEnabled: !preferences.muteNotifications,
+    notificationSound: preferences.notificationSound,
+  };
 }
 
 export async function listNotificationTemplates(
@@ -358,7 +364,7 @@ export async function getNotificationUserPreferences(
   const { data, error } = await supabase
     .schema("hrms")
     .from("notification_user_preferences")
-    .select("id, receive_email, receive_in_app, mute_notifications, daily_digest, weekly_digest")
+    .select("id, receive_email, receive_in_app, mute_notifications, notification_sound, daily_digest, weekly_digest")
     .eq("organization_id", profile.employee.organizationId)
     .eq("user_id", profile.userId)
     .is("deleted_at", null)
@@ -371,6 +377,7 @@ export async function getNotificationUserPreferences(
     receiveEmail: data?.receive_email ?? true,
     receiveInApp: data?.receive_in_app ?? true,
     muteNotifications: data?.mute_notifications ?? false,
+    notificationSound: parseNotificationSoundTone(data?.notification_sound),
     dailyDigest: data?.daily_digest ?? false,
     weeklyDigest: data?.weekly_digest ?? false,
   };

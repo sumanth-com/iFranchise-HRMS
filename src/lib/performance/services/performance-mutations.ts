@@ -101,6 +101,89 @@ export async function updateGoalProgress(
   if (error) throw new Error(error.message);
 }
 
+export async function updateGoal(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  goalId: string,
+  input: z.infer<typeof goalFormSchema>,
+): Promise<void> {
+  const parsed = goalFormSchema.parse(input);
+
+  const { error } = await fromHrms(supabase, "performance_goals")
+    .update({
+      employee_id: parsed.employeeId,
+      cycle_id: parsed.cycleId ?? null,
+      title: parsed.title,
+      description: parsed.description ?? null,
+      category: parsed.category ?? null,
+      goal_priority: parsed.goalPriority,
+      weightage: parsed.weightage,
+      target_value: parsed.targetValue ?? null,
+      current_progress: parsed.currentProgress,
+      due_date: parsed.dueDate ?? null,
+      goal_status: parsed.goalStatus,
+      attachment_path: parsed.attachmentPath ?? null,
+      updated_by: profile.userId,
+    })
+    .eq("id", goalId)
+    .eq("organization_id", profile.employee.organizationId);
+
+  if (error) throw new Error(error.message);
+}
+
+export async function saveReviewDraft(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  reviewId: string,
+  input: {
+    overallRating?: number;
+    comments?: string;
+    strengths?: string;
+    weaknesses?: string;
+    improvementPlan?: string;
+  },
+): Promise<void> {
+  const { error } = await fromHrms(supabase, "performance_reviews")
+    .update({
+      overall_rating: input.overallRating ?? null,
+      comments: input.comments ?? null,
+      strengths: input.strengths ?? null,
+      weaknesses: input.weaknesses ?? null,
+      improvement_plan: input.improvementPlan ?? null,
+      review_status: "in_progress",
+      updated_by: profile.userId,
+    })
+    .eq("id", reviewId)
+    .eq("organization_id", profile.employee.organizationId);
+
+  if (error) throw new Error(error.message);
+}
+
+export async function updateOneOnOne(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  meetingId: string,
+  input: {
+    notes?: string;
+    agenda?: string;
+    followUpDate?: string | null;
+    meetingStatus?: string;
+  },
+): Promise<void> {
+  const { error } = await fromHrms(supabase, "performance_one_on_ones")
+    .update({
+      notes: input.notes ?? null,
+      agenda: input.agenda ?? null,
+      follow_up_date: input.followUpDate ?? null,
+      ...(input.meetingStatus ? { meeting_status: input.meetingStatus } : {}),
+      updated_by: profile.userId,
+    })
+    .eq("id", meetingId)
+    .eq("organization_id", profile.employee.organizationId);
+
+  if (error) throw new Error(error.message);
+}
+
 export async function createKpiTemplate(
   supabase: AuthSupabaseClient,
   profile: UserProfile,

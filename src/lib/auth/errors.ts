@@ -15,6 +15,14 @@ const AUTH_ERROR_MESSAGES: Record<AuthErrorCode, string> = {
   SESSION_EXPIRED: "Your session has expired. Please sign in again.",
   NETWORK_ERROR:
     "Unable to reach the server. Check your connection and try again.",
+  EMAIL_NOT_CONFIRMED:
+    "Your email is not confirmed yet. Check your inbox or ask HR to resend the invitation.",
+  EMAIL_LOGIN_DISABLED:
+    "Email sign-in is disabled for this workspace. Contact your administrator to enable email authentication.",
+  RATE_LIMITED:
+    "Too many sign-in attempts. Please wait a few minutes and try again.",
+  CONFIG_ERROR:
+    "Authentication is not configured correctly. Contact your administrator.",
   SERVER_ERROR: "An unexpected error occurred. Please try again later.",
   VALIDATION_ERROR: "Please check the form and try again.",
   PASSWORD_MISMATCH: "Passwords do not match.",
@@ -31,9 +39,27 @@ export function mapSupabaseAuthError(message: string): AuthErrorCode {
 
   if (
     normalized.includes("invalid login credentials") ||
-    normalized.includes("invalid email or password")
+    normalized.includes("invalid email or password") ||
+    normalized.includes("invalid credentials") ||
+    normalized.includes("wrong password") ||
+    normalized.includes("user not found")
   ) {
     return "INVALID_CREDENTIALS";
+  }
+
+  if (
+    normalized.includes("email not confirmed") ||
+    normalized.includes("email address not confirmed")
+  ) {
+    return "EMAIL_NOT_CONFIRMED";
+  }
+
+  if (
+    normalized.includes("too many requests") ||
+    normalized.includes("rate limit") ||
+    normalized.includes("over_email_send_rate_limit")
+  ) {
+    return "RATE_LIMITED";
   }
 
   if (
@@ -49,6 +75,22 @@ export function mapSupabaseAuthError(message: string): AuthErrorCode {
     (normalized.includes("expired") || normalized.includes("invalid"))
   ) {
     return "SESSION_EXPIRED";
+  }
+
+  if (
+    normalized.includes("api key") ||
+    normalized.includes("invalid jwt") ||
+    normalized.includes("bad_jwt")
+  ) {
+    return "CONFIG_ERROR";
+  }
+
+  if (
+    normalized.includes("email logins are disabled") ||
+    normalized.includes("email_provider_disabled") ||
+    normalized.includes("email provider is disabled")
+  ) {
+    return "EMAIL_LOGIN_DISABLED";
   }
 
   return "SERVER_ERROR";

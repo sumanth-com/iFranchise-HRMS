@@ -1,9 +1,11 @@
 import type { Role } from "@/types/auth";
 import { AUTH_ROUTES } from "@/lib/auth/constants";
+import { getPortalRedirectPath } from "@/lib/auth/portals";
 
 const ROLE_REDIRECT_PRIORITY = [
   "super_admin",
   "hr_admin",
+  "ceo",
   "manager",
   "employee",
 ] as const;
@@ -12,10 +14,11 @@ export function getRoleRedirectPath(roles: Role[]): string {
   const roleCodes = new Set(roles.map((role) => role.code));
 
   for (const code of ROLE_REDIRECT_PRIORITY) {
-    if (roleCodes.has(code)) {
-      return AUTH_ROUTES.dashboard;
-    }
+    if (roleCodes.has(code)) return getPortalRedirectPath([], roles);
   }
-
   return AUTH_ROUTES.dashboard;
+}
+
+export function getAuthenticatedRedirectPath(roles: Role[], permissionCodes: string[]): string {
+  return getPortalRedirectPath(permissionCodes, roles);
 }

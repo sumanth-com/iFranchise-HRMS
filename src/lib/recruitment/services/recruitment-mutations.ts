@@ -515,6 +515,68 @@ export async function cancelInterview(
   );
 }
 
+export async function updateInterview(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  interviewId: string,
+  input: {
+    roundName: string;
+    interviewDate: string;
+    interviewTime: string;
+    meetingLink?: string | null;
+    interviewType: "offline" | "google_meet" | "zoom" | "teams";
+    durationMinutes?: number;
+    interviewerEmployeeId?: string;
+  },
+): Promise<void> {
+  const organizationId = profile.employee.organizationId;
+
+  const { data: interview, error: fetchError } = await fromHrms(supabase, "recruitment_interviews")
+    .select("id, candidate_id, interview_status")
+    .eq("id", interviewId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (fetchError) throw new Error(fetchError.message);
+  if (!interview) throw new Error("Interview not found");
+  if (interview.interview_status !== "scheduled") {
+    throw new Error("Only scheduled interviews can be rescheduled.");
+  }
+
+  const settings = await getRecruitmentSettings(supabase, organizationId);
+  const durationMinutes =
+    input.durationMinutes ?? settings.defaultInterviewDurationMinutes;
+
+  const updates: Record<string, unknown> = {
+    round_name: input.roundName.trim(),
+    interview_date: input.interviewDate,
+    interview_time: input.interviewTime,
+    meeting_link: emptyToNull(input.meetingLink),
+    interview_type: input.interviewType,
+    duration_minutes: durationMinutes,
+    updated_by: profile.userId,
+  };
+
+  if (input.interviewerEmployeeId) {
+    updates.interviewer_employee_id = input.interviewerEmployeeId;
+  }
+
+  const { error } = await fromHrms(supabase, "recruitment_interviews")
+    .update(updates)
+    .eq("id", interviewId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+
+  await addTimeline(supabase, organizationId, interview.candidate_id, profile.userId, {
+    eventType: "interview",
+    title: `Interview rescheduled — ${input.roundName}`,
+    description: `${input.interviewDate} at ${input.interviewTime} (${durationMinutes} mins)`,
+  });
+}
+
 export async function createOffer(
   supabase: AuthSupabaseClient,
   profile: UserProfile,

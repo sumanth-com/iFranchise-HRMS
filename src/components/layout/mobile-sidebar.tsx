@@ -14,11 +14,13 @@ import {
 } from "@/components/ui/sheet";
 import { useNavigation } from "@/hooks/use-permissions";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { useAuth } from "@/providers/auth-provider";
 import { cn } from "@/lib/utils";
 
 export function MobileSidebar() {
   const pathname = usePathname();
   const { isMobileOpen, setMobileOpen } = useSidebar();
+  const { portalHome, portalLabel } = useAuth();
   const navigation = useNavigation();
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     Administration: true,
@@ -35,13 +37,13 @@ export function MobileSidebar() {
     <Sheet open={isMobileOpen} onOpenChange={setMobileOpen}>
       <SheetContent side="left" className="w-64 p-0">
         <SheetHeader className="border-b px-4 py-4">
-          <SheetTitle>iFranchise HRMS</SheetTitle>
+          <SheetTitle>{portalLabel}</SheetTitle>
         </SheetHeader>
         <nav className="flex flex-col gap-1 p-2">
           {navigation.map((item, index) => {
             const isActive =
               pathname === item.href ||
-              (item.href !== "/" && pathname.startsWith(item.href));
+              (item.href !== portalHome && pathname.startsWith(item.href));
             const Icon = item.icon;
             const prevSection = index > 0 ? navigation[index - 1]?.section : undefined;
             const showSection = item.section && item.section !== prevSection;

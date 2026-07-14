@@ -21,7 +21,7 @@ export const goalFormSchema = z.object({
   employeeId: z.string().uuid(),
   cycleId: z.string().uuid().optional().nullable(),
   title: z.string().min(1).max(200),
-  description: z.string().max(2000).optional(),
+  description: z.string().max(10000).optional(),
   category: z.string().max(100).optional(),
   goalPriority: z.enum(["low", "medium", "high", "critical"]).default("medium"),
   weightage: z.coerce.number().min(0).max(100).default(0),

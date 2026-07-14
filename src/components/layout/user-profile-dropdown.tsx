@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, LogOut, Moon, Sun, User } from "lucide-react";
+import { Building2, ChevronDown, LogOut, Moon, Settings, Sun, User } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useState } from "react";
@@ -21,6 +21,7 @@ import {
   COMPANY_SETTINGS_ROUTES,
 } from "@/lib/company-settings/constants";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
+import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { useAuth } from "@/providers/auth-provider";
 
 function getInitials(firstName: string, lastName: string): string {
@@ -30,13 +31,16 @@ function getInitials(firstName: string, lastName: string): string {
 export function UserProfileDropdown() {
   const router = useRouter();
   const { setTheme, resolvedTheme } = useTheme();
-  const { profile, isLoading, signOut } = useAuth();
+  const { profile, isLoading, signOut, portalHome } = useAuth();
   const [signOutOpen, setSignOutOpen] = useState(false);
 
   const { employee, roles, permissionCodes } = profile;
   const displayName = `${employee.firstName} ${employee.lastName}`;
   const primaryRole = roles[0]?.name ?? "User";
-  const profileHref = EMPLOYEE_ROUTES.detail(employee);
+  const isManagerPortal = portalHome.startsWith("/manager");
+  const profileHref = isManagerPortal
+    ? MANAGER_ROUTES.teamMember(employee)
+    : EMPLOYEE_ROUTES.detail(employee);
   const canOpenCompanySettings = canViewCompanySettings(permissionCodes);
 
   async function handleSignOut() {
@@ -51,8 +55,7 @@ export function UserProfileDropdown() {
           render={
             <Button
               variant="ghost"
-              size="icon"
-              className="rounded-full"
+              className="h-9 gap-2 rounded-full px-1.5 pr-2.5"
               aria-label={`${displayName} account menu`}
             >
               <Avatar className="size-8">
@@ -60,6 +63,7 @@ export function UserProfileDropdown() {
                   {getInitials(employee.firstName, employee.lastName)}
                 </AvatarFallback>
               </Avatar>
+              <ChevronDown className="size-4 text-muted-foreground" />
             </Button>
           }
         />
@@ -76,6 +80,12 @@ export function UserProfileDropdown() {
             <User className="size-4" />
             Profile
           </DropdownMenuItem>
+          {isManagerPortal ? (
+            <DropdownMenuItem onClick={() => router.push(MANAGER_ROUTES.settings)}>
+              <Settings className="size-4" />
+              Settings
+            </DropdownMenuItem>
+          ) : null}
           {canOpenCompanySettings ? (
             <DropdownMenuItem onClick={() => router.push(COMPANY_SETTINGS_ROUTES.base)}>
               <Building2 className="size-4" />

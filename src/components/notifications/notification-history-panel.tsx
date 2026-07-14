@@ -2,20 +2,37 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo } from "react";
+
 import { Input } from "@/components/common/input";
-import { FilterSelect } from "@/components/common/filter-select";
-import { NotificationCenterTable } from "@/components/notifications/notification-center-table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/common/select";
+import { NotificationHistoryTimeline } from "@/components/notifications/notification-history-timeline";
+import {
+  FILTER_ANY_VALUE,
+  filterSelectLabel,
+  filterSelectLabelFromMap,
+  MANAGER_FILTER_SELECT_CONTENT_CLASS,
+} from "@/lib/manager/filter-select";
 import {
   NOTIFICATION_MODULES,
   NOTIFICATION_PRIORITIES,
   NOTIFICATIONS_ROUTES,
 } from "@/lib/notifications/constants";
-import { toEmployeeSelectItems, withSelectOption } from "@/components/payroll/select-utils";
+import { toEmployeeSelectItems } from "@/components/payroll/select-utils";
 import type { LookupOption } from "@/types/employee";
 import type { NotificationListResult } from "@/types/notifications";
 
-const STATUS_ITEMS = [
-  { value: "all", label: "All statuses" },
+const MODULE_LABEL = "Every module";
+const PRIORITY_LABEL = "Any priority";
+const STATUS_LABEL = "Any status";
+const EMPLOYEE_LABEL = "Everyone";
+
+const STATUS_OPTIONS = [
   { value: "unread", label: "Unread" },
   { value: "read", label: "Read" },
   { value: "archived", label: "Archived" },
@@ -35,6 +52,7 @@ type Props = {
     dateTo?: string;
     search?: string;
   };
+  historyPath?: string;
 };
 
 export function NotificationHistoryPanel({
@@ -42,6 +60,7 @@ export function NotificationHistoryPanel({
   employees,
   showRecipient,
   filters,
+  historyPath = NOTIFICATIONS_ROUTES.history,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -53,113 +72,245 @@ export function NotificationHistoryPanel({
         if (!value) params.delete(key);
         else params.set(key, value);
       }
-      router.push(`${NOTIFICATIONS_ROUTES.history}?${params.toString()}`);
+      router.push(`${historyPath}?${params.toString()}`);
     },
-    [router, searchParams],
+    [historyPath, router, searchParams],
   );
 
-  const employeeItems = useMemo(
+  const moduleValue = filters.module ?? FILTER_ANY_VALUE;
+  const priorityValue = filters.priority ?? FILTER_ANY_VALUE;
+  const statusValue = filters.status ?? FILTER_ANY_VALUE;
+  const employeeValue = filters.employeeId ?? FILTER_ANY_VALUE;
+
+  const moduleOptions = useMemo(
     () =>
-      withSelectOption(toEmployeeSelectItems(employees), {
-        value: "all",
-        label: "All employees",
-      }),
-    [employees],
-  );
-  const moduleItems = useMemo(
-    () =>
-      withSelectOption(
-        NOTIFICATION_MODULES.map((mod) => ({ value: mod.value, label: mod.label })),
-        { value: "all", label: "All modules" },
-      ),
+      NOTIFICATION_MODULES.map((mod) => ({
+        value: mod.value,
+        label: mod.label,
+      })),
     [],
   );
-  const priorityItems = useMemo(
+
+  const priorityOptions = useMemo(
     () =>
-      withSelectOption(
-        NOTIFICATION_PRIORITIES.map((p) => ({ value: p.value, label: p.label })),
-        { value: "all", label: "All priorities" },
-      ),
+      NOTIFICATION_PRIORITIES.map((item) => ({
+        value: item.value,
+        label: item.label,
+      })),
+    [],
+  );
+
+  const employeeOptions = useMemo(
+    () =>
+      toEmployeeSelectItems(employees).map((item) => ({
+        value: item.value,
+        label: item.label,
+      })),
+    [employees],
+  );
+
+  const moduleLabels = useMemo(
+    () => Object.fromEntries(moduleOptions.map((item) => [item.value, item.label])),
+    [moduleOptions],
+  );
+
+  const priorityLabels = useMemo(
+    () => Object.fromEntries(priorityOptions.map((item) => [item.value, item.label])),
+    [priorityOptions],
+  );
+
+  const statusLabels = useMemo(
+    () => Object.fromEntries(STATUS_OPTIONS.map((item) => [item.value, item.label])),
     [],
   );
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-3 rounded-xl border bg-card p-4 shadow-sm md:grid-cols-2 xl:grid-cols-4">
-        {showRecipient ? (
-          <div className="space-y-1">
-            <p className="text-xs font-medium text-muted-foreground">Employee</p>
-            <FilterSelect
-              items={employeeItems}
-              value={filters.employeeId ?? "all"}
-              placeholder="All employees"
-              onValueChange={(v) =>
-                setParams({ employeeId: v === "all" ? undefined : v, page: "1" })
+    <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+      <div className="border-b px-4 py-3">
+        <div
+          className={
+            showRecipient
+              ? "grid grid-cols-2 gap-2 xl:grid-cols-7"
+              : "grid grid-cols-2 gap-2 xl:grid-cols-6"
+          }
+        >
+          {showRecipient ? (
+            <div className="min-w-0">
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                Employee
+              </label>
+              <Select
+                value={employeeValue}
+                onValueChange={(value) =>
+                  setParams({
+                    employeeId: !value || value === FILTER_ANY_VALUE ? undefined : value,
+                    page: "1",
+                    id: undefined,
+                  })
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={EMPLOYEE_LABEL}>
+                    {filterSelectLabel(employeeValue, EMPLOYEE_LABEL, employeeOptions)}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent
+                  alignItemWithTrigger={false}
+                  className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
+                >
+                  <SelectItem value={FILTER_ANY_VALUE}>{EMPLOYEE_LABEL}</SelectItem>
+                  {employeeOptions.map((employee) => (
+                    <SelectItem key={employee.value} value={employee.value}>
+                      {employee.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+
+          <div className="min-w-0">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Module</label>
+            <Select
+              value={moduleValue}
+              onValueChange={(value) =>
+                setParams({
+                  module: !value || value === FILTER_ANY_VALUE ? undefined : value,
+                  page: "1",
+                  id: undefined,
+                })
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder={MODULE_LABEL}>
+                  {filterSelectLabelFromMap(moduleValue, MODULE_LABEL, moduleLabels)}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent
+                alignItemWithTrigger={false}
+                className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
+              >
+                <SelectItem value={FILTER_ANY_VALUE}>{MODULE_LABEL}</SelectItem>
+                {moduleOptions.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="min-w-0">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              Priority
+            </label>
+            <Select
+              value={priorityValue}
+              onValueChange={(value) =>
+                setParams({
+                  priority: !value || value === FILTER_ANY_VALUE ? undefined : value,
+                  page: "1",
+                  id: undefined,
+                })
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder={PRIORITY_LABEL}>
+                  {filterSelectLabelFromMap(priorityValue, PRIORITY_LABEL, priorityLabels)}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent
+                alignItemWithTrigger={false}
+                className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
+              >
+                <SelectItem value={FILTER_ANY_VALUE}>{PRIORITY_LABEL}</SelectItem>
+                {priorityOptions.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="min-w-0">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Status</label>
+            <Select
+              value={statusValue}
+              onValueChange={(value) =>
+                setParams({
+                  status: !value || value === FILTER_ANY_VALUE ? undefined : value,
+                  page: "1",
+                  id: undefined,
+                })
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder={STATUS_LABEL}>
+                  {filterSelectLabelFromMap(statusValue, STATUS_LABEL, statusLabels)}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent
+                alignItemWithTrigger={false}
+                className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
+              >
+                <SelectItem value={FILTER_ANY_VALUE}>{STATUS_LABEL}</SelectItem>
+                {STATUS_OPTIONS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="min-w-0">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">From</label>
+            <Input
+              type="date"
+              className="w-full"
+              defaultValue={filters.dateFrom}
+              onChange={(event) =>
+                setParams({ dateFrom: event.target.value || undefined, page: "1", id: undefined })
               }
             />
           </div>
-        ) : null}
-        <div className="space-y-1">
-          <p className="text-xs font-medium text-muted-foreground">Module</p>
-          <FilterSelect
-            items={moduleItems}
-            value={filters.module ?? "all"}
-            placeholder="All modules"
-            onValueChange={(v) => setParams({ module: v === "all" ? undefined : v, page: "1" })}
-          />
-        </div>
-        <div className="space-y-1">
-          <p className="text-xs font-medium text-muted-foreground">Priority</p>
-          <FilterSelect
-            items={priorityItems}
-            value={filters.priority ?? "all"}
-            placeholder="All priorities"
-            onValueChange={(v) => setParams({ priority: v === "all" ? undefined : v, page: "1" })}
-          />
-        </div>
-        <div className="space-y-1">
-          <p className="text-xs font-medium text-muted-foreground">Status</p>
-          <FilterSelect
-            items={STATUS_ITEMS}
-            value={filters.status ?? "all"}
-            placeholder="All statuses"
-            onValueChange={(v) => setParams({ status: v === "all" ? undefined : v, page: "1" })}
-          />
-        </div>
-        <div className="space-y-1">
-          <p className="text-xs font-medium text-muted-foreground">From</p>
-          <Input
-            type="date"
-            defaultValue={filters.dateFrom}
-            onChange={(e) => setParams({ dateFrom: e.target.value || undefined, page: "1" })}
-          />
-        </div>
-        <div className="space-y-1">
-          <p className="text-xs font-medium text-muted-foreground">To</p>
-          <Input
-            type="date"
-            defaultValue={filters.dateTo}
-            onChange={(e) => setParams({ dateTo: e.target.value || undefined, page: "1" })}
-          />
-        </div>
-        <div className="space-y-1 md:col-span-2">
-          <p className="text-xs font-medium text-muted-foreground">Search</p>
-          <Input
-            placeholder="Search title or message..."
-            defaultValue={filters.search}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                setParams({ search: e.currentTarget.value || undefined, page: "1" });
+
+          <div className="min-w-0">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">To</label>
+            <Input
+              type="date"
+              className="w-full"
+              defaultValue={filters.dateTo}
+              onChange={(event) =>
+                setParams({ dateTo: event.target.value || undefined, page: "1", id: undefined })
               }
-            }}
-          />
+            />
+          </div>
+
+          <div className="col-span-2 min-w-0 xl:col-span-1">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Search</label>
+            <Input
+              placeholder="Title or message..."
+              className="w-full"
+              defaultValue={filters.search}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  setParams({
+                    search: event.currentTarget.value || undefined,
+                    page: "1",
+                    id: undefined,
+                  });
+                }
+              }}
+            />
+          </div>
         </div>
       </div>
 
-      <NotificationCenterTable
+      <NotificationHistoryTimeline
         result={result}
-        tab="all"
-        search={filters.search ?? ""}
+        historyPath={historyPath}
         showRecipient={showRecipient}
       />
     </div>

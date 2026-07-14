@@ -271,11 +271,11 @@ export async function getEmployeeLeaveRequests(
     .schema("hrms")
     .from("leave_requests")
     .select(
-      "id, start_date, end_date, total_days, leave_status, reason, applied_at, leave_types:leave_type_id (name, code)",
+      "id, start_date, end_date, total_days, leave_status, reason, created_at, leave_types:leave_type_id (name, code)",
     )
     .eq("employee_id", employeeId)
     .is("deleted_at", null)
-    .order("applied_at", { ascending: false })
+    .order("created_at", { ascending: false })
     .limit(20);
 
   if (error) throw new Error(error.message);
@@ -295,7 +295,7 @@ export async function getEmployeeLeaveRequests(
       endDate: row.end_date,
       totalDays: Number(row.total_days),
       leaveStatus: row.leave_status,
-      appliedAt: row.applied_at,
+      appliedAt: row.created_at,
       reason: row.reason,
     };
   });

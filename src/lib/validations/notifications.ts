@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { NOTIFICATION_SOUND_OPTIONS } from "@/lib/notifications/constants";
+
 const notificationModuleSchema = z.enum([
   "system",
   "attendance",
@@ -58,10 +60,18 @@ export const notificationSettingsFormSchema = z.object({
   ),
 });
 
+const notificationSoundSchema = z.enum(
+  NOTIFICATION_SOUND_OPTIONS.map((option) => option.value) as [
+    (typeof NOTIFICATION_SOUND_OPTIONS)[number]["value"],
+    ...(typeof NOTIFICATION_SOUND_OPTIONS)[number]["value"][],
+  ],
+);
+
 export const notificationPreferencesFormSchema = z.object({
   receiveEmail: z.boolean(),
   receiveInApp: z.boolean(),
   muteNotifications: z.boolean(),
+  notificationSound: notificationSoundSchema,
   dailyDigest: z.boolean(),
   weeklyDigest: z.boolean(),
 });
