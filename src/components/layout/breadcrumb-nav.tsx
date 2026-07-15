@@ -188,6 +188,7 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
     ];
 
     const sectionLabels: Record<string, string> = {
+      profile: "Profile",
       team: "My Team",
       attendance: "Attendance",
       leave: "Leave",

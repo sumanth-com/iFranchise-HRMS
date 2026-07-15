@@ -115,6 +115,30 @@ export async function listNotifications(
   };
 }
 
+export async function getNotificationById(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  notificationId: string,
+): Promise<NotificationListItem | null> {
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("notifications")
+    .select(
+      `id, notification_type, title, message, module, priority, employee_id, user_id,
+       notification_status, action_url, created_at, read_at, archived_at,
+       employees:employee_id (first_name, last_name)`,
+    )
+    .eq("id", notificationId)
+    .eq("organization_id", profile.employee.organizationId)
+    .eq("user_id", profile.userId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return mapNotificationRow(data as NotificationRow);
+}
+
 export async function listNotificationHistory(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -266,8 +290,8 @@ export async function getNotificationBellData(
       .select("id, title, message, module, priority, notification_status, action_url, created_at")
       .eq("organization_id", profile.employee.organizationId)
       .eq("user_id", profile.userId)
+      .eq("notification_status", "unread")
       .is("deleted_at", null)
-      .neq("notification_status", "archived")
       .order("created_at", { ascending: false })
       .limit(8),
     getNotificationUserPreferences(supabase, profile),

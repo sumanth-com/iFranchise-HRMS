@@ -22,6 +22,7 @@ export const MANAGER_ROUTES = {
   notificationsCenter: "/manager/notifications/center",
   notificationsHistory: "/manager/notifications/history",
   settings: "/manager/settings",
+  profile: "/manager/profile",
 } as const;
 
 export const MANAGER_QUICK_ACTIONS = [

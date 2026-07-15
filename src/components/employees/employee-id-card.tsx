@@ -145,11 +145,16 @@ export function EmployeeIdCard({
   };
 
   return (
-    <div className={cn("relative mx-auto w-full max-w-[19rem]", className)}>
-      <div className="relative [perspective:1400px]">
+    <div
+      className={cn(
+        "relative mx-auto h-[30rem] w-full max-w-[19rem]",
+        className,
+      )}
+    >
+      <div className="relative h-full [perspective:1400px]">
         <div
           className={cn(
-            "relative h-[32rem] w-full transition-transform duration-500 ease-out [transform-style:preserve-3d]",
+            "relative h-full w-full transition-transform duration-500 ease-out [transform-style:preserve-3d]",
             flipped && "[transform:rotateY(180deg)]",
           )}
         >

@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Settings,
   Target,
+  User,
   Users,
 } from "lucide-react";
 
@@ -18,6 +19,11 @@ export const managerNavItems: NavigationItem[] = [
     title: "Dashboard",
     href: MANAGER_ROUTES.home,
     icon: LayoutDashboard,
+  },
+  {
+    title: "My Profile",
+    href: MANAGER_ROUTES.profile,
+    icon: User,
   },
   {
     title: "My Team",

@@ -39,7 +39,7 @@ export function UserProfileDropdown() {
   const primaryRole = roles[0]?.name ?? "User";
   const isManagerPortal = portalHome.startsWith("/manager");
   const profileHref = isManagerPortal
-    ? MANAGER_ROUTES.teamMember(employee)
+    ? MANAGER_ROUTES.profile
     : EMPLOYEE_ROUTES.detail(employee);
   const canOpenCompanySettings = canViewCompanySettings(permissionCodes);
 
@@ -55,11 +55,11 @@ export function UserProfileDropdown() {
           render={
             <Button
               variant="ghost"
-              className="h-9 gap-2 rounded-full px-1.5 pr-2.5"
+              className="h-9 gap-2 rounded-xl px-1.5 pr-2.5"
               aria-label={`${displayName} account menu`}
             >
-              <Avatar className="size-8">
-                <AvatarFallback>
+              <Avatar className="h-8 w-9 rounded-lg after:rounded-lg">
+                <AvatarFallback className="rounded-lg bg-neutral-900 text-[0.7rem] font-semibold tracking-wide text-white">
                   {getInitials(employee.firstName, employee.lastName)}
                 </AvatarFallback>
               </Avatar>
