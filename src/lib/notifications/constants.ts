@@ -2,6 +2,7 @@ import { hasAnyPermission } from "@/lib/permissions/utils";
 import type { NotificationModule, NotificationPriority } from "@/types/notifications";
 import type { NotificationSoundTone } from "@/types/notifications";
 
+import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 
 export const NOTIFICATIONS_ROUTES = {
@@ -18,6 +19,13 @@ export const MANAGER_NOTIFICATIONS_ROUTES = {
   center: MANAGER_ROUTES.notificationsCenter,
   history: MANAGER_ROUTES.notificationsHistory,
   preferences: `${MANAGER_ROUTES.settings}#notifications`,
+} as const;
+
+export const CEO_NOTIFICATIONS_ROUTES = {
+  dashboard: CEO_ROUTES.notifications,
+  center: CEO_ROUTES.notifications,
+  history: CEO_ROUTES.notifications,
+  preferences: `${CEO_ROUTES.profile}#notifications`,
 } as const;
 
 export type NotificationRouteSet = {
@@ -38,6 +46,17 @@ export function getNotificationsRoutes(portalHome: string): NotificationRouteSet
       templates: NOTIFICATIONS_ROUTES.templates,
       settings: NOTIFICATIONS_ROUTES.settings,
       preferences: MANAGER_NOTIFICATIONS_ROUTES.preferences,
+    };
+  }
+
+  if (portalHome.startsWith("/ceo")) {
+    return {
+      dashboard: CEO_NOTIFICATIONS_ROUTES.dashboard,
+      center: CEO_NOTIFICATIONS_ROUTES.center,
+      history: CEO_NOTIFICATIONS_ROUTES.history,
+      templates: NOTIFICATIONS_ROUTES.templates,
+      settings: NOTIFICATIONS_ROUTES.settings,
+      preferences: CEO_NOTIFICATIONS_ROUTES.preferences,
     };
   }
 

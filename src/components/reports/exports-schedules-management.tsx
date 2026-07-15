@@ -40,6 +40,7 @@ import { reportScheduleSchema } from "@/lib/validations/reports";
 import type {
   ReportExportFormat,
   ReportKey,
+  ReportScheduleFrequency,
   ReportScheduleItem,
   ReportScheduleRunItem,
 } from "@/types/reports";
@@ -47,7 +48,7 @@ import type {
 type ScheduleFormInput = {
   name: string;
   reportKey: ReportKey;
-  frequency: "daily" | "weekly" | "monthly";
+  frequency: ReportScheduleFrequency;
   exportFormat: ReportExportFormat;
   recipients: string;
   isEnabled: boolean;
@@ -109,6 +110,8 @@ export function ExportsSchedulesManagement({
     { value: "daily", label: "Daily" },
     { value: "weekly", label: "Weekly" },
     { value: "monthly", label: "Monthly" },
+    { value: "quarterly", label: "Quarterly" },
+    { value: "yearly", label: "Yearly" },
   ];
   const formatItems = [
     { value: "csv", label: "CSV" },

@@ -17,6 +17,7 @@ import { getAuthenticatedRedirectPath } from "@/lib/auth/redirect";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
 import { recordEmployeeSuccessfulLogin } from "@/lib/employees/services/employee-account";
+import { recordUserLoginSession } from "@/lib/ceo/services/ceo-profile-queries";
 import { siteConfig } from "@/config/site";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -114,6 +115,22 @@ export async function loginAction(
     }
 
     const ctx = await getRequestAuditContext();
+
+    try {
+      await recordUserLoginSession(supabase, {
+        organizationId: profileResult.profile.employee.organizationId,
+        userId: authData.user.id,
+        employeeId: profileResult.profile.employee.id,
+        deviceType: ctx.deviceType,
+        browser: ctx.browser,
+        operatingSystem: ctx.operatingSystem,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+    } catch (sessionError) {
+      console.error("[loginAction] Failed to record login session:", sessionError);
+    }
+
     await writeApplicationAudit(supabase, {
       organizationId: profileResult.profile.employee.organizationId,
       module: "dashboard",

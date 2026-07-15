@@ -224,6 +224,42 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
     return items;
   }
 
+  if (segments[0] === "ceo") {
+    const items: BreadcrumbItemConfig[] = [
+      { label: "Dashboard", href: "/ceo" },
+    ];
+
+    const sectionLabels: Record<string, string> = {
+      organization: "Organization",
+      recruitment: "Recruitment",
+      performance: "Performance",
+      payroll: "Payroll",
+      attendance: "Attendance",
+      approvals: "Approvals",
+      analytics: "Analytics",
+      reports: "Reports",
+      notifications: "Notifications",
+      profile: "Profile & Settings",
+    };
+
+    if (segments[1]) {
+      const sectionLabel = sectionLabels[segments[1]] ?? formatSegment(segments[1]);
+      items.push({
+        label: sectionLabel,
+        href: `/ceo/${segments[1]}`,
+      });
+    }
+
+    if (segments[1] === "notifications" && segments[2]) {
+      items.push({
+        label: formatSegment(segments[2]),
+        href: pathname,
+      });
+    }
+
+    return items;
+  }
+
   return segments.map((segment, index) => ({
     label: formatSegment(segment),
     href: `/${segments.slice(0, index + 1).join("/")}`,

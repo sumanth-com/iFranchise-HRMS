@@ -1,5 +1,10 @@
 export type ReportExportFormat = "csv" | "excel" | "pdf";
-export type ReportScheduleFrequency = "daily" | "weekly" | "monthly";
+export type ReportScheduleFrequency =
+  | "daily"
+  | "weekly"
+  | "monthly"
+  | "quarterly"
+  | "yearly";
 
 export type ReportModuleKey =
   | "hr"

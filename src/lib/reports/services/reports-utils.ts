@@ -197,12 +197,19 @@ export function defaultDateRange(days = 30) {
   };
 }
 
-export function computeNextRunAt(frequency: "daily" | "weekly" | "monthly", from = new Date()) {
+export function computeNextRunAt(
+  frequency: "daily" | "weekly" | "monthly" | "quarterly" | "yearly",
+  from = new Date(),
+) {
   const next = new Date(from);
   if (frequency === "daily") {
     next.setDate(next.getDate() + 1);
   } else if (frequency === "weekly") {
     next.setDate(next.getDate() + 7);
+  } else if (frequency === "quarterly") {
+    next.setMonth(next.getMonth() + 3);
+  } else if (frequency === "yearly") {
+    next.setFullYear(next.getFullYear() + 1);
   } else {
     next.setMonth(next.getMonth() + 1);
   }

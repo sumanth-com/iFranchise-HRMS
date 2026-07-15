@@ -24,7 +24,7 @@ export const reportFiltersSchema = z.object({
 export const reportScheduleSchema = z.object({
   name: z.string().trim().min(2).max(120),
   reportKey: z.enum(reportKeys),
-  frequency: z.enum(["daily", "weekly", "monthly"]),
+  frequency: z.enum(["daily", "weekly", "monthly", "quarterly", "yearly"]),
   exportFormat: z.enum(["csv", "excel", "pdf"]),
   recipients: z
     .array(z.string().email())

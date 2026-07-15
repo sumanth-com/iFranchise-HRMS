@@ -15,8 +15,11 @@ import { toast } from "sonner";
 import { LOGOUT_BROADCAST_KEY, AUTH_ROUTES } from "@/lib/auth/constants";
 import { getAuthErrorMessage } from "@/lib/auth/errors";
 import { getSidebarNavigation } from "@/lib/auth/navigation";
+import { ceoNavItems } from "@/config/ceo-navigation";
 import { mainNavItems, type NavItem } from "@/config/navigation";
 import { managerNavItems } from "@/config/manager-navigation";
+import type { NavigationItem } from "@/lib/auth/navigation";
+import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -45,11 +48,11 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export type PortalVariant = "hr" | "manager";
+export type PortalVariant = "hr" | "manager" | "ceo";
 
 const PORTAL_CONFIG: Record<
   PortalVariant,
-  { navItems: typeof mainNavItems; home: string; label: string }
+  { navItems: NavigationItem[]; home: string; label: string }
 > = {
   hr: {
     navItems: mainNavItems,
@@ -60,6 +63,11 @@ const PORTAL_CONFIG: Record<
     navItems: managerNavItems,
     home: MANAGER_ROUTES.home,
     label: "Manager Portal",
+  },
+  ceo: {
+    navItems: ceoNavItems,
+    home: CEO_ROUTES.home,
+    label: "CEO Portal",
   },
 };
 
