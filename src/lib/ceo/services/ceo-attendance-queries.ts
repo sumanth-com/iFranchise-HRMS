@@ -108,7 +108,7 @@ async function loadScopedEmployees(
       `id, employee_code, first_name, last_name, email, department_id, designation_id,
       reporting_manager_id, employment_type_id, branch_id, employment_status,
       departments:department_id(id, name, department_head_id),
-      designations:designation_id(title),
+      designations:designation_id(title, code),
       managers:reporting_manager_id(first_name, last_name),
       branches:branch_id(id, name),
       employee_profiles(profile_image_storage_path)`,
@@ -134,7 +134,7 @@ async function loadScopedEmployees(
 
   const { data, error } = await query.order("first_name");
   if (error) throw new Error(error.message);
-  return (data ?? []) as LooseRow[];
+  return filterAttendanceWorkforce((data ?? []) as LooseRow[]);
 }
 
 async function loadAttendanceRows(
@@ -168,6 +168,32 @@ function isWorking(status: AttendanceStatus) {
   return WORKING_STATUSES.includes(status);
 }
 
+const EXECUTIVE_DESIGNATION_CODES = new Set([
+  "CEO",
+  "CO_FOUNDER",
+  "COFOUNDER",
+  "CHIEF_EXECUTIVE_OFFICER",
+]);
+
+function isExecutiveLeadershipEmployee(row: LooseRow) {
+  const designation = unwrap(row.designations);
+  const title = String(designation?.title ?? "").toLowerCase();
+  const code = String(designation?.code ?? "").toUpperCase();
+
+  if (EXECUTIVE_DESIGNATION_CODES.has(code)) return true;
+
+  return (
+    title.includes("chief executive") ||
+    title.includes("co-founder") ||
+    title.includes("co founder") ||
+    title.includes("cofounder")
+  );
+}
+
+function filterAttendanceWorkforce(employees: LooseRow[]) {
+  return employees.filter((row) => !isExecutiveLeadershipEmployee(row));
+}
+
 export async function getCeoAttendanceFilterLookups(
   supabase: AuthSupabaseClient,
   organizationId: string,
@@ -175,7 +201,9 @@ export async function getCeoAttendanceFilterLookups(
   const [employeesRes, departments, managers, branches, employmentTypes, reporting] =
     await Promise.all([
     fromHrms(supabase, "employees")
-      .select("id, first_name, last_name, employee_code")
+      .select(
+        "id, first_name, last_name, employee_code, designations:designation_id(title, code)",
+      )
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
       .order("first_name"),
@@ -224,10 +252,12 @@ export async function getCeoAttendanceFilterLookups(
   );
 
   return {
-    employees: ((employeesRes.data ?? []) as LooseRow[]).map((row) => ({
-      id: row.id,
-      label: `${row.first_name} ${row.last_name} · ${row.employee_code}`,
-    })),
+    employees: filterAttendanceWorkforce((employeesRes.data ?? []) as LooseRow[]).map(
+      (row) => ({
+        id: row.id,
+        label: `${row.first_name} ${row.last_name} · ${row.employee_code}`,
+      }),
+    ),
     departments: ((departments.data ?? []) as LooseRow[]).map((row) => ({
       id: row.id,
       label: row.name,
@@ -1052,7 +1082,7 @@ export async function getCeoAttendanceEmployeeDetail(
     .select(
       `id, employee_code, first_name, last_name, email,
       departments:department_id(name),
-      designations:designation_id(title),
+      designations:designation_id(title, code),
       managers:reporting_manager_id(first_name, last_name),
       employee_profiles(profile_image_storage_path)`,
     )

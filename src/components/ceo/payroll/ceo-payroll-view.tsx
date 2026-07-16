@@ -1,25 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
 
 import {
   CeoBackToDashboard,
   CeoModulePageHeader,
 } from "@/components/ceo/ceo-module-primitives";
 import { CeoPayrollAnalytics } from "@/components/ceo/payroll/ceo-payroll-analytics";
-import { CeoPayrollDepartmentsTable } from "@/components/ceo/payroll/ceo-payroll-departments-table";
 import { CeoPayrollDrawer } from "@/components/ceo/payroll/ceo-payroll-drawer";
 import { CeoPayrollEmployeesTable } from "@/components/ceo/payroll/ceo-payroll-employees-table";
 import { CeoPayrollFilters } from "@/components/ceo/payroll/ceo-payroll-filters";
-import { CeoPayrollHistoryTable } from "@/components/ceo/payroll/ceo-payroll-history-table";
-import { CeoPayrollInsights } from "@/components/ceo/payroll/ceo-payroll-insights";
-import { CeoPayrollOverviewPanel } from "@/components/ceo/payroll/ceo-payroll-overview";
+import { CeoPayrollPanels } from "@/components/ceo/payroll/ceo-payroll-panels";
 import { CeoPayrollSummary } from "@/components/ceo/payroll/ceo-payroll-summary";
 import {
   fetchCeoPayrollAnalyticsAction,
   fetchCeoPayrollDepartmentsAction,
   fetchCeoPayrollEmployeesAction,
-  fetchCeoPayrollHistoryAction,
   fetchCeoPayrollInsightsAction,
   fetchCeoPayrollKpisAction,
   fetchCeoPayrollOverviewAction,
@@ -27,7 +23,6 @@ import {
 } from "@/lib/ceo/actions/ceo-payroll-actions";
 import type {
   CeoPayrollEmployeeRow,
-  CeoPayrollHistoryRow,
   CeoPayrollListParams,
   CeoPayrollPageData,
 } from "@/types/ceo-payroll";
@@ -52,7 +47,6 @@ export function CeoPayrollView({
   employees: initialEmployees,
   analytics: initialAnalytics,
   departments: initialDepartments,
-  history: initialHistory,
   insights: initialInsights,
   lookups,
   initialFilters,
@@ -62,7 +56,6 @@ export function CeoPayrollView({
   const [employees, setEmployees] = useState(initialEmployees);
   const [analytics, setAnalytics] = useState(initialAnalytics);
   const [departments, setDepartments] = useState(initialDepartments);
-  const [history, setHistory] = useState(initialHistory);
   const [insights, setInsights] = useState(initialInsights);
   const [filters, setFilters] = useState<CeoPayrollListParams>(initialFilters);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
@@ -71,13 +64,6 @@ export function CeoPayrollView({
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const searchTimerRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (searchTimerRef.current) window.clearTimeout(searchTimerRef.current);
-    };
-  }, []);
 
   const refreshScopedData = useCallback((nextFilters: CeoPayrollListParams) => {
     startTransition(async () => {
@@ -87,7 +73,6 @@ export function CeoPayrollView({
         nextEmployees,
         nextAnalytics,
         nextDepartments,
-        nextHistory,
         nextInsights,
       ] = await Promise.all([
         fetchCeoPayrollKpisAction(nextFilters),
@@ -95,7 +80,6 @@ export function CeoPayrollView({
         fetchCeoPayrollEmployeesAction(nextFilters),
         fetchCeoPayrollAnalyticsAction(nextFilters),
         fetchCeoPayrollDepartmentsAction(nextFilters),
-        fetchCeoPayrollHistoryAction(nextFilters),
         fetchCeoPayrollInsightsAction(nextFilters),
       ]);
       setKpis(nextKpis);
@@ -103,7 +87,6 @@ export function CeoPayrollView({
       setEmployees(nextEmployees);
       setAnalytics(nextAnalytics);
       setDepartments(nextDepartments);
-      setHistory(nextHistory);
       setInsights(nextInsights);
     });
   }, []);
@@ -111,15 +94,6 @@ export function CeoPayrollView({
   function updateFilters(next: Partial<CeoPayrollListParams>) {
     const merged = { ...filters, ...next };
     setFilters(merged);
-
-    if ("search" in next) {
-      if (searchTimerRef.current) window.clearTimeout(searchTimerRef.current);
-      searchTimerRef.current = window.setTimeout(() => {
-        refreshScopedData(merged);
-      }, 250);
-      return;
-    }
-
     refreshScopedData(merged);
   }
 
@@ -133,7 +107,6 @@ export function CeoPayrollView({
       setEmployees(data.employees);
       setAnalytics(data.analytics);
       setDepartments(data.departments);
-      setHistory(data.history);
       setInsights(data.insights);
     });
   }
@@ -144,16 +117,15 @@ export function CeoPayrollView({
     setDrawerOpen(true);
   }
 
-  function openHistory(row: CeoPayrollHistoryRow) {
-    updateFilters({
-      month: row.month,
-      year: row.year,
-      page: 1,
-    });
-  }
+  const hasScopedFilters = Boolean(
+    filters.employeeId ||
+      filters.departmentId ||
+      filters.employmentTypeId ||
+      filters.payrollStatus,
+  );
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5">
+    <div className="flex w-full min-h-0 flex-1 flex-col gap-3 overflow-y-auto scroll-smooth p-3 pb-8 md:gap-4 md:p-4 md:pb-10 lg:p-5">
       <CeoBackToDashboard />
       <CeoModulePageHeader
         title="Payroll"
@@ -170,29 +142,26 @@ export function CeoPayrollView({
         disabled={isPending}
       />
 
-      <CeoPayrollOverviewPanel overview={overview} />
-
-      <CeoPayrollEmployeesTable
-        employees={employees.data}
-        total={employees.total}
-        page={employees.page}
-        pageSize={employees.pageSize}
-        isLoading={isPending}
-        onPageChange={(page) => updateFilters({ page })}
-        onView={openEmployee}
+      <CeoPayrollPanels
+        departments={departments}
+        overview={overview}
+        analytics={analytics}
+        insights={insights}
       />
 
       <CeoPayrollAnalytics analytics={analytics} />
 
-      <CeoPayrollDepartmentsTable departments={departments} isLoading={isPending} />
-
-      <CeoPayrollHistoryTable
-        history={history}
-        isLoading={isPending}
-        onView={openHistory}
-      />
-
-      <CeoPayrollInsights insights={insights} />
+      {hasScopedFilters ? (
+        <CeoPayrollEmployeesTable
+          employees={employees.data}
+          total={employees.total}
+          page={employees.page}
+          pageSize={employees.pageSize}
+          isLoading={isPending}
+          onPageChange={(page) => updateFilters({ page })}
+          onView={openEmployee}
+        />
+      ) : null}
 
       <CeoPayrollDrawer
         employeeId={selectedEmployeeId}

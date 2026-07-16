@@ -6,19 +6,12 @@ import {
   CeoBackToDashboard,
   CeoModulePageHeader,
 } from "@/components/ceo/ceo-module-primitives";
-import { CeoAttendanceAnalytics } from "@/components/ceo/attendance/ceo-attendance-analytics";
-import { CeoAttendanceCalendar } from "@/components/ceo/attendance/ceo-attendance-calendar";
-import { CeoAttendanceDepartmentsTable } from "@/components/ceo/attendance/ceo-attendance-departments-table";
 import { CeoAttendanceDrawer } from "@/components/ceo/attendance/ceo-attendance-drawer";
-import { CeoAttendanceEmployeesTable } from "@/components/ceo/attendance/ceo-attendance-employees-table";
-import { CeoAttendanceExceptions } from "@/components/ceo/attendance/ceo-attendance-exceptions";
 import { CeoAttendanceFilters } from "@/components/ceo/attendance/ceo-attendance-filters";
+import { CeoAttendanceInsights } from "@/components/ceo/attendance/ceo-attendance-insights";
 import { CeoAttendanceOverviewPanel } from "@/components/ceo/attendance/ceo-attendance-overview";
 import { CeoAttendanceSummary } from "@/components/ceo/attendance/ceo-attendance-summary";
 import {
-  fetchCeoAttendanceAnalyticsAction,
-  fetchCeoAttendanceCalendarAction,
-  fetchCeoAttendanceDepartmentsAction,
   fetchCeoAttendanceEmployeesAction,
   fetchCeoAttendanceExceptionsAction,
   fetchCeoAttendanceKpisAction,
@@ -40,7 +33,7 @@ function defaultFilters(): CeoAttendanceListParams {
   const [year, month] = today.split("-").map(Number);
   return {
     page: 1,
-    pageSize: 10,
+    pageSize: 15,
     month,
     year,
   };
@@ -49,23 +42,22 @@ function defaultFilters(): CeoAttendanceListParams {
 export function CeoAttendanceView({
   kpis: initialKpis,
   overview: initialOverview,
-  departments: initialDepartments,
   employees: initialEmployees,
-  analytics: initialAnalytics,
   exceptions: initialExceptions,
-  calendar: initialCalendar,
   lookups,
   initialFilters,
 }: CeoAttendanceViewProps) {
   const [kpis, setKpis] = useState(initialKpis);
   const [overview, setOverview] = useState(initialOverview);
-  const [departments, setDepartments] = useState(initialDepartments);
   const [employees, setEmployees] = useState(initialEmployees);
-  const [analytics, setAnalytics] = useState(initialAnalytics);
   const [exceptions, setExceptions] = useState(initialExceptions);
-  const [calendar, setCalendar] = useState(initialCalendar);
   const [filters, setFilters] = useState<CeoAttendanceListParams>(initialFilters);
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+  const [overviewEmployeeId, setOverviewEmployeeId] = useState<string | null>(
+    initialFilters.employeeId ?? null,
+  );
+  const [drawerEmployeeId, setDrawerEmployeeId] = useState<string | null>(null);
+  const [drawerMonth, setDrawerMonth] = useState(initialFilters.month);
+  const [drawerYear, setDrawerYear] = useState(initialFilters.year);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const searchTimerRef = useRef<number | null>(null);
@@ -76,32 +68,32 @@ export function CeoAttendanceView({
     };
   }, []);
 
+  useEffect(() => {
+    setOverviewEmployeeId(filters.employeeId ?? null);
+  }, [filters.employeeId]);
+
+  useEffect(() => {
+    if (!overviewEmployeeId) return;
+    const stillVisible = employees.data.some(
+      (employee) => employee.employeeId === overviewEmployeeId,
+    );
+    if (!stillVisible && !isPending) {
+      setOverviewEmployeeId(null);
+    }
+  }, [employees.data, overviewEmployeeId, isPending]);
+
   const refreshScopedData = useCallback((nextFilters: CeoAttendanceListParams) => {
     startTransition(async () => {
-      const [
-        nextKpis,
-        nextOverview,
-        nextDepartments,
-        nextEmployees,
-        nextAnalytics,
-        nextExceptions,
-        nextCalendar,
-      ] = await Promise.all([
+      const [nextKpis, nextOverview, nextEmployees, nextExceptions] = await Promise.all([
         fetchCeoAttendanceKpisAction(nextFilters),
         fetchCeoAttendanceOverviewAction(nextFilters),
-        fetchCeoAttendanceDepartmentsAction(nextFilters),
         fetchCeoAttendanceEmployeesAction(nextFilters),
-        fetchCeoAttendanceAnalyticsAction(nextFilters),
         fetchCeoAttendanceExceptionsAction(nextFilters),
-        fetchCeoAttendanceCalendarAction(nextFilters),
       ]);
       setKpis(nextKpis);
       setOverview(nextOverview);
-      setDepartments(nextDepartments);
       setEmployees(nextEmployees);
-      setAnalytics(nextAnalytics);
       setExceptions(nextExceptions);
-      setCalendar(nextCalendar);
     });
   }, []);
 
@@ -123,25 +115,36 @@ export function CeoAttendanceView({
   function resetFilters() {
     const next = defaultFilters();
     setFilters(next);
+    setOverviewEmployeeId(null);
     startTransition(async () => {
       const data = await getCeoAttendanceModuleData(next);
       setKpis(data.kpis);
       setOverview(data.overview);
-      setDepartments(data.departments);
       setEmployees(data.employees);
-      setAnalytics(data.analytics);
       setExceptions(data.exceptions);
-      setCalendar(data.calendar);
     });
   }
 
-  function openEmployee(employeeId: string) {
-    setSelectedEmployeeId(employeeId);
+  function openDrawer(employeeId: string, month?: number, year?: number) {
+    setDrawerEmployeeId(employeeId);
+    setDrawerMonth(month ?? filters.month);
+    setDrawerYear(year ?? filters.year);
     setDrawerOpen(true);
   }
 
+  function selectOverviewEmployee(employeeId: string) {
+    setOverviewEmployeeId(employeeId);
+  }
+
+  function selectCompanyOverview() {
+    setOverviewEmployeeId(null);
+    if (filters.employeeId) {
+      updateFilters({ employeeId: undefined, page: 1 });
+    }
+  }
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5">
+    <div className="flex w-full min-h-0 flex-1 flex-col gap-3 overflow-y-auto scroll-smooth p-3 pb-8 md:gap-4 md:p-4 md:pb-10 lg:p-5">
       <CeoBackToDashboard />
       <CeoModulePageHeader
         title="Attendance"
@@ -158,38 +161,39 @@ export function CeoAttendanceView({
         disabled={isPending}
       />
 
-      <CeoAttendanceOverviewPanel overview={overview} />
-
-      <CeoAttendanceDepartmentsTable
-        departments={departments}
-        isLoading={isPending}
-        onView={(departmentId) => updateFilters({ departmentId, page: 1 })}
-      />
-
-      <CeoAttendanceEmployeesTable
+      <CeoAttendanceOverviewPanel
+        overview={overview}
         employees={employees.data}
         total={employees.total}
         page={employees.page}
         pageSize={employees.pageSize}
+        selectedEmployeeId={overviewEmployeeId}
+        periodFilters={{
+          month: filters.month,
+          year: filters.year,
+          departmentId: filters.departmentId,
+          attendanceStatus: filters.attendanceStatus,
+          employeeId: filters.employeeId,
+        }}
         isLoading={isPending}
+        onSelectEmployee={selectOverviewEmployee}
+        onSelectCompanyOverview={selectCompanyOverview}
         onPageChange={(page) => updateFilters({ page })}
-        onView={openEmployee}
+        onViewDetail={openDrawer}
       />
 
-      <CeoAttendanceAnalytics analytics={analytics} />
-
-      <CeoAttendanceExceptions
+      <CeoAttendanceInsights
+        kpis={kpis}
+        overview={overview}
         exceptions={exceptions}
-        onSelectEmployee={openEmployee}
-        onSelectDepartment={(departmentId) => updateFilters({ departmentId, page: 1 })}
+        initialMonth={filters.month}
+        initialYear={filters.year}
       />
-
-      <CeoAttendanceCalendar calendar={calendar} />
 
       <CeoAttendanceDrawer
-        employeeId={selectedEmployeeId}
-        month={filters.month}
-        year={filters.year}
+        employeeId={drawerEmployeeId}
+        month={drawerMonth}
+        year={drawerYear}
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
       />

@@ -3,47 +3,43 @@ import {
   formatCeoCurrency,
 } from "@/components/ceo/ceo-module-primitives";
 import type { CeoPayrollKpis } from "@/types/ceo-payroll";
+import { cn } from "@/lib/utils";
 
 export function CeoPayrollSummary({ kpis }: { kpis: CeoPayrollKpis }) {
   return (
     <section
       aria-label="Payroll KPIs"
-      className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5"
+      className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
     >
       <CeoStatCard
-        label="Total Payroll Cost"
+        label="Month Payroll"
+        value={formatCeoCurrency(kpis.currentMonthPayroll)}
+      />
+      <CeoStatCard
+        label="Total Cost"
         value={formatCeoCurrency(kpis.totalPayrollCost)}
       />
       <CeoStatCard
-        label="Current Month Payroll"
-        value={formatCeoCurrency(kpis.currentMonthPayroll)}
-      />
-      <CeoStatCard label="Payroll Processed" value={String(kpis.payrollProcessed)} />
-      <CeoStatCard
-        label="Pending Payroll"
+        label="Pending"
         value={String(kpis.pendingPayroll)}
         accent={kpis.pendingPayroll > 0 ? "text-amber-600 dark:text-amber-400" : undefined}
       />
+      <CeoStatCard label="Benefits" value={formatCeoCurrency(kpis.benefitsCost)} />
       <CeoStatCard
-        label="Average Employee Salary"
+        label="Avg Salary"
         value={formatCeoCurrency(kpis.averageEmployeeSalary)}
       />
-      <CeoStatCard label="Benefits Cost" value={formatCeoCurrency(kpis.benefitsCost)} />
-      <CeoStatCard label="Bonus Cost" value={formatCeoCurrency(kpis.bonusCost)} />
-      <CeoStatCard label="Deductions" value={formatCeoCurrency(kpis.deductions)} />
       <CeoStatCard
-        label="Upcoming Payroll Date"
-        value={
-          kpis.upcomingPayrollDate
-            ? new Date(kpis.upcomingPayrollDate).toLocaleDateString("en-IN", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              })
-            : "—"
-        }
+        label="Status"
+        value={kpis.payrollStatusLabel}
+        accent={cn(
+          kpis.payrollStatus === "draft" || kpis.payrollStatus === "processing"
+            ? "text-amber-700 dark:text-amber-400"
+            : kpis.payrollStatus === "paid" || kpis.payrollStatus === "approved"
+              ? "text-emerald-600 dark:text-emerald-400"
+              : undefined,
+        )}
       />
-      <CeoStatCard label="Payroll Status" value={kpis.payrollStatusLabel} />
     </section>
   );
 }

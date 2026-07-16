@@ -139,8 +139,12 @@ export function CeoPayrollEmployeesTable({
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
+  if (!isLoading && employees.length === 0 && total === 0) {
+    return null;
+  }
+
   return (
-    <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
+    <section className="w-full overflow-hidden rounded-xl border bg-card shadow-sm">
       <div className="border-b px-4 py-3">
         <h2 className="text-sm font-semibold">Payroll Table</h2>
         <p className="text-xs text-muted-foreground">
