@@ -25,6 +25,7 @@ export default async function CeoPerformancePage({
     page: firstString(rawParams.page),
     pageSize: firstString(rawParams.pageSize),
     search: firstString(rawParams.search),
+    employeeId: firstString(rawParams.employeeId),
     departmentId: firstString(rawParams.departmentId),
     managerId: firstString(rawParams.managerId),
     cycleId: firstString(rawParams.cycleId),

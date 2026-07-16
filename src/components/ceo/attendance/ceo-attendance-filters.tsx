@@ -1,9 +1,8 @@
 "use client";
 
-import { RotateCcw, Search } from "lucide-react";
+import { RotateCcw, Users } from "lucide-react";
 
 import { Button } from "@/components/common/button";
-import { Input } from "@/components/common/input";
 import {
   Select,
   SelectContent,
@@ -17,6 +16,7 @@ import {
   filterSelectLabel,
   filterSelectLabelFromMap,
   MANAGER_FILTER_SELECT_CONTENT_CLASS,
+  MANAGER_TEAM_MEMBER_SELECT_CONTENT_CLASS,
 } from "@/lib/manager/filter-select";
 import type {
   CeoAttendanceFilterLookups,
@@ -30,6 +30,10 @@ type CeoAttendanceFiltersProps = {
   onReset: () => void;
   disabled?: boolean;
 };
+
+const EMPLOYEE_LABEL = "All Employees";
+const DEPARTMENT_LABEL = "All Departments";
+const STATUS_LABEL = "Any Status";
 
 const MONTH_LABELS: Record<string, string> = {
   "1": "January",
@@ -54,43 +58,52 @@ export function CeoAttendanceFilters({
   disabled,
 }: CeoAttendanceFiltersProps) {
   const now = new Date();
+  const employeeValue = filters.employeeId ?? FILTER_ANY_VALUE;
   const monthValue = String(filters.month ?? now.getMonth() + 1);
   const departmentValue = filters.departmentId ?? FILTER_ANY_VALUE;
-  const managerValue = filters.managerId ?? FILTER_ANY_VALUE;
-  const locationValue = filters.branchId ?? FILTER_ANY_VALUE;
-  const employmentTypeValue = filters.employmentTypeId ?? FILTER_ANY_VALUE;
   const statusValue = filters.attendanceStatus ?? FILTER_ANY_VALUE;
 
+  const employeeOptions = (lookups.employees ?? []).map((item) => ({
+    value: item.id,
+    label: item.label,
+  }));
   const departmentOptions = lookups.departments.map((item) => ({
-    value: item.id,
-    label: item.label,
-  }));
-  const managerOptions = lookups.managers.map((item) => ({
-    value: item.id,
-    label: item.label,
-  }));
-  const locationOptions = lookups.locations.map((item) => ({
-    value: item.id,
-    label: item.label,
-  }));
-  const employmentTypeOptions = lookups.employmentTypes.map((item) => ({
     value: item.id,
     label: item.label,
   }));
 
   return (
-    <section className="rounded-xl border bg-card p-4 shadow-sm">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <div className="relative xl:col-span-2">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={filters.search ?? ""}
-            onChange={(event) => onChange({ search: event.target.value, page: 1 })}
-            placeholder="Search employee..."
-            className="pl-9"
-            disabled={disabled}
-          />
-        </div>
+    <section className="w-full rounded-xl border bg-card p-3 shadow-sm sm:p-4">
+      <div className="flex w-full flex-wrap items-center gap-2 lg:flex-nowrap lg:gap-3">
+        <Select
+          value={employeeValue}
+          onValueChange={(value) =>
+            onChange({
+              employeeId: !value || value === FILTER_ANY_VALUE ? undefined : value,
+              search: undefined,
+              page: 1,
+            })
+          }
+          disabled={disabled}
+        >
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[11rem]">
+            <Users className="mr-2 size-4 shrink-0 text-muted-foreground" />
+            <SelectValue placeholder={EMPLOYEE_LABEL}>
+              {filterSelectLabel(employeeValue, EMPLOYEE_LABEL, employeeOptions)}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent
+            alignItemWithTrigger={false}
+            className={MANAGER_TEAM_MEMBER_SELECT_CONTENT_CLASS}
+          >
+            <SelectItem value={FILTER_ANY_VALUE}>{EMPLOYEE_LABEL}</SelectItem>
+            {employeeOptions.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         <Select
           value={departmentValue}
@@ -102,105 +115,17 @@ export function CeoAttendanceFilters({
           }
           disabled={disabled}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Every department">
-              {filterSelectLabel(departmentValue, "Every department", departmentOptions)}
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[10rem]">
+            <SelectValue placeholder={DEPARTMENT_LABEL}>
+              {filterSelectLabel(departmentValue, DEPARTMENT_LABEL, departmentOptions)}
             </SelectValue>
           </SelectTrigger>
           <SelectContent
             alignItemWithTrigger={false}
             className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
           >
-            <SelectItem value={FILTER_ANY_VALUE}>Every department</SelectItem>
+            <SelectItem value={FILTER_ANY_VALUE}>{DEPARTMENT_LABEL}</SelectItem>
             {departmentOptions.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={managerValue}
-          onValueChange={(value) =>
-            onChange({
-              managerId: !value || value === FILTER_ANY_VALUE ? undefined : value,
-              page: 1,
-            })
-          }
-          disabled={disabled}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Every manager">
-              {filterSelectLabel(managerValue, "Every manager", managerOptions)}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent
-            alignItemWithTrigger={false}
-            className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
-          >
-            <SelectItem value={FILTER_ANY_VALUE}>Every manager</SelectItem>
-            {managerOptions.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={locationValue}
-          onValueChange={(value) =>
-            onChange({
-              branchId: !value || value === FILTER_ANY_VALUE ? undefined : value,
-              page: 1,
-            })
-          }
-          disabled={disabled}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Every location">
-              {filterSelectLabel(locationValue, "Every location", locationOptions)}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent
-            alignItemWithTrigger={false}
-            className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
-          >
-            <SelectItem value={FILTER_ANY_VALUE}>Every location</SelectItem>
-            {locationOptions.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={employmentTypeValue}
-          onValueChange={(value) =>
-            onChange({
-              employmentTypeId: !value || value === FILTER_ANY_VALUE ? undefined : value,
-              page: 1,
-            })
-          }
-          disabled={disabled}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Every employment type">
-              {filterSelectLabel(
-                employmentTypeValue,
-                "Every employment type",
-                employmentTypeOptions,
-              )}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent
-            alignItemWithTrigger={false}
-            className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
-          >
-            <SelectItem value={FILTER_ANY_VALUE}>Every employment type</SelectItem>
-            {employmentTypeOptions.map((item) => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}
               </SelectItem>
@@ -221,11 +146,11 @@ export function CeoAttendanceFilters({
           }
           disabled={disabled}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Any attendance status">
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[9rem]">
+            <SelectValue placeholder={STATUS_LABEL}>
               {filterSelectLabelFromMap(
                 statusValue,
-                "Any attendance status",
+                STATUS_LABEL,
                 ATTENDANCE_STATUS_LABELS,
               )}
             </SelectValue>
@@ -234,7 +159,7 @@ export function CeoAttendanceFilters({
             alignItemWithTrigger={false}
             className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
           >
-            <SelectItem value={FILTER_ANY_VALUE}>Any attendance status</SelectItem>
+            <SelectItem value={FILTER_ANY_VALUE}>{STATUS_LABEL}</SelectItem>
             {Object.entries(ATTENDANCE_STATUS_LABELS).map(([value, label]) => (
               <SelectItem key={value} value={value}>
                 {label}
@@ -246,15 +171,11 @@ export function CeoAttendanceFilters({
         <Select
           value={monthValue}
           onValueChange={(value) =>
-            onChange({
-              month: value ? Number(value) : undefined,
-              year: filters.year ?? now.getFullYear(),
-              page: 1,
-            })
+            onChange({ month: value ? Number(value) : undefined, page: 1 })
           }
           disabled={disabled}
         >
-          <SelectTrigger>
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[8rem]">
             <SelectValue placeholder="Month">
               {MONTH_LABELS[monthValue] ?? "Month"}
             </SelectValue>
@@ -271,60 +192,16 @@ export function CeoAttendanceFilters({
           </SelectContent>
         </Select>
 
-        <div>
-          <label
-            htmlFor="ceo-attendance-date-from"
-            className="mb-1.5 block text-xs font-medium text-muted-foreground"
-          >
-            From
-          </label>
-          <Input
-            id="ceo-attendance-date-from"
-            type="date"
-            value={filters.dateFrom ?? ""}
-            onChange={(event) =>
-              onChange({
-                dateFrom: event.target.value || undefined,
-                page: 1,
-              })
-            }
-            disabled={disabled}
-          />
-        </div>
-
-        <div>
-          <label
-            htmlFor="ceo-attendance-date-to"
-            className="mb-1.5 block text-xs font-medium text-muted-foreground"
-          >
-            To
-          </label>
-          <Input
-            id="ceo-attendance-date-to"
-            type="date"
-            value={filters.dateTo ?? ""}
-            onChange={(event) =>
-              onChange({
-                dateTo: event.target.value || undefined,
-                page: 1,
-              })
-            }
-            disabled={disabled}
-          />
-        </div>
-      </div>
-
-      <div className="mt-3 flex justify-end">
         <Button
           type="button"
           variant="outline"
           size="sm"
           onClick={onReset}
           disabled={disabled}
-          className="gap-1.5"
+          className="h-10 shrink-0 gap-1.5 px-3"
         >
           <RotateCcw className="size-3.5" />
-          Reset Filters
+          Reset
         </Button>
       </div>
     </section>

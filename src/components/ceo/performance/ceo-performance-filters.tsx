@@ -1,9 +1,8 @@
 "use client";
 
-import { RotateCcw, Search } from "lucide-react";
+import { RotateCcw, Users } from "lucide-react";
 
 import { Button } from "@/components/common/button";
-import { Input } from "@/components/common/input";
 import {
   Select,
   SelectContent,
@@ -16,6 +15,7 @@ import {
   filterSelectLabel,
   filterSelectLabelFromMap,
   MANAGER_FILTER_SELECT_CONTENT_CLASS,
+  MANAGER_TEAM_MEMBER_SELECT_CONTENT_CLASS,
 } from "@/lib/manager/filter-select";
 import { RATING_LABELS } from "@/lib/performance/constants";
 import type {
@@ -31,6 +31,12 @@ type CeoPerformanceFiltersProps = {
   disabled?: boolean;
 };
 
+const EMPLOYEE_LABEL = "All Employees";
+const DEPARTMENT_LABEL = "All Departments";
+const MANAGER_LABEL = "All Managers";
+const CYCLE_LABEL = "All Cycles";
+const RATING_LABEL = "Any Rating";
+
 const RATING_FILTER_LABELS = Object.fromEntries(
   Object.entries(RATING_LABELS).map(([value, label]) => [value, `${value} · ${label}`]),
 ) as Record<string, string>;
@@ -42,13 +48,17 @@ export function CeoPerformanceFilters({
   onReset,
   disabled,
 }: CeoPerformanceFiltersProps) {
+  const employeeValue = filters.employeeId ?? FILTER_ANY_VALUE;
   const departmentValue = filters.departmentId ?? FILTER_ANY_VALUE;
   const managerValue = filters.managerId ?? FILTER_ANY_VALUE;
   const cycleValue = filters.cycleId ?? FILTER_ANY_VALUE;
   const ratingValue =
     filters.rating != null ? String(filters.rating) : FILTER_ANY_VALUE;
-  const employmentTypeValue = filters.employmentTypeId ?? FILTER_ANY_VALUE;
 
+  const employeeOptions = (lookups.employees ?? []).map((item) => ({
+    value: item.id,
+    label: item.label,
+  }));
   const departmentOptions = lookups.departments.map((item) => ({
     value: item.id,
     label: item.label,
@@ -61,24 +71,39 @@ export function CeoPerformanceFilters({
     value: item.id,
     label: item.label,
   }));
-  const employmentTypeOptions = lookups.employmentTypes.map((item) => ({
-    value: item.id,
-    label: item.label,
-  }));
 
   return (
-    <section className="rounded-xl border bg-card p-4 shadow-sm">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <div className="relative xl:col-span-2">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={filters.search ?? ""}
-            onChange={(event) => onChange({ search: event.target.value, page: 1 })}
-            placeholder="Search employee..."
-            className="pl-9"
-            disabled={disabled}
-          />
-        </div>
+    <section className="w-full rounded-xl border bg-card p-3 shadow-sm sm:p-4">
+      <div className="flex w-full flex-wrap items-center gap-2 lg:flex-nowrap lg:gap-3">
+        <Select
+          value={employeeValue}
+          onValueChange={(value) =>
+            onChange({
+              employeeId: !value || value === FILTER_ANY_VALUE ? undefined : value,
+              search: undefined,
+              page: 1,
+            })
+          }
+          disabled={disabled}
+        >
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[11rem]">
+            <Users className="mr-2 size-4 shrink-0 text-muted-foreground" />
+            <SelectValue placeholder={EMPLOYEE_LABEL}>
+              {filterSelectLabel(employeeValue, EMPLOYEE_LABEL, employeeOptions)}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent
+            alignItemWithTrigger={false}
+            className={MANAGER_TEAM_MEMBER_SELECT_CONTENT_CLASS}
+          >
+            <SelectItem value={FILTER_ANY_VALUE}>{EMPLOYEE_LABEL}</SelectItem>
+            {employeeOptions.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         <Select
           value={departmentValue}
@@ -90,16 +115,16 @@ export function CeoPerformanceFilters({
           }
           disabled={disabled}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Every department">
-              {filterSelectLabel(departmentValue, "Every department", departmentOptions)}
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[10rem]">
+            <SelectValue placeholder={DEPARTMENT_LABEL}>
+              {filterSelectLabel(departmentValue, DEPARTMENT_LABEL, departmentOptions)}
             </SelectValue>
           </SelectTrigger>
           <SelectContent
             alignItemWithTrigger={false}
             className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
           >
-            <SelectItem value={FILTER_ANY_VALUE}>Every department</SelectItem>
+            <SelectItem value={FILTER_ANY_VALUE}>{DEPARTMENT_LABEL}</SelectItem>
             {departmentOptions.map((item) => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}
@@ -118,16 +143,16 @@ export function CeoPerformanceFilters({
           }
           disabled={disabled}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Every manager">
-              {filterSelectLabel(managerValue, "Every manager", managerOptions)}
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[10rem]">
+            <SelectValue placeholder={MANAGER_LABEL}>
+              {filterSelectLabel(managerValue, MANAGER_LABEL, managerOptions)}
             </SelectValue>
           </SelectTrigger>
           <SelectContent
             alignItemWithTrigger={false}
             className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
           >
-            <SelectItem value={FILTER_ANY_VALUE}>Every manager</SelectItem>
+            <SelectItem value={FILTER_ANY_VALUE}>{MANAGER_LABEL}</SelectItem>
             {managerOptions.map((item) => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}
@@ -146,16 +171,16 @@ export function CeoPerformanceFilters({
           }
           disabled={disabled}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Every review cycle">
-              {filterSelectLabel(cycleValue, "Every review cycle", cycleOptions)}
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[9rem]">
+            <SelectValue placeholder={CYCLE_LABEL}>
+              {filterSelectLabel(cycleValue, CYCLE_LABEL, cycleOptions)}
             </SelectValue>
           </SelectTrigger>
           <SelectContent
             alignItemWithTrigger={false}
             className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
           >
-            <SelectItem value={FILTER_ANY_VALUE}>Every review cycle</SelectItem>
+            <SelectItem value={FILTER_ANY_VALUE}>{CYCLE_LABEL}</SelectItem>
             {cycleOptions.map((item) => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}
@@ -175,20 +200,16 @@ export function CeoPerformanceFilters({
           }
           disabled={disabled}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Any performance rating">
-              {filterSelectLabelFromMap(
-                ratingValue,
-                "Any performance rating",
-                RATING_FILTER_LABELS,
-              )}
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[9rem]">
+            <SelectValue placeholder={RATING_LABEL}>
+              {filterSelectLabelFromMap(ratingValue, RATING_LABEL, RATING_FILTER_LABELS)}
             </SelectValue>
           </SelectTrigger>
           <SelectContent
             alignItemWithTrigger={false}
             className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
           >
-            <SelectItem value={FILTER_ANY_VALUE}>Any performance rating</SelectItem>
+            <SelectItem value={FILTER_ANY_VALUE}>{RATING_LABEL}</SelectItem>
             {Object.entries(RATING_FILTER_LABELS).map(([value, label]) => (
               <SelectItem key={value} value={value}>
                 {label}
@@ -197,50 +218,16 @@ export function CeoPerformanceFilters({
           </SelectContent>
         </Select>
 
-        <Select
-          value={employmentTypeValue}
-          onValueChange={(value) =>
-            onChange({
-              employmentTypeId: !value || value === FILTER_ANY_VALUE ? undefined : value,
-              page: 1,
-            })
-          }
-          disabled={disabled}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Every employment type">
-              {filterSelectLabel(
-                employmentTypeValue,
-                "Every employment type",
-                employmentTypeOptions,
-              )}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent
-            alignItemWithTrigger={false}
-            className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
-          >
-            <SelectItem value={FILTER_ANY_VALUE}>Every employment type</SelectItem>
-            {employmentTypeOptions.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="mt-3 flex justify-end">
         <Button
           type="button"
           variant="outline"
           size="sm"
           onClick={onReset}
           disabled={disabled}
-          className="gap-1.5"
+          className="h-10 shrink-0 gap-1.5 px-3"
         >
           <RotateCcw className="size-3.5" />
-          Reset Filters
+          Reset
         </Button>
       </div>
     </section>

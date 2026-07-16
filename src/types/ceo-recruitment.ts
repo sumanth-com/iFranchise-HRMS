@@ -11,6 +11,7 @@ export type CeoRecruitmentListParams = {
   page?: number;
   pageSize?: number;
   search?: string;
+  candidateId?: string;
   departmentId?: string;
   jobOpeningId?: string;
   recruiterId?: string;
@@ -109,6 +110,7 @@ export type CeoRecruitmentInsights = {
 };
 
 export type CeoRecruitmentFilterLookups = {
+  candidates: LookupOption[];
   departments: LookupOption[];
   jobs: LookupOption[];
   recruiters: LookupOption[];

@@ -1,9 +1,8 @@
 "use client";
 
-import { RotateCcw, Search } from "lucide-react";
+import { RotateCcw, UserRound } from "lucide-react";
 
 import { Button } from "@/components/common/button";
-import { Input } from "@/components/common/input";
 import {
   Select,
   SelectContent,
@@ -16,6 +15,7 @@ import {
   filterSelectLabel,
   filterSelectLabelFromMap,
   MANAGER_FILTER_SELECT_CONTENT_CLASS,
+  MANAGER_TEAM_MEMBER_SELECT_CONTENT_CLASS,
 } from "@/lib/manager/filter-select";
 import { CANDIDATE_STAGE_LABELS } from "@/lib/recruitment/constants";
 import type {
@@ -30,6 +30,11 @@ type CeoRecruitmentFiltersProps = {
   onReset: () => void;
   disabled?: boolean;
 };
+
+const CANDIDATE_LABEL = "All Candidates";
+const DEPARTMENT_LABEL = "All Departments";
+const JOB_LABEL = "All Jobs";
+const STAGE_LABEL = "Any Stage";
 
 const STAGE_FILTER_LABELS = {
   applied: CANDIDATE_STAGE_LABELS.applied,
@@ -49,12 +54,15 @@ export function CeoRecruitmentFilters({
   onReset,
   disabled,
 }: CeoRecruitmentFiltersProps) {
+  const candidateValue = filters.candidateId ?? FILTER_ANY_VALUE;
   const departmentValue = filters.departmentId ?? FILTER_ANY_VALUE;
   const jobValue = filters.jobOpeningId ?? FILTER_ANY_VALUE;
-  const recruiterValue = filters.recruiterId ?? FILTER_ANY_VALUE;
   const stageValue = filters.stage ?? FILTER_ANY_VALUE;
-  const employmentTypeValue = filters.employmentTypeId ?? FILTER_ANY_VALUE;
 
+  const candidateOptions = lookups.candidates.map((item) => ({
+    value: item.id,
+    label: item.label,
+  }));
   const departmentOptions = lookups.departments.map((item) => ({
     value: item.id,
     label: item.label,
@@ -63,28 +71,39 @@ export function CeoRecruitmentFilters({
     value: item.id,
     label: item.label,
   }));
-  const recruiterOptions = lookups.recruiters.map((item) => ({
-    value: item.id,
-    label: item.label,
-  }));
-  const employmentTypeOptions = lookups.employmentTypes.map((item) => ({
-    value: item.id,
-    label: item.label,
-  }));
 
   return (
-    <section className="rounded-xl border bg-card p-4 shadow-sm">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <div className="relative xl:col-span-2">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={filters.search ?? ""}
-            onChange={(event) => onChange({ search: event.target.value, page: 1 })}
-            placeholder="Search candidate..."
-            className="pl-9"
-            disabled={disabled}
-          />
-        </div>
+    <section className="w-full rounded-xl border bg-card p-3 shadow-sm sm:p-4">
+      <div className="flex w-full flex-wrap items-center gap-2 lg:flex-nowrap lg:gap-3">
+        <Select
+          value={candidateValue}
+          onValueChange={(value) =>
+            onChange({
+              candidateId: !value || value === FILTER_ANY_VALUE ? undefined : value,
+              search: undefined,
+              page: 1,
+            })
+          }
+          disabled={disabled}
+        >
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[11rem]">
+            <UserRound className="mr-2 size-4 shrink-0 text-muted-foreground" />
+            <SelectValue placeholder={CANDIDATE_LABEL}>
+              {filterSelectLabel(candidateValue, CANDIDATE_LABEL, candidateOptions)}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent
+            alignItemWithTrigger={false}
+            className={MANAGER_TEAM_MEMBER_SELECT_CONTENT_CLASS}
+          >
+            <SelectItem value={FILTER_ANY_VALUE}>{CANDIDATE_LABEL}</SelectItem>
+            {candidateOptions.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         <Select
           value={departmentValue}
@@ -96,16 +115,16 @@ export function CeoRecruitmentFilters({
           }
           disabled={disabled}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Every department">
-              {filterSelectLabel(departmentValue, "Every department", departmentOptions)}
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[10rem]">
+            <SelectValue placeholder={DEPARTMENT_LABEL}>
+              {filterSelectLabel(departmentValue, DEPARTMENT_LABEL, departmentOptions)}
             </SelectValue>
           </SelectTrigger>
           <SelectContent
             alignItemWithTrigger={false}
             className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
           >
-            <SelectItem value={FILTER_ANY_VALUE}>Every department</SelectItem>
+            <SelectItem value={FILTER_ANY_VALUE}>{DEPARTMENT_LABEL}</SelectItem>
             {departmentOptions.map((item) => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}
@@ -124,45 +143,17 @@ export function CeoRecruitmentFilters({
           }
           disabled={disabled}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Every job position">
-              {filterSelectLabel(jobValue, "Every job position", jobOptions)}
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[10rem]">
+            <SelectValue placeholder={JOB_LABEL}>
+              {filterSelectLabel(jobValue, JOB_LABEL, jobOptions)}
             </SelectValue>
           </SelectTrigger>
           <SelectContent
             alignItemWithTrigger={false}
             className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
           >
-            <SelectItem value={FILTER_ANY_VALUE}>Every job position</SelectItem>
+            <SelectItem value={FILTER_ANY_VALUE}>{JOB_LABEL}</SelectItem>
             {jobOptions.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={recruiterValue}
-          onValueChange={(value) =>
-            onChange({
-              recruiterId: !value || value === FILTER_ANY_VALUE ? undefined : value,
-              page: 1,
-            })
-          }
-          disabled={disabled}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Every recruiter">
-              {filterSelectLabel(recruiterValue, "Every recruiter", recruiterOptions)}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent
-            alignItemWithTrigger={false}
-            className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
-          >
-            <SelectItem value={FILTER_ANY_VALUE}>Every recruiter</SelectItem>
-            {recruiterOptions.map((item) => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}
               </SelectItem>
@@ -183,16 +174,16 @@ export function CeoRecruitmentFilters({
           }
           disabled={disabled}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Any hiring stage">
-              {filterSelectLabelFromMap(stageValue, "Any hiring stage", STAGE_FILTER_LABELS)}
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[9rem]">
+            <SelectValue placeholder={STAGE_LABEL}>
+              {filterSelectLabelFromMap(stageValue, STAGE_LABEL, STAGE_FILTER_LABELS)}
             </SelectValue>
           </SelectTrigger>
           <SelectContent
             alignItemWithTrigger={false}
             className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
           >
-            <SelectItem value={FILTER_ANY_VALUE}>Any hiring stage</SelectItem>
+            <SelectItem value={FILTER_ANY_VALUE}>{STAGE_LABEL}</SelectItem>
             {Object.entries(STAGE_FILTER_LABELS).map(([value, label]) => (
               <SelectItem key={value} value={value}>
                 {label}
@@ -201,92 +192,16 @@ export function CeoRecruitmentFilters({
           </SelectContent>
         </Select>
 
-        <Select
-          value={employmentTypeValue}
-          onValueChange={(value) =>
-            onChange({
-              employmentTypeId: !value || value === FILTER_ANY_VALUE ? undefined : value,
-              page: 1,
-            })
-          }
-          disabled={disabled}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Every employment type">
-              {filterSelectLabel(
-                employmentTypeValue,
-                "Every employment type",
-                employmentTypeOptions,
-              )}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent
-            alignItemWithTrigger={false}
-            className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
-          >
-            <SelectItem value={FILTER_ANY_VALUE}>Every employment type</SelectItem>
-            {employmentTypeOptions.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <div>
-          <label
-            htmlFor="ceo-recruitment-date-from"
-            className="mb-1.5 block text-xs font-medium text-muted-foreground"
-          >
-            From
-          </label>
-          <Input
-            id="ceo-recruitment-date-from"
-            type="date"
-            value={filters.dateFrom ?? ""}
-            onChange={(event) =>
-              onChange({
-                dateFrom: event.target.value || undefined,
-                page: 1,
-              })
-            }
-            disabled={disabled}
-          />
-        </div>
-
-        <div>
-          <label
-            htmlFor="ceo-recruitment-date-to"
-            className="mb-1.5 block text-xs font-medium text-muted-foreground"
-          >
-            To
-          </label>
-          <Input
-            id="ceo-recruitment-date-to"
-            type="date"
-            value={filters.dateTo ?? ""}
-            onChange={(event) =>
-              onChange({
-                dateTo: event.target.value || undefined,
-                page: 1,
-              })
-            }
-            disabled={disabled}
-          />
-        </div>
-      </div>
-
-      <div className="mt-3 flex justify-end">
         <Button
           type="button"
           variant="outline"
           size="sm"
           onClick={onReset}
           disabled={disabled}
-          className="gap-1.5"
+          className="h-10 shrink-0 gap-1.5 px-3"
         >
           <RotateCcw className="size-3.5" />
-          Reset Filters
+          Reset
         </Button>
       </div>
     </section>

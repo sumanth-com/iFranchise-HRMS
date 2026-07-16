@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
 
 import {
   CeoBackToDashboard,
@@ -56,13 +56,6 @@ export function CeoRecruitmentView({
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const searchTimerRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (searchTimerRef.current) window.clearTimeout(searchTimerRef.current);
-    };
-  }, []);
 
   const refreshScopedData = useCallback((nextFilters: CeoRecruitmentListParams) => {
     startTransition(async () => {
@@ -85,15 +78,6 @@ export function CeoRecruitmentView({
   function updateFilters(next: Partial<CeoRecruitmentListParams>) {
     const merged = { ...filters, ...next };
     setFilters(merged);
-
-    if ("search" in next) {
-      if (searchTimerRef.current) window.clearTimeout(searchTimerRef.current);
-      searchTimerRef.current = window.setTimeout(() => {
-        refreshScopedData(merged);
-      }, 250);
-      return;
-    }
-
     refreshScopedData(merged);
   }
 
@@ -117,7 +101,7 @@ export function CeoRecruitmentView({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5">
+    <div className="flex w-full min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5">
       <CeoBackToDashboard />
       <CeoModulePageHeader
         title="Recruitment"
@@ -140,6 +124,8 @@ export function CeoRecruitmentView({
         onSelect={(stage) => updateFilters({ stage, page: 1 })}
       />
 
+      <CeoRecruitmentInsights insights={insights} />
+
       <CeoRecruitmentCandidatesTable
         candidates={candidates.data}
         total={candidates.total}
@@ -161,8 +147,6 @@ export function CeoRecruitmentView({
         isLoading={isPending}
         onSelectJob={(jobOpeningId) => updateFilters({ jobOpeningId, page: 1 })}
       />
-
-      <CeoRecruitmentInsights insights={insights} />
 
       <CeoRecruitmentDrawer
         candidateId={selectedCandidateId}

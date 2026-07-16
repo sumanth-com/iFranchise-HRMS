@@ -11,16 +11,17 @@ function ChartBlock({
   items: { label: string; value: number }[];
   color?: string;
 }) {
-  const max = Math.max(1, ...items.map((item) => item.value));
+  const displayItems = items.filter((item) => item.value !== 0);
+  const max = Math.max(1, ...displayItems.map((item) => item.value));
 
   return (
     <section className="rounded-xl border bg-card p-4 shadow-sm">
       <h3 className="mb-3 text-sm font-semibold">{title}</h3>
-      {items.length === 0 ? (
+      {displayItems.length === 0 ? (
         <p className="text-sm text-muted-foreground">No data available.</p>
       ) : (
         <div className="space-y-2.5">
-          {items.slice(0, 6).map((item) => (
+          {displayItems.slice(0, 6).map((item) => (
             <BarRow
               key={item.label}
               label={item.label}

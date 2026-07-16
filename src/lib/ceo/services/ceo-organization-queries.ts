@@ -137,27 +137,34 @@ export async function getCeoOrgFilterLookups(
   supabase: AuthSupabaseClient,
   organizationId: string,
 ): Promise<CeoOrgFilterLookups> {
-  const [departmentsRes, managersQuery, employmentTypesRes] = await Promise.all([
-    fromHrms(supabase, "departments")
-      .select("id, name, code")
-      .eq("organization_id", organizationId)
-      .is("deleted_at", null)
-      .order("name"),
-    fromHrms(supabase, "user_roles")
-      .select(
-        "id, roles:role_id!inner(code), employees:employee_id(id, first_name, last_name, employment_status, deleted_at)",
-      )
-      .eq("organization_id", organizationId)
-      .eq("status", "active")
-      .is("deleted_at", null)
-      .eq("roles.code", "manager"),
-    fromHrms(supabase, "employment_types")
-      .select("id, name")
-      .eq("organization_id", organizationId)
-      .is("deleted_at", null)
-      .order("name"),
-  ]);
+  const [employeesRes, departmentsRes, managersQuery, employmentTypesRes] =
+    await Promise.all([
+      fromHrms(supabase, "employees")
+        .select("id, first_name, last_name, employee_code, employment_status")
+        .eq("organization_id", organizationId)
+        .is("deleted_at", null)
+        .order("first_name"),
+      fromHrms(supabase, "departments")
+        .select("id, name, code")
+        .eq("organization_id", organizationId)
+        .is("deleted_at", null)
+        .order("name"),
+      fromHrms(supabase, "user_roles")
+        .select(
+          "id, roles:role_id!inner(code), employees:employee_id(id, first_name, last_name, employment_status, deleted_at)",
+        )
+        .eq("organization_id", organizationId)
+        .eq("status", "active")
+        .is("deleted_at", null)
+        .eq("roles.code", "manager"),
+      fromHrms(supabase, "employment_types")
+        .select("id, name")
+        .eq("organization_id", organizationId)
+        .is("deleted_at", null)
+        .order("name"),
+    ]);
 
+  if (employeesRes.error) throw new Error(employeesRes.error.message);
   if (departmentsRes.error) throw new Error(departmentsRes.error.message);
   if (managersQuery.error) throw new Error(managersQuery.error.message);
   if (employmentTypesRes.error) throw new Error(employmentTypesRes.error.message);
@@ -174,6 +181,10 @@ export async function getCeoOrgFilterLookups(
   }
 
   return {
+    employees: ((employeesRes.data ?? []) as LooseRow[]).map((row) => ({
+      id: row.id,
+      label: `${row.first_name} ${row.last_name} · ${row.employee_code}`,
+    })),
     departments: ((departmentsRes.data ?? []) as LooseRow[]).map((row) => ({
       id: row.id,
       label: row.name,
@@ -196,6 +207,7 @@ export async function listCeoOrgEmployees(
     page,
     pageSize,
     search,
+    employeeId,
     sortBy,
     sortOrder,
     departmentId,
@@ -236,7 +248,9 @@ export async function listCeoOrgEmployees(
     .eq("organization_id", organizationId)
     .is("deleted_at", null);
 
-  if (search) {
+  if (employeeId) {
+    query = query.eq("id", employeeId);
+  } else if (search) {
     const term = `%${search}%`;
     query = query.or(
       `first_name.ilike.${term},last_name.ilike.${term},email.ilike.${term},employee_code.ilike.${term}`,

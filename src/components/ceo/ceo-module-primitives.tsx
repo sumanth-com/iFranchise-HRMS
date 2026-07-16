@@ -30,11 +30,11 @@ export function CeoStatCard({
   accent?: string;
 }) {
   return (
-    <div className="rounded-xl border bg-card px-4 py-3.5 shadow-sm">
-      <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+    <div className="flex h-full min-h-[4.25rem] w-full min-w-0 flex-col justify-between rounded-xl border bg-card px-4 py-3.5 shadow-sm">
+      <p className="line-clamp-1 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
         {label}
       </p>
-      <p className={cn("mt-2 text-2xl font-semibold tabular-nums", accent)}>{value}</p>
+      <p className={cn("text-2xl font-semibold tabular-nums", accent)}>{value}</p>
     </div>
   );
 }
@@ -50,16 +50,17 @@ export function CeoChartPanel({
   color?: string;
   formatValue?: (value: number) => string;
 }) {
-  const max = Math.max(1, ...items.map((item) => item.value));
+  const displayItems = items.filter((item) => item.value !== 0);
+  const max = Math.max(1, ...displayItems.map((item) => item.value));
 
   return (
     <section className="rounded-xl border bg-card p-4 shadow-sm">
       <h2 className="mb-3 text-sm font-semibold">{title}</h2>
-      {items.length === 0 ? (
+      {displayItems.length === 0 ? (
         <p className="text-sm text-muted-foreground">No data available.</p>
       ) : (
         <div className="space-y-2.5">
-          {items.map((item) => (
+          {displayItems.map((item) => (
             <BarRow
               key={item.label}
               label={item.label}

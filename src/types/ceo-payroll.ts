@@ -5,6 +5,7 @@ export type CeoPayrollListParams = {
   page?: number;
   pageSize?: number;
   search?: string;
+  employeeId?: string;
   month?: number;
   year?: number;
   departmentId?: string;
@@ -109,6 +110,7 @@ export type CeoPayrollInsights = {
 };
 
 export type CeoPayrollFilterLookups = {
+  employees: LookupOption[];
   departments: LookupOption[];
   employmentTypes: LookupOption[];
 };

@@ -1,9 +1,8 @@
 "use client";
 
-import { RotateCcw, Search } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/common/button";
-import { Input } from "@/components/common/input";
 import {
   Select,
   SelectContent,
@@ -36,12 +35,16 @@ type CeoReportsFiltersProps = {
   disabled?: boolean;
 };
 
+const CATEGORY_LABEL = "All Categories";
+const DEPARTMENT_LABEL = "All Departments";
+const FORMAT_LABEL = "Any Format";
+
 const FORMAT_LABELS: Record<string, string> = {
   csv: "CSV",
   excel: "Excel",
   pdf: "PDF",
-  summary_pdf: "Executive Summary PDF",
-  board_summary: "Board Presentation Summary",
+  summary_pdf: "Summary PDF",
+  board_summary: "Board Summary",
 };
 
 export function CeoReportsFilters({
@@ -53,19 +56,9 @@ export function CeoReportsFilters({
 }: CeoReportsFiltersProps) {
   const categoryValue = filters.category ?? FILTER_ANY_VALUE;
   const departmentValue = filters.departmentId ?? FILTER_ANY_VALUE;
-  const branchValue = filters.branchId ?? FILTER_ANY_VALUE;
   const formatValue = filters.format ?? FILTER_ANY_VALUE;
-  const createdByValue = filters.createdById ?? FILTER_ANY_VALUE;
 
   const departmentOptions = lookups.departments.map((item) => ({
-    value: item.id,
-    label: item.label,
-  }));
-  const branchOptions = lookups.branches.map((item) => ({
-    value: item.id,
-    label: item.label,
-  }));
-  const creatorOptions = lookups.creators.map((item) => ({
     value: item.id,
     label: item.label,
   }));
@@ -75,19 +68,8 @@ export function CeoReportsFilters({
   }));
 
   return (
-    <section className="rounded-xl border bg-card p-4 shadow-sm">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <div className="relative xl:col-span-2">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={filters.search ?? ""}
-            onChange={(event) => onChange({ search: event.target.value, page: 1 })}
-            placeholder="Search reports…"
-            className="pl-9"
-            disabled={disabled}
-          />
-        </div>
-
+    <section className="w-full rounded-xl border bg-card p-3 shadow-sm sm:p-4">
+      <div className="flex w-full flex-wrap items-center gap-2 lg:flex-nowrap lg:gap-3">
         <Select
           value={categoryValue}
           onValueChange={(value) =>
@@ -101,16 +83,16 @@ export function CeoReportsFilters({
           }
           disabled={disabled}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Every category">
-              {filterSelectLabel(categoryValue, "Every category", categoryOptions)}
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[11rem]">
+            <SelectValue placeholder={CATEGORY_LABEL}>
+              {filterSelectLabel(categoryValue, CATEGORY_LABEL, categoryOptions)}
             </SelectValue>
           </SelectTrigger>
           <SelectContent
             alignItemWithTrigger={false}
             className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
           >
-            <SelectItem value={FILTER_ANY_VALUE}>Every category</SelectItem>
+            <SelectItem value={FILTER_ANY_VALUE}>{CATEGORY_LABEL}</SelectItem>
             {categoryOptions.map((item) => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}
@@ -129,45 +111,17 @@ export function CeoReportsFilters({
           }
           disabled={disabled}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Every department">
-              {filterSelectLabel(departmentValue, "Every department", departmentOptions)}
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[10rem]">
+            <SelectValue placeholder={DEPARTMENT_LABEL}>
+              {filterSelectLabel(departmentValue, DEPARTMENT_LABEL, departmentOptions)}
             </SelectValue>
           </SelectTrigger>
           <SelectContent
             alignItemWithTrigger={false}
             className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
           >
-            <SelectItem value={FILTER_ANY_VALUE}>Every department</SelectItem>
+            <SelectItem value={FILTER_ANY_VALUE}>{DEPARTMENT_LABEL}</SelectItem>
             {departmentOptions.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={branchValue}
-          onValueChange={(value) =>
-            onChange({
-              branchId: !value || value === FILTER_ANY_VALUE ? undefined : value,
-              page: 1,
-            })
-          }
-          disabled={disabled}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Every branch">
-              {filterSelectLabel(branchValue, "Every branch", branchOptions)}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent
-            alignItemWithTrigger={false}
-            className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
-          >
-            <SelectItem value={FILTER_ANY_VALUE}>Every branch</SelectItem>
-            {branchOptions.map((item) => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}
               </SelectItem>
@@ -188,16 +142,16 @@ export function CeoReportsFilters({
           }
           disabled={disabled}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Every format">
-              {filterSelectLabelFromMap(formatValue, "Every format", FORMAT_LABELS)}
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[9rem]">
+            <SelectValue placeholder={FORMAT_LABEL}>
+              {filterSelectLabelFromMap(formatValue, FORMAT_LABEL, FORMAT_LABELS)}
             </SelectValue>
           </SelectTrigger>
           <SelectContent
             alignItemWithTrigger={false}
             className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
           >
-            <SelectItem value={FILTER_ANY_VALUE}>Every format</SelectItem>
+            <SelectItem value={FILTER_ANY_VALUE}>{FORMAT_LABEL}</SelectItem>
             {Object.entries(FORMAT_LABELS).map(([value, label]) => (
               <SelectItem key={value} value={value}>
                 {label}
@@ -206,58 +160,16 @@ export function CeoReportsFilters({
           </SelectContent>
         </Select>
 
-        <Select
-          value={createdByValue}
-          onValueChange={(value) =>
-            onChange({
-              createdById: !value || value === FILTER_ANY_VALUE ? undefined : value,
-              page: 1,
-            })
-          }
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onReset}
           disabled={disabled}
+          className="h-10 shrink-0 gap-1.5 px-3"
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Every creator">
-              {filterSelectLabel(createdByValue, "Every creator", creatorOptions)}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent
-            alignItemWithTrigger={false}
-            className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
-          >
-            <SelectItem value={FILTER_ANY_VALUE}>Every creator</SelectItem>
-            {creatorOptions.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Input
-          type="date"
-          value={filters.dateFrom ?? ""}
-          onChange={(event) =>
-            onChange({ dateFrom: event.target.value || undefined, page: 1 })
-          }
-          disabled={disabled}
-          aria-label="Date from"
-        />
-        <Input
-          type="date"
-          value={filters.dateTo ?? ""}
-          onChange={(event) =>
-            onChange({ dateTo: event.target.value || undefined, page: 1 })
-          }
-          disabled={disabled}
-          aria-label="Date to"
-        />
-      </div>
-
-      <div className="mt-3 flex justify-end">
-        <Button type="button" variant="outline" size="sm" onClick={onReset} disabled={disabled}>
           <RotateCcw className="size-3.5" />
-          Reset Filters
+          Reset
         </Button>
       </div>
     </section>

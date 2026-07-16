@@ -8,7 +8,7 @@ export function CeoRecruitmentSummary({ kpis }: { kpis: CeoRecruitmentKpis }) {
   return (
     <section
       aria-label="Recruitment KPIs"
-      className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5"
+      className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5"
     >
       <CeoStatCard label="Open Positions" value={String(kpis.openPositions)} />
       <CeoStatCard label="Total Candidates" value={String(kpis.totalCandidates)} />

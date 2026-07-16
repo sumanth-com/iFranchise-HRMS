@@ -21,27 +21,28 @@ export function CeoDashboardHeader() {
   }, []);
 
   return (
-    <section className="shrink-0 rounded-xl border bg-card px-4 py-3 shadow-sm sm:px-5">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-[11px] font-medium tracking-wide text-primary uppercase">
-            Executive Dashboard
-          </p>
-          <h1 className="mt-0.5 truncate text-xl font-semibold tracking-tight sm:text-2xl">
+    <section className="relative w-full shrink-0 overflow-hidden rounded-2xl border bg-gradient-to-br from-card via-card to-primary/5 px-5 py-5 shadow-sm lg:px-6 lg:py-6">
+      <div className="pointer-events-none absolute -top-10 -right-10 size-36 rounded-full bg-primary/10 blur-2xl" />
+      <div className="relative flex flex-col gap-1">
+        <p className="text-xs font-medium tracking-wide text-primary uppercase">
+          CEO Dashboard
+        </p>
+        <div className="mt-1 flex items-start justify-between gap-4">
+          <h1 className="min-w-0 text-2xl font-semibold tracking-tight lg:text-3xl">
             {greetingForHour(now.getHours())}, {profile.employee.firstName}
           </h1>
-          <p className="mt-0.5 truncate text-xs text-muted-foreground sm:text-sm">
-            {profile.organization.name}
-          </p>
+          <div className="shrink-0 pt-1 text-right">
+            <p className="whitespace-nowrap text-sm font-medium">
+              {format(now, "EEEE, d MMMM yyyy")}
+            </p>
+            <p className="whitespace-nowrap text-xs text-muted-foreground">
+              {format(now, "hh:mm a")}
+            </p>
+          </div>
         </div>
-        <div className="shrink-0 text-right">
-          <p className="whitespace-nowrap text-sm font-medium">
-            {format(now, "EEE, d MMM yyyy")}
-          </p>
-          <p className="whitespace-nowrap text-xs text-muted-foreground">
-            {format(now, "hh:mm a")}
-          </p>
-        </div>
+        <p className="mt-1.5 text-sm text-muted-foreground lg:text-base">
+          Here&apos;s what needs your attention across {profile.organization.name} today.
+        </p>
       </div>
     </section>
   );

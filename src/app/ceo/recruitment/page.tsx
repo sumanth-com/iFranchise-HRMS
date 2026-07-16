@@ -25,6 +25,7 @@ export default async function CeoRecruitmentPage({
     page: firstString(rawParams.page),
     pageSize: firstString(rawParams.pageSize),
     search: firstString(rawParams.search),
+    candidateId: firstString(rawParams.candidateId),
     departmentId: firstString(rawParams.departmentId),
     jobOpeningId: firstString(rawParams.jobOpeningId),
     recruiterId: firstString(rawParams.recruiterId),

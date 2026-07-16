@@ -98,7 +98,12 @@ export async function getCeoPayrollFilterLookups(
   supabase: AuthSupabaseClient,
   organizationId: string,
 ): Promise<CeoPayrollFilterLookups> {
-  const [departments, employmentTypes] = await Promise.all([
+  const [employeesRes, departments, employmentTypes] = await Promise.all([
+    fromHrms(supabase, "employees")
+      .select("id, first_name, last_name, employee_code")
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .order("first_name"),
     fromHrms(supabase, "departments")
       .select("id, name")
       .eq("organization_id", organizationId)
@@ -112,9 +117,14 @@ export async function getCeoPayrollFilterLookups(
   ]);
 
   if (departments.error) throw new Error(departments.error.message);
+  if (employeesRes.error) throw new Error(employeesRes.error.message);
   if (employmentTypes.error) throw new Error(employmentTypes.error.message);
 
   return {
+    employees: ((employeesRes.data ?? []) as LooseRow[]).map((row) => ({
+      id: row.id,
+      label: `${row.first_name} ${row.last_name} · ${row.employee_code}`,
+    })),
     departments: ((departments.data ?? []) as LooseRow[]).map((row) => ({
       id: row.id,
       label: row.name,
@@ -179,7 +189,9 @@ async function loadPayrollItems(
       (row) => unwrap(row.employees)?.employment_type_id === filters.employmentTypeId,
     );
   }
-  if (filters.search) {
+  if (filters.employeeId) {
+    rows = rows.filter((row) => unwrap(row.employees)?.id === filters.employeeId);
+  } else if (filters.search) {
     const term = filters.search.toLowerCase();
     rows = rows.filter((row) => {
       const employee = unwrap(row.employees);

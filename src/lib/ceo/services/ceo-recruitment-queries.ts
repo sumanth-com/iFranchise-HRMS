@@ -218,7 +218,14 @@ export async function getCeoRecruitmentFilterLookups(
   supabase: AuthSupabaseClient,
   organizationId: string,
 ): Promise<CeoRecruitmentFilterLookups> {
-  const [departments, jobs, employmentTypes] = await Promise.all([
+  const [candidates, departments, jobs, employmentTypes] = await Promise.all([
+    fromHrms(supabase, "recruitment_candidates")
+      .select("id, first_name, last_name, candidate_code")
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .is("archived_at", null)
+      .order("first_name")
+      .limit(300),
     fromHrms(supabase, "departments")
       .select("id, name")
       .eq("organization_id", organizationId)
@@ -238,6 +245,7 @@ export async function getCeoRecruitmentFilterLookups(
       .order("name"),
   ]);
 
+  if (candidates.error) throw new Error(candidates.error.message);
   if (departments.error) throw new Error(departments.error.message);
   if (jobs.error) throw new Error(jobs.error.message);
   if (employmentTypes.error) throw new Error(employmentTypes.error.message);
@@ -253,6 +261,10 @@ export async function getCeoRecruitmentFilterLookups(
   }
 
   return {
+    candidates: ((candidates.data ?? []) as LooseRow[]).map((row) => ({
+      id: row.id,
+      label: `${row.first_name} ${row.last_name} · ${row.candidate_code}`,
+    })),
     departments: ((departments.data ?? []) as LooseRow[]).map((row) => ({
       id: row.id,
       label: row.name,
@@ -296,6 +308,7 @@ export async function listCeoRecruitmentCandidates(
     .order("created_at", { ascending: false })
     .range(from, to);
 
+  if (parsed.candidateId) query = query.eq("id", parsed.candidateId);
   if (parsed.jobOpeningId) query = query.eq("job_opening_id", parsed.jobOpeningId);
   if (parsed.stage) query = query.eq("stage", parsed.stage);
   if (parsed.departmentId) query = query.eq("job.department_id", parsed.departmentId);
@@ -305,7 +318,7 @@ export async function listCeoRecruitmentCandidates(
   }
   if (parsed.dateFrom) query = query.gte("created_at", `${parsed.dateFrom}T00:00:00`);
   if (parsed.dateTo) query = query.lte("created_at", `${parsed.dateTo}T23:59:59`);
-  if (parsed.search) {
+  if (!parsed.candidateId && parsed.search) {
     query = query.or(
       `first_name.ilike.%${parsed.search}%,last_name.ilike.%${parsed.search}%,email.ilike.%${parsed.search}%`,
     );

@@ -24,6 +24,7 @@ export default async function CeoPayrollPage({ searchParams }: CeoPayrollPagePro
     page: firstString(rawParams.page),
     pageSize: firstString(rawParams.pageSize),
     search: firstString(rawParams.search),
+    employeeId: firstString(rawParams.employeeId),
     month: firstString(rawParams.month) ?? String(now.getMonth() + 1),
     year: firstString(rawParams.year) ?? String(now.getFullYear()),
     departmentId: firstString(rawParams.departmentId),

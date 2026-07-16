@@ -4,6 +4,7 @@ import { paginationSchema } from "@/lib/validations/common";
 
 export const ceoRecruitmentListParamsSchema = paginationSchema.extend({
   search: z.string().trim().optional(),
+  candidateId: z.string().uuid().optional(),
   departmentId: z.string().uuid().optional(),
   jobOpeningId: z.string().uuid().optional(),
   recruiterId: z.string().uuid().optional(),

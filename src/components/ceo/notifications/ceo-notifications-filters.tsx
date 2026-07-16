@@ -1,9 +1,8 @@
 "use client";
 
-import { RotateCcw, Search } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/common/button";
-import { Input } from "@/components/common/input";
 import {
   Select,
   SelectContent,
@@ -37,6 +36,11 @@ type Props = {
   disabled?: boolean;
 };
 
+const CATEGORY_LABEL = "All Categories";
+const PRIORITY_LABEL = "Any Priority";
+const STATUS_LABEL = "Any Status";
+const DEPARTMENT_LABEL = "All Departments";
+
 const STATUS_OPTIONS: { value: NotificationStatus; label: string }[] = [
   { value: "unread", label: "Unread" },
   { value: "read", label: "Read" },
@@ -69,19 +73,8 @@ export function CeoNotificationsFilters({
   }));
 
   return (
-    <section className="rounded-xl border bg-card p-4 shadow-sm">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <div className="relative xl:col-span-2">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={filters.search ?? ""}
-            onChange={(event) => onChange({ search: event.target.value, page: 1 })}
-            placeholder="Search employee, department, category, title…"
-            className="pl-9"
-            disabled={disabled}
-          />
-        </div>
-
+    <section className="w-full rounded-xl border bg-card p-3 shadow-sm sm:p-4">
+      <div className="flex w-full flex-wrap items-center gap-2 lg:flex-nowrap lg:gap-3">
         <Select
           value={categoryValue}
           onValueChange={(value) =>
@@ -95,16 +88,16 @@ export function CeoNotificationsFilters({
           }
           disabled={disabled}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Every category">
-              {filterSelectLabel(categoryValue, "Every category", categoryOptions)}
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[11rem]">
+            <SelectValue placeholder={CATEGORY_LABEL}>
+              {filterSelectLabel(categoryValue, CATEGORY_LABEL, categoryOptions)}
             </SelectValue>
           </SelectTrigger>
           <SelectContent
             alignItemWithTrigger={false}
             className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
           >
-            <SelectItem value={FILTER_ANY_VALUE}>Every category</SelectItem>
+            <SelectItem value={FILTER_ANY_VALUE}>{CATEGORY_LABEL}</SelectItem>
             {categoryOptions.map((item) => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}
@@ -126,19 +119,19 @@ export function CeoNotificationsFilters({
           }
           disabled={disabled}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Every priority">
-              {filterSelectLabelFromMap(priorityValue, "Every priority", PRIORITY_LABELS)}
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[9rem]">
+            <SelectValue placeholder={PRIORITY_LABEL}>
+              {filterSelectLabelFromMap(priorityValue, PRIORITY_LABEL, PRIORITY_LABELS)}
             </SelectValue>
           </SelectTrigger>
           <SelectContent
             alignItemWithTrigger={false}
             className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
           >
-            <SelectItem value={FILTER_ANY_VALUE}>Every priority</SelectItem>
-            {NOTIFICATION_PRIORITIES.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
+            <SelectItem value={FILTER_ANY_VALUE}>{PRIORITY_LABEL}</SelectItem>
+            {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -157,20 +150,19 @@ export function CeoNotificationsFilters({
           }
           disabled={disabled}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Active (excl. archived)">
-              {filterSelectLabel(
-                statusValue,
-                "Active (excl. archived)",
-                STATUS_OPTIONS,
-              )}
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[9rem]">
+            <SelectValue placeholder={STATUS_LABEL}>
+              {statusValue === FILTER_ANY_VALUE
+                ? STATUS_LABEL
+                : STATUS_OPTIONS.find((item) => item.value === statusValue)?.label ??
+                  STATUS_LABEL}
             </SelectValue>
           </SelectTrigger>
           <SelectContent
             alignItemWithTrigger={false}
             className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
           >
-            <SelectItem value={FILTER_ANY_VALUE}>Active (excl. archived)</SelectItem>
+            <SelectItem value={FILTER_ANY_VALUE}>{STATUS_LABEL}</SelectItem>
             {STATUS_OPTIONS.map((item) => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}
@@ -189,20 +181,16 @@ export function CeoNotificationsFilters({
           }
           disabled={disabled}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Every department">
-              {filterSelectLabel(
-                departmentValue,
-                "Every department",
-                departmentOptions,
-              )}
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[10rem]">
+            <SelectValue placeholder={DEPARTMENT_LABEL}>
+              {filterSelectLabel(departmentValue, DEPARTMENT_LABEL, departmentOptions)}
             </SelectValue>
           </SelectTrigger>
           <SelectContent
             alignItemWithTrigger={false}
             className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
           >
-            <SelectItem value={FILTER_ANY_VALUE}>Every department</SelectItem>
+            <SelectItem value={FILTER_ANY_VALUE}>{DEPARTMENT_LABEL}</SelectItem>
             {departmentOptions.map((item) => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}
@@ -211,44 +199,17 @@ export function CeoNotificationsFilters({
           </SelectContent>
         </Select>
 
-        <Input
-          type="date"
-          value={filters.dateFrom ?? ""}
-          onChange={(event) =>
-            onChange({
-              dateFrom: event.target.value || undefined,
-              page: 1,
-            })
-          }
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onReset}
           disabled={disabled}
-          aria-label="Date from"
-        />
-
-        <Input
-          type="date"
-          value={filters.dateTo ?? ""}
-          onChange={(event) =>
-            onChange({
-              dateTo: event.target.value || undefined,
-              page: 1,
-            })
-          }
-          disabled={disabled}
-          aria-label="Date to"
-        />
-
-        <div className="flex items-end">
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={onReset}
-            disabled={disabled}
-          >
-            <RotateCcw className="size-4" />
-            Reset Filters
-          </Button>
-        </div>
+          className="h-10 shrink-0 gap-1.5 px-3"
+        >
+          <RotateCcw className="size-3.5" />
+          Reset
+        </Button>
       </div>
     </section>
   );

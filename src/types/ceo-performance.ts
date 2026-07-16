@@ -5,6 +5,7 @@ export type CeoPerformanceListParams = {
   page?: number;
   pageSize?: number;
   search?: string;
+  employeeId?: string;
   departmentId?: string;
   managerId?: string;
   cycleId?: string;
@@ -106,6 +107,7 @@ export type CeoPerformancePromotionOverview = {
 };
 
 export type CeoPerformanceFilterLookups = {
+  employees: LookupOption[];
   departments: LookupOption[];
   managers: LookupOption[];
   cycles: LookupOption[];

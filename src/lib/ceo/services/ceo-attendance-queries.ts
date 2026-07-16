@@ -123,7 +123,9 @@ async function loadScopedEmployees(
   if (filters.employmentTypeId) {
     query = query.eq("employment_type_id", filters.employmentTypeId);
   }
-  if (filters.search) {
+  if (filters.employeeId) {
+    query = query.eq("id", filters.employeeId);
+  } else if (filters.search) {
     const term = `%${filters.search}%`;
     query = query.or(
       `employee_code.ilike.${term},first_name.ilike.${term},last_name.ilike.${term}`,
@@ -170,7 +172,13 @@ export async function getCeoAttendanceFilterLookups(
   supabase: AuthSupabaseClient,
   organizationId: string,
 ): Promise<CeoAttendanceFilterLookups> {
-  const [departments, managers, branches, employmentTypes, reporting] = await Promise.all([
+  const [employeesRes, departments, managers, branches, employmentTypes, reporting] =
+    await Promise.all([
+    fromHrms(supabase, "employees")
+      .select("id, first_name, last_name, employee_code")
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .order("first_name"),
     fromHrms(supabase, "departments")
       .select("id, name")
       .eq("organization_id", organizationId)
@@ -203,6 +211,7 @@ export async function getCeoAttendanceFilterLookups(
   ]);
 
   if (departments.error) throw new Error(departments.error.message);
+  if (employeesRes.error) throw new Error(employeesRes.error.message);
   if (managers.error) throw new Error(managers.error.message);
   if (branches.error) throw new Error(branches.error.message);
   if (employmentTypes.error) throw new Error(employmentTypes.error.message);
@@ -215,6 +224,10 @@ export async function getCeoAttendanceFilterLookups(
   );
 
   return {
+    employees: ((employeesRes.data ?? []) as LooseRow[]).map((row) => ({
+      id: row.id,
+      label: `${row.first_name} ${row.last_name} · ${row.employee_code}`,
+    })),
     departments: ((departments.data ?? []) as LooseRow[]).map((row) => ({
       id: row.id,
       label: row.name,

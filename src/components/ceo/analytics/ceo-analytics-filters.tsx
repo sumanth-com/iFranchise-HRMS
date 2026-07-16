@@ -30,12 +30,15 @@ type CeoAnalyticsFiltersProps = {
   disabled?: boolean;
 };
 
+const DEPARTMENT_LABEL = "All Departments";
+const MANAGER_LABEL = "All Managers";
+
 const COMPARE_OPTIONS: { value: CeoAnalyticsCompareMode; label: string }[] = [
   { value: "none", label: "No comparison" },
-  { value: "previous_month", label: "Current vs previous month" },
-  { value: "previous_quarter", label: "Quarter vs quarter" },
-  { value: "previous_year", label: "Year vs year" },
-  { value: "department", label: "Department vs department" },
+  { value: "previous_month", label: "vs Prev Month" },
+  { value: "previous_quarter", label: "vs Prev Quarter" },
+  { value: "previous_year", label: "vs Prev Year" },
+  { value: "department", label: "Dept vs Dept" },
 ];
 
 export function CeoAnalyticsFilters({
@@ -46,9 +49,7 @@ export function CeoAnalyticsFilters({
   disabled,
 }: CeoAnalyticsFiltersProps) {
   const departmentValue = filters.departmentId ?? FILTER_ANY_VALUE;
-  const branchValue = filters.branchId ?? FILTER_ANY_VALUE;
   const managerValue = filters.managerId ?? FILTER_ANY_VALUE;
-  const employmentTypeValue = filters.employmentTypeId ?? FILTER_ANY_VALUE;
   const compareMode = filters.compareMode ?? "none";
   const compareDepartmentValue = filters.compareDepartmentId ?? FILTER_ANY_VALUE;
 
@@ -56,28 +57,21 @@ export function CeoAnalyticsFilters({
     value: item.id,
     label: item.label,
   }));
-  const branchOptions = lookups.branches.map((item) => ({
-    value: item.id,
-    label: item.label,
-  }));
   const managerOptions = lookups.managers.map((item) => ({
-    value: item.id,
-    label: item.label,
-  }));
-  const employmentTypeOptions = lookups.employmentTypes.map((item) => ({
     value: item.id,
     label: item.label,
   }));
 
   return (
-    <section className="rounded-xl border bg-card p-4 shadow-sm">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <section className="w-full rounded-xl border bg-card p-3 shadow-sm sm:p-4">
+      <div className="flex w-full flex-wrap items-center gap-2 lg:flex-nowrap lg:gap-3">
         <Input
           type="date"
           value={filters.dateFrom ?? ""}
           onChange={(event) => onChange({ dateFrom: event.target.value || undefined })}
           disabled={disabled}
           aria-label="Date from"
+          className="h-10 min-w-0 flex-1 basis-[9rem]"
         />
         <Input
           type="date"
@@ -85,6 +79,7 @@ export function CeoAnalyticsFilters({
           onChange={(event) => onChange({ dateTo: event.target.value || undefined })}
           disabled={disabled}
           aria-label="Date to"
+          className="h-10 min-w-0 flex-1 basis-[9rem]"
         />
 
         <Select
@@ -96,44 +91,17 @@ export function CeoAnalyticsFilters({
           }
           disabled={disabled}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Every department">
-              {filterSelectLabel(departmentValue, "Every department", departmentOptions)}
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[10rem]">
+            <SelectValue placeholder={DEPARTMENT_LABEL}>
+              {filterSelectLabel(departmentValue, DEPARTMENT_LABEL, departmentOptions)}
             </SelectValue>
           </SelectTrigger>
           <SelectContent
             alignItemWithTrigger={false}
             className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
           >
-            <SelectItem value={FILTER_ANY_VALUE}>Every department</SelectItem>
+            <SelectItem value={FILTER_ANY_VALUE}>{DEPARTMENT_LABEL}</SelectItem>
             {departmentOptions.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={branchValue}
-          onValueChange={(value) =>
-            onChange({
-              branchId: !value || value === FILTER_ANY_VALUE ? undefined : value,
-            })
-          }
-          disabled={disabled}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Every branch">
-              {filterSelectLabel(branchValue, "Every branch", branchOptions)}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent
-            alignItemWithTrigger={false}
-            className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
-          >
-            <SelectItem value={FILTER_ANY_VALUE}>Every branch</SelectItem>
-            {branchOptions.map((item) => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}
               </SelectItem>
@@ -150,48 +118,17 @@ export function CeoAnalyticsFilters({
           }
           disabled={disabled}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Every manager">
-              {filterSelectLabel(managerValue, "Every manager", managerOptions)}
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[10rem]">
+            <SelectValue placeholder={MANAGER_LABEL}>
+              {filterSelectLabel(managerValue, MANAGER_LABEL, managerOptions)}
             </SelectValue>
           </SelectTrigger>
           <SelectContent
             alignItemWithTrigger={false}
             className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
           >
-            <SelectItem value={FILTER_ANY_VALUE}>Every manager</SelectItem>
+            <SelectItem value={FILTER_ANY_VALUE}>{MANAGER_LABEL}</SelectItem>
             {managerOptions.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={employmentTypeValue}
-          onValueChange={(value) =>
-            onChange({
-              employmentTypeId: !value || value === FILTER_ANY_VALUE ? undefined : value,
-            })
-          }
-          disabled={disabled}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Every employment type">
-              {filterSelectLabel(
-                employmentTypeValue,
-                "Every employment type",
-                employmentTypeOptions,
-              )}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent
-            alignItemWithTrigger={false}
-            className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
-          >
-            <SelectItem value={FILTER_ANY_VALUE}>Every employment type</SelectItem>
-            {employmentTypeOptions.map((item) => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}
               </SelectItem>
@@ -203,14 +140,15 @@ export function CeoAnalyticsFilters({
           value={compareMode}
           onValueChange={(value) =>
             onChange({
-              compareMode: (value as CeoAnalyticsCompareMode) || "none",
-              comparePreviousPeriod: value !== "none" && value !== "department",
+              compareMode: value as CeoAnalyticsCompareMode,
+              compareDepartmentId:
+                value === "department" ? filters.compareDepartmentId : undefined,
             })
           }
           disabled={disabled}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Comparison mode">
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[10rem]">
+            <SelectValue placeholder="Compare">
               {COMPARE_OPTIONS.find((item) => item.value === compareMode)?.label ??
                 "No comparison"}
             </SelectValue>
@@ -238,11 +176,11 @@ export function CeoAnalyticsFilters({
             }
             disabled={disabled}
           >
-            <SelectTrigger>
-              <SelectValue placeholder="Compare with department">
+            <SelectTrigger className="h-10 min-w-0 flex-1 basis-[10rem]">
+              <SelectValue placeholder="Compare Dept">
                 {filterSelectLabel(
                   compareDepartmentValue,
-                  "Compare with department",
+                  "Compare Dept",
                   departmentOptions,
                 )}
               </SelectValue>
@@ -251,7 +189,7 @@ export function CeoAnalyticsFilters({
               alignItemWithTrigger={false}
               className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
             >
-              <SelectItem value={FILTER_ANY_VALUE}>Compare with department</SelectItem>
+              <SelectItem value={FILTER_ANY_VALUE}>Compare Dept</SelectItem>
               {departmentOptions.map((item) => (
                 <SelectItem key={item.value} value={item.value}>
                   {item.label}
@@ -260,12 +198,17 @@ export function CeoAnalyticsFilters({
             </SelectContent>
           </Select>
         ) : null}
-      </div>
 
-      <div className="mt-3 flex justify-end">
-        <Button type="button" variant="outline" size="sm" onClick={onReset} disabled={disabled}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onReset}
+          disabled={disabled}
+          className="h-10 shrink-0 gap-1.5 px-3"
+        >
           <RotateCcw className="size-3.5" />
-          Reset Filters
+          Reset
         </Button>
       </div>
     </section>

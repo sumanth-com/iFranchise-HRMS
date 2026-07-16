@@ -10,6 +10,7 @@ export type CeoOrgListParams = {
   page?: number;
   pageSize?: number;
   search?: string;
+  employeeId?: string;
   departmentId?: string;
   managerId?: string;
   employmentStatus?: EmploymentStatus;
@@ -62,6 +63,7 @@ export type CeoOrgSummary = {
 };
 
 export type CeoOrgFilterLookups = {
+  employees: LookupOption[];
   departments: LookupOption[];
   managers: LookupOption[];
   employmentTypes: LookupOption[];

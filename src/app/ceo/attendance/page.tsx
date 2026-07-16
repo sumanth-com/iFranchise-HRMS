@@ -28,6 +28,7 @@ export default async function CeoAttendancePage({
     page: firstString(rawParams.page),
     pageSize: firstString(rawParams.pageSize),
     search: firstString(rawParams.search),
+    employeeId: firstString(rawParams.employeeId),
     departmentId: firstString(rawParams.departmentId),
     managerId: firstString(rawParams.managerId),
     branchId: firstString(rawParams.branchId),

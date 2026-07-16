@@ -25,6 +25,7 @@ export default async function CeoOrganizationPage({
     page: firstString(rawParams.page),
     pageSize: firstString(rawParams.pageSize),
     search: firstString(rawParams.search),
+    employeeId: firstString(rawParams.employeeId),
     departmentId: firstString(rawParams.departmentId),
     managerId: firstString(rawParams.managerId),
     employmentStatus: firstString(rawParams.employmentStatus),
@@ -34,7 +35,7 @@ export default async function CeoOrganizationPage({
   });
 
   const data = await getCeoOrganizationModuleData(parsed);
-  const employeeId = firstString(rawParams.employeeId);
+  const viewEmployeeId = firstString(rawParams.view);
 
   return (
     <Suspense
@@ -47,7 +48,7 @@ export default async function CeoOrganizationPage({
       <CeoOrganizationView
         {...data}
         initialFilters={parsed}
-        initialEmployeeId={employeeId}
+        initialEmployeeId={viewEmployeeId}
       />
     </Suspense>
   );

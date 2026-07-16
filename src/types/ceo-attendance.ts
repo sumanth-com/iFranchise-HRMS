@@ -5,6 +5,7 @@ export type CeoAttendanceListParams = {
   page?: number;
   pageSize?: number;
   search?: string;
+  employeeId?: string;
   departmentId?: string;
   managerId?: string;
   branchId?: string;
@@ -109,6 +110,7 @@ export type CeoAttendanceCalendarItem = {
 };
 
 export type CeoAttendanceFilterLookups = {
+  employees: LookupOption[];
   departments: LookupOption[];
   managers: LookupOption[];
   locations: LookupOption[];

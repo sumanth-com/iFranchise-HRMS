@@ -97,6 +97,10 @@ export function CeoRecruitmentJobsTable({
     getCoreRowModel: getCoreRowModel(),
   });
 
+  if (!isLoading && jobs.length === 0) {
+    return null;
+  }
+
   return (
     <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
       <div className="border-b px-4 py-3">

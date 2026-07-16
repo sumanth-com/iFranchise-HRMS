@@ -19,12 +19,12 @@ function KpiCard({
   return (
     <Link
       href={href}
-      className="flex min-h-[4.25rem] flex-col justify-between rounded-xl border bg-card px-3 py-2.5 shadow-sm transition-colors hover:border-primary/20 hover:bg-primary/[0.02]"
+      className="flex h-full min-h-[4rem] w-full min-w-0 flex-col justify-between rounded-xl border bg-card px-3 py-2.5 shadow-sm transition-colors hover:border-primary/20 hover:bg-primary/[0.02]"
     >
       <p className="line-clamp-1 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
         {label}
       </p>
-      <p className={cn("text-xl font-semibold tracking-tight tabular-nums sm:text-2xl", accent)}>
+      <p className={cn("text-lg font-semibold tracking-tight tabular-nums sm:text-xl", accent)}>
         {value}
       </p>
     </Link>
@@ -43,15 +43,13 @@ export function CeoDashboardKpis({ kpis }: { kpis: CeoKpis }) {
       href: CEO_ROUTES.organization,
     },
     {
-      label: "New Joiners",
-      value: String(kpis.newJoiners),
-      href: CEO_ROUTES.organization,
-    },
-    {
       label: "Attendance",
       value: formatPercent(kpis.attendancePercent),
       href: CEO_ROUTES.attendance,
-      accent: "text-emerald-600 dark:text-emerald-400",
+      accent:
+        kpis.attendancePercent < 85
+          ? "text-destructive"
+          : "text-emerald-600 dark:text-emerald-400",
     },
     {
       label: "Attrition",
@@ -63,10 +61,9 @@ export function CeoDashboardKpis({ kpis }: { kpis: CeoKpis }) {
       label: "Open Roles",
       value: String(kpis.openPositions),
       href: CEO_ROUTES.recruitment,
-      accent: "text-indigo-600 dark:text-indigo-400",
     },
     {
-      label: "Approvals",
+      label: "Pending Approvals",
       value: String(kpis.pendingApprovals),
       href: CEO_ROUTES.approvals,
       accent: kpis.pendingApprovals > 0 ? "text-violet-600 dark:text-violet-400" : undefined,
@@ -76,17 +73,11 @@ export function CeoDashboardKpis({ kpis }: { kpis: CeoKpis }) {
       value: formatCurrencyInr(kpis.payrollCost),
       href: CEO_ROUTES.payroll,
     },
-    {
-      label: "Avg Rating",
-      value:
-        kpis.employeeSatisfaction != null ? kpis.employeeSatisfaction.toFixed(1) : "—",
-      href: CEO_ROUTES.performance,
-    },
   ] as const;
 
   return (
-    <section aria-label="Executive KPIs" className="shrink-0">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
+    <section aria-label="Executive KPIs" className="w-full shrink-0">
+      <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {items.map((item) => (
           <KpiCard
             key={item.label}

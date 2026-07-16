@@ -27,55 +27,61 @@ function priorityBorder(priority: CeoInsightPriority) {
 }
 
 export function CeoDashboardInsights({ insights }: { insights: CeoInsight[] }) {
-  const topInsights = insights.slice(0, 3);
+  const topInsights = insights
+    .filter((insight) => insight.priority === "high" || insight.priority === "medium")
+    .slice(0, 3);
 
   if (topInsights.length === 0) return null;
 
+  const gridCols =
+    topInsights.length === 1
+      ? "grid-cols-1"
+      : topInsights.length === 2
+        ? "grid-cols-1 md:grid-cols-2"
+        : "grid-cols-1 md:grid-cols-2 xl:grid-cols-3";
+
   return (
-    <section className="shrink-0" aria-label="Executive insights">
-      <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+    <section className="w-full shrink-0" aria-label="Executive alerts">
+      <ul className={cn("grid w-full gap-3", gridCols)}>
         {topInsights.map((insight) => {
+          const cardClass = cn(
+            "flex h-full w-full min-w-0 flex-col justify-between rounded-xl border border-l-[3px] bg-card px-4 py-3 shadow-sm transition-colors",
+            priorityBorder(insight.priority),
+            insight.href && "hover:border-primary/30 hover:bg-primary/[0.02]",
+          );
+
           const content = (
-            <div className="flex min-w-0 items-center gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{insight.title}</p>
-                <p className="truncate text-xs text-muted-foreground">{insight.description}</p>
+            <>
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm font-semibold tracking-tight">{insight.title}</p>
+                <span
+                  className={cn(
+                    "shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase",
+                    priorityBadge(insight.priority),
+                  )}
+                >
+                  {insight.priority}
+                </span>
               </div>
-              <span
-                className={cn(
-                  "shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase",
-                  priorityBadge(insight.priority),
-                )}
-              >
-                {insight.priority}
-              </span>
-              {insight.href ? (
-                <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
-              ) : null}
-            </div>
+              <div className="mt-2 flex items-end justify-between gap-3">
+                <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                  {insight.description}
+                </p>
+                {insight.href ? (
+                  <ArrowRight className="mb-0.5 size-4 shrink-0 text-muted-foreground" />
+                ) : null}
+              </div>
+            </>
           );
 
           return (
-            <li key={insight.id}>
+            <li key={insight.id} className="min-w-0">
               {insight.href ? (
-                <Link
-                  href={insight.href}
-                  className={cn(
-                    "block rounded-lg border border-l-[3px] bg-card px-3 py-2 shadow-sm transition-colors hover:border-primary/30 hover:bg-primary/[0.02]",
-                    priorityBorder(insight.priority),
-                  )}
-                >
+                <Link href={insight.href} className={cardClass}>
                   {content}
                 </Link>
               ) : (
-                <div
-                  className={cn(
-                    "rounded-lg border border-l-[3px] bg-card px-3 py-2 shadow-sm",
-                    priorityBorder(insight.priority),
-                  )}
-                >
-                  {content}
-                </div>
+                <div className={cardClass}>{content}</div>
               )}
             </li>
           );

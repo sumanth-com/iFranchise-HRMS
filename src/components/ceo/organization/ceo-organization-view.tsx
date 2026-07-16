@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 
 import {
   CeoBackToDashboard,
@@ -56,13 +56,6 @@ export function CeoOrganizationView({
   );
   const [drawerOpen, setDrawerOpen] = useState(Boolean(initialEmployeeId));
   const [isPending, startTransition] = useTransition();
-  const searchTimerRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (searchTimerRef.current) window.clearTimeout(searchTimerRef.current);
-    };
-  }, []);
 
   useEffect(() => {
     if (!initialEmployeeId) return;
@@ -88,15 +81,6 @@ export function CeoOrganizationView({
   function updateFilters(next: Partial<CeoOrgListParams>) {
     const merged = { ...filters, ...next };
     setFilters(merged);
-
-    if ("search" in next) {
-      if (searchTimerRef.current) window.clearTimeout(searchTimerRef.current);
-      searchTimerRef.current = window.setTimeout(() => {
-        refreshScopedData(merged);
-      }, 250);
-      return;
-    }
-
     refreshScopedData(merged);
   }
 
