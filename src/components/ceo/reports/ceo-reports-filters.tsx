@@ -83,7 +83,7 @@ export function CeoReportsFilters({
           }
           disabled={disabled}
         >
-          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[11rem]">
+          <SelectTrigger className="h-10 w-[11rem] shrink-0 lg:w-auto lg:min-w-0 lg:flex-1">
             <SelectValue placeholder={CATEGORY_LABEL}>
               {filterSelectLabel(categoryValue, CATEGORY_LABEL, categoryOptions)}
             </SelectValue>
@@ -111,7 +111,7 @@ export function CeoReportsFilters({
           }
           disabled={disabled}
         >
-          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[10rem]">
+          <SelectTrigger className="h-10 w-[11rem] shrink-0 lg:w-auto lg:min-w-0 lg:flex-1">
             <SelectValue placeholder={DEPARTMENT_LABEL}>
               {filterSelectLabel(departmentValue, DEPARTMENT_LABEL, departmentOptions)}
             </SelectValue>
@@ -142,7 +142,7 @@ export function CeoReportsFilters({
           }
           disabled={disabled}
         >
-          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[9rem]">
+          <SelectTrigger className="h-10 w-[9.5rem] shrink-0 lg:w-auto lg:min-w-0 lg:flex-1">
             <SelectValue placeholder={FORMAT_LABEL}>
               {filterSelectLabelFromMap(formatValue, FORMAT_LABEL, FORMAT_LABELS)}
             </SelectValue>

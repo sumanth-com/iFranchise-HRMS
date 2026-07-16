@@ -69,21 +69,20 @@ export async function archiveNotification(
 
 export async function deleteNotification(
   supabase: AuthSupabaseClient,
-  profile: UserProfile,
+  _profile: UserProfile,
   notificationId: string,
 ): Promise<void> {
-  const { error } = await supabase
-    .schema("hrms")
-    .from("notifications")
-    .update({
-      deleted_at: new Date().toISOString(),
-      updated_by: profile.userId,
-    })
-    .eq("id", notificationId)
-    .eq("user_id", profile.userId)
-    .is("deleted_at", null);
+  // Soft-delete via SECURITY DEFINER RPC. A direct UPDATE that returns the row
+  // fails SELECT RLS (deleted_at IS NULL) with "new row violates row-level security".
+  const { data, error } = await supabase.schema("hrms").rpc(
+    "soft_delete_own_notification",
+    { p_notification_id: notificationId },
+  );
 
   if (error) throw new Error(error.message);
+  if (data !== true) {
+    throw new Error("Notification not found or already deleted.");
+  }
 }
 
 export async function saveNotificationTemplate(

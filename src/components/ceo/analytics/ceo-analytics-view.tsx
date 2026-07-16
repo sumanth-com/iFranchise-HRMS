@@ -131,12 +131,12 @@ export function CeoAnalyticsView({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5">
+    <div className="flex w-full min-h-0 flex-1 flex-col gap-3 overflow-y-auto scroll-smooth p-3 pb-8 md:gap-4 md:p-4 md:pb-10 lg:p-5">
       <CeoBackToDashboard />
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <CeoModulePageHeader
           title="Executive Analytics"
-          description="Analyze workforce performance, growth, hiring, attendance, payroll, and organizational trends."
+          description="Company health, workforce, hiring, attendance, performance, and payroll trends."
         />
         <div className="flex flex-wrap gap-2">
           <Button
@@ -176,13 +176,13 @@ export function CeoAnalyticsView({
             onClick={() => onExport("summary_pdf")}
           >
             <FileText className="size-3.5" />
-            Executive Summary PDF
+            Summary PDF
           </Button>
         </div>
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Read-only executive view · Generated {new Date(generatedAt).toLocaleString()}
+        Read-only · Generated {new Date(generatedAt).toLocaleString()}
         {isPending ? " · Refreshing…" : ""}
       </p>
 
@@ -200,14 +200,14 @@ export function CeoAnalyticsView({
         <p className="text-sm text-muted-foreground">{exportMessage}</p>
       ) : null}
 
+      <CeoAnalyticsInsights insights={insights} />
       <CeoAnalyticsComparisonPanel comparison={comparison} />
 
       <CeoAnalyticsWorkforcePanel workforce={workforce} />
       <CeoAnalyticsHiringPanel hiring={hiring} />
-      <CeoAnalyticsPerformancePanel performance={performance} />
       <CeoAnalyticsAttendancePanel attendance={attendance} />
+      <CeoAnalyticsPerformancePanel performance={performance} />
       <CeoAnalyticsPayrollPanel payroll={payroll} />
-      <CeoAnalyticsInsights insights={insights} />
     </div>
   );
 }

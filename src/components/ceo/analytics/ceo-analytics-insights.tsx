@@ -4,14 +4,23 @@ import type {
   CeoAnalyticsInsight,
 } from "@/types/ceo-analytics";
 
-function priorityClass(priority: CeoAnalyticsInsight["priority"]) {
+function priorityStyles(priority: CeoAnalyticsInsight["priority"]) {
   switch (priority) {
     case "high":
-      return "border-l-destructive text-destructive";
+      return {
+        border: "border-l-destructive",
+        badge: "bg-destructive/10 text-destructive",
+      };
     case "medium":
-      return "border-l-amber-500 text-amber-700 dark:text-amber-400";
+      return {
+        border: "border-l-amber-500",
+        badge: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+      };
     default:
-      return "border-l-emerald-500 text-emerald-700 dark:text-emerald-400";
+      return {
+        border: "border-l-emerald-500",
+        badge: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+      };
   }
 }
 
@@ -20,45 +29,46 @@ export function CeoAnalyticsInsights({
 }: {
   insights: CeoAnalyticsInsight[];
 }) {
+  if (insights.length === 0) return null;
+
   return (
-    <section className="space-y-3">
+    <section className="w-full space-y-3">
       <div>
-        <h2 className="text-sm font-semibold">Executive Insights</h2>
+        <h2 className="text-sm font-semibold tracking-tight">Executive Insights</h2>
         <p className="text-xs text-muted-foreground">
-          Automatically generated signals from workforce, hiring, attendance, and payroll.
+          Signals that need attention across workforce, hiring, attendance, and payroll
         </p>
       </div>
 
-      {insights.length === 0 ? (
-        <div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground shadow-sm">
-          No material executive signals for the selected filters.
-        </div>
-      ) : (
-        <div className="grid gap-2 md:grid-cols-2">
-          {insights.map((insight) => (
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {insights.map((insight) => {
+          const styles = priorityStyles(insight.priority);
+          return (
             <article
               key={insight.id}
               className={cn(
-                "rounded-xl border border-l-[3px] bg-card px-4 py-3 shadow-sm",
-                priorityClass(insight.priority).split(" ")[0],
+                "rounded-xl border border-l-[3px] bg-card px-4 py-3.5 shadow-sm",
+                styles.border,
               )}
             >
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-medium">{insight.title}</p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-semibold tracking-tight">{insight.title}</p>
                 <span
                   className={cn(
-                    "rounded-md bg-muted px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase",
-                    priorityClass(insight.priority).split(" ").slice(1).join(" "),
+                    "shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase",
+                    styles.badge,
                   )}
                 >
                   {insight.priority}
                 </span>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">{insight.description}</p>
+              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+                {insight.description}
+              </p>
             </article>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
     </section>
   );
 }
@@ -71,17 +81,17 @@ export function CeoAnalyticsComparisonPanel({
   if (comparison.mode === "none") return null;
 
   return (
-    <section className="space-y-3">
+    <section className="w-full space-y-3">
       <div>
-        <h2 className="text-sm font-semibold">Comparison Mode</h2>
+        <h2 className="text-sm font-semibold tracking-tight">Comparison</h2>
         <p className="text-xs text-muted-foreground">
-          {comparison.currentLabel} compared with {comparison.previousLabel}.
+          {comparison.currentLabel} vs {comparison.previousLabel}
         </p>
       </div>
 
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+          <thead className="bg-muted/40 text-left text-xs tracking-wide text-muted-foreground uppercase">
             <tr>
               <th className="px-4 py-2.5 font-medium">Metric</th>
               <th className="px-4 py-2.5 font-medium">Current</th>
@@ -121,7 +131,7 @@ export function CeoAnalyticsComparisonPanel({
             {comparison.departmentComparison.rightLabel}
           </div>
           <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+            <thead className="bg-muted/40 text-left text-xs tracking-wide text-muted-foreground uppercase">
               <tr>
                 <th className="px-4 py-2.5 font-medium">Segment</th>
                 <th className="px-4 py-2.5 font-medium">

@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { Eye, MessageSquareWarning, ThumbsDown, ThumbsUp } from "lucide-react";
+import { Eye } from "lucide-react";
 import { useMemo } from "react";
 import {
   flexRender,
@@ -10,6 +10,7 @@ import {
   type ColumnDef,
 } from "@tanstack/react-table";
 
+import { formatCeoCurrency } from "@/components/ceo/ceo-module-primitives";
 import { Button } from "@/components/common/button";
 import {
   Table,
@@ -19,9 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  EXECUTIVE_APPROVAL_PRIORITY_LABELS,
-} from "@/lib/ceo/executive-approvals-constants";
+import { EXECUTIVE_APPROVAL_PRIORITY_LABELS } from "@/lib/ceo/executive-approvals-constants";
 import { cn } from "@/lib/utils";
 import type { CeoApprovalsQueueRow } from "@/types/ceo-approvals";
 
@@ -33,9 +32,6 @@ type CeoApprovalsQueueTableProps = {
   isLoading?: boolean;
   onPageChange: (page: number) => void;
   onView: (requestId: string) => void;
-  onApprove: (requestId: string) => void;
-  onReject: (requestId: string) => void;
-  onClarify: (requestId: string) => void;
 };
 
 function priorityClass(priority: CeoApprovalsQueueRow["priority"]) {
@@ -58,56 +54,48 @@ export function CeoApprovalsQueueTable({
   isLoading,
   onPageChange,
   onView,
-  onApprove,
-  onReject,
-  onClarify,
 }: CeoApprovalsQueueTableProps) {
   const columns = useMemo<ColumnDef<CeoApprovalsQueueRow>[]>(
     () => [
       {
         accessorKey: "requestCode",
-        header: "Request ID",
+        header: "Request",
         cell: ({ row }) => (
-          <button
-            type="button"
-            className="font-medium text-primary hover:underline"
-            onClick={() => onView(row.original.id)}
-          >
-            {row.original.requestCode}
-          </button>
+          <div className="min-w-0">
+            <button
+              type="button"
+              className="font-medium text-primary hover:underline"
+              onClick={() => onView(row.original.id)}
+            >
+              {row.original.requestCode}
+            </button>
+            <p className="mt-0.5 max-w-[16rem] truncate text-xs text-muted-foreground">
+              {row.original.title}
+            </p>
+          </div>
         ),
       },
       {
         accessorKey: "approvalTypeLabel",
-        header: "Approval Type",
-      },
-      {
-        accessorKey: "departmentName",
-        header: "Department",
-        cell: ({ row }) => row.original.departmentName ?? "—",
-      },
-      {
-        accessorKey: "requestedByName",
-        header: "Requested By",
-        cell: ({ row }) => row.original.requestedByName ?? "System / HR",
-      },
-      {
-        accessorKey: "submittedAt",
-        header: "Submitted Date",
-        cell: ({ row }) => format(new Date(row.original.submittedAt), "dd MMM yyyy"),
+        header: "Type",
       },
       {
         accessorKey: "priority",
         header: "Priority",
         cell: ({ row }) => (
-          <span className={cn("text-xs font-semibold uppercase", priorityClass(row.original.priority))}>
+          <span
+            className={cn(
+              "text-xs font-semibold uppercase",
+              priorityClass(row.original.priority),
+            )}
+          >
             {EXECUTIVE_APPROVAL_PRIORITY_LABELS[row.original.priority]}
           </span>
         ),
       },
       {
         accessorKey: "statusLabel",
-        header: "Current Status",
+        header: "Status",
         cell: ({ row }) => (
           <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium">
             {row.original.statusLabel}
@@ -116,71 +104,47 @@ export function CeoApprovalsQueueTable({
       },
       {
         accessorKey: "dueAt",
-        header: "Due Date",
+        header: "Due",
         cell: ({ row }) =>
           row.original.dueAt ? (
-            <span className={row.original.isOverdue ? "text-destructive" : undefined}>
-              {format(new Date(row.original.dueAt), "dd MMM yyyy")}
+            <span
+              className={cn(
+                "tabular-nums",
+                row.original.isOverdue ? "font-medium text-destructive" : undefined,
+              )}
+            >
+              {format(new Date(row.original.dueAt), "d MMM yyyy")}
             </span>
           ) : (
             "—"
           ),
       },
       {
+        accessorKey: "financialImpact",
+        header: "Impact",
+        cell: ({ row }) =>
+          row.original.financialImpact > 0
+            ? formatCeoCurrency(row.original.financialImpact)
+            : "—",
+      },
+      {
         id: "actions",
-        header: "Actions",
-        cell: ({ row }) => {
-          const canAct = ["pending_ceo", "escalated", "forwarded"].includes(
-            row.original.status,
-          );
-          return (
-            <div className="flex flex-wrap items-center gap-1">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => onView(row.original.id)}
-              >
-                <Eye className="size-3.5" />
-                View
-              </Button>
-              {canAct ? (
-                <>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onApprove(row.original.id)}
-                  >
-                    <ThumbsUp className="size-3.5" />
-                    Approve
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onReject(row.original.id)}
-                  >
-                    <ThumbsDown className="size-3.5" />
-                    Reject
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onClarify(row.original.id)}
-                  >
-                    <MessageSquareWarning className="size-3.5" />
-                    Clarify
-                  </Button>
-                </>
-              ) : null}
-            </div>
-          );
-        },
+        header: "",
+        cell: ({ row }) => (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={() => onView(row.original.id)}
+          >
+            <Eye className="size-3.5" />
+            Review
+          </Button>
+        ),
       },
     ],
-    [onApprove, onClarify, onReject, onView],
+    [onView],
   );
 
   const table = useReactTable({
@@ -192,79 +156,97 @@ export function CeoApprovalsQueueTable({
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
-    <section className="space-y-3">
+    <section className="w-full space-y-3">
       <div>
-        <h2 className="text-sm font-semibold">Approval Queue</h2>
+        <h2 className="text-sm font-semibold tracking-tight">Approval Queue</h2>
         <p className="text-xs text-muted-foreground">
-          Strategic approvals escalated for CEO authorization.
+          Open a request to approve, reject, clarify, or forward
         </p>
       </div>
 
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
-                  {isLoading ? "Loading approvals…" : "No executive approvals match these filters."}
-                </TableCell>
-              </TableRow>
-            ) : (
-              table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} className={isLoading ? "opacity-60" : undefined}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => (
+                    <TableHead key={header.id}>
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext(),
+                          )}
+                    </TableHead>
                   ))}
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      <div className="flex items-center justify-between gap-3 text-sm">
-        <p className="text-muted-foreground">
-          Showing {rows.length === 0 ? 0 : (page - 1) * pageSize + 1}–
-          {Math.min(page * pageSize, total)} of {total}
-        </p>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={page <= 1 || isLoading}
-            onClick={() => onPageChange(page - 1)}
-          >
-            Previous
-          </Button>
-          <span className="tabular-nums text-muted-foreground">
-            {page} / {totalPages}
-          </span>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={page >= totalPages || isLoading}
-            onClick={() => onPageChange(page + 1)}
-          >
-            Next
-          </Button>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {rows.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-24 text-center text-muted-foreground"
+                  >
+                    {isLoading
+                      ? "Loading approvals…"
+                      : "No executive approvals match these filters."}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    className={isLoading ? "opacity-60" : undefined}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </div>
+
+        {total > pageSize ? (
+          <div className="flex items-center justify-between gap-3 border-t px-4 py-3 text-sm">
+            <p className="text-muted-foreground">
+              Showing {rows.length === 0 ? 0 : (page - 1) * pageSize + 1}–
+              {Math.min(page * pageSize, total)} of {total}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={page <= 1 || isLoading}
+                onClick={() => onPageChange(page - 1)}
+              >
+                Previous
+              </Button>
+              <span className="tabular-nums text-muted-foreground">
+                {page} / {totalPages}
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={page >= totalPages || isLoading}
+                onClick={() => onPageChange(page + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </section>
   );

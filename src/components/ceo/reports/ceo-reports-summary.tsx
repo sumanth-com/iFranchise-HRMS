@@ -1,47 +1,39 @@
 import { CeoStatCard } from "@/components/ceo/ceo-module-primitives";
 import type { CeoReportsKpis } from "@/types/ceo-reports";
 
-function formatBytes(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 export function CeoReportsSummary({ kpis }: { kpis: CeoReportsKpis }) {
   return (
     <section
       aria-label="Executive reports KPIs"
-      className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4"
+      className="grid w-full grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6 lg:gap-3"
     >
       <CeoStatCard
-        label="Total Reports Generated"
-        value={String(kpis.totalReportsGenerated)}
-      />
-      <CeoStatCard label="Scheduled Reports" value={String(kpis.scheduledReports)} />
-      <CeoStatCard
-        label="Reports Generated This Month"
+        label="Generated"
         value={String(kpis.reportsGeneratedThisMonth)}
       />
       <CeoStatCard
-        label="Most Downloaded Report"
-        value={kpis.mostDownloadedReport ?? "—"}
+        label="Active Schedules"
+        value={String(kpis.scheduledReports)}
       />
       <CeoStatCard
-        label="Last Generated Report"
-        value={kpis.lastGeneratedReport ?? "—"}
-      />
-      <CeoStatCard
-        label="Next Scheduled Report"
+        label="Next Delivery"
         value={kpis.nextScheduledReport ?? "—"}
+        wrapValue
       />
       <CeoStatCard
-        label="Failed Report Jobs"
+        label="Latest Report"
+        value={kpis.lastGeneratedReport ?? "—"}
+        wrapValue
+      />
+      <CeoStatCard
+        label="Failed"
         value={String(kpis.failedReportJobs)}
         accent={kpis.failedReportJobs > 0 ? "text-destructive" : undefined}
       />
       <CeoStatCard
-        label="Report Storage Usage"
-        value={formatBytes(kpis.reportStorageUsageBytes)}
+        label="Most Used"
+        value={kpis.mostDownloadedReport ?? "—"}
+        wrapValue
       />
     </section>
   );

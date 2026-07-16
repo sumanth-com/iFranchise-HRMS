@@ -19,6 +19,7 @@ import {
 import { formatNotificationModule } from "@/lib/notifications/constants";
 import {
   archiveNotification,
+  deleteNotification,
   markNotificationRead,
 } from "@/lib/notifications/services/notification-mutations";
 import { ceoNotificationsListParamsSchema } from "@/lib/validations/ceo-notifications";
@@ -464,6 +465,14 @@ export async function archiveCeoNotification(
   notificationId: string,
 ) {
   await archiveNotification(supabase, profile, notificationId);
+}
+
+export async function deleteCeoNotification(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  notificationId: string,
+) {
+  await deleteNotification(supabase, profile, notificationId);
 }
 
 export async function completeCeoNotificationAfterNavigate(

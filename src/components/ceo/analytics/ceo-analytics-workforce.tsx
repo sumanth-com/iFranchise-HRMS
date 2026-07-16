@@ -4,67 +4,73 @@ import {
 } from "@/components/ceo/ceo-module-primitives";
 import type { CeoAnalyticsWorkforce } from "@/types/ceo-analytics";
 
+function hasChartData(items: { value: number }[]) {
+  return items.some((item) => item.value !== 0);
+}
+
 export function CeoAnalyticsWorkforcePanel({
   workforce,
 }: {
   workforce: CeoAnalyticsWorkforce;
 }) {
+  const charts = [
+    hasChartData(workforce.headcountGrowth) ? (
+      <CeoChartPanel
+        key="headcount"
+        title="Headcount Growth"
+        items={workforce.headcountGrowth}
+      />
+    ) : null,
+    hasChartData(workforce.departmentGrowth) ? (
+      <CeoChartPanel
+        key="department"
+        title="Department Growth"
+        items={workforce.departmentGrowth}
+        color="bg-sky-500"
+      />
+    ) : null,
+    hasChartData(workforce.joiningTrend) ? (
+      <CeoChartPanel
+        key="joining"
+        title="Joining Trend"
+        items={workforce.joiningTrend}
+        color="bg-emerald-500"
+      />
+    ) : null,
+    hasChartData(workforce.employmentTypeDistribution) ? (
+      <CeoChartPanel
+        key="employment"
+        title="Employment Type"
+        items={workforce.employmentTypeDistribution}
+        color="bg-violet-500"
+      />
+    ) : null,
+  ].filter(Boolean);
+
+  if (charts.length === 0 && workforce.averageTenureYears <= 0) return null;
+
   return (
-    <section className="space-y-3">
-      <div>
-        <h2 className="text-sm font-semibold">Workforce Analytics</h2>
-        <p className="text-xs text-muted-foreground">
-          Headcount, demographics, tenure, joining and exit trends.
-        </p>
-      </div>
-
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        <CeoStatCard
-          label="Average Employee Tenure"
-          value={`${workforce.averageTenureYears.toFixed(1)} yrs`}
-        />
-      </div>
-
-      <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-        <CeoChartPanel title="Headcount Growth" items={workforce.headcountGrowth} />
-        <CeoChartPanel
-          title="Department Growth"
-          items={workforce.departmentGrowth}
-          color="bg-sky-500"
-        />
-        <CeoChartPanel
-          title="Manager Distribution"
-          items={workforce.managerDistribution}
-          color="bg-indigo-500"
-        />
-        <CeoChartPanel
-          title="Employment Type Distribution"
-          items={workforce.employmentTypeDistribution}
-          color="bg-violet-500"
-        />
-        <CeoChartPanel
-          title="Gender Distribution"
-          items={workforce.genderDistribution}
-          color="bg-fuchsia-500"
-        />
-        {workforce.ageDistribution.length > 0 ? (
-          <CeoChartPanel
-            title="Age Distribution"
-            items={workforce.ageDistribution}
-            color="bg-amber-500"
-          />
+    <section className="w-full space-y-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold tracking-tight">Workforce</h2>
+          <p className="text-xs text-muted-foreground">
+            Headcount, growth, and workforce mix
+          </p>
+        </div>
+        {workforce.averageTenureYears > 0 ? (
+          <div className="w-full max-w-[10.5rem] sm:w-auto">
+            <CeoStatCard
+              label="Avg Tenure"
+              value={`${workforce.averageTenureYears.toFixed(1)} yrs`}
+            />
+          </div>
         ) : null}
-        <CeoChartPanel
-          title="Joining Trend"
-          items={workforce.joiningTrend}
-          color="bg-emerald-500"
-        />
-        <CeoChartPanel
-          title="Exit Trend"
-          items={workforce.exitTrend}
-          color="bg-rose-500"
-        />
       </div>
+
+      {charts.length > 0 ? (
+        <div className="grid gap-3 lg:grid-cols-2">{charts}</div>
+      ) : null}
     </section>
   );
 }

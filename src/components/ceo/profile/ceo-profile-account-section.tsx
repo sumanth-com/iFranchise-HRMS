@@ -15,13 +15,13 @@ import {
 } from "@/lib/ceo/actions/ceo-profile-actions";
 import type { CeoAccountInfo } from "@/types/ceo-profile";
 
-function Field({ label, value }: { label: string; value: React.ReactNode }) {
+function Meta({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="rounded-lg border bg-background/80 px-3 py-2.5">
+    <div>
       <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
         {label}
       </p>
-      <div className="mt-1 text-sm font-medium break-words">{value || "—"}</div>
+      <p className="mt-1 text-sm font-medium">{value || "—"}</p>
     </div>
   );
 }
@@ -116,38 +116,37 @@ export function CeoProfileAccountSection({
   }
 
   return (
-    <section id="account" className="rounded-xl border bg-card p-4 shadow-sm md:p-6">
+    <section id="account" className="rounded-xl border bg-card p-4 shadow-sm md:p-5">
       <div className="mb-4">
-        <h2 className="text-lg font-semibold">Account</h2>
-        <p className="text-sm text-muted-foreground">
-          Manage password, two-factor authentication, and active sessions.
+        <h2 className="text-sm font-semibold tracking-tight">Account & security</h2>
+        <p className="text-xs text-muted-foreground">
+          Password, two-factor authentication, and active sessions.
         </p>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <Field label="Email" value={account.email} />
-        <Field label="Username" value={account.username} />
-        <Field
-          label="Last Login"
+      <div className="grid gap-4 border-b pb-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Meta label="Work email" value={account.email} />
+        <Meta
+          label="Last login"
           value={
             account.lastLoginAt
-              ? format(new Date(account.lastLoginAt), "dd MMM yyyy HH:mm")
+              ? format(new Date(account.lastLoginAt), "d MMM yyyy HH:mm")
               : "—"
           }
         />
-        <Field
-          label="Last Password Change"
+        <Meta
+          label="2FA"
+          value={account.twoFactorEnabled ? "Enabled" : "Off"}
+        />
+        <Meta
+          label="Password changed"
           value={
             account.passwordLastChangedAt
-              ? format(new Date(account.passwordLastChangedAt), "dd MMM yyyy HH:mm")
+              ? format(new Date(account.passwordLastChangedAt), "d MMM yyyy")
               : "—"
           }
         />
-        <Field
-          label="Two-Factor Authentication"
-          value={account.twoFactorEnabled ? "Enabled" : "Disabled"}
-        />
-        <Field label="Active Sessions" value={String(account.activeSessionCount)} />
+        <Meta label="Active sessions" value={String(account.activeSessionCount)} />
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
@@ -158,7 +157,7 @@ export function CeoProfileAccountSection({
           disabled={isPending}
           onClick={() => setShowPasswordForm((value) => !value)}
         >
-          Change Password
+          Change password
         </Button>
         <Button
           type="button"
@@ -176,12 +175,12 @@ export function CeoProfileAccountSection({
           disabled={isPending || account.activeSessionCount <= 1}
           onClick={signOutOthers}
         >
-          Sign Out Other Sessions
+          Sign out other devices
         </Button>
       </div>
 
       {showPasswordForm ? (
-        <div className="mt-4 grid max-w-xl gap-3 md:grid-cols-3">
+        <div className="mt-4 grid max-w-xl gap-3 sm:grid-cols-3">
           <Input
             type="password"
             placeholder="Current password"
@@ -206,12 +205,12 @@ export function CeoProfileAccountSection({
           <Button
             type="button"
             size="sm"
-            className="md:col-span-3"
+            className="sm:col-span-3"
             disabled={isPending}
             onClick={changePassword}
           >
             {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-            Save Password
+            Update password
           </Button>
         </div>
       ) : null}
@@ -222,7 +221,11 @@ export function CeoProfileAccountSection({
             Scan this QR code, then enter the 6-digit code from your authenticator app.
           </p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={mfaQr} alt="2FA QR code" className="size-40 rounded-md border bg-white p-2" />
+          <img
+            src={mfaQr}
+            alt="2FA QR code"
+            className="size-40 rounded-md border bg-white p-2"
+          />
           <div className="flex max-w-sm gap-2">
             <Input
               value={mfaCode}

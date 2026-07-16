@@ -7,6 +7,7 @@ import { CEO_ROUTES } from "@/lib/ceo/constants";
 import {
   archiveCeoNotification,
   completeCeoNotificationAfterNavigate,
+  deleteCeoNotification,
   getCeoNotificationDetail,
   getCeoNotificationsPageData,
   markCeoNotificationRead,
@@ -123,6 +124,24 @@ export async function archiveCeoNotificationAction(
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to archive notification",
+    };
+  }
+}
+
+export async function deleteCeoNotificationAction(
+  input: unknown,
+): Promise<CeoNotificationsActionResult> {
+  try {
+    const profile = await requireServerPermission(PORTAL_PERMISSIONS.ceo);
+    const supabase = await createClient();
+    const parsed = ceoNotificationIdSchema.parse(input);
+    await deleteCeoNotification(supabase, profile, parsed.notificationId);
+    revalidateCeoNotifications();
+    return { success: true, message: "Notification deleted." };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to delete notification",
     };
   }
 }

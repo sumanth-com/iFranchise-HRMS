@@ -1,19 +1,13 @@
 "use client";
 
-import { useCallback, useRef, useState, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
 
 import {
   CeoBackToDashboard,
   CeoModulePageHeader,
 } from "@/components/ceo/ceo-module-primitives";
 import { CeoReportsBuilder } from "@/components/ceo/reports/ceo-reports-builder";
-import { CeoReportsCategories } from "@/components/ceo/reports/ceo-reports-categories";
 import { CeoReportsDrawer } from "@/components/ceo/reports/ceo-reports-drawer";
-import { CeoReportsFilters } from "@/components/ceo/reports/ceo-reports-filters";
-import {
-  CeoReportsHistory,
-  CeoReportsInsightsPanel,
-} from "@/components/ceo/reports/ceo-reports-history";
 import { CeoReportsLibraryTable } from "@/components/ceo/reports/ceo-reports-library-table";
 import { CeoReportsSchedules } from "@/components/ceo/reports/ceo-reports-schedules";
 import { CeoReportsSummary } from "@/components/ceo/reports/ceo-reports-summary";
@@ -44,32 +38,23 @@ function downloadBase64(filename: string, mimeType: string, contentBase64: strin
   URL.revokeObjectURL(url);
 }
 
-function defaultFilters(): CeoReportsListParams {
-  return { page: 1, pageSize: 10 };
-}
-
 export function CeoReportsView({
   kpis: initialKpis,
   catalog,
   library: initialLibrary,
   schedules: initialSchedules,
-  history: initialHistory,
-  insights: initialInsights,
   lookups,
   initialFilters,
 }: CeoReportsViewProps) {
   const [kpis, setKpis] = useState(initialKpis);
   const [library, setLibrary] = useState(initialLibrary);
   const [schedules, setSchedules] = useState(initialSchedules);
-  const [history, setHistory] = useState(initialHistory);
-  const [insights, setInsights] = useState(initialInsights);
   const [filters, setFilters] = useState<CeoReportsListParams>(initialFilters);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [scheduleReportKey, setScheduleReportKey] = useState<string | undefined>();
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const searchTimerRef = useRef<number | null>(null);
 
   const refresh = useCallback((nextFilters: CeoReportsListParams) => {
     startTransition(async () => {
@@ -77,27 +62,8 @@ export function CeoReportsView({
       setKpis(data.kpis);
       setLibrary(data.library);
       setSchedules(data.schedules);
-      setHistory(data.history);
-      setInsights(data.insights);
     });
   }, []);
-
-  function updateFilters(next: Partial<CeoReportsListParams>) {
-    const merged = { ...filters, ...next };
-    setFilters(merged);
-    if ("search" in next) {
-      if (searchTimerRef.current) window.clearTimeout(searchTimerRef.current);
-      searchTimerRef.current = window.setTimeout(() => refresh(merged), 250);
-      return;
-    }
-    refresh(merged);
-  }
-
-  function resetFilters() {
-    const next = defaultFilters();
-    setFilters(next);
-    refresh(next);
-  }
 
   function openPreview(runId: string) {
     setSelectedRunId(runId);
@@ -136,32 +102,29 @@ export function CeoReportsView({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5">
+    <div className="flex w-full min-h-0 flex-1 flex-col gap-3 overflow-y-auto scroll-smooth p-3 pb-8 md:gap-4 md:p-4 md:pb-10 lg:p-5">
       <CeoBackToDashboard />
       <CeoModulePageHeader
         title="Executive Reports"
-        description="Generate, schedule and export executive business reports for leadership and board meetings."
+        description="Generate, schedule, and export leadership reports for board and executive reviews."
       />
 
       <CeoReportsSummary kpis={kpis} />
 
-      <CeoReportsFilters
-        filters={filters}
-        lookups={lookups}
-        onChange={updateFilters}
-        onReset={resetFilters}
-        disabled={isPending}
-      />
-
-      <CeoReportsCategories
-        catalog={catalog}
-        activeCategory={filters.category}
-        onSelect={(category) => updateFilters({ category, page: 1 })}
-      />
-
       {actionMessage ? (
         <p className="text-sm text-muted-foreground">{actionMessage}</p>
       ) : null}
+
+      <CeoReportsBuilder
+        catalog={catalog}
+        lookups={lookups}
+        disabled={isPending}
+        onGenerated={(payload) => {
+          setActionMessage(payload.message);
+          refresh(filters);
+          if (payload.runId) openPreview(payload.runId);
+        }}
+      />
 
       <CeoReportsLibraryTable
         rows={library.data}
@@ -169,7 +132,11 @@ export function CeoReportsView({
         page={library.page}
         pageSize={library.pageSize}
         isLoading={isPending}
-        onPageChange={(page) => updateFilters({ page })}
+        onPageChange={(page) => {
+          const next = { ...filters, page };
+          setFilters(next);
+          refresh(next);
+        }}
         onView={openPreview}
         onDownload={onDownload}
         onShare={onShare}
@@ -181,21 +148,6 @@ export function CeoReportsView({
         }}
       />
 
-      <CeoReportsBuilder
-        catalog={
-          filters.category
-            ? catalog.filter((item) => item.category === filters.category)
-            : catalog
-        }
-        lookups={lookups}
-        disabled={isPending}
-        onGenerated={(payload) => {
-          setActionMessage(payload.message);
-          refresh(filters);
-          if (payload.runId) openPreview(payload.runId);
-        }}
-      />
-
       <div id="ceo-scheduled-reports">
         <CeoReportsSchedules
           schedules={schedules}
@@ -204,9 +156,6 @@ export function CeoReportsView({
           onChanged={() => refresh(filters)}
         />
       </div>
-
-      <CeoReportsHistory history={history} />
-      <CeoReportsInsightsPanel insights={insights} />
 
       <CeoReportsDrawer
         runId={selectedRunId}

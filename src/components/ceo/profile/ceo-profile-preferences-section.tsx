@@ -1,12 +1,11 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Loader2, Volume2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
-import { Input } from "@/components/common/input";
 import {
   Select,
   SelectContent,
@@ -20,7 +19,10 @@ import {
 } from "@/lib/ceo/actions/ceo-profile-actions";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { NOTIFICATION_SOUND_OPTIONS } from "@/lib/notifications/constants";
+import { previewNotificationSound } from "@/lib/notifications/play-notification-sound";
+import { cn } from "@/lib/utils";
 import type { CeoAlertPreferences, CeoUserPreferences } from "@/types/ceo-profile";
+import type { NotificationSoundTone } from "@/types/notifications";
 
 const LANDING_OPTIONS = [
   { value: CEO_ROUTES.home, label: "CEO Dashboard" },
@@ -30,20 +32,36 @@ const LANDING_OPTIONS = [
   { value: CEO_ROUTES.notifications, label: "Notifications" },
 ];
 
-const ALERT_TOGGLES: {
+const USEFUL_ALERTS: {
   key: keyof CeoAlertPreferences;
   label: string;
+  description: string;
 }[] = [
-  { key: "executiveAlerts", label: "Executive Alerts" },
-  { key: "payrollAlerts", label: "Payroll Alerts" },
-  { key: "recruitmentAlerts", label: "Recruitment Alerts" },
-  { key: "attendanceAlerts", label: "Attendance Alerts" },
-  { key: "performanceAlerts", label: "Performance Alerts" },
-  { key: "approvals", label: "Approvals" },
-  { key: "companyAnnouncements", label: "Company Announcements" },
-  { key: "emailNotifications", label: "Email Notifications" },
-  { key: "pushNotifications", label: "Push Notifications" },
-  { key: "desktopNotifications", label: "Desktop Notifications" },
+  {
+    key: "approvals",
+    label: "Pending approvals",
+    description: "Alert when executive approvals need your decision.",
+  },
+  {
+    key: "executiveAlerts",
+    label: "Critical executive alerts",
+    description: "High-priority company and leadership signals.",
+  },
+  {
+    key: "payrollAlerts",
+    label: "Payroll alerts",
+    description: "Payroll exceptions and release readiness.",
+  },
+  {
+    key: "companyAnnouncements",
+    label: "Company announcements",
+    description: "Board and organization-wide updates.",
+  },
+  {
+    key: "emailNotifications",
+    label: "Email delivery",
+    description: "Also send important alerts to your work email.",
+  },
 ];
 
 export function CeoProfilePreferencesSection({
@@ -71,28 +89,33 @@ export function CeoProfilePreferencesSection({
   }
 
   return (
-    <section id="preferences" className="rounded-xl border bg-card p-4 shadow-sm md:p-6">
+    <section id="preferences" className="rounded-xl border bg-card p-4 shadow-sm md:p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Preferences</h2>
-          <p className="text-sm text-muted-foreground">
-            Theme, language, formats, and default landing experience.
+          <h2 className="text-sm font-semibold tracking-tight">Workspace preferences</h2>
+          <p className="text-xs text-muted-foreground">
+            Theme, landing page, and how you enter the portal each day.
           </p>
         </div>
         <Button type="button" size="sm" disabled={isPending} onClick={save}>
           {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-          Save Preferences
+          Save
         </Button>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Theme</label>
+          <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+            Theme
+          </label>
           <Select
             value={form.theme}
             onValueChange={(value) => {
               if (!value) return;
-              setForm((prev) => ({ ...prev, theme: value as CeoUserPreferences["theme"] }));
+              setForm((prev) => ({
+                ...prev,
+                theme: value as CeoUserPreferences["theme"],
+              }));
             }}
           >
             <SelectTrigger>
@@ -108,140 +131,16 @@ export function CeoProfilePreferencesSection({
 
         <div>
           <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-            Language
-          </label>
-          <Select
-            value={form.language}
-            onValueChange={(value) => {
-              if (!value) return;
-              setForm((prev) => ({ ...prev, language: value }));
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="en">English</SelectItem>
-              <SelectItem value="hi">Hindi</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-            Timezone
-          </label>
-          <Input
-            value={form.timezone}
-            onChange={(e) => setForm((prev) => ({ ...prev, timezone: e.target.value }))}
-          />
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-            Date Format
-          </label>
-          <Select
-            value={form.dateFormat}
-            onValueChange={(value) => {
-              if (!value) return;
-              setForm((prev) => ({ ...prev, dateFormat: value }));
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="dd MMM yyyy">dd MMM yyyy</SelectItem>
-              <SelectItem value="MM/dd/yyyy">MM/dd/yyyy</SelectItem>
-              <SelectItem value="yyyy-MM-dd">yyyy-MM-dd</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-            Time Format
-          </label>
-          <Select
-            value={form.timeFormat}
-            onValueChange={(value) => {
-              if (!value) return;
-              setForm((prev) => ({
-                ...prev,
-                timeFormat: value as CeoUserPreferences["timeFormat"],
-              }));
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="24h">24-hour</SelectItem>
-              <SelectItem value="12h">12-hour</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-            Default Dashboard
-          </label>
-          <Select
-            value={form.defaultDashboard}
-            onValueChange={(value) => {
-              if (!value) return;
-              setForm((prev) => ({ ...prev, defaultDashboard: value }));
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {LANDING_OPTIONS.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-            Default Landing Page
+            Default landing page
           </label>
           <Select
             value={form.defaultLandingPage}
             onValueChange={(value) => {
               if (!value) return;
-              setForm((prev) => ({ ...prev, defaultLandingPage: value }));
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {LANDING_OPTIONS.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-            Sidebar State
-          </label>
-          <Select
-            value={form.sidebarState}
-            onValueChange={(value) => {
-              if (!value) return;
               setForm((prev) => ({
                 ...prev,
-                sidebarState: value as CeoUserPreferences["sidebarState"],
+                defaultLandingPage: value,
+                defaultDashboard: value,
               }));
             }}
           >
@@ -249,28 +148,7 @@ export function CeoProfilePreferencesSection({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="expanded">Expanded</SelectItem>
-              <SelectItem value="collapsed">Collapsed</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-            Notification Sound
-          </label>
-          <Select
-            value={form.notificationSound}
-            onValueChange={(value) => {
-              if (!value) return;
-              setForm((prev) => ({ ...prev, notificationSound: value }));
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {NOTIFICATION_SOUND_OPTIONS.map((item) => (
+              {LANDING_OPTIONS.map((item) => (
                 <SelectItem key={item.value} value={item.value}>
                   {item.label}
                 </SelectItem>
@@ -285,59 +163,135 @@ export function CeoProfilePreferencesSection({
 
 export function CeoProfileNotificationSection({
   alertPreferences,
+  preferences,
   onUpdated,
 }: {
   alertPreferences: CeoAlertPreferences;
+  preferences: CeoUserPreferences;
   onUpdated: () => void;
 }) {
-  const [form, setForm] = useState(alertPreferences);
+  const [alerts, setAlerts] = useState(alertPreferences);
+  const [sound, setSound] = useState(preferences.notificationSound);
+  const [prefs, setPrefs] = useState(preferences);
   const [isPending, startTransition] = useTransition();
 
   function save() {
     startTransition(async () => {
-      const result = await saveCeoAlertPreferencesAction(form);
-      if (result.success) {
-        toast.success(result.message);
-        onUpdated();
-      } else {
-        toast.error(result.message);
+      const nextPrefs = { ...prefs, notificationSound: sound };
+      const [prefsResult, alertsResult] = await Promise.all([
+        saveCeoPreferencesAction(nextPrefs),
+        saveCeoAlertPreferencesAction(alerts),
+      ]);
+      if (!prefsResult.success) {
+        toast.error(prefsResult.message);
+        return;
       }
+      if (!alertsResult.success) {
+        toast.error(alertsResult.message);
+        return;
+      }
+      setPrefs(nextPrefs);
+      toast.success("Notification settings saved.");
+      onUpdated();
     });
   }
 
   return (
-    <section id="notifications" className="rounded-xl border bg-card p-4 shadow-sm md:p-6">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold">Notification Preferences</h2>
-          <p className="text-sm text-muted-foreground">
-            Configure executive alert categories and delivery channels.
-          </p>
+    <section id="notifications" className="space-y-3">
+      <div className="rounded-xl border bg-card p-4 shadow-sm md:p-5">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold tracking-tight">Notification sound</h2>
+            <p className="text-xs text-muted-foreground">
+              Choose one of three tones for new in-app alerts.
+            </p>
+          </div>
+          <Button type="button" size="sm" disabled={isPending} onClick={save}>
+            {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+            Save
+          </Button>
         </div>
-        <Button type="button" size="sm" disabled={isPending} onClick={save}>
-          {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-          Save Notifications
-        </Button>
+
+        <div className="divide-y rounded-lg border">
+          {NOTIFICATION_SOUND_OPTIONS.map((option) => {
+            const selected = sound === option.value;
+            return (
+              <div
+                key={option.value}
+                className={cn(
+                  "flex items-start justify-between gap-3 px-3 py-3",
+                  selected && "bg-accent/40",
+                )}
+              >
+                <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3">
+                  <input
+                    type="radio"
+                    name="ceo-notification-sound"
+                    className="mt-1 size-4 shrink-0"
+                    checked={selected}
+                    disabled={isPending}
+                    onChange={() => setSound(option.value)}
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium">{option.label}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {option.description}
+                    </span>
+                  </span>
+                </label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0"
+                  disabled={isPending}
+                  onClick={() =>
+                    previewNotificationSound(option.value as NotificationSoundTone)
+                  }
+                >
+                  <Volume2 className="size-3.5" />
+                  Preview
+                </Button>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        {ALERT_TOGGLES.map((item) => (
-          <label
-            key={item.key}
-            className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
-          >
-            <span className="text-sm font-medium">{item.label}</span>
-            <input
-              type="checkbox"
-              className="size-4"
-              checked={form[item.key]}
-              disabled={isPending}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, [item.key]: event.target.checked }))
-              }
-            />
-          </label>
-        ))}
+      <div className="rounded-xl border bg-card p-4 shadow-sm md:p-5">
+        <div className="mb-3">
+          <h2 className="text-sm font-semibold tracking-tight">Alert categories</h2>
+          <p className="text-xs text-muted-foreground">
+            Only the channels executives usually need day to day.
+          </p>
+        </div>
+        <div className="divide-y rounded-lg border">
+          {USEFUL_ALERTS.map((item) => (
+            <label
+              key={item.key}
+              className="flex cursor-pointer items-start justify-between gap-3 px-3 py-3"
+            >
+              <span className="min-w-0">
+                <span className="block text-sm font-medium">{item.label}</span>
+                <span className="block text-xs text-muted-foreground">
+                  {item.description}
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                className="mt-1 size-4 shrink-0"
+                checked={alerts[item.key]}
+                disabled={isPending}
+                onChange={(event) =>
+                  setAlerts((prev) => ({
+                    ...prev,
+                    [item.key]: event.target.checked,
+                  }))
+                }
+              />
+            </label>
+          ))}
+        </div>
       </div>
     </section>
   );

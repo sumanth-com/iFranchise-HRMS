@@ -5,56 +5,69 @@ import {
 } from "@/components/ceo/ceo-module-primitives";
 import type { CeoAnalyticsPayroll } from "@/types/ceo-analytics";
 
+function hasChartData(items: { value: number }[]) {
+  return items.some((item) => item.value !== 0);
+}
+
 export function CeoAnalyticsPayrollPanel({ payroll }: { payroll: CeoAnalyticsPayroll }) {
+  const hasStats = payroll.averageSalary > 0 || payroll.benefitsCost > 0;
+
+  const charts = [
+    hasChartData(payroll.payrollCostTrend) ? (
+      <CeoChartPanel
+        key="trend"
+        title="Payroll Cost Trend"
+        items={payroll.payrollCostTrend}
+        formatValue={formatCeoCurrency}
+      />
+    ) : null,
+    hasChartData(payroll.departmentPayroll) ? (
+      <CeoChartPanel
+        key="dept"
+        title="Department Spend"
+        items={payroll.departmentPayroll}
+        color="bg-violet-500"
+        formatValue={formatCeoCurrency}
+      />
+    ) : null,
+    hasChartData(payroll.bonusTrend) ? (
+      <CeoChartPanel
+        key="bonus"
+        title="Bonus Trend"
+        items={payroll.bonusTrend}
+        color="bg-amber-500"
+        formatValue={formatCeoCurrency}
+      />
+    ) : null,
+  ].filter(Boolean);
+
+  if (!hasStats && charts.length === 0) return null;
+
   return (
-    <section className="space-y-3">
+    <section className="w-full space-y-3">
       <div>
-        <h2 className="text-sm font-semibold">Payroll Analytics</h2>
+        <h2 className="text-sm font-semibold tracking-tight">Payroll</h2>
         <p className="text-xs text-muted-foreground">
-          Cost trends, department spend, salary bands, bonuses, and benefits.
+          Cost trends, department spend, and benefits
         </p>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-        <CeoStatCard
-          label="Average Salary"
-          value={formatCeoCurrency(payroll.averageSalary)}
-        />
-        <CeoStatCard
-          label="Benefits Cost"
-          value={formatCeoCurrency(payroll.benefitsCost)}
-        />
-      </div>
+      {hasStats ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <CeoStatCard
+            label="Avg Salary"
+            value={formatCeoCurrency(payroll.averageSalary)}
+          />
+          <CeoStatCard
+            label="Benefits"
+            value={formatCeoCurrency(payroll.benefitsCost)}
+          />
+        </div>
+      ) : null}
 
-      <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-        <CeoChartPanel
-          title="Payroll Cost Trend"
-          items={payroll.payrollCostTrend}
-          formatValue={formatCeoCurrency}
-        />
-        <CeoChartPanel
-          title="Department Payroll"
-          items={payroll.departmentPayroll}
-          color="bg-violet-500"
-          formatValue={formatCeoCurrency}
-        />
-        <CeoChartPanel
-          title="Salary Distribution"
-          items={payroll.salaryDistribution}
-          color="bg-indigo-500"
-        />
-        <CeoChartPanel
-          title="Bonus Trend"
-          items={payroll.bonusTrend}
-          color="bg-amber-500"
-          formatValue={formatCeoCurrency}
-        />
-        <CeoChartPanel
-          title="Payroll Growth"
-          items={payroll.payrollGrowth}
-          color="bg-rose-500"
-        />
-      </div>
+      {charts.length > 0 ? (
+        <div className="grid gap-3 lg:grid-cols-2">{charts}</div>
+      ) : null}
     </section>
   );
 }
