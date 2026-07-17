@@ -1,6 +1,6 @@
 "use client";
 
-import { RotateCcw, Users } from "lucide-react";
+import { Building2, RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/common/button";
 import {
@@ -10,13 +10,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/common/select";
-import { EMPLOYMENT_STATUS_LABELS } from "@/lib/employees/constants";
 import {
   FILTER_ANY_VALUE,
   filterSelectLabel,
-  filterSelectLabelFromMap,
   MANAGER_FILTER_SELECT_CONTENT_CLASS,
-  MANAGER_TEAM_MEMBER_SELECT_CONTENT_CLASS,
 } from "@/lib/manager/filter-select";
 import type { CeoOrgFilterLookups, CeoOrgListParams } from "@/types/ceo-organization";
 
@@ -28,11 +25,8 @@ type CeoOrganizationFiltersProps = {
   disabled?: boolean;
 };
 
-const EMPLOYEE_LABEL = "All Employees";
 const DEPARTMENT_LABEL = "All Departments";
-const MANAGER_LABEL = "All Managers";
 const TYPE_LABEL = "All Types";
-const STATUS_LABEL = "Any Status";
 
 export function CeoOrganizationFilters({
   filters,
@@ -41,21 +35,10 @@ export function CeoOrganizationFilters({
   onReset,
   disabled,
 }: CeoOrganizationFiltersProps) {
-  const employeeValue = filters.employeeId ?? FILTER_ANY_VALUE;
   const departmentValue = filters.departmentId ?? FILTER_ANY_VALUE;
-  const managerValue = filters.managerId ?? FILTER_ANY_VALUE;
-  const employmentStatusValue = filters.employmentStatus ?? FILTER_ANY_VALUE;
   const employmentTypeValue = filters.employmentTypeId ?? FILTER_ANY_VALUE;
 
-  const employeeOptions = lookups.employees.map((item) => ({
-    value: item.id,
-    label: item.label,
-  }));
   const departmentOptions = lookups.departments.map((item) => ({
-    value: item.id,
-    label: item.label,
-  }));
-  const managerOptions = lookups.managers.map((item) => ({
     value: item.id,
     label: item.label,
   }));
@@ -68,36 +51,6 @@ export function CeoOrganizationFilters({
     <section className="w-full rounded-xl border bg-card p-3 shadow-sm sm:p-4">
       <div className="flex w-full flex-wrap items-center gap-2 lg:flex-nowrap lg:gap-3">
         <Select
-          value={employeeValue}
-          onValueChange={(value) =>
-            onChange({
-              employeeId: !value || value === FILTER_ANY_VALUE ? undefined : value,
-              search: undefined,
-              page: 1,
-            })
-          }
-          disabled={disabled}
-        >
-          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[11rem]">
-            <Users className="mr-2 size-4 shrink-0 text-muted-foreground" />
-            <SelectValue placeholder={EMPLOYEE_LABEL}>
-              {filterSelectLabel(employeeValue, EMPLOYEE_LABEL, employeeOptions)}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent
-            alignItemWithTrigger={false}
-            className={MANAGER_TEAM_MEMBER_SELECT_CONTENT_CLASS}
-          >
-            <SelectItem value={FILTER_ANY_VALUE}>{EMPLOYEE_LABEL}</SelectItem>
-            {employeeOptions.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
           value={departmentValue}
           onValueChange={(value) =>
             onChange({
@@ -107,7 +60,8 @@ export function CeoOrganizationFilters({
           }
           disabled={disabled}
         >
-          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[10rem]">
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[12rem]">
+            <Building2 className="mr-2 size-4 shrink-0 text-muted-foreground" />
             <SelectValue placeholder={DEPARTMENT_LABEL}>
               {filterSelectLabel(departmentValue, DEPARTMENT_LABEL, departmentOptions)}
             </SelectValue>
@@ -126,34 +80,6 @@ export function CeoOrganizationFilters({
         </Select>
 
         <Select
-          value={managerValue}
-          onValueChange={(value) =>
-            onChange({
-              managerId: !value || value === FILTER_ANY_VALUE ? undefined : value,
-              page: 1,
-            })
-          }
-          disabled={disabled}
-        >
-          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[10rem]">
-            <SelectValue placeholder={MANAGER_LABEL}>
-              {filterSelectLabel(managerValue, MANAGER_LABEL, managerOptions)}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent
-            alignItemWithTrigger={false}
-            className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
-          >
-            <SelectItem value={FILTER_ANY_VALUE}>{MANAGER_LABEL}</SelectItem>
-            {managerOptions.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
           value={employmentTypeValue}
           onValueChange={(value) =>
             onChange({
@@ -163,7 +89,7 @@ export function CeoOrganizationFilters({
           }
           disabled={disabled}
         >
-          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[9rem]">
+          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[12rem]">
             <SelectValue placeholder={TYPE_LABEL}>
               {filterSelectLabel(employmentTypeValue, TYPE_LABEL, employmentTypeOptions)}
             </SelectValue>
@@ -176,41 +102,6 @@ export function CeoOrganizationFilters({
             {employmentTypeOptions.map((item) => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={employmentStatusValue}
-          onValueChange={(value) =>
-            onChange({
-              employmentStatus:
-                value === FILTER_ANY_VALUE
-                  ? undefined
-                  : (value as CeoOrgListParams["employmentStatus"]),
-              page: 1,
-            })
-          }
-          disabled={disabled}
-        >
-          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[9rem]">
-            <SelectValue placeholder={STATUS_LABEL}>
-              {filterSelectLabelFromMap(
-                employmentStatusValue,
-                STATUS_LABEL,
-                EMPLOYMENT_STATUS_LABELS,
-              )}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent
-            alignItemWithTrigger={false}
-            className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
-          >
-            <SelectItem value={FILTER_ANY_VALUE}>{STATUS_LABEL}</SelectItem>
-            {Object.entries(EMPLOYMENT_STATUS_LABELS).map(([value, label]) => (
-              <SelectItem key={value} value={value}>
-                {label}
               </SelectItem>
             ))}
           </SelectContent>

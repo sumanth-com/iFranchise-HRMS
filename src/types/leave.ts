@@ -106,6 +106,7 @@ export type LeaveApprovalStep = {
   approvalStatus: ApprovalStatus;
   comments: string | null;
   actedAt: string | null;
+  actedVia: "portal" | "email";
 };
 
 export type LeaveDetail = {

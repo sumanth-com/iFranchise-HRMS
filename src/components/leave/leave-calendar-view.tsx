@@ -5,10 +5,12 @@ import {
   endOfMonth,
   format,
   getDay,
+  parseISO,
   startOfMonth,
+  startOfWeek,
 } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/common/button";
 import {
@@ -39,7 +41,11 @@ type LeaveCalendarViewProps = {
   showYearPicker?: boolean;
   /** Hide the color legend under the calendar header. */
   hideLegend?: boolean;
+  /** Enable a Month / Week view toggle (defaults to month-only). */
+  enableWeekView?: boolean;
 };
+
+type CalendarViewMode = "month" | "week";
 
 type DayCell = {
   date: string;
@@ -132,14 +138,46 @@ export function LeaveCalendarView({
   currentMonthOnly = false,
   showYearPicker = false,
   hideLegend = false,
+  enableWeekView = false,
 }: LeaveCalendarViewProps) {
-  const calendarDays = useMemo(
+  const [view, setView] = useState<CalendarViewMode>("month");
+  const [anchor, setAnchor] = useState<string>(() =>
+    format(startOfMonth(new Date(year, month - 1, 1)), "yyyy-MM-dd"),
+  );
+
+  // Keep the week anchor aligned with the month/year the parent is loading.
+  useEffect(() => {
+    const current = parseISO(anchor);
+    if (current.getFullYear() !== year || current.getMonth() !== month - 1) {
+      setAnchor(format(startOfMonth(new Date(year, month - 1, 1)), "yyyy-MM-dd"));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [month, year]);
+
+  const monthCells = useMemo(
     () =>
       currentMonthOnly
         ? buildCurrentMonthCalendarDays(month, year)
         : buildCalendarDays(month, year),
     [currentMonthOnly, month, year],
   );
+
+  const weekCells = useMemo<CalendarCell[]>(() => {
+    const weekStart = startOfWeek(parseISO(anchor), { weekStartsOn: 0 });
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = addDays(weekStart, index);
+      return {
+        date: format(date, "yyyy-MM-dd"),
+        dayNumber: date.getDate(),
+        isCurrentMonth: date.getMonth() === month - 1,
+      };
+    });
+  }, [anchor, month]);
+
+  const isWeek = enableWeekView && view === "week";
+  const calendarDays = isWeek ? weekCells : monthCells;
+  const cellMinHeight = isWeek ? "min-h-40" : "min-h-28";
+  const maxVisibleLeaves = isWeek ? 8 : 3;
 
   const yearOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -170,6 +208,13 @@ export function LeaveCalendarView({
 
   const monthLabel = format(new Date(year, month - 1, 1), "MMMM");
 
+  const weekStart = startOfWeek(parseISO(anchor), { weekStartsOn: 0 });
+  const weekEnd = addDays(weekStart, 6);
+  const weekLabel =
+    weekStart.getMonth() === weekEnd.getMonth()
+      ? `${format(weekStart, "MMM d")} – ${format(weekEnd, "d")}`
+      : `${format(weekStart, "MMM d")} – ${format(weekEnd, "MMM d")}`;
+
   const goToPreviousMonth = () => {
     if (month === 1) {
       onMonthChange(12, year - 1);
@@ -186,15 +231,54 @@ export function LeaveCalendarView({
     onMonthChange(month + 1, year);
   };
 
+  const applyAnchor = (date: Date) => {
+    setAnchor(format(date, "yyyy-MM-dd"));
+    const nextMonth = date.getMonth() + 1;
+    const nextYear = date.getFullYear();
+    if (nextMonth !== month || nextYear !== year) {
+      onMonthChange(nextMonth, nextYear);
+    }
+  };
+
+  const goToPreviousWeek = () => applyAnchor(addDays(weekStart, -7));
+  const goToNextWeek = () => applyAnchor(addDays(weekStart, 7));
+
+  const handleViewChange = (nextView: CalendarViewMode) => {
+    if (nextView === "week") {
+      const today = new Date();
+      const withinMonth =
+        today.getFullYear() === year && today.getMonth() === month - 1;
+      setAnchor(
+        format(
+          withinMonth ? today : startOfMonth(new Date(year, month - 1, 1)),
+          "yyyy-MM-dd",
+        ),
+      );
+    }
+    setView(nextView);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="icon-sm" onClick={goToPreviousMonth}>
+          <Button
+            variant="outline"
+            size="icon-sm"
+            onClick={isWeek ? goToPreviousWeek : goToPreviousMonth}
+            aria-label={isWeek ? "Previous week" : "Previous month"}
+          >
             <ChevronLeft className="size-4" />
           </Button>
-          <h2 className="min-w-[7rem] text-center text-lg font-semibold">{monthLabel}</h2>
-          <Button variant="outline" size="icon-sm" onClick={goToNextMonth}>
+          <h2 className="min-w-[8rem] text-center text-lg font-semibold">
+            {isWeek ? weekLabel : monthLabel}
+          </h2>
+          <Button
+            variant="outline"
+            size="icon-sm"
+            onClick={isWeek ? goToNextWeek : goToNextMonth}
+            aria-label={isWeek ? "Next week" : "Next month"}
+          >
             <ChevronRight className="size-4" />
           </Button>
           {showYearPicker ? (
@@ -218,7 +302,28 @@ export function LeaveCalendarView({
           )}
         </div>
 
-        {!hideLegend ? <CalendarLegend /> : null}
+        <div className="flex flex-wrap items-center gap-3">
+          {enableWeekView ? (
+            <div className="inline-flex rounded-lg border bg-muted/40 p-0.5">
+              {(["month", "week"] as CalendarViewMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => handleViewChange(mode)}
+                  className={cn(
+                    "rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors",
+                    view === mode
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {!hideLegend ? <CalendarLegend /> : null}
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-xl border bg-card">
@@ -239,7 +344,10 @@ export function LeaveCalendarView({
               return (
                 <div
                   key={`empty-${index}`}
-                  className="min-h-28 border-b border-r bg-muted/10 last:border-r-0"
+                  className={cn(
+                    "border-b border-r bg-muted/10 last:border-r-0",
+                    cellMinHeight,
+                  )}
                 />
               );
             }
@@ -252,7 +360,8 @@ export function LeaveCalendarView({
               <div
                 key={day.date}
                 className={cn(
-                  "min-h-28 border-b border-r p-2 last:border-r-0",
+                  "border-b border-r p-2 last:border-r-0",
+                  cellMinHeight,
                   !day.isCurrentMonth && "bg-muted/20 text-muted-foreground",
                   isWeekend && day.isCurrentMonth && "bg-muted/30",
                   holiday && day.isCurrentMonth && "bg-violet-500/5",
@@ -278,7 +387,7 @@ export function LeaveCalendarView({
                 </div>
 
                 <div className="space-y-1">
-                  {dayLeaves.slice(0, 3).map((leave) => (
+                  {dayLeaves.slice(0, maxVisibleLeaves).map((leave) => (
                     <div
                       key={`${day.date}-${leave.id}`}
                       className={cn(
@@ -292,9 +401,9 @@ export function LeaveCalendarView({
                       {leave.employeeName}
                     </div>
                   ))}
-                  {dayLeaves.length > 3 ? (
+                  {dayLeaves.length > maxVisibleLeaves ? (
                     <p className="text-[10px] text-muted-foreground">
-                      +{dayLeaves.length - 3} more
+                      +{dayLeaves.length - maxVisibleLeaves} more
                     </p>
                   ) : null}
                 </div>

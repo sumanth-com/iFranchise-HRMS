@@ -4,11 +4,13 @@ import {
   BriefcaseBusiness,
   Building2,
   CalendarCheck,
+  CalendarDays,
   CheckSquare,
   LayoutDashboard,
   LineChart,
   Target,
   UserRound,
+  UserRoundPlus,
   Wallet,
 } from "lucide-react";
 
@@ -52,6 +54,12 @@ export const ceoNavItems: NavigationItem[] = [
     permissions: ["attendance.view"],
   },
   {
+    title: "Leave",
+    href: CEO_ROUTES.leave,
+    icon: CalendarDays,
+    permissions: ["leave.view"],
+  },
+  {
     title: "Approvals",
     href: CEO_ROUTES.approvals,
     icon: CheckSquare,
@@ -73,6 +81,12 @@ export const ceoNavItems: NavigationItem[] = [
     href: CEO_ROUTES.notifications,
     icon: Bell,
     permissions: ["notifications.view", "notification.view"],
+  },
+  {
+    title: "User Provisioning",
+    href: CEO_ROUTES.userProvisioning,
+    icon: UserRoundPlus,
+    permissions: ["user_provisioning.view", "user_provisioning.manage"],
   },
   {
     title: "Profile & Settings",

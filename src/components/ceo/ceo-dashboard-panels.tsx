@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-import { BarRow } from "@/components/reports/report-chart-cards";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { formatCurrencyInr } from "@/lib/reports/services/reports-utils";
 import type {
@@ -23,8 +22,89 @@ import type {
 } from "@/types/ceo-dashboard";
 import { cn } from "@/lib/utils";
 
-function seriesMax(items: CeoChartItem[]) {
-  return Math.max(1, ...items.map((item) => item.value));
+const DONUT_COLORS = [
+  "#6366f1",
+  "#22c55e",
+  "#f59e0b",
+  "#06b6d4",
+  "#ec4899",
+  "#94a3b8",
+];
+
+function WorkforceDonut({ items }: { items: CeoChartItem[] }) {
+  const total = items.reduce((sum, item) => sum + item.value, 0);
+  const radius = 42;
+  const circumference = 2 * Math.PI * radius;
+
+  let cumulative = 0;
+  const segments = items.map((item, index) => {
+    const fraction = total > 0 ? item.value / total : 0;
+    const length = fraction * circumference;
+    const segment = {
+      color: DONUT_COLORS[index % DONUT_COLORS.length],
+      length,
+      offset: -cumulative,
+    };
+    cumulative += length;
+    return segment;
+  });
+
+  return (
+    <div className="flex items-center gap-5">
+      <div className="relative shrink-0">
+        <svg viewBox="0 0 100 100" className="size-36 -rotate-90">
+          <circle
+            cx="50"
+            cy="50"
+            r={radius}
+            fill="none"
+            strokeWidth="11"
+            className="stroke-muted"
+          />
+          {total > 0 &&
+            segments.map((segment, index) => (
+              <circle
+                key={index}
+                cx="50"
+                cy="50"
+                r={radius}
+                fill="none"
+                strokeWidth="11"
+                stroke={segment.color}
+                strokeDasharray={`${segment.length} ${circumference - segment.length}`}
+                strokeDashoffset={segment.offset}
+              />
+            ))}
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-3xl leading-none font-semibold tabular-nums">
+            {total}
+          </span>
+          <span className="mt-1 text-[10px] tracking-wide text-muted-foreground uppercase">
+            People
+          </span>
+        </div>
+      </div>
+      <ul className="min-w-0 flex-1 space-y-2 text-sm">
+        {items.map((item, index) => {
+          const pct = total > 0 ? Math.round((item.value / total) * 100) : 0;
+          return (
+            <li key={item.label} className="flex items-center gap-2">
+              <span
+                className="size-3 shrink-0 rounded-sm"
+                style={{ backgroundColor: DONUT_COLORS[index % DONUT_COLORS.length] }}
+              />
+              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              <span className="shrink-0 font-medium tabular-nums">{item.value}</span>
+              <span className="w-9 shrink-0 text-right tabular-nums text-muted-foreground">
+                {pct}%
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
 }
 
 function Panel({
@@ -74,13 +154,13 @@ function WorkforcePanel({
   attendance: CeoAttendanceOverview;
 }) {
   const deptItems = organization.departmentDistribution.slice(0, 5);
-  const max = seriesMax(deptItems);
 
   return (
     <Panel
       title="Workforce"
       subtitle="Headcount and today’s presence"
       href={CEO_ROUTES.organization}
+      bodyClassName="flex min-h-0 flex-1 flex-col"
     >
       <div className="mb-3 grid grid-cols-3 gap-2">
         <div className="rounded-lg border bg-background/80 px-2.5 py-2">
@@ -115,18 +195,35 @@ function WorkforcePanel({
       {deptItems.length === 0 ? (
         <p className="text-sm text-muted-foreground">No department data yet.</p>
       ) : (
-        <div className="space-y-2">
-          {deptItems.map((item) => (
-            <BarRow
-              key={item.label}
-              label={item.label}
-              value={item.value}
-              max={max}
-              color="bg-primary"
-            />
-          ))}
-        </div>
+        <WorkforceDonut items={deptItems} />
       )}
+
+      <div className="mt-auto grid grid-cols-3 gap-2 border-t pt-3 text-center">
+        <div>
+          <p className="text-base font-semibold tabular-nums">
+            {organization.totalDepartments}
+          </p>
+          <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
+            Departments
+          </p>
+        </div>
+        <div>
+          <p className="text-base font-semibold tabular-nums">
+            {organization.totalManagers}
+          </p>
+          <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
+            Managers
+          </p>
+        </div>
+        <div>
+          <p className="text-base font-semibold tabular-nums">
+            {organization.reportingCoveragePercent}%
+          </p>
+          <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
+            Coverage
+          </p>
+        </div>
+      </div>
     </Panel>
   );
 }

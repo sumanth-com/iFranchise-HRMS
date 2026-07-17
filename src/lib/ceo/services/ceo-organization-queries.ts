@@ -56,7 +56,7 @@ export async function getCeoOrgSummary(
 
   const [employeesRes, departmentsRes, managersRes] = await Promise.all([
     fromHrms(supabase, "employees")
-      .select("id, employment_status, reporting_manager_id")
+      .select("id, employment_status, reporting_manager_id, department_id")
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
       .limit(5000),
@@ -79,8 +79,12 @@ export async function getCeoOrgSummary(
 
   const empRows = (employeesRes.data ?? []) as LooseRow[];
   const activeEmployees = empRows.filter((row) => ACTIVE_STATUSES.has(row.employment_status));
+  const departmentsWithPeople = new Set(
+    activeEmployees.map((row) => row.department_id).filter(Boolean),
+  );
   const activeDepartments = ((departmentsRes.data ?? []) as LooseRow[]).filter(
-    (row) => row.status === "active" || !row.status,
+    (row) =>
+      (row.status === "active" || !row.status) && departmentsWithPeople.has(row.id),
   );
 
   const managerRows = (managersRes.data ?? []) as LooseRow[];
@@ -140,7 +144,7 @@ export async function getCeoOrgFilterLookups(
   const [employeesRes, departmentsRes, managersQuery, employmentTypesRes] =
     await Promise.all([
       fromHrms(supabase, "employees")
-        .select("id, first_name, last_name, employee_code, employment_status")
+        .select("id, first_name, last_name, employee_code, employment_status, department_id")
         .eq("organization_id", organizationId)
         .is("deleted_at", null)
         .order("first_name"),
@@ -180,16 +184,23 @@ export async function getCeoOrgFilterLookups(
     });
   }
 
+  const employeeRows = (employeesRes.data ?? []) as LooseRow[];
+  const departmentsWithPeople = new Set(
+    employeeRows.map((row) => row.department_id).filter(Boolean),
+  );
+
   return {
-    employees: ((employeesRes.data ?? []) as LooseRow[]).map((row) => ({
+    employees: employeeRows.map((row) => ({
       id: row.id,
       label: `${row.first_name} ${row.last_name} · ${row.employee_code}`,
     })),
-    departments: ((departmentsRes.data ?? []) as LooseRow[]).map((row) => ({
-      id: row.id,
-      label: row.name,
-      code: row.code ?? undefined,
-    })),
+    departments: ((departmentsRes.data ?? []) as LooseRow[])
+      .filter((row) => departmentsWithPeople.has(row.id))
+      .map((row) => ({
+        id: row.id,
+        label: row.name,
+        code: row.code ?? undefined,
+      })),
     managers: [...managers.values()].sort((a, b) => a.label.localeCompare(b.label)),
     employmentTypes: ((employmentTypesRes.data ?? []) as LooseRow[]).map((row) => ({
       id: row.id,
@@ -246,7 +257,8 @@ export async function listCeoOrgEmployees(
       { count: "exact" },
     )
     .eq("organization_id", organizationId)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .neq("id", profile.employee.id);
 
   if (employeeId) {
     query = query.eq("id", employeeId);
@@ -449,6 +461,7 @@ export async function getCeoOrgWorkforceInsights(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   departmentId?: string,
+  employmentTypeId?: string,
 ): Promise<CeoOrgWorkforceInsights> {
   const organizationId = profile.employee.organizationId;
   const monthStart = format(startOfMonth(new Date()), "yyyy-MM-dd");
@@ -471,6 +484,7 @@ export async function getCeoOrgWorkforceInsights(
     .limit(5000);
 
   if (departmentId) employeesQuery = employeesQuery.eq("department_id", departmentId);
+  if (employmentTypeId) employeesQuery = employeesQuery.eq("employment_type_id", employmentTypeId);
 
   const { data, error } = await employeesQuery;
   if (error) throw new Error(error.message);
@@ -645,7 +659,12 @@ export async function getCeoOrganizationPageData(
       getCeoOrgFilterLookups(supabase, organizationId),
       getCeoOrgDepartments(supabase, profile, parsed.departmentId),
       listHierarchyEmployees(supabase, organizationId),
-      getCeoOrgWorkforceInsights(supabase, profile, parsed.departmentId),
+      getCeoOrgWorkforceInsights(
+        supabase,
+        profile,
+        parsed.departmentId,
+        parsed.employmentTypeId,
+      ),
     ]);
 
   return {

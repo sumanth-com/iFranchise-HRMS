@@ -59,10 +59,11 @@ export async function fetchCeoOrgDepartmentsAction(
 
 export async function fetchCeoOrgInsightsAction(
   departmentId?: string,
+  employmentTypeId?: string,
 ): Promise<CeoOrgWorkforceInsights> {
   const profile = await requireServerPermission(PORTAL_PERMISSIONS.ceo);
   const supabase = await createClient();
-  return getCeoOrgWorkforceInsights(supabase, profile, departmentId);
+  return getCeoOrgWorkforceInsights(supabase, profile, departmentId, employmentTypeId);
 }
 
 export async function fetchCeoOrgEmployeeDetailAction(

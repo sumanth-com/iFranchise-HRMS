@@ -23,7 +23,7 @@ export default async function CeoOrganizationPage({
 
   const parsed = ceoOrgListParamsSchema.parse({
     page: firstString(rawParams.page),
-    pageSize: firstString(rawParams.pageSize),
+    pageSize: firstString(rawParams.pageSize) ?? "6",
     search: firstString(rawParams.search),
     employeeId: firstString(rawParams.employeeId),
     departmentId: firstString(rawParams.departmentId),

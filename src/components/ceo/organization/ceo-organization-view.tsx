@@ -6,18 +6,16 @@ import {
   CeoBackToDashboard,
   CeoModulePageHeader,
 } from "@/components/ceo/ceo-module-primitives";
-import { CeoOrganizationDepartments } from "@/components/ceo/organization/ceo-organization-departments";
+import { CeoOrganizationDistribution } from "@/components/ceo/organization/ceo-organization-distribution";
 import { CeoOrganizationDrawer } from "@/components/ceo/organization/ceo-organization-drawer";
 import { CeoOrganizationFilters } from "@/components/ceo/organization/ceo-organization-filters";
 import { CeoOrganizationHierarchy } from "@/components/ceo/organization/ceo-organization-hierarchy";
-import { CeoOrganizationInsights } from "@/components/ceo/organization/ceo-organization-insights";
+import { CeoOrganizationPeople } from "@/components/ceo/organization/ceo-organization-people";
+import { CeoOrganizationSignals } from "@/components/ceo/organization/ceo-organization-signals";
 import { CeoOrganizationSummary } from "@/components/ceo/organization/ceo-organization-summary";
-import { CeoOrganizationTable } from "@/components/ceo/organization/ceo-organization-table";
 import {
-  fetchCeoOrgDepartmentsAction,
   fetchCeoOrgEmployeesAction,
   fetchCeoOrgInsightsAction,
-  fetchCeoOrgSummaryAction,
 } from "@/lib/ceo/actions/ceo-organization-actions";
 import type {
   CeoOrgListParams,
@@ -31,25 +29,22 @@ type CeoOrganizationViewProps = CeoOrganizationPageData & {
 
 const DEFAULT_FILTERS: CeoOrgListParams = {
   page: 1,
-  pageSize: 10,
+  pageSize: 6,
   sortBy: "first_name",
   sortOrder: "asc",
 };
 
 export function CeoOrganizationView({
-  summary: initialSummary,
+  summary,
   employees: initialEmployees,
   lookups,
-  departments: initialDepartments,
   hierarchyRoots,
   insights: initialInsights,
   initialFilters,
   initialEmployeeId,
 }: CeoOrganizationViewProps) {
-  const [summary, setSummary] = useState(initialSummary);
-  const [tableState, setTableState] = useState(initialEmployees);
-  const [departments, setDepartments] = useState(initialDepartments);
   const [insights, setInsights] = useState(initialInsights);
+  const [people, setPeople] = useState(initialEmployees);
   const [filters, setFilters] = useState<CeoOrgListParams>(initialFilters);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(
     initialEmployeeId ?? null,
@@ -65,16 +60,15 @@ export function CeoOrganizationView({
 
   const refreshScopedData = useCallback((nextFilters: CeoOrgListParams) => {
     startTransition(async () => {
-      const [employees, nextDepartments, nextInsights, nextSummary] = await Promise.all([
+      const [nextInsights, nextPeople] = await Promise.all([
+        fetchCeoOrgInsightsAction(
+          nextFilters.departmentId,
+          nextFilters.employmentTypeId,
+        ),
         fetchCeoOrgEmployeesAction(nextFilters),
-        fetchCeoOrgDepartmentsAction(nextFilters.departmentId),
-        fetchCeoOrgInsightsAction(nextFilters.departmentId),
-        fetchCeoOrgSummaryAction(),
       ]);
-      setTableState(employees);
-      setDepartments(nextDepartments);
       setInsights(nextInsights);
-      setSummary(nextSummary);
+      setPeople(nextPeople);
     });
   }, []);
 
@@ -100,10 +94,14 @@ export function CeoOrganizationView({
       <CeoBackToDashboard />
       <CeoModulePageHeader
         title="Organization"
-        description="View the complete company structure, departments, managers, and workforce distribution."
+        description="View the complete company structure, managers, and workforce distribution."
       />
 
       <CeoOrganizationSummary summary={summary} />
+
+      <CeoOrganizationDistribution insights={insights} />
+
+      <CeoOrganizationSignals insights={insights} />
 
       <CeoOrganizationFilters
         filters={filters}
@@ -113,17 +111,11 @@ export function CeoOrganizationView({
         disabled={isPending}
       />
 
-      <CeoOrganizationDepartments
-        departments={departments}
-        selectedDepartmentId={filters.departmentId}
-        onSelect={(departmentId) => updateFilters({ departmentId, page: 1 })}
-      />
-
-      <CeoOrganizationTable
-        employees={tableState.data}
-        total={tableState.total}
-        page={tableState.page}
-        pageSize={tableState.pageSize}
+      <CeoOrganizationPeople
+        employees={people.data}
+        total={people.total}
+        page={people.page}
+        pageSize={people.pageSize}
         isLoading={isPending}
         onPageChange={(page) => updateFilters({ page })}
         onView={openEmployee}
@@ -133,8 +125,6 @@ export function CeoOrganizationView({
         roots={hierarchyRoots}
         onSelectEmployee={openEmployee}
       />
-
-      <CeoOrganizationInsights insights={insights} />
 
       <CeoOrganizationDrawer
         employeeId={selectedEmployeeId}

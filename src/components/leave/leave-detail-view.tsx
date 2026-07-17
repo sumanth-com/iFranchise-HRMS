@@ -273,6 +273,13 @@ export function LeaveDetailView({ leave }: LeaveDetailViewProps) {
                             {format(parseISO(step.actedAt), "dd MMM yyyy, hh:mm a")}
                           </span>
                         ) : null}
+                        {step.actedAt &&
+                        (step.approvalStatus === "approved" ||
+                          step.approvalStatus === "rejected") ? (
+                          <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                            via {step.actedVia === "email" ? "Email" : "Portal"}
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                   </li>

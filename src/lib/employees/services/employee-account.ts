@@ -79,6 +79,7 @@ async function ensureEmployeeRole(
   userId: string,
   employee: EmployeeAccountRow,
   actorUserId: string,
+  roleCode: string = "employee",
 ) {
   const admin = createAdminClient();
   const { data: role, error: roleError } = await admin
@@ -86,12 +87,12 @@ async function ensureEmployeeRole(
     .from("roles")
     .select("id")
     .eq("organization_id", employee.organization_id)
-    .eq("code", "employee")
+    .eq("code", roleCode)
     .is("deleted_at", null)
     .maybeSingle();
 
   if (roleError) throw new Error(roleError.message);
-  if (!role?.id) throw new Error("Default employee role is not configured");
+  if (!role?.id) throw new Error(`Role "${roleCode}" is not configured for this organization`);
 
   const { data: existing, error: findError } = await admin
     .schema("hrms")
@@ -234,6 +235,7 @@ export async function sendEmployeeInvitation(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   employeeId: string,
+  roleCode: string = "employee",
 ) {
   const employee = await getEmployeeAccountRow(employeeId, profile.employee.organizationId);
   if (!["draft", "invited"].includes(employee.account_status)) {
@@ -241,7 +243,7 @@ export async function sendEmployeeInvitation(
   }
 
   const authUserId = employee.user_id ?? (await sendSupabaseInvite(employee));
-  await ensureEmployeeRole(authUserId, employee, profile.userId);
+  await ensureEmployeeRole(authUserId, employee, profile.userId, roleCode);
 
   const now = new Date().toISOString();
   await updateEmployeeAccount(employee.id, {
@@ -290,6 +292,9 @@ export type InviteEmployeeByEmailOptions = {
   reportingManagerId?: string;
   departmentId?: string | null;
   branchId?: string | null;
+  designationId?: string | null;
+  employmentTypeId?: string | null;
+  roleCode?: string;
 };
 
 async function applyTeamInvitePlacement(
@@ -322,6 +327,7 @@ export async function inviteEmployeeByEmail(
   options: InviteEmployeeByEmailOptions = {},
 ) {
   const email = emailInput.trim().toLowerCase();
+  const roleCode = options.roleCode ?? "employee";
   const admin = createAdminClient();
 
   const { data: existing, error: existingError } = await admin
@@ -352,11 +358,11 @@ export async function inviteEmployeeByEmail(
     }
 
     if (row.account_status === "invitation_pending") {
-      await resendEmployeeInvitation(supabase, profile, row.id);
+      await resendEmployeeInvitation(supabase, profile, row.id, roleCode);
       return row.id;
     }
     if (row.account_status === "draft" || row.account_status === "invited") {
-      await sendEmployeeInvitation(supabase, profile, row.id);
+      await sendEmployeeInvitation(supabase, profile, row.id, roleCode);
       return row.id;
     }
     throw new Error("This employee already has an account workflow");
@@ -371,6 +377,8 @@ export async function inviteEmployeeByEmail(
       organization_id: profile.employee.organizationId,
       branch_id: options.branchId ?? profile.employee.branchId,
       department_id: options.departmentId ?? null,
+      designation_id: options.designationId ?? null,
+      employment_type_id: options.employmentTypeId ?? null,
       reporting_manager_id: options.reportingManagerId ?? null,
       employee_code: employeeCode,
       first_name: firstName,
@@ -389,7 +397,7 @@ export async function inviteEmployeeByEmail(
     throw new Error(createError?.message ?? "Failed to create employee invite record");
   }
 
-  await sendEmployeeInvitation(supabase, profile, created.id);
+  await sendEmployeeInvitation(supabase, profile, created.id, roleCode);
   return created.id as string;
 }
 
@@ -397,6 +405,7 @@ export async function resendEmployeeInvitation(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   employeeId: string,
+  roleCode: string = "employee",
 ) {
   const employee = await getEmployeeAccountRow(employeeId, profile.employee.organizationId);
   if (employee.account_status !== "invitation_pending") {
@@ -411,7 +420,7 @@ export async function resendEmployeeInvitation(
   }
 
   authUserId = await sendSupabaseInvite({ ...employee, user_id: authUserId });
-  await ensureEmployeeRole(authUserId, employee, profile.userId);
+  await ensureEmployeeRole(authUserId, employee, profile.userId, roleCode);
 
   const now = new Date().toISOString();
   await updateEmployeeAccount(employee.id, {
@@ -617,14 +626,14 @@ export async function recordEmployeeSuccessfulLogin(
     .schema("hrms")
     .from("employees")
     .select(
-      "id, organization_id, user_id, employee_code, first_name, last_name, email, account_status, first_login_at, deleted_at",
+      "id, organization_id, user_id, employee_code, first_name, last_name, email, employment_status, account_status, first_login_at, date_of_joining, created_by, deleted_at",
     )
     .eq("user_id", userId)
     .maybeSingle();
 
   if (error || !employee || employee.deleted_at) return;
 
-  const employeeRow = employee as EmployeeAccountRow;
+  const employeeRow = employee as EmployeeAccountRow & { date_of_joining: string | null };
   const now = new Date().toISOString();
   const isFirstLogin = !employeeRow.first_login_at;
   const shouldActivate =
@@ -638,6 +647,9 @@ export async function recordEmployeeSuccessfulLogin(
   if (shouldActivate) {
     updates.account_status = "active";
     updates.account_activated_at = now;
+    if (!employeeRow.date_of_joining) {
+      updates.date_of_joining = now.slice(0, 10);
+    }
   }
 
   await updateEmployeeAccountWithClient(supabase, employeeRow.id, updates);
@@ -663,5 +675,26 @@ export async function recordEmployeeSuccessfulLogin(
         email,
       },
     });
+
+    // Notify the inviter (e.g. the CEO) that the invitation was accepted.
+    const inviterUserId = (employee as { created_by?: string | null }).created_by ?? null;
+    if (inviterUserId && inviterUserId !== userId) {
+      try {
+        await createNotification(supabase, {
+          organizationId: employeeRow.organization_id,
+          userId: inviterUserId,
+          employeeId: employeeRow.id,
+          title: "Invitation accepted",
+          message: `${fullName(employeeRow)} (${email}) accepted their invitation and activated their account.`,
+          notificationType: "executive_invitation_accepted",
+          module: "security",
+          priority: "medium",
+          sourceEventKey: `executive_invitation_accepted:${employeeRow.id}`,
+          createdBy: userId,
+        });
+      } catch {
+        // Notifying the inviter must never block a successful login.
+      }
+    }
   }
 }

@@ -21,6 +21,9 @@ const PORTAL_PRIORITY: PortalKey[] = ["hr", "ceo", "manager", "employee"];
 const ROLE_PORTALS: Record<string, PortalKey> = {
   super_admin: "hr",
   hr_admin: "hr",
+  hr_executive: "hr",
+  founder: "ceo",
+  co_founder: "ceo",
   ceo: "ceo",
   manager: "manager",
   employee: "employee",

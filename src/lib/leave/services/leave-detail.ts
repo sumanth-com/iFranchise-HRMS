@@ -50,6 +50,7 @@ export async function getLeaveRequestById(
           approver_employee_id,
           comments,
           acted_at,
+          acted_via,
           employees:approver_employee_id (first_name, last_name)
         )
       `,
@@ -79,6 +80,7 @@ export async function getLeaveRequestById(
         approvalStatus: row.approval_status as LeaveDetail["approvals"][number]["approvalStatus"],
         comments: row.comments,
         actedAt: row.acted_at,
+        actedVia: (row.acted_via === "email" ? "email" : "portal") as "portal" | "email",
       };
     })
     .sort((a, b) => a.approvalLevel - b.approvalLevel);

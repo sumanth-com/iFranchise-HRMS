@@ -7,11 +7,15 @@ export const AUTH_ROUTES = {
   dashboard: "/",
 } as const;
 
+/** Base path for the Universal Email Approval Engine landing page. */
+export const APPROVAL_PUBLIC_ROUTE = "/approval";
+
 export const PUBLIC_ROUTES = [
   AUTH_ROUTES.login,
   AUTH_ROUTES.forgotPassword,
   AUTH_ROUTES.resetPassword,
   AUTH_ROUTES.callback,
+  APPROVAL_PUBLIC_ROUTE,
 ] as const;
 
 export const LOGOUT_BROADCAST_KEY = "ifranchise-hrms-logout";

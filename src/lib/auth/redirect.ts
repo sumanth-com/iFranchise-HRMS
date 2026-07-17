@@ -5,6 +5,9 @@ import { getPortalRedirectPath } from "@/lib/auth/portals";
 const ROLE_REDIRECT_PRIORITY = [
   "super_admin",
   "hr_admin",
+  "hr_executive",
+  "founder",
+  "co_founder",
   "ceo",
   "manager",
   "employee",

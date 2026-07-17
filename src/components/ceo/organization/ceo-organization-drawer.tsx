@@ -7,11 +7,11 @@ import { useEffect, useState, useTransition } from "react";
 import { EmploymentStatusBadge } from "@/components/employees/employment-status-badge";
 import { EmployeeAvatar } from "@/components/employees/employee-avatar";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { fetchCeoOrgEmployeeDetailAction } from "@/lib/ceo/actions/ceo-organization-actions";
 import type { CeoOrgEmployeeDetail } from "@/types/ceo-organization";
 
@@ -63,11 +63,11 @@ export function CeoOrganizationDrawer({
   const employee = detail?.employee;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
-        <SheetHeader>
-          <SheetTitle>Employee Profile</SheetTitle>
-        </SheetHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[88vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <DialogHeader className="shrink-0 border-b px-5 py-4">
+          <DialogTitle>Employee Profile</DialogTitle>
+        </DialogHeader>
 
         {isPending ? (
           <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
@@ -77,7 +77,7 @@ export function CeoOrganizationDrawer({
         ) : error ? (
           <p className="py-10 text-center text-sm text-destructive">{error}</p>
         ) : employee ? (
-          <div className="mt-4 space-y-4">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
             <div className="flex items-center gap-3 rounded-xl border bg-card p-4">
               <EmployeeAvatar
                 firstName={employee.firstName}
@@ -236,7 +236,7 @@ export function CeoOrganizationDrawer({
             </p>
           </div>
         ) : null}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }

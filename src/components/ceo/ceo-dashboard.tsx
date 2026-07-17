@@ -2,9 +2,9 @@
 
 import { ErrorState } from "@/components/common";
 import { CeoDashboardHeader } from "@/components/ceo/ceo-dashboard-header";
-import { CeoDashboardInsights } from "@/components/ceo/ceo-dashboard-insights";
 import { CeoDashboardKpis } from "@/components/ceo/ceo-dashboard-kpis";
 import { CeoDashboardPanels } from "@/components/ceo/ceo-dashboard-panels";
+import { CeoDashboardSnapshot } from "@/components/ceo/ceo-dashboard-snapshot";
 import type { CeoDashboardData } from "@/types/ceo-dashboard";
 
 type CeoDashboardProps = {
@@ -25,7 +25,7 @@ export function CeoDashboard({ data, error }: CeoDashboardProps) {
     <div className="flex w-full min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 md:p-4 lg:gap-4 lg:p-5">
       <CeoDashboardHeader />
       <CeoDashboardKpis kpis={data.kpis} />
-      <CeoDashboardInsights insights={data.insights} />
+      <CeoDashboardSnapshot kpis={data.kpis} recruitment={data.recruitment} />
       <CeoDashboardPanels
         organization={data.organization}
         recruitment={data.recruitment}

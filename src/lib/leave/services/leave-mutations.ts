@@ -21,6 +21,29 @@ function emptyToNull(value?: string | null) {
   return value && value.trim().length > 0 ? value.trim() : null;
 }
 
+/**
+ * Emails the current pending approver(s) a secure approve/reject link.
+ * Uses a dynamic import to avoid a static import cycle with the approval
+ * engine, and never throws so leave mutations are unaffected by email issues.
+ */
+async function dispatchLeaveApprovalEmails(
+  leaveRequestId: string,
+  createdByUserId?: string | null,
+) {
+  try {
+    const { dispatchApprovalEmails } = await import(
+      "@/lib/approvals/email-approval-service"
+    );
+    await dispatchApprovalEmails({
+      requestType: "leave",
+      sourceRecordId: leaveRequestId,
+      createdByUserId: createdByUserId ?? null,
+    });
+  } catch (error) {
+    console.error("[leave] approval email dispatch failed", error);
+  }
+}
+
 async function getLeaveBalanceRow(
   supabase: AuthSupabaseClient,
   employeeId: string,
@@ -165,6 +188,7 @@ export async function createLeaveRequest(
 
   await createApprovalSteps(supabase, profile, data.id, input.employeeId);
   await notifyLeaveSubmitted(supabase, profile, data.id, input.employeeId);
+  await dispatchLeaveApprovalEmails(data.id, profile.userId);
 
   return data.id;
 }
@@ -196,6 +220,16 @@ async function canActorApproveRequest(
   leaveRequestId: string,
   employeeId: string,
 ): Promise<boolean> {
+  // An approver explicitly assigned to a pending step can always act on it —
+  // this covers direct managers, the CEO, and any approver a request was
+  // forwarded/reassigned to.
+  const assignedStep = await getPendingApprovalForActor(
+    supabase,
+    leaveRequestId,
+    profile.employee.id,
+  );
+  if (assignedStep) return true;
+
   const codes = profile.permissionCodes;
   const isHrOrAdmin =
     codes.includes("leave.approve") &&
@@ -369,6 +403,8 @@ export async function approveLeaveRequest(
       leaveRequestId,
       afterRequest.employee_id,
     );
+    // Next approval level is now active — email that approver a secure link.
+    await dispatchLeaveApprovalEmails(leaveRequestId, profile.userId);
   }
 }
 

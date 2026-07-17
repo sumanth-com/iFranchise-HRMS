@@ -17,20 +17,11 @@ import {
   saveCeoAlertPreferencesAction,
   saveCeoPreferencesAction,
 } from "@/lib/ceo/actions/ceo-profile-actions";
-import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { NOTIFICATION_SOUND_OPTIONS } from "@/lib/notifications/constants";
 import { previewNotificationSound } from "@/lib/notifications/play-notification-sound";
 import { cn } from "@/lib/utils";
 import type { CeoAlertPreferences, CeoUserPreferences } from "@/types/ceo-profile";
 import type { NotificationSoundTone } from "@/types/notifications";
-
-const LANDING_OPTIONS = [
-  { value: CEO_ROUTES.home, label: "CEO Dashboard" },
-  { value: CEO_ROUTES.approvals, label: "Approvals" },
-  { value: CEO_ROUTES.analytics, label: "Analytics" },
-  { value: CEO_ROUTES.reports, label: "Reports" },
-  { value: CEO_ROUTES.notifications, label: "Notifications" },
-];
 
 const USEFUL_ALERTS: {
   key: keyof CeoAlertPreferences;
@@ -92,9 +83,9 @@ export function CeoProfilePreferencesSection({
     <section id="preferences" className="rounded-xl border bg-card p-4 shadow-sm md:p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold tracking-tight">Workspace preferences</h2>
+          <h2 className="text-sm font-semibold tracking-tight">Appearance</h2>
           <p className="text-xs text-muted-foreground">
-            Theme, landing page, and how you enter the portal each day.
+            Choose how the portal looks. Changes apply instantly.
           </p>
         </div>
         <Button type="button" size="sm" disabled={isPending} onClick={save}>
@@ -103,59 +94,28 @@ export function CeoProfilePreferencesSection({
         </Button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-            Theme
-          </label>
-          <Select
-            value={form.theme}
-            onValueChange={(value) => {
-              if (!value) return;
-              setForm((prev) => ({
-                ...prev,
-                theme: value as CeoUserPreferences["theme"],
-              }));
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="system">System</SelectItem>
-              <SelectItem value="light">Light</SelectItem>
-              <SelectItem value="dark">Dark</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-            Default landing page
-          </label>
-          <Select
-            value={form.defaultLandingPage}
-            onValueChange={(value) => {
-              if (!value) return;
-              setForm((prev) => ({
-                ...prev,
-                defaultLandingPage: value,
-                defaultDashboard: value,
-              }));
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {LANDING_OPTIONS.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="max-w-xs">
+        <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+          Theme
+        </label>
+        <Select
+          value={form.theme}
+          onValueChange={(value) => {
+            if (!value) return;
+            const nextTheme = value as CeoUserPreferences["theme"];
+            setForm((prev) => ({ ...prev, theme: nextTheme }));
+            setTheme(nextTheme);
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="system">System</SelectItem>
+            <SelectItem value="light">Light</SelectItem>
+            <SelectItem value="dark">Dark</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
     </section>
   );
