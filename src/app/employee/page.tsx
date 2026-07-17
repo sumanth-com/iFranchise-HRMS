@@ -1,18 +1,29 @@
-import { requireServerPermission } from "@/lib/permissions/server";
-import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import { Suspense } from "react";
 
-export default async function EmployeePortalPage() {
-  await requireServerPermission(PORTAL_PERMISSIONS.employee);
+import { LoadingSpinner } from "@/components/common/loading-spinner";
+import { EmployeeDashboardView } from "@/components/employee/dashboard/employee-dashboard-view";
+import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import { getEmployeeDashboardData } from "@/lib/employee/services/employee-dashboard-queries";
+import { requireServerAnyPermission } from "@/lib/permissions/server";
+import { createClient } from "@/lib/supabase/server";
+
+export default async function EmployeeDashboardPage() {
+  const profile = await requireServerAnyPermission([
+    PORTAL_PERMISSIONS.employee,
+    "employee_profile.view",
+  ]);
+  const supabase = await createClient();
+  const data = await getEmployeeDashboardData(supabase, profile);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background p-6">
-      <div className="max-w-md rounded-2xl border bg-card p-6 text-center shadow-sm">
-        <p className="text-sm font-medium text-muted-foreground">Employee Portal</p>
-        <h1 className="mt-2 text-2xl font-semibold">Employee perspective ready</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Role mapping and route protection are active. Employee self-service can be added here next.
-        </p>
-      </div>
-    </main>
+    <Suspense
+      fallback={
+        <div className="flex flex-1 items-center justify-center">
+          <LoadingSpinner />
+        </div>
+      }
+    >
+      <EmployeeDashboardView {...data} />
+    </Suspense>
   );
 }

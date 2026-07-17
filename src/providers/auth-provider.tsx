@@ -16,10 +16,12 @@ import { LOGOUT_BROADCAST_KEY, AUTH_ROUTES } from "@/lib/auth/constants";
 import { getAuthErrorMessage } from "@/lib/auth/errors";
 import { getSidebarNavigation } from "@/lib/auth/navigation";
 import { ceoNavItems } from "@/config/ceo-navigation";
+import { employeeNavItems } from "@/config/employee-navigation";
 import { mainNavItems, type NavItem } from "@/config/navigation";
 import { managerNavItems } from "@/config/manager-navigation";
 import type { NavigationItem } from "@/lib/auth/navigation";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
+import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -48,7 +50,7 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export type PortalVariant = "hr" | "manager" | "ceo";
+export type PortalVariant = "hr" | "manager" | "ceo" | "employee";
 
 const PORTAL_CONFIG: Record<
   PortalVariant,
@@ -68,6 +70,11 @@ const PORTAL_CONFIG: Record<
     navItems: ceoNavItems,
     home: CEO_ROUTES.home,
     label: "CEO Portal",
+  },
+  employee: {
+    navItems: employeeNavItems,
+    home: EMPLOYEE_ROUTES.home,
+    label: "Employee Portal",
   },
 };
 

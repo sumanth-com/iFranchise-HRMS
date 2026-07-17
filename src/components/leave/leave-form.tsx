@@ -32,9 +32,11 @@ type LeaveFormProps = {
   lookups: LeaveLookups;
   defaultEmployeeId?: string;
   mode?: "create";
+  /** When set, the form redirects here on success/cancel instead of the HR leave routes. */
+  redirectPath?: string;
 };
 
-export function LeaveForm({ lookups, defaultEmployeeId }: LeaveFormProps) {
+export function LeaveForm({ lookups, defaultEmployeeId, redirectPath }: LeaveFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -112,6 +114,12 @@ export function LeaveForm({ lookups, defaultEmployeeId }: LeaveFormProps) {
       }
 
       toast.success("Leave request submitted successfully");
+
+      if (redirectPath) {
+        router.push(redirectPath);
+        router.refresh();
+        return;
+      }
 
       if (result.data) {
         router.push(LEAVE_ROUTES.detail(result.data));
@@ -364,7 +372,7 @@ export function LeaveForm({ lookups, defaultEmployeeId }: LeaveFormProps) {
           type="button"
           variant="outline"
           disabled={isPending}
-          onClick={() => router.push(LEAVE_ROUTES.list)}
+          onClick={() => router.push(redirectPath ?? LEAVE_ROUTES.list)}
         >
           Cancel
         </Button>
