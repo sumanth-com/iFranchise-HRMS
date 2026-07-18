@@ -2,9 +2,9 @@
 
 import { EmployeeAttendanceWidget } from "@/components/employee/dashboard/employee-attendance-widget";
 import { EmployeeBirthdayCard } from "@/components/employee/dashboard/employee-birthday-card";
+import { EmployeeDailyQuoteCard } from "@/components/employee/dashboard/employee-daily-quote-card";
 import { EmployeeDashboardHeader } from "@/components/employee/dashboard/employee-dashboard-header";
 import { EmployeeDashboardKpiCards } from "@/components/employee/dashboard/employee-dashboard-kpis";
-import { EmployeeQuickActions } from "@/components/employee/dashboard/employee-quick-actions";
 import { EmployeeUpcomingEvents } from "@/components/employee/dashboard/employee-upcoming-events";
 import type { EmployeeDashboardData } from "@/types/employee-dashboard";
 
@@ -24,13 +24,16 @@ export function EmployeeDashboardView(data: EmployeeDashboardData) {
         <EmployeeDashboardKpiCards kpis={data.kpis} />
 
         <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-5">
-          <div className="flex min-h-0 flex-col gap-4 lg:col-span-3">
+          <div className="flex min-h-0 flex-col gap-4 overflow-y-auto lg:col-span-3">
             <EmployeeAttendanceWidget today={data.today} />
             <EmployeeBirthdayCard
               birthdays={data.birthdaysThisWeek}
               referenceDate={data.referenceDate}
             />
-            <EmployeeQuickActions />
+            <EmployeeDailyQuoteCard
+              name={data.greeting.firstName}
+              referenceDate={data.referenceDate}
+            />
           </div>
           <div className="min-h-0 lg:col-span-2">
             <EmployeeUpcomingEvents

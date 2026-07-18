@@ -1,19 +1,38 @@
-import Image from "next/image";
 import { differenceInCalendarDays, parseISO } from "date-fns";
+import { Cake, Gift, PartyPopper } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import type { EmployeeBirthdayPerson } from "@/types/employee-dashboard";
 
-function CakeIcon({ className }: { className?: string }) {
+type Tone = "festive" | "soft" | "calm";
+
+const TONE_BADGE: Record<Tone, string> = {
+  festive: "bg-gradient-to-br from-pink-500 via-rose-500 to-amber-400 text-white shadow-md",
+  soft: "bg-gradient-to-br from-fuchsia-500 to-orange-400 text-white shadow-sm",
+  calm: "bg-gradient-to-br from-violet-500 to-sky-400 text-white shadow-sm",
+};
+
+function BirthdayBadge({
+  tone,
+  animate,
+  icon: Icon,
+}: {
+  tone: Tone;
+  animate?: boolean;
+  icon: typeof Cake;
+}) {
   return (
-    <Image
-      src="/images/birthday-cake-smile.png"
-      alt="Birthday cake"
-      width={48}
-      height={48}
-      className={cn("size-11 object-contain", className)}
-      priority={false}
-    />
+    <span
+      className={cn(
+        "flex size-11 shrink-0 items-center justify-center rounded-full",
+        TONE_BADGE[tone],
+        animate && "animate-bounce",
+      )}
+      style={animate ? { animationDuration: "1.6s" } : undefined}
+      aria-hidden
+    >
+      <Icon className="size-6" />
+    </span>
   );
 }
 
@@ -48,18 +67,6 @@ function Celebration() {
           style={{ animationDelay: piece.delay, animationDuration: "1.6s" }}
         />
       ))}
-      <span
-        className="absolute right-4 top-1 text-base animate-bounce"
-        style={{ animationDelay: "120ms", animationDuration: "2s" }}
-      >
-        🎈
-      </span>
-      <span
-        className="absolute right-9 top-3 text-sm animate-bounce"
-        style={{ animationDelay: "480ms", animationDuration: "2.4s" }}
-      >
-        🎈
-      </span>
     </div>
   );
 }
@@ -87,24 +94,18 @@ export function EmployeeBirthdayCard({
       title = `Happy Birthday, ${firstName(self.name)}! 🎉`;
       subtitle =
         others.length > 0
-          ? `It's your day — also celebrating ${joinNames(others.map((o) => firstName(o.name)))}!`
-          : "Wishing you an amazing year ahead 🥳";
+          ? `It's your special day — also celebrating ${joinNames(others.map((o) => firstName(o.name)))}!`
+          : "Wishing you joy, success, and a wonderful year ahead.";
     } else {
       title = `It's ${joinNames(others.map((o) => firstName(o.name)))}'s birthday today! 🎂`;
-      subtitle = "Don't forget to send your wishes 🎈";
+      subtitle = "Take a moment to send your warm wishes.";
     }
 
     return (
-      <section className="relative shrink-0 overflow-hidden rounded-xl border border-pink-500/20 bg-gradient-to-r from-pink-500/10 via-amber-500/10 to-violet-500/10 p-4 shadow-sm">
+      <section className="relative shrink-0 overflow-hidden rounded-xl border border-pink-500/25 bg-gradient-to-r from-pink-500/10 via-amber-500/10 to-violet-500/10 p-4 shadow-sm">
         <Celebration />
         <div className="relative flex items-center gap-3">
-          <span
-            className="shrink-0 animate-bounce"
-            style={{ animationDuration: "1.4s" }}
-            aria-hidden
-          >
-            <CakeIcon />
-          </span>
+          <BirthdayBadge tone="festive" animate icon={PartyPopper} />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{title}</p>
             <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
@@ -123,13 +124,7 @@ export function EmployeeBirthdayCard({
     return (
       <section className="relative shrink-0 overflow-hidden rounded-xl border bg-gradient-to-r from-rose-500/5 via-card to-amber-500/5 p-4 shadow-sm">
         <div className="flex items-center gap-3">
-          <span
-            className="shrink-0 animate-bounce"
-            style={{ animationDuration: "2s" }}
-            aria-hidden
-          >
-            <CakeIcon />
-          </span>
+          <BirthdayBadge tone="soft" animate icon={Gift} />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">
               {next.isSelf
@@ -137,7 +132,9 @@ export function EmployeeBirthdayCard({
                 : `${firstName(next.name)}'s birthday is ${whenLabel} 🎉`}
             </p>
             <p className="truncate text-xs text-muted-foreground">
-              {next.isSelf ? "Get ready to celebrate!" : "Mark your calendar to wish them."}
+              {next.isSelf
+                ? "Something special is just around the corner."
+                : "Plan a little surprise to make their day."}
             </p>
           </div>
         </div>
@@ -145,17 +142,15 @@ export function EmployeeBirthdayCard({
     );
   }
 
-  // Nothing this week — calm placeholder.
+  // Nothing this week — calm, still colorful placeholder.
   return (
-    <section className="shrink-0 rounded-xl border bg-card p-4 shadow-sm">
+    <section className="shrink-0 overflow-hidden rounded-xl border bg-gradient-to-r from-violet-500/5 via-card to-sky-500/5 p-4 shadow-sm">
       <div className="flex items-center gap-3">
-        <span className="shrink-0" aria-hidden>
-          <CakeIcon />
-        </span>
+        <BirthdayBadge tone="calm" icon={Cake} />
         <div className="min-w-0">
           <p className="text-sm font-medium">No birthdays this week</p>
           <p className="text-xs text-muted-foreground">
-            We&apos;ll celebrate here when one is coming up.
+            The next celebration will light up right here.
           </p>
         </div>
       </div>

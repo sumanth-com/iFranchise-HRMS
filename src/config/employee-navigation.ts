@@ -5,7 +5,7 @@ import {
   FileText,
   LaptopMinimal,
   LayoutDashboard,
-  UserRound,
+  Settings,
   Wallet,
 } from "lucide-react";
 
@@ -54,8 +54,8 @@ export const employeeNavItems: NavigationItem[] = [
     permissions: ["notification.view"],
   },
   {
-    title: "Profile & Settings",
-    href: EMPLOYEE_ROUTES.profile,
-    icon: UserRound,
+    title: "Settings",
+    href: EMPLOYEE_ROUTES.settings,
+    icon: Settings,
   },
 ];

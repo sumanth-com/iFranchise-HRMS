@@ -6,7 +6,7 @@ export const EMPLOYEE_ROUTES = {
   documents: "/employee/documents",
   assets: "/employee/assets",
   notifications: "/employee/notifications",
-  profile: "/employee/profile",
+  settings: "/employee/settings",
 } as const;
 
 export type EmployeeRouteKey = keyof typeof EMPLOYEE_ROUTES;

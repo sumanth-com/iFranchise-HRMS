@@ -21,6 +21,7 @@ import {
   COMPANY_SETTINGS_ROUTES,
 } from "@/lib/company-settings/constants";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
+import { EMPLOYEE_ROUTES as EMPLOYEE_PORTAL_ROUTES } from "@/lib/employee/constants";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { useAuth } from "@/providers/auth-provider";
@@ -40,6 +41,7 @@ export function UserProfileDropdown() {
   const primaryRole = roles[0]?.name ?? "User";
   const isManagerPortal = portalHome.startsWith("/manager");
   const isCeoPortal = portalHome.startsWith("/ceo");
+  const isEmployeePortal = portalHome === "/employee" || portalHome.startsWith("/employee/");
   const profileHref = isManagerPortal
     ? MANAGER_ROUTES.profile
     : isCeoPortal
@@ -49,7 +51,9 @@ export function UserProfileDropdown() {
     ? MANAGER_ROUTES.settings
     : isCeoPortal
       ? `${CEO_ROUTES.profile}#preferences`
-      : null;
+      : isEmployeePortal
+        ? EMPLOYEE_PORTAL_ROUTES.settings
+        : null;
   const canOpenCompanySettings = canViewCompanySettings(permissionCodes);
 
   async function handleSignOut() {
@@ -85,10 +89,12 @@ export function UserProfileDropdown() {
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => router.push(profileHref)}>
-            <User className="size-4" />
-            Profile
-          </DropdownMenuItem>
+          {!isEmployeePortal ? (
+            <DropdownMenuItem onClick={() => router.push(profileHref)}>
+              <User className="size-4" />
+              Profile
+            </DropdownMenuItem>
+          ) : null}
           {settingsHref ? (
             <DropdownMenuItem onClick={() => router.push(settingsHref)}>
               <Settings className="size-4" />
