@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Info, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
@@ -195,16 +196,23 @@ export function LeaveForm({ lookups, defaultEmployeeId, redirectPath }: LeaveFor
 
         {selectedEmployeeId ? (
           <div className="md:col-span-2">
-            <section className="rounded-xl border bg-muted/20 p-4">
+            <section className="rounded-xl border bg-card p-4 shadow-sm">
               <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-sm font-medium">Current leave balances</h2>
-                  <p className="text-xs text-muted-foreground">
-                    CL, EL, Optional Holiday, and LOP available before submission.
-                  </p>
+                <div className="flex items-center gap-2.5">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Wallet className="size-4" />
+                  </span>
+                  <div>
+                    <h2 className="text-sm font-semibold tracking-tight">
+                      Leave balance
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                      Your available balance before you submit.
+                    </p>
+                  </div>
                 </div>
                 {balancesLoading ? (
-                  <span className="text-xs text-muted-foreground">Loading...</span>
+                  <span className="text-xs text-muted-foreground">Loading…</span>
                 ) : null}
               </div>
               {balances.length > 0 ? (
@@ -212,24 +220,37 @@ export function LeaveForm({ lookups, defaultEmployeeId, redirectPath }: LeaveFor
                   {balances.map((balance) => (
                     <div
                       key={balance.leaveTypeCode}
-                      className="rounded-lg border bg-card px-4 py-3"
+                      className="rounded-lg border bg-muted/20 px-4 py-3"
                     >
-                      <p className="text-xs text-muted-foreground">
+                      <p className="truncate text-xs text-muted-foreground">
                         {balance.leaveTypeName}
                       </p>
                       <p className="mt-1 text-2xl font-semibold tabular-nums">
                         {balance.balanceDays}
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">
+                          days
+                        </span>
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Used {balance.usedDays} · Pending {balance.pendingDays}
+                        {balance.usedDays} used · {balance.pendingDays} pending
                       </p>
                     </div>
                   ))}
                 </div>
               ) : !balancesLoading ? (
-                <p className="text-sm text-muted-foreground">
-                  No CL, EL, Optional Holiday, or LOP balances configured for this employee.
-                </p>
+                <div className="flex items-start gap-2.5 rounded-lg border border-dashed bg-muted/20 px-4 py-3">
+                  <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">
+                      No leave balance allocated yet
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      You can still submit this request. HR will review it and apply
+                      the appropriate leave type — if no paid balance is available, it
+                      may be treated as Loss of Pay (LOP).
+                    </p>
+                  </div>
+                </div>
               ) : null}
             </section>
           </div>
@@ -353,16 +374,6 @@ export function LeaveForm({ lookups, defaultEmployeeId, redirectPath }: LeaveFor
             id="emergencyContactPhone"
             disabled={isPending}
             {...form.register("emergencyContactPhone")}
-          />
-        </div>
-
-        <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="attachmentPath">Attachment Path</Label>
-          <Input
-            id="attachmentPath"
-            placeholder="Enter attachment file path"
-            disabled={isPending}
-            {...form.register("attachmentPath")}
           />
         </div>
       </div>

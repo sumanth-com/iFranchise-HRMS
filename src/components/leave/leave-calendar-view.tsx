@@ -327,19 +327,21 @@ export function LeaveCalendarView({
       </div>
 
       <div className="overflow-hidden rounded-xl border bg-card">
-        <div className="grid grid-cols-7 border-b bg-muted/40">
-          {WEEKDAY_LABELS.map((label) => (
-            <div
-              key={label}
-              className="px-2 py-2 text-center text-xs font-medium text-muted-foreground"
-            >
-              {label}
+        <div className="overflow-x-auto">
+          <div className="min-w-[44rem]">
+            <div className="grid grid-cols-7 border-b bg-muted/40">
+              {WEEKDAY_LABELS.map((label) => (
+                <div
+                  key={label}
+                  className="px-2 py-2 text-center text-xs font-medium text-muted-foreground"
+                >
+                  {label}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        <div className="grid grid-cols-7">
-          {calendarDays.map((day, index) => {
+            <div className="grid grid-cols-7">
+              {calendarDays.map((day, index) => {
             if (!day) {
               return (
                 <div
@@ -410,6 +412,8 @@ export function LeaveCalendarView({
               </div>
             );
           })}
+            </div>
+          </div>
         </div>
       </div>
     </div>

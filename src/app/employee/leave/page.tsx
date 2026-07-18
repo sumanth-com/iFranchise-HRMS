@@ -4,11 +4,13 @@ import { CalendarPlus } from "lucide-react";
 import { Button } from "@/components/common/button";
 import { DataTable, type DataTableColumn } from "@/components/common/data-table";
 import { EmployeeStatCard } from "@/components/employee/dashboard/employee-module-primitives";
+import { EmployeeLeaveCalendar } from "@/components/employee/leave/employee-leave-calendar";
 import { LeaveStatusBadge } from "@/components/leave/leave-status-badge";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import {
   getEmployeeLeaveBalanceSnapshot,
+  getEmployeeLeaveCalendarData,
   listLeaveRequests,
 } from "@/lib/leave/services/leave-queries";
 import { formatLeaveDate } from "@/lib/leave/services/leave-utils";
@@ -25,9 +27,14 @@ export default async function EmployeeLeavePage() {
   const supabase = await createClient();
   const employeeId = profile.employee.id;
 
-  const [balances, requests] = await Promise.all([
+  const now = new Date();
+  const calendarMonth = now.getMonth() + 1;
+  const calendarYear = now.getFullYear();
+
+  const [balances, requests, calendar] = await Promise.all([
     getEmployeeLeaveBalanceSnapshot(supabase, employeeId),
     listLeaveRequests(supabase, profile, { employeeId, page: 1, pageSize: 25 }),
+    getEmployeeLeaveCalendarData(supabase, profile, calendarMonth, calendarYear),
   ]);
 
   const totalBalance = balances.reduce((sum, row) => sum + row.balanceDays, 0);
@@ -61,8 +68,8 @@ export default async function EmployeeLeavePage() {
   ];
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-5">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-4 md:p-5">
+      <div className="flex flex-col gap-4">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">My Leave</h1>
@@ -97,6 +104,13 @@ export default async function EmployeeLeavePage() {
             </div>
           </section>
         ) : null}
+
+        <EmployeeLeaveCalendar
+          initialMonth={calendarMonth}
+          initialYear={calendarYear}
+          initialLeaves={calendar.leaves}
+          initialHolidays={calendar.holidays}
+        />
 
         <section className="rounded-xl border bg-card p-4 shadow-sm">
           <h2 className="mb-3 text-sm font-semibold tracking-tight">My Requests</h2>

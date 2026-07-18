@@ -524,6 +524,74 @@ export async function getLeaveCalendarData(
   return { leaves, holidays };
 }
 
+/**
+ * Calendar data scoped to a single employee — only their own leave requests plus
+ * company holidays for the month. Used by the Employee Self-Service leave module so
+ * an employee never sees other people's leave on the calendar.
+ */
+export async function getEmployeeLeaveCalendarData(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  month: number,
+  year: number,
+): Promise<{ leaves: LeaveCalendarEntry[]; holidays: LeaveHolidayEntry[] }> {
+  const employeeId = profile.employee.id;
+  const organizationId = profile.employee.organizationId;
+  const range = getMonthDateRange(month, year);
+
+  const [leavesResult, holidaysResult] = await Promise.all([
+    supabase
+      .schema("hrms")
+      .from("leave_requests")
+      .select(
+        `id, start_date, end_date, total_days, is_half_day, leave_status,
+         leave_types:leave_type_id (name)`,
+      )
+      .eq("employee_id", employeeId)
+      .in("leave_status", ["approved", "pending"])
+      .lte("start_date", range.end)
+      .gte("end_date", range.start)
+      .is("deleted_at", null),
+    supabase
+      .schema("hrms")
+      .from("holidays")
+      .select("id, name, holiday_date, is_optional")
+      .eq("organization_id", organizationId)
+      .gte("holiday_date", range.start)
+      .lte("holiday_date", range.end)
+      .is("deleted_at", null),
+  ]);
+
+  if (leavesResult.error) throw new Error(leavesResult.error.message);
+  if (holidaysResult.error) throw new Error(holidaysResult.error.message);
+
+  const leaves = (leavesResult.data ?? []).map((row) => {
+    const leaveType = unwrapRelation(row.leave_types);
+    const typeName = leaveType?.name ?? "Leave";
+    return {
+      id: row.id,
+      employeeId,
+      // On the personal calendar the chip shows the leave type (not a name).
+      employeeName: typeName,
+      leaveTypeName: typeName,
+      startDate: row.start_date,
+      endDate: row.end_date,
+      totalDays: Number(row.total_days),
+      isHalfDay: row.is_half_day,
+      leaveStatus: row.leave_status as LeaveCalendarEntry["leaveStatus"],
+    };
+  });
+
+  const holidays = (holidaysResult.data ?? []).map((row) => ({
+    id: row.id,
+    name: row.name,
+    holidayDate: row.holiday_date,
+    isOptional: row.is_optional,
+  }));
+
+  return { leaves, holidays };
+}
+
 export async function getLeaveLookups(
   supabase: AuthSupabaseClient,
   organizationId: string,
