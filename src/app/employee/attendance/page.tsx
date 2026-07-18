@@ -20,11 +20,19 @@ export default async function EmployeeAttendancePage({ searchParams }: PageProps
   const params = managerProfilePageParamsSchema.parse({
     month: typeof raw.month === "string" ? raw.month : undefined,
     year: typeof raw.year === "string" ? raw.year : undefined,
+    date: typeof raw.date === "string" ? raw.date : undefined,
     status: typeof raw.status === "string" ? raw.status : undefined,
+    searchDate: typeof raw.searchDate === "string" ? raw.searchDate : undefined,
     page: typeof raw.page === "string" ? raw.page : undefined,
   });
 
   const data = await getManagerProfilePageData(supabase, profile, params);
 
-  return <EmployeeAttendanceView data={data} />;
+  return (
+    <EmployeeAttendanceView
+      data={data}
+      status={params.status}
+      searchDate={params.searchDate}
+    />
+  );
 }

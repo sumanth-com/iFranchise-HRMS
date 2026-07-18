@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CalendarDays, Clock } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { EmployeeGreeting } from "@/types/employee-dashboard";
@@ -52,28 +53,40 @@ export function EmployeeDashboardHeader({ greeting }: { greeting: EmployeeGreeti
     greeting.employeeCode;
 
   return (
-    <header className="flex flex-col gap-4 overflow-hidden rounded-2xl border bg-gradient-to-r from-primary/10 via-primary/5 to-card px-5 py-5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
-      <div className="flex items-center gap-4">
-        <Avatar className="size-14 border-2 border-background shadow-sm">
-          {greeting.avatarUrl ? (
-            <AvatarImage src={greeting.avatarUrl} alt={greeting.fullName} />
-          ) : null}
-          <AvatarFallback className="text-base font-semibold">
-            {initials(greeting.fullName) || "EE"}
-          </AvatarFallback>
-        </Avatar>
-        <div className="min-w-0">
-          <h2 className="truncate text-xl font-semibold tracking-tight sm:text-2xl">
-            {salutation}, {greeting.firstName}
-          </h2>
-          <p className="mt-1 truncate text-sm text-muted-foreground">{subtitle}</p>
+    <section className="relative w-full shrink-0 overflow-hidden rounded-2xl border bg-gradient-to-br from-card via-card to-primary/5 px-5 py-5 shadow-sm lg:px-6 lg:py-6">
+      <div className="pointer-events-none absolute -top-10 -right-10 size-36 rounded-full bg-primary/10 blur-2xl" />
+      <div className="relative flex items-center justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-4">
+          <Avatar className="size-14 shrink-0 border-2 border-background shadow-sm">
+            {greeting.avatarUrl ? (
+              <AvatarImage src={greeting.avatarUrl} alt={greeting.fullName} />
+            ) : null}
+            <AvatarFallback className="text-base font-semibold">
+              {initials(greeting.fullName) || "EE"}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <h1 className="truncate text-2xl font-semibold tracking-tight lg:text-3xl">
+              {salutation}, {greeting.firstName}
+            </h1>
+            <p className="mt-1 truncate text-sm text-muted-foreground lg:text-base">
+              {subtitle}
+            </p>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <CalendarDays className="size-5" />
+          </span>
+          <div className="text-right">
+            <p className="whitespace-nowrap text-sm font-medium">{dateLabel || "\u00A0"}</p>
+            <p className="flex items-center justify-end gap-1 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+              <Clock className="size-3" />
+              {timeLabel}
+            </p>
+          </div>
         </div>
       </div>
-      <div className="flex items-center gap-2 sm:flex-col sm:items-end sm:gap-0.5">
-        <p className="text-sm font-medium">{dateLabel || "\u00A0"}</p>
-        <span className="hidden text-muted-foreground sm:inline">·</span>
-        <p className="text-sm font-semibold tabular-nums text-primary">{timeLabel}</p>
-      </div>
-    </header>
+    </section>
   );
 }

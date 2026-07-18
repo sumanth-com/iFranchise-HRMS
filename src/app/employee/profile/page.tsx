@@ -1,4 +1,5 @@
-import { format, parseISO } from "date-fns";
+import Image from "next/image";
+import { differenceInCalendarDays, format, parseISO } from "date-fns";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EmployeeSectionCard } from "@/components/employee/dashboard/employee-module-primitives";
@@ -15,6 +16,23 @@ function fmtDate(value: string | null) {
     return format(parseISO(value), "dd MMM yyyy");
   } catch {
     return value;
+  }
+}
+
+/** Days until the next annual occurrence of a birth date, or null if far off / missing. */
+function birthdayCountdown(dob: string | null | undefined): number | null {
+  if (!dob || dob.length < 10) return null;
+  try {
+    const now = new Date();
+    const src = parseISO(dob);
+    let next = new Date(now.getFullYear(), src.getMonth(), src.getDate());
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (next < todayMidnight) {
+      next = new Date(now.getFullYear() + 1, src.getMonth(), src.getDate());
+    }
+    return differenceInCalendarDays(next, todayMidnight);
+  } catch {
+    return null;
   }
 }
 
@@ -53,6 +71,15 @@ export default async function EmployeeProfilePage() {
     .map((part) => part[0]?.toUpperCase() ?? "")
     .join("");
 
+  const daysToBirthday = birthdayCountdown(employee.profile?.dateOfBirth ?? null);
+  const showBirthday = daysToBirthday != null && daysToBirthday <= 7;
+  const birthdayMessage =
+    daysToBirthday === 0
+      ? `Happy Birthday, ${employee.firstName}! 🎉 Wishing you an amazing year ahead.`
+      : daysToBirthday === 1
+        ? `Your birthday is tomorrow, ${employee.firstName}! 🎂 Get ready to celebrate.`
+        : `Your birthday is in ${daysToBirthday} days, ${employee.firstName}! 🎈`;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-5">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
@@ -60,6 +87,33 @@ export default async function EmployeeProfilePage() {
           <h1 className="text-2xl font-semibold tracking-tight">Profile &amp; Settings</h1>
           <p className="mt-1 text-sm text-muted-foreground">Your personal and employment details.</p>
         </div>
+
+        {showBirthday ? (
+          <section className="relative overflow-hidden rounded-xl border border-pink-500/20 bg-gradient-to-r from-pink-500/10 via-amber-500/10 to-violet-500/10 p-4 shadow-sm">
+            <div className="pointer-events-none absolute -top-8 right-10 size-24 rounded-full bg-pink-400/20 blur-2xl animate-pulse" />
+            <div className="relative flex items-center gap-3">
+              <span
+                className="shrink-0 animate-bounce"
+                style={{ animationDuration: "1.4s" }}
+                aria-hidden
+              >
+                <Image
+                  src="/images/birthday-cake-smile.png"
+                  alt="Birthday cake"
+                  width={48}
+                  height={48}
+                  className="size-12 object-contain"
+                />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">{birthdayMessage}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  From everyone at your workplace 💐
+                </p>
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         <section className="flex items-center gap-4 rounded-xl border bg-gradient-to-br from-primary/5 via-card to-card p-4 shadow-sm">
           <Avatar className="size-16 border">

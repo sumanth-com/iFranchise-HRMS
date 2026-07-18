@@ -9,6 +9,7 @@ import { listHolidays } from "@/lib/organization/services/org-queries";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { UserProfile } from "@/types/auth";
 import type {
+  EmployeeBirthdayPerson,
   EmployeeDashboardData,
   EmployeeGreeting,
   EmployeeUpcomingEvent,
@@ -124,7 +125,8 @@ async function loadLeaveSnapshot(
 async function loadCompanyBirthdays(
   organizationId: string,
   today: string,
-): Promise<EmployeeUpcomingEvent[]> {
+  selfEmployeeId: string,
+): Promise<EmployeeBirthdayPerson[]> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .schema("hrms")
@@ -137,7 +139,7 @@ async function loadCompanyBirthdays(
     .limit(3000);
   if (error) throw new Error(error.message);
 
-  const events: EmployeeUpcomingEvent[] = [];
+  const people: EmployeeBirthdayPerson[] = [];
   for (const row of (data ?? []) as Array<{
     date_of_birth: string | null;
     employees:
@@ -162,19 +164,15 @@ async function loadCompanyBirthdays(
 
     const next = nextAnnualOccurrence(row.date_of_birth, today);
     if (!next) continue;
-    if (differenceInCalendarDays(parseISO(next), parseISO(today)) > 45) continue;
+    // Only surface birthdays happening within the coming week.
+    if (differenceInCalendarDays(parseISO(next), parseISO(today)) > 7) continue;
 
     const name = `${employee.first_name ?? ""} ${employee.last_name ?? ""}`.trim() || "Team member";
-    events.push({
-      id: `birthday-${employee.id}`,
-      type: "birthday",
-      title: name,
-      subtitle: next === today ? "Birthday today" : "Birthday",
-      date: next,
-    });
+    people.push({ name, date: next, isSelf: employee.id === selfEmployeeId });
   }
 
-  return events;
+  people.sort((a, b) => a.date.localeCompare(b.date));
+  return people;
 }
 
 export async function getEmployeeDashboardData(
@@ -210,13 +208,17 @@ export async function getEmployeeDashboardData(
       page: 1,
       year: currentYear,
     }),
-    safe(() => loadCompanyBirthdays(organizationId, today), [] as EmployeeUpcomingEvent[]),
+    safe(
+      () => loadCompanyBirthdays(organizationId, today, employeeId),
+      [] as EmployeeBirthdayPerson[],
+    ),
   ]);
 
   const todayPanel = attendance?.today ?? buildFallbackToday(today);
 
-  const holidayEvents: EmployeeUpcomingEvent[] = holidays.data
+  const upcomingHolidays: EmployeeUpcomingEvent[] = holidays.data
     .filter((holiday) => holiday.holidayDate >= today)
+    .sort((a, b) => a.holidayDate.localeCompare(b.holidayDate))
     .map((holiday) => ({
       id: `holiday-${holiday.id}`,
       type: "holiday" as const,
@@ -224,10 +226,6 @@ export async function getEmployeeDashboardData(
       subtitle: holiday.isOptional ? "Optional holiday" : "Company holiday",
       date: holiday.holidayDate,
     }));
-
-  const upcomingEvents = [...holidayEvents, ...birthdays]
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(0, 8);
 
   return {
     greeting,
@@ -239,6 +237,8 @@ export async function getEmployeeDashboardData(
       leaveBalanceDays: leave.totalBalanceDays,
       pendingLeaveRequests: leave.pendingCount,
     },
-    upcomingEvents,
+    referenceDate: today,
+    upcomingHolidays,
+    birthdaysThisWeek: birthdays,
   };
 }
