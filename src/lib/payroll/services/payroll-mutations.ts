@@ -1252,7 +1252,7 @@ export async function getPayslipById(
 
   const { data: bankAccount } = await supabase
     .schema("hrms")
-    .from("employee_bank_accounts")
+    .from("bank_accounts")
     .select("bank_name, account_number")
     .eq("employee_id", payslip.employee_id)
     .eq("is_primary", true)
