@@ -254,14 +254,14 @@ export function EmployeeDirectoryView({ people }: { people: EmployeeDirectoryPer
               </p>
             </div>
 
-            <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-3 sm:w-auto sm:max-w-xl">
-              <div className="relative min-w-0 flex-1 sm:min-w-[16rem]">
+            <div className="flex w-full items-center gap-3 sm:ml-auto sm:w-auto sm:min-w-0">
+              <div className="relative w-full min-w-[12rem] sm:w-72 md:w-80 lg:w-96">
                 <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search by name, role, ID, or department"
-                  className="h-10 w-full border-muted-foreground/15 bg-muted/25 pr-10 pl-10 shadow-none"
+                  placeholder="Search name, role, ID, department"
+                  className="h-10 w-full rounded-lg border-muted-foreground/15 bg-muted/25 pr-10 pl-10 shadow-none"
                 />
                 {query ? (
                   <button

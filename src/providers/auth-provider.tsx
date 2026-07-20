@@ -24,6 +24,7 @@ import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { createClient } from "@/lib/supabase/client";
+import { UnsavedChangesProvider } from "@/providers/unsaved-changes-provider";
 import {
   hasAllPermissions,
   hasAnyPermission,
@@ -201,7 +202,11 @@ export function AuthProvider({
     ],
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      <UnsavedChangesProvider>{children}</UnsavedChangesProvider>
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthContextValue {

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { employeeChangePasswordAction } from "@/lib/employee/actions/employee-settings-actions";
+import { useRegisterUnsavedChanges } from "@/providers/unsaved-changes-provider";
 import { cn } from "@/lib/utils";
 
 const THEME_OPTIONS = [
@@ -77,6 +78,10 @@ function AccountSection({ email }: { email: string }) {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isPending, startTransition] = useTransition();
+  const hasPasswordDraft =
+    showForm && Boolean(currentPassword || newPassword || confirmPassword);
+
+  useRegisterUnsavedChanges("employee-password", "Password update", hasPasswordDraft);
 
   function changePassword() {
     startTransition(async () => {

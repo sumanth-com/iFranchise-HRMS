@@ -11,6 +11,7 @@ import { Button } from "@/components/common/button";
 import { saveNotificationPreferencesAction } from "@/lib/notifications/actions";
 import { NOTIFICATION_SOUND_OPTIONS } from "@/lib/notifications/constants";
 import { previewNotificationSound } from "@/lib/notifications/play-notification-sound";
+import { useRegisterUnsavedChanges } from "@/providers/unsaved-changes-provider";
 import { notificationPreferencesFormSchema } from "@/lib/validations/notifications";
 import { cn } from "@/lib/utils";
 import type { NotificationUserPreferences } from "@/types/notifications";
@@ -65,6 +66,12 @@ export function NotificationPreferencesForm({ preferences }: Props) {
       weeklyDigest: preferences.weeklyDigest,
     },
   });
+
+  useRegisterUnsavedChanges(
+    "notification-preferences",
+    "Notification preferences",
+    form.formState.isDirty,
+  );
 
   const selectedSound = form.watch("notificationSound");
   const isMuted = form.watch("muteNotifications");

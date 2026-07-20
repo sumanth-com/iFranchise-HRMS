@@ -16,6 +16,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
+import { SignOutConfirmationContent } from "@/components/layout/sign-out-confirmation-content";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -141,9 +142,10 @@ export function UserProfileDropdown() {
       <Modal
         open={signOutOpen}
         onOpenChange={setSignOutOpen}
-        title="Sign out?"
-        description="Are you sure you want to sign out? You will need to sign in again to access your account."
-        contentClassName="sm:max-w-md"
+        title="Confirm sign out"
+        description="Review what is saved and what still needs to be saved before ending your session."
+        contentClassName="sm:max-w-lg"
+        cancelLabel="Stay signed in"
         footer={
           <Button
             variant="destructive"
@@ -154,9 +156,7 @@ export function UserProfileDropdown() {
           </Button>
         }
       >
-        <p className="text-sm text-muted-foreground">
-          Any unsaved changes in open forms will be lost.
-        </p>
+        <SignOutConfirmationContent />
       </Modal>
     </>
   );
