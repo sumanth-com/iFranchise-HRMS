@@ -35,7 +35,7 @@ export function ManagerProfileTodayCard({ today }: Props) {
       getElapsedWorkingSeconds(today.checkInAt, today.checkOutAt),
     );
 
-    if (!today.checkInAt || today.checkOutAt || today.isLocked) return;
+    if (!today.checkInAt || today.checkOutAt) return;
 
     const id = window.setInterval(() => {
       setElapsedSeconds(
@@ -44,7 +44,7 @@ export function ManagerProfileTodayCard({ today }: Props) {
     }, 1000);
 
     return () => window.clearInterval(id);
-  }, [today.checkInAt, today.checkOutAt, today.isLocked]);
+  }, [today.checkInAt, today.checkOutAt]);
 
   const dateLabel = format(parseISO(today.attendanceDate), "do MMM yyyy");
 

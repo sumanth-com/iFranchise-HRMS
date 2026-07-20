@@ -6,16 +6,18 @@ import type { NotificationSoundTone } from "@/types/notifications";
 
 const NOTIFICATION_SOUND_VOLUME = 0.55;
 
-const audioCache = new Map<NotificationSoundTone, HTMLAudioElement>();
+const audioCache = new Map<Exclude<NotificationSoundTone, "off">, HTMLAudioElement>();
 let unlocked = false;
 let unlockListenersAttached = false;
 
 function getAudio(tone: NotificationSoundTone) {
-  if (typeof window === "undefined") return null;
+  if (typeof window === "undefined" || tone === "off") return null;
 
   let element = audioCache.get(tone);
   if (!element) {
-    element = new Audio(getNotificationSoundUrl(tone));
+    const url = getNotificationSoundUrl(tone);
+    if (!url) return null;
+    element = new Audio(url);
     element.preload = "auto";
     element.volume = NOTIFICATION_SOUND_VOLUME;
     audioCache.set(tone, element);
@@ -53,6 +55,8 @@ export function attachNotificationSoundUnlock() {
 }
 
 export function playNotificationSound(tone: NotificationSoundTone = DEFAULT_NOTIFICATION_SOUND) {
+  if (tone === "off") return;
+
   const element = getAudio(tone);
   if (!element) return;
 

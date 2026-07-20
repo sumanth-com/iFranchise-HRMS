@@ -6,6 +6,7 @@ import {
   LaptopMinimal,
   LayoutDashboard,
   Settings,
+  Users,
   Wallet,
 } from "lucide-react";
 
@@ -23,6 +24,12 @@ export const employeeNavItems: NavigationItem[] = [
     href: EMPLOYEE_ROUTES.attendance,
     icon: CalendarCheck,
     permissions: ["attendance.view"],
+  },
+  {
+    title: "Employee Directory",
+    href: EMPLOYEE_ROUTES.directory,
+    icon: Users,
+    permissions: ["employee.view"],
   },
   {
     title: "Leave",

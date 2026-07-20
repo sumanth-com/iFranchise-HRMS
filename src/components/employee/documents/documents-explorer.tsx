@@ -134,9 +134,18 @@ export function DocumentsExplorer({ data }: { data: EmployeeDocumentsExplorerDat
   );
   const remainingBytes = Math.max(0, data.storage.softLimitBytes - data.storage.usedBytes);
 
-  const folderDefaultType = openFolder
-    ? data.documentTypes.find((type) => type.categoryKey === openFolder)?.id
-    : undefined;
+  /** When inside a folder, only offer document types that belong to that category. */
+  const uploadDocumentTypes = useMemo(() => {
+    if (!openFolder) return data.documentTypes;
+    const filtered = data.documentTypes.filter((type) => type.categoryKey === openFolder);
+    if (filtered.length > 0) return filtered;
+    // Folders without dedicated types (e.g. education / payroll) fall back to "Other"
+    return data.documentTypes.filter(
+      (type) => type.code.toUpperCase() === "OTHER" || type.categoryKey === "other",
+    );
+  }, [data.documentTypes, openFolder]);
+
+  const folderDefaultType = uploadDocumentTypes[0]?.id;
 
   function handleRename() {
     if (!renameFile) return;
@@ -352,7 +361,7 @@ export function DocumentsExplorer({ data }: { data: EmployeeDocumentsExplorerDat
       <DocumentUploadDialog
         open={uploadOpen}
         onOpenChange={setUploadOpen}
-        documentTypes={data.documentTypes}
+        documentTypes={uploadDocumentTypes}
         maxUploadSizeMb={data.maxUploadSizeMb}
         allowedFileTypes={data.allowedFileTypes}
         defaultDocumentTypeId={folderDefaultType}

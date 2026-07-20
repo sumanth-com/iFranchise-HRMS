@@ -16,7 +16,7 @@ export const ceoProfilePreferencesSchema = z.object({
   defaultDashboard: z.string().min(1).max(200),
   defaultLandingPage: z.string().min(1).max(200),
   sidebarState: z.enum(["expanded", "collapsed"]),
-  notificationSound: z.enum(["classic", "soft", "alert"]),
+  notificationSound: z.enum(["classic", "soft", "alert", "off"]),
 });
 
 export const ceoAlertPreferencesSchema = z.object({

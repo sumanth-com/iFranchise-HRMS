@@ -28,12 +28,12 @@ export function EmployeeAttendanceTodayCard({ today }: { today: ManagerTodayAtte
 
   useEffect(() => {
     setElapsedSeconds(elapsedWorkingSeconds(today.checkInAt, today.checkOutAt));
-    if (!today.checkInAt || today.checkOutAt || today.isLocked) return;
+    if (!today.checkInAt || today.checkOutAt) return;
     const id = window.setInterval(() => {
       setElapsedSeconds(elapsedWorkingSeconds(today.checkInAt, null));
     }, 1000);
     return () => window.clearInterval(id);
-  }, [today.checkInAt, today.checkOutAt, today.isLocked]);
+  }, [today.checkInAt, today.checkOutAt]);
 
   const dateLabel = format(parseISO(today.attendanceDate), "do MMM yyyy");
 

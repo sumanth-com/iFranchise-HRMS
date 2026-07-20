@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Volume2 } from "lucide-react";
+import { Loader2, Volume2, VolumeX } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { useForm } from "react-hook-form";
@@ -83,18 +83,19 @@ export function NotificationPreferencesForm({ preferences }: Props) {
   }
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-2xl space-y-6">
+    <form onSubmit={form.handleSubmit(onSubmit)} className="w-full space-y-6">
       <div className="rounded-xl border bg-card shadow-sm">
         <div className="border-b px-4 py-4">
           <h3 className="font-medium">Notification Sound</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Choose the tone played when a new in-app notification arrives.
+            Choose the tone played when a new in-app notification arrives — or turn sound off.
           </p>
         </div>
 
         <div className="divide-y">
           {NOTIFICATION_SOUND_OPTIONS.map((option) => {
             const isSelected = selectedSound === option.value;
+            const isOff = option.value === "off";
 
             return (
               <div
@@ -111,7 +112,9 @@ export function NotificationPreferencesForm({ preferences }: Props) {
                     value={option.value}
                     checked={isSelected}
                     disabled={isMuted || isPending}
-                    onChange={() => form.setValue("notificationSound", option.value, { shouldDirty: true })}
+                    onChange={() =>
+                      form.setValue("notificationSound", option.value, { shouldDirty: true })
+                    }
                     className="mt-1 size-4 shrink-0"
                   />
                   <div className="min-w-0">
@@ -120,16 +123,23 @@ export function NotificationPreferencesForm({ preferences }: Props) {
                   </div>
                 </label>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isMuted || isPending}
-                  onClick={() => previewNotificationSound(option.value)}
-                >
-                  <Volume2 className="mr-2 size-4" />
-                  Preview
-                </Button>
+                {isOff ? (
+                  <span className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-xs text-muted-foreground">
+                    <VolumeX className="size-3.5" />
+                    Silent
+                  </span>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isMuted || isPending}
+                    onClick={() => previewNotificationSound(option.value)}
+                  >
+                    <Volume2 className="mr-2 size-4" />
+                    Preview
+                  </Button>
+                )}
               </div>
             );
           })}
@@ -142,7 +152,7 @@ export function NotificationPreferencesForm({ preferences }: Props) {
         ) : null}
       </div>
 
-      <div className="rounded-xl border bg-card shadow-sm divide-y">
+      <div className="divide-y rounded-xl border bg-card shadow-sm">
         {TOGGLES.map((toggle) => (
           <label
             key={toggle.key}

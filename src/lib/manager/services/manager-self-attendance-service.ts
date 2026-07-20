@@ -24,7 +24,7 @@ import {
   extractTimeFromTimestamp,
   formatAttendanceTime,
   getTodayDateString,
-  OFFICE_CHECK_OUT_TIME,
+  OFFICE_CHECK_IN_LOCK_TIME,
   OFFICE_TIMEZONE,
   type AttendanceRules,
 } from "@/lib/attendance/services/attendance-utils";
@@ -34,8 +34,8 @@ import { parseWorkingConfiguration } from "@/lib/company-settings/services/compa
 import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
 import { getEmployeeById } from "@/lib/employees/services/employee-detail";
 import { createSignedStorageUrl } from "@/lib/employees/services/employee-mutations";
+import { buildEmployeeRouteRef } from "@/lib/employees/routing";
 import { expandDateRange, getMonthDateRange } from "@/lib/leave/services/leave-utils";
-import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import type {
   ManagerAttendancePunchInput,
   ManagerAttendanceRegularizationInput,
@@ -116,16 +116,21 @@ function getOfficeNowParts() {
   return { hour, minute, totalMinutes: hour * 60 + minute };
 }
 
-export function isAttendanceLockedNow(attendanceDate: string) {
+export function isCheckInLockedNow(attendanceDate: string) {
   const today = getTodayDateString();
   if (attendanceDate < today) return true;
   if (attendanceDate > today) return false;
 
-  const [lockHour, lockMinute] = OFFICE_CHECK_OUT_TIME.split(":").map((part) =>
+  const [lockHour, lockMinute] = OFFICE_CHECK_IN_LOCK_TIME.split(":").map((part) =>
     Number.parseInt(part, 10),
   );
   const lockMinutes = lockHour * 60 + lockMinute;
   return getOfficeNowParts().totalMinutes >= lockMinutes;
+}
+
+/** @deprecated Prefer isCheckInLockedNow — checkout is never auto-locked by time. */
+export function isAttendanceLockedNow(attendanceDate: string) {
+  return isCheckInLockedNow(attendanceDate);
 }
 
 function computeOvertimeHours(workHours: number, rules: AttendanceRules) {
@@ -144,11 +149,13 @@ function resolvePunchStatus(
 ): AttendanceStatus {
   const lateMinutes = computeLateMinutes(checkInAt, attendanceDate, rules.lateAfter);
   const workHours = computeWorkHours(checkInAt, checkOutAt);
+  const today = getTodayDateString();
+  // Finalize hours once checkout is recorded, or for past days.
   const finalizeHours =
-    options?.finalizeHours ?? isAttendanceLockedNow(attendanceDate);
+    options?.finalizeHours ?? (Boolean(checkOutAt) || attendanceDate < today);
 
-  // Until the day locks at 7 PM, status follows check-in only (present / late).
-  // Hours-based half-day / absent apply only after lock, when checkout is final.
+  // Until checkout is recorded, status follows check-in only (present / late).
+  // Hours-based half-day / absent apply once the workday has a checkout.
   if (
     finalizeHours &&
     checkOutAt &&
@@ -168,10 +175,14 @@ function resolvePunchState(
   checkOutAt: string | null,
   attendanceDate: string,
 ): ManagerAttendancePunchState {
-  const locked = isAttendanceLockedNow(attendanceDate);
-  if (!checkInAt) return locked && attendanceDate <= getTodayDateString() ? "locked" : "not_checked_in";
-  if (!checkOutAt) return locked ? "locked" : "checked_in";
-  return locked ? "locked" : "checked_out";
+  // Checkout is never auto-locked — only check-in closes at OFFICE_CHECK_IN_LOCK_TIME.
+  if (!checkInAt) {
+    return isCheckInLockedNow(attendanceDate) && attendanceDate <= getTodayDateString()
+      ? "locked"
+      : "not_checked_in";
+  }
+  if (!checkOutAt) return "checked_in";
+  return "checked_out";
 }
 
 function buildTodayPanel(
@@ -181,7 +192,7 @@ function buildTodayPanel(
 ): ManagerTodayAttendance {
   const checkInAt = row?.check_in_at ?? null;
   const checkOutAt = row?.check_out_at ?? null;
-  const isLocked = isAttendanceLockedNow(attendanceDate);
+  const checkInLocked = isCheckInLockedNow(attendanceDate);
   const punchState = resolvePunchState(checkInAt, checkOutAt, attendanceDate);
   const workHours = row
     ? Number(row.work_hours ?? 0)
@@ -191,20 +202,22 @@ function buildTodayPanel(
     ? Number(row.overtime_hours ?? 0)
     : computeOvertimeHours(workHours, rules);
 
-  // Prefer live punch status so an early checkout before lock does not show Half Day.
+  // Prefer live punch status so an early checkout does not show Half Day until hours finalize.
   const attendanceStatus = checkInAt
     ? resolvePunchStatus(checkInAt, checkOutAt, attendanceDate, rules)
     : row?.attendance_status ?? null;
 
+  const lockTimeLabel = formatAttendanceTime(
+    `${attendanceDate}T${OFFICE_CHECK_IN_LOCK_TIME}:00+05:30`,
+  );
+
   let lockMessage: string | null = null;
-  if (isLocked && attendanceDate === getTodayDateString()) {
-    lockMessage = "Attendance locked for today.";
-  } else if (!isLocked && checkInAt) {
-    lockMessage = `Checkout can be updated until ${formatAttendanceTime(
-      `${attendanceDate}T${OFFICE_CHECK_OUT_TIME}:00+05:30`,
-    )}. Attendance will lock automatically at ${formatAttendanceTime(
-      `${attendanceDate}T${OFFICE_CHECK_OUT_TIME}:00+05:30`,
-    )}.`;
+  if (attendanceDate === getTodayDateString()) {
+    if (!checkInAt && checkInLocked) {
+      lockMessage = `Check-in locked. Check-in closed at ${lockTimeLabel}.`;
+    } else if (!checkInAt) {
+      lockMessage = `Check-in will automatically lock at ${lockTimeLabel}.`;
+    }
   }
 
   return {
@@ -217,7 +230,7 @@ function buildTodayPanel(
     workHours,
     overtimeHours,
     lateMinutes,
-    isLocked,
+    isLocked: checkInLocked && !checkInAt,
     lockMessage,
     workingDurationLabel: formatWorkingDuration(
       getElapsedWorkingSeconds(checkInAt, checkOutAt),
@@ -632,9 +645,8 @@ function buildHistoryRows(input: {
       date,
       input.rules.lateAfter,
     );
-    const locked = isAttendanceLockedNow(date);
     const canUpdateCheckout = Boolean(
-      attendance?.check_in_at && !locked && date === input.today,
+      attendance?.check_in_at && date === input.today,
     );
     const canRequestRegularization =
       date <= input.today &&
@@ -712,7 +724,11 @@ async function buildProfileCard(
     email: employee.email,
     phone: employee.phone,
     imageUrl,
-    profilePath: MANAGER_ROUTES.profile,
+    profilePath: `/e/${buildEmployeeRouteRef({
+      employeeCode: employee.employeeCode,
+      firstName: employee.firstName,
+      lastName: employee.lastName,
+    })}/card`,
   };
 }
 
@@ -833,8 +849,12 @@ export async function punchManagerAttendance(
     profile.employee.organizationId,
   );
 
-  if (isAttendanceLockedNow(today) && input.type === "out") {
-    throw new Error("Attendance locked for today.");
+  if (isCheckInLockedNow(today) && input.type === "in") {
+    throw new Error(
+      `Check-in locked. Check-in closes at ${formatAttendanceTime(
+        `${today}T${OFFICE_CHECK_IN_LOCK_TIME}:00+05:30`,
+      )}.`,
+    );
   }
 
   const existing = await getAttendanceForDate(supabase, employeeId, today);
@@ -966,10 +986,7 @@ export async function updateManagerCheckout(
   input: ManagerUpdateCheckoutInput,
 ) {
   const today = getTodayDateString();
-  if (isAttendanceLockedNow(today)) {
-    throw new Error("Attendance locked for today.");
-  }
-
+  // Checkout is never auto-locked by time — only today can be updated.
   const employeeId = profile.employee.id;
   const existing = input.attendanceId
     ? await getAttendanceForDate(supabase, employeeId, today).then(async (row) => {

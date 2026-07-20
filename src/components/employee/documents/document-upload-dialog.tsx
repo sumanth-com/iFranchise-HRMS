@@ -63,11 +63,13 @@ export function DocumentUploadDialog({
 
   useEffect(() => {
     if (!open) return;
-    setDocumentTypeId(replaceTarget?.documentTypeId ?? defaultDocumentTypeId);
+    const preferred = replaceTarget?.documentTypeId ?? defaultDocumentTypeId;
+    const stillValid = documentTypes.some((type) => type.id === preferred);
+    setDocumentTypeId(stillValid ? preferred : (documentTypes[0]?.id ?? ""));
     setTitle(replaceTarget?.title ?? "");
     setFile(null);
     setDragging(false);
-  }, [open, defaultDocumentTypeId, replaceTarget]);
+  }, [open, defaultDocumentTypeId, replaceTarget, documentTypes]);
 
   function validateAndSet(next: File | null) {
     if (!next) return;

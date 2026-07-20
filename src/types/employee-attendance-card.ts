@@ -1,0 +1,21 @@
+export type EmployeeAttendanceCardSnapshot = {
+  employeeId: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  employeeCode: string;
+  designation: string | null;
+  departmentName: string | null;
+  month: number;
+  year: number;
+  monthLabel: string;
+  present: number;
+  late: number;
+  absent: number;
+  leaveDays: number;
+  halfDay: number;
+  workingDays: number;
+  averageWorkingHours: number;
+  performanceRating: number | null;
+  hasTakenLeave: boolean;
+};

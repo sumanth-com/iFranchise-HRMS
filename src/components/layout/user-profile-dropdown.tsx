@@ -1,6 +1,15 @@
 "use client";
 
-import { Building2, ChevronDown, LogOut, Moon, Settings, Sun, User } from "lucide-react";
+import {
+  Building2,
+  ChevronDown,
+  CircleHelp,
+  LogOut,
+  Moon,
+  Settings,
+  Sun,
+  User,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useState } from "react";
@@ -42,6 +51,7 @@ export function UserProfileDropdown() {
   const isManagerPortal = portalHome.startsWith("/manager");
   const isCeoPortal = portalHome.startsWith("/ceo");
   const isEmployeePortal = portalHome === "/employee" || portalHome.startsWith("/employee/");
+  const isDark = resolvedTheme === "dark";
   const profileHref = isManagerPortal
     ? MANAGER_ROUTES.profile
     : isCeoPortal
@@ -51,9 +61,8 @@ export function UserProfileDropdown() {
     ? MANAGER_ROUTES.settings
     : isCeoPortal
       ? `${CEO_ROUTES.profile}#preferences`
-      : isEmployeePortal
-        ? EMPLOYEE_PORTAL_ROUTES.settings
-        : null;
+      : null;
+  const helpHref = isEmployeePortal ? EMPLOYEE_PORTAL_ROUTES.help : null;
   const canOpenCompanySettings = canViewCompanySettings(permissionCodes);
 
   async function handleSignOut() {
@@ -95,6 +104,12 @@ export function UserProfileDropdown() {
               Profile
             </DropdownMenuItem>
           ) : null}
+          {helpHref ? (
+            <DropdownMenuItem onClick={() => router.push(helpHref)}>
+              <CircleHelp className="size-4" />
+              Help
+            </DropdownMenuItem>
+          ) : null}
           {settingsHref ? (
             <DropdownMenuItem onClick={() => router.push(settingsHref)}>
               <Settings className="size-4" />
@@ -107,15 +122,9 @@ export function UserProfileDropdown() {
               Company Setting
             </DropdownMenuItem>
           ) : null}
-          <DropdownMenuItem
-            onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-          >
-            {resolvedTheme === "dark" ? (
-              <Sun className="size-4" />
-            ) : (
-              <Moon className="size-4" />
-            )}
-            Toggle theme
+          <DropdownMenuItem onClick={() => setTheme(isDark ? "light" : "dark")}>
+            {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+            {isDark ? "Light mode" : "Dark mode"}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem

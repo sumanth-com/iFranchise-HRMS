@@ -199,19 +199,25 @@ export function CeoProfileNotificationSection({
                     </span>
                   </span>
                 </label>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="shrink-0"
-                  disabled={isPending}
-                  onClick={() =>
-                    previewNotificationSound(option.value as NotificationSoundTone)
-                  }
-                >
-                  <Volume2 className="size-3.5" />
-                  Preview
-                </Button>
+                {option.value === "off" ? (
+                  <span className="inline-flex h-8 shrink-0 items-center rounded-lg border px-3 text-xs text-muted-foreground">
+                    Silent
+                  </span>
+                ) : (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                    disabled={isPending}
+                    onClick={() =>
+                      previewNotificationSound(option.value as NotificationSoundTone)
+                    }
+                  >
+                    <Volume2 className="size-3.5" />
+                    Preview
+                  </Button>
+                )}
               </div>
             );
           })}

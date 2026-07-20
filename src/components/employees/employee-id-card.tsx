@@ -56,6 +56,7 @@ export function EmployeeIdCard({
 
   const fullName = `${firstName} ${lastName}`.trim();
   const roleTitle = designation?.trim() || "Team Member";
+  const isAttendanceCard = profilePath.endsWith("/card");
 
   useEffect(() => {
     setImageUrl(initialUrl);
@@ -312,7 +313,9 @@ export function EmployeeIdCard({
                   Empowered to do great work.
                 </h3>
                 <p className="mt-3 max-w-[14rem] text-sm leading-relaxed text-white/82">
-                  Scan this secure digital identity to open the employee profile.
+                  {isAttendanceCard
+                    ? "Scan this QR to view this month's attendance, leaves, and performance."
+                    : "Scan this secure digital identity to open the employee profile."}
                 </p>
 
                 <div className="mt-7 rounded-[1.35rem] bg-white p-3 shadow-[0_16px_32px_-16px_rgba(0,0,0,0.45)]">
@@ -329,7 +332,9 @@ export function EmployeeIdCard({
                   )}
                 </div>
                 <p className="mt-3 text-[0.72rem] font-medium tracking-wide text-white/80">
-                  Scan for {firstName}&apos;s profile
+                  {isAttendanceCard
+                    ? `Scan for ${firstName}'s attendance`
+                    : `Scan for ${firstName}'s profile`}
                 </p>
               </div>
 

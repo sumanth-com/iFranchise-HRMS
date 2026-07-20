@@ -19,7 +19,7 @@ export type NotificationChannel = "in_app" | "email" | "push";
 
 export type DeliveryStatus = "pending" | "delivered" | "failed" | "skipped";
 
-export type NotificationSoundTone = "classic" | "soft" | "alert";
+export type NotificationSoundTone = "classic" | "soft" | "alert" | "off";
 
 export type NotificationListItem = {
   id: string;

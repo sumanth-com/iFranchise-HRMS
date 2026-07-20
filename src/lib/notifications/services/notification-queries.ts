@@ -311,7 +311,7 @@ export async function getNotificationBellData(
   return {
     unreadCount: unreadCount ?? 0,
     items,
-    soundEnabled: !preferences.muteNotifications,
+    soundEnabled: !preferences.muteNotifications && preferences.notificationSound !== "off",
     notificationSound: preferences.notificationSound,
   };
 }

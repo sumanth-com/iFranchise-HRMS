@@ -1,8 +1,7 @@
 "use client";
 
 import { format, formatDistanceToNow } from "date-fns";
-import { Archive, Check, ExternalLink, Loader2, MoreHorizontal, Trash2, X } from "lucide-react";
-import Link from "next/link";
+import { Check, Loader2, MoreHorizontal, Search, Trash2, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -22,7 +21,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  archiveNotificationAction,
   deleteNotificationAction,
   markAllNotificationsReadAction,
   markNotificationReadAction,
@@ -145,28 +143,31 @@ export function NotificationCenterSplitView({
           )}
 
           {showToolbarSearch || showMarkAllRead ? (
-            <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+            <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
               {showToolbarSearch ? (
-                <Input
-                  placeholder="Search notifications..."
-                  defaultValue={search}
-                  className="h-8 w-full min-w-[10rem] sm:w-52"
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      setParams({
-                        search: event.currentTarget.value || undefined,
-                        page: "1",
-                        id: undefined,
-                      });
-                    }
-                  }}
-                />
+                <div className="relative w-full min-w-0 sm:w-80 md:w-96">
+                  <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search notifications..."
+                    defaultValue={search}
+                    className="h-9 w-full pl-9"
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        setParams({
+                          search: event.currentTarget.value || undefined,
+                          page: "1",
+                          id: undefined,
+                        });
+                      }
+                    }}
+                  />
+                </div>
               ) : null}
               {showMarkAllRead ? (
                 <Button
                   variant="outline"
                   size="sm"
-                  className="shrink-0"
+                  className="h-9 shrink-0"
                   disabled={isPending}
                   onClick={() => {
                     startTransition(async () => {
@@ -240,25 +241,7 @@ export function NotificationCenterSplitView({
           {selected ? (
             <NotificationDetailPanel
               notification={selected}
-              isPending={isPending}
               onClose={() => setParams({ id: undefined })}
-              onArchive={() => {
-                startTransition(async () => {
-                  const res = await archiveNotificationAction(selected.id);
-                  if (res.success) {
-                    toast.success("Archived");
-                    router.refresh();
-                  } else toast.error(res.message);
-                });
-              }}
-              onDelete={() => setDeleteTarget(selected)}
-              onMarkRead={() => {
-                startTransition(async () => {
-                  const res = await markNotificationReadAction(selected.id);
-                  if (res.success) router.refresh();
-                  else toast.error(res.message);
-                });
-              }}
             />
           ) : (
             <div className="flex flex-1 items-center justify-center p-8">
@@ -401,18 +384,10 @@ function NotificationListRow({
 
 function NotificationDetailPanel({
   notification,
-  isPending,
   onClose,
-  onArchive,
-  onDelete,
-  onMarkRead,
 }: {
   notification: NotificationListItem;
-  isPending: boolean;
   onClose: () => void;
-  onArchive: () => void;
-  onDelete: () => void;
-  onMarkRead: () => void;
 }) {
   const metaParts = [
     formatNotificationModule(notification.module),
@@ -452,37 +427,6 @@ function NotificationDetailPanel({
         <p className="max-w-2xl whitespace-pre-wrap text-[15px] leading-7 text-foreground">
           {formatNotificationDisplayText(notification.message)}
         </p>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2 border-t px-6 py-4">
-        {notification.actionUrl ? (
-          <Link
-            href={notification.actionUrl}
-            className={cn(
-              "inline-flex h-8 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground",
-              "hover:bg-primary/90",
-            )}
-          >
-            <ExternalLink className="size-4" />
-            Open related page
-          </Link>
-        ) : null}
-        {notification.status === "unread" ? (
-          <Button variant="outline" size="sm" disabled={isPending} onClick={onMarkRead}>
-            <Check className="mr-2 size-4" />
-            Mark as read
-          </Button>
-        ) : null}
-        {notification.status !== "archived" ? (
-          <Button variant="outline" size="sm" disabled={isPending} onClick={onArchive}>
-            <Archive className="mr-2 size-4" />
-            Archive
-          </Button>
-        ) : null}
-        <Button variant="outline" size="sm" disabled={isPending} onClick={onDelete}>
-          <Trash2 className="mr-2 size-4 text-destructive" />
-          Delete
-        </Button>
       </div>
     </div>
   );

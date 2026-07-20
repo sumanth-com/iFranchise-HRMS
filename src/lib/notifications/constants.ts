@@ -122,13 +122,13 @@ export const NOTIFICATION_SOUND_OPTIONS: {
   value: NotificationSoundTone;
   label: string;
   description: string;
-  fileName: string;
+  fileName: string | null;
 }[] = [
   {
     value: "classic",
-    label: "Classic Chime",
-    description: "Balanced tone for everyday alerts.",
-    fileName: "notification-classic.mp3",
+    label: "Soft Chime",
+    description: "Gentle two-note tone for everyday alerts.",
+    fileName: "notification-classic.wav",
   },
   {
     value: "soft",
@@ -142,17 +142,26 @@ export const NOTIFICATION_SOUND_OPTIONS: {
     description: "Louder tone for urgent notifications.",
     fileName: "notification-alert.mp3",
   },
+  {
+    value: "off",
+    label: "No sound",
+    description: "Keep visual alerts only — no tone when notifications arrive.",
+    fileName: null,
+  },
 ];
 
 export const DEFAULT_NOTIFICATION_SOUND: NotificationSoundTone = "classic";
 
 export function getNotificationSoundUrl(tone: NotificationSoundTone) {
+  if (tone === "off") return null;
   const option = NOTIFICATION_SOUND_OPTIONS.find((item) => item.value === tone);
   return `/sounds/${option?.fileName ?? NOTIFICATION_SOUND_OPTIONS[0]!.fileName}`;
 }
 
 export function parseNotificationSoundTone(value: string | null | undefined): NotificationSoundTone {
-  if (value === "soft" || value === "alert" || value === "classic") return value;
+  if (value === "soft" || value === "alert" || value === "classic" || value === "off") {
+    return value;
+  }
   return DEFAULT_NOTIFICATION_SOUND;
 }
 
