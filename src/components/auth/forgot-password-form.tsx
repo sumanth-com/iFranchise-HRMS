@@ -52,9 +52,11 @@ export function ForgotPasswordForm() {
   if (isSubmitted) {
     return (
       <div className="space-y-6">
-        <div className="space-y-2 text-center">
-          <h2 className="text-lg font-semibold">Check your email</h2>
-          <p className="text-sm text-muted-foreground">
+        <div className="space-y-1.5">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+            Check your email
+          </h1>
+          <p className="text-sm text-slate-500">
             If an account exists for that email, you will receive password reset
             instructions shortly.
           </p>
@@ -63,7 +65,7 @@ export function ForgotPasswordForm() {
           href="/login"
           className={cn(
             buttonVariants({ variant: "outline" }),
-            "w-full",
+            "h-11 w-full rounded-xl",
           )}
         >
           Back to sign in
@@ -74,36 +76,45 @@ export function ForgotPasswordForm() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2 text-center">
-        <h2 className="text-lg font-semibold">Forgot password</h2>
-        <p className="text-sm text-muted-foreground">
+      <div className="space-y-1.5">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+          Forgot password
+        </h1>
+        <p className="text-sm text-slate-500">
           Enter your company email and we will send you a reset link.
         </p>
       </div>
 
       {formError ? (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {formError}
         </div>
       ) : null}
 
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="email">Company email</Label>
+          <Label htmlFor="email" className="text-sm font-medium text-slate-700">
+            Company Email
+          </Label>
           <Input
             id="email"
             type="email"
             autoComplete="email"
-            placeholder="you@company.com"
+            placeholder="Enter your company email"
             disabled={isPending}
+            className="h-11 rounded-xl border-slate-200"
             {...register("email")}
           />
           {errors.email ? (
-            <p className="text-sm text-destructive">{errors.email.message}</p>
+            <p className="text-sm text-red-600">{errors.email.message}</p>
           ) : null}
         </div>
 
-        <Button type="submit" className="w-full" disabled={isPending}>
+        <Button
+          type="submit"
+          className="h-11 w-full rounded-xl bg-[#0f2f6d] text-sm font-semibold text-white hover:bg-[#0c275c]"
+          disabled={isPending}
+        >
           {isPending ? "Sending..." : "Send reset link"}
         </Button>
 
