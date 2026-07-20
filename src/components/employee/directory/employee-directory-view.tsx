@@ -13,6 +13,7 @@ import {
   Phone,
   Search,
   Users,
+  X,
 } from "lucide-react";
 
 import { Input } from "@/components/common/input";
@@ -244,26 +245,39 @@ export function EmployeeDirectoryView({ people }: { people: EmployeeDirectoryPer
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-5">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Employee Directory</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Meet your colleagues across the organization.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="relative w-full sm:w-72">
-              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search name, role, ID…"
-                className="h-9 pl-9"
-              />
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-semibold tracking-tight">Employee Directory</h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Connect with colleagues across the organization.
+              </p>
             </div>
-            <span className="hidden shrink-0 rounded-full border bg-muted/40 px-2.5 py-1 text-xs font-medium text-muted-foreground sm:inline-flex">
-              {filtered.length} people
-            </span>
+
+            <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-3 sm:w-auto sm:max-w-xl">
+              <div className="relative min-w-0 flex-1 sm:min-w-[16rem]">
+                <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search by name, role, ID, or department"
+                  className="h-10 w-full border-muted-foreground/15 bg-muted/25 pr-10 pl-10 shadow-none"
+                />
+                {query ? (
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    className="absolute top-1/2 right-3 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+                    aria-label="Clear search"
+                  >
+                    <X className="size-4" />
+                  </button>
+                ) : null}
+              </div>
+              <span className="inline-flex shrink-0 items-center rounded-full border bg-muted/40 px-3 py-1 text-xs font-medium text-muted-foreground">
+                {filtered.length} {filtered.length === 1 ? "employee" : "employees"}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -272,7 +286,7 @@ export function EmployeeDirectoryView({ people }: { people: EmployeeDirectoryPer
             <Users className="size-10 text-muted-foreground/50" />
             <p className="mt-3 text-sm font-medium">No employees found</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Try a different search, or check back when more people join.
+              Try a different search, or check back when more colleagues join.
             </p>
           </div>
         ) : (

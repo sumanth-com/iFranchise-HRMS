@@ -9,7 +9,7 @@ import type { EmployeeDirectoryPerson } from "@/types/employee-directory";
 
 const ACTIVE_STATUSES = new Set(["active", "probation", "on_leave"]);
 
-type LooseRow = Record<string, any>;
+type LooseRow = Record<string, unknown>;
 
 function experienceYearsFromJoining(dateOfJoining: string | null | undefined): number | null {
   if (!dateOfJoining) return null;

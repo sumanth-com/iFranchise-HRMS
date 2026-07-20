@@ -260,6 +260,33 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
     return items;
   }
 
+  if (segments[0] === "employee") {
+    const items: BreadcrumbItemConfig[] = [
+      { label: "Employee", href: "/employee" },
+    ];
+
+    const sectionLabels: Record<string, string> = {
+      directory: "Employee Directory",
+      attendance: "Attendance",
+      leave: "Leave",
+      payroll: "Payroll",
+      documents: "Documents",
+      assets: "Assets",
+      notifications: "Notifications",
+      settings: "Settings",
+      help: "Help",
+    };
+
+    if (segments[1]) {
+      items.push({
+        label: sectionLabels[segments[1]] ?? formatSegment(segments[1]),
+        href: pathname,
+      });
+    }
+
+    return items;
+  }
+
   return segments.map((segment, index) => ({
     label: formatSegment(segment),
     href: `/${segments.slice(0, index + 1).join("/")}`,
