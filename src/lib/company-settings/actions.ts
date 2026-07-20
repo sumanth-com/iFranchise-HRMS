@@ -44,13 +44,18 @@ import type { CompanySettingsActionResult } from "@/types/company-settings";
 function revalidateCompanySettings() {
   revalidatePath(COMPANY_SETTINGS_ROUTES.base);
   revalidatePath("/dashboard/attendance");
+  revalidatePath("/dashboard/attendance-management");
   revalidatePath("/dashboard/leave");
+  revalidatePath("/dashboard/leave-management");
   revalidatePath("/dashboard/payroll");
+  revalidatePath("/dashboard/payroll-management");
   revalidatePath("/dashboard/recruitment");
   revalidatePath("/dashboard/performance");
   revalidatePath("/dashboard/notifications");
   revalidatePath("/dashboard/documents");
+  revalidatePath("/dashboard/documents-management");
   revalidatePath("/dashboard/assets");
+  revalidatePath("/dashboard/assets-management");
   revalidatePath("/dashboard/exit");
 }
 

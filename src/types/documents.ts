@@ -190,3 +190,13 @@ export type DocumentsLookups = {
   documentTypes: DocumentTypeItem[];
   templates: { id: string; label: string; letterType: LetterType }[];
 };
+
+export type DocumentEmployeeCard = {
+  id: string;
+  employeeCode: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  designationTitle: string | null;
+  avatarUrl: string | null;
+};

@@ -1,10 +1,9 @@
-import { ModuleShell } from "@/components/common/sticky-layout";
-import { PayrollSubNav } from "@/components/payroll/payroll-sub-nav";
+import { PageScroll } from "@/components/common/sticky-layout";
 
-export default function PayrollLayout({
+export default function PayrollSelfLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <ModuleShell header={<PayrollSubNav />}>{children}</ModuleShell>;
+  return <PageScroll>{children}</PageScroll>;
 }

@@ -42,7 +42,9 @@ function revalidateExit(employeeId?: string) {
   revalidatePath(EXIT_ROUTES.settings);
   revalidatePath("/dashboard/employees");
   revalidatePath("/dashboard/assets");
+  revalidatePath("/dashboard/assets-management");
   revalidatePath("/dashboard/documents");
+  revalidatePath("/dashboard/documents-management");
   if (employeeId) {
     revalidatePath(`/dashboard/employees/${employeeId}`);
   }

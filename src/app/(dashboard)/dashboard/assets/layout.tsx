@@ -1,10 +1,9 @@
-import { ModuleShell } from "@/components/common/sticky-layout";
-import { AssetsSubNav } from "@/components/assets/assets-sub-nav";
+import { PageScroll } from "@/components/common/sticky-layout";
 
-export default function AssetsLayout({
+export default function AssetsSelfLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <ModuleShell header={<AssetsSubNav />}>{children}</ModuleShell>;
+  return <PageScroll>{children}</PageScroll>;
 }

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { requireServerPermission } from "@/lib/permissions/server";
-import { ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
+import { ATTENDANCE_ROUTES, SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
 import { getAttendanceById } from "@/lib/attendance/services/attendance-detail";
 import {
   createAttendance,
@@ -119,6 +119,7 @@ export async function createAttendanceAction(
     const parsed = attendanceFormSchema.parse(input);
     const id = await createAttendance(supabase, profile, parsed);
     revalidatePath(ATTENDANCE_ROUTES.list);
+    revalidatePath(SELF_ATTENDANCE_ROUTES.list);
     return { success: true, data: { id } };
   } catch (error) {
     return {
@@ -141,6 +142,7 @@ export async function updateAttendanceAction(
     revalidatePath(ATTENDANCE_ROUTES.list);
     revalidatePath(ATTENDANCE_ROUTES.detail(attendanceId));
     revalidatePath(ATTENDANCE_ROUTES.edit(attendanceId));
+    revalidatePath(SELF_ATTENDANCE_ROUTES.list);
     return { success: true, data: null };
   } catch (error) {
     return {
@@ -159,6 +161,7 @@ export async function deleteAttendanceAction(
     const supabase = await getAuthenticatedSupabase();
     await softDeleteAttendance(supabase, profile, attendanceId);
     revalidatePath(ATTENDANCE_ROUTES.list);
+    revalidatePath(SELF_ATTENDANCE_ROUTES.list);
     return { success: true, data: null };
   } catch (error) {
     return {

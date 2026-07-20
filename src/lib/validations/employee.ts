@@ -42,7 +42,7 @@ export const addressTypeSchema = z.enum(["current", "permanent", "work"]);
 
 export const employeeListParamsSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(10),
+  pageSize: z.coerce.number().int().min(1).max(100).default(8),
   search: z.string().trim().optional(),
   sortBy: z
     .enum([

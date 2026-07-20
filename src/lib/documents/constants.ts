@@ -2,12 +2,19 @@ import { hasAnyPermission } from "@/lib/permissions/utils";
 import type { LetterType } from "@/types/documents";
 
 export const DOCUMENTS_ROUTES = {
-  dashboard: "/dashboard/documents",
-  employeeDocuments: "/dashboard/documents/employees",
-  letters: "/dashboard/documents/letters",
-  templates: "/dashboard/documents/templates",
-  expiring: "/dashboard/documents/expiring",
-  settings: "/dashboard/documents/settings",
+  dashboard: "/dashboard/documents-management",
+  employeeDocuments: "/dashboard/documents-management/employees",
+  employeeDocument: (employeeId: string) =>
+    `/dashboard/documents-management/employees/${employeeId}`,
+  letters: "/dashboard/documents-management/letters",
+  templates: "/dashboard/documents-management/templates",
+  expiring: "/dashboard/documents-management/expiring",
+  settings: "/dashboard/documents-management/settings",
+} as const;
+
+/** Personal / self-service documents in the HR portal main nav. */
+export const SELF_DOCUMENTS_ROUTES = {
+  list: "/dashboard/documents",
 } as const;
 
 export const DOCUMENTS_SUB_NAV = [

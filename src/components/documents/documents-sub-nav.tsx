@@ -13,7 +13,7 @@ export function DocumentsSubNav() {
     <nav className="flex flex-wrap gap-1 rounded-lg border bg-card p-1 shadow-sm">
       {DOCUMENTS_SUB_NAV.map((item) => {
         const isActive =
-          item.href === "/dashboard/documents"
+          item.href === DOCUMENTS_SUB_NAV[0].href
             ? pathname === item.href
             : pathname === item.href || pathname.startsWith(`${item.href}/`);
 

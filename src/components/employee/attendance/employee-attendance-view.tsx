@@ -16,9 +16,23 @@ type Props = {
   data: ManagerProfilePageData;
   status?: AttendanceStatus;
   searchDate?: string;
+  /** Base path for calendar/history filters. Defaults to employee portal attendance. */
+  basePath?: string;
+  title?: string;
+  description?: string;
+  /** When false, omit the outer employee-portal padding wrapper. */
+  padded?: boolean;
 };
 
-export function EmployeeAttendanceView({ data, status, searchDate }: Props) {
+export function EmployeeAttendanceView({
+  data,
+  status,
+  searchDate,
+  basePath = EMPLOYEE_ROUTES.attendance,
+  title = "My Attendance",
+  description = "Your personal attendance, identity, and regularization requests.",
+  padded = true,
+}: Props) {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState<string | null>(data.selectedDate);
 
@@ -37,69 +51,73 @@ export function EmployeeAttendanceView({ data, status, searchDate }: Props) {
     if (next.status) params.set("status", next.status);
     if (next.searchDate) params.set("searchDate", next.searchDate);
     if (next.page && next.page > 1) params.set("page", String(next.page));
-    router.push(`${EMPLOYEE_ROUTES.attendance}?${params.toString()}`);
+    router.push(`${basePath}?${params.toString()}`);
   }
+
+  const content = (
+    <div className="flex flex-col gap-4">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      </div>
+
+      <EmployeeAttendanceTodayCard today={data.today} />
+
+      <div className="grid gap-4 xl:min-h-[min(32rem,calc(100dvh-16rem))] xl:grid-cols-[minmax(0,1.4fr)_minmax(16rem,18.5rem)] xl:items-stretch">
+        <ManagerAttendanceCalendar
+          days={data.calendarDays}
+          month={data.month}
+          year={data.year}
+          selectedDate={selectedDate}
+          onMonthChange={(month, year) =>
+            pushParams({ month, year, date: selectedDate, status, searchDate })
+          }
+          onSelectDate={(date) => {
+            setSelectedDate(date);
+            pushParams({
+              month: data.month,
+              year: data.year,
+              date,
+              status,
+              searchDate,
+            });
+          }}
+        />
+        <div className="flex h-full min-h-[28rem] w-full justify-center xl:justify-end">
+          <ManagerProfileIdCard
+            profile={data.profileCard}
+            className="h-full min-h-[28rem] w-full max-w-[18.5rem]"
+          />
+        </div>
+      </div>
+
+      <ManagerProfileSummaryCards summary={data.summary} />
+
+      <EmployeeAttendanceHistoryTable
+        history={data.history}
+        month={data.month}
+        year={data.year}
+        status={status}
+        searchDate={searchDate}
+        onFilterChange={(filters) =>
+          pushParams({
+            month: filters.month,
+            year: filters.year,
+            date: selectedDate,
+            status: filters.status,
+            searchDate: filters.searchDate,
+            page: filters.page,
+          })
+        }
+      />
+    </div>
+  );
+
+  if (!padded) return content;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-4 md:p-5">
-      <div className="flex flex-col gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">My Attendance</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Your personal attendance, identity, and regularization requests.
-          </p>
-        </div>
-
-        <EmployeeAttendanceTodayCard today={data.today} />
-
-        <div className="grid gap-4 xl:min-h-[min(32rem,calc(100dvh-16rem))] xl:grid-cols-[minmax(0,1.4fr)_minmax(16rem,18.5rem)] xl:items-stretch">
-          <ManagerAttendanceCalendar
-            days={data.calendarDays}
-            month={data.month}
-            year={data.year}
-            selectedDate={selectedDate}
-            onMonthChange={(month, year) =>
-              pushParams({ month, year, date: selectedDate, status, searchDate })
-            }
-            onSelectDate={(date) => {
-              setSelectedDate(date);
-              pushParams({
-                month: data.month,
-                year: data.year,
-                date,
-                status,
-                searchDate,
-              });
-            }}
-          />
-          <div className="flex h-full min-h-[28rem] w-full justify-center xl:justify-end">
-            <ManagerProfileIdCard
-              profile={data.profileCard}
-              className="h-full min-h-[28rem] w-full max-w-[18.5rem]"
-            />
-          </div>
-        </div>
-
-        <ManagerProfileSummaryCards summary={data.summary} />
-
-        <EmployeeAttendanceHistoryTable
-          history={data.history}
-          month={data.month}
-          year={data.year}
-          status={status}
-          searchDate={searchDate}
-          onFilterChange={(filters) =>
-            pushParams({
-              month: filters.month,
-              year: filters.year,
-              date: selectedDate,
-              status: filters.status,
-              searchDate: filters.searchDate,
-              page: filters.page,
-            })
-          }
-        />
-      </div>
+      {content}
     </div>
   );
 }

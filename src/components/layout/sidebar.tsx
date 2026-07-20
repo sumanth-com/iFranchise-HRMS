@@ -10,6 +10,19 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/providers/auth-provider";
 import { cn } from "@/lib/utils";
 
+function resolveActiveHref(
+  pathname: string,
+  portalHome: string,
+  hrefs: string[],
+): string | null {
+  const matches = hrefs.filter(
+    (href) =>
+      pathname === href || (href !== portalHome && pathname.startsWith(href)),
+  );
+  if (matches.length === 0) return null;
+  return matches.sort((a, b) => b.length - a.length)[0] ?? null;
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const { isCollapsed } = useSidebar();
@@ -18,6 +31,12 @@ export function Sidebar() {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     Administration: true,
   });
+
+  const activeHref = resolveActiveHref(
+    pathname,
+    portalHome,
+    navigation.map((item) => item.href),
+  );
 
   function toggleSection(section: string) {
     setOpenSections((current) => ({
@@ -35,7 +54,7 @@ export function Sidebar() {
     >
       <div
         className={cn(
-          "flex h-14 items-center border-b px-4",
+          "flex h-14 shrink-0 items-center border-b px-4",
           isCollapsed && "justify-center px-2",
         )}
       >
@@ -49,18 +68,16 @@ export function Sidebar() {
         </Link>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-1 p-2">
+      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain p-2">
         {navigation.map((item, index) => {
-          const isActive =
-            pathname === item.href ||
-            (item.href !== portalHome && pathname.startsWith(item.href));
+          const isActive = activeHref === item.href;
           const Icon = item.icon;
           const prevSection = index > 0 ? navigation[index - 1]?.section : undefined;
           const showSection = item.section && item.section !== prevSection && !isCollapsed;
           const sectionOpen = item.section ? (openSections[item.section] ?? true) : true;
 
           return (
-            <div key={item.href}>
+            <div key={item.href} className="shrink-0">
               {showSection ? (
                 <button
                   type="button"
@@ -76,10 +93,11 @@ export function Sidebar() {
                   />
                 </button>
               ) : null}
-              {sectionOpen ? (
+              {sectionOpen || isCollapsed ? (
                 <Link
                   href={item.disabled ? "#" : item.href}
                   aria-disabled={item.disabled}
+                  title={isCollapsed ? item.title : undefined}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                     item.section && !isCollapsed && "ml-2",
@@ -91,7 +109,7 @@ export function Sidebar() {
                   )}
                 >
                   <Icon className="size-4 shrink-0" />
-                  {!isCollapsed ? <span>{item.title}</span> : null}
+                  {!isCollapsed ? <span className="truncate">{item.title}</span> : null}
                 </Link>
               ) : null}
             </div>

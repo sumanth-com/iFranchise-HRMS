@@ -35,6 +35,7 @@ export async function employeeReportAssetIssueAction(input: unknown) {
     const parsed = reportIssueSchema.parse(input);
     await employeeReportAssetIssue(supabase, profile, parsed);
     revalidatePath(EMPLOYEE_ROUTES.assets);
+    revalidatePath("/dashboard/assets");
     return { success: true as const };
   } catch (error) {
     return {
@@ -54,6 +55,7 @@ export async function employeeRequestAssetReplacementAction(input: unknown) {
     const parsed = replacementSchema.parse(input);
     await employeeRequestAssetReplacement(supabase, profile, parsed);
     revalidatePath(EMPLOYEE_ROUTES.assets);
+    revalidatePath("/dashboard/assets");
     return { success: true as const };
   } catch (error) {
     return {

@@ -10,6 +10,7 @@ import {
 } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { getOrganizationAttendanceRules } from "@/lib/attendance/services/attendance-detail";
 import {
   notifyAttendanceCheckedIn,
@@ -36,6 +37,7 @@ import { getEmployeeById } from "@/lib/employees/services/employee-detail";
 import { createSignedStorageUrl } from "@/lib/employees/services/employee-mutations";
 import { buildEmployeeRouteRef } from "@/lib/employees/routing";
 import { expandDateRange, getMonthDateRange } from "@/lib/leave/services/leave-utils";
+import { hasPermission } from "@/lib/permissions/utils";
 import type {
   ManagerAttendancePunchInput,
   ManagerAttendanceRegularizationInput,
@@ -128,6 +130,11 @@ export function isCheckInLockedNow(attendanceDate: string) {
   return getOfficeNowParts().totalMinutes >= lockMinutes;
 }
 
+/** HR portal users can check in anytime — office check-in lock does not apply. */
+export function shouldEnforceCheckInLock(profile: Pick<UserProfile, "permissionCodes">) {
+  return !hasPermission(profile.permissionCodes, PORTAL_PERMISSIONS.hr);
+}
+
 /** @deprecated Prefer isCheckInLockedNow — checkout is never auto-locked by time. */
 export function isAttendanceLockedNow(attendanceDate: string) {
   return isCheckInLockedNow(attendanceDate);
@@ -174,9 +181,11 @@ function resolvePunchState(
   checkInAt: string | null,
   checkOutAt: string | null,
   attendanceDate: string,
+  enforceCheckInLock = true,
 ): ManagerAttendancePunchState {
   // Checkout is never auto-locked — only check-in closes at OFFICE_CHECK_IN_LOCK_TIME.
   if (!checkInAt) {
+    if (!enforceCheckInLock) return "not_checked_in";
     return isCheckInLockedNow(attendanceDate) && attendanceDate <= getTodayDateString()
       ? "locked"
       : "not_checked_in";
@@ -189,11 +198,17 @@ function buildTodayPanel(
   row: AttendanceRow | null,
   attendanceDate: string,
   rules: AttendanceRules,
+  enforceCheckInLock = true,
 ): ManagerTodayAttendance {
   const checkInAt = row?.check_in_at ?? null;
   const checkOutAt = row?.check_out_at ?? null;
-  const checkInLocked = isCheckInLockedNow(attendanceDate);
-  const punchState = resolvePunchState(checkInAt, checkOutAt, attendanceDate);
+  const checkInLocked = enforceCheckInLock && isCheckInLockedNow(attendanceDate);
+  const punchState = resolvePunchState(
+    checkInAt,
+    checkOutAt,
+    attendanceDate,
+    enforceCheckInLock,
+  );
   const workHours = row
     ? Number(row.work_hours ?? 0)
     : computeWorkHours(checkInAt, checkOutAt);
@@ -212,7 +227,7 @@ function buildTodayPanel(
   );
 
   let lockMessage: string | null = null;
-  if (attendanceDate === getTodayDateString()) {
+  if (enforceCheckInLock && attendanceDate === getTodayDateString()) {
     if (!checkInAt && checkInLocked) {
       lockMessage = `Check-in locked. Check-in closed at ${lockTimeLabel}.`;
     } else if (!checkInAt) {
@@ -825,7 +840,12 @@ export async function getManagerProfilePageData(
     : null;
 
   return {
-    today: buildTodayPanel(todayRow, today, rules),
+    today: buildTodayPanel(
+      todayRow,
+      today,
+      rules,
+      shouldEnforceCheckInLock(profile),
+    ),
     calendarDays,
     profileCard,
     summary,
@@ -849,7 +869,11 @@ export async function punchManagerAttendance(
     profile.employee.organizationId,
   );
 
-  if (isCheckInLockedNow(today) && input.type === "in") {
+  if (
+    shouldEnforceCheckInLock(profile) &&
+    isCheckInLockedNow(today) &&
+    input.type === "in"
+  ) {
     throw new Error(
       `Check-in locked. Check-in closes at ${formatAttendanceTime(
         `${today}T${OFFICE_CHECK_IN_LOCK_TIME}:00+05:30`,

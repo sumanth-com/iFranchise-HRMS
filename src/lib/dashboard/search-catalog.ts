@@ -1,18 +1,18 @@
-import { ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
-import { ASSETS_ROUTES } from "@/lib/assets/constants";
+import { ASSETS_ROUTES, SELF_ASSETS_ROUTES } from "@/lib/assets/constants";
 import { AUDIT_ROUTES } from "@/lib/audit/constants";
 import { COMPANY_SETTINGS_ROUTES } from "@/lib/company-settings/constants";
-import { DOCUMENTS_ROUTES } from "@/lib/documents/constants";
+import { DOCUMENTS_ROUTES, SELF_DOCUMENTS_ROUTES } from "@/lib/documents/constants";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
 import { EXIT_ROUTES } from "@/lib/exit/constants";
-import { LEAVE_ROUTES } from "@/lib/leave/constants";
+import { LEAVE_ROUTES, SELF_LEAVE_ROUTES } from "@/lib/leave/constants";
 import { NOTIFICATIONS_ROUTES } from "@/lib/notifications/constants";
 import { ORGANIZATION_ROUTES } from "@/lib/organization/constants";
-import { PAYROLL_ROUTES } from "@/lib/payroll/constants";
+import { PAYROLL_ROUTES, SELF_PAYROLL_ROUTES } from "@/lib/payroll/constants";
 import { PERFORMANCE_ROUTES } from "@/lib/performance/constants";
 import { RECRUITMENT_ROUTES } from "@/lib/recruitment/constants";
 import { REPORTS_ROUTES } from "@/lib/reports/constants";
 import { ROLES_ROUTES } from "@/lib/roles/constants";
+import { ATTENDANCE_ROUTES, SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
 
 export type DashboardSearchItem = {
   id: string;
@@ -43,27 +43,43 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
   },
   {
     id: "attendance",
-    label: "Attendance",
-    description: "Daily presence and records",
+    label: "My Attendance",
+    description: "Your personal attendance and check-ins",
+    href: SELF_ATTENDANCE_ROUTES.list,
+    keywords: ["attendance", "my attendance", "present", "punch", "check in"],
+    permission: "attendance.view",
+  },
+  {
+    id: "attendance-management",
+    label: "Attendance Management",
+    description: "Track attendance across the organization",
     href: ATTENDANCE_ROUTES.list,
-    keywords: ["attendance", "present", "absent", "late", "punch"],
+    keywords: ["attendance management", "absent", "late", "workforce presence"],
     permission: "attendance.view",
   },
   {
     id: "leave",
-    label: "Leave",
-    description: "Requests and approvals",
-    href: LEAVE_ROUTES.list,
-    keywords: ["leave", "time off", "vacation", "approval", "pending"],
+    label: "My Leave",
+    description: "Your balances and leave requests",
+    href: SELF_LEAVE_ROUTES.list,
+    keywords: ["leave", "my leave", "time off", "vacation", "balance"],
     permission: "leave.view",
   },
   {
     id: "leave-new",
     label: "Apply Leave",
-    description: "Submit a leave request",
-    href: LEAVE_ROUTES.new,
+    description: "Submit your leave request",
+    href: SELF_LEAVE_ROUTES.new,
     keywords: ["apply leave", "request leave", "time off"],
     permission: "leave.create",
+  },
+  {
+    id: "leave-management",
+    label: "Leave Management",
+    description: "Track leave across the organization",
+    href: LEAVE_ROUTES.list,
+    keywords: ["leave management", "approvals", "pending leave", "workforce leave"],
+    permission: "leave.view",
   },
   {
     id: "leave-balances",
@@ -83,10 +99,18 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
   },
   {
     id: "payroll",
-    label: "Payroll",
-    description: "Salary processing overview",
+    label: "My Payroll",
+    description: "Your salary, payslips, and payment history",
+    href: SELF_PAYROLL_ROUTES.list,
+    keywords: ["payroll", "my payroll", "salary", "payslip", "wage"],
+    permission: "payroll.view",
+  },
+  {
+    id: "payroll-management",
+    label: "Payroll Management",
+    description: "Salary processing across the organization",
     href: PAYROLL_ROUTES.dashboard,
-    keywords: ["payroll", "salary", "payslip", "wage"],
+    keywords: ["payroll management", "run payroll", "compensation"],
     permission: "payroll.view",
   },
   {
@@ -147,10 +171,18 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
   },
   {
     id: "documents",
-    label: "Documents",
-    description: "Employee documents hub",
+    label: "My Documents",
+    description: "Your personal and company documents",
+    href: SELF_DOCUMENTS_ROUTES.list,
+    keywords: ["document", "my documents", "files", "papers"],
+    permission: "documents.view",
+  },
+  {
+    id: "documents-management",
+    label: "Documents Management",
+    description: "Employee documents hub across the organization",
     href: DOCUMENTS_ROUTES.dashboard,
-    keywords: ["document", "files", "papers"],
+    keywords: ["documents management", "employee files", "letters"],
     permission: "documents.view",
   },
   {
@@ -163,11 +195,27 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
   },
   {
     id: "assets",
-    label: "Assets",
+    label: "My Assets",
+    description: "Assets assigned to you",
+    href: SELF_ASSETS_ROUTES.list,
+    keywords: ["asset", "my assets", "laptop", "device"],
+    permission: "asset.view",
+  },
+  {
+    id: "assets-management",
+    label: "Assets Management",
     description: "Asset inventory and assignments",
     href: ASSETS_ROUTES.dashboard,
-    keywords: ["asset", "laptop", "device", "inventory"],
+    keywords: ["assets management", "inventory", "assignment"],
     permission: "asset.view",
+  },
+  {
+    id: "directory",
+    label: "Employee Directory",
+    description: "Browse colleagues across the organization",
+    href: "/dashboard/directory",
+    keywords: ["directory", "people", "colleagues", "contacts"],
+    permission: "employee.view",
   },
   {
     id: "exit",
@@ -203,11 +251,26 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
   },
   {
     id: "notifications",
-    label: "Notifications",
-    description: "Alerts and templates",
-    href: NOTIFICATIONS_ROUTES.dashboard,
-    keywords: ["notification", "alert", "message"],
+    label: "My Notifications",
+    description: "Your personal notification inbox",
+    href: NOTIFICATIONS_ROUTES.center,
+    keywords: ["notification", "my notifications", "alert", "inbox"],
     permission: "notification.view",
+  },
+  {
+    id: "notifications-management",
+    label: "Notifications Management",
+    description: "Alerts, templates, and delivery settings",
+    href: NOTIFICATIONS_ROUTES.dashboard,
+    keywords: ["notifications management", "templates", "alerts"],
+    permission: "notification.view",
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    description: "Your appearance and notification preferences",
+    href: "/dashboard/settings",
+    keywords: ["settings", "preferences", "profile"],
   },
   {
     id: "audit",

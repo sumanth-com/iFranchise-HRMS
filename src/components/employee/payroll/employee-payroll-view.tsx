@@ -84,7 +84,13 @@ function fmtMonth(value: string): string {
   }
 }
 
-export function EmployeePayrollView({ data }: { data: EmployeePayrollData }) {
+export function EmployeePayrollView({
+  data,
+  documentsHref = EMPLOYEE_ROUTES.documents,
+}: {
+  data: EmployeePayrollData;
+  documentsHref?: string;
+}) {
   const [activePayslipId, setActivePayslipId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -117,7 +123,7 @@ export function EmployeePayrollView({ data }: { data: EmployeePayrollData }) {
           variant="outline"
           className="gap-1.5"
           nativeButton={false}
-          render={<Link href={EMPLOYEE_ROUTES.documents} />}
+          render={<Link href={documentsHref} />}
         >
           <FileText className="size-4" />
           Tax Documents

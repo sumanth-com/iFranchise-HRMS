@@ -15,7 +15,10 @@ import type {
   DocumentListParams,
   LetterListParams,
 } from "@/lib/validations/documents";
+import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
+import { createSignedStorageUrl } from "@/lib/employees/services/employee-mutations";
 import type {
+  DocumentEmployeeCard,
   DocumentTypeItem,
   DocumentsLookups,
   DocumentsSummary,
@@ -443,6 +446,66 @@ export async function getExpiringSummary(
     ).length,
     expired: withExpiry.filter((d: EmployeeDocumentItem) => d.expiryDate! < today).length,
   };
+}
+
+export async function listDocumentEmployeeCards(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+): Promise<DocumentEmployeeCard[]> {
+  const organizationId = profile.employee.organizationId;
+  const scoped = scopeEmployeeId(profile, null);
+
+  let query = fromHrms(supabase, "employees")
+    .select(
+      `
+      id, employee_code, first_name, last_name,
+      designations:designation_id (title),
+      employee_profiles (profile_image_storage_path)
+    `,
+    )
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .eq("status", "active")
+    .in("employment_status", ["active", "probation", "on_leave"])
+    .order("first_name")
+    .order("last_name")
+    .limit(500);
+
+  if (scoped) query = query.eq("id", scoped);
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  return Promise.all(
+    (data ?? []).map(async (row: DocRow): Promise<DocumentEmployeeCard> => {
+      const designation = unwrapRelation(row.designations) as { title?: string } | null;
+      const employeeProfile = unwrapRelation(row.employee_profiles) as {
+        profile_image_storage_path?: string | null;
+      } | null;
+
+      const imagePath = employeeProfile?.profile_image_storage_path ?? null;
+      const avatarUrl = imagePath
+        ? await createSignedStorageUrl(
+            supabase,
+            EMPLOYEE_STORAGE_BUCKETS.profileImages,
+            imagePath,
+          )
+        : null;
+
+      const firstName = row.first_name as string;
+      const lastName = row.last_name as string;
+
+      return {
+        id: row.id as string,
+        employeeCode: row.employee_code as string,
+        firstName,
+        lastName,
+        fullName: formatEmployeeName(firstName, lastName),
+        designationTitle: designation?.title ?? null,
+        avatarUrl,
+      };
+    }),
+  );
 }
 
 export async function getDocumentsLookups(

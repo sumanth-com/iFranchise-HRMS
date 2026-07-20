@@ -1,99 +1,39 @@
-import { Suspense } from "react";
-import { CalendarDays } from "lucide-react";
-
-import { AttendanceSummaryCards } from "@/components/attendance/attendance-summary-cards";
-import { AttendanceTable } from "@/components/attendance/attendance-table";
-import { LoadingSpinner } from "@/components/common/loading-spinner";
-import { createClient } from "@/lib/supabase/server";
-import {
-  getAttendanceLookups,
-  getAttendanceSummary,
-  listAttendance,
-} from "@/lib/attendance/services/attendance-queries";
-import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
-import { attendanceListParamsSchema } from "@/lib/validations/attendance";
+import { EmployeeAttendanceView } from "@/components/employee/attendance/employee-attendance-view";
+import { SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
+import { getManagerProfilePageData } from "@/lib/manager/services/manager-self-attendance-service";
 import { requireServerPermission } from "@/lib/permissions/server";
-import { hasPermission } from "@/lib/permissions/utils";
+import { createClient } from "@/lib/supabase/server";
+import { managerProfilePageParamsSchema } from "@/lib/validations/manager-self-attendance";
 
-type AttendancePageProps = {
+type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function AttendancePage({ searchParams }: AttendancePageProps) {
+export default async function AttendanceSelfServicePage({ searchParams }: PageProps) {
   const profile = await requireServerPermission("attendance.view");
   const supabase = await createClient();
-  const rawParams = await searchParams;
-  const today = getTodayDateString();
+  const raw = await searchParams;
 
-  const params = attendanceListParamsSchema.parse({
-    page: rawParams.page,
-    pageSize: rawParams.pageSize,
-    search: typeof rawParams.search === "string" ? rawParams.search : undefined,
-    sortBy: rawParams.sortBy,
-    sortOrder: rawParams.sortOrder,
-    dateFrom:
-      typeof rawParams.dateFrom === "string" && rawParams.dateFrom.length > 0
-        ? rawParams.dateFrom
-        : undefined,
-    dateTo:
-      typeof rawParams.dateTo === "string" && rawParams.dateTo.length > 0
-        ? rawParams.dateTo
-        : undefined,
-    branchId: rawParams.branchId,
-    departmentId: rawParams.departmentId,
-    attendanceStatus: rawParams.attendanceStatus,
-    employeeId: rawParams.employeeId,
+  const params = managerProfilePageParamsSchema.parse({
+    month: typeof raw.month === "string" ? raw.month : undefined,
+    year: typeof raw.year === "string" ? raw.year : undefined,
+    date: typeof raw.date === "string" ? raw.date : undefined,
+    status: typeof raw.status === "string" ? raw.status : undefined,
+    searchDate: typeof raw.searchDate === "string" ? raw.searchDate : undefined,
+    page: typeof raw.page === "string" ? raw.page : undefined,
   });
 
-  const [result, lookups, summary] = await Promise.all([
-    listAttendance(supabase, profile, params),
-    getAttendanceLookups(supabase, profile.employee.organizationId),
-    getAttendanceSummary(supabase, profile, params.dateFrom, params.dateTo),
-  ]);
+  const data = await getManagerProfilePageData(supabase, profile, params);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <div className="flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-semibold tracking-tight">Attendance</h1>
-          <span className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-foreground">
-            <CalendarDays className="size-4 shrink-0" />
-            Summary for {summary.date}
-          </span>
-        </div>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Manage daily attendance records, manual entries, and workforce presence.
-        </p>
-      </div>
-
-      <AttendanceSummaryCards summary={summary} />
-
-      <Suspense
-        fallback={
-          <div className="flex justify-center py-12">
-            <LoadingSpinner />
-          </div>
-        }
-      >
-        <AttendanceTable
-          records={result.data}
-          total={result.total}
-          page={result.page}
-          pageSize={result.pageSize}
-          search={params.search ?? ""}
-          dateFrom={params.dateFrom}
-          dateTo={params.dateTo}
-          today={today}
-          departmentId={params.departmentId}
-          attendanceStatus={params.attendanceStatus}
-          employeeId={params.employeeId}
-          departments={lookups.departments}
-          employees={lookups.employees}
-          canCreate={hasPermission(profile.permissionCodes, "attendance.create")}
-          canEdit={hasPermission(profile.permissionCodes, "attendance.edit")}
-          canDelete={hasPermission(profile.permissionCodes, "attendance.delete")}
-        />
-      </Suspense>
-    </div>
+    <EmployeeAttendanceView
+      data={data}
+      status={params.status}
+      searchDate={params.searchDate}
+      basePath={SELF_ATTENDANCE_ROUTES.list}
+      title="My Attendance"
+      description="Your personal attendance, check-in status, and regularization requests."
+      padded={false}
+    />
   );
 }

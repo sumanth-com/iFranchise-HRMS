@@ -1,26 +1,22 @@
-import {
-  DocumentsDashboardPanels,
-  DocumentsSummaryCards,
-} from "@/components/documents/documents-dashboard-panels";
-import { createClient } from "@/lib/supabase/server";
-import { getDocumentsSummary } from "@/lib/documents/services/document-queries";
+import { DocumentsExplorer } from "@/components/employee/documents/documents-explorer";
+import { getEmployeeDocumentsExplorer } from "@/lib/employee/services/employee-documents-queries";
 import { requireServerPermission } from "@/lib/permissions/server";
+import { createClient } from "@/lib/supabase/server";
 
-export default async function DocumentsDashboardPage() {
+export default async function DocumentsSelfServicePage() {
   const profile = await requireServerPermission("documents.view");
   const supabase = await createClient();
-  const summary = await getDocumentsSummary(supabase, profile);
+  const data = await getEmployeeDocumentsExplorer(supabase, profile);
 
   return (
-    <>
+    <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Documents</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">My Documents</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Track employee files, company letters, expiring credentials, and verification status.
+          Securely store, organize and manage your personal and company documents.
         </p>
       </div>
-      <DocumentsSummaryCards summary={summary} />
-      <DocumentsDashboardPanels summary={summary} />
-    </>
+      <DocumentsExplorer data={data} />
+    </div>
   );
 }

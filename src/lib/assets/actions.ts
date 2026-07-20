@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { ASSETS_ROUTES } from "@/lib/assets/constants";
+import { ASSETS_ROUTES, SELF_ASSETS_ROUTES } from "@/lib/assets/constants";
 import {
   assignAsset,
   createAsset,
@@ -42,6 +42,7 @@ function revalidateAssets(employeeId?: string) {
   revalidatePath(ASSETS_ROUTES.vendors);
   revalidatePath(ASSETS_ROUTES.reports);
   revalidatePath(ASSETS_ROUTES.settings);
+  revalidatePath(SELF_ASSETS_ROUTES.list);
   revalidatePath("/dashboard/employees");
   if (employeeId) {
     revalidatePath(`/dashboard/employees`);

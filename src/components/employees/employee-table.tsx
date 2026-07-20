@@ -1,35 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useTransition } from "react";
-import {
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-  type ColumnDef,
-} from "@tanstack/react-table";
-import { format } from "date-fns";
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  Eye,
-  MoreHorizontal,
-  Pencil,
-  Trash2,
-  UserPlus,
-} from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
-import { EmploymentStatusBadge } from "@/components/employees/employment-status-badge";
-import {
-  EmployeeAccountStatusBadge,
-  EmployeeLoginStatusBadge,
-} from "@/components/employees/employee-account-status-badge";
-import { EmployeeAvatar } from "@/components/employees/employee-avatar";
 import { Button, buttonVariants } from "@/components/common/button";
 import { Input } from "@/components/common/input";
+import { Modal } from "@/components/common/modal";
 import {
   Select,
   SelectContent,
@@ -37,21 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/common/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Modal } from "@/components/common/modal";
+import { EmployeeCardsGrid } from "@/components/employees/employee-cards-grid";
 import { deleteEmployeeAction, fetchEmployeesAction } from "@/lib/employees/actions";
 import {
   EMPLOYEE_ACCOUNT_STATUS_LABELS,
@@ -63,7 +27,6 @@ import type {
   EmployeeListParams,
   LookupOption,
 } from "@/types/employee";
-import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 type EmployeeTableProps = {
@@ -99,7 +62,6 @@ export function EmployeeTable({
   canEdit,
   canDelete,
 }: EmployeeTableProps) {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [deleteTarget, setDeleteTarget] = useState<EmployeeListItem | null>(null);
   const [tableState, setTableState] = useState({
@@ -158,8 +120,7 @@ export function EmployeeTable({
   );
 
   const { employees, total, page, pageSize } = tableState;
-  const { search, sortBy, sortOrder, department, employmentStatus, accountStatus } =
-    filters;
+  const { search, department, employmentStatus, accountStatus } = filters;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const departmentItems = useMemo(
@@ -196,157 +157,6 @@ export function EmployeeTable({
     ],
     [],
   );
-
-  const columns = useMemo<ColumnDef<EmployeeListItem>[]>(
-    () => [
-      {
-        id: "employee",
-        header: "Employee",
-        cell: ({ row }) => (
-          <div className="flex min-w-[15rem] items-center gap-3">
-            <EmployeeAvatar
-              firstName={row.original.firstName}
-              lastName={row.original.lastName}
-              profileImagePath={row.original.profileImagePath}
-              className="size-9"
-            />
-            <div className="min-w-0">
-              <p className="truncate font-medium">{row.original.fullName}</p>
-              <p className="truncate text-xs text-muted-foreground">
-                {row.original.employeeCode} · {row.original.email}
-              </p>
-            </div>
-          </div>
-        ),
-      },
-      {
-        id: "role",
-        header: "Department / Designation",
-        cell: ({ row }) => (
-          <div className="min-w-[12rem]">
-            <p className="truncate text-sm">{row.original.departmentName ?? "—"}</p>
-            <p className="truncate text-xs text-muted-foreground">
-              {row.original.designationTitle ?? "—"}
-            </p>
-          </div>
-        ),
-      },
-      {
-        accessorKey: "employmentStatus",
-        header: "Employee Status",
-        cell: ({ row }) => (
-          <EmploymentStatusBadge status={row.original.employmentStatus} />
-        ),
-      },
-      {
-        id: "account",
-        header: "Account",
-        cell: ({ row }) => (
-          <div className="min-w-[12rem] space-y-1">
-            <div className="flex flex-wrap gap-1.5">
-              <EmployeeAccountStatusBadge status={row.original.accountStatus} />
-              <EmployeeLoginStatusBadge status={row.original.accountStatus} />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Last login:{" "}
-              {row.original.lastLoginAt
-                ? format(new Date(row.original.lastLoginAt), "MMM d, yyyy")
-                : "—"}
-            </p>
-          </div>
-        ),
-      },
-      {
-        accessorKey: "dateOfJoining",
-        header: "Joining Date",
-        cell: ({ row }) =>
-          row.original.dateOfJoining
-            ? format(new Date(row.original.dateOfJoining), "MMM d, yyyy")
-            : "—",
-      },
-      {
-        id: "actions",
-        header: "",
-        cell: ({ row }) => (
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button variant="ghost" size="icon" aria-label="Open actions">
-                  <MoreHorizontal className="size-4" />
-                </Button>
-              }
-            />
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={() =>
-                  router.push(
-                    EMPLOYEE_ROUTES.detail({
-                      employeeCode: row.original.employeeCode,
-                      firstName: row.original.firstName,
-                      lastName: row.original.lastName,
-                    }),
-                  )
-                }
-              >
-                <Eye className="size-4" />
-                View
-              </DropdownMenuItem>
-              {canEdit ? (
-                <DropdownMenuItem
-                  onClick={() =>
-                    router.push(
-                      EMPLOYEE_ROUTES.edit({
-                        employeeCode: row.original.employeeCode,
-                        firstName: row.original.firstName,
-                        lastName: row.original.lastName,
-                      }),
-                    )
-                  }
-                >
-                  <Pencil className="size-4" />
-                  Edit
-                </DropdownMenuItem>
-              ) : null}
-              {canDelete ? (
-                <DropdownMenuItem
-                  onClick={() => setDeleteTarget(row.original)}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="size-4" />
-                  Delete
-                </DropdownMenuItem>
-              ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ),
-      },
-    ],
-    [canDelete, canEdit, router],
-  );
-
-  const table = useReactTable({
-    data: employees,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    manualPagination: true,
-    manualSorting: true,
-    pageCount: totalPages,
-  });
-
-  const handleSort = (column: string) => {
-    const nextOrder =
-      sortBy === column && sortOrder === "asc" ? "desc" : "asc";
-    updateParams({ sortBy: column, sortOrder: nextOrder, page: "1" });
-  };
-
-  const sortIcon = (column: string) => {
-    if (sortBy !== column) return <ArrowUpDown className="ml-1 size-3.5" />;
-    return sortOrder === "asc" ? (
-      <ArrowUp className="ml-1 size-3.5" />
-    ) : (
-      <ArrowDown className="ml-1 size-3.5" />
-    );
-  };
 
   const handleDelete = () => {
     if (!deleteTarget) return;
@@ -470,93 +280,13 @@ export function EmployeeTable({
         ) : null}
       </div>
 
-      <div className="overflow-x-auto rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>
-                <button
-                  type="button"
-                  className="inline-flex items-center font-medium"
-                  onClick={() => handleSort("first_name")}
-                >
-                  Employee
-                  {sortIcon("first_name")}
-                </button>
-              </TableHead>
-              <TableHead>Department / Designation</TableHead>
-              <TableHead>
-                <button
-                  type="button"
-                  className="inline-flex items-center font-medium"
-                  onClick={() => handleSort("employment_status")}
-                >
-                  Employee Status
-                  {sortIcon("employment_status")}
-                </button>
-              </TableHead>
-              <TableHead>
-                <button
-                  type="button"
-                  className="inline-flex items-center font-medium"
-                  onClick={() => handleSort("account_status")}
-                >
-                  Account
-                  {sortIcon("account_status")}
-                </button>
-              </TableHead>
-              <TableHead>
-                <button
-                  type="button"
-                  className="inline-flex items-center font-medium"
-                  onClick={() => handleSort("date_of_joining")}
-                >
-                  Joining Date
-                  {sortIcon("date_of_joining")}
-                </button>
-              </TableHead>
-              <TableHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                  No employees found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() =>
-                    router.push(
-                      EMPLOYEE_ROUTES.detail({
-                        employeeCode: row.original.employeeCode,
-                        firstName: row.original.firstName,
-                        lastName: row.original.lastName,
-                      }),
-                    )
-                  }
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell
-                      key={cell.id}
-                      onClick={
-                        cell.column.id === "actions"
-                          ? (event) => event.stopPropagation()
-                          : undefined
-                      }
-                    >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+      <div className={cn(isPending && "pointer-events-none opacity-70")}>
+        <EmployeeCardsGrid
+          employees={employees}
+          canEdit={canEdit}
+          canDelete={canDelete}
+          onDelete={setDeleteTarget}
+        />
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

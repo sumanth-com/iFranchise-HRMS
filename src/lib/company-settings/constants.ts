@@ -49,13 +49,14 @@ export const COMPANY_SETTINGS_SECTIONS: {
 ];
 
 export const MODULE_SETTINGS_REDIRECTS: Record<string, CompanySettingsSection> = {
-  "/dashboard/payroll/settings": "payroll",
+  "/dashboard/payroll-management/settings": "payroll",
   "/dashboard/recruitment/settings": "recruitment",
   "/dashboard/performance/settings": "performance",
   "/dashboard/leave/settings": "leave",
+  "/dashboard/leave-management/settings": "leave",
   "/dashboard/exit/settings": "leave",
-  "/dashboard/assets/settings": "working",
-  "/dashboard/documents/settings": "profile",
+  "/dashboard/assets-management/settings": "working",
+  "/dashboard/documents-management/settings": "profile",
   "/dashboard/reports/settings": "profile",
 };
 

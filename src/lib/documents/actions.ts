@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { DOCUMENTS_ROUTES } from "@/lib/documents/constants";
+import { DOCUMENTS_ROUTES, DOCUMENTS_STORAGE_BUCKET, SELF_DOCUMENTS_ROUTES } from "@/lib/documents/constants";
 import {
   archiveDocument,
   createSignedDocumentUrl,
@@ -19,8 +19,9 @@ import {
   getDocumentSettings,
   updateDocumentSettings,
 } from "@/lib/documents/services/document-settings";
-import { isEmployeeScoped } from "@/lib/documents/services/documents-utils";
+import { isEmployeeScoped, fromHrms, unwrapRelation } from "@/lib/documents/services/documents-utils";
 import { requireServerAnyPermission, requireServerPermission } from "@/lib/permissions/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   documentSettingsSchema,
@@ -29,13 +30,17 @@ import {
   templateFormSchema,
 } from "@/lib/validations/documents";
 
-function revalidateDocuments() {
+function revalidateDocuments(employeeId?: string) {
   revalidatePath(DOCUMENTS_ROUTES.dashboard);
   revalidatePath(DOCUMENTS_ROUTES.employeeDocuments);
+  if (employeeId) {
+    revalidatePath(DOCUMENTS_ROUTES.employeeDocument(employeeId));
+  }
   revalidatePath(DOCUMENTS_ROUTES.letters);
   revalidatePath(DOCUMENTS_ROUTES.templates);
   revalidatePath(DOCUMENTS_ROUTES.expiring);
   revalidatePath(DOCUMENTS_ROUTES.settings);
+  revalidatePath(SELF_DOCUMENTS_ROUTES.list);
 }
 
 export async function uploadDocumentAction(formData: FormData) {
@@ -62,7 +67,7 @@ export async function uploadDocumentAction(formData: FormData) {
     });
 
     const id = await uploadAndCreateDocument(supabase, profile, meta, file);
-    revalidateDocuments();
+    revalidateDocuments(meta.employeeId);
     return { success: true as const, data: id };
   } catch (error) {
     return {
@@ -109,7 +114,7 @@ export async function verifyDocumentAction(
   }
 }
 
-export async function getDocumentSignedUrlAction(storagePath: string) {
+export async function getDocumentSignedUrlAction(documentId: string) {
   try {
     const profile = await requireServerAnyPermission([
       "documents.download",
@@ -130,8 +135,62 @@ export async function getDocumentSignedUrlAction(storagePath: string) {
         message: "Employee downloads are disabled by HR",
       };
     }
-    const url = await createSignedDocumentUrl(supabase, storagePath);
-    if (!url) return { success: false as const, message: "Unable to create download link" };
+
+    const { data: doc, error } = await fromHrms(supabase, "employee_documents")
+      .select(
+        `
+        id, storage_path, file_name, mime_type, title, employee_id,
+        employees:employee_id!inner(organization_id)
+      `,
+      )
+      .eq("id", documentId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    if (!doc) {
+      return { success: false as const, message: "Document not found" };
+    }
+
+    const employee = unwrapRelation(doc.employees);
+    if (employee?.organization_id !== profile.employee.organizationId) {
+      return { success: false as const, message: "Document not found" };
+    }
+    if (isEmployeeScoped(profile) && doc.employee_id !== profile.employee.id) {
+      return { success: false as const, message: "Document not found" };
+    }
+
+    const admin = createAdminClient();
+    let url = await createSignedDocumentUrl(admin, doc.storage_path);
+
+    if (!url && doc.storage_path.startsWith("seed/")) {
+      const placeholder = [
+        `Document: ${doc.title}`,
+        `File: ${doc.file_name}`,
+        "",
+        "This is auto-generated placeholder content for seeded HRMS reference data.",
+        "Replace this document with an actual upload when available.",
+      ].join("\n");
+
+      const { error: uploadError } = await admin.storage
+        .from(DOCUMENTS_STORAGE_BUCKET)
+        .upload(doc.storage_path, placeholder, {
+          upsert: true,
+          contentType: doc.mime_type || "text/plain",
+        });
+
+      if (!uploadError) {
+        url = await createSignedDocumentUrl(admin, doc.storage_path);
+      }
+    }
+
+    if (!url) {
+      return {
+        success: false as const,
+        message: "File is not available in storage. Please re-upload this document.",
+      };
+    }
+
     return { success: true as const, data: url };
   } catch (error) {
     return {

@@ -88,14 +88,14 @@ export function ExpiringDocumentsManagement({
             <Button
               size="icon-sm"
               variant="ghost"
-              onClick={() => actions.openSigned(row.storagePath, "preview")}
+              onClick={() => actions.openSigned(row, "preview")}
             >
               <Eye className="h-4 w-4" />
             </Button>
             <Button
               size="icon-sm"
               variant="ghost"
-              onClick={() => actions.openSigned(row.storagePath, "download")}
+              onClick={() => actions.openSigned(row, "download")}
             >
               <Download className="h-4 w-4" />
             </Button>

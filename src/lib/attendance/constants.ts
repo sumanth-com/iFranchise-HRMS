@@ -1,11 +1,17 @@
 import type { AttendanceStatus } from "@/types/attendance";
 
+/** Org-wide attendance tracking for HR (Administration). */
 export const ATTENDANCE_ROUTES = {
+  list: "/dashboard/attendance-management",
+  new: "/dashboard/attendance-management/new",
+  settings: "/dashboard/attendance-management/settings",
+  detail: (id: string) => `/dashboard/attendance-management/${id}`,
+  edit: (id: string) => `/dashboard/attendance-management/${id}/edit`,
+} as const;
+
+/** Personal / self-service attendance in the HR portal main nav. */
+export const SELF_ATTENDANCE_ROUTES = {
   list: "/dashboard/attendance",
-  new: "/dashboard/attendance/new",
-  settings: "/dashboard/attendance/settings",
-  detail: (id: string) => `/dashboard/attendance/${id}`,
-  edit: (id: string) => `/dashboard/attendance/${id}/edit`,
 } as const;
 
 export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatus, string> = {

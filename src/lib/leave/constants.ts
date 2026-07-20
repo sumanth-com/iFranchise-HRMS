@@ -1,12 +1,19 @@
 import type { LeaveStatus } from "@/types/leave";
 
+/** Org-wide leave tracking for HR (Administration). */
 export const LEAVE_ROUTES = {
+  list: "/dashboard/leave-management",
+  new: "/dashboard/leave-management/new",
+  detail: (id: string) => `/dashboard/leave-management/${id}`,
+  balances: "/dashboard/leave-management/balances",
+  calendar: "/dashboard/leave-management/calendar",
+  settings: "/dashboard/leave-management/settings",
+} as const;
+
+/** Personal / self-service leave in the HR portal main nav. */
+export const SELF_LEAVE_ROUTES = {
   list: "/dashboard/leave",
   new: "/dashboard/leave/new",
-  detail: (id: string) => `/dashboard/leave/${id}`,
-  balances: "/dashboard/leave/balances",
-  calendar: "/dashboard/leave/calendar",
-  settings: "/dashboard/leave/settings",
 } as const;
 
 export const LEAVE_STATUS_LABELS: Record<LeaveStatus, string> = {

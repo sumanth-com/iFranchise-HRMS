@@ -7,7 +7,7 @@ import {
   requireServerAnyPermission,
   requireServerPermission,
 } from "@/lib/permissions/server";
-import { LEAVE_ROUTES } from "@/lib/leave/constants";
+import { LEAVE_ROUTES, SELF_LEAVE_ROUTES } from "@/lib/leave/constants";
 import { getLeaveRequestById } from "@/lib/leave/services/leave-detail";
 import {
   approveLeaveRequest,
@@ -54,6 +54,7 @@ export async function createLeaveRequestAction(
     const id = await createLeaveRequest(supabase, profile, parsed);
     revalidatePath(LEAVE_ROUTES.list);
     revalidatePath(LEAVE_ROUTES.balances);
+    revalidatePath(SELF_LEAVE_ROUTES.list);
     return { success: true, data: id };
   } catch (error) {
     return {
@@ -79,6 +80,7 @@ export async function approveLeaveRequestAction(
     revalidatePath(LEAVE_ROUTES.list);
     revalidatePath(LEAVE_ROUTES.detail(parsed.leaveRequestId));
     revalidatePath(LEAVE_ROUTES.balances);
+    revalidatePath(SELF_LEAVE_ROUTES.list);
     return { success: true, data: undefined };
   } catch (error) {
     return {
@@ -104,6 +106,7 @@ export async function rejectLeaveRequestAction(
     revalidatePath(LEAVE_ROUTES.list);
     revalidatePath(LEAVE_ROUTES.detail(parsed.leaveRequestId));
     revalidatePath(LEAVE_ROUTES.balances);
+    revalidatePath(SELF_LEAVE_ROUTES.list);
     return { success: true, data: undefined };
   } catch (error) {
     return {
@@ -126,6 +129,7 @@ export async function cancelLeaveRequestAction(
     revalidatePath(LEAVE_ROUTES.list);
     revalidatePath(LEAVE_ROUTES.detail(leaveRequestId));
     revalidatePath(LEAVE_ROUTES.balances);
+    revalidatePath(SELF_LEAVE_ROUTES.list);
     return { success: true, data: undefined };
   } catch (error) {
     return {

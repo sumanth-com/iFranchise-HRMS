@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
+import { SELF_DOCUMENTS_ROUTES } from "@/lib/documents/constants";
 import {
   employeeDeleteDocument,
   employeeRenameDocument,
@@ -21,6 +22,7 @@ const uploadMetaSchema = z.object({
 
 function revalidate() {
   revalidatePath(EMPLOYEE_ROUTES.documents);
+  revalidatePath(SELF_DOCUMENTS_ROUTES.list);
 }
 
 export async function employeeUploadDocumentAction(formData: FormData) {

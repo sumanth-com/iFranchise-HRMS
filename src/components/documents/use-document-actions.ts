@@ -9,14 +9,21 @@ import {
   verifyDocumentAction,
 } from "@/lib/documents/actions";
 
+import type { EmployeeDocumentItem } from "@/types/documents";
+
+type DocumentFileTarget = Pick<
+  EmployeeDocumentItem,
+  "id" | "storagePath" | "fileName" | "title"
+>;
+
 export function useDocumentFileActions(onDone?: () => void) {
   const [isFilePending, setIsFilePending] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  async function getSignedUrl(storagePath: string) {
+  async function getSignedUrl(document: DocumentFileTarget) {
     setIsFilePending(true);
     try {
-      const result = await getDocumentSignedUrlAction(storagePath);
+      const result = await getDocumentSignedUrlAction(document.id);
       if (!result.success || !result.data) {
         toast.error(result.message ?? "Unable to open file");
         return null;
@@ -27,8 +34,8 @@ export function useDocumentFileActions(onDone?: () => void) {
     }
   }
 
-  async function download(storagePath: string, fileName?: string) {
-    const url = await getSignedUrl(storagePath);
+  async function download(document: DocumentFileTarget) {
+    const url = await getSignedUrl(document);
     if (!url) return;
 
     try {
@@ -37,35 +44,35 @@ export function useDocumentFileActions(onDone?: () => void) {
 
       const blob = await response.blob();
       const objectUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
+      const anchor = window.document.createElement("a");
       anchor.href = objectUrl;
-      anchor.download = fileName || "document";
-      document.body.appendChild(anchor);
+      anchor.download = document.fileName || "document";
+      window.document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
       URL.revokeObjectURL(objectUrl);
       toast.success("Download started");
     } catch {
-      const anchor = document.createElement("a");
+      const anchor = window.document.createElement("a");
       anchor.href = url;
-      anchor.download = fileName || "document";
+      anchor.download = document.fileName || "document";
       anchor.rel = "noopener noreferrer";
-      document.body.appendChild(anchor);
+      window.document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
       toast.success("Download opened");
     }
   }
 
-  async function share(storagePath: string, title: string) {
-    const url = await getSignedUrl(storagePath);
+  async function share(document: DocumentFileTarget) {
+    const url = await getSignedUrl(document);
     if (!url) return;
 
     try {
       if (navigator.share) {
         await navigator.share({
-          title,
-          text: `Sharing document: ${title}`,
+          title: document.title,
+          text: `Sharing document: ${document.title}`,
           url,
         });
         return;
@@ -79,13 +86,13 @@ export function useDocumentFileActions(onDone?: () => void) {
     }
   }
 
-  async function openSigned(storagePath: string, mode: "preview" | "download") {
+  async function openSigned(document: DocumentFileTarget, mode: "preview" | "download") {
     if (mode === "download") {
-      await download(storagePath);
+      await download(document);
       return;
     }
 
-    const url = await getSignedUrl(storagePath);
+    const url = await getSignedUrl(document);
     if (url) window.open(url, "_blank", "noopener,noreferrer");
   }
 

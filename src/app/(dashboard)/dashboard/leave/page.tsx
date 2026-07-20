@@ -1,99 +1,41 @@
-import { Suspense } from "react";
-
-import { LeaveSummaryCards } from "@/components/leave/leave-summary-cards";
-import { LeaveTable } from "@/components/leave/leave-table";
-import { LoadingSpinner } from "@/components/common/loading-spinner";
-import { createClient } from "@/lib/supabase/server";
+import { MyLeaveSelfServiceView } from "@/components/leave/my-leave-self-service-view";
+import { SELF_LEAVE_ROUTES } from "@/lib/leave/constants";
 import {
-  getLeaveLookups,
-  getLeaveSummary,
+  getEmployeeLeaveBalanceSnapshot,
+  getEmployeeLeaveCalendarData,
   listLeaveRequests,
 } from "@/lib/leave/services/leave-queries";
-import { leaveListParamsSchema } from "@/lib/validations/leave";
 import { requireServerPermission } from "@/lib/permissions/server";
 import { hasPermission } from "@/lib/permissions/utils";
+import { createClient } from "@/lib/supabase/server";
 
-type LeavePageProps = {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-};
-
-export default async function LeavePage({ searchParams }: LeavePageProps) {
+export default async function LeaveSelfServicePage() {
   const profile = await requireServerPermission("leave.view");
   const supabase = await createClient();
-  const rawParams = await searchParams;
+  const employeeId = profile.employee.id;
+
   const now = new Date();
+  const calendarMonth = now.getMonth() + 1;
+  const calendarYear = now.getFullYear();
 
-  const params = leaveListParamsSchema.parse({
-    page: rawParams.page,
-    pageSize: rawParams.pageSize,
-    search: typeof rawParams.search === "string" ? rawParams.search : undefined,
-    sortBy: rawParams.sortBy,
-    sortOrder: rawParams.sortOrder,
-    month: rawParams.month ?? now.getMonth() + 1,
-    year: rawParams.year ?? now.getFullYear(),
-    leaveStatus: rawParams.leaveStatus,
-    leaveTypeId: rawParams.leaveTypeId,
-    departmentId: rawParams.departmentId,
-    branchId: rawParams.branchId,
-    approverId: rawParams.approverId,
-    reportingManagerId: rawParams.reportingManagerId,
-    employeeId: rawParams.employeeId,
-  });
-
-  const [result, lookups, summary] = await Promise.all([
-    listLeaveRequests(supabase, profile, params),
-    getLeaveLookups(supabase, profile.employee.organizationId),
-    getLeaveSummary(supabase, profile, params.month, params.year),
+  const [balances, requests, calendar] = await Promise.all([
+    getEmployeeLeaveBalanceSnapshot(supabase, employeeId),
+    listLeaveRequests(supabase, profile, { employeeId, page: 1, pageSize: 25 }),
+    getEmployeeLeaveCalendarData(supabase, profile, calendarMonth, calendarYear),
   ]);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Leave</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Manage leave requests, approvals, balances, and workforce availability.
-        </p>
-      </div>
-
-      <LeaveSummaryCards summary={summary} />
-
-      <Suspense
-        fallback={
-          <div className="flex justify-center py-12">
-            <LoadingSpinner />
-          </div>
-        }
-      >
-        <LeaveTable
-          records={result.data}
-          total={result.total}
-          page={result.page}
-          pageSize={result.pageSize}
-          search={params.search ?? ""}
-          month={params.month ?? now.getMonth() + 1}
-          year={params.year ?? now.getFullYear()}
-          leaveStatus={params.leaveStatus}
-          leaveTypeId={params.leaveTypeId}
-          departmentId={params.departmentId}
-          branchId={params.branchId}
-          approverId={params.approverId}
-          reportingManagerId={params.reportingManagerId}
-          employeeId={params.employeeId}
-          leaveTypes={lookups.leaveTypes}
-          departments={lookups.departments}
-          branches={lookups.branches}
-          employees={lookups.employees}
-          approvers={lookups.approvers}
-          managers={lookups.managers}
-          canCreate={hasPermission(profile.permissionCodes, "leave.create")}
-          canApprove={hasPermission(profile.permissionCodes, "leave.approve")}
-          canReject={hasPermission(profile.permissionCodes, "leave.reject")}
-          canCancel={
-            hasPermission(profile.permissionCodes, "leave.cancel") ||
-            hasPermission(profile.permissionCodes, "leave.withdraw")
-          }
-        />
-      </Suspense>
-    </div>
+    <MyLeaveSelfServiceView
+      title="My Leave"
+      description="Apply for leave, check your balances, and track your own requests."
+      applyHref={SELF_LEAVE_ROUTES.new}
+      canApply={hasPermission(profile.permissionCodes, "leave.create")}
+      balances={balances}
+      requests={requests.data}
+      calendarMonth={calendarMonth}
+      calendarYear={calendarYear}
+      calendarLeaves={calendar.leaves}
+      calendarHolidays={calendar.holidays}
+    />
   );
 }

@@ -12,6 +12,7 @@ import { DataTable, type DataTableColumn } from "@/components/common/data-table"
 import { EmptyState } from "@/components/common/empty-state";
 import { generateExitDocumentsAction } from "@/lib/exit/actions";
 import { canExitDocuments, EXIT_STATUS_LABELS } from "@/lib/exit/constants";
+import { DOCUMENTS_ROUTES } from "@/lib/documents/constants";
 import { cn } from "@/lib/utils";
 import type { ExitResignationItem } from "@/types/exit";
 
@@ -138,7 +139,7 @@ export function ExitDocumentsManagement({
           </p>
         </div>
         <Link
-          href="/dashboard/documents/letters"
+          href={DOCUMENTS_ROUTES.letters}
           className={cn(buttonVariants({ variant: "outline" }), "inline-flex items-center")}
         >
           <ExternalLink className="mr-2 h-4 w-4" />

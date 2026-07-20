@@ -66,10 +66,57 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
     return items;
   }
 
+  if (segments[0] === "dashboard" && segments[1] === "documents") {
+    const items: BreadcrumbItemConfig[] = [
+      { label: "Dashboard", href: "/" },
+      { label: "Documents", href: "/dashboard/documents" },
+    ];
+    return items;
+  }
+
+  if (segments[0] === "dashboard" && segments[1] === "documents-management") {
+    const items: BreadcrumbItemConfig[] = [
+      { label: "Dashboard", href: "/" },
+      { label: "Documents Management", href: "/dashboard/documents-management" },
+    ];
+
+    const sectionLabels: Record<string, string> = {
+      employees: "Employee Documents",
+      letters: "Company Letters",
+      templates: "Templates",
+      expiring: "Expiring Documents",
+      settings: "Settings",
+    };
+
+    if (segments[2]) {
+      items.push({
+        label: sectionLabels[segments[2]] ?? formatSegment(segments[2]),
+        href: `/dashboard/documents-management/${segments[2]}`,
+      });
+    }
+
+    if (segments[2] === "employees" && segments[3]) {
+      items.push({
+        label: formatEmployeeRouteRefLabel(segments[3]),
+        href: pathname,
+      });
+    }
+
+    return items;
+  }
+
   if (segments[0] === "dashboard" && segments[1] === "attendance") {
     const items: BreadcrumbItemConfig[] = [
       { label: "Dashboard", href: "/" },
       { label: "Attendance", href: "/dashboard/attendance" },
+    ];
+    return items;
+  }
+
+  if (segments[0] === "dashboard" && segments[1] === "attendance-management") {
+    const items: BreadcrumbItemConfig[] = [
+      { label: "Dashboard", href: "/" },
+      { label: "Attendance Management", href: "/dashboard/attendance-management" },
     ];
 
     if (segments[2] === "new") {
@@ -77,8 +124,13 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
       return items;
     }
 
+    if (segments[2] === "settings") {
+      items.push({ label: "Settings", href: pathname });
+      return items;
+    }
+
     if (segments[2]) {
-      const attendanceHref = `/dashboard/attendance/${segments[2]}`;
+      const attendanceHref = `/dashboard/attendance-management/${segments[2]}`;
 
       if (segments[3] === "edit") {
         items.push({ label: "Attendance details", href: attendanceHref });
@@ -97,6 +149,60 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
     const items: BreadcrumbItemConfig[] = [
       { label: "Dashboard", href: "/" },
       { label: "Payroll", href: "/dashboard/payroll" },
+    ];
+    return items;
+  }
+
+  if (segments[0] === "dashboard" && segments[1] === "directory") {
+    return [
+      { label: "Dashboard", href: "/" },
+      { label: "Employee Directory", href: "/dashboard/directory" },
+    ];
+  }
+
+  if (segments[0] === "dashboard" && segments[1] === "assets") {
+    return [
+      { label: "Dashboard", href: "/" },
+      { label: "Assets", href: "/dashboard/assets" },
+    ];
+  }
+
+  if (segments[0] === "dashboard" && segments[1] === "settings") {
+    return [
+      { label: "Dashboard", href: "/" },
+      { label: "Settings", href: "/dashboard/settings" },
+    ];
+  }
+
+  if (segments[0] === "dashboard" && segments[1] === "assets-management") {
+    const items: BreadcrumbItemConfig[] = [
+      { label: "Dashboard", href: "/" },
+      { label: "Assets Management", href: "/dashboard/assets-management" },
+    ];
+
+    const sectionLabels: Record<string, string> = {
+      inventory: "Assets",
+      assignments: "Assignments",
+      maintenance: "Maintenance",
+      vendors: "Vendors",
+      reports: "Reports",
+      settings: "Settings",
+    };
+
+    if (segments[2]) {
+      items.push({
+        label: sectionLabels[segments[2]] ?? formatSegment(segments[2]),
+        href: `/dashboard/assets-management/${segments[2]}`,
+      });
+    }
+
+    return items;
+  }
+
+  if (segments[0] === "dashboard" && segments[1] === "payroll-management") {
+    const items: BreadcrumbItemConfig[] = [
+      { label: "Dashboard", href: "/" },
+      { label: "Payroll Management", href: "/dashboard/payroll-management" },
     ];
 
     const sectionLabels: Record<string, string> = {
@@ -117,7 +223,7 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
     if (segments[2] === "salary-structures") {
       items.push({
         label: sectionLabels["salary-structures"],
-        href: "/dashboard/payroll/salary-structures",
+        href: "/dashboard/payroll-management/salary-structures",
       });
       if (segments[3] === "new") {
         items.push({ label: "New", href: pathname });
@@ -128,7 +234,7 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
     if (segments[2] === "payslips") {
       items.push({
         label: sectionLabels.payslips,
-        href: "/dashboard/payroll/payslips",
+        href: "/dashboard/payroll-management/payslips",
       });
       if (segments[3]) {
         items.push({ label: "Payslip details", href: pathname });
@@ -139,7 +245,7 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
     if (sectionLabels[segments[2]]) {
       items.push({
         label: sectionLabels[segments[2]],
-        href: `/dashboard/payroll/${segments[2]}`,
+        href: `/dashboard/payroll-management/${segments[2]}`,
       });
       return items;
     }
@@ -152,6 +258,20 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
     const items: BreadcrumbItemConfig[] = [
       { label: "Dashboard", href: "/" },
       { label: "Leave", href: "/dashboard/leave" },
+    ];
+
+    if (segments[2] === "new") {
+      items.push({ label: "Apply leave", href: pathname });
+      return items;
+    }
+
+    return items;
+  }
+
+  if (segments[0] === "dashboard" && segments[1] === "leave-management") {
+    const items: BreadcrumbItemConfig[] = [
+      { label: "Dashboard", href: "/" },
+      { label: "Leave Management", href: "/dashboard/leave-management" },
     ];
 
     if (segments[2] === "new") {

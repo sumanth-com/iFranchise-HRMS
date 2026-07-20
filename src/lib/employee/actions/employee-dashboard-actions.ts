@@ -40,6 +40,7 @@ export async function employeeAttendancePunchAction(
     await punchManagerAttendance(supabase, profile, parsed);
     revalidatePath(EMPLOYEE_ROUTES.home);
     revalidatePath(EMPLOYEE_ROUTES.attendance);
+    revalidatePath("/dashboard/attendance");
     return { success: true };
   } catch (error) {
     return {
@@ -59,6 +60,7 @@ export async function employeeUpdateCheckoutAction(
     await updateManagerCheckout(supabase, profile, parsed);
     revalidatePath(EMPLOYEE_ROUTES.home);
     revalidatePath(EMPLOYEE_ROUTES.attendance);
+    revalidatePath("/dashboard/attendance");
     return { success: true };
   } catch (error) {
     return {

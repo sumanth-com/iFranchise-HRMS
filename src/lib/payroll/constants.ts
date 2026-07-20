@@ -9,18 +9,23 @@ import type {
 } from "@/types/payroll";
 
 export const PAYROLL_ROUTES = {
-  dashboard: "/dashboard/payroll",
-  run: "/dashboard/payroll/run",
-  history: "/dashboard/payroll/history",
-  detail: (id: string) => `/dashboard/payroll/${id}`,
-  salaryStructures: "/dashboard/payroll/salary-structures",
-  newSalaryStructure: "/dashboard/payroll/salary-structures/new",
-  revisions: "/dashboard/payroll/revisions",
-  bonuses: "/dashboard/payroll/bonuses",
-  reimbursements: "/dashboard/payroll/reimbursements",
-  payslips: "/dashboard/payroll/payslips",
-  payslipDetail: (id: string) => `/dashboard/payroll/payslips/${id}`,
-  settings: "/dashboard/payroll/settings",
+  dashboard: "/dashboard/payroll-management",
+  run: "/dashboard/payroll-management/run",
+  history: "/dashboard/payroll-management/history",
+  detail: (id: string) => `/dashboard/payroll-management/${id}`,
+  salaryStructures: "/dashboard/payroll-management/salary-structures",
+  newSalaryStructure: "/dashboard/payroll-management/salary-structures/new",
+  revisions: "/dashboard/payroll-management/revisions",
+  bonuses: "/dashboard/payroll-management/bonuses",
+  reimbursements: "/dashboard/payroll-management/reimbursements",
+  payslips: "/dashboard/payroll-management/payslips",
+  payslipDetail: (id: string) => `/dashboard/payroll-management/payslips/${id}`,
+  settings: "/dashboard/payroll-management/settings",
+} as const;
+
+/** Personal / self-service payroll in the HR portal main nav. */
+export const SELF_PAYROLL_ROUTES = {
+  list: "/dashboard/payroll",
 } as const;
 
 export const PAYROLL_STATUS_LABELS: Record<PayrollStatus, string> = {

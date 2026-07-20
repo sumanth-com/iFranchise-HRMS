@@ -33,6 +33,7 @@ export function LoginForm() {
   const [formError, setFormError] = useState<string | null>(null);
   const [isInviteLinkPending, setInviteLinkPending] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showSignedOutMessage, setShowSignedOutMessage] = useState(false);
 
   const {
     register,
@@ -52,6 +53,24 @@ export function LoginForm() {
     const email = searchParams.get("email");
     if (email) setValue("email", email);
   }, [searchParams, setValue]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("signedOut") !== "1") return;
+
+    setShowSignedOutMessage(true);
+    params.delete("signedOut");
+    const query = params.toString();
+    router.replace(query ? `${AUTH_ROUTES.login}?${query}` : AUTH_ROUTES.login, {
+      scroll: false,
+    });
+
+    const timeout = window.setTimeout(() => {
+      setShowSignedOutMessage(false);
+    }, 4000);
+
+    return () => window.clearTimeout(timeout);
+  }, [router]);
 
   useEffect(() => {
     const hash = window.location.hash.startsWith("#")
@@ -136,7 +155,6 @@ export function LoginForm() {
   });
 
   const expired = searchParams.get("expired") === "1";
-  const signedOut = searchParams.get("signedOut") === "1";
   const passwordUpdated = searchParams.get("passwordUpdated") === "1";
   const errorParam = searchParams.get("error");
   const profileError =
@@ -167,8 +185,8 @@ export function LoginForm() {
         </div>
       ) : null}
 
-      {signedOut ? (
-        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-200">
+      {showSignedOutMessage ? (
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-800 transition-opacity duration-300 dark:text-emerald-200">
           You have been signed out successfully.
         </div>
       ) : null}

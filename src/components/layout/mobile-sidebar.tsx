@@ -17,6 +17,19 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/providers/auth-provider";
 import { cn } from "@/lib/utils";
 
+function resolveActiveHref(
+  pathname: string,
+  portalHome: string,
+  hrefs: string[],
+): string | null {
+  const matches = hrefs.filter(
+    (href) =>
+      pathname === href || (href !== portalHome && pathname.startsWith(href)),
+  );
+  if (matches.length === 0) return null;
+  return matches.sort((a, b) => b.length - a.length)[0] ?? null;
+}
+
 export function MobileSidebar() {
   const pathname = usePathname();
   const { isMobileOpen, setMobileOpen } = useSidebar();
@@ -25,6 +38,12 @@ export function MobileSidebar() {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     Administration: true,
   });
+
+  const activeHref = resolveActiveHref(
+    pathname,
+    portalHome,
+    navigation.map((item) => item.href),
+  );
 
   function toggleSection(section: string) {
     setOpenSections((current) => ({
@@ -35,22 +54,20 @@ export function MobileSidebar() {
 
   return (
     <Sheet open={isMobileOpen} onOpenChange={setMobileOpen}>
-      <SheetContent side="left" className="w-64 p-0">
-        <SheetHeader className="border-b px-4 py-4">
+      <SheetContent side="left" className="flex w-64 flex-col p-0">
+        <SheetHeader className="shrink-0 border-b px-4 py-4">
           <SheetTitle>{portalLabel}</SheetTitle>
         </SheetHeader>
-        <nav className="flex flex-col gap-1 p-2">
+        <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain p-2">
           {navigation.map((item, index) => {
-            const isActive =
-              pathname === item.href ||
-              (item.href !== portalHome && pathname.startsWith(item.href));
+            const isActive = activeHref === item.href;
             const Icon = item.icon;
             const prevSection = index > 0 ? navigation[index - 1]?.section : undefined;
             const showSection = item.section && item.section !== prevSection;
             const sectionOpen = item.section ? (openSections[item.section] ?? true) : true;
 
             return (
-              <div key={item.href}>
+              <div key={item.href} className="shrink-0">
                 {showSection ? (
                   <button
                     type="button"
@@ -80,14 +97,14 @@ export function MobileSidebar() {
                     )}
                   >
                     <Icon className="size-4 shrink-0" />
-                    <span>{item.title}</span>
+                    <span className="truncate">{item.title}</span>
                   </Link>
                 ) : null}
               </div>
             );
           })}
         </nav>
-        <div className="px-4 pb-4">
+        <div className="shrink-0 border-t px-4 py-4">
           <Button
             variant="outline"
             className="w-full"

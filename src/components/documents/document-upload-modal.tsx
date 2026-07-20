@@ -11,7 +11,7 @@ import { Modal } from "@/components/common/modal";
 import { Label } from "@/components/ui/label";
 import { EmployeeSelect, LabeledSelect } from "@/components/payroll/payroll-select";
 import { uploadDocumentAction } from "@/lib/documents/actions";
-import type { DocumentsLookups } from "@/types/documents";
+import type { DocumentTypeItem, DocumentsLookups } from "@/types/documents";
 
 type Props = {
   open: boolean;
@@ -22,6 +22,7 @@ type Props = {
   defaultDocumentTypeId?: string;
   defaultTitle?: string;
   lockEmployee?: boolean;
+  documentTypes?: DocumentTypeItem[];
 };
 
 export function DocumentUploadModal({
@@ -33,9 +34,11 @@ export function DocumentUploadModal({
   defaultDocumentTypeId = "",
   defaultTitle = "",
   lockEmployee = false,
+  documentTypes,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const availableDocumentTypes = documentTypes ?? lookups.documentTypes;
   const [employeeId, setEmployeeId] = useState(defaultEmployeeId);
   const [documentTypeId, setDocumentTypeId] = useState(defaultDocumentTypeId);
   const [title, setTitle] = useState(defaultTitle);
@@ -47,13 +50,19 @@ export function DocumentUploadModal({
   useEffect(() => {
     if (!open) return;
     setEmployeeId(defaultEmployeeId);
-    setDocumentTypeId(defaultDocumentTypeId);
-    setTitle(defaultTitle);
+    const initialTypeId =
+      defaultDocumentTypeId &&
+      availableDocumentTypes.some((type) => type.id === defaultDocumentTypeId)
+        ? defaultDocumentTypeId
+        : (availableDocumentTypes[0]?.id ?? "");
+    setDocumentTypeId(initialTypeId);
+    const initialType = availableDocumentTypes.find((type) => type.id === initialTypeId);
+    setTitle(defaultTitle || initialType?.name || "");
     setIssuedDate("");
     setExpiryDate("");
     setNotes("");
     setFile(null);
-  }, [open, defaultEmployeeId, defaultDocumentTypeId, defaultTitle]);
+  }, [open, defaultEmployeeId, defaultDocumentTypeId, defaultTitle, availableDocumentTypes]);
 
   function resetAndClose(next: boolean) {
     if (!next) {
@@ -69,7 +78,7 @@ export function DocumentUploadModal({
       return;
     }
 
-    const selected = lookups.documentTypes.find((t) => t.id === documentTypeId);
+    const selected = availableDocumentTypes.find((t) => t.id === documentTypeId);
     if (selected?.requiresExpiry && !expiryDate) {
       toast.error("Expiry date is required for this document type");
       return;
@@ -97,7 +106,7 @@ export function DocumentUploadModal({
     });
   }
 
-  const selectedType = lookups.documentTypes.find((t) => t.id === documentTypeId);
+  const selectedType = availableDocumentTypes.find((t) => t.id === documentTypeId);
 
   return (
     <Modal
@@ -107,7 +116,7 @@ export function DocumentUploadModal({
       description="Upload a file to the employee document folder."
       contentClassName="sm:max-w-lg"
       footer={
-        <Button onClick={onSubmit} disabled={isPending}>
+        <Button onClick={onSubmit} disabled={isPending || availableDocumentTypes.length === 0}>
           {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
           {replaceDocumentId ? "Replace" : "Upload"}
         </Button>
@@ -125,17 +134,23 @@ export function DocumentUploadModal({
         </div>
         <div className="space-y-2">
           <Label>Document Type</Label>
-          <LabeledSelect
-            items={lookups.documentTypes.map((t) => ({ value: t.id, label: t.name }))}
-            value={documentTypeId}
-            onValueChange={(value) => {
-              setDocumentTypeId(value);
-              const type = lookups.documentTypes.find((t) => t.id === value);
-              if (type && !title.trim()) setTitle(type.name);
-            }}
-            disabled={isPending}
-            placeholder="Select type"
-          />
+          {availableDocumentTypes.length === 0 ? (
+            <p className="rounded-lg border border-dashed bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+              All document types in this section are already uploaded.
+            </p>
+          ) : (
+            <LabeledSelect
+              items={availableDocumentTypes.map((t) => ({ value: t.id, label: t.name }))}
+              value={documentTypeId}
+              onValueChange={(value) => {
+                setDocumentTypeId(value);
+                const type = availableDocumentTypes.find((t) => t.id === value);
+                if (type) setTitle(type.name);
+              }}
+              disabled={isPending}
+              placeholder="Select type"
+            />
+          )}
         </div>
         <div className="space-y-2">
           <Label>Title</Label>

@@ -7,7 +7,7 @@ import {
   requireServerAnyPermission,
   requireServerPermission,
 } from "@/lib/permissions/server";
-import { PAYROLL_ROUTES } from "@/lib/payroll/constants";
+import { PAYROLL_ROUTES, SELF_PAYROLL_ROUTES } from "@/lib/payroll/constants";
 import {
   getPayrollRunById,
   getPayslipById,
@@ -82,6 +82,7 @@ function revalidatePayrollPaths() {
   revalidatePath(PAYROLL_ROUTES.history);
   revalidatePath(PAYROLL_ROUTES.run);
   revalidatePath(PAYROLL_ROUTES.payslips);
+  revalidatePath(SELF_PAYROLL_ROUTES.list);
 }
 
 export async function previewPayrollRunAction(

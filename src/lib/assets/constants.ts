@@ -7,13 +7,18 @@ import type {
 } from "@/types/assets";
 
 export const ASSETS_ROUTES = {
-  dashboard: "/dashboard/assets",
-  inventory: "/dashboard/assets/inventory",
-  assignments: "/dashboard/assets/assignments",
-  maintenance: "/dashboard/assets/maintenance",
-  vendors: "/dashboard/assets/vendors",
-  reports: "/dashboard/assets/reports",
-  settings: "/dashboard/assets/settings",
+  dashboard: "/dashboard/assets-management",
+  inventory: "/dashboard/assets-management/inventory",
+  assignments: "/dashboard/assets-management/assignments",
+  maintenance: "/dashboard/assets-management/maintenance",
+  vendors: "/dashboard/assets-management/vendors",
+  reports: "/dashboard/assets-management/reports",
+  settings: "/dashboard/assets-management/settings",
+} as const;
+
+/** Personal / self-service assets in the HR portal main nav. */
+export const SELF_ASSETS_ROUTES = {
+  list: "/dashboard/assets",
 } as const;
 
 export const ASSETS_SUB_NAV = [
