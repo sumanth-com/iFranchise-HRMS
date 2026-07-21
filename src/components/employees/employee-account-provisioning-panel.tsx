@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
+import { SuccessCelebrationOverlay } from "@/components/common/success-celebration-overlay";
 import { EmployeeAccountStatusBadge } from "@/components/employees/employee-account-status-badge";
 import {
   activateEmployeeAccountAction,
@@ -69,6 +70,10 @@ export function EmployeeAccountProvisioningPanel({
   const [exitingInvitationIds, setExitingInvitationIds] = useState<string[]>([]);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [cancelTarget, setCancelTarget] = useState<EmployeeAccountProvisioningItem | null>(null);
+  const [resendSuccess, setResendSuccess] = useState<{
+    title: string;
+    description: string;
+  } | null>(null);
 
   const pendingSignature = summary.pendingInvitations.map((item) => item.id).join(",");
 
@@ -117,9 +122,16 @@ export function EmployeeAccountProvisioningPanel({
           current.filter((id) => id !== employee.id),
         );
       }, 280);
+      toast.success(successMessage, { description: successDescription });
     }
 
-    toast.success(successMessage, { description: successDescription });
+    if (type === "resend") {
+      setResendSuccess({
+        title: successMessage,
+        description: successDescription ?? "",
+      });
+    }
+
     router.refresh();
   }
 
@@ -181,7 +193,7 @@ export function EmployeeAccountProvisioningPanel({
                     "resend",
                     () => resendEmployeeInvitationAction(employee.id),
                     "Invitation resent",
-                    `A new invitation email was sent to ${employee.email}.`,
+                    `A new invitation was sent to ${employee.email}.`,
                   )
                 }
               >
@@ -249,6 +261,14 @@ export function EmployeeAccountProvisioningPanel({
 
   return (
     <>
+      <SuccessCelebrationOverlay
+        open={Boolean(resendSuccess)}
+        title={resendSuccess?.title ?? "Invitation resent"}
+        description={resendSuccess?.description}
+        durationMs={3000}
+        onClose={() => setResendSuccess(null)}
+      />
+
       <section className="rounded-2xl border bg-card p-4 shadow-sm md:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch lg:justify-between">
           {canInvite ? (

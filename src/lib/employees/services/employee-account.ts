@@ -271,7 +271,7 @@ async function loadInviteEmailContext(employeeId: string): Promise<InviteEmailCo
     .select(
       `first_name, last_name, email,
       departments:department_id (name),
-      designations:designation_id (name),
+      designations:designation_id (title),
       employment_types:employment_type_id (name),
       manager:reporting_manager_id (first_name, last_name)`,
     )
@@ -286,7 +286,7 @@ async function loadInviteEmailContext(employeeId: string): Promise<InviteEmailCo
     data.departments as { name: string } | { name: string }[] | null,
   );
   const designation = unwrapRelation(
-    data.designations as { name: string } | { name: string }[] | null,
+    data.designations as { title: string } | { title: string }[] | null,
   );
   const employmentType = unwrapRelation(
     data.employment_types as { name: string } | { name: string }[] | null,
@@ -301,7 +301,7 @@ async function loadInviteEmailContext(employeeId: string): Promise<InviteEmailCo
     fullName: employeeFullName,
     greetingName: getEmployeeGreetingName(data.first_name, data.last_name),
     departmentName: department?.name ?? "—",
-    designationName: designation?.name ?? "—",
+    designationName: designation?.title ?? "—",
     employmentTypeName: employmentType?.name ?? "—",
     reportingManagerName: manager
       ? `${manager.first_name} ${manager.last_name}`.trim()
