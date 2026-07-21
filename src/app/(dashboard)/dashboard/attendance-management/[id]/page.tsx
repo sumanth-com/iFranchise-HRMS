@@ -6,7 +6,7 @@ import { AttendanceDetailView } from "@/components/attendance/attendance-detail-
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { buttonVariants } from "@/components/common/button";
 import { getAttendanceDetailAction } from "@/lib/attendance/actions";
-import { ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
+import { attendanceTeamListUrl } from "@/lib/attendance/constants";
 import { requireServerPermission } from "@/lib/permissions/server";
 import { hasPermission } from "@/lib/permissions/utils";
 import { cn } from "@/lib/utils";
@@ -29,7 +29,7 @@ export default async function AttendanceDetailPage({
   return (
     <div className="space-y-6">
       <Link
-        href={ATTENDANCE_ROUTES.list}
+        href={attendanceTeamListUrl()}
         className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "px-0")}
       >
         ← Back to attendance

@@ -42,6 +42,8 @@ type Props = {
   search: string;
   selectedId?: string;
   centerPath?: string;
+  filterParamKey?: string;
+  preserveQuery?: Record<string, string>;
   showTabs?: boolean;
   showToolbarSearch?: boolean;
   showMarkAllRead?: boolean;
@@ -54,6 +56,8 @@ export function NotificationCenterSplitView({
   search,
   selectedId,
   centerPath = NOTIFICATIONS_ROUTES.center,
+  filterParamKey = "tab",
+  preserveQuery,
   showTabs = true,
   showToolbarSearch = true,
   showMarkAllRead = true,
@@ -72,13 +76,18 @@ export function NotificationCenterSplitView({
   const setParams = useCallback(
     (updates: Record<string, string | undefined>) => {
       const params = new URLSearchParams(searchParams.toString());
+      if (preserveQuery) {
+        Object.entries(preserveQuery).forEach(([key, value]) => {
+          params.set(key, value);
+        });
+      }
       for (const [key, value] of Object.entries(updates)) {
         if (!value) params.delete(key);
         else params.set(key, value);
       }
       router.push(`${centerPath}?${params.toString()}`);
     },
-    [centerPath, router, searchParams],
+    [centerPath, preserveQuery, router, searchParams],
   );
 
   function markAsRead(item: NotificationListItem) {
@@ -126,7 +135,13 @@ export function NotificationCenterSplitView({
                 <button
                   key={item.value}
                   type="button"
-                  onClick={() => setParams({ tab: item.value, page: "1", id: undefined })}
+                  onClick={() =>
+                    setParams({
+                      [filterParamKey]: item.value,
+                      page: "1",
+                      id: undefined,
+                    })
+                  }
                   className={cn(
                     "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                     tab === item.value

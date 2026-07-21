@@ -40,6 +40,10 @@ function revalidateExit(employeeId?: string) {
   revalidatePath(EXIT_ROUTES.interview);
   revalidatePath(EXIT_ROUTES.documents);
   revalidatePath(EXIT_ROUTES.settings);
+  revalidatePath("/employee/resignation");
+  revalidatePath("/employee/resignation/apply");
+  revalidatePath("/manager/resignation");
+  revalidatePath("/ceo/exit");
   revalidatePath("/dashboard/employees");
   revalidatePath("/dashboard/assets");
   revalidatePath("/dashboard/assets-management");
@@ -94,6 +98,25 @@ export async function hrDecideResignationAction(input: unknown) {
     return {
       success: false as const,
       message: error instanceof Error ? error.message : "Failed to process HR decision",
+    };
+  }
+}
+
+export async function ceoDecideResignationAction(input: unknown) {
+  try {
+    const profile = await requireServerAnyPermission([
+      "portal.ceo.access",
+      "exit.approve",
+    ]);
+    const supabase = await createClient();
+    const parsed = resignationDecisionSchema.parse(input);
+    await decideResignation(supabase, profile, parsed, "ceo");
+    revalidateExit();
+    return { success: true as const };
+  } catch (error) {
+    return {
+      success: false as const,
+      message: error instanceof Error ? error.message : "Failed to process CEO decision",
     };
   }
 }

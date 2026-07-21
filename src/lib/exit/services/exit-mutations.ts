@@ -11,6 +11,7 @@ import {
   fromHrms,
   isEmployeeOnly,
   isHrAdmin,
+  isCeoRole,
 } from "@/lib/exit/services/exit-utils";
 import type {
   AssetReturnDecisionValues,
@@ -356,7 +357,7 @@ export async function decideResignation(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   input: ResignationDecisionValues,
-  stage: "manager" | "hr",
+  stage: "manager" | "hr" | "ceo",
 ): Promise<void> {
   const organizationId = profile.employee.organizationId;
 
@@ -371,26 +372,37 @@ export async function decideResignation(
   if (!row) throw new Error("Resignation not found");
 
   if (input.decision === "reject") {
-    await setResignationStatus(supabase, row.id, profile.userId, "rejected", {
-      rejected_reason: emptyToNull(input.rejectedReason) ?? emptyToNull(input.remarks),
-      ...(stage === "manager"
+    const rejectUpdates =
+      stage === "manager"
         ? {
             manager_acted_at: new Date().toISOString(),
             manager_remarks: emptyToNull(input.remarks),
           }
-        : {
-            hr_acted_at: new Date().toISOString(),
-            hr_acted_by: profile.userId,
-            hr_remarks: emptyToNull(input.remarks),
-          }),
+        : stage === "hr"
+          ? {
+              hr_acted_at: new Date().toISOString(),
+              hr_acted_by: profile.userId,
+              hr_remarks: emptyToNull(input.remarks),
+            }
+          : {
+              ceo_acted_at: new Date().toISOString(),
+              ceo_acted_by: profile.userId,
+              ceo_remarks: emptyToNull(input.remarks),
+            };
+
+    await setResignationStatus(supabase, row.id, profile.userId, "rejected", {
+      rejected_reason: emptyToNull(input.rejectedReason) ?? emptyToNull(input.remarks),
+      ...rejectUpdates,
     });
+    const actorLabel =
+      stage === "manager" ? "Manager" : stage === "hr" ? "HR" : "CEO";
     await addTimeline(
       supabase,
       organizationId,
       row.id,
       profile.userId,
       "rejected",
-      `${stage === "manager" ? "Manager" : "HR"} rejected resignation`,
+      `${actorLabel} rejected resignation`,
       input.rejectedReason ?? input.remarks,
     );
     return;
@@ -400,6 +412,7 @@ export async function decideResignation(
     if (row.exit_status !== "submitted") throw new Error("Resignation is not awaiting manager approval");
     if (
       !isHrAdmin(profile) &&
+      !isCeoRole(profile) &&
       row.manager_employee_id &&
       row.manager_employee_id !== profile.employee.id
     ) {
@@ -422,50 +435,79 @@ export async function decideResignation(
     return;
   }
 
-  if (!["submitted", "manager_approved"].includes(row.exit_status)) {
-    throw new Error("Resignation is not awaiting HR approval");
+  if (stage === "hr") {
+    if (row.exit_status !== "manager_approved") {
+      throw new Error("Resignation is not awaiting HR approval");
+    }
+    if (!isHrAdmin(profile)) throw new Error("Only HR can perform HR approval");
+
+    await setResignationStatus(supabase, row.id, profile.userId, "hr_approved", {
+      hr_acted_at: new Date().toISOString(),
+      hr_acted_by: profile.userId,
+      hr_remarks: emptyToNull(input.remarks),
+    });
+
+    await addTimeline(
+      supabase,
+      organizationId,
+      row.id,
+      profile.userId,
+      "hr_approved",
+      "HR approved resignation",
+      "Awaiting CEO approval before clearance starts.",
+    );
+    return;
   }
-  if (!isHrAdmin(profile)) throw new Error("Only HR can perform HR approval");
 
-  await setResignationStatus(supabase, row.id, profile.userId, "clearance", {
-    hr_acted_at: new Date().toISOString(),
-    hr_acted_by: profile.userId,
-    hr_remarks: emptyToNull(input.remarks),
-  });
+  if (stage === "ceo") {
+    if (row.exit_status !== "hr_approved") {
+      throw new Error("Resignation is not awaiting CEO approval");
+    }
+    if (!isCeoRole(profile)) throw new Error("Only CEO can perform final approval");
 
-  await seedClearanceAndAssets(supabase, profile, row.id, row.employee_id);
+    await setResignationStatus(supabase, row.id, profile.userId, "clearance", {
+      ceo_acted_at: new Date().toISOString(),
+      ceo_acted_by: profile.userId,
+      ceo_remarks: emptyToNull(input.remarks),
+    });
 
-  await autoGenerateLetterForEmployee(supabase, profile, {
-    employeeId: row.employee_id,
-    letterType: "resignation_acceptance_letter",
-    sourceModule: "exit",
-    sourceRecordId: row.id,
-    publishNow: true,
-  });
+    await seedClearanceAndAssets(supabase, profile, row.id, row.employee_id);
 
-  await addTimeline(
-    supabase,
-    organizationId,
-    row.id,
-    profile.userId,
-    "hr_approved",
-    "HR approved resignation",
-    "Clearance checklist and asset return list created.",
-  );
+    await autoGenerateLetterForEmployee(supabase, profile, {
+      employeeId: row.employee_id,
+      letterType: "resignation_acceptance_letter",
+      sourceModule: "exit",
+      sourceRecordId: row.id,
+      publishNow: true,
+    });
 
-  await notifyEmployee(supabase, {
-    organizationId,
-    employeeId: row.employee_id,
-    title: "Exit approved",
-    message: "Your exit request has been approved. Clearance process has started.",
-    notificationType: "exit_approved",
-    module: "exit",
-    priority: "high",
-    actionUrl: EXIT_ROUTES.clearance,
-    sourceEventKey: `exit_approved:${row.id}`,
-    templateKey: "exit_approved",
-    createdBy: profile.userId,
-  });
+    await addTimeline(
+      supabase,
+      organizationId,
+      row.id,
+      profile.userId,
+      "ceo_approved",
+      "CEO approved resignation",
+      "Clearance checklist and asset return list created.",
+    );
+
+    await notifyEmployee(supabase, {
+      organizationId,
+      employeeId: row.employee_id,
+      title: "Exit approved",
+      message: "Your exit request has been approved. Clearance process has started.",
+      notificationType: "exit_approved",
+      module: "exit",
+      priority: "high",
+      actionUrl: EXIT_ROUTES.clearance,
+      sourceEventKey: `exit_approved:${row.id}`,
+      templateKey: "exit_approved",
+      createdBy: profile.userId,
+    });
+    return;
+  }
+
+  throw new Error("Invalid approval stage");
 }
 
 export async function withdrawResignation(

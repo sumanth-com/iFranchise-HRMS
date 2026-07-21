@@ -9,7 +9,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -104,6 +104,12 @@ export function CandidatesManagement({
   const [moveOpen, setMoveOpen] = useState(false);
   const [interviewOpen, setInterviewOpen] = useState(false);
   const [offerOpen, setOfferOpen] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("add") === "1" && filters.jobOpeningId && canCreate) {
+      setCreating(true);
+    }
+  }, [searchParams, filters.jobOpeningId, canCreate]);
 
   function updateParams(updates: Record<string, string | undefined>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -355,6 +361,7 @@ export function CandidatesManagement({
           open={creating}
           onOpenChange={setCreating}
           lookups={lookups}
+          defaultJobOpeningId={filters.jobOpeningId}
         />
       ) : null}
       {selected && moveOpen ? (
@@ -406,10 +413,12 @@ function CandidateFormModal({
   open,
   onOpenChange,
   lookups,
+  defaultJobOpeningId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   lookups: RecruitmentLookups;
+  defaultJobOpeningId?: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -420,7 +429,7 @@ function CandidateFormModal({
   const form = useForm<CandidateFormInput>({
     resolver: zodResolver(candidateFormSchema),
     defaultValues: {
-      jobOpeningId: "",
+      jobOpeningId: defaultJobOpeningId ?? "",
       firstName: "",
       lastName: "",
       email: "",

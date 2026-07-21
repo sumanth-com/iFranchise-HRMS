@@ -14,6 +14,7 @@ import { DESIGNATION_OTHER_VALUE } from "@/lib/employees/constants";
 import { resolveOrCreateDesignation } from "@/lib/employees/services/employee-mutations";
 import { suggestNextEmployeeCode } from "@/lib/employees/services/employee-queries";
 import { CANDIDATE_STAGE_LABELS } from "@/lib/recruitment/constants";
+import { notifyManagerCandidateAssigned } from "@/lib/manager/services/manager-recruitment-notifications";
 import {
   notifyInterviewCancelled,
   notifyInterviewScheduled,
@@ -238,7 +239,7 @@ export async function createCandidate(
   const organizationId = profile.employee.organizationId;
 
   const { data: job, error: jobError } = await fromHrms(supabase, "recruitment_job_openings")
-    .select("id, job_status")
+    .select("id, job_status, title, hiring_manager_id")
     .eq("id", input.jobOpeningId)
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
@@ -299,6 +300,18 @@ export async function createCandidate(
     title: "Candidate applied",
     toStage: "applied",
   });
+
+  if (job.hiring_manager_id) {
+    const candidateName = `${input.firstName.trim()} ${input.lastName.trim()}`.trim();
+    await notifyManagerCandidateAssigned(
+      supabase,
+      profile,
+      job.hiring_manager_id,
+      candidateName,
+      job.title,
+      data.id,
+    ).catch(() => undefined);
+  }
 
   return data.id;
 }

@@ -74,7 +74,7 @@ export const employeeBasicStepSchema = z.object({
     .max(50, "Employee code is too long"),
   firstName: z.string().min(1, "First name is required").max(100),
   lastName: z.string().min(1, "Last name is required").max(100),
-  email: z.string().email("Enter a valid company email"),
+  email: z.string().email("Enter a valid email address"),
   phone: z.string().max(30).optional(),
   dateOfBirth: z.string().optional(),
   gender: genderTypeSchema.optional(),

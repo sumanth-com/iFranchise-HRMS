@@ -73,7 +73,8 @@ export function OffersManagement({
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Offers</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Manage offer letters. Accepting an offer automatically creates the employee.
+          Manage offer letters. Mark Sent when the candidate receives the offer (email or call).
+          Accepting an offer automatically creates the employee.
         </p>
       </div>
 

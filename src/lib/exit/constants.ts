@@ -95,6 +95,12 @@ export function canCreateExit(codes: string[]) {
 export function canApproveExit(codes: string[]) {
   return hasAnyPermission(codes, ["exit.approve"]);
 }
+export function canCeoApproveExit(codes: string[], profile?: { roles: { code: string }[] }) {
+  if (profile?.roles.some((r) => ["ceo", "founder", "co_founder"].includes(r.code))) {
+    return hasAnyPermission(codes, ["exit.approve"]);
+  }
+  return false;
+}
 export function canClearanceExit(codes: string[]) {
   return hasAnyPermission(codes, ["exit.clearance", "exit.approve"]);
 }

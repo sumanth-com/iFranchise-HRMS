@@ -170,10 +170,8 @@ function PriorityTasks({ items }: { items: DashboardTaskItem[] }) {
 }
 
 function RecentActivity({ items }: { items: DashboardActivityItem[] }) {
-  const rows = items.slice(0, 5);
-
   return (
-    <section className="flex min-h-0 flex-1 flex-col rounded-xl border bg-card p-3 shadow-sm md:p-4">
+    <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card p-3 shadow-sm md:p-4">
       <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
         <h2 className="text-xs font-semibold tracking-wide text-foreground uppercase">
           Recent Activity
@@ -186,45 +184,43 @@ function RecentActivity({ items }: { items: DashboardActivityItem[] }) {
         </Link>
       </div>
 
-      {rows.length === 0 ? (
+      {items.length === 0 ? (
         <EmptyState
           title="No recent activity"
           description="Meaningful HR events will appear here."
           className="flex-1 border-0 bg-transparent p-2 shadow-none"
         />
       ) : (
-        <ul className="flex min-h-0 flex-1 flex-col gap-2">
-          {rows.map((item) => {
+        <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-0.5">
+          {items.map((item) => {
             const Icon = MODULE_ICONS[item.module] ?? Users;
             const row = (
-              <div className="flex items-start gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-3 transition-colors hover:bg-muted/35">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-background shadow-sm">
-                  <Icon className="size-4 text-muted-foreground" />
+              <div className="flex items-start gap-2.5 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5 transition-colors hover:bg-muted/35">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-background shadow-sm">
+                  <Icon className="size-3.5 text-muted-foreground" />
                 </span>
 
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate text-sm font-medium leading-5 text-foreground">
-                          {item.user}
-                        </p>
-                        <span className="inline-flex shrink-0 items-center rounded-full border bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                          {moduleLabel(item.module)}
-                        </span>
-                      </div>
-                      <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
-                        <span className="font-medium text-foreground">{item.title}</span>
-                        {item.description ? (
-                          <span className="text-muted-foreground"> · {item.description}</span>
-                        ) : null}
+                  <div className="flex items-baseline justify-between gap-3">
+                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                      <p className="truncate text-sm font-medium leading-5 text-foreground">
+                        {item.user}
                       </p>
+                      <span className="inline-flex shrink-0 items-center rounded-full border bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        {moduleLabel(item.module)}
+                      </span>
                     </div>
-
-                    <time className="shrink-0 pt-0.5 text-right text-[11px] leading-4 whitespace-nowrap text-muted-foreground tabular-nums">
+                    <time
+                      className="shrink-0 text-[10px] leading-4 whitespace-nowrap text-muted-foreground tabular-nums"
+                      suppressHydrationWarning
+                    >
                       {formatActivityWhen(item.occurredAt)}
                     </time>
                   </div>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                    <span className="font-medium text-foreground">{item.title}</span>
+                    {item.description ? <span> · {item.description}</span> : null}
+                  </p>
                 </div>
               </div>
             );
@@ -232,7 +228,10 @@ function RecentActivity({ items }: { items: DashboardActivityItem[] }) {
             return (
               <li key={item.id}>
                 {item.href ? (
-                  <Link href={item.href} className="block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+                  <Link
+                    href={item.href}
+                    className="block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                  >
                     {row}
                   </Link>
                 ) : (
@@ -287,12 +286,12 @@ export function DashboardOperationsRow({
   charts: DashboardCharts;
 }) {
   return (
-    <div className="grid h-full min-h-0 auto-rows-fr gap-3 lg:grid-cols-2 lg:items-stretch">
-      <div className="flex h-full min-h-0 flex-col gap-3">
+    <div className="grid h-full min-h-0 gap-3 overflow-hidden lg:grid-cols-2 lg:items-stretch">
+      <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
         <PriorityTasks items={tasks} />
         <RecentActivity items={activities} />
       </div>
-      <div className="h-full min-h-0">
+      <div className="h-full min-h-0 overflow-hidden">
         <HrInsightsPanel charts={charts} />
       </div>
     </div>

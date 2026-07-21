@@ -28,6 +28,20 @@ export const SELF_PAYROLL_ROUTES = {
   list: "/dashboard/payroll",
 } as const;
 
+export function payrollTeamListUrl(
+  searchParams?: Record<string, string | undefined>,
+) {
+  const params = new URLSearchParams({ tab: "team" });
+  if (searchParams) {
+    Object.entries(searchParams).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
+      }
+    });
+  }
+  return `${SELF_PAYROLL_ROUTES.list}?${params.toString()}`;
+}
+
 export const PAYROLL_STATUS_LABELS: Record<PayrollStatus, string> = {
   draft: "Draft",
   processing: "Processing",

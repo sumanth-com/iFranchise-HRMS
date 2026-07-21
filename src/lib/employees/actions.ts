@@ -63,7 +63,7 @@ import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
 import { z } from "zod";
 
 const directInviteSchema = z.object({
-  email: z.string().email("Enter a valid company email"),
+  email: z.string().email("Enter a valid email address"),
 });
 
 async function getAuthenticatedSupabase() {

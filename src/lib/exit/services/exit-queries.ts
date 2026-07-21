@@ -6,6 +6,7 @@ import {
   ExitRow,
   formatEmployeeName,
   fromHrms,
+  isCeoRole,
   isEmployeeOnly,
   isHrAdmin,
   isManagerRole,
@@ -118,6 +119,8 @@ function mapResignation(row: ExitRow): ExitResignationItem {
     managerRemarks: row.manager_remarks,
     hrActedAt: row.hr_acted_at,
     hrRemarks: row.hr_remarks,
+    ceoActedAt: row.ceo_acted_at,
+    ceoRemarks: row.ceo_remarks,
     rejectedReason: row.rejected_reason,
     withdrawnAt: row.withdrawn_at,
     completedAt: row.completed_at,
@@ -128,6 +131,7 @@ function mapResignation(row: ExitRow): ExitResignationItem {
 const RESIGNATION_SELECT = `
   id, employee_id, resignation_date, last_working_day, notice_period_days, reason, comments,
   exit_status, manager_employee_id, manager_acted_at, manager_remarks, hr_acted_at, hr_remarks,
+  ceo_acted_at, ceo_remarks,
   rejected_reason, withdrawn_at, completed_at, created_at,
   employees:employee_id(
     employee_code, first_name, last_name, department_id,
@@ -155,7 +159,7 @@ export async function listResignations(
 
   if (isEmployeeOnly(profile)) {
     query = query.eq("employee_id", profile.employee.id);
-  } else if (isManagerRole(profile) && !isHrAdmin(profile)) {
+  } else if (isManagerRole(profile) && !isHrAdmin(profile) && !isCeoRole(profile)) {
     query = query.or(
       `manager_employee_id.eq.${profile.employee.id},employee_id.eq.${profile.employee.id}`,
     );
@@ -451,4 +455,21 @@ export async function listDocumentResignations(
   return resignations.data.filter((r) =>
     ["documents", "interview", "completed", "settlement"].includes(r.exitStatus),
   );
+}
+
+const TERMINAL_EXIT_STATUSES = new Set(["completed", "rejected", "withdrawn"]);
+
+export async function getEmployeeResignationSnapshot(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+) {
+  const result = await listResignations(supabase, profile, {
+    page: 1,
+    pageSize: 50,
+    employeeId: profile.employee.id,
+  });
+  const activeResignation =
+    result.data.find((row) => !TERMINAL_EXIT_STATUSES.has(row.exitStatus)) ?? null;
+  const history = result.data.filter((row) => TERMINAL_EXIT_STATUSES.has(row.exitStatus));
+  return { activeResignation, history };
 }

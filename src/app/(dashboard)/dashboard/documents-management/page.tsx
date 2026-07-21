@@ -1,26 +1,22 @@
-import {
-  DocumentsDashboardPanels,
-  DocumentsSummaryCards,
-} from "@/components/documents/documents-dashboard-panels";
-import { createClient } from "@/lib/supabase/server";
-import { getDocumentsSummary } from "@/lib/documents/services/document-queries";
-import { requireServerPermission } from "@/lib/permissions/server";
+import { redirect } from "next/navigation";
 
-export default async function DocumentsDashboardPage() {
-  const profile = await requireServerPermission("documents.view");
-  const supabase = await createClient();
-  const summary = await getDocumentsSummary(supabase, profile);
+type DocumentsManagementPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
 
-  return (
-    <>
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">HR Documents</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Track employee files, company letters, expiring credentials, and verification status.
-        </p>
-      </div>
-      <DocumentsSummaryCards summary={summary} />
-      <DocumentsDashboardPanels summary={summary} />
-    </>
-  );
+export default async function DocumentsManagementPage({
+  searchParams,
+}: DocumentsManagementPageProps) {
+  const rawParams = await searchParams;
+  const params = new URLSearchParams();
+  params.set("tab", "team");
+
+  Object.entries(rawParams).forEach(([key, value]) => {
+    if (key === "tab" || typeof value !== "string") {
+      return;
+    }
+    params.set(key, value);
+  });
+
+  redirect(`/dashboard/documents?${params.toString()}`);
 }

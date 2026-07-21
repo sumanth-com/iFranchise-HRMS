@@ -117,6 +117,8 @@ export type ExitResignationItem = {
   managerRemarks: string | null;
   hrActedAt: string | null;
   hrRemarks: string | null;
+  ceoActedAt: string | null;
+  ceoRemarks: string | null;
   rejectedReason: string | null;
   withdrawnAt: string | null;
   completedAt: string | null;

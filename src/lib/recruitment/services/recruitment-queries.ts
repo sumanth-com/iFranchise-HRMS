@@ -124,7 +124,7 @@ export async function getRecruitmentSummary(
       .eq("organization_id", organizationId)
       .is("deleted_at", null),
     fromHrms(supabase, "recruitment_candidates")
-      .select("id, stage, joined_at, created_at")
+      .select("id, stage, joined_at, created_at, source")
       .eq("organization_id", organizationId)
       .is("deleted_at", null),
     fromHrms(supabase, "recruitment_interviews")
@@ -197,6 +197,16 @@ export async function getRecruitmentSummary(
     count: candidateRows.filter((c) => c.stage === stage).length,
   }));
 
+  const sourceMap = new Map<string, number>();
+  for (const row of candidateRows) {
+    const source = row.source ? String(row.source) : "Not specified";
+    sourceMap.set(source, (sourceMap.get(source) ?? 0) + 1);
+  }
+  const candidateSources = Array.from(sourceMap.entries())
+    .map(([source, count]) => ({ source, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6);
+
   const deptResult = await fromHrms(supabase, "recruitment_candidates")
     .select(
       `id, stage, job:job_opening_id!inner(department_id, departments:department_id(name))`,
@@ -244,6 +254,7 @@ export async function getRecruitmentSummary(
     hiresThisMonth,
     averageHiringTimeDays,
     candidatesByStage,
+    candidateSources,
     hiringByDepartment: Array.from(deptMap.values()),
     upcomingInterviews,
     recentActivity,

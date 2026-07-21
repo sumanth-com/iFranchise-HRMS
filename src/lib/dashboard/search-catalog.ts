@@ -1,20 +1,20 @@
-import { ASSETS_ROUTES, SELF_ASSETS_ROUTES } from "@/lib/assets/constants";
+import { ASSETS_ROUTES, SELF_ASSETS_ROUTES, assetsTeamListUrl } from "@/lib/assets/constants";
 import { AUDIT_ROUTES } from "@/lib/audit/constants";
 import { COMPANY_SETTINGS_ROUTES } from "@/lib/company-settings/constants";
-import { DOCUMENTS_ROUTES, SELF_DOCUMENTS_ROUTES } from "@/lib/documents/constants";
+import { DOCUMENTS_ROUTES, SELF_DOCUMENTS_ROUTES, documentsTeamListUrl } from "@/lib/documents/constants";
 import { HR_OVERVIEW_ROUTES } from "@/lib/dashboard/constants";
 import { USER_PROVISIONING_ROUTES } from "@/lib/user-provisioning/constants";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
 import { EXIT_ROUTES } from "@/lib/exit/constants";
-import { LEAVE_ROUTES, SELF_LEAVE_ROUTES } from "@/lib/leave/constants";
+import { LEAVE_ROUTES, SELF_LEAVE_ROUTES, leaveTeamListUrl } from "@/lib/leave/constants";
 import { NOTIFICATIONS_ROUTES } from "@/lib/notifications/constants";
 import { ORGANIZATION_ROUTES } from "@/lib/organization/constants";
-import { PAYROLL_ROUTES, SELF_PAYROLL_ROUTES } from "@/lib/payroll/constants";
+import { PAYROLL_ROUTES, SELF_PAYROLL_ROUTES, payrollTeamListUrl } from "@/lib/payroll/constants";
 import { PERFORMANCE_ROUTES } from "@/lib/performance/constants";
 import { RECRUITMENT_ROUTES } from "@/lib/recruitment/constants";
 import { REPORTS_ROUTES } from "@/lib/reports/constants";
 import { ROLES_ROUTES } from "@/lib/roles/constants";
-import { ATTENDANCE_ROUTES, SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
+import { ATTENDANCE_ROUTES, SELF_ATTENDANCE_ROUTES, attendanceTeamListUrl } from "@/lib/attendance/constants";
 
 export type DashboardSearchItem = {
   id: string;
@@ -63,7 +63,7 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
     id: "attendance-management",
     label: "Team Attendance",
     description: "Track attendance across the organization",
-    href: ATTENDANCE_ROUTES.list,
+    href: attendanceTeamListUrl(),
     keywords: ["team attendance", "attendance", "absent", "late", "workforce presence"],
     permission: "attendance.view",
   },
@@ -87,7 +87,7 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
     id: "leave-management",
     label: "Leave & Approvals",
     description: "Track leave across the organization",
-    href: LEAVE_ROUTES.list,
+    href: leaveTeamListUrl(),
     keywords: ["leave approvals", "leave admin", "pending leave", "workforce leave"],
     permission: "leave.view",
   },
@@ -119,7 +119,7 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
     id: "payroll-management",
     label: "Payroll",
     description: "Salary processing across the organization",
-    href: PAYROLL_ROUTES.dashboard,
+    href: payrollTeamListUrl(),
     keywords: ["payroll", "run payroll", "compensation", "salary processing"],
     permission: "payroll.view",
   },
@@ -191,7 +191,7 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
     id: "documents-management",
     label: "HR Documents",
     description: "Employee documents hub across the organization",
-    href: DOCUMENTS_ROUTES.dashboard,
+    href: documentsTeamListUrl(),
     keywords: ["hr documents", "employee files", "letters", "documents"],
     permission: "documents.view",
   },
@@ -215,7 +215,7 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
     id: "assets-management",
     label: "Company Assets",
     description: "Asset inventory and assignments",
-    href: ASSETS_ROUTES.dashboard,
+    href: assetsTeamListUrl(),
     keywords: ["company assets", "inventory", "assignment", "assets"],
     permission: "asset.view",
   },
@@ -271,7 +271,7 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
     id: "notifications-management",
     label: "Alerts & Broadcasts",
     description: "Alerts, templates, and delivery settings",
-    href: NOTIFICATIONS_ROUTES.dashboard,
+    href: "/dashboard/notifications?tab=team",
     keywords: ["alerts", "broadcasts", "templates", "notifications admin"],
     permission: "notification.view",
   },

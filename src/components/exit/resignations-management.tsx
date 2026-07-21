@@ -25,6 +25,7 @@ import { Modal } from "@/components/common/modal";
 import { Label } from "@/components/ui/label";
 import { EmployeeSelect, LabeledSelect } from "@/components/payroll/payroll-select";
 import {
+  ceoDecideResignationAction,
   getResignationDetailAction,
   hrDecideResignationAction,
   managerDecideResignationAction,
@@ -60,6 +61,7 @@ type Props = {
   currentEmployeeId: string;
   isSelfOnly: boolean;
   isHrAdmin: boolean;
+  isCeoAdmin: boolean;
   defaultNoticePeriodDays: number;
 };
 
@@ -67,6 +69,7 @@ type ModalMode =
   | "submit"
   | "manager"
   | "hr"
+  | "ceo"
   | "timeline"
   | null;
 
@@ -97,6 +100,7 @@ export function ResignationsManagement({
   currentEmployeeId,
   isSelfOnly,
   isHrAdmin,
+  isCeoAdmin,
   defaultNoticePeriodDays,
 }: Props) {
   const router = useRouter();
@@ -162,7 +166,7 @@ export function ResignationsManagement({
   }
 
   const openDecision = useCallback(
-    (row: ExitResignationItem, actor: "manager" | "hr", decision: "approve" | "reject") => {
+    (row: ExitResignationItem, actor: "manager" | "hr" | "ceo", decision: "approve" | "reject") => {
       setSelected(row);
       setDecisionType(decision);
       decisionForm.reset({
@@ -213,7 +217,11 @@ export function ResignationsManagement({
     };
     startTransition(async () => {
       const action =
-        mode === "manager" ? managerDecideResignationAction : hrDecideResignationAction;
+        mode === "manager"
+          ? managerDecideResignationAction
+          : mode === "hr"
+            ? hrDecideResignationAction
+            : ceoDecideResignationAction;
       const res = await action(payload);
       if (!res.success) {
         toast.error(res.message);
@@ -295,11 +303,9 @@ export function ResignationsManagement({
         render: (row) => {
           const terminal = ["completed", "rejected", "withdrawn"].includes(row.exitStatus);
           const showManager =
-            canApprove && !isHrAdmin && row.exitStatus === "submitted";
-          const showHr =
-            canApprove &&
-            isHrAdmin &&
-            (row.exitStatus === "submitted" || row.exitStatus === "manager_approved");
+            canApprove && !isHrAdmin && !isCeoAdmin && row.exitStatus === "submitted";
+          const showHr = canApprove && isHrAdmin && row.exitStatus === "manager_approved";
+          const showCeo = canApprove && isCeoAdmin && row.exitStatus === "hr_approved";
           const showWithdraw =
             (canCreate || canApprove) && !terminal;
 
@@ -358,6 +364,28 @@ export function ResignationsManagement({
                   </Button>
                 </>
               ) : null}
+              {showCeo ? (
+                <>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    onClick={() => openDecision(row, "ceo", "approve")}
+                    aria-label="CEO approve"
+                    title="CEO approve"
+                  >
+                    <Check className="h-4 w-4 text-emerald-600" />
+                  </Button>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    onClick={() => openDecision(row, "ceo", "reject")}
+                    aria-label="CEO reject"
+                    title="CEO reject"
+                  >
+                    <X className="h-4 w-4 text-destructive" />
+                  </Button>
+                </>
+              ) : null}
               {showWithdraw ? (
                 <Button
                   size="icon-sm"
@@ -375,7 +403,7 @@ export function ResignationsManagement({
         },
       },
     ],
-    [canApprove, canCreate, isHrAdmin, isPending, openDecision, openTimeline],
+    [canApprove, canCreate, isCeoAdmin, isHrAdmin, isPending, openDecision, openTimeline],
   );
 
   return (
@@ -578,16 +606,20 @@ export function ResignationsManagement({
       </Modal>
 
       <Modal
-        open={mode === "manager" || mode === "hr"}
+        open={mode === "manager" || mode === "hr" || mode === "ceo"}
         onOpenChange={(open) => !open && setMode(null)}
         title={
           decisionType === "approve"
-            ? mode === "hr"
-              ? "HR Approve Resignation"
-              : "Manager Approve Resignation"
-            : mode === "hr"
-              ? "HR Reject Resignation"
-              : "Manager Reject Resignation"
+            ? mode === "ceo"
+              ? "CEO Approve Resignation"
+              : mode === "hr"
+                ? "HR Approve Resignation"
+                : "Manager Approve Resignation"
+            : mode === "ceo"
+              ? "CEO Reject Resignation"
+              : mode === "hr"
+                ? "HR Reject Resignation"
+                : "Manager Reject Resignation"
         }
         description={
           selected

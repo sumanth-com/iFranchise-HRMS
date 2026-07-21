@@ -1,4 +1,5 @@
 import type { PerformanceSummary } from "@/types/performance";
+import { GoalCompletionTrendChart } from "@/components/performance/goal-completion-trend-chart";
 
 type PerformanceDashboardPanelsProps = {
   summary: PerformanceSummary;
@@ -16,22 +17,7 @@ export function PerformanceDashboardPanels({ summary }: PerformanceDashboardPane
           <h2 className="text-sm font-semibold">Goal completion trend</h2>
           <p className="text-xs text-muted-foreground">Recent monthly goal progress</p>
         </div>
-        <div className="space-y-2.5">
-          {goalTrend.map((item) => {
-            const pct = item.total > 0 ? Math.round((item.completed / item.total) * 100) : 0;
-            return (
-              <div key={item.month}>
-                <div className="mb-1 flex justify-between text-xs">
-                  <span>{item.month}</span>
-                  <span className="text-muted-foreground">{pct}%</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-muted">
-                  <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <GoalCompletionTrendChart items={goalTrend} />
       </section>
 
       <section className="rounded-2xl border bg-card p-4 shadow-sm lg:col-span-3">

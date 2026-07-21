@@ -1,6 +1,6 @@
-import { ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
+import { attendanceTeamListUrl } from "@/lib/attendance/constants";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
-import { LEAVE_ROUTES } from "@/lib/leave/constants";
+import { leaveTeamListUrl } from "@/lib/leave/constants";
 import { PAYROLL_ROUTES } from "@/lib/payroll/constants";
 import { RECRUITMENT_ROUTES } from "@/lib/recruitment/constants";
 
@@ -21,10 +21,10 @@ export const DASHBOARD_QUICK_ACTIONS = [
 /** KPI cards only — no overlap with Priority Tasks. */
 export const DASHBOARD_KPI_LINKS = {
   totalEmployees: EMPLOYEE_ROUTES.list,
-  presentToday: ATTENDANCE_ROUTES.list,
-  onLeaveToday: LEAVE_ROUTES.list,
-  absentToday: `${ATTENDANCE_ROUTES.list}?attendanceStatus=absent`,
-  pendingLeaveApprovals: LEAVE_ROUTES.list,
+  presentToday: attendanceTeamListUrl(),
+  onLeaveToday: leaveTeamListUrl(),
+  absentToday: attendanceTeamListUrl({ attendanceStatus: "absent" }),
+  pendingLeaveApprovals: leaveTeamListUrl(),
 } as const;
 
 export const DASHBOARD_ACTION_LINKS = {

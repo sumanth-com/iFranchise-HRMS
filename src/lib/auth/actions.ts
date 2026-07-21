@@ -14,6 +14,7 @@ import {
 } from "@/lib/auth/errors";
 import { loadUserProfile } from "@/lib/auth/profile-loader";
 import { getAuthenticatedRedirectPath } from "@/lib/auth/redirect";
+import { resolveApprovedLoginEmail } from "@/lib/auth/login-email";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
 import { recordEmployeeSuccessfulLogin } from "@/lib/employees/services/employee-account";
@@ -56,7 +57,8 @@ export async function loginAction(
       };
     }
 
-    const { email, password, rememberMe } = parsed.data;
+    const { email: rawEmail, password, rememberMe } = parsed.data;
+    const email = await resolveApprovedLoginEmail(rawEmail);
     const supabase = await createClient();
 
     const { data: authData, error: authError } =
@@ -203,13 +205,11 @@ export async function forgotPasswordAction(
     };
   }
 
+  const email = await resolveApprovedLoginEmail(parsed.data.email);
   const supabase = await createClient();
   const redirectTo = `${siteConfig.url}${AUTH_ROUTES.callback}?next=${AUTH_ROUTES.resetPassword}`;
 
-  const { error } = await supabase.auth.resetPasswordForEmail(
-    parsed.data.email,
-    { redirectTo },
-  );
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
 
   if (error) {
     return {
@@ -224,8 +224,8 @@ export async function forgotPasswordAction(
     organizationId: null,
     module: "dashboard",
     action: "password_reset",
-    description: `Password reset requested for ${parsed.data.email}`,
-    recordId: parsed.data.email,
+    description: `Password reset requested for ${email}`,
+    recordId: email,
     priority: "high",
     ...ctx,
   });

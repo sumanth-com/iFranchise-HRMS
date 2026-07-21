@@ -6,6 +6,7 @@ export const CEO_ROUTES = {
   payroll: "/ceo/payroll",
   attendance: "/ceo/attendance",
   leave: "/ceo/leave",
+  exit: "/ceo/exit",
   analytics: "/ceo/analytics",
   approvals: "/ceo/approvals",
   reports: "/ceo/reports",

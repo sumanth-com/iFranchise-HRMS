@@ -7,7 +7,7 @@ import {
   getExitLookups,
   listResignations,
 } from "@/lib/exit/services/exit-queries";
-import { isEmployeeOnly, isHrAdmin } from "@/lib/exit/services/exit-utils";
+import { isEmployeeOnly, isHrAdmin, isCeoRole } from "@/lib/exit/services/exit-utils";
 import { requireServerPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 import { exitListParamsSchema } from "@/lib/validations/exit";
@@ -45,6 +45,7 @@ export default async function ExitResignationsPage({ searchParams }: Props) {
         currentEmployeeId={profile.employee.id}
         isSelfOnly={isEmployeeOnly(profile)}
         isHrAdmin={isHrAdmin(profile)}
+        isCeoAdmin={isCeoRole(profile)}
         defaultNoticePeriodDays={settings.defaultNoticePeriodDays}
       />
     </Suspense>

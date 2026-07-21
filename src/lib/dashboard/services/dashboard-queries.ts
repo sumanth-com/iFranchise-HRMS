@@ -517,7 +517,7 @@ export async function getHrDashboardData(
     }
   }
 
-  const activities: DashboardActivityItem[] = auditRows.slice(0, 5).map((row) => ({
+  const activities: DashboardActivityItem[] = auditRows.slice(0, 15).map((row) => ({
     id: row.id,
     title: preferredActivityTitle(row.action, row.module, row.table_name),
     description: humanizeActivityDescription(
@@ -687,7 +687,7 @@ export async function getHrDashboardData(
         Array.from(typeMap.entries()).map(([label, value]) => ({ label, value })),
       ),
     },
-    activities: activities.slice(0, 5),
+    activities: activities.slice(0, 15),
     tasks,
     upcomingBirthdays: upcomingBirthdays.slice(0, 6),
     upcomingAnniversaries: upcomingAnniversaries.slice(0, 6),

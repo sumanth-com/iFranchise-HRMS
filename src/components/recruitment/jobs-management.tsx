@@ -1,6 +1,7 @@
 "use client";
 
-import { Copy, Loader2, Pencil, Plus, XCircle } from "lucide-react";
+import { Copy, Loader2, Pencil, Plus, UserPlus, XCircle } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
@@ -9,7 +10,7 @@ import { toast } from "sonner";
 import type { z } from "zod";
 
 import { EmptyState } from "@/components/common/empty-state";
-import { Button } from "@/components/common/button";
+import { Button, buttonVariants } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/common/modal";
@@ -25,9 +26,11 @@ import {
 } from "@/lib/recruitment/actions";
 import {
   JOB_STATUS_LABELS,
+  RECRUITMENT_ROUTES,
   WORK_MODE_LABELS,
 } from "@/lib/recruitment/constants";
 import { DESIGNATION_OTHER_VALUE } from "@/lib/employees/constants";
+import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/recruitment/services/recruitment-utils";
 import { jobFormSchema } from "@/lib/validations/recruitment";
 import type { JobOpeningItem, RecruitmentLookups } from "@/types/recruitment";
@@ -120,7 +123,7 @@ export function JobsManagement({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Job Openings</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Create and manage open positions for hiring.
+            Create and manage open positions. Set status to Open, then add leads from Candidates.
           </p>
         </div>
         {canCreate ? (
@@ -228,6 +231,18 @@ export function JobsManagement({
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1">
+                        {canCreate && row.jobStatus === "open" ? (
+                          <Link
+                            href={`${RECRUITMENT_ROUTES.candidates}?jobOpeningId=${row.id}&add=1`}
+                            className={cn(
+                              buttonVariants({ size: "sm", variant: "outline" }),
+                              "inline-flex",
+                            )}
+                          >
+                            <UserPlus className="mr-1 h-3.5 w-3.5" />
+                            Add lead
+                          </Link>
+                        ) : null}
                         {canEdit ? (
                           <Button size="sm" variant="outline" onClick={() => setEditing(row)}>
                             <Pencil className="mr-1 h-3.5 w-3.5" />

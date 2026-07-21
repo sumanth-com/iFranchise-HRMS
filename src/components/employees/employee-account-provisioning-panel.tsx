@@ -120,7 +120,7 @@ export function EmployeeAccountProvisioningPanel({
             Invite Employee
           </h2>
           <p className="text-sm text-muted-foreground">
-            Enter a company email to create a draft employee account and send the login invite.
+            Enter the login email HR approved for this employee. Any valid email works (Gmail, personal, etc.).
           </p>
           <form
             onSubmit={handleDirectInvite}

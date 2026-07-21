@@ -80,6 +80,8 @@ type AttendanceTableProps = {
   canCreate: boolean;
   canEdit: boolean;
   canDelete: boolean;
+  listBasePath?: string;
+  fixedQuery?: Record<string, string>;
 };
 
 function formatDateTime(value?: string | null) {
@@ -186,6 +188,8 @@ export function AttendanceTable({
   canCreate,
   canEdit,
   canDelete,
+  listBasePath,
+  fixedQuery,
 }: AttendanceTableProps) {
   const router = useRouter();
   const initialParams = useSearchParams();
@@ -193,11 +197,27 @@ export function AttendanceTable({
   const [isPending, startTransition] = useTransition();
   const [deleteTarget, setDeleteTarget] = useState<AttendanceListItem | null>(null);
 
+  const resolvedListPath = listBasePath ?? ATTENDANCE_ROUTES.list;
+
+  const buildListUrl = useCallback(
+    (query: string) => {
+      const params = new URLSearchParams(query);
+      if (fixedQuery) {
+        Object.entries(fixedQuery).forEach(([key, value]) => {
+          params.set(key, value);
+        });
+      }
+      const nextQuery = params.toString();
+      return nextQuery ? `${resolvedListPath}?${nextQuery}` : resolvedListPath;
+    },
+    [fixedQuery, resolvedListPath],
+  );
+
   useEffect(() => {
-    if (window.location.search) {
-      window.history.replaceState(null, "", ATTENDANCE_ROUTES.list);
+    if (!fixedQuery && window.location.search) {
+      window.history.replaceState(null, "", resolvedListPath);
     }
-  }, []);
+  }, [fixedQuery, resolvedListPath]);
 
   const updateParams = useCallback(
     (updates: Record<string, string | undefined>) => {
@@ -214,16 +234,16 @@ export function AttendanceTable({
       filterParamsRef.current = params.toString();
 
       startTransition(() => {
-        const query = params.toString();
-        router.push(
-          query ? `${ATTENDANCE_ROUTES.list}?${query}` : ATTENDANCE_ROUTES.list,
-        );
-        window.setTimeout(() => {
-          window.history.replaceState(null, "", ATTENDANCE_ROUTES.list);
-        }, 0);
+        const url = buildListUrl(params.toString());
+        router.push(url);
+        if (!fixedQuery) {
+          window.setTimeout(() => {
+            window.history.replaceState(null, "", resolvedListPath);
+          }, 0);
+        }
       });
     },
-    [router, startTransition],
+    [buildListUrl, fixedQuery, resolvedListPath, router, startTransition],
   );
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));

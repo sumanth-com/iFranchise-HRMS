@@ -21,6 +21,20 @@ export const SELF_ASSETS_ROUTES = {
   list: "/dashboard/assets",
 } as const;
 
+export function assetsTeamListUrl(
+  searchParams?: Record<string, string | undefined>,
+) {
+  const params = new URLSearchParams({ tab: "team" });
+  if (searchParams) {
+    Object.entries(searchParams).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
+      }
+    });
+  }
+  return `${SELF_ASSETS_ROUTES.list}?${params.toString()}`;
+}
+
 export const ASSETS_SUB_NAV = [
   { title: "Dashboard", href: ASSETS_ROUTES.dashboard },
   { title: "Assets", href: ASSETS_ROUTES.inventory },

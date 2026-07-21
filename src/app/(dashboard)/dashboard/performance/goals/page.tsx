@@ -40,7 +40,7 @@ export default async function GoalsPage({ searchParams }: GoalsPageProps) {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Goals & OKRs</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Create and track employee goals with milestones, weightage, and progress.
+          Choose a template, assign to an employee, and track progress below.
         </p>
       </div>
       {canCreatePerformance(profile.permissionCodes) ? (

@@ -4,7 +4,7 @@ import { AttendanceForm } from "@/components/attendance/attendance-form";
 import { buttonVariants } from "@/components/common/button";
 import { createClient } from "@/lib/supabase/server";
 import { getAttendanceLookups } from "@/lib/attendance/services/attendance-queries";
-import { ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
+import { attendanceTeamListUrl } from "@/lib/attendance/constants";
 import { requireServerPermission } from "@/lib/permissions/server";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +28,7 @@ export default async function NewAttendancePage() {
           </p>
         </div>
         <Link
-          href={ATTENDANCE_ROUTES.list}
+          href={attendanceTeamListUrl()}
           className={cn(buttonVariants({ variant: "outline" }))}
         >
           Cancel

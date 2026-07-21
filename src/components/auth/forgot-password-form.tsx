@@ -81,7 +81,7 @@ export function ForgotPasswordForm() {
           Forgot password
         </h1>
         <p className="text-sm text-slate-500">
-          Enter your company email and we will send you a reset link.
+          Enter the email HR registered for your account and we will send you a reset link.
         </p>
       </div>
 
@@ -94,13 +94,13 @@ export function ForgotPasswordForm() {
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="email" className="text-sm font-medium text-slate-700">
-            Company Email
+            Email
           </Label>
           <Input
             id="email"
             type="email"
             autoComplete="email"
-            placeholder="Enter your company email"
+            placeholder="Enter your email"
             disabled={isPending}
             className="h-11 rounded-xl border-slate-200"
             {...register("email")}

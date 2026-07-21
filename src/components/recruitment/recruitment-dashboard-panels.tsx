@@ -1,16 +1,15 @@
 import { format } from "date-fns";
 
+import { CandidatesByStagePipeline } from "@/components/recruitment/candidates-by-stage-pipeline";
+import { RecruitmentFlowGuide } from "@/components/recruitment/recruitment-flow-guide";
 import {
-  CANDIDATE_STAGE_LABELS,
   INTERVIEW_STATUS_LABELS,
   INTERVIEW_TYPE_LABELS,
 } from "@/lib/recruitment/constants";
 import type { RecruitmentSummary } from "@/types/recruitment";
 
 export function RecruitmentDashboardPanels({ summary }: { summary: RecruitmentSummary }) {
-  const maxStage = Math.max(1, ...summary.candidatesByStage.map((s) => s.count));
   const maxDept = Math.max(1, ...summary.hiringByDepartment.map((d) => d.count));
-  const stages = summary.candidatesByStage.slice(0, 6);
   const departments = summary.hiringByDepartment.slice(0, 6);
   const interviews = summary.upcomingInterviews.slice(0, 3);
   const activity = summary.recentActivity.slice(0, 4);
@@ -20,24 +19,9 @@ export function RecruitmentDashboardPanels({ summary }: { summary: RecruitmentSu
       <section className="rounded-2xl border bg-card p-4 shadow-sm xl:col-span-2">
         <div className="mb-3">
           <h2 className="text-sm font-semibold">Candidates by stage</h2>
-          <p className="text-xs text-muted-foreground">Hiring pipeline distribution</p>
+          <p className="text-xs text-muted-foreground">Hiring pipeline funnel</p>
         </div>
-        <div className="space-y-2.5">
-          {stages.map((item) => (
-            <div key={item.stage}>
-              <div className="mb-1 flex justify-between text-xs">
-                <span>{CANDIDATE_STAGE_LABELS[item.stage]}</span>
-                <span className="text-muted-foreground">{item.count}</span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-primary"
-                  style={{ width: `${(item.count / maxStage) * 100}%` }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
+        <CandidatesByStagePipeline stages={summary.candidatesByStage} />
       </section>
 
       <section className="rounded-2xl border bg-card p-4 shadow-sm xl:col-span-2">
@@ -102,6 +86,10 @@ export function RecruitmentDashboardPanels({ summary }: { summary: RecruitmentSu
           )}
         </div>
       </section>
+
+      <div className="xl:col-span-6">
+        <RecruitmentFlowGuide sources={summary.candidateSources} />
+      </div>
 
       <section className="rounded-2xl border bg-card p-4 shadow-sm xl:col-span-6">
         <div className="mb-3 flex items-start justify-between gap-3">

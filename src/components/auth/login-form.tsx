@@ -189,7 +189,7 @@ export function LoginForm() {
             Welcome back <span aria-hidden>👋</span>
           </h1>
           <p className="text-sm text-slate-500">
-            Sign in to access your iFranchise HRMS account
+            Sign in with the email HR registered for your account
           </p>
         </div>
       </div>
@@ -225,7 +225,7 @@ export function LoginForm() {
 
       {passwordUpdated ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-          Password created successfully. Sign in with your company email and new password.
+          Password created successfully. Sign in with your email and new password.
         </div>
       ) : null}
 
@@ -244,7 +244,7 @@ export function LoginForm() {
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="email" className="text-sm font-medium text-slate-700">
-            Company Email
+            Email
           </Label>
           <div className="relative">
             <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -252,7 +252,7 @@ export function LoginForm() {
               id="email"
               type="email"
               autoComplete="email"
-              placeholder="Enter your company email"
+              placeholder="Enter your email"
               disabled={isPending}
               className={fieldClass}
               {...register("email")}

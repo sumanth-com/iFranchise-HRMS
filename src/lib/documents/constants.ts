@@ -17,6 +17,20 @@ export const SELF_DOCUMENTS_ROUTES = {
   list: "/dashboard/documents",
 } as const;
 
+export function documentsTeamListUrl(
+  searchParams?: Record<string, string | undefined>,
+) {
+  const params = new URLSearchParams({ tab: "team" });
+  if (searchParams) {
+    Object.entries(searchParams).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
+      }
+    });
+  }
+  return `${SELF_DOCUMENTS_ROUTES.list}?${params.toString()}`;
+}
+
 export const DOCUMENTS_SUB_NAV = [
   { title: "Dashboard", href: DOCUMENTS_ROUTES.dashboard },
   { title: "Employee Documents", href: DOCUMENTS_ROUTES.employeeDocuments },

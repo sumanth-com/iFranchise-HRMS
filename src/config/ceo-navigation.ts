@@ -8,6 +8,7 @@ import {
   CheckSquare,
   LayoutDashboard,
   LineChart,
+  LogOut,
   Target,
   UserRound,
   UserRoundPlus,
@@ -58,6 +59,12 @@ export const ceoNavItems: NavigationItem[] = [
     href: CEO_ROUTES.leave,
     icon: CalendarDays,
     permissions: ["leave.view"],
+  },
+  {
+    title: "Exit Approvals",
+    href: CEO_ROUTES.exit,
+    icon: LogOut,
+    permissions: ["exit.view", "exit.approve"],
   },
   {
     title: "Approvals",

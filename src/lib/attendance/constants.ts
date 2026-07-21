@@ -1,8 +1,8 @@
 import type { AttendanceStatus } from "@/types/attendance";
 
-/** Org-wide attendance tracking for HR (Administration). */
+/** Org-wide attendance tracking for HR (team tab in Attendance hub). */
 export const ATTENDANCE_ROUTES = {
-  list: "/dashboard/attendance-management",
+  list: "/dashboard/attendance",
   new: "/dashboard/attendance-management/new",
   settings: "/dashboard/attendance-management/settings",
   detail: (id: string) => `/dashboard/attendance-management/${id}`,
@@ -13,6 +13,20 @@ export const ATTENDANCE_ROUTES = {
 export const SELF_ATTENDANCE_ROUTES = {
   list: "/dashboard/attendance",
 } as const;
+
+export function attendanceTeamListUrl(
+  searchParams?: Record<string, string | undefined>,
+) {
+  const params = new URLSearchParams({ tab: "team" });
+  if (searchParams) {
+    Object.entries(searchParams).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
+      }
+    });
+  }
+  return `${SELF_ATTENDANCE_ROUTES.list}?${params.toString()}`;
+}
 
 export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatus, string> = {
   present: "Present",

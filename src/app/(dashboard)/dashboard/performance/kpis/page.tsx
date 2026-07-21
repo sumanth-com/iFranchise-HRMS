@@ -46,7 +46,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">KPI Management</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Define KPI templates, assign them to employees, and track completion through review periods.
+          Choose a template, assign to an employee, and track progress below.
         </p>
       </div>
 

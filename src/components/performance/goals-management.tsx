@@ -2,8 +2,8 @@
 
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -23,14 +23,16 @@ import {
   GoalStatusBadge,
 } from "@/components/performance/performance-status-badge";
 import { EmployeeSelect, LabeledSelect } from "@/components/payroll/payroll-select";
-import { toSelectItems } from "@/components/payroll/select-utils";
 import { createGoalAction } from "@/lib/performance/actions";
-import { GOAL_PRIORITY_LABELS, GOAL_STATUS_LABELS } from "@/lib/performance/constants";
+import { GOAL_STATUS_LABELS } from "@/lib/performance/constants";
+import {
+  BUILTIN_GOAL_PRESETS,
+  getDefaultGoalDueDate,
+} from "@/lib/performance/goal-presets";
 import { goalFormSchema } from "@/lib/validations/performance";
 import type { GoalListItem } from "@/types/performance";
 import type { LookupOption } from "@/types/employee";
 
-const priorityItems = toSelectItems(GOAL_PRIORITY_LABELS);
 const statusItems = buildStatusItems(GOAL_STATUS_LABELS);
 
 type GoalsManagementProps = {
@@ -52,8 +54,6 @@ type GoalsManagementProps = {
 
 export function GoalForm({
   employees,
-  cycles,
-  categories,
 }: {
   employees: LookupOption[];
   cycles: LookupOption[];
@@ -61,95 +61,148 @@ export function GoalForm({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [templateId, setTemplateId] = useState("");
+  const [keyResult1, setKeyResult1] = useState("");
+  const [keyResult2, setKeyResult2] = useState("");
+
   const form = useForm<z.input<typeof goalFormSchema>>({
     resolver: zodResolver(goalFormSchema),
     defaultValues: {
       employeeId: "",
       title: "",
       goalPriority: "medium",
-      weightage: 0,
+      weightage: 20,
       currentProgress: 0,
-      goalStatus: "draft",
+      goalStatus: "not_started",
       milestones: [],
     },
   });
 
+  const templateOptions = useMemo(
+    () =>
+      BUILTIN_GOAL_PRESETS.map((preset) => ({
+        value: preset.id,
+        label: preset.title,
+      })),
+    [],
+  );
+
+  function applyTemplate(id: string) {
+    setTemplateId(id);
+    if (!id) return;
+
+    const preset = BUILTIN_GOAL_PRESETS.find((item) => item.id === id);
+    if (!preset) return;
+
+    form.reset({
+      employeeId: form.getValues("employeeId"),
+      cycleId: form.getValues("cycleId"),
+      title: preset.title,
+      description: preset.description,
+      category: preset.category,
+      goalPriority: preset.goalPriority,
+      weightage: preset.weightage,
+      dueDate: getDefaultGoalDueDate(preset.dueInDays),
+      currentProgress: 0,
+      goalStatus: "not_started",
+      milestones: preset.milestones.map((title) => ({ title })),
+    });
+    setKeyResult1(preset.milestones[0] ?? "");
+    setKeyResult2(preset.milestones[1] ?? "");
+  }
+
+  function handleCreate() {
+    const milestones = [keyResult1, keyResult2]
+      .map((title) => title.trim())
+      .filter(Boolean)
+      .map((title) => ({ title }));
+    form.setValue("milestones", milestones);
+
+    form.handleSubmit((values) => {
+      startTransition(async () => {
+        const result = await createGoalAction(values);
+        if (!result.success) {
+          toast.error(result.message);
+          return;
+        }
+        toast.success("Goal assigned");
+        setTemplateId("");
+        setKeyResult1("");
+        setKeyResult2("");
+        form.reset({
+          employeeId: "",
+          title: "",
+          goalPriority: "medium",
+          weightage: 20,
+          currentProgress: 0,
+          goalStatus: "not_started",
+          milestones: [],
+        });
+        router.refresh();
+      });
+    })();
+  }
+
   return (
     <section className="rounded-xl border bg-card p-5 shadow-sm">
       <div className="mb-4">
-        <h2 className="text-sm font-medium">Create goal / OKR</h2>
+        <h2 className="text-sm font-semibold">Assign goal / OKR</h2>
         <p className="text-xs text-muted-foreground">
-          Set objectives with priority, weightage, milestones, and progress tracking.
+          Choose a template, adjust if needed, and assign to an employee.
         </p>
       </div>
-      <form
-        onSubmit={form.handleSubmit((values) => {
-          startTransition(async () => {
-            const result = await createGoalAction(values);
-            if (!result.success) {
-              toast.error(result.message);
-              return;
-            }
-            toast.success("Goal created");
-            form.reset();
-            router.refresh();
-          });
-        })}
-        className="grid gap-4 md:grid-cols-2"
-      >
-        <Field label="Employee">
-          <EmployeeSelect
-            employees={employees}
-            value={form.watch("employeeId")}
-            onValueChange={(v) => form.setValue("employeeId", v, { shouldValidate: true })}
-            disabled={isPending}
-          />
-        </Field>
-        <Field label="Review cycle">
+
+      <div className="space-y-4">
+        <Field label="Template">
           <LabeledSelect
-            items={[{ value: "", label: "No cycle" }, ...cycles.map((c) => ({ value: c.id, label: c.label }))]}
-            value={form.watch("cycleId") ?? ""}
-            onValueChange={(v) => form.setValue("cycleId", v || null)}
+            items={[{ value: "", label: "Select a goal template" }, ...templateOptions]}
+            value={templateId}
+            onValueChange={applyTemplate}
             disabled={isPending}
           />
         </Field>
-        <Field label="Title" className="md:col-span-2">
-          <Input disabled={isPending} {...form.register("title")} placeholder="Goal title" />
-        </Field>
-        <Field label="Category">
-          <LabeledSelect
-            items={categories.map((c) => ({ value: c, label: c }))}
-            value={form.watch("category") ?? ""}
-            onValueChange={(v) => form.setValue("category", v)}
-            disabled={isPending}
-          />
-        </Field>
-        <Field label="Priority">
-          <LabeledSelect
-            items={priorityItems}
-            value={form.watch("goalPriority")}
-            onValueChange={(v) =>
-              form.setValue("goalPriority", v as z.input<typeof goalFormSchema>["goalPriority"])
-            }
-            disabled={isPending}
-          />
-        </Field>
-        <Field label="Weightage (%)">
-          <Input type="number" min={0} max={100} disabled={isPending} {...form.register("weightage")} />
-        </Field>
-        <Field label="Due date">
-          <Input type="date" disabled={isPending} {...form.register("dueDate")} />
-        </Field>
-        <Field label="Description" className="md:col-span-2">
-          <Input disabled={isPending} {...form.register("description")} placeholder="Goal description" />
-        </Field>
-        <div className="md:col-span-2">
-          <Button type="submit" disabled={isPending}>
-            {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Create goal
-          </Button>
-        </div>
-      </form>
+
+        {templateId ? (
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label="Employee">
+              <EmployeeSelect
+                employees={employees}
+                value={form.watch("employeeId")}
+                onValueChange={(value) =>
+                  form.setValue("employeeId", value, { shouldValidate: true })
+                }
+                disabled={isPending}
+              />
+            </Field>
+            <Field label="Goal title">
+              <Input disabled={isPending} {...form.register("title")} />
+            </Field>
+            <Field label="Due date">
+              <Input type="date" disabled={isPending} {...form.register("dueDate")} />
+            </Field>
+            <Field label="Key result 1">
+              <Input
+                disabled={isPending}
+                value={keyResult1}
+                onChange={(event) => setKeyResult1(event.target.value)}
+              />
+            </Field>
+            <Field label="Key result 2" className="md:col-span-2">
+              <Input
+                disabled={isPending}
+                value={keyResult2}
+                onChange={(event) => setKeyResult2(event.target.value)}
+              />
+            </Field>
+            <div className="md:col-span-2">
+              <Button type="button" disabled={isPending} onClick={handleCreate}>
+                {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Assign goal
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }
@@ -185,52 +238,55 @@ export function GoalsTable({
           searchPlaceholder="Search goals..."
         />
       </div>
+
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
         {records.length === 0 ? (
-          <EmptyState title="No goals found" description="Create a goal or adjust filters." className="border-0" />
+          <EmptyState
+            title="No goals yet"
+            description="Select a template above to assign a goal."
+            className="border-0"
+          />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="max-h-[24rem] overflow-auto">
             <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/30 text-left text-muted-foreground">
-                  <th className="px-4 py-3">Employee</th>
-                  <th className="px-4 py-3">Goal</th>
-                  <th className="px-4 py-3">Priority</th>
-                  <th className="px-4 py-3">Weight</th>
-                  <th className="px-4 py-3">Progress</th>
-                  <th className="px-4 py-3">Milestones</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Due</th>
+              <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
+                <tr className="text-left text-muted-foreground">
+                  <th className="px-4 py-3 font-medium">Employee</th>
+                  <th className="px-4 py-3 font-medium">Goal</th>
+                  <th className="px-4 py-3 font-medium">Progress</th>
+                  <th className="px-4 py-3 font-medium">Key results</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Due</th>
                 </tr>
               </thead>
               <tbody>
                 {records.map((row) => (
-                  <tr key={row.id} className="border-b">
+                  <tr key={row.id} className="border-t align-middle">
                     <td className="px-4 py-3">
                       <div className="font-medium">{row.employeeName}</div>
-                      <div className="text-xs text-muted-foreground">{row.departmentName ?? row.employeeCode}</div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="font-medium">{row.title}</div>
-                      {row.category ? (
-                        <div className="text-xs text-muted-foreground">{row.category}</div>
-                      ) : null}
+                      <GoalPriorityBadge priority={row.goalPriority} />
                     </td>
-                    <td className="px-4 py-3"><GoalPriorityBadge priority={row.goalPriority} /></td>
-                    <td className="px-4 py-3">{row.weightage}%</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <div className="h-2 w-16 overflow-hidden rounded-full bg-muted">
-                          <div className="h-full bg-primary" style={{ width: `${row.currentProgress}%` }} />
+                          <div
+                            className="h-full rounded-full bg-primary"
+                            style={{ width: `${row.currentProgress}%` }}
+                          />
                         </div>
-                        <span>{row.currentProgress}%</span>
+                        <span className="tabular-nums">{row.currentProgress}%</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 tabular-nums">
                       {row.completedMilestones}/{row.milestoneCount}
                     </td>
-                    <td className="px-4 py-3"><GoalStatusBadge status={row.goalStatus} /></td>
                     <td className="px-4 py-3">
+                      <GoalStatusBadge status={row.goalStatus} />
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
                       {row.dueDate ? format(new Date(row.dueDate), "MMM d, yyyy") : "—"}
                     </td>
                   </tr>
@@ -255,7 +311,7 @@ function Field({
   className?: string;
 }) {
   return (
-    <div className={`space-y-2 ${className ?? ""}`}>
+    <div className={className ? `${className} space-y-2` : "space-y-2"}>
       <Label>{label}</Label>
       {children}
     </div>

@@ -23,6 +23,7 @@ export type RecruitmentSummary = {
   hiresThisMonth: number;
   averageHiringTimeDays: number;
   candidatesByStage: { stage: CandidateStage; count: number }[];
+  candidateSources: { source: string; count: number }[];
   hiringByDepartment: { departmentId: string; departmentName: string; count: number }[];
   upcomingInterviews: InterviewListItem[];
   recentActivity: TimelineItem[];

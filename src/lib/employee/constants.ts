@@ -3,6 +3,7 @@ export const EMPLOYEE_ROUTES = {
   attendance: "/employee/attendance",
   directory: "/employee/directory",
   leave: "/employee/leave",
+  resignation: "/employee/resignation",
   payroll: "/employee/payroll",
   documents: "/employee/documents",
   assets: "/employee/assets",

@@ -87,9 +87,11 @@ function fmtMonth(value: string): string {
 export function EmployeePayrollView({
   data,
   documentsHref = EMPLOYEE_ROUTES.documents,
+  showPageHeading = true,
 }: {
   data: EmployeePayrollData;
   documentsHref?: string;
+  showPageHeading?: boolean;
 }) {
   const [activePayslipId, setActivePayslipId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -101,7 +103,7 @@ export function EmployeePayrollView({
     setDrawerOpen(true);
   }
 
-  const header = (
+  const header = showPageHeading ? (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">My Payroll</h1>
@@ -129,6 +131,27 @@ export function EmployeePayrollView({
           Tax Documents
         </Button>
       </div>
+    </div>
+  ) : (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      <Button
+        variant="outline"
+        className="gap-1.5"
+        disabled={data.payslips.length === 0}
+        onClick={() => data.payslips[0] && openPayslip(data.payslips[0].id)}
+      >
+        <Download className="size-4" />
+        Latest Payslip
+      </Button>
+      <Button
+        variant="outline"
+        className="gap-1.5"
+        nativeButton={false}
+        render={<Link href={documentsHref} />}
+      >
+        <FileText className="size-4" />
+        Tax Documents
+      </Button>
     </div>
   );
 

@@ -96,6 +96,7 @@ type LeaveTableProps = {
   canApprove: boolean;
   canReject: boolean;
   canCancel: boolean;
+  embedded?: boolean;
 };
 
 const TABLE_HEAD_CELL_CLASS = "h-11 whitespace-nowrap py-3.5 pl-10 pr-4";
@@ -200,6 +201,7 @@ export function LeaveTable({
   canApprove,
   canReject,
   canCancel,
+  embedded = false,
 }: LeaveTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -211,10 +213,10 @@ export function LeaveTable({
   const [rejectComments, setRejectComments] = useState("");
 
   useEffect(() => {
-    if (window.location.search) {
+    if (!embedded && window.location.search) {
       window.history.replaceState(null, "", LEAVE_ROUTES.list);
     }
-  }, []);
+  }, [embedded]);
 
   const now = new Date();
   const defaultMonth = month ?? now.getMonth() + 1;

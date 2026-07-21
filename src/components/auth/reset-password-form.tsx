@@ -72,7 +72,7 @@ export function ResetPasswordForm() {
             {isInviteSetup ? "Password created" : "Password updated"}
           </h2>
           <p className="text-sm text-muted-foreground">
-            Your account is ready. Sign in with your company email and the password you just created.
+            Your account is ready. Sign in with your email and the password you just created.
           </p>
         </div>
 

@@ -1,26 +1,22 @@
-import {
-  AssetsDashboardPanels,
-  AssetsSummaryCards,
-} from "@/components/assets/assets-dashboard-panels";
-import { getAssetsSummary } from "@/lib/assets/services/asset-queries";
-import { requireServerPermission } from "@/lib/permissions/server";
-import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
-export default async function AssetsDashboardPage() {
-  const profile = await requireServerPermission("asset.view");
-  const supabase = await createClient();
-  const summary = await getAssetsSummary(supabase, profile);
+type AssetsManagementPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
 
-  return (
-    <>
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Company Assets</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Track inventory, assignments, maintenance, warranties, and vendors.
-        </p>
-      </div>
-      <AssetsSummaryCards summary={summary} />
-      <AssetsDashboardPanels summary={summary} />
-    </>
-  );
+export default async function AssetsManagementPage({
+  searchParams,
+}: AssetsManagementPageProps) {
+  const rawParams = await searchParams;
+  const params = new URLSearchParams();
+  params.set("tab", "team");
+
+  Object.entries(rawParams).forEach(([key, value]) => {
+    if (key === "tab" || typeof value !== "string") {
+      return;
+    }
+    params.set(key, value);
+  });
+
+  redirect(`/dashboard/assets?${params.toString()}`);
 }

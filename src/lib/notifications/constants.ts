@@ -7,7 +7,7 @@ import { MANAGER_ROUTES } from "@/lib/manager/constants";
 
 export const NOTIFICATIONS_ROUTES = {
   dashboard: "/dashboard/notifications",
-  center: "/dashboard/notifications/center",
+  center: "/dashboard/notifications?tab=my",
   history: "/dashboard/notifications/history",
   templates: "/dashboard/notifications/templates",
   settings: "/dashboard/notifications/settings",
@@ -64,8 +64,8 @@ export function getNotificationsRoutes(portalHome: string): NotificationRouteSet
 }
 
 export const NOTIFICATIONS_SUB_NAV = [
-  { title: "Dashboard", href: NOTIFICATIONS_ROUTES.dashboard },
-  { title: "Notification Center", href: NOTIFICATIONS_ROUTES.center },
+  { title: "My Notifications", href: "/dashboard/notifications?tab=my" },
+  { title: "Alerts & Broadcasts", href: "/dashboard/notifications?tab=team", admin: true },
   { title: "History", href: NOTIFICATIONS_ROUTES.history },
   { title: "Templates", href: NOTIFICATIONS_ROUTES.templates, admin: true },
   { title: "Settings", href: NOTIFICATIONS_ROUTES.settings, admin: true },

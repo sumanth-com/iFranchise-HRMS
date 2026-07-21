@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import {
-  NOTIFICATIONS_ROUTES,
   NOTIFICATIONS_SUB_NAV,
   canManageNotificationSettings,
   canManageNotifications,
@@ -17,6 +16,8 @@ type Props = {
 
 export function NotificationsSubNav({ permissionCodes }: Props) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const hubTab = searchParams.get("tab");
   const canManage = canManageNotifications(permissionCodes);
   const canSettings = canManageNotificationSettings(permissionCodes);
 
@@ -30,10 +31,13 @@ export function NotificationsSubNav({ permissionCodes }: Props) {
   return (
     <nav className="flex flex-wrap gap-1 rounded-lg border bg-card p-1 shadow-sm">
       {items.map((item) => {
-        const isActive =
-          item.href === NOTIFICATIONS_ROUTES.dashboard
-            ? pathname === item.href
-            : pathname === item.href || pathname.startsWith(`${item.href}/`);
+        const isHubItem = item.href.includes("tab=");
+        const isActive = isHubItem
+          ? pathname === "/dashboard/notifications" &&
+            (item.href.includes("tab=team")
+              ? hubTab === "team"
+              : hubTab !== "team")
+          : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
         return (
           <Link

@@ -1,8 +1,8 @@
 import type { LeaveStatus } from "@/types/leave";
 
-/** Org-wide leave tracking for HR (Administration). */
+/** Org-wide leave tracking for HR (team tab in Leave hub). */
 export const LEAVE_ROUTES = {
-  list: "/dashboard/leave-management",
+  list: "/dashboard/leave",
   new: "/dashboard/leave-management/new",
   detail: (id: string) => `/dashboard/leave-management/${id}`,
   balances: "/dashboard/leave-management/balances",
@@ -15,6 +15,20 @@ export const SELF_LEAVE_ROUTES = {
   list: "/dashboard/leave",
   new: "/dashboard/leave/new",
 } as const;
+
+export function leaveTeamListUrl(
+  searchParams?: Record<string, string | undefined>,
+) {
+  const params = new URLSearchParams({ tab: "team" });
+  if (searchParams) {
+    Object.entries(searchParams).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
+      }
+    });
+  }
+  return `${SELF_LEAVE_ROUTES.list}?${params.toString()}`;
+}
 
 export const LEAVE_STATUS_LABELS: Record<LeaveStatus, string> = {
   pending: "Pending",

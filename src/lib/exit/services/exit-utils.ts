@@ -30,8 +30,14 @@ export function isManagerRole(profile: UserProfile) {
   return profile.roles.some((r) => r.code === "manager");
 }
 
+export function isCeoRole(profile: UserProfile) {
+  return profile.roles.some((r) =>
+    ["ceo", "founder", "co_founder"].includes(r.code),
+  );
+}
+
 export function isEmployeeOnly(profile: UserProfile) {
-  return !isHrAdmin(profile) && !isManagerRole(profile);
+  return !isHrAdmin(profile) && !isManagerRole(profile) && !isCeoRole(profile);
 }
 
 export function formatCurrencyInr(value: number | null | undefined) {

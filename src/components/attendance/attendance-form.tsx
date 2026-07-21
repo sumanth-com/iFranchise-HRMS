@@ -20,7 +20,7 @@ import {
   createAttendanceAction,
   updateAttendanceAction,
 } from "@/lib/attendance/actions";
-import { ATTENDANCE_ROUTES, ATTENDANCE_STATUS_LABELS } from "@/lib/attendance/constants";
+import { ATTENDANCE_ROUTES, ATTENDANCE_STATUS_LABELS, attendanceTeamListUrl } from "@/lib/attendance/constants";
 import {
   extractTimeFromTimestamp,
   OFFICE_CHECK_IN_TIME,
@@ -230,7 +230,7 @@ export function AttendanceForm({ mode, attendance, lookups }: AttendanceFormProp
             router.push(
               mode === "edit" && attendance
                 ? ATTENDANCE_ROUTES.detail(attendance.id)
-                : ATTENDANCE_ROUTES.list,
+                : attendanceTeamListUrl(),
             )
           }
         >

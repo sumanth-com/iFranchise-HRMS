@@ -5,6 +5,7 @@ import {
   FileText,
   LaptopMinimal,
   LayoutDashboard,
+  LogOut,
   Settings,
   Users,
   Wallet,
@@ -36,6 +37,12 @@ export const employeeNavItems: NavigationItem[] = [
     href: EMPLOYEE_ROUTES.leave,
     icon: CalendarDays,
     permissions: ["leave.view"],
+  },
+  {
+    title: "Resignation",
+    href: EMPLOYEE_ROUTES.resignation,
+    icon: LogOut,
+    permissions: ["exit.view", "exit.create"],
   },
   {
     title: "Payroll",
