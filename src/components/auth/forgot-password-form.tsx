@@ -11,6 +11,10 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { forgotPasswordAction } from "@/lib/auth/actions";
+import { AUTH_ROUTES } from "@/lib/auth/constants";
+import { getPasswordResetRedirectTo } from "@/lib/auth/reset-redirect";
+import { createClient } from "@/lib/supabase/client";
+import { getAuthErrorMessage } from "@/lib/auth/errors";
 import {
   forgotPasswordSchema,
   type ForgotPasswordInput,
@@ -44,6 +48,21 @@ export function ForgotPasswordForm() {
         return;
       }
 
+      if (result.resolvedEmail) {
+        const supabase = createClient();
+        const { error } = await supabase.auth.resetPasswordForEmail(
+          result.resolvedEmail,
+          { redirectTo: getPasswordResetRedirectTo() },
+        );
+
+        if (error) {
+          const message = getAuthErrorMessage("SERVER_ERROR");
+          setFormError(message);
+          toast.error(message);
+          return;
+        }
+      }
+
       setIsSubmitted(true);
       toast.success("Password reset instructions sent");
     });
@@ -62,7 +81,7 @@ export function ForgotPasswordForm() {
           </p>
         </div>
         <Link
-          href="/login"
+          href={AUTH_ROUTES.login}
           className={cn(
             buttonVariants({ variant: "outline" }),
             "h-11 w-full rounded-xl",
@@ -119,7 +138,7 @@ export function ForgotPasswordForm() {
         </Button>
 
         <Link
-          href="/login"
+          href={AUTH_ROUTES.login}
           className={cn(buttonVariants({ variant: "ghost" }), "w-full")}
         >
           Back to sign in

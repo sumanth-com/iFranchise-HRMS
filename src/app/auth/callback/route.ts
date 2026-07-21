@@ -1,22 +1,54 @@
 import { NextResponse, type NextRequest } from "next/server";
+import type { EmailOtpType } from "@supabase/supabase-js";
 
 import { AUTH_ROUTES } from "@/lib/auth/constants";
 import { createClient } from "@/lib/supabase/server";
 
+function buildAuthErrorRedirect(
+  origin: string,
+  next: string,
+  reason: "expired" | "invalid",
+) {
+  if (next === AUTH_ROUTES.resetPassword || next.startsWith(`${AUTH_ROUTES.resetPassword}?`)) {
+    const redirectUrl = new URL(AUTH_ROUTES.resetPassword, origin);
+    redirectUrl.searchParams.set("error", reason);
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  const redirectUrl = new URL(AUTH_ROUTES.login, origin);
+  redirectUrl.searchParams.set("expired", reason === "expired" ? "1" : "0");
+  return NextResponse.redirect(redirectUrl);
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
+  const tokenHash = searchParams.get("token_hash");
+  const type = searchParams.get("type");
   const next = searchParams.get("next") ?? AUTH_ROUTES.dashboard;
   let email: string | null = null;
 
-  if (code) {
-    const supabase = await createClient();
+  const supabase = await createClient();
+
+  if (tokenHash && type) {
+    const { error } = await supabase.auth.verifyOtp({
+      token_hash: tokenHash,
+      type: type as EmailOtpType,
+    });
+
+    if (error) {
+      return buildAuthErrorRedirect(origin, next, "invalid");
+    }
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    email = user?.email ?? null;
+  } else if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (error) {
-      const redirectUrl = new URL(AUTH_ROUTES.login, origin);
-      redirectUrl.searchParams.set("expired", "1");
-      return NextResponse.redirect(redirectUrl);
+      return buildAuthErrorRedirect(origin, next, "invalid");
     }
 
     const {
@@ -33,5 +65,6 @@ export async function GET(request: NextRequest) {
   ) {
     redirectUrl.searchParams.set("email", email);
   }
+
   return NextResponse.redirect(redirectUrl);
 }

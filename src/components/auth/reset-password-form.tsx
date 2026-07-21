@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { resetPasswordAction } from "@/lib/auth/actions";
+import { AUTH_ROUTES } from "@/lib/auth/constants";
 import { getAuthErrorMessage } from "@/lib/auth/errors";
 import {
   resetPasswordSchema,
@@ -191,16 +192,12 @@ export function ResetPasswordForm() {
         </Button>
 
         <Link
-          href="/login"
+          href={AUTH_ROUTES.login}
           className={cn(buttonVariants({ variant: "ghost" }), "w-full")}
         >
           Back to sign in
         </Link>
       </form>
-
-      <p className="text-center text-xs text-muted-foreground">
-        {getAuthErrorMessage("RESET_LINK_INVALID")}
-      </p>
     </div>
   );
 }

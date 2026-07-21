@@ -19,7 +19,6 @@ import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
 import { recordEmployeeSuccessfulLogin } from "@/lib/employees/services/employee-account";
 import { recordUserLoginSession } from "@/lib/ceo/services/ceo-profile-queries";
-import { siteConfig } from "@/config/site";
 import { createClient } from "@/lib/supabase/server";
 import {
   forgotPasswordSchema,
@@ -207,17 +206,6 @@ export async function forgotPasswordAction(
 
   const email = await resolveApprovedLoginEmail(parsed.data.email);
   const supabase = await createClient();
-  const redirectTo = `${siteConfig.url}${AUTH_ROUTES.callback}?next=${AUTH_ROUTES.resetPassword}`;
-
-  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
-
-  if (error) {
-    return {
-      success: false,
-      error: mapSupabaseAuthError(error.message),
-      message: getAuthErrorMessage("SERVER_ERROR"),
-    };
-  }
 
   const ctx = await getRequestAuditContext();
   await writeApplicationAudit(supabase, {
@@ -233,6 +221,7 @@ export async function forgotPasswordAction(
   return {
     success: true,
     redirectTo: AUTH_ROUTES.forgotPassword,
+    resolvedEmail: email,
   };
 }
 

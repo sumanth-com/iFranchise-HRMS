@@ -76,5 +76,5 @@ export type AuthErrorCode =
   | "RESET_LINK_INVALID";
 
 export type AuthActionResult =
-  | { success: true; redirectTo: string }
+  | { success: true; redirectTo: string; resolvedEmail?: string }
   | { success: false; error: AuthErrorCode; message: string };

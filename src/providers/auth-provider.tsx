@@ -12,7 +12,7 @@ import {
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { LOGOUT_BROADCAST_KEY, AUTH_ROUTES } from "@/lib/auth/constants";
+import { LOGOUT_BROADCAST_KEY, AUTH_ROUTES, PUBLIC_ROUTES } from "@/lib/auth/constants";
 import { getAuthErrorMessage } from "@/lib/auth/errors";
 import { getSidebarNavigation } from "@/lib/auth/navigation";
 import { ceoNavItems } from "@/config/ceo-navigation";
@@ -142,7 +142,16 @@ export function AuthProvider({
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT" && window.location.pathname !== AUTH_ROUTES.login) {
+      const pathname = window.location.pathname;
+      const isPublicAuthRoute = PUBLIC_ROUTES.some(
+        (route) => pathname === route || pathname.startsWith(`${route}/`),
+      );
+
+      if (
+        event === "SIGNED_OUT" &&
+        pathname !== AUTH_ROUTES.login &&
+        !isPublicAuthRoute
+      ) {
         router.push(`${AUTH_ROUTES.login}?expired=1`);
         router.refresh();
       }

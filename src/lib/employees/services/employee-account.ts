@@ -1,5 +1,5 @@
-import { AUTH_ROUTES } from "@/lib/auth/constants";
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { getPasswordResetRedirectTo } from "@/lib/auth/reset-redirect";
 import { siteConfig } from "@/config/site";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import type { ApplicationAuditInput } from "@/lib/audit/services/audit-utils";
@@ -46,10 +46,8 @@ function deriveNameFromEmail(email: string) {
   return { firstName, lastName };
 }
 
-const INVITE_REDIRECT_TO = `${siteConfig.url}${AUTH_ROUTES.callback}?next=${encodeURIComponent(
-  `${AUTH_ROUTES.resetPassword}?invite=1`,
-)}`;
-const RESET_REDIRECT_TO = `${siteConfig.url}${AUTH_ROUTES.callback}?next=${AUTH_ROUTES.resetPassword}`;
+const INVITE_REDIRECT_TO = getPasswordResetRedirectTo(true);
+const RESET_REDIRECT_TO = getPasswordResetRedirectTo();
 
 function fullName(employee: Pick<EmployeeAccountRow, "first_name" | "last_name">) {
   return `${employee.first_name} ${employee.last_name}`.trim();

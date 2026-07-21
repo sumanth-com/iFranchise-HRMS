@@ -49,7 +49,12 @@ enabled = false
 [auth]
 enabled = true
 site_url = "https://hrmsifranchise.vercel.app"
-additional_redirect_urls = ["https://hrmsifranchise.vercel.app", "http://localhost:3000"]
+additional_redirect_urls = [
+  "https://hrmsifranchise.vercel.app",
+  "https://hrmsifranchise.vercel.app/**",
+  "http://localhost:3000",
+  "http://localhost:3000/**",
+]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
@@ -71,6 +76,10 @@ otp_expiry = 3600
 [auth.email.template.invite]
 subject = "You're invited to activate your iFranchise HRMS account"
 content_path = "./supabase/templates/invite.html"
+
+[auth.email.template.recovery]
+subject = "Reset your password"
+content_path = "./supabase/templates/recovery.html"
 
 [auth.sms]
 enable_signup = false
