@@ -7,7 +7,10 @@ export const MANAGER_ROUTES = {
   teamMember: (employee: EmployeeRouteIdentity | string) =>
     `/manager/team/${typeof employee === "string" ? employee : buildEmployeeRouteRef(employee)}`,
   attendance: "/manager/attendance",
+  attendanceMy: "/manager/attendance?tab=my",
+  attendanceTeam: "/manager/attendance?tab=team",
   leave: "/manager/leave",
+  leaveNew: "/manager/leave/new",
   leaveDetail: (id: string) => `/manager/leave?leaveId=${id}`,
   performance: "/manager/performance",
   performanceDetail: (employeeId: string, tab?: "feedback" | "oneOnOne") => {
@@ -22,7 +25,7 @@ export const MANAGER_ROUTES = {
   notificationsCenter: "/manager/notifications/center",
   notificationsHistory: "/manager/notifications/history",
   settings: "/manager/settings",
-  profile: "/manager/profile",
+  profile: "/manager/attendance?tab=my",
 } as const;
 
 export const MANAGER_QUICK_ACTIONS = [

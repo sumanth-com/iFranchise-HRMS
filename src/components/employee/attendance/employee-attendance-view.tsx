@@ -22,6 +22,9 @@ type Props = {
   description?: string;
   /** When false, omit the outer employee-portal padding wrapper. */
   padded?: boolean;
+  showPageHeading?: boolean;
+  /** Keeps the hub tab in the URL when filtering calendar/history. */
+  tabQuery?: string;
 };
 
 export function EmployeeAttendanceView({
@@ -32,6 +35,8 @@ export function EmployeeAttendanceView({
   title = "My Attendance",
   description = "Your personal attendance, identity, and regularization requests.",
   padded = true,
+  showPageHeading = true,
+  tabQuery,
 }: Props) {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState<string | null>(data.selectedDate);
@@ -45,6 +50,7 @@ export function EmployeeAttendanceView({
     page?: number;
   }) {
     const params = new URLSearchParams();
+    if (tabQuery) params.set("tab", tabQuery);
     params.set("month", String(next.month));
     params.set("year", String(next.year));
     if (next.date) params.set("date", next.date);
@@ -56,10 +62,12 @@ export function EmployeeAttendanceView({
 
   const content = (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      </div>
+      {showPageHeading ? (
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        </div>
+      ) : null}
 
       <EmployeeAttendanceTodayCard today={data.today} />
 

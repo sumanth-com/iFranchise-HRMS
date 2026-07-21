@@ -315,7 +315,7 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
     ];
 
     const sectionLabels: Record<string, string> = {
-      profile: "My Attendance",
+      profile: "Attendance",
       team: "My Team",
       attendance: "Attendance",
       leave: "Leave",
@@ -332,6 +332,11 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
         label: sectionLabel,
         href: `/manager/${segments[1]}`,
       });
+    }
+
+    if (segments[1] === "leave" && segments[2] === "new") {
+      items.push({ label: "Apply leave", href: pathname });
+      return items;
     }
 
     if (segments[1] === "notifications" && segments[2]) {

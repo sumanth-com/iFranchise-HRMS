@@ -5,7 +5,6 @@ import { useCallback, useState, useTransition } from "react";
 
 import { Button } from "@/components/common/button";
 import { ManagerTeamCards } from "@/components/manager/team/manager-team-cards";
-import { ManagerTeamFilters } from "@/components/manager/team/manager-team-filters";
 import { ManagerTeamHierarchy } from "@/components/manager/team/manager-team-hierarchy";
 import { ManagerTeamKpis } from "@/components/manager/team/manager-team-kpis";
 import { ManagerTeamQuickActions } from "@/components/manager/team/manager-team-quick-actions";
@@ -16,7 +15,13 @@ import { cn } from "@/lib/utils";
 
 type ManagerTeamViewProps = ManagerTeamPageData & {
   managerEmployeeId: string;
-  initialFilters: TeamListParams;
+};
+
+const DEFAULT_LIST_PARAMS: TeamListParams = {
+  page: 1,
+  pageSize: 8,
+  sortBy: "first_name",
+  sortOrder: "asc",
 };
 
 type ViewMode = "directory" | "hierarchy";
@@ -24,36 +29,27 @@ type ViewMode = "directory" | "hierarchy";
 export function ManagerTeamView({
   summary: initialSummary,
   employees: initialEmployees,
-  lookups,
   hierarchyRoot,
   managerEmployeeId,
-  initialFilters,
 }: ManagerTeamViewProps) {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<ViewMode>("directory");
   const [summary, setSummary] = useState(initialSummary);
   const [tableState, setTableState] = useState(initialEmployees);
-  const [filters, setFilters] = useState<TeamListParams>(initialFilters);
   const [isPending, startTransition] = useTransition();
 
-  const refreshEmployees = useCallback(
-    (nextFilters: TeamListParams) => {
-      startTransition(async () => {
-        const result = await fetchTeamEmployeesAction(nextFilters);
-        setTableState(result);
+  const refreshEmployees = useCallback((page: number) => {
+    startTransition(async () => {
+      const result = await fetchTeamEmployeesAction({
+        ...DEFAULT_LIST_PARAMS,
+        page,
       });
-    },
-    [],
-  );
-
-  function updateFilters(next: Partial<TeamListParams>) {
-    const merged = { ...filters, ...next };
-    setFilters(merged);
-    refreshEmployees(merged);
-  }
+      setTableState(result);
+    });
+  }, []);
 
   function refreshTeamData() {
-    refreshEmployees(filters);
+    refreshEmployees(tableState.page);
     startTransition(async () => {
       const nextSummary = await fetchTeamSummaryAction();
       setSummary(nextSummary);
@@ -93,22 +89,14 @@ export function ManagerTeamView({
       <ManagerTeamQuickActions onRefresh={refreshTeamData} />
 
       {viewMode === "directory" ? (
-        <>
-          <ManagerTeamFilters
-            filters={filters}
-            lookups={lookups}
-            onChange={updateFilters}
-            disabled={isPending}
-          />
-          <ManagerTeamCards
-            employees={tableState.data}
-            total={tableState.total}
-            page={tableState.page}
-            pageSize={tableState.pageSize}
-            isLoading={isPending}
-            onPageChange={(page) => updateFilters({ page })}
-          />
-        </>
+        <ManagerTeamCards
+          employees={tableState.data}
+          total={tableState.total}
+          page={tableState.page}
+          pageSize={tableState.pageSize}
+          isLoading={isPending}
+          onPageChange={refreshEmployees}
+        />
       ) : (
         <div className={cn("max-w-3xl")}>
           <ManagerTeamHierarchy

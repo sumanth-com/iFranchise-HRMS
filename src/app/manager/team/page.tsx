@@ -18,19 +18,12 @@ export default async function ManagerTeamPage({ searchParams }: ManagerTeamPageP
   const profile = await requireServerPermission("portal.manager.access");
   const rawParams = await searchParams;
 
-  const parsed = teamListParamsSchema.parse({
-    page: firstString(rawParams.page),
-    pageSize: firstString(rawParams.pageSize),
-    search: firstString(rawParams.search),
-    departmentId: firstString(rawParams.departmentId),
-    designationId: firstString(rawParams.designationId),
-    employmentStatus: firstString(rawParams.employmentStatus),
-    employmentTypeId: firstString(rawParams.employmentTypeId),
-    sortBy: firstString(rawParams.sortBy),
-    sortOrder: firstString(rawParams.sortOrder),
-  });
-
-  const data = await getManagerTeamPageData(parsed);
+  const data = await getManagerTeamPageData(
+    teamListParamsSchema.parse({
+      page: firstString(rawParams.page),
+      pageSize: firstString(rawParams.pageSize),
+    }),
+  );
 
   return (
     <Suspense
@@ -40,11 +33,7 @@ export default async function ManagerTeamPage({ searchParams }: ManagerTeamPageP
         </div>
       }
     >
-      <ManagerTeamView
-        {...data}
-        managerEmployeeId={profile.employee.id}
-        initialFilters={parsed}
-      />
+      <ManagerTeamView {...data} managerEmployeeId={profile.employee.id} />
     </Suspense>
   );
 }

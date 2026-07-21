@@ -26,6 +26,7 @@ type Props = {
   calendarYear: number;
   calendarLeaves: LeaveCalendarEntry[];
   calendarHolidays: LeaveHolidayEntry[];
+  showPageHeading?: boolean;
 };
 
 export function MyLeaveSelfServiceView({
@@ -39,6 +40,7 @@ export function MyLeaveSelfServiceView({
   calendarYear,
   calendarLeaves,
   calendarHolidays,
+  showPageHeading = true,
 }: Props) {
   const totalBalance = balances.reduce((sum, row) => sum + row.balanceDays, 0);
   const pending = requests.filter((row) => row.leaveStatus === "pending").length;
@@ -72,18 +74,27 @@ export function MyLeaveSelfServiceView({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      {showPageHeading ? (
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          </div>
+          {canApply ? (
+            <Link href={applyHref} className={cn(buttonVariants(), "gap-1.5")}>
+              <CalendarPlus className="size-4" />
+              Apply Leave
+            </Link>
+          ) : null}
         </div>
-        {canApply ? (
+      ) : canApply ? (
+        <div className="flex justify-end">
           <Link href={applyHref} className={cn(buttonVariants(), "gap-1.5")}>
             <CalendarPlus className="size-4" />
             Apply Leave
           </Link>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <EmployeeStatCard

@@ -608,6 +608,7 @@ export async function uploadProfileImageAction(
       revalidatePath(EMPLOYEE_ROUTES.detail(employee));
     }
 
+    revalidatePath("/manager/attendance");
     revalidatePath("/manager/profile");
     revalidatePath("/employee/attendance");
     revalidatePath("/dashboard/attendance");
@@ -668,6 +669,7 @@ export async function removeProfileImageAction(
     }
 
     revalidatePath(EMPLOYEE_ROUTES.detail(employee));
+    revalidatePath("/manager/attendance");
     revalidatePath("/manager/profile");
     revalidatePath("/employee/attendance");
     revalidatePath("/dashboard/attendance");

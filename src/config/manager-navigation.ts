@@ -20,8 +20,8 @@ export const managerNavItems: NavigationItem[] = [
     icon: LayoutDashboard,
   },
   {
-    title: "My Attendance",
-    href: MANAGER_ROUTES.profile,
+    title: "Attendance",
+    href: MANAGER_ROUTES.attendance,
     icon: CalendarCheck,
   },
   {
@@ -29,12 +29,6 @@ export const managerNavItems: NavigationItem[] = [
     href: MANAGER_ROUTES.team,
     icon: Users,
     permissions: ["employee.view"],
-  },
-  {
-    title: "Team Attendance",
-    href: MANAGER_ROUTES.attendance,
-    icon: CalendarCheck,
-    permissions: ["attendance.view"],
   },
   {
     title: "Leave",

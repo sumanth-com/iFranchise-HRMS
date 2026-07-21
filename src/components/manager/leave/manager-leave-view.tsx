@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
+import { MyLeaveSelfServiceView } from "@/components/leave/my-leave-self-service-view";
 import { ManagerLeaveCalendar } from "@/components/manager/leave/manager-leave-calendar";
 import { ManagerLeaveDetailDrawer } from "@/components/manager/leave/manager-leave-detail-drawer";
 import { ManagerLeaveFilters } from "@/components/manager/leave/manager-leave-filters";
@@ -18,17 +19,31 @@ import {
   fetchTeamLeaveSummaryAction,
   rejectTeamLeaveRequestAction,
 } from "@/lib/manager/actions/manager-leave-actions";
+import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import type {
   ManagerTeamLeavePageData,
   TeamLeaveListParams,
 } from "@/types/manager-leave";
-import type { LeaveCalendarEntry, LeaveHolidayEntry } from "@/types/leave";
+import type { LeaveCalendarEntry, LeaveEmployeeBalanceSnapshot, LeaveHolidayEntry, LeaveListItem } from "@/types/leave";
 
+type LeaveSection = "my" | "team";
 type ViewMode = "requests" | "calendar";
+
+type ManagerSelfLeaveData = {
+  canApply: boolean;
+  balances: LeaveEmployeeBalanceSnapshot[];
+  requests: LeaveListItem[];
+  calendarMonth: number;
+  calendarYear: number;
+  calendarLeaves: LeaveCalendarEntry[];
+  calendarHolidays: LeaveHolidayEntry[];
+};
 
 type ManagerLeaveViewProps = ManagerTeamLeavePageData & {
   initialFilters: TeamLeaveListParams;
   initialLeaveId?: string;
+  initialSection?: LeaveSection;
+  selfLeave: ManagerSelfLeaveData;
 };
 
 export function ManagerLeaveView({
@@ -38,7 +53,10 @@ export function ManagerLeaveView({
   calendar: initialCalendar,
   initialFilters,
   initialLeaveId,
+  initialSection = "my",
+  selfLeave,
 }: ManagerLeaveViewProps) {
+  const [section, setSection] = useState<LeaveSection>(initialSection);
   const [viewMode, setViewMode] = useState<ViewMode>("requests");
   const [summary, setSummary] = useState(initialSummary);
   const [tableState, setTableState] = useState(initialRecords);
@@ -150,121 +168,162 @@ export function ManagerLeaveView({
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Team Leave</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Leave</h1>
           <p className="text-sm text-muted-foreground">
-            Leave requests from your reporting hierarchy only.
+            Apply and track your own leave, and manage team requests.
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-lg border bg-card p-1">
           <Button
             size="sm"
-            variant={viewMode === "requests" ? "default" : "ghost"}
-            onClick={() => setViewMode("requests")}
+            variant={section === "my" ? "default" : "ghost"}
+            onClick={() => setSection("my")}
           >
-            Leave Requests
+            My Leave
           </Button>
           <Button
             size="sm"
-            variant={viewMode === "calendar" ? "default" : "ghost"}
-            onClick={() => setViewMode("calendar")}
+            variant={section === "team" ? "default" : "ghost"}
+            onClick={() => setSection("team")}
           >
-            Leave Calendar
+            Team Leave
           </Button>
         </div>
       </div>
 
-      <ManagerLeaveKpis summary={summary} />
-
-      {viewMode === "requests" ? (
+      {section === "my" ? (
+        <MyLeaveSelfServiceView
+          showPageHeading={false}
+          applyHref={MANAGER_ROUTES.leaveNew}
+          canApply={selfLeave.canApply}
+          balances={selfLeave.balances}
+          requests={selfLeave.requests}
+          calendarMonth={selfLeave.calendarMonth}
+          calendarYear={selfLeave.calendarYear}
+          calendarLeaves={selfLeave.calendarLeaves}
+          calendarHolidays={selfLeave.calendarHolidays}
+        />
+      ) : (
         <>
-          <ManagerLeaveFilters
-            filters={filters}
-            lookups={lookups}
-            onChange={updateFilters}
-            disabled={isPending}
-          />
-
-          {pendingAction ? (
-            <section className="rounded-xl border bg-card p-4 shadow-sm">
-              <p className="text-sm font-medium">
-                {pendingAction.mode === "approve"
-                  ? "Approve leave request"
-                  : "Reject leave request"}
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight">Team Leave</h2>
+              <p className="text-sm text-muted-foreground">
+                Leave requests from your reporting hierarchy only.
               </p>
-              <div className="mt-3 flex flex-wrap items-end gap-2">
-                <Input
-                  value={actionNotes}
-                  onChange={(event) => setActionNotes(event.target.value)}
-                  placeholder={
-                    pendingAction.mode === "approve"
-                      ? "Approval notes (optional)"
-                      : "Rejection reason"
-                  }
-                  className="max-w-md"
-                />
-                <Button size="sm" disabled={isPending} onClick={handleQuickAction}>
-                  Confirm
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setPendingAction(null);
-                    setActionNotes("");
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </section>
-          ) : null}
+            </div>
+            <div className="flex items-center gap-2 rounded-lg border bg-card p-1">
+              <Button
+                size="sm"
+                variant={viewMode === "requests" ? "default" : "ghost"}
+                onClick={() => setViewMode("requests")}
+              >
+                Leave Requests
+              </Button>
+              <Button
+                size="sm"
+                variant={viewMode === "calendar" ? "default" : "ghost"}
+                onClick={() => setViewMode("calendar")}
+              >
+                Leave Calendar
+              </Button>
+            </div>
+          </div>
 
-          <ManagerLeaveTable
-            records={tableState.data}
-            total={tableState.total}
-            page={tableState.page}
-            pageSize={tableState.pageSize}
-            isLoading={isPending}
-            onPageChange={(page) => updateFilters({ page })}
-            onViewDetails={openDetails}
-            onApprove={(leaveRequestId) => {
-              setPendingAction({ leaveRequestId, mode: "approve" });
-              setActionNotes("");
-            }}
-            onReject={(leaveRequestId) => {
-              setPendingAction({ leaveRequestId, mode: "reject" });
-              setActionNotes("");
+          <ManagerLeaveKpis summary={summary} />
+
+          {viewMode === "requests" ? (
+            <>
+              <ManagerLeaveFilters
+                filters={filters}
+                lookups={lookups}
+                onChange={updateFilters}
+                disabled={isPending}
+              />
+
+              {pendingAction ? (
+                <section className="rounded-xl border bg-card p-4 shadow-sm">
+                  <p className="text-sm font-medium">
+                    {pendingAction.mode === "approve"
+                      ? "Approve leave request"
+                      : "Reject leave request"}
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-end gap-2">
+                    <Input
+                      value={actionNotes}
+                      onChange={(event) => setActionNotes(event.target.value)}
+                      placeholder={
+                        pendingAction.mode === "approve"
+                          ? "Approval notes (optional)"
+                          : "Rejection reason"
+                      }
+                      className="max-w-md"
+                    />
+                    <Button size="sm" disabled={isPending} onClick={handleQuickAction}>
+                      Confirm
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setPendingAction(null);
+                        setActionNotes("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </section>
+              ) : null}
+
+              <ManagerLeaveTable
+                records={tableState.data}
+                total={tableState.total}
+                page={tableState.page}
+                pageSize={tableState.pageSize}
+                isLoading={isPending}
+                onPageChange={(page) => updateFilters({ page })}
+                onViewDetails={openDetails}
+                onApprove={(leaveRequestId) => {
+                  setPendingAction({ leaveRequestId, mode: "approve" });
+                  setActionNotes("");
+                }}
+                onReject={(leaveRequestId) => {
+                  setPendingAction({ leaveRequestId, mode: "reject" });
+                  setActionNotes("");
+                }}
+              />
+            </>
+          ) : (
+            <ManagerLeaveCalendar
+              leaves={calendarLeaves}
+              holidays={calendarHolidays}
+              month={calendarMonth}
+              year={calendarYear}
+              mode={calendarMode}
+              onModeChange={setCalendarMode}
+              onMonthChange={(month, year) => {
+                setCalendarMonth(month);
+                setCalendarYear(year);
+              }}
+              weekStart={weekStart}
+              onWeekChange={setWeekStart}
+            />
+          )}
+
+          <ManagerLeaveDetailDrawer
+            leaveRequestId={drawerLeaveId}
+            open={drawerOpen}
+            onOpenChange={setDrawerOpen}
+            onActionComplete={() => {
+              refreshRequests(filters);
+              if (viewMode === "calendar") {
+                refreshCalendar(calendarMonth, calendarYear);
+              }
             }}
           />
         </>
-      ) : (
-        <ManagerLeaveCalendar
-          leaves={calendarLeaves}
-          holidays={calendarHolidays}
-          month={calendarMonth}
-          year={calendarYear}
-          mode={calendarMode}
-          onModeChange={setCalendarMode}
-          onMonthChange={(month, year) => {
-            setCalendarMonth(month);
-            setCalendarYear(year);
-          }}
-          weekStart={weekStart}
-          onWeekChange={setWeekStart}
-        />
       )}
-
-      <ManagerLeaveDetailDrawer
-        leaveRequestId={drawerLeaveId}
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        onActionComplete={() => {
-          refreshRequests(filters);
-          if (viewMode === "calendar") {
-            refreshCalendar(calendarMonth, calendarYear);
-          }
-        }}
-      />
     </div>
   );
 }

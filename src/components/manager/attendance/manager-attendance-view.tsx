@@ -29,6 +29,7 @@ type ViewMode = "daily" | "monthly";
 type ManagerAttendanceViewProps = ManagerTeamAttendancePageData & {
   initialFilters: TeamAttendanceListParams;
   today: string;
+  embedded?: boolean;
 };
 
 export function ManagerAttendanceView({
@@ -38,6 +39,7 @@ export function ManagerAttendanceView({
   monthlySummary: initialMonthlySummary,
   initialFilters,
   today,
+  embedded = false,
 }: ManagerAttendanceViewProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("daily");
   const [summary, setSummary] = useState(initialSummary);
@@ -118,14 +120,25 @@ export function ManagerAttendanceView({
 
   const monthLabel = format(new Date(year, month - 1, 1), "MMMM yyyy");
 
-  return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5">
+  const content = (
+    <>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Team Attendance</h1>
-          <p className="text-sm text-muted-foreground">
-            Attendance for employees in your reporting hierarchy only.
-          </p>
+          {embedded ? (
+            <>
+              <h2 className="text-lg font-semibold tracking-tight">Team Attendance</h2>
+              <p className="text-sm text-muted-foreground">
+                Attendance for employees in your reporting hierarchy only.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-2xl font-semibold tracking-tight">Team Attendance</h1>
+              <p className="text-sm text-muted-foreground">
+                Attendance for employees in your reporting hierarchy only.
+              </p>
+            </>
+          )}
         </div>
         <div className="flex items-center gap-2 rounded-lg border bg-card p-1">
           <Button
@@ -270,6 +283,16 @@ export function ManagerAttendanceView({
         onOpenChange={setDrawerOpen}
         onReviewComplete={() => refreshData(filters)}
       />
+    </>
+  );
+
+  if (embedded) {
+    return <div className="flex flex-col gap-4">{content}</div>;
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5">
+      {content}
     </div>
   );
 }

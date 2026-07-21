@@ -25,7 +25,8 @@ import {
 import type { ManagerProfilePageData } from "@/types/manager-self-attendance";
 
 function revalidateSelfAttendancePaths() {
-  revalidatePath(MANAGER_ROUTES.profile);
+  revalidatePath("/manager/attendance");
+  revalidatePath("/manager/profile");
   revalidatePath(MANAGER_ROUTES.home);
   revalidatePath(MANAGER_ROUTES.attendance);
   revalidatePath(MANAGER_ROUTES.reports);
