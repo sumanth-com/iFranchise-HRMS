@@ -7,6 +7,7 @@ import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
+import { Modal } from "@/components/common/modal";
 import { EmployeeAccountStatusBadge } from "@/components/employees/employee-account-status-badge";
 import {
   activateEmployeeAccountAction,
@@ -65,12 +66,15 @@ export function EmployeeAccountProvisioningPanel({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [removedInvitationIds, setRemovedInvitationIds] = useState<string[]>([]);
+  const [exitingInvitationIds, setExitingInvitationIds] = useState<string[]>([]);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<EmployeeAccountProvisioningItem | null>(null);
 
   const pendingSignature = summary.pendingInvitations.map((item) => item.id).join(",");
 
   useEffect(() => {
     setRemovedInvitationIds([]);
+    setExitingInvitationIds([]);
   }, [pendingSignature]);
 
   const visiblePendingInvitations = summary.pendingInvitations.filter(
@@ -85,28 +89,51 @@ export function EmployeeAccountProvisioningPanel({
   );
 
   async function runInvitationAction(
-    employeeId: string,
+    employee: EmployeeAccountProvisioningItem,
     type: "resend" | "cancel",
     action: () => Promise<{ success: true } | { success: false; message: string }>,
     successMessage: string,
+    successDescription?: string,
   ) {
-    setPendingAction({ employeeId, type });
+    setPendingAction({ employeeId: employee.id, type });
     const result = await action();
     setPendingAction(null);
 
     if (!result.success) {
-      toast.error(result.message);
+      toast.error("Action failed", { description: result.message });
       return;
     }
 
     if (type === "cancel") {
-      setRemovedInvitationIds((current) =>
-        current.includes(employeeId) ? current : [...current, employeeId],
+      setCancelTarget(null);
+      setExitingInvitationIds((current) =>
+        current.includes(employee.id) ? current : [...current, employee.id],
       );
+      window.setTimeout(() => {
+        setRemovedInvitationIds((current) =>
+          current.includes(employee.id) ? current : [...current, employee.id],
+        );
+        setExitingInvitationIds((current) =>
+          current.filter((id) => id !== employee.id),
+        );
+      }, 280);
     }
 
-    toast.success(successMessage);
+    toast.success(successMessage, { description: successDescription });
     router.refresh();
+  }
+
+  async function confirmCancelInvitation() {
+    if (!cancelTarget) return;
+    const employee = cancelTarget;
+    setCancelTarget(null);
+    await runInvitationAction(
+      employee,
+      "cancel",
+      () => cancelEmployeeInvitationAction(employee.id),
+      "Invitation cancelled",
+      `${employee.fullName} was removed from pending invitations.`,
+    );
   }
 
   function renderPendingInvitation(employee: EmployeeAccountProvisioningItem) {
@@ -119,8 +146,9 @@ export function EmployeeAccountProvisioningPanel({
     return (
       <li
         key={employee.id}
-        className="rounded-xl border bg-background p-3.5 shadow-sm transition-opacity data-[busy=true]:opacity-70"
+        className="rounded-xl border bg-background p-3.5 shadow-sm transition-all duration-300 data-[busy=true]:opacity-70 data-[removing=true]:pointer-events-none data-[removing=true]:scale-[0.98] data-[removing=true]:opacity-0"
         data-busy={isRowBusy}
+        data-removing={isCancelling || exitingInvitationIds.includes(employee.id)}
       >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-start gap-3">
@@ -146,13 +174,14 @@ export function EmployeeAccountProvisioningPanel({
               <Button
                 size="sm"
                 variant="outline"
-                disabled={isPending || isRowBusy || !inviteServiceReady}
+                disabled={isPending || isRowBusy || !inviteServiceReady || Boolean(cancelTarget)}
                 onClick={() =>
                   runInvitationAction(
-                    employee.id,
+                    employee,
                     "resend",
                     () => resendEmployeeInvitationAction(employee.id),
                     "Invitation resent",
+                    `A new invitation email was sent to ${employee.email}.`,
                   )
                 }
               >
@@ -168,22 +197,10 @@ export function EmployeeAccountProvisioningPanel({
               <Button
                 size="sm"
                 variant="outline"
-                disabled={isPending || isRowBusy || !inviteServiceReady}
-                onClick={() => {
-                  if (!window.confirm(`Cancel invitation for ${employee.fullName}?`)) return;
-                  void runInvitationAction(
-                    employee.id,
-                    "cancel",
-                    () => cancelEmployeeInvitationAction(employee.id),
-                    "Invitation cancelled",
-                  );
-                }}
+                disabled={isPending || isRowBusy || !inviteServiceReady || Boolean(cancelTarget)}
+                onClick={() => setCancelTarget(employee)}
               >
-                {isCancelling ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <XCircle className="size-4" />
-                )}
+                <XCircle className="size-4" />
                 Cancel
               </Button>
             ) : null}
@@ -231,56 +248,101 @@ export function EmployeeAccountProvisioningPanel({
   );
 
   return (
-    <section className="rounded-2xl border bg-card p-4 shadow-sm md:p-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch lg:justify-between">
-        {canInvite ? (
-          <EmployeeInviteSection
-            lookups={{
-              departments: lookups.departments,
-              employmentTypes: lookups.employmentTypes,
-              managers: lookups.managers,
-            }}
-            canInvite={canInvite}
-            inviteServiceReady={inviteServiceReady}
-          />
-        ) : (
-          <div className="hidden lg:block lg:max-w-sm" />
-        )}
-        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:max-w-xl">
-          <StatCard label="Draft" value={summary.draft + summary.invited} />
-          <StatCard label="Pending" value={pendingCount} />
-          <StatCard label="Active" value={summary.active} />
-          <StatCard label="Suspended" value={summary.suspended} />
-        </div>
-      </div>
-
-      <div className="mt-5 grid gap-4 xl:grid-cols-2">
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold">Pending invitations</h3>
-          {visiblePendingInvitations.length === 0 ? (
-            <div className="rounded-xl border border-dashed bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
-              No pending invitations.
-            </div>
+    <>
+      <section className="rounded-2xl border bg-card p-4 shadow-sm md:p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch lg:justify-between">
+          {canInvite ? (
+            <EmployeeInviteSection
+              lookups={{
+                departments: lookups.departments,
+                employmentTypes: lookups.employmentTypes,
+                managers: lookups.managers,
+              }}
+              canInvite={canInvite}
+              inviteServiceReady={inviteServiceReady}
+            />
           ) : (
-            <ul className="space-y-2">
-              {visiblePendingInvitations.map(renderPendingInvitation)}
-            </ul>
+            <div className="hidden lg:block lg:max-w-sm" />
           )}
+          <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:max-w-xl">
+            <StatCard label="Draft" value={summary.draft + summary.invited} />
+            <StatCard label="Pending" value={pendingCount} />
+            <StatCard label="Active" value={summary.active} />
+            <StatCard label="Suspended" value={summary.suspended} />
+          </div>
         </div>
 
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold">Suspended accounts</h3>
-          {summary.suspendedAccounts.length === 0 ? (
-            <div className="rounded-xl border border-dashed bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
-              No suspended employee accounts.
-            </div>
-          ) : (
-            <ul className="space-y-2">
-              {summary.suspendedAccounts.map(renderSuspendedEmployee)}
-            </ul>
-          )}
+        <div className="mt-5 grid gap-4 xl:grid-cols-2">
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold">Pending invitations</h3>
+            {visiblePendingInvitations.length === 0 ? (
+              <div className="rounded-xl border border-dashed bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
+                No pending invitations.
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {visiblePendingInvitations.map(renderPendingInvitation)}
+              </ul>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold">Suspended accounts</h3>
+            {summary.suspendedAccounts.length === 0 ? (
+              <div className="rounded-xl border border-dashed bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
+                No suspended employee accounts.
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {summary.suspendedAccounts.map(renderSuspendedEmployee)}
+              </ul>
+            )}
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+
+      <Modal
+        open={Boolean(cancelTarget)}
+        onOpenChange={(open) => {
+          if (!open && !pendingAction) setCancelTarget(null);
+        }}
+        title="Cancel invitation?"
+        description={
+          cancelTarget
+            ? `This will withdraw the invitation for ${cancelTarget.fullName} (${cancelTarget.email}). They will no longer be able to activate their account with the current link.`
+            : undefined
+        }
+        showCancel={false}
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={pendingAction?.type === "cancel"}
+              onClick={() => setCancelTarget(null)}
+            >
+              Keep invitation
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={pendingAction?.type === "cancel"}
+              onClick={() => void confirmCancelInvitation()}
+            >
+              {pendingAction?.type === "cancel" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <XCircle className="size-4" />
+              )}
+              Yes, cancel invitation
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          You can send a new invitation later from the employee record if needed.
+        </p>
+      </Modal>
+    </>
   );
 }

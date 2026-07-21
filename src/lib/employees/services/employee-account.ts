@@ -187,17 +187,40 @@ async function notifyEmployeeAccount(
   });
 }
 
+function isInvitationColumnSchemaError(message: string) {
+  return (
+    message.includes("invitation_expires_at") ||
+    message.includes("invitation_token")
+  );
+}
+
+function stripInvitationFields(values: Record<string, unknown>) {
+  const next = { ...values };
+  delete next.invitation_token;
+  delete next.invitation_expires_at;
+  return next;
+}
+
 async function updateEmployeeAccount(
   employeeId: string,
   values: Record<string, unknown>,
 ) {
   const admin = createAdminClient();
-  const { error } = await admin
+  let { error } = await admin
     .schema("hrms")
     .from("employees")
     .update(values)
     .eq("id", employeeId)
     .is("deleted_at", null);
+
+  if (error && isInvitationColumnSchemaError(error.message)) {
+    ({ error } = await admin
+      .schema("hrms")
+      .from("employees")
+      .update(stripInvitationFields(values))
+      .eq("id", employeeId)
+      .is("deleted_at", null));
+  }
 
   if (error) throw new Error(error.message);
 }
@@ -207,12 +230,21 @@ async function updateEmployeeAccountWithClient(
   employeeId: string,
   values: Record<string, unknown>,
 ) {
-  const { error } = await supabase
+  let { error } = await supabase
     .schema("hrms")
     .from("employees")
     .update(values)
     .eq("id", employeeId)
     .is("deleted_at", null);
+
+  if (error && isInvitationColumnSchemaError(error.message)) {
+    ({ error } = await supabase
+      .schema("hrms")
+      .from("employees")
+      .update(stripInvitationFields(values))
+      .eq("id", employeeId)
+      .is("deleted_at", null));
+  }
 
   if (error) throw new Error(error.message);
 }
