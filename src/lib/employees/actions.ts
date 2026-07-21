@@ -27,6 +27,7 @@ import {
   createEmployeeFromWizard,
   createSignedStorageUrl,
   ensureDefaultDocumentTypes,
+  resolveOrCreateDesignation,
   softDeleteEmployee,
   updateEmployee,
   uploadEmployeeDocument,
@@ -243,10 +244,16 @@ export async function inviteEmployeeAction(
     const profile = await requireServerPermission("employee_account.invite");
     const parsed = employeeInviteSchema.parse(input);
     const supabase = await getAuthenticatedSupabase();
+    const designationId = await resolveOrCreateDesignation(
+      supabase,
+      profile.employee.organizationId,
+      profile.userId,
+      parsed.designation,
+    );
     const employeeId = await inviteEmployeeByEmail(supabase, profile, parsed.email, {
       fullName: parsed.fullName,
       departmentId: parsed.departmentId,
-      designationId: parsed.designationId,
+      designationId,
       employmentTypeId: parsed.employmentTypeId,
       reportingManagerId: parsed.reportingManagerId,
     });

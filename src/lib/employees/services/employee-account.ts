@@ -632,6 +632,8 @@ export async function cancelEmployeeInvitation(
     user_id: null,
     account_status: "draft",
     invitation_cancelled_at: new Date().toISOString(),
+    invitation_token: null,
+    invitation_expires_at: null,
     updated_by: profile.userId,
   });
   await writeAccountAudit(

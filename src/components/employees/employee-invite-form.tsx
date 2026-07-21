@@ -1,13 +1,14 @@
 "use client";
 
-import { Loader2, Mail, UserRoundPlus } from "lucide-react";
+import { ChevronRight, Loader2, Mail, UserRoundPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
+import { Modal } from "@/components/common/modal";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
@@ -22,21 +23,30 @@ import type { LookupOption } from "@/types/employee";
 type EmployeeInviteFormProps = {
   lookups: {
     departments: LookupOption[];
-    designations: LookupOption[];
     employmentTypes: LookupOption[];
     managers: LookupOption[];
   };
   canInvite: boolean;
   inviteServiceReady: boolean;
+  formId?: string;
+  onSuccess?: () => void;
+  onPendingChange?: (pending: boolean) => void;
 };
 
 export function EmployeeInviteForm({
   lookups,
   canInvite,
   inviteServiceReady,
+  formId = "employee-invite-form",
+  onSuccess,
+  onPendingChange,
 }: EmployeeInviteFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    onPendingChange?.(isPending);
+  }, [isPending, onPendingChange]);
 
   const {
     register,
@@ -51,14 +61,13 @@ export function EmployeeInviteForm({
       fullName: "",
       email: "",
       departmentId: "",
-      designationId: "",
+      designation: "",
       employmentTypeId: "",
       reportingManagerId: "",
     },
   });
 
   const departmentId = watch("departmentId");
-  const designationId = watch("designationId");
   const employmentTypeId = watch("employmentTypeId");
   const reportingManagerId = watch("reportingManagerId");
 
@@ -71,13 +80,14 @@ export function EmployeeInviteForm({
       }
       toast.success("Invitation sent successfully");
       reset();
+      onSuccess?.();
       router.refresh();
     });
   });
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2">
+    <form id={formId} onSubmit={onSubmit} className="space-y-5">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="fullName">Employee Name *</Label>
           <Input
@@ -96,21 +106,17 @@ export function EmployeeInviteForm({
           <Input
             id="email"
             type="email"
-            placeholder="name@gmail.com"
+            placeholder="name@company.com"
             disabled={isPending || !canInvite}
             {...register("email")}
           />
           {errors.email ? (
             <p className="text-xs text-destructive">{errors.email.message}</p>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              Any valid email works — Gmail, personal, or company address.
-            </p>
-          )}
+          ) : null}
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="departmentId">Department *</Label>
           <LabeledSelect
@@ -127,17 +133,15 @@ export function EmployeeInviteForm({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="designationId">Designation *</Label>
-          <LabeledSelect
-            id="designationId"
-            items={toLookupSelectItems(lookups.designations)}
-            value={designationId}
-            onValueChange={(value) => setValue("designationId", value, { shouldValidate: true })}
-            placeholder="Select designation"
+          <Label htmlFor="designation">Designation *</Label>
+          <Input
+            id="designation"
+            placeholder="Website Developer Intern"
             disabled={isPending || !canInvite}
+            {...register("designation")}
           />
-          {errors.designationId ? (
-            <p className="text-xs text-destructive">{errors.designationId.message}</p>
+          {errors.designation ? (
+            <p className="text-xs text-destructive">{errors.designation.message}</p>
           ) : null}
         </div>
 
@@ -176,21 +180,11 @@ export function EmployeeInviteForm({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 pt-1">
-        <Button
-          type="submit"
-          size="sm"
-          disabled={isPending || !canInvite || !inviteServiceReady}
-        >
-          {isPending ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
-          Send Invite
-        </Button>
-        {!inviteServiceReady ? (
-          <p className="text-xs text-amber-600">
-            Invite sending is not configured for this environment.
-          </p>
-        ) : null}
-      </div>
+      {!inviteServiceReady ? (
+        <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+          Invite sending is not configured for this environment.
+        </p>
+      ) : null}
     </form>
   );
 }
@@ -200,20 +194,70 @@ export function EmployeeInviteSection({
   canInvite,
   inviteServiceReady,
 }: EmployeeInviteFormProps) {
+  const [open, setOpen] = useState(false);
+  const [isPending, setIsPending] = useState(false);
+
+  function handleOpenChange(next: boolean) {
+    if (!isPending) setOpen(next);
+  }
+
   return (
-    <div className="space-y-3">
-      <h2 className="flex items-center gap-2 text-base font-semibold">
-        <UserRoundPlus className="size-4 text-primary" />
-        Invite Employee
-      </h2>
-      <p className="text-sm text-muted-foreground">
-        Enter employee details and we will send a secure onboarding invitation to their email.
-      </p>
-      <EmployeeInviteForm
-        lookups={lookups}
-        canInvite={canInvite}
-        inviteServiceReady={inviteServiceReady}
-      />
-    </div>
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        disabled={!canInvite}
+        className="flex h-[52px] w-full items-center justify-between rounded-xl border bg-background px-4 text-left shadow-sm transition-colors hover:bg-accent/40 disabled:cursor-not-allowed disabled:opacity-60 lg:max-w-sm"
+      >
+        <span className="flex items-center gap-2.5 text-sm font-medium">
+          <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <UserRoundPlus className="size-4" />
+          </span>
+          Invite Employee
+        </span>
+        <ChevronRight className="size-4 text-muted-foreground" />
+      </button>
+
+      <Modal
+        open={open}
+        onOpenChange={handleOpenChange}
+        title="Invite Employee"
+        description="Send a secure onboarding invitation to the employee's email."
+        contentClassName="sm:max-w-2xl"
+        showCancel={false}
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPending}
+              onClick={() => setOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="employee-invite-form"
+              disabled={isPending || !canInvite || !inviteServiceReady}
+            >
+              {isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Mail className="size-4" />
+              )}
+              Send Invite
+            </Button>
+          </>
+        }
+      >
+        <EmployeeInviteForm
+          lookups={lookups}
+          canInvite={canInvite}
+          inviteServiceReady={inviteServiceReady}
+          onPendingChange={setIsPending}
+          onSuccess={() => setOpen(false)}
+        />
+      </Modal>
+    </>
   );
 }

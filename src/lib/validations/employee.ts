@@ -75,7 +75,11 @@ export const employeeInviteSchema = z.object({
     .max(100, "Employee name must be 100 characters or fewer"),
   email: z.string().trim().email("Enter a valid company email"),
   departmentId: z.string().uuid("Select a department"),
-  designationId: z.string().uuid("Select a designation"),
+  designation: z
+    .string()
+    .trim()
+    .min(1, "Enter a designation")
+    .max(100, "Designation must be 100 characters or fewer"),
   employmentTypeId: z.string().uuid("Select an employment type"),
   reportingManagerId: z.string().uuid("Select a reporting manager"),
 });

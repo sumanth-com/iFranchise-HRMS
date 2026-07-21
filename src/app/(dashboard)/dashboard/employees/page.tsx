@@ -121,7 +121,6 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
           summary={accountProvisioning}
           lookups={{
             departments: inviteLookups.departments,
-            designations: inviteLookups.designations,
             employmentTypes: inviteLookups.employmentTypes,
             managers: inviteLookups.managers,
           }}
