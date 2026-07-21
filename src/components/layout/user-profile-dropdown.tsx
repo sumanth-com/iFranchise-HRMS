@@ -1,14 +1,11 @@
 "use client";
 
 import {
-  Building2,
   ChevronDown,
   CircleHelp,
   LogOut,
   Moon,
-  Settings,
   Sun,
-  User,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -26,14 +23,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  canViewCompanySettings,
-  COMPANY_SETTINGS_ROUTES,
-} from "@/lib/company-settings/constants";
-import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
-import { EMPLOYEE_ROUTES as EMPLOYEE_PORTAL_ROUTES } from "@/lib/employee/constants";
-import { CEO_ROUTES } from "@/lib/ceo/constants";
-import { MANAGER_ROUTES } from "@/lib/manager/constants";
+import { getPortalHelpHref } from "@/lib/auth/portal-account-menu";
 import { useAuth } from "@/providers/auth-provider";
 
 function getInitials(firstName: string, lastName: string): string {
@@ -46,25 +36,11 @@ export function UserProfileDropdown() {
   const { profile, isLoading, signOut, portalHome } = useAuth();
   const [signOutOpen, setSignOutOpen] = useState(false);
 
-  const { employee, roles, permissionCodes } = profile;
+  const { employee, roles } = profile;
   const displayName = `${employee.firstName} ${employee.lastName}`;
   const primaryRole = roles[0]?.name ?? "User";
-  const isManagerPortal = portalHome.startsWith("/manager");
-  const isCeoPortal = portalHome.startsWith("/ceo");
-  const isEmployeePortal = portalHome === "/employee" || portalHome.startsWith("/employee/");
   const isDark = resolvedTheme === "dark";
-  const profileHref = isManagerPortal
-    ? MANAGER_ROUTES.profile
-    : isCeoPortal
-      ? CEO_ROUTES.profile
-      : EMPLOYEE_ROUTES.detail(employee);
-  const settingsHref = isManagerPortal
-    ? MANAGER_ROUTES.settings
-    : isCeoPortal
-      ? `${CEO_ROUTES.profile}#preferences`
-      : null;
-  const helpHref = isEmployeePortal ? EMPLOYEE_PORTAL_ROUTES.help : null;
-  const canOpenCompanySettings = canViewCompanySettings(permissionCodes);
+  const helpHref = getPortalHelpHref(portalHome);
 
   async function handleSignOut() {
     setSignOutOpen(false);
@@ -99,30 +75,10 @@ export function UserProfileDropdown() {
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {!isEmployeePortal ? (
-            <DropdownMenuItem onClick={() => router.push(profileHref)}>
-              <User className="size-4" />
-              Profile
-            </DropdownMenuItem>
-          ) : null}
-          {helpHref ? (
-            <DropdownMenuItem onClick={() => router.push(helpHref)}>
-              <CircleHelp className="size-4" />
-              Help
-            </DropdownMenuItem>
-          ) : null}
-          {settingsHref ? (
-            <DropdownMenuItem onClick={() => router.push(settingsHref)}>
-              <Settings className="size-4" />
-              Settings
-            </DropdownMenuItem>
-          ) : null}
-          {canOpenCompanySettings ? (
-            <DropdownMenuItem onClick={() => router.push(COMPANY_SETTINGS_ROUTES.base)}>
-              <Building2 className="size-4" />
-              Company Setting
-            </DropdownMenuItem>
-          ) : null}
+          <DropdownMenuItem onClick={() => router.push(helpHref)}>
+            <CircleHelp className="size-4" />
+            Help
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setTheme(isDark ? "light" : "dark")}>
             {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
             {isDark ? "Light mode" : "Dark mode"}
