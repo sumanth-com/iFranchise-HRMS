@@ -69,7 +69,7 @@ const QUICK_FAQS = [
   },
   {
     q: "How do I change my password?",
-    a: "Settings → Account & security → Reset password. Use at least 12 characters with upper, lower, number, and a special character.",
+    a: "Settings → Account & security → Reset password. We email you a secure link — open it to set a new password, then sign in again.",
   },
   {
     q: "How do I silence notification sounds?",

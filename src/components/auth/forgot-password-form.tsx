@@ -12,9 +12,8 @@ import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { forgotPasswordAction } from "@/lib/auth/actions";
 import { AUTH_ROUTES } from "@/lib/auth/constants";
-import { getPasswordResetRedirectTo } from "@/lib/auth/reset-redirect";
-import { createClient } from "@/lib/supabase/client";
 import { getAuthErrorMessage } from "@/lib/auth/errors";
+import { sendPasswordResetEmail } from "@/lib/auth/password-reset-client";
 import {
   forgotPasswordSchema,
   type ForgotPasswordInput,
@@ -49,11 +48,7 @@ export function ForgotPasswordForm() {
       }
 
       if (result.resolvedEmail) {
-        const supabase = createClient();
-        const { error } = await supabase.auth.resetPasswordForEmail(
-          result.resolvedEmail,
-          { redirectTo: getPasswordResetRedirectTo() },
-        );
+        const { error } = await sendPasswordResetEmail(result.resolvedEmail);
 
         if (error) {
           const message = getAuthErrorMessage("SERVER_ERROR");

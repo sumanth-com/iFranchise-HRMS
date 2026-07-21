@@ -1,14 +1,10 @@
 "use client";
 
-import { KeyRound, Loader2, Monitor, Moon, Sun } from "lucide-react";
+import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useEffect, useState, useTransition } from "react";
-import { toast } from "sonner";
+import { useEffect, useState } from "react";
 
-import { Button } from "@/components/common/button";
-import { Input } from "@/components/common/input";
-import { employeeChangePasswordAction } from "@/lib/employee/actions/employee-settings-actions";
-import { useRegisterUnsavedChanges } from "@/providers/unsaved-changes-provider";
+import { AccountPasswordResetSection } from "@/components/auth/account-password-reset-section";
 import { cn } from "@/lib/utils";
 
 const THEME_OPTIONS = [
@@ -72,112 +68,11 @@ function AppearanceSection() {
   );
 }
 
-function AccountSection({ email }: { email: string }) {
-  const [showForm, setShowForm] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [isPending, startTransition] = useTransition();
-  const hasPasswordDraft =
-    showForm && Boolean(currentPassword || newPassword || confirmPassword);
-
-  useRegisterUnsavedChanges("employee-password", "Password update", hasPasswordDraft);
-
-  function changePassword() {
-    startTransition(async () => {
-      const result = await employeeChangePasswordAction({
-        currentPassword,
-        newPassword,
-        confirmPassword,
-      });
-      if (result.success) {
-        toast.success(result.message);
-        setCurrentPassword("");
-        setNewPassword("");
-        setConfirmPassword("");
-        setShowForm(false);
-      } else {
-        toast.error(result.message);
-      }
-    });
-  }
-
-  return (
-    <section className="rounded-xl border bg-card p-4 shadow-sm md:p-5">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold tracking-tight">Account & security</h2>
-          <p className="text-xs text-muted-foreground">
-            Signed in as <span className="font-medium text-foreground">{email}</span>
-          </p>
-        </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={isPending}
-          onClick={() => setShowForm((value) => !value)}
-        >
-          <KeyRound className="size-3.5" />
-          Reset password
-        </Button>
-      </div>
-
-      {showForm ? (
-        <div className="grid max-w-xl gap-3 sm:grid-cols-2">
-          <Input
-            type="password"
-            autoComplete="current-password"
-            placeholder="Current password"
-            className="sm:col-span-2"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            disabled={isPending}
-          />
-          <Input
-            type="password"
-            autoComplete="new-password"
-            placeholder="New password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            disabled={isPending}
-          />
-          <Input
-            type="password"
-            autoComplete="new-password"
-            placeholder="Confirm new password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            disabled={isPending}
-          />
-          <p className="text-xs text-muted-foreground sm:col-span-2">
-            Use at least 12 characters with an uppercase letter, a number, and a special character.
-          </p>
-          <Button
-            type="button"
-            size="sm"
-            className="sm:col-span-2"
-            disabled={isPending || !currentPassword || !newPassword || !confirmPassword}
-            onClick={changePassword}
-          >
-            {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-            Update password
-          </Button>
-        </div>
-      ) : (
-        <p className="text-xs text-muted-foreground">
-          Keep your account secure by using a strong, unique password.
-        </p>
-      )}
-    </section>
-  );
-}
-
 export function EmployeeSettingsView({ email }: { email: string }) {
   return (
     <>
       <AppearanceSection />
-      <AccountSection email={email} />
+      <AccountPasswordResetSection email={email} />
     </>
   );
 }

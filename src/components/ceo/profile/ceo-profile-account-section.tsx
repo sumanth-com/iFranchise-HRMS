@@ -5,10 +5,10 @@ import { Loader2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { AccountPasswordResetSection } from "@/components/auth/account-password-reset-section";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import {
-  changeCeoPasswordAction,
   signOutOtherCeoSessionsAction,
   toggleCeoMfaAction,
   verifyCeoMfaAction,
@@ -33,34 +33,10 @@ export function CeoProfileAccountSection({
   account: CeoAccountInfo;
   onUpdated: () => void;
 }) {
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
   const [mfaQr, setMfaQr] = useState<string | null>(null);
   const [mfaCode, setMfaCode] = useState("");
   const [isPending, startTransition] = useTransition();
-
-  function changePassword() {
-    startTransition(async () => {
-      const result = await changeCeoPasswordAction({
-        currentPassword,
-        newPassword,
-        confirmPassword,
-      });
-      if (result.success) {
-        toast.success(result.message);
-        setCurrentPassword("");
-        setNewPassword("");
-        setConfirmPassword("");
-        setShowPasswordForm(false);
-        onUpdated();
-      } else {
-        toast.error(result.message);
-      }
-    });
-  }
 
   function toggleMfa() {
     startTransition(async () => {
@@ -155,15 +131,6 @@ export function CeoProfileAccountSection({
           size="sm"
           variant="outline"
           disabled={isPending}
-          onClick={() => setShowPasswordForm((value) => !value)}
-        >
-          Change password
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={isPending}
           onClick={toggleMfa}
         >
           {account.twoFactorEnabled ? "Disable 2FA" : "Enable 2FA"}
@@ -179,41 +146,13 @@ export function CeoProfileAccountSection({
         </Button>
       </div>
 
-      {showPasswordForm ? (
-        <div className="mt-4 grid max-w-xl gap-3 sm:grid-cols-3">
-          <Input
-            type="password"
-            placeholder="Current password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            disabled={isPending}
-          />
-          <Input
-            type="password"
-            placeholder="New password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            disabled={isPending}
-          />
-          <Input
-            type="password"
-            placeholder="Confirm password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            disabled={isPending}
-          />
-          <Button
-            type="button"
-            size="sm"
-            className="sm:col-span-3"
-            disabled={isPending}
-            onClick={changePassword}
-          >
-            {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-            Update password
-          </Button>
-        </div>
-      ) : null}
+      <div className="mt-4">
+        <AccountPasswordResetSection
+          email={account.email}
+          embedded
+          description="Send a secure reset link to your work email. Open the link to choose a new password, then sign in again."
+        />
+      </div>
 
       {mfaQr ? (
         <div className="mt-4 space-y-3 rounded-lg border p-4">

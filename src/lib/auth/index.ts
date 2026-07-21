@@ -2,6 +2,7 @@ export {
   loginAction,
   logoutAction,
   forgotPasswordAction,
+  requestPasswordResetEmailAction,
   resetPasswordAction,
 } from "./actions";
 export { AUTH_ROUTES, PUBLIC_ROUTES } from "./constants";

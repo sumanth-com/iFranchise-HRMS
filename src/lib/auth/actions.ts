@@ -19,6 +19,7 @@ import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
 import { recordEmployeeSuccessfulLogin } from "@/lib/employees/services/employee-account";
 import { recordUserLoginSession } from "@/lib/ceo/services/ceo-profile-queries";
+import { requireAuthenticatedProfile } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 import {
   forgotPasswordSchema,
@@ -223,6 +224,37 @@ export async function forgotPasswordAction(
     redirectTo: AUTH_ROUTES.forgotPassword,
     resolvedEmail: email,
   };
+}
+
+export async function requestPasswordResetEmailAction(): Promise<AuthActionResult> {
+  try {
+    const profile = await requireAuthenticatedProfile();
+    const email = await resolveApprovedLoginEmail(profile.email);
+    const supabase = await createClient();
+
+    const ctx = await getRequestAuditContext();
+    await writeApplicationAudit(supabase, {
+      organizationId: profile.employee?.organizationId ?? null,
+      module: "settings",
+      action: "password_reset",
+      description: `Password reset requested from settings for ${email}`,
+      recordId: email,
+      priority: "high",
+      ...ctx,
+    });
+
+    return {
+      success: true,
+      redirectTo: "",
+      resolvedEmail: email,
+    };
+  } catch {
+    return {
+      success: false,
+      error: "SERVER_ERROR",
+      message: getAuthErrorMessage("SERVER_ERROR"),
+    };
+  }
 }
 
 export async function resetPasswordAction(
