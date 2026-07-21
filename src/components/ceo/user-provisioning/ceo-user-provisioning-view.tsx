@@ -10,6 +10,7 @@ import {
 } from "@/components/ceo/ceo-module-primitives";
 import { CeoInviteUserDialog } from "@/components/ceo/user-provisioning/ceo-invite-user-dialog";
 import { CeoProvisioningDrawer } from "@/components/ceo/user-provisioning/ceo-provisioning-drawer";
+import { CeoProvisioningFilters } from "@/components/ceo/user-provisioning/ceo-provisioning-filters";
 import { CeoProvisioningPeople } from "@/components/ceo/user-provisioning/ceo-provisioning-people";
 import { CeoProvisioningSummaryCards } from "@/components/ceo/user-provisioning/ceo-provisioning-summary";
 import { Button } from "@/components/common/button";
@@ -61,6 +62,13 @@ export function CeoUserProvisioningView({
   const [pageParams, setPageParams] = useState<CeoProvisioningListParams>({
     page: initialFilters.page ?? 1,
     pageSize: initialFilters.pageSize ?? 8,
+    search: initialFilters.search,
+    roleCode: initialFilters.roleCode,
+    departmentId: initialFilters.departmentId,
+    branchId: initialFilters.branchId,
+    portalKey: initialFilters.portalKey,
+    employmentTypeId: initialFilters.employmentTypeId,
+    invitationStatus: initialFilters.invitationStatus,
   });
   const [inviteOpen, setInviteOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -82,6 +90,11 @@ export function CeoUserProvisioningView({
       setUsers(data.users);
     });
   }, []);
+
+  function applyFilters(next: CeoProvisioningListParams) {
+    setPageParams(next);
+    refreshList(next);
+  }
 
   function changePage(page: number) {
     const next = { ...pageParams, page };
@@ -148,6 +161,13 @@ export function CeoUserProvisioningView({
       </div>
 
       <CeoProvisioningSummaryCards summary={summary} />
+
+      <CeoProvisioningFilters
+        filters={pageParams}
+        lookups={lookups}
+        disabled={isPending}
+        onChange={applyFilters}
+      />
 
       <CeoProvisioningPeople
         users={users.data}

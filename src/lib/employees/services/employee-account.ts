@@ -871,7 +871,52 @@ export async function recordEmployeeSuccessfulLogin(
       },
     });
 
-    // Notify the inviter (e.g. the CEO) that the invitation was accepted.
+    // Notify executive stakeholders that the invitation was accepted.
+    try {
+      const { data: userRoles } = await supabase
+        .schema("hrms")
+        .from("user_roles")
+        .select("roles:role_id ( code )")
+        .eq("user_id", userId)
+        .eq("status", "active")
+        .is("deleted_at", null);
+
+      const roleCodes = (userRoles ?? [])
+        .map((row) => {
+          const role = Array.isArray(row.roles) ? row.roles[0] : row.roles;
+          return String(role?.code ?? "").toLowerCase();
+        })
+        .filter(Boolean);
+
+      const isExecutiveInvite =
+        roleCodes.some((code) => code !== "employee") &&
+        !roleCodes.every((code) => code === "employee");
+
+      if (isExecutiveInvite) {
+        const { notifyProvisioningStakeholders } = await import(
+          "@/lib/user-provisioning/notifications"
+        );
+        await notifyProvisioningStakeholders(supabase, {
+          organizationId: employeeRow.organization_id,
+          event: "invitation_accepted",
+          subjectName: fullName(employeeRow),
+          subjectEmail: email,
+          employeeId: employeeRow.id,
+          actorUserId: userId,
+        });
+        await notifyProvisioningStakeholders(supabase, {
+          organizationId: employeeRow.organization_id,
+          event: "account_activated",
+          subjectName: fullName(employeeRow),
+          subjectEmail: email,
+          employeeId: employeeRow.id,
+          actorUserId: userId,
+        });
+      }
+    } catch {
+      // Notifying stakeholders must never block a successful login.
+    }
+
     const inviterUserId = (employee as { created_by?: string | null }).created_by ?? null;
     if (inviterUserId && inviterUserId !== userId) {
       try {

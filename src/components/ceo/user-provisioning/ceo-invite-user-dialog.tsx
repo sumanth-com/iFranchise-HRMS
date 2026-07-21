@@ -1,7 +1,9 @@
 "use client";
 
 import { Loader2, Send } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
@@ -20,12 +22,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { LabeledSelect } from "@/components/payroll/payroll-select";
+import { toLookupSelectItems } from "@/components/payroll/select-utils";
 import { inviteExecutiveUserAction } from "@/lib/ceo/actions/ceo-user-provisioning-actions";
+import {
+  inviteExecutiveUserSchema,
+  type InviteExecutiveUserInput,
+} from "@/lib/validations/ceo-user-provisioning";
 import { cn } from "@/lib/utils";
-import type { LookupOption } from "@/types/employee";
 import type { CeoProvisioningLookups } from "@/types/ceo-user-provisioning";
-
-const OTHER_ROLE_VALUE = "__other__";
 
 type CeoInviteUserDialogProps = {
   open: boolean;
@@ -35,78 +41,6 @@ type CeoInviteUserDialogProps = {
   onInvited: () => void;
 };
 
-type FormState = {
-  email: string;
-  roleCode: string;
-  customRole: string;
-  departmentId: string;
-  designationId: string;
-  reportingToId: string;
-  notes: string;
-};
-
-const EMPTY_FORM: FormState = {
-  email: "",
-  roleCode: "",
-  customRole: "",
-  departmentId: "",
-  designationId: "",
-  reportingToId: "",
-  notes: "",
-};
-
-function FieldLabel({
-  children,
-  required,
-}: {
-  children: React.ReactNode;
-  required?: boolean;
-}) {
-  return (
-    <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-      {children}
-      {required ? <span className="text-destructive"> *</span> : null}
-    </label>
-  );
-}
-
-function LabeledSelect({
-  value,
-  placeholder,
-  options,
-  onChange,
-  disabled,
-}: {
-  value: string;
-  placeholder: string;
-  options: LookupOption[];
-  onChange: (value: string) => void;
-  disabled?: boolean;
-}) {
-  const selected = options.find((option) => option.id === value);
-  return (
-    <Select
-      value={value ? value : null}
-      onValueChange={(next) => onChange(next ?? "")}
-      disabled={disabled}
-    >
-      <SelectTrigger className="h-10 w-full">
-        <SelectValue placeholder={placeholder}>{selected?.label ?? placeholder}</SelectValue>
-      </SelectTrigger>
-      <SelectContent
-        alignItemWithTrigger={false}
-        className="w-(--anchor-width) max-w-[min(100vw-2rem,26rem)]"
-      >
-        {options.map((option) => (
-          <SelectItem key={option.id} value={option.id}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
-
 export function CeoInviteUserDialog({
   open,
   onOpenChange,
@@ -114,63 +48,65 @@ export function CeoInviteUserDialog({
   inviteServiceReady,
   onInvited,
 }: CeoInviteUserDialogProps) {
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [isPending, startTransition] = useTransition();
 
-  const roleOptions: LookupOption[] = [
-    ...lookups.roles,
-    { id: OTHER_ROLE_VALUE, label: "Others (type manually)" },
-  ];
-  const isCustomRole = form.roleCode === OTHER_ROLE_VALUE;
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    reset,
+    formState: { errors },
+  } = useForm<InviteExecutiveUserInput>({
+    resolver: zodResolver(inviteExecutiveUserSchema),
+    defaultValues: {
+      fullName: "",
+      email: "",
+      roleCode: "",
+      departmentId: "",
+      designation: "",
+      reportingToId: "",
+      employmentTypeId: "",
+      branchId: "",
+      notes: "",
+    },
+  });
 
-  function update<K extends keyof FormState>(key: K, value: FormState[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  }
+  const roleCode = watch("roleCode");
+  const departmentId = watch("departmentId");
+  const reportingToId = watch("reportingToId");
+  const employmentTypeId = watch("employmentTypeId");
+  const branchId = watch("branchId");
 
   function handleOpenChange(next: boolean) {
-    if (!next) setForm(EMPTY_FORM);
+    if (!next) reset();
     onOpenChange(next);
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
+  const onSubmit = handleSubmit((data) => {
     if (!inviteServiceReady) {
       toast.error("Invitations are not configured on this environment.");
       return;
     }
-    const email = form.email.trim();
-    const roleCode = isCustomRole ? form.customRole.trim().toLowerCase() : form.roleCode;
-
-    if (!email) return toast.error("Enter an email address.");
-    if (!roleCode) return toast.error("Select or enter a role.");
-    if (!form.departmentId) return toast.error("Select a department.");
-    if (!form.designationId) return toast.error("Select a designation.");
 
     startTransition(async () => {
-      const result = await inviteExecutiveUserAction({
-        email,
-        roleCode,
-        departmentId: form.departmentId,
-        designationId: form.designationId,
-        reportingToId: form.reportingToId || undefined,
-        notes: form.notes.trim() || undefined,
-      });
-
+      const result = await inviteExecutiveUserAction(data);
       if (!result.success) {
         toast.error(result.message);
         return;
       }
       toast.success(result.message);
-      setForm(EMPTY_FORM);
+      reset();
       onOpenChange(false);
       onInvited();
     });
-  }
+  });
+
+  const selectedRole = lookups.roles.find((role) => role.code === roleCode);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
         <DialogHeader className="shrink-0 border-b px-5 py-4">
           <DialogTitle>Invite User</DialogTitle>
           <DialogDescription>
@@ -178,85 +114,161 @@ export function CeoInviteUserDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
-            <div>
-              <FieldLabel required>Email Address</FieldLabel>
-              <Input
-                type="email"
-                value={form.email}
-                onChange={(event) => update("email", event.target.value)}
-                placeholder="name@gmail.com"
-                className="h-10"
-                disabled={isPending}
-                autoFocus
-              />
+        <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="fullName">Full Name *</Label>
+                <Input
+                  id="fullName"
+                  placeholder="Sumanth Reddy"
+                  disabled={isPending}
+                  autoFocus
+                  {...register("fullName")}
+                />
+                {errors.fullName ? (
+                  <p className="text-xs text-destructive">{errors.fullName.message}</p>
+                ) : null}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Company Email *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="name@company.com"
+                  disabled={isPending}
+                  {...register("email")}
+                />
+                {errors.email ? (
+                  <p className="text-xs text-destructive">{errors.email.message}</p>
+                ) : null}
+              </div>
             </div>
 
-            <div>
-              <FieldLabel required>Role</FieldLabel>
-              <LabeledSelect
-                value={form.roleCode}
-                placeholder="Select role"
-                options={roleOptions}
-                onChange={(value) => update("roleCode", value)}
-                disabled={isPending}
-              />
-              {isCustomRole ? (
-                <div className="mt-2">
-                  <Input
-                    value={form.customRole}
-                    onChange={(event) => update("customRole", event.target.value)}
-                    placeholder="Enter role code (e.g. manager)"
-                    className="h-10"
-                    disabled={isPending}
-                  />
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    Enter an existing role code. Employees cannot be invited here.
-                  </p>
-                </div>
-              ) : null}
-            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Role *</Label>
+                <Select
+                  value={roleCode || null}
+                  onValueChange={(value) => setValue("roleCode", value ?? "", { shouldValidate: true })}
+                  disabled={isPending}
+                >
+                  <SelectTrigger className="h-10 w-full">
+                    <SelectValue placeholder="Select role">
+                      {selectedRole?.name ?? "Select role"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent
+                    alignItemWithTrigger={false}
+                    className="w-(--anchor-width) max-w-[min(100vw-2rem,28rem)]"
+                  >
+                    {lookups.roles.map((role) => (
+                      <SelectItem key={role.code} value={role.code} className="items-start py-2.5">
+                        <div className="flex min-w-0 flex-col gap-0.5 text-left">
+                          <span className="font-medium">{role.name}</span>
+                          <span className="text-[11px] text-muted-foreground">
+                            {role.departmentLabel} · {role.portalLabel}
+                          </span>
+                          {role.description ? (
+                            <span className="line-clamp-2 text-[11px] text-muted-foreground">
+                              {role.description}
+                            </span>
+                          ) : null}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.roleCode ? (
+                  <p className="text-xs text-destructive">{errors.roleCode.message}</p>
+                ) : null}
+              </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <FieldLabel required>Department</FieldLabel>
+              <div className="space-y-2">
+                <Label>Department *</Label>
                 <LabeledSelect
-                  value={form.departmentId}
+                  value={departmentId}
                   placeholder="Select department"
-                  options={lookups.departments}
-                  onChange={(value) => update("departmentId", value)}
+                  items={toLookupSelectItems(lookups.departments)}
+                  onValueChange={(value) =>
+                    setValue("departmentId", value, { shouldValidate: true })
+                  }
                   disabled={isPending}
                 />
+                {errors.departmentId ? (
+                  <p className="text-xs text-destructive">{errors.departmentId.message}</p>
+                ) : null}
               </div>
-              <div>
-                <FieldLabel required>Designation</FieldLabel>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="designation">Designation *</Label>
+                <Input
+                  id="designation"
+                  placeholder="Chief Technology Officer"
+                  disabled={isPending}
+                  {...register("designation")}
+                />
+                {errors.designation ? (
+                  <p className="text-xs text-destructive">{errors.designation.message}</p>
+                ) : null}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Reporting Manager *</Label>
                 <LabeledSelect
-                  value={form.designationId}
-                  placeholder="Select designation"
-                  options={lookups.designations}
-                  onChange={(value) => update("designationId", value)}
+                  value={reportingToId}
+                  placeholder="Select reporting manager"
+                  items={toLookupSelectItems(lookups.managers)}
+                  onValueChange={(value) =>
+                    setValue("reportingToId", value, { shouldValidate: true })
+                  }
                   disabled={isPending}
                 />
+                {errors.reportingToId ? (
+                  <p className="text-xs text-destructive">{errors.reportingToId.message}</p>
+                ) : null}
               </div>
             </div>
 
-            <div>
-              <FieldLabel>Reporting To</FieldLabel>
-              <LabeledSelect
-                value={form.reportingToId}
-                placeholder="Select manager (optional)"
-                options={lookups.managers}
-                onChange={(value) => update("reportingToId", value)}
-                disabled={isPending}
-              />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Employment Type *</Label>
+                <LabeledSelect
+                  value={employmentTypeId}
+                  placeholder="Select employment type"
+                  items={toLookupSelectItems(lookups.employmentTypes)}
+                  onValueChange={(value) =>
+                    setValue("employmentTypeId", value, { shouldValidate: true })
+                  }
+                  disabled={isPending}
+                />
+                {errors.employmentTypeId ? (
+                  <p className="text-xs text-destructive">{errors.employmentTypeId.message}</p>
+                ) : null}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Branch *</Label>
+                <LabeledSelect
+                  value={branchId}
+                  placeholder="Select branch"
+                  items={toLookupSelectItems(lookups.branches)}
+                  onValueChange={(value) => setValue("branchId", value, { shouldValidate: true })}
+                  disabled={isPending}
+                />
+                {errors.branchId ? (
+                  <p className="text-xs text-destructive">{errors.branchId.message}</p>
+                ) : null}
+              </div>
             </div>
 
-            <div>
-              <FieldLabel>Optional Notes</FieldLabel>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Optional Notes</Label>
               <textarea
-                value={form.notes}
-                onChange={(event) => update("notes", event.target.value)}
+                id="notes"
                 placeholder="Add context for this invitation…"
                 rows={3}
                 disabled={isPending}
@@ -265,6 +277,7 @@ export function CeoInviteUserDialog({
                   "placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
                   "disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30",
                 )}
+                {...register("notes")}
               />
             </div>
 

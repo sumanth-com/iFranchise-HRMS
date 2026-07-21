@@ -1,10 +1,13 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { fromHrms, unwrapRelation } from "@/lib/reports/services/reports-utils";
+import {
+  derivePortalFromRoleCode,
+  loadExecutiveDirectoryRoleCodes,
+  loadProvisionableRoles,
+} from "@/lib/user-provisioning/provisionable-roles";
 import type { UserProfile } from "@/types/auth";
 import type { LookupOption } from "@/types/employee";
 import {
-  EXECUTIVE_ROLE_CODES,
-  PROVISIONABLE_ROLE_CODES,
   ROLE_LABELS,
   type CeoProvisioningListParams,
   type CeoProvisioningListResult,
@@ -13,13 +16,12 @@ import {
   type CeoProvisioningTimelineEntry,
   type CeoProvisioningUser,
   type CeoProvisioningUserDetail,
-  type ExecutiveRoleCode,
   type ProvisioningInvitationStatus,
 } from "@/types/ceo-user-provisioning";
 
 const INVITATION_EXPIRY_HOURS = 48;
 
-const ROLE_PRIORITY: Record<ExecutiveRoleCode, number> = {
+const ROLE_PRIORITY: Record<string, number> = {
   founder: 0,
   co_founder: 1,
   ceo: 2,
@@ -28,12 +30,22 @@ const ROLE_PRIORITY: Record<ExecutiveRoleCode, number> = {
   manager: 5,
 };
 
-const EXECUTIVE_ROLE_SET = new Set<string>(EXECUTIVE_ROLE_CODES);
+function rolePriority(code: string) {
+  return ROLE_PRIORITY[code] ?? 99;
+}
+
+function normalizePortalKey(value: string | null | undefined) {
+  if (value === "hr" || value === "ceo" || value === "manager" || value === "employee") {
+    return value;
+  }
+  return null;
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LooseRow = Record<string, any>;
 
 type NormalizedExecutiveUser = CeoProvisioningUser & {
+  employmentTypeId: string | null;
   employmentTypeName: string | null;
   joiningDate: string | null;
   firstLoginAt: string | null;
@@ -69,12 +81,13 @@ async function loadExecutiveUsers(
   profile: UserProfile,
 ): Promise<NormalizedExecutiveUser[]> {
   const organizationId = profile.employee.organizationId;
+  const directoryRoleCodes = await loadExecutiveDirectoryRoleCodes(supabase, organizationId);
 
   const { data, error } = await fromHrms(supabase, "user_roles")
     .select(
       `
       user_id,
-      roles:role_id ( code, name ),
+      roles:role_id ( code, name, portal_key ),
       employee:employee_id (
         id, user_id, employee_code, first_name, last_name, email,
         account_status, invitation_sent_at, invitation_cancelled_at,
@@ -105,13 +118,13 @@ async function loadExecutiveUsers(
     if (!role || !employee || employee.deleted_at) continue;
 
     const roleCode = String(role.code);
-    if (!EXECUTIVE_ROLE_SET.has(roleCode)) continue;
+    if (!directoryRoleCodes.has(roleCode.toLowerCase())) continue;
+
+    const portalKey =
+      normalizePortalKey(role.portal_key) ?? derivePortalFromRoleCode(roleCode);
 
     const existing = byEmployee.get(employee.id);
-    if (
-      existing &&
-      ROLE_PRIORITY[existing.roleCode] <= ROLE_PRIORITY[roleCode as ExecutiveRoleCode]
-    ) {
+    if (existing && rolePriority(existing.roleCode) <= rolePriority(roleCode)) {
       continue;
     }
 
@@ -131,8 +144,9 @@ async function loadExecutiveUsers(
       lastName: employee.last_name,
       fullName: fullName(employee.first_name, employee.last_name),
       email: employee.email,
-      roleCode: roleCode as ExecutiveRoleCode,
-      roleLabel: ROLE_LABELS[roleCode as ExecutiveRoleCode] ?? role.name ?? roleCode,
+      roleCode,
+      portalKey,
+      roleLabel: ROLE_LABELS[roleCode] ?? role.name ?? roleCode,
       departmentName: department?.name ?? null,
       branchName: branch?.name ?? null,
       designationTitle: designation?.title ?? null,
@@ -146,6 +160,7 @@ async function loadExecutiveUsers(
       acceptedAt: employee.account_activated_at ?? employee.first_login_at ?? null,
       lastActivityAt: employee.last_login_at ?? employee.updated_at ?? null,
       isSelf: employee.id === profile.employee.id,
+      employmentTypeId: employee.employment_type_id ?? null,
       employmentTypeName: employmentType?.name ?? null,
       joiningDate: employee.date_of_joining ?? null,
       firstLoginAt: employee.first_login_at ?? null,
@@ -219,7 +234,14 @@ function paginateUsers(
   let filtered = users;
   if (search) {
     filtered = filtered.filter((u) =>
-      [u.fullName, u.email, u.departmentName ?? "", u.roleLabel, u.invitationStatus]
+      [
+        u.fullName,
+        u.email,
+        u.employeeCode,
+        u.departmentName ?? "",
+        u.roleLabel,
+        u.invitationStatus,
+      ]
         .join(" ")
         .toLowerCase()
         .includes(search),
@@ -227,6 +249,12 @@ function paginateUsers(
   }
   if (params.roleCode) {
     filtered = filtered.filter((u) => u.roleCode === params.roleCode);
+  }
+  if (params.portalKey) {
+    filtered = filtered.filter((u) => u.portalKey === params.portalKey);
+  }
+  if (params.employmentTypeId) {
+    filtered = filtered.filter((u) => u.employmentTypeId === params.employmentTypeId);
   }
   if (params.invitationStatus) {
     filtered = filtered.filter((u) => u.invitationStatus === params.invitationStatus);
@@ -244,12 +272,14 @@ function paginateUsers(
 
 function stripInternal(user: NormalizedExecutiveUser): CeoProvisioningUser {
   const {
+    employmentTypeId: _employmentTypeId,
     employmentTypeName: _employmentTypeName,
     joiningDate: _joiningDate,
     firstLoginAt: _firstLoginAt,
     invitationCancelledAt: _invitationCancelledAt,
     ...rest
   } = user;
+  void _employmentTypeId;
   void _employmentTypeName;
   void _joiningDate;
   void _firstLoginAt;
@@ -293,12 +323,9 @@ export async function getCeoProvisioningLookups(
 ): Promise<CeoProvisioningLookups> {
   const organizationId = profile.employee.organizationId;
 
-  const [rolesRes, departmentsRes, branchesRes, designationsRes, employmentTypesRes, managersRes] =
+  const [provisionableRoles, departmentsRes, branchesRes, employmentTypesRes, managersRes] =
     await Promise.all([
-      fromHrms(supabase, "roles")
-        .select("code, name")
-        .eq("organization_id", organizationId)
-        .is("deleted_at", null),
+      loadProvisionableRoles(supabase, organizationId),
       fromHrms(supabase, "departments")
         .select("id, name")
         .eq("organization_id", organizationId)
@@ -309,11 +336,6 @@ export async function getCeoProvisioningLookups(
         .eq("organization_id", organizationId)
         .is("deleted_at", null)
         .order("name"),
-      fromHrms(supabase, "designations")
-        .select("id, title")
-        .eq("organization_id", organizationId)
-        .is("deleted_at", null)
-        .order("title"),
       fromHrms(supabase, "employment_types")
         .select("id, name")
         .eq("organization_id", organizationId)
@@ -333,33 +355,18 @@ export async function getCeoProvisioningLookups(
         .is("deleted_at", null),
     ]);
 
-  for (const res of [
-    rolesRes,
-    departmentsRes,
-    branchesRes,
-    designationsRes,
-    employmentTypesRes,
-    managersRes,
-  ]) {
+  for (const res of [departmentsRes, branchesRes, employmentTypesRes, managersRes]) {
     if (res.error) throw new Error(res.error.message);
   }
 
-  const availableRoleCodes = new Set(
-    ((rolesRes.data ?? []) as LooseRow[]).map((row) => String(row.code)),
-  );
+  const directoryRoleCodes = await loadExecutiveDirectoryRoleCodes(supabase, organizationId);
 
-  const roles: LookupOption[] = PROVISIONABLE_ROLE_CODES.filter((code) =>
-    availableRoleCodes.has(code),
-  ).map((code) => ({ id: code, label: ROLE_LABELS[code] }));
-
-  // Reporting managers can only be senior/manager-capable users
-  // (CEO, Founder, Co-Founder, HR Admin/Executive, Manager).
   const managersMap = new Map<string, LookupOption>();
   for (const row of (managersRes.data ?? []) as LooseRow[]) {
     const role = unwrapRelation<LooseRow>(row.roles);
     const employee = unwrapRelation<LooseRow>(row.employee);
     if (!role || !employee || employee.deleted_at) continue;
-    if (!EXECUTIVE_ROLE_SET.has(String(role.code))) continue;
+    if (!directoryRoleCodes.has(String(role.code).toLowerCase())) continue;
     if (String(employee.employment_status ?? "") === "draft") continue;
     if (managersMap.has(employee.id)) continue;
     managersMap.set(employee.id, {
@@ -371,8 +378,31 @@ export async function getCeoProvisioningLookups(
     a.label.localeCompare(b.label),
   );
 
+  const portalOptions: LookupOption[] = [
+    { id: "ceo", label: "Executive Portal" },
+    { id: "hr", label: "HR Portal" },
+    { id: "manager", label: "Manager Portal" },
+  ];
+
+  const statusOptions: LookupOption[] = [
+    { id: "pending", label: "Pending" },
+    { id: "accepted", label: "Accepted" },
+    { id: "expired", label: "Expired" },
+    { id: "cancelled", label: "Cancelled" },
+    { id: "revoked", label: "Suspended" },
+    { id: "inactive", label: "Inactive" },
+  ];
+
   return {
-    roles,
+    roles: provisionableRoles.map((role) => ({
+      id: role.code,
+      code: role.code,
+      name: role.name,
+      description: role.description,
+      portalKey: role.portalKey,
+      portalLabel: role.portalLabel,
+      departmentLabel: role.departmentLabel,
+    })),
     departments: ((departmentsRes.data ?? []) as LooseRow[]).map((row) => ({
       id: row.id,
       label: row.name,
@@ -381,15 +411,13 @@ export async function getCeoProvisioningLookups(
       id: row.id,
       label: row.name,
     })),
-    designations: ((designationsRes.data ?? []) as LooseRow[]).map((row) => ({
-      id: row.id,
-      label: row.title,
-    })),
     employmentTypes: ((employmentTypesRes.data ?? []) as LooseRow[]).map((row) => ({
       id: row.id,
       label: row.name,
     })),
     managers,
+    portals: portalOptions,
+    statuses: statusOptions,
   };
 }
 

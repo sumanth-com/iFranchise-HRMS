@@ -8,34 +8,23 @@ import {
   inviteEmployeeByEmail,
   resendEmployeeInvitation,
 } from "@/lib/employees/services/employee-account";
+import { resolveOrCreateDesignation } from "@/lib/employees/services/employee-mutations";
 import { fromHrms, unwrapRelation } from "@/lib/reports/services/reports-utils";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { assertProvisionableRole } from "@/lib/user-provisioning/provisionable-roles";
+import { notifyProvisioningStakeholders } from "@/lib/user-provisioning/notifications";
 import type { UserProfile } from "@/types/auth";
-import {
-  EXECUTIVE_ROLE_CODES,
-  ROLE_LABELS,
-  type ExecutiveRoleCode,
-} from "@/types/ceo-user-provisioning";
+import { ROLE_LABELS } from "@/types/ceo-user-provisioning";
 import type { InviteExecutiveUserInput } from "@/lib/validations/ceo-user-provisioning";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LooseRow = Record<string, any>;
 
-const EXECUTIVE_ROLE_SET = new Set<string>(EXECUTIVE_ROLE_CODES);
-
-const ROLE_PRIORITY: Record<ExecutiveRoleCode, number> = {
-  founder: 0,
-  co_founder: 1,
-  ceo: 2,
-  hr_admin: 3,
-  hr_executive: 4,
-  manager: 5,
-};
-
 async function resolveEmployeeRoleCode(
   supabase: AuthSupabaseClient,
   organizationId: string,
   employeeId: string,
-): Promise<ExecutiveRoleCode | null> {
+): Promise<string | null> {
   const { data } = await fromHrms(supabase, "user_roles")
     .select("roles:role_id ( code )")
     .eq("organization_id", organizationId)
@@ -43,15 +32,24 @@ async function resolveEmployeeRoleCode(
     .eq("status", "active")
     .is("deleted_at", null);
 
-  let best: ExecutiveRoleCode | null = null;
+  let best: string | null = null;
+  let bestPriority = 99;
+  const priority: Record<string, number> = {
+    founder: 0,
+    co_founder: 1,
+    ceo: 2,
+    hr_admin: 3,
+    hr_executive: 4,
+    manager: 5,
+  };
+
   for (const row of (data ?? []) as LooseRow[]) {
     const code = unwrapRelation<LooseRow>(row.roles)?.code as string | undefined;
-    if (!code || !EXECUTIVE_ROLE_SET.has(code)) continue;
-    if (
-      !best ||
-      ROLE_PRIORITY[code as ExecutiveRoleCode] < ROLE_PRIORITY[best]
-    ) {
-      best = code as ExecutiveRoleCode;
+    if (!code) continue;
+    const rank = priority[code] ?? 99;
+    if (!best || rank < bestPriority) {
+      best = code;
+      bestPriority = rank;
     }
   }
   return best;
@@ -79,35 +77,98 @@ async function audit(
   });
 }
 
+async function assertEmailAvailable(organizationId: string, email: string) {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select("id, account_status")
+    .eq("organization_id", organizationId)
+    .ilike("email", email)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) return;
+
+  if (data.account_status === "invitation_pending" || data.account_status === "draft") {
+    throw new Error(
+      "This email already has a pending invitation. Resend or cancel it from the list.",
+    );
+  }
+
+  throw new Error("This email is already registered in your organization.");
+}
+
+async function storeInvitationNotes(
+  employeeId: string,
+  notes: string | undefined,
+  actorUserId: string,
+) {
+  if (!notes?.trim()) return;
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .schema("hrms")
+    .from("employees")
+    .update({
+      invitation_notes: notes.trim(),
+      updated_by: actorUserId,
+    })
+    .eq("id", employeeId)
+    .is("deleted_at", null);
+
+  if (error && !error.message.includes("invitation_notes")) {
+    throw new Error(error.message);
+  }
+}
+
 export async function inviteExecutiveUser(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   input: InviteExecutiveUserInput,
 ): Promise<{ employeeId: string }> {
+  const organizationId = profile.employee.organizationId;
+  await assertEmailAvailable(organizationId, input.email);
+
+  const role = await assertProvisionableRole(supabase, organizationId, input.roleCode);
+  const designationId = await resolveOrCreateDesignation(
+    supabase,
+    organizationId,
+    profile.userId,
+    input.designation,
+  );
+
   const employeeId = await inviteEmployeeByEmail(supabase, profile, input.email, {
-    roleCode: input.roleCode,
+    fullName: input.fullName,
+    roleCode: role.code,
     departmentId: input.departmentId,
-    designationId: input.designationId,
+    designationId,
     branchId: input.branchId,
-    employmentTypeId: input.employmentTypeId ?? null,
+    employmentTypeId: input.employmentTypeId,
     reportingManagerId: input.reportingToId,
   });
 
-  const roleLabel = ROLE_LABELS[input.roleCode as ExecutiveRoleCode] ?? input.roleCode;
+  await storeInvitationNotes(employeeId, input.notes, profile.userId);
+
+  const roleLabel = ROLE_LABELS[role.code] ?? role.name;
 
   await audit(
     supabase,
     profile,
-    "user_provisioning_invite",
-    `Invited ${input.email} as ${roleLabel}`,
+    "invitation_sent",
+    `Invited ${input.fullName} (${input.email}) as ${roleLabel}`,
     employeeId,
     {
+      fullName: input.fullName,
       email: input.email,
-      roleCode: input.roleCode,
+      roleCode: role.code,
+      portalKey: role.portalKey,
       departmentId: input.departmentId,
-      designationId: input.designationId,
+      designation: input.designation,
       branchId: input.branchId,
-      reportingToId: input.reportingToId ?? null,
+      employmentTypeId: input.employmentTypeId,
+      reportingToId: input.reportingToId,
       notes: input.notes ?? null,
     },
     "high",
@@ -131,7 +192,7 @@ export async function resendExecutiveInvitation(
   await audit(
     supabase,
     profile,
-    "user_provisioning_resend",
+    "invitation_resent",
     `Resent invitation for executive user`,
     employeeId,
     { employeeId, roleCode },
@@ -143,11 +204,33 @@ export async function cancelExecutiveInvitation(
   profile: UserProfile,
   employeeId: string,
 ): Promise<void> {
+  const admin = createAdminClient();
+  const { data: employee } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select("first_name, last_name, email")
+    .eq("id", employeeId)
+    .maybeSingle();
+
   await cancelEmployeeInvitation(supabase, profile, employeeId);
+
+  const fullName = employee
+    ? `${employee.first_name} ${employee.last_name}`.trim()
+    : "User";
+
+  await notifyProvisioningStakeholders(supabase, {
+    organizationId: profile.employee.organizationId,
+    event: "invitation_rejected",
+    subjectName: fullName,
+    subjectEmail: employee?.email ?? "",
+    employeeId,
+    actorUserId: profile.userId,
+  });
+
   await audit(
     supabase,
     profile,
-    "user_provisioning_cancel",
+    "invitation_cancelled",
     `Cancelled invitation for executive user`,
     employeeId,
     { employeeId },
@@ -164,8 +247,8 @@ export async function deactivateExecutiveUser(
   await audit(
     supabase,
     profile,
-    "user_provisioning_deactivate",
-    `Deactivated executive account`,
+    "account_suspended",
+    `Suspended executive account`,
     employeeId,
     { employeeId },
     "high",
@@ -177,13 +260,81 @@ export async function reactivateExecutiveUser(
   profile: UserProfile,
   employeeId: string,
 ): Promise<void> {
+  const admin = createAdminClient();
+  const { data: employee } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select("first_name, last_name, email")
+    .eq("id", employeeId)
+    .maybeSingle();
+
   await activateEmployeeAccount(supabase, profile, employeeId);
+
+  const fullName = employee
+    ? `${employee.first_name} ${employee.last_name}`.trim()
+    : "User";
+
+  await notifyProvisioningStakeholders(supabase, {
+    organizationId: profile.employee.organizationId,
+    event: "account_activated",
+    subjectName: fullName,
+    subjectEmail: employee?.email ?? "",
+    employeeId,
+    actorUserId: profile.userId,
+  });
+
   await audit(
     supabase,
     profile,
-    "user_provisioning_reactivate",
+    "account_reactivated",
     `Reactivated executive account`,
     employeeId,
     { employeeId },
+  );
+}
+
+export async function notifyExecutiveAccountActivated(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  employeeId: string,
+) {
+  const admin = createAdminClient();
+  const { data: employee } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select("first_name, last_name, email")
+    .eq("id", employeeId)
+    .maybeSingle();
+
+  if (!employee) return;
+
+  const subjectName = `${employee.first_name} ${employee.last_name}`.trim();
+
+  await notifyProvisioningStakeholders(supabase, {
+    organizationId: profile.employee.organizationId,
+    event: "invitation_accepted",
+    subjectName,
+    subjectEmail: employee.email,
+    employeeId,
+    actorUserId: profile.userId,
+  });
+
+  await notifyProvisioningStakeholders(supabase, {
+    organizationId: profile.employee.organizationId,
+    event: "account_activated",
+    subjectName,
+    subjectEmail: employee.email,
+    employeeId,
+    actorUserId: profile.userId,
+  });
+
+  await audit(
+    supabase,
+    profile,
+    "account_activated",
+    `Executive account activated for ${subjectName}`,
+    employeeId,
+    { employeeId, email: employee.email },
+    "high",
   );
 }

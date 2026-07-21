@@ -26,6 +26,10 @@ export default async function HrUserProvisioningPage({
     pageSize: firstString(rawParams.pageSize) ?? "8",
     search: firstString(rawParams.search),
     roleCode: firstString(rawParams.roleCode),
+    departmentId: firstString(rawParams.departmentId),
+    branchId: firstString(rawParams.branchId),
+    portalKey: firstString(rawParams.portalKey),
+    employmentTypeId: firstString(rawParams.employmentTypeId),
     invitationStatus: firstString(rawParams.invitationStatus),
   });
 

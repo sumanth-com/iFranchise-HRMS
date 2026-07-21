@@ -1,20 +1,7 @@
+import type { PortalKey } from "@/lib/auth/portals";
 import type { LookupOption } from "@/types/employee";
 
-/**
- * Roles the CEO is allowed to provision. The Employee role is intentionally
- * excluded — employees are managed by HR.
- */
-export const PROVISIONABLE_ROLE_CODES = [
-  "founder",
-  "co_founder",
-  "hr_admin",
-  "hr_executive",
-  "manager",
-] as const;
-
-export type ProvisionableRoleCode = (typeof PROVISIONABLE_ROLE_CODES)[number];
-
-/** All executive-level roles surfaced in the provisioning directory. */
+/** Known executive role codes used for labels and sorting fallbacks. */
 export const EXECUTIVE_ROLE_CODES = [
   "founder",
   "co_founder",
@@ -26,13 +13,23 @@ export const EXECUTIVE_ROLE_CODES = [
 
 export type ExecutiveRoleCode = (typeof EXECUTIVE_ROLE_CODES)[number];
 
-export const ROLE_LABELS: Record<ExecutiveRoleCode, string> = {
+export const ROLE_LABELS: Record<string, string> = {
   founder: "Founder",
   co_founder: "Co-Founder",
   ceo: "CEO",
   hr_admin: "HR Admin",
   hr_executive: "HR Executive",
   manager: "Manager",
+};
+
+export type ProvisionableRoleOption = {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  portalKey: PortalKey | null;
+  portalLabel: string;
+  departmentLabel: string;
 };
 
 export type ProvisioningRowAction =
@@ -58,7 +55,8 @@ export type CeoProvisioningUser = {
   lastName: string;
   fullName: string;
   email: string;
-  roleCode: ExecutiveRoleCode;
+  roleCode: string;
+  portalKey: PortalKey | null;
   roleLabel: string;
   departmentName: string | null;
   branchName: string | null;
@@ -91,6 +89,8 @@ export type CeoProvisioningListParams = {
   roleCode?: string;
   departmentId?: string;
   branchId?: string;
+  portalKey?: PortalKey;
+  employmentTypeId?: string;
   invitationStatus?: ProvisioningInvitationStatus;
 };
 
@@ -102,12 +102,13 @@ export type CeoProvisioningListResult = {
 };
 
 export type CeoProvisioningLookups = {
-  roles: LookupOption[];
+  roles: ProvisionableRoleOption[];
   departments: LookupOption[];
   branches: LookupOption[];
-  designations: LookupOption[];
   employmentTypes: LookupOption[];
   managers: LookupOption[];
+  portals: LookupOption[];
+  statuses: LookupOption[];
 };
 
 export type CeoProvisioningTimelineEntry = {
