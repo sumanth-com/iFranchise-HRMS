@@ -6,6 +6,10 @@ import type { ApplicationAuditInput } from "@/lib/audit/services/audit-utils";
 import { createNotification } from "@/lib/notifications/services/notification-service";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { allocateNextEmployeeCode } from "@/lib/employees/services/employee-code";
+import {
+  getEmployeeGreetingName,
+  parseEmployeeFullName,
+} from "@/lib/employees/parse-employee-name";
 import type { UserProfile } from "@/types/auth";
 import type { EmployeeAccountStatus } from "@/types/employee";
 
@@ -213,6 +217,66 @@ async function updateEmployeeAccountWithClient(
   if (error) throw new Error(error.message);
 }
 
+function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+type InviteEmailContext = {
+  fullName: string;
+  greetingName: string;
+  departmentName: string;
+  designationName: string;
+  employmentTypeName: string;
+  reportingManagerName: string;
+};
+
+async function loadInviteEmailContext(employeeId: string): Promise<InviteEmailContext> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select(
+      `first_name, last_name, email,
+      departments:department_id (name),
+      designations:designation_id (name),
+      employment_types:employment_type_id (name),
+      manager:reporting_manager_id (first_name, last_name)`,
+    )
+    .eq("id", employeeId)
+    .maybeSingle();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "Failed to load invitation details");
+  }
+
+  const department = unwrapRelation(
+    data.departments as { name: string } | { name: string }[] | null,
+  );
+  const designation = unwrapRelation(
+    data.designations as { name: string } | { name: string }[] | null,
+  );
+  const employmentType = unwrapRelation(
+    data.employment_types as { name: string } | { name: string }[] | null,
+  );
+  const manager = unwrapRelation(
+    data.manager as { first_name: string; last_name: string } | { first_name: string; last_name: string }[] | null,
+  );
+
+  const employeeFullName = `${data.first_name} ${data.last_name}`.trim();
+
+  return {
+    fullName: employeeFullName,
+    greetingName: getEmployeeGreetingName(data.first_name, data.last_name),
+    departmentName: department?.name ?? "—",
+    designationName: designation?.name ?? "—",
+    employmentTypeName: employmentType?.name ?? "—",
+    reportingManagerName: manager
+      ? `${manager.first_name} ${manager.last_name}`.trim()
+      : "—",
+  };
+}
+
 async function findAuthUserIdByEmail(email: string) {
   const admin = createAdminClient();
   const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
@@ -223,12 +287,20 @@ async function findAuthUserIdByEmail(email: string) {
 
 async function sendSupabaseInvite(employee: EmployeeAccountRow) {
   const admin = createAdminClient();
+  const inviteContext = await loadInviteEmailContext(employee.id);
+
   const { data, error } = await admin.auth.admin.inviteUserByEmail(employee.email, {
     redirectTo: INVITE_REDIRECT_TO,
     data: {
       employee_id: employee.id,
       employee_code: employee.employee_code,
-      full_name: fullName(employee),
+      full_name: inviteContext.fullName,
+      employee_name: inviteContext.greetingName,
+      company_email: employee.email,
+      department_name: inviteContext.departmentName,
+      designation_name: inviteContext.designationName,
+      employment_type_name: inviteContext.employmentTypeName,
+      reporting_manager_name: inviteContext.reportingManagerName,
       organization_id: employee.organization_id,
     },
   });
@@ -262,15 +334,20 @@ export async function sendEmployeeInvitation(
     throw new Error("Invitation can only be sent for draft employees");
   }
 
+  await ensureEmployeeProfile(employee.id, profile.userId);
+
   const authUserId = employee.user_id ?? (await sendSupabaseInvite(employee));
   await ensureEmployeeRole(authUserId, employee, profile.userId, roleCode);
 
+  const invitationToken = crypto.randomUUID();
   const now = new Date().toISOString();
   await updateEmployeeAccount(employee.id, {
     user_id: authUserId,
     account_status: "invitation_pending",
     invitation_sent_at: now,
     invitation_cancelled_at: null,
+    invitation_token: invitationToken,
+    invitation_expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
     updated_by: profile.userId,
   });
 
@@ -291,11 +368,38 @@ export async function sendEmployeeInvitation(
   );
 }
 
+async function ensureEmployeeProfile(employeeId: string, actorUserId: string) {
+  const admin = createAdminClient();
+  const { data: existing, error: findError } = await admin
+    .schema("hrms")
+    .from("employee_profiles")
+    .select("id")
+    .eq("employee_id", employeeId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (findError) throw new Error(findError.message);
+  if (existing?.id) return;
+
+  const { error: insertError } = await admin
+    .schema("hrms")
+    .from("employee_profiles")
+    .insert({
+      employee_id: employeeId,
+      status: "active",
+      created_by: actorUserId,
+      updated_by: actorUserId,
+    });
+
+  if (insertError) throw new Error(insertError.message);
+}
+
 async function suggestEmployeeCodeForInvite(organizationId: string) {
   return allocateNextEmployeeCode(organizationId);
 }
 
 export type InviteEmployeeByEmailOptions = {
+  fullName?: string;
   reportingManagerId?: string;
   departmentId?: string | null;
   branchId?: string | null;
@@ -304,23 +408,38 @@ export type InviteEmployeeByEmailOptions = {
   roleCode?: string;
 };
 
-async function applyTeamInvitePlacement(
+async function applyInvitePlacement(
   employeeId: string,
   options: InviteEmployeeByEmailOptions,
   actorUserId: string,
 ) {
-  if (!options.reportingManagerId) return;
-
   const admin = createAdminClient();
+  const updates: Record<string, unknown> = {
+    updated_by: actorUserId,
+  };
+
+  if (options.reportingManagerId) {
+    updates.reporting_manager_id = options.reportingManagerId;
+  }
+  if (options.departmentId) {
+    updates.department_id = options.departmentId;
+  }
+  if (options.designationId) {
+    updates.designation_id = options.designationId;
+  }
+  if (options.employmentTypeId) {
+    updates.employment_type_id = options.employmentTypeId;
+  }
+  if (options.branchId) {
+    updates.branch_id = options.branchId;
+  }
+
+  if (Object.keys(updates).length === 1) return;
+
   const { error } = await admin
     .schema("hrms")
     .from("employees")
-    .update({
-      reporting_manager_id: options.reportingManagerId,
-      ...(options.departmentId ? { department_id: options.departmentId } : {}),
-      ...(options.branchId ? { branch_id: options.branchId } : {}),
-      updated_by: actorUserId,
-    })
+    .update(updates)
     .eq("id", employeeId)
     .is("deleted_at", null);
 
@@ -360,8 +479,8 @@ export async function inviteEmployeeByEmail(
       throw new Error("This email already belongs to an active employee. Contact HR for changes.");
     }
 
-    if (options.reportingManagerId) {
-      await applyTeamInvitePlacement(row.id, options, profile.userId);
+    if (options.reportingManagerId || options.departmentId || options.designationId) {
+      await applyInvitePlacement(row.id, options, profile.userId);
     }
 
     if (row.account_status === "invitation_pending") {
@@ -375,7 +494,9 @@ export async function inviteEmployeeByEmail(
     throw new Error("This employee already has an account workflow");
   }
 
-  const { firstName, lastName } = deriveNameFromEmail(email);
+  const { firstName, lastName } = options.fullName
+    ? parseEmployeeFullName(options.fullName)
+    : deriveNameFromEmail(email);
 
   let createdId: string | null = null;
   let lastCreateError: string | null = null;
@@ -430,6 +551,8 @@ export async function inviteEmployeeByEmail(
     throw new Error(lastCreateError ?? "Failed to create employee invite record");
   }
 
+  await ensureEmployeeProfile(createdId, profile.userId);
+
   await sendEmployeeInvitation(supabase, profile, createdId, roleCode);
   return createdId;
 }
@@ -455,10 +578,13 @@ export async function resendEmployeeInvitation(
   authUserId = await sendSupabaseInvite({ ...employee, user_id: authUserId });
   await ensureEmployeeRole(authUserId, employee, profile.userId, roleCode);
 
+  const invitationToken = crypto.randomUUID();
   const now = new Date().toISOString();
   await updateEmployeeAccount(employee.id, {
     user_id: authUserId,
     invitation_sent_at: now,
+    invitation_token: invitationToken,
+    invitation_expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
     updated_by: profile.userId,
   });
 
@@ -680,6 +806,8 @@ export async function recordEmployeeSuccessfulLogin(
   if (shouldActivate) {
     updates.account_status = "active";
     updates.account_activated_at = now;
+    updates.invitation_token = null;
+    updates.invitation_expires_at = null;
     if (!employeeRow.date_of_joining) {
       updates.date_of_joining = now.slice(0, 10);
     }

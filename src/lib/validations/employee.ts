@@ -67,6 +67,42 @@ export const employeeListParamsSchema = z.object({
   accountStatus: employeeAccountStatusSchema.optional(),
 });
 
+export const employeeInviteSchema = z.object({
+  fullName: z
+    .string()
+    .trim()
+    .min(2, "Employee name must be at least 2 characters")
+    .max(100, "Employee name must be 100 characters or fewer"),
+  email: z.string().trim().email("Enter a valid company email"),
+  departmentId: z.string().uuid("Select a department"),
+  designationId: z.string().uuid("Select a designation"),
+  employmentTypeId: z.string().uuid("Select an employment type"),
+  reportingManagerId: z.string().uuid("Select a reporting manager"),
+});
+
+export type EmployeeInviteInput = z.infer<typeof employeeInviteSchema>;
+
+export const employeeSelfProfileSchema = z.object({
+  firstName: z.string().trim().min(1, "First name is required").max(100),
+  lastName: z.string().trim().min(1, "Last name is required").max(100),
+  phone: z.string().max(30).optional().or(z.literal("")),
+  preferredName: z.string().max(100).optional().or(z.literal("")),
+  language: z.string().min(2).max(20),
+  timezone: z.string().min(1).max(80),
+  addressLine1: z.string().max(200).optional().or(z.literal("")),
+  addressLine2: z.string().max(200).optional().or(z.literal("")),
+  city: z.string().max(100).optional().or(z.literal("")),
+  state: z.string().max(100).optional().or(z.literal("")),
+  postalCode: z.string().max(20).optional().or(z.literal("")),
+  country: z.string().max(100).optional().or(z.literal("")),
+  emergencyContactName: z.string().max(100).optional().or(z.literal("")),
+  emergencyContactRelationship: z.string().max(100).optional().or(z.literal("")),
+  emergencyContactPhone: z.string().max(30).optional().or(z.literal("")),
+  emergencyContactEmail: z.string().email().optional().or(z.literal("")),
+});
+
+export type EmployeeSelfProfileInput = z.infer<typeof employeeSelfProfileSchema>;
+
 export const employeeBasicStepSchema = z.object({
   employeeCode: z
     .string()

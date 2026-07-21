@@ -74,7 +74,7 @@ export async function getEmployeeById(
       .schema("hrms")
       .from("employee_profiles")
       .select(
-        "id, date_of_birth, gender, marital_status, nationality, blood_group, personal_email, personal_phone, profile_image_storage_path, bio",
+        "id, date_of_birth, gender, marital_status, nationality, blood_group, personal_email, personal_phone, profile_image_storage_path, bio, preferred_name",
       )
       .eq("employee_id", employeeId)
       .is("deleted_at", null)
@@ -150,6 +150,7 @@ export async function getEmployeeById(
         personalPhone: profileResult.data.personal_phone,
         profileImageStoragePath: profileResult.data.profile_image_storage_path,
         bio: profileResult.data.bio,
+        preferredName: profileResult.data.preferred_name ?? null,
       }
     : null;
 

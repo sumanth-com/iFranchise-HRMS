@@ -5,6 +5,8 @@ import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 
 import { AccountPasswordResetSection } from "@/components/auth/account-password-reset-section";
+import { EmployeeProfileSettingsSection } from "@/components/employee/settings/employee-profile-settings-section";
+import type { EmployeeSelfProfileSettings } from "@/lib/employee/services/employee-self-profile";
 import { cn } from "@/lib/utils";
 
 const THEME_OPTIONS = [
@@ -68,9 +70,23 @@ function AppearanceSection() {
   );
 }
 
-export function EmployeeSettingsView({ email }: { email: string }) {
+export function EmployeeSettingsView({
+  email,
+  profileSettings,
+  profileImageUrl,
+}: {
+  email: string;
+  profileSettings?: EmployeeSelfProfileSettings | null;
+  profileImageUrl?: string | null;
+}) {
   return (
     <>
+      {profileSettings ? (
+        <EmployeeProfileSettingsSection
+          settings={profileSettings}
+          profileImageUrl={profileImageUrl ?? null}
+        />
+      ) : null}
       <AppearanceSection />
       <AccountPasswordResetSection email={email} />
     </>

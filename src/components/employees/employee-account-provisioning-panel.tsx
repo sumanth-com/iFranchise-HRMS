@@ -1,25 +1,24 @@
 "use client";
 
 import { format } from "date-fns";
-import { Loader2, Mail, RefreshCw, ShieldCheck, UserRoundPlus, XCircle } from "lucide-react";
+import { RefreshCw, ShieldCheck, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useState } from "react";
 import { useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
-import { Input } from "@/components/common/input";
 import { EmployeeAccountStatusBadge } from "@/components/employees/employee-account-status-badge";
 import {
   activateEmployeeAccountAction,
   cancelEmployeeInvitationAction,
-  inviteEmployeeByEmailAction,
   resendEmployeeInvitationAction,
 } from "@/lib/employees/actions";
+import { EmployeeInviteSection } from "@/components/employees/employee-invite-form";
 import type {
   EmployeeAccountProvisioningItem,
   EmployeeAccountProvisioningSummary,
+  LookupOption,
 } from "@/types/employee";
 
 function StatCard({ label, value }: { label: string; value: number }) {
@@ -42,19 +41,25 @@ function formatDate(value: string | null) {
 
 export function EmployeeAccountProvisioningPanel({
   summary,
+  lookups,
   canInvite,
   canCancelInvitation,
   canActivate,
   inviteServiceReady,
 }: {
   summary: EmployeeAccountProvisioningSummary;
+  lookups: {
+    departments: LookupOption[];
+    designations: LookupOption[];
+    employmentTypes: LookupOption[];
+    managers: LookupOption[];
+  };
   canInvite: boolean;
   canCancelInvitation: boolean;
   canActivate: boolean;
   inviteServiceReady: boolean;
 }) {
   const router = useRouter();
-  const [email, setEmail] = useState("");
   const [isPending, startTransition] = useTransition();
 
   function runAction(
@@ -70,21 +75,6 @@ export function EmployeeAccountProvisioningPanel({
       toast.success(successMessage);
       router.refresh();
     });
-  }
-
-  function handleDirectInvite(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const trimmedEmail = email.trim();
-    if (!trimmedEmail) {
-      toast.error("Enter an employee email");
-      return;
-    }
-
-    runAction(
-      () => inviteEmployeeByEmailAction({ email: trimmedEmail }),
-      "Invitation sent",
-    );
-    setEmail("");
   }
 
   const renderEmployee = (
@@ -114,40 +104,11 @@ export function EmployeeAccountProvisioningPanel({
   return (
     <section className="rounded-2xl border bg-card p-4 shadow-sm">
       <div className="grid gap-4 xl:grid-cols-[minmax(20rem,1fr)_auto] xl:items-start">
-        <div className="space-y-3">
-          <h2 className="flex items-center gap-2 text-base font-semibold">
-            <UserRoundPlus className="size-4 text-primary" />
-            Invite Employee
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Enter the login email HR approved for this employee. Any valid email works (Gmail, personal, etc.).
-          </p>
-          <form
-            onSubmit={handleDirectInvite}
-            className="flex flex-col gap-2 sm:flex-row sm:items-center"
-          >
-            <Input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="name@gmail.com"
-              className="h-9 sm:max-w-sm"
-            />
-            <Button
-              type="submit"
-              size="sm"
-              disabled={isPending || !canInvite || !inviteServiceReady}
-            >
-              {isPending ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
-              Send Invite
-            </Button>
-          </form>
-          {!inviteServiceReady ? (
-            <p className="text-xs text-amber-600">
-              Invite sending is not configured for this environment.
-            </p>
-          ) : null}
-        </div>
+        <EmployeeInviteSection
+          lookups={lookups}
+          canInvite={canInvite}
+          inviteServiceReady={inviteServiceReady}
+        />
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:min-w-[22rem]">
           <StatCard label="Draft" value={summary.draft + summary.invited} />
           <StatCard label="Pending" value={summary.invitationPending} />

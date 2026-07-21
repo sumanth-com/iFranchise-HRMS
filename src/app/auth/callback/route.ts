@@ -58,12 +58,27 @@ export async function GET(request: NextRequest) {
   }
 
   const redirectUrl = new URL(next, origin);
-  if (
-    email &&
-    redirectUrl.pathname === AUTH_ROUTES.resetPassword &&
-    !redirectUrl.searchParams.has("email")
-  ) {
-    redirectUrl.searchParams.set("email", email);
+  const isInviteFlow = type === "invite";
+  const isResetPasswordFlow =
+    redirectUrl.pathname === AUTH_ROUTES.resetPassword || isInviteFlow;
+
+  if (email && isResetPasswordFlow) {
+    if (!redirectUrl.searchParams.has("email")) {
+      redirectUrl.searchParams.set("email", email);
+    }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const displayName =
+      typeof user?.user_metadata?.full_name === "string"
+        ? user.user_metadata.full_name
+        : null;
+    if (displayName && !redirectUrl.searchParams.has("name")) {
+      redirectUrl.searchParams.set("name", displayName);
+    }
+    if (isInviteFlow && !redirectUrl.searchParams.has("invite")) {
+      redirectUrl.searchParams.set("invite", "1");
+    }
   }
 
   return NextResponse.redirect(redirectUrl);

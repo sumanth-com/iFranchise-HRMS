@@ -10,6 +10,7 @@ import { requireServerPermission } from "@/lib/permissions/server";
 import {
   getDepartments,
   getEmployeeAccountProvisioningSummary,
+  getEmployeeLookups,
   listEmployees,
 } from "@/lib/employees/services/employee-queries";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
@@ -91,9 +92,10 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
     accountStatus: firstString(rawParams.accountStatus),
   });
 
-  const [result, accountProvisioning] = await Promise.all([
+  const [result, accountProvisioning, inviteLookups] = await Promise.all([
     listEmployees(supabase, profile, params),
     getEmployeeAccountProvisioningSummary(supabase, profile),
+    getEmployeeLookups(supabase, profile.employee.organizationId),
   ]);
   const canInviteEmployee = hasPermission(profile.permissionCodes, "employee_account.invite");
   const canCancelEmployeeInvitation = hasPermission(
@@ -117,6 +119,12 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
       {(canInviteEmployee || canCancelEmployeeInvitation || canActivateEmployeeAccount) ? (
         <EmployeeAccountProvisioningPanel
           summary={accountProvisioning}
+          lookups={{
+            departments: inviteLookups.departments,
+            designations: inviteLookups.designations,
+            employmentTypes: inviteLookups.employmentTypes,
+            managers: inviteLookups.managers,
+          }}
           canInvite={canInviteEmployee}
           canCancelInvitation={canCancelEmployeeInvitation}
           canActivate={canActivateEmployeeAccount}

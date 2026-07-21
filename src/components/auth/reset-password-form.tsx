@@ -14,7 +14,6 @@ import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { resetPasswordAction } from "@/lib/auth/actions";
 import { AUTH_ROUTES } from "@/lib/auth/constants";
-import { getAuthErrorMessage } from "@/lib/auth/errors";
 import {
   resetPasswordSchema,
   type ResetPasswordInput,
@@ -29,6 +28,7 @@ export function ResetPasswordForm() {
   const [signInHref, setSignInHref] = useState<string | null>(null);
   const isInviteSetup = searchParams.get("invite") === "1";
   const invitedEmail = searchParams.get("email");
+  const invitedName = searchParams.get("name");
 
   const {
     register,
@@ -106,10 +106,20 @@ export function ResetPasswordForm() {
         </p>
       </div>
 
-      {isInviteSetup && invitedEmail ? (
-        <div className="rounded-xl border bg-muted/30 px-3 py-2 text-center text-sm">
-          <p className="text-xs text-muted-foreground">Activating account for</p>
-          <p className="font-medium text-foreground">{invitedEmail}</p>
+      {isInviteSetup && (invitedName || invitedEmail) ? (
+        <div className="space-y-3 rounded-xl border bg-muted/30 px-4 py-3 text-sm">
+          {invitedName ? (
+            <div>
+              <p className="text-xs text-muted-foreground">Employee name</p>
+              <p className="font-medium text-foreground">{invitedName}</p>
+            </div>
+          ) : null}
+          {invitedEmail ? (
+            <div>
+              <p className="text-xs text-muted-foreground">Company email</p>
+              <p className="font-medium text-foreground">{invitedEmail}</p>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -121,7 +131,9 @@ export function ResetPasswordForm() {
 
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="password">New password</Label>
+          <Label htmlFor="password">
+            {isInviteSetup ? "Create password" : "New password"}
+          </Label>
           <div className="relative">
             <Input
               id="password"
@@ -187,7 +199,7 @@ export function ResetPasswordForm() {
               ? "Creating..."
               : "Updating..."
             : isInviteSetup
-              ? "Create password"
+              ? "Create password & activate"
               : "Update password"}
         </Button>
 

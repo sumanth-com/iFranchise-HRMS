@@ -165,6 +165,7 @@ export type EmployeeProfileDetail = {
   personalPhone: string | null;
   profileImageStoragePath: string | null;
   bio: string | null;
+  preferredName: string | null;
 };
 
 export type EmployeeAddressDetail = {

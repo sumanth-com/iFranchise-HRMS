@@ -1,55 +1,255 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>You're invited to iFranchise HRMS</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="x-apple-disable-message-reformatting" />
+    <meta name="format-detection" content="telephone=no,address=no,email=no,date=no,url=no" />
+    <title>Welcome to iFranchise HRMS</title>
+    <!--[if mso]>
+      <noscript>
+        <xml>
+          <o:OfficeDocumentSettings>
+            <o:PixelsPerInch>96</o:PixelsPerInch>
+          </o:OfficeDocumentSettings>
+        </xml>
+      </noscript>
+    <![endif]-->
+    <style>
+      @media only screen and (max-width: 620px) {
+        .email-container {
+          width: 100% !important;
+        }
+        .card-padding {
+          padding: 28px 20px !important;
+        }
+        .header-padding {
+          padding: 28px 20px 24px !important;
+        }
+        .footer-padding {
+          padding: 20px !important;
+        }
+        .cta-button {
+          display: block !important;
+          width: 100% !important;
+          box-sizing: border-box !important;
+          text-align: center !important;
+        }
+        .logo-image {
+          width: 64px !important;
+          height: 64px !important;
+        }
+        .logo-wrap {
+          padding: 10px !important;
+        }
+        .summary-label,
+        .summary-value {
+          display: block !important;
+          width: 100% !important;
+        }
+        .summary-value {
+          padding-bottom: 12px !important;
+        }
+      }
+    </style>
   </head>
-  <body style="margin:0;background:#f6f7fb;font-family:Inter,Arial,sans-serif;color:#111827;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f7fb;padding:32px 16px;">
+  <body style="margin:0;padding:0;width:100%;background-color:#F8FAFC;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0F172A;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">
+      {{ if .Data.employee_name }}Hello {{ .Data.employee_name }},{{ else }}Hello,{{ end }} HR has invited you to join iFranchise HRMS. Activate your account within 48 hours.
+    </div>
+
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#F8FAFC;margin:0;padding:0;width:100%;">
       <tr>
-        <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;overflow:hidden;border-radius:24px;background:#ffffff;border:1px solid #e5e7eb;box-shadow:0 18px 50px rgba(15,23,42,0.08);">
+        <td align="center" style="padding:40px 16px;">
+          <table role="presentation" class="email-container" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;width:100%;background-color:#FFFFFF;border-radius:16px;border:1px solid #E2E8F0;box-shadow:0 4px 18px rgba(15,23,42,0.04);overflow:hidden;">
+
             <tr>
-              <td style="background:linear-gradient(135deg,#111827,#334155);padding:28px 32px;color:#ffffff;">
-                <div style="display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:12px;background:#ffffff;color:#111827;font-weight:700;font-size:13px;margin-bottom:18px;">IF</div>
-                <h1 style="margin:0;font-size:26px;line-height:1.25;font-weight:750;">Welcome to iFranchise HRMS</h1>
-                <p style="margin:8px 0 0;color:#d1d5db;font-size:14px;line-height:1.6;">Your employee portal account invitation is ready.</p>
+              <td class="header-padding" align="center" style="padding:36px 40px 28px;background-color:#FFFFFF;border-bottom:1px solid #F1F5F9;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto;">
+                  <tr>
+                    <td align="center" style="padding-bottom:16px;">
+                      <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto;">
+                        <tr>
+                          <td align="center" class="logo-wrap" style="padding:12px;background-color:#F8FAFC;border:1px solid #E2E8F0;border-radius:18px;">
+                            <img
+                              class="logo-image"
+                              src="{{ .SiteURL }}/images/ifranchise-hrms-logo.png"
+                              width="64"
+                              height="64"
+                              alt="iFranchise HRMS"
+                              style="display:block;width:64px;height:64px;max-width:64px;max-height:64px;border:0;border-radius:14px;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;"
+                            />
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td align="center">
+                      <p style="margin:0;font-size:20px;line-height:1.3;font-weight:600;letter-spacing:-0.02em;color:#334155;">
+                        iFranchise HRMS
+                      </p>
+                      <p style="margin:6px 0 0;font-size:13px;line-height:1.5;font-weight:500;color:#64748B;">
+                        Enterprise Human Resource Management
+                      </p>
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
+
             <tr>
-              <td style="padding:32px;">
-                <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#374151;">Hello,</p>
-                <p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:#374151;">
-                  HR has invited you to activate your iFranchise HRMS employee account. Use the secure button below to create your password and complete your first sign in.
+              <td class="card-padding" style="padding:36px 40px 32px;">
+
+                <h1 style="margin:0 0 20px;font-size:24px;line-height:1.3;font-weight:600;letter-spacing:-0.02em;color:#334155;">
+                  Welcome to iFranchise HRMS
+                </h1>
+
+                <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#334155;">
+                  {{ if .Data.employee_name }}Hello {{ .Data.employee_name }},{{ else }}Hello,{{ end }}
                 </p>
-                <table role="presentation" cellspacing="0" cellpadding="0" style="margin:28px 0;">
+
+                <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#334155;">
+                  HR has invited you to join the iFranchise HRMS portal.
+                </p>
+
+                <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#334155;">
+                  Your account has been prepared for you.
+                </p>
+
+                <p style="margin:0 0 28px;font-size:15px;line-height:1.7;color:#334155;">
+                  Click the button below to create your password and activate your account securely.
+                </p>
+
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 28px;">
                   <tr>
-                    <td>
-                      <a href="{{ .ConfirmationURL }}" style="display:inline-block;border-radius:12px;background:#111827;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:14px 22px;">
-                        Create password & activate account
+                    <td align="center">
+                      <a
+                        class="cta-button"
+                        href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&amp;type=invite&amp;next=/reset-password"
+                        target="_blank"
+                        style="display:inline-block;width:100%;max-width:100%;box-sizing:border-box;padding:15px 24px;background-color:#111827;color:#FFFFFF;text-decoration:none;font-size:15px;font-weight:600;line-height:1.4;text-align:center;border-radius:10px;mso-padding-alt:0;"
+                      >
+                        <!--[if mso]>
+                          <i style="letter-spacing:24px;mso-font-width:-100%;mso-text-raise:24pt">&nbsp;</i>
+                        <![endif]-->
+                        <span style="mso-text-raise:6pt;">Create Password &amp; Activate Account</span>
+                        <!--[if mso]>
+                          <i style="letter-spacing:24px;mso-font-width:-100%">&nbsp;</i>
+                        <![endif]-->
                       </a>
                     </td>
                   </tr>
                 </table>
-                <div style="border-radius:16px;background:#f8fafc;border:1px solid #e5e7eb;padding:16px;margin:0 0 22px;">
-                  <p style="margin:0;font-size:13px;line-height:1.6;color:#64748b;">
-                    This link is private to you. If you were not expecting this invitation, please ignore this email or contact HR.
-                  </p>
-                </div>
-                <p style="margin:0 0 8px;font-size:13px;color:#6b7280;">If the button does not work, copy and paste this link into your browser:</p>
-                <p style="margin:0;word-break:break-all;font-size:12px;line-height:1.6;color:#2563eb;">
-                  <a href="{{ .ConfirmationURL }}" style="color:#2563eb;">{{ .ConfirmationURL }}</a>
-                </p>
+
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 28px;background-color:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;">
+                  <tr>
+                    <td style="padding:18px 20px;">
+                      <p style="margin:0 0 14px;font-size:14px;line-height:1.5;font-weight:600;color:#475569;">
+                        Account Summary
+                      </p>
+                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                        <tr>
+                          <td class="summary-label" style="padding:0 0 8px;font-size:12px;line-height:1.5;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.04em;width:42%;vertical-align:top;">Employee Name</td>
+                          <td class="summary-value" style="padding:0 0 8px;font-size:14px;line-height:1.6;color:#334155;vertical-align:top;">{{ if .Data.full_name }}{{ .Data.full_name }}{{ else }}—{{ end }}</td>
+                        </tr>
+                        <tr>
+                          <td class="summary-label" style="padding:0 0 8px;font-size:12px;line-height:1.5;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.04em;width:42%;vertical-align:top;">Company Email</td>
+                          <td class="summary-value" style="padding:0 0 8px;font-size:14px;line-height:1.6;color:#334155;vertical-align:top;">{{ if .Data.company_email }}{{ .Data.company_email }}{{ else }}{{ .Email }}{{ end }}</td>
+                        </tr>
+                        <tr>
+                          <td class="summary-label" style="padding:0 0 8px;font-size:12px;line-height:1.5;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.04em;width:42%;vertical-align:top;">Department</td>
+                          <td class="summary-value" style="padding:0 0 8px;font-size:14px;line-height:1.6;color:#334155;vertical-align:top;">{{ if .Data.department_name }}{{ .Data.department_name }}{{ else }}—{{ end }}</td>
+                        </tr>
+                        <tr>
+                          <td class="summary-label" style="padding:0 0 8px;font-size:12px;line-height:1.5;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.04em;width:42%;vertical-align:top;">Designation</td>
+                          <td class="summary-value" style="padding:0 0 8px;font-size:14px;line-height:1.6;color:#334155;vertical-align:top;">{{ if .Data.designation_name }}{{ .Data.designation_name }}{{ else }}—{{ end }}</td>
+                        </tr>
+                        <tr>
+                          <td class="summary-label" style="padding:0 0 8px;font-size:12px;line-height:1.5;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.04em;width:42%;vertical-align:top;">Employment Type</td>
+                          <td class="summary-value" style="padding:0 0 8px;font-size:14px;line-height:1.6;color:#334155;vertical-align:top;">{{ if .Data.employment_type_name }}{{ .Data.employment_type_name }}{{ else }}—{{ end }}</td>
+                        </tr>
+                        <tr>
+                          <td class="summary-label" style="padding:0;font-size:12px;line-height:1.5;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.04em;width:42%;vertical-align:top;">Reporting Manager</td>
+                          <td class="summary-value" style="padding:0;font-size:14px;line-height:1.6;color:#334155;vertical-align:top;">{{ if .Data.reporting_manager_name }}{{ .Data.reporting_manager_name }}{{ else }}—{{ end }}</td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 28px;background-color:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;">
+                  <tr>
+                    <td style="padding:18px 20px;">
+                      <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 12px;">
+                        <tr>
+                          <td style="padding-right:10px;vertical-align:middle;width:4px;">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                              <tr>
+                                <td style="width:4px;height:18px;background-color:#CBD5E1;border-radius:2px;font-size:0;line-height:0;">&nbsp;</td>
+                              </tr>
+                            </table>
+                          </td>
+                          <td style="vertical-align:middle;">
+                            <p style="margin:0;font-size:14px;line-height:1.5;font-weight:600;color:#475569;">
+                              Security Information
+                            </p>
+                          </td>
+                        </tr>
+                      </table>
+                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                        <tr>
+                          <td style="padding:0 0 8px;font-size:13px;line-height:1.6;color:#475569;vertical-align:top;width:14px;">&bull;</td>
+                          <td style="padding:0 0 8px;font-size:13px;line-height:1.6;color:#475569;">Invitation expires in 48 hours.</td>
+                        </tr>
+                        <tr>
+                          <td style="padding:0 0 8px;font-size:13px;line-height:1.6;color:#475569;vertical-align:top;width:14px;">&bull;</td>
+                          <td style="padding:0 0 8px;font-size:13px;line-height:1.6;color:#475569;">Link can only be used once.</td>
+                        </tr>
+                        <tr>
+                          <td style="padding:0 0 8px;font-size:13px;line-height:1.6;color:#475569;vertical-align:top;width:14px;">&bull;</td>
+                          <td style="padding:0 0 8px;font-size:13px;line-height:1.6;color:#475569;">Never share this invitation.</td>
+                        </tr>
+                        <tr>
+                          <td style="padding:0;font-size:13px;line-height:1.6;color:#475569;vertical-align:top;width:14px;">&bull;</td>
+                          <td style="padding:0;font-size:13px;line-height:1.6;color:#475569;">Contact HR if unexpected.</td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0;border-top:1px solid #F1F5F9;">
+                  <tr>
+                    <td style="padding-top:24px;">
+                      <p style="margin:0 0 6px;font-size:14px;line-height:1.5;font-weight:500;color:#64748B;">
+                        Need assistance?
+                      </p>
+                      <p style="margin:0;font-size:14px;line-height:1.6;color:#94A3B8;">
+                        <a href="mailto:support@ifranchise.in" style="color:#64748B;font-weight:500;text-decoration:underline;">support@ifranchise.in</a>
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+
               </td>
             </tr>
+
             <tr>
-              <td style="border-top:1px solid #e5e7eb;padding:20px 32px;background:#fbfdff;">
-                <p style="margin:0;font-size:12px;line-height:1.6;color:#94a3b8;">
-                  iFranchise HRMS · Secure employee account provisioning
+              <td class="footer-padding" align="center" style="padding:24px 40px 28px;background-color:#FAFBFC;border-top:1px solid #F1F5F9;">
+                <p style="margin:0 0 6px;font-size:12px;line-height:1.6;color:#94A3B8;">
+                  &copy; 2026 iFranchise Technologies
+                </p>
+                <p style="margin:0 0 6px;font-size:12px;line-height:1.6;color:#94A3B8;">
+                  Enterprise Human Resource Management
+                </p>
+                <p style="margin:0;font-size:11px;line-height:1.6;color:#CBD5E1;">
+                  Automated email &middot; Do not reply
                 </p>
               </td>
             </tr>
+
           </table>
         </td>
       </tr>

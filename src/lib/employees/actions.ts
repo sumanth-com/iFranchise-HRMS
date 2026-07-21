@@ -62,9 +62,11 @@ import type {
 import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
 import { z } from "zod";
 
-const directInviteSchema = z.object({
-  email: z.string().email("Enter a valid email address"),
-});
+import { employeeInviteSchema, employeeSelfProfileSchema } from "@/lib/validations/employee";
+import {
+  getEmployeeSelfProfileSettings,
+  updateEmployeeSelfProfile,
+} from "@/lib/employee/services/employee-self-profile";
 
 async function getAuthenticatedSupabase() {
   const supabase = await createClient();
@@ -234,12 +236,47 @@ export async function sendEmployeeInvitationAction(
   }
 }
 
+export async function inviteEmployeeAction(
+  input: unknown,
+): Promise<EmployeeActionResult<{ employeeId: string }>> {
+  try {
+    const profile = await requireServerPermission("employee_account.invite");
+    const parsed = employeeInviteSchema.parse(input);
+    const supabase = await getAuthenticatedSupabase();
+    const employeeId = await inviteEmployeeByEmail(supabase, profile, parsed.email, {
+      fullName: parsed.fullName,
+      departmentId: parsed.departmentId,
+      designationId: parsed.designationId,
+      employmentTypeId: parsed.employmentTypeId,
+      reportingManagerId: parsed.reportingManagerId,
+    });
+    await revalidateEmployeeAccountPaths(employeeId);
+    return { success: true, data: { employeeId } };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to invite employee";
+    if (message.includes("employees_org_email_active_idx")) {
+      return {
+        success: false,
+        message: "This email is already registered for an employee in your organization.",
+      };
+    }
+    if (message.includes("employees_org_code_active_idx")) {
+      return {
+        success: false,
+        message: "Could not assign a unique employee ID. Please try again.",
+      };
+    }
+    return { success: false, message };
+  }
+}
+
+/** @deprecated Use inviteEmployeeAction for HR onboarding invites. */
 export async function inviteEmployeeByEmailAction(
   input: unknown,
 ): Promise<EmployeeActionResult<{ employeeId: string }>> {
   try {
     const profile = await requireServerPermission("employee_account.invite");
-    const parsed = directInviteSchema.parse(input);
+    const parsed = z.object({ email: z.string().email("Enter a valid email address") }).parse(input);
     const supabase = await getAuthenticatedSupabase();
     const employeeId = await inviteEmployeeByEmail(supabase, profile, parsed.email);
     await revalidateEmployeeAccountPaths(employeeId);
@@ -690,6 +727,45 @@ export async function removeProfileImageAction(
       success: false,
       message:
         error instanceof Error ? error.message : "Failed to remove profile image",
+    };
+  }
+}
+
+export async function updateEmployeeSelfProfileAction(
+  input: unknown,
+): Promise<EmployeeActionResult<null>> {
+  try {
+    const profile = await requireAuthenticatedProfile();
+    if (!profile.employee?.id) {
+      return { success: false, message: "Employee profile not found" };
+    }
+
+    const parsed = employeeSelfProfileSchema.parse(input);
+    const supabase = await getAuthenticatedSupabase();
+    const existing = await getEmployeeSelfProfileSettings(supabase, profile);
+
+    if (!existing) {
+      return { success: false, message: "Employee profile not found" };
+    }
+
+    await updateEmployeeSelfProfile(supabase, profile, parsed, existing);
+
+    revalidatePath("/employee/settings");
+    revalidatePath("/dashboard/settings");
+    revalidatePath(
+      EMPLOYEE_ROUTES.detail({
+        employeeCode: profile.employee.employeeCode,
+        firstName: parsed.firstName,
+        lastName: parsed.lastName,
+      }),
+    );
+
+    return { success: true, data: null };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "Failed to update profile",
     };
   }
 }
