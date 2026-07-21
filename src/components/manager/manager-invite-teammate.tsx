@@ -57,7 +57,7 @@ export function ManagerInviteTeammate({
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            placeholder="name@company.com"
+            placeholder="name@gmail.com"
             className="h-10 bg-background pl-8"
             disabled={disabled}
             aria-label="Teammate email"

@@ -1,4 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { allocateNextEmployeeCode } from "@/lib/employees/services/employee-code";
 import type { UserProfile } from "@/types/auth";
 import type {
   EmployeeAccountProvisioningItem,
@@ -199,28 +200,8 @@ export async function suggestNextEmployeeCode(
   supabase: AuthSupabaseClient,
   organizationId: string,
 ): Promise<string> {
-  const { data, error } = await supabase
-    .schema("hrms")
-    .from("employees")
-    .select("employee_code")
-    .eq("organization_id", organizationId)
-    .is("deleted_at", null)
-    .order("employee_code", { ascending: false })
-    .limit(1);
-
-  if (error || !data?.length) {
-    return "EMP-0001";
-  }
-
-  const latest = data[0]?.employee_code ?? "";
-  const match = latest.match(/(\d+)$/);
-
-  if (!match) {
-    return "EMP-0001";
-  }
-
-  const next = Number.parseInt(match[1], 10) + 1;
-  return `EMP-${String(next).padStart(4, "0")}`;
+  void supabase;
+  return allocateNextEmployeeCode(organizationId);
 }
 
 function mapProvisioningItem(

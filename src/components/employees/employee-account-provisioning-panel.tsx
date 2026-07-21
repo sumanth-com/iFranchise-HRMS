@@ -130,7 +130,7 @@ export function EmployeeAccountProvisioningPanel({
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="employee@company.com"
+              placeholder="name@gmail.com"
               className="h-9 sm:max-w-sm"
             />
             <Button

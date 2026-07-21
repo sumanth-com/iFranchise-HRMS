@@ -186,7 +186,7 @@ export function CeoInviteUserDialog({
                 type="email"
                 value={form.email}
                 onChange={(event) => update("email", event.target.value)}
-                placeholder="name@company.com"
+                placeholder="name@gmail.com"
                 className="h-10"
                 disabled={isPending}
                 autoFocus

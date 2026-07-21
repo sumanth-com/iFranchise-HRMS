@@ -245,10 +245,20 @@ export async function inviteEmployeeByEmailAction(
     await revalidateEmployeeAccountPaths(employeeId);
     return { success: true, data: { employeeId } };
   } catch (error) {
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : "Failed to invite employee",
-    };
+    const message = error instanceof Error ? error.message : "Failed to invite employee";
+    if (message.includes("employees_org_email_active_idx")) {
+      return {
+        success: false,
+        message: "This email is already registered for an employee in your organization.",
+      };
+    }
+    if (message.includes("employees_org_code_active_idx")) {
+      return {
+        success: false,
+        message: "Could not assign a unique employee ID. Please try again.",
+      };
+    }
+    return { success: false, message };
   }
 }
 

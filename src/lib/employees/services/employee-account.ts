@@ -5,6 +5,7 @@ import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import type { ApplicationAuditInput } from "@/lib/audit/services/audit-utils";
 import { createNotification } from "@/lib/notifications/services/notification-service";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { allocateNextEmployeeCode } from "@/lib/employees/services/employee-code";
 import type { UserProfile } from "@/types/auth";
 import type { EmployeeAccountStatus } from "@/types/employee";
 
@@ -212,6 +213,14 @@ async function updateEmployeeAccountWithClient(
   if (error) throw new Error(error.message);
 }
 
+async function findAuthUserIdByEmail(email: string) {
+  const admin = createAdminClient();
+  const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (error) throw new Error(error.message);
+  const match = data.users.find((user) => user.email?.toLowerCase() === email.toLowerCase());
+  return match?.id ?? null;
+}
+
 async function sendSupabaseInvite(employee: EmployeeAccountRow) {
   const admin = createAdminClient();
   const { data, error } = await admin.auth.admin.inviteUserByEmail(employee.email, {
@@ -224,9 +233,22 @@ async function sendSupabaseInvite(employee: EmployeeAccountRow) {
     },
   });
 
-  if (error) throw new Error(error.message);
-  if (!data.user?.id) throw new Error("Supabase did not return an invited user");
-  return data.user.id;
+  if (!error && data.user?.id) {
+    return data.user.id;
+  }
+
+  const message = error?.message?.toLowerCase() ?? "";
+  const alreadyExists =
+    message.includes("already registered") ||
+    message.includes("already exists") ||
+    message.includes("user already");
+
+  if (alreadyExists) {
+    const existingUserId = await findAuthUserIdByEmail(employee.email);
+    if (existingUserId) return existingUserId;
+  }
+
+  throw new Error(error?.message ?? "Failed to send invitation email");
 }
 
 export async function sendEmployeeInvitation(
@@ -270,20 +292,7 @@ export async function sendEmployeeInvitation(
 }
 
 async function suggestEmployeeCodeForInvite(organizationId: string) {
-  const admin = createAdminClient();
-  const { data } = await admin
-    .schema("hrms")
-    .from("employees")
-    .select("employee_code")
-    .eq("organization_id", organizationId)
-    .is("deleted_at", null)
-    .order("employee_code", { ascending: false })
-    .limit(1);
-
-  const latest = data?.[0]?.employee_code ?? "";
-  const match = latest.match(/(\d+)$/);
-  if (!match) return "EMP-0001";
-  return `EMP-${String(Number.parseInt(match[1], 10) + 1).padStart(4, "0")}`;
+  return allocateNextEmployeeCode(organizationId);
 }
 
 export type InviteEmployeeByEmailOptions = {
@@ -367,36 +376,62 @@ export async function inviteEmployeeByEmail(
   }
 
   const { firstName, lastName } = deriveNameFromEmail(email);
-  const employeeCode = await suggestEmployeeCodeForInvite(profile.employee.organizationId);
-  const { data: created, error: createError } = await admin
-    .schema("hrms")
-    .from("employees")
-    .insert({
-      organization_id: profile.employee.organizationId,
-      branch_id: options.branchId ?? profile.employee.branchId,
-      department_id: options.departmentId ?? null,
-      designation_id: options.designationId ?? null,
-      employment_type_id: options.employmentTypeId ?? null,
-      reporting_manager_id: options.reportingManagerId ?? null,
-      employee_code: employeeCode,
-      first_name: firstName,
-      last_name: lastName,
-      email,
-      employment_status: "draft",
-      account_status: "draft",
-      status: "active",
-      created_by: profile.userId,
-      updated_by: profile.userId,
-    })
-    .select("id")
-    .single();
 
-  if (createError || !created?.id) {
-    throw new Error(createError?.message ?? "Failed to create employee invite record");
+  let createdId: string | null = null;
+  let lastCreateError: string | null = null;
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const employeeCode = await suggestEmployeeCodeForInvite(
+      profile.employee.organizationId,
+    );
+
+    const { data: created, error: createError } = await admin
+      .schema("hrms")
+      .from("employees")
+      .insert({
+        organization_id: profile.employee.organizationId,
+        branch_id: options.branchId ?? profile.employee.branchId,
+        department_id: options.departmentId ?? null,
+        designation_id: options.designationId ?? null,
+        employment_type_id: options.employmentTypeId ?? null,
+        reporting_manager_id: options.reportingManagerId ?? null,
+        employee_code: employeeCode,
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        employment_status: "draft",
+        account_status: "draft",
+        status: "active",
+        created_by: profile.userId,
+        updated_by: profile.userId,
+      })
+      .select("id")
+      .single();
+
+    if (!createError && created?.id) {
+      createdId = created.id as string;
+      break;
+    }
+
+    lastCreateError = createError?.message ?? "Failed to create employee invite record";
+
+    if (!lastCreateError.includes("employees_org_code_active_idx")) {
+      break;
+    }
   }
 
-  await sendEmployeeInvitation(supabase, profile, created.id, roleCode);
-  return created.id as string;
+  if (!createdId) {
+    if (lastCreateError?.includes("employees_org_email_active_idx")) {
+      throw new Error("This email is already registered for an employee in your organization.");
+    }
+    if (lastCreateError?.includes("employees_org_code_active_idx")) {
+      throw new Error("Could not assign a unique employee ID. Please try again.");
+    }
+    throw new Error(lastCreateError ?? "Failed to create employee invite record");
+  }
+
+  await sendEmployeeInvitation(supabase, profile, createdId, roleCode);
+  return createdId;
 }
 
 export async function resendEmployeeInvitation(
