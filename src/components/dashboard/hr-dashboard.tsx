@@ -15,7 +15,7 @@ export function HrDashboard({ data, error }: Props) {
   if (error) {
     return (
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 md:p-5">
-        <DashboardHeader />
+        <DashboardHeader showGreeting={false} />
         <ErrorState title="Unable to load dashboard" description={error} />
       </div>
     );
@@ -28,7 +28,7 @@ export function HrDashboard({ data, error }: Props) {
       )}
     >
       <div className="shrink-0">
-        <DashboardHeader />
+        <DashboardHeader showGreeting={false} />
       </div>
 
       <section className="shrink-0" aria-label="Key performance indicators">

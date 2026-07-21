@@ -4,6 +4,12 @@ import { LEAVE_ROUTES } from "@/lib/leave/constants";
 import { PAYROLL_ROUTES } from "@/lib/payroll/constants";
 import { RECRUITMENT_ROUTES } from "@/lib/recruitment/constants";
 
+export const HR_SELF_SERVICE_HOME = "/" as const;
+
+export const HR_OVERVIEW_ROUTES = {
+  overview: "/dashboard/hr-overview",
+} as const;
+
 export const DASHBOARD_QUICK_ACTIONS = [
   {
     label: "Add Employee",

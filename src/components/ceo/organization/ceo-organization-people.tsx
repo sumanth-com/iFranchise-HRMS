@@ -1,17 +1,12 @@
 "use client";
 
-import { format } from "date-fns";
-import { Eye, Mail, MoreVertical, Phone, Users } from "lucide-react";
+import { Users } from "lucide-react";
 
 import { Button } from "@/components/common/button";
-import { EmployeeAvatar } from "@/components/employees/employee-avatar";
-import { EmploymentStatusBadge } from "@/components/employees/employment-status-badge";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  EmployeeDirectoryGrid,
+  type DirectoryCardPerson,
+} from "@/components/employee/directory/employee-directory-card";
 import type { CeoOrgDirectoryItem } from "@/types/ceo-organization";
 
 type CeoOrganizationPeopleProps = {
@@ -24,96 +19,23 @@ type CeoOrganizationPeopleProps = {
   onView: (employeeId: string) => void;
 };
 
-function MetaRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="shrink-0 text-muted-foreground">{label}</span>
-      <span className="min-w-0 truncate text-right font-medium">{value}</span>
-    </div>
-  );
-}
-
-function PersonCard({
-  person,
-  onView,
-}: {
-  person: CeoOrgDirectoryItem;
-  onView: (employeeId: string) => void;
-}) {
-  return (
-    <article className="relative flex flex-col rounded-xl border bg-card p-4 shadow-sm transition-colors hover:border-primary/30">
-      <div className="absolute right-2 top-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-7 text-muted-foreground"
-                aria-label="Employee actions"
-              >
-                <MoreVertical className="size-4" />
-              </Button>
-            }
-          />
-          <DropdownMenuContent align="end" className="min-w-[10rem]">
-            <DropdownMenuItem onClick={() => onView(person.id)}>
-              <Eye className="mr-2 size-4" />
-              View profile
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      <button
-        type="button"
-        onClick={() => onView(person.id)}
-        className="flex flex-col items-center text-center"
-      >
-        <EmployeeAvatar
-          firstName={person.firstName}
-          lastName={person.lastName}
-          profileImagePath={person.profileImagePath}
-          className="size-16"
-        />
-        <p className="mt-2 line-clamp-1 font-semibold hover:text-primary">
-          {person.fullName}
-        </p>
-        <p className="line-clamp-1 text-xs text-muted-foreground">
-          {person.designationTitle ?? "—"}
-        </p>
-      </button>
-
-      <div className="mt-2 flex justify-center">
-        <EmploymentStatusBadge status={person.employmentStatus} />
-      </div>
-
-      <div className="mt-3 space-y-1.5 border-t pt-3 text-xs">
-        <div className="flex items-center gap-2">
-          <Mail className="size-3.5 shrink-0 text-muted-foreground" />
-          <span className="min-w-0 truncate">{person.email}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Phone className="size-3.5 shrink-0 text-muted-foreground" />
-          <span className="min-w-0 truncate">{person.phone ?? "—"}</span>
-        </div>
-      </div>
-
-      <div className="mt-3 space-y-1.5 border-t pt-3 text-xs">
-        <MetaRow label="Department" value={person.departmentName ?? "—"} />
-        <MetaRow label="Reporting to" value={person.managerName ?? "—"} />
-        <MetaRow
-          label="Joined"
-          value={
-            person.dateOfJoining
-              ? format(new Date(person.dateOfJoining), "d MMM yyyy")
-              : "—"
-          }
-        />
-      </div>
-    </article>
-  );
+function toDirectoryCardPerson(person: CeoOrgDirectoryItem): DirectoryCardPerson {
+  return {
+    id: person.id,
+    employeeCode: person.employeeCode,
+    firstName: person.firstName,
+    lastName: person.lastName,
+    fullName: person.fullName,
+    email: person.email,
+    phone: person.phone,
+    designationTitle: person.designationTitle,
+    departmentName: person.departmentName,
+    dateOfJoining: person.dateOfJoining,
+    experienceYears: person.experienceYears,
+    avatarUrl: null,
+    profileImagePath: person.profileImagePath,
+    managerName: person.managerName,
+  };
 }
 
 export function CeoOrganizationPeople({
@@ -126,35 +48,41 @@ export function CeoOrganizationPeople({
   onView,
 }: CeoOrganizationPeopleProps) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const people = employees.map(toDirectoryCardPerson);
 
   return (
-    <section className="rounded-xl border bg-card p-4 shadow-sm">
-      <div className="mb-4 flex items-center gap-2">
-        <Users className="size-4 text-muted-foreground" />
-        <div>
-          <h2 className="text-sm font-semibold">People</h2>
-          <p className="text-xs text-muted-foreground">
-            Employees matching the selected filters · click a card to view the profile.
-          </p>
+    <section className="rounded-xl border bg-card p-4 shadow-sm md:p-5">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex items-start gap-2">
+          <Users className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+          <div>
+            <h2 className="text-sm font-semibold">People</h2>
+            <p className="text-xs text-muted-foreground">
+              Browse colleagues across the organization — expand a card for details.
+            </p>
+          </div>
         </div>
+        <span className="inline-flex w-fit items-center rounded-full border bg-muted/40 px-3 py-1 text-xs font-medium text-muted-foreground">
+          {total} {total === 1 ? "person" : "people"}
+        </span>
       </div>
 
       {isLoading ? (
-        <p className="py-10 text-center text-sm text-muted-foreground">Loading people…</p>
-      ) : employees.length === 0 ? (
-        <p className="py-10 text-center text-sm text-muted-foreground">
-          No people match the current filters.
-        </p>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {employees.map((person) => (
-            <PersonCard key={person.id} person={person} onView={onView} />
-          ))}
+        <p className="py-16 text-center text-sm text-muted-foreground">Loading people…</p>
+      ) : people.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed bg-background px-6 py-16 text-center">
+          <Users className="size-10 text-muted-foreground/50" />
+          <p className="mt-3 text-sm font-medium">No people match the current filters</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Try adjusting department, manager, or search filters.
+          </p>
         </div>
+      ) : (
+        <EmployeeDirectoryGrid people={people} onViewProfile={onView} />
       )}
 
       {total > pageSize ? (
-        <div className="mt-4 flex items-center justify-between gap-3 border-t pt-3">
+        <div className="mt-5 flex items-center justify-between gap-3 border-t pt-4">
           <p className="text-xs text-muted-foreground">
             Showing {employees.length} of {total} people
           </p>

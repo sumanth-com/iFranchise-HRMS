@@ -460,6 +460,74 @@
   }
 }
 
+/* Sidebar nav icon hover — playful lift + wiggle */
+.sidebar-nav-icon {
+  transition:
+    transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1),
+    filter 0.28s ease;
+}
+
+.sidebar-nav-icon svg {
+  transition: transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1);
+  transform-origin: center;
+}
+
+.group\/nav:hover .sidebar-nav-icon,
+.group\/nav:focus-visible .sidebar-nav-icon {
+  transform: scale(1.14) translateY(-1px);
+  filter: drop-shadow(0 2px 4px rgb(0 0 0 / 0.12));
+}
+
+.group\/nav:hover .sidebar-nav-icon svg,
+.group\/nav:focus-visible .sidebar-nav-icon svg {
+  animation: sidebar-icon-wiggle 0.55s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.sidebar-nav-icon-active svg {
+  animation: sidebar-icon-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes sidebar-icon-wiggle {
+  0%,
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+  18% {
+    transform: rotate(-11deg) scale(1.06);
+  }
+  36% {
+    transform: rotate(9deg) scale(1.08);
+  }
+  54% {
+    transform: rotate(-6deg) scale(1.05);
+  }
+  72% {
+    transform: rotate(4deg) scale(1.03);
+  }
+}
+
+@keyframes sidebar-icon-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+.sidebar-brand-mark {
+  transition:
+    transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1),
+    box-shadow 0.28s ease;
+}
+
+.group\/brand:hover .sidebar-brand-mark,
+.group\/brand:focus-visible .sidebar-brand-mark {
+  transform: scale(1.08) rotate(-4deg);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.15);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .auth-globe-map,
   .auth-globe-shine,
@@ -471,5 +539,18 @@
   .auth-globe-halo,
   .auth-logo-shine::after {
     animation: none !important;
+  }
+
+  .sidebar-nav-icon,
+  .sidebar-nav-icon svg,
+  .sidebar-brand-mark {
+    transition: none;
+    animation: none !important;
+  }
+
+  .group\/nav:hover .sidebar-nav-icon,
+  .group\/nav:focus-visible .sidebar-nav-icon {
+    transform: scale(1.05);
+    filter: none;
   }
 }

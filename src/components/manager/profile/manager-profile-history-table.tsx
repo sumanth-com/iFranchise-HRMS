@@ -212,9 +212,9 @@ export function ManagerProfileHistoryTable({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="max-h-[26rem] overflow-auto">
         <table className="w-full min-w-[72rem] text-sm">
-          <thead className="bg-muted/40 text-left text-xs tracking-wide text-muted-foreground uppercase">
+          <thead className="sticky top-0 z-10 bg-muted/95 text-left text-xs tracking-wide text-muted-foreground uppercase backdrop-blur supports-[backdrop-filter]:bg-muted/80">
             <tr>
               <th className="px-4 py-3 font-medium">Date</th>
               <th className="px-4 py-3 font-medium">Status</th>

@@ -20,7 +20,7 @@ function greetingForHour(hour: number) {
   return "Good Evening";
 }
 
-export function DashboardHeader() {
+export function DashboardHeader({ showGreeting = true }: { showGreeting?: boolean }) {
   const router = useRouter();
   const { profile } = useAuth();
   const [now, setNow] = useState(() => new Date());
@@ -92,19 +92,21 @@ export function DashboardHeader() {
 
   return (
     <div className="flex shrink-0 flex-col gap-3">
-      <section className="rounded-xl border bg-card px-5 py-6 shadow-sm md:px-7 md:py-7">
-        <div className="flex items-start justify-between gap-4">
-          <h2 className="min-w-0 truncate text-2xl font-semibold tracking-tight md:text-[1.75rem]">
-            {greetingForHour(now.getHours())}, {firstName}
-          </h2>
-          <p className="shrink-0 pt-1.5 text-sm text-muted-foreground">
-            {format(now, "EEE, d MMM")} · {format(now, "hh:mm a")}
+      {showGreeting ? (
+        <section className="rounded-xl border bg-card px-5 py-6 shadow-sm md:px-7 md:py-7">
+          <div className="flex items-start justify-between gap-4">
+            <h2 className="min-w-0 truncate text-2xl font-semibold tracking-tight md:text-[1.75rem]">
+              {greetingForHour(now.getHours())}, {firstName}
+            </h2>
+            <p className="shrink-0 pt-1.5 text-sm text-muted-foreground">
+              {format(now, "EEE, d MMM")} · {format(now, "hh:mm a")}
+            </p>
+          </div>
+          <p className="mt-2 truncate text-sm text-muted-foreground md:text-[15px]">
+            Here&apos;s what is happening in your organization today.
           </p>
-        </div>
-        <p className="mt-2 truncate text-sm text-muted-foreground md:text-[15px]">
-          Here&apos;s what is happening in your organization today.
-        </p>
-      </section>
+        </section>
+      ) : null}
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <div ref={rootRef} className="relative min-w-0 flex-1">

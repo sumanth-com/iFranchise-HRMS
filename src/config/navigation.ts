@@ -15,12 +15,15 @@ import {
   Shield,
   ScrollText,
   Target,
+  UserRoundPlus,
   Users,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
 
 import type { NavigationItem } from "@/lib/auth/navigation";
+import { HR_OVERVIEW_ROUTES } from "@/lib/dashboard/constants";
+import { USER_PROVISIONING_ROUTES } from "@/lib/user-provisioning/constants";
 
 export type NavItem = {
   title: string;
@@ -32,65 +35,74 @@ export type NavItem = {
 
 /**
  * HR portal sidebar.
- * Top = employee self-service (same perspective as the employee portal).
+ * Self-service = personal workspace (attendance, leave, payslips, etc.).
  * Administration = org-wide HR operations and system tools.
  */
 export const mainNavItems: NavigationItem[] = [
-  // ── Self-service (employee perspective) ──────────────────────────
+  // ── Self-service (personal workspace) ────────────────────────────
   {
     title: "Dashboard",
     href: "/",
     icon: LayoutDashboard,
+    section: "Self-service",
   },
   {
     title: "Attendance",
     href: "/dashboard/attendance",
     icon: CalendarCheck,
+    section: "Self-service",
     permissions: ["attendance.view"],
-  },
-  {
-    title: "Employee Directory",
-    href: "/dashboard/directory",
-    icon: Users,
-    permissions: ["employee.view"],
   },
   {
     title: "Leave",
     href: "/dashboard/leave",
     icon: CalendarDays,
+    section: "Self-service",
     permissions: ["leave.view"],
   },
   {
     title: "Payroll",
     href: "/dashboard/payroll",
     icon: Wallet,
+    section: "Self-service",
     permissions: ["payroll.view", "payslip.view"],
   },
   {
     title: "Documents",
     href: "/dashboard/documents",
     icon: FileText,
+    section: "Self-service",
     permissions: ["documents.view"],
   },
   {
     title: "Assets",
     href: "/dashboard/assets",
     icon: LaptopMinimal,
+    section: "Self-service",
     permissions: ["asset.view"],
   },
   {
     title: "Notifications",
     href: "/dashboard/notifications/center",
     icon: Bell,
+    section: "Self-service",
     permissions: ["notifications.view", "notification.view"],
   },
   {
     title: "Settings",
     href: "/dashboard/settings",
     icon: Settings,
+    section: "Self-service",
   },
 
   // ── Administration (org-wide) ────────────────────────────────────
+  {
+    title: "HR Overview",
+    href: HR_OVERVIEW_ROUTES.overview,
+    icon: LayoutDashboard,
+    section: "Administration",
+    permissions: ["employee.view"],
+  },
   {
     title: "Employees",
     href: "/dashboard/employees",
@@ -99,35 +111,35 @@ export const mainNavItems: NavigationItem[] = [
     permissions: ["employee.view"],
   },
   {
-    title: "Attendance Management",
+    title: "Team Attendance",
     href: "/dashboard/attendance-management",
     icon: CalendarCheck,
     section: "Administration",
     permissions: ["attendance.view", "attendance.create", "attendance.edit", "attendance.approve"],
   },
   {
-    title: "Leave Management",
+    title: "Leave & Approvals",
     href: "/dashboard/leave-management",
     icon: CalendarDays,
     section: "Administration",
     permissions: ["leave.view", "leave.approve", "leave_balance.view"],
   },
   {
-    title: "Payroll Management",
+    title: "Payroll",
     href: "/dashboard/payroll-management",
     icon: Banknote,
     section: "Administration",
     permissions: ["payroll.view", "payroll.generate", "payroll.approve", "payslip.view"],
   },
   {
-    title: "Documents Management",
+    title: "HR Documents",
     href: "/dashboard/documents-management",
     icon: FileText,
     section: "Administration",
     permissions: ["documents.view", "documents.manage", "documents.verify"],
   },
   {
-    title: "Assets Management",
+    title: "Company Assets",
     href: "/dashboard/assets-management",
     icon: Package,
     section: "Administration",
@@ -148,7 +160,7 @@ export const mainNavItems: NavigationItem[] = [
     permissions: ["recruitment.view"],
   },
   {
-    title: "Exit Management",
+    title: "Offboarding",
     href: "/dashboard/exit",
     icon: LogOut,
     section: "Administration",
@@ -178,21 +190,28 @@ export const mainNavItems: NavigationItem[] = [
     ],
   },
   {
-    title: "Notifications Management",
+    title: "Alerts & Broadcasts",
     href: "/dashboard/notifications",
     icon: Bell,
     section: "Administration",
     permissions: ["notifications.view", "notification.view"],
   },
   {
-    title: "Roles & Permissions",
+    title: "Roles & Access",
     href: "/dashboard/roles",
     icon: Shield,
     section: "Administration",
     permissions: ["role.view", "permission.view", "user_role.view"],
   },
   {
-    title: "Audit Logs",
+    title: "User Provisioning",
+    href: USER_PROVISIONING_ROUTES.hr,
+    icon: UserRoundPlus,
+    section: "Administration",
+    permissions: ["user_provisioning.view", "user_provisioning.manage"],
+  },
+  {
+    title: "Audit Trail",
     href: "/dashboard/audit",
     icon: ScrollText,
     section: "Administration",

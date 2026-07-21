@@ -30,7 +30,14 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
   const segments = pathname.split("/").filter(Boolean);
 
   if (segments.length === 0) {
-    return [{ label: "Dashboard", href: "/" }];
+    return [{ label: "Home", href: "/" }];
+  }
+
+  if (segments[0] === "dashboard" && segments[1] === "hr-overview") {
+    return [
+      { label: "Dashboard", href: "/" },
+      { label: "HR Overview", href: "/dashboard/hr-overview" },
+    ];
   }
 
   if (segments[0] === "dashboard" && segments[1] === "employees") {
@@ -77,7 +84,7 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
   if (segments[0] === "dashboard" && segments[1] === "documents-management") {
     const items: BreadcrumbItemConfig[] = [
       { label: "Dashboard", href: "/" },
-      { label: "Documents Management", href: "/dashboard/documents-management" },
+      { label: "HR Documents", href: "/dashboard/documents-management" },
     ];
 
     const sectionLabels: Record<string, string> = {
@@ -116,7 +123,7 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
   if (segments[0] === "dashboard" && segments[1] === "attendance-management") {
     const items: BreadcrumbItemConfig[] = [
       { label: "Dashboard", href: "/" },
-      { label: "Attendance Management", href: "/dashboard/attendance-management" },
+      { label: "Team Attendance", href: "/dashboard/attendance-management" },
     ];
 
     if (segments[2] === "new") {
@@ -177,7 +184,7 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
   if (segments[0] === "dashboard" && segments[1] === "assets-management") {
     const items: BreadcrumbItemConfig[] = [
       { label: "Dashboard", href: "/" },
-      { label: "Assets Management", href: "/dashboard/assets-management" },
+      { label: "Company Assets", href: "/dashboard/assets-management" },
     ];
 
     const sectionLabels: Record<string, string> = {
@@ -202,7 +209,7 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
   if (segments[0] === "dashboard" && segments[1] === "payroll-management") {
     const items: BreadcrumbItemConfig[] = [
       { label: "Dashboard", href: "/" },
-      { label: "Payroll Management", href: "/dashboard/payroll-management" },
+      { label: "Payroll", href: "/dashboard/payroll-management" },
     ];
 
     const sectionLabels: Record<string, string> = {
@@ -271,7 +278,7 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
   if (segments[0] === "dashboard" && segments[1] === "leave-management") {
     const items: BreadcrumbItemConfig[] = [
       { label: "Dashboard", href: "/" },
-      { label: "Leave Management", href: "/dashboard/leave-management" },
+      { label: "Leave & Approvals", href: "/dashboard/leave-management" },
     ];
 
     if (segments[2] === "new") {
@@ -308,7 +315,7 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
     ];
 
     const sectionLabels: Record<string, string> = {
-      profile: "Profile",
+      profile: "My Attendance",
       team: "My Team",
       attendance: "Attendance",
       leave: "Leave",

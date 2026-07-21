@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
-import { CEO_ROUTES } from "@/lib/ceo/constants";
+import {
+  userProvisioningPaths,
+} from "@/lib/user-provisioning/constants";
 import {
   getCeoProvisioningLookups,
   getCeoProvisioningSummary,
@@ -35,10 +37,21 @@ import {
 
 const VIEW_PERMISSIONS = [
   PORTAL_PERMISSIONS.ceo,
+  PORTAL_PERMISSIONS.hr,
   "user_provisioning.view",
   "user_provisioning.manage",
 ];
-const MANAGE_PERMISSIONS = [PORTAL_PERMISSIONS.ceo, "user_provisioning.manage"];
+const MANAGE_PERMISSIONS = [
+  PORTAL_PERMISSIONS.ceo,
+  PORTAL_PERMISSIONS.hr,
+  "user_provisioning.manage",
+];
+
+function revalidateUserProvisioning() {
+  for (const path of userProvisioningPaths()) {
+    revalidatePath(path);
+  }
+}
 
 type ActionResult =
   | { success: true; message: string }
@@ -109,7 +122,7 @@ export async function inviteExecutiveUserAction(input: unknown): Promise<ActionR
     const parsed = inviteExecutiveUserSchema.parse(input);
 
     await inviteExecutiveUser(supabase, profile, parsed);
-    revalidatePath(CEO_ROUTES.userProvisioning);
+    revalidateUserProvisioning();
 
     return {
       success: true,
@@ -144,7 +157,7 @@ async function runManageAction(
     const profile = await requireServerAnyPermission(MANAGE_PERMISSIONS);
     const supabase = await createClient();
     await handler(supabase, profile, employeeId);
-    revalidatePath(CEO_ROUTES.userProvisioning);
+    revalidateUserProvisioning();
     return { success: true, message: successMessage };
   } catch (error) {
     return {

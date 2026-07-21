@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   Settings,
   Target,
-  User,
   Users,
 } from "lucide-react";
 
@@ -21,9 +20,9 @@ export const managerNavItems: NavigationItem[] = [
     icon: LayoutDashboard,
   },
   {
-    title: "My Profile",
+    title: "My Attendance",
     href: MANAGER_ROUTES.profile,
-    icon: User,
+    icon: CalendarCheck,
   },
   {
     title: "My Team",
@@ -32,7 +31,7 @@ export const managerNavItems: NavigationItem[] = [
     permissions: ["employee.view"],
   },
   {
-    title: "Attendance",
+    title: "Team Attendance",
     href: MANAGER_ROUTES.attendance,
     icon: CalendarCheck,
     permissions: ["attendance.view"],

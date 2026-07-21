@@ -30,6 +30,28 @@ const TASK_ICONS: Record<string, LucideIcon> = {
   "offers-pending": FileText,
 };
 
+const MODULE_LABELS: Record<string, string> = {
+  employees: "Employees",
+  attendance: "Attendance",
+  leave: "Leave",
+  payroll: "Payroll",
+  recruitment: "Recruitment",
+  exit: "Offboarding",
+  system: "System",
+};
+
+function moduleLabel(module: string) {
+  return MODULE_LABELS[module] ?? module.replace(/_/g, " ");
+}
+
+function formatActivityWhen(iso: string) {
+  try {
+    return formatDistanceToNow(parseISO(iso), { addSuffix: true });
+  } catch {
+    return "Recently";
+  }
+}
+
 const MODULE_ICONS: Record<string, LucideIcon> = {
   employees: Users,
   attendance: CalendarCheck2,
@@ -148,17 +170,17 @@ function PriorityTasks({ items }: { items: DashboardTaskItem[] }) {
 }
 
 function RecentActivity({ items }: { items: DashboardActivityItem[] }) {
-  const rows = items.slice(0, 2);
+  const rows = items.slice(0, 5);
 
   return (
     <section className="flex min-h-0 flex-1 flex-col rounded-xl border bg-card p-3 shadow-sm md:p-4">
-      <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
+      <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
         <h2 className="text-xs font-semibold tracking-wide text-foreground uppercase">
           Recent Activity
         </h2>
         <Link
           href={AUDIT_ROUTES.logs}
-          className="inline-flex h-7 items-center rounded-full border bg-background px-3 text-[11px] font-medium text-foreground transition-colors hover:bg-muted"
+          className="inline-flex h-7 shrink-0 items-center rounded-full border bg-background px-3 text-[11px] font-medium text-foreground transition-colors hover:bg-muted"
         >
           View all
         </Link>
@@ -171,25 +193,38 @@ function RecentActivity({ items }: { items: DashboardActivityItem[] }) {
           className="flex-1 border-0 bg-transparent p-2 shadow-none"
         />
       ) : (
-        <ul className="flex min-h-0 flex-1 flex-col justify-center divide-y">
+        <ul className="flex min-h-0 flex-1 flex-col gap-2">
           {rows.map((item) => {
             const Icon = MODULE_ICONS[item.module] ?? Users;
-            const body = (
-              <div className="flex items-center gap-2.5 py-2.5 transition-colors hover:bg-muted/30">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-muted/40">
-                  <Icon className="size-3.5" />
+            const row = (
+              <div className="flex items-start gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-3 transition-colors hover:bg-muted/35">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-background shadow-sm">
+                  <Icon className="size-4 text-muted-foreground" />
                 </span>
+
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <p className="truncate text-sm font-medium">{item.user}</p>
-                    <time className="shrink-0 text-[10px] text-muted-foreground">
-                      {formatDistanceToNow(parseISO(item.occurredAt), { addSuffix: true })}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-sm font-medium leading-5 text-foreground">
+                          {item.user}
+                        </p>
+                        <span className="inline-flex shrink-0 items-center rounded-full border bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                          {moduleLabel(item.module)}
+                        </span>
+                      </div>
+                      <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+                        <span className="font-medium text-foreground">{item.title}</span>
+                        {item.description ? (
+                          <span className="text-muted-foreground"> · {item.description}</span>
+                        ) : null}
+                      </p>
+                    </div>
+
+                    <time className="shrink-0 pt-0.5 text-right text-[11px] leading-4 whitespace-nowrap text-muted-foreground tabular-nums">
+                      {formatActivityWhen(item.occurredAt)}
                     </time>
                   </div>
-                  <p className="truncate text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground/80">{item.title}</span>
-                    {item.description ? ` · ${item.description}` : null}
-                  </p>
                 </div>
               </div>
             );
@@ -197,11 +232,11 @@ function RecentActivity({ items }: { items: DashboardActivityItem[] }) {
             return (
               <li key={item.id}>
                 {item.href ? (
-                  <Link href={item.href} className="block">
-                    {body}
+                  <Link href={item.href} className="block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+                    {row}
                   </Link>
                 ) : (
-                  body
+                  row
                 )}
               </li>
             );

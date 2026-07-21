@@ -250,7 +250,7 @@ export async function uploadCeoProfileImageAction(
       return { success: false, message: "Please select an image file" };
     }
     if (file.size > PROFILE_IMAGE_MAX_BYTES) {
-      return { success: false, message: "Profile image must be 15 MB or smaller" };
+      return { success: false, message: "Profile image must be 10 MB or smaller" };
     }
 
     const supabase = await createClient();

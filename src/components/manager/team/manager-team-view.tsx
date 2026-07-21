@@ -4,11 +4,11 @@ import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 
 import { Button } from "@/components/common/button";
+import { ManagerTeamCards } from "@/components/manager/team/manager-team-cards";
 import { ManagerTeamFilters } from "@/components/manager/team/manager-team-filters";
 import { ManagerTeamHierarchy } from "@/components/manager/team/manager-team-hierarchy";
 import { ManagerTeamKpis } from "@/components/manager/team/manager-team-kpis";
 import { ManagerTeamQuickActions } from "@/components/manager/team/manager-team-quick-actions";
-import { ManagerTeamTable } from "@/components/manager/team/manager-team-table";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { fetchTeamEmployeesAction, fetchTeamSummaryAction } from "@/lib/manager/actions/team-actions";
 import type { ManagerTeamPageData, TeamListParams } from "@/types/manager-team";
@@ -100,14 +100,13 @@ export function ManagerTeamView({
             onChange={updateFilters}
             disabled={isPending}
           />
-          <ManagerTeamTable
+          <ManagerTeamCards
             employees={tableState.data}
             total={tableState.total}
             page={tableState.page}
             pageSize={tableState.pageSize}
             isLoading={isPending}
             onPageChange={(page) => updateFilters({ page })}
-            onRefresh={refreshTeamData}
           />
         </>
       ) : (

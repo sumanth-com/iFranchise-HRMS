@@ -14,7 +14,7 @@ export default async function DocumentsDashboardPage() {
   return (
     <>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Documents Management</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">HR Documents</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Track employee files, company letters, expiring credentials, and verification status.
         </p>

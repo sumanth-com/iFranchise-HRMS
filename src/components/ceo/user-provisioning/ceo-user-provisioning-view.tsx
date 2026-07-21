@@ -30,6 +30,7 @@ import type {
 
 type CeoUserProvisioningViewProps = CeoUserProvisioningPageData & {
   initialFilters: CeoProvisioningListParams;
+  variant?: "ceo" | "hr";
 };
 
 const MUTATION_ACTIONS: Record<
@@ -53,6 +54,7 @@ export function CeoUserProvisioningView({
   lookups,
   inviteServiceReady,
   initialFilters,
+  variant = "ceo",
 }: CeoUserProvisioningViewProps) {
   const [summary, setSummary] = useState(initialSummary);
   const [users, setUsers] = useState(initialUsers);
@@ -118,13 +120,22 @@ export function CeoUserProvisioningView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5">
-      <CeoBackToDashboard />
+      {variant === "ceo" ? <CeoBackToDashboard /> : null}
 
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <CeoModulePageHeader
-          title="User Provisioning"
-          description="Invite and manage executive users across the organization."
-        />
+        {variant === "hr" ? (
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">User Provisioning</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Invite and manage portal users, executives, and managers across the organization.
+            </p>
+          </div>
+        ) : (
+          <CeoModulePageHeader
+            title="User Provisioning"
+            description="Invite and manage executive users across the organization."
+          />
+        )}
         <Button
           type="button"
           className="gap-1.5"

@@ -45,7 +45,7 @@ export function ManagerProfileView({ data, status, searchDate }: Props) {
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-4 md:p-5">
       <div className="flex flex-col gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">My Profile</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">My Attendance</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Your personal attendance, identity, and regularization requests.
           </p>

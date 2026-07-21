@@ -4,6 +4,7 @@ import { employmentStatusSchema } from "@/lib/validations/employee";
 import { paginationSchema } from "@/lib/validations/common";
 
 export const teamListParamsSchema = paginationSchema.extend({
+  pageSize: z.coerce.number().int().min(1).max(100).default(8),
   search: z.string().trim().optional(),
   departmentId: z.string().uuid().optional(),
   designationId: z.string().uuid().optional(),

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
+import { SidebarNavIcon } from "@/components/layout/sidebar-nav-icon";
 import { useNavigation } from "@/hooks/use-permissions";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/providers/auth-provider";
@@ -29,6 +30,7 @@ export function Sidebar() {
   const { portalHome, portalLabel } = useAuth();
   const navigation = useNavigation();
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    "Self-service": true,
     Administration: true,
   });
 
@@ -58,8 +60,8 @@ export function Sidebar() {
           isCollapsed && "justify-center px-2",
         )}
       >
-        <Link href={portalHome} className="flex items-center gap-2 font-semibold">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-xs text-primary-foreground">
+        <Link href={portalHome} className="group/brand flex items-center gap-2 font-semibold">
+          <span className="sidebar-brand-mark flex size-8 items-center justify-center rounded-lg bg-primary text-xs text-primary-foreground">
             IF
           </span>
           {!isCollapsed ? (
@@ -99,7 +101,7 @@ export function Sidebar() {
                   aria-disabled={item.disabled}
                   title={isCollapsed ? item.title : undefined}
                   className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    "group/nav flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                     item.section && !isCollapsed && "ml-2",
                     isActive
                       ? "bg-primary text-primary-foreground"
@@ -108,7 +110,7 @@ export function Sidebar() {
                     isCollapsed && "justify-center px-2",
                   )}
                 >
-                  <Icon className="size-4 shrink-0" />
+                  <SidebarNavIcon icon={Icon} active={isActive} />
                   {!isCollapsed ? <span className="truncate">{item.title}</span> : null}
                 </Link>
               ) : null}

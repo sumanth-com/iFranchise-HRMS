@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
-import { requireServerPermission } from "@/lib/permissions/server";
+import {
+  requireAuthenticatedProfile,
+  requireServerPermission,
+} from "@/lib/permissions/server";
+import { hasPermission } from "@/lib/permissions/utils";
 import { EMPLOYEE_ROUTES, PROFILE_IMAGE_MAX_BYTES } from "@/lib/employees/constants";
 import {
   getEmployeeById,
@@ -548,7 +552,20 @@ export async function uploadProfileImageAction(
   formData: FormData,
 ): Promise<EmployeeActionResult<string>> {
   try {
-    const profile = await requireServerPermission("employee_profile.edit");
+    const profile = await requireAuthenticatedProfile();
+    const isSelf = profile.employee.id === employeeId;
+    const canEditOthers = hasPermission(
+      profile.permissionCodes,
+      "employee_profile.edit",
+    );
+
+    if (!isSelf && !canEditOthers) {
+      return {
+        success: false,
+        message: "You do not have permission to update this profile photo",
+      };
+    }
+
     const file = formData.get("file");
 
     if (!(file instanceof File)) {
@@ -560,7 +577,7 @@ export async function uploadProfileImageAction(
     }
 
     if (file.size > PROFILE_IMAGE_MAX_BYTES) {
-      return { success: false, message: "Profile image must be 15 MB or smaller" };
+      return { success: false, message: "Profile image must be 10 MB or smaller" };
     }
 
     const supabase = await getAuthenticatedSupabase();
@@ -591,6 +608,10 @@ export async function uploadProfileImageAction(
       revalidatePath(EMPLOYEE_ROUTES.detail(employee));
     }
 
+    revalidatePath("/manager/profile");
+    revalidatePath("/employee/attendance");
+    revalidatePath("/dashboard/attendance");
+
     return { success: true, data: storagePath };
   } catch (error) {
     return {
@@ -605,7 +626,20 @@ export async function removeProfileImageAction(
   employeeId: string,
 ): Promise<EmployeeActionResult<null>> {
   try {
-    const profile = await requireServerPermission("employee_profile.edit");
+    const profile = await requireAuthenticatedProfile();
+    const isSelf = profile.employee.id === employeeId;
+    const canEditOthers = hasPermission(
+      profile.permissionCodes,
+      "employee_profile.edit",
+    );
+
+    if (!isSelf && !canEditOthers) {
+      return {
+        success: false,
+        message: "You do not have permission to remove this profile photo",
+      };
+    }
+
     const supabase = await getAuthenticatedSupabase();
     const employee = await getEmployeeById(supabase, employeeId);
 
@@ -634,6 +668,9 @@ export async function removeProfileImageAction(
     }
 
     revalidatePath(EMPLOYEE_ROUTES.detail(employee));
+    revalidatePath("/manager/profile");
+    revalidatePath("/employee/attendance");
+    revalidatePath("/dashboard/attendance");
 
     return { success: true, data: null };
   } catch (error) {

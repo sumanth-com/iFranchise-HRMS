@@ -13,7 +13,7 @@ export default async function RolesDashboardPage() {
   return (
     <>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Roles & Permissions</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Roles & Access</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Manage roles, permissions, user assignments, and access control across the HRMS.
         </p>

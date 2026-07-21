@@ -67,7 +67,9 @@ export async function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
 
   if (isPublicRoute(pathname)) {
-    if (user && isAuthRoute(pathname)) {
+    // Only redirect page navigations — server actions POST to /login and must not
+    // receive a 307 HTML redirect or the client shows "unexpected response".
+    if (user && isAuthRoute(pathname) && request.method === "GET") {
       const permissionCodes = await loadPermissionCodes(supabase, user.id);
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = getPortalRedirectPath(permissionCodes);

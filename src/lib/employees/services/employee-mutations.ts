@@ -333,7 +333,7 @@ export async function uploadProfileImage(
   file: File,
 ): Promise<string> {
   if (file.size > PROFILE_IMAGE_MAX_BYTES) {
-    throw new Error("Profile image must be 15 MB or smaller");
+    throw new Error("Profile image must be 10 MB or smaller");
   }
 
   const extension = file.name.split(".").pop() ?? "jpg";

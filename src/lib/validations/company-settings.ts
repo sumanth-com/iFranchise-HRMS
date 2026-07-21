@@ -14,6 +14,11 @@ const weekendRuleSchema = z.enum(["off", "working", "half_day"]);
 
 export const companySettingsSectionSchema = z.enum([
   "profile",
+  "working",
+  "leave",
+  "payroll",
+  "recruitment",
+  "performance",
   "notifications",
   "security",
   "branding",

@@ -57,6 +57,12 @@ export function EmployeeIdCard({
   const fullName = `${firstName} ${lastName}`.trim();
   const roleTitle = designation?.trim() || "Team Member";
   const isAttendanceCard = profilePath.endsWith("/card");
+  const backHeading = isAttendanceCard
+    ? "One scan. Your full work story."
+    : "Verified identity. Instant access.";
+  const backSubtext = isAttendanceCard
+    ? "Attendance, leave, and performance — all in one place."
+    : "Scan to open your secure employee profile.";
 
   useEffect(() => {
     setImageUrl(initialUrl);
@@ -104,7 +110,7 @@ export function EmployeeIdCard({
     }
 
     if (file.size > PROFILE_IMAGE_MAX_BYTES) {
-      toast.error("Profile image must be 15 MB or smaller");
+      toast.error("Profile image must be 10 MB or smaller");
       event.target.value = "";
       return;
     }
@@ -164,6 +170,7 @@ export function EmployeeIdCard({
             className={cn(
               "absolute inset-0 flex flex-col overflow-hidden rounded-[1.65rem] border border-black/[0.06] bg-white [backface-visibility:hidden]",
               "shadow-[0_2px_6px_rgba(15,23,42,0.06),0_18px_42px_-18px_rgba(15,23,42,0.35)]",
+              flipped && "pointer-events-none",
             )}
           >
             <div className="pointer-events-none absolute inset-0 z-20 rounded-[1.65rem] ring-1 ring-inset ring-white/80" />
@@ -172,7 +179,26 @@ export function EmployeeIdCard({
               DIGITAL ID
             </div>
 
-            <div className="group/photo relative h-[19.25rem] overflow-hidden bg-[#d9dbe1]">
+            <div
+              className={cn(
+                "group/photo relative min-h-0 flex-1 overflow-hidden bg-[#d9dbe1]",
+                canEdit && "cursor-pointer",
+              )}
+              onClick={canEdit ? openPicker : undefined}
+              onKeyDown={
+                canEdit
+                  ? (event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openPicker();
+                      }
+                    }
+                  : undefined
+              }
+              role={canEdit ? "button" : undefined}
+              tabIndex={canEdit ? 0 : undefined}
+              aria-label={canEdit ? "Change profile photo" : undefined}
+            >
               {imageUrl ? (
                 <img
                   src={imageUrl}
@@ -181,20 +207,14 @@ export function EmployeeIdCard({
                 />
               ) : (
                 <div className="flex size-full items-center justify-center bg-[#d8d8de]">
-                  <button
-                    type="button"
-                    onClick={openPicker}
-                    disabled={!canEdit || isPending}
+                  <span
                     className={cn(
                       "flex size-[4.5rem] items-center justify-center rounded-full bg-white text-neutral-800 shadow-md ring-1 ring-black/5 transition",
-                      canEdit
-                        ? "hover:scale-[1.03] hover:shadow-lg disabled:cursor-not-allowed"
-                        : "cursor-default opacity-90",
+                      canEdit ? "group-hover/photo:scale-[1.03] group-hover/photo:shadow-lg" : "opacity-90",
                     )}
-                    aria-label={canEdit ? "Upload profile photo" : "No profile photo"}
                   >
                     <Camera className="size-7" strokeWidth={1.75} />
-                  </button>
+                  </span>
                 </div>
               )}
 
@@ -209,10 +229,13 @@ export function EmployeeIdCard({
               ) : null}
 
               {canEdit && imageUrl ? (
-                <div className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-center gap-2 bg-gradient-to-t from-black/45 to-transparent px-3 pb-3 pt-10 opacity-0 transition-opacity duration-200 group-hover/photo:opacity-100 focus-within:opacity-100">
+                <div className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-center gap-2 bg-gradient-to-t from-black/45 to-transparent px-3 pb-3 pt-10 opacity-0 transition-opacity duration-200 group-hover/photo:opacity-100 group-focus-within/photo:opacity-100">
                   <button
                     type="button"
-                    onClick={openPicker}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openPicker();
+                    }}
                     disabled={isPending}
                     className="flex size-8 items-center justify-center rounded-full bg-white text-foreground shadow-sm hover:bg-neutral-50 disabled:cursor-not-allowed"
                     aria-label="Change profile photo"
@@ -232,7 +255,7 @@ export function EmployeeIdCard({
               ) : null}
             </div>
 
-            <div className="relative -mt-[3.1rem] flex flex-1 flex-col">
+            <div className="relative z-10 -mt-[3.1rem] shrink-0">
               <svg
                 className="absolute inset-x-0 top-0 h-[3.1rem] w-full"
                 viewBox="0 0 360 68"
@@ -258,7 +281,7 @@ export function EmployeeIdCard({
                 />
               </svg>
 
-              <div className="relative flex flex-1 flex-col justify-center bg-gradient-to-br from-white via-[#f7f2ff] to-[#d7c6f3] px-5 pb-6 pt-9">
+              <div className="relative bg-gradient-to-br from-white via-[#f7f2ff] to-[#d7c6f3] px-5 pb-5 pt-9">
                 <p className="break-words text-[1.15rem] font-bold leading-snug tracking-tight text-neutral-950">
                   {fullName}
                 </p>
@@ -268,7 +291,7 @@ export function EmployeeIdCard({
                 <p className="mt-2.5 font-mono text-[0.7rem] font-semibold tracking-[0.08em] text-neutral-600/90">
                   ID · {employeeCode}
                 </p>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-3 flex flex-wrap items-center gap-2 pr-12">
                   <p className="inline-flex w-fit rounded-full bg-white/70 px-2.5 py-1 text-[0.68rem] font-semibold tracking-wide text-neutral-600 shadow-sm ring-1 ring-black/5">
                     {employmentTypeName}
                   </p>
@@ -284,6 +307,7 @@ export function EmployeeIdCard({
               "absolute inset-0 flex flex-col overflow-hidden rounded-[1.65rem] text-white [backface-visibility:hidden] [transform:rotateY(180deg)]",
               "bg-gradient-to-br from-[#6948f5] via-[#7657f7] to-[#45377f]",
               "shadow-[0_2px_6px_rgba(15,23,42,0.06),0_18px_42px_-18px_rgba(15,23,42,0.35)]",
+              !flipped && "pointer-events-none",
             )}
           >
             <svg className="pointer-events-none absolute inset-0 size-full opacity-30" aria-hidden>
@@ -300,57 +324,47 @@ export function EmployeeIdCard({
               <rect width="100%" height="100%" fill={`url(#${backPatternId})`} />
             </svg>
 
-            <div className="relative flex h-full flex-col px-5 pb-5 pt-7">
-              <div>
-                <p className="text-[0.68rem] font-semibold tracking-[0.18em] text-white/75 uppercase">
-                  {siteConfig.name}
-                </p>
-                <div className="mt-3 h-px w-full bg-white/25" />
-              </div>
+            <div className="absolute left-4 top-4 z-10 rounded-full bg-white/15 px-3 py-1 text-[0.65rem] font-semibold tracking-[0.16em] text-white/95 shadow-sm backdrop-blur">
+              DIGITAL ID
+            </div>
 
-              <div className="flex flex-1 flex-col items-center justify-center text-center">
-                <h3 className="text-[1.6rem] font-bold leading-tight tracking-tight">
-                  Empowered to do great work.
+            <div className="relative flex h-full min-h-0 flex-col px-5 pb-12 pt-12">
+              <div className="flex min-h-0 flex-1 flex-col items-center justify-center text-center">
+                <h3 className="max-w-[14.5rem] text-[1.18rem] font-bold leading-snug tracking-tight">
+                  {backHeading}
                 </h3>
-                <p className="mt-3 max-w-[14rem] text-sm leading-relaxed text-white/82">
-                  {isAttendanceCard
-                    ? "Scan this QR to view this month's attendance, leaves, and performance."
-                    : "Scan this secure digital identity to open the employee profile."}
+                <p className="mt-1.5 max-w-[13.5rem] text-[0.85rem] leading-relaxed text-white/80">
+                  {backSubtext}
                 </p>
 
-                <div className="mt-7 rounded-[1.35rem] bg-white p-3 shadow-[0_16px_32px_-16px_rgba(0,0,0,0.45)]">
+                <div className="mt-4 rounded-[1.25rem] bg-white p-3 shadow-[0_16px_32px_-16px_rgba(0,0,0,0.45)]">
                   {qrDataUrl ? (
                     <img
                       src={qrDataUrl}
                       alt={`QR code for ${fullName}`}
-                      className="size-[8.25rem]"
+                      className="size-[7.5rem]"
                     />
                   ) : (
-                    <div className="flex size-[8.25rem] items-center justify-center text-xs text-neutral-400">
+                    <div className="flex size-[7.5rem] items-center justify-center text-xs text-neutral-400">
                       Loading…
                     </div>
                   )}
                 </div>
-                <p className="mt-3 text-[0.72rem] font-medium tracking-wide text-white/80">
-                  {isAttendanceCard
-                    ? `Scan for ${firstName}'s attendance`
-                    : `Scan for ${firstName}'s profile`}
-                </p>
-              </div>
 
-              <div className="rounded-2xl bg-white/12 px-4 py-3 backdrop-blur-sm">
-                <div className="flex items-end justify-between gap-3">
-                  <div>
-                    <p className="text-[0.62rem] font-semibold tracking-[0.14em] text-white/60 uppercase">
-                      Team
-                    </p>
-                    <p className="mt-1 max-w-[9rem] break-words text-sm font-medium">
-                      {departmentName?.trim() || "Organization"}
+                <div className="mt-3 w-full rounded-2xl bg-white/12 px-4 py-2.5 text-left backdrop-blur-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[0.62rem] font-semibold tracking-[0.14em] text-white/60 uppercase">
+                        Team
+                      </p>
+                      <p className="mt-0.5 truncate text-sm font-medium">
+                        {departmentName?.trim() || "Organization"}
+                      </p>
+                    </div>
+                    <p className="shrink-0 font-mono text-[0.68rem] font-semibold tracking-[0.08em] text-white/80">
+                      {employeeCode}
                     </p>
                   </div>
-                  <p className="font-mono text-[0.68rem] font-semibold tracking-[0.08em] text-white/75">
-                    {employeeCode}
-                  </p>
                 </div>
               </div>
             </div>
@@ -361,9 +375,9 @@ export function EmployeeIdCard({
           type="button"
           onClick={() => setFlipped((value) => !value)}
           className={cn(
-            "absolute right-4 top-[19.25rem] z-30 flex size-9 -translate-y-1/2 items-center justify-center rounded-full",
+            "absolute bottom-5 right-4 z-50 flex size-9 items-center justify-center rounded-full",
             "border border-black/5 bg-white/95 text-neutral-800 shadow-md backdrop-blur",
-            "transition hover:scale-105 hover:shadow-lg",
+            "transition hover:scale-105 hover:shadow-lg active:scale-95",
           )}
           aria-label={flipped ? "Show front of ID card" : "Show back of ID card"}
         >

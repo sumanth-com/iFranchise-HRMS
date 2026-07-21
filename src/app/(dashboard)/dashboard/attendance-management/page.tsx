@@ -55,7 +55,7 @@ export default async function AttendancePage({ searchParams }: AttendancePagePro
     <div className="space-y-6">
       <div>
         <div className="flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-semibold tracking-tight">Attendance Management</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Team Attendance</h1>
           <span className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-foreground">
             <CalendarDays className="size-4 shrink-0" />
             Summary for {summary.date}

@@ -12,6 +12,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { SidebarNavIcon } from "@/components/layout/sidebar-nav-icon";
 import { useNavigation } from "@/hooks/use-permissions";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/providers/auth-provider";
@@ -36,6 +37,7 @@ export function MobileSidebar() {
   const { portalHome, portalLabel } = useAuth();
   const navigation = useNavigation();
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    "Self-service": true,
     Administration: true,
   });
 
@@ -88,7 +90,7 @@ export function MobileSidebar() {
                     href={item.disabled ? "#" : item.href}
                     onClick={() => setMobileOpen(false)}
                     className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                      "group/nav flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                       item.section && "ml-2",
                       isActive
                         ? "bg-primary text-primary-foreground"
@@ -96,7 +98,7 @@ export function MobileSidebar() {
                       item.disabled && "pointer-events-none opacity-50",
                     )}
                   >
-                    <Icon className="size-4 shrink-0" />
+                    <SidebarNavIcon icon={Icon} active={isActive} />
                     <span className="truncate">{item.title}</span>
                   </Link>
                 ) : null}

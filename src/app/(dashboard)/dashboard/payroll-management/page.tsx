@@ -41,7 +41,7 @@ export default async function PayrollDashboardPage({
     <div className="space-y-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Payroll Management</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Payroll</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Monitor payroll runs, compensation, and employee payouts.
           </p>

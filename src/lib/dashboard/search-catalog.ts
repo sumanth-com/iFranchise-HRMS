@@ -2,6 +2,8 @@ import { ASSETS_ROUTES, SELF_ASSETS_ROUTES } from "@/lib/assets/constants";
 import { AUDIT_ROUTES } from "@/lib/audit/constants";
 import { COMPANY_SETTINGS_ROUTES } from "@/lib/company-settings/constants";
 import { DOCUMENTS_ROUTES, SELF_DOCUMENTS_ROUTES } from "@/lib/documents/constants";
+import { HR_OVERVIEW_ROUTES } from "@/lib/dashboard/constants";
+import { USER_PROVISIONING_ROUTES } from "@/lib/user-provisioning/constants";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
 import { EXIT_ROUTES } from "@/lib/exit/constants";
 import { LEAVE_ROUTES, SELF_LEAVE_ROUTES } from "@/lib/leave/constants";
@@ -25,6 +27,14 @@ export type DashboardSearchItem = {
 
 /** Global HR command/search catalog for the dashboard. */
 export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
+  {
+    id: "hr-overview",
+    label: "HR Overview",
+    description: "Organization metrics, priorities, and workforce insights",
+    href: HR_OVERVIEW_ROUTES.overview,
+    keywords: ["hr overview", "dashboard", "organization", "metrics", "insights", "workforce"],
+    permission: "employee.view",
+  },
   {
     id: "employees",
     label: "Employees",
@@ -51,10 +61,10 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
   },
   {
     id: "attendance-management",
-    label: "Attendance Management",
+    label: "Team Attendance",
     description: "Track attendance across the organization",
     href: ATTENDANCE_ROUTES.list,
-    keywords: ["attendance management", "absent", "late", "workforce presence"],
+    keywords: ["team attendance", "attendance", "absent", "late", "workforce presence"],
     permission: "attendance.view",
   },
   {
@@ -75,10 +85,10 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
   },
   {
     id: "leave-management",
-    label: "Leave Management",
+    label: "Leave & Approvals",
     description: "Track leave across the organization",
     href: LEAVE_ROUTES.list,
-    keywords: ["leave management", "approvals", "pending leave", "workforce leave"],
+    keywords: ["leave approvals", "leave admin", "pending leave", "workforce leave"],
     permission: "leave.view",
   },
   {
@@ -107,10 +117,10 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
   },
   {
     id: "payroll-management",
-    label: "Payroll Management",
+    label: "Payroll",
     description: "Salary processing across the organization",
     href: PAYROLL_ROUTES.dashboard,
-    keywords: ["payroll management", "run payroll", "compensation"],
+    keywords: ["payroll", "run payroll", "compensation", "salary processing"],
     permission: "payroll.view",
   },
   {
@@ -179,10 +189,10 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
   },
   {
     id: "documents-management",
-    label: "Documents Management",
+    label: "HR Documents",
     description: "Employee documents hub across the organization",
     href: DOCUMENTS_ROUTES.dashboard,
-    keywords: ["documents management", "employee files", "letters"],
+    keywords: ["hr documents", "employee files", "letters", "documents"],
     permission: "documents.view",
   },
   {
@@ -203,26 +213,18 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
   },
   {
     id: "assets-management",
-    label: "Assets Management",
+    label: "Company Assets",
     description: "Asset inventory and assignments",
     href: ASSETS_ROUTES.dashboard,
-    keywords: ["assets management", "inventory", "assignment"],
+    keywords: ["company assets", "inventory", "assignment", "assets"],
     permission: "asset.view",
   },
   {
-    id: "directory",
-    label: "Employee Directory",
-    description: "Browse colleagues across the organization",
-    href: "/dashboard/directory",
-    keywords: ["directory", "people", "colleagues", "contacts"],
-    permission: "employee.view",
-  },
-  {
     id: "exit",
-    label: "Exit Management",
+    label: "Offboarding",
     description: "Resignations and clearance",
     href: EXIT_ROUTES.dashboard,
-    keywords: ["exit", "resignation", "clearance", "offboard"],
+    keywords: ["offboarding", "exit", "resignation", "clearance"],
     permission: "exit.view",
   },
   {
@@ -243,11 +245,19 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
   },
   {
     id: "roles",
-    label: "Roles & Permissions",
+    label: "Roles & Access",
     description: "Access control",
     href: ROLES_ROUTES.dashboard,
-    keywords: ["role", "permission", "access"],
+    keywords: ["roles", "access", "permission", "rbac"],
     permission: "role.view",
+  },
+  {
+    id: "user-provisioning",
+    label: "User Provisioning",
+    description: "Invite and manage portal users, executives, and managers",
+    href: USER_PROVISIONING_ROUTES.hr,
+    keywords: ["user provisioning", "invite", "executive", "portal access", "manager invite"],
+    permission: "user_provisioning.view",
   },
   {
     id: "notifications",
@@ -259,10 +269,10 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
   },
   {
     id: "notifications-management",
-    label: "Notifications Management",
+    label: "Alerts & Broadcasts",
     description: "Alerts, templates, and delivery settings",
     href: NOTIFICATIONS_ROUTES.dashboard,
-    keywords: ["notifications management", "templates", "alerts"],
+    keywords: ["alerts", "broadcasts", "templates", "notifications admin"],
     permission: "notification.view",
   },
   {
@@ -274,18 +284,18 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
   },
   {
     id: "audit",
-    label: "Audit Logs",
+    label: "Audit Trail",
     description: "System activity history",
     href: AUDIT_ROUTES.logs,
-    keywords: ["audit", "log", "history", "activity"],
+    keywords: ["audit trail", "audit", "log", "history", "activity"],
     permission: "audit.view",
   },
   {
     id: "settings",
     label: "Company Settings",
-    description: "Organization configuration",
+    description: "Organization profile, HR policies, and platform controls",
     href: COMPANY_SETTINGS_ROUTES.base,
-    keywords: ["settings", "company", "config"],
+    keywords: ["settings", "company", "config", "hr policies", "leave policy", "payroll settings"],
     permission: "settings.view",
   },
 ];

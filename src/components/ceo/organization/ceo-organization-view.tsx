@@ -29,7 +29,7 @@ type CeoOrganizationViewProps = CeoOrganizationPageData & {
 
 const DEFAULT_FILTERS: CeoOrgListParams = {
   page: 1,
-  pageSize: 6,
+  pageSize: 8,
   sortBy: "first_name",
   sortOrder: "asc",
 };

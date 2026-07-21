@@ -9,7 +9,7 @@ type Props = {
   className?: string;
 };
 
-/** Display-only digital ID using the same HR portal card look. */
+/** Self-service digital ID card with profile photo upload. */
 export function ManagerProfileIdCard({ profile, className }: Props) {
   return (
     <EmployeeIdCard
@@ -23,7 +23,7 @@ export function ManagerProfileIdCard({ profile, className }: Props) {
       accountStatus={profile.accountStatus}
       imageUrl={profile.imageUrl}
       profilePath={profile.profilePath}
-      canEdit={false}
+      canEdit={true}
       className={cn("mx-auto h-full min-h-[28rem] max-w-[18.5rem] xl:mx-0", className)}
     />
   );

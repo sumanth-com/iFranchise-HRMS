@@ -13,7 +13,7 @@ export default async function NotificationsDashboardPage() {
   return (
     <div className="space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Notifications Management</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Alerts & Broadcasts</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Centralized notification center for alerts across every HRMS module.
         </p>

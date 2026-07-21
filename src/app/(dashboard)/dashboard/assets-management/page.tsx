@@ -14,7 +14,7 @@ export default async function AssetsDashboardPage() {
   return (
     <>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Assets Management</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Company Assets</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Track inventory, assignments, maintenance, warranties, and vendors.
         </p>

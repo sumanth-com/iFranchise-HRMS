@@ -1,81 +1,31 @@
 import { Suspense } from "react";
 
-import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
-import { HrDashboard } from "@/components/dashboard/hr-dashboard";
-import { getHrDashboardData } from "@/lib/dashboard/services/dashboard-queries";
+import { LoadingSpinner } from "@/components/common/loading-spinner";
+import { EmployeeDashboardView } from "@/components/employee/dashboard/employee-dashboard-view";
+import { getEmployeeDashboardData } from "@/lib/employee/services/employee-dashboard-queries";
 import { requireAuthenticatedProfile } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
-import type { HrDashboardData } from "@/types/dashboard";
 
-const EMPTY_DASHBOARD: HrDashboardData = {
-  generatedAt: new Date().toISOString(),
-  kpis: {
-    totalEmployees: 0,
-    presentToday: 0,
-    onLeaveToday: 0,
-    absentToday: 0,
-    pendingLeaveApprovals: 0,
-  },
-  secondary: {
-    attendancePercent: 0,
-    leaveUtilizationPercent: 0,
-    payrollStatus: "—",
-    upcomingBirthdaysCount: 0,
-    upcomingAnniversariesCount: 0,
-    probationEndingSoon: 0,
-    documentsExpiring: 0,
-    assetsPendingReturn: 0,
-    interviewsToday: 0,
-    birthdaysToday: 0,
-    exitClearancePending: 0,
-  },
-  charts: {
-    headcountByDepartment: [],
-    attendanceTrend7Days: [],
-    monthlyHiring: [],
-    monthlyAttrition: [],
-    leaveDistribution: [],
-    genderDistribution: [],
-    employmentTypeDistribution: [],
-  },
-  activities: [],
-  tasks: [],
-  upcomingBirthdays: [],
-  upcomingAnniversaries: [],
-  upcomingInterviews: [],
-  upcomingHolidays: [],
-  recentEmployees: [],
-  recentLeaveRequests: [],
-  recentRecruitment: [],
-  recentPayrollRuns: [],
-};
-
-async function DashboardContent() {
+async function SelfServiceHomeContent() {
   const profile = await requireAuthenticatedProfile();
   const supabase = await createClient();
+  const data = await getEmployeeDashboardData(supabase, profile);
 
-  try {
-    const data = await getHrDashboardData(supabase, profile);
-    return (
-      <HrDashboard data={data} permissionCodes={profile.permissionCodes} />
-    );
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to load dashboard data.";
-    return (
-      <HrDashboard
-        data={EMPTY_DASHBOARD}
-        permissionCodes={profile.permissionCodes}
-        error={message}
-      />
-    );
-  }
+  return (
+    <EmployeeDashboardView {...data} showPageHeading={false} />
+  );
 }
 
-export default function DashboardPage() {
+export default function HrSelfServiceHomePage() {
   return (
-    <Suspense fallback={<DashboardSkeleton />}>
-      <DashboardContent />
+    <Suspense
+      fallback={
+        <div className="flex flex-1 items-center justify-center">
+          <LoadingSpinner />
+        </div>
+      }
+    >
+      <SelfServiceHomeContent />
     </Suspense>
   );
 }
