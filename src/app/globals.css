@@ -554,3 +554,16 @@
     filter: none;
   }
 }
+
+@keyframes navigation-progress-slide {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.navigation-progress-bar {
+  animation: navigation-progress-slide 0.9s ease-in-out infinite;
+}

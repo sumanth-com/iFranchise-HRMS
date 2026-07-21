@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
-import { SidebarNavIcon } from "@/components/layout/sidebar-nav-icon";
+import { SidebarNavLink } from "@/components/layout/sidebar-nav-link";
 import { useNavigation } from "@/hooks/use-permissions";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/providers/auth-provider";
@@ -96,23 +96,15 @@ export function Sidebar() {
                 </button>
               ) : null}
               {sectionOpen || isCollapsed ? (
-                <Link
-                  href={item.disabled ? "#" : item.href}
-                  aria-disabled={item.disabled}
-                  title={isCollapsed ? item.title : undefined}
-                  className={cn(
-                    "group/nav flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                    item.section && !isCollapsed && "ml-2",
-                    isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                    item.disabled && "pointer-events-none opacity-50",
-                    isCollapsed && "justify-center px-2",
-                  )}
-                >
-                  <SidebarNavIcon icon={Icon} active={isActive} />
-                  {!isCollapsed ? <span className="truncate">{item.title}</span> : null}
-                </Link>
+                <SidebarNavLink
+                  href={item.href}
+                  title={item.title}
+                  active={isActive}
+                  disabled={item.disabled}
+                  collapsed={isCollapsed}
+                  indented={Boolean(item.section) && !isCollapsed}
+                  icon={Icon}
+                />
               ) : null}
             </div>
           );

@@ -38,7 +38,6 @@ function revalidateNotifications() {
   for (const route of Object.values(NOTIFICATIONS_ROUTES)) {
     revalidatePath(route);
   }
-  revalidatePath("/", "layout");
 }
 
 export async function markNotificationReadAction(

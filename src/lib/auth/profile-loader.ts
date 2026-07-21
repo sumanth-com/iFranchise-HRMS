@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type {
   Employee,
   EmploymentStatus,
@@ -82,7 +83,7 @@ export type ProfileLoadResult =
   | { success: true; profile: UserProfile }
   | { success: false; error: ProfileLoadError };
 
-export async function loadUserProfile(
+export const loadUserProfile = cache(async function loadUserProfile(
   userId: string,
   email: string,
   supabaseClient?: AuthSupabaseClient,
@@ -141,25 +142,29 @@ export async function loadUserProfile(
     return { success: false, error: "EMPLOYEE_INACTIVE" };
   }
 
-  const { data: organizationRow, error: organizationError } = await supabase
-    .schema("hrms")
-    .from("organizations")
-    .select("id, name, legal_name, email, logo_storage_path, status")
-    .eq("id", employeeRow.organization_id)
-    .is("deleted_at", null)
-    .maybeSingle();
+  const [
+    { data: organizationRow, error: organizationError },
+    { data: userRoleRows, error: userRolesError },
+  ] = await Promise.all([
+    supabase
+      .schema("hrms")
+      .from("organizations")
+      .select("id, name, legal_name, email, logo_storage_path, status")
+      .eq("id", employeeRow.organization_id)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    supabase
+      .schema("hrms")
+      .from("user_roles")
+      .select("role_id")
+      .eq("user_id", userId)
+      .is("deleted_at", null)
+      .eq("status", "active"),
+  ]);
 
   if (organizationError || !organizationRow) {
     return { success: false, error: "ORGANIZATION_NOT_FOUND" };
   }
-
-  const { data: userRoleRows, error: userRolesError } = await supabase
-    .schema("hrms")
-    .from("user_roles")
-    .select("role_id")
-    .eq("user_id", userId)
-    .is("deleted_at", null)
-    .eq("status", "active");
 
   if (userRolesError || !userRoleRows?.length) {
     return { success: false, error: "NO_ROLES" };
@@ -167,13 +172,24 @@ export async function loadUserProfile(
 
   const roleIds = userRoleRows.map((row) => row.role_id);
 
-  const { data: roleRows, error: rolesError } = await supabase
-    .schema("hrms")
-    .from("roles")
-    .select("id, name, code, is_system_role, parent_role_id, status")
-    .in("id", roleIds)
-    .is("deleted_at", null)
-    .eq("status", "active");
+  const [
+    { data: roleRows, error: rolesError },
+    { data: orgRoles },
+  ] = await Promise.all([
+    supabase
+      .schema("hrms")
+      .from("roles")
+      .select("id, name, code, is_system_role, parent_role_id, status")
+      .in("id", roleIds)
+      .is("deleted_at", null)
+      .eq("status", "active"),
+    supabase
+      .schema("hrms")
+      .from("roles")
+      .select("id, parent_role_id")
+      .eq("organization_id", employeeRow.organization_id)
+      .is("deleted_at", null),
+  ]);
 
   if (rolesError || !roleRows?.length) {
     return { success: false, error: "NO_ROLES" };
@@ -188,13 +204,6 @@ export async function loadUserProfile(
   }));
 
   const allRoleIds = new Set<string>(roleIds);
-  const { data: orgRoles } = await supabase
-    .schema("hrms")
-    .from("roles")
-    .select("id, parent_role_id")
-    .eq("organization_id", employeeRow.organization_id)
-    .is("deleted_at", null);
-
   const parentMap = new Map(
     (orgRoles ?? []).map((r) => [r.id, r.parent_role_id as string | null]),
   );
@@ -277,9 +286,9 @@ export async function loadUserProfile(
       permissionCodes,
     },
   };
-}
+});
 
-export async function getCurrentUserProfile(): Promise<UserProfile | null> {
+export const getCurrentUserProfile = cache(async function getCurrentUserProfile(): Promise<UserProfile | null> {
   const supabase = await createClient();
 
   const {
@@ -298,4 +307,4 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
   }
 
   return result.profile;
-}
+});

@@ -62,6 +62,10 @@ async function loadPermissionCodes(
   return permissions.map((permission) => permission.code as string);
 }
 
+function isNavigationPrefetch(request: NextRequest) {
+  return request.headers.get("next-router-prefetch") === "1";
+}
+
 export async function middleware(request: NextRequest) {
   const { supabase, supabaseResponse, user } = await updateSession(request);
   const { pathname, searchParams } = request.nextUrl;
@@ -96,6 +100,10 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname === AUTH_ROUTES.unauthorized) {
+    return supabaseResponse;
+  }
+
+  if (isNavigationPrefetch(request)) {
     return supabaseResponse;
   }
 

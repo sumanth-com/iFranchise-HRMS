@@ -12,7 +12,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { SidebarNavIcon } from "@/components/layout/sidebar-nav-icon";
+import { SidebarNavLink } from "@/components/layout/sidebar-nav-link";
 import { useNavigation } from "@/hooks/use-permissions";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/providers/auth-provider";
@@ -86,21 +86,15 @@ export function MobileSidebar() {
                   </button>
                 ) : null}
                 {sectionOpen ? (
-                  <Link
-                    href={item.disabled ? "#" : item.href}
-                    onClick={() => setMobileOpen(false)}
-                    className={cn(
-                      "group/nav flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                      item.section && "ml-2",
-                      isActive
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                      item.disabled && "pointer-events-none opacity-50",
-                    )}
-                  >
-                    <SidebarNavIcon icon={Icon} active={isActive} />
-                    <span className="truncate">{item.title}</span>
-                  </Link>
+                  <SidebarNavLink
+                    href={item.href}
+                    title={item.title}
+                    active={isActive}
+                    disabled={item.disabled}
+                    indented={Boolean(item.section)}
+                    icon={Icon}
+                    onNavigate={() => setMobileOpen(false)}
+                  />
                 ) : null}
               </div>
             );

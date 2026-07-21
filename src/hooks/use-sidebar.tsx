@@ -4,16 +4,21 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
+import { usePathname } from "next/navigation";
 
 type SidebarContextValue = {
   isCollapsed: boolean;
   isMobileOpen: boolean;
+  pendingHref: string | null;
   toggleCollapsed: () => void;
   setMobileOpen: (open: boolean) => void;
+  startNavigation: (href: string) => void;
+  clearNavigation: () => void;
 };
 
 const SidebarContext = createContext<SidebarContextValue | null>(null);
@@ -23,8 +28,14 @@ type SidebarProviderProps = {
 };
 
 export function SidebarProvider({ children }: SidebarProviderProps) {
+  const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPendingHref(null);
+  }, [pathname]);
 
   const toggleCollapsed = useCallback(() => {
     setIsCollapsed((prev) => !prev);
@@ -34,14 +45,33 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
     setIsMobileOpen(open);
   }, []);
 
+  const startNavigation = useCallback((href: string) => {
+    setPendingHref(href);
+  }, []);
+
+  const clearNavigation = useCallback(() => {
+    setPendingHref(null);
+  }, []);
+
   const value = useMemo(
     () => ({
       isCollapsed,
       isMobileOpen,
+      pendingHref,
       toggleCollapsed,
       setMobileOpen,
+      startNavigation,
+      clearNavigation,
     }),
-    [isCollapsed, isMobileOpen, toggleCollapsed, setMobileOpen],
+    [
+      isCollapsed,
+      isMobileOpen,
+      pendingHref,
+      toggleCollapsed,
+      setMobileOpen,
+      startNavigation,
+      clearNavigation,
+    ],
   );
 
   return (
