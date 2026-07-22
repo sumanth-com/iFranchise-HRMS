@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 
+import { PageSkeleton } from "@/components/common/page-skeleton";
 import { HrLeaveHubView } from "@/components/leave/hr-leave-hub-view";
-import { LoadingSpinner } from "@/components/common/loading-spinner";
 import {
   getLeaveLookups,
   getLeaveSummary,
@@ -32,7 +32,11 @@ function parseSection(value: string | undefined): "my" | "team" {
   return value === "team" ? "team" : "my";
 }
 
-export default async function LeaveSelfServicePage({ searchParams }: PageProps) {
+async function LeaveContent({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const profile = await requireServerPermission("leave.view");
   const supabase = await createClient();
   const raw = await searchParams;
@@ -76,60 +80,60 @@ export default async function LeaveSelfServicePage({ searchParams }: PageProps) 
   ]);
 
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-1 items-center justify-center">
-          <LoadingSpinner />
-        </div>
-      }
-    >
-      <HrLeaveHubView
-        initialSection={section}
-        canViewTeam={canViewTeam}
-        canApply={hasPermission(profile.permissionCodes, "leave.create")}
-        balances={balances}
-        requests={requests.data}
-        calendarMonth={calendarMonth}
-        calendarYear={calendarYear}
-        calendarLeaves={calendar.leaves}
-        calendarHolidays={calendar.holidays}
-        teamLeave={{
-          summary: summary ?? {
-            pendingRequests: 0,
-            approvedThisMonth: 0,
-            rejectedThisMonth: 0,
-            employeesOnLeaveToday: 0,
-            balanceUtilizationPercent: 0,
-            upcomingPlannedLeaves: 0,
-          },
-          records: teamResult?.data ?? [],
-          total: teamResult?.total ?? 0,
-          page: teamResult?.page ?? teamParams.page,
-          pageSize: teamResult?.pageSize ?? teamParams.pageSize,
-          search: teamParams.search ?? "",
-          month: teamParams.month ?? calendarMonth,
-          year: teamParams.year ?? calendarYear,
-          leaveStatus: teamParams.leaveStatus,
-          leaveTypeId: teamParams.leaveTypeId,
-          departmentId: teamParams.departmentId,
-          branchId: teamParams.branchId,
-          approverId: teamParams.approverId,
-          reportingManagerId: teamParams.reportingManagerId,
-          employeeId: teamParams.employeeId,
-          leaveTypes: lookups?.leaveTypes ?? [],
-          departments: lookups?.departments ?? [],
-          branches: lookups?.branches ?? [],
-          employees: lookups?.employees ?? [],
-          approvers: lookups?.approvers ?? [],
-          managers: lookups?.managers ?? [],
-          canCreate: hasPermission(profile.permissionCodes, "leave.create"),
-          canApprove: hasPermission(profile.permissionCodes, "leave.approve"),
-          canReject: hasPermission(profile.permissionCodes, "leave.reject"),
-          canCancel:
-            hasPermission(profile.permissionCodes, "leave.cancel") ||
-            hasPermission(profile.permissionCodes, "leave.withdraw"),
-        }}
-      />
+    <HrLeaveHubView
+      initialSection={section}
+      canViewTeam={canViewTeam}
+      canApply={hasPermission(profile.permissionCodes, "leave.create")}
+      balances={balances}
+      requests={requests.data}
+      calendarMonth={calendarMonth}
+      calendarYear={calendarYear}
+      calendarLeaves={calendar.leaves}
+      calendarHolidays={calendar.holidays}
+      teamLeave={{
+        summary: summary ?? {
+          pendingRequests: 0,
+          approvedThisMonth: 0,
+          rejectedThisMonth: 0,
+          employeesOnLeaveToday: 0,
+          balanceUtilizationPercent: 0,
+          upcomingPlannedLeaves: 0,
+        },
+        records: teamResult?.data ?? [],
+        total: teamResult?.total ?? 0,
+        page: teamResult?.page ?? teamParams.page,
+        pageSize: teamResult?.pageSize ?? teamParams.pageSize,
+        search: teamParams.search ?? "",
+        month: teamParams.month ?? calendarMonth,
+        year: teamParams.year ?? calendarYear,
+        leaveStatus: teamParams.leaveStatus,
+        leaveTypeId: teamParams.leaveTypeId,
+        departmentId: teamParams.departmentId,
+        branchId: teamParams.branchId,
+        approverId: teamParams.approverId,
+        reportingManagerId: teamParams.reportingManagerId,
+        employeeId: teamParams.employeeId,
+        leaveTypes: lookups?.leaveTypes ?? [],
+        departments: lookups?.departments ?? [],
+        branches: lookups?.branches ?? [],
+        employees: lookups?.employees ?? [],
+        approvers: lookups?.approvers ?? [],
+        managers: lookups?.managers ?? [],
+        canCreate: hasPermission(profile.permissionCodes, "leave.create"),
+        canApprove: hasPermission(profile.permissionCodes, "leave.approve"),
+        canReject: hasPermission(profile.permissionCodes, "leave.reject"),
+        canCancel:
+          hasPermission(profile.permissionCodes, "leave.cancel") ||
+          hasPermission(profile.permissionCodes, "leave.withdraw"),
+      }}
+    />
+  );
+}
+
+export default function LeaveSelfServicePage({ searchParams }: PageProps) {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <LeaveContent searchParams={searchParams} />
     </Suspense>
   );
 }

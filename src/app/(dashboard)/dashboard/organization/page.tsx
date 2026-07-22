@@ -1,3 +1,6 @@
+import { Suspense } from "react";
+
+import { PageSkeleton } from "@/components/common/page-skeleton";
 import { OrganizationDashboardPanels } from "@/components/organization/organization-dashboard-panels";
 import { OrganizationSearch } from "@/components/organization/organization-search";
 import { OrganizationSummaryCards } from "@/components/organization/organization-summary-cards";
@@ -6,7 +9,7 @@ import { getOrganizationDashboardStats } from "@/lib/organization/services/org-q
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
-export default async function OrganizationDashboardPage() {
+async function OrganizationDashboardContent() {
   const profile = await requireServerAnyPermission([...ORGANIZATION_VIEW_PERMISSIONS]);
   const supabase = await createClient();
   const stats = await getOrganizationDashboardStats(supabase, profile);
@@ -23,5 +26,13 @@ export default async function OrganizationDashboardPage() {
       <OrganizationDashboardPanels stats={stats} />
       <OrganizationSearch />
     </div>
+  );
+}
+
+export default function OrganizationDashboardPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <OrganizationDashboardContent />
+    </Suspense>
   );
 }

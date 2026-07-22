@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import { EmployeeAccountProvisioningPanel } from "@/components/employees/employee-account-provisioning-panel";
 import { EmployeeTable } from "@/components/employees/employee-table";
-import { LoadingSpinner } from "@/components/common/loading-spinner";
+import { PageSkeleton } from "@/components/common/page-skeleton";
 import { createClient } from "@/lib/supabase/server";
 import { hasSupabaseServiceRoleEnv } from "@/lib/supabase/env";
 import { requireServerPermission } from "@/lib/permissions/server";
@@ -131,13 +131,7 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
         />
       ) : null}
 
-      <Suspense
-        fallback={
-          <div className="flex justify-center py-12">
-            <LoadingSpinner />
-          </div>
-        }
-      >
+      <Suspense fallback={<PageSkeleton />}>
         <EmployeeTable
           employees={result.data}
           total={result.total}

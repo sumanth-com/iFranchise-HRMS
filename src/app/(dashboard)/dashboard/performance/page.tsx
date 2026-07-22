@@ -1,10 +1,13 @@
+import { Suspense } from "react";
+
+import { PageSkeleton } from "@/components/common/page-skeleton";
 import { PerformanceDashboardPanels } from "@/components/performance/performance-dashboard-panels";
 import { PerformanceSummaryCards } from "@/components/performance/performance-summary-cards";
 import { createClient } from "@/lib/supabase/server";
 import { getPerformanceSummary } from "@/lib/performance/services/performance-queries";
 import { requireServerPermission } from "@/lib/permissions/server";
 
-export default async function PerformanceDashboardPage() {
+async function PerformanceDashboardContent() {
   const profile = await requireServerPermission("performance.view");
   const supabase = await createClient();
   const summary = await getPerformanceSummary(supabase, profile);
@@ -21,5 +24,13 @@ export default async function PerformanceDashboardPage() {
       <PerformanceSummaryCards summary={summary} />
       <PerformanceDashboardPanels summary={summary} />
     </div>
+  );
+}
+
+export default function PerformanceDashboardPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <PerformanceDashboardContent />
+    </Suspense>
   );
 }

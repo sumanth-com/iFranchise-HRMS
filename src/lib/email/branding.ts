@@ -1,3 +1,4 @@
+import { EMAIL_BRAND_LOGO_PATH } from "@/lib/brand/constants";
 import { siteConfig } from "@/config/site";
 
 const COLORS = {
@@ -91,6 +92,7 @@ export function renderBrandedEmail(options: BrandedEmailOptions): string {
   const preheader = options.preheader
     ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${options.preheader}</div>`
     : "";
+  const logoUrl = `${siteConfig.url}${EMAIL_BRAND_LOGO_PATH}`;
 
   return `<!doctype html>
 <html lang="en">
@@ -107,7 +109,7 @@ export function renderBrandedEmail(options: BrandedEmailOptions): string {
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;overflow:hidden;border-radius:24px;background:#ffffff;border:1px solid ${COLORS.border};box-shadow:0 18px 50px rgba(15,23,42,0.08);">
             <tr>
               <td style="background:linear-gradient(135deg,${COLORS.headerFrom},${COLORS.headerTo});padding:28px 32px;color:#ffffff;">
-                <div style="display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:12px;background:#ffffff;color:${COLORS.headerFrom};font-weight:700;font-size:13px;margin-bottom:18px;">IF</div>
+                <img src="${logoUrl}" width="48" height="48" alt="iFranchise" style="display:block;width:48px;height:48px;border:0;border-radius:12px;margin-bottom:18px;" />
                 <h1 style="margin:0;font-size:24px;line-height:1.25;font-weight:750;">${options.heading}</h1>
                 ${
                   options.subheading

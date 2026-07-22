@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import { LoadingSpinner } from "@/components/common/loading-spinner";
+import { PageSkeleton } from "@/components/common/page-skeleton";
 import { EmployeeDashboardView } from "@/components/employee/dashboard/employee-dashboard-view";
 import { getEmployeeDashboardData } from "@/lib/employee/services/employee-dashboard-queries";
 import { requireAuthenticatedProfile } from "@/lib/permissions/server";
@@ -18,13 +18,7 @@ async function SelfServiceHomeContent() {
 
 export default function HrSelfServiceHomePage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-1 items-center justify-center">
-          <LoadingSpinner />
-        </div>
-      }
-    >
+    <Suspense fallback={<PageSkeleton />}>
       <SelfServiceHomeContent />
     </Suspense>
   );

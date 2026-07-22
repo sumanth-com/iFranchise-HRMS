@@ -646,5 +646,9 @@
 }
 
 .navigation-progress-bar {
-  animation: navigation-progress-slide 0.9s ease-in-out infinite;
+  animation: navigation-progress-slide 1.1s ease-in-out infinite;
+}
+
+.navigation-progress-bar-active {
+  animation: navigation-progress-slide 0.65s ease-in-out infinite;
 }

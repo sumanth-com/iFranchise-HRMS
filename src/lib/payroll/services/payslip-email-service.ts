@@ -1,3 +1,4 @@
+import { EMAIL_BRAND_LOGO_PATH } from "@/lib/brand/constants";
 import { formatPayrollMonthLabel } from "@/lib/payroll/services/payroll-utils";
 import { generatePayslipPdfBytes } from "@/lib/payroll/services/payslip-pdf";
 import { PAYSLIP_ENGINE_NAME } from "@/lib/payroll/services/payslip-publication";
@@ -6,7 +7,7 @@ import { PAYROLL_ROUTES } from "@/lib/payroll/constants";
 import { siteConfig } from "@/config/site";
 import type { PayslipDetail } from "@/types/payroll";
 
-function payslipEmailHtml(payslip: PayslipDetail, downloadUrl: string): string {
+function payslipEmailHtml(payslip: PayslipDetail, downloadUrl: string, logoUrl: string): string {
   const month = formatPayrollMonthLabel(payslip.payrollMonth);
   return `<!DOCTYPE html>
 <html lang="en">
@@ -15,7 +16,8 @@ function payslipEmailHtml(payslip: PayslipDetail, downloadUrl: string): string {
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #e4e4e7;border-radius:12px;overflow:hidden;">
-        <tr><td style="padding:32px 36px 24px;border-bottom:1px solid #f0f0f2;">
+        <tr><td align="center" style="padding:28px 36px 20px;border-bottom:1px solid #f0f0f2;">
+          <img src="${logoUrl}" width="64" height="64" alt="iFranchise" style="display:block;width:64px;height:64px;border:0;border-radius:14px;margin:0 auto 14px;" />
           <p style="margin:0;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#71717a;">${payslip.organization.name}</p>
           <h1 style="margin:8px 0 0;font-size:22px;font-weight:600;color:#18181b;">Your Payslip for ${month} is Ready</h1>
         </td></tr>
@@ -50,11 +52,12 @@ export async function sendPayslipReadyEmail(
   const month = formatPayrollMonthLabel(payslip.payrollMonth);
   const pdfBytes = await generatePayslipPdfBytes(payslip);
   const downloadUrl = `${appOrigin}${PAYROLL_ROUTES.payslipDetail(payslip.id)}`;
+  const logoUrl = `${appOrigin}${EMAIL_BRAND_LOGO_PATH}`;
 
   const result = await sendEmail({
     to: payslip.employee.email,
     subject: `Your Payslip for ${month} is Ready`,
-    html: payslipEmailHtml(payslip, downloadUrl),
+    html: payslipEmailHtml(payslip, downloadUrl, logoUrl),
     attachments: [
       {
         filename: `Payslip-${month.replace(/\s+/g, "-")}-${payslip.employee.employeeCode}.pdf`,

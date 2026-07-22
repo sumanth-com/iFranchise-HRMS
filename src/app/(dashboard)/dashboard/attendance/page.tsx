@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 
 import { HrAttendanceHubView } from "@/components/attendance/hr-attendance-hub-view";
-import { LoadingSpinner } from "@/components/common/loading-spinner";
+import { PageSkeleton } from "@/components/common/page-skeleton";
 import {
   getAttendanceLookups,
   getAttendanceSummary,
@@ -34,7 +34,11 @@ function parseSection(value: string | undefined): "my" | "team" {
   return value === "team" ? "team" : "my";
 }
 
-export default async function AttendanceSelfServicePage({ searchParams }: PageProps) {
+async function AttendanceContent({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const profile = await requireServerPermission("attendance.view");
   const supabase = await createClient();
   const raw = await searchParams;
@@ -83,49 +87,49 @@ export default async function AttendanceSelfServicePage({ searchParams }: PagePr
   ]);
 
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-1 items-center justify-center">
-          <LoadingSpinner />
-        </div>
-      }
-    >
-      <HrAttendanceHubView
-        initialSection={section}
-        canViewTeam={canViewTeam}
-        selfAttendance={{
-          data: selfData,
-          status: selfParams.status,
-          searchDate: selfParams.searchDate,
-        }}
-        teamAttendance={{
-          summary: summary ?? {
-            date: today,
-            presentToday: 0,
-            absentToday: 0,
-            lateToday: 0,
-            halfDayToday: 0,
-            onLeaveToday: 0,
-            totalEmployees: 0,
-          },
-          records: teamResult?.data ?? [],
-          total: teamResult?.total ?? 0,
-          page: teamResult?.page ?? teamParams.page,
-          pageSize: teamResult?.pageSize ?? teamParams.pageSize,
-          search: teamParams.search ?? "",
-          dateFrom: teamParams.dateFrom,
-          dateTo: teamParams.dateTo,
-          today,
-          departmentId: teamParams.departmentId,
-          attendanceStatus: teamParams.attendanceStatus,
-          employeeId: teamParams.employeeId,
-          departments: lookups?.departments ?? [],
-          employees: lookups?.employees ?? [],
-          canCreate: hasPermission(profile.permissionCodes, "attendance.create"),
-          canEdit: hasPermission(profile.permissionCodes, "attendance.edit"),
-          canDelete: hasPermission(profile.permissionCodes, "attendance.delete"),
-        }}
-      />
+    <HrAttendanceHubView
+      initialSection={section}
+      canViewTeam={canViewTeam}
+      selfAttendance={{
+        data: selfData,
+        status: selfParams.status,
+        searchDate: selfParams.searchDate,
+      }}
+      teamAttendance={{
+        summary: summary ?? {
+          date: today,
+          presentToday: 0,
+          absentToday: 0,
+          lateToday: 0,
+          halfDayToday: 0,
+          onLeaveToday: 0,
+          totalEmployees: 0,
+        },
+        records: teamResult?.data ?? [],
+        total: teamResult?.total ?? 0,
+        page: teamResult?.page ?? teamParams.page,
+        pageSize: teamResult?.pageSize ?? teamParams.pageSize,
+        search: teamParams.search ?? "",
+        dateFrom: teamParams.dateFrom,
+        dateTo: teamParams.dateTo,
+        today,
+        departmentId: teamParams.departmentId,
+        attendanceStatus: teamParams.attendanceStatus,
+        employeeId: teamParams.employeeId,
+        departments: lookups?.departments ?? [],
+        employees: lookups?.employees ?? [],
+        canCreate: hasPermission(profile.permissionCodes, "attendance.create"),
+        canEdit: hasPermission(profile.permissionCodes, "attendance.edit"),
+        canDelete: hasPermission(profile.permissionCodes, "attendance.delete"),
+      }}
+    />
+  );
+}
+
+export default function AttendanceSelfServicePage({ searchParams }: PageProps) {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <AttendanceContent searchParams={searchParams} />
     </Suspense>
   );
 }

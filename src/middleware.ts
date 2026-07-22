@@ -2,6 +2,10 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { AUTH_ROUTES, PUBLIC_ROUTES } from "@/lib/auth/constants";
 import {
+  attachPermissionCache,
+  getCachedPermissionCodes,
+} from "@/lib/auth/permission-cache";
+import {
   canAccessPortalPath,
   getPortalRedirectPath,
 } from "@/lib/auth/portals";
@@ -107,7 +111,12 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
-  const permissionCodes = await loadPermissionCodes(supabase, user.id);
+  let permissionCodes = getCachedPermissionCodes(request, user.id);
+  if (!permissionCodes) {
+    permissionCodes = await loadPermissionCodes(supabase, user.id);
+  }
+  attachPermissionCache(supabaseResponse, user.id, permissionCodes);
+
   if (!canAccessPortalPath(pathname, permissionCodes)) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = getPortalRedirectPath(permissionCodes);

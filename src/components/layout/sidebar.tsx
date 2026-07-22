@@ -26,7 +26,7 @@ function resolveActiveHref(
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { isCollapsed } = useSidebar();
+  const { isCollapsed, startNavigation } = useSidebar();
   const { portalHome, portalLabel } = useAuth();
   const navigation = useNavigation();
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
@@ -60,7 +60,14 @@ export function Sidebar() {
           isCollapsed && "justify-center px-2",
         )}
       >
-        <Link href={portalHome} className="group/brand flex items-center gap-2 font-semibold">
+        <Link
+          href={portalHome}
+          prefetch
+          onClick={() => {
+            if (pathname !== portalHome) startNavigation(portalHome);
+          }}
+          className="group/brand flex items-center gap-2 font-semibold"
+        >
           <span className="sidebar-brand-mark flex size-8 items-center justify-center rounded-lg bg-primary text-xs text-primary-foreground">
             IF
           </span>
