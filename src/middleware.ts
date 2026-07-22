@@ -6,8 +6,14 @@ import {
   getCachedPermissionCodes,
 } from "@/lib/auth/permission-cache";
 import {
+  resolveUserPermissionCodes,
+  resolveUserPortalRoute,
+  userAccountAllowsPortalAccess,
+} from "@/lib/auth/permission-resolver";
+import {
   canAccessPortalPath,
   getPortalRedirectPath,
+  normalizePortalRoute,
 } from "@/lib/auth/portals";
 import { updateSession } from "@/lib/supabase/middleware";
 
@@ -24,48 +30,6 @@ function isAuthRoute(pathname: string): boolean {
   );
 }
 
-async function loadPermissionCodes(
-  supabase: Awaited<ReturnType<typeof updateSession>>["supabase"],
-  userId: string,
-) {
-  if (!supabase) return [];
-
-  const { data: userRoles, error: userRolesError } = await supabase
-    .schema("hrms")
-    .from("user_roles")
-    .select("role_id")
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .is("deleted_at", null);
-
-  if (userRolesError || !userRoles?.length) return [];
-
-  const roleIds = [...new Set(userRoles.map((row) => row.role_id as string))];
-  const { data: rolePermissions, error: rolePermissionsError } = await supabase
-    .schema("hrms")
-    .from("role_permissions")
-    .select("permission_id")
-    .in("role_id", roleIds)
-    .eq("status", "active")
-    .is("deleted_at", null);
-
-  if (rolePermissionsError || !rolePermissions?.length) return [];
-
-  const permissionIds = [
-    ...new Set(rolePermissions.map((row) => row.permission_id as string)),
-  ];
-  const { data: permissions, error: permissionsError } = await supabase
-    .schema("hrms")
-    .from("permissions")
-    .select("code")
-    .in("id", permissionIds)
-    .eq("status", "active")
-    .is("deleted_at", null);
-
-  if (permissionsError || !permissions?.length) return [];
-  return permissions.map((permission) => permission.code as string);
-}
-
 function isNavigationPrefetch(request: NextRequest) {
   return request.headers.get("next-router-prefetch") === "1";
 }
@@ -74,13 +38,20 @@ export async function middleware(request: NextRequest) {
   const { supabase, supabaseResponse, user } = await updateSession(request);
   const { pathname, searchParams } = request.nextUrl;
 
+  if (pathname === "/executive" || pathname.startsWith("/executive/")) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = pathname.replace(/^\/executive/, "/ceo");
+    return NextResponse.redirect(redirectUrl);
+  }
+
   if (isPublicRoute(pathname)) {
-    // Only redirect page navigations — server actions POST to /login and must not
-    // receive a 307 HTML redirect or the client shows "unexpected response".
     if (user && isAuthRoute(pathname) && request.method === "GET") {
-      const permissionCodes = await loadPermissionCodes(supabase, user.id);
+      const [permissionCodes, portalRoute] = await Promise.all([
+        resolveUserPermissionCodes(supabase, user.id),
+        resolveUserPortalRoute(supabase, user.id),
+      ]);
       const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = getPortalRedirectPath(permissionCodes);
+      redirectUrl.pathname = getPortalRedirectPath(permissionCodes, [], portalRoute);
       redirectUrl.search = "";
       return NextResponse.redirect(redirectUrl);
     }
@@ -111,15 +82,25 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
+  const accountAllowed = await userAccountAllowsPortalAccess(supabase, user.id);
+  if (!accountAllowed) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = AUTH_ROUTES.login;
+    redirectUrl.searchParams.set("suspended", "1");
+    redirectUrl.search = redirectUrl.searchParams.toString();
+    return NextResponse.redirect(redirectUrl);
+  }
+
   let permissionCodes = getCachedPermissionCodes(request, user.id);
   if (!permissionCodes) {
-    permissionCodes = await loadPermissionCodes(supabase, user.id);
+    permissionCodes = await resolveUserPermissionCodes(supabase, user.id);
   }
   attachPermissionCache(supabaseResponse, user.id, permissionCodes);
 
   if (!canAccessPortalPath(pathname, permissionCodes)) {
+    const portalRoute = await resolveUserPortalRoute(supabase, user.id);
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = getPortalRedirectPath(permissionCodes);
+    redirectUrl.pathname = normalizePortalRoute(portalRoute) ?? getPortalRedirectPath(permissionCodes);
     redirectUrl.search = "";
     return NextResponse.redirect(redirectUrl);
   }

@@ -34,9 +34,11 @@ export const EMPLOYEE_ACCOUNT_STATUS_LABELS: Record<string, string> = {
   draft: "Draft",
   invited: "Invited",
   invitation_pending: "Invitation Pending",
+  invitation_accepted: "Invitation Accepted",
   active: "Active",
   inactive: "Inactive",
   suspended: "Suspended",
+  archived: "Archived",
 };
 
 export const EMPLOYEE_TABS = [

@@ -63,7 +63,12 @@ import type {
 import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
 import { z } from "zod";
 
-import { employeeInviteSchema, employeeSelfProfileSchema } from "@/lib/validations/employee";
+import { loadInviteableRoles, getInviteableRoleByCode } from "@/lib/auth/iam-roles";
+import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  employeeInviteSchema,
+  employeeSelfProfileSchema,
+} from "@/lib/validations/employee";
 import {
   getEmployeeSelfProfileSettings,
   updateEmployeeSelfProfile,
@@ -226,13 +231,50 @@ export async function sendEmployeeInvitationAction(
   try {
     const profile = await requireServerPermission("employee_account.invite");
     const supabase = await getAuthenticatedSupabase();
-    await sendEmployeeInvitation(supabase, profile, employeeId);
+    const admin = createAdminClient();
+    const { data: employee } = await admin
+      .schema("hrms")
+      .from("employees")
+      .select("invited_role_id")
+      .eq("id", employeeId)
+      .maybeSingle();
+    const roleId =
+      (employee?.invited_role_id as string | null) ??
+      (await getInviteableRoleByCode(admin, profile.employee.organizationId, "employee")).id;
+    await sendEmployeeInvitation(supabase, profile, employeeId, roleId);
     await revalidateEmployeeAccountPaths(employeeId);
     return { success: true, data: undefined };
   } catch (error) {
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to send invitation",
+    };
+  }
+}
+
+export async function getEmployeeInviteLookupsAction() {
+  try {
+    const profile = await requireServerPermission("employee_account.invite");
+    const supabase = await getAuthenticatedSupabase();
+    const [lookups, roles] = await Promise.all([
+      getEmployeeLookups(supabase, profile.employee.organizationId),
+      loadInviteableRoles(supabase, profile.employee.organizationId),
+    ]);
+    return {
+      success: true as const,
+      data: {
+        ...lookups,
+        roles: roles.map((role) => ({
+          id: role.id,
+          label: `${role.name} · ${role.portalLabel}`,
+          code: role.code,
+        })),
+      },
+    };
+  } catch (error) {
+    return {
+      success: false as const,
+      message: error instanceof Error ? error.message : "Failed to load invite options",
     };
   }
 }
@@ -252,7 +294,9 @@ export async function inviteEmployeeAction(
     );
     const employeeId = await inviteEmployeeByEmail(supabase, profile, parsed.email, {
       fullName: parsed.fullName,
+      roleId: parsed.roleId,
       departmentId: parsed.departmentId,
+      branchId: parsed.branchId,
       designationId,
       employmentTypeId: parsed.employmentTypeId,
       reportingManagerId: parsed.reportingManagerId,

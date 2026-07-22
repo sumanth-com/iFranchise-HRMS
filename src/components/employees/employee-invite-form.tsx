@@ -22,6 +22,8 @@ import type { LookupOption } from "@/types/employee";
 
 type EmployeeInviteFormProps = {
   lookups: {
+    roles: LookupOption[];
+    branches: LookupOption[];
     departments: LookupOption[];
     employmentTypes: LookupOption[];
     managers: LookupOption[];
@@ -48,6 +50,11 @@ export function EmployeeInviteForm({
     onPendingChange?.(isPending);
   }, [isPending, onPendingChange]);
 
+  const defaultRoleId =
+    lookups.roles.find((role) => role.code === "employee")?.id ??
+    lookups.roles[0]?.id ??
+    "";
+
   const {
     register,
     handleSubmit,
@@ -60,6 +67,8 @@ export function EmployeeInviteForm({
     defaultValues: {
       fullName: "",
       email: "",
+      roleId: defaultRoleId,
+      branchId: "",
       departmentId: "",
       designation: "",
       employmentTypeId: "",
@@ -67,6 +76,8 @@ export function EmployeeInviteForm({
     },
   });
 
+  const roleId = watch("roleId");
+  const branchId = watch("branchId");
   const departmentId = watch("departmentId");
   const employmentTypeId = watch("employmentTypeId");
   const reportingManagerId = watch("reportingManagerId");
@@ -79,7 +90,16 @@ export function EmployeeInviteForm({
         return;
       }
       toast.success("Invitation sent successfully");
-      reset();
+      reset({
+        fullName: "",
+        email: "",
+        roleId: defaultRoleId,
+        branchId: "",
+        departmentId: "",
+        designation: "",
+        employmentTypeId: "",
+        reportingManagerId: "",
+      });
       onSuccess?.();
       router.refresh();
     });
@@ -117,6 +137,39 @@ export function EmployeeInviteForm({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="roleId">Role *</Label>
+          <LabeledSelect
+            id="roleId"
+            items={toLookupSelectItems(lookups.roles)}
+            value={roleId}
+            onValueChange={(value) => setValue("roleId", value, { shouldValidate: true })}
+            placeholder="Select role"
+            disabled={isPending || !canInvite}
+          />
+          <p className="text-xs text-muted-foreground">
+            Role determines portal access, permissions, and sidebar automatically.
+          </p>
+          {errors.roleId ? (
+            <p className="text-xs text-destructive">{errors.roleId.message}</p>
+          ) : null}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="branchId">Branch *</Label>
+          <LabeledSelect
+            id="branchId"
+            items={toLookupSelectItems(lookups.branches)}
+            value={branchId}
+            onValueChange={(value) => setValue("branchId", value, { shouldValidate: true })}
+            placeholder="Select branch"
+            disabled={isPending || !canInvite}
+          />
+          {errors.branchId ? (
+            <p className="text-xs text-destructive">{errors.branchId.message}</p>
+          ) : null}
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="departmentId">Department *</Label>
           <LabeledSelect
@@ -162,7 +215,7 @@ export function EmployeeInviteForm({
           ) : null}
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 sm:col-span-2">
           <Label htmlFor="reportingManagerId">Reporting Manager *</Label>
           <LabeledSelect
             id="reportingManagerId"
@@ -222,7 +275,7 @@ export function EmployeeInviteSection({
         open={open}
         onOpenChange={handleOpenChange}
         title="Invite Employee"
-        description="Send a secure onboarding invitation to the employee's email."
+        description="Send a secure onboarding invitation. The selected role determines portal access automatically."
         contentClassName="sm:max-w-2xl"
         showCancel={false}
         footer={

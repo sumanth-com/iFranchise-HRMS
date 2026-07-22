@@ -5,6 +5,7 @@ import { EmployeeAccountProvisioningPanel } from "@/components/employees/employe
 import { EmployeeTable } from "@/components/employees/employee-table";
 import { PageSkeleton } from "@/components/common/page-skeleton";
 import { createClient } from "@/lib/supabase/server";
+import { loadInviteableRoles } from "@/lib/auth/iam-roles";
 import { hasSupabaseServiceRoleEnv } from "@/lib/supabase/env";
 import { requireServerPermission } from "@/lib/permissions/server";
 import {
@@ -92,10 +93,11 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
     accountStatus: firstString(rawParams.accountStatus),
   });
 
-  const [result, accountProvisioning, inviteLookups] = await Promise.all([
+  const [result, accountProvisioning, inviteLookups, inviteableRoles] = await Promise.all([
     listEmployees(supabase, profile, params),
     getEmployeeAccountProvisioningSummary(supabase, profile),
     getEmployeeLookups(supabase, profile.employee.organizationId),
+    loadInviteableRoles(supabase, profile.employee.organizationId),
   ]);
   const canInviteEmployee = hasPermission(profile.permissionCodes, "employee_account.invite");
   const canCancelEmployeeInvitation = hasPermission(
@@ -120,6 +122,12 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
         <EmployeeAccountProvisioningPanel
           summary={accountProvisioning}
           lookups={{
+            roles: inviteableRoles.map((role) => ({
+              id: role.id,
+              label: `${role.name} · ${role.portalLabel}`,
+              code: role.code,
+            })),
+            branches: inviteLookups.branches,
             departments: inviteLookups.departments,
             employmentTypes: inviteLookups.employmentTypes,
             managers: inviteLookups.managers,

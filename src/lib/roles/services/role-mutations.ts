@@ -1,4 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import type { UserProfile } from "@/types/auth";
 import type { z } from "zod";
 import {
@@ -329,7 +330,7 @@ export async function changeUserRole(
   const { data: assignment } = await supabase
     .schema("hrms")
     .from("user_roles")
-    .select("id, user_id, role_id, roles:role_id (code)")
+    .select("id, user_id, employee_id, role_id, roles:role_id (code, name, portal_route)")
     .eq("id", userRoleId)
     .eq("organization_id", orgId)
     .is("deleted_at", null)
@@ -337,13 +338,17 @@ export async function changeUserRole(
 
   if (!assignment) throw new Error("Assignment not found");
 
-  const oldRole = assignment.roles as { code: string } | { code: string }[] | null;
-  const oldCode = Array.isArray(oldRole) ? oldRole[0]?.code : oldRole?.code;
+  const oldRole = assignment.roles as
+    | { code: string; name: string; portal_route: string | null }
+    | { code: string; name: string; portal_route: string | null }[]
+    | null;
+  const oldRoleRow = Array.isArray(oldRole) ? oldRole[0] : oldRole;
+  const oldCode = oldRoleRow?.code;
 
   const { data: newRole } = await supabase
     .schema("hrms")
     .from("roles")
-    .select("code")
+    .select("code, name, portal_route")
     .eq("id", newRoleId)
     .maybeSingle();
 
@@ -358,6 +363,51 @@ export async function changeUserRole(
     .eq("id", userRoleId);
 
   if (error) throw new Error(error.message);
+
+  if (assignment.employee_id) {
+    await supabase
+      .schema("hrms")
+      .from("employees")
+      .update({
+        invited_role_id: newRoleId,
+        updated_by: profile.userId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", assignment.employee_id);
+  }
+
+  await writeApplicationAudit(supabase, {
+    organizationId: orgId,
+    module: "security",
+    action: "role_changed",
+    description: `Role changed from ${oldRoleRow?.name ?? oldCode ?? "unknown"} to ${newRole?.name ?? newRole?.code ?? "unknown"}`,
+    recordId: userRoleId,
+    priority: "high",
+    metadata: {
+      userId: assignment.user_id,
+      employeeId: assignment.employee_id,
+      oldRoleCode: oldCode,
+      newRoleCode: newRole?.code,
+      oldPortalRoute: oldRoleRow?.portal_route,
+      newPortalRoute: newRole?.portal_route,
+    },
+  });
+
+  if (oldRoleRow?.portal_route !== newRole?.portal_route) {
+    await writeApplicationAudit(supabase, {
+      organizationId: orgId,
+      module: "security",
+      action: "portal_changed",
+      description: `Portal route changed to ${newRole?.portal_route ?? "default"} for user ${assignment.user_id}`,
+      recordId: userRoleId,
+      priority: "high",
+      metadata: {
+        userId: assignment.user_id,
+        employeeId: assignment.employee_id,
+        portalRoute: newRole?.portal_route,
+      },
+    });
+  }
 }
 
 export async function removeUserRole(

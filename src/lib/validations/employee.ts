@@ -18,9 +18,11 @@ export const employeeAccountStatusSchema = z.enum([
   "draft",
   "invited",
   "invitation_pending",
+  "invitation_accepted",
   "active",
   "inactive",
   "suspended",
+  "archived",
 ] satisfies [EmployeeAccountStatus, ...EmployeeAccountStatus[]]);
 
 export const genderTypeSchema = z.enum([
@@ -74,7 +76,9 @@ export const employeeInviteSchema = z.object({
     .min(2, "Employee name must be at least 2 characters")
     .max(100, "Employee name must be 100 characters or fewer"),
   email: z.string().trim().email("Enter a valid company email"),
+  roleId: z.string().uuid("Select a role"),
   departmentId: z.string().uuid("Select a department"),
+  branchId: z.string().uuid("Select a branch"),
   designation: z
     .string()
     .trim()

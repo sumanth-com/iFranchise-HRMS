@@ -55,6 +55,8 @@ export function EmployeeAccountProvisioningPanel({
 }: {
   summary: EmployeeAccountProvisioningSummary;
   lookups: {
+    roles: LookupOption[];
+    branches: LookupOption[];
     departments: LookupOption[];
     employmentTypes: LookupOption[];
     managers: LookupOption[];
@@ -273,11 +275,7 @@ export function EmployeeAccountProvisioningPanel({
         <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch lg:justify-between">
           {canInvite ? (
             <EmployeeInviteSection
-              lookups={{
-                departments: lookups.departments,
-                employmentTypes: lookups.employmentTypes,
-                managers: lookups.managers,
-              }}
+              lookups={lookups}
               canInvite={canInvite}
               inviteServiceReady={inviteServiceReady}
             />

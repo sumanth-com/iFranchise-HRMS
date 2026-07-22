@@ -11,6 +11,7 @@ import {
 import { resolveOrCreateDesignation } from "@/lib/employees/services/employee-mutations";
 import { fromHrms, unwrapRelation } from "@/lib/reports/services/reports-utils";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getInviteableRoleByCode } from "@/lib/auth/iam-roles";
 import { assertProvisionableRole } from "@/lib/user-provisioning/provisionable-roles";
 import { notifyProvisioningStakeholders } from "@/lib/user-provisioning/notifications";
 import type { UserProfile } from "@/types/auth";
@@ -188,7 +189,12 @@ export async function resendExecutiveInvitation(
       profile.employee.organizationId,
       employeeId,
     )) ?? "manager";
-  await resendEmployeeInvitation(supabase, profile, employeeId, roleCode);
+  const inviteRole = await getInviteableRoleByCode(
+    createAdminClient(),
+    profile.employee.organizationId,
+    roleCode,
+  );
+  await resendEmployeeInvitation(supabase, profile, employeeId, inviteRole.id);
   await audit(
     supabase,
     profile,

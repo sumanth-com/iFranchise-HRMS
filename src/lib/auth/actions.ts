@@ -17,7 +17,9 @@ import { getAuthenticatedRedirectPath } from "@/lib/auth/redirect";
 import { resolveApprovedLoginEmail } from "@/lib/auth/login-email";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
-import { recordEmployeeSuccessfulLogin } from "@/lib/employees/services/employee-account";
+import { recordEmployeeSuccessfulLogin, acceptInvitationOnPasswordSet } from "@/lib/employees/services/employee-account";
+import { resolveUserPortalRoute } from "@/lib/auth/permission-resolver";
+import { getPortalRedirectPath } from "@/lib/auth/portals";
 import { recordUserLoginSession } from "@/lib/ceo/services/ceo-profile-queries";
 import { requireAuthenticatedProfile } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -144,11 +146,14 @@ export async function loginAction(
       metadata: { email },
     });
 
+    const portalRoute = await resolveUserPortalRoute(supabase, authData.user.id);
+
     return {
       success: true,
       redirectTo: getAuthenticatedRedirectPath(
         profileResult.profile.roles,
         profileResult.profile.permissionCodes,
+        portalRoute,
       ),
     };
   } catch (error) {
@@ -302,6 +307,21 @@ export async function resetPasswordAction(
   }
 
   const email = user.email ?? "";
+
+  try {
+    await acceptInvitationOnPasswordSet(supabase, user.id, email);
+  } catch (inviteError) {
+    await supabase.auth.signOut();
+    return {
+      success: false,
+      error: "RESET_LINK_INVALID",
+      message:
+        inviteError instanceof Error
+          ? inviteError.message
+          : getAuthErrorMessage("RESET_LINK_INVALID"),
+    };
+  }
+
   await supabase.auth.signOut();
 
   return {

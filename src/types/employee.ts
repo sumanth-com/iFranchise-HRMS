@@ -26,9 +26,11 @@ export type EmployeeAccountStatus =
   | "draft"
   | "invited"
   | "invitation_pending"
+  | "invitation_accepted"
   | "active"
   | "inactive"
-  | "suspended";
+  | "suspended"
+  | "archived";
 
 export type EmployeeListItem = {
   id: string;
@@ -73,9 +75,11 @@ export type EmployeeAccountProvisioningSummary = {
   draft: number;
   invited: number;
   invitationPending: number;
+  invitationAccepted: number;
   active: number;
   inactive: number;
   suspended: number;
+  archived: number;
   readyToInvite: EmployeeAccountProvisioningItem[];
   pendingInvitations: EmployeeAccountProvisioningItem[];
   suspendedAccounts: EmployeeAccountProvisioningItem[];

@@ -18,7 +18,15 @@ export type Employee = {
   lastName: string;
   email: string;
   employmentStatus: EmploymentStatus;
-  accountStatus?: "draft" | "invited" | "invitation_pending" | "active" | "inactive" | "suspended";
+  accountStatus?:
+    | "draft"
+    | "invited"
+    | "invitation_pending"
+    | "invitation_accepted"
+    | "active"
+    | "inactive"
+    | "suspended"
+    | "archived";
   status: RecordStatus;
 };
 

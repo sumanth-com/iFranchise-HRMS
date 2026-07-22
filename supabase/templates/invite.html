@@ -150,6 +150,18 @@
                           <td class="summary-value" style="padding:0 0 8px;font-size:14px;line-height:1.6;color:#334155;vertical-align:top;">{{ if .Data.company_email }}{{ .Data.company_email }}{{ else }}{{ .Email }}{{ end }}</td>
                         </tr>
                         <tr>
+                          <td class="summary-label" style="padding:0 0 8px;font-size:12px;line-height:1.5;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.04em;width:42%;vertical-align:top;">Role</td>
+                          <td class="summary-value" style="padding:0 0 8px;font-size:14px;line-height:1.6;color:#334155;vertical-align:top;">{{ if .Data.role_name }}{{ .Data.role_name }}{{ else }}—{{ end }}</td>
+                        </tr>
+                        <tr>
+                          <td class="summary-label" style="padding:0 0 8px;font-size:12px;line-height:1.5;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.04em;width:42%;vertical-align:top;">Portal</td>
+                          <td class="summary-value" style="padding:0 0 8px;font-size:14px;line-height:1.6;color:#334155;vertical-align:top;">{{ if .Data.portal_label }}{{ .Data.portal_label }}{{ else }}—{{ end }}</td>
+                        </tr>
+                        <tr>
+                          <td class="summary-label" style="padding:0 0 8px;font-size:12px;line-height:1.5;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.04em;width:42%;vertical-align:top;">Branch</td>
+                          <td class="summary-value" style="padding:0 0 8px;font-size:14px;line-height:1.6;color:#334155;vertical-align:top;">{{ if .Data.branch_name }}{{ .Data.branch_name }}{{ else }}—{{ end }}</td>
+                        </tr>
+                        <tr>
                           <td class="summary-label" style="padding:0 0 8px;font-size:12px;line-height:1.5;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.04em;width:42%;vertical-align:top;">Department</td>
                           <td class="summary-value" style="padding:0 0 8px;font-size:14px;line-height:1.6;color:#334155;vertical-align:top;">{{ if .Data.department_name }}{{ .Data.department_name }}{{ else }}—{{ end }}</td>
                         </tr>

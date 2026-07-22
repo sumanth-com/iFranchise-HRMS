@@ -21,6 +21,7 @@ const LOGIN_ELIGIBLE_ACCOUNT_STATUSES = [
   "active",
   "invited",
   "invitation_pending",
+  "invitation_accepted",
 ] as const;
 
 type EmployeeRow = {
@@ -131,7 +132,8 @@ export const loadUserProfile = cache(async function loadUserProfile(
   const isInviteSetupEmployee =
     employeeRow.employment_status === "draft" &&
     (employeeRow.account_status === "invited" ||
-      employeeRow.account_status === "invitation_pending");
+      employeeRow.account_status === "invitation_pending" ||
+      employeeRow.account_status === "invitation_accepted");
 
   if (
     !isInviteSetupEmployee &&

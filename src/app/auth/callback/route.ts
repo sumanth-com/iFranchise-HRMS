@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 
 import { AUTH_ROUTES } from "@/lib/auth/constants";
+import { validateInvitationForUser } from "@/lib/employees/services/employee-account";
 import { createClient } from "@/lib/supabase/server";
 
 function buildAuthErrorRedirect(
@@ -44,6 +45,13 @@ export async function GET(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
     email = user?.email ?? null;
+
+    if (user && type === "invite" && email) {
+      const validation = await validateInvitationForUser(supabase, user.id, email);
+      if (!validation.valid) {
+        return buildAuthErrorRedirect(origin, next, validation.reason);
+      }
+    }
   } else if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 

@@ -1,4 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { getInviteableRoleByCode, getInviteableRoleById } from "@/lib/auth/iam-roles";
 import { getPasswordResetRedirectTo } from "@/lib/auth/reset-redirect";
 import { siteConfig } from "@/config/site";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
@@ -78,24 +79,40 @@ async function getEmployeeAccountRow(
   return data as EmployeeAccountRow;
 }
 
-async function ensureEmployeeRole(
+async function setUserPrimaryRole(
   userId: string,
   employee: EmployeeAccountRow,
   actorUserId: string,
-  roleCode: string = "employee",
+  roleId: string,
 ) {
   const admin = createAdminClient();
+  const inviteRole = await getInviteableRoleById(admin, employee.organization_id, roleId);
+
   const { data: role, error: roleError } = await admin
     .schema("hrms")
     .from("roles")
     .select("id")
     .eq("organization_id", employee.organization_id)
-    .eq("code", roleCode)
+    .eq("id", roleId)
     .is("deleted_at", null)
     .maybeSingle();
 
   if (roleError) throw new Error(roleError.message);
-  if (!role?.id) throw new Error(`Role "${roleCode}" is not configured for this organization`);
+  if (!role?.id) throw new Error(`Role "${inviteRole.name}" is not configured for this organization`);
+
+  const now = new Date().toISOString();
+  await admin
+    .schema("hrms")
+    .from("user_roles")
+    .update({
+      status: "inactive",
+      deleted_at: now,
+      updated_by: actorUserId,
+    })
+    .eq("organization_id", employee.organization_id)
+    .eq("user_id", userId)
+    .neq("role_id", role.id)
+    .is("deleted_at", null);
 
   const { data: existing, error: findError } = await admin
     .schema("hrms")
@@ -121,10 +138,8 @@ async function ensureEmployeeRole(
       })
       .eq("id", existing.id);
     if (error) throw new Error(error.message);
-    return;
-  }
-
-  const { error } = await admin.schema("hrms").from("user_roles").insert({
+  } else {
+    const { error } = await admin.schema("hrms").from("user_roles").insert({
       organization_id: employee.organization_id,
       user_id: userId,
       employee_id: employee.id,
@@ -134,8 +149,15 @@ async function ensureEmployeeRole(
       updated_by: actorUserId,
       deleted_at: null,
     });
+    if (error) throw new Error(error.message);
+  }
 
-  if (error) throw new Error(error.message);
+  await updateEmployeeAccount(employee.id, {
+    invited_role_id: role.id,
+    updated_by: actorUserId,
+  });
+
+  return inviteRole;
 }
 
 async function writeAccountAudit(
@@ -261,18 +283,25 @@ type InviteEmailContext = {
   designationName: string;
   employmentTypeName: string;
   reportingManagerName: string;
+  branchName: string;
+  roleName: string;
+  portalLabel: string;
 };
 
-async function loadInviteEmailContext(employeeId: string): Promise<InviteEmailContext> {
+async function loadInviteEmailContext(
+  employeeId: string,
+  roleId?: string | null,
+): Promise<InviteEmailContext> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .schema("hrms")
     .from("employees")
     .select(
-      `first_name, last_name, email,
+      `first_name, last_name, email, organization_id, invited_role_id,
       departments:department_id (name),
       designations:designation_id (title),
       employment_types:employment_type_id (name),
+      branches:branch_id (name),
       manager:reporting_manager_id (first_name, last_name)`,
     )
     .eq("id", employeeId)
@@ -291,11 +320,27 @@ async function loadInviteEmailContext(employeeId: string): Promise<InviteEmailCo
   const employmentType = unwrapRelation(
     data.employment_types as { name: string } | { name: string }[] | null,
   );
+  const branch = unwrapRelation(
+    data.branches as { name: string } | { name: string }[] | null,
+  );
   const manager = unwrapRelation(
     data.manager as { first_name: string; last_name: string } | { first_name: string; last_name: string }[] | null,
   );
 
   const employeeFullName = `${data.first_name} ${data.last_name}`.trim();
+  const resolvedRoleId = roleId ?? (data.invited_role_id as string | null);
+  let roleName = "Employee";
+  let portalLabel = "Employee Portal";
+
+  if (resolvedRoleId) {
+    const inviteRole = await getInviteableRoleById(
+      admin,
+      data.organization_id as string,
+      resolvedRoleId,
+    );
+    roleName = inviteRole.name;
+    portalLabel = inviteRole.portalLabel;
+  }
 
   return {
     fullName: employeeFullName,
@@ -306,7 +351,22 @@ async function loadInviteEmailContext(employeeId: string): Promise<InviteEmailCo
     reportingManagerName: manager
       ? `${manager.first_name} ${manager.last_name}`.trim()
       : "—",
+    branchName: branch?.name ?? "—",
+    roleName,
+    portalLabel,
   };
+}
+
+async function adminLookupInvitedRoleId(employeeId: string) {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select("invited_role_id")
+    .eq("id", employeeId)
+    .maybeSingle();
+
+  return (data?.invited_role_id as string | null) ?? null;
 }
 
 async function findAuthUserIdByEmail(email: string) {
@@ -317,9 +377,9 @@ async function findAuthUserIdByEmail(email: string) {
   return match?.id ?? null;
 }
 
-async function sendSupabaseInvite(employee: EmployeeAccountRow) {
+async function sendSupabaseInvite(employee: EmployeeAccountRow, roleId?: string | null) {
   const admin = createAdminClient();
-  const inviteContext = await loadInviteEmailContext(employee.id);
+  const inviteContext = await loadInviteEmailContext(employee.id, roleId);
 
   const { data, error } = await admin.auth.admin.inviteUserByEmail(employee.email, {
     redirectTo: INVITE_REDIRECT_TO,
@@ -333,6 +393,9 @@ async function sendSupabaseInvite(employee: EmployeeAccountRow) {
       designation_name: inviteContext.designationName,
       employment_type_name: inviteContext.employmentTypeName,
       reporting_manager_name: inviteContext.reportingManagerName,
+      branch_name: inviteContext.branchName,
+      role_name: inviteContext.roleName,
+      portal_label: inviteContext.portalLabel,
       organization_id: employee.organization_id,
     },
   });
@@ -355,11 +418,64 @@ async function sendSupabaseInvite(employee: EmployeeAccountRow) {
   throw new Error(error?.message ?? "Failed to send invitation email");
 }
 
+async function createEmployeeInvitationRecord(input: {
+  organizationId: string;
+  employeeId: string;
+  roleId: string;
+  email: string;
+  fullName: string;
+  departmentId?: string | null;
+  designationId?: string | null;
+  employmentTypeId?: string | null;
+  branchId?: string | null;
+  reportingManagerId?: string | null;
+  invitationToken: string;
+  portalRoute: string | null;
+  createdBy: string;
+  expiresAt: string;
+}) {
+  const admin = createAdminClient();
+
+  await admin
+    .schema("hrms")
+    .from("employee_invitations")
+    .update({
+      status: "cancelled",
+      cancelled_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("employee_id", input.employeeId)
+    .eq("status", "pending")
+    .is("deleted_at", null);
+
+  const { error } = await admin.schema("hrms").from("employee_invitations").insert({
+    organization_id: input.organizationId,
+    employee_id: input.employeeId,
+    role_id: input.roleId,
+    email: input.email,
+    full_name: input.fullName,
+    department_id: input.departmentId ?? null,
+    designation_id: input.designationId ?? null,
+    employment_type_id: input.employmentTypeId ?? null,
+    branch_id: input.branchId ?? null,
+    reporting_manager_id: input.reportingManagerId ?? null,
+    invitation_token: input.invitationToken,
+    portal_route: input.portalRoute,
+    status: "pending",
+    created_by: input.createdBy,
+    expires_at: input.expiresAt,
+  });
+
+  if (error && !error.message.includes("employee_invitations")) {
+    throw new Error(error.message);
+  }
+}
+
 export async function sendEmployeeInvitation(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   employeeId: string,
-  roleCode: string = "employee",
+  roleId: string,
 ) {
   const employee = await getEmployeeAccountRow(employeeId, profile.employee.organizationId);
   if (!["draft", "invited"].includes(employee.account_status)) {
@@ -368,19 +484,40 @@ export async function sendEmployeeInvitation(
 
   await ensureEmployeeProfile(employee.id, profile.userId);
 
-  const authUserId = employee.user_id ?? (await sendSupabaseInvite(employee));
-  await ensureEmployeeRole(authUserId, employee, profile.userId, roleCode);
+  const assignedRole = await getInviteableRoleById(
+    createAdminClient(),
+    employee.organization_id,
+    roleId,
+  );
+
+  const authUserId = employee.user_id ?? (await sendSupabaseInvite(employee, roleId));
+  await setUserPrimaryRole(authUserId, employee, profile.userId, roleId);
 
   const invitationToken = crypto.randomUUID();
   const now = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+
   await updateEmployeeAccount(employee.id, {
     user_id: authUserId,
     account_status: "invitation_pending",
     invitation_sent_at: now,
     invitation_cancelled_at: null,
     invitation_token: invitationToken,
-    invitation_expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+    invitation_expires_at: expiresAt,
+    invited_role_id: roleId,
     updated_by: profile.userId,
+  });
+
+  await createEmployeeInvitationRecord({
+    organizationId: employee.organization_id,
+    employeeId: employee.id,
+    roleId,
+    email: employee.email,
+    fullName: fullName(employee),
+    createdBy: profile.userId,
+    invitationToken,
+    portalRoute: assignedRole.portalRoute,
+    expiresAt,
   });
 
   const updatedEmployee = { ...employee, user_id: authUserId };
@@ -396,8 +533,42 @@ export async function sendEmployeeInvitation(
     profile,
     updatedEmployee,
     "invitation_sent",
-    `Invitation sent to ${fullName(employee)} (${employee.employee_code})`,
+    `Invitation sent to ${fullName(employee)} (${employee.employee_code}) as ${assignedRole.name}`,
+    {
+      roleId,
+      roleCode: assignedRole.code,
+      roleName: assignedRole.name,
+      portalRoute: assignedRole.portalRoute,
+      portalLabel: assignedRole.portalLabel,
+    },
   );
+  await writeApplicationAudit(supabase, {
+    organizationId: employee.organization_id,
+    module: "security",
+    action: "role_assigned",
+    description: `Role ${assignedRole.name} assigned during invitation for ${employee.email}`,
+    recordId: employee.id,
+    priority: "medium",
+    metadata: {
+      employeeId: employee.id,
+      roleId,
+      roleCode: assignedRole.code,
+      portalRoute: assignedRole.portalRoute,
+    },
+  });
+  await writeApplicationAudit(supabase, {
+    organizationId: employee.organization_id,
+    module: "security",
+    action: "portal_assigned",
+    description: `Portal ${assignedRole.portalLabel} assigned for ${employee.email}`,
+    recordId: employee.id,
+    priority: "medium",
+    metadata: {
+      employeeId: employee.id,
+      portalRoute: assignedRole.portalRoute,
+      portalLabel: assignedRole.portalLabel,
+    },
+  });
 }
 
 async function ensureEmployeeProfile(employeeId: string, actorUserId: string) {
@@ -437,6 +608,7 @@ export type InviteEmployeeByEmailOptions = {
   branchId?: string | null;
   designationId?: string | null;
   employmentTypeId?: string | null;
+  roleId?: string;
   roleCode?: string;
 };
 
@@ -485,8 +657,15 @@ export async function inviteEmployeeByEmail(
   options: InviteEmployeeByEmailOptions = {},
 ) {
   const email = emailInput.trim().toLowerCase();
-  const roleCode = options.roleCode ?? "employee";
   const admin = createAdminClient();
+
+  let roleId = options.roleId;
+  if (!roleId && options.roleCode) {
+    roleId = (await getInviteableRoleByCode(admin, profile.employee.organizationId, options.roleCode)).id;
+  }
+  if (!roleId) {
+    roleId = (await getInviteableRoleByCode(admin, profile.employee.organizationId, "employee")).id;
+  }
 
   const { data: existing, error: existingError } = await admin
     .schema("hrms")
@@ -516,11 +695,11 @@ export async function inviteEmployeeByEmail(
     }
 
     if (row.account_status === "invitation_pending") {
-      await resendEmployeeInvitation(supabase, profile, row.id, roleCode);
+      await resendEmployeeInvitation(supabase, profile, row.id, roleId);
       return row.id;
     }
     if (row.account_status === "draft" || row.account_status === "invited") {
-      await sendEmployeeInvitation(supabase, profile, row.id, roleCode);
+      await sendEmployeeInvitation(supabase, profile, row.id, roleId);
       return row.id;
     }
     throw new Error("This employee already has an account workflow");
@@ -585,7 +764,7 @@ export async function inviteEmployeeByEmail(
 
   await ensureEmployeeProfile(createdId, profile.userId);
 
-  await sendEmployeeInvitation(supabase, profile, createdId, roleCode);
+  await sendEmployeeInvitation(supabase, profile, createdId, roleId);
   return createdId;
 }
 
@@ -593,12 +772,17 @@ export async function resendEmployeeInvitation(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   employeeId: string,
-  roleCode: string = "employee",
+  roleId?: string,
 ) {
   const employee = await getEmployeeAccountRow(employeeId, profile.employee.organizationId);
   if (employee.account_status !== "invitation_pending") {
     throw new Error("Only pending invitations can be resent");
   }
+
+  const resolvedRoleId =
+    roleId ||
+    (await adminLookupInvitedRoleId(employee.id)) ||
+    (await getInviteableRoleByCode(createAdminClient(), employee.organization_id, "employee")).id;
 
   let authUserId = employee.user_id;
   if (employee.user_id && !employee.first_login_at) {
@@ -607,17 +791,37 @@ export async function resendEmployeeInvitation(
     authUserId = null;
   }
 
-  authUserId = await sendSupabaseInvite({ ...employee, user_id: authUserId });
-  await ensureEmployeeRole(authUserId, employee, profile.userId, roleCode);
+  authUserId = await sendSupabaseInvite({ ...employee, user_id: authUserId }, resolvedRoleId);
+  await setUserPrimaryRole(authUserId, employee, profile.userId, resolvedRoleId);
+
+  const assignedRole = await getInviteableRoleById(
+    createAdminClient(),
+    employee.organization_id,
+    resolvedRoleId,
+  );
 
   const invitationToken = crypto.randomUUID();
   const now = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
   await updateEmployeeAccount(employee.id, {
     user_id: authUserId,
     invitation_sent_at: now,
     invitation_token: invitationToken,
-    invitation_expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+    invitation_expires_at: expiresAt,
+    invited_role_id: resolvedRoleId,
     updated_by: profile.userId,
+  });
+
+  await createEmployeeInvitationRecord({
+    organizationId: employee.organization_id,
+    employeeId: employee.id,
+    roleId: resolvedRoleId,
+    email: employee.email,
+    fullName: fullName(employee),
+    createdBy: profile.userId,
+    invitationToken,
+    portalRoute: assignedRole.portalRoute,
+    expiresAt,
   });
 
   const updatedEmployee = { ...employee, user_id: authUserId };
@@ -666,8 +870,22 @@ export async function cancelEmployeeInvitation(
     invitation_cancelled_at: new Date().toISOString(),
     invitation_token: null,
     invitation_expires_at: null,
+    invited_role_id: null,
     updated_by: profile.userId,
   });
+
+  await admin
+    .schema("hrms")
+    .from("employee_invitations")
+    .update({
+      status: "cancelled",
+      cancelled_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("employee_id", employee.id)
+    .eq("status", "pending")
+    .is("deleted_at", null);
+
   await writeAccountAudit(
     supabase,
     profile,
@@ -830,7 +1048,9 @@ export async function recordEmployeeSuccessfulLogin(
   const now = new Date().toISOString();
   const isFirstLogin = !employeeRow.first_login_at;
   const shouldActivate =
-    employeeRow.account_status === "invited" || employeeRow.account_status === "invitation_pending";
+    employeeRow.account_status === "invited" ||
+    employeeRow.account_status === "invitation_pending" ||
+    employeeRow.account_status === "invitation_accepted";
 
   const updates: Record<string, unknown> = {
     last_login_at: now,
@@ -937,4 +1157,111 @@ export async function recordEmployeeSuccessfulLogin(
       }
     }
   }
+}
+
+export async function validateInvitationForUser(
+  supabase: AuthSupabaseClient,
+  userId: string,
+  email: string,
+): Promise<{ valid: true } | { valid: false; reason: "expired" | "invalid" }> {
+  const { data: employee, error } = await supabase
+    .schema("hrms")
+    .from("employees")
+    .select("id, account_status, invitation_expires_at, deleted_at")
+    .eq("user_id", userId)
+    .ilike("email", email)
+    .maybeSingle();
+
+  if (error || !employee || employee.deleted_at) {
+    return { valid: false, reason: "invalid" };
+  }
+
+  if (employee.account_status !== "invitation_pending") {
+    return { valid: true };
+  }
+
+  if (!employee.invitation_expires_at) {
+    return { valid: true };
+  }
+
+  const expiresAt = Date.parse(employee.invitation_expires_at);
+  if (Number.isNaN(expiresAt) || expiresAt < Date.now()) {
+    const admin = createAdminClient();
+    await admin
+      .schema("hrms")
+      .from("employees")
+      .update({ account_status: "inactive", updated_at: new Date().toISOString() })
+      .eq("id", employee.id);
+    await admin
+      .schema("hrms")
+      .from("employee_invitations")
+      .update({
+        status: "expired",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("employee_id", employee.id)
+      .eq("status", "pending")
+      .is("deleted_at", null);
+    return { valid: false, reason: "expired" };
+  }
+
+  return { valid: true };
+}
+
+export async function acceptInvitationOnPasswordSet(
+  supabase: AuthSupabaseClient,
+  userId: string,
+  email: string,
+) {
+  const validation = await validateInvitationForUser(supabase, userId, email);
+  if (!validation.valid) {
+    throw new Error(
+      validation.reason === "expired"
+        ? "This invitation has expired. Contact HR for a new invitation."
+        : "This invitation link is invalid.",
+    );
+  }
+
+  const { data: employee, error } = await supabase
+    .schema("hrms")
+    .from("employees")
+    .select("id, organization_id, account_status, employee_code, first_name, last_name")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error || !employee) return;
+  if (employee.account_status !== "invitation_pending") return;
+
+  const now = new Date().toISOString();
+  await updateEmployeeAccountWithClient(supabase, employee.id, {
+    account_status: "invitation_accepted",
+    updated_at: now,
+  });
+
+  const admin = createAdminClient();
+  await admin
+    .schema("hrms")
+    .from("employee_invitations")
+    .update({
+      status: "accepted",
+      accepted_at: now,
+      updated_at: now,
+    })
+    .eq("employee_id", employee.id)
+    .eq("status", "pending")
+    .is("deleted_at", null);
+
+  await writeApplicationAudit(supabase, {
+    organizationId: employee.organization_id,
+    module: "employees",
+    action: "invitation_accepted",
+    description: `Invitation accepted by ${email}`,
+    recordId: employee.id,
+    priority: "medium",
+    metadata: {
+      employeeId: employee.id,
+      employeeCode: employee.employee_code,
+      email,
+    },
+  });
 }

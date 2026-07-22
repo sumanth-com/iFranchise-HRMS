@@ -22,6 +22,10 @@ export function getRoleRedirectPath(roles: Role[]): string {
   return AUTH_ROUTES.dashboard;
 }
 
-export function getAuthenticatedRedirectPath(roles: Role[], permissionCodes: string[]): string {
-  return getPortalRedirectPath(permissionCodes, roles);
+export function getAuthenticatedRedirectPath(
+  roles: Role[],
+  permissionCodes: string[],
+  portalRouteFromDb?: string | null,
+): string {
+  return getPortalRedirectPath(permissionCodes, roles, portalRouteFromDb);
 }

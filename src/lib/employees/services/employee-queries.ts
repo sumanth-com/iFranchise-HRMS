@@ -240,14 +240,17 @@ export async function getEmployeeAccountProvisioningSummary(
     draft: 0,
     invited: 0,
     invitationPending: 0,
+    invitationAccepted: 0,
     active: 0,
     inactive: 0,
     suspended: 0,
+    archived: 0,
   };
 
   for (const row of rows) {
     if (row.account_status === "invitation_pending") counts.invitationPending += 1;
-    else counts[row.account_status] += 1;
+    else if (row.account_status === "invitation_accepted") counts.invitationAccepted += 1;
+    else if (row.account_status in counts) counts[row.account_status as keyof typeof counts] += 1;
   }
 
   return {
