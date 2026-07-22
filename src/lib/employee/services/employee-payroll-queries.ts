@@ -2,6 +2,14 @@ import { addMonths, format } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getPayslipById } from "@/lib/payroll/services/payroll-mutations";
+import {
+  paymentStatusLabel,
+} from "@/lib/payroll/services/payslip-history-queries";
+import {
+  resolvePayslipAvailability,
+  resolvePayslipSchedule,
+} from "@/lib/payroll/services/payslip-publication";
+import { processDuePayslipPublications } from "@/lib/payroll/services/payslip-publication-worker";
 import { listBonuses, listReimbursements } from "@/lib/payroll/services/payroll-queries";
 import { getPayrollSettings } from "@/lib/payroll/services/payroll-settings";
 import { maskAccountNumber } from "@/lib/payroll/services/payroll-utils";
@@ -191,9 +199,16 @@ function buildTimeline(payroll: {
 export async function getEmployeePayrollData(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
+  appOrigin?: string,
 ): Promise<EmployeePayrollData> {
   const employeeId = profile.employee.id;
   const organizationId = profile.employee.organizationId;
+
+  if (appOrigin) {
+    void processDuePayslipPublications(supabase, profile, appOrigin).catch((error) => {
+      console.error("[employee-payroll] publication worker failed", error);
+    });
+  }
 
   const [payslipRows, structureRow, bankRow, settings, bonusResult, reimbursementResult] =
     await Promise.all([
@@ -207,6 +222,10 @@ export async function getEmployeePayrollData(
             payslip_number,
             employee_id,
             issued_at,
+            salary_credit_date,
+            published_at,
+            payslip_version,
+            archived_at,
             payroll_items:payroll_item_id (
               gross_salary,
               net_salary,
@@ -223,6 +242,8 @@ export async function getEmployeePayrollData(
           `,
         )
         .eq("employee_id", employeeId)
+        .eq("is_current", true)
+        .is("archived_at", null)
         .is("deleted_at", null)
         .order("issued_at", { ascending: false });
       if (error) throw new Error(error.message);
@@ -279,6 +300,10 @@ export async function getEmployeePayrollData(
     id: string;
     payslip_number: string;
     issued_at: string;
+    salary_credit_date: string | null;
+    published_at: string | null;
+    payslip_version: string | null;
+    archived_at: string | null;
     payroll_items:
       | {
           gross_salary: number;
@@ -320,18 +345,40 @@ export async function getEmployeePayrollData(
     return { row, item, payroll };
   });
 
-  const payslips: PayslipListItem[] = rows.map(({ row, item, payroll }) => ({
-    id: row.id,
-    payslipNumber: row.payslip_number,
-    employeeId,
-    employeeCode: profile.employee.employeeCode,
-    employeeName: `${profile.employee.firstName} ${profile.employee.lastName}`.trim(),
-    payrollMonth: payroll?.payroll_month ?? "",
-    grossSalary: Number(item?.gross_salary ?? 0),
-    netSalary: Number(item?.net_salary ?? 0),
-    payrollStatus: payroll?.payroll_status ?? "draft",
-    issuedAt: row.issued_at,
-  }));
+  const payslips: PayslipListItem[] = rows.map(({ row, item, payroll }) => {
+    const schedule = resolvePayslipSchedule(payroll?.payroll_month ?? "", {
+      salaryCreditDate: row.salary_credit_date ?? undefined,
+      publishedAt: row.published_at ?? undefined,
+    });
+    const access = resolvePayslipAvailability(
+      schedule.publishedAt,
+      profile.permissionCodes,
+    );
+    return {
+      id: row.id,
+      payslipNumber: row.payslip_number,
+      employeeId,
+      employeeCode: profile.employee.employeeCode,
+      employeeName: `${profile.employee.firstName} ${profile.employee.lastName}`.trim(),
+      payrollMonth: payroll?.payroll_month ?? "",
+      grossSalary: Number(item?.gross_salary ?? 0),
+      netSalary: Number(item?.net_salary ?? 0),
+      payrollStatus: payroll?.payroll_status ?? "draft",
+      issuedAt: row.issued_at,
+      salaryCreditDate: schedule.salaryCreditDate,
+      publishedAt: schedule.publishedAt,
+      availability: access.availability,
+      canEmployeeAccess: access.canEmployeeAccess,
+      reviewMessage: access.reviewMessage,
+      payslipVersion: row.payslip_version ?? "1.0",
+      paymentStatus: paymentStatusLabel(
+        payroll?.payroll_status ?? "draft",
+        access.availability,
+      ),
+      isArchived: Boolean(row.archived_at),
+      versionCount: 1,
+    };
+  });
 
   const currencyCode = settings?.settings.currency ?? "INR";
   const creditDay = settings?.settings.salaryCreditDate ?? 1;
@@ -377,8 +424,17 @@ export async function getEmployeePayrollData(
   const latestPaid = rows.find(({ payroll }) => payroll?.payroll_status === "paid");
   const latestRow = rows[0] ?? null;
 
-  const latest = latestRow
-    ? await safe(() => getPayslipById(supabase, profile, latestRow.row.id), null)
+  const latestAccessible = rows.find(({ row, payroll }) => {
+    const schedule = resolvePayslipSchedule(payroll?.payroll_month ?? "", {
+      salaryCreditDate: row.salary_credit_date ?? undefined,
+      publishedAt: row.published_at ?? undefined,
+    });
+    return resolvePayslipAvailability(schedule.publishedAt, profile.permissionCodes)
+      .canEmployeeAccess;
+  });
+
+  const latest = latestAccessible
+    ? await safe(() => getPayslipById(supabase, profile, latestAccessible.row.id), null)
     : null;
 
   const latestTimeline = latestRow?.payroll

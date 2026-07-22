@@ -3,6 +3,7 @@ import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { getEmployeePayrollData } from "@/lib/employee/services/employee-payroll-queries";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
+import { siteConfig } from "@/config/site";
 
 export default async function EmployeePayrollPage() {
   const profile = await requireServerAnyPermission([
@@ -10,7 +11,7 @@ export default async function EmployeePayrollPage() {
     "payslip.view",
   ]);
   const supabase = await createClient();
-  const data = await getEmployeePayrollData(supabase, profile);
+  const data = await getEmployeePayrollData(supabase, profile, siteConfig.url);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-4 md:p-5">

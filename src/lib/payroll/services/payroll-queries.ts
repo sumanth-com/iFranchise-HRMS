@@ -24,6 +24,13 @@ import {
   getPayrollMonthDate,
 } from "@/lib/payroll/services/payroll-utils";
 import {
+  paymentStatusLabel,
+} from "@/lib/payroll/services/payslip-history-queries";
+import {
+  resolvePayslipAvailability,
+  resolvePayslipSchedule,
+} from "@/lib/payroll/services/payslip-publication";
+import {
   getBranches,
   getDepartments,
 } from "@/lib/employees/services/employee-queries";
@@ -256,6 +263,10 @@ export async function listPayslips(
         payslip_number,
         employee_id,
         issued_at,
+        salary_credit_date,
+        published_at,
+        payslip_version,
+        archived_at,
         employees!inner (
           employee_code,
           first_name,
@@ -300,6 +311,14 @@ export async function listPayslips(
       const employee = unwrapRelation(row.employees);
       const payrollItem = unwrapRelation(row.payroll_items);
       const payroll = unwrapRelation(row.payrolls);
+      const schedule = resolvePayslipSchedule(payroll?.payroll_month ?? "", {
+        salaryCreditDate: row.salary_credit_date ?? undefined,
+        publishedAt: row.published_at ?? undefined,
+      });
+      const access = resolvePayslipAvailability(
+        schedule.publishedAt,
+        profile.permissionCodes,
+      );
       return {
         id: row.id,
         payslipNumber: row.payslip_number,
@@ -313,6 +332,18 @@ export async function listPayslips(
         netSalary: Number(payrollItem?.net_salary ?? 0),
         payrollStatus: payroll?.payroll_status ?? "draft",
         issuedAt: row.issued_at,
+        salaryCreditDate: schedule.salaryCreditDate,
+        publishedAt: schedule.publishedAt,
+        availability: access.availability,
+        canEmployeeAccess: access.canEmployeeAccess,
+        reviewMessage: access.reviewMessage,
+        payslipVersion: row.payslip_version ?? "1.0",
+        paymentStatus: paymentStatusLabel(
+          payroll?.payroll_status ?? "draft",
+          access.availability,
+        ),
+        isArchived: Boolean(row.archived_at),
+        versionCount: 1,
       };
     }),
     total: count ?? 0,

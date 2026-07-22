@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/common/button";
 import { HrTeamAttendanceView } from "@/components/attendance/hr-team-attendance-view";
 import { EmployeeAttendanceView } from "@/components/employee/attendance/employee-attendance-view";
-import { SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
+import { SELF_ATTENDANCE_ROUTES, ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
 import type { AttendanceStatus } from "@/types/attendance";
 import type { AttendanceListItem, AttendanceSummary } from "@/types/attendance";
 import type { LookupOption } from "@/types/employee";
@@ -89,6 +89,7 @@ export function HrAttendanceHubView({
           status={selfAttendance.status}
           searchDate={selfAttendance.searchDate}
           basePath={SELF_ATTENDANCE_ROUTES.list}
+          policyHref={ATTENDANCE_ROUTES.policy}
           tabQuery="my"
           padded={false}
           showPageHeading={false}

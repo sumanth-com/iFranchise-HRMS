@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarCheck, CalendarClock, CalendarPlus, CalendarX } from "lucide-react";
+import { CalendarCheck, CalendarClock, CalendarPlus, CalendarX, FileText } from "lucide-react";
 
 import { buttonVariants } from "@/components/common/button";
 import { DataTable, type DataTableColumn } from "@/components/common/data-table";
@@ -19,6 +19,7 @@ type Props = {
   title?: string;
   description?: string;
   applyHref: string;
+  policyHref?: string;
   canApply: boolean;
   balances: LeaveEmployeeBalanceSnapshot[];
   requests: LeaveListItem[];
@@ -33,6 +34,7 @@ export function MyLeaveSelfServiceView({
   title = "My Leave",
   description = "Your leave balances and request history.",
   applyHref,
+  policyHref,
   canApply,
   balances,
   requests,
@@ -72,6 +74,27 @@ export function MyLeaveSelfServiceView({
     },
   ];
 
+  const headerActions =
+    policyHref || canApply ? (
+      <div className="flex shrink-0 items-center gap-2">
+        {policyHref ? (
+          <Link
+            href={policyHref}
+            className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}
+          >
+            <FileText className="size-4" />
+            Leave Policy
+          </Link>
+        ) : null}
+        {canApply ? (
+          <Link href={applyHref} className={cn(buttonVariants(), "gap-1.5")}>
+            <CalendarPlus className="size-4" />
+            Apply Leave
+          </Link>
+        ) : null}
+      </div>
+    ) : null;
+
   return (
     <div className="space-y-4">
       {showPageHeading ? (
@@ -80,20 +103,10 @@ export function MyLeaveSelfServiceView({
             <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
             <p className="mt-1 text-sm text-muted-foreground">{description}</p>
           </div>
-          {canApply ? (
-            <Link href={applyHref} className={cn(buttonVariants(), "gap-1.5")}>
-              <CalendarPlus className="size-4" />
-              Apply Leave
-            </Link>
-          ) : null}
+          {headerActions}
         </div>
-      ) : canApply ? (
-        <div className="flex justify-end">
-          <Link href={applyHref} className={cn(buttonVariants(), "gap-1.5")}>
-            <CalendarPlus className="size-4" />
-            Apply Leave
-          </Link>
-        </div>
+      ) : headerActions ? (
+        <div className="flex justify-end">{headerActions}</div>
       ) : null}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

@@ -4,6 +4,7 @@ import {
   EmployeeEmpty,
   EmployeeSectionCard,
 } from "@/components/employee/dashboard/employee-module-primitives";
+import { cn } from "@/lib/utils";
 import type { EmployeeUpcomingEvent } from "@/types/employee-dashboard";
 
 /** Maps a holiday to a festive glyph so each row reads at a glance. */
@@ -46,16 +47,18 @@ function countdownLabel(date: string, referenceDate: string): string {
 export function EmployeeUpcomingEvents({
   events,
   referenceDate,
+  className,
 }: {
   events: EmployeeUpcomingEvent[];
   referenceDate: string;
+  className?: string;
 }) {
   return (
     <EmployeeSectionCard
       title="Upcoming Holidays"
       description="Company and public holidays."
-      className="h-full"
-      bodyClassName="min-h-0 overflow-y-auto pr-1"
+      className={cn("flex h-full min-h-0 flex-col", className)}
+      bodyClassName="min-h-0 flex-1 overflow-y-auto pr-1"
     >
       {events.length > 0 ? (
         <ul className="flex flex-col gap-2">

@@ -8,6 +8,11 @@ export type SendEmailInput = {
   html: string;
   text?: string;
   replyTo?: string;
+  attachments?: {
+    filename: string;
+    content: Buffer | Uint8Array;
+    contentType?: string;
+  }[];
 };
 
 export type SendEmailResult =
@@ -93,6 +98,11 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       html: input.html,
       text: input.text ?? stripHtml(input.html),
       replyTo: input.replyTo,
+      attachments: input.attachments?.map((file) => ({
+        filename: file.filename,
+        content: Buffer.isBuffer(file.content) ? file.content : Buffer.from(file.content),
+        contentType: file.contentType ?? "application/octet-stream",
+      })),
     });
     return { delivered: true, messageId: info.messageId };
   } catch (error) {

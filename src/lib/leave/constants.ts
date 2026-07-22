@@ -8,6 +8,7 @@ export const LEAVE_ROUTES = {
   balances: "/dashboard/leave-management/balances",
   calendar: "/dashboard/leave-management/calendar",
   settings: "/dashboard/leave-management/settings",
+  policy: "/dashboard/leave-management/policy",
 } as const;
 
 /** Personal / self-service leave in the HR portal main nav. */

@@ -31,7 +31,12 @@ export function formatCurrency(
     style: "currency",
     currency: currencyCode,
     maximumFractionDigits,
+    minimumFractionDigits: maximumFractionDigits > 0 ? maximumFractionDigits : 0,
   }).format(value);
+}
+
+export function formatPayslipCurrency(value: number, currencyCode = "INR"): string {
+  return formatCurrency(value, currencyCode, 2);
 }
 
 export function roundCurrency(value: number): number {

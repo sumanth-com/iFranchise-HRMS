@@ -138,6 +138,11 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
       return items;
     }
 
+    if (segments[2] === "policy") {
+      items.push({ label: "Attendance Policy", href: pathname });
+      return items;
+    }
+
     if (segments[2]) {
       const attendanceHref = `/dashboard/attendance-management/${segments[2]}`;
 
@@ -306,6 +311,11 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
       return items;
     }
 
+    if (segments[2] === "policy") {
+      items.push({ label: "Leave Policy", href: pathname });
+      return items;
+    }
+
     if (segments[2]) {
       items.push({ label: "Leave details", href: pathname });
       return items;
@@ -415,10 +425,19 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
     };
 
     if (segments[1]) {
+      const sectionHref =
+        segments[1] === "attendance" && segments[2] === "policy"
+          ? "/employee/attendance"
+          : pathname;
+
       items.push({
         label: sectionLabels[segments[1]] ?? formatSegment(segments[1]),
-        href: pathname,
+        href: sectionHref,
       });
+
+      if (segments[1] === "attendance" && segments[2] === "policy") {
+        items.push({ label: "Attendance Policy", href: pathname });
+      }
     }
 
     return items;

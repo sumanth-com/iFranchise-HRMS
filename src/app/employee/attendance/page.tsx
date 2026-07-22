@@ -1,5 +1,6 @@
 import { EmployeeAttendanceView } from "@/components/employee/attendance/employee-attendance-view";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { getManagerProfilePageData } from "@/lib/manager/services/manager-self-attendance-service";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -33,6 +34,7 @@ export default async function EmployeeAttendancePage({ searchParams }: PageProps
       data={data}
       status={params.status}
       searchDate={params.searchDate}
+      policyHref={EMPLOYEE_ROUTES.attendancePolicy}
     />
   );
 }

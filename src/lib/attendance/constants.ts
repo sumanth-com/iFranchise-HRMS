@@ -5,6 +5,7 @@ export const ATTENDANCE_ROUTES = {
   list: "/dashboard/attendance",
   new: "/dashboard/attendance-management/new",
   settings: "/dashboard/attendance-management/settings",
+  policy: "/dashboard/attendance-management/policy",
   detail: (id: string) => `/dashboard/attendance-management/${id}`,
   edit: (id: string) => `/dashboard/attendance-management/${id}/edit`,
 } as const;

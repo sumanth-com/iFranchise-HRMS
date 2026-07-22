@@ -564,6 +564,87 @@
   }
 }
 
+@keyframes payment-timeline-flow {
+  0% {
+    transform: translateY(-120%);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(120%);
+    opacity: 0;
+  }
+}
+
+@keyframes payment-timeline-fill {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes payment-timeline-node-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.14);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(16, 185, 129, 0.08);
+  }
+}
+
+@keyframes payment-timeline-dot-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.85;
+  }
+}
+
+.payment-timeline-flow {
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(16, 185, 129, 0.15) 20%,
+    rgb(16, 185, 129) 50%,
+    rgba(16, 185, 129, 0.15) 80%,
+    transparent 100%
+  );
+  animation: payment-timeline-flow 1.35s ease-in-out infinite;
+}
+
+.payment-timeline-fill {
+  animation: payment-timeline-fill 0.55s ease-out both;
+}
+
+.payment-timeline-node-active {
+  animation: payment-timeline-node-pulse 1.8s ease-in-out infinite;
+}
+
+.payment-timeline-node-dot {
+  animation: payment-timeline-dot-pulse 1.35s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .payment-timeline-flow,
+  .payment-timeline-fill,
+  .payment-timeline-node-active,
+  .payment-timeline-node-dot {
+    animation: none !important;
+  }
+}
+
 .navigation-progress-bar {
   animation: navigation-progress-slide 0.9s ease-in-out infinite;
 }

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { siteConfig } from "@/config/site";
 import { createClient } from "@/lib/supabase/server";
 import {
   requireServerAnyPermission,
@@ -350,7 +351,7 @@ export async function emailPayslipAction(payslipId: string): Promise<PayrollActi
       "payslip.view",
     ]);
     const supabase = await getAuthenticatedSupabase();
-    await emailPayslip(supabase, profile, payslipId);
+    await emailPayslip(supabase, profile, payslipId, siteConfig.url);
     return { success: true, data: undefined };
   } catch (error) {
     return {

@@ -32,6 +32,7 @@ export default async function EmployeeLeavePage() {
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-4 md:p-5">
       <MyLeaveSelfServiceView
         applyHref={`${EMPLOYEE_ROUTES.leave}/new`}
+        policyHref={EMPLOYEE_ROUTES.leavePolicy}
         canApply={hasPermission(profile.permissionCodes, "leave.create")}
         balances={balances}
         requests={requests.data}

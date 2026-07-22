@@ -11,6 +11,7 @@ import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { hasAnyPermission } from "@/lib/permissions/utils";
 import { createClient } from "@/lib/supabase/server";
 import { payrollListParamsSchema } from "@/lib/validations/payroll";
+import { siteConfig } from "@/config/site";
 
 type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -49,7 +50,7 @@ export default async function PayrollSelfServicePage({ searchParams }: PageProps
   });
 
   const [selfData, summary, recentRuns] = await Promise.all([
-    getEmployeePayrollData(supabase, profile),
+    getEmployeePayrollData(supabase, profile, siteConfig.url),
     canViewTeam
       ? getPayrollSummary(supabase, profile, teamParams.month, teamParams.year)
       : Promise.resolve(null),

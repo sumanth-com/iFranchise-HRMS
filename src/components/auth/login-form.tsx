@@ -180,7 +180,7 @@ export function LoginForm() {
               width={64}
               height={64}
               priority
-              className="relative z-0 size-16 rounded-[14px]"
+              className="relative z-0 size-full object-contain"
             />
           </div>
         </div>

@@ -21,7 +21,7 @@ export function EmployeeStatCard({
   return (
     <div className="flex h-full min-w-0 flex-col justify-between gap-2 rounded-xl border bg-card p-3.5 shadow-sm">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[11px] font-medium leading-snug text-muted-foreground">
+        <p className="truncate whitespace-nowrap text-[11px] font-medium leading-snug text-muted-foreground">
           {label}
         </p>
         <span
@@ -61,7 +61,7 @@ export function EmployeeSectionCard({
   bodyClassName?: string;
 }) {
   return (
-    <section className={cn("flex flex-col rounded-xl border bg-card p-4 shadow-sm", className)}>
+    <section className={cn("flex flex-col overflow-hidden rounded-xl border bg-card p-4 shadow-sm", className)}>
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold tracking-tight">{title}</h2>

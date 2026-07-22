@@ -19,6 +19,7 @@ export const PAYROLL_ROUTES = {
   bonuses: "/dashboard/payroll-management/bonuses",
   reimbursements: "/dashboard/payroll-management/reimbursements",
   payslips: "/dashboard/payroll-management/payslips",
+  payslipHistory: "/dashboard/payroll-management/payslips/history",
   payslipDetail: (id: string) => `/dashboard/payroll-management/payslips/${id}`,
   settings: "/dashboard/payroll-management/settings",
 } as const;

@@ -198,6 +198,18 @@ export const salaryRevisionFormSchema = z
 
 export const payslipListParamsSchema = payrollListParamsSchema;
 
+export const payslipHistoryParamsSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(24),
+  search: z.string().trim().optional(),
+  month: z.coerce.number().int().min(1).max(12).optional(),
+  year: z.coerce.number().int().min(2000).max(2100).optional(),
+  yearFilter: z.enum(["all", "current", "last"]).optional(),
+  employeeId: z.string().uuid().optional(),
+  includeArchived: z.coerce.boolean().optional().default(false),
+  groupByYear: z.coerce.boolean().optional().default(true),
+});
+
 export const bonusListParamsSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),

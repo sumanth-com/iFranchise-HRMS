@@ -59,6 +59,9 @@ export type PayrollBreakdown = {
     lopDays: number;
     leaveLopDays: number;
     overtimeHours: number;
+    leaveDays?: number;
+    paidDays?: number;
+    holidayCount?: number;
   };
   notes?: string[];
 };
@@ -182,6 +185,8 @@ export type PayrollPreviewResult = {
   employeeCount: number;
 };
 
+export type PayslipAvailability = "available" | "under_review";
+
 export type PayslipListItem = {
   id: string;
   payslipNumber: string;
@@ -193,6 +198,48 @@ export type PayslipListItem = {
   netSalary: number;
   payrollStatus: PayrollStatus;
   issuedAt: string;
+  salaryCreditDate: string;
+  publishedAt: string;
+  availability: PayslipAvailability;
+  canEmployeeAccess: boolean;
+  reviewMessage: string | null;
+  payslipVersion: string;
+  paymentStatus: string;
+  isArchived: boolean;
+  versionCount: number;
+};
+
+export type PayslipHistoryStats = {
+  totalPayslips: number;
+  yearsAvailable: number[];
+  latestSalary: number | null;
+  highestSalary: number | null;
+  latestPublished: string | null;
+};
+
+export type PayslipHistoryYearGroup = {
+  year: number;
+  payslips: PayslipListItem[];
+};
+
+export type PayslipHistoryResult = {
+  data: PayslipListItem[];
+  groups: PayslipHistoryYearGroup[];
+  stats: PayslipHistoryStats;
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+export type PayslipVersionItem = {
+  id: string;
+  payslipId: string;
+  versionNumber: number;
+  payslipNumber: string;
+  storagePath: string | null;
+  salaryCreditDate: string | null;
+  publishedAt: string | null;
+  createdAt: string;
 };
 
 export type PayslipListResult = {
@@ -208,6 +255,15 @@ export type PayslipDetail = {
   issuedAt: string;
   payrollMonth: string;
   payrollStatus: PayrollStatus;
+  salaryCreditDate: string;
+  publishedAt: string;
+  payrollGeneratedAt: string;
+  paymentMode: string;
+  transactionReference: string | null;
+  payslipVersion: string;
+  availability: PayslipAvailability;
+  canEmployeeAccess: boolean;
+  reviewMessage: string | null;
   employee: {
     id: string;
     employeeCode: string;
@@ -216,21 +272,40 @@ export type PayslipDetail = {
     email: string;
     departmentName: string | null;
     designationTitle: string | null;
+    employmentType: string | null;
+    branchName: string | null;
     dateOfJoining: string | null;
+    pan: string | null;
+    uan: string | null;
+    pfNumber: string | null;
   };
   organization: {
     name: string;
+    addressLines: string[];
+    logoUrl: string | null;
+    email: string | null;
+    phone: string | null;
+    footerMessage: string;
+    gstNumber: string | null;
+    cin: string | null;
   };
+  currencyCode: string;
   basicSalary: number;
   totalAllowances: number;
   totalDeductions: number;
   grossSalary: number;
   netSalary: number;
+  totalEarnings: number;
+  employerContributionTotal: number;
   breakdown: PayrollBreakdown;
+  employerContributions: PayrollBreakdownLine[];
   bankAccount: {
     bankName: string;
     accountNumberMasked: string;
+    ifscCode: string | null;
+    accountHolderName: string | null;
   } | null;
+  storagePath: string | null;
 };
 
 export type SalaryStructureItem = {

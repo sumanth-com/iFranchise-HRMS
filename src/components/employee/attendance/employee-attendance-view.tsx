@@ -1,14 +1,18 @@
 "use client";
 
+import Link from "next/link";
+import { FileText } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { buttonVariants } from "@/components/common/button";
 import { EmployeeAttendanceHistoryTable } from "@/components/employee/attendance/employee-attendance-history-table";
 import { EmployeeAttendanceTodayCard } from "@/components/employee/attendance/employee-attendance-today-card";
 import { ManagerAttendanceCalendar } from "@/components/manager/profile/manager-attendance-calendar";
 import { ManagerProfileIdCard } from "@/components/manager/profile/manager-profile-id-card";
 import { ManagerProfileSummaryCards } from "@/components/manager/profile/manager-profile-summary-cards";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
+import { cn } from "@/lib/utils";
 import type { AttendanceStatus } from "@/types/attendance";
 import type { ManagerProfilePageData } from "@/types/manager-self-attendance";
 
@@ -18,6 +22,7 @@ type Props = {
   searchDate?: string;
   /** Base path for calendar/history filters. Defaults to employee portal attendance. */
   basePath?: string;
+  policyHref?: string;
   title?: string;
   description?: string;
   /** When false, omit the outer employee-portal padding wrapper. */
@@ -32,6 +37,7 @@ export function EmployeeAttendanceView({
   status,
   searchDate,
   basePath = EMPLOYEE_ROUTES.attendance,
+  policyHref,
   title = "My Attendance",
   description = "Your personal attendance, identity, and regularization requests.",
   padded = true,
@@ -63,9 +69,30 @@ export function EmployeeAttendanceView({
   const content = (
     <div className="flex flex-col gap-4">
       {showPageHeading ? (
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          </div>
+          {policyHref ? (
+            <Link
+              href={policyHref}
+              className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}
+            >
+              <FileText className="size-4" />
+              Attendance Policy
+            </Link>
+          ) : null}
+        </div>
+      ) : policyHref ? (
+        <div className="flex justify-end">
+          <Link
+            href={policyHref}
+            className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}
+          >
+            <FileText className="size-4" />
+            Attendance Policy
+          </Link>
         </div>
       ) : null}
 

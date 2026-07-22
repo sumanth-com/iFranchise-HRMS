@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/common/button";
 import { HrTeamLeaveView } from "@/components/leave/hr-team-leave-view";
 import { MyLeaveSelfServiceView } from "@/components/leave/my-leave-self-service-view";
-import { SELF_LEAVE_ROUTES } from "@/lib/leave/constants";
+import { LEAVE_ROUTES, SELF_LEAVE_ROUTES } from "@/lib/leave/constants";
 import type {
   LeaveCalendarEntry,
   LeaveEmployeeBalanceSnapshot,
@@ -106,6 +106,7 @@ export function HrLeaveHubView({
       {section === "my" || !canViewTeam ? (
         <MyLeaveSelfServiceView
           applyHref={SELF_LEAVE_ROUTES.new}
+          policyHref={LEAVE_ROUTES.policy}
           canApply={canApply}
           balances={balances}
           requests={requests}

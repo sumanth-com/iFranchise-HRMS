@@ -5,10 +5,8 @@ import { useState } from "react";
 import { format, parseISO } from "date-fns";
 import {
   Banknote,
-  CalendarClock,
   CalendarDays,
-  CheckCircle2,
-  Circle,
+  ChevronRight,
   Download,
   FileText,
   Gift,
@@ -24,7 +22,9 @@ import {
   EmployeeStatCard,
 } from "@/components/employee/dashboard/employee-module-primitives";
 import { EmployeePayslipDrawer } from "@/components/employee/payroll/employee-payslip-drawer";
-import { Button } from "@/components/common/button";
+import { PaymentTimeline } from "@/components/employee/payroll/payment-timeline";
+import { EarningsDeductionsTable } from "@/components/payroll/earnings-deductions-table";
+import { Button, buttonVariants } from "@/components/common/button";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import {
   BONUS_STATUS_LABELS,
@@ -34,6 +34,7 @@ import {
   REIMBURSEMENT_STATUS_LABELS,
 } from "@/lib/payroll/constants";
 import { formatCurrency } from "@/lib/payroll/services/payroll-utils";
+import { formatReviewBannerMessage } from "@/lib/payroll/services/payslip-publication";
 import type { EmployeePayrollData } from "@/types/employee-payroll";
 import type {
   BonusItem,
@@ -202,7 +203,7 @@ export function EmployeePayrollView({
       {header}
 
       {/* KPI cards */}
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-5">
         <EmployeeStatCard
           label="Current Net Salary"
           value={data.kpis.currentNetSalary != null ? money(data.kpis.currentNetSalary) : "—"}
@@ -220,13 +221,6 @@ export function EmployeePayrollView({
           iconBg="bg-sky-500/10"
         />
         <EmployeeStatCard
-          label="Next Salary Date"
-          value={fmtDate(data.kpis.nextSalaryDate)}
-          icon={CalendarClock}
-          accent="text-indigo-600 dark:text-indigo-400"
-          iconBg="bg-indigo-500/10"
-        />
-        <EmployeeStatCard
           label="Last Payment"
           value={fmtDate(data.kpis.lastPaymentDate)}
           icon={CalendarDays}
@@ -235,11 +229,10 @@ export function EmployeePayrollView({
         />
         <EmployeeStatCard
           label={`${data.ytd.financialYearLabel} Earnings`}
-          value={money(data.kpis.ytdEarnings)}
+          value={`${money(data.kpis.ytdEarnings)} · ${data.ytd.monthsCount} mo`}
           icon={TrendingUp}
           accent="text-teal-600 dark:text-teal-400"
           iconBg="bg-teal-500/10"
-          hint={`${data.ytd.monthsCount} month(s)`}
         />
         <EmployeeStatCard
           label={`${data.ytd.financialYearLabel} Tax`}
@@ -250,9 +243,8 @@ export function EmployeePayrollView({
         />
       </section>
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        {/* Salary breakdown + net pay */}
-        <div className="xl:col-span-2">
+      <div className="grid gap-4 xl:grid-cols-3 xl:items-stretch">
+        <div className="flex flex-col gap-4 xl:col-span-2">
           <EmployeeSectionCard
             title={usingStructure ? "Salary Structure" : "Current Payroll Summary"}
             description={
@@ -265,18 +257,18 @@ export function EmployeePayrollView({
             action={
               data.latest ? <StatusPill status={data.latest.payrollStatus} /> : null
             }
+            bodyClassName="flex flex-col gap-4"
           >
-            <div className="grid gap-4 md:grid-cols-2">
-              <BreakdownColumn title="Earnings" lines={earnings} money={money} tone="earning" />
-              <BreakdownColumn
-                title="Deductions"
-                lines={deductions}
-                money={money}
-                tone="deduction"
-              />
-            </div>
+            <EarningsDeductionsTable
+              variant="dashboard"
+              earnings={earnings}
+              deductions={deductions}
+              grossSalary={gross}
+              totalDeductions={totalDeductions}
+              money={money}
+            />
 
-            <div className="mt-4 flex flex-col gap-3 rounded-xl border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 rounded-xl border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                 <span className="text-muted-foreground">Gross</span>
                 <span className="font-medium tabular-nums">{money(gross)}</span>
@@ -293,40 +285,94 @@ export function EmployeePayrollView({
               </div>
             </div>
           </EmployeeSectionCard>
+
+          <div className="grid flex-1 gap-4 sm:grid-cols-2">
+            <EmployeeSectionCard
+              className="h-full"
+              title="My Bonuses"
+              description="Bonuses awarded to you and their status."
+            >
+              {data.bonuses.length > 0 ? (
+                <ul className="divide-y">
+                  {data.bonuses.map((bonus: BonusItem) => (
+                    <li key={bonus.id} className="flex items-center gap-3 py-2.5">
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400">
+                        <Gift className="size-4" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">
+                          {BONUS_TYPE_LABELS[bonus.bonusType] ?? bonus.bonusType}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {fmtMonth(bonus.bonusMonth)}
+                          {bonus.reason ? ` · ${bonus.reason}` : ""}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-sm font-semibold tabular-nums">{money(bonus.amount)}</p>
+                        <p className="text-[11px] capitalize text-muted-foreground">
+                          {BONUS_STATUS_LABELS[bonus.bonusStatus] ?? bonus.bonusStatus}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  No bonuses recorded yet.
+                </p>
+              )}
+            </EmployeeSectionCard>
+
+            <EmployeeSectionCard
+              className="h-full"
+              title="My Reimbursements"
+              description="Expense claims and their status."
+            >
+              {data.reimbursements.length > 0 ? (
+                <ul className="divide-y">
+                  {data.reimbursements.map((item: ReimbursementItem) => (
+                    <li key={item.id} className="flex items-center gap-3 py-2.5">
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                        <ReceiptText className="size-4" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">
+                          {REIMBURSEMENT_CATEGORY_LABELS[item.category] ?? item.category}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {fmtDate(item.expenseDate)}
+                          {item.description ? ` · ${item.description}` : ""}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-sm font-semibold tabular-nums">{money(item.amount)}</p>
+                        <p className="text-[11px] capitalize text-muted-foreground">
+                          {REIMBURSEMENT_STATUS_LABELS[item.reimbursementStatus] ??
+                            item.reimbursementStatus}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  No reimbursement claims yet.
+                </p>
+              )}
+            </EmployeeSectionCard>
+          </div>
         </div>
 
         {/* Right column: timeline + bank */}
         <div className="flex flex-col gap-4">
           {data.latestTimeline ? (
-            <EmployeeSectionCard title="Payment Timeline">
-              <ol className="space-y-3">
-                {data.latestTimeline.stages.map((stage) => (
-                  <li key={stage.key} className="flex items-start gap-3">
-                    {stage.done ? (
-                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-500" />
-                    ) : (
-                      <Circle className="mt-0.5 size-4 shrink-0 text-muted-foreground/40" />
-                    )}
-                    <div className="min-w-0">
-                      <p
-                        className={cn(
-                          "text-sm font-medium",
-                          !stage.done && "text-muted-foreground",
-                        )}
-                      >
-                        {stage.label}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {stage.at
-                          ? format(parseISO(stage.at), "dd MMM yyyy, h:mm a")
-                          : stage.done
-                            ? "Completed"
-                            : "Pending"}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
+            <EmployeeSectionCard
+              className="flex flex-1 flex-col"
+              bodyClassName="flex flex-1 flex-col justify-center"
+              title="Payment Timeline"
+            >
+              <PaymentTimeline stages={data.latestTimeline.stages} />
             </EmployeeSectionCard>
           ) : null}
 
@@ -388,89 +434,31 @@ export function EmployeePayrollView({
         </EmployeeSectionCard>
       ) : null}
 
-      {/* Bonuses & reimbursements */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <EmployeeSectionCard
-          title="My Bonuses"
-          description="Bonuses awarded to you and their status."
-        >
-          {data.bonuses.length > 0 ? (
-            <ul className="divide-y">
-              {data.bonuses.map((bonus: BonusItem) => (
-                <li key={bonus.id} className="flex items-center gap-3 py-2.5">
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400">
-                    <Gift className="size-4" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">
-                      {BONUS_TYPE_LABELS[bonus.bonusType] ?? bonus.bonusType}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {fmtMonth(bonus.bonusMonth)}
-                      {bonus.reason ? ` · ${bonus.reason}` : ""}
-                    </p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-sm font-semibold tabular-nums">{money(bonus.amount)}</p>
-                    <p className="text-[11px] capitalize text-muted-foreground">
-                      {BONUS_STATUS_LABELS[bonus.bonusStatus] ?? bonus.bonusStatus}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              No bonuses recorded yet.
-            </p>
-          )}
-        </EmployeeSectionCard>
-
-        <EmployeeSectionCard
-          title="My Reimbursements"
-          description="Expense claims and their status."
-        >
-          {data.reimbursements.length > 0 ? (
-            <ul className="divide-y">
-              {data.reimbursements.map((item: ReimbursementItem) => (
-                <li key={item.id} className="flex items-center gap-3 py-2.5">
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-                    <ReceiptText className="size-4" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">
-                      {REIMBURSEMENT_CATEGORY_LABELS[item.category] ?? item.category}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {fmtDate(item.expenseDate)}
-                      {item.description ? ` · ${item.description}` : ""}
-                    </p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-sm font-semibold tabular-nums">{money(item.amount)}</p>
-                    <p className="text-[11px] capitalize text-muted-foreground">
-                      {REIMBURSEMENT_STATUS_LABELS[item.reimbursementStatus] ??
-                        item.reimbursementStatus}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              No reimbursement claims yet.
-            </p>
-          )}
-        </EmployeeSectionCard>
-      </div>
-
       {/* Payslip history */}
       <EmployeeSectionCard
         title="Payslip History"
-        description="All your issued payslips."
+        description="All published salary statements during your employment."
         bodyClassName="overflow-x-auto"
+        action={
+          <Link
+            href={EMPLOYEE_ROUTES.payrollHistory}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            View full history
+            <ChevronRight className="ml-1 size-4" />
+          </Link>
+        }
       >
+        {data.payslips.some((row) => row.availability === "under_review") ? (
+          <div className="mb-4 rounded-lg border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm text-amber-900">
+            {formatReviewBannerMessage(
+              data.payslips.find((row) => row.availability === "under_review")?.publishedAt ??
+                new Date().toISOString(),
+            )}
+          </div>
+        ) : null}
         {data.payslips.length > 0 ? (
+          <>
           <table className="w-full min-w-[44rem] text-sm">
             <thead>
               <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -478,13 +466,13 @@ export function EmployeePayrollView({
                 <th className="pb-2 pr-3 font-medium">Payslip #</th>
                 <th className="pb-2 pr-3 font-medium">Gross</th>
                 <th className="pb-2 pr-3 font-medium">Net</th>
+                <th className="pb-2 pr-3 font-medium">Credit Date</th>
                 <th className="pb-2 pr-3 font-medium">Status</th>
-                <th className="pb-2 pr-3 font-medium">Issued</th>
                 <th className="pb-2 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {data.payslips.map((row: PayslipListItem) => (
+              {data.payslips.slice(0, 3).map((row: PayslipListItem) => (
                 <tr key={row.id} className="border-b last:border-0">
                   <td className="py-2.5 pr-3 font-medium">{fmtMonth(row.payrollMonth)}</td>
                   <td className="py-2.5 pr-3 text-muted-foreground">{row.payslipNumber}</td>
@@ -492,25 +480,70 @@ export function EmployeePayrollView({
                   <td className="py-2.5 pr-3 tabular-nums font-medium">
                     {money(row.netSalary)}
                   </td>
-                  <td className="py-2.5 pr-3">
-                    <StatusPill status={row.payrollStatus} />
+                  <td className="py-2.5 pr-3 text-muted-foreground">
+                    {fmtDate(row.salaryCreditDate)}
                   </td>
-                  <td className="py-2.5 pr-3 text-muted-foreground">{fmtDate(row.issuedAt)}</td>
+                  <td className="py-2.5 pr-3">
+                    {row.availability === "under_review" ? (
+                      <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                        HR Review
+                      </span>
+                    ) : (
+                      <StatusPill status={row.payrollStatus} />
+                    )}
+                  </td>
                   <td className="py-2.5 text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5"
-                      onClick={() => openPayslip(row.id)}
-                    >
-                      <Download className="size-3.5" />
-                      View
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5"
+                        disabled={!row.canEmployeeAccess}
+                        onClick={() => openPayslip(row.id)}
+                      >
+                        <FileText className="size-3.5" />
+                        View
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5"
+                        disabled={!row.canEmployeeAccess}
+                        onClick={async () => {
+                          if (!row.canEmployeeAccess) return;
+                          try {
+                            const response = await fetch(`/api/payslips/${row.id}/pdf`);
+                            if (!response.ok) throw new Error("Download failed");
+                            const blob = await response.blob();
+                            const url = URL.createObjectURL(blob);
+                            const anchor = document.createElement("a");
+                            anchor.href = url;
+                            anchor.download = `payslip-${row.payslipNumber}.pdf`;
+                            anchor.click();
+                            URL.revokeObjectURL(url);
+                          } catch {
+                            openPayslip(row.id);
+                          }
+                        }}
+                      >
+                        <Download className="size-3.5" />
+                        PDF
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {data.payslips.length > 3 ? (
+            <p className="mt-3 text-center text-xs text-muted-foreground">
+              Showing 3 most recent ·{" "}
+              <Link href={EMPLOYEE_ROUTES.payrollHistory} className="font-medium text-primary underline-offset-2 hover:underline">
+                View all {data.payslips.length} payslips
+              </Link>
+            </p>
+          ) : null}
+          </>
         ) : (
           <p className="py-6 text-center text-sm text-muted-foreground">
             No payslips issued yet.
@@ -524,54 +557,6 @@ export function EmployeePayrollView({
         onOpenChange={setDrawerOpen}
       />
     </>
-  );
-}
-
-function BreakdownColumn({
-  title,
-  lines,
-  money,
-  tone,
-}: {
-  title: string;
-  lines: PayrollBreakdownLine[];
-  money: (value: number) => string;
-  tone: "earning" | "deduction";
-}) {
-  const total = lines.reduce((sum, line) => sum + Number(line.amount || 0), 0);
-  return (
-    <div className="rounded-xl border bg-card p-4">
-      <h3 className="mb-3 text-sm font-semibold">{title}</h3>
-      {lines.length > 0 ? (
-        <table className="w-full text-sm">
-          <tbody>
-            {lines.map((line) => (
-              <tr key={line.code} className="border-b last:border-0">
-                <td className="py-2 text-muted-foreground">{line.label}</td>
-                <td className="py-2 text-right tabular-nums">{money(Number(line.amount))}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td className="pt-3 text-sm font-semibold">Total {title}</td>
-              <td
-                className={cn(
-                  "pt-3 text-right text-sm font-semibold tabular-nums",
-                  tone === "earning"
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : "text-destructive",
-                )}
-              >
-                {money(total)}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      ) : (
-        <p className="text-sm text-muted-foreground">No {title.toLowerCase()} recorded.</p>
-      )}
-    </div>
   );
 }
 

@@ -1,4 +1,19 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { getPayslipBranding } from "@/lib/payroll/services/payslip-branding";
+import { sendPayslipReadyEmail } from "@/lib/payroll/services/payslip-email-service";
+import { storePayslipPdf } from "@/lib/payroll/services/payslip-storage";
+import {
+  buildEmployerContributions,
+  parseStatutoryIds,
+  totalEarnings,
+} from "@/lib/payroll/services/payslip-document-helpers";
+import {
+  PAYSLIP_VERSION,
+  canAccessPayslipDuringReview,
+  computePayslipSchedule,
+  resolvePayslipAvailability,
+  resolvePayslipSchedule,
+} from "@/lib/payroll/services/payslip-publication";
 import type { UserProfile } from "@/types/auth";
 import type {
   PayrollBreakdown,
@@ -12,6 +27,7 @@ import {
 } from "@/lib/payroll/services/payroll-calculator";
 import {
   generatePayslipNumber,
+  formatPayrollMonthLabel,
   getMonthDateRange,
   getPayrollMonthDate,
   maskAccountNumber,
@@ -638,6 +654,8 @@ export async function generatePayslips(
 
   if (!payroll) throw new Error("Payroll not found.");
 
+  const schedule = computePayslipSchedule(payroll.payroll_month);
+
   const { data: items, error } = await supabase
     .schema("hrms")
     .from("payroll_items")
@@ -678,6 +696,11 @@ export async function generatePayslips(
       payroll_item_id: item.id,
       employee_id: item.employee_id,
       payslip_number: payslipNumber,
+      salary_credit_date: schedule.salaryCreditDate,
+      published_at: schedule.publishedAt,
+      payroll_generated_at: new Date().toISOString(),
+      payment_mode: "Bank Transfer",
+      payslip_version: PAYSLIP_VERSION,
       created_by: profile.userId,
       updated_by: profile.userId,
     });
@@ -690,49 +713,117 @@ export async function emailPayslip(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   payslipId: string,
+  appOrigin: string,
 ): Promise<void> {
-  const { data: payslip, error } = await supabase
-    .schema("hrms")
-    .from("payslips")
-    .select(
-      `
-        id,
-        payslip_number,
-        employee_id,
-        payrolls:payroll_id (payroll_month),
-        employees:employee_id (first_name, last_name, user_id)
-      `,
-    )
-    .eq("id", payslipId)
-    .single();
+  const payslip = await getPayslipById(supabase, profile, payslipId, {
+    bypassAccessCheck: true,
+  });
+  if (!payslip) throw new Error("Payslip not found.");
 
-  if (error || !payslip) throw new Error("Payslip not found.");
+  if (!payslip.canEmployeeAccess && !canAccessPayslipDuringReview(profile.permissionCodes)) {
+    throw new Error("Payslip is not yet published to employees.");
+  }
 
-  const payroll = unwrapRelation(
-    payslip.payrolls as { payroll_month: string } | { payroll_month: string }[] | null,
-  );
+  if (!payslip.storagePath) {
+    await storePayslipPdf(supabase, payslip);
+  }
 
-  const monthLabel = payroll?.payroll_month
-    ? new Date(payroll.payroll_month).toLocaleString("en-IN", {
-        month: "long",
-        year: "numeric",
-      })
-    : "";
+  await sendPayslipReadyEmail(payslip, appOrigin);
 
+  const monthLabel = formatPayrollMonthLabel(payslip.payrollMonth);
   await notifyEmployee(supabase, {
     organizationId: profile.employee.organizationId,
-    employeeId: payslip.employee_id,
+    employeeId: payslip.employee.id,
     title: "Payslip available",
-    message: `Your payslip for ${monthLabel} (${payslip.payslip_number}) is ready to view.`,
+    message: `Your payslip for ${monthLabel} (${payslip.payslipNumber}) is ready to view.`,
     notificationType: "payslip_available",
     module: "payroll",
     priority: "medium",
     actionUrl: PAYROLL_ROUTES.payslipDetail(payslipId),
     sourceEventKey: `payslip_available:${payslipId}`,
     templateKey: "payslip_available",
-    templateVariables: { month: monthLabel, payslipNumber: payslip.payslip_number },
+    templateVariables: { month: monthLabel, payslipNumber: payslip.payslipNumber },
     createdBy: profile.userId,
   });
+
+  await supabase
+    .schema("hrms")
+    .from("payslips")
+    .update({ email_sent_at: new Date().toISOString() })
+    .eq("id", payslipId);
+}
+
+export async function archivePayslip(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  payslipId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .schema("hrms")
+    .from("payslips")
+    .update({
+      archived_at: new Date().toISOString(),
+      status: "archived",
+      updated_by: profile.userId,
+    })
+    .eq("id", payslipId)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+}
+
+export async function snapshotPayslipVersion(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  payslipId: string,
+): Promise<void> {
+  const payslip = await getPayslipById(supabase, profile, payslipId, {
+    bypassAccessCheck: true,
+  });
+  if (!payslip) throw new Error("Payslip not found.");
+
+  const { count } = await supabase
+    .schema("hrms")
+    .from("payslip_versions")
+    .select("id", { count: "exact", head: true })
+    .eq("payslip_id", payslipId);
+
+  const versionNumber = (count ?? 0) + 1;
+  const numericVersion = Number.parseFloat(payslip.payslipVersion) || 1;
+
+  const { error: versionError } = await supabase.schema("hrms").from("payslip_versions").insert({
+    payslip_id: payslipId,
+    version_number: versionNumber,
+    payslip_number: payslip.payslipNumber,
+    storage_path: payslip.storagePath,
+    snapshot: {
+      grossSalary: payslip.grossSalary,
+      netSalary: payslip.netSalary,
+      breakdown: payslip.breakdown,
+      employee: payslip.employee,
+    },
+    salary_credit_date: payslip.salaryCreditDate,
+    published_at: payslip.publishedAt,
+    payroll_generated_at: payslip.payrollGeneratedAt,
+    payment_mode: payslip.paymentMode,
+    transaction_reference: payslip.transactionReference,
+    created_by: profile.userId,
+  });
+
+  if (versionError) throw new Error(versionError.message);
+
+  const { error: updateError } = await supabase
+    .schema("hrms")
+    .from("payslips")
+    .update({
+      payslip_version: String(numericVersion + 1),
+      storage_path: null,
+      email_sent_at: null,
+      updated_by: profile.userId,
+    })
+    .eq("id", payslipId);
+
+  if (updateError) throw new Error(updateError.message);
 }
 
 export async function createSalaryStructure(
@@ -1187,6 +1278,7 @@ export async function getPayslipById(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   payslipId: string,
+  options?: { bypassAccessCheck?: boolean },
 ): Promise<PayslipDetail | null> {
   const organizationId = profile.employee.organizationId;
 
@@ -1199,18 +1291,27 @@ export async function getPayslipById(
         payslip_number,
         issued_at,
         employee_id,
+        storage_path,
+        salary_credit_date,
+        published_at,
+        payroll_generated_at,
+        payment_mode,
+        transaction_reference,
+        payslip_version,
         payroll_items:payroll_item_id (
           basic_salary,
           total_allowances,
           total_deductions,
           gross_salary,
           net_salary,
-          breakdown
+          breakdown,
+          salary_structure_id
         ),
         payrolls:payroll_id (
           payroll_month,
           payroll_status,
           organization_id,
+          processed_at,
           organizations:organization_id (name)
         ),
         employees:employee_id (
@@ -1221,7 +1322,9 @@ export async function getPayslipById(
           date_of_joining,
           organization_id,
           departments:department_id (name),
-          designations:designation_id (title)
+          designations:designation_id (title),
+          branches:branch_id (name),
+          employment_types:employment_type_id (name)
         )
       `,
     )
@@ -1240,31 +1343,97 @@ export async function getPayslipById(
     return null;
   }
 
-  const organization = unwrapRelation(
-    payroll.organizations as { name: string } | { name: string }[] | null,
+  const schedule = resolvePayslipSchedule(payroll.payroll_month, {
+    salaryCreditDate: payslip.salary_credit_date ?? undefined,
+    publishedAt: payslip.published_at ?? undefined,
+  });
+
+  const access = resolvePayslipAvailability(
+    schedule.publishedAt,
+    profile.permissionCodes,
   );
+
+  if (
+    !options?.bypassAccessCheck &&
+    !access.canEmployeeAccess &&
+    !canAccessPayslipDuringReview(profile.permissionCodes)
+  ) {
+    return null;
+  }
+
   const department = unwrapRelation(
     employee.departments as { name: string } | { name: string }[] | null,
   );
   const designation = unwrapRelation(
     employee.designations as { title: string } | { title: string }[] | null,
   );
+  const branch = unwrapRelation(
+    employee.branches as { name: string } | { name: string }[] | null,
+  );
+  const employmentType = unwrapRelation(
+    employee.employment_types as { name: string } | { name: string }[] | null,
+  );
 
   const { data: bankAccount } = await supabase
     .schema("hrms")
     .from("bank_accounts")
-    .select("bank_name, account_number")
+    .select("bank_name, account_number, ifsc_code, account_holder_name")
     .eq("employee_id", payslip.employee_id)
     .eq("is_primary", true)
     .is("deleted_at", null)
     .maybeSingle();
 
-  return {
+  const { data: salaryStructure } = await supabase
+    .schema("hrms")
+    .from("salary_structures")
+    .select("components")
+    .eq("employee_id", payslip.employee_id)
+    .is("deleted_at", null)
+    .lte("effective_from", payroll.payroll_month)
+    .order("effective_from", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const components =
+    (salaryStructure?.components as Record<string, unknown> | null) ?? null;
+  const statutory = parseStatutoryIds(components);
+  const branding = await getPayslipBranding(supabase, organizationId);
+
+  const breakdown = (payrollItem?.breakdown as PayrollBreakdown) ?? {
+    earnings: [],
+    deductions: [],
+    attendance: {
+      workingDays: 0,
+      presentDays: 0,
+      absentDays: 0,
+      lopDays: 0,
+      leaveLopDays: 0,
+      overtimeHours: 0,
+    },
+  };
+
+  const employerContributions = buildEmployerContributions(components, breakdown);
+  const employerContributionTotal = employerContributions.reduce(
+    (sum, line) => sum + line.amount,
+    0,
+  );
+
+  const detail: PayslipDetail = {
     id: payslip.id,
     payslipNumber: payslip.payslip_number,
     issuedAt: payslip.issued_at,
     payrollMonth: payroll.payroll_month,
     payrollStatus: payroll.payroll_status,
+    salaryCreditDate: schedule.salaryCreditDate,
+    publishedAt: schedule.publishedAt,
+    payrollGeneratedAt:
+      payslip.payroll_generated_at ?? payroll.processed_at ?? payslip.issued_at,
+    paymentMode: payslip.payment_mode ?? "Bank Transfer",
+    transactionReference: payslip.transaction_reference ?? null,
+    payslipVersion: payslip.payslip_version ?? PAYSLIP_VERSION,
+    availability: access.availability,
+    canEmployeeAccess: access.canEmployeeAccess,
+    reviewMessage: access.reviewMessage,
     employee: {
       id: payslip.employee_id,
       employeeCode: employee.employee_code,
@@ -1273,33 +1442,44 @@ export async function getPayslipById(
       email: employee.email,
       departmentName: department?.name ?? null,
       designationTitle: designation?.title ?? null,
+      employmentType: employmentType?.name ?? null,
+      branchName: branch?.name ?? null,
       dateOfJoining: employee.date_of_joining,
+      pan: statutory.pan,
+      uan: statutory.uan,
+      pfNumber: statutory.pfNumber,
     },
     organization: {
-      name: organization?.name ?? "Organization",
+      name: branding.companyName,
+      addressLines: branding.addressLines,
+      logoUrl: branding.logoUrl,
+      email: branding.email,
+      phone: branding.phone,
+      footerMessage: branding.footerMessage,
+      gstNumber: branding.gstNumber,
+      cin: branding.cin,
     },
+    currencyCode: branding.currencyCode,
     basicSalary: Number(payrollItem?.basic_salary ?? 0),
     totalAllowances: Number(payrollItem?.total_allowances ?? 0),
     totalDeductions: Number(payrollItem?.total_deductions ?? 0),
     grossSalary: Number(payrollItem?.gross_salary ?? 0),
     netSalary: Number(payrollItem?.net_salary ?? 0),
-    breakdown: (payrollItem?.breakdown as PayrollBreakdown) ?? {
-      earnings: [],
-      deductions: [],
-      attendance: {
-        workingDays: 0,
-        presentDays: 0,
-        absentDays: 0,
-        lopDays: 0,
-        leaveLopDays: 0,
-        overtimeHours: 0,
-      },
-    },
+    totalEarnings: 0,
+    employerContributionTotal,
+    breakdown,
+    employerContributions,
     bankAccount: bankAccount
       ? {
           bankName: bankAccount.bank_name,
           accountNumberMasked: maskAccountNumber(bankAccount.account_number),
+          ifscCode: bankAccount.ifsc_code ?? null,
+          accountHolderName: bankAccount.account_holder_name ?? null,
         }
       : null,
+    storagePath: payslip.storage_path ?? null,
   };
+
+  detail.totalEarnings = totalEarnings(detail);
+  return detail;
 }

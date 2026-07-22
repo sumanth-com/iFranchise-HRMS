@@ -12,7 +12,7 @@ async function SelfServiceHomeContent() {
   const data = await getEmployeeDashboardData(supabase, profile);
 
   return (
-    <EmployeeDashboardView {...data} showPageHeading={false} />
+    <EmployeeDashboardView {...data} />
   );
 }
 
