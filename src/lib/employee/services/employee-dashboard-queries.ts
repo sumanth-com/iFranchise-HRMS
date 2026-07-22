@@ -1,15 +1,11 @@
-import { differenceInCalendarDays, format, parseISO } from "date-fns";
-
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { getEmployeeById } from "@/lib/employees/services/employee-detail";
 import { getEmployeeLeaveBalanceSnapshot } from "@/lib/leave/services/leave-queries";
 import { getManagerProfilePageData } from "@/lib/manager/services/manager-self-attendance-service";
 import { listHolidays } from "@/lib/organization/services/org-queries";
-import { createAdminClient } from "@/lib/supabase/admin";
 import type { UserProfile } from "@/types/auth";
 import type {
-  EmployeeBirthdayPerson,
   EmployeeDashboardData,
   EmployeeGreeting,
   EmployeeUpcomingEvent,
@@ -41,23 +37,6 @@ function buildFallbackToday(today: string): ManagerTodayAttendance {
     lockMessage: null,
     workingDurationLabel: "0h 00m",
   };
-}
-
-/** Returns the next annual occurrence (this year or next) of a birth/joining date. */
-function nextAnnualOccurrence(source: string | null, today: string): string | null {
-  if (!source || source.length < 10) return null;
-  try {
-    const src = parseISO(source);
-    const [ty, tm, td] = today.split("-").map(Number);
-    const todayDate = new Date(ty, tm - 1, td);
-    let candidate = new Date(ty, src.getMonth(), src.getDate());
-    if (candidate < todayDate) {
-      candidate = new Date(ty + 1, src.getMonth(), src.getDate());
-    }
-    return format(candidate, "yyyy-MM-dd");
-  } catch {
-    return null;
-  }
 }
 
 async function loadGreeting(
@@ -117,64 +96,6 @@ async function loadLeaveSnapshot(
   };
 }
 
-/**
- * Company birthdays celebrated in the next ~45 days. Uses the service-role client so a
- * standard employee can see the shared celebration board without gaining read access to
- * any other sensitive profile field (only display name + the day/month is exposed).
- */
-async function loadCompanyBirthdays(
-  organizationId: string,
-  today: string,
-  selfEmployeeId: string,
-): Promise<EmployeeBirthdayPerson[]> {
-  const admin = createAdminClient();
-  const { data, error } = await admin
-    .schema("hrms")
-    .from("employee_profiles")
-    .select(
-      "date_of_birth, employees:employee_id!inner(id, first_name, last_name, organization_id, employment_status, deleted_at)",
-    )
-    .eq("employees.organization_id", organizationId)
-    .not("date_of_birth", "is", null)
-    .limit(3000);
-  if (error) throw new Error(error.message);
-
-  const people: EmployeeBirthdayPerson[] = [];
-  for (const row of (data ?? []) as Array<{
-    date_of_birth: string | null;
-    employees:
-      | {
-          id: string;
-          first_name: string | null;
-          last_name: string | null;
-          employment_status: string | null;
-          deleted_at: string | null;
-        }
-      | Array<{
-          id: string;
-          first_name: string | null;
-          last_name: string | null;
-          employment_status: string | null;
-          deleted_at: string | null;
-        }>;
-  }>) {
-    const employee = Array.isArray(row.employees) ? row.employees[0] : row.employees;
-    if (!employee || employee.deleted_at) continue;
-    if (employee.employment_status && employee.employment_status === "terminated") continue;
-
-    const next = nextAnnualOccurrence(row.date_of_birth, today);
-    if (!next) continue;
-    // Only surface birthdays happening within the coming week.
-    if (differenceInCalendarDays(parseISO(next), parseISO(today)) > 7) continue;
-
-    const name = `${employee.first_name ?? ""} ${employee.last_name ?? ""}`.trim() || "Team member";
-    people.push({ name, date: next, isSelf: employee.id === selfEmployeeId });
-  }
-
-  people.sort((a, b) => a.date.localeCompare(b.date));
-  return people;
-}
-
 export async function getEmployeeDashboardData(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -184,7 +105,7 @@ export async function getEmployeeDashboardData(
   const organizationId = profile.employee.organizationId;
   const currentYear = new Date().getFullYear();
 
-  const [greeting, attendance, leave, holidays, birthdays] = await Promise.all([
+  const [greeting, attendance, leave, holidays] = await Promise.all([
     safe(() => loadGreeting(supabase, profile), {
       employeeId,
       firstName: "there",
@@ -208,10 +129,6 @@ export async function getEmployeeDashboardData(
       page: 1,
       year: currentYear,
     }),
-    safe(
-      () => loadCompanyBirthdays(organizationId, today, employeeId),
-      [] as EmployeeBirthdayPerson[],
-    ),
   ]);
 
   const todayPanel = attendance?.today ?? buildFallbackToday(today);
@@ -239,6 +156,5 @@ export async function getEmployeeDashboardData(
     },
     referenceDate: today,
     upcomingHolidays,
-    birthdaysThisWeek: birthdays,
   };
 }

@@ -1,5 +1,7 @@
 import { Sparkles } from "lucide-react";
 
+import { cn } from "@/lib/utils";
+
 type DailyBoost = {
   quote: string;
   personal: string;
@@ -97,9 +99,11 @@ function daysSinceEpoch(referenceDate: string) {
 export function EmployeeDailyQuoteCard({
   name,
   referenceDate,
+  className,
 }: {
   name: string;
   referenceDate: string;
+  className?: string;
 }) {
   const day = daysSinceEpoch(referenceDate);
   const index = ((day % DAILY_BOOSTS.length) + DAILY_BOOSTS.length) % DAILY_BOOSTS.length;
@@ -108,7 +112,12 @@ export function EmployeeDailyQuoteCard({
   const quoteLines = boost.quote.split("\n");
 
   return (
-    <section className="shrink-0 overflow-hidden rounded-xl border bg-gradient-to-br from-rose-500/10 via-amber-500/5 to-violet-500/10 p-5 shadow-sm">
+    <section
+      className={cn(
+        "flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-gradient-to-br from-rose-500/10 via-amber-500/5 to-violet-500/10 p-5 shadow-sm",
+        className,
+      )}
+    >
       <div className="flex items-center gap-2.5">
         <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rose-400 to-amber-400 text-white shadow-sm">
           <Sparkles className="size-3.5" />
@@ -126,7 +135,7 @@ export function EmployeeDailyQuoteCard({
         ))}
       </div>
 
-      <p className="mt-4 border-t border-rose-500/15 pt-4 text-sm leading-6 text-foreground/80">
+      <p className="mt-auto border-t border-rose-500/15 pt-4 text-sm leading-6 text-foreground/80">
         {personalLine}
       </p>
     </section>

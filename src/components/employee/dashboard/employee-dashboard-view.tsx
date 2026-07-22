@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 
 import { EmployeeAttendanceWidget } from "@/components/employee/dashboard/employee-attendance-widget";
-import { EmployeeBirthdayCard } from "@/components/employee/dashboard/employee-birthday-card";
 import { EmployeeDailyQuoteCard } from "@/components/employee/dashboard/employee-daily-quote-card";
 import { EmployeeDashboardHeader } from "@/components/employee/dashboard/employee-dashboard-header";
 import { EmployeeDashboardKpiCards } from "@/components/employee/dashboard/employee-dashboard-kpis";
@@ -16,7 +15,6 @@ export function EmployeeDashboardView({
   kpis,
   referenceDate,
   upcomingHolidays,
-  birthdaysThisWeek,
 }: EmployeeDashboardData) {
   const leftColumnRef = useRef<HTMLDivElement>(null);
   const [pairedColumnHeight, setPairedColumnHeight] = useState<number | null>(null);
@@ -48,16 +46,13 @@ export function EmployeeDashboardView({
 
         <EmployeeDashboardKpiCards kpis={kpis} />
 
-        <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[3fr_2fr] lg:items-start">
-          <div ref={leftColumnRef} className="flex flex-col gap-3">
+        <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[3fr_2fr] lg:items-stretch">
+          <div ref={leftColumnRef} className="flex min-h-0 flex-col gap-3">
             <EmployeeAttendanceWidget today={today} />
-            <EmployeeBirthdayCard
-              birthdays={birthdaysThisWeek}
-              referenceDate={referenceDate}
-            />
             <EmployeeDailyQuoteCard
               name={greeting.firstName}
               referenceDate={referenceDate}
+              className="min-h-[12rem]"
             />
           </div>
 

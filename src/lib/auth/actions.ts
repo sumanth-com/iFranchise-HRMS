@@ -18,6 +18,7 @@ import { resolveApprovedLoginEmail } from "@/lib/auth/login-email";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
 import { recordEmployeeSuccessfulLogin, acceptInvitationOnPasswordSet } from "@/lib/employees/services/employee-account";
+import { sendBirthdayRemindersOnLogin } from "@/lib/employee/services/birthday-reminder-notifications";
 import { resolveUserPortalRoute } from "@/lib/auth/permission-resolver";
 import { getPortalRedirectPath } from "@/lib/auth/portals";
 import { recordUserLoginSession } from "@/lib/ceo/services/ceo-profile-queries";
@@ -116,6 +117,12 @@ export async function loginAction(
       await recordEmployeeSuccessfulLogin(supabase, authData.user.id, email);
     } catch (loginRecordError) {
       console.error("[loginAction] Failed to record successful login:", loginRecordError);
+    }
+
+    try {
+      await sendBirthdayRemindersOnLogin(supabase, profileResult.profile);
+    } catch (birthdayReminderError) {
+      console.error("[loginAction] Failed to send birthday reminders:", birthdayReminderError);
     }
 
     const ctx = await getRequestAuditContext();

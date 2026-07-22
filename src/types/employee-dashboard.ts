@@ -29,19 +29,12 @@ export type EmployeeUpcomingEvent = {
   date: string;
 };
 
-export type EmployeeBirthdayPerson = {
-  name: string;
-  date: string;
-  isSelf: boolean;
-};
-
 export type EmployeeDashboardData = {
   greeting: EmployeeGreeting;
   today: ManagerTodayAttendance;
   kpis: EmployeeDashboardKpis;
   referenceDate: string;
   upcomingHolidays: EmployeeUpcomingEvent[];
-  birthdaysThisWeek: EmployeeBirthdayPerson[];
 };
 
 export type EmployeeAttendanceActionResult =
