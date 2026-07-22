@@ -37,6 +37,7 @@ export function LoginForm() {
   const [isInviteLinkPending, setInviteLinkPending] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showSignedOutMessage, setShowSignedOutMessage] = useState(false);
+  const [showPasswordUpdatedMessage, setShowPasswordUpdatedMessage] = useState(false);
 
   const {
     register,
@@ -71,6 +72,24 @@ export function LoginForm() {
     const timeout = window.setTimeout(() => {
       setShowSignedOutMessage(false);
     }, 4000);
+
+    return () => window.clearTimeout(timeout);
+  }, [router]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("passwordUpdated") !== "1") return;
+
+    setShowPasswordUpdatedMessage(true);
+    params.delete("passwordUpdated");
+    const query = params.toString();
+    router.replace(query ? `${AUTH_ROUTES.login}?${query}` : AUTH_ROUTES.login, {
+      scroll: false,
+    });
+
+    const timeout = window.setTimeout(() => {
+      setShowPasswordUpdatedMessage(false);
+    }, 3000);
 
     return () => window.clearTimeout(timeout);
   }, [router]);
@@ -158,7 +177,6 @@ export function LoginForm() {
   });
 
   const expired = searchParams.get("expired") === "1";
-  const passwordUpdated = searchParams.get("passwordUpdated") === "1";
   const errorParam = searchParams.get("error");
   const profileError =
     errorParam &&
@@ -223,8 +241,8 @@ export function LoginForm() {
         </div>
       ) : null}
 
-      {passwordUpdated ? (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+      {showPasswordUpdatedMessage ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 transition-opacity duration-300">
           Password created successfully. Sign in with your email and new password.
         </div>
       ) : null}

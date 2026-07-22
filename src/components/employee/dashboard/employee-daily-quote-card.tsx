@@ -1,4 +1,4 @@
-import { Heart, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 type DailyBoost = {
   quote: string;
@@ -108,8 +108,8 @@ export function EmployeeDailyQuoteCard({
   const quoteLines = boost.quote.split("\n");
 
   return (
-    <section className="rounded-xl border bg-gradient-to-br from-rose-500/10 via-amber-500/5 to-violet-500/10 p-4 shadow-sm">
-      <div className="flex items-center gap-2">
+    <section className="shrink-0 overflow-hidden rounded-xl border bg-gradient-to-br from-rose-500/10 via-amber-500/5 to-violet-500/10 p-5 shadow-sm">
+      <div className="flex items-center gap-2.5">
         <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rose-400 to-amber-400 text-white shadow-sm">
           <Sparkles className="size-3.5" />
         </span>
@@ -118,18 +118,17 @@ export function EmployeeDailyQuoteCard({
         </p>
       </div>
 
-      <div className="mt-3 space-y-2">
-        {quoteLines.map((line) => (
-          <p key={line} className="text-sm leading-relaxed text-foreground/90">
+      <div className="mt-4 space-y-1">
+        {quoteLines.map((line, index) => (
+          <p key={index} className="text-sm leading-6 text-foreground/90">
             {line}
           </p>
         ))}
-
-        <div className="flex items-start gap-2.5 border-t border-rose-500/15 pt-3">
-          <Heart className="mt-0.5 size-3.5 shrink-0 fill-rose-500/20 text-rose-500" />
-          <p className="text-sm leading-relaxed text-foreground">{personalLine}</p>
-        </div>
       </div>
+
+      <p className="mt-4 border-t border-rose-500/15 pt-4 text-sm leading-6 text-foreground/80">
+        {personalLine}
+      </p>
     </section>
   );
 }
