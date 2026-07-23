@@ -26,8 +26,15 @@ export function EmployeeDashboardView({
         </div>
 
         <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[3fr_2fr] lg:items-stretch lg:overflow-hidden">
-          <div className="min-h-0 lg:h-full">
+          <div className="flex min-h-0 flex-col gap-3 lg:h-full lg:gap-4">
             <EmployeeAttendanceWidget today={today} />
+            <DailyBoostCard
+              firstName={greeting.firstName}
+              lastName={greeting.lastName}
+              personKey={greeting.employeeId}
+              referenceDate={referenceDate}
+              className="min-h-0 flex-1"
+            />
           </div>
           <EmployeeUpcomingEvents
             events={upcomingHolidays}
@@ -35,15 +42,6 @@ export function EmployeeDashboardView({
             className="min-h-0 lg:h-full"
           />
         </div>
-
-        <DailyBoostCard
-          firstName={greeting.firstName}
-          lastName={greeting.lastName}
-          personKey={greeting.employeeId}
-          referenceDate={referenceDate}
-          compact
-          className="shrink-0"
-        />
       </div>
     </div>
   );

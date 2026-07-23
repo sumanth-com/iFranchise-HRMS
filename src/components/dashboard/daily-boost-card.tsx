@@ -67,7 +67,7 @@ export function DailyBoostCard({
         </p>
       </div>
 
-      <div className="mt-4 space-y-2">
+      <div className="mt-4 flex min-h-0 flex-1 flex-col justify-center space-y-2">
         <p className="text-sm leading-6 text-foreground/90">{line1}</p>
         <p className="text-sm leading-6 text-foreground/80">{line2}</p>
       </div>
