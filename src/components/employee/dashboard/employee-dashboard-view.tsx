@@ -16,7 +16,7 @@ export function EmployeeDashboardView({
 }: EmployeeDashboardData) {
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-5 lg:overflow-hidden">
-      <div className="mx-auto flex h-full min-h-0 w-full max-w-[88rem] flex-col gap-4 md:gap-5 lg:overflow-hidden">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[88rem] flex-col gap-3 md:gap-4 lg:overflow-hidden">
         <div className="shrink-0">
           <EmployeeDashboardHeader greeting={greeting} />
         </div>
@@ -26,23 +26,24 @@ export function EmployeeDashboardView({
         </div>
 
         <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[3fr_2fr] lg:items-stretch lg:overflow-hidden">
-          <div className="flex min-h-0 flex-col gap-3 lg:overflow-hidden">
+          <div className="min-h-0 lg:h-full">
             <EmployeeAttendanceWidget today={today} />
-            <DailyBoostCard
-              firstName={greeting.firstName}
-              lastName={greeting.lastName}
-              personKey={greeting.employeeId}
-              referenceDate={referenceDate}
-              className="min-h-0 flex-1"
-            />
           </div>
-
           <EmployeeUpcomingEvents
             events={upcomingHolidays}
             referenceDate={referenceDate}
             className="min-h-0 lg:h-full"
           />
         </div>
+
+        <DailyBoostCard
+          firstName={greeting.firstName}
+          lastName={greeting.lastName}
+          personKey={greeting.employeeId}
+          referenceDate={referenceDate}
+          compact
+          className="shrink-0"
+        />
       </div>
     </div>
   );

@@ -30,17 +30,13 @@ export function CeoDashboard({ data, error }: CeoDashboardProps) {
   }
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-1 flex-col gap-3 overflow-y-auto p-3 md:p-4 lg:gap-4 lg:overflow-hidden lg:p-5">
-      <CeoDashboardHeader />
-      <CeoDashboardKpis kpis={data.kpis} />
-      <CeoDashboardSnapshot kpis={data.kpis} recruitment={data.recruitment} />
-      <DailyBoostCard
-        firstName={profile.employee.firstName}
-        lastName={profile.employee.lastName}
-        personKey={profile.employee.id}
-        referenceDate={referenceDate}
-        className="shrink-0"
-      />
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col gap-2 overflow-y-auto p-3 md:p-4 lg:gap-3 lg:overflow-hidden lg:p-5">
+      <div className="flex shrink-0 flex-col gap-2 lg:gap-3">
+        <CeoDashboardHeader />
+        <CeoDashboardKpis kpis={data.kpis} />
+        <CeoDashboardSnapshot kpis={data.kpis} recruitment={data.recruitment} />
+      </div>
+
       <section className="flex min-h-0 flex-1 flex-col lg:overflow-hidden">
         <CeoDashboardPanels
           organization={data.organization}
@@ -51,6 +47,15 @@ export function CeoDashboard({ data, error }: CeoDashboardProps) {
           payroll={data.payroll}
         />
       </section>
+
+      <DailyBoostCard
+        firstName={profile.employee.firstName}
+        lastName={profile.employee.lastName}
+        personKey={profile.employee.id}
+        referenceDate={referenceDate}
+        compact
+        className="shrink-0"
+      />
     </div>
   );
 }

@@ -13,6 +13,7 @@ type DailyBoostCardProps = {
   personKey: string;
   referenceDate?: string;
   className?: string;
+  compact?: boolean;
 };
 
 export function DailyBoostCard({
@@ -21,10 +22,34 @@ export function DailyBoostCard({
   personKey,
   referenceDate,
   className,
+  compact = false,
 }: DailyBoostCardProps) {
   const dayKey = referenceDate ?? format(new Date(), "yyyy-MM-dd");
   const displayName = getDailyBoostDisplayName(firstName, lastName);
   const { line1, line2 } = resolveDailyBoostMessage(dayKey, personKey, displayName);
+
+  if (compact) {
+    return (
+      <section
+        className={cn(
+          "flex items-start gap-3 overflow-hidden rounded-xl border bg-gradient-to-r from-rose-500/10 via-amber-500/5 to-violet-500/10 px-4 py-3 shadow-sm",
+          className,
+        )}
+      >
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rose-400 to-amber-400 text-white shadow-sm">
+          <Sparkles className="size-3.5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-rose-600 dark:text-rose-400">
+            Daily Boost
+          </p>
+          <p className="mt-1 line-clamp-2 text-sm leading-snug text-foreground/90">
+            {line1} {line2}
+          </p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section

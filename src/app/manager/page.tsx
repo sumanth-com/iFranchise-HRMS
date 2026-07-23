@@ -5,7 +5,6 @@ import { ManagerDashboard } from "@/components/manager/manager-dashboard";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { getManagerDashboardData } from "@/lib/manager/services/manager-dashboard-queries";
 import { requireServerPermission } from "@/lib/permissions/server";
-import { hasSupabaseServiceRoleEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function ManagerPortalPage() {
@@ -48,12 +47,7 @@ export default async function ManagerPortalPage() {
         </div>
       }
     >
-      <ManagerDashboard
-        data={data}
-        error={error}
-        canInviteTeamMember
-        inviteServiceReady={hasSupabaseServiceRoleEnv()}
-      />
+      <ManagerDashboard data={data} error={error} />
     </Suspense>
   );
 }

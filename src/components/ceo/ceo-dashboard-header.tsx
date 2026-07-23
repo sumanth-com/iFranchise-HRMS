@@ -21,14 +21,14 @@ export function CeoDashboardHeader() {
   }, []);
 
   return (
-    <section className="relative w-full shrink-0 overflow-hidden rounded-2xl border bg-gradient-to-br from-card via-card to-primary/5 px-5 py-5 shadow-sm lg:px-6 lg:py-6">
+    <section className="relative w-full shrink-0 overflow-hidden rounded-2xl border bg-gradient-to-br from-card via-card to-primary/5 px-4 py-4 shadow-sm lg:px-5 lg:py-4">
       <div className="pointer-events-none absolute -top-10 -right-10 size-36 rounded-full bg-primary/10 blur-2xl" />
       <div className="relative flex flex-col gap-1">
         <p className="text-xs font-medium tracking-wide text-primary uppercase">
           CEO Dashboard
         </p>
         <div className="mt-1 flex items-start justify-between gap-4">
-          <h1 className="min-w-0 text-2xl font-semibold tracking-tight lg:text-3xl">
+          <h1 className="min-w-0 text-xl font-semibold tracking-tight lg:text-2xl">
             {greetingForHour(now.getHours())}, {profile.employee.firstName}
           </h1>
           <div className="shrink-0 pt-1 text-right">
@@ -40,7 +40,7 @@ export function CeoDashboardHeader() {
             </p>
           </div>
         </div>
-        <p className="mt-1.5 text-sm text-muted-foreground lg:text-base">
+        <p className="mt-1 text-sm text-muted-foreground">
           Here&apos;s what needs your attention across {profile.organization.name} today.
         </p>
       </div>

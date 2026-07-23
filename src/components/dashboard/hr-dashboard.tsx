@@ -34,7 +34,7 @@ export function HrDashboard({ data, error }: Props) {
   return (
     <div
       className={cn(
-        "flex h-full min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 md:gap-3 md:p-5 lg:overflow-hidden",
+        "flex h-full min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-4 md:gap-3 md:p-5 lg:overflow-hidden",
       )}
     >
       <div className="shrink-0">
@@ -45,24 +45,22 @@ export function HrDashboard({ data, error }: Props) {
         <DashboardKpiRow kpis={data.kpis} />
       </section>
 
-      <DailyBoostCard
-        firstName={profile.employee.firstName}
-        lastName={profile.employee.lastName}
-        personKey={profile.employee.id}
-        referenceDate={referenceDate}
-        className="shrink-0"
-      />
-
-      <section
-        className="flex min-h-0 flex-1 flex-col"
-        aria-label="Operations"
-      >
+      <section className="flex min-h-0 flex-1 flex-col lg:overflow-hidden" aria-label="Operations">
         <DashboardOperationsRow
           activities={data.activities}
           tasks={data.tasks}
           charts={data.charts}
         />
       </section>
+
+      <DailyBoostCard
+        firstName={profile.employee.firstName}
+        lastName={profile.employee.lastName}
+        personKey={profile.employee.id}
+        referenceDate={referenceDate}
+        compact
+        className="shrink-0"
+      />
     </div>
   );
 }
