@@ -89,11 +89,11 @@ export function formatAuditRecordLabel(input: {
   }
 
   const table = formatAuditTableLabel(input.tableName);
-  const module = input.module ? formatAuditModule(input.module) : null;
+  const moduleLabel = input.module ? formatAuditModule(input.module) : null;
   const action = input.action ? formatAuditAction(input.action) : null;
 
-  if (module && action) {
-    return `${module} · ${action}`;
+  if (moduleLabel && action) {
+    return `${moduleLabel} · ${action}`;
   }
 
   return table;
