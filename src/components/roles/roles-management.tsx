@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Copy, Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 import { RoleStatusBadge } from "@/components/roles/role-status-badge";
 import { RolesExportButtons } from "@/components/roles/roles-export-buttons";
 import { RolesPagination } from "@/components/roles/roles-pagination";
-import { deleteRoleAction, saveRoleAction } from "@/lib/roles/actions";
+import { deleteRoleAction, cloneRoleAction, saveRoleAction } from "@/lib/roles/actions";
 import {
   canCreateRole,
   canDeleteRole,
@@ -175,6 +175,21 @@ export function RolesManagement({
     [router],
   );
 
+  const onClone = useCallback(
+    (item: RoleListItem) => {
+      startTransition(async () => {
+        const res = await cloneRoleAction(item.id);
+        if (!res.success) {
+          toast.error(res.message);
+          return;
+        }
+        toast.success("Role cloned");
+        router.refresh();
+      });
+    },
+    [router],
+  );
+
   const columns = useMemo<DataTableColumn<RoleListItem & Record<string, unknown>>[]>(
     () => [
       {
@@ -241,6 +256,17 @@ export function RolesManagement({
                   <Pencil className="h-4 w-4" />
                 </Button>
               ) : null}
+              {canCreate ? (
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  onClick={() => onClone(row)}
+                  aria-label="Clone"
+                  title="Clone role"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              ) : null}
               {canDelete ? (
                 <Button
                   size="icon-sm"
@@ -266,7 +292,7 @@ export function RolesManagement({
         },
       },
     ],
-    [canDelete, canEdit, onDelete, openEdit],
+    [canCreate, canDelete, canEdit, onClone, onDelete, openEdit],
   );
 
   return (

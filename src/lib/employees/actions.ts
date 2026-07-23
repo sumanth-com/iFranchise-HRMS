@@ -22,13 +22,17 @@ import {
   getEmployeeTimeline,
 } from "@/lib/employees/services/employee-detail";
 import { listEmployeeAssets } from "@/lib/assets/services/asset-queries";
+import {
+  getEmployeeRoleAssignment,
+  getRoleLookupOptions,
+} from "@/lib/roles/services/role-queries";
+import { canAssignUserRole } from "@/lib/roles/constants";
 import { resolveEmployeeFromRouteRef } from "@/lib/employees/services/employee-route-resolver";
 import {
   createEmployeeFromWizard,
   createSignedStorageUrl,
   ensureDefaultDocumentTypes,
   resolveOrCreateDesignation,
-  softDeleteEmployee,
   updateEmployee,
   uploadEmployeeDocument,
   uploadProfileImage,
@@ -63,6 +67,7 @@ import type {
 import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
 import { z } from "zod";
 
+import { permanentlyDeleteEmployee } from "@/lib/employees/services/employee-permanent-delete";
 import { loadInviteableRoles, getInviteableRoleByCode } from "@/lib/auth/iam-roles";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -207,15 +212,14 @@ export async function updateEmployeeAction(
 
 export async function deleteEmployeeAction(
   employeeId: string,
-): Promise<EmployeeActionResult> {
+): Promise<EmployeeActionResult<{ fullName: string; employeeCode: string }>> {
   try {
     const profile = await requireServerPermission("employee.delete");
-    const supabase = await getAuthenticatedSupabase();
-    await softDeleteEmployee(supabase, profile, employeeId);
+    const deleted = await permanentlyDeleteEmployee(profile, employeeId);
 
     revalidatePath(EMPLOYEE_ROUTES.list);
 
-    return { success: true, data: undefined };
+    return { success: true, data: deleted };
   } catch (error) {
     return {
       success: false,
@@ -619,6 +623,14 @@ export async function getEmployeeDetailBundleAction(employeeRef: string) {
     timelineResult.status === "fulfilled" ? timelineResult.value : [];
   const assets = assetsResult.status === "fulfilled" ? assetsResult.value : [];
 
+  const canChangeRole = canAssignUserRole(profile.permissionCodes);
+  const [roleAssignment, assignableRoles] = canChangeRole
+    ? await Promise.all([
+        getEmployeeRoleAssignment(supabase, profile.employee.organizationId, resolved.id),
+        getRoleLookupOptions(supabase, profile.employee.organizationId),
+      ])
+    : [null, []];
+
   let profileImageUrl: string | null = null;
   if (employee.profile?.profileImageStoragePath) {
     profileImageUrl = await createSignedStorageUrl(
@@ -642,6 +654,8 @@ export async function getEmployeeDetailBundleAction(employeeRef: string) {
     assets,
     profileImageUrl,
     permissionCodes: profile.permissionCodes,
+    roleAssignment,
+    assignableRoles,
   };
 }
 

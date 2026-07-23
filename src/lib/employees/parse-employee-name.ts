@@ -28,3 +28,18 @@ export function getEmployeeGreetingName(
   const last = lastName.trim();
   return last || "there";
 }
+
+/** Preferred short name for Daily Boost (e.g. Gangaram Sumanth → Sumanth). */
+export function getDailyBoostDisplayName(firstName: string, lastName = ""): string {
+  const firstParts = firstName.trim().split(/\s+/).filter(Boolean);
+  if (firstParts.length > 1) {
+    return firstParts[firstParts.length - 1]!;
+  }
+
+  const lastParts = lastName.trim().split(/\s+/).filter(Boolean);
+  if (lastParts.length >= 1) {
+    return lastParts[0]!;
+  }
+
+  return firstParts[0] ?? "there";
+}

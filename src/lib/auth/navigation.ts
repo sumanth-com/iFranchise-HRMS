@@ -14,6 +14,8 @@ export function getSidebarNavigation(
   permissionCodes: string[],
   roles: Role[],
 ): NavItem[] {
+  const seenHrefs = new Set<string>();
+
   return items.filter((item) => {
     const permissionAllowed = hasAnyPermission(
       permissionCodes,
@@ -21,6 +23,10 @@ export function getSidebarNavigation(
     );
     const roleAllowed = hasAnyRole(roles, item.roles ?? []);
 
-    return permissionAllowed && roleAllowed;
+    if (!permissionAllowed || !roleAllowed) return false;
+
+    if (seenHrefs.has(item.href)) return false;
+    seenHrefs.add(item.href);
+    return true;
   });
 }

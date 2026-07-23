@@ -147,7 +147,6 @@ export async function inviteExecutiveUser(
     designationId,
     branchId: input.branchId,
     employmentTypeId: input.employmentTypeId,
-    reportingManagerId: input.reportingToId,
   });
 
   await storeInvitationNotes(employeeId, input.notes, profile.userId);
@@ -169,7 +168,6 @@ export async function inviteExecutiveUser(
       designation: input.designation,
       branchId: input.branchId,
       employmentTypeId: input.employmentTypeId,
-      reportingToId: input.reportingToId,
       notes: input.notes ?? null,
     },
     "high",

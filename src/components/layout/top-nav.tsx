@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Button } from "@/components/common/button";
 import { BreadcrumbNav } from "@/components/layout/breadcrumb-nav";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { PortalSwitcher } from "@/components/system-admin/portal-switcher";
 import { UserProfileDropdown } from "@/components/layout/user-profile-dropdown";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/providers/auth-provider";
@@ -50,6 +51,7 @@ export function TopNav() {
         </div>
       </div>
       <div className="flex items-center gap-3 pl-1">
+        <PortalSwitcher />
         <NotificationBell />
         <UserProfileDropdown />
       </div>

@@ -147,7 +147,7 @@ export function WorkingConfigurationForm({
   }
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-full flex-1 flex-col gap-6">
+    <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-full flex-1 flex-col gap-4">
       <SettingsSectionCard title="Office Working Days">
         <div className="flex flex-wrap gap-2">
           {WORKING_DAYS.map((day) => (
@@ -297,7 +297,7 @@ export function LeavePoliciesForm({
   );
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-full flex-1 flex-col gap-6">
+    <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-full flex-1 flex-col gap-4">
       <SettingsSectionCard title="Leave Year & Approvals">
         <div className="grid gap-4 md:grid-cols-3">
           <SettingsField label="Leave year start month">
@@ -404,7 +404,7 @@ export function NotificationsGlobalForm({
   );
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-full flex-1 flex-col gap-6">
+    <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-full flex-1 flex-col gap-4">
       <SettingsSectionCard title="Delivery Channels">
         <div className="grid gap-3 sm:grid-cols-2">
           <SettingsToggle label="Email notifications" disabled={!canEdit || isPending} {...form.register("emailEnabled")} />
@@ -469,7 +469,7 @@ export function SecurityConfigurationForm({
   );
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-full flex-1 flex-col gap-6">
+    <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-full flex-1 flex-col gap-4">
       <SettingsSectionCard title="Password Policy">
         <div className="grid gap-4 md:grid-cols-3">
           <SettingsField label="Minimum length">
@@ -539,7 +539,7 @@ export function BrandingConfigurationForm({
   );
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-full flex-1 flex-col gap-6">
+    <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-full flex-1 flex-col gap-4">
       <SettingsSectionCard title="Brand Colors">
         <div className="grid gap-4 sm:grid-cols-2">
           <SettingsField label="Primary color">
@@ -604,7 +604,7 @@ export function IntegrationsConfigurationForm({
   );
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-full flex-1 flex-col gap-6">
+    <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-full flex-1 flex-col gap-4">
       <SettingsSectionCard title="SMTP">
         <SettingsToggle label="Enable SMTP" disabled={!canEdit || isPending} {...form.register("smtp.enabled")} />
         <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -699,7 +699,7 @@ export function BackupConfigurationForm({
   );
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-full flex-1 flex-col gap-6">
+    <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-full flex-1 flex-col gap-4">
       <SettingsSectionCard title="Backup">
         <SettingsField label="Backup frequency">
           <Select

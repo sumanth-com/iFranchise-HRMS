@@ -162,12 +162,14 @@ export function CeoUserProvisioningView({
 
       <CeoProvisioningSummaryCards summary={summary} />
 
-      <CeoProvisioningFilters
-        filters={pageParams}
-        lookups={lookups}
-        disabled={isPending}
-        onChange={applyFilters}
-      />
+      {variant !== "hr" ? (
+        <CeoProvisioningFilters
+          filters={pageParams}
+          lookups={lookups}
+          disabled={isPending}
+          onChange={applyFilters}
+        />
+      ) : null}
 
       <CeoProvisioningPeople
         users={users.data}

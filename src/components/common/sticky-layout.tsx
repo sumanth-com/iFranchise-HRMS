@@ -11,6 +11,8 @@ type ModuleShellProps = {
   header: ReactNode;
   children: ReactNode;
   className?: string;
+  /** Optional classes for the scrollable content region below the sticky header. */
+  contentClassName?: string;
 };
 
 /**
@@ -18,13 +20,23 @@ type ModuleShellProps = {
  * Content never scrolls underneath the header (separate scroll region).
  * Applies a consistent vertical rhythm (`gap-6`) between page sections.
  */
-export function ModuleShell({ header, children, className }: ModuleShellProps) {
+export function ModuleShell({
+  header,
+  children,
+  className,
+  contentClassName,
+}: ModuleShellProps) {
   return (
     <div className={cn("flex min-h-0 flex-1 flex-col", className)}>
       <div className="z-40 shrink-0 border-b border-border bg-background px-4 pt-4 pb-3 md:px-6">
         {header}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-6 pb-8 md:px-6">
+      <div
+        className={cn(
+          "min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-6 pb-8 md:px-6",
+          contentClassName,
+        )}
+      >
         <div className="flex min-h-full flex-col gap-6">{children}</div>
       </div>
     </div>

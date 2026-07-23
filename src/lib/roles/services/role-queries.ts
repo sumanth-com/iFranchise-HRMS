@@ -575,3 +575,59 @@ export async function getAssignableEmployees(
     code: e.employee_code,
   }));
 }
+
+export type EmployeeRoleAssignment = {
+  userRoleId: string;
+  roleId: string;
+  roleName: string;
+  roleCode: string;
+  portalRoute: string | null;
+};
+
+export async function getEmployeeRoleAssignment(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  employeeId: string,
+): Promise<EmployeeRoleAssignment | null> {
+  const { data: employee } = await supabase
+    .schema("hrms")
+    .from("employees")
+    .select("user_id")
+    .eq("id", employeeId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (!employee?.user_id) return null;
+
+  const { data: assignment } = await supabase
+    .schema("hrms")
+    .from("user_roles")
+    .select("id, role_id, roles:role_id (name, code, portal_route)")
+    .eq("user_id", employee.user_id)
+    .eq("organization_id", organizationId)
+    .eq("status", "active")
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!assignment) return null;
+
+  const role = unwrap(
+    assignment.roles as
+      | { name: string; code: string; portal_route: string | null }
+      | { name: string; code: string; portal_route: string | null }[]
+      | null,
+  );
+
+  if (!role) return null;
+
+  return {
+    userRoleId: assignment.id,
+    roleId: assignment.role_id,
+    roleName: role.name,
+    roleCode: role.code,
+    portalRoute: role.portal_route,
+  };
+}

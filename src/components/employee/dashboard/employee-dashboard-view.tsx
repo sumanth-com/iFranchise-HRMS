@@ -1,9 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-
 import { EmployeeAttendanceWidget } from "@/components/employee/dashboard/employee-attendance-widget";
-import { EmployeeDailyQuoteCard } from "@/components/employee/dashboard/employee-daily-quote-card";
+import { DailyBoostCard } from "@/components/dashboard/daily-boost-card";
 import { EmployeeDashboardHeader } from "@/components/employee/dashboard/employee-dashboard-header";
 import { EmployeeDashboardKpiCards } from "@/components/employee/dashboard/employee-dashboard-kpis";
 import { EmployeeUpcomingEvents } from "@/components/employee/dashboard/employee-upcoming-events";
@@ -16,55 +14,34 @@ export function EmployeeDashboardView({
   referenceDate,
   upcomingHolidays,
 }: EmployeeDashboardData) {
-  const leftColumnRef = useRef<HTMLDivElement>(null);
-  const [pairedColumnHeight, setPairedColumnHeight] = useState<number | null>(null);
-
-  useEffect(() => {
-    const leftColumn = leftColumnRef.current;
-    if (!leftColumn) return;
-
-    const syncPairedHeight = () => {
-      const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
-      setPairedColumnHeight(isDesktop ? leftColumn.getBoundingClientRect().height : null);
-    };
-
-    const observer = new ResizeObserver(syncPairedHeight);
-    observer.observe(leftColumn);
-    window.addEventListener("resize", syncPairedHeight);
-    syncPairedHeight();
-
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", syncPairedHeight);
-    };
-  }, []);
-
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden p-4 md:p-5">
-      <div className="mx-auto flex h-full min-h-0 w-full max-w-[88rem] flex-col gap-4 overflow-hidden md:gap-5">
-        <EmployeeDashboardHeader greeting={greeting} />
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-5 lg:overflow-hidden">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[88rem] flex-col gap-4 md:gap-5 lg:overflow-hidden">
+        <div className="shrink-0">
+          <EmployeeDashboardHeader greeting={greeting} />
+        </div>
 
-        <EmployeeDashboardKpiCards kpis={kpis} />
+        <div className="shrink-0">
+          <EmployeeDashboardKpiCards kpis={kpis} />
+        </div>
 
-        <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[3fr_2fr] lg:items-stretch">
-          <div ref={leftColumnRef} className="flex min-h-0 flex-col gap-3">
+        <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[3fr_2fr] lg:items-stretch lg:overflow-hidden">
+          <div className="flex min-h-0 flex-col gap-3 lg:overflow-hidden">
             <EmployeeAttendanceWidget today={today} />
-            <EmployeeDailyQuoteCard
-              name={greeting.firstName}
+            <DailyBoostCard
+              firstName={greeting.firstName}
+              lastName={greeting.lastName}
+              personKey={greeting.employeeId}
               referenceDate={referenceDate}
-              className="min-h-[12rem]"
+              className="min-h-0 flex-1"
             />
           </div>
 
-          <div
-            className="flex min-h-0 flex-col"
-            style={pairedColumnHeight ? { height: pairedColumnHeight } : undefined}
-          >
-            <EmployeeUpcomingEvents
-              events={upcomingHolidays}
-              referenceDate={referenceDate}
-            />
-          </div>
+          <EmployeeUpcomingEvents
+            events={upcomingHolidays}
+            referenceDate={referenceDate}
+            className="min-h-0 lg:h-full"
+          />
         </div>
       </div>
     </div>

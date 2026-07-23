@@ -10,6 +10,7 @@ import {
   EmployeeLoginStatusBadge,
 } from "@/components/employees/employee-account-status-badge";
 import { EmployeeAccountSection } from "@/components/employees/employee-account-section";
+import { EmployeeRoleSection } from "@/components/employees/employee-role-section";
 import { EmploymentStatusBadge } from "@/components/employees/employment-status-badge";
 import { buttonVariants } from "@/components/common/button";
 import { EmptyState } from "@/components/common/empty-state";
@@ -33,6 +34,8 @@ import type {
   EmployeeTimelineEvent,
 } from "@/types/employee";
 import type { AssetAssignmentItem } from "@/types/assets";
+import type { EmployeeRoleAssignment } from "@/lib/roles/services/role-queries";
+import type { LookupOption } from "@/types/employee";
 import { cn } from "@/lib/utils";
 import type { LeaveStatus } from "@/types/leave";
 import { hasPermission } from "@/lib/permissions/utils";
@@ -51,6 +54,8 @@ type EmployeeDetailViewProps = {
   timeline: EmployeeTimelineEvent[];
   assets: AssetAssignmentItem[];
   permissionCodes: string[];
+  roleAssignment?: EmployeeRoleAssignment | null;
+  assignableRoles?: LookupOption[];
 };
 
 function resolveActiveTab(tabParam: string | null): EmployeeTab {
@@ -184,6 +189,8 @@ export function EmployeeDetailView({
   timeline,
   assets,
   permissionCodes,
+  roleAssignment = null,
+  assignableRoles = [],
 }: EmployeeDetailViewProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -324,7 +331,15 @@ export function EmployeeDetailView({
       ) : null}
 
       {activeTab === "account" ? (
-        <EmployeeAccountSection employee={employee} permissionCodes={permissionCodes} />
+        <div className="space-y-6">
+          <EmployeeRoleSection
+            employeeId={employee.id}
+            assignment={roleAssignment}
+            roles={assignableRoles}
+            permissionCodes={permissionCodes}
+          />
+          <EmployeeAccountSection employee={employee} permissionCodes={permissionCodes} />
+        </div>
       ) : null}
 
       {activeTab === "profile" ? (

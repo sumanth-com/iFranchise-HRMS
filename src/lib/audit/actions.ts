@@ -130,7 +130,7 @@ export async function logAuditViewAction(recordId: string) {
     organizationId: profile.employee.organizationId,
     module: "dashboard",
     action: "update",
-    description: `Viewed audit log detail ${recordId}`,
+    description: "Viewed audit log detail",
     recordId,
     priority: "low",
     ...ctx,

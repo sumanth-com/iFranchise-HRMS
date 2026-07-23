@@ -65,7 +65,6 @@ export function CeoInviteUserDialog({
       roleCode: "",
       departmentId: "",
       designation: "",
-      reportingToId: "",
       employmentTypeId: "",
       branchId: "",
       notes: "",
@@ -74,7 +73,6 @@ export function CeoInviteUserDialog({
 
   const roleCode = watch("roleCode");
   const departmentId = watch("departmentId");
-  const reportingToId = watch("reportingToId");
   const employmentTypeId = watch("employmentTypeId");
   const branchId = watch("branchId");
 
@@ -132,11 +130,11 @@ export function CeoInviteUserDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Company Email *</Label>
+                <Label htmlFor="email">Email *</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="name@company.com"
+                  placeholder="you@example.com"
                   disabled={isPending}
                   {...register("email")}
                 />
@@ -217,24 +215,6 @@ export function CeoInviteUserDialog({
               </div>
 
               <div className="space-y-2">
-                <Label>Reporting Manager *</Label>
-                <LabeledSelect
-                  value={reportingToId}
-                  placeholder="Select reporting manager"
-                  items={toLookupSelectItems(lookups.managers)}
-                  onValueChange={(value) =>
-                    setValue("reportingToId", value, { shouldValidate: true })
-                  }
-                  disabled={isPending}
-                />
-                {errors.reportingToId ? (
-                  <p className="text-xs text-destructive">{errors.reportingToId.message}</p>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
                 <Label>Employment Type *</Label>
                 <LabeledSelect
                   value={employmentTypeId}
@@ -249,7 +229,9 @@ export function CeoInviteUserDialog({
                   <p className="text-xs text-destructive">{errors.employmentTypeId.message}</p>
                 ) : null}
               </div>
+            </div>
 
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Branch *</Label>
                 <LabeledSelect

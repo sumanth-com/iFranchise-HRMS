@@ -32,6 +32,7 @@ export function Sidebar() {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     "Self-service": true,
     Administration: true,
+    "System Administration": true,
   });
 
   const activeHref = resolveActiveHref(

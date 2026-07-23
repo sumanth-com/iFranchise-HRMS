@@ -84,7 +84,7 @@ export function CompanyProfileSettingsForm({
   return (
     <form
       onSubmit={form.handleSubmit(onSubmit)}
-      className="flex min-h-full flex-1 flex-col gap-6"
+      className="flex min-h-full flex-1 flex-col gap-4"
     >
       <SettingsSectionCard title="Company Information">
         <div className="grid gap-4 sm:grid-cols-2">
@@ -127,7 +127,7 @@ export function CompanyProfileSettingsForm({
         </div>
       </SettingsSectionCard>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         <SettingsSectionCard title="Registered Address">
           <div className="space-y-4">
             <Input placeholder="Address line 1" {...form.register("registeredAddressLine1")} disabled={!canEdit || isPending} />

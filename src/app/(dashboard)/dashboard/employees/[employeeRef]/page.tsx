@@ -95,6 +95,8 @@ export default async function EmployeeDetailPage({
           timeline={bundle.timeline}
           assets={bundle.assets}
           permissionCodes={bundle.permissionCodes}
+          roleAssignment={bundle.roleAssignment}
+          assignableRoles={bundle.assignableRoles}
         />
       </Suspense>
     </div>

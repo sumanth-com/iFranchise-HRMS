@@ -24,6 +24,7 @@ import {
 import type { NavigationItem } from "@/lib/auth/navigation";
 import { HR_OVERVIEW_ROUTES } from "@/lib/dashboard/constants";
 import { USER_PROVISIONING_ROUTES } from "@/lib/user-provisioning/constants";
+import { SYSTEM_ADMIN_NAV_ITEMS } from "@/config/system-admin-navigation";
 
 export type NavItem = {
   title: string;
@@ -182,4 +183,5 @@ export const mainNavItems: NavigationItem[] = [
     section: "Administration",
     permissions: ["settings.view"],
   },
+  ...SYSTEM_ADMIN_NAV_ITEMS,
 ];

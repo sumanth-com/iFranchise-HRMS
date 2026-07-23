@@ -8,6 +8,7 @@ import {
   AuditStatusBadge,
 } from "@/components/audit/audit-status-badge";
 import { AUDIT_ROUTES, formatAuditAction, formatAuditModule } from "@/lib/audit/constants";
+import { formatAuditRecordLabel } from "@/lib/audit/display";
 import { humanizeActivityDescription } from "@/lib/common/display-text";
 import type { AuditListItem } from "@/types/audit";
 
@@ -46,7 +47,7 @@ export function AuditTimeline({ items }: { items: AuditListItem[] }) {
               </div>
             </div>
             <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
-              <span>Record: {item.recordId}</span>
+              <span>Record: {formatAuditRecordLabel(item)}</span>
               {item.ipAddress ? <span>IP: {item.ipAddress}</span> : null}
               {item.browser ? <span>{item.browser}</span> : null}
             </div>

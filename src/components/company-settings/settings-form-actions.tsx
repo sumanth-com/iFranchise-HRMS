@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 
 import { Button } from "@/components/common/button";
 import { StickyPageActions } from "@/components/common/sticky-layout";
+import { cn } from "@/lib/utils";
 
 type SettingsFormActionsProps = {
   canEdit: boolean;
@@ -58,11 +59,11 @@ export function SettingsSectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-xl border bg-card p-5 shadow-sm">
+    <section className="rounded-xl border bg-card p-4 shadow-sm md:p-5">
       <div className="mb-4">
-        <h2 className="text-sm font-medium">{title}</h2>
+        <h2 className="text-sm font-semibold tracking-tight">{title}</h2>
         {description ? (
-          <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
         ) : null}
       </div>
       {children}
@@ -73,17 +74,24 @@ export function SettingsSectionCard({
 export function SettingsToggle({
   label,
   disabled,
+  className,
   ...props
-}: { label: string; disabled?: boolean } & React.InputHTMLAttributes<HTMLInputElement>) {
+}: { label: string; disabled?: boolean; className?: string } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
-    <label className="flex items-center gap-3 rounded-lg border px-4 py-3 text-sm">
+    <label
+      className={cn(
+        "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm transition-colors hover:bg-muted/40",
+        disabled && "cursor-not-allowed opacity-60",
+        className,
+      )}
+    >
       <input
         type="checkbox"
-        className="size-4 rounded border-input"
+        className="size-4 shrink-0 rounded border-input accent-primary"
         disabled={disabled}
         {...props}
       />
-      <span>{label}</span>
+      <span className="leading-snug">{label}</span>
     </label>
   );
 }
@@ -96,7 +104,7 @@ export function SettingsField({
   children: ReactNode;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       <label className="text-sm font-medium leading-none">{label}</label>
       {children}
     </div>

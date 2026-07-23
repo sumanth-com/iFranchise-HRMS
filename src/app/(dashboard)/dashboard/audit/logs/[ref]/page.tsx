@@ -1,26 +1,32 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { AuditDetailView } from "@/components/audit/audit-detail-view";
 import { logAuditViewAction } from "@/lib/audit/actions";
 import { AUDIT_ROUTES, AUDIT_VIEW_PERMISSIONS } from "@/lib/audit/constants";
+import { buildAuditLogRef, isAuditUuid } from "@/lib/audit/display";
 import { getAuditLogDetail } from "@/lib/audit/services/audit-queries";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
 type Props = {
-  params: Promise<{ id: string }>;
+  params: Promise<{ ref: string }>;
 };
 
 export default async function AuditDetailPage({ params }: Props) {
   const profile = await requireServerAnyPermission([...AUDIT_VIEW_PERMISSIONS]);
   const supabase = await createClient();
-  const { id } = await params;
-  const detail = await getAuditLogDetail(supabase, profile, id);
+  const { ref } = await params;
+  const detail = await getAuditLogDetail(supabase, profile, ref);
 
   if (!detail) notFound();
 
-  await logAuditViewAction(id);
+  const shortRef = buildAuditLogRef(detail.id);
+  if (isAuditUuid(ref) && ref !== shortRef) {
+    redirect(AUDIT_ROUTES.detail(detail.id));
+  }
+
+  await logAuditViewAction(detail.id);
 
   return (
     <div className="space-y-6 p-6">

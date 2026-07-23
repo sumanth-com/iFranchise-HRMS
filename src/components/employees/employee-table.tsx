@@ -7,7 +7,6 @@ import { toast } from "sonner";
 
 import { Button, buttonVariants } from "@/components/common/button";
 import { Input } from "@/components/common/input";
-import { Modal } from "@/components/common/modal";
 import {
   Select,
   SelectContent,
@@ -16,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/common/select";
 import { EmployeeCardsGrid } from "@/components/employees/employee-cards-grid";
+import { EmployeeDeleteConfirmDialog } from "@/components/employees/employee-delete-confirm-dialog";
 import { deleteEmployeeAction, fetchEmployeesAction } from "@/lib/employees/actions";
 import {
   EMPLOYEE_ACCOUNT_STATUS_LABELS,
@@ -168,7 +168,9 @@ export function EmployeeTable({
         return;
       }
 
-      toast.success("Employee deleted successfully");
+      toast.success(
+        `${result.data.fullName} (${result.data.employeeCode}) was permanently removed.`,
+      );
       setDeleteTarget(null);
 
       const refreshResult = await fetchEmployeesAction(filters);
@@ -317,28 +319,13 @@ export function EmployeeTable({
         </div>
       </div>
 
-      <Modal
+      <EmployeeDeleteConfirmDialog
+        employee={deleteTarget}
         open={Boolean(deleteTarget)}
+        isPending={isPending}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="Delete employee"
-        description={
-          deleteTarget
-            ? `Soft delete ${deleteTarget.fullName}? This action marks the employee as terminated and removes them from active lists.`
-            : undefined
-        }
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" disabled={isPending} onClick={handleDelete}>
-              Delete
-            </Button>
-          </>
-        }
-      >
-        <span />
-      </Modal>
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

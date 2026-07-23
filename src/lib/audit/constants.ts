@@ -1,4 +1,5 @@
 import { hasAnyPermission, hasPermission } from "@/lib/permissions/utils";
+import { buildAuditLogRef } from "@/lib/audit/display";
 import type { UserProfile } from "@/types/auth";
 import type { AuditModule } from "@/types/audit";
 
@@ -7,7 +8,7 @@ export const AUDIT_ROUTES = {
   logs: "/dashboard/audit/logs",
   timeline: "/dashboard/audit/timeline",
   settings: "/dashboard/audit/settings",
-  detail: (id: string) => `/dashboard/audit/logs/${id}`,
+  detail: (id: string) => `/dashboard/audit/logs/${buildAuditLogRef(id)}`,
 } as const;
 
 export const AUDIT_SUB_NAV = [

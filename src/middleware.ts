@@ -15,6 +15,8 @@ import {
   getPortalRedirectPath,
   normalizePortalRoute,
 } from "@/lib/auth/portals";
+import { SYSTEM_ADMIN_PERMISSION } from "@/lib/system-admin/constants";
+import { isSystemAdminPath } from "@/lib/system-admin/paths";
 import { updateSession } from "@/lib/supabase/middleware";
 
 function isPublicRoute(pathname: string): boolean {
@@ -96,6 +98,13 @@ export async function middleware(request: NextRequest) {
     permissionCodes = await resolveUserPermissionCodes(supabase, user.id);
   }
   attachPermissionCache(supabaseResponse, user.id, permissionCodes);
+
+  if (isSystemAdminPath(pathname) && !permissionCodes.includes(SYSTEM_ADMIN_PERMISSION)) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = AUTH_ROUTES.unauthorized;
+    redirectUrl.search = "";
+    return NextResponse.redirect(redirectUrl);
+  }
 
   if (!canAccessPortalPath(pathname, permissionCodes)) {
     const portalRoute = await resolveUserPortalRoute(supabase, user.id);

@@ -5,7 +5,9 @@ import { revalidatePath } from "next/cache";
 import { ROLES_ROUTES } from "@/lib/roles/constants";
 import {
   assignUserRole,
+  changeEmployeeRole,
   changeUserRole,
+  cloneRole,
   deleteRole,
   removeUserRole,
   saveRole,
@@ -154,6 +156,43 @@ export async function removeUserRoleAction(
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to remove role",
+    };
+  }
+}
+
+export async function changeEmployeeRoleAction(
+  employeeId: string,
+  newRoleId: string,
+): Promise<RoleActionResult> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "permission.assign",
+      "user_role.assign",
+      "role.manage",
+    ]);
+    const supabase = await createClient();
+    await changeEmployeeRole(supabase, profile, employeeId, newRoleId);
+    revalidateRoles();
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to change employee role",
+    };
+  }
+}
+
+export async function cloneRoleAction(roleId: string): Promise<RoleActionResult<string>> {
+  try {
+    const profile = await requireServerAnyPermission(["role.create", "role.manage"]);
+    const supabase = await createClient();
+    const id = await cloneRole(supabase, profile, roleId);
+    revalidateRoles();
+    return { success: true, data: id };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to clone role",
     };
   }
 }

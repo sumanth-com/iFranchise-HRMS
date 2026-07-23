@@ -66,6 +66,7 @@ async function loadGreeting(
   return {
     employeeId: profile.employee.id,
     firstName,
+    lastName,
     fullName: fullName || firstName,
     employeeCode: employee?.employeeCode ?? profile.employee.employeeCode,
     designation: employee?.designationTitle ?? null,
@@ -109,6 +110,7 @@ export async function getEmployeeDashboardData(
     safe(() => loadGreeting(supabase, profile), {
       employeeId,
       firstName: "there",
+      lastName: "",
       fullName: "there",
       employeeCode: profile.employee.employeeCode,
       designation: null,

@@ -4,6 +4,7 @@ import type { ManagerTodayAttendance } from "@/types/manager-self-attendance";
 export type EmployeeGreeting = {
   employeeId: string;
   firstName: string;
+  lastName: string;
   fullName: string;
   employeeCode: string;
   designation: string | null;

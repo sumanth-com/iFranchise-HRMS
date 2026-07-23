@@ -6,7 +6,5 @@ import { requireServerAnyPermission } from "@/lib/permissions/server";
 export default async function AuditLayout({ children }: { children: React.ReactNode }) {
   const profile = await requireServerAnyPermission([...AUDIT_VIEW_PERMISSIONS]);
 
-  return (
-    <ModuleShell header={<AuditSubNav profile={profile} />}>{children}</ModuleShell>
-  );
+  return <ModuleShell header={<AuditSubNav profile={profile} />}>{children}</ModuleShell>;
 }

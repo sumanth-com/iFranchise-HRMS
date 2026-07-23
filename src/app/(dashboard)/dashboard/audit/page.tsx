@@ -11,13 +11,14 @@ export default async function AuditDashboardPage() {
   const stats = await getAuditDashboardStats(supabase, profile);
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Audit Trail</h1>
-        <p className="mt-0.5 text-sm text-muted-foreground">
+    <div className="flex min-h-[calc(100dvh-13.5rem)] flex-col gap-3 overflow-hidden lg:min-h-[calc(100dvh-12.5rem)]">
+      <header className="shrink-0">
+        <h1 className="text-lg font-semibold tracking-tight">Audit Trail</h1>
+        <p className="text-xs text-muted-foreground">
           Centralized audit trail for every important action across the HRMS.
         </p>
-      </div>
+      </header>
+
       <AuditSummaryCards stats={stats} />
       <AuditDashboardPanels stats={stats} />
     </div>

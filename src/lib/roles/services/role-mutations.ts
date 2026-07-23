@@ -1,4 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { syncUserAuthRoleMetadata } from "@/lib/auth/sync-user-auth-role";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import type { UserProfile } from "@/types/auth";
 import type { z } from "zod";
@@ -11,6 +12,7 @@ import {
   getRoleAncestorIds,
   getRolePermissionDetail,
 } from "@/lib/roles/services/role-queries";
+import { isSuperAdmin } from "@/lib/system-admin/is-super-admin";
 
 type RoleInput = z.infer<typeof roleFormSchema>;
 
@@ -277,6 +279,9 @@ export async function assignUserRole(
   if (!role) throw new Error("Role not found");
 
   if (role.code === "super_admin") {
+    if (!isSuperAdmin(profile)) {
+      throw new Error("Only Super Admin can assign the Super Admin role");
+    }
     await assertSuperAdminRemains(supabase, orgId, null);
   }
 
@@ -297,6 +302,7 @@ export async function assignUserRole(
       .update({ status: "active", employee_id: employee.id, ...auditFields(profile) })
       .eq("id", existing.id);
     if (error) throw new Error(error.message);
+    await syncUserAuthRoleMetadata(employee.user_id, orgId, role.code);
     return existing.id;
   }
 
@@ -316,6 +322,7 @@ export async function assignUserRole(
     .single();
 
   if (error) throw new Error(error.message);
+  await syncUserAuthRoleMetadata(employee.user_id, orgId, role.code);
   return data.id;
 }
 
@@ -351,6 +358,12 @@ export async function changeUserRole(
     .select("code, name, portal_route")
     .eq("id", newRoleId)
     .maybeSingle();
+
+  if (newRole?.code === "super_admin" && oldCode !== "super_admin") {
+    if (!isSuperAdmin(profile)) {
+      throw new Error("Only Super Admin can assign the Super Admin role");
+    }
+  }
 
   if (oldCode === "super_admin" && newRole?.code !== "super_admin") {
     await assertSuperAdminRemains(supabase, orgId, assignment.user_id);
@@ -407,6 +420,10 @@ export async function changeUserRole(
         portalRoute: newRole?.portal_route,
       },
     });
+  }
+
+  if (newRole?.code) {
+    await syncUserAuthRoleMetadata(assignment.user_id, orgId, newRole.code);
   }
 }
 
@@ -477,4 +494,113 @@ async function assertSuperAdminRemains(
   if ((count ?? 0) < 1) {
     throw new Error("At least one Super Admin must remain in the organization");
   }
+}
+
+export async function cloneRole(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  roleId: string,
+) {
+  const orgId = profile.employee.organizationId;
+
+  const { data: source } = await supabase
+    .schema("hrms")
+    .from("roles")
+    .select("id, name, code, description, parent_role_id, is_default, status")
+    .eq("id", roleId)
+    .eq("organization_id", orgId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (!source) throw new Error("Role not found");
+
+  const suffix = Date.now().toString(36);
+  const newCode = `${source.code}_copy_${suffix}`.slice(0, 64);
+  const newName = `${source.name} (Copy)`;
+
+  const { data: created, error: createError } = await supabase
+    .schema("hrms")
+    .from("roles")
+    .insert({
+      organization_id: orgId,
+      name: newName,
+      code: newCode,
+      description: source.description,
+      parent_role_id: source.parent_role_id,
+      is_default: false,
+      is_system_role: false,
+      status: source.status,
+      created_by: profile.userId,
+      updated_by: profile.userId,
+    })
+    .select("id")
+    .single();
+
+  if (createError) throw new Error(createError.message);
+
+  const { data: permissions } = await supabase
+    .schema("hrms")
+    .from("role_permissions")
+    .select("permission_id")
+    .eq("role_id", roleId)
+    .eq("status", "active")
+    .is("deleted_at", null);
+
+  if (permissions?.length) {
+    const { error: permError } = await supabase.schema("hrms").from("role_permissions").insert(
+      permissions.map((row) => ({
+        role_id: created.id,
+        permission_id: row.permission_id,
+        status: "active",
+        created_by: profile.userId,
+        updated_by: profile.userId,
+      })),
+    );
+    if (permError) throw new Error(permError.message);
+  }
+
+  return created.id;
+}
+
+export async function changeEmployeeRole(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  employeeId: string,
+  newRoleId: string,
+) {
+  const orgId = profile.employee.organizationId;
+
+  const { data: employee } = await supabase
+    .schema("hrms")
+    .from("employees")
+    .select("id, user_id")
+    .eq("id", employeeId)
+    .eq("organization_id", orgId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (!employee?.user_id) {
+    throw new Error("Employee does not have an active user account");
+  }
+
+  const { data: assignments } = await supabase
+    .schema("hrms")
+    .from("user_roles")
+    .select("id, role_id")
+    .eq("user_id", employee.user_id)
+    .eq("organization_id", orgId)
+    .eq("status", "active")
+    .is("deleted_at", null);
+
+  const activeAssignment = assignments?.[0];
+
+  if (activeAssignment) {
+    if (activeAssignment.role_id === newRoleId) {
+      return activeAssignment.id;
+    }
+    await changeUserRole(supabase, profile, activeAssignment.id, newRoleId);
+    return activeAssignment.id;
+  }
+
+  return assignUserRole(supabase, profile, { employeeId, roleId: newRoleId });
 }

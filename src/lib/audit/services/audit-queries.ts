@@ -1,6 +1,7 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
 import { getAuditModuleScope } from "@/lib/audit/constants";
+import { buildAuditLogRef, isAuditUuid } from "@/lib/audit/display";
 import { auditListParamsSchema, type AuditListParams } from "@/lib/validations/audit";
 import type {
   AuditDashboardStats,
@@ -169,12 +170,50 @@ export async function listAuditLogs(
   };
 }
 
+export async function resolveAuditLogId(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  ref: string,
+): Promise<string | null> {
+  const normalized = ref.trim().toLowerCase();
+  if (!normalized) return null;
+
+  if (isAuditUuid(normalized)) return normalized;
+
+  const prefix = normalized.includes("-") ? normalized.split("-")[0]! : normalized;
+  if (!/^[0-9a-f]{8}$/i.test(prefix)) return null;
+
+  const rangeStart = `${prefix}-0000-0000-0000-000000000000`;
+  const rangeEnd = `${prefix}-ffff-ffff-ffff-ffffffffffff`;
+
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("audit_logs")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .is("archived_at", null)
+    .gte("id", rangeStart)
+    .lte("id", rangeEnd)
+    .order("occurred_at", { ascending: false })
+    .limit(5);
+
+  if (error) throw new Error(error.message);
+  if (!data?.length) return null;
+
+  const exact = data.find((row) => buildAuditLogRef(row.id as string) === normalized);
+  return (exact?.id as string | undefined) ?? (data[0].id as string);
+}
+
 export async function getAuditLogDetail(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
-  id: string,
+  ref: string,
 ): Promise<AuditDetail | null> {
   const organizationId = profile.employee.organizationId;
+  const id = await resolveAuditLogId(supabase, organizationId, ref);
+  if (!id) return null;
+
   const scope = getAuditModuleScope(profile);
 
   let query = supabase

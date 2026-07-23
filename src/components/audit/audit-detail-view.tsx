@@ -5,23 +5,45 @@ import {
   AuditStatusBadge,
 } from "@/components/audit/audit-status-badge";
 import { formatAuditAction, formatAuditModule } from "@/lib/audit/constants";
+import {
+  formatAuditRecordLabel,
+  formatAuditTableLabel,
+  sanitizeAuditRecordData,
+} from "@/lib/audit/display";
 import { humanizeActivityDescription } from "@/lib/common/display-text";
 import type { AuditDetail } from "@/types/audit";
 
-function JsonBlock({ title, data }: { title: string; data: Record<string, unknown> | null }) {
+function AuditDataPanel({
+  title,
+  data,
+}: {
+  title: string;
+  data: Record<string, unknown> | null;
+}) {
+  const rows = sanitizeAuditRecordData(data);
+
   return (
     <div className="rounded-lg border bg-muted/30 p-4">
       <h4 className="text-sm font-semibold">{title}</h4>
-      {!data || Object.keys(data).length === 0 ? (
+      {rows.length === 0 ? (
         <p className="mt-2 text-sm text-muted-foreground">No data recorded.</p>
       ) : (
-        <pre className="mt-2 max-h-80 overflow-auto text-xs">{JSON.stringify(data, null, 2)}</pre>
+        <dl className="mt-3 space-y-2">
+          {rows.map((row) => (
+            <div key={`${title}-${row.label}`} className="grid gap-1 sm:grid-cols-[10rem_1fr]">
+              <dt className="text-xs font-medium text-muted-foreground">{row.label}</dt>
+              <dd className="text-sm">{row.value}</dd>
+            </div>
+          ))}
+        </dl>
       )}
     </div>
   );
 }
 
 export function AuditDetailView({ detail }: { detail: AuditDetail }) {
+  const recordLabel = formatAuditRecordLabel(detail);
+
   return (
     <div className="space-y-6">
       <div className="rounded-xl border bg-card p-6 shadow-sm">
@@ -63,11 +85,11 @@ export function AuditDetailView({ detail }: { detail: AuditDetail }) {
           </div>
           <div>
             <dt className="text-xs font-medium uppercase text-muted-foreground">Record</dt>
-            <dd className="mt-1 text-sm font-mono">{detail.recordId}</dd>
+            <dd className="mt-1 text-sm font-medium">{recordLabel}</dd>
           </div>
           <div>
-            <dt className="text-xs font-medium uppercase text-muted-foreground">Table</dt>
-            <dd className="mt-1 text-sm">{detail.tableName}</dd>
+            <dt className="text-xs font-medium uppercase text-muted-foreground">Source</dt>
+            <dd className="mt-1 text-sm">{formatAuditTableLabel(detail.tableName)}</dd>
           </div>
           <div>
             <dt className="text-xs font-medium uppercase text-muted-foreground">IP Address</dt>
@@ -95,8 +117,8 @@ export function AuditDetailView({ detail }: { detail: AuditDetail }) {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <JsonBlock title="Before Values" data={detail.oldRecord} />
-        <JsonBlock title="After Values" data={detail.newRecord} />
+        <AuditDataPanel title="Before Values" data={detail.oldRecord} />
+        <AuditDataPanel title="After Values" data={detail.newRecord} />
       </div>
     </div>
   );

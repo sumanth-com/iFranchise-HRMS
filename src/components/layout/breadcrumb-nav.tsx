@@ -443,6 +443,30 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
     return items;
   }
 
+  if (segments[0] === "dashboard" && segments[1] === "audit") {
+    const items: BreadcrumbItemConfig[] = [
+      { label: "Dashboard", href: "/" },
+      { label: "Audit", href: "/dashboard/audit" },
+    ];
+
+    if (segments[2] === "logs") {
+      items.push({ label: "Logs", href: "/dashboard/audit/logs" });
+      if (segments[3]) {
+        items.push({ label: "Detail", href: pathname });
+      }
+      return items;
+    }
+
+    if (segments[2]) {
+      items.push({
+        label: formatSegment(segments[2]),
+        href: pathname,
+      });
+    }
+
+    return items;
+  }
+
   return segments.map((segment, index) => ({
     label: formatSegment(segment),
     href: `/${segments.slice(0, index + 1).join("/")}`,

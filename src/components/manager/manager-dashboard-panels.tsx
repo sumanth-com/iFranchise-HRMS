@@ -322,7 +322,7 @@ export function ManagerDashboardPanels({
   selectedEmployeeId,
 }: ManagerDashboardPanelsProps) {
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-2 lg:items-stretch">
+    <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden lg:grid-cols-2 lg:items-stretch">
       <ManagerPrioritiesPanel
         actionItems={actionItems}
         focusFilter={focusFilter}

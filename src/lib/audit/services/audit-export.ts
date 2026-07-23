@@ -4,6 +4,7 @@ import {
   formatAuditAction,
   formatAuditModule,
 } from "@/lib/audit/constants";
+import { formatAuditRecordLabel } from "@/lib/audit/display";
 import { reportToCsv, reportToExcelXml } from "@/lib/reports/services/reports-utils";
 import type { AuditExportFormat } from "@/types/audit";
 
@@ -28,7 +29,7 @@ function buildAuditReport(items: AuditListItem[]): ReportResult {
     roleName: item.roleName ?? "—",
     module: formatAuditModule(item.module),
     action: formatAuditAction(item.action),
-    recordId: item.recordId,
+    recordId: formatAuditRecordLabel(item),
     description: item.description ?? "—",
     ipAddress: item.ipAddress ?? "—",
     deviceType: item.deviceType ?? "—",

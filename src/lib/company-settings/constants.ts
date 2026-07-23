@@ -11,85 +11,60 @@ export const COMPANY_SETTINGS_ROUTES = {
 export const COMPANY_SETTINGS_VIEW_PERMISSIONS = ["settings.view"] as const;
 export const COMPANY_SETTINGS_EDIT_PERMISSIONS = ["settings.edit"] as const;
 
+/** HR-facing company settings shown in the portal (platform controls live under System Administration). */
 export const COMPANY_SETTINGS_SECTIONS: {
   id: CompanySettingsSection;
   title: string;
   description: string;
-  group: "organization" | "hr" | "platform";
 }[] = [
   {
     id: "profile",
     title: "Company Profile",
-    description: "Legal name, registration, fiscal year, timezone, and contact details.",
-    group: "organization",
+    description: "Legal name, registration, addresses, timezone, and regional defaults.",
   },
   {
     id: "branding",
     title: "Branding",
-    description: "Portal colors, login screen copy, logos, and employee-facing identity.",
-    group: "organization",
+    description: "Portal colors, login screen copy, and employee-facing identity.",
   },
   {
     id: "working",
     title: "Work & Attendance",
     description: "Office hours, working days, grace time, weekends, and default shifts.",
-    group: "hr",
   },
   {
     id: "leave",
     title: "Leave Policies",
     description: "Leave year, approvals, half-day rules, carry forward, and encashment.",
-    group: "hr",
   },
   {
     id: "payroll",
     title: "Payroll",
     description: "Pay cycles, statutory defaults, approval workflow, and payslip rules.",
-    group: "hr",
   },
   {
     id: "recruitment",
     title: "Hiring",
     description: "Job numbering, interview defaults, offer rules, and hiring sources.",
-    group: "hr",
   },
   {
     id: "performance",
     title: "Performance",
     description: "Review cycles, goal categories, rating scales, and calibration rules.",
-    group: "hr",
   },
   {
     id: "notifications",
     title: "Notifications",
-    description: "Email and in-app delivery, reminders, and digest schedules.",
-    group: "platform",
-  },
-  {
-    id: "security",
-    title: "Security",
-    description: "Password policy, session timeout, lockouts, and MFA readiness.",
-    group: "platform",
-  },
-  {
-    id: "integrations",
-    title: "Integrations",
-    description: "SMTP, calendars, storage, webhooks, and API access.",
-    group: "platform",
-  },
-  {
-    id: "backup",
-    title: "Backup & Maintenance",
-    description: "Backup frequency, maintenance mode, and audit log retention.",
-    group: "platform",
+    description: "Organization-wide email and in-app delivery defaults.",
   },
 ];
 
-export const COMPANY_SETTINGS_GROUPS = [
-  { id: "organization" as const, label: "Organization" },
-  { id: "hr" as const, label: "HR policies" },
-  { id: "platform" as const, label: "Platform" },
-];
+/** Legacy section slugs removed from the HR settings UI. */
+export const DEPRECATED_COMPANY_SETTINGS_SECTIONS = [
+  "security",
+  "integrations",
+  "backup",
+] as const;
 
 export const MODULE_SETTINGS_REDIRECTS: Record<string, CompanySettingsSection> = {
   "/dashboard/payroll-management/settings": "payroll",
@@ -103,6 +78,10 @@ export const MODULE_SETTINGS_REDIRECTS: Record<string, CompanySettingsSection> =
   "/dashboard/documents-management/settings": "profile",
   "/dashboard/reports/settings": "profile",
 };
+
+export function isCompanySettingsSection(value: string | undefined): value is CompanySettingsSection {
+  return COMPANY_SETTINGS_SECTIONS.some((section) => section.id === value);
+}
 
 export function canViewCompanySettings(permissionCodes: string[]) {
   return hasPermission(permissionCodes, "settings.view");

@@ -27,7 +27,7 @@ export const inviteExecutiveUserSchema = z.object({
     .trim()
     .min(2, "Full name must be at least 2 characters")
     .max(100, "Full name must be 100 characters or fewer"),
-  email: z.string().trim().toLowerCase().email("Enter a valid company email"),
+  email: z.string().trim().toLowerCase().email("Enter a valid email address"),
   roleCode: z.string().trim().min(1, "Select a role"),
   departmentId: z.string().uuid("Select a department"),
   designation: z
@@ -36,7 +36,6 @@ export const inviteExecutiveUserSchema = z.object({
     .min(1, "Designation is required")
     .max(120, "Designation must be 120 characters or fewer"),
   branchId: z.string().uuid("Select a branch"),
-  reportingToId: z.string().uuid("Select a reporting manager"),
   employmentTypeId: z.string().uuid("Select an employment type"),
   notes: z.string().trim().max(1000).optional(),
 });

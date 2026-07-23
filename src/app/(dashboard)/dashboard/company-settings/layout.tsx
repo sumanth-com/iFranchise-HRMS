@@ -14,12 +14,12 @@ export default async function CompanySettingsLayout({
   return (
     <ModuleShell
       header={
-        <Suspense fallback={<div className="h-24 animate-pulse rounded-lg bg-muted" />}>
+        <Suspense fallback={<div className="h-10 animate-pulse rounded-lg bg-muted" />}>
           <CompanySettingsNav />
         </Suspense>
       }
     >
-      <div className="lg:pl-0">{children}</div>
+      {children}
     </ModuleShell>
   );
 }
