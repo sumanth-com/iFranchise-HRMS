@@ -165,6 +165,7 @@ export async function saveNotificationPreferencesAction(
 
 export async function previewNotificationTemplateAction(input: unknown) {
   try {
+    await requireServerAnyPermission([...NOTIFICATION_MANAGE_PERMISSIONS]);
     const parsed = notificationPreviewSchema.parse(input);
     return {
       success: true as const,

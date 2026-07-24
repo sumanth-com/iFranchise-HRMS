@@ -22,17 +22,19 @@ export async function processDuePayslipPublications(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   appOrigin: string,
+  organizationId?: string,
 ): Promise<PayslipPublicationResult> {
   const now = new Date().toISOString();
-  const organizationId = profile.employee.organizationId;
+  const scopedOrganizationId = organizationId ?? profile.employee.organizationId;
 
   const { data: dueRows, error } = await supabase
     .schema("hrms")
     .from("payslips")
-    .select("id, employee_id, payslip_number, published_at, email_sent_at")
+    .select("id, employee_id, payslip_number, published_at, email_sent_at, payrolls!inner(organization_id)")
     .is("deleted_at", null)
     .is("email_sent_at", null)
-    .lte("published_at", now);
+    .lte("published_at", now)
+    .eq("payrolls.organization_id", scopedOrganizationId);
 
   if (error) throw new Error(error.message);
 
@@ -63,7 +65,7 @@ export async function processDuePayslipPublications(
       const emailResult = await sendPayslipReadyEmail(payslip, appOrigin);
 
       await notifyEmployee(supabase, {
-        organizationId,
+        organizationId: scopedOrganizationId,
         employeeId: payslip.employee.id,
         title: "Payslip available",
         message: `Your payslip for ${monthLabel} (${payslip.payslipNumber}) is ready to download.`,

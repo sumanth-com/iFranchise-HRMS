@@ -23,6 +23,7 @@ import {
   updateAssetSettings,
 } from "@/lib/assets/services/asset-settings";
 import { requireServerAnyPermission, requireServerPermission } from "@/lib/permissions/server";
+import { assertOrganizationStoragePath } from "@/lib/security/storage-path";
 import { createClient } from "@/lib/supabase/server";
 import {
   assetFormSchema,
@@ -264,7 +265,8 @@ export async function getAssetQrAction(payload: string) {
 
 export async function getAssetImageUrlAction(path: string) {
   try {
-    await requireServerPermission("asset.view");
+    const profile = await requireServerPermission("asset.view");
+    assertOrganizationStoragePath(path, profile.employee.organizationId);
     const supabase = await createClient();
     const url = await createSignedAssetImageUrl(supabase, path);
     if (!url) return { success: false as const, message: "Unable to open image" };

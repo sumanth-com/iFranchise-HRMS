@@ -14,10 +14,14 @@ const TOKEN_COLUMNS =
   "id, organization_id, request_type, source_module, source_record_id, approval_record_id, approver_employee_id, approver_user_id, role_code, token_hash, expires_at, consumed_at, consumed_action, status, deleted_at";
 
 function hmacSecret(): string {
-  // Prefer a dedicated secret; fall back to the service-role key which is
-  // always present server-side. Either way the raw token is 256-bit random,
-  // so links cannot be guessed, and only the HMAC is ever persisted.
-  return process.env.APPROVAL_TOKEN_SECRET || getSupabaseServiceRoleKey();
+  const secret = process.env.APPROVAL_TOKEN_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("APPROVAL_TOKEN_SECRET is required in production");
+    }
+    return getSupabaseServiceRoleKey();
+  }
+  return secret;
 }
 
 export function hashApprovalToken(rawToken: string): string {

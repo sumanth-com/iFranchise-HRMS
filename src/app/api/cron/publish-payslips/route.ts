@@ -1,61 +1,67 @@
 import { NextResponse } from "next/server";
 
 import { processDuePayslipPublications } from "@/lib/payroll/services/payslip-publication-worker";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { siteConfig } from "@/config/site";
 
 export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    return NextResponse.json({ message: "Cron is not configured" }, { status: 503 });
+  }
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  const authHeader = request.headers.get("authorization");
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user && !cronSecret) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
-
-    const { data: employee } = await supabase
+    const admin = createAdminClient();
+    const { data: organizations, error } = await admin
       .schema("hrms")
-      .from("employees")
-      .select("id, organization_id, user_id")
-      .eq("user_id", user?.id ?? "")
-      .is("deleted_at", null)
-      .maybeSingle();
+      .from("organizations")
+      .select("id")
+      .is("deleted_at", null);
 
-    if (!employee && cronSecret) {
-      return NextResponse.json(
-        { message: "Cron requires service role or authenticated HR user" },
-        { status: 401 },
-      );
+    if (error) {
+      return NextResponse.json({ message: "Failed to load organizations" }, { status: 500 });
     }
 
-    const origin = new URL(request.url).origin;
-    const profile = {
-      userId: user?.id ?? "system",
-      employee: {
-        id: employee?.id ?? "",
-        organizationId: employee?.organization_id ?? "",
-      },
-      permissionCodes: ["payroll.view", "payslip.generate"],
-    } as const;
+    const origin = new URL(request.url).origin || siteConfig.url;
+    let processed = 0;
+    let emailed = 0;
+    let skipped = 0;
 
-    const result = await processDuePayslipPublications(
-      supabase,
-      profile as never,
-      origin || siteConfig.url,
-    );
+    for (const organization of organizations ?? []) {
+      const profile = {
+        userId: "system-cron",
+        email: "system-cron@internal",
+        employee: {
+          id: "",
+          organizationId: organization.id,
+          firstName: "System",
+          lastName: "Cron",
+        },
+        roles: [],
+        permissionCodes: ["payroll.view", "payslip.generate"],
+      } as const;
 
-    return NextResponse.json({ success: true, ...result });
+      const result = await processDuePayslipPublications(
+        admin,
+        profile as never,
+        origin,
+        organization.id,
+      );
+      processed += result.processed;
+      emailed += result.emailed;
+      skipped += result.skipped;
+    }
+
+    return NextResponse.json({ success: true, processed, emailed, skipped });
   } catch (error) {
-    console.error("[cron/publish-payslips]", error);
+    if (process.env.NODE_ENV === "development") {
+      console.error("[cron/publish-payslips]", error);
+    }
     return NextResponse.json({ message: "Publication job failed" }, { status: 500 });
   }
 }

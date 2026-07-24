@@ -15,8 +15,10 @@ import {
 import { loadUserProfile } from "@/lib/auth/profile-loader";
 import { getAuthenticatedRedirectPath } from "@/lib/auth/redirect";
 import { resolveApprovedLoginEmail } from "@/lib/auth/login-email";
+import { clearPermissionCacheCookie } from "@/lib/auth/permission-cache";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
+import { assertRateLimit } from "@/lib/security/rate-limit";
 import { recordEmployeeSuccessfulLogin, acceptInvitationOnPasswordSet } from "@/lib/employees/services/employee-account";
 import { sendBirthdayRemindersOnLogin } from "@/lib/employee/services/birthday-reminder-notifications";
 import { resolveUserPortalRoute } from "@/lib/auth/permission-resolver";
@@ -62,6 +64,22 @@ export async function loginAction(
 
     const { email: rawEmail, password, rememberMe } = parsed.data;
     const email = await resolveApprovedLoginEmail(rawEmail);
+    const ctx = await getRequestAuditContext();
+
+    try {
+      assertRateLimit({
+        key: `login:${ctx.ipAddress ?? "unknown"}:${email.toLowerCase()}`,
+        limit: 5,
+        windowMs: 15 * 60 * 1000,
+      });
+    } catch {
+      return {
+        success: false,
+        error: "RATE_LIMITED",
+        message: getAuthErrorMessage("RATE_LIMITED"),
+      };
+    }
+
     const supabase = await createClient();
 
     const { data: authData, error: authError } =
@@ -72,7 +90,6 @@ export async function loginAction(
 
     if (authError || !authData.user) {
       const mappedError = mapSupabaseAuthError(authError?.message ?? "");
-      const ctx = await getRequestAuditContext();
       await writeApplicationAudit(supabase, {
         organizationId: null,
         module: "dashboard",
@@ -124,8 +141,6 @@ export async function loginAction(
     } catch (birthdayReminderError) {
       console.error("[loginAction] Failed to send birthday reminders:", birthdayReminderError);
     }
-
-    const ctx = await getRequestAuditContext();
 
     try {
       await recordUserLoginSession(supabase, {
@@ -199,6 +214,7 @@ export async function logoutAction(): Promise<void> {
   }
 
   await supabase.auth.signOut();
+  await clearPermissionCacheCookie();
   redirect(`${AUTH_ROUTES.login}?signedOut=1`);
 }
 
@@ -218,9 +234,24 @@ export async function forgotPasswordAction(
   }
 
   const email = await resolveApprovedLoginEmail(parsed.data.email);
+  const ctx = await getRequestAuditContext();
+
+  try {
+    assertRateLimit({
+      key: `forgot-password:${ctx.ipAddress ?? "unknown"}:${email.toLowerCase()}`,
+      limit: 3,
+      windowMs: 60 * 60 * 1000,
+    });
+  } catch {
+    return {
+      success: false,
+      error: "RATE_LIMITED",
+      message: getAuthErrorMessage("RATE_LIMITED"),
+    };
+  }
+
   const supabase = await createClient();
 
-  const ctx = await getRequestAuditContext();
   await writeApplicationAudit(supabase, {
     organizationId: null,
     module: "dashboard",

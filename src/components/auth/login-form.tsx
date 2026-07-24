@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { loginAction } from "@/lib/auth/actions";
 import { AUTH_ROUTES } from "@/lib/auth/constants";
 import { getAuthErrorMessage } from "@/lib/auth/errors";
+import { getSafeRedirectPath } from "@/lib/security/safe-redirect";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import type { AuthErrorCode } from "@/types/auth";
@@ -160,10 +161,9 @@ export function LoginForm() {
         }
 
         const requestedRedirect = searchParams.get("redirectTo");
-        const redirectTo =
-          requestedRedirect && requestedRedirect !== "/"
-            ? requestedRedirect
-            : result.redirectTo;
+        const redirectTo = requestedRedirect
+          ? getSafeRedirectPath(requestedRedirect, result.redirectTo)
+          : result.redirectTo;
 
         toast.success("Signed in successfully");
         router.push(redirectTo);

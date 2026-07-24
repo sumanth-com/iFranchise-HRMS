@@ -484,8 +484,8 @@ export async function savePayrollSettingsAction(
       "payroll.approve",
     ]);
     const supabase = await getAuthenticatedSupabase();
-    payrollSettingsSchema.parse(input);
-    const data = await savePayrollSettings(supabase, profile, input);
+    const parsed = payrollSettingsSchema.parse(input);
+    const data = await savePayrollSettings(supabase, profile, parsed);
     revalidatePath(PAYROLL_ROUTES.settings);
     revalidatePath("/dashboard/company-settings");
     return { success: true, data };

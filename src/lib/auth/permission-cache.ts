@@ -1,5 +1,7 @@
 import type { NextRequest, NextResponse } from "next/server";
 
+import { signPayload, verifySignedPayload } from "@/lib/security/hmac";
+
 const COOKIE_NAME = "hrms_permissions";
 const TTL_SECONDS = 5 * 60;
 
@@ -9,42 +11,80 @@ type PermissionCachePayload = {
   expiresAt: number;
 };
 
-export function getCachedPermissionCodes(
-  request: NextRequest,
-  userId: string,
-): string[] | null {
-  const value = request.cookies.get(COOKIE_NAME)?.value;
-  if (!value) return null;
+async function serializeSignedPayload(payload: PermissionCachePayload): Promise<string> {
+  const body = JSON.stringify(payload);
+  return `${await signPayload(body)}.${body}`;
+}
+
+async function parseSignedPayload(value: string): Promise<PermissionCachePayload | null> {
+  const separator = value.indexOf(".");
+  if (separator <= 0) return null;
+
+  const signature = value.slice(0, separator);
+  const body = value.slice(separator + 1);
+  if (!(await verifySignedPayload(body, signature))) return null;
 
   try {
-    const payload = JSON.parse(value) as PermissionCachePayload;
-    if (payload.userId !== userId) return null;
-    if (payload.expiresAt <= Date.now()) return null;
-    return payload.codes;
+    return JSON.parse(body) as PermissionCachePayload;
   } catch {
     return null;
   }
 }
 
-export function attachPermissionCache(
+export async function getCachedPermissionCodes(
+  request: NextRequest,
+  userId: string,
+): Promise<string[] | null> {
+  const value = request.cookies.get(COOKIE_NAME)?.value;
+  if (!value) return null;
+
+  const payload = await parseSignedPayload(value);
+  if (!payload) return null;
+  if (payload.userId !== userId) return null;
+  if (payload.expiresAt <= Date.now()) return null;
+  return payload.codes;
+}
+
+export async function attachPermissionCache(
   response: NextResponse,
   userId: string,
   codes: string[],
-): void {
+): Promise<void> {
   const payload: PermissionCachePayload = {
     userId,
     codes,
     expiresAt: Date.now() + TTL_SECONDS * 1000,
   };
 
-  response.cookies.set(COOKIE_NAME, JSON.stringify(payload), {
+  response.cookies.set(COOKIE_NAME, await serializeSignedPayload(payload), {
     httpOnly: true,
     sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: TTL_SECONDS,
   });
 }
 
 export function clearPermissionCache(response: NextResponse): void {
-  response.cookies.delete(COOKIE_NAME);
+  response.cookies.set(COOKIE_NAME, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0,
+  });
 }
+
+export async function clearPermissionCacheCookie(): Promise<void> {
+  const { cookies } = await import("next/headers");
+  const cookieStore = await cookies();
+  cookieStore.set(COOKIE_NAME, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0,
+  });
+}
+
+export const PERMISSION_CACHE_COOKIE_NAME = COOKIE_NAME;

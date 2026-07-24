@@ -3,6 +3,7 @@ import type { EmailOtpType } from "@supabase/supabase-js";
 
 import { AUTH_ROUTES } from "@/lib/auth/constants";
 import { validateInvitationForUser } from "@/lib/employees/services/employee-account";
+import { getSafeRedirectPath } from "@/lib/security/safe-redirect";
 import { createClient } from "@/lib/supabase/server";
 
 function buildAuthErrorRedirect(
@@ -10,7 +11,11 @@ function buildAuthErrorRedirect(
   next: string,
   reason: "expired" | "invalid",
 ) {
-  if (next === AUTH_ROUTES.resetPassword || next.startsWith(`${AUTH_ROUTES.resetPassword}?`)) {
+  const safeNext = getSafeRedirectPath(next, AUTH_ROUTES.dashboard);
+  if (
+    safeNext === AUTH_ROUTES.resetPassword ||
+    safeNext.startsWith(`${AUTH_ROUTES.resetPassword}?`)
+  ) {
     const redirectUrl = new URL(AUTH_ROUTES.resetPassword, origin);
     redirectUrl.searchParams.set("error", reason);
     return NextResponse.redirect(redirectUrl);
@@ -26,7 +31,7 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type");
-  const next = searchParams.get("next") ?? AUTH_ROUTES.dashboard;
+  const next = getSafeRedirectPath(searchParams.get("next"), AUTH_ROUTES.dashboard);
   let email: string | null = null;
 
   const supabase = await createClient();
@@ -63,6 +68,13 @@ export async function GET(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
     email = user?.email ?? null;
+
+    if (user && type === "invite" && email) {
+      const validation = await validateInvitationForUser(supabase, user.id, email);
+      if (!validation.valid) {
+        return buildAuthErrorRedirect(origin, next, validation.reason);
+      }
+    }
   }
 
   const redirectUrl = new URL(next, origin);

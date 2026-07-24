@@ -70,6 +70,7 @@ import { z } from "zod";
 import { permanentlyDeleteEmployee } from "@/lib/employees/services/employee-permanent-delete";
 import { loadInviteableRoles, getInviteableRoleByCode } from "@/lib/auth/iam-roles";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { assertOrganizationStoragePath } from "@/lib/security/storage-path";
 import {
   employeeInviteSchema,
   employeeSelfProfileSchema,
@@ -532,7 +533,8 @@ export async function getSignedUrlAction(
   path: string,
 ): Promise<EmployeeActionResult<string>> {
   try {
-    await requireServerPermission("employee.view");
+    const profile = await requireServerPermission("employee.view");
+    assertOrganizationStoragePath(path, profile.employee.organizationId);
     const supabase = await getAuthenticatedSupabase();
     const bucketName = EMPLOYEE_STORAGE_BUCKETS[bucket];
     const signedUrl = await createSignedStorageUrl(supabase, bucketName, path);

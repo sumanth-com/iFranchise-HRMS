@@ -93,11 +93,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  let permissionCodes = getCachedPermissionCodes(request, user.id);
+  let permissionCodes = await getCachedPermissionCodes(request, user.id);
   if (!permissionCodes) {
     permissionCodes = await resolveUserPermissionCodes(supabase, user.id);
   }
-  attachPermissionCache(supabaseResponse, user.id, permissionCodes);
+  await attachPermissionCache(supabaseResponse, user.id, permissionCodes);
 
   if (isSystemAdminPath(pathname) && !permissionCodes.includes(SYSTEM_ADMIN_PERMISSION)) {
     const redirectUrl = request.nextUrl.clone();
