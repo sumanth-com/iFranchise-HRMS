@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/common/button";
-import { PORTAL_SWITCH_LINKS } from "@/lib/system-admin/constants";
+import { PORTAL_SWITCH_LINKS, getPortalSwitchLabel } from "@/lib/system-admin/constants";
 import { hasPermission } from "@/lib/permissions/utils";
 import { useAuth } from "@/providers/auth-provider";
 import { cn } from "@/lib/utils";
@@ -35,6 +35,10 @@ export function PortalSwitcher() {
       (portal) => pathname === portal.href || pathname.startsWith(`${portal.href}/`),
     ) ?? availablePortals[0];
 
+  const activePortalLabel = activePortal
+    ? getPortalSwitchLabel(activePortal.portal, activePortal.label, isSuperAdmin)
+    : "Portals";
+
   return (
     <div className="relative">
       <Button
@@ -46,7 +50,7 @@ export function PortalSwitcher() {
         aria-haspopup="listbox"
       >
         <LayoutGrid className="size-4" />
-        <span className="hidden sm:inline">{activePortal?.label ?? "Portals"}</span>
+        <span className="hidden sm:inline">{activePortalLabel}</span>
         <ChevronDown className={cn("size-4 transition-transform", open && "rotate-180")} />
       </Button>
       {open ? (
@@ -71,7 +75,7 @@ export function PortalSwitcher() {
                     : "",
                 )}
               >
-                {portal.label}
+                {getPortalSwitchLabel(portal.portal, portal.label, isSuperAdmin)}
               </Link>
             ))}
           </div>
