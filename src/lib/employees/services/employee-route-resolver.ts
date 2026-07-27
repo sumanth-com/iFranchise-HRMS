@@ -64,3 +64,59 @@ export async function resolveEmployeeFromRouteRef(
 
   return null;
 }
+
+/** Resolve an employee route ref without scoping to an organization (public QR scans). */
+export async function resolveEmployeeFromRouteRefGlobal(
+  supabase: AuthSupabaseClient,
+  routeRef: string,
+): Promise<(ResolvedEmployeeRoute & { organizationId: string }) | null> {
+  if (isEmployeeUuid(routeRef)) {
+    const { data, error } = await supabase
+      .schema("hrms")
+      .from("employees")
+      .select("id, employee_code, first_name, last_name, organization_id")
+      .eq("id", routeRef)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return {
+      id: data.id,
+      employeeCode: data.employee_code,
+      firstName: data.first_name,
+      lastName: data.last_name,
+      organizationId: data.organization_id as string,
+    };
+  }
+
+  const candidates = buildEmployeeCodeCandidates(routeRef);
+
+  for (const employeeCode of candidates) {
+    const { data, error } = await supabase
+      .schema("hrms")
+      .from("employees")
+      .select("id, employee_code, first_name, last_name, organization_id")
+      .eq("employee_code", employeeCode)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (data) {
+      return {
+        id: data.id,
+        employeeCode: data.employee_code,
+        firstName: data.first_name,
+        lastName: data.last_name,
+        organizationId: data.organization_id as string,
+      };
+    }
+  }
+
+  return null;
+}

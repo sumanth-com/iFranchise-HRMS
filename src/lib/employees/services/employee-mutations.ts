@@ -1,7 +1,12 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
 import type { EmployeeUpdateInput, EmployeeWizardInputValidated } from "@/lib/validations/employee";
-import { EMPLOYEE_STORAGE_BUCKETS, DESIGNATION_OTHER_VALUE, PROFILE_IMAGE_MAX_BYTES } from "@/lib/employees/constants";
+import {
+  EMPLOYEE_STORAGE_BUCKETS,
+  DESIGNATION_OTHER_VALUE,
+  DOCUMENT_MAX_BYTES,
+  PROFILE_IMAGE_MAX_BYTES,
+} from "@/lib/employees/constants";
 
 function emptyToNull(value?: string | null) {
   return value && value.trim().length > 0 ? value : null;
@@ -303,6 +308,10 @@ export async function uploadEmployeeDocument(
   employeeId: string,
   file: File,
 ): Promise<{ storagePath: string; fileName: string; mimeType: string; fileSizeBytes: number }> {
+  if (file.size > DOCUMENT_MAX_BYTES) {
+    throw new Error("Document must be 30 MB or smaller");
+  }
+
   const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
   const storagePath = `${organizationId}/${employeeId}/${crypto.randomUUID()}-${sanitizedName}`;
 

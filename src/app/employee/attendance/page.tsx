@@ -1,4 +1,7 @@
+import { Suspense } from "react";
+
 import { EmployeeAttendanceView } from "@/components/employee/attendance/employee-attendance-view";
+import { ModulePageSkeleton } from "@/components/layout/module-page-skeleton";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { getManagerProfilePageData } from "@/lib/manager/services/manager-self-attendance-service";
@@ -10,7 +13,11 @@ type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function EmployeeAttendancePage({ searchParams }: PageProps) {
+async function EmployeeAttendanceContent({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const profile = await requireServerAnyPermission([
     PORTAL_PERMISSIONS.employee,
     "attendance.view",
@@ -36,5 +43,13 @@ export default async function EmployeeAttendancePage({ searchParams }: PageProps
       searchDate={params.searchDate}
       policyHref={EMPLOYEE_ROUTES.attendancePolicy}
     />
+  );
+}
+
+export default function EmployeeAttendancePage({ searchParams }: PageProps) {
+  return (
+    <Suspense fallback={<ModulePageSkeleton />}>
+      <EmployeeAttendanceContent searchParams={searchParams} />
+    </Suspense>
   );
 }

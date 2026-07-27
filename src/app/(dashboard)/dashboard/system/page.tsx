@@ -1,4 +1,4 @@
-import { SystemDashboard } from "@/components/system-admin/system-dashboard";
+import { SystemDashboardLive } from "@/components/system-admin/system-admin-modules";
 import { requireSuperAdminProfile } from "@/lib/system-admin/guards";
 import { getSystemDashboardStats } from "@/lib/system-admin/queries";
 import { createClient } from "@/lib/supabase/server";
@@ -9,14 +9,8 @@ export default async function SystemAdminDashboardPage() {
   const stats = await getSystemDashboardStats(supabase, profile.employee.organizationId);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">System Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Organization-wide health, security, and operational metrics. Super Admin only.
-        </p>
-      </div>
-      <SystemDashboard stats={stats} />
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <SystemDashboardLive initialStats={stats} />
     </div>
   );
 }

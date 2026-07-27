@@ -44,6 +44,10 @@ const nextConfig: NextConfig = {
       dynamic: 30,
       static: 180,
     },
+    // Profile images up to 10 MB; documents up to 30 MB via Server Actions.
+    serverActions: {
+      bodySizeLimit: "32mb",
+    },
   },
   async headers() {
     return [

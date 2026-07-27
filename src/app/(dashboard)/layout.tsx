@@ -1,40 +1,11 @@
 import { type ReactNode } from "react";
-import { redirect } from "next/navigation";
 
-import { DashboardShell } from "@/components/layout/dashboard-shell";
-import { AUTH_ROUTES } from "@/lib/auth/constants";
-import { loadUserProfile } from "@/lib/auth/profile-loader";
-import { AuthProvider } from "@/providers/auth-provider";
-import { createClient } from "@/lib/supabase/server";
+import { PortalShellLayout } from "@/components/layout/portalshell-layout";
 
 type DashboardGroupLayoutProps = {
   children: ReactNode;
 };
 
-export default async function DashboardGroupLayout({
-  children,
-}: DashboardGroupLayoutProps) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user?.email) {
-    redirect(AUTH_ROUTES.login);
-  }
-
-  const profileResult = await loadUserProfile(user.id, user.email, supabase);
-
-  if (!profileResult.success) {
-    await supabase.auth.signOut();
-    redirect(`${AUTH_ROUTES.login}?error=${profileResult.error}`);
-  }
-
-  return (
-    <AuthProvider initialProfile={profileResult.profile}>
-      <DashboardShell>{children}</DashboardShell>
-    </AuthProvider>
-  );
+export default function DashboardGroupLayout({ children }: DashboardGroupLayoutProps) {
+  return <PortalShellLayout>{children}</PortalShellLayout>;
 }

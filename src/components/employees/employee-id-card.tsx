@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
-import { ArrowLeft, ArrowRight, Camera, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Camera, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { PROFILE_IMAGE_MAX_BYTES } from "@/lib/employees/constants";
@@ -52,6 +52,7 @@ export function EmployeeIdCard({
   const [imageUrl, setImageUrl] = useState(initialUrl);
   const [isPending, startTransition] = useTransition();
   const [flipped, setFlipped] = useState(false);
+  const [photoHovered, setPhotoHovered] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
   const fullName = `${firstName} ${lastName}`.trim();
@@ -181,9 +182,11 @@ export function EmployeeIdCard({
 
             <div
               className={cn(
-                "group/photo relative min-h-0 flex-1 overflow-hidden bg-[#d9dbe1]",
+                "relative min-h-0 flex-1 overflow-hidden bg-[#d9dbe1]",
                 canEdit && "cursor-pointer",
               )}
+              onMouseEnter={() => setPhotoHovered(true)}
+              onMouseLeave={() => setPhotoHovered(false)}
               onClick={canEdit ? openPicker : undefined}
               onKeyDown={
                 canEdit
@@ -210,7 +213,7 @@ export function EmployeeIdCard({
                   <span
                     className={cn(
                       "flex size-[4.5rem] items-center justify-center rounded-full bg-white text-neutral-800 shadow-md ring-1 ring-black/5 transition",
-                      canEdit ? "group-hover/photo:scale-[1.03] group-hover/photo:shadow-lg" : "opacity-90",
+                      canEdit && photoHovered ? "scale-[1.03] shadow-lg" : "opacity-90",
                     )}
                   >
                     <Camera className="size-7" strokeWidth={1.75} />
@@ -228,8 +231,13 @@ export function EmployeeIdCard({
                 />
               ) : null}
 
-              {canEdit && imageUrl ? (
-                <div className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-center gap-2 bg-gradient-to-t from-black/45 to-transparent px-3 pb-3 pt-10 opacity-0 transition-opacity duration-200 group-hover/photo:opacity-100 group-focus-within/photo:opacity-100">
+              {canEdit ? (
+                <div
+                  className={cn(
+                    "absolute bottom-14 right-3 z-30 flex items-center gap-1.5 transition-opacity duration-200",
+                    photoHovered ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
+                  )}
+                >
                   <button
                     type="button"
                     onClick={(event) => {
@@ -237,20 +245,22 @@ export function EmployeeIdCard({
                       openPicker();
                     }}
                     disabled={isPending}
-                    className="flex size-8 items-center justify-center rounded-full bg-white text-foreground shadow-sm hover:bg-neutral-50 disabled:cursor-not-allowed"
-                    aria-label="Change profile photo"
+                    className="flex size-8 items-center justify-center rounded-full bg-white/95 text-foreground shadow-md ring-1 ring-black/5 backdrop-blur-sm hover:bg-white disabled:cursor-not-allowed"
+                    aria-label="Upload profile photo"
                   >
-                    <Camera className="size-3.5" />
+                    <Upload className="size-3.5" />
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleRemove}
-                    disabled={isPending}
-                    className="flex size-8 items-center justify-center rounded-full bg-white text-destructive shadow-sm hover:bg-neutral-50 disabled:cursor-not-allowed"
-                    aria-label="Remove profile photo"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
+                  {imageUrl ? (
+                    <button
+                      type="button"
+                      onClick={handleRemove}
+                      disabled={isPending}
+                      className="flex size-8 items-center justify-center rounded-full bg-white/95 text-destructive shadow-md ring-1 ring-black/5 backdrop-blur-sm hover:bg-white disabled:cursor-not-allowed"
+                      aria-label="Remove profile photo"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
             </div>

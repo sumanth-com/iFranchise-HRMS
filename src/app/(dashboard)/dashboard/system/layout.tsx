@@ -8,5 +8,11 @@ export default async function SystemAdminLayout({
 }) {
   await requireSuperAdminProfile();
 
-  return <PageScroll>{children}</PageScroll>;
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <PageScroll className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 md:p-5">
+        {children}
+      </PageScroll>
+    </div>
+  );
 }

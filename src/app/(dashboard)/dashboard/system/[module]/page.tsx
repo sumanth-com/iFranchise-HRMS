@@ -1,10 +1,33 @@
 import { notFound } from "next/navigation";
 
 import { SystemModuleView } from "@/components/system-admin/system-module-view";
+import {
+  ApiKeysPanel,
+  BackupPanel,
+  DatabaseHealthPanel,
+  EmailServicesPanel,
+  EnvironmentPanel,
+  FeatureFlagsPanel,
+  ImportExportPanel,
+  IntegrationsPanel,
+  LicensePanel,
+  MaintenancePanel,
+  StorageManagerPanel,
+} from "@/components/system-admin/system-admin-modules";
 import { SYSTEM_MODULE_LINKS } from "@/config/system-admin-navigation";
 import { requireSuperAdminProfile } from "@/lib/system-admin/guards";
-import { getDatabaseHealthSnapshot } from "@/lib/system-admin/queries";
-import { getSystemSettings } from "@/lib/system-admin/services/system-settings";
+import { listSystemApiKeys } from "@/lib/system-admin/services/api-keys-service";
+import { listBackupJobs } from "@/lib/system-admin/services/backup-service";
+import { getDatabaseHealthDetail } from "@/lib/system-admin/services/database-health-service";
+import { getEmailServiceSnapshot } from "@/lib/system-admin/services/email-service";
+import { getEnvironmentSnapshot } from "@/lib/system-admin/services/environment-service";
+import { listImportJobs } from "@/lib/system-admin/services/import-export-service";
+import { listSystemIntegrations } from "@/lib/system-admin/services/integrations-service";
+import {
+  getLicenseSnapshot,
+  getSystemSettings,
+} from "@/lib/system-admin/services/system-settings";
+import { listStorageBuckets } from "@/lib/system-admin/services/storage-service";
 import { createClient } from "@/lib/supabase/server";
 
 const MODULE_META: Record<string, { title: string; description: string }> = {
@@ -34,15 +57,15 @@ const MODULE_META: Record<string, { title: string; description: string }> = {
   },
   database: {
     title: "Database Health",
-    description: "Row counts and connectivity for core HRMS tables.",
+    description: "Connection, table counts, issues, and remediation.",
   },
   storage: {
     title: "Storage Manager",
-    description: "Document and profile image storage buckets.",
+    description: "Buckets, files, signed URLs, and cleanup.",
   },
   email: {
     title: "Email Services",
-    description: "Transactional email delivery and templates.",
+    description: "SMTP status, test delivery, queue, and logs.",
   },
   notifications: {
     title: "Notification Services",
@@ -50,7 +73,7 @@ const MODULE_META: Record<string, { title: string; description: string }> = {
   },
   "api-keys": {
     title: "API Keys",
-    description: "Service credentials and integration tokens.",
+    description: "Generate, rotate, and revoke API credentials.",
   },
   audit: {
     title: "Audit Center",
@@ -66,31 +89,31 @@ const MODULE_META: Record<string, { title: string; description: string }> = {
   },
   integrations: {
     title: "Integrations",
-    description: "Third-party connectors and webhooks.",
+    description: "Microsoft 365, Google, Slack, Teams, Zoom, webhooks.",
   },
   license: {
     title: "License & Subscription",
-    description: "Plan details and subscription status.",
+    description: "Plan, seats, limits, and subscription status.",
   },
   "feature-flags": {
     title: "Feature Flags",
-    description: "Toggle experimental and rollout features.",
+    description: "Rollout percentages, beta features, kill switch.",
   },
   maintenance: {
     title: "Maintenance Mode",
-    description: "Enable maintenance mode and customize the banner message.",
+    description: "Scheduled maintenance, banners, and emergency shutdown.",
   },
   backup: {
     title: "Backup & Restore",
-    description: "Database backups and disaster recovery.",
+    description: "Export, download, and restore organization data.",
   },
   "import-export": {
     title: "Import / Export",
-    description: "Bulk data import and export utilities.",
+    description: "Bulk CSV/JSON import and export with validation.",
   },
   environment: {
     title: "Environment Settings",
-    description: "Environment label and deployment configuration.",
+    description: "Deployment version, runtime, and infrastructure status.",
   },
   branding: {
     title: "Branding",
@@ -116,22 +139,131 @@ export default async function SystemModulePage({ params }: SystemModulePageProps
   const orgId = profile.employee.organizationId;
 
   const link = SYSTEM_MODULE_LINKS[module];
-  const settings =
-    module === "maintenance" || module === "feature-flags" || module === "environment" || module === "license"
-      ? await getSystemSettings(supabase, orgId)
-      : undefined;
-  const databaseHealth = module === "database" ? await getDatabaseHealthSnapshot(supabase) : undefined;
-
-  return (
-    <div className="space-y-6">
+  if (link?.targetHref) {
+    return (
       <SystemModuleView
         module={module}
         title={meta.title}
         description={meta.description}
-        targetHref={link?.targetHref}
-        settings={settings}
-        databaseHealth={databaseHealth}
+        targetHref={link.targetHref}
       />
-    </div>
+    );
+  }
+
+  if (module === "database") {
+    const data = await getDatabaseHealthDetail(supabase, orgId);
+    return (
+      <div className="h-full min-h-0 overflow-hidden">
+        <DatabaseHealthPanel initial={data} />
+      </div>
+    );
+  }
+
+  if (module === "storage") {
+    const buckets = await listStorageBuckets(orgId);
+    return (
+      <div className="h-full min-h-0 overflow-hidden">
+        <StorageManagerPanel buckets={buckets} organizationId={orgId} />
+      </div>
+    );
+  }
+
+  if (module === "email") {
+    const snapshot = await getEmailServiceSnapshot(supabase, orgId);
+    return (
+      <div className="h-full min-h-0 overflow-hidden">
+        <EmailServicesPanel snapshot={snapshot} />
+      </div>
+    );
+  }
+
+  if (module === "api-keys") {
+    const keys = await listSystemApiKeys(supabase, orgId);
+    return (
+      <div className="h-full min-h-0 overflow-hidden">
+        <ApiKeysPanel keys={keys} />
+      </div>
+    );
+  }
+
+  if (module === "integrations") {
+    const integrations = await listSystemIntegrations(supabase, orgId);
+    return (
+      <div className="h-full min-h-0 overflow-hidden">
+        <IntegrationsPanel integrations={integrations} />
+      </div>
+    );
+  }
+
+  if (module === "license") {
+    const license = await getLicenseSnapshot(supabase, orgId);
+    return (
+      <div className="h-full min-h-0 overflow-hidden">
+        <LicensePanel
+          licensePlan={license.settings.licensePlan}
+          licenseExpiresAt={license.settings.licenseExpiresAt}
+          licenseKey={license.settings.licenseKey}
+          activeUsers={license.activeUsers}
+          remainingSeats={license.remainingSeats}
+          employeeLimit={license.settings.licenseEmployeeLimit}
+          storageLimitGb={license.settings.licenseStorageLimitGb}
+          apiUsage={license.settings.apiUsageCount}
+        />
+      </div>
+    );
+  }
+
+  if (module === "feature-flags") {
+    const settings = await getSystemSettings(supabase, orgId);
+    return (
+      <div className="h-full min-h-0 overflow-hidden">
+        <FeatureFlagsPanel settings={settings} />
+      </div>
+    );
+  }
+
+  if (module === "maintenance") {
+    const settings = await getSystemSettings(supabase, orgId);
+    return (
+      <div className="h-full min-h-0 overflow-hidden">
+        <MaintenancePanel settings={settings} />
+      </div>
+    );
+  }
+
+  if (module === "backup") {
+    const jobs = await listBackupJobs(supabase, orgId);
+    return (
+      <div className="h-full min-h-0 overflow-hidden">
+        <BackupPanel jobs={jobs} />
+      </div>
+    );
+  }
+
+  if (module === "import-export") {
+    const jobs = await listImportJobs(supabase, orgId);
+    return (
+      <div className="h-full min-h-0 overflow-hidden">
+        <ImportExportPanel jobs={jobs} />
+      </div>
+    );
+  }
+
+  if (module === "environment") {
+    const settings = await getSystemSettings(supabase, orgId);
+    const env = getEnvironmentSnapshot(settings.smtpConfigured, true);
+    return (
+      <div className="h-full min-h-0 overflow-hidden">
+        <EnvironmentPanel env={env} settings={settings} />
+      </div>
+    );
+  }
+
+  return (
+    <SystemModuleView
+      module={module}
+      title={meta.title}
+      description={meta.description}
+    />
   );
 }

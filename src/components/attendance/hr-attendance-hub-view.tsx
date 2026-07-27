@@ -1,11 +1,14 @@
 "use client";
 
+import Link from "next/link";
+import { FileText } from "lucide-react";
 import { useState } from "react";
 
-import { Button } from "@/components/common/button";
+import { Button, buttonVariants } from "@/components/common/button";
 import { HrTeamAttendanceView } from "@/components/attendance/hr-team-attendance-view";
 import { EmployeeAttendanceView } from "@/components/employee/attendance/employee-attendance-view";
 import { SELF_ATTENDANCE_ROUTES, ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
+import { cn } from "@/lib/utils";
 import type { AttendanceStatus } from "@/types/attendance";
 import type { AttendanceListItem, AttendanceSummary } from "@/types/attendance";
 import type { LookupOption } from "@/types/employee";
@@ -63,24 +66,33 @@ export function HrAttendanceHubView({
             Track your own attendance and manage workforce attendance across the organization.
           </p>
         </div>
-        {canViewTeam ? (
-          <div className="flex items-center gap-2 rounded-lg border bg-card p-1">
-            <Button
-              size="sm"
-              variant={section === "my" ? "default" : "ghost"}
-              onClick={() => setSection("my")}
-            >
-              My Attendance
-            </Button>
-            <Button
-              size="sm"
-              variant={section === "team" ? "default" : "ghost"}
-              onClick={() => setSection("team")}
-            >
-              Team Attendance
-            </Button>
-          </div>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {canViewTeam ? (
+            <div className="flex items-center gap-2 rounded-lg border bg-card p-1">
+              <Button
+                size="sm"
+                variant={section === "my" ? "default" : "ghost"}
+                onClick={() => setSection("my")}
+              >
+                My Attendance
+              </Button>
+              <Button
+                size="sm"
+                variant={section === "team" ? "default" : "ghost"}
+                onClick={() => setSection("team")}
+              >
+                Team Attendance
+              </Button>
+            </div>
+          ) : null}
+          <Link
+            href={ATTENDANCE_ROUTES.policy}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
+          >
+            <FileText className="size-4" />
+            Attendance Policy
+          </Link>
+        </div>
       </div>
 
       {section === "my" || !canViewTeam ? (
@@ -89,10 +101,10 @@ export function HrAttendanceHubView({
           status={selfAttendance.status}
           searchDate={selfAttendance.searchDate}
           basePath={SELF_ATTENDANCE_ROUTES.list}
-          policyHref={ATTENDANCE_ROUTES.policy}
           tabQuery="my"
           padded={false}
           showPageHeading={false}
+          showPolicyLink={false}
         />
       ) : (
         <HrTeamAttendanceView {...teamAttendance} embedded />

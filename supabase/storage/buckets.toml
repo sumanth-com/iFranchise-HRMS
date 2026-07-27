@@ -8,7 +8,7 @@
 #
 # Buckets:
 #   - employee-documents        (private, 50 MB, documents + images)
-#   - employee-profile-images   (private, 5 MB, images only)
+#   - employee-profile-images   (private, 10 MB, images only)
 #   - company-assets            (private, 10 MB, images + PDF + SVG)
 #
 # All authenticated access policies are intentionally denied (AND false).
@@ -22,7 +22,7 @@ file_size_limit = 52428800
 [buckets.employee-profile-images]
 id = "employee-profile-images"
 public = false
-file_size_limit = 5242880
+file_size_limit = 10485760
 
 [buckets.company-assets]
 id = "company-assets"

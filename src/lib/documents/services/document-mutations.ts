@@ -4,6 +4,7 @@ import {
   DOCUMENTS_STORAGE_BUCKET,
   LETTER_TYPE_OPTIONS,
 } from "@/lib/documents/constants";
+import { DOCUMENT_MAX_BYTES } from "@/lib/employees/constants";
 import {
   getDocumentSettings,
   nextDocumentNumber,
@@ -60,9 +61,10 @@ export async function uploadAndCreateDocument(
   if (!settings.allowedFileTypes.includes(ext)) {
     throw new Error(`File type .${ext} is not allowed`);
   }
-  const maxBytes = settings.maxUploadSizeMb * 1024 * 1024;
+  const maxBytes = Math.min(settings.maxUploadSizeMb * 1024 * 1024, DOCUMENT_MAX_BYTES);
   if (file.size > maxBytes) {
-    throw new Error(`File exceeds maximum size of ${settings.maxUploadSizeMb} MB`);
+    const limitMb = Math.floor(maxBytes / (1024 * 1024));
+    throw new Error(`File exceeds maximum size of ${limitMb} MB`);
   }
 
   const organizationId = profile.employee.organizationId;

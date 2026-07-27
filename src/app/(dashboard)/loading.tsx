@@ -1,5 +1,5 @@
-import { PageSkeleton } from "@/components/common/page-skeleton";
+import { ModulePageSkeleton } from "@/components/layout/module-page-skeleton";
 
 export default function DashboardLoading() {
-  return <PageSkeleton />;
+  return <ModulePageSkeleton />;
 }

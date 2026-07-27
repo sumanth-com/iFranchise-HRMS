@@ -116,7 +116,7 @@ export const DEFAULT_DOCUMENT_SETTINGS = {
     "xlsx",
     "zip",
   ],
-  maxUploadSizeMb: 20,
+  maxUploadSizeMb: 30,
   documentNumberPrefix: "DOC",
   autoVerification: false,
   requireHrApprovalForLetters: true,

@@ -290,23 +290,24 @@ export const loadUserProfile = cache(async function loadUserProfile(
   };
 });
 
-export const getCurrentUserProfile = cache(async function getCurrentUserProfile(): Promise<UserProfile | null> {
+export async function getCurrentUserProfile(): Promise<UserProfile | null> {
+  const { getLayoutUserProfile } = await import("@/lib/auth/layout-profile");
   const supabase = await createClient();
 
   const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  if (error || !user?.email) {
+  const user = session?.user;
+  if (!user?.email) {
     return null;
   }
 
-  const result = await loadUserProfile(user.id, user.email, supabase);
+  const result = await getLayoutUserProfile(user.id, user.email);
 
   if (!result.success) {
     return null;
   }
 
   return result.profile;
-});
+}

@@ -29,6 +29,8 @@ type Props = {
   padded?: boolean;
   showPageHeading?: boolean;
   /** Keeps the hub tab in the URL when filtering calendar/history. */
+  /** When false, policy link is rendered by a parent hub header instead. */
+  showPolicyLink?: boolean;
   tabQuery?: string;
 };
 
@@ -42,6 +44,7 @@ export function EmployeeAttendanceView({
   description = "Your personal attendance, identity, and regularization requests.",
   padded = true,
   showPageHeading = true,
+  showPolicyLink = true,
   tabQuery,
 }: Props) {
   const router = useRouter();
@@ -74,7 +77,7 @@ export function EmployeeAttendanceView({
             <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
             <p className="mt-1 text-sm text-muted-foreground">{description}</p>
           </div>
-          {policyHref ? (
+          {policyHref && showPolicyLink ? (
             <Link
               href={policyHref}
               className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}
@@ -84,7 +87,7 @@ export function EmployeeAttendanceView({
             </Link>
           ) : null}
         </div>
-      ) : policyHref ? (
+      ) : policyHref && showPolicyLink ? (
         <div className="flex justify-end">
           <Link
             href={policyHref}

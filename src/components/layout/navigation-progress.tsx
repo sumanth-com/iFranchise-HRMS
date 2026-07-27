@@ -19,7 +19,7 @@ export function NavigationProgress() {
       return;
     }
 
-    const timer = window.setTimeout(() => setVisible(false), 120);
+    const timer = window.setTimeout(() => setVisible(false), 50);
     return () => window.clearTimeout(timer);
   }, [isNavigating]);
 

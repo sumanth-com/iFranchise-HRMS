@@ -84,7 +84,35 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
-  const accountAllowed = await userAccountAllowsPortalAccess(supabase, user.id);
+  const cachedPermissionCodes = await getCachedPermissionCodes(request, user.id);
+
+  if (cachedPermissionCodes) {
+    if (
+      isSystemAdminPath(pathname) &&
+      !cachedPermissionCodes.includes(SYSTEM_ADMIN_PERMISSION)
+    ) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = AUTH_ROUTES.unauthorized;
+      redirectUrl.search = "";
+      return NextResponse.redirect(redirectUrl);
+    }
+
+    if (!canAccessPortalPath(pathname, cachedPermissionCodes)) {
+      const portalRoute = await resolveUserPortalRoute(supabase, user.id);
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname =
+        normalizePortalRoute(portalRoute) ?? getPortalRedirectPath(cachedPermissionCodes);
+      redirectUrl.search = "";
+      return NextResponse.redirect(redirectUrl);
+    }
+
+    return supabaseResponse;
+  }
+
+  const [accountAllowed, permissionCodes] = await Promise.all([
+    userAccountAllowsPortalAccess(supabase, user.id),
+    resolveUserPermissionCodes(supabase, user.id),
+  ]);
   if (!accountAllowed) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = AUTH_ROUTES.login;
@@ -93,10 +121,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  let permissionCodes = await getCachedPermissionCodes(request, user.id);
-  if (!permissionCodes) {
-    permissionCodes = await resolveUserPermissionCodes(supabase, user.id);
-  }
   await attachPermissionCache(supabaseResponse, user.id, permissionCodes);
 
   if (isSystemAdminPath(pathname) && !permissionCodes.includes(SYSTEM_ADMIN_PERMISSION)) {
