@@ -7,6 +7,7 @@ import { createSignedStorageUrl } from "@/lib/employees/services/employee-mutati
 import { resolveEmployeeFromRouteRefGlobal } from "@/lib/employees/services/employee-route-resolver";
 import { getMonthDateRange } from "@/lib/leave/services/leave-utils";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { hasSupabaseServiceRoleEnv } from "@/lib/supabase/env";
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { EmployeeAttendanceCardSnapshot } from "@/types/employee-attendance-card";
 import type { EmploymentStatus } from "@/types/employee";
@@ -15,7 +16,8 @@ function countByStatus(rows: { attendance_status: string }[], status: string) {
   return rows.filter((row) => row.attendance_status === status).length;
 }
 
-function getAdminClient(): AuthSupabaseClient {
+function getAdminClient(): AuthSupabaseClient | null {
+  if (!hasSupabaseServiceRoleEnv()) return null;
   return createAdminClient() as unknown as AuthSupabaseClient;
 }
 
@@ -36,6 +38,7 @@ export async function getPublicEmployeeAttendanceCardSnapshot(
   employeeRef: string,
 ): Promise<{ snapshot: EmployeeAttendanceCardSnapshot; canonicalRef: string } | null> {
   const admin = getAdminClient();
+  if (!admin) return null;
   const resolved = await resolveEmployeeFromRouteRefGlobal(admin, employeeRef);
   if (!resolved) return null;
 
@@ -164,6 +167,7 @@ export async function getPublicEmployeeScanProfile(
   employeeRef: string,
 ): Promise<{ profile: PublicEmployeeScanProfile; canonicalRef: string } | null> {
   const admin = getAdminClient();
+  if (!admin) return null;
   const resolved = await resolveEmployeeFromRouteRefGlobal(admin, employeeRef);
   if (!resolved) return null;
 

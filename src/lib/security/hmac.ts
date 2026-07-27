@@ -4,11 +4,20 @@ function securitySecret(): string {
   const secret =
     process.env.PERMISSION_CACHE_SECRET ??
     process.env.CRON_SECRET ??
-    process.env.APPROVAL_TOKEN_SECRET;
+    process.env.APPROVAL_TOKEN_SECRET ??
+    process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!secret) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (url && anon) {
+      return `hrms-perm-cache-v1:${url}:${anon}`;
+    }
+
     if (process.env.NODE_ENV === "production") {
-      throw new Error("PERMISSION_CACHE_SECRET is required in production");
+      throw new Error(
+        "Set PERMISSION_CACHE_SECRET (or SUPABASE_SERVICE_ROLE_KEY) in production.",
+      );
     }
     return "dev-only-insecure-permission-cache-secret";
   }

@@ -121,7 +121,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  await attachPermissionCache(supabaseResponse, user.id, permissionCodes);
+  try {
+    await attachPermissionCache(supabaseResponse, user.id, permissionCodes);
+  } catch (error) {
+    console.error("[middleware] permission cache attach failed", error);
+  }
 
   if (isSystemAdminPath(pathname) && !permissionCodes.includes(SYSTEM_ADMIN_PERMISSION)) {
     const redirectUrl = request.nextUrl.clone();
