@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { CalendarDays, Clock } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useSidebarNavigation } from "@/hooks/use-sidebar-navigation";
+import { useAuth } from "@/providers/auth-provider";
 import type { EmployeeGreeting } from "@/types/employee-dashboard";
 
 function greetingForHour(hour: number) {
@@ -21,7 +23,29 @@ function initials(name: string) {
     .join("");
 }
 
+function buildPortalSubtitle(
+  greeting: EmployeeGreeting,
+  isSuperAdmin: boolean,
+  isSystemAdminPortal: boolean,
+): string {
+  if (isSystemAdminPortal) {
+    return "Super Admin · System Administration";
+  }
+
+  if (isSuperAdmin) {
+    return greeting.departmentName ? `HR · ${greeting.departmentName}` : "HR Portal";
+  }
+
+  const roleLine = [greeting.designation, greeting.departmentName].filter(Boolean).join(" · ");
+  return roleLine || greeting.employeeCode;
+}
+
 export function EmployeeDashboardHeader({ greeting }: { greeting: EmployeeGreeting }) {
+  const { roles } = useAuth();
+  const { isSystemAdminPortal } = useSidebarNavigation();
+  const isSuperAdmin = roles.some((role) => role.code === "super_admin");
+  const subtitle = buildPortalSubtitle(greeting, isSuperAdmin, isSystemAdminPortal);
+
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -47,10 +71,6 @@ export function EmployeeDashboardHeader({ greeting }: { greeting: EmployeeGreeti
         hour12: true,
       })
     : "";
-
-  const subtitle =
-    [greeting.designation, greeting.departmentName].filter(Boolean).join(" · ") ||
-    greeting.employeeCode;
 
   return (
     <section className="relative w-full shrink-0 overflow-hidden rounded-2xl border bg-gradient-to-br from-card via-card to-primary/5 px-6 py-7 shadow-sm md:px-8 md:py-8 lg:px-10 lg:py-9">
