@@ -5,8 +5,8 @@ import { useState } from "react";
 
 import { ErrorState } from "@/components/common";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import { DashboardKpiRow } from "@/components/dashboard/dashboard-kpi-rows";
 import { DashboardOperationsRow } from "@/components/dashboard/dashboard-panels";
+import { HrTodayPulseSection } from "@/components/dashboard/hr-today-pulse-section";
 import { DailyBoostCard } from "@/components/dashboard/daily-boost-card";
 import type { HrDashboardData } from "@/types/dashboard";
 import { cn } from "@/lib/utils";
@@ -41,8 +41,8 @@ export function HrDashboard({ data, error }: Props) {
         <DashboardHeader showGreeting={false} />
       </div>
 
-      <section className="shrink-0" aria-label="Key performance indicators">
-        <DashboardKpiRow kpis={data.kpis} />
+      <section className="shrink-0" aria-label="Today's Pulse">
+        <HrTodayPulseSection pulse={data.todayPulse} />
       </section>
 
       <section className="flex min-h-0 flex-1 flex-col lg:overflow-hidden" aria-label="Operations">

@@ -102,6 +102,9 @@ export async function getTeamMemberDetailBundle(
 
   if (!employee) return null;
 
+  // Managers may not view employee document metadata or storage paths.
+  employee.documents = [];
+
   if (reviewsResult.error) throw new Error(reviewsResult.error.message);
   if (feedbackResult.error) throw new Error(feedbackResult.error.message);
   if (oneOnOnesResult.error) throw new Error(oneOnOnesResult.error.message);

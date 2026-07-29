@@ -6,6 +6,7 @@ import QRCode from "qrcode";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 
 import { amountToIndianWords } from "@/lib/payroll/services/amount-in-words";
+import { buildPayslipVerificationUrl } from "@/lib/payroll/services/payslip-verification";
 import { formatPayslipDisplayAddress } from "@/lib/payroll/services/payslip-branding";
 import { PAYSLIP_ENGINE_NAME } from "@/lib/payroll/services/payslip-publication";
 import {
@@ -751,10 +752,12 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
 
   let qrImage: Awaited<ReturnType<PDFDocument["embedPng"]>> | undefined;
   try {
-    const qrPng = await QRCode.toBuffer(payslip.payslipNumber, {
+    const verifyUrl = buildPayslipVerificationUrl(payslip.payslipNumber);
+    const qrPng = await QRCode.toBuffer(verifyUrl, {
       margin: 1,
       width: 128,
       type: "png",
+      errorCorrectionLevel: "M",
     });
     qrImage = await pdf.embedPng(qrPng);
   } catch {

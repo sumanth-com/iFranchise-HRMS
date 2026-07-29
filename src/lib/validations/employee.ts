@@ -91,10 +91,8 @@ export const employeeInviteSchema = z.object({
 export type EmployeeInviteInput = z.infer<typeof employeeInviteSchema>;
 
 export const employeeSelfProfileSchema = z.object({
-  firstName: z.string().trim().min(1, "First name is required").max(100),
-  lastName: z.string().trim().min(1, "Last name is required").max(100),
-  phone: z.string().max(30).optional().or(z.literal("")),
-  preferredName: z.string().max(100).optional().or(z.literal("")),
+  personalEmail: z.string().email().optional().or(z.literal("")),
+  personalPhone: z.string().max(30).optional().or(z.literal("")),
   language: z.string().min(2).max(20),
   timezone: z.string().min(1).max(80),
   addressLine1: z.string().max(200).optional().or(z.literal("")),

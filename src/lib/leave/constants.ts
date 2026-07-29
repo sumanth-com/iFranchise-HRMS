@@ -66,5 +66,8 @@ export const APPROVAL_LEVEL_LABELS: Record<number, string> = {
   2: "HR Approval",
 };
 
-/** iFranchise leave policy — only these types are active in the product */
-export const ALLOWED_LEAVE_TYPE_CODES = ["CL", "EL", "OH", "LOP"] as const;
+/** iFranchise leave policy — active leave types (including LOP for requests/payroll). */
+export const ALLOWED_LEAVE_TYPE_CODES = ["CL", "SL", "EL", "OH", "LOP"] as const;
+
+/** Leave balance UI — actual balances only; LOP appears in payroll, not leave balance. */
+export const LEAVE_BALANCE_DISPLAY_CODES = ["CL", "SL", "EL", "OH"] as const;

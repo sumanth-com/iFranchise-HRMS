@@ -6,6 +6,7 @@ import {
   CalendarDays,
   LayoutDashboard,
   LogOut,
+  Wallet,
   Settings,
   Target,
   Users,
@@ -36,6 +37,12 @@ export const managerNavItems: NavigationItem[] = [
     href: MANAGER_ROUTES.leave,
     icon: CalendarDays,
     permissions: ["leave.view"],
+  },
+  {
+    title: "Payroll",
+    href: MANAGER_ROUTES.payroll,
+    icon: Wallet,
+    permissions: ["payslip.view"],
   },
   {
     title: "Resignations",

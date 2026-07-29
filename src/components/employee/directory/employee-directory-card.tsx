@@ -1,17 +1,12 @@
 "use client";
 
-import { format } from "date-fns";
 import { useEffect, useState, type ComponentType } from "react";
 import {
   Briefcase,
   Building2,
-  CalendarDays,
   ChevronUp,
-  Clock,
   Hash,
-  Mail,
-  Phone,
-  UserRound,
+  Layers,
 } from "lucide-react";
 
 import { Button } from "@/components/common/button";
@@ -22,7 +17,6 @@ import type { EmployeeDirectoryPerson } from "@/types/employee-directory";
 const CARD_HEIGHT = "h-[21.5rem]";
 
 export type DirectoryCardPerson = EmployeeDirectoryPerson & {
-  profileImagePath?: string | null;
   managerName?: string | null;
 };
 
@@ -30,43 +24,21 @@ function initials(firstName: string, lastName: string) {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 }
 
-function experienceLabel(years: number | null) {
-  if (years == null) return "—";
-  if (years < 1) return "< 1 year";
-  if (years === 1) return "1 year";
-  return `${years} years`;
-}
-
 function InfoRow({
   icon: Icon,
   label,
   value,
-  href,
-  breakAll = false,
 }: {
   icon: ComponentType<{ className?: string }>;
   label: string;
   value: string;
-  href?: string;
-  breakAll?: boolean;
 }) {
-  const valueClass = cn(
-    "font-medium leading-snug text-foreground",
-    breakAll ? "break-all" : "break-words",
-  );
-
   return (
     <div className="flex items-start gap-2 text-xs">
       <Icon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1">
         <p className="text-muted-foreground">{label}</p>
-        {href ? (
-          <a href={href} className={cn(valueClass, "hover:underline")}>
-            {value}
-          </a>
-        ) : (
-          <p className={valueClass}>{value}</p>
-        )}
+        <p className="font-medium leading-snug break-words text-foreground">{value}</p>
       </div>
     </div>
   );
@@ -193,23 +165,16 @@ export function EmployeeDirectoryCard({
             </div>
 
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
-              <InfoRow
-                icon={Mail}
-                label="Email"
-                value={person.email}
-                href={`mailto:${person.email}`}
-                breakAll
-              />
-              <InfoRow
-                icon={Phone}
-                label="Phone"
-                value={person.phone || "—"}
-                href={person.phone ? `tel:${person.phone}` : undefined}
-              />
+              <InfoRow icon={Hash} label="Employee ID" value={person.employeeCode} />
               <InfoRow
                 icon={Building2}
                 label="Department"
                 value={person.departmentName || "—"}
+              />
+              <InfoRow
+                icon={Layers}
+                label="Vertical / Team"
+                value={person.verticalName || "—"}
               />
               <InfoRow
                 icon={Briefcase}
@@ -217,23 +182,8 @@ export function EmployeeDirectoryCard({
                 value={person.designationTitle || "—"}
               />
               {person.managerName ? (
-                <InfoRow icon={UserRound} label="Reporting to" value={person.managerName} />
+                <InfoRow icon={Briefcase} label="Reporting to" value={person.managerName} />
               ) : null}
-              <InfoRow icon={Hash} label="Employee ID" value={person.employeeCode} />
-              <InfoRow
-                icon={CalendarDays}
-                label="Joined"
-                value={
-                  person.dateOfJoining
-                    ? format(new Date(person.dateOfJoining), "d MMM yyyy")
-                    : "—"
-                }
-              />
-              <InfoRow
-                icon={Clock}
-                label="Experience"
-                value={experienceLabel(person.experienceYears)}
-              />
             </div>
 
             {onViewProfile ? (

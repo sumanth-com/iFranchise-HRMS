@@ -1,6 +1,7 @@
 "use client";
 
 import { Download, FileSpreadsheet, FileText, Loader2, Play, Printer } from "lucide-react";
+import { format, parseISO } from "date-fns";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -26,6 +27,10 @@ type Definition = {
   key: ReportKey;
   title: string;
   description: string;
+  purpose: string;
+  filterSummary: string;
+  exportFormats: ReportExportFormat[];
+  usageInformation: string;
 };
 
 type Props = {
@@ -323,6 +328,42 @@ export function ModuleReportsView({
           {selectedDef?.description ?? "Run filtered operational reports and export results."}
         </p>
       </div>
+
+      {selectedDef ? (
+        <section className="rounded-xl border bg-muted/20 p-4 text-sm">
+          <h2 className="text-sm font-semibold">{selectedDef.title}</h2>
+          <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs font-medium text-muted-foreground uppercase">Purpose</dt>
+              <dd className="mt-1">{selectedDef.purpose}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-muted-foreground uppercase">Description</dt>
+              <dd className="mt-1">{selectedDef.description}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-muted-foreground uppercase">Filters</dt>
+              <dd className="mt-1">{selectedDef.filterSummary}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-muted-foreground uppercase">Export formats</dt>
+              <dd className="mt-1">{selectedDef.exportFormats.join(", ").toUpperCase()}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-muted-foreground uppercase">Last generated</dt>
+              <dd className="mt-1">
+                {result?.key === reportKey
+                  ? format(parseISO(result.generatedAt), "d MMM yyyy, HH:mm")
+                  : "Not run in this session"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-muted-foreground uppercase">Usage</dt>
+              <dd className="mt-1">{selectedDef.usageInformation}</dd>
+            </div>
+          </dl>
+        </section>
+      ) : null}
 
       <section className="space-y-4 rounded-xl border bg-card p-5 shadow-sm">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">

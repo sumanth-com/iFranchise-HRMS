@@ -822,8 +822,8 @@ export async function updateEmployeeSelfProfileAction(
     revalidatePath(
       EMPLOYEE_ROUTES.detail({
         employeeCode: profile.employee.employeeCode,
-        firstName: parsed.firstName,
-        lastName: parsed.lastName,
+        firstName: profile.employee.firstName,
+        lastName: profile.employee.lastName,
       }),
     );
 

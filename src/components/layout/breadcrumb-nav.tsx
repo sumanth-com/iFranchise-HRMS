@@ -334,6 +334,8 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
       team: "My Team",
       attendance: "Attendance",
       leave: "Leave",
+      payroll: "Payroll",
+      resignation: "Resignations",
       performance: "Performance",
       recruitment: "Recruitment",
       reports: "Reports",

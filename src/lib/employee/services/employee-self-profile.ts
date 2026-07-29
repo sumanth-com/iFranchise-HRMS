@@ -4,11 +4,14 @@ import type { EmployeeSelfProfileInput } from "@/lib/validations/employee";
 
 export type EmployeeSelfProfileSettings = {
   employeeId: string;
+  employeeCode: string;
   email: string;
   firstName: string;
   lastName: string;
-  phone: string;
-  preferredName: string;
+  departmentName: string | null;
+  designationTitle: string | null;
+  personalEmail: string;
+  personalPhone: string;
   language: string;
   timezone: string;
   profileImageStoragePath: string | null;
@@ -49,14 +52,18 @@ export async function getEmployeeSelfProfileSettings(
       supabase
         .schema("hrms")
         .from("employees")
-        .select("id, email, first_name, last_name, phone")
+        .select(
+          "id, email, employee_code, first_name, last_name, departments:department_id(name), designations:designation_id(title)",
+        )
         .eq("id", employeeId)
         .is("deleted_at", null)
         .maybeSingle(),
       supabase
         .schema("hrms")
         .from("employee_profiles")
-        .select("profile_image_storage_path, preferred_name")
+        .select(
+          "profile_image_storage_path, personal_email, personal_phone",
+        )
         .eq("employee_id", employeeId)
         .is("deleted_at", null)
         .maybeSingle(),
@@ -92,14 +99,21 @@ export async function getEmployeeSelfProfileSettings(
   if (employeeResult.error || !employeeResult.data) return null;
 
   const employee = employeeResult.data;
+  const department = employee.departments as { name?: string } | { name?: string }[] | null;
+  const designation = employee.designations as { title?: string } | { title?: string }[] | null;
+  const deptName = Array.isArray(department) ? department[0]?.name : department?.name;
+  const desigTitle = Array.isArray(designation) ? designation[0]?.title : designation?.title;
 
   return {
     employeeId: employee.id,
+    employeeCode: employee.employee_code,
     email: employee.email ?? profile.email,
     firstName: employee.first_name,
     lastName: employee.last_name,
-    phone: employee.phone ?? "",
-    preferredName: profileResult.data?.preferred_name ?? "",
+    departmentName: deptName ?? null,
+    designationTitle: desigTitle ?? null,
+    personalEmail: profileResult.data?.personal_email ?? "",
+    personalPhone: profileResult.data?.personal_phone ?? "",
     language: prefsResult.data?.language ?? DEFAULT_LANGUAGE,
     timezone: prefsResult.data?.timezone ?? DEFAULT_TIMEZONE,
     profileImageStoragePath: profileResult.data?.profile_image_storage_path ?? null,
@@ -168,7 +182,8 @@ async function upsertEmployeeProfileRow(
   supabase: AuthSupabaseClient,
   employeeId: string,
   profile: UserProfile,
-  preferredName: string | null,
+  personalEmail: string | null,
+  personalPhone: string | null,
 ) {
   const { data: existing } = await supabase
     .schema("hrms")
@@ -179,7 +194,8 @@ async function upsertEmployeeProfileRow(
     .maybeSingle();
 
   const payload = {
-    preferred_name: preferredName,
+    personal_email: personalEmail,
+    personal_phone: personalPhone,
     updated_by: profile.userId,
   };
 
@@ -302,25 +318,12 @@ export async function updateEmployeeSelfProfile(
     throw new Error("You can only update your own profile");
   }
 
-  const { error: employeeError } = await supabase
-    .schema("hrms")
-    .from("employees")
-    .update({
-      first_name: input.firstName.trim(),
-      last_name: input.lastName.trim(),
-      phone: emptyToNull(input.phone),
-      updated_by: profile.userId,
-    })
-    .eq("id", existing.employeeId)
-    .is("deleted_at", null);
-
-  if (employeeError) throw new Error(employeeError.message);
-
   await upsertEmployeeProfileRow(
     supabase,
     existing.employeeId,
     profile,
-    emptyToNull(input.preferredName),
+    emptyToNull(input.personalEmail)?.toLowerCase() ?? null,
+    emptyToNull(input.personalPhone),
   );
   await upsertUserPreferences(supabase, profile, input.language, input.timezone);
   await upsertCurrentAddress(

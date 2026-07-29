@@ -74,8 +74,7 @@ function getVisibleTabs(readOnly: boolean) {
     { id: "overview" as const, label: "Profile" },
     { id: "attendance" as const, label: "Attendance" },
     { id: "leave" as const, label: "Leave" },
-    { id: "documents" as const, label: "Documents" },
-    { id: "assets" as const, label: "Assets" },
+    { id: "performance" as const, label: "Performance" },
   ];
 }
 
@@ -503,7 +502,6 @@ function TeamMemberProfileLayout({ detail }: { detail: TeamMemberDetailBundle })
         <h3 className="text-base font-semibold lg:col-start-1">Employee Information</h3>
         <dl className="overflow-hidden rounded-xl border bg-card lg:col-start-1 lg:row-start-2">
           <ProfileInfoRow label="Employee ID" value={employee.employeeCode} />
-          <ProfileInfoRow label="Email" value={employee.email} />
           <ProfileInfoRow label="Department" value={employee.departmentName ?? "—"} />
           <ProfileInfoRow label="Designation" value={employee.designationTitle ?? "—"} />
           <ProfileInfoRow label="Employment type" value={employee.employmentTypeName ?? "—"} />
@@ -516,8 +514,6 @@ function TeamMemberProfileLayout({ detail }: { detail: TeamMemberDetailBundle })
                 : "—"
             }
           />
-          <ProfileInfoRow label="Phone" value={employee.phone ?? "—"} />
-          <ProfileInfoRow label="Personal email" value={employee.profile?.personalEmail ?? "—"} />
           <ProfileInfoRow
             label="Attendance summary"
             value={`${detail.attendanceSummary.presentDays} present day(s) · ${detail.attendanceSummary.totalWorkHours.toFixed(1)} total hours`}
@@ -553,9 +549,10 @@ function OverviewTab({ detail }: { detail: TeamMemberDetailBundle }) {
     ["Employment type", employee.employmentTypeName ?? "—"],
     ["Branch", employee.branchName ?? "—"],
     ["Manager", employee.reportingManagerName ?? "—"],
-    ["Joining date", employee.dateOfJoining ? format(new Date(employee.dateOfJoining), "d MMM yyyy") : "—"],
-    ["Phone", employee.phone ?? "—"],
-    ["Personal email", employee.profile?.personalEmail ?? "—"],
+    [
+      "Joining date",
+      employee.dateOfJoining ? format(new Date(employee.dateOfJoining), "d MMM yyyy") : "—",
+    ],
   ];
 
   return (

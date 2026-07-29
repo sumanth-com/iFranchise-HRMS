@@ -1,4 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { LEAVE_BALANCE_DISPLAY_CODES } from "@/lib/leave/constants";
 import type {
   EmployeeAddressDetail,
   EmployeeDetail,
@@ -468,25 +469,31 @@ export async function getEmployeeLeaveBalances(
 
   if (error) throw new Error(error.message);
 
-  return (data ?? []).map((row) => {
-    const leaveType = unwrapRelation(
-      row.leave_types as
-        | { name: string; code: string }
-        | { name: string; code: string }[]
-        | null,
-    );
+  return (data ?? [])
+    .map((row) => {
+      const leaveType = unwrapRelation(
+        row.leave_types as
+          | { name: string; code: string }
+          | { name: string; code: string }[]
+          | null,
+      );
 
-    return {
-      id: row.id,
-      leaveTypeName: leaveType?.name ?? "Leave",
-      leaveTypeCode: leaveType?.code ?? "",
-      balanceYear: row.balance_year,
-      allocatedDays: Number(row.allocated_days),
-      usedDays: Number(row.used_days),
-      pendingDays: Number(row.pending_days),
-      balanceDays: Number(row.balance_days),
-    };
-  });
+      return {
+        id: row.id,
+        leaveTypeName: leaveType?.name ?? "Leave",
+        leaveTypeCode: leaveType?.code ?? "",
+        balanceYear: row.balance_year,
+        allocatedDays: Number(row.allocated_days),
+        usedDays: Number(row.used_days),
+        pendingDays: Number(row.pending_days),
+        balanceDays: Number(row.balance_days),
+      };
+    })
+    .filter((row) =>
+      LEAVE_BALANCE_DISPLAY_CODES.includes(
+        row.leaveTypeCode as (typeof LEAVE_BALANCE_DISPLAY_CODES)[number],
+      ),
+    );
 }
 
 export async function getEmployeeSalaryStructure(

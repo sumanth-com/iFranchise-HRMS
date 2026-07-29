@@ -63,10 +63,8 @@ export function EmployeeProfileSettingsSection({
   } = useForm<EmployeeSelfProfileInput>({
     resolver: zodResolver(employeeSelfProfileSchema),
     defaultValues: {
-      firstName: settings.firstName,
-      lastName: settings.lastName,
-      phone: settings.phone,
-      preferredName: settings.preferredName,
+      personalEmail: settings.personalEmail,
+      personalPhone: settings.personalPhone,
       language: settings.language,
       timezone: settings.timezone,
       addressLine1: settings.address.addressLine1,
@@ -145,7 +143,8 @@ export function EmployeeProfileSettingsSection({
       <div className="mb-4">
         <h2 className="text-sm font-semibold tracking-tight">Profile</h2>
         <p className="text-xs text-muted-foreground">
-          Update your personal details, contact information, and preferences.
+          Update personal contact details and emergency information. Employment fields are managed
+          by HR.
         </p>
       </div>
 
@@ -197,37 +196,55 @@ export function EmployeeProfileSettingsSection({
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="firstName">First name</Label>
-            <Input id="firstName" disabled={isPending} {...register("firstName")} />
-            {errors.firstName ? (
-              <p className="text-xs text-destructive">{errors.firstName.message}</p>
-            ) : null}
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium">Employment (read-only)</h3>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>First name</Label>
+              <Input value={settings.firstName} disabled readOnly />
+            </div>
+            <div className="space-y-2">
+              <Label>Last name</Label>
+              <Input value={settings.lastName} disabled readOnly />
+            </div>
+            <div className="space-y-2">
+              <Label>Employee ID</Label>
+              <Input value={settings.employeeCode} disabled readOnly />
+            </div>
+            <div className="space-y-2">
+              <Label>Company email</Label>
+              <Input value={settings.email} disabled readOnly />
+            </div>
+            <div className="space-y-2">
+              <Label>Department</Label>
+              <Input value={settings.departmentName ?? "—"} disabled readOnly />
+            </div>
+            <div className="space-y-2">
+              <Label>Designation</Label>
+              <Input value={settings.designationTitle ?? "—"} disabled readOnly />
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="lastName">Last name</Label>
-            <Input id="lastName" disabled={isPending} {...register("lastName")} />
-            {errors.lastName ? (
-              <p className="text-xs text-destructive">{errors.lastName.message}</p>
-            ) : null}
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <Label>Company email</Label>
-            <Input value={settings.email} disabled readOnly />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="phone">Phone</Label>
-            <Input id="phone" disabled={isPending} {...register("phone")} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="preferredName">Preferred name</Label>
-            <Input
-              id="preferredName"
-              placeholder="How you prefer to be addressed"
-              disabled={isPending}
-              {...register("preferredName")}
-            />
+        </div>
+
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium">Personal contact</h3>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="personalEmail">Personal email</Label>
+              <Input
+                id="personalEmail"
+                type="email"
+                disabled={isPending}
+                {...register("personalEmail")}
+              />
+              {errors.personalEmail ? (
+                <p className="text-xs text-destructive">{errors.personalEmail.message}</p>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="personalPhone">Personal phone</Label>
+              <Input id="personalPhone" disabled={isPending} {...register("personalPhone")} />
+            </div>
           </div>
         </div>
 

@@ -1,5 +1,5 @@
 import { hasAnyPermission } from "@/lib/permissions/utils";
-import type { ReportKey, ReportModuleKey } from "@/types/reports";
+import type { ReportExportFormat, ReportKey, ReportModuleKey } from "@/types/reports";
 
 export const REPORTS_ROUTES = {
   dashboard: "/dashboard/reports",
@@ -46,7 +46,7 @@ export const DEFAULT_REPORTS_SETTINGS = {
   scheduleRetainRuns: 90,
 };
 
-export const REPORT_DEFINITIONS: {
+const BASE_REPORT_DEFINITIONS: {
   key: ReportKey;
   module: ReportModuleKey;
   title: string;
@@ -93,6 +93,36 @@ export const REPORT_DEFINITIONS: {
   { key: "exit_reasons", module: "exit", title: "Exit Reasons", description: "Resignation reasons breakdown." },
   { key: "exit_settlement", module: "exit", title: "Settlement Status", description: "Final settlement progress." },
 ];
+
+const MODULE_FILTER_SUMMARIES: Record<ReportModuleKey, string> = {
+  hr: "Date range, department, designation, employment status.",
+  attendance: "Date range, employee, attendance status.",
+  leave: "Date range, employee, leave status, month/year.",
+  payroll: "Date range, employee, payroll month, run status.",
+  performance: "Date range, department, designation, employee, review status.",
+  recruitment: "Date range, job status, pipeline stage.",
+  assets: "Date range, employee, asset status.",
+  exit: "Date range, resignation status, settlement stage.",
+};
+
+const MODULE_USAGE: Record<ReportModuleKey, string> = {
+  hr: "Use for monthly workforce audits and leadership reporting.",
+  attendance: "Review punctuality and attendance compliance before payroll lock.",
+  leave: "Track utilization and pending approvals before payroll processing.",
+  payroll: "Finance reconciliation; restrict exports to authorized payroll roles.",
+  performance: "Review cycle tracking for managers and HR business partners.",
+  recruitment: "Hiring pipeline reviews with talent acquisition stakeholders.",
+  assets: "IT and facilities audits for assigned equipment.",
+  exit: "Monitor offboarding clearance and settlement progress.",
+};
+
+export const REPORT_DEFINITIONS = BASE_REPORT_DEFINITIONS.map((definition) => ({
+  ...definition,
+  purpose: definition.description,
+  filterSummary: MODULE_FILTER_SUMMARIES[definition.module],
+  exportFormats: ["csv", "excel", "pdf"] as ReportExportFormat[],
+  usageInformation: MODULE_USAGE[definition.module],
+}));
 
 export const REPORT_KEY_LABELS: Record<ReportKey, string> = Object.fromEntries(
   REPORT_DEFINITIONS.map((d) => [d.key, d.title]),

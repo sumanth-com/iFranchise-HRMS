@@ -16,6 +16,14 @@ const EMPTY_DASHBOARD: HrDashboardData = {
     absentToday: 0,
     pendingLeaveApprovals: 0,
   },
+  todayPulse: {
+    presentToday: 0,
+    onLeaveToday: 0,
+    lateToday: 0,
+    pendingApprovals: 0,
+    exitRequests: 0,
+    upcomingHolidays: [],
+  },
   secondary: {
     attendancePercent: 0,
     leaveUtilizationPercent: 0,

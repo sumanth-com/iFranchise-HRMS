@@ -12,6 +12,8 @@ export const MANAGER_ROUTES = {
   leave: "/manager/leave",
   leaveNew: "/manager/leave/new",
   leaveDetail: (id: string) => `/manager/leave?leaveId=${id}`,
+  payroll: "/manager/payroll",
+  payrollHistory: "/manager/payroll/history",
   resignation: "/manager/resignation",
   performance: "/manager/performance",
   performanceDetail: (employeeId: string, tab?: "feedback" | "oneOnOne") => {

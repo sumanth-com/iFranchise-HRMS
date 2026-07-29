@@ -4,11 +4,10 @@ export type EmployeeDirectoryPerson = {
   firstName: string;
   lastName: string;
   fullName: string;
-  email: string;
-  phone: string | null;
   designationTitle: string | null;
+  departmentId: string | null;
   departmentName: string | null;
-  dateOfJoining: string | null;
-  experienceYears: number | null;
+  verticalName: string | null;
   avatarUrl: string | null;
+  profileImagePath: string | null;
 };

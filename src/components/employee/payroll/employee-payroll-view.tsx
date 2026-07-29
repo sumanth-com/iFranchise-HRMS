@@ -88,10 +88,14 @@ function fmtMonth(value: string): string {
 export function EmployeePayrollView({
   data,
   documentsHref = EMPLOYEE_ROUTES.documents,
+  payrollHistoryHref = EMPLOYEE_ROUTES.payrollHistory,
+  showTaxDocuments = true,
   showPageHeading = true,
 }: {
   data: EmployeePayrollData;
   documentsHref?: string;
+  payrollHistoryHref?: string;
+  showTaxDocuments?: boolean;
   showPageHeading?: boolean;
 }) {
   const [activePayslipId, setActivePayslipId] = useState<string | null>(null);
@@ -122,15 +126,17 @@ export function EmployeePayrollView({
           <Download className="size-4" />
           Latest Payslip
         </Button>
-        <Button
-          variant="outline"
-          className="gap-1.5"
-          nativeButton={false}
-          render={<Link href={documentsHref} />}
-        >
-          <FileText className="size-4" />
-          Tax Documents
-        </Button>
+        {showTaxDocuments ? (
+          <Button
+            variant="outline"
+            className="gap-1.5"
+            nativeButton={false}
+            render={<Link href={documentsHref} />}
+          >
+            <FileText className="size-4" />
+            Tax Documents
+          </Button>
+        ) : null}
       </div>
     </div>
   ) : (
@@ -144,15 +150,17 @@ export function EmployeePayrollView({
         <Download className="size-4" />
         Latest Payslip
       </Button>
-      <Button
-        variant="outline"
-        className="gap-1.5"
-        nativeButton={false}
-        render={<Link href={documentsHref} />}
-      >
-        <FileText className="size-4" />
-        Tax Documents
-      </Button>
+      {showTaxDocuments ? (
+        <Button
+          variant="outline"
+          className="gap-1.5"
+          nativeButton={false}
+          render={<Link href={documentsHref} />}
+        >
+          <FileText className="size-4" />
+          Tax Documents
+        </Button>
+      ) : null}
     </div>
   );
 
@@ -441,7 +449,7 @@ export function EmployeePayrollView({
         bodyClassName="overflow-x-auto"
         action={
           <Link
-            href={EMPLOYEE_ROUTES.payrollHistory}
+            href={payrollHistoryHref}
             className={buttonVariants({ variant: "outline", size: "sm" })}
           >
             View full history
@@ -538,7 +546,7 @@ export function EmployeePayrollView({
           {data.payslips.length > 3 ? (
             <p className="mt-3 text-center text-xs text-muted-foreground">
               Showing 3 most recent ·{" "}
-              <Link href={EMPLOYEE_ROUTES.payrollHistory} className="font-medium text-primary underline-offset-2 hover:underline">
+              <Link href={payrollHistoryHref} className="font-medium text-primary underline-offset-2 hover:underline">
                 View all {data.payslips.length} payslips
               </Link>
             </p>

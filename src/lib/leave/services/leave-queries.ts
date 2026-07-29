@@ -11,7 +11,7 @@ import type {
   LeaveSummary,
 } from "@/types/leave";
 import { leaveListParamsSchema } from "@/lib/validations/leave";
-import { ALLOWED_LEAVE_TYPE_CODES } from "@/lib/leave/constants";
+import { ALLOWED_LEAVE_TYPE_CODES, LEAVE_BALANCE_DISPLAY_CODES } from "@/lib/leave/constants";
 import {
   getBranches,
   getDepartments,
@@ -362,7 +362,7 @@ export async function getEmployeeLeaveBalanceSnapshot(
 
   if (error) throw new Error(error.message);
 
-  const priorityCodes: string[] = [...ALLOWED_LEAVE_TYPE_CODES];
+  const priorityCodes: string[] = [...LEAVE_BALANCE_DISPLAY_CODES];
 
   return (data ?? [])
     .map((row) => {
@@ -427,29 +427,35 @@ export async function listLeaveBalances(
 
   if (error) throw new Error(error.message);
 
-  return (data ?? []).map((row) => {
-    const employee = unwrapRelation(row.employees);
-    const leaveType = unwrapRelation(row.leave_types);
-    const department = unwrapRelation(employee?.departments ?? null);
+  return (data ?? [])
+    .map((row) => {
+      const employee = unwrapRelation(row.employees);
+      const leaveType = unwrapRelation(row.leave_types);
+      const department = unwrapRelation(employee?.departments ?? null);
 
-    return {
-      id: row.id,
-      employeeId: row.employee_id,
-      employeeCode: employee?.employee_code ?? "",
-      employeeName: employee
-        ? `${employee.first_name} ${employee.last_name}`
-        : "",
-      departmentName: department?.name ?? null,
-      leaveTypeId: row.leave_type_id,
-      leaveTypeName: leaveType?.name ?? "",
-      leaveTypeCode: leaveType?.code ?? "",
-      balanceYear: row.balance_year,
-      allocatedDays: Number(row.allocated_days),
-      usedDays: Number(row.used_days),
-      pendingDays: Number(row.pending_days),
-      balanceDays: Number(row.balance_days),
-    };
-  });
+      return {
+        id: row.id,
+        employeeId: row.employee_id,
+        employeeCode: employee?.employee_code ?? "",
+        employeeName: employee
+          ? `${employee.first_name} ${employee.last_name}`
+          : "",
+        departmentName: department?.name ?? null,
+        leaveTypeId: row.leave_type_id,
+        leaveTypeName: leaveType?.name ?? "",
+        leaveTypeCode: leaveType?.code ?? "",
+        balanceYear: row.balance_year,
+        allocatedDays: Number(row.allocated_days),
+        usedDays: Number(row.used_days),
+        pendingDays: Number(row.pending_days),
+        balanceDays: Number(row.balance_days),
+      };
+    })
+    .filter((row) =>
+      LEAVE_BALANCE_DISPLAY_CODES.includes(
+        row.leaveTypeCode as (typeof LEAVE_BALANCE_DISPLAY_CODES)[number],
+      ),
+    );
 }
 
 export async function getLeaveCalendarData(

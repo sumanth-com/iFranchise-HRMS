@@ -1,6 +1,5 @@
 "use client";
 
-import { differenceInMonths } from "date-fns";
 import { useRouter } from "next/navigation";
 import { Users } from "lucide-react";
 
@@ -21,13 +20,6 @@ type ManagerTeamCardsProps = {
   onPageChange: (page: number) => void;
 };
 
-function experienceYearsFromJoining(dateOfJoining: string | null): number | null {
-  if (!dateOfJoining) return null;
-  const months = differenceInMonths(new Date(), new Date(dateOfJoining));
-  if (months < 0) return 0;
-  return Math.round((months / 12) * 10) / 10;
-}
-
 function toDirectoryCardPerson(member: TeamMemberListItem): DirectoryCardPerson {
   return {
     id: member.id,
@@ -35,12 +27,10 @@ function toDirectoryCardPerson(member: TeamMemberListItem): DirectoryCardPerson 
     firstName: member.firstName,
     lastName: member.lastName,
     fullName: member.fullName,
-    email: member.email,
-    phone: member.phone,
     designationTitle: member.designationTitle,
+    departmentId: member.departmentId,
     departmentName: member.departmentName,
-    dateOfJoining: member.dateOfJoining,
-    experienceYears: experienceYearsFromJoining(member.dateOfJoining),
+    verticalName: member.branchName,
     avatarUrl: null,
     profileImagePath: member.profileImagePath,
     managerName: member.managerName,

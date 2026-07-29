@@ -48,6 +48,10 @@ export async function loadModuleReportsPage(
       key: d.key,
       title: d.title,
       description: d.description,
+      purpose: d.purpose,
+      filterSummary: d.filterSummary,
+      exportFormats: d.exportFormats,
+      usageInformation: d.usageInformation,
     }),
   );
 

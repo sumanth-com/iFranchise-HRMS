@@ -643,6 +643,14 @@ export async function getHrDashboardData(
       absentToday: attendance.absentToday,
       pendingLeaveApprovals: leave.pendingRequests,
     },
+    todayPulse: {
+      presentToday: presentCount,
+      onLeaveToday: attendance.onLeaveToday || leave.employeesOnLeaveToday || 0,
+      lateToday: attendance.lateToday,
+      pendingApprovals: leave.pendingRequests,
+      exitRequests: exitSummary.pendingClearance || 0,
+      upcomingHolidays,
+    },
     secondary: {
       attendancePercent,
       leaveUtilizationPercent: leave.balanceUtilizationPercent ?? 0,

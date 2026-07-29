@@ -70,9 +70,19 @@ export type DashboardCharts = {
   employmentTypeDistribution: DashboardChartItem[];
 };
 
+export type HrTodayPulse = {
+  presentToday: number;
+  onLeaveToday: number;
+  lateToday: number;
+  pendingApprovals: number;
+  exitRequests: number;
+  upcomingHolidays: DashboardListItem[];
+};
+
 export type HrDashboardData = {
   generatedAt: string;
   kpis: DashboardKpis;
+  todayPulse: HrTodayPulse;
   secondary: DashboardSecondaryMetrics;
   charts: DashboardCharts;
   activities: DashboardActivityItem[];
