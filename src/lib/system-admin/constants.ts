@@ -39,20 +39,28 @@ export const SYSTEM_ADMIN_PERMISSION = "system.admin.access" as const;
 export const SUPER_ADMIN_PORTAL_LABEL = "Super Admin Portal";
 
 export const PORTAL_SWITCH_LINKS = [
+  { label: SUPER_ADMIN_PORTAL_LABEL, href: "/dashboard/system", portal: "system" },
   { label: "HR Portal", href: "/dashboard", portal: "hr" },
   { label: "Executive Portal", href: "/ceo", portal: "ceo" },
   { label: "Manager Portal", href: "/manager", portal: "manager" },
   { label: "Employee Portal", href: "/employee", portal: "employee" },
 ] as const;
 
-/** Super Admin uses the HR route tree but should see Super Admin Portal in the switcher. */
-export function getPortalSwitchLabel(
-  portalKey: string,
-  defaultLabel: string,
-  isSuperAdmin: boolean,
-): string {
-  if (isSuperAdmin && portalKey === "hr") {
-    return SUPER_ADMIN_PORTAL_LABEL;
-  }
-  return defaultLabel;
+export function portalPathMatches(pathname: string, href: string): boolean {
+  if (pathname === href) return true;
+  if (!pathname.startsWith(`${href}/`)) return false;
+  // /dashboard must not swallow /dashboard/system (system has its own entry).
+  if (href === "/dashboard" && pathname.startsWith("/dashboard/system")) return false;
+  return true;
+}
+
+export function resolveActivePortalSwitchLink(
+  pathname: string,
+  available: ReadonlyArray<{ label: string; href: string; portal: string }>,
+) {
+  return (
+    [...available]
+      .sort((left, right) => right.href.length - left.href.length)
+      .find((portal) => portalPathMatches(pathname, portal.href)) ?? available[0]
+  );
 }

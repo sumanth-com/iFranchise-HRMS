@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { AUTH_ROUTES } from "@/lib/auth/constants";
 import { getLayoutUserProfile } from "@/lib/auth/layout-profile";
-import { SUPER_ADMIN_PORTAL_LABEL } from "@/lib/system-admin/constants";
 import { AuthProvider, type PortalVariant } from "@/providers/auth-provider";
 import { createClient } from "@/lib/supabase/server";
 
@@ -32,13 +31,6 @@ export async function PortalShellLayout({
 
   const profileResult = await getLayoutUserProfile(user.id, user.email);
 
-  function resolvePortalLabel(profile: { roles: { code: string }[] }) {
-    const isSuperAdmin = profile.roles.some((role) => role.code === "super_admin");
-    if (portalLabel) return portalLabel;
-    if (isSuperAdmin && portalVariant === "hr") return SUPER_ADMIN_PORTAL_LABEL;
-    return undefined;
-  }
-
   if (!profileResult.success) {
     const {
       data: { user: verifiedUser },
@@ -58,7 +50,7 @@ export async function PortalShellLayout({
       <AuthProvider
         initialProfile={retry.profile}
         portalVariant={portalVariant}
-        portalLabel={resolvePortalLabel(retry.profile)}
+        portalLabel={portalLabel}
       >
         <DashboardShell>{children}</DashboardShell>
       </AuthProvider>
@@ -69,7 +61,7 @@ export async function PortalShellLayout({
     <AuthProvider
       initialProfile={profileResult.profile}
       portalVariant={portalVariant}
-      portalLabel={resolvePortalLabel(profileResult.profile)}
+      portalLabel={portalLabel}
     >
       <DashboardShell>{children}</DashboardShell>
     </AuthProvider>

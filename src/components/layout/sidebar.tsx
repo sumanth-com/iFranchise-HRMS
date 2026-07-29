@@ -6,9 +6,8 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 import { SidebarNavLink } from "@/components/layout/sidebar-nav-link";
-import { useNavigation } from "@/hooks/use-permissions";
+import { useSidebarNavigation } from "@/hooks/use-sidebar-navigation";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { useAuth } from "@/providers/auth-provider";
 import { cn } from "@/lib/utils";
 
 function resolveActiveHref(
@@ -27,8 +26,7 @@ function resolveActiveHref(
 export function Sidebar() {
   const pathname = usePathname();
   const { isCollapsed, startNavigation } = useSidebar();
-  const { portalHome, portalLabel } = useAuth();
-  const navigation = useNavigation();
+  const { navigation, portalHome, portalLabel } = useSidebarNavigation();
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     "Self-service": true,
     Administration: true,

@@ -6,12 +6,18 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/common/button";
-import { PORTAL_SWITCH_LINKS, getPortalSwitchLabel } from "@/lib/system-admin/constants";
+import {
+  PORTAL_SWITCH_LINKS,
+  portalPathMatches,
+  resolveActivePortalSwitchLink,
+  SYSTEM_ADMIN_PERMISSION,
+} from "@/lib/system-admin/constants";
 import { hasPermission } from "@/lib/permissions/utils";
 import { useAuth } from "@/providers/auth-provider";
 import { cn } from "@/lib/utils";
 
 const PORTAL_PERMISSION_MAP: Record<string, string> = {
+  system: SYSTEM_ADMIN_PERMISSION,
   hr: "portal.hr.access",
   ceo: "portal.ceo.access",
   manager: "portal.manager.access",
@@ -30,14 +36,7 @@ export function PortalSwitcher() {
     hasPermission(permissionCodes, PORTAL_PERMISSION_MAP[portal.portal]),
   );
 
-  const activePortal =
-    availablePortals.find(
-      (portal) => pathname === portal.href || pathname.startsWith(`${portal.href}/`),
-    ) ?? availablePortals[0];
-
-  const activePortalLabel = activePortal
-    ? getPortalSwitchLabel(activePortal.portal, activePortal.label, isSuperAdmin)
-    : "Portals";
+  const activePortal = resolveActivePortalSwitchLink(pathname, availablePortals);
 
   return (
     <div className="relative">
@@ -50,7 +49,7 @@ export function PortalSwitcher() {
         aria-haspopup="listbox"
       >
         <LayoutGrid className="size-4" />
-        <span className="hidden sm:inline">{activePortalLabel}</span>
+        <span className="hidden sm:inline">{activePortal?.label ?? "Portals"}</span>
         <ChevronDown className={cn("size-4 transition-transform", open && "rotate-180")} />
       </Button>
       {open ? (
@@ -70,12 +69,13 @@ export function PortalSwitcher() {
                 onClick={() => setOpen(false)}
                 className={cn(
                   "block rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent",
-                  pathname === portal.href || pathname.startsWith(`${portal.href}/`)
+                  portalPathMatches(pathname, portal.href) &&
+                    activePortal?.portal === portal.portal
                     ? "bg-accent font-medium"
                     : "",
                 )}
               >
-                {getPortalSwitchLabel(portal.portal, portal.label, isSuperAdmin)}
+                {portal.label}
               </Link>
             ))}
           </div>
