@@ -50,7 +50,7 @@ export function EmployeeDashboardHeader({ greeting }: { greeting: EmployeeGreeti
 
   useEffect(() => {
     setNow(new Date());
-    const timer = setInterval(() => setNow(new Date()), 1000);
+    const timer = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(timer);
   }, []);
 
@@ -67,7 +67,6 @@ export function EmployeeDashboardHeader({ greeting }: { greeting: EmployeeGreeti
     ? now.toLocaleTimeString("en-IN", {
         hour: "2-digit",
         minute: "2-digit",
-        second: "2-digit",
         hour12: true,
       })
     : "";

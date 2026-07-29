@@ -1,11 +1,9 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-
 import { format, parseISO } from "date-fns";
 import QRCode from "qrcode";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 
 import { amountToIndianWords } from "@/lib/payroll/services/amount-in-words";
+import { loadLogoBytesCached } from "@/lib/payroll/services/payslip-logo-cache";
 import { buildPayslipVerificationUrl } from "@/lib/payroll/services/payslip-verification";
 import { formatPayslipDisplayAddress } from "@/lib/payroll/services/payslip-branding";
 import { PAYSLIP_ENGINE_NAME } from "@/lib/payroll/services/payslip-publication";
@@ -70,26 +68,7 @@ function fmtDate(value: string | null | undefined): string {
 }
 
 async function loadLogoBytes(logoUrl: string | null): Promise<Uint8Array | null> {
-  if (!logoUrl) return null;
-  if (logoUrl.startsWith("/")) {
-    const publicPath = path.join(process.cwd(), "public", logoUrl.replace(/^\//, ""));
-    try {
-      return await readFile(publicPath);
-    } catch {
-      try {
-        return await readFile(path.join(process.cwd(), "src/assets/Logo.png"));
-      } catch {
-        return null;
-      }
-    }
-  }
-  try {
-    const response = await fetch(logoUrl);
-    if (!response.ok) return null;
-    return new Uint8Array(await response.arrayBuffer());
-  } catch {
-    return null;
-  }
+  return loadLogoBytesCached(logoUrl);
 }
 
 function ensureSpace(ctx: Ctx, height: number) {

@@ -15,6 +15,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 
+import { usePollWhenVisible } from "@/hooks/use-poll-when-visible";
 import { Button } from "@/components/common/button";
 import {
   DropdownMenu,
@@ -89,9 +90,9 @@ export function NotificationBell() {
   useEffect(() => {
     attachNotificationSoundUnlock();
     void refresh();
-    const timer = setInterval(() => void refresh(), POLL_INTERVAL_MS);
-    return () => clearInterval(timer);
   }, [refresh]);
+
+  usePollWhenVisible(() => void refresh(), POLL_INTERVAL_MS, { skipInitial: true });
 
   useEffect(() => {
     if (open) void refresh();

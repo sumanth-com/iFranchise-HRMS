@@ -1,3 +1,4 @@
+import { cache } from "react";
 import {
   addDays,
   format,
@@ -47,7 +48,7 @@ import type { PayrollStatus } from "@/types/payroll";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LooseRow = Record<string, any>;
 
-const ACTIVE_STATUSES = new Set(["active", "probation", "on_leave"]);
+const ACTIVE_EMPLOYMENT_STATUSES = ["active", "probation", "on_leave"];
 
 function employeeHref(row: {
   employee_code?: string;
@@ -201,15 +202,18 @@ function preferredActivityTitle(
   return humanizeActivityTitle(action);
 }
 
-export async function getHrDashboardData(
+export const getHrDashboardData = cache(async function getHrDashboardData(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
 ): Promise<HrDashboardData> {
   const organizationId = profile.employee.organizationId;
   const today = getTodayDateString();
   const todayDate = parseISO(today);
-  const sevenDaysAgo = format(subDays(todayDate, 6), "yyyy-MM-dd");
   const eventHorizon = addDays(todayDate, 30);
+  const dayKeys: string[] = [];
+  for (let i = 6; i >= 0; i--) {
+    dayKeys.push(format(subDays(todayDate, i), "yyyy-MM-dd"));
+  }
 
   const [
     attendance,
@@ -221,7 +225,9 @@ export async function getHrDashboardData(
     holidays,
     employeesRes,
     profilesRes,
-    attendanceTrendRes,
+    departmentsRes,
+    employmentTypesRes,
+    attendanceTrendCountsRes,
     leaveTypesRes,
     recentEmployeesRes,
     recentLeaveRes,
@@ -241,25 +247,36 @@ export async function getHrDashboardData(
     }),
     fromHrms(supabase, "employees")
       .select(
-        `id, employee_code, first_name, last_name, email, employment_status, date_of_joining, date_of_leaving,
-         department_id, employment_type_id,
-         departments:department_id(name),
-         employment_types:employment_type_id(name)`,
+        "id, employee_code, first_name, last_name, employment_status, date_of_joining, department_id, employment_type_id",
       )
       .eq("organization_id", organizationId)
-      .is("deleted_at", null)
-      .limit(5000),
+      .in("employment_status", ACTIVE_EMPLOYMENT_STATUSES)
+      .is("deleted_at", null),
     fromHrms(supabase, "employee_profiles")
-      .select("employee_id, date_of_birth, gender, employees:employee_id!inner(organization_id)")
+      .select(
+        "employee_id, date_of_birth, gender, employees:employee_id!inner(organization_id, employment_status)",
+      )
       .eq("employees.organization_id", organizationId)
-      .is("deleted_at", null)
-      .limit(5000),
-    fromHrms(supabase, "attendance")
-      .select("attendance_date, attendance_status")
+      .in("employees.employment_status", ACTIVE_EMPLOYMENT_STATUSES)
+      .is("deleted_at", null),
+    fromHrms(supabase, "departments")
+      .select("id, name")
       .eq("organization_id", organizationId)
-      .is("deleted_at", null)
-      .gte("attendance_date", sevenDaysAgo)
-      .lte("attendance_date", today),
+      .is("deleted_at", null),
+    fromHrms(supabase, "employment_types")
+      .select("id, name")
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null),
+    Promise.all(
+      dayKeys.map((day) =>
+        fromHrms(supabase, "attendance")
+          .select("id", { count: "exact", head: true })
+          .eq("organization_id", organizationId)
+          .eq("attendance_date", day)
+          .in("attendance_status", ["present", "late", "half_day"])
+          .is("deleted_at", null),
+      ),
+    ),
     fromHrms(supabase, "leave_requests")
       .select("leave_type_id, total_days, leave_status, leave_types:leave_type_id(name)")
       .eq("organization_id", organizationId)
@@ -305,15 +322,29 @@ export async function getHrDashboardData(
       .select("employee_id, components, employees:employee_id!inner(organization_id)")
       .eq("employees.organization_id", organizationId)
       .is("deleted_at", null)
-      .eq("status", "active")
-      .limit(5000),
+      .eq("status", "active"),
   ]);
 
   if (employeesRes.error) throw new Error(employeesRes.error.message);
+  if (departmentsRes.error) throw new Error(departmentsRes.error.message);
+  if (employmentTypesRes.error) throw new Error(employmentTypesRes.error.message);
+  for (const trendRes of attendanceTrendCountsRes) {
+    if (trendRes.error) throw new Error(trendRes.error.message);
+  }
 
   const empRows = (employeesRes.data ?? []) as LooseRow[];
-  const activeEmployees = empRows.filter((e) => ACTIVE_STATUSES.has(e.employment_status));
+  const activeEmployees = empRows;
   const totalEmployees = activeEmployees.length;
+
+  const departmentNameById = new Map<string, string>();
+  for (const row of (departmentsRes.data ?? []) as LooseRow[]) {
+    if (row.id && row.name) departmentNameById.set(row.id, row.name);
+  }
+
+  const employmentTypeNameById = new Map<string, string>();
+  for (const row of (employmentTypesRes.data ?? []) as LooseRow[]) {
+    if (row.id && row.name) employmentTypeNameById.set(row.id, row.name);
+  }
 
   const profileByEmployee = new Map<string, LooseRow>();
   for (const p of (profilesRes.data ?? []) as LooseRow[]) {
@@ -330,7 +361,10 @@ export async function getHrDashboardData(
   // Department headcount
   const deptMap = new Map<string, number>();
   for (const e of activeEmployees) {
-    const dept = unwrapRelation(e.departments)?.name ?? "Unassigned";
+    const dept =
+      e.department_id
+        ? departmentNameById.get(e.department_id as string) ?? "Unassigned"
+        : "Unassigned";
     deptMap.set(dept, (deptMap.get(dept) ?? 0) + 1);
   }
 
@@ -352,7 +386,9 @@ export async function getHrDashboardData(
   // Employment type
   const typeMap = new Map<string, number>();
   for (const e of activeEmployees) {
-    const typeName = unwrapRelation(e.employment_types)?.name ?? "Unassigned";
+    const typeName = e.employment_type_id
+      ? employmentTypeNameById.get(e.employment_type_id as string) ?? "Unassigned"
+      : "Unassigned";
     typeMap.set(typeName, (typeMap.get(typeName) ?? 0) + 1);
   }
 
@@ -363,19 +399,10 @@ export async function getHrDashboardData(
     leaveDistMap.set(name, (leaveDistMap.get(name) ?? 0) + Number(row.total_days ?? 0));
   }
 
-  // Attendance 7-day trend
-  const dayKeys: string[] = [];
-  for (let i = 6; i >= 0; i--) {
-    dayKeys.push(format(subDays(todayDate, i), "yyyy-MM-dd"));
-  }
-  const presentByDay = new Map<string, number>(dayKeys.map((k) => [k, 0]));
-  for (const row of (attendanceTrendRes.data ?? []) as LooseRow[]) {
-    const d = String(row.attendance_date);
-    if (!presentByDay.has(d)) continue;
-    if (["present", "late", "half_day"].includes(row.attendance_status)) {
-      presentByDay.set(d, (presentByDay.get(d) ?? 0) + 1);
-    }
-  }
+  // Attendance 7-day trend (count queries per day — avoids scanning full attendance rows)
+  const presentByDay = new Map<string, number>(
+    dayKeys.map((day, index) => [day, attendanceTrendCountsRes[index]?.count ?? 0]),
+  );
 
   // Birthdays & anniversaries (next 30 days)
   const upcomingBirthdays: DashboardPersonEvent[] = [];
@@ -706,4 +733,4 @@ export async function getHrDashboardData(
     recentRecruitment,
     recentPayrollRuns,
   };
-}
+});

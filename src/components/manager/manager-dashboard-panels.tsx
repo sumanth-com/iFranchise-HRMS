@@ -17,8 +17,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition, useCallback } from "react";
 
+import { usePollWhenVisible } from "@/hooks/use-poll-when-visible";
 import { EmptyState } from "@/components/common/empty-state";
 import { fetchManagerDashboardActivitiesAction } from "@/lib/manager/actions/manager-dashboard-actions";
 import {
@@ -224,35 +225,31 @@ function ManagerLiveActivityFeed({
     [activities, focusFilter, selectedEmployeeId],
   );
 
+  const refreshActivities = useCallback(() => {
+    startRefresh(async () => {
+      const result = await fetchManagerDashboardActivitiesAction(
+        selectedEmployeeId ?? undefined,
+      );
+      setActivities((previous) => {
+        const previousIds = new Set(previous.map((item) => item.id));
+        const incomingNew = result.activities
+          .filter((item) => !previousIds.has(item.id))
+          .map((item) => item.id);
+        if (incomingNew.length) {
+          setNewIds(new Set(incomingNew));
+          window.setTimeout(() => setNewIds(new Set()), 4_000);
+        }
+        return result.activities;
+      });
+      setLastUpdated(new Date(result.generatedAt));
+    });
+  }, [selectedEmployeeId, startRefresh]);
+
   useEffect(() => {
     setActivities(initialActivities);
   }, [initialActivities]);
 
-  useEffect(() => {
-    function refresh() {
-      startRefresh(async () => {
-        const result = await fetchManagerDashboardActivitiesAction(
-          selectedEmployeeId ?? undefined,
-        );
-        setActivities((previous) => {
-          const previousIds = new Set(previous.map((item) => item.id));
-          const incomingNew = result.activities
-            .filter((item) => !previousIds.has(item.id))
-            .map((item) => item.id);
-          if (incomingNew.length) {
-            setNewIds(new Set(incomingNew));
-            window.setTimeout(() => setNewIds(new Set()), 4_000);
-          }
-          return result.activities;
-        });
-        setLastUpdated(new Date(result.generatedAt));
-      });
-    }
-
-    refresh();
-    const pollId = window.setInterval(refresh, LIVE_POLL_MS);
-    return () => window.clearInterval(pollId);
-  }, [selectedEmployeeId]);
+  usePollWhenVisible(refreshActivities, LIVE_POLL_MS, { skipInitial: true });
 
   useEffect(() => {
     const tickId = window.setInterval(() => setTimeTick((value) => value + 1), TIME_REFRESH_MS);

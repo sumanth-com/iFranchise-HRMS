@@ -74,6 +74,222 @@ function emptyDashboard(teamMembers: ManagerDashboardData["teamMembers"]): Manag
   };
 }
 
+function buildManagerActivitiesFromSources(sources: {
+  recentLeaves: LooseRow[];
+  recentCorrections: LooseRow[];
+  recentFeedback: LooseRow[];
+  recentJoiners: LooseRow[];
+  recentPromotions: LooseRow[];
+  completedInterviews: LooseRow[];
+}): ManagerActivityItem[] {
+  return [
+    ...sources.recentLeaves.map((row: LooseRow) => {
+      const employee = unwrapRelation(row.employees);
+      const leaveType = unwrapRelation(row.leave_types);
+      return {
+        id: `activity-leave-${row.id}`,
+        kind: "leave_applied" as const,
+        title: "Leave applied",
+        description: `${employee ? formatEmployeeName(employee.first_name, employee.last_name) : "Team member"} · ${leaveType?.name ?? "Leave"} · ${row.total_days} day(s)`,
+        occurredAt: row.created_at,
+        employeeId: row.employee_id as string | undefined,
+      };
+    }),
+    ...sources.recentCorrections.map((row: LooseRow) => {
+      const employee = unwrapRelation(row.employees);
+      const attendance = unwrapRelation(row.attendance);
+      return {
+        id: `activity-correction-${row.id}`,
+        kind: "attendance_regularized" as const,
+        title: "Attendance regularized",
+        description: `${employee ? formatEmployeeName(employee.first_name, employee.last_name) : "Team member"} · ${attendance?.attendance_date ?? "Date pending"} · ${row.correction_status}`,
+        occurredAt: row.reviewed_at ?? row.updated_at ?? row.created_at,
+        employeeId: row.employee_id as string | undefined,
+      };
+    }),
+    ...sources.recentFeedback.map((row: LooseRow) => {
+      const recipient = unwrapRelation(row.to_employee);
+      const author = unwrapRelation(row.from_employee);
+      return {
+        id: `activity-feedback-${row.id}`,
+        kind: "feedback_submitted" as const,
+        title: "Feedback submitted",
+        description: `${author ? formatEmployeeName(author.first_name, author.last_name) : "Someone"} → ${recipient ? formatEmployeeName(recipient.first_name, recipient.last_name) : "Team member"} · ${row.feedback_type}`,
+        occurredAt: row.created_at,
+        employeeId: row.to_employee_id as string | undefined,
+      };
+    }),
+    ...sources.recentJoiners.map((row: LooseRow) => ({
+      id: `activity-join-${row.id}`,
+      kind: "employee_joined" as const,
+      title: "New employee joined",
+      description: `${formatEmployeeName(row.first_name, row.last_name)} · ${row.employee_code}${row.date_of_joining ? ` · Joined ${format(parseISO(row.date_of_joining), "d MMM yyyy")}` : ""}`,
+      occurredAt: row.created_at,
+      employeeId: row.id as string,
+    })),
+    ...sources.recentPromotions.map((row: LooseRow) => {
+      const employee = unwrapRelation(row.employees);
+      const designation = unwrapRelation(row.recommended_designation);
+      return {
+        id: `activity-promotion-${row.id}`,
+        kind: "promotion_recommendation" as const,
+        title: "Promotion recommendation",
+        description: `${employee ? formatEmployeeName(employee.first_name, employee.last_name) : "Team member"} · ${designation?.title ?? "New role"} · ${row.promotion_status}`,
+        occurredAt: row.created_at,
+        employeeId: row.employee_id as string | undefined,
+      };
+    }),
+    ...sources.completedInterviews.map((row: LooseRow) => {
+      const candidate = unwrapRelation(row.candidates);
+      return {
+        id: `activity-interview-${row.id}`,
+        kind: "interview_completed" as const,
+        title: "Interview completed",
+        description: `${candidate ? formatEmployeeName(candidate.first_name, candidate.last_name) : "Candidate"} · ${row.round_name ?? "Interview round"}`,
+        occurredAt: row.updated_at ?? row.created_at,
+      };
+    }),
+  ]
+    .sort(
+      (left, right) =>
+        new Date(right.occurredAt).getTime() - new Date(left.occurredAt).getTime(),
+    )
+    .slice(0, ACTIVITY_LIMIT);
+}
+
+async function fetchManagerActivitySources(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  managerId: string,
+  teamIds: string[],
+  todayDate: Date,
+) {
+  const [
+    recentLeavesResult,
+    recentCorrectionsResult,
+    recentFeedbackResult,
+    recentJoinersResult,
+    recentPromotionsResult,
+    completedInterviewsResult,
+  ] = await Promise.all([
+    supabase
+      .schema("hrms")
+      .from("leave_requests")
+      .select(
+        `
+          id,
+          employee_id,
+          start_date,
+          end_date,
+          total_days,
+          leave_status,
+          created_at,
+          employees:employee_id!inner (first_name, last_name),
+          leave_types:leave_type_id (name)
+        `,
+      )
+      .in("employee_id", teamIds)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(12),
+    supabase
+      .schema("hrms")
+      .from("attendance_corrections")
+      .select(
+        `
+          id,
+          employee_id,
+          correction_status,
+          reviewed_at,
+          updated_at,
+          created_at,
+          employees:employee_id!inner (first_name, last_name),
+          attendance:attendance_id (attendance_date)
+        `,
+      )
+      .in("employee_id", teamIds)
+      .in("correction_status", ["approved", "rejected"])
+      .is("deleted_at", null)
+      .order("updated_at", { ascending: false })
+      .limit(12),
+    fromHrms(supabase, "performance_feedback")
+      .select(
+        `
+          id,
+          feedback_type,
+          to_employee_id,
+          created_at,
+          to_employee:to_employee_id (first_name, last_name),
+          from_employee:from_employee_id (first_name, last_name)
+        `,
+      )
+      .eq("organization_id", organizationId)
+      .in("to_employee_id", teamIds)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(12),
+    supabase
+      .schema("hrms")
+      .from("employees")
+      .select("id, first_name, last_name, employee_code, date_of_joining, created_at")
+      .eq("organization_id", organizationId)
+      .in("id", teamIds)
+      .gte("date_of_joining", format(addDays(todayDate, -60), "yyyy-MM-dd"))
+      .is("deleted_at", null)
+      .order("date_of_joining", { ascending: false })
+      .limit(12),
+    fromHrms(supabase, "performance_promotions")
+      .select(
+        `
+          id,
+          promotion_status,
+          created_at,
+          employees:employee_id!inner (first_name, last_name),
+          recommended_designation:recommended_designation_id (title)
+        `,
+      )
+      .eq("organization_id", organizationId)
+      .in("employee_id", teamIds)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(12),
+    fromHrms(supabase, "recruitment_interviews")
+      .select(
+        `
+          id,
+          round_name,
+          interview_status,
+          interview_date,
+          updated_at,
+          created_at,
+          candidates:candidate_id (first_name, last_name)
+        `,
+      )
+      .eq("organization_id", organizationId)
+      .eq("interviewer_employee_id", managerId)
+      .eq("interview_status", "completed")
+      .is("deleted_at", null)
+      .order("updated_at", { ascending: false })
+      .limit(12),
+  ]);
+
+  if (recentLeavesResult.error) throw new Error(recentLeavesResult.error.message);
+  if (recentCorrectionsResult.error) throw new Error(recentCorrectionsResult.error.message);
+  if (recentFeedbackResult.error) throw new Error(recentFeedbackResult.error.message);
+  if (recentJoinersResult.error) throw new Error(recentJoinersResult.error.message);
+  if (recentPromotionsResult.error) throw new Error(recentPromotionsResult.error.message);
+  if (completedInterviewsResult.error) throw new Error(completedInterviewsResult.error.message);
+
+  return {
+    recentLeaves: (recentLeavesResult.data ?? []) as LooseRow[],
+    recentCorrections: (recentCorrectionsResult.data ?? []) as LooseRow[],
+    recentFeedback: (recentFeedbackResult.data ?? []) as LooseRow[],
+    recentJoiners: (recentJoinersResult.data ?? []) as LooseRow[],
+    recentPromotions: (recentPromotionsResult.data ?? []) as LooseRow[],
+    completedInterviews: (completedInterviewsResult.data ?? []) as LooseRow[],
+  };
+}
+
 export async function getManagerDashboardData(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -552,79 +768,14 @@ export async function getManagerDashboardData(
     probationEndingSoon,
   };
 
-  const activities: ManagerActivityItem[] = [
-    ...(recentLeavesResult.data ?? []).map((row: LooseRow) => {
-      const employee = unwrapRelation(row.employees);
-      const leaveType = unwrapRelation(row.leave_types);
-      return {
-        id: `activity-leave-${row.id}`,
-        kind: "leave_applied" as const,
-        title: "Leave applied",
-        description: `${employee ? formatEmployeeName(employee.first_name, employee.last_name) : "Team member"} · ${leaveType?.name ?? "Leave"} · ${row.total_days} day(s)`,
-        occurredAt: row.created_at,
-        employeeId: row.employee_id as string | undefined,
-      };
-    }),
-    ...(recentCorrectionsResult.data ?? []).map((row: LooseRow) => {
-      const employee = unwrapRelation(row.employees);
-      const attendance = unwrapRelation(row.attendance);
-      return {
-        id: `activity-correction-${row.id}`,
-        kind: "attendance_regularized" as const,
-        title: "Attendance regularized",
-        description: `${employee ? formatEmployeeName(employee.first_name, employee.last_name) : "Team member"} · ${attendance?.attendance_date ?? "Date pending"} · ${row.correction_status}`,
-        occurredAt: row.reviewed_at ?? row.updated_at ?? row.created_at,
-        employeeId: row.employee_id as string | undefined,
-      };
-    }),
-    ...(recentFeedbackResult.data ?? []).map((row: LooseRow) => {
-      const recipient = unwrapRelation(row.to_employee);
-      const author = unwrapRelation(row.from_employee);
-      return {
-        id: `activity-feedback-${row.id}`,
-        kind: "feedback_submitted" as const,
-        title: "Feedback submitted",
-        description: `${author ? formatEmployeeName(author.first_name, author.last_name) : "Someone"} → ${recipient ? formatEmployeeName(recipient.first_name, recipient.last_name) : "Team member"} · ${row.feedback_type}`,
-        occurredAt: row.created_at,
-        employeeId: row.to_employee_id as string | undefined,
-      };
-    }),
-    ...(recentJoinersResult.data ?? []).map((row: LooseRow) => ({
-      id: `activity-join-${row.id}`,
-      kind: "employee_joined" as const,
-      title: "New employee joined",
-      description: `${formatEmployeeName(row.first_name, row.last_name)} · ${row.employee_code}${row.date_of_joining ? ` · Joined ${format(parseISO(row.date_of_joining), "d MMM yyyy")}` : ""}`,
-      occurredAt: row.created_at,
-      employeeId: row.id as string,
-    })),
-    ...(recentPromotionsResult.data ?? []).map((row: LooseRow) => {
-      const employee = unwrapRelation(row.employees);
-      const designation = unwrapRelation(row.recommended_designation);
-      return {
-        id: `activity-promotion-${row.id}`,
-        kind: "promotion_recommendation" as const,
-        title: "Promotion recommendation",
-        description: `${employee ? formatEmployeeName(employee.first_name, employee.last_name) : "Team member"} · ${designation?.title ?? "New role"} · ${row.promotion_status}`,
-        occurredAt: row.created_at,
-        employeeId: row.employee_id as string | undefined,
-      };
-    }),
-    ...(completedInterviewsResult.data ?? []).map((row: LooseRow) => {
-      const candidate = unwrapRelation(row.candidates);
-      return {
-        id: `activity-interview-${row.id}`,
-        kind: "interview_completed" as const,
-        title: "Interview completed",
-        description: `${candidate ? formatEmployeeName(candidate.first_name, candidate.last_name) : "Candidate"} · ${row.round_name ?? "Interview round"}`,
-        occurredAt: row.updated_at ?? row.created_at,
-      };
-    }),
-  ]
-    .sort(
-      (left, right) =>
-        new Date(right.occurredAt).getTime() - new Date(left.occurredAt).getTime(),
-    )
-    .slice(0, ACTIVITY_LIMIT);
+  const activities = buildManagerActivitiesFromSources({
+    recentLeaves: (recentLeavesResult.data ?? []) as LooseRow[],
+    recentCorrections: (recentCorrectionsResult.data ?? []) as LooseRow[],
+    recentFeedback: (recentFeedbackResult.data ?? []) as LooseRow[],
+    recentJoiners: (recentJoinersResult.data ?? []) as LooseRow[],
+    recentPromotions: (recentPromotionsResult.data ?? []) as LooseRow[],
+    completedInterviews: (completedInterviewsResult.data ?? []) as LooseRow[],
+  });
 
   return {
     generatedAt: new Date().toISOString(),
@@ -640,15 +791,36 @@ export async function getManagerDashboardActivities(
   profile: UserProfile,
   employeeId?: string,
 ): Promise<{ generatedAt: string; activities: ManagerActivityItem[] }> {
-  const data = await getManagerDashboardData(supabase, profile);
-  const activities = employeeId
-    ? data.activities.filter(
+  const managerId = profile.employee.id;
+  const organizationId = profile.employee.organizationId;
+  const todayDate = parseISO(getTodayDateString());
+
+  const { teamIds } = await getManagerTeamContext(
+    supabase,
+    organizationId,
+    managerId,
+  );
+
+  if (teamIds.length === 0) {
+    return { generatedAt: new Date().toISOString(), activities: [] };
+  }
+
+  const sources = await fetchManagerActivitySources(
+    supabase,
+    organizationId,
+    managerId,
+    teamIds,
+    todayDate,
+  );
+  const activities = buildManagerActivitiesFromSources(sources);
+  const filtered = employeeId
+    ? activities.filter(
         (item) => !item.employeeId || item.employeeId === employeeId,
       )
-    : data.activities;
+    : activities;
 
   return {
     generatedAt: new Date().toISOString(),
-    activities,
+    activities: filtered,
   };
 }

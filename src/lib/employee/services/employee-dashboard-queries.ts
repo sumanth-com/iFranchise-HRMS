@@ -1,6 +1,7 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
-import { getEmployeeById } from "@/lib/employees/services/employee-detail";
+import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
+import { createSignedStorageUrl } from "@/lib/employees/services/employee-mutations";
 import { getEmployeeLeaveBalanceSnapshot } from "@/lib/leave/services/leave-queries";
 import { getManagerProfilePageData } from "@/lib/manager/services/manager-self-attendance-service";
 import { listHolidays } from "@/lib/organization/services/org-queries";
@@ -43,19 +44,50 @@ async function loadGreeting(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
 ): Promise<EmployeeGreeting> {
-  const employee = await getEmployeeById(supabase, profile.employee.id);
+  const employeeId = profile.employee.id;
 
-  const firstName = employee?.firstName ?? "there";
-  const lastName = employee?.lastName ?? "";
+  const [employeeResult, profileResult] = await Promise.all([
+    supabase
+      .schema("hrms")
+      .from("employees")
+      .select(
+        `
+          employee_code,
+          first_name,
+          last_name,
+          departments:department_id (name),
+          designations:designation_id (title)
+        `,
+      )
+      .eq("id", employeeId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    supabase
+      .schema("hrms")
+      .from("employee_profiles")
+      .select("profile_image_storage_path")
+      .eq("employee_id", employeeId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+  ]);
+
+  const employee = employeeResult.data;
+  const firstName = employee?.first_name ?? "there";
+  const lastName = employee?.last_name ?? "";
   const fullName = `${firstName} ${lastName}`.trim();
 
+  const department = employee?.departments as { name: string } | { name: string }[] | null;
+  const designation = employee?.designations as { title: string } | { title: string }[] | null;
+  const departmentName = Array.isArray(department)
+    ? department[0]?.name ?? null
+    : department?.name ?? null;
+  const designationTitle = Array.isArray(designation)
+    ? designation[0]?.title ?? null
+    : designation?.title ?? null;
+
   let avatarUrl: string | null = null;
-  const imagePath = employee?.profile?.profileImageStoragePath ?? null;
+  const imagePath = profileResult.data?.profile_image_storage_path ?? null;
   if (imagePath) {
-    const { createSignedStorageUrl } = await import(
-      "@/lib/employees/services/employee-mutations"
-    );
-    const { EMPLOYEE_STORAGE_BUCKETS } = await import("@/lib/employees/constants");
     avatarUrl = await createSignedStorageUrl(
       supabase,
       EMPLOYEE_STORAGE_BUCKETS.profileImages,
@@ -64,13 +96,13 @@ async function loadGreeting(
   }
 
   return {
-    employeeId: profile.employee.id,
+    employeeId,
     firstName,
     lastName,
     fullName: fullName || firstName,
-    employeeCode: employee?.employeeCode ?? profile.employee.employeeCode,
-    designation: employee?.designationTitle ?? null,
-    departmentName: employee?.departmentName ?? null,
+    employeeCode: employee?.employee_code ?? profile.employee.employeeCode,
+    designation: designationTitle,
+    departmentName,
     avatarUrl,
   };
 }

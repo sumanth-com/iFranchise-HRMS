@@ -84,26 +84,35 @@ export async function getOrganizationProfile(
   };
 }
 
-async function countEmployees(
+type EmployeeCountField = "branch_id" | "department_id" | "designation_id" | "employment_type_id";
+
+async function countEmployeesGrouped(
   supabase: AuthSupabaseClient,
   organizationId: string,
-  filter: { branchId?: string; departmentId?: string; designationId?: string; employmentTypeId?: string },
-) {
-  let query = supabase
+  field: EmployeeCountField,
+  ids: string[],
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  if (ids.length === 0) return counts;
+
+  const { data, error } = await supabase
     .schema("hrms")
     .from("employees")
-    .select("id", { count: "exact", head: true })
+    .select(field)
     .eq("organization_id", organizationId)
+    .in(field, ids)
     .is("deleted_at", null);
 
-  if (filter.branchId) query = query.eq("branch_id", filter.branchId);
-  if (filter.departmentId) query = query.eq("department_id", filter.departmentId);
-  if (filter.designationId) query = query.eq("designation_id", filter.designationId);
-  if (filter.employmentTypeId) query = query.eq("employment_type_id", filter.employmentTypeId);
-
-  const { count, error } = await query;
   if (error) throw new Error(error.message);
-  return count ?? 0;
+
+  for (const id of ids) counts.set(id, 0);
+  for (const row of data ?? []) {
+    const key = (row as Record<string, string | null>)[field];
+    if (!key) continue;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  return counts;
 }
 
 export async function getOrganizationDashboardStats(
@@ -279,34 +288,39 @@ export async function listBranches(
   const { data, error, count } = await query;
   if (error) throw new Error(error.message);
 
-  const rows = await Promise.all(
-    (data ?? []).map(async (row) => {
-      const head = unwrapRelation(
-        row.branch_head as { first_name: string; last_name: string } | { first_name: string; last_name: string }[] | null,
-      );
-      const employeeCount = await countEmployees(supabase, organizationId, { branchId: row.id });
-      return {
-        id: row.id,
-        code: row.code,
-        name: row.name,
-        location: row.location,
-        addressLine1: row.address_line1,
-        addressLine2: row.address_line2,
-        city: row.city,
-        state: row.state,
-        postalCode: row.postal_code,
-        country: row.country,
-        phone: row.phone,
-        email: row.email,
-        branchHeadId: row.branch_head_id,
-        branchHeadName: head ? `${head.first_name} ${head.last_name}` : null,
-        isHeadOffice: row.is_head_office,
-        status: row.status,
-        employeeCount,
-        updatedAt: row.updated_at,
-      };
-    }),
+  const branchIds = (data ?? []).map((row) => row.id);
+  const employeeCounts = await countEmployeesGrouped(
+    supabase,
+    organizationId,
+    "branch_id",
+    branchIds,
   );
+
+  const rows = (data ?? []).map((row) => {
+    const head = unwrapRelation(
+      row.branch_head as { first_name: string; last_name: string } | { first_name: string; last_name: string }[] | null,
+    );
+    return {
+      id: row.id,
+      code: row.code,
+      name: row.name,
+      location: row.location,
+      addressLine1: row.address_line1,
+      addressLine2: row.address_line2,
+      city: row.city,
+      state: row.state,
+      postalCode: row.postal_code,
+      country: row.country,
+      phone: row.phone,
+      email: row.email,
+      branchHeadId: row.branch_head_id,
+      branchHeadName: head ? `${head.first_name} ${head.last_name}` : null,
+      isHeadOffice: row.is_head_office,
+      status: row.status,
+      employeeCount: employeeCounts.get(row.id) ?? 0,
+      updatedAt: row.updated_at,
+    };
+  });
 
   return { data: rows, total: count ?? 0, page, pageSize };
 }
@@ -345,15 +359,21 @@ export async function listDepartments(
   const { data, error, count } = await query;
   if (error) throw new Error(error.message);
 
-  const rows = await Promise.all(
-    (data ?? []).map(async (row) => {
-      const head = unwrapRelation(
-        row.department_head as { first_name: string; last_name: string } | { first_name: string; last_name: string }[] | null,
-      );
-      const parent = unwrapRelation(row.parent_department as { name: string } | { name: string }[] | null);
-      const branch = unwrapRelation(row.branches as { name: string } | { name: string }[] | null);
-      const employeeCount = await countEmployees(supabase, organizationId, { departmentId: row.id });
-      return {
+  const departmentIds = (data ?? []).map((row) => row.id);
+  const employeeCounts = await countEmployeesGrouped(
+    supabase,
+    organizationId,
+    "department_id",
+    departmentIds,
+  );
+
+  const rows = (data ?? []).map((row) => {
+    const head = unwrapRelation(
+      row.department_head as { first_name: string; last_name: string } | { first_name: string; last_name: string }[] | null,
+    );
+    const parent = unwrapRelation(row.parent_department as { name: string } | { name: string }[] | null);
+    const branch = unwrapRelation(row.branches as { name: string } | { name: string }[] | null);
+    return {
         id: row.id,
         name: row.name,
         code: row.code,
@@ -365,11 +385,10 @@ export async function listDepartments(
         branchId: row.branch_id,
         branchName: branch?.name ?? null,
         status: row.status,
-        employeeCount,
+        employeeCount: employeeCounts.get(row.id) ?? 0,
         updatedAt: row.updated_at,
       };
-    }),
-  );
+  });
 
   return { data: rows, total: count ?? 0, page, pageSize };
 }
@@ -406,24 +425,29 @@ export async function listDesignations(
   const { data, error, count } = await query;
   if (error) throw new Error(error.message);
 
-  const rows = await Promise.all(
-    (data ?? []).map(async (row) => {
-      const dept = unwrapRelation(row.departments as { name: string } | { name: string }[] | null);
-      const employeeCount = await countEmployees(supabase, organizationId, { designationId: row.id });
-      return {
-        id: row.id,
-        title: row.title,
-        code: row.code,
-        departmentId: row.department_id,
-        departmentName: dept?.name ?? null,
-        level: row.level,
-        description: row.description,
-        status: row.status,
-        employeeCount,
-        updatedAt: row.updated_at,
-      };
-    }),
+  const designationIds = (data ?? []).map((row) => row.id);
+  const employeeCounts = await countEmployeesGrouped(
+    supabase,
+    organizationId,
+    "designation_id",
+    designationIds,
   );
+
+  const rows = (data ?? []).map((row) => {
+    const dept = unwrapRelation(row.departments as { name: string } | { name: string }[] | null);
+    return {
+      id: row.id,
+      title: row.title,
+      code: row.code,
+      departmentId: row.department_id,
+      departmentName: dept?.name ?? null,
+      level: row.level,
+      description: row.description,
+      status: row.status,
+      employeeCount: employeeCounts.get(row.id) ?? 0,
+      updatedAt: row.updated_at,
+    };
+  });
 
   return { data: rows, total: count ?? 0, page, pageSize };
 }
@@ -442,19 +466,25 @@ export async function listEmploymentTypes(
 
   if (error) throw new Error(error.message);
 
-  return Promise.all(
-    (data ?? []).map(async (row) => ({
-      id: row.id,
-      name: row.name,
-      code: row.code,
-      description: row.description,
-      isFullTime: row.is_full_time,
-      defaultHoursPerWeek: Number(row.default_hours_per_week),
-      status: row.status,
-      employeeCount: await countEmployees(supabase, organizationId, { employmentTypeId: row.id }),
-      updatedAt: row.updated_at,
-    })),
+  const typeIds = (data ?? []).map((row) => row.id);
+  const employeeCounts = await countEmployeesGrouped(
+    supabase,
+    organizationId,
+    "employment_type_id",
+    typeIds,
   );
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    name: row.name,
+    code: row.code,
+    description: row.description,
+    isFullTime: row.is_full_time,
+    defaultHoursPerWeek: Number(row.default_hours_per_week),
+    status: row.status,
+    employeeCount: employeeCounts.get(row.id) ?? 0,
+    updatedAt: row.updated_at,
+  }));
 }
 
 export async function listWorkLocations(
