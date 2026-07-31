@@ -8,6 +8,7 @@ import {
   clearCandidateSession,
 } from "@/lib/onboarding/candidate-session";
 import {
+  consumeOnboardingInvitationToken,
   createPortalSession,
   generateOtpCode,
   markInvitationViewed,
@@ -26,6 +27,10 @@ import {
   uploadOnboardingDocument,
 } from "@/lib/onboarding/services/onboarding-mutations";
 import { getCandidatePortalContext } from "@/lib/onboarding/services/onboarding-queries";
+import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
+import { assertRateLimit } from "@/lib/security/rate-limit";
+import { hashEmailVerificationToken } from "@/lib/security/signed-flow-tokens";
+import { validateUploadFile } from "@/lib/security/upload-validation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   agreementAcceptanceSchema,
@@ -39,6 +44,26 @@ import {
 } from "@/lib/validations/onboarding";
 
 type ActionResult = { success: true; message: string } | { success: false; message: string };
+
+function onboardingRateLimitKey(scope: string, email: string, ip?: string | null): string {
+  const normalizedEmail = email.trim().toLowerCase();
+  const ipPart = hashEmailVerificationToken(`ip:${ip ?? "unknown"}`);
+  return `onboarding:${scope}:${ipPart}:${normalizedEmail}`;
+}
+
+async function assertOnboardingRateLimit(
+  scope: string,
+  email: string,
+  limit: number,
+  windowMs: number,
+) {
+  const ctx = await getRequestAuditContext();
+  assertRateLimit({
+    key: onboardingRateLimitKey(scope, email, ctx.ipAddress),
+    limit,
+    windowMs,
+  });
+}
 
 export async function validateInviteTokenAction(rawToken: string) {
   return validateOnboardingInvitationToken(rawToken);
@@ -59,6 +84,7 @@ export async function setupCandidateAccountAction(
 
     await markInvitationViewed(validation.data.caseId);
     await storePortalPassword(validation.data.caseId, validation.data.personalEmail, parsed.password);
+    await consumeOnboardingInvitationToken(rawToken);
 
     const session = await createPortalSession(validation.data.caseId);
     await setCandidateSession(session);
@@ -72,6 +98,12 @@ export async function setupCandidateAccountAction(
 export async function candidateLoginAction(input: unknown): Promise<ActionResult> {
   try {
     const parsed = candidateLoginSchema.parse(input);
+    try {
+      await assertOnboardingRateLimit("login", parsed.personalEmail, 5, 15 * 60 * 1000);
+    } catch {
+      return { success: false, message: "Too many login attempts. Please try again later." };
+    }
+
     const caseId = await verifyPortalLogin(parsed.personalEmail, parsed.password);
     if (!caseId) return { success: false, message: "Invalid email or password" };
 
@@ -86,6 +118,12 @@ export async function candidateLoginAction(input: unknown): Promise<ActionResult
 export async function requestCandidateOtpAction(input: unknown): Promise<ActionResult> {
   try {
     const parsed = candidateOtpRequestSchema.parse(input);
+    try {
+      await assertOnboardingRateLimit("otp-request", parsed.personalEmail, 3, 60 * 60 * 1000);
+    } catch {
+      return { success: false, message: "Too many code requests. Please try again later." };
+    }
+
     const admin = createAdminClient();
     const { data: account } = await admin
       .schema("hrms")
@@ -122,6 +160,12 @@ export async function requestCandidateOtpAction(input: unknown): Promise<ActionR
 export async function verifyCandidateOtpAction(input: unknown): Promise<ActionResult> {
   try {
     const parsed = candidateOtpVerifySchema.parse(input);
+    try {
+      await assertOnboardingRateLimit("otp-verify", parsed.personalEmail, 5, 15 * 60 * 1000);
+    } catch {
+      return { success: false, message: "Too many verification attempts. Please try again later." };
+    }
+
     const caseId = await verifyPortalOtp(parsed.personalEmail, parsed.otp);
     if (!caseId) return { success: false, message: "Invalid or expired code" };
 
@@ -177,6 +221,12 @@ export async function uploadCandidateDocumentAction(formData: FormData): Promise
     if (!file || !documentCategory || !documentTypeCode) {
       return { success: false, message: "Missing upload fields" };
     }
+
+    validateUploadFile({
+      fileName: file.name,
+      fileSize: file.size,
+      mimeType: file.type,
+    });
 
     const bytes = new Uint8Array(await file.arrayBuffer());
     await uploadOnboardingDocument(admin, caseId, caseRow.organization_id, {

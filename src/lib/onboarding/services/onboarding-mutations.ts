@@ -20,6 +20,7 @@ import {
 import {
   addTimelineEvent,
   createOnboardingInvitationToken,
+  revokeActiveInvitationTokens,
   revokePortalSessions,
 } from "@/lib/onboarding/onboarding-security";
 import {
@@ -313,11 +314,10 @@ export async function sendOnboardingInvitation(
     throw new Error("Invitation cannot be sent for this onboarding status");
   }
 
-  const { rawToken, expiresAt } = await createOnboardingInvitationToken(
-    caseId,
-    organizationId,
-    profile.userId,
-  );
+  const { rawToken, expiresAt } = await (async () => {
+    await revokeActiveInvitationTokens(caseId);
+    return createOnboardingInvitationToken(caseId, organizationId, profile.userId);
+  })();
   const inviteUrl = onboardingInviteUrl(rawToken);
   const now = new Date().toISOString();
 

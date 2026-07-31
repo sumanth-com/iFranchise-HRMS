@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
 
 import { processDuePayslipPublications } from "@/lib/payroll/services/payslip-publication-worker";
+import { getCronSecret } from "@/lib/security/token-secrets";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { siteConfig } from "@/config/site";
 
 export async function GET(request: Request) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) {
-    return NextResponse.json({ message: "Cron is not configured" }, { status: 503 });
-  }
+  const cronSecret = getCronSecret();
 
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${cronSecret}`) {

@@ -1,8 +1,12 @@
-import { createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { randomBytes, randomInt, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 
+import "server-only";
+
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
-import { getSupabaseServiceRoleKey } from "@/lib/supabase/env";
+import { hmacSha256Hex } from "@/lib/security/hmac-utils";
+import { hashEmailVerificationToken } from "@/lib/security/signed-flow-tokens";
+import { getOnboardingTokenSecret } from "@/lib/security/token-secrets";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   ONBOARDING_INVITATION_TTL_HOURS,
@@ -13,15 +17,11 @@ import {
 const scryptAsync = promisify(scrypt);
 
 function secret(): string {
-  const key = process.env.ONBOARDING_TOKEN_SECRET ?? process.env.APPROVAL_TOKEN_SECRET;
-  if (!key && process.env.NODE_ENV === "production") {
-    throw new Error("ONBOARDING_TOKEN_SECRET is required in production");
-  }
-  return key ?? getSupabaseServiceRoleKey();
+  return getOnboardingTokenSecret();
 }
 
 export function hashOnboardingToken(raw: string): string {
-  return createHmac("sha256", secret()).update(raw).digest("hex");
+  return hmacSha256Hex(secret(), raw);
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -40,11 +40,11 @@ export async function verifyPassword(password: string, stored: string): Promise<
 }
 
 export function generateOtpCode(): string {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  return String(randomInt(100000, 1000000));
 }
 
-export async function hashOtp(code: string): Promise<string> {
-  return hashOnboardingToken(`otp:${code}`);
+export function hashOtp(code: string): string {
+  return hashEmailVerificationToken(`otp:${code}`);
 }
 
 export async function createOnboardingInvitationToken(
@@ -70,6 +70,39 @@ export async function createOnboardingInvitationToken(
 
   if (error) throw new Error(error.message);
   return { rawToken, expiresAt };
+}
+
+export async function revokeActiveInvitationTokens(caseId: string): Promise<void> {
+  const admin = createAdminClient();
+  const now = new Date().toISOString();
+  await admin
+    .schema("hrms")
+    .from("onboarding_invitation_tokens")
+    .update({ status: "inactive", updated_at: now })
+    .eq("case_id", caseId)
+    .eq("status", "active")
+    .is("consumed_at", null)
+    .is("deleted_at", null);
+}
+
+export async function consumeOnboardingInvitationToken(rawToken: string): Promise<void> {
+  const admin = createAdminClient();
+  const tokenHash = hashOnboardingToken(rawToken);
+  const now = new Date().toISOString();
+  const { error } = await admin
+    .schema("hrms")
+    .from("onboarding_invitation_tokens")
+    .update({
+      consumed_at: now,
+      status: "inactive",
+      updated_at: now,
+    })
+    .eq("token_hash", tokenHash)
+    .is("consumed_at", null)
+    .eq("status", "active")
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
 }
 
 export type ValidatedInvitation = {
@@ -143,6 +176,7 @@ export async function markInvitationViewed(caseId: string): Promise<void> {
 }
 
 export async function createPortalSession(caseId: string): Promise<string> {
+  await revokePortalSessions(caseId);
   const admin = createAdminClient();
   const rawSession = randomBytes(32).toString("base64url");
   const sessionHash = hashOnboardingToken(`session:${rawSession}`);
@@ -204,7 +238,7 @@ export async function storePortalPassword(caseId: string, email: string, passwor
 
 export async function storePortalOtp(caseId: string, email: string, otp: string) {
   const admin = createAdminClient();
-  const otpHash = await hashOtp(otp);
+  const otpHash = hashOtp(otp);
   const expiresAt = new Date(Date.now() + ONBOARDING_OTP_TTL_MINUTES * 60 * 1000).toISOString();
   const { error } = await admin.schema("hrms").from("onboarding_portal_accounts").upsert(
     {
@@ -269,8 +303,12 @@ export async function verifyPortalOtp(email: string, otp: string): Promise<strin
   }
   if (new Date(account.otp_expires_at) < new Date()) return null;
 
-  const otpHash = await hashOtp(otp);
-  if (otpHash !== account.otp_hash) return null;
+  const otpHash = hashOtp(otp);
+  const storedHash = Buffer.from(account.otp_hash, "hex");
+  const computedHash = Buffer.from(otpHash, "hex");
+  if (storedHash.length !== computedHash.length || !timingSafeEqual(storedHash, computedHash)) {
+    return null;
+  }
 
   await admin
     .schema("hrms")

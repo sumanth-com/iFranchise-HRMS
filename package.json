@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "type-check": "tsc --noEmit",
+    "generate:secrets": "node scripts/generate-secrets.mjs",
     "supabase": "supabase",
     "supabase:login": "supabase login",
     "supabase:link": "supabase link --project-ref zqppkdagitctmqcfttnv",

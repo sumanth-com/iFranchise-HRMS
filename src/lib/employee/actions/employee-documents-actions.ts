@@ -11,7 +11,10 @@ import {
   employeeRenameDocument,
 } from "@/lib/employee/services/employee-documents-mutations";
 import { createSignedDocumentUrl, uploadAndCreateDocument } from "@/lib/documents/services/document-mutations";
+import { fromHrms } from "@/lib/documents/services/documents-utils";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
+import { assertOrganizationStoragePath } from "@/lib/security/storage-path";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 const uploadMetaSchema = z.object({
@@ -107,9 +110,24 @@ export async function employeeDeleteDocumentAction(documentId: string) {
 
 export async function employeeGetDocumentUrlAction(storagePath: string) {
   try {
-    await requireServerAnyPermission([PORTAL_PERMISSIONS.employee, "documents.view"]);
+    const profile = await requireServerAnyPermission([PORTAL_PERMISSIONS.employee, "documents.view"]);
     const supabase = await createClient();
-    const url = await createSignedDocumentUrl(supabase, storagePath);
+
+    assertOrganizationStoragePath(storagePath, profile.employee.organizationId);
+
+    const { data: doc, error } = await fromHrms(supabase, "employee_documents")
+      .select("id, storage_path, employee_id")
+      .eq("storage_path", storagePath)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    if (!doc || doc.employee_id !== profile.employee.id) {
+      return { success: false as const, message: "Document not found" };
+    }
+
+    const admin = createAdminClient();
+    const url = await createSignedDocumentUrl(admin, storagePath);
     if (!url) return { success: false as const, message: "Unable to open this file" };
     return { success: true as const, data: url };
   } catch (error) {

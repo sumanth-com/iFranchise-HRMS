@@ -1,4 +1,6 @@
-import { createHmac, randomBytes } from "node:crypto";
+import "server-only";
+
+import { randomBytes } from "node:crypto";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getApprovalTokenTtlHours } from "@/lib/approvals/constants";
@@ -7,25 +9,19 @@ import type {
   ApprovalTokenRow,
   TokenValidationFailure,
 } from "@/lib/approvals/types";
-import { getSupabaseServiceRoleKey } from "@/lib/supabase/env";
+import { hmacSha256Hex } from "@/lib/security/hmac-utils";
+import { getApprovalTokenSecret } from "@/lib/security/token-secrets";
 import type { NotificationModule } from "@/types/notifications";
 
 const TOKEN_COLUMNS =
   "id, organization_id, request_type, source_module, source_record_id, approval_record_id, approver_employee_id, approver_user_id, role_code, token_hash, expires_at, consumed_at, consumed_action, status, deleted_at";
 
 function hmacSecret(): string {
-  const secret = process.env.APPROVAL_TOKEN_SECRET;
-  if (!secret) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("APPROVAL_TOKEN_SECRET is required in production");
-    }
-    return getSupabaseServiceRoleKey();
-  }
-  return secret;
+  return getApprovalTokenSecret();
 }
 
 export function hashApprovalToken(rawToken: string): string {
-  return createHmac("sha256", hmacSecret()).update(rawToken).digest("hex");
+  return hmacSha256Hex(hmacSecret(), rawToken);
 }
 
 export type CreateApprovalTokenParams = {

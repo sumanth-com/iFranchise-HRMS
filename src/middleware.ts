@@ -87,6 +87,15 @@ export async function middleware(request: NextRequest) {
   const cachedPermissionCodes = await getCachedPermissionCodes(request, user.id);
 
   if (cachedPermissionCodes) {
+    const accountAllowed = await userAccountAllowsPortalAccess(supabase, user.id);
+    if (!accountAllowed) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = AUTH_ROUTES.login;
+      redirectUrl.searchParams.set("suspended", "1");
+      redirectUrl.search = redirectUrl.searchParams.toString();
+      return NextResponse.redirect(redirectUrl);
+    }
+
     if (
       isSystemAdminPath(pathname) &&
       !cachedPermissionCodes.includes(SYSTEM_ADMIN_PERMISSION)

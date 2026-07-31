@@ -19,6 +19,7 @@ import { clearPermissionCacheCookie } from "@/lib/auth/permission-cache";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
 import { assertRateLimit } from "@/lib/security/rate-limit";
+import { hashPasswordResetToken } from "@/lib/security/signed-flow-tokens";
 import { recordEmployeeSuccessfulLogin, acceptInvitationOnPasswordSet } from "@/lib/employees/services/employee-account";
 import { sendBirthdayRemindersOnLogin } from "@/lib/employee/services/birthday-reminder-notifications";
 import { resolveUserPortalRoute } from "@/lib/auth/permission-resolver";
@@ -238,7 +239,7 @@ export async function forgotPasswordAction(
 
   try {
     assertRateLimit({
-      key: `forgot-password:${ctx.ipAddress ?? "unknown"}:${email.toLowerCase()}`,
+      key: `forgot-password:${hashPasswordResetToken(`${ctx.ipAddress ?? "unknown"}:${email.toLowerCase()}`)}`,
       limit: 3,
       windowMs: 60 * 60 * 1000,
     });

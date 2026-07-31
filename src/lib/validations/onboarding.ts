@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { MAX_SIGNATURE_DATA_LENGTH } from "@/lib/security/upload-validation";
+
 const nullIfEmpty = (value: string | null | undefined) =>
   value === "" || value === undefined || value === null ? null : value;
 
@@ -96,7 +98,7 @@ export const onboardingSignatureSchema = z.object({
   caseId: z.string().uuid(),
   signatureType: z.enum(["typed", "drawn", "uploaded"]),
   signatureStyle: z.string().optional().nullable(),
-  signatureData: z.string().min(1),
+  signatureData: z.string().min(1).max(MAX_SIGNATURE_DATA_LENGTH),
 });
 
 export const policyAcknowledgementSchema = z.object({

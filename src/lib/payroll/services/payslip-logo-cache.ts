@@ -1,6 +1,9 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import { isSafeRemoteFetchUrl } from "@/lib/security/safe-fetch-url";
+import { resolvePathWithinBase } from "@/lib/security/safe-local-path";
+
 const logoBytesCache = new Map<string, Uint8Array | null>();
 
 export async function loadLogoBytesCached(logoUrl: string | null): Promise<Uint8Array | null> {
@@ -12,19 +15,29 @@ export async function loadLogoBytesCached(logoUrl: string | null): Promise<Uint8
   let bytes: Uint8Array | null = null;
 
   if (logoUrl.startsWith("/")) {
-    const publicPath = path.join(process.cwd(), "public", logoUrl.replace(/^\//, ""));
+    const publicDir = path.join(process.cwd(), "public");
+    const publicPath = resolvePathWithinBase(publicDir, logoUrl.replace(/^\//, ""));
     try {
-      bytes = await readFile(publicPath);
+      if (publicPath) {
+        bytes = await readFile(publicPath);
+      }
     } catch {
+      bytes = null;
+    }
+
+    if (!bytes) {
+      const fallbackPath = resolvePathWithinBase(publicDir, "assets/Logo.png");
       try {
-        bytes = await readFile(path.join(process.cwd(), "src/assets/Logo.png"));
+        if (fallbackPath) {
+          bytes = await readFile(fallbackPath);
+        }
       } catch {
         bytes = null;
       }
     }
-  } else {
+  } else if (isSafeRemoteFetchUrl(logoUrl)) {
     try {
-      const response = await fetch(logoUrl);
+      const response = await fetch(logoUrl, { redirect: "error" });
       if (response.ok) {
         bytes = new Uint8Array(await response.arrayBuffer());
       }

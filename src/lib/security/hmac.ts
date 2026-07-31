@@ -1,29 +1,8 @@
+import "server-only";
+
+import { getPermissionCacheSecret } from "@/lib/security/token-secrets";
+
 const textEncoder = new TextEncoder();
-
-function securitySecret(): string {
-  const secret =
-    process.env.PERMISSION_CACHE_SECRET ??
-    process.env.CRON_SECRET ??
-    process.env.APPROVAL_TOKEN_SECRET ??
-    process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!secret) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (url && anon) {
-      return `hrms-perm-cache-v1:${url}:${anon}`;
-    }
-
-    if (process.env.NODE_ENV === "production") {
-      throw new Error(
-        "Set PERMISSION_CACHE_SECRET (or SUPABASE_SERVICE_ROLE_KEY) in production.",
-      );
-    }
-    return "dev-only-insecure-permission-cache-secret";
-  }
-
-  return secret;
-}
 
 function toBase64Url(bytes: Uint8Array): string {
   let binary = "";
@@ -55,7 +34,7 @@ async function importHmacKey(secret: string): Promise<CryptoKey> {
 }
 
 export async function signPayload(payload: string): Promise<string> {
-  const key = await importHmacKey(securitySecret());
+  const key = await importHmacKey(getPermissionCacheSecret());
   const signature = await crypto.subtle.sign("HMAC", key, textEncoder.encode(payload));
   return toBase64Url(new Uint8Array(signature));
 }
@@ -65,7 +44,7 @@ export async function verifySignedPayload(
   signature: string,
 ): Promise<boolean> {
   try {
-    const key = await importHmacKey(securitySecret());
+    const key = await importHmacKey(getPermissionCacheSecret());
     return crypto.subtle.verify(
       "HMAC",
       key,

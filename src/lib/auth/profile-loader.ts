@@ -95,10 +95,11 @@ export const loadUserProfile = cache(async function loadUserProfile(
   // active session (especially right after signInWithPassword in a Server Action).
   if (!supabaseClient) {
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      data: { user: sessionUser },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (userError || !sessionUser || sessionUser.id !== userId) {
       return { success: false, error: "EMPLOYEE_NOT_FOUND" };
     }
   }
@@ -295,11 +296,11 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
   const supabase = await createClient();
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
 
-  const user = session?.user;
-  if (!user?.email) {
+  if (userError || !user?.email) {
     return null;
   }
 

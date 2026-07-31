@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { LOGOUT_BROADCAST_KEY, AUTH_ROUTES, PUBLIC_ROUTES } from "@/lib/auth/constants";
+import { logoutAction } from "@/lib/auth/actions";
 import { getAuthErrorMessage } from "@/lib/auth/errors";
 import { getSidebarNavigation } from "@/lib/auth/navigation";
 import { ceoNavItems } from "@/config/ceo-navigation";
@@ -118,16 +119,21 @@ export function AuthProvider({
         if (broadcast) {
           localStorage.setItem(LOGOUT_BROADCAST_KEY, Date.now().toString());
         }
-        await supabase.auth.signOut();
-        router.push(`${AUTH_ROUTES.login}?signedOut=1`);
-        router.refresh();
-      } catch {
+        await logoutAction();
+      } catch (error) {
+        const digest =
+          typeof error === "object" && error !== null && "digest" in error
+            ? String((error as { digest?: string }).digest ?? "")
+            : "";
+        if (digest.startsWith("NEXT_REDIRECT")) {
+          return;
+        }
         toast.error(getAuthErrorMessage("SERVER_ERROR"));
       } finally {
         setIsLoading(false);
       }
     },
-    [router, supabase.auth],
+    [],
   );
 
   const signOut = useCallback(async () => {
