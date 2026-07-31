@@ -1,29 +1,36 @@
 import { MyProfileView } from "@/components/employee/profile/my-profile-view";
+import { PageScroll } from "@/components/common/sticky-layout";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import { SELF_PROFILE_ROUTES } from "@/lib/documents/constants";
 import { getMyProfileBundle } from "@/lib/employee/services/my-profile";
-import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
-export default async function ManagerProfilePage() {
+export default async function DashboardProfilePage() {
   const profile = await requireServerAnyPermission([
-    PORTAL_PERMISSIONS.manager,
+    PORTAL_PERMISSIONS.hr,
     "employee_profile.view",
   ]);
   const supabase = await createClient();
-  const data = await getMyProfileBundle(supabase, profile, MANAGER_ROUTES.profile);
+  const data = await getMyProfileBundle(
+    supabase,
+    profile,
+    SELF_PROFILE_ROUTES.profile,
+  );
 
   if (!data) {
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center p-6 text-sm text-muted-foreground">
-        Profile not found.
-      </div>
+      <PageScroll>
+        <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
+          Profile not found.
+        </div>
+      </PageScroll>
     );
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-4 md:p-5">
+    <PageScroll>
       <MyProfileView data={data} />
-    </div>
+    </PageScroll>
   );
 }

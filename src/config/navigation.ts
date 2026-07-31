@@ -10,12 +10,12 @@ import {
   FileText,
   LaptopMinimal,
   LayoutDashboard,
-  LogOut,
   Package,
   Settings,
   Shield,
   ScrollText,
   Target,
+  UserRound,
   UserRoundPlus,
   Users,
   Wallet,
@@ -24,6 +24,7 @@ import {
 
 import type { NavigationItem } from "@/lib/auth/navigation";
 import { HR_OVERVIEW_ROUTES } from "@/lib/dashboard/constants";
+import { SELF_PROFILE_ROUTES } from "@/lib/documents/constants";
 import { USER_PROVISIONING_ROUTES } from "@/lib/user-provisioning/constants";
 
 export type NavItem = {
@@ -46,6 +47,13 @@ export const mainNavItems: NavigationItem[] = [
     href: "/",
     icon: LayoutDashboard,
     section: "Self-service",
+  },
+  {
+    title: "My Profile",
+    href: SELF_PROFILE_ROUTES.profile,
+    icon: UserRound,
+    section: "Self-service",
+    permissions: ["employee_profile.view"],
   },
   {
     title: "Attendance",
@@ -124,13 +132,6 @@ export const mainNavItems: NavigationItem[] = [
     icon: BriefcaseBusiness,
     section: "Administration",
     permissions: ["recruitment.view"],
-  },
-  {
-    title: "Offboarding",
-    href: "/dashboard/exit",
-    icon: LogOut,
-    section: "Administration",
-    permissions: ["exit.view"],
   },
   {
     title: "Reports",

@@ -36,12 +36,15 @@ const VIEW_PERMISSIONS = [
   ONBOARDING_PERMISSIONS.activate,
 ];
 
-function revalidateOnboarding() {
+function revalidateOnboarding(caseId?: string) {
   revalidatePath("/dashboard/onboarding");
+  if (caseId) {
+    revalidatePath(`/dashboard/onboarding/${caseId}`);
+  }
 }
 
 type ActionResult =
-  | { success: true; message: string; caseId?: string }
+  | { success: true; message: string; caseId?: string; detail?: OnboardingCaseDetail }
   | { success: false; message: string };
 
 export async function fetchOnboardingLookupsAction() {
@@ -80,8 +83,9 @@ export async function sendOnboardingInvitationAction(caseId: string): Promise<Ac
     const profile = await requireServerAnyPermission(MANAGE_PERMISSIONS);
     const supabase = await createClient();
     await sendOnboardingInvitation(supabase, profile, caseId);
-    revalidateOnboarding();
-    return { success: true, message: "Onboarding invitation sent" };
+    revalidateOnboarding(caseId);
+    const detail = await loadOnboardingCaseDetail(caseId);
+    return { success: true, message: "Onboarding invitation sent", detail };
   } catch (error) {
     return { success: false, message: error instanceof Error ? error.message : "Failed to send invitation" };
   }
@@ -94,7 +98,7 @@ export async function createAndInviteOnboardingAction(input: unknown): Promise<A
     const parsed = createOnboardingCaseFormSchema.parse(input);
     const { caseId, resent } = await createOrUpdateOnboardingCaseForInvite(supabase, profile, parsed);
     await sendOnboardingInvitation(supabase, profile, caseId);
-    revalidateOnboarding();
+    revalidateOnboarding(caseId);
     return {
       success: true,
       message: resent ? "Invitation updated and resent successfully" : "Invitation sent successfully",

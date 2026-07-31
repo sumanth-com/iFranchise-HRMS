@@ -27,8 +27,9 @@ export const MANAGER_ROUTES = {
   notifications: "/manager/notifications",
   notificationsCenter: "/manager/notifications/center",
   notificationsHistory: "/manager/notifications/history",
+  documents: "/manager/documents",
+  profile: "/manager/profile",
   settings: "/manager/settings",
-  profile: "/manager/attendance?tab=my",
 } as const;
 
 export const MANAGER_DASHBOARD_KPI_LINKS = {

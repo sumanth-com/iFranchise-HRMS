@@ -17,6 +17,11 @@ export const SELF_DOCUMENTS_ROUTES = {
   list: "/dashboard/documents",
 } as const;
 
+/** Personal profile in the HR portal self-service section. */
+export const SELF_PROFILE_ROUTES = {
+  profile: "/dashboard/profile",
+} as const;
+
 export function documentsTeamListUrl(
   searchParams?: Record<string, string | undefined>,
 ) {

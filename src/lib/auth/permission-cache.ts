@@ -35,14 +35,19 @@ export async function getCachedPermissionCodes(
   request: NextRequest,
   userId: string,
 ): Promise<string[] | null> {
-  const value = request.cookies.get(COOKIE_NAME)?.value;
-  if (!value) return null;
+  try {
+    const value = request.cookies.get(COOKIE_NAME)?.value;
+    if (!value) return null;
 
-  const payload = await parseSignedPayload(value);
-  if (!payload) return null;
-  if (payload.userId !== userId) return null;
-  if (payload.expiresAt <= Date.now()) return null;
-  return payload.codes;
+    const payload = await parseSignedPayload(value);
+    if (!payload) return null;
+    if (payload.userId !== userId) return null;
+    if (payload.expiresAt <= Date.now()) return null;
+    return payload.codes;
+  } catch (error) {
+    console.error("[permission-cache] read failed", error);
+    return null;
+  }
 }
 
 export async function attachPermissionCache(
@@ -50,19 +55,23 @@ export async function attachPermissionCache(
   userId: string,
   codes: string[],
 ): Promise<void> {
-  const payload: PermissionCachePayload = {
-    userId,
-    codes,
-    expiresAt: Date.now() + TTL_SECONDS * 1000,
-  };
+  try {
+    const payload: PermissionCachePayload = {
+      userId,
+      codes,
+      expiresAt: Date.now() + TTL_SECONDS * 1000,
+    };
 
-  response.cookies.set(COOKIE_NAME, await serializeSignedPayload(payload), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: TTL_SECONDS,
-  });
+    response.cookies.set(COOKIE_NAME, await serializeSignedPayload(payload), {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: TTL_SECONDS,
+    });
+  } catch (error) {
+    console.error("[permission-cache] attach failed", error);
+  }
 }
 
 export function clearPermissionCache(response: NextResponse): void {

@@ -84,7 +84,12 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
-  const cachedPermissionCodes = await getCachedPermissionCodes(request, user.id);
+  let cachedPermissionCodes: string[] | null = null;
+  try {
+    cachedPermissionCodes = await getCachedPermissionCodes(request, user.id);
+  } catch (error) {
+    console.error("[middleware] permission cache read failed", error);
+  }
 
   if (cachedPermissionCodes) {
     const accountAllowed = await userAccountAllowsPortalAccess(supabase, user.id);

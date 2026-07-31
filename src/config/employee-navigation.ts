@@ -5,8 +5,8 @@ import {
   FileText,
   LaptopMinimal,
   LayoutDashboard,
-  LogOut,
   Settings,
+  UserRound,
   Users,
   Wallet,
 } from "lucide-react";
@@ -19,6 +19,12 @@ export const employeeNavItems: NavigationItem[] = [
     title: "Dashboard",
     href: EMPLOYEE_ROUTES.home,
     icon: LayoutDashboard,
+  },
+  {
+    title: "My Profile",
+    href: EMPLOYEE_ROUTES.profile,
+    icon: UserRound,
+    permissions: ["employee_profile.view"],
   },
   {
     title: "Attendance",
@@ -37,12 +43,6 @@ export const employeeNavItems: NavigationItem[] = [
     href: EMPLOYEE_ROUTES.leave,
     icon: CalendarDays,
     permissions: ["leave.view"],
-  },
-  {
-    title: "Resignation",
-    href: EMPLOYEE_ROUTES.resignation,
-    icon: LogOut,
-    permissions: ["exit.view", "exit.create"],
   },
   {
     title: "Payroll",

@@ -85,6 +85,23 @@ export async function revokeActiveInvitationTokens(caseId: string): Promise<void
     .is("deleted_at", null);
 }
 
+export async function revokeActiveInvitationTokensExcept(
+  caseId: string,
+  exceptTokenHash: string,
+): Promise<void> {
+  const admin = createAdminClient();
+  const now = new Date().toISOString();
+  await admin
+    .schema("hrms")
+    .from("onboarding_invitation_tokens")
+    .update({ status: "inactive", updated_at: now })
+    .eq("case_id", caseId)
+    .eq("status", "active")
+    .neq("token_hash", exceptTokenHash)
+    .is("consumed_at", null)
+    .is("deleted_at", null);
+}
+
 export async function consumeOnboardingInvitationToken(rawToken: string): Promise<void> {
   const admin = createAdminClient();
   const tokenHash = hashOnboardingToken(rawToken);

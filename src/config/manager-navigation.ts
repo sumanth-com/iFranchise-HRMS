@@ -4,11 +4,12 @@ import {
   BriefcaseBusiness,
   CalendarCheck,
   CalendarDays,
+  FileText,
   LayoutDashboard,
-  LogOut,
   Wallet,
   Settings,
   Target,
+  UserRound,
   Users,
 } from "lucide-react";
 
@@ -20,6 +21,12 @@ export const managerNavItems: NavigationItem[] = [
     title: "Dashboard",
     href: MANAGER_ROUTES.home,
     icon: LayoutDashboard,
+  },
+  {
+    title: "My Profile",
+    href: MANAGER_ROUTES.profile,
+    icon: UserRound,
+    permissions: ["employee_profile.view"],
   },
   {
     title: "Attendance",
@@ -45,10 +52,10 @@ export const managerNavItems: NavigationItem[] = [
     permissions: ["payslip.view"],
   },
   {
-    title: "Resignations",
-    href: MANAGER_ROUTES.resignation,
-    icon: LogOut,
-    permissions: ["exit.view", "exit.approve"],
+    title: "Documents",
+    href: MANAGER_ROUTES.documents,
+    icon: FileText,
+    permissions: ["documents.view"],
   },
   {
     title: "Performance",

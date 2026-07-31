@@ -4,6 +4,7 @@ import type {
   LeaveBalanceItem,
   LeaveCalendarEntry,
   LeaveHolidayEntry,
+  LeaveListItem,
   LeaveListParams,
   LeaveListResult,
   LeaveLookups,
@@ -253,6 +254,76 @@ export async function listLeaveRequests(
     page,
     pageSize,
   };
+}
+
+/** Employee self-service list — avoids heavy HR joins that can fail under RLS. */
+export async function listEmployeeOwnLeaveRequests(
+  supabase: AuthSupabaseClient,
+  employeeId: string,
+  page = 1,
+  pageSize = 25,
+): Promise<LeaveListItem[]> {
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("leave_requests")
+    .select(
+      `
+        id,
+        employee_id,
+        leave_type_id,
+        start_date,
+        end_date,
+        total_days,
+        is_half_day,
+        half_day_period,
+        reason,
+        leave_status,
+        created_at,
+        leave_types:leave_type_id (name, code)
+      `,
+    )
+    .eq("employee_id", employeeId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((row) => {
+    const leaveType = unwrapRelation(
+      row.leave_types as { name: string; code: string } | { name: string; code: string }[] | null,
+    );
+
+    return {
+      id: row.id,
+      employeeId: row.employee_id,
+      employeeCode: "",
+      employeeName: "",
+      departmentId: null,
+      departmentName: null,
+      branchId: null,
+      branchName: null,
+      leaveTypeId: row.leave_type_id,
+      leaveTypeName: leaveType?.name ?? "",
+      leaveTypeCode: leaveType?.code ?? "",
+      startDate: row.start_date,
+      endDate: row.end_date,
+      totalDays: Number(row.total_days),
+      isHalfDay: row.is_half_day,
+      halfDayPeriod:
+        row.half_day_period === "morning" || row.half_day_period === "afternoon"
+          ? row.half_day_period
+          : null,
+      reason: row.reason,
+      leaveStatus: row.leave_status as LeaveListItem["leaveStatus"],
+      appliedAt: row.created_at,
+      approverName: null,
+      currentApprovalLevel: null,
+    };
+  });
 }
 
 export async function getLeaveSummary(

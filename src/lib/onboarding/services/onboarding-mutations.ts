@@ -20,7 +20,8 @@ import {
 import {
   addTimelineEvent,
   createOnboardingInvitationToken,
-  revokeActiveInvitationTokens,
+  hashOnboardingToken,
+  revokeActiveInvitationTokensExcept,
   revokePortalSessions,
 } from "@/lib/onboarding/onboarding-security";
 import {
@@ -310,32 +311,23 @@ export async function sendOnboardingInvitation(
 ): Promise<void> {
   const organizationId = profile.employee.organizationId;
   const detail = await getOnboardingCaseDetail(supabase, organizationId, caseId);
-  if (!["draft", "invitation_sent", "corrections_requested"].includes(detail.status)) {
+  if (
+    !ONBOARDING_RESENDABLE_STATUSES.includes(
+      detail.status as (typeof ONBOARDING_RESENDABLE_STATUSES)[number],
+    )
+  ) {
     throw new Error("Invitation cannot be sent for this onboarding status");
   }
 
-  const { rawToken, expiresAt } = await (async () => {
-    await revokeActiveInvitationTokens(caseId);
-    return createOnboardingInvitationToken(caseId, organizationId, profile.userId);
-  })();
+  const { rawToken, expiresAt } = await createOnboardingInvitationToken(
+    caseId,
+    organizationId,
+    profile.userId,
+  );
+  const tokenHash = hashOnboardingToken(rawToken);
+  await revokeActiveInvitationTokensExcept(caseId, tokenHash);
+
   const inviteUrl = onboardingInviteUrl(rawToken);
-  const now = new Date().toISOString();
-
-  const { error } = await supabase
-    .schema("hrms")
-    .from("onboarding_cases")
-    .update({
-      status: "invitation_sent",
-      invitation_sent_at: now,
-      invitation_expires_at: expiresAt,
-      onboarding_account_active: true,
-      updated_by: profile.userId,
-      updated_at: now,
-    })
-    .eq("id", caseId);
-
-  if (error) throw new Error(error.message);
-
   const expiryLabel = new Date(expiresAt).toLocaleString("en-IN", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -354,12 +346,40 @@ export async function sendOnboardingInvitation(
     reportingManagerName: detail.reportingManagerName,
   });
 
-  await sendEmail({
+  const emailResult = await sendEmail({
     to: detail.personalEmail,
     subject: invitationEmail.subject,
     html: invitationEmail.html,
     text: invitationEmail.text,
   });
+
+  if (!emailResult.delivered) {
+    if (emailResult.skipped) {
+      throw new Error(
+        "Invitation email could not be sent — SMTP is not configured. Add SMTP_HOST, SMTP_USER, and SMTP_PASSWORD in your environment.",
+      );
+    }
+    throw new Error(
+      emailResult.error ?? "Failed to deliver invitation email. Please check SMTP settings and try again.",
+    );
+  }
+
+  const now = new Date().toISOString();
+
+  const { error } = await supabase
+    .schema("hrms")
+    .from("onboarding_cases")
+    .update({
+      status: "invitation_sent",
+      invitation_sent_at: now,
+      invitation_expires_at: expiresAt,
+      onboarding_account_active: true,
+      updated_by: profile.userId,
+      updated_at: now,
+    })
+    .eq("id", caseId);
+
+  if (error) throw new Error(error.message);
 
   await addTimelineEvent(supabase, caseId, {
     eventType: "invitation_sent",

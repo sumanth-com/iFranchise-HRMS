@@ -2,11 +2,12 @@ import { Suspense } from "react";
 
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { ManagerLeaveView } from "@/components/manager/leave/manager-leave-view";
+import { safeServerCall } from "@/lib/errors/safe-server";
 import { getManagerTeamLeavePageData } from "@/lib/manager/actions/manager-leave-actions";
 import {
   getEmployeeLeaveBalanceSnapshot,
   getEmployeeLeaveCalendarData,
-  listLeaveRequests,
+  listEmployeeOwnLeaveRequests,
 } from "@/lib/leave/services/leave-queries";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { hasPermission } from "@/lib/permissions/utils";
@@ -57,10 +58,43 @@ export default async function ManagerLeavePage({
   const calendarYear = now.getFullYear();
 
   const [teamData, balances, requests, calendar] = await Promise.all([
-    getManagerTeamLeavePageData(parsed),
-    getEmployeeLeaveBalanceSnapshot(supabase, employeeId),
-    listLeaveRequests(supabase, profile, { employeeId, page: 1, pageSize: 25 }),
-    getEmployeeLeaveCalendarData(supabase, profile, calendarMonth, calendarYear),
+    safeServerCall(
+      () => getManagerTeamLeavePageData(parsed),
+      {
+        summary: {
+          pendingRequests: 0,
+          approvedThisMonth: 0,
+          rejectedThisMonth: 0,
+          employeesOnLeaveToday: 0,
+          upcomingPlannedLeaves: 0,
+          leaveConflicts: 0,
+        },
+        records: { data: [], total: 0, page: 1, pageSize: 25 },
+        lookups: { leaveTypes: [], departments: [], employees: [] },
+        calendar: {
+          leaves: [],
+          holidays: [],
+          month: calendarMonth,
+          year: calendarYear,
+        },
+      },
+      "[manager/leave] team data",
+    ),
+    safeServerCall(
+      () => getEmployeeLeaveBalanceSnapshot(supabase, employeeId),
+      [],
+      "[manager/leave] balances",
+    ),
+    safeServerCall(
+      () => listEmployeeOwnLeaveRequests(supabase, employeeId, 1, 25),
+      [],
+      "[manager/leave] requests",
+    ),
+    safeServerCall(
+      () => getEmployeeLeaveCalendarData(supabase, profile, calendarMonth, calendarYear),
+      { leaves: [], holidays: [] },
+      "[manager/leave] calendar",
+    ),
   ]);
 
   return (
@@ -79,7 +113,7 @@ export default async function ManagerLeavePage({
         selfLeave={{
           canApply: hasPermission(profile.permissionCodes, "leave.create"),
           balances,
-          requests: requests.data,
+          requests,
           calendarMonth,
           calendarYear,
           calendarLeaves: calendar.leaves,

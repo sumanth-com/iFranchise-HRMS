@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Clock,
   FileText,
+  Loader2,
   Mail,
   MapPin,
   User,
@@ -101,6 +102,7 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
   const [hrComments, setHrComments] = useState("");
   const [correctionNotes, setCorrectionNotes] = useState("");
   const [intendedRoleId, setIntendedRoleId] = useState(initialDetail.intendedRoleId);
+  const [isResending, setIsResending] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   useSetBreadcrumbLabel(detail.fullName);
@@ -120,9 +122,14 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
     detail.status === "completed";
   const canResendInvite =
     !isTerminal &&
-    ["draft", "invitation_sent", "invitation_viewed", "corrections_requested"].includes(
-      detail.status,
-    );
+    [
+      "draft",
+      "invitation_sent",
+      "invitation_viewed",
+      "in_progress",
+      "documents_uploaded",
+      "corrections_requested",
+    ].includes(detail.status);
 
   function refresh() {
     startTransition(async () => {
@@ -164,12 +171,22 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
   }
 
   function resendInvite() {
+    setIsResending(true);
     startTransition(async () => {
-      const result = await resendOnboardingInvitationAction(detail.id);
-      if (!result.success) toast.error(result.message);
-      else {
+      try {
+        const result = await resendOnboardingInvitationAction(detail.id);
+        if (!result.success) {
+          toast.error(result.message);
+          return;
+        }
         toast.success(result.message);
-        refresh();
+        if (result.detail) {
+          setDetail(result.detail);
+        } else {
+          refresh();
+        }
+      } finally {
+        setIsResending(false);
       }
     });
   }
@@ -227,9 +244,13 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
               variant="outline"
               size="sm"
               onClick={resendInvite}
-              disabled={isPending || !canResendInvite}
+              disabled={isResending || isPending || !canResendInvite}
             >
-              <Mail className="h-4 w-4 mr-1.5" />
+              {isResending ? (
+                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+              ) : (
+                <Mail className="h-4 w-4 mr-1.5" />
+              )}
               Resend invitation
             </Button>
             <Button

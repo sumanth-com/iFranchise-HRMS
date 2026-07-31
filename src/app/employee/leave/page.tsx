@@ -1,10 +1,11 @@
 import { MyLeaveSelfServiceView } from "@/components/leave/my-leave-self-service-view";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
+import { safeServerCall } from "@/lib/errors/safe-server";
 import {
   getEmployeeLeaveBalanceSnapshot,
   getEmployeeLeaveCalendarData,
-  listLeaveRequests,
+  listEmployeeOwnLeaveRequests,
 } from "@/lib/leave/services/leave-queries";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { hasPermission } from "@/lib/permissions/utils";
@@ -23,9 +24,21 @@ export default async function EmployeeLeavePage() {
   const calendarYear = now.getFullYear();
 
   const [balances, requests, calendar] = await Promise.all([
-    getEmployeeLeaveBalanceSnapshot(supabase, employeeId),
-    listLeaveRequests(supabase, profile, { employeeId, page: 1, pageSize: 25 }),
-    getEmployeeLeaveCalendarData(supabase, profile, calendarMonth, calendarYear),
+    safeServerCall(
+      () => getEmployeeLeaveBalanceSnapshot(supabase, employeeId),
+      [],
+      "[employee/leave] balances",
+    ),
+    safeServerCall(
+      () => listEmployeeOwnLeaveRequests(supabase, employeeId, 1, 25),
+      [],
+      "[employee/leave] requests",
+    ),
+    safeServerCall(
+      () => getEmployeeLeaveCalendarData(supabase, profile, calendarMonth, calendarYear),
+      { leaves: [], holidays: [] },
+      "[employee/leave] calendar",
+    ),
   ]);
 
   return (
@@ -35,7 +48,7 @@ export default async function EmployeeLeavePage() {
         policyHref={EMPLOYEE_ROUTES.leavePolicy}
         canApply={hasPermission(profile.permissionCodes, "leave.create")}
         balances={balances}
-        requests={requests.data}
+        requests={requests}
         calendarMonth={calendarMonth}
         calendarYear={calendarYear}
         calendarLeaves={calendar.leaves}

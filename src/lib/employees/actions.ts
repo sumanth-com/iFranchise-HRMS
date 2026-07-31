@@ -95,6 +95,12 @@ async function revalidateEmployeeAccountPaths(employeeId: string) {
   }
 }
 
+function revalidateSelfProfilePaths() {
+  revalidatePath("/employee/profile");
+  revalidatePath("/manager/profile");
+  revalidatePath("/dashboard/profile");
+}
+
 export async function fetchEmployeesAction(
   params: EmployeeListParams,
 ): Promise<EmployeeActionResult<EmployeeListResult>> {
@@ -726,6 +732,7 @@ export async function uploadProfileImageAction(
     revalidatePath("/manager/profile");
     revalidatePath("/employee/attendance");
     revalidatePath("/dashboard/attendance");
+    revalidateSelfProfilePaths();
 
     return { success: true, data: storagePath };
   } catch (error) {
@@ -787,6 +794,7 @@ export async function removeProfileImageAction(
     revalidatePath("/manager/profile");
     revalidatePath("/employee/attendance");
     revalidatePath("/dashboard/attendance");
+    revalidateSelfProfilePaths();
 
     return { success: true, data: null };
   } catch (error) {
@@ -815,10 +823,43 @@ export async function updateEmployeeSelfProfileAction(
       return { success: false, message: "Employee profile not found" };
     }
 
+    const { data: profileRow, error: profileRowError } = await supabase
+      .schema("hrms")
+      .from("employee_profiles")
+      .select("self_profile_submitted_at")
+      .eq("employee_id", profile.employee.id)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (profileRowError) {
+      throw new Error(profileRowError.message);
+    }
+
+    if (profileRow?.self_profile_submitted_at) {
+      return {
+        success: false,
+        message:
+          "Your profile has already been submitted. Please contact HR if you need further changes.",
+      };
+    }
+
     await updateEmployeeSelfProfile(supabase, profile, parsed, existing);
 
-    revalidatePath("/employee/settings");
-    revalidatePath("/dashboard/settings");
+    const { error: submitError } = await supabase
+      .schema("hrms")
+      .from("employee_profiles")
+      .update({
+        self_profile_submitted_at: new Date().toISOString(),
+        updated_by: profile.userId,
+      })
+      .eq("employee_id", profile.employee.id)
+      .is("deleted_at", null);
+
+    if (submitError) {
+      throw new Error(submitError.message);
+    }
+
+    revalidateSelfProfilePaths();
     revalidatePath(
       EMPLOYEE_ROUTES.detail({
         employeeCode: profile.employee.employeeCode,

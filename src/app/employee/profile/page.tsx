@@ -1,17 +1,17 @@
 import { MyProfileView } from "@/components/employee/profile/my-profile-view";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { getMyProfileBundle } from "@/lib/employee/services/my-profile";
-import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
-export default async function ManagerProfilePage() {
+export default async function EmployeeProfilePage() {
   const profile = await requireServerAnyPermission([
-    PORTAL_PERMISSIONS.manager,
+    PORTAL_PERMISSIONS.employee,
     "employee_profile.view",
   ]);
   const supabase = await createClient();
-  const data = await getMyProfileBundle(supabase, profile, MANAGER_ROUTES.profile);
+  const data = await getMyProfileBundle(supabase, profile, EMPLOYEE_ROUTES.profile);
 
   if (!data) {
     return (
