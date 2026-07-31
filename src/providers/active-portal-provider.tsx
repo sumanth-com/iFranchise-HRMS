@@ -43,6 +43,18 @@ export function ActivePortalProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const stored = sessionStorage.getItem(STORAGE_KEY) as ActivePortal | null;
+    if (stored && pathname.startsWith("/dashboard/system")) {
+      setActivePortalState(stored);
+      return;
+    }
+    if (
+      pathname.startsWith("/dashboard") &&
+      !pathname.startsWith("/dashboard/system")
+    ) {
+      setActivePortalState("hr");
+      sessionStorage.setItem(STORAGE_KEY, "hr");
+      return;
+    }
     if (stored) {
       setActivePortalState(stored);
       return;
@@ -50,7 +62,7 @@ export function ActivePortalProvider({ children }: { children: ReactNode }) {
     const inferred = inferPortalFromPath(pathname);
     setActivePortalState(inferred);
     sessionStorage.setItem(STORAGE_KEY, inferred);
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
     if (

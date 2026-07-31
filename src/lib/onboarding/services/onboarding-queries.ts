@@ -1,0 +1,391 @@
+import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { loadInviteableRoles } from "@/lib/auth/iam-roles";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { ONBOARDING_WIZARD_SECTIONS } from "@/lib/onboarding/constants";
+import type {
+  OnboardingCaseDetail,
+  OnboardingCaseListItem,
+  OnboardingDashboardStats,
+  OnboardingDocumentRecord,
+  OnboardingLookups,
+  CandidatePortalContext,
+  OnboardingStatus,
+} from "@/types/onboarding";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type LooseRow = Record<string, any>;
+
+function unwrapName(row: LooseRow | null | undefined, key: string): string | null {
+  if (!row) return null;
+  const rel = row[key];
+  if (!rel) return null;
+  if (Array.isArray(rel)) return rel[0]?.name ?? rel[0]?.title ?? null;
+  return rel.name ?? rel.title ?? null;
+}
+
+/** Creates work locations from active branches when none exist yet (common on new orgs). */
+async function ensureWorkLocationsFromBranches(organizationId: string): Promise<void> {
+  const admin = createAdminClient();
+
+  const { count, error: countError } = await admin
+    .schema("hrms")
+    .from("work_locations")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null);
+
+  if (countError) throw new Error(countError.message);
+  if ((count ?? 0) > 0) return;
+
+  const { data: branches, error: branchError } = await admin
+    .schema("hrms")
+    .from("branches")
+    .select("id, name, location, city")
+    .eq("organization_id", organizationId)
+    .eq("status", "active")
+    .is("deleted_at", null)
+    .order("name");
+
+  if (branchError) throw new Error(branchError.message);
+  if (!branches?.length) return;
+
+  for (const branch of branches) {
+    const place =
+      (branch.location as string | null)?.trim() ||
+      (branch.city as string | null)?.trim() ||
+      null;
+    const name = place && place.toLowerCase() !== branch.name.toLowerCase()
+      ? `${branch.name} — ${place}`
+      : branch.name;
+
+    const { error } = await admin.schema("hrms").from("work_locations").insert({
+      organization_id: organizationId,
+      branch_id: branch.id,
+      name,
+      status: "active",
+    });
+
+    if (error && !error.message.includes("duplicate")) {
+      throw new Error(error.message);
+    }
+  }
+}
+
+function mapListRow(row: LooseRow): OnboardingCaseListItem {
+  return {
+    id: row.id,
+    fullName: row.full_name,
+    personalEmail: row.personal_email,
+    mobileNumber: row.mobile_number ?? null,
+    status: row.status as OnboardingStatus,
+    designationName: unwrapName(row, "designations"),
+    departmentName: unwrapName(row, "departments"),
+    joiningDate: row.joining_date ?? null,
+    completionPercent: row.completion_percent ?? 0,
+    intendedRoleName: unwrapName(row, "roles") ?? "—",
+    invitationSentAt: row.invitation_sent_at ?? null,
+    submittedAt: row.submitted_at ?? null,
+    createdAt: row.created_at,
+  };
+}
+
+export async function getOnboardingLookups(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+): Promise<OnboardingLookups> {
+  await ensureWorkLocationsFromBranches(organizationId);
+
+  const [departments, designations, branches, employmentTypes, workLocations, managers, roles] =
+    await Promise.all([
+      supabase.schema("hrms").from("departments").select("id, name").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
+      supabase.schema("hrms").from("designations").select("id, title").eq("organization_id", organizationId).is("deleted_at", null).order("title"),
+      supabase.schema("hrms").from("branches").select("id, name").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
+      supabase.schema("hrms").from("employment_types").select("id, name").eq("organization_id", organizationId).is("deleted_at", null).order("name"),
+      supabase
+        .schema("hrms")
+        .from("work_locations")
+        .select("id, name")
+        .eq("organization_id", organizationId)
+        .eq("status", "active")
+        .is("deleted_at", null)
+        .order("name"),
+      supabase.schema("hrms").from("employees").select("id, first_name, last_name").eq("organization_id", organizationId).eq("employment_status", "active").is("deleted_at", null).order("first_name"),
+      loadInviteableRoles(supabase, organizationId),
+    ]);
+
+  return {
+    departments: (departments.data ?? []).map((r) => ({ id: r.id, name: r.name })),
+    designations: (designations.data ?? []).map((r) => ({ id: r.id, title: r.title })),
+    branches: (branches.data ?? []).map((r) => ({ id: r.id, name: r.name })),
+    employmentTypes: (employmentTypes.data ?? []).map((r) => ({ id: r.id, name: r.name })),
+    workLocations: (workLocations.data ?? []).map((r) => ({ id: r.id, name: r.name })),
+    managers: (managers.data ?? []).map((r) => ({
+      id: r.id,
+      name: `${r.first_name} ${r.last_name}`.trim(),
+    })),
+    roles: roles.map((r) => ({ id: r.id, name: r.name, code: r.code })),
+  };
+}
+
+export async function getOnboardingDashboardStats(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+): Promise<OnboardingDashboardStats> {
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("onboarding_cases")
+    .select("status")
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+  const rows = data ?? [];
+  return {
+    total: rows.length,
+    pendingReview: rows.filter((r) => r.status === "pending_hr_review").length,
+    inProgress: rows.filter((r) =>
+      ["in_progress", "documents_uploaded", "invitation_viewed", "corrections_requested"].includes(
+        r.status as string,
+      ),
+    ).length,
+    completed: rows.filter((r) => ["completed", "employee_created"].includes(r.status as string)).length,
+    invitationSent: rows.filter((r) => r.status === "invitation_sent").length,
+  };
+}
+
+export async function listOnboardingCases(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  params: { page: number; pageSize: number; search?: string; status?: string },
+): Promise<{ data: OnboardingCaseListItem[]; total: number }> {
+  const from = (params.page - 1) * params.pageSize;
+  const to = from + params.pageSize - 1;
+
+  let query = supabase
+    .schema("hrms")
+    .from("onboarding_cases")
+    .select(
+      `
+        id, full_name, personal_email, mobile_number, status, joining_date,
+        completion_percent, invitation_sent_at, submitted_at, created_at,
+        designations:designation_id (title),
+        departments:department_id (name),
+        roles:intended_role_id (name)
+      `,
+      { count: "exact" },
+    )
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (params.status) query = query.eq("status", params.status);
+  if (params.search) {
+    const term = `%${params.search}%`;
+    query = query.or(`full_name.ilike.${term},personal_email.ilike.${term}`);
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw new Error(error.message);
+  return { data: (data ?? []).map((r) => mapListRow(r as LooseRow)), total: count ?? 0 };
+}
+
+async function loadCaseDocuments(caseId: string): Promise<OnboardingDocumentRecord[]> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .schema("hrms")
+    .from("onboarding_documents")
+    .select("id, document_category, document_type_code, file_name, file_size, review_status, hr_comment, reviewed_at, storage_path")
+    .eq("case_id", caseId)
+    .is("deleted_at", null)
+    .order("created_at");
+
+  if (error) throw new Error(error.message);
+
+  const docs: OnboardingDocumentRecord[] = [];
+  for (const row of data ?? []) {
+    let signedUrl: string | null = null;
+    if (row.storage_path) {
+      const { data: signed } = await admin.storage
+        .from("onboarding-documents")
+        .createSignedUrl(row.storage_path, 3600);
+      signedUrl = signed?.signedUrl ?? null;
+    }
+    docs.push({
+      id: row.id,
+      documentCategory: row.document_category,
+      documentTypeCode: row.document_type_code,
+      fileName: row.file_name,
+      fileSize: row.file_size ? Number(row.file_size) : null,
+      reviewStatus: row.review_status,
+      hrComment: row.hr_comment ?? null,
+      reviewedAt: row.reviewed_at ?? null,
+      signedUrl,
+    });
+  }
+  return docs;
+}
+
+export async function getOnboardingCaseDetail(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  caseId: string,
+): Promise<OnboardingCaseDetail> {
+  const { data: row, error } = await supabase
+    .schema("hrms")
+    .from("onboarding_cases")
+    .select(
+      `
+        *,
+        designations:designation_id (title),
+        departments:department_id (name),
+        roles:intended_role_id (name),
+        employment_types:employment_type_id (name),
+        branches:branch_id (name),
+        work_locations:work_location_id (name),
+        manager:reporting_manager_id (first_name, last_name)
+      `,
+    )
+    .eq("id", caseId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!row) throw new Error("Onboarding case not found");
+
+  const [sections, documents, policies, agreements, signature, timeline] = await Promise.all([
+    supabase.schema("hrms").from("onboarding_sections").select("section_key, data, completed_at").eq("case_id", caseId),
+    loadCaseDocuments(caseId),
+    supabase.schema("hrms").from("onboarding_policy_acknowledgements").select("policy_code").eq("case_id", caseId),
+    supabase.schema("hrms").from("onboarding_agreements").select("agreement_type, signed_at, locked_at").eq("case_id", caseId),
+    supabase.schema("hrms").from("onboarding_signatures").select("id, signature_type, signature_style, finalized_at").eq("case_id", caseId).order("finalized_at", { ascending: false }).limit(1).maybeSingle(),
+    supabase.schema("hrms").from("onboarding_timeline_events").select("id, event_type, title, description, occurred_at").eq("case_id", caseId).order("occurred_at", { ascending: false }).limit(50),
+  ]);
+
+  const manager = row.manager as { first_name?: string; last_name?: string } | null;
+  const base = mapListRow(row as LooseRow);
+
+  return {
+    ...base,
+    organizationId: row.organization_id,
+    reportingManagerName: manager ? `${manager.first_name ?? ""} ${manager.last_name ?? ""}`.trim() : null,
+    employmentTypeName: unwrapName(row as LooseRow, "employment_types"),
+    workLocationName: unwrapName(row as LooseRow, "work_locations"),
+    branchName: unwrapName(row as LooseRow, "branches"),
+    employmentCategory: row.employment_category ?? null,
+    offerReferenceNumber: row.offer_reference_number ?? null,
+    intendedRoleId: row.intended_role_id,
+    employeeId: row.employee_id ?? null,
+    companyEmail: row.company_email ?? null,
+    employeeCode: row.employee_code ?? null,
+    hrComments: row.hr_comments ?? null,
+    correctionNotes: row.correction_notes ?? null,
+    sections: (sections.data ?? []).map((s) => ({
+      sectionKey: s.section_key,
+      data: (s.data as Record<string, unknown>) ?? {},
+      completedAt: s.completed_at ?? null,
+    })),
+    documents,
+    policyAcknowledgements: (policies.data ?? []).map((p) => p.policy_code),
+    agreements: (agreements.data ?? []).map((a) => ({
+      agreementType: a.agreement_type,
+      signedAt: a.signed_at ?? null,
+      lockedAt: a.locked_at ?? null,
+    })),
+    signature: signature.data
+      ? {
+          id: signature.data.id,
+          signatureType: signature.data.signature_type,
+          signatureStyle: signature.data.signature_style ?? null,
+          finalizedAt: signature.data.finalized_at,
+        }
+      : null,
+    timeline: (timeline.data ?? []).map((t) => ({
+      id: t.id,
+      eventType: t.event_type,
+      title: t.title,
+      description: t.description ?? null,
+      occurredAt: t.occurred_at,
+    })),
+  };
+}
+
+export async function getCandidatePortalContext(caseId: string): Promise<CandidatePortalContext | null> {
+  const admin = createAdminClient();
+  const { data: row, error } = await admin
+    .schema("hrms")
+    .from("onboarding_cases")
+    .select("id, full_name, personal_email, status, completion_percent, joining_date, correction_notes, onboarding_account_active, deleted_at, submitted_at")
+    .eq("id", caseId)
+    .maybeSingle();
+
+  if (error || !row || row.deleted_at || !row.onboarding_account_active) return null;
+
+  const locked = ["pending_hr_review", "approved", "employee_created", "completed", "rejected", "cancelled", "archived"].includes(row.status);
+
+  const [sections, documents, policies, agreements, signature] = await Promise.all([
+    admin.schema("hrms").from("onboarding_sections").select("section_key, data, completed_at").eq("case_id", caseId),
+    loadCaseDocuments(caseId),
+    admin.schema("hrms").from("onboarding_policy_acknowledgements").select("policy_code").eq("case_id", caseId),
+    admin.schema("hrms").from("onboarding_agreements").select("agreement_type, signed_at, locked_at").eq("case_id", caseId),
+    admin.schema("hrms").from("onboarding_signatures").select("id, signature_type, signature_style, finalized_at").eq("case_id", caseId).order("finalized_at", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+
+  return {
+    caseId: row.id,
+    fullName: row.full_name,
+    personalEmail: row.personal_email,
+    status: row.status,
+    completionPercent: row.completion_percent ?? 0,
+    joiningDate: row.joining_date ?? null,
+    correctionNotes: row.correction_notes ?? null,
+    locked,
+    sections: (sections.data ?? []).map((s) => ({
+      sectionKey: s.section_key,
+      data: (s.data as Record<string, unknown>) ?? {},
+      completedAt: s.completed_at ?? null,
+    })),
+    documents,
+    policyAcknowledgements: (policies.data ?? []).map((p) => p.policy_code),
+    agreements: (agreements.data ?? []).map((a) => ({
+      agreementType: a.agreement_type,
+      signedAt: a.signed_at ?? null,
+      lockedAt: a.locked_at ?? null,
+    })),
+    signature: signature.data
+      ? {
+          id: signature.data.id,
+          signatureType: signature.data.signature_type,
+          signatureStyle: signature.data.signature_style ?? null,
+          finalizedAt: signature.data.finalized_at,
+        }
+      : null,
+  };
+}
+
+export function calculateCompletionPercent(
+  sections: { sectionKey: string; completedAt: string | null }[],
+  documentsCount: number,
+  policyCount: number,
+  agreementCount: number,
+  hasSignature: boolean,
+): number {
+  const sectionWeight = 60;
+  const docWeight = 15;
+  const policyWeight = 10;
+  const agreementWeight = 10;
+  const signatureWeight = 5;
+
+  const completedSections = sections.filter((s) => s.completedAt).length;
+  const sectionScore =
+    ONBOARDING_WIZARD_SECTIONS.length > 0
+      ? (completedSections / ONBOARDING_WIZARD_SECTIONS.length) * sectionWeight
+      : 0;
+  const docScore = documentsCount > 0 ? docWeight : 0;
+  const policyScore = policyCount >= 7 ? policyWeight : (policyCount / 7) * policyWeight;
+  const agreementScore = agreementCount >= 6 ? agreementWeight : (agreementCount / 6) * agreementWeight;
+  const sigScore = hasSignature ? signatureWeight : 0;
+
+  return Math.min(100, Math.round(sectionScore + docScore + policyScore + agreementScore + sigScore));
+}

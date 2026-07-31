@@ -13,11 +13,18 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { formatEmployeeRouteRefLabel } from "@/lib/employees/routing";
+import { useBreadcrumbLabelState } from "@/providers/breadcrumb-label-provider";
 
 type BreadcrumbItemConfig = {
   label: string;
   href: string;
 };
+
+function isUuid(segment: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    segment,
+  );
+}
 
 function formatSegment(segment: string) {
   return segment
@@ -445,6 +452,22 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
     return items;
   }
 
+  if (segments[0] === "dashboard" && segments[1] === "onboarding") {
+    const items: BreadcrumbItemConfig[] = [
+      { label: "Dashboard", href: "/" },
+      { label: "Onboarding", href: "/dashboard/onboarding" },
+    ];
+
+    if (segments[2]) {
+      items.push({
+        label: isUuid(segments[2]) ? "New hire" : formatSegment(segments[2]),
+        href: pathname,
+      });
+    }
+
+    return items;
+  }
+
   if (segments[0] === "dashboard" && segments[1] === "audit") {
     const items: BreadcrumbItemConfig[] = [
       { label: "Dashboard", href: "/" },
@@ -470,20 +493,28 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
   }
 
   return segments.map((segment, index) => ({
-    label: formatSegment(segment),
+    label: isUuid(segment) ? "Details" : formatSegment(segment),
     href: `/${segments.slice(0, index + 1).join("/")}`,
   }));
 }
 
 export function BreadcrumbNav() {
   const pathname = usePathname();
+  const breadcrumbLabel = useBreadcrumbLabelState();
   const items = buildBreadcrumbItems(pathname);
+
+  const resolvedItems =
+    breadcrumbLabel?.label && items.length > 0
+      ? items.map((item, index) =>
+          index === items.length - 1 ? { ...item, label: breadcrumbLabel.label! } : item,
+        )
+      : items;
 
   return (
     <Breadcrumb className="min-w-0">
       <BreadcrumbList className="flex-nowrap">
-        {items.map((item, index) => {
-          const isLast = index === items.length - 1;
+        {resolvedItems.map((item, index) => {
+          const isLast = index === resolvedItems.length - 1;
 
           return (
             <Fragment key={item.href}>

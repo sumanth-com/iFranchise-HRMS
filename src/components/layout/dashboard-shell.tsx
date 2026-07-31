@@ -8,6 +8,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { TopNav } from "@/components/layout/top-nav";
 import { DashboardUrlCleaner } from "@/components/layout/dashboard-url-cleaner";
 import { ActivePortalProvider } from "@/providers/active-portal-provider";
+import { BreadcrumbLabelProvider } from "@/providers/breadcrumb-label-provider";
 import { SidebarProvider } from "@/hooks/use-sidebar";
 
 type DashboardShellProps = {
@@ -17,7 +18,8 @@ type DashboardShellProps = {
 export function DashboardShell({ children }: DashboardShellProps) {
   return (
     <ActivePortalProvider>
-      <SidebarProvider>
+      <BreadcrumbLabelProvider>
+        <SidebarProvider>
         <DashboardUrlCleaner />
         <div className="flex h-screen overflow-hidden bg-background">
           <Sidebar />
@@ -34,7 +36,8 @@ export function DashboardShell({ children }: DashboardShellProps) {
             </main>
           </div>
         </div>
-      </SidebarProvider>
+        </SidebarProvider>
+      </BreadcrumbLabelProvider>
     </ActivePortalProvider>
   );
 }

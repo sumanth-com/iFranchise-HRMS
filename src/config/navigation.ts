@@ -6,6 +6,7 @@ import {
   Building2,
   CalendarCheck,
   CalendarDays,
+  ClipboardList,
   FileText,
   LaptopMinimal,
   LayoutDashboard,
@@ -167,6 +168,13 @@ export const mainNavItems: NavigationItem[] = [
     icon: UserRoundPlus,
     section: "Administration",
     permissions: ["user_provisioning.view", "user_provisioning.manage"],
+  },
+  {
+    title: "Onboarding",
+    href: "/dashboard/onboarding",
+    icon: ClipboardList,
+    section: "Administration",
+    permissions: ["onboarding.view", "onboarding.manage", "onboarding.review", "onboarding.activate"],
   },
   {
     title: "Audit Trail",

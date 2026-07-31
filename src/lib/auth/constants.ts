@@ -18,6 +18,7 @@ export const PUBLIC_ROUTES = [
   APPROVAL_PUBLIC_ROUTE,
   "/e",
   "/verify/payslip",
+  "/onboarding",
 ] as const;
 
 export const LOGOUT_BROADCAST_KEY = "ifranchise-hrms-logout";
