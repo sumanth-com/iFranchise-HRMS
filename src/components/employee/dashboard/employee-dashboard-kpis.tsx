@@ -1,8 +1,16 @@
+"use client";
+
 import { CalendarClock, CalendarDays, Clock, Timer } from "lucide-react";
+import { usePathname } from "next/navigation";
 
 import { EmployeeStatCard } from "@/components/employee/dashboard/employee-module-primitives";
 import { ATTENDANCE_STATUS_LABELS } from "@/lib/attendance/constants";
 import { formatHoursLabel } from "@/lib/employee/attendance-format";
+import {
+  EMPLOYEE_DASHBOARD_KPI_LINKS,
+  EMPLOYEE_ROUTES,
+  HR_SELF_SERVICE_DASHBOARD_KPI_LINKS,
+} from "@/lib/employee/constants";
 import type { EmployeeDashboardKpis } from "@/types/employee-dashboard";
 
 function attendanceLabel(kpis: EmployeeDashboardKpis) {
@@ -21,7 +29,17 @@ function attendanceLabel(kpis: EmployeeDashboardKpis) {
   }
 }
 
+function resolveKpiLinks(pathname: string) {
+  if (pathname.startsWith(EMPLOYEE_ROUTES.home)) {
+    return EMPLOYEE_DASHBOARD_KPI_LINKS;
+  }
+  return HR_SELF_SERVICE_DASHBOARD_KPI_LINKS;
+}
+
 export function EmployeeDashboardKpiCards({ kpis }: { kpis: EmployeeDashboardKpis }) {
+  const pathname = usePathname();
+  const links = resolveKpiLinks(pathname);
+
   return (
     <section
       aria-label="Your day at a glance"
@@ -33,6 +51,7 @@ export function EmployeeDashboardKpiCards({ kpis }: { kpis: EmployeeDashboardKpi
         icon={CalendarClock}
         accent="text-emerald-600 dark:text-emerald-400"
         iconBg="bg-emerald-500/10"
+        href={links.attendance}
       />
       <EmployeeStatCard
         label="Working Hours Today"
@@ -40,6 +59,7 @@ export function EmployeeDashboardKpiCards({ kpis }: { kpis: EmployeeDashboardKpi
         icon={Timer}
         accent="text-sky-600 dark:text-sky-400"
         iconBg="bg-sky-500/10"
+        href={links.workingHours}
       />
       <EmployeeStatCard
         label="Leave Balance"
@@ -47,6 +67,7 @@ export function EmployeeDashboardKpiCards({ kpis }: { kpis: EmployeeDashboardKpi
         icon={CalendarDays}
         accent="text-indigo-600 dark:text-indigo-400"
         iconBg="bg-indigo-500/10"
+        href={links.leaveBalance}
       />
       <EmployeeStatCard
         label="Pending Leave Requests"
@@ -54,6 +75,7 @@ export function EmployeeDashboardKpiCards({ kpis }: { kpis: EmployeeDashboardKpi
         icon={Clock}
         accent="text-amber-600 dark:text-amber-400"
         iconBg="bg-amber-500/10"
+        href={links.pendingLeaveRequests}
       />
     </section>
   );

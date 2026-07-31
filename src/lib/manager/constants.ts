@@ -31,6 +31,17 @@ export const MANAGER_ROUTES = {
   profile: "/manager/attendance?tab=my",
 } as const;
 
+export const MANAGER_DASHBOARD_KPI_LINKS = {
+  teamSize: MANAGER_ROUTES.team,
+  presentToday: MANAGER_ROUTES.attendanceTeam,
+  onLeaveToday: `${MANAGER_ROUTES.leave}?leaveStatus=approved`,
+  lateToday: MANAGER_ROUTES.attendanceTeam,
+  pendingLeaveApprovals: `${MANAGER_ROUTES.leave}?leaveStatus=pending`,
+  pendingPerformanceReviews: MANAGER_ROUTES.performance,
+  openRecruitmentRequests: MANAGER_ROUTES.recruitment,
+  probationEndingSoon: MANAGER_ROUTES.performance,
+} as const;
+
 export const MANAGER_QUICK_ACTIONS = [
   {
     id: "approve-leave",

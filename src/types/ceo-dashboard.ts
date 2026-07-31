@@ -15,6 +15,7 @@ export type CeoKpis = {
   openPositions: number;
   recruitmentPipeline: number;
   pendingApprovals: number;
+  pendingLeaveApprovals: number;
   attendancePercent: number;
   leavePercent: number;
   averageProductivity: number;

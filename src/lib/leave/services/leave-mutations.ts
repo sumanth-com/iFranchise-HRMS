@@ -7,6 +7,8 @@ import {
 } from "@/lib/leave/services/leave-utils";
 import {
   getEmployeeReportingManagerId,
+  getEmployeeRoleCodes,
+  getCeoApproverEmployeeId,
   getHrApproverEmployeeId,
 } from "@/lib/leave/services/leave-queries";
 import {
@@ -114,6 +116,11 @@ async function createApprovalSteps(
   const organizationId = profile.employee.organizationId;
   const managerId = await getEmployeeReportingManagerId(supabase, employeeId);
   const hrId = await getHrApproverEmployeeId(supabase, organizationId);
+  const ceoId = await getCeoApproverEmployeeId(supabase, organizationId);
+  const requesterRoles = await getEmployeeRoleCodes(supabase, employeeId);
+  const isHrRequester = requesterRoles.some((code) =>
+    ["hr_admin", "hr_executive"].includes(code),
+  );
 
   const steps: Array<{ level: number; approverId: string }> = [];
 
@@ -121,8 +128,24 @@ async function createApprovalSteps(
     steps.push({ level: 1, approverId: managerId });
   }
 
-  if (hrId && hrId !== employeeId && !steps.some((s) => s.approverId === hrId)) {
+  if (isHrRequester) {
+    if (ceoId && ceoId !== employeeId && !steps.some((s) => s.approverId === ceoId)) {
+      steps.push({ level: steps.length + 1, approverId: ceoId });
+    }
+  } else if (
+    hrId &&
+    hrId !== employeeId &&
+    !steps.some((s) => s.approverId === hrId)
+  ) {
     steps.push({ level: steps.length + 1, approverId: hrId });
+  }
+
+  if (
+    ceoId &&
+    ceoId !== employeeId &&
+    !steps.some((s) => s.approverId === ceoId)
+  ) {
+    steps.push({ level: steps.length + 1, approverId: ceoId });
   }
 
   if (steps.length === 0) {

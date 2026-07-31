@@ -44,12 +44,6 @@ export const CEO_QUICK_ACTIONS = [
     href: CEO_ROUTES.recruitment,
   },
   {
-    id: "open-payroll",
-    label: "Open Payroll",
-    description: "Salary cost and status",
-    href: CEO_ROUTES.payroll,
-  },
-  {
     id: "company-analytics",
     label: "Company Analytics",
     description: "Trends and executive charts",

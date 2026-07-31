@@ -10,6 +10,7 @@ import {
   EXECUTIVE_APPROVAL_TYPE_LABELS,
 } from "@/lib/ceo/executive-approvals-constants";
 import { syncExecutiveApprovalsFromDomain } from "@/lib/ceo/services/ceo-approvals-sync";
+import { listCeoApprovalQueue } from "@/lib/ceo/services/ceo-leave-queries";
 import { isWorkFromHomeBranch } from "@/lib/manager/services/attendance-correction-service";
 import { getExitSummary } from "@/lib/exit/services/exit-queries";
 import { getLeaveSummary } from "@/lib/leave/services/leave-queries";
@@ -86,7 +87,7 @@ function activityHref(module: string | null): string | null {
     case "leave":
       return CEO_ROUTES.approvals;
     case "payroll":
-      return CEO_ROUTES.payroll;
+      return CEO_ROUTES.analytics;
     case "recruitment":
       return CEO_ROUTES.recruitment;
     case "performance":
@@ -144,7 +145,7 @@ function buildInsights(input: {
       title: "Payroll ready",
       description: "Current month payroll has been completed successfully.",
       priority: "low",
-      href: CEO_ROUTES.payroll,
+      href: CEO_ROUTES.analytics,
     });
   } else if (input.payrollPending) {
     insights.push({
@@ -152,7 +153,7 @@ function buildInsights(input: {
       title: "Payroll pending review",
       description: "Payroll is awaiting completion or executive acknowledgment.",
       priority: "high",
-      href: CEO_ROUTES.payroll,
+      href: CEO_ROUTES.analytics,
     });
   }
 
@@ -210,6 +211,8 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
   const yesterday = format(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1), "yyyy-MM-dd");
 
   await syncExecutiveApprovalsFromDomain(supabase, profile);
+
+  const leaveApprovalQueue = await listCeoApprovalQueue(supabase, profile);
 
   const [
     yesterdayAttendance,
@@ -545,6 +548,7 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
       openPositions: recruitment.openPositions,
       recruitmentPipeline: recruitment.activeCandidates,
       pendingApprovals: approvals.length,
+      pendingLeaveApprovals: leaveApprovalQueue.length,
       attendancePercent,
       leavePercent,
       averageProductivity,

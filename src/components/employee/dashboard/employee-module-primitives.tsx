@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -10,6 +11,7 @@ export function EmployeeStatCard({
   accent = "text-foreground",
   iconBg = "bg-muted",
   hint,
+  href,
 }: {
   label: string;
   value: string;
@@ -17,9 +19,10 @@ export function EmployeeStatCard({
   accent?: string;
   iconBg?: string;
   hint?: string;
+  href?: string;
 }) {
-  return (
-    <div className="flex h-full min-w-0 flex-col justify-between gap-2 rounded-xl border bg-card p-3.5 shadow-sm">
+  const content = (
+    <>
       <div className="flex items-start justify-between gap-2">
         <p className="truncate whitespace-nowrap text-[11px] font-medium leading-snug text-muted-foreground">
           {label}
@@ -41,8 +44,24 @@ export function EmployeeStatCard({
           <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{hint}</p>
         ) : null}
       </div>
-    </div>
+    </>
   );
+
+  const className =
+    "flex h-full min-w-0 flex-col justify-between gap-2 rounded-xl border bg-card p-3.5 shadow-sm";
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className={cn(className, "transition-colors hover:border-primary/40 hover:bg-accent/30")}
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return <div className={className}>{content}</div>;
 }
 
 export function EmployeeSectionCard({

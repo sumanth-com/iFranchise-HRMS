@@ -36,6 +36,8 @@ function formatPercent(value: number) {
 }
 
 export function CeoDashboardKpis({ kpis }: { kpis: CeoKpis }) {
+  const totalPendingApprovals = kpis.pendingApprovals + kpis.pendingLeaveApprovals;
+
   const items = [
     {
       label: "Employees",
@@ -64,14 +66,15 @@ export function CeoDashboardKpis({ kpis }: { kpis: CeoKpis }) {
     },
     {
       label: "Pending Approvals",
-      value: String(kpis.pendingApprovals),
-      href: CEO_ROUTES.approvals,
-      accent: kpis.pendingApprovals > 0 ? "text-violet-600 dark:text-violet-400" : undefined,
+      value: String(totalPendingApprovals),
+      href:
+        kpis.pendingLeaveApprovals > 0 ? CEO_ROUTES.leave : CEO_ROUTES.approvals,
+      accent: totalPendingApprovals > 0 ? "text-violet-600 dark:text-violet-400" : undefined,
     },
     {
       label: "Payroll Cost",
       value: formatCurrencyInr(kpis.payrollCost),
-      href: CEO_ROUTES.payroll,
+      href: CEO_ROUTES.analytics,
     },
   ] as const;
 

@@ -265,13 +265,19 @@ function PrioritiesPanel({
     <Panel title="Priorities" subtitle="Key decisions and company status" href={CEO_ROUTES.approvals}>
       <div className="grid h-full min-h-0 flex-1 grid-cols-2 gap-2">
         <PriorityTile
-          label="Approvals"
-          value={String(kpis.pendingApprovals)}
-          detail={kpis.pendingApprovals > 0 ? "Needs your decision" : "All clear"}
-          href={CEO_ROUTES.approvals}
+          label="Leave Approvals"
+          value={String(kpis.pendingLeaveApprovals)}
+          detail={
+            kpis.pendingLeaveApprovals > 0
+              ? "Leave requests awaiting you"
+              : "No pending leave"
+          }
+          href={CEO_ROUTES.leave}
           icon={<CheckSquare className="size-3.5" />}
           tone={
-            kpis.pendingApprovals > 0 ? "text-violet-600 dark:text-violet-400" : undefined
+            kpis.pendingLeaveApprovals > 0
+              ? "text-violet-600 dark:text-violet-400"
+              : undefined
           }
         />
         <PriorityTile
@@ -292,10 +298,10 @@ function PrioritiesPanel({
           icon={<BriefcaseBusiness className="size-3.5" />}
         />
         <PriorityTile
-          label="Payroll"
+          label="Payroll Status"
           value={payroll.status}
           detail={formatCurrencyInr(payroll.salaryCost)}
-          href={CEO_ROUTES.payroll}
+          href={CEO_ROUTES.analytics}
           icon={<Wallet className="size-3.5" />}
           tone={payroll.pending ? "text-amber-700 dark:text-amber-400" : undefined}
         />

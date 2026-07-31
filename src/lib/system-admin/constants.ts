@@ -57,7 +57,13 @@ export function portalPathMatches(pathname: string, href: string): boolean {
 export function resolveActivePortalSwitchLink(
   pathname: string,
   available: ReadonlyArray<{ label: string; href: string; portal: string }>,
+  preferredPortal?: string | null,
 ) {
+  if (preferredPortal) {
+    const preferred = available.find((portal) => portal.portal === preferredPortal);
+    if (preferred) return preferred;
+  }
+
   return (
     [...available]
       .sort((left, right) => right.href.length - left.href.length)

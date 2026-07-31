@@ -12,7 +12,6 @@ import {
   Target,
   UserRound,
   UserRoundPlus,
-  Wallet,
 } from "lucide-react";
 
 import type { NavigationItem } from "@/lib/auth/navigation";
@@ -43,22 +42,16 @@ export const ceoNavItems: NavigationItem[] = [
     permissions: ["performance.view"],
   },
   {
-    title: "Payroll",
-    href: CEO_ROUTES.payroll,
-    icon: Wallet,
-    permissions: ["payroll.view"],
-  },
-  {
     title: "Attendance",
     href: CEO_ROUTES.attendance,
     icon: CalendarCheck,
     permissions: ["attendance.view"],
   },
   {
-    title: "Leave",
+    title: "Leave Approvals",
     href: CEO_ROUTES.leave,
     icon: CalendarDays,
-    permissions: ["leave.view"],
+    permissions: ["leave.approve"],
   },
   {
     title: "Exit Approvals",

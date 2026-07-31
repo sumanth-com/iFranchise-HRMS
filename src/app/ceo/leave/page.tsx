@@ -1,15 +1,36 @@
 import { Suspense } from "react";
 
-import { CeoLeaveView } from "@/components/ceo/leave/ceo-leave-view";
+import { CeoLeaveApprovalsView } from "@/components/ceo/leave/ceo-leave-approvals-view";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
-import { getCeoLeaveModuleData } from "@/lib/ceo/actions/ceo-leave-actions";
+import {
+  getCeoForwardTargets,
+  listCeoApprovalQueue,
+} from "@/lib/ceo/services/ceo-leave-queries";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
+import { createClient } from "@/lib/supabase/server";
 
-export default async function CeoLeavePage() {
-  await requireServerAnyPermission([PORTAL_PERMISSIONS.ceo, "leave.view"]);
-  const data = await getCeoLeaveModuleData();
+async function CeoLeaveApprovalsContent() {
+  const profile = await requireServerAnyPermission([
+    PORTAL_PERMISSIONS.ceo,
+    "leave.approve",
+  ]);
+  const supabase = await createClient();
 
+  const [approvalQueue, forwardTargets] = await Promise.all([
+    listCeoApprovalQueue(supabase, profile),
+    getCeoForwardTargets(supabase, profile),
+  ]);
+
+  return (
+    <CeoLeaveApprovalsView
+      approvalQueue={approvalQueue}
+      forwardTargets={forwardTargets}
+    />
+  );
+}
+
+export default function CeoLeavePage() {
   return (
     <Suspense
       fallback={
@@ -18,7 +39,7 @@ export default async function CeoLeavePage() {
         </div>
       }
     >
-      <CeoLeaveView {...data} />
+      <CeoLeaveApprovalsContent />
     </Suspense>
   );
 }

@@ -21,6 +21,7 @@ function emptyDashboard(): CeoDashboardData {
       openPositions: 0,
       recruitmentPipeline: 0,
       pendingApprovals: 0,
+      pendingLeaveApprovals: 0,
       attendancePercent: 0,
       leavePercent: 0,
       averageProductivity: 0,

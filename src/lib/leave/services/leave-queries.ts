@@ -691,3 +691,46 @@ export async function getHrApproverEmployeeId(
   const row = data?.[0];
   return row?.employee_id ?? null;
 }
+
+export async function getCeoApproverEmployeeId(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("user_roles")
+    .select(
+      `
+        employee_id,
+        roles!inner (code),
+        employees!inner (organization_id, employment_status, deleted_at)
+      `,
+    )
+    .eq("employees.organization_id", organizationId)
+    .in("roles.code", ["ceo", "founder", "co_founder"])
+    .is("employees.deleted_at", null)
+    .limit(1);
+
+  if (error) throw new Error(error.message);
+  const row = data?.[0];
+  return row?.employee_id ?? null;
+}
+
+export async function getEmployeeRoleCodes(
+  supabase: AuthSupabaseClient,
+  employeeId: string,
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("user_roles")
+    .select("roles!inner (code)")
+    .eq("employee_id", employeeId)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((row) => {
+    const role = Array.isArray(row.roles) ? row.roles[0] : row.roles;
+    return role?.code as string;
+  }).filter(Boolean);
+}

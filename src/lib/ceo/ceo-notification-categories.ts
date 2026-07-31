@@ -224,7 +224,7 @@ export function buildQuickActions(
     push({ id: "open-approvals", label: "Open Approval", href: CEO_ROUTES.approvals });
   }
   if (item.category === "payroll" && !item.actionUrl) {
-    push({ id: "open-payroll", label: "Open Payroll", href: CEO_ROUTES.payroll });
+    push({ id: "open-analytics", label: "Open Analytics", href: CEO_ROUTES.analytics });
   }
   if (item.category === "recruitment" && !item.actionUrl) {
     push({ id: "open-recruitment", label: "Open Recruitment", href: CEO_ROUTES.recruitment });
