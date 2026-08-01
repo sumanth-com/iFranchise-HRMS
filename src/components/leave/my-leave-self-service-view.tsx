@@ -1,5 +1,7 @@
+"use client";
+
 import Link from "next/link";
-import { CalendarCheck, CalendarClock, CalendarPlus, CalendarX, FileText } from "lucide-react";
+import { CalendarCheck, CalendarClock, CalendarPlus, FileText } from "lucide-react";
 
 import { buttonVariants } from "@/components/common/button";
 import { DataTable, type DataTableColumn } from "@/components/common/data-table";
@@ -127,7 +129,7 @@ export function MyLeaveSelfServiceView({
         <EmployeeStatCard
           label="Approved"
           value={String(approved)}
-          icon={CalendarX}
+          icon={CalendarCheck}
           accent="text-emerald-600 dark:text-emerald-400"
           iconBg="bg-emerald-500/10"
         />

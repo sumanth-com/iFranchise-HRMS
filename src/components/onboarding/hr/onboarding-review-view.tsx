@@ -23,6 +23,14 @@ import { Input } from "@/components/common/input";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import type { SelectItemOption } from "@/components/payroll/select-utils";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   archiveOnboardingAction,
   cancelOnboardingAction,
   fetchOnboardingDetailAction,
@@ -103,6 +111,7 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
   const [correctionNotes, setCorrectionNotes] = useState("");
   const [intendedRoleId, setIntendedRoleId] = useState(initialDetail.intendedRoleId);
   const [isResending, setIsResending] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   useSetBreadcrumbLabel(detail.fullName);
@@ -114,22 +123,21 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
   ).length;
 
   const canReview = detail.status === "pending_hr_review";
-  const isTerminal =
+  const cannotCancel =
     detail.status === "cancelled" ||
     detail.status === "archived" ||
     detail.status === "rejected" ||
     detail.status === "employee_created" ||
     detail.status === "completed";
-  const canResendInvite =
-    !isTerminal &&
-    [
-      "draft",
-      "invitation_sent",
-      "invitation_viewed",
-      "in_progress",
-      "documents_uploaded",
-      "corrections_requested",
-    ].includes(detail.status);
+  const canResendInvite = [
+    "draft",
+    "invitation_sent",
+    "invitation_viewed",
+    "in_progress",
+    "documents_uploaded",
+    "corrections_requested",
+    "cancelled",
+  ].includes(detail.status);
 
   function refresh() {
     startTransition(async () => {
@@ -192,11 +200,13 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
   }
 
   function cancelCase() {
-    if (!confirm("Cancel this onboarding? The candidate will lose portal access.")) return;
     startTransition(async () => {
       const result = await cancelOnboardingAction(detail.id);
       toast[result.success ? "success" : "error"](result.message);
-      if (result.success) refresh();
+      if (result.success) {
+        setCancelDialogOpen(false);
+        refresh();
+      }
     });
   }
 
@@ -256,8 +266,8 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
             <Button
               variant="outline"
               size="sm"
-              onClick={cancelCase}
-              disabled={isPending || isTerminal}
+              onClick={() => setCancelDialogOpen(true)}
+              disabled={isPending || cannotCancel}
             >
               Cancel
             </Button>
@@ -275,6 +285,13 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
 
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
+          {detail.status === "cancelled" ? (
+            <div className="rounded-xl border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-950">
+              <strong>Onboarding cancelled.</strong> The candidate cannot access the portal. Use
+              &quot;Resend invitation&quot; to reopen onboarding and send a new link.
+            </div>
+          ) : null}
+
           {detail.status === "draft" && !detail.invitationSentAt ? (
             <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
               <strong>Invitation not sent yet.</strong> Use &quot;Resend invitation&quot; to email
@@ -582,6 +599,36 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
           </section>
         </div>
       </div>
+
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancel onboarding?</DialogTitle>
+            <DialogDescription>
+              {detail.fullName} will lose portal access and active invitation links will stop
+              working. You can resend a new invitation later to reopen this onboarding.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPending}
+              onClick={() => setCancelDialogOpen(false)}
+            >
+              Keep onboarding
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isPending}
+              onClick={cancelCase}
+            >
+              {isPending ? "Cancelling…" : "Cancel onboarding"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

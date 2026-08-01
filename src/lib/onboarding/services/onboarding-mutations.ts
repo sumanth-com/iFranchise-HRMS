@@ -21,6 +21,7 @@ import {
   addTimelineEvent,
   createOnboardingInvitationToken,
   hashOnboardingToken,
+  revokeActiveInvitationTokens,
   revokeActiveInvitationTokensExcept,
   revokePortalSessions,
 } from "@/lib/onboarding/onboarding-security";
@@ -41,6 +42,7 @@ const ONBOARDING_RESENDABLE_STATUSES = [
   "in_progress",
   "documents_uploaded",
   "corrections_requested",
+  "cancelled",
 ] as const;
 
 const ONBOARDING_BLOCKED_DUPLICATE_STATUSES = [
@@ -374,6 +376,8 @@ export async function sendOnboardingInvitation(
       invitation_sent_at: now,
       invitation_expires_at: expiresAt,
       onboarding_account_active: true,
+      cancelled_at: null,
+      archived_at: null,
       updated_by: profile.userId,
       updated_at: now,
     })
@@ -383,7 +387,10 @@ export async function sendOnboardingInvitation(
 
   await addTimelineEvent(supabase, caseId, {
     eventType: "invitation_sent",
-    title: "Onboarding invitation sent",
+    title:
+      detail.status === "cancelled"
+        ? "Onboarding reopened — invitation sent"
+        : "Onboarding invitation sent",
     description: `Invitation emailed to ${detail.personalEmail}`,
     actorUserId: profile.userId,
   });
@@ -808,8 +815,17 @@ export async function cancelOnboardingCase(
   profile: UserProfile,
   caseId: string,
 ) {
+  const organizationId = profile.employee.organizationId;
+  const detail = await getOnboardingCaseDetail(supabase, organizationId, caseId);
+
+  if (
+    ["cancelled", "archived", "employee_created", "completed", "rejected"].includes(detail.status)
+  ) {
+    throw new Error("This onboarding cannot be cancelled");
+  }
+
   const now = new Date().toISOString();
-  await supabase
+  const { error } = await supabase
     .schema("hrms")
     .from("onboarding_cases")
     .update({
@@ -820,7 +836,11 @@ export async function cancelOnboardingCase(
       updated_at: now,
     })
     .eq("id", caseId);
+
+  if (error) throw new Error(error.message);
+
   await revokePortalSessions(caseId);
+  await revokeActiveInvitationTokens(caseId);
   await addTimelineEvent(supabase, caseId, {
     eventType: "cancelled",
     title: "Onboarding cancelled",
