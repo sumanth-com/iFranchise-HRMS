@@ -1,9 +1,11 @@
 import { ONBOARDING_PERMISSIONS } from "@/lib/onboarding/constants";
 import {
   getOnboardingCaseDetail,
+  getOnboardingCaseRouteRef,
   getOnboardingDashboardStats,
   getOnboardingLookups,
   listOnboardingCases,
+  resolveOnboardingCaseId,
 } from "@/lib/onboarding/services/onboarding-queries";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -45,19 +47,23 @@ export async function loadOnboardingModuleData(
   return { stats, cases, lookups };
 }
 
-export async function loadOnboardingCaseDetail(caseId: string): Promise<OnboardingCaseDetail> {
-  const profile = await requireServerAnyPermission(VIEW_PERMISSIONS);
-  const supabase = await createClient();
-  return getOnboardingCaseDetail(supabase, profile.employee.organizationId, caseId);
-}
-
-export async function loadOnboardingReviewPageData(caseId: string) {
+export async function loadOnboardingCaseDetail(routeRef: string): Promise<OnboardingCaseDetail> {
   const profile = await requireServerAnyPermission(VIEW_PERMISSIONS);
   const supabase = await createClient();
   const organizationId = profile.employee.organizationId;
-  const [detail, lookups] = await Promise.all([
+  const caseId = await resolveOnboardingCaseId(supabase, organizationId, routeRef);
+  return getOnboardingCaseDetail(supabase, organizationId, caseId);
+}
+
+export async function loadOnboardingReviewPageData(routeRef: string) {
+  const profile = await requireServerAnyPermission(VIEW_PERMISSIONS);
+  const supabase = await createClient();
+  const organizationId = profile.employee.organizationId;
+  const caseId = await resolveOnboardingCaseId(supabase, organizationId, routeRef);
+  const [detail, lookups, routeRefCanonical] = await Promise.all([
     getOnboardingCaseDetail(supabase, organizationId, caseId),
     getOnboardingLookups(supabase, organizationId),
+    getOnboardingCaseRouteRef(supabase, organizationId, caseId),
   ]);
-  return { detail, roles: lookups.roles };
+  return { detail, roles: lookups.roles, routeRef: routeRefCanonical };
 }

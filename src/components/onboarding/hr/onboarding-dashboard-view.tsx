@@ -13,7 +13,8 @@ import { FilterSelect } from "@/components/common/filter-select";
 import { CreateOnboardingDialog } from "@/components/onboarding/hr/create-onboarding-dialog";
 import { fetchOnboardingModuleAction } from "@/lib/onboarding/actions/hr-onboarding-actions";
 import type { OnboardingModuleData } from "@/lib/onboarding/loaders/hr-onboarding-loaders";
-import { ONBOARDING_STATUS_LABELS, ONBOARDING_STATUSES } from "@/types/onboarding";
+import { assignOnboardingRouteRefs } from "@/lib/onboarding/routing";
+import { ONBOARDING_ROUTES, ONBOARDING_STATUS_LABELS, ONBOARDING_STATUSES } from "@/types/onboarding";
 import type { OnboardingListParams } from "@/types/onboarding";
 
 type OnboardingDashboardViewProps = OnboardingModuleData & {
@@ -61,6 +62,10 @@ export function OnboardingDashboardView({
     { label: "In progress", value: stats.inProgress, key: "in_progress" },
     { label: "Completed", value: stats.completed, key: "employee_created" },
   ];
+
+  const routeRefs = assignOnboardingRouteRefs(
+    cases.data.map((row) => ({ id: row.id, fullName: row.fullName })),
+  );
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -145,7 +150,7 @@ export function OnboardingDashboardView({
                   </td>
                   <td className="p-3 text-right">
                     <Link
-                      href={`/dashboard/onboarding/${row.id}`}
+                      href={ONBOARDING_ROUTES.hrDetail(routeRefs.get(row.id) ?? row.id)}
                       className="inline-flex items-center text-sm font-medium text-primary hover:underline"
                     >
                       <ClipboardList className="h-4 w-4 mr-1" />
@@ -187,10 +192,14 @@ export function OnboardingDashboardView({
         open={createOpen}
         onOpenChange={setCreateOpen}
         lookups={lookups}
-        onSuccess={(caseId) => {
+        onSuccess={(caseId, fullName) => {
           setCreateOpen(false);
           toast.success("Onboarding invitation sent");
-          router.push(`/dashboard/onboarding/${caseId}`);
+          const routeRef = assignOnboardingRouteRefs([
+            ...cases.data.map((row) => ({ id: row.id, fullName: row.fullName })),
+            { id: caseId, fullName },
+          ]).get(caseId) ?? caseId;
+          router.push(ONBOARDING_ROUTES.hrDetail(routeRef));
         }}
       />
     </div>

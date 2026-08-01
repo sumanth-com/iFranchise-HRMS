@@ -34,7 +34,7 @@ type CreateOnboardingDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   lookups: OnboardingLookups;
-  onSuccess: (caseId: string) => void;
+  onSuccess: (caseId: string, fullName: string) => void;
 };
 
 function Field({
@@ -177,7 +177,7 @@ export function CreateOnboardingDialog({
       }
       reset();
       if (result.caseId) {
-        onSuccess(result.caseId);
+        onSuccess(result.caseId, values.fullName);
       } else {
         toast.success(result.message);
         onOpenChange(false);

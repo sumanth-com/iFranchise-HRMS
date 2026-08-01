@@ -1,12 +1,13 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { OnboardingReviewView } from "@/components/onboarding/hr/onboarding-review-view";
 import { loadOnboardingReviewPageData } from "@/lib/onboarding/loaders/hr-onboarding-loaders";
+import { isOnboardingCaseUuid } from "@/lib/onboarding/routing";
 import { ONBOARDING_PERMISSIONS } from "@/lib/onboarding/constants";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 
 type PageProps = {
-  params: Promise<{ id: string }>;
+  params: Promise<{ caseRef: string }>;
 };
 
 export default async function OnboardingDetailPage({ params }: PageProps) {
@@ -17,10 +18,15 @@ export default async function OnboardingDetailPage({ params }: PageProps) {
     ONBOARDING_PERMISSIONS.activate,
   ]);
 
-  const { id } = await params;
+  const { caseRef } = await params;
 
   try {
-    const { detail, roles } = await loadOnboardingReviewPageData(id);
+    const { detail, roles, routeRef } = await loadOnboardingReviewPageData(caseRef);
+
+    if (isOnboardingCaseUuid(caseRef) && caseRef !== routeRef) {
+      redirect(`/dashboard/onboarding/${routeRef}`);
+    }
+
     return <OnboardingReviewView detail={detail} roles={roles} />;
   } catch {
     notFound();

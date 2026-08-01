@@ -2,6 +2,11 @@ import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { loadInviteableRoles } from "@/lib/auth/iam-roles";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ONBOARDING_WIZARD_SECTIONS } from "@/lib/onboarding/constants";
+import {
+  assignOnboardingRouteRefs,
+  isOnboardingCaseUuid,
+  resolveOnboardingCaseIdFromRouteRef,
+} from "@/lib/onboarding/routing";
 import type {
   OnboardingCaseDetail,
   OnboardingCaseListItem,
@@ -224,6 +229,60 @@ async function loadCaseDocuments(caseId: string): Promise<OnboardingDocumentReco
     });
   }
   return docs;
+}
+
+async function listOnboardingRouteIdentities(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+): Promise<{ id: string; fullName: string }[]> {
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("onboarding_cases")
+    .select("id, full_name")
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    fullName: row.full_name as string,
+  }));
+}
+
+export async function resolveOnboardingCaseId(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  routeRef: string,
+): Promise<string> {
+  if (isOnboardingCaseUuid(routeRef)) {
+    const { data, error } = await supabase
+      .schema("hrms")
+      .from("onboarding_cases")
+      .select("id")
+      .eq("id", routeRef)
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    if (!data) throw new Error("Onboarding case not found");
+    return data.id;
+  }
+
+  const cases = await listOnboardingRouteIdentities(supabase, organizationId);
+  const caseId = resolveOnboardingCaseIdFromRouteRef(routeRef, cases);
+  if (!caseId) throw new Error("Onboarding case not found");
+  return caseId;
+}
+
+export async function getOnboardingCaseRouteRef(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  caseId: string,
+): Promise<string> {
+  const cases = await listOnboardingRouteIdentities(supabase, organizationId);
+  return assignOnboardingRouteRefs(cases).get(caseId) ?? caseId;
 }
 
 export async function getOnboardingCaseDetail(
