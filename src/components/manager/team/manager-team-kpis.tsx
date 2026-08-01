@@ -34,9 +34,9 @@ export function ManagerTeamKpis({ summary }: { summary: TeamSummary }) {
       accent: "text-emerald-600 dark:text-emerald-400",
     },
     {
-      label: "On Leave Today",
+      label: "Absent Today",
       value: summary.onLeaveToday,
-      accent: "text-amber-600 dark:text-amber-400",
+      accent: "text-destructive",
     },
     {
       label: "Probation Employees",

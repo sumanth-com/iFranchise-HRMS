@@ -66,9 +66,9 @@ export function ManagerDashboardKpis({
           href={MANAGER_DASHBOARD_KPI_LINKS.presentToday}
         />
         <KpiCard
-          label="On Leave Today"
+          label="Absent Today"
           value={kpis.onLeaveToday}
-          accent="text-amber-600 dark:text-amber-400"
+          accent="text-destructive"
           href={MANAGER_DASHBOARD_KPI_LINKS.onLeaveToday}
         />
         <KpiCard

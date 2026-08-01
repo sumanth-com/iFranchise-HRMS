@@ -55,10 +55,10 @@ export function HrTodayPulseSection({ pulse }: { pulse: HrTodayPulse }) {
           accent="text-emerald-600 dark:text-emerald-400"
         />
         <PulseMetric
-          label="On Leave"
-          value={pulse.onLeaveToday}
-          href="/dashboard/leave?tab=team"
-          accent="text-amber-600 dark:text-amber-400"
+          label="Absent Today"
+          value={pulse.absentToday}
+          href="/dashboard/attendance?tab=team&attendanceStatus=absent"
+          accent="text-destructive"
         />
         <PulseMetric
           label="Late Employees"

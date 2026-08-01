@@ -11,6 +11,7 @@ import {
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getAttendanceSummary } from "@/lib/attendance/services/attendance-queries";
+import { absentTodayIncludingLeave } from "@/lib/attendance/attendance-presence";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { ASSETS_ROUTES } from "@/lib/assets/constants";
 import { DOCUMENTS_ROUTES } from "@/lib/documents/constants";
@@ -666,13 +667,12 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
     kpis: {
       totalEmployees,
       presentToday: presentCount,
-      onLeaveToday: attendance.onLeaveToday || leave.employeesOnLeaveToday || 0,
-      absentToday: attendance.absentToday,
+      absentToday: absentTodayIncludingLeave(attendance),
       pendingLeaveApprovals: leave.pendingRequests,
     },
     todayPulse: {
       presentToday: presentCount,
-      onLeaveToday: attendance.onLeaveToday || leave.employeesOnLeaveToday || 0,
+      absentToday: absentTodayIncludingLeave(attendance),
       lateToday: attendance.lateToday,
       pendingApprovals: leave.pendingRequests,
       exitRequests: exitSummary.pendingClearance || 0,

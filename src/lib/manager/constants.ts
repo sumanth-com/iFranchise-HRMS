@@ -35,7 +35,7 @@ export const MANAGER_ROUTES = {
 export const MANAGER_DASHBOARD_KPI_LINKS = {
   teamSize: MANAGER_ROUTES.team,
   presentToday: MANAGER_ROUTES.attendanceTeam,
-  onLeaveToday: `${MANAGER_ROUTES.leave}?leaveStatus=approved`,
+  onLeaveToday: `${MANAGER_ROUTES.attendanceTeam}&attendanceStatus=absent`,
   lateToday: MANAGER_ROUTES.attendanceTeam,
   pendingLeaveApprovals: `${MANAGER_ROUTES.leave}?leaveStatus=pending`,
   pendingPerformanceReviews: MANAGER_ROUTES.performance,

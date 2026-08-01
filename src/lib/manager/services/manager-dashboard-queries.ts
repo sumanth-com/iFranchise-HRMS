@@ -591,6 +591,7 @@ export async function getManagerDashboardData(
       case "late":
         attendanceCounts.lateToday += 1;
         break;
+      case "absent":
       case "on_leave":
         attendanceCounts.onLeaveToday += 1;
         break;

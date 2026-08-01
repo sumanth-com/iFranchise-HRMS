@@ -22,7 +22,6 @@ export const DASHBOARD_QUICK_ACTIONS = [
 export const DASHBOARD_KPI_LINKS = {
   totalEmployees: EMPLOYEE_ROUTES.list,
   presentToday: attendanceTeamListUrl(),
-  onLeaveToday: leaveTeamListUrl(),
   absentToday: attendanceTeamListUrl({ attendanceStatus: "absent" }),
   pendingLeaveApprovals: leaveTeamListUrl(),
 } as const;

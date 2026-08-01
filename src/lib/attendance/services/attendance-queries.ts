@@ -133,7 +133,11 @@ export async function listAttendance(
   }
 
   if (attendanceStatus) {
-    query = query.eq("attendance_status", attendanceStatus);
+    if (attendanceStatus === "absent") {
+      query = query.in("attendance_status", ["absent", "on_leave"]);
+    } else {
+      query = query.eq("attendance_status", attendanceStatus);
+    }
   }
 
   if (employeeId) {
@@ -257,6 +261,7 @@ export async function getAttendanceSummary(
         counts.presentToday += 1;
         break;
       case "absent":
+      case "on_leave":
         counts.absentToday += 1;
         break;
       case "late":
@@ -264,9 +269,6 @@ export async function getAttendanceSummary(
         break;
       case "half_day":
         counts.halfDayToday += 1;
-        break;
-      case "on_leave":
-        counts.onLeaveToday += 1;
         break;
       default:
         break;

@@ -165,7 +165,7 @@ export function CeoAttendanceInsights({
             </div>
             <div className="rounded-lg border bg-background/80 px-3 py-2.5">
               <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
-                Absent
+                Absent Today
               </p>
               <p
                 className={cn(
@@ -175,12 +175,6 @@ export function CeoAttendanceInsights({
               >
                 {kpis.absentToday}
               </p>
-            </div>
-            <div className="rounded-lg border bg-background/80 px-3 py-2.5">
-              <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
-                On Leave
-              </p>
-              <p className="mt-1 text-xl font-semibold tabular-nums">{kpis.onLeaveToday}</p>
             </div>
             <div className="rounded-lg border bg-background/80 px-3 py-2.5">
               <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">

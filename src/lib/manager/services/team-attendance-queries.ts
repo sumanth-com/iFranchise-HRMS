@@ -93,6 +93,7 @@ export async function getTeamAttendanceSummary(
         presentToday += 1;
         break;
       case "absent":
+      case "on_leave":
         absentToday += 1;
         break;
       case "late":
@@ -180,7 +181,13 @@ export async function listTeamAttendance(
   if (parsed.employmentTypeId) {
     query = query.eq("employees.employment_type_id", parsed.employmentTypeId);
   }
-  if (parsed.attendanceStatus) query = query.eq("attendance_status", parsed.attendanceStatus);
+  if (parsed.attendanceStatus) {
+    if (parsed.attendanceStatus === "absent") {
+      query = query.in("attendance_status", ["absent", "on_leave"]);
+    } else {
+      query = query.eq("attendance_status", parsed.attendanceStatus);
+    }
+  }
   if (parsed.employeeId) query = query.eq("employee_id", parsed.employeeId);
 
   if (parsed.search) {

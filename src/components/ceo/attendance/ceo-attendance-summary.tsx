@@ -9,7 +9,7 @@ export function CeoAttendanceSummary({ kpis }: { kpis: CeoAttendanceKpis }) {
   return (
     <section
       aria-label="Attendance KPIs"
-      className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
+      className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
     >
       <CeoStatCard
         label="Attendance %"
@@ -25,7 +25,6 @@ export function CeoAttendanceSummary({ kpis }: { kpis: CeoAttendanceKpis }) {
         value={String(kpis.absentToday)}
         accent={kpis.absentToday > 0 ? "text-destructive" : undefined}
       />
-      <CeoStatCard label="On Leave" value={String(kpis.onLeaveToday)} />
       <CeoStatCard
         label="Late Today"
         value={String(kpis.lateArrivals)}

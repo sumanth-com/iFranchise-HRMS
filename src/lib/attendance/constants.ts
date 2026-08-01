@@ -44,6 +44,5 @@ export const ATTENDANCE_SUMMARY_LABELS = {
   absentToday: "Absent Today",
   lateToday: "Late Today",
   halfDayToday: "Half Day",
-  onLeaveToday: "On Leave",
   totalEmployees: "Total Employees",
 } as const;

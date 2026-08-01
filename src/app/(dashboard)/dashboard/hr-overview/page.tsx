@@ -12,13 +12,12 @@ const EMPTY_DASHBOARD: HrDashboardData = {
   kpis: {
     totalEmployees: 0,
     presentToday: 0,
-    onLeaveToday: 0,
     absentToday: 0,
     pendingLeaveApprovals: 0,
   },
   todayPulse: {
     presentToday: 0,
-    onLeaveToday: 0,
+    absentToday: 0,
     lateToday: 0,
     pendingApprovals: 0,
     exitRequests: 0,

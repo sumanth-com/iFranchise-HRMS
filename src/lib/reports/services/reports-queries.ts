@@ -1,6 +1,7 @@
 import { format, startOfMonth, subMonths } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { absentTodayIncludingLeave } from "@/lib/attendance/attendance-presence";
 import { getAttendanceSummary } from "@/lib/attendance/services/attendance-queries";
 import { getAssetsReports, getAssetsSummary } from "@/lib/assets/services/asset-queries";
 import { getExitSummary } from "@/lib/exit/services/exit-queries";
@@ -276,7 +277,7 @@ export async function getExecutiveDashboard(
       newHires: joiners.data?.length ?? 0,
       employeesLeft: leavers.data?.length ?? 0,
       attendanceToday: attendance.presentToday + attendance.lateToday + attendance.halfDayToday,
-      employeesOnLeave: attendance.onLeaveToday || leave.employeesOnLeaveToday || 0,
+      employeesOnLeave: absentTodayIncludingLeave(attendance),
       payrollCost: payroll.netPayroll || payroll.grossPayroll || 0,
       averagePerformanceRating: performance.averageRating ?? 0,
       openRecruitments: recruitment.openPositions ?? 0,

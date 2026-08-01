@@ -1,7 +1,6 @@
 import {
   Clock3,
   Coffee,
-  Palmtree,
   UserCheck,
   UserMinus,
   Users,
@@ -49,7 +48,7 @@ const SUMMARY_CONFIG = [
     key: "totalEmployees" as const,
     icon: Users,
     accent: "text-foreground",
-    bg: "bg-muted",
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
   },
 ];
 

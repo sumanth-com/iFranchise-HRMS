@@ -45,12 +45,6 @@ export function DashboardKpiRow({ kpis }: { kpis: DashboardKpis }) {
       accent: "text-emerald-600 dark:text-emerald-400",
     },
     {
-      key: "onLeaveToday",
-      label: "On Leave Today",
-      value: kpis.onLeaveToday,
-      accent: "text-amber-600 dark:text-amber-400",
-    },
-    {
       key: "absentToday",
       label: "Absent Today",
       value: kpis.absentToday,
@@ -65,7 +59,7 @@ export function DashboardKpiRow({ kpis }: { kpis: DashboardKpis }) {
   ];
 
   return (
-    <div className="grid h-full grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+    <div className="grid h-full grid-cols-2 gap-2 sm:grid-cols-2 xl:grid-cols-4">
       {items.map((item) => (
         <KpiTile
           key={item.key}

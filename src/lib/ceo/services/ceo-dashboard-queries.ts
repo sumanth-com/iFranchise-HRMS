@@ -343,6 +343,7 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
         attendance.presentToday += 1;
         break;
       case "absent":
+      case "on_leave":
         attendance.absentToday += 1;
         break;
       case "late":
@@ -350,9 +351,6 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
         break;
       case "half_day":
         attendance.halfDayToday += 1;
-        break;
-      case "on_leave":
-        attendance.onLeaveToday += 1;
         break;
       default:
         break;
@@ -612,7 +610,7 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
       presentToday: attendance.presentToday,
       absentToday: attendance.absentToday,
       lateToday: attendance.lateToday,
-      onLeaveToday: attendance.onLeaveToday || leave.employeesOnLeaveToday || 0,
+      onLeaveToday: 0,
     },
     activities,
     approvals,

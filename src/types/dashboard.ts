@@ -41,7 +41,6 @@ export type DashboardListItem = {
 export type DashboardKpis = {
   totalEmployees: number;
   presentToday: number;
-  onLeaveToday: number;
   absentToday: number;
   pendingLeaveApprovals: number;
 };
@@ -72,7 +71,7 @@ export type DashboardCharts = {
 
 export type HrTodayPulse = {
   presentToday: number;
-  onLeaveToday: number;
+  absentToday: number;
   lateToday: number;
   pendingApprovals: number;
   exitRequests: number;

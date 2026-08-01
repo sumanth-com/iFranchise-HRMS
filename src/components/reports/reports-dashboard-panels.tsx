@@ -109,9 +109,9 @@ export function ReportsDashboardPanels({
                 <p className="text-xs text-muted-foreground">Employees left</p>
               </div>
               <div className="rounded-xl border bg-background p-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Leave today</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Absent today</p>
                 <p className="mt-1 text-xl font-semibold">{cards.employeesOnLeave}</p>
-                <p className="text-xs text-muted-foreground">Employees on leave</p>
+                <p className="text-xs text-muted-foreground">Employees absent</p>
               </div>
               <div className="rounded-xl border bg-background p-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Performance</p>

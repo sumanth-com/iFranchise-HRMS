@@ -448,7 +448,7 @@ export async function getManagerTeamReportSummary(
       .eq("organization_id", organizationId)
       .in("employee_id", teamIds)
       .eq("attendance_date", today)
-      .eq("attendance_status", "on_leave")
+      .in("attendance_status", ["absent", "on_leave"])
       .is("deleted_at", null),
   ]);
 
@@ -461,7 +461,7 @@ export async function getManagerTeamReportSummary(
       ["active", "probation", "on_leave"].includes(String(row.employment_status)),
     ).length,
     onProbation: employees.filter((row) => row.employment_status === "probation").length,
-    onLeaveToday: attendanceTodayRes.data?.length ?? leaveSummary.employeesOnLeaveToday,
+    onLeaveToday: attendanceTodayRes.data?.length ?? 0,
     newJoinersThisMonth: employees.filter(
       (row) => row.date_of_joining && String(row.date_of_joining) >= monthStart,
     ).length,
@@ -596,7 +596,7 @@ export async function getManagerCategoryReportBundles(
       metrics: [
         { label: "Active Members", value: teamSummary.activeMembers },
         { label: "On Probation", value: teamSummary.onProbation },
-        { label: "On Leave Today", value: teamSummary.onLeaveToday },
+        { label: "Absent Today", value: teamSummary.onLeaveToday },
         { label: "New Joiners (Month)", value: teamSummary.newJoinersThisMonth },
         { label: "Pending Approvals", value: teamSummary.pendingApprovals },
         { label: "Team Headcount", value: teamIds.length },

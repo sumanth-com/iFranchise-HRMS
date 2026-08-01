@@ -328,7 +328,14 @@ export async function getCeoAttendanceKpis(
 
   let rows = todayRows;
   if (parsed.attendanceStatus) {
-    rows = rows.filter((row) => row.attendance_status === parsed.attendanceStatus);
+    if (parsed.attendanceStatus === "absent") {
+      rows = rows.filter(
+        (row) =>
+          row.attendance_status === "absent" || row.attendance_status === "on_leave",
+      );
+    } else {
+      rows = rows.filter((row) => row.attendance_status === parsed.attendanceStatus);
+    }
   }
   if (parsed.branchId) {
     rows = rows.filter((row) => row.branch_id === parsed.branchId);
@@ -336,14 +343,16 @@ export async function getCeoAttendanceKpis(
 
   const presentToday = rows.filter((row) => row.attendance_status === "present").length;
   const lateArrivals = rows.filter((row) => row.attendance_status === "late").length;
-  const absentToday = rows.filter((row) => row.attendance_status === "absent").length;
-  const onLeaveAttendance = rows.filter((row) => row.attendance_status === "on_leave").length;
-  const leaveEmployees = new Set(
-    ((leaveRes.data ?? []) as LooseRow[]).map((row) => row.employee_id as string),
-  );
+  const absentEmployees = new Set<string>();
   for (const row of rows) {
-    if (row.attendance_status === "on_leave") leaveEmployees.add(row.employee_id);
+    if (row.attendance_status === "absent" || row.attendance_status === "on_leave") {
+      absentEmployees.add(row.employee_id as string);
+    }
   }
+  for (const row of (leaveRes.data ?? []) as LooseRow[]) {
+    if (row.employee_id) absentEmployees.add(row.employee_id as string);
+  }
+  const absentToday = absentEmployees.size;
 
   const workFromHome = rows.filter((row) => {
     const branch = unwrap(row.branches);
@@ -391,7 +400,7 @@ export async function getCeoAttendanceKpis(
     overallAttendancePercent,
     presentToday: presentToday + rows.filter((row) => row.attendance_status === "half_day").length,
     absentToday,
-    onLeaveToday: Math.max(onLeaveAttendance, leaveEmployees.size),
+    onLeaveToday: 0,
     workFromHome,
     lateArrivals,
     earlyCheckouts,
@@ -624,7 +633,13 @@ export async function listCeoAttendanceEmployees(
   });
 
   if (parsed.attendanceStatus) {
-    mapped = mapped.filter((row) => row.todayStatus === parsed.attendanceStatus);
+    if (parsed.attendanceStatus === "absent") {
+      mapped = mapped.filter(
+        (row) => row.todayStatus === "absent" || row.todayStatus === "on_leave",
+      );
+    } else {
+      mapped = mapped.filter((row) => row.todayStatus === parsed.attendanceStatus);
+    }
   }
 
   const total = mapped.length;

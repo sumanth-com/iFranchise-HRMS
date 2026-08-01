@@ -194,6 +194,7 @@ export async function getTeamSummary(
         presentToday += 1;
         break;
       case "on_leave":
+      case "absent":
         onLeaveToday += 1;
         break;
       default:

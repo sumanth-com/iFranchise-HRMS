@@ -137,8 +137,6 @@ export function MyProfileView({ data }: MyProfileViewProps) {
     });
   }
 
-  const attendanceSummaryText = `${data.attendanceSummary.presentDays} present day(s) · ${data.attendanceSummary.totalWorkHours.toFixed(1)} total hours`;
-
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -207,35 +205,11 @@ export function MyProfileView({ data }: MyProfileViewProps) {
         <h2 className="text-base font-semibold lg:col-start-1">Employee Information</h2>
 
         <dl className="overflow-hidden rounded-xl border bg-card lg:col-start-1 lg:row-start-2">
-          <ProfileInfoRow label="Employee ID" value={data.employeeCode} />
-          <ProfileInfoRow label="Department" value={data.departmentName ?? "—"} />
-          <ProfileInfoRow label="Designation" value={data.designationTitle ?? "—"} />
-          <ProfileInfoRow
-            label="Employment type"
-            value={formatDisplayLabel(data.employmentTypeName)}
-          />
+          <input type="hidden" {...register("personalEmail")} />
+
           <ProfileInfoRow label="Manager" value={data.reportingManagerName ?? "—"} />
           <ProfileInfoRow label="Joining date" value={formatJoiningDate(data.dateOfJoining)} />
-          <ProfileInfoRow label="Attendance summary" value={attendanceSummaryText} />
           <ProfileInfoRow label="Company email" value={data.email} />
-
-          <ProfileInfoRow
-            label="Personal email"
-            value={data.profileSettings.personalEmail || "—"}
-            editing={isEditing}
-          >
-            <div className="w-full max-w-xs">
-              <Input
-                type="email"
-                disabled={isPending}
-                className="h-8 text-right"
-                {...register("personalEmail")}
-              />
-              {errors.personalEmail ? (
-                <p className="mt-1 text-xs text-destructive">{errors.personalEmail.message}</p>
-              ) : null}
-            </div>
-          </ProfileInfoRow>
 
           <ProfileInfoRow
             label="Personal phone"
@@ -303,44 +277,59 @@ export function MyProfileView({ data }: MyProfileViewProps) {
           </ProfileInfoRow>
 
           <ProfileInfoRow
-            label="Emergency contact"
-            value={
-              data.profileSettings.emergencyContact.name
-                ? `${data.profileSettings.emergencyContact.name} (${data.profileSettings.emergencyContact.phone})`
-                : "—"
-            }
+            label="Emergency relation"
+            value={data.profileSettings.emergencyContact.relationship || "—"}
             editing={isEditing}
           >
-            <div className="flex w-full max-w-xs flex-col gap-2">
-              <Input
-                placeholder="Name"
-                disabled={isPending}
-                className="h-8 text-right"
-                {...register("emergencyContactName")}
-              />
-              <Input
-                placeholder="Relationship"
-                disabled={isPending}
-                className="h-8 text-right"
-                {...register("emergencyContactRelationship")}
-              />
-              <Input
-                placeholder="Phone"
-                disabled={isPending}
-                className="h-8 text-right"
-                {...register("emergencyContactPhone")}
-              />
-              <Input
-                placeholder="Email"
-                type="email"
-                disabled={isPending}
-                className="h-8 text-right"
-                {...register("emergencyContactEmail")}
-              />
-              {errors.emergencyContactEmail ? (
-                <p className="text-xs text-destructive">{errors.emergencyContactEmail.message}</p>
-              ) : null}
-            </div>
+            <Input
+              placeholder="Relationship"
+              disabled={isPending}
+              className="h-8 max-w-xs text-right"
+              {...register("emergencyContactRelationship")}
+            />
+          </ProfileInfoRow>
+
+          <ProfileInfoRow
+            label="Emergency name"
+            value={data.profileSettings.emergencyContact.name || "—"}
+            editing={isEditing}
+          >
+            <Input
+              placeholder="Name"
+              disabled={isPending}
+              className="h-8 max-w-xs text-right"
+              {...register("emergencyContactName")}
+            />
+          </ProfileInfoRow>
+
+          <ProfileInfoRow
+            label="Emergency contact"
+            value={data.profileSettings.emergencyContact.phone || "—"}
+            editing={isEditing}
+          >
+            <Input
+              placeholder="Phone"
+              disabled={isPending}
+              className="h-8 max-w-xs text-right"
+              {...register("emergencyContactPhone")}
+            />
+          </ProfileInfoRow>
+
+          <ProfileInfoRow
+            label="Emergency email"
+            value={data.profileSettings.emergencyContact.email || "—"}
+            editing={isEditing}
+          >
+            <Input
+              placeholder="Email"
+              type="email"
+              disabled={isPending}
+              className="h-8 max-w-xs text-right"
+              {...register("emergencyContactEmail")}
+            />
+            {errors.emergencyContactEmail ? (
+              <p className="text-xs text-destructive">{errors.emergencyContactEmail.message}</p>
+            ) : null}
           </ProfileInfoRow>
 
           <ProfileInfoRow
