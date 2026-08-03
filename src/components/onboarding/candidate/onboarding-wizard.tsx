@@ -6,9 +6,12 @@ import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
+import { OnboardingPhoneField } from "@/components/onboarding/candidate/onboarding-phone-field";
+import { OnboardingPortalHero } from "@/components/onboarding/candidate/onboarding-portal-hero";
 import { OnboardingSignature } from "@/components/onboarding/candidate/onboarding-signature";
 import { OnboardingStepNav } from "@/components/onboarding/candidate/onboarding-step-nav";
 import { OnboardingSubmittedCelebration } from "@/components/onboarding/candidate/onboarding-submitted-celebration";
+import { LabeledSelect } from "@/components/payroll/payroll-select";
 import {
   saveCandidateAgreementsAction,
   saveCandidatePoliciesAction,
@@ -18,6 +21,14 @@ import {
   uploadCandidateDocumentAction,
 } from "@/lib/onboarding/actions/candidate-onboarding-actions";
 import { ONBOARDING_UPLOAD_MAX_MB } from "@/lib/onboarding/constants";
+import {
+  ONBOARDING_BLOOD_GROUP_OPTIONS,
+  ONBOARDING_GENDER_OPTIONS,
+  ONBOARDING_MARITAL_STATUS_OPTIONS,
+  normalizeSelectValue,
+  todayIsoDate,
+  toIsoDate,
+} from "@/lib/onboarding/personal-field-options";
 import {
   canNavigateToStep,
   canSubmitOnboarding,
@@ -58,18 +69,18 @@ const SECTION_TITLES: Record<string, string> = {
   signature: "Electronic Signature",
 };
 
-const PERSONAL_FIELDS: { key: string; label: string; required?: boolean }[] = [
-  { key: "fullName", label: "Full name", required: true },
-  { key: "dateOfBirth", label: "Date of birth", required: true },
-  { key: "gender", label: "Gender", required: true },
-  { key: "maritalStatus", label: "Marital status" },
-  { key: "bloodGroup", label: "Blood group" },
-  { key: "nationality", label: "Nationality" },
-  { key: "address", label: "Address", required: true },
-  { key: "emergencyContact", label: "Emergency contact", required: true },
-  { key: "personalMobile", label: "Personal mobile", required: true },
-  { key: "personalEmail", label: "Personal email", required: true },
-];
+const GENDER_ITEMS = ONBOARDING_GENDER_OPTIONS.map((item) => ({
+  value: item.value,
+  label: item.label,
+}));
+const MARITAL_ITEMS = ONBOARDING_MARITAL_STATUS_OPTIONS.map((item) => ({
+  value: item.value,
+  label: item.label,
+}));
+const BLOOD_GROUP_ITEMS = ONBOARDING_BLOOD_GROUP_OPTIONS.map((item) => ({
+  value: item.value,
+  label: item.label,
+}));
 
 function UploadHint() {
   return (
@@ -129,6 +140,18 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
   function updateField(key: string, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function personalField(key: string): string {
+    return form[key] ?? String(sectionData[key] ?? "");
+  }
+
+  function personalSelectValue(
+    key: string,
+    options: readonly { value: string }[],
+  ): string {
+    if (form[key]) return form[key];
+    return normalizeSelectValue(sectionData[key], options);
   }
 
   function showValidationError(result: { missing: string[] }) {
@@ -283,42 +306,11 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col max-h-[calc(100dvh-3.25rem)] min-h-0">
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-lg shadow-slate-900/[0.04] ring-1 ring-black/[0.03]">
-        <div className="shrink-0 border-b border-white/10 bg-gradient-to-r from-slate-900 to-slate-800 px-4 py-3.5 text-white sm:px-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/50">
-                Welcome aboard
-              </p>
-              <h1 className="mt-0.5 text-lg font-semibold tracking-tight sm:text-xl">
-                {context.fullName}
-              </h1>
-            </div>
-            <div className="flex shrink-0 flex-wrap items-center gap-4 sm:gap-5">
-              <div className="text-left">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-white/50">
-                  Joining date
-                </p>
-                <p className="text-sm font-semibold tabular-nums">
-                  {formatJoiningDate(context.joiningDate)}
-                </p>
-              </div>
-              <div className="min-w-[7.5rem] flex-1 sm:flex-initial sm:min-w-[9rem]">
-                <div className="flex items-center justify-between gap-2 text-[10px] font-medium uppercase tracking-wide text-white/50">
-                  <span>Overall progress</span>
-                  <span className="tabular-nums text-white/90">
-                    {context.completionPercent}%
-                  </span>
-                </div>
-                <div className="mt-1 h-1 overflow-hidden rounded-full bg-white/20">
-                  <div
-                    className="h-full rounded-full bg-white transition-all duration-500 ease-out"
-                    style={{ width: `${context.completionPercent}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <OnboardingPortalHero
+          fullName={context.fullName}
+          joiningDateLabel={formatJoiningDate(context.joiningDate)}
+          completionPercent={context.completionPercent}
+        />
 
         <OnboardingStepNav
           activeStep={step}
@@ -351,16 +343,94 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
           {sectionKey === "personal" && (
             <div className="grid gap-2.5 sm:grid-cols-2">
-              {PERSONAL_FIELDS.map(({ key, label, required }) => (
-                <div key={key} className="space-y-1">
-                  <FieldLabel label={label} required={required} />
-                  <Input
-                    className="h-9 text-sm"
-                    value={form[key] ?? String(sectionData[key] ?? "")}
-                    onChange={(e) => updateField(key, e.target.value)}
-                  />
-                </div>
-              ))}
+              <div className="space-y-1">
+                <FieldLabel label="Full name" required />
+                <Input
+                  className="h-9 text-sm"
+                  value={personalField("fullName")}
+                  onChange={(e) => updateField("fullName", e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <FieldLabel label="Date of birth" required />
+                <Input
+                  type="date"
+                  className="h-9 text-sm"
+                  max={todayIsoDate()}
+                  value={form.dateOfBirth ?? toIsoDate(sectionData.dateOfBirth)}
+                  onChange={(e) => updateField("dateOfBirth", e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <FieldLabel label="Gender" required />
+                <LabeledSelect
+                  items={GENDER_ITEMS}
+                  value={personalSelectValue("gender", ONBOARDING_GENDER_OPTIONS)}
+                  placeholder="Select gender"
+                  onValueChange={(value) => updateField("gender", value)}
+                  triggerClassName="h-9 w-full text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <FieldLabel label="Marital status" />
+                <LabeledSelect
+                  items={MARITAL_ITEMS}
+                  value={personalSelectValue("maritalStatus", ONBOARDING_MARITAL_STATUS_OPTIONS)}
+                  placeholder="Select marital status"
+                  onValueChange={(value) => updateField("maritalStatus", value)}
+                  triggerClassName="h-9 w-full text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <FieldLabel label="Blood group" />
+                <LabeledSelect
+                  items={BLOOD_GROUP_ITEMS}
+                  value={personalSelectValue("bloodGroup", ONBOARDING_BLOOD_GROUP_OPTIONS)}
+                  placeholder="Select blood group"
+                  onValueChange={(value) => updateField("bloodGroup", value)}
+                  triggerClassName="h-9 w-full text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <FieldLabel label="Nationality" />
+                <Input
+                  className="h-9 text-sm"
+                  value={personalField("nationality")}
+                  onChange={(e) => updateField("nationality", e.target.value)}
+                  placeholder="Nationality"
+                />
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <FieldLabel label="Address" required />
+                <Input
+                  className="h-9 text-sm"
+                  value={personalField("address")}
+                  onChange={(e) => updateField("address", e.target.value)}
+                />
+              </div>
+              <OnboardingPhoneField
+                label="Personal mobile"
+                required
+                value={personalField("personalMobile")}
+                onChange={(value) => updateField("personalMobile", value)}
+                placeholder="Mobile number"
+              />
+              <OnboardingPhoneField
+                label="Emergency contact"
+                required
+                value={personalField("emergencyContact")}
+                onChange={(value) => updateField("emergencyContact", value)}
+                placeholder="Emergency number"
+              />
+              <div className="space-y-1 sm:col-span-2">
+                <FieldLabel label="Personal email" required />
+                <Input
+                  type="email"
+                  className="h-9 text-sm"
+                  value={personalField("personalEmail")}
+                  onChange={(e) => updateField("personalEmail", e.target.value)}
+                />
+              </div>
             </div>
           )}
 

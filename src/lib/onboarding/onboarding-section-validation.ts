@@ -1,3 +1,4 @@
+import { isValidStoredPhone } from "@/lib/onboarding/personal-field-options";
 import {
   ONBOARDING_AGREEMENT_TYPES,
   ONBOARDING_EMPLOYMENT_DOCUMENTS,
@@ -75,7 +76,11 @@ export function validateOnboardingSection(
   switch (sectionKey) {
     case "personal":
       for (const field of PERSONAL_REQUIRED) {
-        if (!hasText(data[field.key])) missing.push(field.label);
+        if (field.key === "personalMobile" || field.key === "emergencyContact") {
+          if (!isValidStoredPhone(data[field.key])) missing.push(field.label);
+        } else if (!hasText(data[field.key])) {
+          missing.push(field.label);
+        }
       }
       break;
 

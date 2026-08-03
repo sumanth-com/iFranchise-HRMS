@@ -9,6 +9,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
+import { OnboardingPhoneField } from "@/components/onboarding/candidate/onboarding-phone-field";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import type { SelectItemOption } from "@/components/payroll/select-utils";
 import {
@@ -119,6 +120,7 @@ export function CreateOnboardingDialog({
     },
   });
 
+  const mobileNumber = watch("mobileNumber");
   const designationId = watch("designationId");
   const departmentId = watch("departmentId");
   const employmentTypeId = watch("employmentTypeId");
@@ -206,16 +208,21 @@ export function CreateOnboardingDialog({
                 {...register("fullName")}
               />
             </Field>
-            <Field label="Mobile number" error={errors.mobileNumber?.message}>
-              <Input
-                className="h-9"
-                type="tel"
-                placeholder="Enter mobile number"
+            <div>
+              <OnboardingPhoneField
+                label="Mobile number"
+                value={mobileNumber ?? ""}
+                onChange={(value) =>
+                  setValue("mobileNumber", value, { shouldValidate: true })
+                }
                 disabled={isPending}
-                autoComplete="off"
-                {...register("mobileNumber")}
+                showHint={false}
+                placeholder="Mobile number"
               />
-            </Field>
+              {errors.mobileNumber ? (
+                <p className="mt-1 text-xs text-destructive">{errors.mobileNumber.message}</p>
+              ) : null}
+            </div>
             <div className="sm:col-span-2">
               <Field label="Personal email" required error={errors.personalEmail?.message}>
                 <Input
