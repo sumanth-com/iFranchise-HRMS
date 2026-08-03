@@ -1,6 +1,19 @@
 "use client";
 
-import { Check, Lock } from "lucide-react";
+import {
+  Briefcase,
+  Check,
+  FileText,
+  GraduationCap,
+  IdCard,
+  Landmark,
+  Lock,
+  PenLine,
+  Receipt,
+  ScrollText,
+  User,
+  type LucideIcon,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
@@ -18,6 +31,18 @@ const STEP_LABELS: Record<string, string> = {
   policies: "Policies",
   agreements: "Agreements",
   signature: "Signature",
+};
+
+const STEP_ICONS: Record<string, LucideIcon> = {
+  personal: User,
+  identity: IdCard,
+  education: GraduationCap,
+  employment_history: Briefcase,
+  bank: Landmark,
+  tax: Receipt,
+  policies: ScrollText,
+  agreements: FileText,
+  signature: PenLine,
 };
 
 type OnboardingStepNavProps = {
@@ -84,6 +109,7 @@ export function OnboardingStepNav({
             const isComplete = completedSteps.includes(index);
             const isAccessible = canNavigateToStep(index, context);
             const isLocked = !isAccessible;
+            const StepIcon = STEP_ICONS[key] ?? User;
 
             return (
               <button
@@ -106,27 +132,27 @@ export function OnboardingStepNav({
                     "flex items-center justify-center gap-1.5 whitespace-nowrap text-xs font-medium sm:text-sm",
                     isActive ? "text-foreground" : "text-muted-foreground",
                     isAccessible && !isActive && "group-hover:text-foreground",
-                    isLocked && "opacity-40",
+                    isLocked && "opacity-45",
                   )}
                 >
                   <span
                     className={cn(
-                      "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold transition-all duration-300",
+                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-all duration-300",
                       isComplete
                         ? "bg-emerald-100 text-emerald-700"
                         : isActive
                           ? "bg-primary text-primary-foreground shadow-sm"
                           : isLocked
                             ? "bg-muted text-muted-foreground"
-                            : "bg-muted/80 text-muted-foreground",
+                            : "bg-slate-100 text-slate-600 group-hover:bg-slate-200",
                     )}
                   >
                     {isComplete ? (
-                      <Check className="h-3 w-3" strokeWidth={3} />
+                      <Check className="h-3.5 w-3.5" strokeWidth={3} />
                     ) : isLocked ? (
-                      <Lock className="h-2.5 w-2.5" strokeWidth={2.5} />
+                      <Lock className="h-3 w-3" strokeWidth={2.5} />
                     ) : (
-                      index + 1
+                      <StepIcon className="h-3.5 w-3.5" strokeWidth={2} />
                     )}
                   </span>
                   {STEP_LABELS[key]}

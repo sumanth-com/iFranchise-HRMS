@@ -74,7 +74,7 @@ function FieldLabel({ label, required }: { label: string; required?: boolean }) 
   return (
     <Label className="text-sm font-medium">
       {label}
-      {required ? <span className="text-destructive"> *</span> : null}
+      {required ? <span className="text-foreground"> *</span> : null}
     </Label>
   );
 }
@@ -292,7 +292,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
             {!currentValidation.valid ? (
               <p className="mt-2 text-sm text-muted-foreground">
                 Complete required fields (
-                <span className="text-destructive">*</span>) to unlock the next section
+                <span className="text-foreground">*</span>) to unlock the next section
               </p>
             ) : step < firstIncompleteStep ? (
               <p className="mt-2 text-sm text-emerald-600 font-medium">Section completed</p>

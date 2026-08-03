@@ -72,8 +72,14 @@ export const onboardingReviewSchema = z.object({
 
 export const candidatePasswordSchema = z
   .object({
-    password: z.string().min(8).max(128),
-    confirmPassword: z.string().min(8).max(128),
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .max(128, "Password must be at most 128 characters"),
+    confirmPassword: z
+      .string()
+      .min(8, "Confirm password must be at least 8 characters")
+      .max(128),
   })
   .refine((v) => v.password === v.confirmPassword, {
     message: "Passwords do not match",
