@@ -37,6 +37,15 @@ import type { CandidatePortalContext } from "@/types/onboarding";
 const UPLOAD_ACCEPT =
   ".pdf,.doc,.docx,.xls,.xlsx,.zip,image/jpeg,image/png,image/webp";
 
+function formatJoiningDate(value: string | null) {
+  if (!value) return "To be confirmed";
+  return new Date(value).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 const SECTION_TITLES: Record<string, string> = {
   personal: "Personal Information",
   identity: "Identity Documents",
@@ -272,8 +281,45 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   const isLastStep = step === ONBOARDING_WIZARD_SECTIONS.length - 1;
 
   return (
-    <div className="mx-auto w-full max-w-6xl">
-      <div className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-lg shadow-slate-900/[0.04] ring-1 ring-black/[0.03]">
+    <div className="mx-auto flex w-full max-w-6xl flex-col max-h-[calc(100dvh-3.25rem)] min-h-0">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-lg shadow-slate-900/[0.04] ring-1 ring-black/[0.03]">
+        <div className="shrink-0 border-b border-white/10 bg-gradient-to-r from-slate-900 to-slate-800 px-4 py-3.5 text-white sm:px-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/50">
+                Welcome aboard
+              </p>
+              <h1 className="mt-0.5 text-lg font-semibold tracking-tight sm:text-xl">
+                {context.fullName}
+              </h1>
+            </div>
+            <div className="flex shrink-0 flex-wrap items-center gap-4 sm:gap-5">
+              <div className="text-left">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-white/50">
+                  Joining date
+                </p>
+                <p className="text-sm font-semibold tabular-nums">
+                  {formatJoiningDate(context.joiningDate)}
+                </p>
+              </div>
+              <div className="min-w-[7.5rem] flex-1 sm:flex-initial sm:min-w-[9rem]">
+                <div className="flex items-center justify-between gap-2 text-[10px] font-medium uppercase tracking-wide text-white/50">
+                  <span>Overall progress</span>
+                  <span className="tabular-nums text-white/90">
+                    {context.completionPercent}%
+                  </span>
+                </div>
+                <div className="mt-1 h-1 overflow-hidden rounded-full bg-white/20">
+                  <div
+                    className="h-full rounded-full bg-white transition-all duration-500 ease-out"
+                    style={{ width: `${context.completionPercent}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <OnboardingStepNav
           activeStep={step}
           completedSteps={completedSteps}
@@ -281,34 +327,35 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           onStepChange={goToStep}
         />
 
-        <div className="onboarding-section-enter px-5 py-6 sm:px-8 sm:py-8">
-          <div className="mb-6 text-center">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        <div className="onboarding-section-enter min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+          <div className="mb-4 text-center">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               Step {step + 1} of {ONBOARDING_WIZARD_SECTIONS.length}
             </p>
-            <h2 className="mt-2 text-xl font-semibold tracking-tight sm:text-2xl">
+            <h2 className="mt-1 text-lg font-semibold tracking-tight sm:text-xl">
               {SECTION_TITLES[sectionKey]}
             </h2>
             {!currentValidation.valid ? (
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Complete required fields (
                 <span className="text-foreground">*</span>) to unlock the next section
               </p>
             ) : step < firstIncompleteStep ? (
-              <p className="mt-2 text-sm text-emerald-600 font-medium">Section completed</p>
+              <p className="mt-1 text-xs font-medium text-emerald-600">Section completed</p>
             ) : (
-              <p className="mt-2 text-sm text-emerald-600 font-medium">
+              <p className="mt-1 text-xs font-medium text-emerald-600">
                 Ready — continue to the next section
               </p>
             )}
           </div>
 
           {sectionKey === "personal" && (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-2.5 sm:grid-cols-2">
               {PERSONAL_FIELDS.map(({ key, label, required }) => (
-                <div key={key} className="space-y-1.5">
+                <div key={key} className="space-y-1">
                   <FieldLabel label={label} required={required} />
                   <Input
+                    className="h-9 text-sm"
                     value={form[key] ?? String(sectionData[key] ?? "")}
                     onChange={(e) => updateField(key, e.target.value)}
                   />
@@ -553,9 +600,10 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           {sectionKey !== "policies" &&
             sectionKey !== "agreements" &&
             sectionKey !== "signature" && (
-              <div className="mt-8 flex justify-center">
+              <div className="mt-4 flex justify-center">
                 <Button
                   variant="outline"
+                  size="sm"
                   onClick={() => saveSection(false)}
                   disabled={isPending}
                 >
@@ -565,7 +613,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
             )}
         </div>
 
-        <div className="flex flex-col gap-4 border-t border-border/60 bg-gradient-to-b from-slate-50/80 to-slate-50/40 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+        <div className="flex shrink-0 flex-col gap-2 border-t border-border/60 bg-slate-50/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <Button
             variant="outline"
             disabled={step === 0 || isPending}
@@ -578,9 +626,8 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
             Previous
           </Button>
 
-          <div className="text-center text-xs text-muted-foreground sm:order-none">
-            Step {step + 1} of {ONBOARDING_WIZARD_SECTIONS.length} · {context.completionPercent}%
-            complete
+          <div className="text-center text-[11px] text-muted-foreground sm:order-none">
+            Step {step + 1}/{ONBOARDING_WIZARD_SECTIONS.length}
           </div>
 
           {isLastStep ? (

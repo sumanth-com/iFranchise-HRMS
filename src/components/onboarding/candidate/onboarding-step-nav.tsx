@@ -123,7 +123,7 @@ export function OnboardingStepNav({
                   if (isAccessible) onStepChange(index);
                 }}
                 className={cn(
-                  "group relative shrink-0 px-2 py-4 transition-colors duration-200 sm:px-3",
+                  "group relative shrink-0 px-2 py-2.5 transition-colors duration-200 sm:px-2.5",
                   isLocked && "cursor-not-allowed",
                 )}
               >
