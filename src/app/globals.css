@@ -652,3 +652,51 @@
 .navigation-progress-bar-active {
   animation: navigation-progress-slide 0.65s ease-in-out infinite;
 }
+
+@keyframes onboarding-confetti-fall {
+  0% {
+    transform: translateY(-12px) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(380px) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+@keyframes onboarding-check-pop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes onboarding-section-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.onboarding-confetti {
+  animation: onboarding-confetti-fall linear forwards;
+}
+
+.onboarding-check-pop {
+  animation: onboarding-check-pop 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.onboarding-section-enter {
+  animation: onboarding-section-enter 0.45s ease-out forwards;
+}
