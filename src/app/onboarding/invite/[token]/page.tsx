@@ -14,14 +14,14 @@ export default async function OnboardingInvitePage({ params }: PageProps) {
 
   if (!validation.ok) {
     return (
-      <div className="flex min-h-[calc(100vh-5rem)] items-center justify-center py-8 sm:py-10">
+      <div className="flex min-h-[calc(100dvh-3.25rem)] items-center justify-center py-3">
         <OnboardingInviteUnavailable reason={validation.reason} />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-5rem)] items-center justify-center py-8 sm:py-10">
+    <div className="flex min-h-[calc(100dvh-3.25rem)] items-center justify-center py-3">
       <OnboardingInviteSetup
         token={token}
         personalEmail={validation.data.personalEmail}
