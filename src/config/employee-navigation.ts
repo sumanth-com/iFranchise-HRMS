@@ -39,12 +39,6 @@ export const employeeNavItems: NavigationItem[] = [
     permissions: ["employee.directory.view"],
   },
   {
-    title: "Leave",
-    href: EMPLOYEE_ROUTES.leave,
-    icon: CalendarDays,
-    permissions: ["leave.view"],
-  },
-  {
     title: "Payroll",
     href: EMPLOYEE_ROUTES.payroll,
     icon: Wallet,
@@ -55,6 +49,12 @@ export const employeeNavItems: NavigationItem[] = [
     href: EMPLOYEE_ROUTES.documents,
     icon: FileText,
     permissions: ["documents.view"],
+  },
+  {
+    title: "Leave",
+    href: EMPLOYEE_ROUTES.leave,
+    icon: CalendarDays,
+    permissions: ["leave.view"],
   },
   {
     title: "Assets",

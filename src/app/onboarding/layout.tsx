@@ -10,12 +10,14 @@ export default function OnboardingLayout({ children }: { children: React.ReactNo
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
       <header className="border-b bg-white/80 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
-          <div className="font-semibold tracking-tight">Employee Onboarding</div>
-          <p className="text-xs text-muted-foreground">Secure pre-joining portal</p>
+        <div className="mx-auto max-w-5xl px-4 py-5 text-center">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Secure pre-joining portal
+          </p>
+          <h1 className="mt-1 text-lg font-semibold tracking-tight">Employee Onboarding</h1>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-10">{children}</main>
+      <main className="mx-auto max-w-5xl px-4 py-8 sm:py-10">{children}</main>
     </div>
   );
 }

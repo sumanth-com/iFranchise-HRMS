@@ -37,8 +37,8 @@ export type NavItem = {
 
 /**
  * HR portal sidebar.
- * Self-service = personal workspace (attendance, leave, payslips, etc.).
- * Administration = org-wide HR operations and system tools.
+ * Self-service (personal workspace) is listed first.
+ * Administration (org-wide HR) follows — Onboarding is prioritized near the top.
  */
 export const mainNavItems: NavigationItem[] = [
   // ── Self-service (personal workspace) ────────────────────────────
@@ -63,13 +63,6 @@ export const mainNavItems: NavigationItem[] = [
     permissions: ["attendance.view"],
   },
   {
-    title: "Leave",
-    href: "/dashboard/leave",
-    icon: CalendarDays,
-    section: "Self-service",
-    permissions: ["leave.view"],
-  },
-  {
     title: "Payroll",
     href: "/dashboard/payroll",
     icon: Wallet,
@@ -82,6 +75,13 @@ export const mainNavItems: NavigationItem[] = [
     icon: FileText,
     section: "Self-service",
     permissions: ["documents.view"],
+  },
+  {
+    title: "Leave",
+    href: "/dashboard/leave",
+    icon: CalendarDays,
+    section: "Self-service",
+    permissions: ["leave.view"],
   },
   {
     title: "Assets",
@@ -113,6 +113,13 @@ export const mainNavItems: NavigationItem[] = [
     permissions: ["employee.view"],
   },
   {
+    title: "Onboarding",
+    href: "/dashboard/onboarding",
+    icon: ClipboardList,
+    section: "Administration",
+    permissions: ["onboarding.view", "onboarding.manage", "onboarding.review", "onboarding.activate"],
+  },
+  {
     title: "Employees",
     href: "/dashboard/employees",
     icon: Users,
@@ -120,18 +127,18 @@ export const mainNavItems: NavigationItem[] = [
     permissions: ["employee.view"],
   },
   {
-    title: "Performance",
-    href: "/dashboard/performance",
-    icon: Target,
-    section: "Administration",
-    permissions: ["performance.view"],
-  },
-  {
     title: "Recruitment",
     href: "/dashboard/recruitment",
     icon: BriefcaseBusiness,
     section: "Administration",
     permissions: ["recruitment.view"],
+  },
+  {
+    title: "Performance",
+    href: "/dashboard/performance",
+    icon: Target,
+    section: "Administration",
+    permissions: ["performance.view"],
   },
   {
     title: "Reports",
@@ -157,13 +164,6 @@ export const mainNavItems: NavigationItem[] = [
     ],
   },
   {
-    title: "Roles & Access",
-    href: "/dashboard/roles",
-    icon: Shield,
-    section: "Administration",
-    permissions: ["role.view", "permission.view", "user_role.view"],
-  },
-  {
     title: "User Provisioning",
     href: USER_PROVISIONING_ROUTES.hr,
     icon: UserRoundPlus,
@@ -171,11 +171,11 @@ export const mainNavItems: NavigationItem[] = [
     permissions: ["user_provisioning.view", "user_provisioning.manage"],
   },
   {
-    title: "Onboarding",
-    href: "/dashboard/onboarding",
-    icon: ClipboardList,
+    title: "Roles & Access",
+    href: "/dashboard/roles",
+    icon: Shield,
     section: "Administration",
-    permissions: ["onboarding.view", "onboarding.manage", "onboarding.review", "onboarding.activate"],
+    permissions: ["role.view", "permission.view", "user_role.view"],
   },
   {
     title: "Audit Trail",

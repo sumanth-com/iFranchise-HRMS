@@ -30,7 +30,12 @@ import { getCandidatePortalContext } from "@/lib/onboarding/services/onboarding-
 import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
 import { assertRateLimit } from "@/lib/security/rate-limit";
 import { hashEmailVerificationToken } from "@/lib/security/signed-flow-tokens";
-import { validateUploadFile } from "@/lib/security/upload-validation";
+import { ONBOARDING_UPLOAD_MAX_BYTES } from "@/lib/onboarding/constants";
+import {
+  ONBOARDING_ALLOWED_EXTENSIONS,
+  ONBOARDING_ALLOWED_MIME_TYPES,
+  validateUploadFile,
+} from "@/lib/security/upload-validation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   agreementAcceptanceSchema,
@@ -144,14 +149,29 @@ export async function requestCandidateOtpAction(input: unknown): Promise<ActionR
       personalEmail: parsed.personalEmail.trim().toLowerCase(),
     });
 
-    await sendEmail({
-      to: parsed.personalEmail,
+    const emailResult = await sendEmail({
+      to: parsed.personalEmail.trim().toLowerCase(),
       subject: otpEmail.subject,
       html: otpEmail.html,
       text: otpEmail.text,
     });
 
-    return { success: true, message: "Verification code sent" };
+    if (!emailResult.delivered) {
+      if (emailResult.skipped) {
+        return {
+          success: false,
+          message:
+            emailResult.error ??
+            "Verification email could not be sent — SMTP is not configured. Contact HR for assistance.",
+        };
+      }
+      return {
+        success: false,
+        message: emailResult.error ?? "Failed to send verification code. Please try again.",
+      };
+    }
+
+    return { success: true, message: "Verification code sent to your email" };
   } catch (error) {
     return { success: false, message: error instanceof Error ? error.message : "OTP request failed" };
   }
@@ -226,6 +246,9 @@ export async function uploadCandidateDocumentAction(formData: FormData): Promise
       fileName: file.name,
       fileSize: file.size,
       mimeType: file.type,
+      maxBytes: ONBOARDING_UPLOAD_MAX_BYTES,
+      allowedExtensions: ONBOARDING_ALLOWED_EXTENSIONS,
+      allowedMimeTypes: ONBOARDING_ALLOWED_MIME_TYPES,
     });
 
     const bytes = new Uint8Array(await file.arrayBuffer());

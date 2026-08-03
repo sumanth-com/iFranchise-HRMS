@@ -82,7 +82,11 @@ export async function sendOnboardingInvitationAction(caseId: string): Promise<Ac
     await sendOnboardingInvitation(supabase, profile, caseId);
     revalidateOnboarding();
     const detail = await loadOnboardingCaseDetail(caseId);
-    return { success: true, message: "Onboarding invitation sent", detail };
+    return {
+      success: true,
+      message: `Invitation email sent to ${detail.personalEmail}`,
+      detail,
+    };
   } catch (error) {
     return { success: false, message: error instanceof Error ? error.message : "Failed to send invitation" };
   }
@@ -98,7 +102,9 @@ export async function createAndInviteOnboardingAction(input: unknown): Promise<A
     revalidateOnboarding();
     return {
       success: true,
-      message: resent ? "Invitation updated and resent successfully" : "Invitation sent successfully",
+      message: resent
+        ? `Invitation updated and resent to ${parsed.personalEmail}`
+        : `Invitation sent to ${parsed.personalEmail}`,
       caseId,
     };
   } catch (error) {

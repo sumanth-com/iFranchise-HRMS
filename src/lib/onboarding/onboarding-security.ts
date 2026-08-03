@@ -237,6 +237,21 @@ export async function revokePortalSessions(caseId: string): Promise<void> {
     .is("revoked_at", null);
 }
 
+/** Ensures a portal account row exists and is active when an invitation is sent. */
+export async function ensurePortalAccountForInvitation(caseId: string, email: string) {
+  const admin = createAdminClient();
+  const { error } = await admin.schema("hrms").from("onboarding_portal_accounts").upsert(
+    {
+      case_id: caseId,
+      personal_email: email.trim().toLowerCase(),
+      is_active: true,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "case_id" },
+  );
+  if (error) throw new Error(error.message);
+}
+
 export async function storePortalPassword(caseId: string, email: string, password: string) {
   const admin = createAdminClient();
   const passwordHash = await hashPassword(password);

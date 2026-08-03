@@ -36,13 +36,13 @@ export default function OnboardingPortalPage() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="text-center space-y-1">
         <h1 className="text-2xl font-semibold">{context.fullName}</h1>
         <p className="text-sm text-muted-foreground">
           Joining {context.joiningDate ?? "soon"} · {context.completionPercent}% complete
         </p>
         {context.correctionNotes && (
-          <p className="mt-2 text-sm rounded-lg border border-orange-200 bg-orange-50 p-3">
+          <p className="mx-auto mt-3 max-w-xl text-sm rounded-lg border border-orange-200 bg-orange-50 p-3 text-left">
             HR requested corrections: {context.correctionNotes}
           </p>
         )}

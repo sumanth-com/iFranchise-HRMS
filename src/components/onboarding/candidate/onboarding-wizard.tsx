@@ -16,6 +16,9 @@ import {
   uploadCandidateDocumentAction,
 } from "@/lib/onboarding/actions/candidate-onboarding-actions";
 import {
+  ONBOARDING_UPLOAD_MAX_MB,
+} from "@/lib/onboarding/constants";
+import {
   ONBOARDING_AGREEMENT_TYPES,
   ONBOARDING_EMPLOYMENT_DOCUMENTS,
   ONBOARDING_IDENTITY_DOCUMENTS,
@@ -24,6 +27,17 @@ import {
   ONBOARDING_WIZARD_SECTIONS,
 } from "@/types/onboarding";
 import type { CandidatePortalContext } from "@/types/onboarding";
+
+const UPLOAD_ACCEPT =
+  ".pdf,.doc,.docx,.xls,.xlsx,.zip,image/jpeg,image/png,image/webp";
+
+function UploadHint() {
+  return (
+    <p className="mt-1 text-xs text-muted-foreground">
+      PDF, Word, Excel, images, or ZIP · max {ONBOARDING_UPLOAD_MAX_MB} MB
+    </p>
+  );
+}
 
 const SECTION_LABELS: Record<string, string> = {
   personal: "Personal Information",
@@ -107,7 +121,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap justify-center gap-2">
         {ONBOARDING_WIZARD_SECTIONS.map((key, index) => (
           <button
             key={key}
@@ -120,8 +134,8 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
         ))}
       </div>
 
-      <div className="rounded-xl border p-6 bg-card">
-        <h2 className="text-lg font-semibold mb-4">{SECTION_LABELS[sectionKey]}</h2>
+      <div className="rounded-xl border p-6 bg-card shadow-sm">
+        <h2 className="text-lg font-semibold mb-4 text-center">{SECTION_LABELS[sectionKey]}</h2>
 
         {sectionKey === "personal" && (
           <div className="grid gap-3 sm:grid-cols-2">
@@ -155,12 +169,13 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                 <Label>{doc.label}{doc.required ? " *" : ""}</Label>
                 <Input
                   type="file"
-                  accept=".pdf,image/*"
+                  accept={UPLOAD_ACCEPT}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) uploadDoc("identity", doc.code, file);
                   }}
                 />
+                <UploadHint />
               </div>
             ))}
             <div className="grid gap-3 sm:grid-cols-2">
@@ -194,12 +209,13 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                 <Label>{doc.label}{doc.required ? " *" : ""}</Label>
                 <Input
                   type="file"
-                  accept=".pdf,image/*"
+                  accept={UPLOAD_ACCEPT}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) uploadDoc("employment", doc.code, file);
                   }}
                 />
+                <UploadHint />
               </div>
             ))}
           </div>
@@ -219,10 +235,11 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
             ))}
             <div className="sm:col-span-2">
               <Label>Cancelled cheque</Label>
-              <Input type="file" accept=".pdf,image/*" onChange={(e) => {
+              <Input type="file" accept={UPLOAD_ACCEPT} onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) uploadDoc("bank", "cancelled_cheque", file);
               }} />
+              <UploadHint />
             </div>
           </div>
         )}
@@ -323,7 +340,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
         )}
 
         {sectionKey !== "policies" && sectionKey !== "agreements" && sectionKey !== "signature" && (
-          <div className="mt-4">
+          <div className="mt-4 flex justify-center">
             <Button onClick={() => saveSection()} disabled={isPending}>Save section</Button>
           </div>
         )}

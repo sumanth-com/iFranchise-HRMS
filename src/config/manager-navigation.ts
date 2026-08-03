@@ -40,12 +40,6 @@ export const managerNavItems: NavigationItem[] = [
     permissions: ["employee.view"],
   },
   {
-    title: "Leave",
-    href: MANAGER_ROUTES.leave,
-    icon: CalendarDays,
-    permissions: ["leave.view"],
-  },
-  {
     title: "Payroll",
     href: MANAGER_ROUTES.payroll,
     icon: Wallet,
@@ -56,6 +50,12 @@ export const managerNavItems: NavigationItem[] = [
     href: MANAGER_ROUTES.documents,
     icon: FileText,
     permissions: ["documents.view"],
+  },
+  {
+    title: "Leave",
+    href: MANAGER_ROUTES.leave,
+    icon: CalendarDays,
+    permissions: ["leave.view"],
   },
   {
     title: "Performance",

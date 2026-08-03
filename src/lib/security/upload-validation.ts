@@ -1,14 +1,9 @@
-export const DEFAULT_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+import { DEFAULT_DOCUMENT_SETTINGS } from "@/lib/documents/constants";
+import { DOCUMENT_MAX_BYTES } from "@/lib/employees/constants";
 
-export const ONBOARDING_ALLOWED_EXTENSIONS = [
-  "pdf",
-  "jpg",
-  "jpeg",
-  "png",
-  "webp",
-  "doc",
-  "docx",
-] as const;
+export const DEFAULT_UPLOAD_MAX_BYTES = DOCUMENT_MAX_BYTES;
+
+export const ONBOARDING_ALLOWED_EXTENSIONS = DEFAULT_DOCUMENT_SETTINGS.allowedFileTypes;
 
 export const ONBOARDING_ALLOWED_MIME_TYPES = [
   "application/pdf",
@@ -17,6 +12,10 @@ export const ONBOARDING_ALLOWED_MIME_TYPES = [
   "image/webp",
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/zip",
+  "application/x-zip-compressed",
 ] as const;
 
 export type UploadValidationInput = {

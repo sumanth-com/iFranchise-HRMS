@@ -220,20 +220,22 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="border-b bg-card/80 px-6 py-5">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-start gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="shrink-0 -ml-2"
-            onClick={() => router.push("/dashboard/onboarding")}
-          >
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back to list
-          </Button>
+      <div className="border-b bg-card/80 px-6 py-6">
+        <div className="mx-auto max-w-6xl space-y-4">
+          <div className="flex justify-start">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="-ml-2"
+              onClick={() => router.push("/dashboard/onboarding")}
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back to list
+            </Button>
+          </div>
 
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-3">
+          <div className="text-center space-y-2">
+            <div className="flex flex-wrap items-center justify-center gap-3">
               <h1 className="text-2xl font-semibold tracking-tight capitalize">
                 {detail.fullName}
               </h1>
@@ -243,13 +245,13 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
                 {ONBOARDING_STATUS_LABELS[detail.status]}
               </span>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">{detail.personalEmail}</p>
+            <p className="text-sm text-muted-foreground">{detail.personalEmail}</p>
             {detail.mobileNumber ? (
               <p className="text-sm text-muted-foreground">{detail.mobileNumber}</p>
             ) : null}
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap justify-center gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -374,7 +376,7 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
           </div>
 
           <section className="rounded-xl border bg-card p-5 shadow-sm">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            <h2 className="text-center text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               Assignment details
             </h2>
             <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -425,7 +427,7 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
 
           <section className="rounded-xl border bg-card p-5 shadow-sm">
             <div className="flex items-center justify-between gap-2">
-              <h2 className="font-semibold">Onboarding checklist</h2>
+              <h2 className="text-center font-semibold">Onboarding checklist</h2>
               <span className="text-xs text-muted-foreground">
                 {completedSections}/{ONBOARDING_WIZARD_SECTIONS.length} complete
               </span>
@@ -454,7 +456,7 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
           </section>
 
           <section className="rounded-xl border bg-card p-5 shadow-sm">
-            <h2 className="font-semibold">Documents</h2>
+            <h2 className="text-center font-semibold">Documents</h2>
             {detail.documents.length === 0 ? (
               <p className="mt-3 text-sm text-muted-foreground">
                 No documents yet. They will appear here when the candidate uploads files in the
@@ -520,7 +522,7 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
 
           {canReview ? (
             <section className="rounded-xl border border-primary/20 bg-card p-5 shadow-sm space-y-4">
-              <h2 className="font-semibold">HR review</h2>
+              <h2 className="text-center font-semibold">HR review</h2>
               <p className="text-sm text-muted-foreground">
                 Review the candidate&apos;s submission, then approve to create their company account
                 or request corrections.
@@ -573,7 +575,7 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
           ) : null}
 
           <section className="rounded-xl border bg-card p-5 shadow-sm">
-            <h2 className="font-semibold">Activity timeline</h2>
+            <h2 className="text-center font-semibold">Activity timeline</h2>
             {detail.timeline.length === 0 ? (
               <p className="mt-3 text-sm text-muted-foreground">No activity recorded yet.</p>
             ) : (

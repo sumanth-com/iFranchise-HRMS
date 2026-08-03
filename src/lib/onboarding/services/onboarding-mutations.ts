@@ -20,6 +20,7 @@ import {
 import {
   addTimelineEvent,
   createOnboardingInvitationToken,
+  ensurePortalAccountForInvitation,
   hashOnboardingToken,
   revokeActiveInvitationTokens,
   revokeActiveInvitationTokensExcept,
@@ -348,8 +349,9 @@ export async function sendOnboardingInvitation(
     reportingManagerName: detail.reportingManagerName,
   });
 
+  const recipient = detail.personalEmail.trim().toLowerCase();
   const emailResult = await sendEmail({
-    to: detail.personalEmail,
+    to: recipient,
     subject: invitationEmail.subject,
     html: invitationEmail.html,
     text: invitationEmail.text,
@@ -358,13 +360,16 @@ export async function sendOnboardingInvitation(
   if (!emailResult.delivered) {
     if (emailResult.skipped) {
       throw new Error(
-        "Invitation email could not be sent — SMTP is not configured. Add SMTP_HOST, SMTP_USER, and SMTP_PASSWORD in your environment.",
+        emailResult.error ??
+          "Invitation email could not be sent — SMTP is not configured. Add SMTP_HOST, SMTP_USER, SMTP_PASSWORD, and EMAIL_FROM in your environment (and in Vercel for production), then redeploy.",
       );
     }
     throw new Error(
       emailResult.error ?? "Failed to deliver invitation email. Please check SMTP settings and try again.",
     );
   }
+
+  await ensurePortalAccountForInvitation(caseId, recipient);
 
   const now = new Date().toISOString();
 

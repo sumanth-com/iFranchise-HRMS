@@ -28,8 +28,8 @@ export function OnboardingInviteSetup({ token, personalEmail, fullName }: Onboar
   }
 
   return (
-    <div className="w-full max-w-md space-y-4 rounded-xl border bg-card p-6 shadow-sm">
-      <div>
+    <div className="w-full max-w-md space-y-5 rounded-xl border bg-card p-6 shadow-sm">
+      <div className="text-center space-y-2">
         <h1 className="text-xl font-semibold">Welcome, {fullName}</h1>
         <p className="text-sm text-muted-foreground">
           Create your temporary onboarding password for {personalEmail}.

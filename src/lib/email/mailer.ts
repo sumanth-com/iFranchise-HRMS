@@ -48,9 +48,13 @@ function readSmtpConfig(): SmtpConfig | null {
   return { host, port, secure, user, pass, from };
 }
 
-/** True when SMTP credentials are configured on this environment. */
+/** True when SMTP host and credentials are configured on this environment. */
 export function hasEmailTransport(): boolean {
-  return Boolean(process.env.SMTP_HOST);
+  return Boolean(
+    process.env.SMTP_HOST &&
+      process.env.SMTP_USER &&
+      (process.env.SMTP_PASSWORD || process.env.SMTP_PASS),
+  );
 }
 
 function getTransporter(config: SmtpConfig): Transporter {
@@ -60,6 +64,8 @@ function getTransporter(config: SmtpConfig): Transporter {
     port: config.port,
     secure: config.secure,
     auth: config.user && config.pass ? { user: config.user, pass: config.pass } : undefined,
+    requireTLS: !config.secure && config.port === 587,
+    tls: { minVersion: "TLSv1.2" },
   });
   return cachedTransporter;
 }
@@ -81,12 +87,18 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   const config = readSmtpConfig();
 
   if (!config) {
-    // No SMTP configured (e.g. local dev). Surface it without breaking the flow.
     console.warn(
       `[email] SMTP not configured — skipping email to ${input.to} (subject: "${input.subject}"). ` +
         `Set SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASSWORD/EMAIL_FROM to enable delivery.`,
     );
     return { delivered: false, skipped: true };
+  }
+
+  if (!config.user || !config.pass) {
+    const message =
+      "SMTP_USER and SMTP_PASSWORD are required. Add them to your environment and redeploy.";
+    console.warn(`[email] ${message} (to: ${input.to})`);
+    return { delivered: false, skipped: true, error: message };
   }
 
   try {
@@ -97,7 +109,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       subject: input.subject,
       html: input.html,
       text: input.text ?? stripHtml(input.html),
-      replyTo: input.replyTo,
+      replyTo: input.replyTo ?? config.user,
       attachments: input.attachments?.map((file) => ({
         filename: file.filename,
         content: Buffer.isBuffer(file.content) ? file.content : Buffer.from(file.content),

@@ -1,3 +1,7 @@
+import { siteConfig } from "@/config/site";
+import { DEFAULT_DOCUMENT_SETTINGS } from "@/lib/documents/constants";
+import { DOCUMENT_MAX_BYTES, DOCUMENT_MAX_MB } from "@/lib/employees/constants";
+
 import {
   ONBOARDING_AGREEMENT_TYPES,
   ONBOARDING_IDENTITY_DOCUMENTS,
@@ -39,9 +43,13 @@ export const ONBOARDING_PERMISSIONS = {
   activate: "onboarding.activate",
 } as const;
 
+/** Matches employee documents module limits (30 MB, same file types). */
+export const ONBOARDING_UPLOAD_MAX_BYTES = DOCUMENT_MAX_BYTES;
+export const ONBOARDING_UPLOAD_MAX_MB = DOCUMENT_MAX_MB;
+export const ONBOARDING_ALLOWED_FILE_TYPES = DEFAULT_DOCUMENT_SETTINGS.allowedFileTypes;
+
 export function onboardingInviteUrl(token: string): string {
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  return `${base}${ONBOARDING_ROUTES.invite(token)}`;
+  return `${siteConfig.url}${ONBOARDING_ROUTES.invite(token)}`;
 }
 
 export function companyEmailDomain(organizationName: string): string {
