@@ -44,17 +44,17 @@ export function renderEmailButtons(buttons: EmailButton[]): string {
   const cells = buttons
     .map(
       (button) => `
-        <td style="padding:0 8px 8px 0;">
-          <a href="${button.href}" style="display:inline-block;border-radius:12px;background:${buttonBackground(
+        <td align="center" style="padding:0;">
+          <a href="${button.href}" style="display:inline-block;min-width:260px;box-sizing:border-box;border-radius:12px;background:${buttonBackground(
             button.variant,
-          )};color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:12px 20px;">
+          )};color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;line-height:1.2;padding:14px 32px;text-align:center;box-shadow:0 8px 20px rgba(15,23,42,0.16);">
             ${button.label}
           </a>
         </td>`,
     )
     .join("");
 
-  return `<table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0 8px;"><tr>${cells}</tr></table>`;
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" align="center" style="margin:28px auto 16px;"><tr>${cells}</tr></table>`;
 }
 
 export function renderDetailTable(rows: EmailDetailRow[]): string {
@@ -108,12 +108,12 @@ export function renderBrandedEmail(options: BrandedEmailOptions): string {
         <td align="center">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;overflow:hidden;border-radius:24px;background:#ffffff;border:1px solid ${COLORS.border};box-shadow:0 18px 50px rgba(15,23,42,0.08);">
             <tr>
-              <td style="background:linear-gradient(135deg,${COLORS.headerFrom},${COLORS.headerTo});padding:28px 32px;color:#ffffff;">
-                <img src="${logoUrl}" width="48" height="48" alt="iFranchise" style="display:block;width:48px;height:48px;border:0;border-radius:12px;margin-bottom:18px;" />
-                <h1 style="margin:0;font-size:24px;line-height:1.25;font-weight:750;">${options.heading}</h1>
+              <td align="center" style="background:linear-gradient(135deg,${COLORS.headerFrom},${COLORS.headerTo});padding:36px 32px 32px;color:#ffffff;text-align:center;">
+                <img src="${logoUrl}" width="52" height="52" alt="iFranchise" style="display:block;width:52px;height:52px;border:0;border-radius:14px;margin:0 auto 20px;" />
+                <h1 style="margin:0;font-size:26px;line-height:1.3;font-weight:750;">${options.heading}</h1>
                 ${
                   options.subheading
-                    ? `<p style="margin:8px 0 0;color:#d1d5db;font-size:14px;line-height:1.6;">${options.subheading}</p>`
+                    ? `<p style="margin:10px 0 0;color:#d1d5db;font-size:14px;line-height:1.6;">${options.subheading}</p>`
                     : ""
                 }
               </td>
@@ -124,7 +124,7 @@ export function renderBrandedEmail(options: BrandedEmailOptions): string {
               </td>
             </tr>
             <tr>
-              <td style="border-top:1px solid ${COLORS.border};padding:20px 32px;background:#fbfdff;">
+              <td align="center" style="border-top:1px solid ${COLORS.border};padding:20px 32px;background:#fbfdff;text-align:center;">
                 <p style="margin:0;font-size:12px;line-height:1.6;color:${COLORS.faint};">
                   ${options.footerNote ?? `${siteConfig.name} · Secure approvals`}
                 </p>

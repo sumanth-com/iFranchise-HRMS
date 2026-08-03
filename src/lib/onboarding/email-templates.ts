@@ -57,14 +57,12 @@ function renderOnboardingSteps(): string {
 
   const items = steps
     .map(
-      (step, index) =>
-        `<li style="margin:0 0 10px;font-size:14px;line-height:1.6;color:#374151;">
-          <strong style="color:#111827;">${index + 1}.</strong> ${step}
-        </li>`,
+      (step) =>
+        `<li style="margin:0 0 10px;font-size:14px;line-height:1.65;color:#374151;">${step}</li>`,
     )
     .join("");
 
-  return `<ol style="margin:12px 0 0;padding-left:20px;">${items}</ol>`;
+  return `<ol style="margin:12px auto 0;padding-left:22px;max-width:480px;list-style-position:outside;">${items}</ol>`;
 }
 
 /** Pre-joining invitation — sent to the candidate's personal email. */
@@ -81,11 +79,13 @@ export function renderOnboardingInvitationEmail(params: OnboardingInvitationEmai
       `Congratulations on your upcoming journey with <strong>${siteConfig.name}</strong>. To help us prepare for your joining, please complete your secure pre-joining onboarding before your start date.`,
     )}
     ${renderDetailTable(buildDetailRows(params))}
-  <div style="margin:24px 0 8px;">
-    <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#111827;text-transform:uppercase;letter-spacing:0.04em;">
+  <div style="margin:28px 0 4px;text-align:center;">
+    <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:#111827;text-transform:uppercase;letter-spacing:0.06em;">
       What you will complete
     </p>
-    ${renderOnboardingSteps()}
+    <div style="display:inline-block;text-align:left;max-width:480px;">
+      ${renderOnboardingSteps()}
+    </div>
   </div>
     ${renderEmailButtons([
       { label: "Begin secure onboarding", href: params.inviteUrl, variant: "primary" },
@@ -93,9 +93,14 @@ export function renderOnboardingInvitationEmail(params: OnboardingInvitationEmai
     ${renderNote(
       `This invitation link is unique to you and expires on <strong>${params.expiryLabel}</strong> (${ONBOARDING_INVITATION_TTL_HOURS} hours from issue). Sign in with this personal email address: <strong>${params.personalEmail}</strong>. Do not forward this email.`,
     )}
-    ${renderParagraph(
-      `If the button does not work, copy and paste this link into your browser:<br/><a href="${params.inviteUrl}" style="color:#2563eb;word-break:break-all;">${params.inviteUrl}</a>`,
-    )}
+    <div style="margin:16px 0 0;text-align:center;">
+      <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#64748b;">
+        If the button does not work, copy and paste this link into your browser:
+      </p>
+      <p style="margin:0;font-size:12px;line-height:1.6;">
+        <a href="${params.inviteUrl}" style="color:#2563eb;word-break:break-all;">${params.inviteUrl}</a>
+      </p>
+    </div>
   `;
 
   const html = renderBrandedEmail({
