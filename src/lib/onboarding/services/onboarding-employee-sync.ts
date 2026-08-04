@@ -43,6 +43,7 @@ function onboardingDocTitle(code: string): string {
   const match = catalog.find((item) => item.code === code);
   if (match) return match.label;
   if (code === "cancelled_cheque") return "Cancelled Cheque";
+  if (code.startsWith("edu_")) return "Education Certificate";
   return code.replace(/_/g, " ");
 }
 
@@ -67,6 +68,22 @@ async function resolveDocumentTypeId(
 }
 
 function buildEducationBio(education: Record<string, unknown>): string | null {
+  const entries = education.entries;
+  if (Array.isArray(entries)) {
+    const lines: string[] = [];
+    for (const item of entries) {
+      if (!item || typeof item !== "object") continue;
+      const record = item as Record<string, unknown>;
+      const level = typeof record.level === "string" ? record.level : "";
+      const institution =
+        typeof record.institutionName === "string" ? record.institutionName.trim() : "";
+      if (!level || !institution) continue;
+      const label = level.replace(/_/g, " ");
+      lines.push(`${label}: ${institution}`);
+    }
+    if (lines.length) return `Education (from onboarding)\n${lines.join("\n")}`;
+  }
+
   const lines: string[] = [];
   const fields: Array<[string, string]> = [
     ["ssc", "SSC"],

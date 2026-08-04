@@ -1,3 +1,9 @@
+import {
+  educationDocumentTypeCode,
+  educationLevelLabel,
+  parseEducationEntries,
+} from "@/lib/onboarding/education-utils";
+import { isValidBankAccountNumber, isValidIfsc } from "@/lib/onboarding/bank-field-utils";
 import { isValidStoredPhone } from "@/lib/onboarding/personal-field-options";
 import {
   ONBOARDING_AGREEMENT_TYPES,
@@ -6,6 +12,7 @@ import {
   ONBOARDING_POLICY_DOCUMENTS,
   ONBOARDING_WIZARD_SECTIONS,
   type CandidatePortalContext,
+  type OnboardingEducationEntry,
   type OnboardingWizardSection,
 } from "@/types/onboarding";
 
@@ -19,22 +26,10 @@ const PERSONAL_REQUIRED: { key: string; label: string }[] = [
   { key: "personalEmail", label: "Personal email" },
 ];
 
-const EDUCATION_REQUIRED: { key: string; label: string }[] = [
-  { key: "ssc", label: "SSC" },
-  { key: "intermediate", label: "Intermediate" },
-  { key: "graduation", label: "Graduation" },
-];
-
 const BANK_REQUIRED: { key: string; label: string }[] = [
   { key: "bankName", label: "Bank name" },
   { key: "accountNumber", label: "Account number" },
   { key: "ifsc", label: "IFSC" },
-];
-
-const TAX_REQUIRED: { key: string; label: string }[] = [
-  { key: "taxPan", label: "PAN" },
-  { key: "taxAadhaar", label: "Aadhaar" },
-  { key: "taxDeclaration", label: "Tax declaration" },
 ];
 
 function hasText(value: unknown): boolean {
@@ -64,6 +59,30 @@ export type SectionValidationResult = {
   valid: boolean;
   missing: string[];
 };
+
+export function validateEducationSection(
+  context: CandidatePortalContext,
+  entries: OnboardingEducationEntry[],
+): SectionValidationResult {
+  const missing: string[] = [];
+
+  if (entries.length === 0) {
+    missing.push("At least one education qualification");
+    return { valid: false, missing };
+  }
+
+  for (const entry of entries) {
+    const label = educationLevelLabel(entry.level);
+    if (!hasText(entry.institutionName)) {
+      missing.push(`${label} — school / college name`);
+    }
+    if (!hasUploadedDocument(context, "education", educationDocumentTypeCode(entry.id))) {
+      missing.push(`${label} — certificate upload`);
+    }
+  }
+
+  return { valid: missing.length === 0, missing };
+}
 
 export function validateOnboardingSection(
   sectionKey: OnboardingWizardSection,
@@ -95,10 +114,8 @@ export function validateOnboardingSection(
       break;
 
     case "education":
-      for (const field of EDUCATION_REQUIRED) {
-        if (!hasText(data[field.key])) missing.push(field.label);
-      }
-      break;
+      const entries = parseEducationEntries(data);
+      return validateEducationSection(context, entries);
 
     case "employment_history":
       for (const doc of ONBOARDING_EMPLOYMENT_DOCUMENTS) {
@@ -112,15 +129,15 @@ export function validateOnboardingSection(
       for (const field of BANK_REQUIRED) {
         if (!hasText(data[field.key])) missing.push(field.label);
       }
-      if (!hasUploadedDocument(context, "bank", "cancelled_cheque")) {
-        missing.push("Cancelled cheque");
+      if (hasText(data.accountNumber) && !isValidBankAccountNumber(data.accountNumber)) {
+        missing.push("Valid account number (9–18 digits)");
+      }
+      if (hasText(data.ifsc) && !isValidIfsc(data.ifsc)) {
+        missing.push("Valid IFSC code");
       }
       break;
 
     case "tax":
-      for (const field of TAX_REQUIRED) {
-        if (!hasText(data[field.key])) missing.push(field.label);
-      }
       break;
 
     case "policies":
@@ -152,8 +169,7 @@ export function isOnboardingSectionComplete(
   context: CandidatePortalContext,
 ): boolean {
   const saved = context.sections.find((s) => s.sectionKey === sectionKey);
-  if (saved?.completedAt) return true;
-  return validateOnboardingSection(sectionKey, context).valid;
+  return Boolean(saved?.completedAt);
 }
 
 export function getCompletedStepIndices(context: CandidatePortalContext): number[] {

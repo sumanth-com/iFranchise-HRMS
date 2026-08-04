@@ -484,6 +484,25 @@ export async function uploadOnboardingDocument(
 export async function savePolicyAcknowledgements(caseId: string, policyCodes: string[]) {
   const admin = createAdminClient();
   const now = new Date().toISOString();
+
+  const { data: existing } = await admin
+    .schema("hrms")
+    .from("onboarding_policy_acknowledgements")
+    .select("policy_code")
+    .eq("case_id", caseId);
+
+  const keep = new Set(policyCodes);
+  for (const row of existing ?? []) {
+    if (!keep.has(row.policy_code)) {
+      await admin
+        .schema("hrms")
+        .from("onboarding_policy_acknowledgements")
+        .delete()
+        .eq("case_id", caseId)
+        .eq("policy_code", row.policy_code);
+    }
+  }
+
   for (const code of policyCodes) {
     await admin.schema("hrms").from("onboarding_policy_acknowledgements").upsert(
       { case_id: caseId, policy_code: code, acknowledged_at: now },
@@ -496,6 +515,25 @@ export async function savePolicyAcknowledgements(caseId: string, policyCodes: st
 export async function saveAgreementAcceptances(caseId: string, agreementTypes: string[], signatureId?: string) {
   const admin = createAdminClient();
   const now = new Date().toISOString();
+
+  const { data: existing } = await admin
+    .schema("hrms")
+    .from("onboarding_agreements")
+    .select("agreement_type")
+    .eq("case_id", caseId);
+
+  const keep = new Set(agreementTypes);
+  for (const row of existing ?? []) {
+    if (!keep.has(row.agreement_type)) {
+      await admin
+        .schema("hrms")
+        .from("onboarding_agreements")
+        .delete()
+        .eq("case_id", caseId)
+        .eq("agreement_type", row.agreement_type);
+    }
+  }
+
   for (const type of agreementTypes) {
     await admin.schema("hrms").from("onboarding_agreements").upsert(
       {

@@ -1,6 +1,7 @@
 "use server";
 
 import { sendEmail } from "@/lib/email/mailer";
+import { onboardingActionErrorMessage } from "@/lib/onboarding/action-error-message";
 import { renderOnboardingOtpEmail } from "@/lib/onboarding/email-templates";
 import {
   getCandidateCaseIdFromSession,
@@ -278,7 +279,10 @@ export async function saveCandidatePoliciesAction(input: unknown): Promise<Actio
     await savePolicyAcknowledgements(caseId, parsed.policyCodes);
     return { success: true, message: "Policies acknowledged" };
   } catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : "Save failed" };
+    return {
+      success: false,
+      message: onboardingActionErrorMessage(error, "Could not update policy acknowledgements"),
+    };
   }
 }
 
@@ -293,7 +297,10 @@ export async function saveCandidateAgreementsAction(input: unknown): Promise<Act
     await saveAgreementAcceptances(caseId, parsed.agreementTypes);
     return { success: true, message: "Agreements accepted" };
   } catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : "Save failed" };
+    return {
+      success: false,
+      message: onboardingActionErrorMessage(error, "Could not update agreement acceptances"),
+    };
   }
 }
 

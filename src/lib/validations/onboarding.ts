@@ -109,12 +109,12 @@ export const onboardingSignatureSchema = z.object({
 
 export const policyAcknowledgementSchema = z.object({
   caseId: z.string().uuid(),
-  policyCodes: z.array(z.string()).min(1),
+  policyCodes: z.array(z.string()),
 });
 
 export const agreementAcceptanceSchema = z.object({
   caseId: z.string().uuid(),
-  agreementTypes: z.array(z.string()).min(1),
+  agreementTypes: z.array(z.string()),
 });
 
 export type CreateOnboardingCaseInput = z.infer<typeof createOnboardingCaseSchema>;

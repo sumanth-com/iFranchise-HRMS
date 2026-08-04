@@ -92,16 +92,44 @@ export const ONBOARDING_IDENTITY_DOCUMENTS = [
 
 export const ONBOARDING_EMPLOYMENT_DOCUMENTS = [
   { code: "resume", label: "Resume", required: true },
-  { code: "experience_letter", label: "Experience Letters", required: true },
-  { code: "relieving_letter", label: "Relieving Letters", required: true },
-  { code: "salary_slip", label: "Salary Slips", required: false },
+  { code: "offer_letter", label: "Offer Letters", required: false },
+  { code: "experience_letter", label: "Experience Letters", required: false },
+  { code: "relieving_letter", label: "Relieving Letters", required: false },
+  { code: "salary_slip", label: "Salary Slips / Payslips", required: false },
 ] as const;
 
-export const ONBOARDING_SIGNATURE_STYLES = [
-  { id: "classic", label: "Classic Script", fontFamily: "Georgia, serif" },
-  { id: "modern", label: "Modern Sans", fontFamily: "Helvetica, Arial, sans-serif" },
-  { id: "elegant", label: "Elegant Serif", fontFamily: "Times New Roman, serif" },
+export const ONBOARDING_EDUCATION_LEVELS = [
+  { code: "ssc", label: "SSC / 10th" },
+  { code: "intermediate", label: "Intermediate / 12th" },
+  { code: "diploma", label: "Diploma" },
+  { code: "graduation", label: "Graduation" },
+  { code: "post_graduation", label: "Post Graduation" },
+  { code: "certification", label: "Certification / Other" },
 ] as const;
+
+export type OnboardingEducationLevelCode = (typeof ONBOARDING_EDUCATION_LEVELS)[number]["code"];
+
+export type OnboardingEducationEntry = {
+  id: string;
+  level: OnboardingEducationLevelCode;
+  institutionName: string;
+};
+
+export const ONBOARDING_SIGNATURE_STYLES = [
+  { id: "script_casual", label: "Casual Script", fontFamily: "var(--font-signature-casual), cursive" },
+  { id: "script_round", label: "Rounded Script", fontFamily: "var(--font-signature-round), cursive" },
+  { id: "script_elegant", label: "Elegant Script", fontFamily: "var(--font-signature-elegant), cursive" },
+  { id: "script_formal", label: "Formal Script", fontFamily: "var(--font-signature-formal), cursive" },
+  { id: "script_bold", label: "Bold Script", fontFamily: "var(--font-signature-bold), cursive" },
+  { id: "script_classic", label: "Classic Script", fontFamily: "var(--font-signature-classic), cursive" },
+] as const;
+
+export const ONBOARDING_DOCUMENT_CATEGORY_LABELS: Record<string, string> = {
+  identity: "Identity documents",
+  education: "Education certificates",
+  employment: "Employment documents",
+  bank: "Bank documents",
+};
 
 export type OnboardingDocumentReviewStatus =
   | "pending"

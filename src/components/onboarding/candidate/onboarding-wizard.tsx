@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
+import { OnboardingEducationSection } from "@/components/onboarding/candidate/onboarding-education-section";
 import { OnboardingPhoneField } from "@/components/onboarding/candidate/onboarding-phone-field";
 import { OnboardingPortalHero } from "@/components/onboarding/candidate/onboarding-portal-hero";
 import { OnboardingSignature } from "@/components/onboarding/candidate/onboarding-signature";
@@ -30,10 +31,16 @@ import {
   toIsoDate,
 } from "@/lib/onboarding/personal-field-options";
 import {
+  sanitizeAccountNumber,
+  sanitizeIfsc,
+} from "@/lib/onboarding/bank-field-utils";
+import { educationDocumentTypeCode, parseEducationEntries } from "@/lib/onboarding/education-utils";
+import {
   canNavigateToStep,
   canSubmitOnboarding,
   getCompletedStepIndices,
   getFirstIncompleteStepIndex,
+  validateEducationSection,
   validateOnboardingSection,
 } from "@/lib/onboarding/onboarding-section-validation";
 import {
@@ -42,6 +49,7 @@ import {
   ONBOARDING_IDENTITY_DOCUMENTS,
   ONBOARDING_POLICY_DOCUMENTS,
   ONBOARDING_WIZARD_SECTIONS,
+  type OnboardingEducationEntry,
 } from "@/types/onboarding";
 import type { CandidatePortalContext } from "@/types/onboarding";
 
@@ -122,13 +130,17 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   const sectionKey = ONBOARDING_WIZARD_SECTIONS[step];
   const sectionData = context.sections.find((s) => s.sectionKey === sectionKey)?.data ?? {};
   const [form, setForm] = useState<Record<string, string>>({});
+  const [educationEntries, setEducationEntries] = useState<OnboardingEducationEntry[]>([]);
+  const [stepAnimKey, setStepAnimKey] = useState(0);
 
   const completedSteps = useMemo(() => getCompletedStepIndices(context), [context]);
   const firstIncompleteStep = useMemo(() => getFirstIncompleteStepIndex(context), [context]);
-  const currentValidation = useMemo(
-    () => validateOnboardingSection(sectionKey, context, form),
-    [sectionKey, context, form],
-  );
+  const currentValidation = useMemo(() => {
+    if (sectionKey === "education") {
+      return validateEducationSection(context, educationEntries);
+    }
+    return validateOnboardingSection(sectionKey, context, form);
+  }, [sectionKey, context, form, educationEntries]);
   const submitValidation = useMemo(() => canSubmitOnboarding(context), [context]);
 
   useEffect(() => {
@@ -137,6 +149,26 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
       initializedRef.current = true;
     }
   }, [context]);
+
+  useEffect(() => {
+    if (sectionKey === "education") {
+      setEducationEntries(parseEducationEntries(sectionData));
+    }
+  }, [sectionKey, sectionData]);
+
+  function sectionPayload(): Record<string, unknown> {
+    if (sectionKey === "education") {
+      return { ...sectionData, entries: educationEntries };
+    }
+    return { ...sectionData, ...form };
+  }
+
+  function advanceStep() {
+    setStepAnimKey((k) => k + 1);
+    if (step < ONBOARDING_WIZARD_SECTIONS.length - 1) {
+      setStep((s) => s + 1);
+    }
+  }
 
   function updateField(key: string, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -163,14 +195,17 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   }
 
   function saveSection(markComplete = true) {
-    const validation = validateOnboardingSection(sectionKey, context, form);
+    const validation =
+      sectionKey === "education"
+        ? validateEducationSection(context, educationEntries)
+        : validateOnboardingSection(sectionKey, context, form);
     if (markComplete && !validation.valid) {
       showValidationError(validation);
       return;
     }
 
     startTransition(async () => {
-      const merged = { ...sectionData, ...form };
+      const merged = sectionPayload();
       const result = await saveCandidateSectionAction({
         caseId: context.caseId,
         sectionKey,
@@ -204,11 +239,16 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
       return;
     }
     setForm({});
+    setStepAnimKey((k) => k + 1);
     setStep(index);
   }
 
   async function markSectionCompleteIfNeeded() {
-    if (sectionKey === "policies" || sectionKey === "agreements") {
+    if (
+      sectionKey === "policies" ||
+      sectionKey === "agreements" ||
+      sectionKey === "signature"
+    ) {
       const result = await saveCandidateSectionAction({
         caseId: context.caseId,
         sectionKey,
@@ -220,7 +260,10 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   }
 
   function goNext() {
-    const validation = validateOnboardingSection(sectionKey, context, form);
+    const validation =
+      sectionKey === "education"
+        ? validateEducationSection(context, educationEntries)
+        : validateOnboardingSection(sectionKey, context, form);
     if (!validation.valid) {
       showValidationError(validation);
       return;
@@ -232,7 +275,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
     startTransition(async () => {
       try {
         if (isFormSection) {
-          const merged = { ...sectionData, ...form };
+          const merged = sectionPayload();
           const result = await saveCandidateSectionAction({
             caseId: context.caseId,
             sectionKey,
@@ -249,10 +292,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
         }
 
         await onRefresh();
-
-        if (step < ONBOARDING_WIZARD_SECTIONS.length - 1) {
-          setStep((s) => s + 1);
-        }
+        advanceStep();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Could not save section");
       }
@@ -319,7 +359,10 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           onStepChange={goToStep}
         />
 
-        <div className="onboarding-section-enter min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+        <div
+          key={`${sectionKey}-${stepAnimKey}`}
+          className="onboarding-section-enter min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5"
+        >
           <div className="mb-4 text-center">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               Step {step + 1} of {ONBOARDING_WIZARD_SECTIONS.length}
@@ -479,23 +522,14 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           )}
 
           {sectionKey === "education" && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              {[
-                { key: "ssc", label: "SSC", required: true },
-                { key: "intermediate", label: "Intermediate", required: true },
-                { key: "graduation", label: "Graduation", required: true },
-                { key: "postGraduation", label: "Post graduation" },
-                { key: "certifications", label: "Certifications" },
-              ].map(({ key, label, required }) => (
-                <div key={key} className="space-y-1.5 sm:col-span-2 last:sm:col-span-1">
-                  <FieldLabel label={label} required={required} />
-                  <Input
-                    value={form[key] ?? String(sectionData[key] ?? "")}
-                    onChange={(e) => updateField(key, e.target.value)}
-                  />
-                </div>
-              ))}
-            </div>
+            <OnboardingEducationSection
+              context={context}
+              entries={educationEntries}
+              onEntriesChange={setEducationEntries}
+              onUpload={(entryId, file) =>
+                uploadDoc("education", educationDocumentTypeCode(entryId), file)
+              }
+            />
           )}
 
           {sectionKey === "employment_history" && (
@@ -536,13 +570,24 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                 <div key={key} className="space-y-1.5">
                   <FieldLabel label={label} required={required} />
                   <Input
+                    className="h-9 text-sm"
                     value={form[key] ?? String(sectionData[key] ?? "")}
-                    onChange={(e) => updateField(key, e.target.value)}
+                    onChange={(e) => {
+                      if (key === "accountNumber") {
+                        updateField(key, sanitizeAccountNumber(e.target.value));
+                      } else if (key === "ifsc") {
+                        updateField(key, sanitizeIfsc(e.target.value));
+                      } else {
+                        updateField(key, e.target.value);
+                      }
+                    }}
+                    inputMode={key === "accountNumber" ? "numeric" : undefined}
+                    maxLength={key === "accountNumber" ? 18 : key === "ifsc" ? 11 : undefined}
                   />
                 </div>
               ))}
               <div className="space-y-2 sm:col-span-2 rounded-xl border bg-muted/20 p-4">
-                <FieldLabel label="Cancelled cheque" required />
+                <FieldLabel label="Cancelled cheque" />
                 {documentUploaded(context, "bank", "cancelled_cheque") ? (
                   <p className="text-xs font-medium text-emerald-600">Uploaded</p>
                 ) : null}
@@ -560,25 +605,34 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           )}
 
           {sectionKey === "tax" && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              {[
-                { key: "taxPan", label: "PAN", required: true },
-                { key: "taxAadhaar", label: "Aadhaar", required: true },
-                { key: "taxDeclaration", label: "Tax declaration", required: true },
-              ].map(({ key, label, required }) => (
-                <div key={key} className="space-y-1.5 sm:col-span-2 last:sm:col-span-1">
-                  <FieldLabel label={label} required={required} />
-                  <Input
-                    value={form[key] ?? String(sectionData[key] ?? "")}
-                    onChange={(e) => updateField(key, e.target.value)}
-                  />
-                </div>
-              ))}
+            <div className="mx-auto max-w-lg space-y-4">
+              <p className="text-center text-sm text-muted-foreground">
+                Optional — add tax details if you have them. You can skip this section.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {[
+                  { key: "taxPan", label: "PAN" },
+                  { key: "taxAadhaar", label: "Aadhaar" },
+                  { key: "taxDeclaration", label: "Tax declaration" },
+                ].map(({ key, label }) => (
+                  <div key={key} className="space-y-1.5 sm:col-span-2 last:sm:col-span-1">
+                    <FieldLabel label={label} />
+                    <Input
+                      className="h-9 text-sm"
+                      value={form[key] ?? String(sectionData[key] ?? "")}
+                      onChange={(e) => updateField(key, e.target.value)}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
           {sectionKey === "policies" && (
-            <div className="space-y-3">
+            <div className="mx-auto max-w-2xl space-y-3">
+              <p className="text-center text-sm text-muted-foreground">
+                Please read and acknowledge each company policy to continue.
+              </p>
               {ONBOARDING_POLICY_DOCUMENTS.map((policy) => {
                 const checked = context.policyAcknowledgements.includes(policy.code);
                 return (
@@ -612,7 +666,10 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           )}
 
           {sectionKey === "agreements" && (
-            <div className="space-y-3">
+            <div className="mx-auto max-w-2xl space-y-3">
+              <p className="text-center text-sm text-muted-foreground">
+                Please accept each agreement to continue.
+              </p>
               {ONBOARDING_AGREEMENT_TYPES.map((agreement) => {
                 const accepted = context.agreements.some(
                   (a) => a.agreementType === agreement.code,
@@ -650,7 +707,8 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           )}
 
           {sectionKey === "signature" && (
-            <OnboardingSignature
+            <div className="mx-auto max-w-2xl">
+              <OnboardingSignature
               fullName={context.fullName}
               disabled={Boolean(context.signature)}
               onSave={async (payload) => {
@@ -665,6 +723,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                 }
               }}
             />
+            </div>
           )}
 
           {sectionKey !== "policies" &&
@@ -689,6 +748,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
             disabled={step === 0 || isPending}
             onClick={() => {
               setForm({});
+              setStepAnimKey((k) => k + 1);
               setStep((s) => s - 1);
             }}
             className="w-full sm:w-auto"

@@ -19,9 +19,12 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
+import { PageScroll } from "@/components/common/sticky-layout";
+import { OnboardingDocumentsPanel } from "@/components/onboarding/hr/onboarding-documents-panel";
 import { Input } from "@/components/common/input";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import type { SelectItemOption } from "@/components/payroll/select-utils";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -61,13 +64,6 @@ const SECTION_LABELS: Record<string, string> = {
   policies: "Company policies",
   agreements: "Employment agreements",
   signature: "Electronic signature",
-};
-
-const DOCUMENT_REVIEW_LABELS: Record<string, string> = {
-  pending: "Pending review",
-  approved: "Approved",
-  rejected: "Rejected",
-  correction_requested: "Correction requested",
 };
 
 function statusBadgeClass(status: OnboardingStatus) {
@@ -219,10 +215,10 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="border-b bg-card/80 px-6 py-6">
-        <div className="mx-auto max-w-6xl space-y-4">
-          <div className="flex justify-start">
+    <>
+      <PageScroll>
+        <div className="mx-auto w-full max-w-6xl space-y-6">
+          <div className="space-y-4">
             <Button
               variant="ghost"
               size="sm"
@@ -232,61 +228,58 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
               <ArrowLeft className="h-4 w-4 mr-1" />
               Back to list
             </Button>
-          </div>
 
-          <div className="text-center space-y-2">
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <h1 className="text-2xl font-semibold tracking-tight capitalize">
-                {detail.fullName}
-              </h1>
-              <span
-                className={`rounded-full border px-3 py-0.5 text-xs font-medium ${statusBadgeClass(detail.status)}`}
-              >
-                {ONBOARDING_STATUS_LABELS[detail.status]}
-              </span>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 space-y-1">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h1 className="text-2xl font-semibold tracking-tight capitalize">
+                    {detail.fullName}
+                  </h1>
+                  <span
+                    className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusBadgeClass(detail.status)}`}
+                  >
+                    {ONBOARDING_STATUS_LABELS[detail.status]}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">{detail.personalEmail}</p>
+                {detail.mobileNumber ? (
+                  <p className="text-sm text-muted-foreground">{detail.mobileNumber}</p>
+                ) : null}
+              </div>
+
+              <div className="flex flex-wrap gap-2 shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={resendInvite}
+                  disabled={isResending || isPending || !canResendInvite}
+                >
+                  {isResending ? (
+                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  ) : (
+                    <Mail className="h-4 w-4 mr-1.5" />
+                  )}
+                  Resend invitation
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCancelDialogOpen(true)}
+                  disabled={isPending || cannotCancel}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={archiveCase}
+                  disabled={isPending || detail.status === "archived"}
+                >
+                  Archive
+                </Button>
+              </div>
             </div>
-            <p className="text-sm text-muted-foreground">{detail.personalEmail}</p>
-            {detail.mobileNumber ? (
-              <p className="text-sm text-muted-foreground">{detail.mobileNumber}</p>
-            ) : null}
           </div>
-
-          <div className="flex flex-wrap justify-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={resendInvite}
-              disabled={isResending || isPending || !canResendInvite}
-            >
-              {isResending ? (
-                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-              ) : (
-                <Mail className="h-4 w-4 mr-1.5" />
-              )}
-              Resend invitation
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCancelDialogOpen(true)}
-              disabled={isPending || cannotCancel}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={archiveCase}
-              disabled={isPending || detail.status === "archived"}
-            >
-              Archive
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
           {detail.status === "cancelled" ? (
             <div className="rounded-xl border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-950">
               <strong>Onboarding cancelled.</strong> The candidate cannot access the portal. Use
@@ -457,119 +450,101 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
 
           <section className="rounded-xl border bg-card p-5 shadow-sm">
             <h2 className="text-center font-semibold">Documents</h2>
-            {detail.documents.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">
-                No documents yet. They will appear here when the candidate uploads files in the
-                onboarding portal.
-              </p>
-            ) : (
-              <div className="mt-4 space-y-3">
-                {detail.documents.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="font-medium truncate">{doc.fileName}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {doc.documentTypeCode.replace(/_/g, " ")} ·{" "}
-                        {DOCUMENT_REVIEW_LABELS[doc.reviewStatus] ?? doc.reviewStatus}
-                      </div>
-                      {doc.signedUrl ? (
-                        <a
-                          href={doc.signedUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-primary text-xs font-medium underline-offset-2 hover:underline mt-1 inline-block"
-                        >
-                          View file
-                        </a>
-                      ) : null}
-                    </div>
-                    {canReview ? (
-                      <div className="flex flex-wrap gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => reviewDocument(doc.id, "approved")}
-                          disabled={isPending}
-                        >
-                          Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => reviewDocument(doc.id, "correction_requested")}
-                          disabled={isPending}
-                        >
-                          Request fix
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => reviewDocument(doc.id, "rejected")}
-                          disabled={isPending}
-                        >
-                          Reject
-                        </Button>
-                      </div>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="mt-4">
+              <OnboardingDocumentsPanel
+                documents={detail.documents}
+                educationSectionData={
+                  detail.sections.find((s) => s.sectionKey === "education")?.data
+                }
+                canReview={canReview}
+                isPending={isPending}
+                onReview={reviewDocument}
+              />
+            </div>
           </section>
 
           {canReview ? (
-            <section className="rounded-xl border border-primary/20 bg-card p-5 shadow-sm space-y-4">
-              <h2 className="text-center font-semibold">HR review</h2>
-              <p className="text-sm text-muted-foreground">
-                Review the candidate&apos;s submission, then approve to create their company account
-                or request corrections.
-              </p>
-              <div className="space-y-1.5 max-w-md">
-                <label className="text-sm font-medium">Portal role when employee is created</label>
-                <LabeledSelect
-                  value={intendedRoleId}
-                  placeholder="Select portal role"
-                  items={roleItems}
-                  onValueChange={setIntendedRoleId}
-                  disabled={isPending}
-                  triggerClassName="h-9 w-full"
-                />
+            <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+              <div className="border-b bg-muted/30 px-6 py-5 text-center">
+                <h2 className="text-base font-semibold tracking-tight">
+                  HR review & portal activation
+                </h2>
+                <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                  After reviewing documents above, approve to create the company account. The
+                  candidate receives their company email, portal password, and activation link at
+                  their personal email. Uploaded documents are imported into their employee profile.
+                </p>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Input
-                  placeholder="HR comments (optional)"
-                  value={hrComments}
-                  onChange={(e) => setHrComments(e.target.value)}
-                  disabled={isPending}
-                />
-                <Input
-                  placeholder="Correction notes (if requesting changes)"
-                  value={correctionNotes}
-                  onChange={(e) => setCorrectionNotes(e.target.value)}
-                  disabled={isPending}
-                />
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={() => processReview("approve")} disabled={isPending}>
-                  Approve & create employee
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => processReview("request_corrections")}
-                  disabled={isPending}
-                >
-                  Request corrections
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => processReview("reject")}
-                  disabled={isPending}
-                >
-                  Reject
-                </Button>
+
+              <div className="mx-auto max-w-lg space-y-5 px-6 py-6">
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Portal role when employee is created</Label>
+                  <LabeledSelect
+                    value={intendedRoleId}
+                    placeholder="Select portal role"
+                    items={roleItems}
+                    onValueChange={setIntendedRoleId}
+                    disabled={isPending}
+                    triggerClassName="h-10 w-full"
+                  />
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      HR comments (optional)
+                    </Label>
+                    <Input
+                      className="h-10"
+                      placeholder="Internal notes for this review"
+                      value={hrComments}
+                      onChange={(e) => setHrComments(e.target.value)}
+                      disabled={isPending}
+                    />
+                  </div>
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      Correction notes
+                    </Label>
+                    <Input
+                      className="h-10"
+                      placeholder="Required only when requesting changes"
+                      value={correctionNotes}
+                      onChange={(e) => setCorrectionNotes(e.target.value)}
+                      disabled={isPending}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 border-t border-border/60 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                  <Button
+                    onClick={() => processReview("approve")}
+                    disabled={isPending}
+                    className="sm:min-w-[11rem]"
+                  >
+                    {isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    Approve & create employee
+                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => processReview("request_corrections")}
+                      disabled={isPending}
+                    >
+                      Request corrections
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="text-destructive hover:bg-destructive/5 hover:text-destructive"
+                      onClick={() => processReview("reject")}
+                      disabled={isPending}
+                    >
+                      Reject
+                    </Button>
+                  </div>
+                </div>
               </div>
             </section>
           ) : null}
@@ -600,7 +575,7 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
             )}
           </section>
         </div>
-      </div>
+      </PageScroll>
 
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
         <DialogContent className="sm:max-w-md">
@@ -631,6 +606,6 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
