@@ -138,6 +138,7 @@ export async function processOnboardingReviewAction(input: unknown): Promise<Act
       parsed.hrComments,
       parsed.correctionNotes,
       parsed.intendedRoleId,
+      parsed.companyEmail,
     );
     revalidateOnboarding();
     return { success: true, message: "Onboarding review processed" };

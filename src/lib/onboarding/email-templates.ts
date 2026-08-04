@@ -160,7 +160,7 @@ export function renderOnboardingAccountReadyEmail(params: OnboardingAccountReady
       { label: "Employee ID", value: params.employeeCode },
     ])}
     ${renderParagraph(
-      `A separate password setup invitation has been sent to <strong>${params.companyEmail}</strong>. Please complete that step first, then sign in to the employee portal.`,
+      `Sign in to the employee portal with your <strong>company email</strong> and the <strong>same password</strong> you created during pre-joining onboarding.`,
     )}
     ${renderEmailButtons([{ label: "Open employee portal", href: params.loginUrl, variant: "primary" }])}
     ${renderNote(
@@ -185,7 +185,7 @@ export function renderOnboardingAccountReadyEmail(params: OnboardingAccountReady
     `Employee ID: ${params.employeeCode}`,
     `Login: ${params.loginUrl}`,
     "",
-    "Check your company email for the password setup invitation.",
+    "Use your company email and the same password you set during onboarding.",
   ].join("\n");
 
   return {

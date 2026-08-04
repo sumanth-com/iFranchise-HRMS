@@ -471,6 +471,87 @@ async function createEmployeeInvitationRecord(input: {
   }
 }
 
+export async function activateEmployeeAccountFromOnboarding(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  employeeId: string,
+  authUserId: string,
+  companyEmail: string,
+  roleId: string,
+) {
+  const employee = await getEmployeeAccountRow(employeeId, profile.employee.organizationId);
+  const normalizedEmail = companyEmail.trim().toLowerCase();
+  const assignedRole = await getInviteableRoleById(
+    createAdminClient(),
+    employee.organization_id,
+    roleId,
+  );
+
+  const admin = createAdminClient();
+  const { error: authUpdateError } = await admin.auth.admin.updateUserById(authUserId, {
+    email: normalizedEmail,
+    email_confirm: true,
+  });
+  if (authUpdateError) throw new Error(authUpdateError.message);
+
+  await ensureEmployeeProfile(employee.id, profile.userId);
+
+  const employeeWithEmail = { ...employee, email: normalizedEmail };
+  await setUserPrimaryRole(authUserId, employeeWithEmail, profile.userId, roleId);
+
+  const now = new Date().toISOString();
+  await updateEmployeeAccount(employee.id, {
+    user_id: authUserId,
+    email: normalizedEmail,
+    account_status: "active",
+    account_activated_at: now,
+    invitation_sent_at: now,
+    invitation_cancelled_at: null,
+    invited_role_id: roleId,
+    updated_by: profile.userId,
+  });
+
+  const updatedEmployee = { ...employeeWithEmail, user_id: authUserId, account_status: "active" as const };
+
+  await notifyEmployeeAccount(
+    updatedEmployee,
+    "employee_account_activated",
+    "Employee account activated",
+    `Your ${siteConfig.name} account is ready. Sign in with ${normalizedEmail} using your onboarding password.`,
+    profile.userId,
+  );
+
+  await writeAccountAudit(
+    supabase,
+    profile,
+    updatedEmployee,
+    "account_activated",
+    `Onboarding account activated for ${fullName(updatedEmployee)} (${updatedEmployee.employee_code}) as ${assignedRole.name}`,
+    {
+      roleId,
+      roleCode: assignedRole.code,
+      roleName: assignedRole.name,
+      portalRoute: assignedRole.portalRoute,
+      portalLabel: assignedRole.portalLabel,
+    },
+  );
+
+  await writeApplicationAudit(supabase, {
+    organizationId: employee.organization_id,
+    module: "security",
+    action: "role_assigned",
+    description: `Role ${assignedRole.name} assigned during onboarding activation for ${normalizedEmail}`,
+    recordId: employee.id,
+    priority: "medium",
+    metadata: {
+      employeeId: employee.id,
+      roleId,
+      roleCode: assignedRole.code,
+      portalRoute: assignedRole.portalRoute,
+    },
+  });
+}
+
 export async function sendEmployeeInvitation(
   supabase: AuthSupabaseClient,
   profile: UserProfile,

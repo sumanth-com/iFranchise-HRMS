@@ -62,13 +62,24 @@ export const onboardingDocumentReviewSchema = z.object({
   hrComment: z.string().trim().max(500).optional().nullable(),
 });
 
-export const onboardingReviewSchema = z.object({
-  caseId: z.string().uuid(),
-  action: z.enum(["approve", "reject", "request_corrections"]),
-  hrComments: z.string().trim().max(2000).optional().nullable(),
-  correctionNotes: z.string().trim().max(2000).optional().nullable(),
-  intendedRoleId: z.string().uuid().optional().nullable(),
-});
+export const onboardingReviewSchema = z
+  .object({
+    caseId: z.string().uuid(),
+    action: z.enum(["approve", "reject", "request_corrections"]),
+    hrComments: z.string().trim().max(2000).optional().nullable(),
+    correctionNotes: z.string().trim().max(2000).optional().nullable(),
+    intendedRoleId: z.string().uuid().optional().nullable(),
+    companyEmail: z.string().trim().email().max(255).optional().nullable(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.action === "approve" && !value.companyEmail?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Company email is required when approving onboarding",
+        path: ["companyEmail"],
+      });
+    }
+  });
 
 export const candidatePasswordSchema = z
   .object({

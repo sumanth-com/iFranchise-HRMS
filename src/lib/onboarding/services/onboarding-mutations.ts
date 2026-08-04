@@ -3,7 +3,7 @@ import { getInviteableRoleByCode } from "@/lib/auth/iam-roles";
 import type { UserProfile } from "@/types/auth";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import { allocateNextEmployeeCode } from "@/lib/employees/services/employee-code";
-import { sendEmployeeInvitation } from "@/lib/employees/services/employee-account";
+import { activateEmployeeAccountFromOnboarding } from "@/lib/employees/services/employee-account";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/mailer";
 import { siteConfig } from "@/config/site";
@@ -25,6 +25,7 @@ import {
   revokeActiveInvitationTokens,
   revokeActiveInvitationTokensExcept,
   revokePortalSessions,
+  getOnboardingPortalAuthUserId,
 } from "@/lib/onboarding/onboarding-security";
 import {
   calculateCompletionPercent,
@@ -643,6 +644,7 @@ export async function processOnboardingReview(
   hrComments?: string | null,
   correctionNotes?: string | null,
   intendedRoleId?: string | null,
+  companyEmail?: string | null,
 ) {
   const organizationId = profile.employee.organizationId;
   const now = new Date().toISOString();
@@ -713,20 +715,63 @@ export async function processOnboardingReview(
       .eq("id", caseId);
   }
 
-  await activateOnboardingCase(supabase, profile, caseId, hrComments);
+  const normalizedCompanyEmail = companyEmail?.trim().toLowerCase();
+  if (!normalizedCompanyEmail) {
+    throw new Error("Company email is required to approve onboarding");
+  }
+
+  await activateOnboardingCase(
+    supabase,
+    profile,
+    caseId,
+    normalizedCompanyEmail,
+    hrComments,
+    intendedRoleId ?? undefined,
+  );
+}
+
+async function assertCompanyEmailAvailable(
+  organizationId: string,
+  companyEmail: string,
+): Promise<void> {
+  const admin = createAdminClient();
+  const { count, error } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .ilike("email", companyEmail)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+  if ((count ?? 0) > 0) {
+    throw new Error("This company email is already assigned to another employee");
+  }
 }
 
 export async function activateOnboardingCase(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   caseId: string,
+  companyEmail: string,
   hrComments?: string | null,
+  intendedRoleId?: string,
 ) {
   const organizationId = profile.employee.organizationId;
   const detail = await getOnboardingCaseDetail(supabase, organizationId, caseId);
   const admin = createAdminClient();
+  const normalizedCompanyEmail = companyEmail.trim().toLowerCase();
+
+  await assertCompanyEmailAvailable(organizationId, normalizedCompanyEmail);
+
+  const authUserId = await getOnboardingPortalAuthUserId(caseId);
+  if (!authUserId) {
+    throw new Error(
+      "The candidate has not finished portal password setup. Ask them to complete onboarding login first.",
+    );
+  }
+
   const { firstName, lastName } = parseFullName(detail.fullName);
-  const companyEmail = await generateCompanyEmail(supabase, organizationId, firstName, lastName);
   const employeeCode = await allocateNextEmployeeCode(organizationId);
 
   const { data: caseRow, error: caseError } = await admin
@@ -755,7 +800,7 @@ export async function activateOnboardingCase(
       employee_code: employeeCode,
       first_name: firstName,
       last_name: lastName,
-      email: companyEmail,
+      email: normalizedCompanyEmail,
       phone: detail.mobileNumber ?? (personalSection.personalMobile as string | undefined) ?? null,
       employment_status: "draft",
       account_status: "draft",
@@ -768,16 +813,22 @@ export async function activateOnboardingCase(
 
   if (empError) throw new Error(empError.message);
 
+  const resolvedRoleId = intendedRoleId ?? caseRow.intended_role_id;
+  if (!resolvedRoleId) {
+    throw new Error("Portal role is required to activate the employee account");
+  }
+
   await finalizeEmployeeActivation(
     supabase,
     profile,
     caseId,
     employee.id,
-    companyEmail,
+    normalizedCompanyEmail,
     employeeCode,
     hrComments,
     detail,
-    caseRow.intended_role_id,
+    resolvedRoleId,
+    authUserId,
   );
 }
 
@@ -791,6 +842,7 @@ async function finalizeEmployeeActivation(
   hrComments: string | null | undefined,
   detail: Awaited<ReturnType<typeof getOnboardingCaseDetail>>,
   intendedRoleId: string,
+  authUserId: string,
 ) {
   const admin = createAdminClient();
   const now = new Date().toISOString();
@@ -819,7 +871,14 @@ async function finalizeEmployeeActivation(
     .update({ onboarding_account_active: false })
     .eq("id", caseId);
 
-  await sendEmployeeInvitation(supabase, profile, employeeId, intendedRoleId);
+  await activateEmployeeAccountFromOnboarding(
+    supabase,
+    profile,
+    employeeId,
+    authUserId,
+    companyEmail,
+    intendedRoleId,
+  );
 
   const loginUrl = `${siteConfig.url}/login`;
 

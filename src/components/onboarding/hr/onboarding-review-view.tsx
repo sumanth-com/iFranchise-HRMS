@@ -105,6 +105,7 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
   const [detail, setDetail] = useState(initialDetail);
   const [hrComments, setHrComments] = useState("");
   const [correctionNotes, setCorrectionNotes] = useState("");
+  const [companyEmail, setCompanyEmail] = useState("");
   const [intendedRoleId, setIntendedRoleId] = useState(initialDetail.intendedRoleId);
   const [isResending, setIsResending] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -165,6 +166,7 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
         hrComments: hrComments || null,
         correctionNotes: correctionNotes || null,
         intendedRoleId: action === "approve" ? intendedRoleId : null,
+        companyEmail: action === "approve" ? companyEmail.trim() : null,
       });
       if (!result.success) toast.error(result.message);
       else {
@@ -470,13 +472,31 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
                   HR review & portal activation
                 </h2>
                 <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                  After reviewing documents above, approve to create the company account. The
-                  candidate receives their company email, portal password, and activation link at
-                  their personal email. Uploaded documents are imported into their employee profile.
+                  Enter the official company email for this employee. After approval, they receive
+                  a notification at their personal email and can sign in with that company email and
+                  the password they created during onboarding.
                 </p>
               </div>
 
               <div className="mx-auto max-w-lg space-y-5 px-6 py-6">
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">
+                    Company email <span className="text-foreground">*</span>
+                  </Label>
+                  <Input
+                    type="email"
+                    className="h-10"
+                    placeholder="e.g. coder@yourcompany.com"
+                    value={companyEmail}
+                    onChange={(e) => setCompanyEmail(e.target.value)}
+                    disabled={isPending}
+                    autoComplete="off"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    This is the login email the employee will use on the company portal.
+                  </p>
+                </div>
+
                 <div className="space-y-1.5">
                   <Label className="text-sm font-medium">Portal role when employee is created</Label>
                   <LabeledSelect
@@ -519,7 +539,7 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
                 <div className="flex flex-col gap-2 border-t border-border/60 pt-5 sm:flex-row sm:items-center sm:justify-between">
                   <Button
                     onClick={() => processReview("approve")}
-                    disabled={isPending}
+                    disabled={isPending || !companyEmail.trim()}
                     className="sm:min-w-[11rem]"
                   >
                     {isPending ? (

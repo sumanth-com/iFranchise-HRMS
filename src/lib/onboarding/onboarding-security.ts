@@ -255,17 +255,84 @@ export async function ensurePortalAccountForInvitation(caseId: string, email: st
 export async function storePortalPassword(caseId: string, email: string, password: string) {
   const admin = createAdminClient();
   const passwordHash = await hashPassword(password);
+  const authUserId = await provisionPortalAuthUser(caseId, email, password);
   const { error } = await admin.schema("hrms").from("onboarding_portal_accounts").upsert(
     {
       case_id: caseId,
       personal_email: email.toLowerCase(),
       password_hash: passwordHash,
+      auth_user_id: authUserId,
       is_active: true,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "case_id" },
   );
   if (error) throw new Error(error.message);
+}
+
+async function findAuthUserIdByEmail(email: string): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (error) throw new Error(error.message);
+  const normalized = email.trim().toLowerCase();
+  const match = data.users.find((user) => user.email?.toLowerCase() === normalized);
+  return match?.id ?? null;
+}
+
+/** Creates (or updates) a Supabase auth user so onboarding password works on the main portal later. */
+export async function provisionPortalAuthUser(
+  caseId: string,
+  personalEmail: string,
+  password: string,
+): Promise<string> {
+  const admin = createAdminClient();
+  const email = personalEmail.trim().toLowerCase();
+
+  const { data, error } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: {
+      onboarding_case_id: caseId,
+      source: "onboarding_portal",
+    },
+  });
+
+  if (!error && data.user?.id) {
+    return data.user.id;
+  }
+
+  const message = error?.message?.toLowerCase() ?? "";
+  const alreadyExists =
+    message.includes("already registered") ||
+    message.includes("already exists") ||
+    message.includes("user already");
+
+  if (alreadyExists) {
+    const existingUserId = await findAuthUserIdByEmail(email);
+    if (!existingUserId) throw new Error(error?.message ?? "Failed to create portal auth user");
+    const { error: updateError } = await admin.auth.admin.updateUserById(existingUserId, {
+      password,
+      email_confirm: true,
+    });
+    if (updateError) throw new Error(updateError.message);
+    return existingUserId;
+  }
+
+  throw new Error(error?.message ?? "Failed to create portal auth user");
+}
+
+export async function getOnboardingPortalAuthUserId(caseId: string): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .schema("hrms")
+    .from("onboarding_portal_accounts")
+    .select("auth_user_id")
+    .eq("case_id", caseId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data?.auth_user_id ?? null;
 }
 
 export async function storePortalOtp(caseId: string, email: string, otp: string) {
@@ -294,13 +361,26 @@ export async function verifyPortalLogin(
   const { data: account, error } = await admin
     .schema("hrms")
     .from("onboarding_portal_accounts")
-    .select("case_id, password_hash, is_active, personal_email")
+    .select("case_id, password_hash, auth_user_id, is_active, personal_email")
     .eq("personal_email", email.trim().toLowerCase())
     .maybeSingle();
 
   if (error || !account || !account.is_active || !account.password_hash) return null;
   const valid = await verifyPassword(password, account.password_hash);
   if (!valid) return null;
+
+  if (!account.auth_user_id) {
+    const authUserId = await provisionPortalAuthUser(
+      account.case_id,
+      account.personal_email,
+      password,
+    );
+    await admin
+      .schema("hrms")
+      .from("onboarding_portal_accounts")
+      .update({ auth_user_id: authUserId, updated_at: new Date().toISOString() })
+      .eq("case_id", account.case_id);
+  }
 
   const { data: caseRow } = await admin
     .schema("hrms")
