@@ -162,8 +162,16 @@ export const leaveApprovalHandler: ApprovalHandler = {
 
     if (error || !data?.length) return [];
 
-    const activeLevel = data[0].approval_level;
-    return data
+    type LeaveApprovalRow = {
+      id: string;
+      approval_level: number;
+      approver_employee_id: string;
+      approval_status: string;
+    };
+
+    const rows = data as LeaveApprovalRow[];
+    const activeLevel = rows[0].approval_level;
+    return rows
       .filter((row) => row.approval_level === activeLevel)
       .map((row) => ({
         employeeId: row.approver_employee_id,

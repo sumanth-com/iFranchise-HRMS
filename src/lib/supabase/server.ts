@@ -5,9 +5,7 @@ import { cache } from "react";
 
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
 
-export type ServerSupabaseClient = ReturnType<typeof createServerClient>;
-
-export const createClient = cache(async function createClient(): Promise<ServerSupabaseClient> {
+async function createSupabaseServerClient() {
   const cookieStore = await cookies();
 
   return createServerClient(getSupabaseUrl(), getSupabaseAnonKey(), {
@@ -26,7 +24,11 @@ export const createClient = cache(async function createClient(): Promise<ServerS
       },
     },
   });
-});
+}
+
+export const createClient = cache(createSupabaseServerClient);
+
+export type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
 export type ServerSession = {
   supabase: ServerSupabaseClient;

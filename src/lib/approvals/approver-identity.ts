@@ -56,8 +56,12 @@ export async function loadApproverIdentity(
     .eq("status", "active")
     .is("deleted_at", null);
 
-  const codes = (roleRows ?? [])
-    .map((row) => unwrap(row.roles as { code: string } | { code: string }[] | null)?.code)
+  type UserRoleRow = {
+    roles: { code: string } | { code: string }[] | null;
+  };
+
+  const codes = ((roleRows ?? []) as UserRoleRow[])
+    .map((row) => unwrap(row.roles)?.code)
     .filter((code): code is string => Boolean(code));
 
   const roleCode =
