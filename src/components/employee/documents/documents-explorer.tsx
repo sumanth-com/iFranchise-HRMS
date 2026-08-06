@@ -234,9 +234,6 @@ export function DocumentsExplorer({ data }: { data: EmployeeDocumentsExplorerDat
 
       {/* Toolbar */}
       <div className="flex items-center justify-end gap-2 rounded-xl border bg-card p-3 shadow-sm">
-        <div className="w-40">
-          <LabeledSelect items={KIND_OPTIONS} value={kind} onValueChange={setKind} />
-        </div>
         <Button
           className="h-9 shrink-0 gap-1.5"
           onClick={() => {

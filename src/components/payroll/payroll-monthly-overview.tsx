@@ -1,30 +1,58 @@
-import { formatPayrollMonthLabel, formatCurrency } from "@/lib/payroll/services/payroll-utils";
+import { LabeledSelect } from "@/components/payroll/payroll-select";
+import { getYearSelectItems } from "@/components/payroll/select-utils";
+import { formatCurrency } from "@/lib/payroll/services/payroll-utils";
 import type { PayrollSummary } from "@/types/payroll";
 
 type PayrollMonthlyOverviewProps = {
   overview: PayrollSummary["monthlyOverview"];
+  year: number;
+  onYearChange?: (year: number) => void;
   compact?: boolean;
 };
 
-export function PayrollMonthlyOverview({ overview, compact = false }: PayrollMonthlyOverviewProps) {
+const yearItems = getYearSelectItems();
+
+export function PayrollMonthlyOverview({
+  overview,
+  year,
+  onYearChange,
+  compact = false,
+}: PayrollMonthlyOverviewProps) {
   const maxNet = Math.max(...overview.map((item) => item.net), 1);
   const yearNet = overview.reduce((sum, item) => sum + item.net, 0);
   const paidMonths = overview.filter((item) => item.status === "paid").length;
 
   return (
     <div className="h-full rounded-xl border bg-card p-5 shadow-sm">
-      <div className="mb-3 flex items-start justify-between gap-4">
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-sm font-semibold">Monthly payroll overview</h2>
           <p className="text-xs text-muted-foreground">
-            Net payroll by month for the selected year
+            Net payroll by month for {year}
           </p>
         </div>
-        <div className="rounded-lg bg-muted/60 px-3 py-2 text-right">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            Year net
-          </p>
-          <p className="text-sm font-semibold">{formatCurrency(yearNet)}</p>
+        <div className="flex flex-wrap items-end gap-3">
+          {onYearChange ? (
+            <div className="min-w-[7rem]">
+              <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Chart year
+              </p>
+              <LabeledSelect
+                items={yearItems}
+                value={String(year)}
+                onValueChange={(value) => {
+                  if (!value) return;
+                  onYearChange(Number.parseInt(value, 10));
+                }}
+              />
+            </div>
+          ) : null}
+          <div className="rounded-lg bg-muted/60 px-3 py-2 text-right">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Year net
+            </p>
+            <p className="text-sm font-semibold">{formatCurrency(yearNet)}</p>
+          </div>
         </div>
       </div>
       <div className="grid grid-cols-12 items-end gap-3">

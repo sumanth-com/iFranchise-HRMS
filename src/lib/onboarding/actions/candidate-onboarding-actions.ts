@@ -2,6 +2,7 @@
 
 import { sendEmail } from "@/lib/email/mailer";
 import { onboardingActionErrorMessage } from "@/lib/onboarding/action-error-message";
+import { onboardingPortalErrorMessage } from "@/lib/onboarding/onboarding-errors";
 import { renderOnboardingOtpEmail } from "@/lib/onboarding/email-templates";
 import {
   getCandidateCaseIdFromSession,
@@ -97,7 +98,10 @@ export async function setupCandidateAccountAction(
 
     return { success: true, message: "Account created" };
   } catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : "Setup failed" };
+    return {
+      success: false,
+      message: onboardingPortalErrorMessage(error, "Account setup failed. Please try again."),
+    };
   }
 }
 

@@ -108,3 +108,83 @@ export function computeLateMinutes(
 
   return diff > 0 ? diff : 0;
 }
+
+export type AttendanceStatusValue =
+  | "present"
+  | "absent"
+  | "half_day"
+  | "late"
+  | "on_leave"
+  | "holiday"
+  | "week_off";
+
+export function validateAttendanceStatusConsistency(input: {
+  attendanceStatus: AttendanceStatusValue;
+  attendanceDate: string;
+  checkInAt: string | null;
+  checkOutAt: string | null;
+  workHours: number;
+  rules: AttendanceRules;
+}): string | null {
+  const { attendanceStatus, checkInAt, checkOutAt, workHours, rules } = input;
+  const hasPunch = Boolean(checkInAt && checkOutAt);
+  const lateMinutes = checkInAt
+    ? computeLateMinutes(checkInAt, input.attendanceDate, rules.lateAfter)
+    : 0;
+
+  if (attendanceStatus === "absent") {
+    if (hasPunch || workHours >= rules.halfDayMinimumHours) {
+      return "Absent status cannot be used when check-in, check-out, or working hours are recorded.";
+    }
+    return null;
+  }
+
+  if (
+    attendanceStatus === "on_leave" ||
+    attendanceStatus === "holiday" ||
+    attendanceStatus === "week_off"
+  ) {
+    return null;
+  }
+
+  if (attendanceStatus === "late") {
+    if (!hasPunch) {
+      return "Late status requires check-in and check-out times.";
+    }
+    if (lateMinutes === 0 && workHours >= rules.fullDayMinimumHours) {
+      return "Late status does not match the entered check-in time and working hours.";
+    }
+    if (workHours < rules.halfDayMinimumHours) {
+      return `Late status requires at least ${rules.halfDayMinimumHours} working hours when punches are recorded.`;
+    }
+    return null;
+  }
+
+  if (attendanceStatus === "present") {
+    if (!hasPunch) {
+      return "Present status requires check-in and check-out times.";
+    }
+    if (workHours < rules.fullDayMinimumHours) {
+      return `Present status requires at least ${rules.fullDayMinimumHours} working hours based on organization rules.`;
+    }
+    if (lateMinutes > 0) {
+      return "Use Late status when check-in is after the allowed time.";
+    }
+    return null;
+  }
+
+  if (attendanceStatus === "half_day") {
+    if (!hasPunch) {
+      return "Half day status requires check-in and check-out times.";
+    }
+    if (workHours >= rules.fullDayMinimumHours) {
+      return "Half day status cannot be used when working hours meet full-day requirements.";
+    }
+    if (workHours > 0 && workHours < rules.halfDayMinimumHours) {
+      return `Half day status requires at least ${rules.halfDayMinimumHours} working hours based on organization rules.`;
+    }
+    return null;
+  }
+
+  return null;
+}

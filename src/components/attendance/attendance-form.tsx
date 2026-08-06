@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -18,6 +18,7 @@ import {
 } from "@/components/common/select";
 import {
   createAttendanceAction,
+  fetchEmployeeDepartmentLabelAction,
   updateAttendanceAction,
 } from "@/lib/attendance/actions";
 import { ATTENDANCE_ROUTES, ATTENDANCE_STATUS_LABELS, attendanceTeamListUrl } from "@/lib/attendance/constants";
@@ -41,6 +42,7 @@ type AttendanceFormProps = {
 export function AttendanceForm({ mode, attendance, lookups }: AttendanceFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [departmentLabel, setDepartmentLabel] = useState<string | null>(null);
 
   const employeeItems = lookups.employees.map((employee) => ({
     value: employee.id,
@@ -67,6 +69,24 @@ export function AttendanceForm({ mode, attendance, lookups }: AttendanceFormProp
       notes: attendance?.notes ?? "",
     },
   });
+
+  const selectedEmployeeId = form.watch("employeeId");
+
+  useEffect(() => {
+    if (!selectedEmployeeId) {
+      setDepartmentLabel(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchEmployeeDepartmentLabelAction(selectedEmployeeId).then((result) => {
+      if (!cancelled && result.success) {
+        setDepartmentLabel(result.data);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedEmployeeId]);
 
   const onSubmit = form.handleSubmit((values) => {
     startTransition(async () => {
@@ -127,6 +147,16 @@ export function AttendanceForm({ mode, attendance, lookups }: AttendanceFormProp
               {form.formState.errors.employeeId.message}
             </p>
           ) : null}
+        </div>
+
+        <div className="space-y-2">
+          <Label>Department</Label>
+          <Input
+            readOnly
+            disabled
+            value={departmentLabel ?? "—"}
+            className="bg-muted/40"
+          />
         </div>
 
         <div className="space-y-2">

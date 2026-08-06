@@ -22,7 +22,7 @@ export function PayslipView({
   canEmail,
   hideActions = false,
 }: PayslipViewProps) {
-  const { handleDownload, handleEmail, isPending, underReview, showDownload, showEmail } =
+  const { handleDownload, handleEmail, isPending, isDownloading, underReview, showDownload, showEmail } =
     usePayslipActions(payslip, { canDownload, canEmail });
 
   return (
@@ -37,9 +37,9 @@ export function PayslipView({
       {!hideActions ? (
         <div className="flex flex-wrap gap-3 print:hidden">
           {showDownload ? (
-            <Button variant="outline" onClick={() => void handleDownload()}>
+            <Button variant="outline" onClick={handleDownload} disabled={isDownloading}>
               <Download className="mr-2 h-4 w-4" />
-              Download PDF
+              {isDownloading ? "Preparing PDF…" : "Download PDF"}
             </Button>
           ) : null}
           {showEmail ? (

@@ -7,6 +7,7 @@ import { AttendanceStatusBadge } from "@/components/attendance/attendance-status
 import { EmployeeSectionCard } from "@/components/employee/dashboard/employee-module-primitives";
 import {
   elapsedWorkingSeconds,
+  formatLateByLabel,
   formatWorkingDuration,
 } from "@/lib/employee/attendance-format";
 import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils";
@@ -77,7 +78,7 @@ export function EmployeeAttendanceWidget({ today }: { today: ManagerTodayAttenda
         <div className="mt-3 flex justify-center">
           <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
             <AlarmClock className="size-3" />
-            Late by {today.lateMinutes} min
+            Late by {formatLateByLabel(today.lateMinutes)}
           </span>
         </div>
       ) : null}

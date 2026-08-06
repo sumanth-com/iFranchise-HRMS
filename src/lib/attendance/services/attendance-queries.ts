@@ -318,6 +318,30 @@ export async function getEmployeeBranchId(
   return data.branch_id;
 }
 
+export async function getEmployeeDepartmentLabel(
+  supabase: AuthSupabaseClient,
+  employeeId: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("employees")
+    .select("departments:department_id (name)")
+    .eq("id", employeeId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const department = data?.departments as { name?: string } | { name?: string }[] | null;
+  if (!department) return null;
+  if (Array.isArray(department)) {
+    return department[0]?.name ?? null;
+  }
+  return department.name ?? null;
+}
+
 export async function attendanceExistsForEmployeeDate(
   supabase: AuthSupabaseClient,
   employeeId: string,

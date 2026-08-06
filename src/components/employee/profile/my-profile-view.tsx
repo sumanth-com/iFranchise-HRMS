@@ -75,7 +75,6 @@ export function MyProfileView({ data }: MyProfileViewProps) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const canSubmitProfile = !data.selfProfileSubmittedAt;
 
   const {
     register,
@@ -114,13 +113,6 @@ export function MyProfileView({ data }: MyProfileViewProps) {
   }
 
   function handleStartEdit() {
-    if (!canSubmitProfile) {
-      toast.message("Profile already submitted", {
-        description:
-          "Your profile details were saved once. Please contact HR if you need further changes.",
-      });
-      return;
-    }
     setIsEditing(true);
   }
 
@@ -177,7 +169,6 @@ export function MyProfileView({ data }: MyProfileViewProps) {
               type="button"
               size="sm"
               variant="outline"
-              disabled={!canSubmitProfile}
               onClick={handleStartEdit}
             >
               <Pencil className="size-4" />
@@ -187,16 +178,15 @@ export function MyProfileView({ data }: MyProfileViewProps) {
         </div>
       </div>
 
-      {!canSubmitProfile && !isEditing ? (
+      {!isEditing ? (
         <p className="text-sm text-muted-foreground">
-          Your profile details have been submitted. Contact your HR team if you need to update
-          employment or personal information again.
+          Update your personal contact details below. Employment information is managed by HR.
         </p>
-      ) : isEditing ? (
+      ) : (
         <p className="text-sm text-muted-foreground">
-          You can save your personal details once. Employment fields are managed by HR.
+          Save your personal details. Employment fields are managed by HR.
         </p>
-      ) : null}
+      )}
 
       <form
         onSubmit={handleSubmit(onSubmit)}
@@ -345,7 +335,12 @@ export function MyProfileView({ data }: MyProfileViewProps) {
               disabled={isPending}
             >
               <SelectTrigger className="h-8 max-w-xs">
-                <SelectValue placeholder="Language" />
+                <SelectValue placeholder="Language">
+                  {(value) =>
+                    LANGUAGE_OPTIONS.find((option) => option.value === value)?.label ??
+                    "Language"
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {LANGUAGE_OPTIONS.map((option) => (

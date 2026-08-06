@@ -9,6 +9,7 @@ import type { z } from "zod";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
+import { formatCurrency } from "@/lib/payroll/services/payroll-utils";
 import { createSalaryStructureAction } from "@/lib/payroll/actions";
 import { salaryStructureFormSchema } from "@/lib/validations/payroll";
 import type { LookupOption } from "@/types/employee";
@@ -76,25 +77,31 @@ export function SalaryStructureForm({ employees }: SalaryStructureFormProps) {
           <Label>Effective from</Label>
           <Input type="date" {...form.register("effectiveFrom")} />
         </div>
-        <NumberField label="Basic salary" {...form.register("basicSalary")} />
-        <NumberField label="HRA" {...form.register("hraAmount")} />
-        <NumberField label="Travel allowance" {...form.register("transportAllowance")} />
-        <NumberField
+        <CurrencyField label="Basic salary" name="basicSalary" form={form} disabled={isPending} />
+        <CurrencyField label="HRA" name="hraAmount" form={form} disabled={isPending} />
+        <CurrencyField label="Travel allowance" name="transportAllowance" form={form} disabled={isPending} />
+        <CurrencyField
           label="Special allowance"
-          {...form.register("components.specialAllowance")}
+          name="components.specialAllowance"
+          form={form}
+          disabled={isPending}
         />
-        <NumberField label="Medical" {...form.register("components.medical")} />
-        <NumberField label="Other allowances" {...form.register("otherAllowances")} />
-        <NumberField label="PF" {...form.register("components.pf")} />
-        <NumberField label="ESI" {...form.register("components.esi")} />
-        <NumberField
+        <CurrencyField label="Medical" name="components.medical" form={form} disabled={isPending} />
+        <CurrencyField label="Other allowances" name="otherAllowances" form={form} disabled={isPending} />
+        <CurrencyField label="PF" name="components.pf" form={form} disabled={isPending} />
+        <CurrencyField label="ESI" name="components.esi" form={form} disabled={isPending} />
+        <CurrencyField
           label="Professional tax"
-          {...form.register("components.professionalTax")}
+          name="components.professionalTax"
+          form={form}
+          disabled={isPending}
         />
-        <NumberField label="Income tax" {...form.register("components.incomeTax")} />
-        <NumberField
+        <CurrencyField label="Income tax" name="components.incomeTax" form={form} disabled={isPending} />
+        <CurrencyField
           label="Other deductions"
-          {...form.register("components.other")}
+          name="components.other"
+          form={form}
+          disabled={isPending}
         />
       </div>
       <Button type="submit" disabled={isPending}>
@@ -104,14 +111,37 @@ export function SalaryStructureForm({ employees }: SalaryStructureFormProps) {
   );
 }
 
-function NumberField({
+function CurrencyField({
   label,
-  ...props
-}: { label: string } & React.ComponentProps<typeof Input>) {
+  name,
+  form,
+  disabled,
+}: {
+  label: string;
+  name: keyof FormValues | "components.specialAllowance" | "components.medical" | "components.pf" | "components.esi" | "components.professionalTax" | "components.incomeTax" | "components.other";
+  form: ReturnType<typeof useForm<FormValues>>;
+  disabled?: boolean;
+}) {
+  const watched = form.watch(name as keyof FormValues);
+  const numericValue = Number(watched ?? 0);
+
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
-      <Input type="number" min={0} step="0.01" {...props} />
+      <div className="relative">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+          ₹
+        </span>
+        <Input
+          type="number"
+          min={0}
+          step="0.01"
+          className="pl-7"
+          disabled={disabled}
+          {...form.register(name as keyof FormValues, { valueAsNumber: true })}
+        />
+      </div>
+      <p className="text-xs text-muted-foreground">{formatCurrency(numericValue)}</p>
     </div>
   );
 }

@@ -49,8 +49,8 @@ async function PayrollContent({
   const teamParams = payrollListParamsSchema.parse({
     page: 1,
     pageSize: 5,
-    month: raw.month ?? now.getMonth() + 1,
-    year: raw.year ?? now.getFullYear(),
+    month: firstString(raw.month) ?? now.getMonth() + 1,
+    year: firstString(raw.year) ?? now.getFullYear(),
   });
 
   const [selfData, summary, recentRuns] = await Promise.all([

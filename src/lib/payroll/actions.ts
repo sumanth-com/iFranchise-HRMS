@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { siteConfig } from "@/config/site";
 import { createClient } from "@/lib/supabase/server";
+import { toUserFriendlyError } from "@/lib/errors/user-messages";
 import {
   requireServerAnyPermission,
   requireServerPermission,
@@ -125,7 +126,7 @@ export async function generatePayrollRunAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to generate payroll",
+      message: toUserFriendlyError(error, "Failed to generate payroll"),
     };
   }
 }

@@ -145,7 +145,7 @@ export function NotificationBell() {
           </Button>
         }
       />
-      <DropdownMenuContent align="end" className="w-96">
+      <DropdownMenuContent align="end" className="w-80 max-h-[min(24rem,70vh)] overflow-y-auto p-0">
         <DropdownMenuLabel className="flex items-center justify-between">
           <span>Notifications</span>
           {data.unreadCount > 0 ? (

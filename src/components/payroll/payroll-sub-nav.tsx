@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { PAYROLL_SUB_NAV } from "@/lib/payroll/constants";
+import { PAYROLL_ROUTES, PAYROLL_SUB_NAV } from "@/lib/payroll/constants";
 import { cn } from "@/lib/utils";
 
 export function PayrollSubNav() {
@@ -11,11 +11,11 @@ export function PayrollSubNav() {
 
   return (
     <nav className="flex flex-wrap gap-1 rounded-lg border bg-card p-1 shadow-sm">
-      {PAYROLL_SUB_NAV.map((item) => {
-        const isActive =
-          item.href === PAYROLL_SUB_NAV[0].href
-            ? pathname === item.href
-            : pathname === item.href || pathname.startsWith(`${item.href}/`);
+      {PAYROLL_SUB_NAV.map((item, index) => {
+        const isDashboard = index === 0;
+        const isActive = isDashboard
+          ? pathname === "/dashboard/payroll" || pathname === PAYROLL_ROUTES.dashboard
+          : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
         return (
           <Link

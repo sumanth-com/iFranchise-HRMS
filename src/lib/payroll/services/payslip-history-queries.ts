@@ -4,7 +4,7 @@ import {
   resolvePayslipAvailability,
   resolvePayslipSchedule,
 } from "@/lib/payroll/services/payslip-publication";
-import { getPayrollMonthDate } from "@/lib/payroll/services/payroll-utils";
+import { getPayrollMonthDate, parsePayrollMonthSearch } from "@/lib/payroll/services/payroll-utils";
 import { payslipHistoryParamsSchema } from "@/lib/validations/payroll";
 import type { UserProfile } from "@/types/auth";
 import type {
@@ -158,22 +158,43 @@ export async function listPayslipHistory(
     query = query.is("archived_at", null);
   }
 
-  if (month && yearResolved.year) {
-    query = query.eq("payrolls.payroll_month", getPayrollMonthDate(month, yearResolved.year));
-  } else if (yearResolved.year) {
-    const start = `${yearResolved.year}-01-01`;
-    const end = `${yearResolved.year}-12-01`;
+  let filterMonth = month;
+  let filterYear = yearResolved.year;
+  let payslipNumberTerm: string | undefined;
+
+  if (search) {
+    const parsedSearch = parsePayrollMonthSearch(search);
+    if (parsedSearch?.month) {
+      filterMonth = parsedSearch.month;
+    }
+    if (parsedSearch?.year) {
+      filterYear = parsedSearch.year;
+    }
+    if (
+      parsedSearch?.payslipNumber &&
+      !parsedSearch.month &&
+      !parsedSearch.year
+    ) {
+      payslipNumberTerm = parsedSearch.payslipNumber;
+    }
+  }
+
+  if (filterMonth && filterYear) {
+    query = query.eq(
+      "payrolls.payroll_month",
+      getPayrollMonthDate(filterMonth, filterYear),
+    );
+  } else if (filterYear) {
+    const start = `${filterYear}-01-01`;
+    const end = `${filterYear}-12-01`;
     query = query.gte("payrolls.payroll_month", start).lte("payrolls.payroll_month", end);
-  } else if (month) {
-    const monthStr = String(month).padStart(2, "0");
+  } else if (filterMonth) {
+    const monthStr = String(filterMonth).padStart(2, "0");
     query = query.like("payrolls.payroll_month", `%-${monthStr}-%`);
   }
 
-  if (search) {
-    const term = search.trim();
-    query = query.or(
-      `payslip_number.ilike.%${term}%,payrolls.payroll_month.ilike.%${term}%`,
-    );
+  if (payslipNumberTerm) {
+    query = query.ilike("payslip_number", `%${payslipNumberTerm}%`);
   }
 
   query = query.range(from, to);
@@ -263,23 +284,21 @@ export async function listPayslipHistory(
       statsQuery = statsQuery.eq("employee_id", employeeScope);
     }
     if (!includeArchived) statsQuery = statsQuery.is("archived_at", null);
-    if (month && yearResolved.year) {
+    if (filterMonth && filterYear) {
       statsQuery = statsQuery.eq(
         "payrolls.payroll_month",
-        getPayrollMonthDate(month, yearResolved.year),
+        getPayrollMonthDate(filterMonth, filterYear),
       );
-    } else if (yearResolved.year) {
+    } else if (filterYear) {
       statsQuery = statsQuery
-        .gte("payrolls.payroll_month", `${yearResolved.year}-01-01`)
-        .lte("payrolls.payroll_month", `${yearResolved.year}-12-01`);
-    } else if (month) {
-      const monthStr = String(month).padStart(2, "0");
+        .gte("payrolls.payroll_month", `${filterYear}-01-01`)
+        .lte("payrolls.payroll_month", `${filterYear}-12-01`);
+    } else if (filterMonth) {
+      const monthStr = String(filterMonth).padStart(2, "0");
       statsQuery = statsQuery.like("payrolls.payroll_month", `%-${monthStr}-%`);
     }
-    if (search) {
-      statsQuery = statsQuery.or(
-        `payslip_number.ilike.%${search.trim()}%,payrolls.payroll_month.ilike.%${search.trim()}%`,
-      );
+    if (payslipNumberTerm) {
+      statsQuery = statsQuery.ilike("payslip_number", `%${payslipNumberTerm}%`);
     }
 
     const { data: statsRows } = await statsQuery.order("issued_at", { ascending: false });

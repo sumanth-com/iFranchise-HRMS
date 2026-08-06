@@ -4,7 +4,7 @@ type NotificationCenterPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-const CENTER_TABS = new Set(["all", "unread", "read", "archived"]);
+const CENTER_TABS = new Set(["all", "unread"]);
 
 export default async function NotificationCenterPage({
   searchParams,

@@ -37,6 +37,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils";
+import { formatLateByLabel } from "@/lib/employee/attendance-format";
 import type { CorrectionStatus, TeamAttendanceListItem } from "@/types/manager-attendance";
 import { cn } from "@/lib/utils";
 
@@ -81,7 +82,7 @@ function AttentionFlags({ record }: { record: TeamAttendanceListItem }) {
   const flags = [
     record.monitoring.isLate
       ? record.lateMinutes > 0
-        ? `Late by ${record.lateMinutes} min`
+        ? `Late by ${formatLateByLabel(record.lateMinutes)}`
         : "Late arrival"
       : null,
     record.monitoring.isEarlyExit ? "Early exit" : null,

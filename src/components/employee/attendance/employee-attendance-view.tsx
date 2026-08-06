@@ -9,7 +9,6 @@ import { buttonVariants } from "@/components/common/button";
 import { EmployeeAttendanceHistoryTable } from "@/components/employee/attendance/employee-attendance-history-table";
 import { EmployeeAttendanceTodayCard } from "@/components/employee/attendance/employee-attendance-today-card";
 import { ManagerAttendanceCalendar } from "@/components/manager/profile/manager-attendance-calendar";
-import { ManagerProfileIdCard } from "@/components/manager/profile/manager-profile-id-card";
 import { ManagerProfileSummaryCards } from "@/components/manager/profile/manager-profile-summary-cards";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { cn } from "@/lib/utils";
@@ -107,6 +106,7 @@ export function EmployeeAttendanceView({
           month={data.month}
           year={data.year}
           selectedDate={selectedDate}
+          disableFuture
           onMonthChange={(month, year) =>
             pushParams({ month, year, date: selectedDate, status, searchDate })
           }
@@ -121,15 +121,10 @@ export function EmployeeAttendanceView({
             });
           }}
         />
-        <div className="flex h-full min-h-[28rem] w-full justify-center xl:justify-end">
-          <ManagerProfileIdCard
-            profile={data.profileCard}
-            className="h-full min-h-[28rem] w-full max-w-[18.5rem]"
-          />
+        <div className="flex h-full min-h-[28rem] w-full xl:max-w-[18.5rem]">
+          <ManagerProfileSummaryCards summary={data.summary} layout="sidebar" className="w-full" />
         </div>
       </div>
-
-      <ManagerProfileSummaryCards summary={data.summary} />
 
       <EmployeeAttendanceHistoryTable
         history={data.history}

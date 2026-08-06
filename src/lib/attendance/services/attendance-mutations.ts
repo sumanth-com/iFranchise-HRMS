@@ -1,10 +1,13 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
 import type { AttendanceFormInput } from "@/lib/validations/attendance";
+import { toUserFriendlyError } from "@/lib/errors/user-messages";
 import {
   combineDateAndTime,
   computeWorkHours,
+  validateAttendanceStatusConsistency,
 } from "@/lib/attendance/services/attendance-utils";
+import { getOrganizationAttendanceRules } from "@/lib/attendance/services/attendance-detail";
 import {
   attendanceExistsForEmployeeDate,
   getEmployeeBranchId,
@@ -43,6 +46,29 @@ function buildAttendancePayload(
   };
 }
 
+async function assertAttendanceStatusValid(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  input: AttendanceFormInput,
+) {
+  const rules = await getOrganizationAttendanceRules(supabase, organizationId);
+  const checkInAt = combineDateAndTime(input.attendanceDate, input.checkInAt);
+  const checkOutAt = combineDateAndTime(input.attendanceDate, input.checkOutAt);
+  const workHours = computeWorkHours(checkInAt, checkOutAt);
+  const message = validateAttendanceStatusConsistency({
+    attendanceStatus: input.attendanceStatus,
+    attendanceDate: input.attendanceDate,
+    checkInAt,
+    checkOutAt,
+    workHours,
+    rules,
+  });
+
+  if (message) {
+    throw new Error(message);
+  }
+}
+
 export async function createAttendance(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -57,6 +83,12 @@ export async function createAttendance(
   if (duplicate) {
     throw new Error("Attendance already exists for this employee on the selected date");
   }
+
+  await assertAttendanceStatusValid(
+    supabase,
+    profile.employee.organizationId,
+    input,
+  );
 
   const branchId = await getEmployeeBranchId(supabase, input.employeeId);
   const payload = buildAttendancePayload(
@@ -100,6 +132,12 @@ export async function updateAttendance(
     throw new Error("Attendance already exists for this employee on the selected date");
   }
 
+  await assertAttendanceStatusValid(
+    supabase,
+    profile.employee.organizationId,
+    input,
+  );
+
   const branchId = await getEmployeeBranchId(supabase, input.employeeId);
   const payload = buildAttendancePayload(
     input,
@@ -137,24 +175,18 @@ export async function updateAttendance(
 
 export async function softDeleteAttendance(
   supabase: AuthSupabaseClient,
-  profile: UserProfile,
+  _profile: UserProfile,
   attendanceId: string,
 ): Promise<void> {
-  const now = new Date().toISOString();
-
-  const { error } = await supabase
-    .schema("hrms")
-    .from("attendance")
-    .update({
-      status: "inactive",
-      deleted_at: now,
-      updated_by: profile.userId,
-    })
-    .eq("id", attendanceId)
-    .eq("organization_id", profile.employee.organizationId)
-    .is("deleted_at", null);
+  const { data, error } = await supabase.schema("hrms").rpc("soft_delete_attendance", {
+    p_attendance_id: attendanceId,
+  });
 
   if (error) {
-    throw new Error(error.message);
+    throw new Error(toUserFriendlyError(error, "Failed to delete attendance"));
+  }
+
+  if (!data) {
+    throw new Error("Attendance record not found or has already been deleted.");
   }
 }

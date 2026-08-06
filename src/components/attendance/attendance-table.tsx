@@ -379,6 +379,17 @@ export function AttendanceTable({
         ),
       },
       {
+        id: "overtimeHours",
+        header: "Overtime",
+        cell: ({ row }) => (
+          <span className="tabular-nums">
+            {row.original.overtimeHours > 0
+              ? `${row.original.overtimeHours.toFixed(2)}h`
+              : "—"}
+          </span>
+        ),
+      },
+      {
         id: "attendanceStatus",
         header: "Status",
         cell: ({ row }) => (
@@ -529,6 +540,7 @@ export function AttendanceTable({
                 <Input
                   type="date"
                   value={dateFrom ?? ""}
+                  max={today}
                   data-empty={!dateFrom}
                   className={DATE_INPUT_CLASS}
                   title="From date"
@@ -543,6 +555,7 @@ export function AttendanceTable({
                 <Input
                   type="date"
                   value={dateTo ?? ""}
+                  max={today}
                   data-empty={!dateTo}
                   className={DATE_INPUT_CLASS}
                   title="To date"

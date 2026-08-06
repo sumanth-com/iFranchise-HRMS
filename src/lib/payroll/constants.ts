@@ -201,7 +201,7 @@ export function canApproveReimbursement(codes: string[]) {
 }
 
 export const PAYROLL_SUB_NAV = [
-  { title: "Dashboard", href: PAYROLL_ROUTES.dashboard },
+  { title: "Dashboard", href: payrollTeamListUrl() },
   { title: "Run Payroll", href: PAYROLL_ROUTES.run },
   { title: "Salary Structure", href: PAYROLL_ROUTES.salaryStructures },
   { title: "Payroll History", href: PAYROLL_ROUTES.history },

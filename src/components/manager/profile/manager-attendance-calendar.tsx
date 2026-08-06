@@ -55,6 +55,7 @@ type Props = {
   onMonthChange: (month: number, year: number) => void;
   onSelectDate: (date: string) => void;
   className?: string;
+  disableFuture?: boolean;
 };
 
 export function ManagerAttendanceCalendar({
@@ -65,11 +66,21 @@ export function ManagerAttendanceCalendar({
   onMonthChange,
   onSelectDate,
   className,
+  disableFuture = false,
 }: Props) {
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+
   const yearOptions = useMemo(() => {
     const current = new Date().getFullYear();
-    return Array.from({ length: 6 }, (_, index) => current - 2 + index);
-  }, []);
+    const maxYear = disableFuture ? current : current + 2;
+    const startYear = current - 2;
+    return Array.from(
+      { length: maxYear - startYear + 1 },
+      (_, index) => startYear + index,
+    );
+  }, [disableFuture]);
 
   const monthLabel = format(new Date(year, month - 1, 1), "MMMM yyyy");
 
@@ -84,8 +95,20 @@ export function ManagerAttendanceCalendar({
       direction === 1
         ? addMonths(new Date(year, month - 1, 1), 1)
         : subMonths(new Date(year, month - 1, 1), 1);
+    if (
+      disableFuture &&
+      (next.getFullYear() > currentYear ||
+        (next.getFullYear() === currentYear && next.getMonth() + 1 > currentMonth))
+    ) {
+      return;
+    }
     onMonthChange(next.getMonth() + 1, next.getFullYear());
   }
+
+  const canGoForward =
+    !disableFuture ||
+    year < currentYear ||
+    (year === currentYear && month < currentMonth);
 
   const dayMap = useMemo(() => {
     const map = new Map<string, ManagerAttendanceCalendarDay>();
@@ -184,11 +207,22 @@ export function ManagerAttendanceCalendar({
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {Array.from({ length: 12 }, (_, index) => (
-                <SelectItem key={index + 1} value={String(index + 1)}>
-                  {format(new Date(2026, index, 1), "MMMM")}
-                </SelectItem>
-              ))}
+              {Array.from({ length: 12 }, (_, index) => {
+                const monthValue = index + 1;
+                const isFutureMonth =
+                  disableFuture &&
+                  year === currentYear &&
+                  monthValue > currentMonth;
+                return (
+                  <SelectItem
+                    key={monthValue}
+                    value={String(monthValue)}
+                    disabled={isFutureMonth}
+                  >
+                    {format(new Date(2026, index, 1), "MMMM")}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
           <Button
@@ -205,6 +239,7 @@ export function ManagerAttendanceCalendar({
             size="icon"
             className="size-8 shrink-0"
             onClick={() => shiftMonth(1)}
+            disabled={!canGoForward}
             aria-label="Next month"
           >
             <ChevronRight className="size-4" />

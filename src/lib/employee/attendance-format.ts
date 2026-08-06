@@ -8,12 +8,26 @@ export function formatHoursLabel(hours: number) {
   return `${wholeHours}h ${minutes}m`;
 }
 
-/** Seconds -> "7h 05m". */
+/** Seconds -> "0h 0m" / "7h 5m". */
 export function formatWorkingDuration(seconds: number) {
   const safe = Math.max(0, Math.floor(seconds));
   const hours = Math.floor(safe / 3600);
   const minutes = Math.floor((safe % 3600) / 60);
-  return `${hours}h ${String(minutes).padStart(2, "0")}m`;
+  return `${hours}h ${minutes}m`;
+}
+
+/** Minutes late -> "1h 1m", "45m", etc. */
+export function formatLateByLabel(totalMinutes: number) {
+  const safe = Math.max(0, Math.floor(totalMinutes));
+  const hours = Math.floor(safe / 60);
+  const minutes = safe % 60;
+  if (hours > 0 && minutes > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  if (hours > 0) {
+    return `${hours}h`;
+  }
+  return `${minutes}m`;
 }
 
 /** Elapsed working seconds between check-in and (checkout or now). */

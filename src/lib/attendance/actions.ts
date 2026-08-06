@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
+import { toUserFriendlyError } from "@/lib/errors/user-messages";
 import { requireServerPermission } from "@/lib/permissions/server";
 import { ATTENDANCE_ROUTES, SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
 import { getAttendanceById } from "@/lib/attendance/services/attendance-detail";
@@ -13,6 +14,7 @@ import {
 } from "@/lib/attendance/services/attendance-mutations";
 import {
   getAttendanceLookups,
+  getEmployeeDepartmentLabel,
   getAttendanceSummary,
   listAttendance,
 } from "@/lib/attendance/services/attendance-queries";
@@ -166,8 +168,23 @@ export async function deleteAttendanceAction(
   } catch (error) {
     return {
       success: false,
-      message:
-        error instanceof Error ? error.message : "Failed to delete attendance",
+      message: toUserFriendlyError(error, "Failed to delete attendance"),
+    };
+  }
+}
+
+export async function fetchEmployeeDepartmentLabelAction(
+  employeeId: string,
+): Promise<AttendanceActionResult<string | null>> {
+  try {
+    const profile = await requireServerPermission("attendance.view");
+    const supabase = await getAuthenticatedSupabase();
+    const label = await getEmployeeDepartmentLabel(supabase, employeeId);
+    return { success: true, data: label };
+  } catch (error) {
+    return {
+      success: false,
+      message: toUserFriendlyError(error, "Failed to load employee department"),
     };
   }
 }

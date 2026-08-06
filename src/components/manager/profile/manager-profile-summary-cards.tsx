@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 type Props = {
   summary: ManagerAttendanceMonthSummary;
   className?: string;
+  /** Sidebar stack beside calendar (My Attendance). Default is a responsive grid row. */
+  layout?: "grid" | "sidebar";
 };
 
 const CARDS: {
@@ -21,7 +23,7 @@ const CARDS: {
   {
     key: "absent",
     label: "Absent",
-    hint: "Missed working days",
+    hint: "Missed days",
   },
   {
     key: "late",
@@ -36,11 +38,19 @@ const CARDS: {
   },
 ];
 
-export function ManagerProfileSummaryCards({ summary, className }: Props) {
+export function ManagerProfileSummaryCards({
+  summary,
+  className,
+  layout = "grid",
+}: Props) {
+  const isSidebar = layout === "sidebar";
+
   return (
     <section
       className={cn(
-        "grid grid-cols-2 gap-3 lg:grid-cols-4",
+        isSidebar
+          ? "flex h-full min-h-[28rem] flex-col gap-3"
+          : "grid grid-cols-2 gap-3 lg:grid-cols-4",
         className,
       )}
     >
@@ -53,7 +63,10 @@ export function ManagerProfileSummaryCards({ summary, className }: Props) {
         return (
           <div
             key={card.key}
-            className="rounded-2xl border bg-card px-5 py-4 shadow-sm"
+            className={cn(
+              "rounded-2xl border bg-card px-5 py-4 shadow-sm",
+              isSidebar && "flex flex-1 flex-col justify-center min-h-[5.25rem]",
+            )}
           >
             <p className="text-xs font-medium text-muted-foreground">
               {card.label}

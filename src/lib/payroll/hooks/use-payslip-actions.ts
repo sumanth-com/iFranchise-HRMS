@@ -13,25 +13,28 @@ type Options = {
 
 export function usePayslipActions(payslip: PayslipDetail, { canDownload, canEmail }: Options) {
   const [isPending, startTransition] = useTransition();
+  const [isDownloading, startDownload] = useTransition();
   const underReview = payslip.availability === "under_review" && !canDownload;
 
-  async function handleDownload() {
-    try {
-      const response = await fetch(`/api/payslips/${payslip.id}/pdf`);
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-        throw new Error(payload?.message ?? "Failed to generate payslip PDF");
+  function handleDownload() {
+    startDownload(async () => {
+      try {
+        const response = await fetch(`/api/payslips/${payslip.id}/pdf`);
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+          throw new Error(payload?.message ?? "Failed to generate payslip PDF");
+        }
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `Payslip-${payslip.payslipNumber}.pdf`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to download payslip");
       }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `Payslip-${payslip.payslipNumber}.pdf`;
-      anchor.click();
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to download payslip");
-    }
+    });
   }
 
   function handleEmail() {
@@ -49,6 +52,7 @@ export function usePayslipActions(payslip: PayslipDetail, { canDownload, canEmai
     handleDownload,
     handleEmail,
     isPending,
+    isDownloading,
     underReview,
     showDownload: canDownload && !underReview,
     showEmail: canEmail && !underReview,

@@ -325,6 +325,16 @@ export async function generatePayrollRun(
     throw new Error("Payroll for this month is locked and cannot be regenerated.");
   }
 
+  if (
+    existing &&
+    existing.payroll_status !== "draft" &&
+    existing.payroll_status !== "processing"
+  ) {
+    throw new Error(
+      "Payroll for the selected period has already been generated. Open Payroll History to review the existing run.",
+    );
+  }
+
   let payrollId = existing?.id;
 
   if (!payrollId) {
@@ -363,11 +373,17 @@ export async function generatePayrollRun(
 
     if (updateError) throw new Error(updateError.message);
 
-    await supabase
+    const { error: deleteItemsError } = await supabase
       .schema("hrms")
       .from("payroll_items")
       .delete()
       .eq("payroll_id", payrollId);
+
+    if (deleteItemsError) {
+      throw new Error(
+        "Payroll for the selected period has already been generated and cannot be regenerated while payslips exist.",
+      );
+    }
   }
 
   const employees = await getActiveEmployees(supabase, organizationId);
@@ -394,7 +410,14 @@ export async function generatePayrollRun(
       updated_by: profile.userId,
     });
 
-    if (itemError) throw new Error(itemError.message);
+    if (itemError) {
+      if (itemError.code === "23505") {
+        throw new Error(
+          "Payroll for the selected period has already been generated. Open Payroll History to review the existing run.",
+        );
+      }
+      throw new Error(itemError.message);
+    }
   }
 
   const month = input.month;

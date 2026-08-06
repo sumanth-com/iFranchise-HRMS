@@ -255,28 +255,77 @@ export async function ensurePortalAccountForInvitation(caseId: string, email: st
 export async function storePortalPassword(caseId: string, email: string, password: string) {
   const admin = createAdminClient();
   const passwordHash = await hashPassword(password);
-  const authUserId = await provisionPortalAuthUser(caseId, email, password);
-  const { error } = await admin.schema("hrms").from("onboarding_portal_accounts").upsert(
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const { error: baseError } = await admin.schema("hrms").from("onboarding_portal_accounts").upsert(
     {
       case_id: caseId,
-      personal_email: email.toLowerCase(),
+      personal_email: normalizedEmail,
       password_hash: passwordHash,
-      auth_user_id: authUserId,
       is_active: true,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "case_id" },
   );
-  if (error) throw new Error(error.message);
+  if (baseError) throw new Error(baseError.message);
+
+  try {
+    const authUserId = await provisionPortalAuthUser(caseId, normalizedEmail, password);
+    await linkPortalAuthUserId(caseId, authUserId);
+  } catch (authError) {
+    // Portal login still works via password_hash; auth user links main portal after migration.
+    console.error("[onboarding] auth user provisioning:", authError);
+  }
+}
+
+async function linkPortalAuthUserId(caseId: string, authUserId: string): Promise<void> {
+  const admin = createAdminClient();
+  const { error } = await admin
+    .schema("hrms")
+    .from("onboarding_portal_accounts")
+    .update({
+      auth_user_id: authUserId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("case_id", caseId);
+
+  if (!error) return;
+
+  const msg = error.message.toLowerCase();
+  if (msg.includes("auth_user_id") && (msg.includes("schema cache") || msg.includes("column"))) {
+    return;
+  }
+  throw new Error(error.message);
 }
 
 async function findAuthUserIdByEmail(email: string): Promise<string | null> {
   const admin = createAdminClient();
-  const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  if (error) throw new Error(error.message);
   const normalized = email.trim().toLowerCase();
-  const match = data.users.find((user) => user.email?.toLowerCase() === normalized);
-  return match?.id ?? null;
+
+  const { data: rpcId, error: rpcError } = await admin
+    .schema("hrms")
+    .rpc("find_auth_user_id_by_email", { p_email: normalized });
+
+  if (!rpcError && rpcId) {
+    return rpcId as string;
+  }
+
+  if (rpcError && !rpcError.message.toLowerCase().includes("find_auth_user_id_by_email")) {
+    // Function missing — fall back to paginated list.
+  }
+
+  let page = 1;
+  const perPage = 1000;
+  while (page <= 10) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
+    if (error) throw new Error(error.message);
+    const match = data.users.find((user) => user.email?.toLowerCase() === normalized);
+    if (match?.id) return match.id;
+    if (data.users.length < perPage) break;
+    page += 1;
+  }
+
+  return null;
 }
 
 /** Creates (or updates) a Supabase auth user so onboarding password works on the main portal later. */
@@ -310,16 +359,28 @@ export async function provisionPortalAuthUser(
 
   if (alreadyExists) {
     const existingUserId = await findAuthUserIdByEmail(email);
-    if (!existingUserId) throw new Error(error?.message ?? "Failed to create portal auth user");
+    if (!existingUserId) {
+      throw new Error(
+        "This email is already registered. Sign in with your password below, or contact HR for assistance.",
+      );
+    }
     const { error: updateError } = await admin.auth.admin.updateUserById(existingUserId, {
       password,
       email_confirm: true,
+      user_metadata: {
+        onboarding_case_id: caseId,
+        source: "onboarding_portal",
+      },
     });
     if (updateError) throw new Error(updateError.message);
     return existingUserId;
   }
 
-  throw new Error(error?.message ?? "Failed to create portal auth user");
+  throw new Error(
+    error?.message?.includes("already")
+      ? "This email is already registered. Sign in with your password below, or contact HR for assistance."
+      : (error?.message ?? "Failed to create portal auth user"),
+  );
 }
 
 export async function getOnboardingPortalAuthUserId(caseId: string): Promise<string | null> {
@@ -370,16 +431,16 @@ export async function verifyPortalLogin(
   if (!valid) return null;
 
   if (!account.auth_user_id) {
-    const authUserId = await provisionPortalAuthUser(
-      account.case_id,
-      account.personal_email,
-      password,
-    );
-    await admin
-      .schema("hrms")
-      .from("onboarding_portal_accounts")
-      .update({ auth_user_id: authUserId, updated_at: new Date().toISOString() })
-      .eq("case_id", account.case_id);
+    try {
+      const authUserId = await provisionPortalAuthUser(
+        account.case_id,
+        account.personal_email,
+        password,
+      );
+      await linkPortalAuthUserId(account.case_id, authUserId);
+    } catch {
+      // Password hash login still valid for onboarding portal.
+    }
   }
 
   const { data: caseRow } = await admin

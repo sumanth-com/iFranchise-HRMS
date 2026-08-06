@@ -52,6 +52,14 @@ export const attendanceListParamsSchema = z.object({
     dateFrom = dateTo;
   }
 
+  if (dateFrom && dateFrom > today) {
+    dateFrom = today;
+  }
+
+  if (dateTo && dateTo > today) {
+    dateTo = today;
+  }
+
   if (dateFrom && dateTo && dateFrom > dateTo) {
     return {
       ...value,

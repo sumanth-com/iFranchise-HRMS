@@ -835,21 +835,15 @@ export async function updateEmployeeSelfProfileAction(
       throw new Error(profileRowError.message);
     }
 
-    if (profileRow?.self_profile_submitted_at) {
-      return {
-        success: false,
-        message:
-          "Your profile has already been submitted. Please contact HR if you need further changes.",
-      };
-    }
-
     await updateEmployeeSelfProfile(supabase, profile, parsed, existing);
+
+    const submittedAt = profileRow?.self_profile_submitted_at ?? new Date().toISOString();
 
     const { error: submitError } = await supabase
       .schema("hrms")
       .from("employee_profiles")
       .update({
-        self_profile_submitted_at: new Date().toISOString(),
+        self_profile_submitted_at: submittedAt,
         updated_by: profile.userId,
       })
       .eq("employee_id", profile.employee.id)

@@ -67,9 +67,12 @@ export const NOTIFICATIONS_SUB_NAV = [
   { title: "My Notifications", href: "/dashboard/notifications?tab=my" },
   { title: "Alerts & Broadcasts", href: "/dashboard/notifications?tab=team", admin: true },
   { title: "History", href: NOTIFICATIONS_ROUTES.history },
-  { title: "Templates", href: NOTIFICATIONS_ROUTES.templates, admin: true },
-  { title: "Settings", href: NOTIFICATIONS_ROUTES.settings, admin: true },
   { title: "Preferences", href: NOTIFICATIONS_ROUTES.preferences },
+] as const;
+
+export const NOTIFICATION_CENTER_TABS = [
+  { value: "all", label: "All" },
+  { value: "unread", label: "Unread" },
 ] as const;
 
 export const NOTIFICATION_VIEW_PERMISSIONS = [
@@ -108,13 +111,6 @@ export const NOTIFICATION_PRIORITIES: { value: NotificationPriority; label: stri
   { value: "high", label: "High" },
   { value: "critical", label: "Critical" },
 ];
-
-export const NOTIFICATION_CENTER_TABS = [
-  { value: "all", label: "All" },
-  { value: "unread", label: "Unread" },
-  { value: "read", label: "Read" },
-  { value: "archived", label: "Archived" },
-] as const;
 
 export type NotificationCenterTab = (typeof NOTIFICATION_CENTER_TABS)[number]["value"];
 
