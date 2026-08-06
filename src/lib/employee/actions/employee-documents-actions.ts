@@ -137,3 +137,37 @@ export async function employeeGetDocumentUrlAction(storagePath: string) {
     };
   }
 }
+
+export async function employeeDownloadDocumentAction(storagePath: string, fileName: string) {
+  try {
+    const profile = await requireServerAnyPermission([
+      PORTAL_PERMISSIONS.employee,
+      "documents.view",
+    ]);
+    const supabase = await createClient();
+
+    assertOrganizationStoragePath(storagePath, profile.employee.organizationId);
+
+    const { data: doc, error } = await fromHrms(supabase, "employee_documents")
+      .select("id, storage_path, file_name, employee_id")
+      .eq("storage_path", storagePath)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    if (!doc || doc.employee_id !== profile.employee.id) {
+      return { success: false as const, message: "Document not found" };
+    }
+
+    const admin = createAdminClient();
+    const downloadName = fileName.trim() || (doc.file_name as string) || "document";
+    const url = await createSignedDocumentUrl(admin, storagePath, { download: downloadName });
+    if (!url) return { success: false as const, message: "Unable to download this file" };
+    return { success: true as const, data: url };
+  } catch (error) {
+    return {
+      success: false as const,
+      message: error instanceof Error ? error.message : "Failed to download file",
+    };
+  }
+}

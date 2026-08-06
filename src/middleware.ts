@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { AUTH_ROUTES, PUBLIC_ROUTES } from "@/lib/auth/constants";
 import {
   attachPermissionCache,
-  getCachedPermissionCodes,
+  getCachedPermissionPayload,
 } from "@/lib/auth/permission-cache";
 import {
   resolveUserPermissionCodes,
@@ -15,6 +15,7 @@ import {
   getPortalRedirectPath,
   normalizePortalRoute,
 } from "@/lib/auth/portals";
+import { HR_PORTAL_HOME } from "@/lib/auth/portal-paths";
 import { SYSTEM_ADMIN_PERMISSION } from "@/lib/system-admin/constants";
 import { isSystemAdminPath } from "@/lib/system-admin/paths";
 import { updateSession } from "@/lib/supabase/middleware";
@@ -39,6 +40,13 @@ function isNavigationPrefetch(request: NextRequest) {
 export async function middleware(request: NextRequest) {
   const { supabase, supabaseResponse, user } = await updateSession(request);
   const { pathname, searchParams } = request.nextUrl;
+
+  if (pathname === "/" || pathname === "/settings") {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = HR_PORTAL_HOME;
+    redirectUrl.search = "";
+    return NextResponse.redirect(redirectUrl);
+  }
 
   if (pathname === "/executive" || pathname.startsWith("/executive/")) {
     const redirectUrl = request.nextUrl.clone();
@@ -84,15 +92,18 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
-  let cachedPermissionCodes: string[] | null = null;
+  let cachedPermissionPayload: Awaited<ReturnType<typeof getCachedPermissionPayload>> = null;
   try {
-    cachedPermissionCodes = await getCachedPermissionCodes(request, user.id);
+    cachedPermissionPayload = await getCachedPermissionPayload(request, user.id);
   } catch (error) {
     console.error("[middleware] permission cache read failed", error);
   }
 
-  if (cachedPermissionCodes) {
-    const accountAllowed = await userAccountAllowsPortalAccess(supabase, user.id);
+  if (cachedPermissionPayload) {
+    const cachedPermissionCodes = cachedPermissionPayload.codes;
+    const accountAllowed =
+      cachedPermissionPayload.accountAllowed ??
+      await userAccountAllowsPortalAccess(supabase, user.id);
     if (!accountAllowed) {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = AUTH_ROUTES.login;
@@ -136,7 +147,7 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    await attachPermissionCache(supabaseResponse, user.id, permissionCodes);
+    await attachPermissionCache(supabaseResponse, user.id, permissionCodes, accountAllowed);
   } catch (error) {
     console.error("[middleware] permission cache attach failed", error);
   }

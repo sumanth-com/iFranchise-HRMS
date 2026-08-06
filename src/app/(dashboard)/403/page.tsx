@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ShieldX } from "lucide-react";
 
+import { HR_PORTAL_HOME } from "@/lib/auth/portal-paths";
 import { buttonVariants } from "@/components/common/button";
 import { PageScroll } from "@/components/common/sticky-layout";
 import { cn } from "@/lib/utils";
@@ -20,7 +21,7 @@ export default function UnauthorizedPage() {
           </p>
         </div>
         <div className="flex gap-3">
-          <Link href="/" className={cn(buttonVariants({ variant: "default" }))}>
+          <Link href={HR_PORTAL_HOME} className={cn(buttonVariants({ variant: "default" }))}>
             Go to dashboard
           </Link>
           <Link

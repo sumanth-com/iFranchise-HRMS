@@ -5,6 +5,7 @@ import { safeServerCall } from "@/lib/errors/safe-server";
 import {
   getEmployeeLeaveBalanceSnapshot,
   getEmployeeLeaveCalendarData,
+  getLeaveLookups,
   listEmployeeOwnLeaveRequests,
 } from "@/lib/leave/services/leave-queries";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
@@ -18,12 +19,13 @@ export default async function EmployeeLeavePage() {
   ]);
   const supabase = await createClient();
   const employeeId = profile.employee.id;
+  const canApply = hasPermission(profile.permissionCodes, "leave.create");
 
   const now = new Date();
   const calendarMonth = now.getMonth() + 1;
   const calendarYear = now.getFullYear();
 
-  const [balances, requests, calendar] = await Promise.all([
+  const [balances, requests, calendar, applyLookups] = await Promise.all([
     safeServerCall(
       () => getEmployeeLeaveBalanceSnapshot(supabase, employeeId),
       [],
@@ -39,14 +41,30 @@ export default async function EmployeeLeavePage() {
       { leaves: [], holidays: [] },
       "[employee/leave] calendar",
     ),
+    canApply
+      ? safeServerCall(
+          () => getLeaveLookups(supabase, profile.employee.organizationId),
+          {
+            leaveTypes: [],
+            departments: [],
+            branches: [],
+            employees: [],
+            managers: [],
+            approvers: [],
+            employmentTypes: [],
+          },
+          "[employee/leave] apply lookups",
+        )
+      : Promise.resolve(null),
   ]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-4 md:p-5">
       <MyLeaveSelfServiceView
-        applyHref={`${EMPLOYEE_ROUTES.leave}/new`}
         policyHref={EMPLOYEE_ROUTES.leavePolicy}
-        canApply={hasPermission(profile.permissionCodes, "leave.create")}
+        canApply={canApply}
+        employeeId={employeeId}
+        applyLeaveLookups={applyLookups}
         balances={balances}
         requests={requests}
         calendarMonth={calendarMonth}

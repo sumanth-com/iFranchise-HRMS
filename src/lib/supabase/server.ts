@@ -1,9 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
+import type { User } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { cache } from "react";
 
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
 
-export async function createClient() {
+export type ServerSupabaseClient = ReturnType<typeof createServerClient>;
+
+export const createClient = cache(async function createClient(): Promise<ServerSupabaseClient> {
   const cookieStore = await cookies();
 
   return createServerClient(getSupabaseUrl(), getSupabaseAnonKey(), {
@@ -22,4 +26,24 @@ export async function createClient() {
       },
     },
   });
-}
+});
+
+export type ServerSession = {
+  supabase: ServerSupabaseClient;
+  user: User;
+};
+
+/** One Supabase client + verified user per RSC request (avoids duplicate auth round-trips). */
+export const getServerSession = cache(async function getServerSession(): Promise<ServerSession | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user?.email) {
+    return null;
+  }
+
+  return { supabase, user };
+});

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Fragment } from "react";
 
 import {
@@ -13,6 +13,13 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { formatEmployeeRouteRefLabel } from "@/lib/employees/routing";
+import { HR_PORTAL_HOME } from "@/lib/auth/portal-paths";
+import {
+  parseTeamPayrollSection,
+  payrollHubUrl,
+  TEAM_PAYROLL_SECTIONS,
+  type TeamPayrollSection,
+} from "@/lib/payroll/constants";
 import { useBreadcrumbLabelState } from "@/providers/breadcrumb-label-provider";
 
 type BreadcrumbItemConfig = {
@@ -33,23 +40,26 @@ function formatSegment(segment: string) {
     .join(" ");
 }
 
-function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
+function buildBreadcrumbItems(
+  pathname: string,
+  searchParams: URLSearchParams | null,
+): BreadcrumbItemConfig[] {
   const segments = pathname.split("/").filter(Boolean);
 
   if (segments.length === 0) {
-    return [{ label: "Home", href: "/" }];
+    return [{ label: "Home", href: HR_PORTAL_HOME }];
   }
 
   if (segments[0] === "dashboard" && segments[1] === "hr-overview") {
     return [
-      { label: "Dashboard", href: "/" },
+      { label: "Dashboard", href: HR_PORTAL_HOME },
       { label: "HR Overview", href: "/dashboard/hr-overview" },
     ];
   }
 
   if (segments[0] === "dashboard" && segments[1] === "employees") {
     const items: BreadcrumbItemConfig[] = [
-      { label: "Dashboard", href: "/" },
+      { label: "Dashboard", href: HR_PORTAL_HOME },
       { label: "Employees", href: "/dashboard/employees" },
     ];
 
@@ -82,17 +92,22 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
 
   if (segments[0] === "dashboard" && segments[1] === "documents") {
     const items: BreadcrumbItemConfig[] = [
-      { label: "Dashboard", href: "/" },
+      { label: "Dashboard", href: HR_PORTAL_HOME },
       { label: "Documents", href: "/dashboard/documents" },
     ];
+
+    if (segments[2] === "team") {
+      items.push({ label: "HR Documents", href: "/dashboard/documents/team" });
+    }
+
     return items;
   }
 
   if (segments[0] === "dashboard" && segments[1] === "documents-management") {
     const items: BreadcrumbItemConfig[] = [
-      { label: "Dashboard", href: "/" },
+      { label: "Dashboard", href: HR_PORTAL_HOME },
       { label: "Documents", href: "/dashboard/documents" },
-      { label: "HR Documents", href: "/dashboard/documents?tab=team" },
+      { label: "HR Documents", href: "/dashboard/documents/team" },
     ];
 
     const sectionLabels: Record<string, string> = {
@@ -122,17 +137,22 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
 
   if (segments[0] === "dashboard" && segments[1] === "attendance") {
     const items: BreadcrumbItemConfig[] = [
-      { label: "Dashboard", href: "/" },
+      { label: "Dashboard", href: HR_PORTAL_HOME },
       { label: "Attendance", href: "/dashboard/attendance" },
     ];
+
+    if (segments[2] === "team") {
+      items.push({ label: "Team Attendance", href: "/dashboard/attendance/team" });
+    }
+
     return items;
   }
 
   if (segments[0] === "dashboard" && segments[1] === "attendance-management") {
     const items: BreadcrumbItemConfig[] = [
-      { label: "Dashboard", href: "/" },
+      { label: "Dashboard", href: HR_PORTAL_HOME },
       { label: "Attendance", href: "/dashboard/attendance" },
-      { label: "Team Attendance", href: "/dashboard/attendance?tab=team" },
+      { label: "Team Attendance", href: "/dashboard/attendance/team" },
     ];
 
     if (segments[2] === "new") {
@@ -168,38 +188,78 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
 
   if (segments[0] === "dashboard" && segments[1] === "payroll") {
     const items: BreadcrumbItemConfig[] = [
-      { label: "Dashboard", href: "/" },
+      { label: "Dashboard", href: HR_PORTAL_HOME },
       { label: "Payroll", href: "/dashboard/payroll" },
     ];
+
+    if (segments[2] === "policy") {
+      items.push({ label: "Payroll Policy", href: pathname });
+      return items;
+    }
+
+    if (segments[2] === "team") {
+      const section = parseTeamPayrollSection(segments[3]) ?? TEAM_PAYROLL_SECTIONS.dashboard;
+
+      const sectionLabels: Record<TeamPayrollSection, string> = {
+        dashboard: "Dashboard",
+        run: "Run Payroll",
+        history: "Payroll History",
+        "salary-structures": "Salary Structure",
+        revisions: "Salary Revisions",
+        bonuses: "Bonuses",
+        reimbursements: "Reimbursements",
+        payslips: "Payslips",
+        settings: "Settings",
+      };
+
+      items.push({
+        label: "Team Payroll",
+        href: payrollHubUrl({ tab: "team", section: TEAM_PAYROLL_SECTIONS.dashboard }),
+      });
+      if (section !== TEAM_PAYROLL_SECTIONS.dashboard) {
+        items.push({
+          label: sectionLabels[section],
+          href: payrollHubUrl({ tab: "team", section }),
+        });
+      }
+      return items;
+    }
+
     return items;
   }
 
   if (segments[0] === "dashboard" && segments[1] === "directory") {
     return [
-      { label: "Dashboard", href: "/" },
+      { label: "Dashboard", href: HR_PORTAL_HOME },
       { label: "Employee Directory", href: "/dashboard/directory" },
     ];
   }
 
   if (segments[0] === "dashboard" && segments[1] === "assets") {
-    return [
-      { label: "Dashboard", href: "/" },
+    const items: BreadcrumbItemConfig[] = [
+      { label: "Dashboard", href: HR_PORTAL_HOME },
       { label: "Assets", href: "/dashboard/assets" },
     ];
+
+    if (segments[2] === "team") {
+      items.push({ label: "Company Assets", href: "/dashboard/assets/team" });
+    }
+
+    return items;
   }
 
   if (segments[0] === "dashboard" && segments[1] === "settings") {
     return [
-      { label: "Dashboard", href: "/" },
+      { label: "Dashboard", href: HR_PORTAL_HOME },
       { label: "Settings", href: "/dashboard/settings" },
     ];
   }
 
   if (segments[0] === "dashboard" && segments[1] === "assets-management") {
     const items: BreadcrumbItemConfig[] = [
-      { label: "Dashboard", href: "/" },
+      { label: "Dashboard", href: HR_PORTAL_HOME },
       { label: "Assets", href: "/dashboard/assets" },
-      { label: "Company Assets", href: "/dashboard/assets?tab=team" },
+      { label: "Company Assets", href: "/dashboard/assets/team" },
     ];
 
     const sectionLabels: Record<string, string> = {
@@ -223,9 +283,9 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
 
   if (segments[0] === "dashboard" && segments[1] === "payroll-management") {
     const items: BreadcrumbItemConfig[] = [
-      { label: "Dashboard", href: "/" },
+      { label: "Dashboard", href: HR_PORTAL_HOME },
       { label: "Payroll", href: "/dashboard/payroll" },
-      { label: "Team Payroll", href: "/dashboard/payroll?tab=team" },
+      { label: "Team Payroll", href: "/dashboard/payroll/team" },
     ];
 
     const sectionLabels: Record<string, string> = {
@@ -268,7 +328,10 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
     if (sectionLabels[segments[2]]) {
       items.push({
         label: sectionLabels[segments[2]],
-        href: `/dashboard/payroll-management/${segments[2]}`,
+        href: payrollHubUrl({
+          tab: "team",
+          section: segments[2] as TeamPayrollSection,
+        }),
       });
       return items;
     }
@@ -279,7 +342,7 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
 
   if (segments[0] === "dashboard" && segments[1] === "leave") {
     const items: BreadcrumbItemConfig[] = [
-      { label: "Dashboard", href: "/" },
+      { label: "Dashboard", href: HR_PORTAL_HOME },
       { label: "Leave", href: "/dashboard/leave" },
     ];
 
@@ -288,14 +351,19 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
       return items;
     }
 
+    if (segments[2] === "team") {
+      items.push({ label: "Team Leave", href: "/dashboard/leave/team" });
+      return items;
+    }
+
     return items;
   }
 
   if (segments[0] === "dashboard" && segments[1] === "leave-management") {
     const items: BreadcrumbItemConfig[] = [
-      { label: "Dashboard", href: "/" },
+      { label: "Dashboard", href: HR_PORTAL_HOME },
       { label: "Leave", href: "/dashboard/leave" },
-      { label: "Team Leave", href: "/dashboard/leave?tab=team" },
+      { label: "Team Leave", href: "/dashboard/leave/team" },
     ];
 
     if (segments[2] === "new") {
@@ -454,7 +522,7 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
 
   if (segments[0] === "dashboard" && segments[1] === "onboarding") {
     const items: BreadcrumbItemConfig[] = [
-      { label: "Dashboard", href: "/" },
+      { label: "Dashboard", href: HR_PORTAL_HOME },
       { label: "Onboarding", href: "/dashboard/onboarding" },
     ];
 
@@ -470,7 +538,7 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
 
   if (segments[0] === "dashboard" && segments[1] === "audit") {
     const items: BreadcrumbItemConfig[] = [
-      { label: "Dashboard", href: "/" },
+      { label: "Dashboard", href: HR_PORTAL_HOME },
       { label: "Audit", href: "/dashboard/audit" },
     ];
 
@@ -500,8 +568,9 @@ function buildBreadcrumbItems(pathname: string): BreadcrumbItemConfig[] {
 
 export function BreadcrumbNav() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const breadcrumbLabel = useBreadcrumbLabelState();
-  const items = buildBreadcrumbItems(pathname);
+  const items = buildBreadcrumbItems(pathname, searchParams);
 
   const resolvedItems =
     breadcrumbLabel?.label && items.length > 0

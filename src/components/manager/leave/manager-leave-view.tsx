@@ -1,11 +1,14 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { CalendarPlus } from "lucide-react";
 import { format, startOfWeek } from "date-fns";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
+import { ApplyLeaveDialog } from "@/components/leave/apply-leave-dialog";
 import { MyLeaveSelfServiceView } from "@/components/leave/my-leave-self-service-view";
 import { ManagerLeaveCalendar } from "@/components/manager/leave/manager-leave-calendar";
 import { ManagerLeaveDetailDrawer } from "@/components/manager/leave/manager-leave-detail-drawer";
@@ -19,18 +22,19 @@ import {
   fetchTeamLeaveSummaryAction,
   rejectTeamLeaveRequestAction,
 } from "@/lib/manager/actions/manager-leave-actions";
-import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import type {
   ManagerTeamLeavePageData,
   TeamLeaveListParams,
 } from "@/types/manager-leave";
-import type { LeaveCalendarEntry, LeaveEmployeeBalanceSnapshot, LeaveHolidayEntry, LeaveListItem } from "@/types/leave";
+import type { LeaveCalendarEntry, LeaveEmployeeBalanceSnapshot, LeaveHolidayEntry, LeaveListItem, LeaveLookups } from "@/types/leave";
 
 type LeaveSection = "my" | "team";
 type ViewMode = "requests" | "calendar";
 
 type ManagerSelfLeaveData = {
   canApply: boolean;
+  employeeId: string;
+  applyLeaveLookups: LeaveLookups | null;
   balances: LeaveEmployeeBalanceSnapshot[];
   requests: LeaveListItem[];
   calendarMonth: number;
@@ -56,6 +60,8 @@ export function ManagerLeaveView({
   initialSection = "my",
   selfLeave,
 }: ManagerLeaveViewProps) {
+  const router = useRouter();
+  const [applyOpen, setApplyOpen] = useState(false);
   const [section, setSection] = useState<LeaveSection>(initialSection);
   const [viewMode, setViewMode] = useState<ViewMode>("requests");
   const [summary, setSummary] = useState(initialSummary);
@@ -173,29 +179,38 @@ export function ManagerLeaveView({
             Apply and track your own leave, and manage team requests.
           </p>
         </div>
-        <div className="flex items-center gap-2 rounded-lg border bg-card p-1">
-          <Button
-            size="sm"
-            variant={section === "my" ? "default" : "ghost"}
-            onClick={() => setSection("my")}
-          >
-            My Leave
-          </Button>
-          <Button
-            size="sm"
-            variant={section === "team" ? "default" : "ghost"}
-            onClick={() => setSection("team")}
-          >
-            Team Leave
-          </Button>
+        <div className="flex items-center gap-2">
+          {section === "my" && selfLeave.canApply && selfLeave.applyLeaveLookups ? (
+            <Button type="button" size="sm" className="gap-1.5" onClick={() => setApplyOpen(true)}>
+              <CalendarPlus className="size-4" />
+              Apply Leave
+            </Button>
+          ) : null}
+          <div className="flex items-center gap-2 rounded-lg border bg-card p-1">
+            <Button
+              size="sm"
+              variant={section === "my" ? "default" : "ghost"}
+              onClick={() => setSection("my")}
+            >
+              My Leave
+            </Button>
+            <Button
+              size="sm"
+              variant={section === "team" ? "default" : "ghost"}
+              onClick={() => setSection("team")}
+            >
+              Team Leave
+            </Button>
+          </div>
         </div>
       </div>
 
       {section === "my" ? (
         <MyLeaveSelfServiceView
           showPageHeading={false}
-          applyHref={MANAGER_ROUTES.leaveNew}
           canApply={selfLeave.canApply}
+          employeeId={selfLeave.employeeId}
+          applyLeaveLookups={selfLeave.applyLeaveLookups}
           balances={selfLeave.balances}
           requests={selfLeave.requests}
           calendarMonth={selfLeave.calendarMonth}
@@ -324,6 +339,16 @@ export function ManagerLeaveView({
           />
         </>
       )}
+
+      {selfLeave.applyLeaveLookups ? (
+        <ApplyLeaveDialog
+          open={applyOpen}
+          onOpenChange={setApplyOpen}
+          lookups={selfLeave.applyLeaveLookups}
+          employeeId={selfLeave.employeeId}
+          onSubmitted={() => router.refresh()}
+        />
+      ) : null}
     </div>
   );
 }

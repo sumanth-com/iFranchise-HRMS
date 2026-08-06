@@ -1,8 +1,8 @@
 import { cn } from "@/lib/utils";
-import { ATTENDANCE_STATUS_LABELS } from "@/lib/attendance/constants";
-import type { AttendanceStatus } from "@/types/attendance";
+import { ATTENDANCE_DISPLAY_STATUS_LABELS } from "@/lib/attendance/constants";
+import type { AttendanceDisplayStatus } from "@/types/attendance";
 
-const STATUS_STYLES: Record<AttendanceStatus, string> = {
+const STATUS_STYLES: Record<AttendanceDisplayStatus, string> = {
   present: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
   absent: "bg-destructive/10 text-destructive",
   late: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
@@ -10,10 +10,11 @@ const STATUS_STYLES: Record<AttendanceStatus, string> = {
   on_leave: "bg-blue-500/10 text-blue-700 dark:text-blue-300",
   holiday: "bg-violet-500/10 text-violet-700 dark:text-violet-300",
   week_off: "bg-muted text-muted-foreground",
+  upcoming: "bg-muted text-muted-foreground",
 };
 
 type AttendanceStatusBadgeProps = {
-  status: AttendanceStatus;
+  status: AttendanceDisplayStatus;
   className?: string;
 };
 
@@ -29,7 +30,19 @@ export function AttendanceStatusBadge({
         className,
       )}
     >
-      {ATTENDANCE_STATUS_LABELS[status] ?? status}
+      {ATTENDANCE_DISPLAY_STATUS_LABELS[status] ?? status}
     </span>
   );
+}
+
+/** History rows: upcoming working days have no status yet — show a dash. */
+export function AttendanceHistoryStatusCell({
+  status,
+  className,
+}: AttendanceStatusBadgeProps) {
+  if (status === "upcoming") {
+    return <span className={cn("text-muted-foreground", className)}>—</span>;
+  }
+
+  return <AttendanceStatusBadge status={status} className={className} />;
 }

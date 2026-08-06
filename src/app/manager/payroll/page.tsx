@@ -1,7 +1,6 @@
 import { EmployeePayrollView } from "@/components/employee/payroll/employee-payroll-view";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { getEmployeePayrollData } from "@/lib/employee/services/employee-payroll-queries";
-import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 import { siteConfig } from "@/config/site";
@@ -17,11 +16,7 @@ export default async function ManagerPayrollPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-4 md:p-5">
       <div className="flex flex-col gap-4">
-        <EmployeePayrollView
-          data={data}
-          payrollHistoryHref={MANAGER_ROUTES.payrollHistory}
-          showTaxDocuments={false}
-        />
+        <EmployeePayrollView data={data} showPolicyLink={false} />
       </div>
     </div>
   );

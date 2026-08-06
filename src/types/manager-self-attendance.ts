@@ -1,4 +1,4 @@
-import type { AttendanceStatus } from "@/types/attendance";
+import type { AttendanceStatus, AttendanceDisplayStatus } from "@/types/attendance";
 import type { EmploymentStatus } from "@/types/auth";
 import type { CorrectionStatus } from "@/types/manager-attendance";
 import type { EmployeeAccountStatus } from "@/types/employee";
@@ -77,7 +77,7 @@ export type ManagerAttendanceMonthSummary = {
 export type ManagerAttendanceHistoryRow = {
   id: string | null;
   attendanceDate: string;
-  attendanceStatus: AttendanceStatus;
+  attendanceStatus: AttendanceDisplayStatus;
   checkInAt: string | null;
   checkOutAt: string | null;
   workHours: number;

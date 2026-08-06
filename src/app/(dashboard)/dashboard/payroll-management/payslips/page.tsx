@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
 
-import { PAYROLL_ROUTES } from "@/lib/payroll/constants";
+import {
+  payrollHubUrl,
+  TEAM_PAYROLL_SECTIONS,
+} from "@/lib/payroll/constants";
 
-export default function PayslipsIndexPage() {
-  redirect(PAYROLL_ROUTES.payslipHistory);
+export default function PayslipsPage() {
+  redirect(payrollHubUrl({ tab: "team", section: TEAM_PAYROLL_SECTIONS.payslips }));
 }

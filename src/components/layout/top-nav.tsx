@@ -2,6 +2,7 @@
 
 import { Menu, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { Suspense } from "react";
 
 import { Button } from "@/components/common/button";
 import { BreadcrumbNav } from "@/components/layout/breadcrumb-nav";
@@ -46,7 +47,9 @@ export function TopNav() {
           {isPortalHome ? (
             <p className="truncate text-sm font-semibold tracking-tight">Dashboard</p>
           ) : (
-            <BreadcrumbNav />
+            <Suspense fallback={<p className="truncate text-sm font-semibold tracking-tight">…</p>}>
+              <BreadcrumbNav />
+            </Suspense>
           )}
         </div>
       </div>

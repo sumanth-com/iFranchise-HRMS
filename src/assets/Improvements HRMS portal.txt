@@ -1,0 +1,406 @@
+﻿Improvements:
+Module
+Page
+Current observation
+Suggested improvement
+Reason
+Priority
+Reference Image
+—----------------------------------------------------------------------------------------------------------------
+DASHBOARD
+
+
+1. In dashboard page Ui Consistency
+
+
+Module: dashboard
+Page: Dashboard
+Current observation: In todays attendance working timer is like 0h 00m and late by time also Late by 61 min
+Suggested improvement: In todays attendance working timer should be proper like 0h 0m / 00h 00m and for Late By 1h 1m
+Reason: consistent timer should be needed everywhere
+Priority: P3
+Reference image:
+  
+
+ 
+ 
+
+
+
+
+MYPROFILE
+2. In my profile page language is not showing properly
+
+
+Module: My profile
+Page: my profile
+Current observation: after selecting english it is displaying as in or if you select Hindi it is coming as hi
+Suggested improvement: Naming should be consistent like Hindi or English like this
+Reason: for the user should able to understand which language he selected
+Priority: P3
+ATTENDANCE
+
+
+3. In Attendance instead of profile picture add the cards over there like present, absent,late,avg hours and remove in the bottom of the calender
+
+
+Module: Attendance
+Page: my Attendance Tab
+Current observation: hear we are adding profile picture 
+Suggested improvement:  instead of profile picture add the cards over there like present, absent,late,avg hours and remove in the bottom of the calender
+Reason: No need to show the profile pic in attendees page 
+Priority: P2
+Reference Image: 
+  
+
+We can add the cards like this:
+  
+
+
+
+
+
+4.Improvements in checkin and checkout timings
+
+Hr should able to edit the checkin and checkout timings for the purpose some technical issues or some acceptable resonances from employees
+Module: Attendance
+Page: Check-In / Check-Out
+Current Observation: HR can edit employee check-in and check-out timings directly without any approval or notification workflow.
+Suggested Improvement: Add an approval workflow for attendance edits. If HR requests a timing change, the CEO should be notified for approval. If an employee requests a timing correction, the HR should receive a notification to review and approve the request.
+Reason: Ensures attendance changes are properly reviewed, approved, and tracked for transparency.
+Priority: P2
+
+
+  
+
+
+
+
+
+
+
+
+
+5.Disable Future Months in Attendance History
+Module: Attendance
+Page: My Attendance – Attendance History
+Current Observation: Users can select and view upcoming months (future dates) in the Attendance History filters even though attendance data is not available for future periods.
+Suggested Improvement: Disable or gray out future months and dates in the month selector until they become available.
+Reason: Prevents users from selecting invalid future periods, reduces confusion, and improves the user experience.
+Priority: P2
+Reference Pic:
+
+
+  
+
+
+
+
+
+7. Display Overtime Hours in Attendance Details and History
+Module: Attendance
+Page: Edit Attendance / Team Attendance
+Current Observation: Overtime hours can be entered and saved while adding or editing attendance records, but the overtime value is not displayed anywhere in the Attendance Details or Team Attendance History.
+Suggested Improvement: Display the saved overtime hours in the Attendance Details page and include an Overtime Hours column in the Team Attendance History for better visibility.
+Reason: Users and HR should be able to view recorded overtime hours without opening or editing the attendance record. This improves transparency and makes overtime tracking easier.
+Priority: P2
+Screenshot:
+  
+
+8.Add Department Field While Creating Attendance
+Title: Add Department Field While Creating Attendance
+Module: Attendance
+Page: Add Attendance
+Current Observation: The Add Attendance form does not include a Department field. However, the Team Attendance page provides a department filter, making it difficult to filter manually added attendance records if department information is unavailable.
+Suggested Improvement: Add a Department field to the Add Attendance form. The selected department should be saved along with the attendance record so that records can be filtered correctly using the Department filter in the Team Attendance page.
+Reason: Ensures manually added attendance records are associated with the correct department, making the department filter accurate and improving attendance management.
+Priority: P2
+Reference Image: Screenshot-09
+  
+
+PAYROLL
+
+
+9. Display Currency Symbol and Number Formatting for Salary Amount Fields
+Module: Payroll
+Page: Add Salary Structure
+Click payroll->team payroll->view history->salary structure->add salary structure
+Current Observation: Salary amount fields such as Basic Salary, HRA, and other components display plain numeric values (e.g., 0) without a currency symbol or number formatting.
+Suggested Improvement: Display a ₹ (Rupee) symbol and apply proper number formatting (e.g., ₹ 25,000) to all salary amount fields for consistency across the Payroll module.
+Reason: Improves readability, provides clear currency context, and maintains a consistent user interface throughout the Payroll module.
+Priority: P3
+Screenshot:
+  
+
+
+
+
+
+10. Add Direct Access to Payroll Management Tabs from Team Payroll Dashboard
+Module: Payroll
+Page: Team Payroll Dashboard
+Current Observation: The Team Payroll Dashboard displays only Run Payroll and View History actions. To access other Payroll modules such as Salary Structure, Salary Revisions, Bonuses, Reimbursements, Payslips, and Settings, users must first click View History.
+Suggested Improvement: Display the Payroll navigation tabs directly on the Team Payroll Dashboard or provide a secondary navigation menu for quick access to all Payroll modules.
+Reason: Reduces unnecessary navigation, improves accessibility to frequently used Payroll features, and enhances overall user efficiency.
+Priority: P3
+11. Maintain Consistent Payroll Navigation Across All Payroll Pages
+Module: Payroll
+Page: Team Payroll Dashboard
+Current Observation: The Payroll module navigation tabs (Run Payroll, Salary Structure, Payroll History, Salary Revisions, etc.) are available only after navigating to View History, resulting in an inconsistent navigation experience.
+Suggested Improvement: Display the same Payroll navigation bar consistently across all Team Payroll pages to provide a uniform user experience.
+Reason: Improves navigation consistency, reduces user confusion, and allows quicker access to Payroll features without additional clicks.
+Priority: P3
+
+
+Screenshot:  
+  
+
+12.remove Tax documents in the payroll dashboard or else keep something meaning for it
+
+
+Title: Remove or Replace the "Tax Documents" Widget with Meaningful Payroll Information
+Module: Payroll Dashboard
+Improvement Suggestion:
+ The "Tax Documents" section on the Payroll Dashboard appears to provide limited value or may not be relevant to users if document management is not a primary payroll function
+Screenshot:
+  
+
+
+
+
+
+13.Improvements in payroll
+
+
+
+
+ID
+	Title
+	Improvement Suggestion
+	IMP_001
+	KPI Value Consistency
+	Ensure Total Payroll, Gross Payroll, and Net Payroll values are logically related. The current figures appear inconsistent and may confuse users.
+	IMP_002
+	Add Payroll Period Indicator
+	Display the currently selected payroll period (e.g., August 2026) prominently so users know which month's data is being viewed.
+	IMP_003
+	Dashboard-Level Filters
+	Add filters for Month, Year, Department, Branch, Payroll Status, and update all widgets dynamically.
+	IMP_004
+	Interactive KPI Cards
+	Make KPI cards clickable to navigate to detailed reports (e.g., Pending Payroll → Pending Payroll List, Gross Payroll → Payroll Summary).
+	IMP_005
+	Payroll Status Summary
+	Add summary cards showing Draft, Processed, Approved, Paid, Failed payroll counts.
+	IMP_006
+	Payroll Processing Progress
+	Show a progress bar indicating payroll completion (e.g., 10 of 12 employees processed – 83% Complete).
+	IMP_007
+	Department-wise Payroll Breakdown
+	Include a chart showing payroll expenses by department or branch.
+	IMP_008
+	Monthly Trend Comparison
+	Display month-over-month percentage increase/decrease for Gross Payroll, Net Payroll, and Deductions.
+	IMP_009
+	Employee Count Details
+	Show Total Employees, Processed, Pending, and Excluded employees separately.
+	IMP_010
+	Deduction Breakdown
+	Clicking Total Deductions should open a breakdown of PF, ESI, TDS, PT, Loans, etc.
+	IMP_011
+	Payroll Calendar
+	Add a payroll calendar showing processing dates, approval deadlines, and salary payment dates.
+	IMP_012
+	Dashboard Alerts
+	Display warnings for pending approvals, missing salary structures, incomplete attendance, or failed payroll runs.
+	IMP_013
+	Recent Activity Timeline
+	Show recent actions such as Payroll Processed, Salary Revision Approved, Payslip Generated, and Payroll Reopened.
+	IMP_014
+	Export Dashboard Data
+	Add quick export options (Excel, PDF, CSV) for dashboard metrics and payroll summaries.
+	IMP_015
+	Chart Improvements
+	Display exact payroll amounts on hover, include Y-axis labels, and distinguish paid/unpaid months with different colors.
+	IMP_016
+	Quick Actions Panel
+	Add shortcuts such as Run Payroll, Approve Payroll, Generate Payslips, and Download Bank File in one section.
+	IMP_017
+	Role-Based Dashboard
+	Display dashboard widgets based on user roles (HR Admin, Payroll Manager, Employee).
+	IMP_018
+	Payroll Cost Forecast
+	Estimate the next payroll amount based on current salary structures and attendance.
+	IMP_019
+	Audit & Compliance Widget
+	Show payroll audit status, statutory filing reminders, and compliance due dates.
+	IMP_020
+	Empty State Handling
+	When no payroll exists for a selected period, show an informative empty-state message with a Run Payroll CTA instead of blank sections.
+	Payroll History Page Suggestions
+ID
+	Title
+	Improvement Suggestion
+	IMP_021
+	Advanced Filters
+	Add filters for Department, Payroll Type, Processed By, Employee Count Range, and Salary Range.
+	IMP_022
+	Sortable Columns
+	Allow sorting by Pay Period, Gross, Net, Status, and Employees.
+	IMP_023
+	Payroll Comparison
+	Allow comparison of two payroll runs to identify changes in salary, deductions, and employee count.
+	IMP_024
+	Payroll Summary Panel
+	Display summary statistics above the table (Total Runs, Total Paid, Pending Runs, Total Gross, Total Net).
+	IMP_025
+	Bulk Actions
+	Enable multi-select for downloading reports, generating payslips, or exporting multiple payroll runs.
+	IMP_026
+	Detailed View
+	Expand each payroll run to display earnings, deductions, approvers, processing date, and remarks without leaving the page.
+	IMP_027
+	Audit Information
+	Include Processed By, Approved By, and Processed Date & Time columns for better traceability.
+	IMP_028
+	Search Enhancement
+	Support searching by payroll ID, month, employee name, or payroll status.
+	IMP_029
+	Status Color Standardization
+	Use consistent color coding (Draft – Grey, Processed – Blue, Approved – Green, Paid – Purple, Failed – Red).
+	IMP_030
+	Pagination & Record Count
+	Display the total number of payroll records and provide page size options (10, 25, 50, 100).
+
+
+DOCUMENTS
+
+
+
+
+	14.Remove the "All File Types" Filter to Simplify the Documents Dashboard 
+Module: Documents
+Page: Documents Dashboard
+Current Observation:
+ The "All File Types" filter is displayed on the Documents Dashboard even though it provides limited value and adds unnecessary UI elements.
+Suggested Improvement:
+ Remove the "All File Types" filter or display it only when multiple document categories exist. This will simplify the interface and provide more space for primary actions such as Upload and Search.
+Reason:
+ Reduces UI clutter, improves usability, and keeps the document management interface focused on frequently used actions.
+Priority: P3
+ScreenShot:
+  
+
+
+
+
+
+
+
+Module: Documents
+Page: Documents Dashboard
+Current Observation:
+ Users cannot preview a document directly after clicking on a document record. They must download the file to view its contents.
+Suggested Improvement:
+ Provide a Preview option or open the selected document in an in-app preview panel/modal, allowing users to quickly view supported file types (PDF, images, Office documents) without downloading them.
+Reason:
+ Improves user productivity, reduces unnecessary downloads, and provides a faster document review experience.
+Priority: P2
+ScreenShot:
+  
+
+LEAVE MODULE:
+14. Implement role-based leave notifications to ensure leave requests are routed to the appropriate approver based on the employee's reporting hierarchy.
+Module:Leave
+Page: Leave Application / Leave Approval Workflow
+Improvement Summary: Implement role-based leave notifications to ensure leave requests are routed to the appropriate approver based on the employee's reporting hierarchy.
+Description:
+ The leave management module should send notifications to the appropriate authority according to the organization's approval hierarchy. For example, when an HR user submits a leave request, the CEO should receive the approval notification. When employees reporting to HR submit leave requests, the HR should receive the notification for review and approval. This ensures that leave approvals follow the defined reporting structure and reduces manual follow-ups.
+Suggested Workflow:
+* Employee → HR receives the leave request notification.
+* HR → CEO receives the leave request notification.
+* CEO (or top-level approver) → Final approval notification as per workflow.
+* The applicant should receive notifications when the leave is Approved, Rejected, or Cancelled.
+Expected Result:
+ The system should automatically notify the correct approver based on the employee's reporting manager or approval hierarchy, ensuring a seamless and role-based leave approval process.
+Business Benefit:
+* Ensures leave requests follow the organizational hierarchy.
+* Eliminates manual routing of approval requests.
+* Improves approval efficiency and accountability.
+* Provides a scalable workflow for organizations with multiple reporting levels.
+15. Adjustments in Leave Dashboard:
+
+
+Module: Leave
+Page: leave dashBoard
+Current observation: calender is occupying the more space 
+Suggested improvement: Reduce the calender size to look it more profiently
+Reason:  UI Visibility
+Priority: P3
+
+
+
+
+ASSETES
+
+
+1. Add "Add Asset" Button
+Improvement: Add an "Add Asset" button in the Company Assets page for quick asset creation.
+2. Asset Assignment Shortcut
+Improvement: Add a "Assign Asset" action on the dashboard to assign available assets directly to employees without navigating to another page.
+3. Asset Search & Filters
+Improvement: Provide search and filters based on Asset ID, Asset Name, Category, Employee, Department, Status, Vendor, and Warranty Expiry Date for faster asset management.
+4. Recent Asset Activities
+Improvement: Display a timeline of recent activities such as Asset Added, Assigned, Returned, Under Maintenance, and Lost.
+5. Low Stock Alert
+Improvement: Notify administrators when the available quantity of an asset category falls below a configurable threshold.
+6. Warranty Expiry Notifications
+Improvement: Send automatic notifications before an asset's warranty expires (e.g., 30/15/7 days).
+7. Maintenance Schedule
+Improvement: Allow scheduling preventive maintenance and display upcoming maintenance tasks on the dashboard.
+8. Asset Lifecycle Tracking
+Improvement: Track the complete lifecycle of each asset from Purchase → Assignment → Maintenance → Return → Disposal.
+9. Asset History
+Improvement: Maintain a complete history of each asset, including assignment records, repairs, transfers, and returns.
+
+
+10. Bulk Asset Import
+Improvement: Allow administrators to import multiple assets using Excel/CSV instead of adding assets one by one.
+
+
+11. Asset QR Code / Barcode
+Improvement: Generate QR codes or barcodes for each asset to simplify asset identification and inventory audits.
+12. Asset Return Workflow
+Improvement: Add an approval workflow for asset returns with condition verification before marking an asset as available.
+13. Asset Utilization Report
+Improvement: Provide reports showing asset utilization, idle assets, damaged assets, and department-wise asset allocation.
+14. Empty State Quick Action
+Improvement: When no assets exist, display an "Add Asset" call-to-action button instead of only showing an empty-state message.
+15. Dashboard Drill-down
+Improvement: Make KPI cards (Assigned Assets, Under Maintenance, Warranty Expiring, Lost Assets) clickable to open the corresponding asset lists.
+
+
+
+
+NOTIFICATION 
+
+
+1.Remove the unwanted Tabs and make notification dashboard clear 
+
+
+Module: Notification
+Page: Notification Module
+Current observation: Multiple tabs are presenting over in the notifications tab
+Suggested improvement: Remove the multiple tabs from the NOtifiaction module keep what we need
+Reason: For users it will create the Ambiguity
+Priority: p1
+Reference Image:
+  
+
+2.Notification alerts in the bell iocn an top right corner
+Module: Notification
+Current observation: Observing the lengthy Notification popup in while clicking the alerts 
+Suggested improvement: make shot popup with the scrollebale content
+Reason: Ui visibility
+Priority: P3
+Reference Image:

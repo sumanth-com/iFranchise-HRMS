@@ -1,5 +1,4 @@
-import { SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
-import { SELF_LEAVE_ROUTES } from "@/lib/leave/constants";
+import { HR_HUB_ROUTES } from "@/lib/dashboard/hr-hub-routes";
 
 export const EMPLOYEE_ROUTES = {
   home: "/employee",
@@ -10,6 +9,7 @@ export const EMPLOYEE_ROUTES = {
   leavePolicy: "/employee/leave/policy",
   resignation: "/employee/resignation",
   payroll: "/employee/payroll",
+  payrollPolicy: "/employee/payroll/policy",
   payrollHistory: "/employee/payroll/history",
   documents: "/employee/documents",
   profile: "/employee/profile",
@@ -29,10 +29,10 @@ export const EMPLOYEE_DASHBOARD_KPI_LINKS = {
   pendingLeaveRequests: `${EMPLOYEE_ROUTES.leave}?status=pending`,
 } as const;
 
-/** Self-service dashboard KPI destinations in the HR portal home (/). */
+/** Self-service dashboard KPI destinations in the HR portal home (/dashboard). */
 export const HR_SELF_SERVICE_DASHBOARD_KPI_LINKS = {
-  attendance: SELF_ATTENDANCE_ROUTES.list,
-  workingHours: SELF_ATTENDANCE_ROUTES.list,
-  leaveBalance: SELF_LEAVE_ROUTES.list,
-  pendingLeaveRequests: `${SELF_LEAVE_ROUTES.list}?status=pending`,
+  attendance: HR_HUB_ROUTES.myAttendance,
+  workingHours: HR_HUB_ROUTES.myAttendance,
+  leaveBalance: HR_HUB_ROUTES.myLeave,
+  pendingLeaveRequests: `${HR_HUB_ROUTES.myLeave}?status=pending`,
 } as const;

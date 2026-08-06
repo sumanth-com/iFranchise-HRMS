@@ -41,7 +41,7 @@ export function EmployeeAssetsView({ data }: { data: EmployeeAssetsData }) {
       if (query) {
         const haystack = `${asset.name} ${asset.assetCode} ${asset.serialNumber ?? ""} ${
           asset.model ?? ""
-        }`.toLowerCase();
+        } ${asset.brand ?? ""} ${asset.notes ?? ""}`.toLowerCase();
         if (!haystack.includes(query)) return false;
       }
       return true;

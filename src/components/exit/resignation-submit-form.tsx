@@ -14,6 +14,7 @@ import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { submitResignationAction } from "@/lib/exit/actions";
 import { EXIT_REASON_OPTIONS } from "@/lib/exit/constants";
 import { addDaysIso } from "@/lib/exit/services/exit-utils";
+import { cn } from "@/lib/utils";
 import {
   resignationFormSchema,
   type ResignationFormValues,
@@ -22,7 +23,9 @@ import {
 type Props = {
   employeeId: string;
   defaultNoticePeriodDays: number;
-  redirectPath: string;
+  redirectPath?: string;
+  embedded?: boolean;
+  onSuccess?: () => void;
 };
 
 function todayIso() {
@@ -33,6 +36,8 @@ export function ResignationSubmitForm({
   employeeId,
   defaultNoticePeriodDays,
   redirectPath,
+  embedded = false,
+  onSuccess,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -54,7 +59,10 @@ export function ResignationSubmitForm({
 
   return (
     <form
-      className="space-y-4 rounded-xl border bg-card p-5 shadow-sm"
+      className={cn(
+        "space-y-4",
+        embedded ? "" : "rounded-xl border bg-card p-5 shadow-sm",
+      )}
       onSubmit={form.handleSubmit((values) => {
         startTransition(async () => {
           const result = await submitResignationAction(values);
@@ -63,7 +71,8 @@ export function ResignationSubmitForm({
             return;
           }
           toast.success("Resignation submitted");
-          router.push(redirectPath);
+          if (onSuccess) onSuccess();
+          else if (redirectPath) router.push(redirectPath);
           router.refresh();
         });
       })}

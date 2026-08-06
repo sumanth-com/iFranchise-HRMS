@@ -15,6 +15,7 @@ import {
 
 import { Button } from "@/components/common/button";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
+import { HR_HUB_ROUTES } from "@/lib/dashboard/hr-hub-routes";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import type { PortalVariant } from "@/providers/auth-provider";
@@ -72,8 +73,8 @@ const PORTAL_HELP: Record<PortalVariant, PortalHelpConfig> = {
     description: "Guidance for HR operations, your account, and everyday portal tasks.",
     quickActions: [
       { label: "Employees", href: "/dashboard/employees", icon: Users },
-      { label: "Attendance", href: "/dashboard/attendance-management", icon: CalendarCheck },
-      { label: "Leave", href: "/dashboard/leave-management", icon: ClipboardList },
+      { label: "Attendance", href: HR_HUB_ROUTES.teamAttendance, icon: CalendarCheck },
+      { label: "Leave", href: HR_HUB_ROUTES.teamLeave, icon: ClipboardList },
       { label: "Reset password", href: "/dashboard/settings", icon: KeyRound },
     ],
     faqs: [

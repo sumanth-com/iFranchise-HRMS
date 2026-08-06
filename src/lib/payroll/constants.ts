@@ -1,4 +1,5 @@
 import { hasAnyPermission } from "@/lib/permissions/utils";
+import { hubListUrl } from "@/lib/dashboard/hub-paths";
 import type {
   BonusStatus,
   BonusType,
@@ -7,6 +8,13 @@ import type {
   ReimbursementStatus,
   SalaryRevisionStatus,
 } from "@/types/payroll";
+
+/** Personal / self-service payroll in the HR portal main nav. */
+export const SELF_PAYROLL_ROUTES = {
+  list: "/dashboard/payroll",
+  team: "/dashboard/payroll/team",
+  policy: "/dashboard/payroll/policy",
+} as const;
 
 export const PAYROLL_ROUTES = {
   dashboard: "/dashboard/payroll-management",
@@ -21,26 +29,74 @@ export const PAYROLL_ROUTES = {
   payslips: "/dashboard/payroll-management/payslips",
   payslipHistory: "/dashboard/payroll-management/payslips/history",
   payslipDetail: (id: string) => `/dashboard/payroll-management/payslips/${id}`,
+  policy: SELF_PAYROLL_ROUTES.policy,
   settings: "/dashboard/payroll-management/settings",
 } as const;
 
-/** Personal / self-service payroll in the HR portal main nav. */
-export const SELF_PAYROLL_ROUTES = {
-  list: "/dashboard/payroll",
+export const TEAM_PAYROLL_SECTIONS = {
+  dashboard: "dashboard",
+  run: "run",
+  "salary-structures": "salary-structures",
+  history: "history",
+  revisions: "revisions",
+  bonuses: "bonuses",
+  reimbursements: "reimbursements",
+  payslips: "payslips",
+  settings: "settings",
 } as const;
 
-export function payrollTeamListUrl(
-  searchParams?: Record<string, string | undefined>,
+export type TeamPayrollSection = keyof typeof TEAM_PAYROLL_SECTIONS;
+
+const TEAM_PAYROLL_SECTION_SET = new Set<string>(Object.values(TEAM_PAYROLL_SECTIONS));
+
+export function parseTeamPayrollSection(value: string | undefined): TeamPayrollSection {
+  if (value && TEAM_PAYROLL_SECTION_SET.has(value)) {
+    return value as TeamPayrollSection;
+  }
+  return TEAM_PAYROLL_SECTIONS.dashboard;
+}
+
+export function payrollHubUrl(
+  options?: {
+    tab?: "my" | "team";
+    section?: TeamPayrollSection;
+    params?: Record<string, string | undefined>;
+  },
 ) {
-  const params = new URLSearchParams({ tab: "team" });
-  if (searchParams) {
-    Object.entries(searchParams).forEach(([key, value]) => {
-      if (value) {
-        params.set(key, value);
+  const tab = options?.tab ?? "team";
+  let path: string = SELF_PAYROLL_ROUTES.list;
+
+  if (tab === "team") {
+    const section = options?.section ?? TEAM_PAYROLL_SECTIONS.dashboard;
+    path =
+      section === TEAM_PAYROLL_SECTIONS.dashboard
+        ? SELF_PAYROLL_ROUTES.team
+        : `${SELF_PAYROLL_ROUTES.team}/${section}`;
+  }
+
+  const filterParams: Record<string, string | undefined> = {};
+  if (options?.params) {
+    Object.entries(options.params).forEach(([key, value]) => {
+      if (value && key !== "tab" && key !== "section") {
+        filterParams[key] = value;
       }
     });
   }
-  return `${SELF_PAYROLL_ROUTES.list}?${params.toString()}`;
+
+  return hubListUrl(path, filterParams);
+}
+
+export function payrollTeamSectionPath(section: TeamPayrollSection): string {
+  return section === TEAM_PAYROLL_SECTIONS.dashboard
+    ? SELF_PAYROLL_ROUTES.team
+    : `${SELF_PAYROLL_ROUTES.team}/${section}`;
+}
+
+export function payrollTeamListUrl(
+  searchParams?: Record<string, string | undefined>,
+  section: TeamPayrollSection = TEAM_PAYROLL_SECTIONS.dashboard,
+) {
+  return payrollHubUrl({ tab: "team", section, params: searchParams });
 }
 
 export const PAYROLL_STATUS_LABELS: Record<PayrollStatus, string> = {
@@ -117,7 +173,7 @@ export const PAYROLL_APPROVAL_LEVEL_LABELS: Record<number, string> = {
 };
 
 export const PAYROLL_SUMMARY_LABELS = {
-  totalPayroll: "Total Payroll",
+  totalPayroll: "Total Payroll (YTD)",
   employeesProcessed: "Employees Processed",
   pendingPayroll: "Pending Payroll",
   grossPayroll: "Gross Payroll",
@@ -201,13 +257,17 @@ export function canApproveReimbursement(codes: string[]) {
 }
 
 export const PAYROLL_SUB_NAV = [
-  { title: "Dashboard", href: payrollTeamListUrl() },
-  { title: "Run Payroll", href: PAYROLL_ROUTES.run },
-  { title: "Salary Structure", href: PAYROLL_ROUTES.salaryStructures },
-  { title: "Payroll History", href: PAYROLL_ROUTES.history },
-  { title: "Salary Revisions", href: PAYROLL_ROUTES.revisions },
-  { title: "Bonuses", href: PAYROLL_ROUTES.bonuses },
-  { title: "Reimbursements", href: PAYROLL_ROUTES.reimbursements },
-  { title: "Payslips", href: PAYROLL_ROUTES.payslips },
-  { title: "Settings", href: PAYROLL_ROUTES.settings },
-] as const;
+  { title: "Dashboard", section: TEAM_PAYROLL_SECTIONS.dashboard },
+  { title: "Run Payroll", section: TEAM_PAYROLL_SECTIONS.run },
+  { title: "Salary Structure", section: TEAM_PAYROLL_SECTIONS["salary-structures"] },
+  { title: "Payroll History", section: TEAM_PAYROLL_SECTIONS.history },
+  { title: "Salary Revisions", section: TEAM_PAYROLL_SECTIONS.revisions },
+  { title: "Bonuses", section: TEAM_PAYROLL_SECTIONS.bonuses },
+  { title: "Reimbursements", section: TEAM_PAYROLL_SECTIONS.reimbursements },
+  { title: "Payslips", section: TEAM_PAYROLL_SECTIONS.payslips },
+  { title: "Settings", section: TEAM_PAYROLL_SECTIONS.settings },
+].map((item) => ({
+  title: item.title,
+  section: item.section,
+  href: payrollHubUrl({ tab: "team", section: item.section }),
+}));

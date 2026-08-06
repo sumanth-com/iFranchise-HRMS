@@ -12,6 +12,7 @@ import {
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { HR_PORTAL_HOME } from "@/lib/auth/portal-paths";
 import { LOGOUT_BROADCAST_KEY, AUTH_ROUTES, PUBLIC_ROUTES } from "@/lib/auth/constants";
 import { logoutAction } from "@/lib/auth/actions";
 import { getAuthErrorMessage } from "@/lib/auth/errors";
@@ -60,7 +61,7 @@ const PORTAL_CONFIG: Record<
 > = {
   hr: {
     navItems: mainNavItems,
-    home: "/",
+    home: HR_PORTAL_HOME,
     label: "iFranchise HRMS",
   },
   manager: {

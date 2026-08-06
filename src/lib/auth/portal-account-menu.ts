@@ -1,12 +1,14 @@
 import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
+import { HR_PORTAL_HOME, isHrPortalPath } from "@/lib/auth/portal-paths";
 import type { PortalVariant } from "@/providers/auth-provider";
 
 export function getPortalVariantFromHome(portalHome: string): PortalVariant {
   if (portalHome.startsWith("/manager")) return "manager";
   if (portalHome.startsWith("/ceo")) return "ceo";
   if (portalHome === "/employee" || portalHome.startsWith("/employee/")) return "employee";
+  if (portalHome === "/" || isHrPortalPath(portalHome)) return "hr";
   return "hr";
 }
 

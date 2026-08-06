@@ -6,14 +6,14 @@ import { format, parseISO } from "date-fns";
 import {
   Banknote,
   CalendarDays,
-  ChevronRight,
+  CircleDollarSign,
   Download,
   FileText,
   Gift,
+  History,
   IndianRupee,
   Landmark,
   ReceiptText,
-  TrendingUp,
   Wallet,
 } from "lucide-react";
 
@@ -21,10 +21,11 @@ import {
   EmployeeSectionCard,
   EmployeeStatCard,
 } from "@/components/employee/dashboard/employee-module-primitives";
+import { EmployeePayslipHistoryDialog } from "@/components/employee/payroll/employee-payslip-history-dialog";
 import { EmployeePayslipDrawer } from "@/components/employee/payroll/employee-payslip-drawer";
 import { PaymentTimeline } from "@/components/employee/payroll/payment-timeline";
 import { EarningsDeductionsTable } from "@/components/payroll/earnings-deductions-table";
-import { Button, buttonVariants } from "@/components/common/button";
+import { Button } from "@/components/common/button";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import {
   BONUS_STATUS_LABELS,
@@ -87,25 +88,31 @@ function fmtMonth(value: string): string {
 
 export function EmployeePayrollView({
   data,
-  documentsHref = EMPLOYEE_ROUTES.documents,
-  payrollHistoryHref = EMPLOYEE_ROUTES.payrollHistory,
-  showTaxDocuments = true,
+  policyHref = EMPLOYEE_ROUTES.payrollPolicy,
+  showPolicyLink = true,
+  showHeaderActions = true,
   showPageHeading = true,
 }: {
   data: EmployeePayrollData;
-  documentsHref?: string;
-  payrollHistoryHref?: string;
-  showTaxDocuments?: boolean;
+  policyHref?: string;
+  showPolicyLink?: boolean;
+  showHeaderActions?: boolean;
   showPageHeading?: boolean;
 }) {
   const [activePayslipId, setActivePayslipId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const money = (value: number) => formatCurrency(value, data.currencyCode);
 
   function openPayslip(id: string) {
     setActivePayslipId(id);
     setDrawerOpen(true);
+  }
+
+  function openPayslipFromHistory(id: string) {
+    setHistoryOpen(false);
+    openPayslip(id);
   }
 
   const header = showPageHeading ? (
@@ -116,30 +123,32 @@ export function EmployeePayrollView({
           View salary, payslips, earnings, deductions and payment history.
         </p>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          variant="outline"
-          className="gap-1.5"
-          disabled={data.payslips.length === 0}
-          onClick={() => data.payslips[0] && openPayslip(data.payslips[0].id)}
-        >
-          <Download className="size-4" />
-          Latest Payslip
-        </Button>
-        {showTaxDocuments ? (
+      {showHeaderActions ? (
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             className="gap-1.5"
-            nativeButton={false}
-            render={<Link href={documentsHref} />}
+            disabled={data.payslips.length === 0}
+            onClick={() => data.payslips[0] && openPayslip(data.payslips[0].id)}
           >
-            <FileText className="size-4" />
-            Tax Documents
+            <Download className="size-4" />
+            Latest Payslip
           </Button>
-        ) : null}
-      </div>
+          {showPolicyLink ? (
+            <Button
+              variant="outline"
+              className="gap-1.5"
+              nativeButton={false}
+              render={<Link href={policyHref} />}
+            >
+              <FileText className="size-4" />
+              Payroll Policy
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
-  ) : (
+  ) : showHeaderActions ? (
     <div className="flex flex-wrap items-center justify-end gap-2">
       <Button
         variant="outline"
@@ -150,19 +159,19 @@ export function EmployeePayrollView({
         <Download className="size-4" />
         Latest Payslip
       </Button>
-      {showTaxDocuments ? (
+      {showPolicyLink ? (
         <Button
           variant="outline"
           className="gap-1.5"
           nativeButton={false}
-          render={<Link href={documentsHref} />}
+          render={<Link href={policyHref} />}
         >
           <FileText className="size-4" />
-          Tax Documents
+          Payroll Policy
         </Button>
       ) : null}
     </div>
-  );
+  ) : null;
 
   if (!data.hasAnyData) {
     return (
@@ -236,18 +245,20 @@ export function EmployeePayrollView({
           iconBg="bg-violet-500/10"
         />
         <EmployeeStatCard
-          label={`${data.ytd.financialYearLabel} Earnings`}
-          value={`${money(data.kpis.ytdEarnings)} · ${data.ytd.monthsCount} mo`}
-          icon={TrendingUp}
-          accent="text-teal-600 dark:text-teal-400"
-          iconBg="bg-teal-500/10"
-        />
-        <EmployeeStatCard
-          label={`${data.ytd.financialYearLabel} Tax`}
-          value={money(data.kpis.ytdTax)}
+          label="Total Deductions"
+          value={money(totalDeductions)}
+          hint={usingStructure ? "From salary structure" : "Latest payslip"}
           icon={ReceiptText}
           accent="text-amber-600 dark:text-amber-400"
           iconBg="bg-amber-500/10"
+        />
+        <EmployeeStatCard
+          label={`${data.ytd.financialYearLabel} Net Pay`}
+          value={money(data.ytd.net)}
+          hint={`${data.ytd.monthsCount} month${data.ytd.monthsCount === 1 ? "" : "s"} · take-home`}
+          icon={CircleDollarSign}
+          accent="text-teal-600 dark:text-teal-400"
+          iconBg="bg-teal-500/10"
         />
       </section>
 
@@ -448,13 +459,16 @@ export function EmployeePayrollView({
         description="All published salary statements during your employment."
         bodyClassName="overflow-x-auto"
         action={
-          <Link
-            href={payrollHistoryHref}
-            className={buttonVariants({ variant: "outline", size: "sm" })}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setHistoryOpen(true)}
           >
+            <History className="size-4" />
             View full history
-            <ChevronRight className="ml-1 size-4" />
-          </Link>
+          </Button>
         }
       >
         {data.payslips.some((row) => row.availability === "under_review") ? (
@@ -546,9 +560,13 @@ export function EmployeePayrollView({
           {data.payslips.length > 3 ? (
             <p className="mt-3 text-center text-xs text-muted-foreground">
               Showing 3 most recent ·{" "}
-              <Link href={payrollHistoryHref} className="font-medium text-primary underline-offset-2 hover:underline">
+              <button
+                type="button"
+                className="font-medium text-primary underline-offset-2 hover:underline"
+                onClick={() => setHistoryOpen(true)}
+              >
                 View all {data.payslips.length} payslips
-              </Link>
+              </button>
             </p>
           ) : null}
           </>
@@ -558,6 +576,16 @@ export function EmployeePayrollView({
           </p>
         )}
       </EmployeeSectionCard>
+
+      <EmployeePayslipHistoryDialog
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        payslips={data.payslips}
+        money={money}
+        fmtDate={fmtDate}
+        fmtMonth={fmtMonth}
+        onViewPayslip={openPayslipFromHistory}
+      />
 
       <EmployeePayslipDrawer
         payslipId={activePayslipId}

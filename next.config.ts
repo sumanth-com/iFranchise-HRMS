@@ -45,10 +45,15 @@ const nextConfig: NextConfig = {
       "@radix-ui/react-select",
       "@radix-ui/react-tabs",
       "@radix-ui/react-tooltip",
+      "@radix-ui/react-avatar",
+      "@radix-ui/react-label",
+      "@radix-ui/react-separator",
+      "@tanstack/react-table",
+      "recharts",
     ],
     staleTimes: {
-      dynamic: 30,
-      static: 180,
+      dynamic: 180,
+      static: 300,
     },
     // Profile images up to 10 MB; documents up to 30 MB via Server Actions.
     serverActions: {

@@ -90,6 +90,14 @@ export const employeeInviteSchema = z.object({
 
 export type EmployeeInviteInput = z.infer<typeof employeeInviteSchema>;
 
+/** Employee self-service: language and timezone only. Contact/address/emergency are HR-managed. */
+export const employeeSelfPreferencesSchema = z.object({
+  language: z.string().min(2).max(20),
+  timezone: z.string().min(1).max(80),
+});
+
+export type EmployeeSelfPreferencesInput = z.infer<typeof employeeSelfPreferencesSchema>;
+
 export const employeeSelfProfileSchema = z.object({
   personalEmail: z.string().email().optional().or(z.literal("")),
   personalPhone: z.string().max(30).optional().or(z.literal("")),
@@ -105,6 +113,7 @@ export const employeeSelfProfileSchema = z.object({
   emergencyContactRelationship: z.string().max(100).optional().or(z.literal("")),
   emergencyContactPhone: z.string().max(30).optional().or(z.literal("")),
   emergencyContactEmail: z.string().email().optional().or(z.literal("")),
+  reportingManagerId: z.string().uuid().optional().or(z.literal("")),
 });
 
 export type EmployeeSelfProfileInput = z.infer<typeof employeeSelfProfileSchema>;

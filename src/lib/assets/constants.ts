@@ -16,23 +16,18 @@ export const ASSETS_ROUTES = {
   settings: "/dashboard/assets-management/settings",
 } as const;
 
+import { hubTeamListUrl } from "@/lib/dashboard/hub-paths";
+
 /** Personal / self-service assets in the HR portal main nav. */
 export const SELF_ASSETS_ROUTES = {
   list: "/dashboard/assets",
+  team: "/dashboard/assets/team",
 } as const;
 
 export function assetsTeamListUrl(
   searchParams?: Record<string, string | undefined>,
 ) {
-  const params = new URLSearchParams({ tab: "team" });
-  if (searchParams) {
-    Object.entries(searchParams).forEach(([key, value]) => {
-      if (value) {
-        params.set(key, value);
-      }
-    });
-  }
-  return `${SELF_ASSETS_ROUTES.list}?${params.toString()}`;
+  return hubTeamListUrl(SELF_ASSETS_ROUTES.list, searchParams);
 }
 
 export const ASSETS_SUB_NAV = [

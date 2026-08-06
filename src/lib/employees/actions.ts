@@ -8,6 +8,7 @@ import {
   requireServerPermission,
 } from "@/lib/permissions/server";
 import { hasPermission } from "@/lib/permissions/utils";
+import { canEditSelfProfileContactDetails } from "@/lib/employee/profile-contact";
 import { EMPLOYEE_ROUTES, PROFILE_IMAGE_MAX_BYTES } from "@/lib/employees/constants";
 import {
   getEmployeeById,
@@ -73,11 +74,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { assertOrganizationStoragePath } from "@/lib/security/storage-path";
 import {
   employeeInviteSchema,
+  employeeSelfPreferencesSchema,
   employeeSelfProfileSchema,
 } from "@/lib/validations/employee";
 import {
   getEmployeeSelfProfileSettings,
-  updateEmployeeSelfProfile,
+  updateEmployeeSelfPreferences,
+  updateEmployeeSelfProfileWithContact,
 } from "@/lib/employee/services/employee-self-profile";
 
 async function getAuthenticatedSupabase() {
@@ -815,12 +818,22 @@ export async function updateEmployeeSelfProfileAction(
       return { success: false, message: "Employee profile not found" };
     }
 
-    const parsed = employeeSelfProfileSchema.parse(input);
-    const supabase = await getAuthenticatedSupabase();
-    const existing = await getEmployeeSelfProfileSettings(supabase, profile);
+    const canEditContact = canEditSelfProfileContactDetails(profile.permissionCodes);
 
-    if (!existing) {
-      return { success: false, message: "Employee profile not found" };
+    const supabase = await getAuthenticatedSupabase();
+
+    if (canEditContact) {
+      const parsed = employeeSelfProfileSchema.parse(input);
+      const existing = await getEmployeeSelfProfileSettings(supabase, profile);
+
+      if (!existing) {
+        return { success: false, message: "Employee profile not found" };
+      }
+
+      await updateEmployeeSelfProfileWithContact(supabase, profile, parsed, existing);
+    } else {
+      const parsed = employeeSelfPreferencesSchema.parse(input);
+      await updateEmployeeSelfPreferences(supabase, profile, parsed);
     }
 
     const { data: profileRow, error: profileRowError } = await supabase
@@ -834,8 +847,6 @@ export async function updateEmployeeSelfProfileAction(
     if (profileRowError) {
       throw new Error(profileRowError.message);
     }
-
-    await updateEmployeeSelfProfile(supabase, profile, parsed, existing);
 
     const submittedAt = profileRow?.self_profile_submitted_at ?? new Date().toISOString();
 

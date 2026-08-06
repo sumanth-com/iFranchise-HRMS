@@ -67,17 +67,15 @@ export function HrTeamLeaveView({
 }: HrTeamLeaveViewProps) {
   return (
     <div className="space-y-6">
-      <div>
-        {embedded ? (
-          <h2 className="text-lg font-semibold tracking-tight">Team Leave</h2>
-        ) : (
+      {!embedded ? (
+        <div>
           <h1 className="text-2xl font-semibold tracking-tight">Leave & Approvals</h1>
-        )}
-        <p className="mt-1 text-sm text-muted-foreground">
-          Track leave requests, approvals, balances, and workforce availability across the
-          organization.
-        </p>
-      </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Track leave requests, approvals, balances, and workforce availability across the
+            organization.
+          </p>
+        </div>
+      ) : null}
 
       <LeaveSummaryCards summary={summary} />
 

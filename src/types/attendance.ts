@@ -9,6 +9,9 @@ export type AttendanceStatus =
   | "holiday"
   | "week_off";
 
+/** UI-only statuses for days that are not stored in attendance records. */
+export type AttendanceDisplayStatus = AttendanceStatus | "upcoming";
+
 export type AttendanceListItem = {
   id: string;
   employeeId: string;

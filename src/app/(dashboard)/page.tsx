@@ -1,25 +1,7 @@
-import { Suspense } from "react";
+import { redirect } from "next/navigation";
 
-import { PageSkeleton } from "@/components/common/page-skeleton";
-import { EmployeeDashboardView } from "@/components/employee/dashboard/employee-dashboard-view";
-import { getEmployeeDashboardData } from "@/lib/employee/services/employee-dashboard-queries";
-import { requireAuthenticatedProfile } from "@/lib/permissions/server";
-import { createClient } from "@/lib/supabase/server";
+import { HR_PORTAL_HOME } from "@/lib/auth/portal-paths";
 
-async function SelfServiceHomeContent() {
-  const profile = await requireAuthenticatedProfile();
-  const supabase = await createClient();
-  const data = await getEmployeeDashboardData(supabase, profile);
-
-  return (
-    <EmployeeDashboardView {...data} />
-  );
-}
-
-export default function HrSelfServiceHomePage() {
-  return (
-    <Suspense fallback={<PageSkeleton />}>
-      <SelfServiceHomeContent />
-    </Suspense>
-  );
+export default function RootRedirectPage() {
+  redirect(HR_PORTAL_HOME);
 }

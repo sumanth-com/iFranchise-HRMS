@@ -45,7 +45,7 @@ import type {
   ManagerUpdateCheckoutInput,
 } from "@/lib/validations/manager-self-attendance";
 import type { UserProfile } from "@/types/auth";
-import type { AttendanceStatus } from "@/types/attendance";
+import type { AttendanceDisplayStatus, AttendanceStatus } from "@/types/attendance";
 import type { WeekendDayRule } from "@/types/company-settings";
 import type { CorrectionStatus } from "@/types/manager-attendance";
 import type {
@@ -639,7 +639,7 @@ function buildHistoryRows(input: {
     const leaveTypeName = input.leaveByDate.get(date) ?? null;
     const weekendStatus = weekendStatusForDate(date, input.weekendRules);
 
-    let status: AttendanceStatus = "absent";
+    let status: AttendanceDisplayStatus = "absent";
     if (attendance) {
       status = resolvePunchStatus(
         attendance.check_in_at,
@@ -650,7 +650,7 @@ function buildHistoryRows(input: {
     } else if (holidayName) status = "holiday";
     else if (leaveTypeName) status = "on_leave";
     else if (weekendStatus) status = weekendStatus;
-    else if (date > input.today) status = "absent";
+    else if (date > input.today) status = "upcoming";
 
     const correction = attendance
       ? input.correctionsByAttendanceId.get(attendance.id) ?? null

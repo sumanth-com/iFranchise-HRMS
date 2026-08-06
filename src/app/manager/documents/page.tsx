@@ -1,6 +1,12 @@
+import { ClientSectionBoundary } from "@/components/common/client-section-boundary";
 import { DocumentsExplorer } from "@/components/employee/documents/documents-explorer";
+import { DocumentsLoadError } from "@/components/employee/documents/documents-load-error";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
-import { getEmployeeDocumentsExplorer } from "@/lib/employee/services/employee-documents-queries";
+import {
+  EMPTY_EMPLOYEE_DOCUMENTS_EXPLORER,
+  getEmployeeDocumentsExplorer,
+} from "@/lib/employee/services/employee-documents-queries";
+import { safeServerCallWithError } from "@/lib/errors/safe-server";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -10,7 +16,12 @@ export default async function ManagerDocumentsPage() {
     "documents.view",
   ]);
   const supabase = await createClient();
-  const data = await getEmployeeDocumentsExplorer(supabase, profile);
+
+  const { data, error } = await safeServerCallWithError(
+    () => getEmployeeDocumentsExplorer(supabase, profile),
+    EMPTY_EMPLOYEE_DOCUMENTS_EXPLORER,
+    "[manager/documents] explorer",
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-4 md:p-5">
@@ -21,7 +32,14 @@ export default async function ManagerDocumentsPage() {
             Securely store, organize and manage your personal and company documents.
           </p>
         </div>
-        <DocumentsExplorer data={data} />
+        {error ? <DocumentsLoadError message={error} /> : (
+          <ClientSectionBoundary
+            title="Couldn't load your documents"
+            description="Something went wrong while loading your documents. Please try again."
+          >
+            <DocumentsExplorer data={data} />
+          </ClientSectionBoundary>
+        )}
       </div>
     </div>
   );

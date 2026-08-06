@@ -37,9 +37,17 @@ type AttendanceFormProps = {
   mode: "create" | "edit";
   attendance?: AttendanceDetail;
   lookups: AttendanceLookups;
+  onCancel?: () => void;
+  onSuccess?: (attendanceId?: string) => void;
 };
 
-export function AttendanceForm({ mode, attendance, lookups }: AttendanceFormProps) {
+export function AttendanceForm({
+  mode,
+  attendance,
+  lookups,
+  onCancel,
+  onSuccess,
+}: AttendanceFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [departmentLabel, setDepartmentLabel] = useState<string | null>(null);
@@ -105,6 +113,12 @@ export function AttendanceForm({ mode, attendance, lookups }: AttendanceFormProp
           ? "Attendance created successfully"
           : "Attendance updated successfully",
       );
+
+      if (onSuccess) {
+        onSuccess(mode === "create" ? result.data?.id : attendance?.id);
+        router.refresh();
+        return;
+      }
 
       if (mode === "create" && result.data?.id) {
         router.push(ATTENDANCE_ROUTES.detail(result.data.id));
@@ -256,13 +270,17 @@ export function AttendanceForm({ mode, attendance, lookups }: AttendanceFormProp
           type="button"
           variant="outline"
           disabled={isPending}
-          onClick={() =>
+          onClick={() => {
+            if (onCancel) {
+              onCancel();
+              return;
+            }
             router.push(
               mode === "edit" && attendance
                 ? ATTENDANCE_ROUTES.detail(attendance.id)
                 : attendanceTeamListUrl(),
-            )
-          }
+            );
+          }}
         >
           Cancel
         </Button>

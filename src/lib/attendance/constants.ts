@@ -1,4 +1,6 @@
-import type { AttendanceStatus } from "@/types/attendance";
+import type { AttendanceStatus, AttendanceDisplayStatus } from "@/types/attendance";
+
+import { hubTeamListUrl } from "@/lib/dashboard/hub-paths";
 
 /** Org-wide attendance tracking for HR (team tab in Attendance hub). */
 export const ATTENDANCE_ROUTES = {
@@ -13,20 +15,13 @@ export const ATTENDANCE_ROUTES = {
 /** Personal / self-service attendance in the HR portal main nav. */
 export const SELF_ATTENDANCE_ROUTES = {
   list: "/dashboard/attendance",
+  team: "/dashboard/attendance/team",
 } as const;
 
 export function attendanceTeamListUrl(
   searchParams?: Record<string, string | undefined>,
 ) {
-  const params = new URLSearchParams({ tab: "team" });
-  if (searchParams) {
-    Object.entries(searchParams).forEach(([key, value]) => {
-      if (value) {
-        params.set(key, value);
-      }
-    });
-  }
-  return `${SELF_ATTENDANCE_ROUTES.list}?${params.toString()}`;
+  return hubTeamListUrl(SELF_ATTENDANCE_ROUTES.list, searchParams);
 }
 
 export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatus, string> = {
@@ -37,6 +32,19 @@ export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatus, string> = {
   on_leave: "On Leave",
   holiday: "Holiday",
   week_off: "Weekend",
+};
+
+export const ATTENDANCE_DISPLAY_STATUS_LABELS: Record<AttendanceDisplayStatus, string> = {
+  ...ATTENDANCE_STATUS_LABELS,
+  upcoming: "—",
+};
+
+export const ATTENDANCE_SOURCE_LABELS: Record<string, string> = {
+  manual: "Manual",
+  biometric: "Biometric",
+  mobile: "Mobile",
+  web: "Web",
+  import: "Import",
 };
 
 export const ATTENDANCE_SUMMARY_LABELS = {

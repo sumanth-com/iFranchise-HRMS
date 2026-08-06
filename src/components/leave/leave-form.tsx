@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -35,9 +36,20 @@ type LeaveFormProps = {
   mode?: "create";
   /** When set, the form redirects here on success/cancel instead of the HR leave routes. */
   redirectPath?: string;
+  /** Self-service modal: hide employee picker and optional fields. */
+  variant?: "default" | "self";
+  onSuccess?: () => void;
+  onCancel?: () => void;
 };
 
-export function LeaveForm({ lookups, defaultEmployeeId, redirectPath }: LeaveFormProps) {
+export function LeaveForm({
+  lookups,
+  defaultEmployeeId,
+  redirectPath,
+  variant = "default",
+  onSuccess,
+  onCancel,
+}: LeaveFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -116,6 +128,12 @@ export function LeaveForm({ lookups, defaultEmployeeId, redirectPath }: LeaveFor
 
       toast.success("Leave request submitted successfully");
 
+      if (onSuccess) {
+        onSuccess();
+        router.refresh();
+        return;
+      }
+
       if (redirectPath) {
         router.push(redirectPath);
         router.refresh();
@@ -133,39 +151,43 @@ export function LeaveForm({ lookups, defaultEmployeeId, redirectPath }: LeaveFor
     });
   });
 
-  return (
-    <form onSubmit={onSubmit} className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="employeeId">Employee</Label>
-          <Select
-            items={employeeItems}
-            value={form.watch("employeeId")}
-            onValueChange={(value) => {
-              if (!value) return;
-              form.setValue("employeeId", value, { shouldValidate: true });
-            }}
-            disabled={isPending}
-          >
-            <SelectTrigger id="employeeId" className="h-8 w-full min-w-0">
-              <SelectValue placeholder="Select employee" />
-            </SelectTrigger>
-            <SelectContent align="start" alignItemWithTrigger={false}>
-              {employeeItems.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {form.formState.errors.employeeId ? (
-            <p className="text-sm text-destructive">
-              {form.formState.errors.employeeId.message}
-            </p>
-          ) : null}
-        </div>
+  const isSelfService = variant === "self";
 
-        <div className="space-y-2">
+  return (
+    <form onSubmit={onSubmit} className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        {!isSelfService ? (
+          <div className="space-y-2">
+            <Label htmlFor="employeeId">Employee</Label>
+            <Select
+              items={employeeItems}
+              value={form.watch("employeeId")}
+              onValueChange={(value) => {
+                if (!value) return;
+                form.setValue("employeeId", value, { shouldValidate: true });
+              }}
+              disabled={isPending}
+            >
+              <SelectTrigger id="employeeId" className="h-8 w-full min-w-0">
+                <SelectValue placeholder="Select employee" />
+              </SelectTrigger>
+              <SelectContent align="start" alignItemWithTrigger={false}>
+                {employeeItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {form.formState.errors.employeeId ? (
+              <p className="text-sm text-destructive">
+                {form.formState.errors.employeeId.message}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className={cn("space-y-2", isSelfService && "md:col-span-2")}>
           <Label htmlFor="leaveTypeId">Leave Type</Label>
           <Select
             items={leaveTypeItems}
@@ -195,6 +217,25 @@ export function LeaveForm({ lookups, defaultEmployeeId, redirectPath }: LeaveFor
         </div>
 
         {selectedEmployeeId ? (
+          isSelfService ? (
+            balancesLoading || balances.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2 md:col-span-2">
+                <span className="text-xs font-medium text-muted-foreground">Your balance:</span>
+                {balancesLoading ? (
+                  <span className="text-xs text-muted-foreground">Loading…</span>
+                ) : (
+                  balances.map((balance) => (
+                    <span
+                      key={balance.leaveTypeCode}
+                      className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium"
+                    >
+                      {balance.leaveTypeName}: {balance.balanceDays} days
+                    </span>
+                  ))
+                )}
+              </div>
+            ) : null
+          ) : (
           <div className="md:col-span-2">
             <section className="rounded-xl border bg-card p-4 shadow-sm">
               <div className="mb-3 flex items-center justify-between gap-3">
@@ -254,6 +295,7 @@ export function LeaveForm({ lookups, defaultEmployeeId, redirectPath }: LeaveFor
               ) : null}
             </section>
           </div>
+          )
         ) : null}
 
         <div className="space-y-2">
@@ -347,7 +389,7 @@ export function LeaveForm({ lookups, defaultEmployeeId, redirectPath }: LeaveFor
           <Label htmlFor="reason">Reason</Label>
           <textarea
             id="reason"
-            rows={4}
+            rows={isSelfService ? 3 : 4}
             disabled={isPending}
             className="flex min-h-20 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             {...form.register("reason")}
@@ -359,36 +401,46 @@ export function LeaveForm({ lookups, defaultEmployeeId, redirectPath }: LeaveFor
           ) : null}
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="emergencyContactName">Emergency Contact Name</Label>
-          <Input
-            id="emergencyContactName"
-            disabled={isPending}
-            {...form.register("emergencyContactName")}
-          />
-        </div>
+        {!isSelfService ? (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="emergencyContactName">Emergency Contact Name</Label>
+              <Input
+                id="emergencyContactName"
+                disabled={isPending}
+                {...form.register("emergencyContactName")}
+              />
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="emergencyContactPhone">Emergency Contact Phone</Label>
-          <Input
-            id="emergencyContactPhone"
-            disabled={isPending}
-            {...form.register("emergencyContactPhone")}
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="emergencyContactPhone">Emergency Contact Phone</Label>
+              <Input
+                id="emergencyContactPhone"
+                disabled={isPending}
+                {...form.register("emergencyContactPhone")}
+              />
+            </div>
+          </>
+        ) : null}
       </div>
 
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex items-center justify-end gap-2 border-t pt-3">
         <Button
           type="button"
           variant="outline"
           disabled={isPending}
-          onClick={() => router.push(redirectPath ?? LEAVE_ROUTES.list)}
+          onClick={() => {
+            if (onCancel) {
+              onCancel();
+              return;
+            }
+            router.push(redirectPath ?? LEAVE_ROUTES.list);
+          }}
         >
           Cancel
         </Button>
         <Button type="submit" disabled={isPending}>
-          Submit leave request
+          {isSelfService ? "Submit request" : "Submit leave request"}
         </Button>
       </div>
     </form>

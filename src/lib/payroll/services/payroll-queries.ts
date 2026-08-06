@@ -219,15 +219,7 @@ export async function getPayrollSummary(
     };
   });
 
-  const { data: paidPayrolls } = await supabase
-    .schema("hrms")
-    .from("payrolls")
-    .select("total_net")
-    .eq("organization_id", organizationId)
-    .eq("payroll_status", "paid")
-    .is("deleted_at", null);
-
-  const totalPayroll = (paidPayrolls ?? []).reduce(
+  const totalPayroll = (yearPayrolls ?? []).reduce(
     (sum, row) => sum + Number(row.total_net),
     0,
   );

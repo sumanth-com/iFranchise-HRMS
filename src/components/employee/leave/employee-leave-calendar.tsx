@@ -43,12 +43,7 @@ export function EmployeeLeaveCalendar({
   return (
     <section className="rounded-xl border bg-card p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-sm font-semibold tracking-tight">Leave Calendar</h2>
-          <p className="text-xs text-muted-foreground">
-            Your leaves and company holidays — switch between month and week.
-          </p>
-        </div>
+        <h2 className="text-sm font-semibold tracking-tight">Leave Calendar</h2>
         {isPending ? (
           <span className="shrink-0 text-xs text-muted-foreground">Loading…</span>
         ) : null}

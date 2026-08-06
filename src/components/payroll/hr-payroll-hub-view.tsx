@@ -1,95 +1,116 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import type { ReactNode } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { FileText, Download } from "lucide-react";
 
 import { Button } from "@/components/common/button";
+import { EmployeePayslipDrawer } from "@/components/employee/payroll/employee-payslip-drawer";
 import { EmployeePayrollView } from "@/components/employee/payroll/employee-payroll-view";
-import { HrTeamPayrollView } from "@/components/payroll/hr-team-payroll-view";
 import { PayrollSubNav } from "@/components/payroll/payroll-sub-nav";
-import { SELF_DOCUMENTS_ROUTES } from "@/lib/documents/constants";
-import { SELF_PAYROLL_ROUTES } from "@/lib/payroll/constants";
+import {
+  SELF_PAYROLL_ROUTES,
+  TEAM_PAYROLL_SECTIONS,
+  type TeamPayrollSection,
+} from "@/lib/payroll/constants";
 import type { EmployeePayrollData } from "@/types/employee-payroll";
-import type { PayrollListItem, PayrollSummary } from "@/types/payroll";
 
 type PayrollSection = "my" | "team";
 
-type TeamPayrollData = {
-  summary: PayrollSummary;
-  records: PayrollListItem[];
-  total: number;
-  page: number;
-  pageSize: number;
-  month: number;
-  year: number;
-};
-
 type Props = {
   initialSection?: PayrollSection;
+  initialTeamSection?: TeamPayrollSection;
   canViewTeam: boolean;
   selfPayroll: EmployeePayrollData;
-  teamPayroll: TeamPayrollData;
+  children?: ReactNode;
 };
 
 export function HrPayrollHubView({
   initialSection = "my",
+  initialTeamSection = TEAM_PAYROLL_SECTIONS.dashboard,
   canViewTeam,
   selfPayroll,
-  teamPayroll,
+  children,
 }: Props) {
-  const router = useRouter();
   const searchParams = useSearchParams();
+  const activeSection =
+    initialSection === "team" && canViewTeam ? "team" : "my";
+  const isTeamView = activeSection === "team";
 
-  const tab = searchParams.get("tab");
-  const activeSection: PayrollSection =
-    canViewTeam && (tab === "team" || (tab === null && initialSection === "team"))
-      ? "team"
-      : "my";
+  const teamSection =
+    (searchParams.get("section") as TeamPayrollSection | null) ?? initialTeamSection;
 
-  function setSection(next: PayrollSection) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("tab", next);
-    if (next === "team") {
-      const now = new Date();
-      if (!params.get("year")) params.set("year", String(now.getFullYear()));
-      if (!params.get("month")) params.set("month", String(now.getMonth() + 1));
-    }
-    router.push(`${SELF_PAYROLL_ROUTES.list}?${params.toString()}`);
+  const [activePayslipId, setActivePayslipId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  function openLatestPayslip() {
+    const latestId = selfPayroll.payslips[0]?.id;
+    if (!latestId) return;
+    setActivePayslipId(latestId);
+    setDrawerOpen(true);
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Payroll</h1>
-        {canViewTeam ? (
-          <div className="flex items-center gap-2 rounded-lg border bg-card p-1">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {isTeamView ? "Team Payroll" : "Payroll"}
+          </h1>
+          {isTeamView ? (
+            <p className="text-sm text-muted-foreground">
+              Run payroll, review payslips, and manage compensation across the organization.
+            </p>
+          ) : null}
+        </div>
+        {!isTeamView ? (
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             <Button
+              type="button"
+              variant="outline"
               size="sm"
-              variant={activeSection === "my" ? "default" : "ghost"}
-              onClick={() => setSection("my")}
+              className="gap-1.5"
+              disabled={selfPayroll.payslips.length === 0}
+              onClick={openLatestPayslip}
             >
-              My Payroll
+              <Download className="size-4" />
+              Latest Payslip
             </Button>
             <Button
+              type="button"
+              variant="outline"
               size="sm"
-              variant={activeSection === "team" ? "default" : "ghost"}
-              onClick={() => setSection("team")}
+              className="gap-1.5"
+              nativeButton={false}
+              render={<Link href={SELF_PAYROLL_ROUTES.policy} />}
             >
-              Team Payroll
+              <FileText className="size-4" />
+              Payroll Policy
             </Button>
           </div>
         ) : null}
       </div>
 
-      {activeSection === "team" && canViewTeam ? <PayrollSubNav /> : null}
+      {isTeamView ? <PayrollSubNav /> : null}
 
-      {activeSection === "my" || !canViewTeam ? (
-        <EmployeePayrollView
-          data={selfPayroll}
-          documentsHref={SELF_DOCUMENTS_ROUTES.list}
-          showPageHeading={false}
-        />
+      {isTeamView ? (
+        children
       ) : (
-        <HrTeamPayrollView {...teamPayroll} embedded />
+        <>
+          <EmployeePayrollView
+            data={selfPayroll}
+            policyHref={SELF_PAYROLL_ROUTES.policy}
+            showPageHeading={false}
+            showHeaderActions={false}
+          />
+          <EmployeePayslipDrawer
+            payslipId={activePayslipId}
+            open={drawerOpen}
+            onOpenChange={setDrawerOpen}
+          />
+        </>
       )}
     </div>
   );

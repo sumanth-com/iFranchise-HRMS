@@ -1,17 +1,10 @@
-import { PayrollSettingsForm } from "@/components/payroll/payroll-settings-form";
-import { fetchPayrollSettingsAction } from "@/lib/payroll/actions";
-import { requireServerPermission } from "@/lib/permissions/server";
-import { hasAnyPermission } from "@/lib/permissions/utils";
+import { redirect } from "next/navigation";
 
-export default async function PayrollSettingsPage() {
-  const profile = await requireServerPermission("payroll.view");
-  const record = await fetchPayrollSettingsAction();
-  const canEdit = hasAnyPermission(profile.permissionCodes, [
-    "settings.edit",
-    "settings.manage",
-    "payroll.edit",
-    "payroll.approve",
-  ]);
+import {
+  payrollHubUrl,
+  TEAM_PAYROLL_SECTIONS,
+} from "@/lib/payroll/constants";
 
-  return <PayrollSettingsForm record={record} canEdit={canEdit} />;
+export default function PayrollSettingsPage() {
+  redirect(payrollHubUrl({ tab: "team", section: TEAM_PAYROLL_SECTIONS.settings }));
 }

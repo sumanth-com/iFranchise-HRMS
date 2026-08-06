@@ -8,6 +8,7 @@ const TTL_SECONDS = 5 * 60;
 type PermissionCachePayload = {
   userId: string;
   codes: string[];
+  accountAllowed: boolean;
   expiresAt: number;
 };
 
@@ -35,6 +36,14 @@ export async function getCachedPermissionCodes(
   request: NextRequest,
   userId: string,
 ): Promise<string[] | null> {
+  const payload = await getCachedPermissionPayload(request, userId);
+  return payload?.codes ?? null;
+}
+
+export async function getCachedPermissionPayload(
+  request: NextRequest,
+  userId: string,
+): Promise<PermissionCachePayload | null> {
   try {
     const value = request.cookies.get(COOKIE_NAME)?.value;
     if (!value) return null;
@@ -43,7 +52,7 @@ export async function getCachedPermissionCodes(
     if (!payload) return null;
     if (payload.userId !== userId) return null;
     if (payload.expiresAt <= Date.now()) return null;
-    return payload.codes;
+    return payload;
   } catch (error) {
     console.error("[permission-cache] read failed", error);
     return null;
@@ -54,11 +63,13 @@ export async function attachPermissionCache(
   response: NextResponse,
   userId: string,
   codes: string[],
+  accountAllowed = true,
 ): Promise<void> {
   try {
     const payload: PermissionCachePayload = {
       userId,
       codes,
+      accountAllowed,
       expiresAt: Date.now() + TTL_SECONDS * 1000,
     };
 

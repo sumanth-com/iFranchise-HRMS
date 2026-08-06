@@ -3,16 +3,26 @@ import type { NotificationModule, NotificationPriority } from "@/types/notificat
 import type { NotificationSoundTone } from "@/types/notifications";
 
 import { CEO_ROUTES } from "@/lib/ceo/constants";
+import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
+import { getPortalVariantFromHome } from "@/lib/auth/portal-account-menu";
 
 export const NOTIFICATIONS_ROUTES = {
   dashboard: "/dashboard/notifications",
-  center: "/dashboard/notifications?tab=my",
+  team: "/dashboard/notifications/team",
+  center: "/dashboard/notifications",
   history: "/dashboard/notifications/history",
   templates: "/dashboard/notifications/templates",
   settings: "/dashboard/notifications/settings",
   preferences: "/dashboard/notifications/preferences",
 } as const;
+
+export const NOTIFICATIONS_SUB_NAV = [
+  { title: "My Notifications", href: "/dashboard/notifications" },
+  { title: "Alerts & Broadcasts", href: "/dashboard/notifications/team", admin: true },
+  { title: "History", href: NOTIFICATIONS_ROUTES.history },
+  { title: "Preferences", href: NOTIFICATIONS_ROUTES.preferences },
+] as const;
 
 export const MANAGER_NOTIFICATIONS_ROUTES = {
   dashboard: MANAGER_ROUTES.notifications,
@@ -37,8 +47,17 @@ export type NotificationRouteSet = {
   preferences: string;
 };
 
+export const EMPLOYEE_NOTIFICATIONS_ROUTES = {
+  dashboard: EMPLOYEE_ROUTES.notifications,
+  center: EMPLOYEE_ROUTES.notifications,
+  history: EMPLOYEE_ROUTES.notifications,
+  preferences: `${EMPLOYEE_ROUTES.settings}#notifications`,
+} as const;
+
 export function getNotificationsRoutes(portalHome: string): NotificationRouteSet {
-  if (portalHome.startsWith("/manager")) {
+  const variant = getPortalVariantFromHome(portalHome);
+
+  if (variant === "manager") {
     return {
       dashboard: MANAGER_NOTIFICATIONS_ROUTES.dashboard,
       center: MANAGER_NOTIFICATIONS_ROUTES.center,
@@ -49,7 +68,7 @@ export function getNotificationsRoutes(portalHome: string): NotificationRouteSet
     };
   }
 
-  if (portalHome.startsWith("/ceo")) {
+  if (variant === "ceo") {
     return {
       dashboard: CEO_NOTIFICATIONS_ROUTES.dashboard,
       center: CEO_NOTIFICATIONS_ROUTES.center,
@@ -60,15 +79,19 @@ export function getNotificationsRoutes(portalHome: string): NotificationRouteSet
     };
   }
 
+  if (variant === "employee") {
+    return {
+      dashboard: EMPLOYEE_NOTIFICATIONS_ROUTES.dashboard,
+      center: EMPLOYEE_NOTIFICATIONS_ROUTES.center,
+      history: EMPLOYEE_NOTIFICATIONS_ROUTES.history,
+      templates: NOTIFICATIONS_ROUTES.templates,
+      settings: NOTIFICATIONS_ROUTES.settings,
+      preferences: EMPLOYEE_NOTIFICATIONS_ROUTES.preferences,
+    };
+  }
+
   return NOTIFICATIONS_ROUTES;
 }
-
-export const NOTIFICATIONS_SUB_NAV = [
-  { title: "My Notifications", href: "/dashboard/notifications?tab=my" },
-  { title: "Alerts & Broadcasts", href: "/dashboard/notifications?tab=team", admin: true },
-  { title: "History", href: NOTIFICATIONS_ROUTES.history },
-  { title: "Preferences", href: NOTIFICATIONS_ROUTES.preferences },
-] as const;
 
 export const NOTIFICATION_CENTER_TABS = [
   { value: "all", label: "All" },

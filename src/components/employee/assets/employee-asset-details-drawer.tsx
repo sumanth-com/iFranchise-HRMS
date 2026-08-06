@@ -1,6 +1,5 @@
 "use client";
 
-import { format, parseISO } from "date-fns";
 import { RefreshCw, Wrench } from "lucide-react";
 import Image from "next/image";
 
@@ -12,6 +11,7 @@ import {
 } from "@/components/employee/assets/employee-asset-badges";
 import { assetCategoryIcon } from "@/components/employee/assets/employee-asset-icons";
 import { MAINTENANCE_STATUS_LABELS } from "@/lib/assets/constants";
+import { formatAssetDate, getAssetDisplayName } from "@/lib/employee/assets/asset-display";
 import {
   Sheet,
   SheetContent,
@@ -21,7 +21,7 @@ import {
 import type { EmployeeAsset } from "@/types/employee-assets";
 
 function fmt(date: string | null) {
-  return date ? format(parseISO(date), "dd MMM yyyy") : "—";
+  return formatAssetDate(date);
 }
 
 function Detail({ label, value }: { label: string; value: string | null }) {
@@ -57,7 +57,9 @@ export function EmployeeAssetDetailsDrawer({
         {asset ? (
           <>
             <SheetHeader className="border-b p-4 pr-12">
-              <SheetTitle className="text-base">{asset.name}</SheetTitle>
+              <SheetTitle className="text-base">
+                {asset ? getAssetDisplayName(asset) : "Asset"}
+              </SheetTitle>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span>{asset.assetCode}</span>
                 <span>·</span>
@@ -105,11 +107,11 @@ export function EmployeeAssetDetailsDrawer({
               </div>
 
               {asset.notes?.trim() ? (
-                <div className="mt-4">
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                    Configuration
+                <div className="mt-4 rounded-lg border bg-muted/20 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Configuration & specs
                   </p>
-                  <p className="mt-1 whitespace-pre-line text-sm">{asset.notes}</p>
+                  <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed">{asset.notes}</p>
                 </div>
               ) : null}
 

@@ -274,14 +274,14 @@ export function EmployeeAccountProvisioningPanel({
       <section className="rounded-2xl border bg-card p-4 shadow-sm md:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch lg:justify-between">
           {canInvite ? (
-            <EmployeeInviteSection
-              lookups={lookups}
-              canInvite={canInvite}
-              inviteServiceReady={inviteServiceReady}
-            />
-          ) : (
-            <div className="hidden lg:block lg:max-w-sm" />
-          )}
+            <div className="lg:min-w-[min(100%,320px)] lg:flex-1">
+              <EmployeeInviteSection
+                lookups={lookups}
+                canInvite={canInvite}
+                inviteServiceReady={inviteServiceReady}
+              />
+            </div>
+          ) : null}
           <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:max-w-xl">
             <StatCard label="Draft" value={summary.draft + summary.invited} />
             <StatCard label="Pending" value={pendingCount} />

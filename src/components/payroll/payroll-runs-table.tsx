@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   flexRender,
   getCoreRowModel,
@@ -11,8 +10,9 @@ import {
 } from "@tanstack/react-table";
 import { Eye, Lock, Search } from "lucide-react";
 
+import { PayrollRunSummaryDialog } from "@/components/payroll/payroll-run-summary-dialog";
 import { PayrollStatusBadge } from "@/components/payroll/payroll-status-badge";
-import { Button, buttonVariants } from "@/components/common/button";
+import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import {
@@ -59,6 +59,7 @@ type PayrollRunsTableProps = {
   payrollStatus?: PayrollStatus;
   showFilters?: boolean;
   compact?: boolean;
+  detailMode?: "navigate" | "dialog";
 };
 
 export function PayrollRunsTable({
@@ -72,9 +73,12 @@ export function PayrollRunsTable({
   payrollStatus: initialPayrollStatus,
   showFilters = true,
   compact = false,
+  detailMode = compact ? "dialog" : "navigate",
 }: PayrollRunsTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedRun, setSelectedRun] = useState<PayrollListItem | null>(null);
   const [tableState, setTableState] = useState({
     records: initialRecords,
     total: initialTotal,
@@ -91,10 +95,30 @@ export function PayrollRunsTable({
   });
 
   useEffect(() => {
-    if (window.location.search) {
-      window.history.replaceState(null, "", window.location.pathname);
-    }
-  }, []);
+    setTableState({
+      records: initialRecords,
+      total: initialTotal,
+      page: initialPage,
+      pageSize: initialPageSize,
+    });
+    setFilters({
+      page: initialPage,
+      pageSize: initialPageSize,
+      search: initialSearch,
+      month: initialMonth,
+      year: initialYear,
+      payrollStatus: initialPayrollStatus,
+    });
+  }, [
+    initialRecords,
+    initialTotal,
+    initialPage,
+    initialPageSize,
+    initialSearch,
+    initialMonth,
+    initialYear,
+    initialPayrollStatus,
+  ]);
 
   const updateParams = useCallback(
     (updates: Record<string, string | undefined>) => {
@@ -137,6 +161,15 @@ export function PayrollRunsTable({
 
   const { records, total, page, pageSize } = tableState;
 
+  function openRunDetail(run: PayrollListItem) {
+    if (detailMode === "dialog") {
+      setSelectedRun(run);
+      setDialogOpen(true);
+      return;
+    }
+    router.push(PAYROLL_ROUTES.detail(run.id));
+  }
+
   const columns = useMemo<ColumnDef<PayrollListItem>[]>(
     () => [
       {
@@ -178,19 +211,22 @@ export function PayrollRunsTable({
             {row.original.isLocked ? (
               <Lock className="h-4 w-4 text-muted-foreground" />
             ) : null}
-            <Link
-              href={PAYROLL_ROUTES.detail(row.original.id)}
-              className={buttonVariants({ variant: "ghost", size: "sm" })}
-              onClick={(event) => event.stopPropagation()}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(event) => {
+                event.stopPropagation();
+                openRunDetail(row.original);
+              }}
             >
               <Eye className="mr-1 h-4 w-4" />
               View
-            </Link>
+            </Button>
           </div>
         ),
       },
     ],
-    [],
+    [detailMode],
   );
 
   const table = useReactTable({
@@ -281,9 +317,7 @@ export function PayrollRunsTable({
                   <TableRow
                     key={row.id}
                     className="cursor-pointer"
-                    onClick={() =>
-                      router.push(PAYROLL_ROUTES.detail(row.original.id))
-                    }
+                    onClick={() => openRunDetail(row.original)}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id} className={compact ? "px-3 py-2.5" : "px-4 py-3"}>
@@ -332,6 +366,18 @@ export function PayrollRunsTable({
             </Button>
           </div>
         </div>
+      ) : null}
+
+      {detailMode === "dialog" && dialogOpen ? (
+        <PayrollRunSummaryDialog
+          payrollId={selectedRun?.id ?? null}
+          fallback={selectedRun}
+          open={dialogOpen}
+          onOpenChange={(next) => {
+            setDialogOpen(next);
+            if (!next) setSelectedRun(null);
+          }}
+        />
       ) : null}
     </div>
   );

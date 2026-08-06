@@ -65,7 +65,6 @@ export function ManagerAttendanceHubView({
           status={selfAttendance.status}
           searchDate={selfAttendance.searchDate}
           basePath={MANAGER_ROUTES.attendance}
-          tabQuery="my"
           padded={false}
           showPageHeading={false}
         />

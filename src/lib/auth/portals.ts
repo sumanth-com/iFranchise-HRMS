@@ -1,10 +1,12 @@
 import type { Role } from "@/types/auth";
 
+import { HR_PORTAL_HOME } from "@/lib/auth/portal-paths";
+
 export type PortalKey = "hr" | "ceo" | "manager" | "employee";
 
 /** Canonical portal entry routes (database `roles.portal_route` uses these values). */
 export const PORTAL_ROUTES: Record<PortalKey, string> = {
-  hr: "/dashboard",
+  hr: HR_PORTAL_HOME,
   ceo: "/ceo",
   manager: "/manager",
   employee: "/employee",
@@ -92,7 +94,11 @@ export function getPortalRedirectPath(
 }
 
 export function getRequiredPortalForPath(pathname: string): PortalKey | null {
-  if (pathname === "/" || pathname === "/settings") return "hr";
+  if (pathname === HR_PORTAL_HOME || pathname.startsWith(`${HR_PORTAL_HOME}/`)) {
+    return "hr";
+  }
+
+  if (pathname === "/settings") return "hr";
 
   if (pathname === "/executive" || pathname.startsWith("/executive/")) {
     return "ceo";

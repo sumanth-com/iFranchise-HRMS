@@ -1,6 +1,10 @@
 import { cache } from "react";
 
-import { loadUserProfile, type ProfileLoadResult } from "@/lib/auth/profile-loader";
+import {
+  loadUserProfile,
+  type AuthSupabaseClient,
+  type ProfileLoadResult,
+} from "@/lib/auth/profile-loader";
 
 /**
  * Per-request profile loader for portal layouts and pages.
@@ -9,6 +13,7 @@ import { loadUserProfile, type ProfileLoadResult } from "@/lib/auth/profile-load
 export const getLayoutUserProfile = cache(async function getLayoutUserProfile(
   userId: string,
   email: string,
+  supabaseClient?: AuthSupabaseClient,
 ): Promise<ProfileLoadResult> {
-  return loadUserProfile(userId, email);
+  return loadUserProfile(userId, email, supabaseClient);
 });

@@ -18,6 +18,7 @@ export type MyProfileBundle = {
   departmentName: string | null;
   designationTitle: string | null;
   employmentTypeName: string | null;
+  reportingManagerId: string | null;
   reportingManagerName: string | null;
   dateOfJoining: string | null;
   attendanceSummary: MyProfileAttendanceSummary;

@@ -1,8 +1,10 @@
 import { MyProfileView } from "@/components/employee/profile/my-profile-view";
 import { PageScroll } from "@/components/common/sticky-layout";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import { canEditSelfProfileContactDetails } from "@/lib/employee/profile-contact";
 import { SELF_PROFILE_ROUTES } from "@/lib/documents/constants";
 import { getMyProfileBundle } from "@/lib/employee/services/my-profile";
+import { getEmployeeLookups } from "@/lib/employees/services/employee-queries";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -28,9 +30,27 @@ export default async function DashboardProfilePage() {
     );
   }
 
+  const canEditContactDetails = canEditSelfProfileContactDetails(profile.permissionCodes);
+  const lookups = canEditContactDetails
+    ? await getEmployeeLookups(
+        supabase,
+        profile.employee.organizationId,
+        data.employeeId,
+      )
+    : null;
+
+  const managerOptions = lookups?.managers.map((manager) => ({
+    value: manager.id,
+    label: manager.label,
+  })) ?? [];
+
   return (
     <PageScroll>
-      <MyProfileView data={data} />
+      <MyProfileView
+        data={data}
+        canEditContactDetails={canEditContactDetails}
+        managerOptions={managerOptions}
+      />
     </PageScroll>
   );
 }

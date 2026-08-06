@@ -1,6 +1,6 @@
 "use client";
 
-import { format, parseISO } from "date-fns";
+import { formatDocumentDate } from "@/lib/employee/documents/document-dates";
 import { Download, Eye, History } from "lucide-react";
 
 import { Button } from "@/components/common/button";
@@ -10,6 +10,7 @@ import {
   FileThumbnail,
   getFileKind,
 } from "@/components/employee/documents/document-icons";
+import { DocumentPreviewDialog } from "@/components/employee/documents/document-preview-dialog";
 import { useEmployeeDocumentFile } from "@/components/employee/documents/use-employee-document-file";
 import type { EmployeeDocFile } from "@/types/employee-documents-explorer";
 
@@ -26,10 +27,11 @@ function formatBytes(bytes: number) {
 }
 
 export function DocumentVersionsDialog({ file, open, onOpenChange }: Props) {
-  const { isBusy, preview, download } = useEmployeeDocumentFile();
+  const { isBusy, preview, download, previewTarget, setPreviewTarget } = useEmployeeDocumentFile();
 
   return (
-    <Modal
+    <>
+      <Modal
       open={open}
       onOpenChange={onOpenChange}
       title="Version History"
@@ -63,7 +65,7 @@ export function DocumentVersionsDialog({ file, open, onOpenChange }: Props) {
                   </div>
                   <p className="truncate text-xs text-muted-foreground">
                     {formatBytes(version.fileSizeBytes)} ·{" "}
-                    {format(parseISO(version.createdAt), "dd MMM yyyy, h:mm a")}
+                    {formatDocumentDate(version.createdAt, "dd MMM yyyy, h:mm a")}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
@@ -73,7 +75,14 @@ export function DocumentVersionsDialog({ file, open, onOpenChange }: Props) {
                       size="icon"
                       className="size-8"
                       disabled={isBusy}
-                      onClick={() => preview(version.storagePath)}
+                      onClick={() =>
+                        preview(
+                          version.storagePath,
+                          version.fileName,
+                          version.mimeType,
+                          file.title,
+                        )
+                      }
                       aria-label="Preview version"
                     >
                       <Eye className="size-4" />
@@ -100,6 +109,11 @@ export function DocumentVersionsDialog({ file, open, onOpenChange }: Props) {
           No version history.
         </div>
       )}
-    </Modal>
+      </Modal>
+      <DocumentPreviewDialog
+        target={previewTarget}
+        onOpenChange={(next) => !next && setPreviewTarget(null)}
+      />
+    </>
   );
 }

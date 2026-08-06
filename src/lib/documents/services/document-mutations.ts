@@ -570,10 +570,11 @@ export async function deleteCompanyLetter(
 export async function createSignedDocumentUrl(
   supabase: AuthSupabaseClient,
   storagePath: string,
+  options?: { download?: string },
 ): Promise<string | null> {
   const { data, error } = await supabase.storage
     .from(DOCUMENTS_STORAGE_BUCKET)
-    .createSignedUrl(storagePath, 60 * 60);
+    .createSignedUrl(storagePath, 60 * 60, options?.download ? { download: options.download } : undefined);
 
   if (error || !data?.signedUrl) return null;
   return data.signedUrl;

@@ -57,7 +57,7 @@ export function HrTodayPulseSection({ pulse }: { pulse: HrTodayPulse }) {
         <PulseMetric
           label="Absent Today"
           value={pulse.absentToday}
-          href="/dashboard/attendance?tab=team&attendanceStatus=absent"
+          href="/dashboard/attendance/team?attendanceStatus=absent"
           accent="text-destructive"
         />
         <PulseMetric
@@ -69,7 +69,7 @@ export function HrTodayPulseSection({ pulse }: { pulse: HrTodayPulse }) {
         <PulseMetric
           label="Pending Approvals"
           value={pulse.pendingApprovals}
-          href="/dashboard/leave?tab=team"
+          href="/dashboard/leave/team"
           accent="text-violet-600 dark:text-violet-400"
         />
         <PulseMetric

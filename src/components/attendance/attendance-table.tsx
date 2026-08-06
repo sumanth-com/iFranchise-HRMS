@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
@@ -28,8 +27,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { AddAttendanceDialog } from "@/components/attendance/add-attendance-dialog";
 import { AttendanceStatusBadge } from "@/components/attendance/attendance-status-badge";
-import { Button, buttonVariants } from "@/components/common/button";
+import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Modal } from "@/components/common/modal";
 import {
@@ -59,7 +59,7 @@ import {
 } from "@/lib/attendance/constants";
 import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils";
 import type { LucideIcon } from "lucide-react";
-import type { AttendanceListItem } from "@/types/attendance";
+import type { AttendanceListItem, AttendanceLookups } from "@/types/attendance";
 import type { LookupOption } from "@/types/employee";
 import { cn } from "@/lib/utils";
 
@@ -82,6 +82,7 @@ type AttendanceTableProps = {
   canDelete: boolean;
   listBasePath?: string;
   fixedQuery?: Record<string, string>;
+  attendanceLookups?: AttendanceLookups;
 };
 
 function formatDateTime(value?: string | null) {
@@ -190,12 +191,14 @@ export function AttendanceTable({
   canDelete,
   listBasePath,
   fixedQuery,
+  attendanceLookups,
 }: AttendanceTableProps) {
   const router = useRouter();
   const initialParams = useSearchParams();
   const filterParamsRef = useRef(initialParams.toString());
   const [isPending, startTransition] = useTransition();
   const [deleteTarget, setDeleteTarget] = useState<AttendanceListItem | null>(null);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   const resolvedListPath = listBasePath ?? ATTENDANCE_ROUTES.list;
 
@@ -622,16 +625,14 @@ export function AttendanceTable({
             ) : null}
 
             {canCreate ? (
-              <Link
-                href={ATTENDANCE_ROUTES.new}
-                className={cn(
-                  buttonVariants(),
-                  "h-10 min-w-[10.5rem] whitespace-nowrap px-4",
-                )}
+              <Button
+                className="h-10 min-w-[10.5rem] whitespace-nowrap px-4"
+                disabled={!attendanceLookups}
+                onClick={() => setAddDialogOpen(true)}
               >
                 <Plus className="size-4" />
                 Add Attendance
-              </Link>
+              </Button>
             ) : null}
           </div>
         </div>
@@ -838,6 +839,14 @@ export function AttendanceTable({
           {isEmployeeHistoryView ? " for selected employee and date range" : ""}
         </p>
       )}
+
+      {attendanceLookups ? (
+        <AddAttendanceDialog
+          open={addDialogOpen}
+          onOpenChange={setAddDialogOpen}
+          lookups={attendanceLookups}
+        />
+      ) : null}
 
       <Modal
         open={Boolean(deleteTarget)}

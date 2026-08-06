@@ -1,0 +1,13 @@
+/** HR portal hub routes — personal vs team administration paths. */
+export const HR_HUB_ROUTES = {
+  myAttendance: "/dashboard/attendance",
+  teamAttendance: "/dashboard/attendance/team",
+  myLeave: "/dashboard/leave",
+  teamLeave: "/dashboard/leave/team",
+  myPayroll: "/dashboard/payroll",
+  teamPayroll: "/dashboard/payroll/team",
+  myDocuments: "/dashboard/documents",
+  teamDocuments: "/dashboard/documents/team",
+  myAssets: "/dashboard/assets",
+  teamAssets: "/dashboard/assets/team",
+} as const;

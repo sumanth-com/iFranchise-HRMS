@@ -27,14 +27,29 @@ import {
 import type { EmployeeSelfProfileSettings } from "@/lib/employee/services/employee-self-profile";
 import { TIMEZONE_OPTIONS } from "@/lib/validations/organization";
 import {
-  employeeSelfProfileSchema,
-  type EmployeeSelfProfileInput,
+  employeeSelfPreferencesSchema,
+  type EmployeeSelfPreferencesInput,
 } from "@/lib/validations/employee";
 
 const LANGUAGE_OPTIONS = [
   { value: "en", label: "English" },
   { value: "hi", label: "Hindi" },
 ] as const;
+
+function formatFullAddress(address: EmployeeSelfProfileSettings["address"]) {
+  const parts = [
+    address.addressLine1,
+    address.addressLine2,
+    address.city,
+    address.state,
+    address.postalCode,
+    address.country,
+  ]
+    .map((part) => part?.trim())
+    .filter(Boolean);
+
+  return parts.length > 0 ? parts.join(", ") : "—";
+}
 
 type EmployeeProfileSettingsSectionProps = {
   settings: EmployeeSelfProfileSettings;
@@ -54,36 +69,18 @@ export function EmployeeProfileSettingsSection({
     setImageUrl(initialImageUrl);
   }, [initialImageUrl]);
 
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm<EmployeeSelfProfileInput>({
-    resolver: zodResolver(employeeSelfProfileSchema),
+  const { handleSubmit, setValue, watch } = useForm<EmployeeSelfPreferencesInput>({
+    resolver: zodResolver(employeeSelfPreferencesSchema),
     defaultValues: {
-      personalEmail: settings.personalEmail,
-      personalPhone: settings.personalPhone,
       language: settings.language,
       timezone: settings.timezone,
-      addressLine1: settings.address.addressLine1,
-      addressLine2: settings.address.addressLine2,
-      city: settings.address.city,
-      state: settings.address.state,
-      postalCode: settings.address.postalCode,
-      country: settings.address.country,
-      emergencyContactName: settings.emergencyContact.name,
-      emergencyContactRelationship: settings.emergencyContact.relationship,
-      emergencyContactPhone: settings.emergencyContact.phone,
-      emergencyContactEmail: settings.emergencyContact.email,
     },
   });
 
   const language = watch("language");
   const timezone = watch("timezone");
 
-  function onSubmit(data: EmployeeSelfProfileInput) {
+  function onSubmit(data: EmployeeSelfPreferencesInput) {
     startTransition(async () => {
       const result = await updateEmployeeSelfProfileAction(data);
       if (!result.success) {
@@ -143,8 +140,8 @@ export function EmployeeProfileSettingsSection({
       <div className="mb-4">
         <h2 className="text-sm font-semibold tracking-tight">Profile</h2>
         <p className="text-xs text-muted-foreground">
-          Update personal contact details and emergency information. Employment fields are managed
-          by HR.
+          Update language and timezone preferences. Contact, address, and emergency details are
+          managed by HR.
         </p>
       </div>
 
@@ -227,97 +224,39 @@ export function EmployeeProfileSettingsSection({
         </div>
 
         <div className="space-y-3">
-          <h3 className="text-sm font-medium">Personal contact</h3>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="personalEmail">Personal email</Label>
-              <Input
-                id="personalEmail"
-                type="email"
-                disabled={isPending}
-                {...register("personalEmail")}
-              />
-              {errors.personalEmail ? (
-                <p className="text-xs text-destructive">{errors.personalEmail.message}</p>
-              ) : null}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="personalPhone">Personal phone</Label>
-              <Input id="personalPhone" disabled={isPending} {...register("personalPhone")} />
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <h3 className="text-sm font-medium">Address</h3>
+          <h3 className="text-sm font-medium">Contact & emergency (managed by HR)</h3>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="addressLine1">Address line 1</Label>
-              <Input id="addressLine1" disabled={isPending} {...register("addressLine1")} />
+              <Label>Personal email</Label>
+              <Input value={settings.personalEmail || "—"} disabled readOnly />
+            </div>
+            <div className="space-y-2">
+              <Label>Personal phone</Label>
+              <Input value={settings.personalPhone || "—"} disabled readOnly />
             </div>
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="addressLine2">Address line 2</Label>
-              <Input id="addressLine2" disabled={isPending} {...register("addressLine2")} />
+              <Label>Address</Label>
+              <Input value={formatFullAddress(settings.address)} disabled readOnly />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="city">City</Label>
-              <Input id="city" disabled={isPending} {...register("city")} />
+              <Label>Emergency name</Label>
+              <Input value={settings.emergencyContact.name || "—"} disabled readOnly />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="state">State</Label>
-              <Input id="state" disabled={isPending} {...register("state")} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="postalCode">Postal code</Label>
-              <Input id="postalCode" disabled={isPending} {...register("postalCode")} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="country">Country</Label>
-              <Input id="country" disabled={isPending} {...register("country")} />
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <h3 className="text-sm font-medium">Emergency contact</h3>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="emergencyContactName">Name</Label>
+              <Label>Relationship</Label>
               <Input
-                id="emergencyContactName"
-                disabled={isPending}
-                {...register("emergencyContactName")}
+                value={settings.emergencyContact.relationship || "—"}
+                disabled
+                readOnly
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="emergencyContactRelationship">Relationship</Label>
-              <Input
-                id="emergencyContactRelationship"
-                disabled={isPending}
-                {...register("emergencyContactRelationship")}
-              />
+              <Label>Emergency phone</Label>
+              <Input value={settings.emergencyContact.phone || "—"} disabled readOnly />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="emergencyContactPhone">Phone</Label>
-              <Input
-                id="emergencyContactPhone"
-                disabled={isPending}
-                {...register("emergencyContactPhone")}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="emergencyContactEmail">Email</Label>
-              <Input
-                id="emergencyContactEmail"
-                type="email"
-                disabled={isPending}
-                {...register("emergencyContactEmail")}
-              />
-              {errors.emergencyContactEmail ? (
-                <p className="text-xs text-destructive">
-                  {errors.emergencyContactEmail.message}
-                </p>
-              ) : null}
+              <Label>Emergency email</Label>
+              <Input value={settings.emergencyContact.email || "—"} disabled readOnly />
             </div>
           </div>
         </div>
@@ -372,7 +311,7 @@ export function EmployeeProfileSettingsSection({
 
         <Button type="submit" size="sm" disabled={isPending}>
           {isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-          Save profile
+          Save preferences
         </Button>
       </form>
     </section>

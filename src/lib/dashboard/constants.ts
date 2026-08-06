@@ -1,10 +1,11 @@
 import { attendanceTeamListUrl } from "@/lib/attendance/constants";
+import { HR_PORTAL_HOME } from "@/lib/auth/portal-paths";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
 import { leaveTeamListUrl } from "@/lib/leave/constants";
 import { PAYROLL_ROUTES } from "@/lib/payroll/constants";
 import { RECRUITMENT_ROUTES } from "@/lib/recruitment/constants";
 
-export const HR_SELF_SERVICE_HOME = "/" as const;
+export const HR_SELF_SERVICE_HOME = HR_PORTAL_HOME;
 
 export const HR_OVERVIEW_ROUTES = {
   overview: "/dashboard/hr-overview",

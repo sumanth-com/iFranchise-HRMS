@@ -1,16 +1,22 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { CalendarPlus, FileText } from "lucide-react";
 
-import { Button } from "@/components/common/button";
+import { Button, buttonVariants } from "@/components/common/button";
+import { ApplyLeaveDialog } from "@/components/leave/apply-leave-dialog";
 import { HrTeamLeaveView } from "@/components/leave/hr-team-leave-view";
 import { MyLeaveSelfServiceView } from "@/components/leave/my-leave-self-service-view";
-import { LEAVE_ROUTES, SELF_LEAVE_ROUTES } from "@/lib/leave/constants";
+import { LEAVE_ROUTES } from "@/lib/leave/constants";
+import { cn } from "@/lib/utils";
 import type {
   LeaveCalendarEntry,
   LeaveEmployeeBalanceSnapshot,
   LeaveHolidayEntry,
   LeaveListItem,
+  LeaveLookups,
   LeaveSummary,
 } from "@/types/leave";
 import type { LookupOption } from "@/types/employee";
@@ -49,6 +55,8 @@ type Props = {
   initialSection?: LeaveSection;
   canViewTeam: boolean;
   canApply: boolean;
+  employeeId: string;
+  applyLeaveLookups: LeaveLookups | null;
   balances: LeaveEmployeeBalanceSnapshot[];
   requests: LeaveListItem[];
   calendarMonth: number;
@@ -62,6 +70,8 @@ export function HrLeaveHubView({
   initialSection = "my",
   canViewTeam,
   canApply,
+  employeeId,
+  applyLeaveLookups,
   balances,
   requests,
   calendarMonth,
@@ -70,44 +80,50 @@ export function HrLeaveHubView({
   calendarHolidays,
   teamLeave,
 }: Props) {
-  const sectionDefault =
-    initialSection === "team" && canViewTeam ? "team" : "my";
-  const [section, setSection] = useState<LeaveSection>(sectionDefault);
+  const router = useRouter();
+  const [applyOpen, setApplyOpen] = useState(false);
+  const section = initialSection === "team" && canViewTeam ? "team" : "my";
+  const isTeamView = section === "team";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Leave</h1>
-          <p className="text-sm text-muted-foreground">
-            Apply and track your own leave, and manage workforce leave across the organization.
-          </p>
+      <div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {isTeamView ? "Team Leave" : "Leave"}
+          </h1>
+          {!isTeamView ? (
+            <div className="flex shrink-0 items-center gap-2">
+              <Link
+                href={LEAVE_ROUTES.policy}
+                className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}
+              >
+                <FileText className="size-4" />
+                Leave Policy
+              </Link>
+              {canApply && applyLeaveLookups ? (
+                <Button type="button" className="gap-1.5" onClick={() => setApplyOpen(true)}>
+                  <CalendarPlus className="size-4" />
+                  Apply Leave
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
-        {canViewTeam ? (
-          <div className="flex items-center gap-2 rounded-lg border bg-card p-1">
-            <Button
-              size="sm"
-              variant={section === "my" ? "default" : "ghost"}
-              onClick={() => setSection("my")}
-            >
-              My Leave
-            </Button>
-            <Button
-              size="sm"
-              variant={section === "team" ? "default" : "ghost"}
-              onClick={() => setSection("team")}
-            >
-              Team Leave
-            </Button>
-          </div>
-        ) : null}
+        <p className="mt-1 text-sm text-muted-foreground">
+          {isTeamView
+            ? "Review, approve, and manage leave requests across the organization."
+            : "Apply for leave, track balances, and view your leave calendar."}
+        </p>
       </div>
 
-      {section === "my" || !canViewTeam ? (
+      {isTeamView ? (
+        <HrTeamLeaveView {...teamLeave} embedded />
+      ) : (
         <MyLeaveSelfServiceView
-          applyHref={SELF_LEAVE_ROUTES.new}
-          policyHref={LEAVE_ROUTES.policy}
           canApply={canApply}
+          employeeId={employeeId}
+          applyLeaveLookups={applyLeaveLookups}
           balances={balances}
           requests={requests}
           calendarMonth={calendarMonth}
@@ -116,9 +132,17 @@ export function HrLeaveHubView({
           calendarHolidays={calendarHolidays}
           showPageHeading={false}
         />
-      ) : (
-        <HrTeamLeaveView {...teamLeave} embedded />
       )}
+
+      {applyLeaveLookups ? (
+        <ApplyLeaveDialog
+          open={applyOpen}
+          onOpenChange={setApplyOpen}
+          lookups={applyLeaveLookups}
+          employeeId={employeeId}
+          onSubmitted={() => router.refresh()}
+        />
+      ) : null}
     </div>
   );
 }

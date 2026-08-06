@@ -152,7 +152,6 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
           employmentStatus={params.employmentStatus}
           accountStatus={params.accountStatus}
           departments={departments}
-          canCreate={hasPermission(profile.permissionCodes, "employee.create")}
           canEdit={hasPermission(profile.permissionCodes, "employee.edit")}
           canDelete={hasPermission(profile.permissionCodes, "employee.delete")}
         />

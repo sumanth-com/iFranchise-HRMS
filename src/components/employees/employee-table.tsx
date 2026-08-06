@@ -1,11 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button, buttonVariants } from "@/components/common/button";
+import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import {
   Select,
@@ -41,7 +39,6 @@ type EmployeeTableProps = {
   employmentStatus?: string;
   accountStatus?: string;
   departments: LookupOption[];
-  canCreate: boolean;
   canEdit: boolean;
   canDelete: boolean;
 };
@@ -58,7 +55,6 @@ export function EmployeeTable({
   employmentStatus: initialEmploymentStatus,
   accountStatus: initialAccountStatus,
   departments,
-  canCreate,
   canEdit,
   canDelete,
 }: EmployeeTableProps) {
@@ -271,15 +267,6 @@ export function EmployeeTable({
             </SelectContent>
           </Select>
         </div>
-        {canCreate ? (
-          <Link
-            href={EMPLOYEE_ROUTES.new}
-            className={cn(buttonVariants(), "shrink-0")}
-          >
-            <UserPlus className="size-4" />
-            Add Employee
-          </Link>
-        ) : null}
       </div>
 
       <div className={cn(isPending && "pointer-events-none opacity-70")}>

@@ -23,7 +23,9 @@ import {
 } from "lucide-react";
 
 import type { NavigationItem } from "@/lib/auth/navigation";
+import { HR_HUB_ROUTES } from "@/lib/dashboard/hr-hub-routes";
 import { HR_OVERVIEW_ROUTES } from "@/lib/dashboard/constants";
+import { HR_PORTAL_HOME } from "@/lib/auth/portal-paths";
 import { SELF_PROFILE_ROUTES } from "@/lib/documents/constants";
 import { USER_PROVISIONING_ROUTES } from "@/lib/user-provisioning/constants";
 
@@ -44,7 +46,7 @@ export const mainNavItems: NavigationItem[] = [
   // ── Self-service (personal workspace) ────────────────────────────
   {
     title: "Dashboard",
-    href: "/",
+    href: HR_PORTAL_HOME,
     icon: LayoutDashboard,
     section: "Self-service",
   },
@@ -57,35 +59,35 @@ export const mainNavItems: NavigationItem[] = [
   },
   {
     title: "Attendance",
-    href: "/dashboard/attendance",
+    href: HR_HUB_ROUTES.myAttendance,
     icon: CalendarCheck,
     section: "Self-service",
     permissions: ["attendance.view"],
   },
   {
     title: "Payroll",
-    href: "/dashboard/payroll",
+    href: HR_HUB_ROUTES.myPayroll,
     icon: Wallet,
     section: "Self-service",
     permissions: ["payroll.view", "payslip.view"],
   },
   {
     title: "Documents",
-    href: "/dashboard/documents",
+    href: HR_HUB_ROUTES.myDocuments,
     icon: FileText,
     section: "Self-service",
     permissions: ["documents.view"],
   },
   {
     title: "Leave",
-    href: "/dashboard/leave",
+    href: HR_HUB_ROUTES.myLeave,
     icon: CalendarDays,
     section: "Self-service",
     permissions: ["leave.view"],
   },
   {
     title: "Assets",
-    href: "/dashboard/assets",
+    href: HR_HUB_ROUTES.myAssets,
     icon: LaptopMinimal,
     section: "Self-service",
     permissions: ["asset.view"],
@@ -125,6 +127,41 @@ export const mainNavItems: NavigationItem[] = [
     icon: Users,
     section: "Administration",
     permissions: ["employee.view"],
+  },
+  {
+    title: "Team Attendance",
+    href: HR_HUB_ROUTES.teamAttendance,
+    icon: CalendarCheck,
+    section: "Administration",
+    permissions: ["attendance.view"],
+  },
+  {
+    title: "Team Leave",
+    href: HR_HUB_ROUTES.teamLeave,
+    icon: CalendarDays,
+    section: "Administration",
+    permissions: ["leave.view"],
+  },
+  {
+    title: "Team Payroll",
+    href: HR_HUB_ROUTES.teamPayroll,
+    icon: Wallet,
+    section: "Administration",
+    permissions: ["payroll.view", "payslip.view"],
+  },
+  {
+    title: "HR Documents",
+    href: HR_HUB_ROUTES.teamDocuments,
+    icon: FileText,
+    section: "Administration",
+    permissions: ["documents.view"],
+  },
+  {
+    title: "Company Assets",
+    href: HR_HUB_ROUTES.teamAssets,
+    icon: LaptopMinimal,
+    section: "Administration",
+    permissions: ["asset.view"],
   },
   {
     title: "Recruitment",

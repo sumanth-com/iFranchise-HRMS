@@ -9,7 +9,7 @@ import { payrollSettingsSchema } from "@/lib/validations/payroll-settings";
 export const DEFAULT_PAYROLL_SETTINGS: PayrollSettingsData = {
   payrollCycle: "monthly",
   payrollProcessingDay: "last_working_day",
-  salaryCreditDate: 1,
+  salaryCreditDate: 2,
   financialYearStartMonth: 4,
   financialYearEndMonth: 3,
   currency: "INR",

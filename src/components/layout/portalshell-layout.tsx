@@ -5,7 +5,7 @@ import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { AUTH_ROUTES } from "@/lib/auth/constants";
 import { getLayoutUserProfile } from "@/lib/auth/layout-profile";
 import { AuthProvider, type PortalVariant } from "@/providers/auth-provider";
-import { createClient } from "@/lib/supabase/server";
+import { getServerSession } from "@/lib/supabase/server";
 
 type PortalShellLayoutProps = {
   children: ReactNode;
@@ -18,43 +18,22 @@ export async function PortalShellLayout({
   portalVariant = "hr",
   portalLabel,
 }: PortalShellLayoutProps) {
-  const supabase = await createClient();
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  const user = session?.user;
-  if (!user?.email) {
+  const session = await getServerSession();
+  if (!session) {
     redirect(AUTH_ROUTES.login);
   }
 
-  const profileResult = await getLayoutUserProfile(user.id, user.email);
+  const { supabase, user } = session;
+  const email = user.email;
+  if (!email) {
+    redirect(AUTH_ROUTES.login);
+  }
+
+  const profileResult = await getLayoutUserProfile(user.id, email, supabase);
 
   if (!profileResult.success) {
-    const {
-      data: { user: verifiedUser },
-    } = await supabase.auth.getUser();
-
-    if (!verifiedUser?.email) {
-      redirect(AUTH_ROUTES.login);
-    }
-
-    const retry = await getLayoutUserProfile(verifiedUser.id, verifiedUser.email);
-    if (!retry.success) {
-      await supabase.auth.signOut();
-      redirect(`${AUTH_ROUTES.login}?error=${retry.error}`);
-    }
-
-    return (
-      <AuthProvider
-        initialProfile={retry.profile}
-        portalVariant={portalVariant}
-        portalLabel={portalLabel}
-      >
-        <DashboardShell>{children}</DashboardShell>
-      </AuthProvider>
-    );
+    await supabase.auth.signOut();
+    redirect(`${AUTH_ROUTES.login}?error=${profileResult.error}`);
   }
 
   return (

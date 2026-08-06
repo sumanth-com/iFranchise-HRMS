@@ -6,6 +6,7 @@ import {
   EMPLOYEE_DOC_CATEGORY_ORDER,
 } from "@/lib/employee/documents/categories";
 import { getDocumentSettings } from "@/lib/documents/services/document-settings";
+import { DEFAULT_DOCUMENT_SETTINGS } from "@/lib/documents/constants";
 import { DocRow, fromHrms, unwrapRelation } from "@/lib/documents/services/documents-utils";
 import type { UserProfile } from "@/types/auth";
 import type { DocumentSource, DocumentStatus } from "@/types/documents";
@@ -165,9 +166,33 @@ export async function getEmployeeDocumentsExplorer(
       totalFiles: files.length,
       usedBytes,
       softLimitBytes: SOFT_STORAGE_LIMIT_BYTES,
-      largestFile: largest ? { name: largest.fileName, sizeBytes: largest.fileSizeBytes } : null,
+      largestFile: largest
+        ? { name: largest.documentTypeName, sizeBytes: largest.fileSizeBytes }
+        : null,
     },
     maxUploadSizeMb: settings.maxUploadSizeMb,
     allowedFileTypes: settings.allowedFileTypes,
   };
 }
+
+/** Safe fallback when document explorer data cannot be loaded on the server. */
+export const EMPTY_EMPLOYEE_DOCUMENTS_EXPLORER: EmployeeDocumentsExplorerData = {
+  folders: EMPLOYEE_DOC_CATEGORY_ORDER.map((key) => ({
+    key,
+    name: EMPLOYEE_DOC_CATEGORY_LABELS[key],
+    description: EMPLOYEE_DOC_CATEGORY_DESCRIPTIONS[key],
+    count: 0,
+    storageBytes: 0,
+    lastUpdated: null,
+  })),
+  files: [],
+  documentTypes: [],
+  storage: {
+    totalFiles: 0,
+    usedBytes: 0,
+    softLimitBytes: SOFT_STORAGE_LIMIT_BYTES,
+    largestFile: null,
+  },
+  maxUploadSizeMb: DEFAULT_DOCUMENT_SETTINGS.maxUploadSizeMb,
+  allowedFileTypes: [...DEFAULT_DOCUMENT_SETTINGS.allowedFileTypes],
+};

@@ -271,7 +271,7 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
     id: "notifications-management",
     label: "Alerts & Broadcasts",
     description: "Alerts, templates, and delivery settings",
-    href: "/dashboard/notifications?tab=team",
+    href: "/dashboard/notifications/team",
     keywords: ["alerts", "broadcasts", "templates", "notifications admin"],
     permission: "notification.view",
   },

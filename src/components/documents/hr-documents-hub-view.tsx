@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
-
-import { Button } from "@/components/common/button";
 import { DocumentsExplorer } from "@/components/employee/documents/documents-explorer";
+import { ClientSectionBoundary } from "@/components/common/client-section-boundary";
+import { ErrorState } from "@/components/common/error-state";
 import { HrTeamDocumentsView } from "@/components/documents/hr-team-documents-view";
 import type { EmployeeDocumentsExplorerData } from "@/types/employee-documents-explorer";
 import type { DocumentsSummary } from "@/types/documents";
@@ -15,6 +14,7 @@ type Props = {
   canViewTeam: boolean;
   selfDocuments: EmployeeDocumentsExplorerData;
   teamDocuments: DocumentsSummary;
+  loadError?: string | null;
 };
 
 export function HrDocumentsHubView({
@@ -22,44 +22,46 @@ export function HrDocumentsHubView({
   canViewTeam,
   selfDocuments,
   teamDocuments,
+  loadError = null,
 }: Props) {
-  const sectionDefault =
-    initialSection === "team" && canViewTeam ? "team" : "my";
-  const [section, setSection] = useState<DocumentsSection>(sectionDefault);
+  const section = initialSection === "team" && canViewTeam ? "team" : "my";
+  const isTeamView = section === "team";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Documents</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage your personal documents and organization-wide HR document workflows.
-          </p>
-        </div>
-        {canViewTeam ? (
-          <div className="flex items-center gap-2 rounded-lg border bg-card p-1">
-            <Button
-              size="sm"
-              variant={section === "my" ? "default" : "ghost"}
-              onClick={() => setSection("my")}
-            >
-              My Documents
-            </Button>
-            <Button
-              size="sm"
-              variant={section === "team" ? "default" : "ghost"}
-              onClick={() => setSection("team")}
-            >
-              HR Documents
-            </Button>
-          </div>
-        ) : null}
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {isTeamView ? "HR Documents" : "Documents"}
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {isTeamView
+            ? "Manage organization-wide HR documents, verification, and document workflows."
+            : "View and upload your personal employment documents."}
+        </p>
       </div>
 
-      {section === "my" || !canViewTeam ? (
-        <DocumentsExplorer data={selfDocuments} />
+      {loadError ? (
+        <ErrorState
+          title="Couldn't load documents"
+          description={loadError}
+          onRetry={() => window.location.reload()}
+          retryLabel="Refresh page"
+          className="py-8"
+        />
+      ) : isTeamView ? (
+        <ClientSectionBoundary
+          title="Couldn't load team documents"
+          description="Something went wrong while loading HR documents. Please try again."
+        >
+          <HrTeamDocumentsView summary={teamDocuments} embedded />
+        </ClientSectionBoundary>
       ) : (
-        <HrTeamDocumentsView summary={teamDocuments} embedded />
+        <ClientSectionBoundary
+          title="Couldn't load your documents"
+          description="Something went wrong while loading your documents. Please try again."
+        >
+          <DocumentsExplorer data={selfDocuments} />
+        </ClientSectionBoundary>
       )}
     </div>
   );

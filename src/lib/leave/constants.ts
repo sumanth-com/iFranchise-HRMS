@@ -1,5 +1,7 @@
 import type { LeaveStatus } from "@/types/leave";
 
+import { hubTeamListUrl } from "@/lib/dashboard/hub-paths";
+
 /** Org-wide leave tracking for HR (team tab in Leave hub). */
 export const LEAVE_ROUTES = {
   list: "/dashboard/leave",
@@ -14,21 +16,14 @@ export const LEAVE_ROUTES = {
 /** Personal / self-service leave in the HR portal main nav. */
 export const SELF_LEAVE_ROUTES = {
   list: "/dashboard/leave",
+  team: "/dashboard/leave/team",
   new: "/dashboard/leave/new",
 } as const;
 
 export function leaveTeamListUrl(
   searchParams?: Record<string, string | undefined>,
 ) {
-  const params = new URLSearchParams({ tab: "team" });
-  if (searchParams) {
-    Object.entries(searchParams).forEach(([key, value]) => {
-      if (value) {
-        params.set(key, value);
-      }
-    });
-  }
-  return `${SELF_LEAVE_ROUTES.list}?${params.toString()}`;
+  return hubTeamListUrl(SELF_LEAVE_ROUTES.list, searchParams);
 }
 
 export const LEAVE_STATUS_LABELS: Record<LeaveStatus, string> = {

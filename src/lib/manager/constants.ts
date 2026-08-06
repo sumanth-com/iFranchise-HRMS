@@ -7,8 +7,8 @@ export const MANAGER_ROUTES = {
   teamMember: (employee: EmployeeRouteIdentity | string) =>
     `/manager/team/${typeof employee === "string" ? employee : buildEmployeeRouteRef(employee)}`,
   attendance: "/manager/attendance",
-  attendanceMy: "/manager/attendance?tab=my",
-  attendanceTeam: "/manager/attendance?tab=team",
+  attendanceMy: "/manager/attendance",
+  attendanceTeam: "/manager/attendance/team",
   leave: "/manager/leave",
   leaveNew: "/manager/leave/new",
   leaveDetail: (id: string) => `/manager/leave?leaveId=${id}`,

@@ -35,11 +35,11 @@ export function HrNotificationsHubView({
     initialSection === "team" && canViewTeam ? "team" : "my";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5">
-      <div>
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4 md:p-5">
+      <div className="shrink-0">
         <h1 className="text-2xl font-semibold tracking-tight">Notifications</h1>
         <p className="text-sm text-muted-foreground">
-          Read your personal notifications and manage organization-wide alerts.
+          Stay updated on leave, attendance, payroll, and other HR activity.
         </p>
       </div>
 
@@ -51,8 +51,10 @@ export function HrNotificationsHubView({
           selectedId={center.selectedId}
           centerPath={NOTIFICATIONS_ROUTES.dashboard}
           filterParamKey="centerTab"
-          preserveQuery={{ tab: "my" }}
+          preserveQuery={{}}
           embedded
+          showToolbarSearch={false}
+          showPriorityBadge={false}
         />
       ) : (
         <HrTeamNotificationsView stats={teamNotifications} embedded />

@@ -1,6 +1,6 @@
 "use client";
 
-import { format, parseISO } from "date-fns";
+import { formatDocumentDate } from "@/lib/employee/documents/document-dates";
 import {
   ArrowLeft,
   ChevronRight,
@@ -16,19 +16,16 @@ import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
-import { Input } from "@/components/common/input";
 import { Modal } from "@/components/common/modal";
 import { EmployeeStatCard } from "@/components/employee/dashboard/employee-module-primitives";
-import { CATEGORY_META, getFileKind, type FileKind } from "@/components/employee/documents/document-icons";
+import { CATEGORY_META } from "@/components/employee/documents/document-icons";
 import { DocumentFileCard } from "@/components/employee/documents/document-file-card";
+import { DocumentMissingSlotCard } from "@/components/employee/documents/document-missing-slot-card";
+import { DocumentPreviewDialog } from "@/components/employee/documents/document-preview-dialog";
 import { DocumentUploadDialog } from "@/components/employee/documents/document-upload-dialog";
-import { DocumentVersionsDialog } from "@/components/employee/documents/document-versions-dialog";
-import { LabeledSelect } from "@/components/payroll/payroll-select";
+import { useEmployeeDocumentFile } from "@/components/employee/documents/use-employee-document-file";
 import type { EmployeeDocCategoryKey } from "@/lib/employee/documents/categories";
-import {
-  employeeDeleteDocumentAction,
-  employeeRenameDocumentAction,
-} from "@/lib/employee/actions/employee-documents-actions";
+import { employeeDeleteDocumentAction } from "@/lib/employee/actions/employee-documents-actions";
 import type {
   EmployeeDocFile,
   EmployeeDocFolder,
@@ -43,15 +40,6 @@ function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
-
-const KIND_OPTIONS = [
-  { value: "all", label: "All file types" },
-  { value: "pdf", label: "PDF" },
-  { value: "image", label: "Images" },
-  { value: "word", label: "Word" },
-  { value: "excel", label: "Excel" },
-  { value: "zip", label: "Archives" },
-];
 
 function FolderCard({
   folder,
@@ -84,7 +72,7 @@ function FolderCard({
         <span>{formatBytes(folder.storageBytes)}</span>
         <span>
           {folder.lastUpdated
-            ? `Updated ${format(parseISO(folder.lastUpdated), "dd MMM")}`
+            ? `Updated ${formatDocumentDate(folder.lastUpdated, "dd MMM")}`
             : "Empty"}
         </span>
       </div>
@@ -95,43 +83,28 @@ function FolderCard({
 export function DocumentsExplorer({ data }: { data: EmployeeDocumentsExplorerData }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const fileActions = useEmployeeDocumentFile();
 
   const [openFolder, setOpenFolder] = useState<EmployeeDocCategoryKey | null>(null);
-  const [kind, setKind] = useState("all");
 
   const [uploadOpen, setUploadOpen] = useState(false);
   const [replaceTarget, setReplaceTarget] = useState<EmployeeDocFile | null>(null);
-
-  const [versionsFile, setVersionsFile] = useState<EmployeeDocFile | null>(null);
-  const [versionsOpen, setVersionsOpen] = useState(false);
-
-  const [renameFile, setRenameFile] = useState<EmployeeDocFile | null>(null);
-  const [renameValue, setRenameValue] = useState("");
+  const [uploadTypeId, setUploadTypeId] = useState<string | undefined>();
 
   const [deleteFile, setDeleteFile] = useState<EmployeeDocFile | null>(null);
 
   const filteredFiles = useMemo(() => {
-    return data.files.filter((file) => {
-      if (openFolder && file.categoryKey !== openFolder) return false;
-      if (kind !== "all" && getFileKind(file.mimeType, file.fileName) !== (kind as FileKind)) {
-        return false;
-      }
-      return true;
-    });
-  }, [data.files, openFolder, kind]);
+    if (!openFolder) return data.files;
+    return data.files.filter((file) => file.categoryKey === openFolder);
+  }, [data.files, openFolder]);
 
-  const recent = useMemo(
-    () =>
-      [...data.files]
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-        .slice(0, 6),
-    [data.files],
-  );
-
-  const storagePct = Math.min(
-    100,
-    Math.round((data.storage.usedBytes / data.storage.softLimitBytes) * 100),
-  );
+  const storagePct =
+    data.storage.softLimitBytes > 0
+      ? Math.min(
+          100,
+          Math.round((data.storage.usedBytes / data.storage.softLimitBytes) * 100),
+        )
+      : 0;
   const remainingBytes = Math.max(0, data.storage.softLimitBytes - data.storage.usedBytes);
 
   /** When inside a folder, only offer document types that belong to that category. */
@@ -147,23 +120,16 @@ export function DocumentsExplorer({ data }: { data: EmployeeDocumentsExplorerDat
 
   const folderDefaultType = uploadDocumentTypes[0]?.id;
 
-  function handleRename() {
-    if (!renameFile) return;
-    const value = renameValue.trim();
-    if (!value) {
-      toast.error("Please enter a document name");
-      return;
-    }
-    startTransition(async () => {
-      const result = await employeeRenameDocumentAction(renameFile.id, value);
-      if (!result.success) {
-        toast.error(result.message);
-        return;
-      }
-      toast.success("Document renamed");
-      setRenameFile(null);
-      router.refresh();
-    });
+  const missingTypes = useMemo(() => {
+    if (!openFolder) return [];
+    const uploadedTypeIds = new Set(filteredFiles.map((file) => file.documentTypeId));
+    return uploadDocumentTypes.filter((type) => !uploadedTypeIds.has(type.id));
+  }, [openFolder, filteredFiles, uploadDocumentTypes]);
+
+  function openUpload(typeId?: string) {
+    setReplaceTarget(null);
+    setUploadTypeId(typeId ?? folderDefaultType);
+    setUploadOpen(true);
   }
 
   function handleDelete() {
@@ -232,20 +198,6 @@ export function DocumentsExplorer({ data }: { data: EmployeeDocumentsExplorerDat
         />
       </div>
 
-      {/* Toolbar */}
-      <div className="flex items-center justify-end gap-2 rounded-xl border bg-card p-3 shadow-sm">
-        <Button
-          className="h-9 shrink-0 gap-1.5"
-          onClick={() => {
-            setReplaceTarget(null);
-            setUploadOpen(true);
-          }}
-        >
-          <UploadCloud className="size-4" />
-          Upload
-        </Button>
-      </div>
-
       {/* Breadcrumb when inside a folder */}
       {openFolder ? (
         <div className="flex items-center gap-2 text-sm">
@@ -260,31 +212,35 @@ export function DocumentsExplorer({ data }: { data: EmployeeDocumentsExplorerDat
           </Button>
           <ChevronRight className="size-4 text-muted-foreground" />
           <span className="font-medium">{openFolderMeta?.name}</span>
-          <span className="text-xs text-muted-foreground">({filteredFiles.length})</span>
+          <span className="text-xs text-muted-foreground">
+            ({filteredFiles.length} uploaded
+            {missingTypes.length > 0 ? ` · ${missingTypes.length} pending` : ""})
+          </span>
         </div>
       ) : null}
 
       {/* Content */}
       {openFolder ? (
-        filteredFiles.length > 0 ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        filteredFiles.length > 0 || missingTypes.length > 0 ? (
+          <div className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filteredFiles.map((file) => (
               <DocumentFileCard
                 key={file.id}
                 file={file}
+                fileActions={fileActions}
                 onReplace={(target) => {
                   setReplaceTarget(target);
+                  setUploadTypeId(target.documentTypeId);
                   setUploadOpen(true);
                 }}
-                onRename={(target) => {
-                  setRenameFile(target);
-                  setRenameValue(target.title);
-                }}
                 onDelete={(target) => setDeleteFile(target)}
-                onVersions={(target) => {
-                  setVersionsFile(target);
-                  setVersionsOpen(true);
-                }}
+              />
+            ))}
+            {missingTypes.map((type) => (
+              <DocumentMissingSlotCard
+                key={type.id}
+                typeName={type.name}
+                onUpload={() => openUpload(type.id)}
               />
             ))}
           </div>
@@ -299,60 +255,18 @@ export function DocumentsExplorer({ data }: { data: EmployeeDocumentsExplorerDat
                 Upload a file to get started.
               </p>
             </div>
-            <Button
-              className="gap-1.5"
-              onClick={() => {
-                setReplaceTarget(null);
-                setUploadOpen(true);
-              }}
-            >
+            <Button className="gap-1.5" onClick={() => openUpload()}>
               <UploadCloud className="size-4" />
               Upload document
             </Button>
           </div>
         )
       ) : (
-        <>
-          {/* Folder grid */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {data.folders.map((folder) => (
-              <FolderCard key={folder.key} folder={folder} onOpen={setOpenFolder} />
-            ))}
-          </div>
-
-          {/* Recent documents */}
-          {recent.length > 0 ? (
-            <section className="rounded-xl border bg-card p-4 shadow-sm">
-              <div className="mb-3">
-                <h2 className="text-sm font-semibold tracking-tight">Recent Documents</h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Your most recently uploaded files.
-                </p>
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {recent.map((file) => (
-                  <DocumentFileCard
-                    key={file.id}
-                    file={file}
-                    onReplace={(target) => {
-                      setReplaceTarget(target);
-                      setUploadOpen(true);
-                    }}
-                    onRename={(target) => {
-                      setRenameFile(target);
-                      setRenameValue(target.title);
-                    }}
-                    onDelete={(target) => setDeleteFile(target)}
-                    onVersions={(target) => {
-                      setVersionsFile(target);
-                      setVersionsOpen(true);
-                    }}
-                  />
-                ))}
-              </div>
-            </section>
-          ) : null}
-        </>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {data.folders.map((folder) => (
+            <FolderCard key={folder.key} folder={folder} onOpen={setOpenFolder} />
+          ))}
+        </div>
       )}
 
       <DocumentUploadDialog
@@ -361,44 +275,22 @@ export function DocumentsExplorer({ data }: { data: EmployeeDocumentsExplorerDat
         documentTypes={uploadDocumentTypes}
         maxUploadSizeMb={data.maxUploadSizeMb}
         allowedFileTypes={data.allowedFileTypes}
-        defaultDocumentTypeId={folderDefaultType}
+        defaultDocumentTypeId={uploadTypeId ?? folderDefaultType}
         replaceTarget={
           replaceTarget
             ? {
                 documentId: replaceTarget.id,
                 documentTypeId: replaceTarget.documentTypeId,
-                title: replaceTarget.title,
+                title: replaceTarget.documentTypeName,
               }
             : null
         }
       />
 
-      <DocumentVersionsDialog
-        file={versionsFile}
-        open={versionsOpen}
-        onOpenChange={setVersionsOpen}
+      <DocumentPreviewDialog
+        target={fileActions.previewTarget}
+        onOpenChange={(next) => !next && fileActions.setPreviewTarget(null)}
       />
-
-      <Modal
-        open={Boolean(renameFile)}
-        onOpenChange={(next) => !next && setRenameFile(null)}
-        title="Rename Document"
-        description="Give this document a clearer name."
-        contentClassName="sm:max-w-md"
-        footer={
-          <Button onClick={handleRename} disabled={isPending}>
-            {isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-            Save
-          </Button>
-        }
-      >
-        <Input
-          value={renameValue}
-          onChange={(event) => setRenameValue(event.target.value)}
-          placeholder="Document name"
-          autoFocus
-        />
-      </Modal>
 
       <Modal
         open={Boolean(deleteFile)}
@@ -406,7 +298,7 @@ export function DocumentsExplorer({ data }: { data: EmployeeDocumentsExplorerDat
         title="Delete Document"
         description={
           deleteFile
-            ? `"${deleteFile.title}" will be removed from your documents.`
+            ? `"${deleteFile.documentTypeName}" will be removed from your documents.`
             : undefined
         }
         contentClassName="sm:max-w-md"

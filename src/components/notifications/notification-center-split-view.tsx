@@ -1,7 +1,7 @@
 "use client";
 
 import { format, formatDistanceToNow } from "date-fns";
-import { Check, Loader2, MoreHorizontal, Search, Trash2, X } from "lucide-react";
+import { Check, Bell, Loader2, MoreHorizontal, Search, Trash2, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -10,6 +10,7 @@ import { Button } from "@/components/common/button";
 import { EmptyState } from "@/components/common/empty-state";
 import { Input } from "@/components/common/input";
 import { Modal } from "@/components/common/modal";
+import { NotificationMessageBody } from "@/components/notifications/notification-message-body";
 import {
   NotificationPriorityBadge,
   NotificationStatusBadge,
@@ -28,7 +29,6 @@ import {
 import {
   NOTIFICATION_CENTER_TABS,
   NOTIFICATIONS_ROUTES,
-  formatNotificationDisplayText,
   formatNotificationModule,
   formatNotificationPriority,
   type NotificationCenterTab,
@@ -47,6 +47,7 @@ type Props = {
   showTabs?: boolean;
   showToolbarSearch?: boolean;
   showMarkAllRead?: boolean;
+  showPriorityBadge?: boolean;
   embedded?: boolean;
 };
 
@@ -61,6 +62,7 @@ export function NotificationCenterSplitView({
   showTabs = true,
   showToolbarSearch = true,
   showMarkAllRead = true,
+  showPriorityBadge = true,
   embedded = false,
 }: Props) {
   const router = useRouter();
@@ -121,9 +123,9 @@ export function NotificationCenterSplitView({
   return (
     <div
       className={cn(
-        "flex flex-col overflow-hidden",
+        "flex min-h-0 flex-col overflow-hidden",
         embedded
-          ? "min-h-[calc(100vh-14rem)] flex-1"
+          ? "min-h-0 flex-1"
           : "min-h-[calc(100vh-10rem)] rounded-xl border bg-card shadow-sm",
       )}
     >
@@ -252,17 +254,20 @@ export function NotificationCenterSplitView({
           ) : null}
         </aside>
 
-        <section className="flex min-w-0 flex-1 flex-col bg-background">
+        <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
           {selected ? (
             <NotificationDetailPanel
               notification={selected}
+              showPriorityBadge={showPriorityBadge}
               onClose={() => setParams({ id: undefined })}
             />
           ) : (
-            <div className="flex flex-1 items-center justify-center p-8">
+            <div className="flex min-h-0 flex-1 items-center justify-center p-8">
               <EmptyState
+                icon={<Bell className="size-6" />}
                 title="Select a notification"
                 description="Choose a notification from the left to view full details here."
+                className="max-w-sm border-dashed"
               />
             </div>
           )}
@@ -345,9 +350,7 @@ function NotificationListRow({
             <span className="mt-1 size-2 shrink-0 rounded-full bg-primary" />
           ) : null}
         </div>
-        <p className="line-clamp-2 text-xs text-muted-foreground">
-          {formatNotificationDisplayText(item.message)}
-        </p>
+        <NotificationMessageBody message={item.message} variant="preview" />
         <p className="pt-0.5 text-[11px] text-muted-foreground">
           {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
         </p>
@@ -399,14 +402,18 @@ function NotificationListRow({
 
 function NotificationDetailPanel({
   notification,
+  showPriorityBadge,
   onClose,
 }: {
   notification: NotificationListItem;
+  showPriorityBadge: boolean;
   onClose: () => void;
 }) {
   const metaParts = [
     formatNotificationModule(notification.module),
-    formatNotificationPriority(notification.priority),
+    ...(showPriorityBadge
+      ? [formatNotificationPriority(notification.priority)]
+      : []),
     format(new Date(notification.createdAt), "d MMM yyyy, h:mm a"),
   ];
 
@@ -422,7 +429,9 @@ function NotificationDetailPanel({
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-semibold tracking-tight">{notification.title}</h2>
               <NotificationStatusBadge status={notification.status} />
-              <NotificationPriorityBadge priority={notification.priority} />
+              {showPriorityBadge ? (
+                <NotificationPriorityBadge priority={notification.priority} />
+              ) : null}
             </div>
             <p className="mt-2 text-xs text-muted-foreground">{metaParts.join(" · ")}</p>
           </div>
@@ -439,9 +448,10 @@ function NotificationDetailPanel({
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
-        <p className="max-w-2xl whitespace-pre-wrap text-[15px] leading-7 text-foreground">
-          {formatNotificationDisplayText(notification.message)}
-        </p>
+        <NotificationMessageBody
+          message={notification.message}
+          actionUrl={notification.actionUrl}
+        />
       </div>
     </div>
   );

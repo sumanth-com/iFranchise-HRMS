@@ -29,7 +29,7 @@ export const EMPLOYEE_DOC_CATEGORY_LABELS: Record<EmployeeDocCategoryKey, string
 };
 
 export const EMPLOYEE_DOC_CATEGORY_DESCRIPTIONS: Record<EmployeeDocCategoryKey, string> = {
-  personal: "Resume, photo and personal files",
+  personal: "Resume and photo",
   identity: "Aadhaar, PAN, Passport, Licenses",
   company: "Offer, appointment & HR letters",
   payroll: "Payslips, Form 16 & tax proofs",

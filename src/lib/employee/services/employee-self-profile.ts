@@ -1,6 +1,10 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
-import type { EmployeeSelfProfileInput } from "@/lib/validations/employee";
+import { updateReportingManager } from "@/lib/organization/services/org-mutations";
+import type {
+  EmployeeSelfPreferencesInput,
+  EmployeeSelfProfileInput,
+} from "@/lib/validations/employee";
 
 export type EmployeeSelfProfileSettings = {
   employeeId: string;
@@ -308,7 +312,19 @@ async function upsertEmergencyContact(
   if (error) throw new Error(error.message);
 }
 
-export async function updateEmployeeSelfProfile(
+export async function updateEmployeeSelfPreferences(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: EmployeeSelfPreferencesInput,
+) {
+  if (!profile.employee?.id) {
+    throw new Error("Employee profile not found");
+  }
+
+  await upsertUserPreferences(supabase, profile, input.language, input.timezone);
+}
+
+export async function updateEmployeeSelfProfileWithContact(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   input: EmployeeSelfProfileInput,
@@ -340,4 +356,13 @@ export async function updateEmployeeSelfProfile(
     input,
     existing.emergencyContact.id,
   );
+
+  if (input.reportingManagerId !== undefined) {
+    await updateReportingManager(
+      supabase,
+      profile,
+      existing.employeeId,
+      emptyToNull(input.reportingManagerId),
+    );
+  }
 }

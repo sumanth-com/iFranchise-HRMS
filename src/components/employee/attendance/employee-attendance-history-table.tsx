@@ -6,7 +6,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { AttendanceStatusBadge } from "@/components/attendance/attendance-status-badge";
+import { AttendanceHistoryStatusCell } from "@/components/attendance/attendance-status-badge";
 import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
 import {
@@ -213,7 +213,7 @@ export function EmployeeAttendanceHistoryTable({
                   {format(parseISO(row.attendanceDate), "dd MMM yyyy")}
                 </td>
                 <td className="px-4 py-3">
-                  <AttendanceStatusBadge status={row.attendanceStatus} />
+                  <AttendanceHistoryStatusCell status={row.attendanceStatus} />
                 </td>
                 <td className="px-4 py-3">
                   {formatAttendanceTime(row.checkInAt)}
@@ -364,7 +364,7 @@ function DayReportCard({ row }: { row: ManagerAttendanceHistoryRow }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <AttendanceStatusBadge status={row.attendanceStatus} />
+        <AttendanceHistoryStatusCell status={row.attendanceStatus} />
         {isComplete ? (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
             <span className="flex size-4 items-center justify-center rounded-full bg-emerald-500 text-white">

@@ -8,6 +8,7 @@ import {
 import {
   resolvePayslipAvailability,
   resolvePayslipSchedule,
+  SALARY_CREDIT_DAY,
 } from "@/lib/payroll/services/payslip-publication";
 import { processDuePayslipPublications } from "@/lib/payroll/services/payslip-publication-worker";
 import { listBonuses, listReimbursements } from "@/lib/payroll/services/payroll-queries";
@@ -381,7 +382,7 @@ export async function getEmployeePayrollData(
   });
 
   const currencyCode = settings?.settings.currency ?? "INR";
-  const creditDay = settings?.settings.salaryCreditDate ?? 1;
+  const creditDay = settings?.settings.salaryCreditDate ?? SALARY_CREDIT_DAY;
   const fyStartMonth = settings?.settings.financialYearStartMonth ?? 4;
 
   // Financial year window that contains today.

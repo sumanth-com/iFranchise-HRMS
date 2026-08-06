@@ -19,6 +19,7 @@ import {
   type EmployeeInviteInput,
 } from "@/lib/validations/employee";
 import type { LookupOption } from "@/types/employee";
+import { cn } from "@/lib/utils";
 
 type EmployeeInviteFormProps = {
   lookups: {
@@ -254,21 +255,47 @@ export function EmployeeInviteSection({
     if (!isPending) setOpen(next);
   }
 
+  function handleInviteClick() {
+    if (!canInvite) return;
+    setOpen(true);
+  }
+
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={handleInviteClick}
         disabled={!canInvite}
-        className="flex h-[52px] w-full items-center justify-between rounded-xl border bg-background px-4 text-left shadow-sm transition-colors hover:bg-accent/40 disabled:cursor-not-allowed disabled:opacity-60 lg:max-w-sm"
+        aria-label="Invite employee"
+        className={cn(
+          "group flex min-h-[56px] w-full items-center justify-between gap-3 rounded-xl border bg-background px-4 py-3 text-left shadow-sm transition-all",
+          canInvite &&
+            "cursor-pointer hover:border-primary/35 hover:bg-primary/[0.04] hover:shadow-md active:scale-[0.99]",
+          !canInvite && "cursor-not-allowed opacity-60",
+        )}
       >
-        <span className="flex items-center gap-2.5 text-sm font-medium">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <span className="flex min-w-0 items-center gap-3">
+          <span
+            className={cn(
+              "flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors",
+              canInvite && "group-hover:bg-primary/15",
+            )}
+          >
             <UserRoundPlus className="size-4" />
           </span>
-          Invite Employee
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold tracking-tight">Invite Employee</span>
+            <span className="block text-xs text-muted-foreground">
+              Send a secure portal invitation
+            </span>
+          </span>
         </span>
-        <ChevronRight className="size-4 text-muted-foreground" />
+        <ChevronRight
+          className={cn(
+            "size-4 shrink-0 text-muted-foreground transition-transform",
+            canInvite && "group-hover:translate-x-0.5 group-hover:text-primary",
+          )}
+        />
       </button>
 
       <Modal

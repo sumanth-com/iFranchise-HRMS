@@ -49,6 +49,7 @@ export async function getMyProfileBundle(
     departmentName: employee.departmentName,
     designationTitle: employee.designationTitle,
     employmentTypeName: employee.employmentTypeName,
+    reportingManagerId: employee.reportingManagerId,
     reportingManagerName: employee.reportingManagerName,
     dateOfJoining: employee.dateOfJoining,
     attendanceSummary: {

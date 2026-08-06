@@ -1,41 +1,33 @@
-import { SalaryStructureTable } from "@/components/payroll/salary-structure-table";
-import { createClient } from "@/lib/supabase/server";
-import { listSalaryStructures } from "@/lib/payroll/services/payroll-queries";
-import { salaryStructureListParamsSchema } from "@/lib/validations/payroll";
-import { requireServerAnyPermission } from "@/lib/permissions/server";
+import { redirect } from "next/navigation";
+
+import {
+  payrollHubUrl,
+  TEAM_PAYROLL_SECTIONS,
+} from "@/lib/payroll/constants";
 
 type SalaryStructuresPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
+function firstString(value: string | string[] | undefined) {
+  return typeof value === "string" ? value : undefined;
+}
+
 export default async function SalaryStructuresPage({
   searchParams,
 }: SalaryStructuresPageProps) {
-  const profile = await requireServerAnyPermission([
-    "salary.view",
-    "salary_structure.view",
-  ]);
-  const supabase = await createClient();
-  const rawParams = await searchParams;
+  const raw = await searchParams;
 
-  const params = salaryStructureListParamsSchema.parse({
-    page: rawParams.page,
-    pageSize: rawParams.pageSize,
-    search: typeof rawParams.search === "string" ? rawParams.search : undefined,
-    employeeId: rawParams.employeeId,
-  });
-
-  const result = await listSalaryStructures(supabase, profile, params);
-
-  return (
-    <>
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Salary Structure</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Manage employee compensation components and statutory deductions.
-        </p>
-      </div>
-      <SalaryStructureTable records={result.data} />
-    </>
+  redirect(
+    payrollHubUrl({
+      tab: "team",
+      section: TEAM_PAYROLL_SECTIONS["salary-structures"],
+      params: {
+        page: firstString(raw.page),
+        pageSize: firstString(raw.pageSize),
+        search: firstString(raw.search),
+        employeeId: firstString(raw.employeeId),
+      },
+    }),
   );
 }

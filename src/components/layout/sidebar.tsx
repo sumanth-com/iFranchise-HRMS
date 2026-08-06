@@ -2,29 +2,18 @@
 
 import { ChevronDown } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { SidebarNavLink } from "@/components/layout/sidebar-nav-link";
 import { useSidebarNavigation } from "@/hooks/use-sidebar-navigation";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { resolveActiveNavHref } from "@/lib/layout/sidebar-active";
 import { cn } from "@/lib/utils";
-
-function resolveActiveHref(
-  pathname: string,
-  portalHome: string,
-  hrefs: string[],
-): string | null {
-  const matches = hrefs.filter(
-    (href) =>
-      pathname === href || (href !== portalHome && pathname.startsWith(href)),
-  );
-  if (matches.length === 0) return null;
-  return matches.sort((a, b) => b.length - a.length)[0] ?? null;
-}
 
 export function Sidebar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { isCollapsed, startNavigation } = useSidebar();
   const { navigation, portalHome, portalLabel } = useSidebarNavigation();
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
@@ -33,10 +22,11 @@ export function Sidebar() {
     "System Administration": true,
   });
 
-  const activeHref = resolveActiveHref(
+  const activeHref = resolveActiveNavHref(
     pathname,
+    searchParams,
     portalHome,
-    navigation.map((item) => item.href),
+    navigation,
   );
 
   function toggleSection(section: string) {
@@ -85,7 +75,7 @@ export function Sidebar() {
           const sectionOpen = item.section ? (openSections[item.section] ?? true) : true;
 
           return (
-            <div key={item.href} className="shrink-0">
+            <div key={`${item.section ?? ""}-${item.href}`} className="shrink-0">
               {showSection ? (
                 <button
                   type="button"

@@ -12,9 +12,12 @@ export const DOCUMENTS_ROUTES = {
   settings: "/dashboard/documents-management/settings",
 } as const;
 
+import { hubTeamListUrl } from "@/lib/dashboard/hub-paths";
+
 /** Personal / self-service documents in the HR portal main nav. */
 export const SELF_DOCUMENTS_ROUTES = {
   list: "/dashboard/documents",
+  team: "/dashboard/documents/team",
 } as const;
 
 /** Personal profile in the HR portal self-service section. */
@@ -25,15 +28,7 @@ export const SELF_PROFILE_ROUTES = {
 export function documentsTeamListUrl(
   searchParams?: Record<string, string | undefined>,
 ) {
-  const params = new URLSearchParams({ tab: "team" });
-  if (searchParams) {
-    Object.entries(searchParams).forEach(([key, value]) => {
-      if (value) {
-        params.set(key, value);
-      }
-    });
-  }
-  return `${SELF_DOCUMENTS_ROUTES.list}?${params.toString()}`;
+  return hubTeamListUrl(SELF_DOCUMENTS_ROUTES.list, searchParams);
 }
 
 export const DOCUMENTS_SUB_NAV = [

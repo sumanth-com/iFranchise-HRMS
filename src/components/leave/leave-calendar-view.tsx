@@ -43,6 +43,8 @@ type LeaveCalendarViewProps = {
   hideLegend?: boolean;
   /** Enable a Month / Week view toggle (defaults to month-only). */
   enableWeekView?: boolean;
+  /** Smaller calendar for self-service layouts. */
+  compact?: boolean;
 };
 
 type CalendarViewMode = "month" | "week";
@@ -139,6 +141,7 @@ export function LeaveCalendarView({
   showYearPicker = false,
   hideLegend = false,
   enableWeekView = false,
+  compact = false,
 }: LeaveCalendarViewProps) {
   const [view, setView] = useState<CalendarViewMode>("month");
   const [anchor, setAnchor] = useState<string>(() =>
@@ -176,8 +179,15 @@ export function LeaveCalendarView({
 
   const isWeek = enableWeekView && view === "week";
   const calendarDays = isWeek ? weekCells : monthCells;
-  const cellMinHeight = isWeek ? "min-h-40" : "min-h-28";
-  const maxVisibleLeaves = isWeek ? 8 : 3;
+  const cellMinHeight = isWeek
+    ? compact
+      ? "min-h-24"
+      : "min-h-40"
+    : compact
+      ? "min-h-16"
+      : "min-h-28";
+  const maxVisibleLeaves = isWeek ? (compact ? 4 : 8) : compact ? 2 : 3;
+  const gridMinWidth = compact ? "w-full" : "min-w-[44rem]";
 
   const yearOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -270,7 +280,12 @@ export function LeaveCalendarView({
           >
             <ChevronLeft className="size-4" />
           </Button>
-          <h2 className="min-w-[8rem] text-center text-lg font-semibold">
+          <h2
+            className={cn(
+              "min-w-[8rem] text-center font-semibold",
+              compact ? "text-sm" : "text-lg",
+            )}
+          >
             {isWeek ? weekLabel : monthLabel}
           </h2>
           <Button
@@ -328,14 +343,17 @@ export function LeaveCalendarView({
 
       <div className="overflow-hidden rounded-xl border bg-card">
         <div className="overflow-x-auto">
-          <div className="min-w-[44rem]">
+          <div className={gridMinWidth}>
             <div className="grid grid-cols-7 border-b bg-muted/40">
               {WEEKDAY_LABELS.map((label) => (
                 <div
                   key={label}
-                  className="px-2 py-2 text-center text-xs font-medium text-muted-foreground"
+                  className={cn(
+                    "px-1.5 py-1.5 text-center font-medium text-muted-foreground",
+                    compact ? "text-[10px]" : "text-xs",
+                  )}
                 >
-                  {label}
+                  {compact ? label.slice(0, 3) : label}
                 </div>
               ))}
             </div>
@@ -362,7 +380,8 @@ export function LeaveCalendarView({
               <div
                 key={day.date}
                 className={cn(
-                  "border-b border-r p-2 last:border-r-0",
+                  "border-b border-r last:border-r-0",
+                  compact ? "p-1" : "p-2",
                   cellMinHeight,
                   !day.isCurrentMonth && "bg-muted/20 text-muted-foreground",
                   isWeekend && day.isCurrentMonth && "bg-muted/30",
@@ -372,7 +391,8 @@ export function LeaveCalendarView({
                 <div className="mb-2 flex items-center justify-between gap-1">
                   <span
                     className={cn(
-                      "text-sm font-medium",
+                      "font-medium",
+                      compact ? "text-xs" : "text-sm",
                       !day.isCurrentMonth && "text-muted-foreground",
                     )}
                   >

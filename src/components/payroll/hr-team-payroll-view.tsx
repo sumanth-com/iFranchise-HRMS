@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { CalendarDays } from "lucide-react";
 
 import { PayrollMonthlyOverview } from "@/components/payroll/payroll-monthly-overview";
@@ -12,11 +12,12 @@ import {
   getMonthSelectItems,
   getYearSelectItems,
 } from "@/components/payroll/select-utils";
-import { buttonVariants } from "@/components/common/button";
-import { PAYROLL_ROUTES, SELF_PAYROLL_ROUTES } from "@/lib/payroll/constants";
+import {
+  payrollHubUrl,
+  TEAM_PAYROLL_SECTIONS,
+} from "@/lib/payroll/constants";
 import { formatPayrollMonth } from "@/lib/payroll/services/payroll-utils";
 import type { PayrollListItem, PayrollSummary } from "@/types/payroll";
-import { cn } from "@/lib/utils";
 
 const monthItems = getMonthSelectItems();
 const yearItems = getYearSelectItems();
@@ -43,41 +44,22 @@ export function HrTeamPayrollView({
   embedded = false,
 }: HrTeamPayrollViewProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   function updatePeriod(nextMonth: number, nextYear: number) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("tab", "team");
-    params.set("month", String(nextMonth));
-    params.set("year", String(nextYear));
-    router.push(`${SELF_PAYROLL_ROUTES.list}?${params.toString()}`);
+    router.push(
+      payrollHubUrl({
+        tab: "team",
+        section: TEAM_PAYROLL_SECTIONS.dashboard,
+        params: { month: String(nextMonth), year: String(nextYear) },
+      }),
+    );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          {embedded ? (
-            <h2 className="text-lg font-semibold tracking-tight">Team Payroll</h2>
-          ) : (
-            <h1 className="text-2xl font-semibold tracking-tight">Payroll</h1>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href={PAYROLL_ROUTES.run}
-            className={cn(buttonVariants({ size: "sm" }), "h-9")}
-          >
-            Run Payroll
-          </Link>
-          <Link
-            href={PAYROLL_ROUTES.history}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9")}
-          >
-            View History
-          </Link>
-        </div>
-      </div>
+      {!embedded ? (
+        <h1 className="text-2xl font-semibold tracking-tight">Payroll</h1>
+      ) : null}
 
       <div className="flex flex-col gap-3 rounded-xl border bg-card p-3 shadow-sm sm:flex-row sm:items-end sm:justify-between">
         <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
@@ -117,7 +99,7 @@ export function HrTeamPayrollView({
 
       <div className="space-y-5">
         <PayrollMonthlyOverview
-          overview={summary.monthlyOverview}
+          overview={summary.monthlyOverview ?? []}
           year={year}
           compact
         />
@@ -131,7 +113,11 @@ export function HrTeamPayrollView({
               </p>
             </div>
             <Link
-              href={PAYROLL_ROUTES.history}
+              href={payrollHubUrl({
+                tab: "team",
+                section: TEAM_PAYROLL_SECTIONS.history,
+                params: { month: String(month), year: String(year) },
+              })}
               className="text-xs font-medium text-primary hover:underline"
             >
               View all

@@ -1,16 +1,22 @@
 import { EmployeeSettingsView } from "@/components/employee/settings/employee-settings-view";
 import { NotificationPreferencesForm } from "@/components/notifications/notification-preferences-form";
 import { PageScroll } from "@/components/common/sticky-layout";
-import { SettingsResignationLinkSection } from "@/components/settings/settings-resignation-link-section";
-import { EXIT_ROUTES } from "@/lib/exit/constants";
+import { SettingsResignationModalSection } from "@/components/settings/settings-resignation-modal-section";
+import { getExitSettings } from "@/lib/exit/services/exit-settings";
+import { getEmployeeResignationSnapshot } from "@/lib/exit/services/exit-queries";
 import { getNotificationUserPreferences } from "@/lib/notifications/services/notification-queries";
 import { requireAuthenticatedProfile } from "@/lib/permissions/server";
+import { hasPermission } from "@/lib/permissions/utils";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function SettingsSelfServicePage() {
   const profile = await requireAuthenticatedProfile();
   const supabase = await createClient();
-  const notificationPreferences = await getNotificationUserPreferences(supabase, profile);
+  const [notificationPreferences, snapshot, exitSettings] = await Promise.all([
+    getNotificationUserPreferences(supabase, profile),
+    getEmployeeResignationSnapshot(supabase, profile),
+    getExitSettings(supabase, profile.employee.organizationId),
+  ]);
 
   return (
     <PageScroll>
@@ -24,10 +30,13 @@ export default async function SettingsSelfServicePage() {
 
         <EmployeeSettingsView email={profile.email} />
 
-        <SettingsResignationLinkSection
-          href={EXIT_ROUTES.dashboard}
+        <SettingsResignationModalSection
           title="Offboarding"
-          description="Manage resignations, clearance, settlements, and exit documentation."
+          description="Submit your resignation and track approval status."
+          canApply={hasPermission(profile.permissionCodes, "exit.create")}
+          employeeId={profile.employee.id}
+          defaultNoticePeriodDays={exitSettings.defaultNoticePeriodDays}
+          activeResignation={snapshot.activeResignation}
         />
 
         <section className="rounded-xl border bg-card p-4 shadow-sm md:p-5">

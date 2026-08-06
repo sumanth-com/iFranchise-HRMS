@@ -7,6 +7,7 @@ import { getManagerTeamLeavePageData } from "@/lib/manager/actions/manager-leave
 import {
   getEmployeeLeaveBalanceSnapshot,
   getEmployeeLeaveCalendarData,
+  getLeaveLookups,
   listEmployeeOwnLeaveRequests,
 } from "@/lib/leave/services/leave-queries";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
@@ -57,7 +58,9 @@ export default async function ManagerLeavePage({
   const calendarMonth = now.getMonth() + 1;
   const calendarYear = now.getFullYear();
 
-  const [teamData, balances, requests, calendar] = await Promise.all([
+  const canApply = hasPermission(profile.permissionCodes, "leave.create");
+
+  const [teamData, balances, requests, calendar, applyLookups] = await Promise.all([
     safeServerCall(
       () => getManagerTeamLeavePageData(parsed),
       {
@@ -95,6 +98,21 @@ export default async function ManagerLeavePage({
       { leaves: [], holidays: [] },
       "[manager/leave] calendar",
     ),
+    canApply
+      ? safeServerCall(
+          () => getLeaveLookups(supabase, profile.employee.organizationId),
+          {
+            leaveTypes: [],
+            departments: [],
+            branches: [],
+            employees: [],
+            managers: [],
+            approvers: [],
+            employmentTypes: [],
+          },
+          "[manager/leave] apply lookups",
+        )
+      : Promise.resolve(null),
   ]);
 
   return (
@@ -111,7 +129,9 @@ export default async function ManagerLeavePage({
         initialLeaveId={leaveId}
         initialSection={section}
         selfLeave={{
-          canApply: hasPermission(profile.permissionCodes, "leave.create"),
+          canApply,
+          employeeId,
+          applyLeaveLookups: applyLookups,
           balances,
           requests,
           calendarMonth,

@@ -293,18 +293,18 @@ export const loadUserProfile = cache(async function loadUserProfile(
 
 export async function getCurrentUserProfile(): Promise<UserProfile | null> {
   const { getLayoutUserProfile } = await import("@/lib/auth/layout-profile");
-  const supabase = await createClient();
+  const { getServerSession } = await import("@/lib/supabase/server");
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user?.email) {
+  const session = await getServerSession();
+  if (!session?.user.email) {
     return null;
   }
 
-  const result = await getLayoutUserProfile(user.id, user.email);
+  const result = await getLayoutUserProfile(
+    session.user.id,
+    session.user.email,
+    session.supabase,
+  );
 
   if (!result.success) {
     return null;
