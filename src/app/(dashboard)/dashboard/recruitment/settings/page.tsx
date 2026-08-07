@@ -1,27 +1,7 @@
-import { RecruitmentSettingsForm } from "@/components/recruitment/recruitment-settings-form";
-import { requireServerPermission } from "@/lib/permissions/server";
-import { hasAnyPermission } from "@/lib/permissions/utils";
-import { getRecruitmentLookups } from "@/lib/recruitment/services/recruitment-queries";
-import { getRecruitmentSettings } from "@/lib/recruitment/services/recruitment-settings";
-import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
-export default async function RecruitmentSettingsPage() {
-  const profile = await requireServerPermission("recruitment.view");
-  const supabase = await createClient();
-  const [settings, lookups] = await Promise.all([
-    getRecruitmentSettings(supabase, profile.employee.organizationId),
-    getRecruitmentLookups(supabase, profile.employee.organizationId),
-  ]);
-  const canEdit = hasAnyPermission(profile.permissionCodes, [
-    "recruitment.edit",
-    "settings.edit",
-  ]);
+import { COMPANY_SETTINGS_ROUTES } from "@/lib/company-settings/constants";
 
-  return (
-    <RecruitmentSettingsForm
-      settings={settings}
-      managers={lookups.employees}
-      canEdit={canEdit}
-    />
-  );
+export default function RecruitmentSettingsRedirectPage() {
+  redirect(COMPANY_SETTINGS_ROUTES.section("recruitment"));
 }

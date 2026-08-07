@@ -113,6 +113,7 @@ export async function getRecruitmentLookups(
     noticePeriodOptions: settings.noticePeriodOptions,
     defaultHiringManagerId: settings.defaultHiringManagerId,
     defaultInterviewDurationMinutes: settings.defaultInterviewDurationMinutes,
+    offerEmailDefaults: settings.offerEmailDefaults,
     offerTemplates: settings.offerTemplates,
     emailTemplates: settings.emailTemplates,
     offerLetterDocumentTemplates: ((docTemplates.data ?? []) as PerfRow[]).map((row) => ({

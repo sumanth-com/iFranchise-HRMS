@@ -8,6 +8,7 @@ import {
   SelectValue,
 } from "@/components/common/select";
 import type { SelectItemOption } from "@/components/payroll/select-utils";
+import { cn } from "@/lib/utils";
 
 type FilterSelectProps = {
   items: SelectItemOption[];
@@ -15,6 +16,9 @@ type FilterSelectProps = {
   onValueChange: (value: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  className?: string;
+  triggerClassName?: string;
+  contentClassName?: string;
 };
 
 /** Select with `items` mapping so labels display instead of raw values. */
@@ -24,26 +28,31 @@ export function FilterSelect({
   onValueChange,
   placeholder,
   disabled,
+  className,
+  triggerClassName,
+  contentClassName,
 }: FilterSelectProps) {
   return (
-    <Select
-      items={items}
-      value={value}
-      onValueChange={(next) => {
-        if (next) onValueChange(next);
-      }}
-      disabled={disabled}
-    >
-      <SelectTrigger>
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent align="start" alignItemWithTrigger={false}>
-        {items.map((item) => (
-          <SelectItem key={item.value} value={item.value}>
-            {item.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <div className={cn("w-full", className)}>
+      <Select
+        items={items}
+        value={value}
+        onValueChange={(next) => {
+          if (next) onValueChange(next);
+        }}
+        disabled={disabled}
+      >
+        <SelectTrigger className={cn("h-9 w-full", triggerClassName)}>
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent align="start" className={contentClassName}>
+          {items.map((item) => (
+            <SelectItem key={item.value} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }

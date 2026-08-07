@@ -9,14 +9,13 @@ import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { createOfferAction } from "@/lib/recruitment/actions";
 import { OFFER_STATUS_LABELS } from "@/lib/recruitment/constants";
-import { buildDefaultOfferEmailMessage } from "@/lib/recruitment/offer-email-content";
+import {
+  applyOfferEmailTemplate,
+  buildDefaultOfferEmailSubject,
+} from "@/lib/recruitment/offer-email-content";
 import { isAllowedOfferLetterFilename } from "@/lib/validations/recruitment";
 import { cn } from "@/lib/utils";
-import type { CandidateDetail } from "@/types/recruitment";
-
-function defaultEmailSubject(jobTitle: string): string {
-  return `Offer of Employment — ${jobTitle} | iFranchise`;
-}
+import type { CandidateDetail, OfferEmailDefaults } from "@/types/recruitment";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -28,6 +27,7 @@ type OfferLetterWorkspaceProps = {
   detail: CandidateDetail | null;
   loading: boolean;
   canOffer: boolean;
+  offerEmailDefaults: OfferEmailDefaults;
   onClose: () => void;
   onRefresh: () => void;
 };
@@ -36,6 +36,7 @@ export function OfferLetterWorkspace({
   detail,
   loading,
   canOffer,
+  offerEmailDefaults,
   onClose,
   onRefresh,
 }: OfferLetterWorkspaceProps) {
@@ -59,13 +60,18 @@ export function OfferLetterWorkspace({
 
   const defaultSubject = useMemo(() => {
     if (!detail) return "";
-    return defaultEmailSubject(detail.jobTitle);
-  }, [detail]);
+    return buildDefaultOfferEmailSubject(detail.jobTitle, offerEmailDefaults.subjectTemplate);
+  }, [detail, offerEmailDefaults.subjectTemplate]);
 
   const defaultMessage = useMemo(() => {
     if (!detail) return "";
-    return buildDefaultOfferEmailMessage(detail.fullName, detail.jobTitle);
-  }, [detail]);
+    return applyOfferEmailTemplate(offerEmailDefaults.messageTemplate, {
+      candidateName: detail.fullName,
+      position: detail.jobTitle,
+      hrEmail: offerEmailDefaults.hrEmail,
+      hrPhone: offerEmailDefaults.hrPhone,
+    });
+  }, [detail, offerEmailDefaults]);
 
   useEffect(() => {
     if (!detail) return;

@@ -42,11 +42,7 @@ export function CompanySettingsSectionView({ section, settings, canEdit }: Props
       ) : null}
 
       {section === "recruitment" ? (
-        <RecruitmentSettingsForm
-          settings={settings.recruitment}
-          managers={settings.recruitmentManagers}
-          canEdit={canEdit}
-        />
+        <RecruitmentSettingsForm settings={settings.recruitment} canEdit={canEdit} />
       ) : null}
 
       {section === "performance" ? (

@@ -974,3 +974,47 @@ export async function archiveOnboardingCase(
     actorUserId: profile.userId,
   });
 }
+
+export async function deleteOnboardingCase(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  caseId: string,
+) {
+  const organizationId = profile.employee.organizationId;
+  const detail = await getOnboardingCaseDetail(supabase, organizationId, caseId);
+
+  if (["employee_created", "completed"].includes(detail.status)) {
+    throw new Error("Cannot delete onboarding after an employee record has been created");
+  }
+
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .schema("hrms")
+    .from("onboarding_cases")
+    .update({
+      deleted_at: now,
+      onboarding_account_active: false,
+      updated_by: profile.userId,
+      updated_at: now,
+    })
+    .eq("id", caseId)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+
+  await revokePortalSessions(caseId);
+  await revokeActiveInvitationTokens(caseId);
+  await addTimelineEvent(supabase, caseId, {
+    eventType: "deleted",
+    title: "Onboarding deleted",
+    actorUserId: profile.userId,
+  });
+
+  await writeApplicationAudit(supabase, {
+    organizationId,
+    module: "onboarding",
+    action: "delete",
+    description: `Onboarding case deleted for ${detail.fullName}`,
+    recordId: caseId,
+  });
+}

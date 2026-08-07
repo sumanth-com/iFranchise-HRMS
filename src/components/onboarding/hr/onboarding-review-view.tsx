@@ -42,6 +42,7 @@ import {
 } from "@/lib/onboarding/actions/hr-onboarding-actions";
 import { useSetBreadcrumbLabel } from "@/providers/breadcrumb-label-provider";
 import {
+  ONBOARDING_ROUTES,
   ONBOARDING_STATUS_LABELS,
   ONBOARDING_WIZARD_SECTIONS,
   type OnboardingStatus,
@@ -223,7 +224,7 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
               variant="ghost"
               size="sm"
               className="-ml-2"
-              onClick={() => router.push("/dashboard/onboarding")}
+              onClick={() => router.push(ONBOARDING_ROUTES.hrList)}
             >
               <ArrowLeft className="h-4 w-4 mr-1" />
               Back to list

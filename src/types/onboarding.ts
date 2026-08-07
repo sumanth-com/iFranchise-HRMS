@@ -33,8 +33,8 @@ export const ONBOARDING_STATUS_LABELS: Record<OnboardingStatus, string> = {
 };
 
 export const ONBOARDING_ROUTES = {
-  hrList: "/dashboard/onboarding",
-  hrDetail: (id: string) => `/dashboard/onboarding/${id}`,
+  hrList: "/dashboard/recruitment/onboarding",
+  hrDetail: (id: string) => `/dashboard/recruitment/onboarding/${id}`,
   invite: (token: string) => `/onboarding/invite/${token}`,
   login: "/onboarding/login",
   portal: "/onboarding/portal",

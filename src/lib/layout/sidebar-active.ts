@@ -12,6 +12,7 @@ const TEAM_ADMIN_PATH_PREFIXES: Record<string, string> = {
   "/dashboard/payroll-management": HR_HUB_ROUTES.teamPayroll,
   "/dashboard/documents-management": HR_HUB_ROUTES.teamDocuments,
   "/dashboard/assets-management": HR_HUB_ROUTES.teamAssets,
+  "/dashboard/onboarding": "/dashboard/recruitment",
 };
 
 function navItemPath(href: string) {

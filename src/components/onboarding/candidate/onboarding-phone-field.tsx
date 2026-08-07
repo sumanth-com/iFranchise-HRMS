@@ -9,6 +9,7 @@ import {
   parseStoredPhone,
   phoneCountryMeta,
 } from "@/lib/onboarding/personal-field-options";
+import { cn } from "@/lib/utils";
 
 type OnboardingPhoneFieldProps = {
   label: string;
@@ -19,6 +20,12 @@ type OnboardingPhoneFieldProps = {
   disabled?: boolean;
   showHint?: boolean;
 };
+
+const phoneSelectTriggerClass =
+  "h-9 w-full min-w-0 border-0 bg-transparent shadow-none rounded-none rounded-l-lg px-2.5 focus-visible:border-transparent focus-visible:ring-0 data-[size=default]:h-9";
+
+const phoneInputClass =
+  "h-9 min-w-0 flex-1 border-0 bg-transparent shadow-none rounded-none rounded-r-lg px-2.5 focus-visible:border-transparent focus-visible:ring-0";
 
 export function OnboardingPhoneField({
   label,
@@ -50,20 +57,27 @@ export function OnboardingPhoneField({
   }
 
   return (
-    <div className="space-y-1">
-      <Label className="text-sm font-medium text-foreground">
+    <div className="space-y-1.5">
+      <Label className="text-sm">
         {label}
-        {required ? <span className="text-foreground"> *</span> : null}
+        {required ? <span className="text-destructive"> *</span> : null}
       </Label>
-      <div className="flex gap-2">
-        <LabeledSelect
-          items={countryItems}
-          value={countryCode}
-          onValueChange={updateCountry}
-          triggerClassName="h-9 w-[5.5rem] shrink-0 text-sm"
-          contentClassName="min-w-[8rem]"
-          disabled={disabled}
-        />
+      <div
+        className={cn(
+          "flex h-9 items-stretch rounded-lg border border-input bg-background transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 dark:bg-input/30",
+          disabled && "pointer-events-none opacity-50",
+        )}
+      >
+        <div className="w-[5.75rem] shrink-0 border-r border-input">
+          <LabeledSelect
+            items={countryItems}
+            value={countryCode}
+            onValueChange={updateCountry}
+            triggerClassName={phoneSelectTriggerClass}
+            contentClassName="min-w-[8rem]"
+            disabled={disabled}
+          />
+        </div>
         <Input
           type="tel"
           inputMode="numeric"
@@ -71,7 +85,7 @@ export function OnboardingPhoneField({
           value={parsed.nationalNumber}
           onChange={(e) => updateNumber(e.target.value)}
           placeholder={placeholder}
-          className="h-9 min-w-0 flex-1 text-sm"
+          className={phoneInputClass}
           disabled={disabled}
         />
       </div>

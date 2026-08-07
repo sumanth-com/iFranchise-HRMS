@@ -529,10 +529,28 @@ function buildBreadcrumbItems(
     return items;
   }
 
+  if (segments[0] === "dashboard" && segments[1] === "recruitment" && segments[2] === "onboarding") {
+    const items: BreadcrumbItemConfig[] = [
+      { label: "Dashboard", href: HR_PORTAL_HOME },
+      { label: "Recruitment", href: "/dashboard/recruitment" },
+      { label: "Onboarding", href: "/dashboard/recruitment/onboarding" },
+    ];
+
+    if (segments[3]) {
+      items.push({
+        label: isUuid(segments[3]) ? "New hire" : formatSegment(segments[3]),
+        href: pathname,
+      });
+    }
+
+    return items;
+  }
+
   if (segments[0] === "dashboard" && segments[1] === "onboarding") {
     const items: BreadcrumbItemConfig[] = [
       { label: "Dashboard", href: HR_PORTAL_HOME },
-      { label: "Onboarding", href: "/dashboard/onboarding" },
+      { label: "Recruitment", href: "/dashboard/recruitment" },
+      { label: "Onboarding", href: "/dashboard/recruitment/onboarding" },
     ];
 
     if (segments[2]) {

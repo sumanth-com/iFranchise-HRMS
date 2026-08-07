@@ -248,6 +248,7 @@ export function OfferQueueManagement({
             detail={selectedDetail}
             loading={detailLoading}
             canOffer={canOffer}
+            offerEmailDefaults={lookups.offerEmailDefaults}
             onClose={closePanel}
             onRefresh={() => {
               if (selectedId) void refreshDetail(selectedId);

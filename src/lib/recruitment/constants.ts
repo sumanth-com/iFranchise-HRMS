@@ -16,7 +16,7 @@ export const RECRUITMENT_ROUTES = {
   interviews: "/dashboard/recruitment/interviews",
   offers: "/dashboard/recruitment/offers",
   analytics: "/dashboard/recruitment/analytics",
-  settings: "/dashboard/recruitment/settings",
+  onboarding: "/dashboard/recruitment/onboarding",
 } as const;
 
 export const RECRUITMENT_SUB_NAV = [
@@ -24,7 +24,6 @@ export const RECRUITMENT_SUB_NAV = [
   { title: "Job Openings", href: RECRUITMENT_ROUTES.jobs },
   { title: "Candidates", href: RECRUITMENT_ROUTES.candidates },
   { title: "Offers", href: RECRUITMENT_ROUTES.offers },
-  { title: "Settings", href: RECRUITMENT_ROUTES.settings },
 ] as const;
 
 export const OFFER_QUEUE_FILTER_LABELS = {
@@ -42,7 +41,7 @@ export const OFFER_QUEUE_STAGE_LABELS = {
 /** Recruitment + onboarding tabs shown in the shared hiring module shell. */
 export const HIRING_SUB_NAV = [
   ...RECRUITMENT_SUB_NAV,
-  { title: "Onboarding", href: "/dashboard/onboarding" },
+  { title: "Onboarding", href: RECRUITMENT_ROUTES.onboarding },
 ] as const;
 
 export const JOB_STATUS_LABELS: Record<JobOpeningStatus, string> = {

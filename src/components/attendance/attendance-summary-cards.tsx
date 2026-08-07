@@ -48,7 +48,7 @@ const SUMMARY_CONFIG = [
 
 export function AttendanceSummaryCards({ summary }: AttendanceSummaryCardsProps) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {SUMMARY_CONFIG.map((item) => {
         const Icon = item.icon;
         const value = summary[item.key];
@@ -56,19 +56,19 @@ export function AttendanceSummaryCards({ summary }: AttendanceSummaryCardsProps)
         return (
           <div
             key={item.key}
-            className="rounded-xl border bg-card p-4 shadow-sm"
+            className="min-w-0 rounded-xl border bg-card p-3.5 shadow-sm"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm text-muted-foreground">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-xs text-muted-foreground sm:text-sm">
                   {ATTENDANCE_SUMMARY_LABELS[item.key]}
                 </p>
-                <p className="mt-2 text-2xl font-semibold tracking-tight">
+                <p className="mt-1 text-xl font-semibold tracking-tight tabular-nums">
                   {value}
                 </p>
               </div>
               <div
-                className={`flex size-10 shrink-0 items-center justify-center rounded-full ${item.bg}`}
+                className={`flex size-9 shrink-0 items-center justify-center rounded-full ${item.bg}`}
               >
                 <Icon className={`size-4 ${item.accent}`} />
               </div>

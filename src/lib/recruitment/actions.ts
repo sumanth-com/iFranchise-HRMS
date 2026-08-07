@@ -297,7 +297,6 @@ export async function updateRecruitmentSettingsAction(
       profile.employee.organizationId,
       parsed,
     );
-    revalidatePath(RECRUITMENT_ROUTES.settings);
     revalidatePath("/dashboard/company-settings");
     revalidateRecruitment();
     return { success: true, data: settings };

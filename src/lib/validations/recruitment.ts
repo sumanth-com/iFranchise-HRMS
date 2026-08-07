@@ -207,6 +207,12 @@ export const recruitmentSettingsSchema = z.object({
       .max(10)
       .regex(/^[A-Za-z]+$/, "Prefix must contain letters only"),
   }),
+  offerEmailDefaults: z.object({
+    subjectTemplate: z.string().min(1, "Email subject is required").max(500),
+    messageTemplate: z.string().min(1, "Email message is required").max(10000),
+    hrEmail: z.string().email("Enter a valid HR email").max(200),
+    hrPhone: z.string().min(1, "HR phone is required").max(50),
+  }),
 });
 
 export type RecruitmentSettingsFormValues = z.infer<typeof recruitmentSettingsSchema>;

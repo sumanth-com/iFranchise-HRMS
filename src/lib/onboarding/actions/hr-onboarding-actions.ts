@@ -14,6 +14,7 @@ import {
   cancelOnboardingCase,
   createOnboardingCase,
   createOrUpdateOnboardingCaseForInvite,
+  deleteOnboardingCase,
   processOnboardingReview,
   reviewOnboardingDocument,
   sendOnboardingInvitation,
@@ -37,6 +38,7 @@ const VIEW_PERMISSIONS = [
 ];
 
 function revalidateOnboarding() {
+  revalidatePath("/dashboard/recruitment/onboarding", "layout");
   revalidatePath("/dashboard/onboarding", "layout");
 }
 
@@ -168,6 +170,18 @@ export async function archiveOnboardingAction(caseId: string): Promise<ActionRes
     return { success: true, message: "Onboarding archived" };
   } catch (error) {
     return { success: false, message: error instanceof Error ? error.message : "Archive failed" };
+  }
+}
+
+export async function deleteOnboardingAction(caseId: string): Promise<ActionResult> {
+  try {
+    const profile = await requireServerAnyPermission(MANAGE_PERMISSIONS);
+    const supabase = await createClient();
+    await deleteOnboardingCase(supabase, profile, caseId);
+    revalidateOnboarding();
+    return { success: true, message: "Onboarding case deleted" };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : "Delete failed" };
   }
 }
 

@@ -270,6 +270,13 @@ export type RecruitmentNumberFormats = {
   offerPrefix: string;
 };
 
+export type OfferEmailDefaults = {
+  subjectTemplate: string;
+  messageTemplate: string;
+  hrEmail: string;
+  hrPhone: string;
+};
+
 export type RecruitmentSettings = {
   candidateSources: CandidateSourceItem[];
   defaultHiringManagerId: string | null;
@@ -279,6 +286,7 @@ export type RecruitmentSettings = {
   autoArchiveRejectedDays: 30 | 60 | 90 | 180;
   emailNotifications: RecruitmentEmailNotifications;
   numberFormats: RecruitmentNumberFormats;
+  offerEmailDefaults: OfferEmailDefaults;
   offerTemplates: RecruitmentOfferTemplate[];
   emailTemplates: RecruitmentEmailTemplate[];
 };
@@ -294,6 +302,7 @@ export type RecruitmentLookups = {
   noticePeriodOptions: string[];
   defaultHiringManagerId: string | null;
   defaultInterviewDurationMinutes: number;
+  offerEmailDefaults: OfferEmailDefaults;
   offerTemplates: RecruitmentOfferTemplate[];
   emailTemplates: RecruitmentEmailTemplate[];
   offerLetterDocumentTemplates: OfferLetterDocumentTemplate[];

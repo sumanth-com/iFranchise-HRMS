@@ -10,6 +10,10 @@ import {
   DEFAULT_NOTICE_PERIOD_OPTIONS,
 } from "@/lib/recruitment/constants";
 import type { RecruitmentSettingsFormValues } from "@/lib/validations/recruitment";
+import {
+  DEFAULT_OFFER_EMAIL_MESSAGE_TEMPLATE,
+  DEFAULT_OFFER_EMAIL_SUBJECT_TEMPLATE,
+} from "@/lib/recruitment/offer-email-content";
 
 export const DEFAULT_RECRUITMENT_SETTINGS: RecruitmentSettings = {
   candidateSources: DEFAULT_CANDIDATE_SOURCES.map((s) => ({ ...s })),
@@ -30,6 +34,12 @@ export const DEFAULT_RECRUITMENT_SETTINGS: RecruitmentSettings = {
     candidatePrefix: "CAN",
     jobPrefix: "JOB",
     offerPrefix: "OFF",
+  },
+  offerEmailDefaults: {
+    subjectTemplate: DEFAULT_OFFER_EMAIL_SUBJECT_TEMPLATE,
+    messageTemplate: DEFAULT_OFFER_EMAIL_MESSAGE_TEMPLATE,
+    hrEmail: "hr@ifranchise.in",
+    hrPhone: "+91-9247 536532",
   },
   offerTemplates: [
     {
@@ -164,6 +174,20 @@ export function mergeRecruitmentSettings(
         .toUpperCase()
         .replace(/[^A-Z]/g, "")
         .slice(0, 10) || "OFF",
+    },
+    offerEmailDefaults: {
+      subjectTemplate:
+        String(stored?.offerEmailDefaults?.subjectTemplate ?? "").trim() ||
+        DEFAULT_RECRUITMENT_SETTINGS.offerEmailDefaults.subjectTemplate,
+      messageTemplate:
+        String(stored?.offerEmailDefaults?.messageTemplate ?? "").trim() ||
+        DEFAULT_RECRUITMENT_SETTINGS.offerEmailDefaults.messageTemplate,
+      hrEmail:
+        String(stored?.offerEmailDefaults?.hrEmail ?? "").trim() ||
+        DEFAULT_RECRUITMENT_SETTINGS.offerEmailDefaults.hrEmail,
+      hrPhone:
+        String(stored?.offerEmailDefaults?.hrPhone ?? "").trim() ||
+        DEFAULT_RECRUITMENT_SETTINGS.offerEmailDefaults.hrPhone,
     },
     offerTemplates: normalizeOfferTemplates(stored?.offerTemplates),
     emailTemplates: normalizeEmailTemplates(stored?.emailTemplates),

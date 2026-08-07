@@ -1,21 +1,6 @@
 "use client";
 
-import {
-  BriefcaseBusiness,
-  Building2,
-  DoorOpen,
-  Globe2,
-  GraduationCap,
-  HandHelping,
-  Link2,
-  Loader2,
-  MoreHorizontal,
-  Plus,
-  Search,
-  Trash2,
-  Users,
-  type LucideIcon,
-} from "lucide-react";
+import { Loader2, Plus, X } from "lucide-react";
 import { useTransition } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,14 +9,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
-import { StickyPageActions } from "@/components/common/sticky-layout";
-import { EmployeeSelect, LabeledSelect } from "@/components/payroll/payroll-select";
 import { updateRecruitmentSettingsAction } from "@/lib/recruitment/actions";
-import {
-  ARCHIVE_DAYS_OPTIONS,
-  INTERVIEW_DURATION_OPTIONS,
-} from "@/lib/recruitment/constants";
-import { previewNumberFormat } from "@/lib/recruitment/services/recruitment-settings";
+import { DEFAULT_CANDIDATE_SOURCES } from "@/lib/recruitment/constants";
 import {
   recruitmentSettingsSchema,
   type RecruitmentSettingsFormInput,
@@ -42,46 +21,12 @@ import { cn } from "@/lib/utils";
 
 type Props = {
   settings: RecruitmentSettings;
-  managers: { id: string; label: string }[];
   canEdit: boolean;
 };
 
-function getSourceIcon(label: string, id?: string): LucideIcon {
-  const key = `${id ?? ""} ${label}`.toLowerCase();
-  if (key.includes("linkedin")) return Link2;
-  if (key.includes("naukri")) return BriefcaseBusiness;
-  if (key.includes("indeed")) return Search;
-  if (key.includes("career") || key.includes("company")) return Globe2;
-  if (key.includes("referral") || key.includes("employee")) return Users;
-  if (key.includes("walk")) return DoorOpen;
-  if (key.includes("agency") || key.includes("recruitment")) return Building2;
-  if (key.includes("campus") || key.includes("college") || key.includes("placement")) {
-    return GraduationCap;
-  }
-  if (key.includes("other") || key.includes("new source")) return MoreHorizontal;
-  return HandHelping;
-}
+const BUILTIN_SOURCE_IDS = new Set<string>(DEFAULT_CANDIDATE_SOURCES.map((source) => source.id));
 
-function getSourceIconStyle(label: string, id?: string) {
-  const key = `${id ?? ""} ${label}`.toLowerCase();
-  if (key.includes("linkedin")) return "bg-[#0A66C2]/10 text-[#0A66C2]";
-  if (key.includes("naukri")) return "bg-orange-500/10 text-orange-600";
-  if (key.includes("indeed")) return "bg-indigo-500/10 text-indigo-600";
-  if (key.includes("career") || key.includes("company")) return "bg-sky-500/10 text-sky-600";
-  if (key.includes("referral") || key.includes("employee")) {
-    return "bg-emerald-500/10 text-emerald-600";
-  }
-  if (key.includes("walk")) return "bg-amber-500/10 text-amber-600";
-  if (key.includes("agency") || key.includes("recruitment")) {
-    return "bg-violet-500/10 text-violet-600";
-  }
-  if (key.includes("campus") || key.includes("college") || key.includes("placement")) {
-    return "bg-rose-500/10 text-rose-600";
-  }
-  return "bg-muted text-muted-foreground";
-}
-
-export function RecruitmentSettingsForm({ settings, managers, canEdit }: Props) {
+export function RecruitmentSettingsForm({ settings, canEdit }: Props) {
   const [isPending, startTransition] = useTransition();
   const form = useForm<RecruitmentSettingsFormInput, unknown, RecruitmentSettingsFormValues>({
     resolver: zodResolver(recruitmentSettingsSchema),
@@ -94,7 +39,6 @@ export function RecruitmentSettingsForm({ settings, managers, canEdit }: Props) 
   });
 
   const noticePeriods = form.watch("noticePeriodOptions") ?? [];
-  const numberFormats = form.watch("numberFormats");
 
   function onSubmit(values: RecruitmentSettingsFormValues) {
     startTransition(async () => {
@@ -109,321 +53,249 @@ export function RecruitmentSettingsForm({ settings, managers, canEdit }: Props) 
   }
 
   return (
-    <form
-      onSubmit={form.handleSubmit(onSubmit)}
-      className="flex min-h-full flex-col gap-6"
-    >
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Recruitment Settings</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Configure sources, defaults, automation, notifications, and ID formats.
-        </p>
+    <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-0 flex-col gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Recruitment Settings</h1>
+          <p className="text-xs text-muted-foreground">
+            Offer email defaults, candidate sources, and notice period options.
+          </p>
+        </div>
+        {canEdit ? (
+          <div className="flex shrink-0 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!form.formState.isDirty || isPending}
+              onClick={() => form.reset(settings)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" size="sm" disabled={!form.formState.isDirty || isPending}>
+              {isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+              Save
+            </Button>
+          </div>
+        ) : null}
       </div>
 
-      <SettingsSection
-        title="Candidate Sources"
-        description="Manage where candidates come from. Enabled sources appear in candidate creation."
-      >
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {fields.map((field, index) => {
-            const label = form.watch(`candidateSources.${index}.label`) || field.label;
-            const Icon = getSourceIcon(label, field.id);
-            return (
-              <div
-                key={field.id}
-                className="flex items-center gap-2 rounded-lg border bg-muted/20 px-3 py-2"
-              >
-                <span
-                  className={cn(
-                    "flex size-8 shrink-0 items-center justify-center rounded-md",
-                    getSourceIconStyle(label, field.id),
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                </span>
-                <Input
-                  className="h-9 min-w-0 flex-1"
-                  disabled={!canEdit || isPending}
-                  {...form.register(`candidateSources.${index}.label`)}
-                />
-                <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    className="size-3.5 rounded border-input"
-                    disabled={!canEdit || isPending}
-                    checked={form.watch(`candidateSources.${index}.enabled`)}
-                    onChange={(e) =>
-                      update(index, {
-                        ...form.getValues(`candidateSources.${index}`),
-                        enabled: e.target.checked,
-                      })
-                    }
-                  />
-                  On
-                </label>
-                {canEdit ? (
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    className="shrink-0 text-muted-foreground hover:text-destructive"
-                    disabled={isPending || fields.length <= 1}
-                    onClick={() => remove(index)}
-                    aria-label="Remove source"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-        {canEdit ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="mt-3"
-            disabled={isPending}
-            onClick={() =>
-              append({
-                id: `src_${crypto.randomUUID().slice(0, 8)}`,
-                label: "New Source",
-                enabled: true,
-              })
-            }
-          >
-            <Plus className="mr-1.5 h-4 w-4" />
-            Add Source
-          </Button>
-        ) : null}
-      </SettingsSection>
-
-      <SettingsSection
-        title="Hiring Defaults"
-        description="Defaults applied automatically when creating jobs and interviews."
-      >
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Default Hiring Manager">
-            <EmployeeSelect
-              employees={managers}
-              value={form.watch("defaultHiringManagerId") ?? ""}
-              onValueChange={(value) =>
-                form.setValue("defaultHiringManagerId", value || null, { shouldDirty: true })
-              }
-              placeholder="Select manager"
-              disabled={!canEdit || isPending}
-            />
-          </Field>
-          <Field label="Default Interview Duration">
-            <LabeledSelect
-              items={INTERVIEW_DURATION_OPTIONS.map((o) => ({
-                value: String(o.value),
-                label: o.label,
-              }))}
-              value={String(form.watch("defaultInterviewDurationMinutes"))}
-              onValueChange={(value) =>
-                form.setValue(
-                  "defaultInterviewDurationMinutes",
-                  Number(value) as RecruitmentSettingsFormValues["defaultInterviewDurationMinutes"],
-                  { shouldDirty: true },
-                )
-              }
-              disabled={!canEdit || isPending}
-            />
-          </Field>
-        </div>
-      </SettingsSection>
-
-      <SettingsSection
-        title="Notice Period Options"
-        description="Dropdown values used on candidate profiles."
-      >
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {noticePeriods.map((option, index) => (
-            <div
-              key={`${option}-${index}`}
-              className="flex items-center gap-2 rounded-lg border bg-muted/20 px-3 py-2"
-            >
+      <div className="grid gap-3 lg:grid-cols-2">
+        <SettingsCard
+          title="Offer email defaults"
+          description="Used on the Offers page when sending uploaded offer letters. Placeholders: {{candidateName}}, {{position}}, {{hrEmail}}, {{hrPhone}}."
+        >
+          <div className="space-y-3">
+            <Field label="Default email subject">
               <Input
-                className="h-9 min-w-0 flex-1"
+                className="h-9"
                 disabled={!canEdit || isPending}
-                value={option}
-                onChange={(e) => {
-                  const next = [...noticePeriods];
-                  next[index] = e.target.value;
-                  form.setValue("noticePeriodOptions", next, { shouldDirty: true });
-                }}
+                {...form.register("offerEmailDefaults.subjectTemplate")}
               />
-              {canEdit ? (
-                <Button
-                  type="button"
-                  size="icon-sm"
-                  variant="ghost"
-                  className="shrink-0 text-muted-foreground hover:text-destructive"
-                  disabled={isPending || noticePeriods.length <= 1}
-                  onClick={() => {
-                    const next = noticePeriods.filter((_, i) => i !== index);
+            </Field>
+            <Field label="Default email message">
+              <textarea
+                className="min-h-[140px] w-full rounded-md border bg-background px-3 py-2 text-sm leading-relaxed"
+                disabled={!canEdit || isPending}
+                {...form.register("offerEmailDefaults.messageTemplate")}
+              />
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="HR contact email">
+                <Input
+                  className="h-9"
+                  type="email"
+                  disabled={!canEdit || isPending}
+                  {...form.register("offerEmailDefaults.hrEmail")}
+                />
+              </Field>
+              <Field label="HR contact phone">
+                <Input
+                  className="h-9"
+                  disabled={!canEdit || isPending}
+                  {...form.register("offerEmailDefaults.hrPhone")}
+                />
+              </Field>
+            </div>
+          </div>
+        </SettingsCard>
+
+        <SettingsCard
+          title="Notice period options"
+          description="Shown on candidate profiles when capturing availability."
+        >
+          <div className="flex flex-wrap gap-2">
+            {noticePeriods.map((option, index) => (
+              <div
+                key={`${option}-${index}`}
+                className="inline-flex items-center gap-1 rounded-full border bg-muted/20 px-2 py-1"
+              >
+                <Input
+                  className="h-6 w-[5.5rem] min-w-0 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
+                  disabled={!canEdit || isPending}
+                  value={option}
+                  onChange={(event) => {
+                    const next = [...noticePeriods];
+                    next[index] = event.target.value;
                     form.setValue("noticePeriodOptions", next, { shouldDirty: true });
                   }}
-                  aria-label="Remove notice period option"
+                />
+                {canEdit ? (
+                  <button
+                    type="button"
+                    className="rounded-full p-0.5 text-muted-foreground hover:text-destructive"
+                    disabled={isPending || noticePeriods.length <= 1}
+                    onClick={() => {
+                      form.setValue(
+                        "noticePeriodOptions",
+                        noticePeriods.filter((_, itemIndex) => itemIndex !== index),
+                        { shouldDirty: true },
+                      );
+                    }}
+                    aria-label="Remove notice period"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          {canEdit ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-2 h-8"
+              disabled={isPending}
+              onClick={() =>
+                form.setValue("noticePeriodOptions", [...noticePeriods, "New option"], {
+                  shouldDirty: true,
+                })
+              }
+            >
+              <Plus className="mr-1 h-3.5 w-3.5" />
+              Add option
+            </Button>
+          ) : null}
+        </SettingsCard>
+
+        <SettingsCard
+          title="Candidate sources"
+          description="Enabled sources appear when adding candidates."
+          className="lg:col-span-2"
+        >
+          <div className="flex flex-wrap gap-2">
+            {fields.map((field, index) => {
+              const label = form.watch(`candidateSources.${index}.label`) || field.label;
+              const enabled = form.watch(`candidateSources.${index}.enabled`);
+              const isBuiltin = BUILTIN_SOURCE_IDS.has(field.id);
+
+              return (
+                <div
+                  key={field.id}
+                  className={cn(
+                    "inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-1 text-xs",
+                    enabled ? "border-primary/30 bg-primary/5" : "border-border bg-muted/30",
+                  )}
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              ) : null}
-            </div>
-          ))}
-        </div>
-        {canEdit ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="mt-3"
-            disabled={isPending}
-            onClick={() =>
-              form.setValue("noticePeriodOptions", [...noticePeriods, "New Option"], {
-                shouldDirty: true,
-              })
-            }
-          >
-            <Plus className="mr-1.5 h-4 w-4" />
-            Add Option
-          </Button>
-        ) : null}
-      </SettingsSection>
-
-      <SettingsSection
-        title="Automation"
-        description="Controls automatic employee creation and rejected candidate archival."
-      >
-        <div className="grid gap-4 md:grid-cols-2">
-          <Toggle
-            label="Auto Employee Creation on Offer Accepted"
-            description="Creates employee, assigns org structure, and prepares login invitation."
-            disabled={!canEdit || isPending}
-            checked={form.watch("autoEmployeeCreation")}
-            onChange={(checked) =>
-              form.setValue("autoEmployeeCreation", checked, { shouldDirty: true })
-            }
-          />
-          <Field label="Auto Candidate Archive (Rejected)">
-            <LabeledSelect
-              items={ARCHIVE_DAYS_OPTIONS.map((o) => ({
-                value: String(o.value),
-                label: o.label,
-              }))}
-              value={String(form.watch("autoArchiveRejectedDays"))}
-              onValueChange={(value) =>
-                form.setValue(
-                  "autoArchiveRejectedDays",
-                  Number(value) as RecruitmentSettingsFormValues["autoArchiveRejectedDays"],
-                  { shouldDirty: true },
-                )
+                  {isBuiltin ? (
+                    <button
+                      type="button"
+                      disabled={!canEdit || isPending}
+                      className={cn(
+                        "truncate font-medium",
+                        !enabled && "text-muted-foreground",
+                        canEdit && !isPending && "hover:text-foreground",
+                      )}
+                      onClick={() =>
+                        update(index, {
+                          ...form.getValues(`candidateSources.${index}`),
+                          enabled: !enabled,
+                        })
+                      }
+                    >
+                      {label}
+                    </button>
+                  ) : (
+                    <>
+                      <Input
+                        className="h-6 w-[7.5rem] min-w-0 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
+                        disabled={!canEdit || isPending}
+                        {...form.register(`candidateSources.${index}.label`)}
+                      />
+                      <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          className="size-3 rounded border-input"
+                          disabled={!canEdit || isPending}
+                          checked={enabled}
+                          onChange={(event) =>
+                            update(index, {
+                              ...form.getValues(`candidateSources.${index}`),
+                              enabled: event.target.checked,
+                            })
+                          }
+                        />
+                        On
+                      </label>
+                    </>
+                  )}
+                  {canEdit && !isBuiltin ? (
+                    <button
+                      type="button"
+                      className="rounded-full p-0.5 text-muted-foreground hover:text-destructive"
+                      disabled={isPending}
+                      onClick={() => remove(index)}
+                      aria-label="Remove source"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+          {canEdit ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-2 h-8"
+              disabled={isPending}
+              onClick={() =>
+                append({
+                  id: `src_${crypto.randomUUID().slice(0, 8)}`,
+                  label: "New source",
+                  enabled: true,
+                })
               }
-              disabled={!canEdit || isPending}
-            />
-            <p className="text-xs text-muted-foreground">
-              Rejected candidates older than this period are archived automatically.
-            </p>
-          </Field>
-        </div>
-      </SettingsSection>
-
-      <SettingsSection
-        title="Email Notifications"
-        description="Control which recruitment events create in-app notifications."
-      >
-        <div className="grid gap-3 sm:grid-cols-2">
-          {(
-            [
-              ["interviewScheduled", "Interview Scheduled"],
-              ["interviewCancelled", "Interview Cancelled"],
-              ["offerSent", "Offer Sent"],
-              ["offerAccepted", "Offer Accepted"],
-              ["offerRejected", "Offer Rejected"],
-              ["joiningReminder", "Joining Reminder"],
-            ] as const
-          ).map(([key, label]) => (
-            <Toggle
-              key={key}
-              label={label}
-              disabled={!canEdit || isPending}
-              checked={form.watch(`emailNotifications.${key}`)}
-              onChange={(checked) =>
-                form.setValue(`emailNotifications.${key}`, checked, { shouldDirty: true })
-              }
-            />
-          ))}
-        </div>
-      </SettingsSection>
-
-      <SettingsSection
-        title="Recruitment Number Format"
-        description="Prefixes used when generating Job, Candidate, and Offer IDs."
-      >
-        <div className="grid gap-4 md:grid-cols-3">
-          <Field label="Candidate ID Prefix">
-            <Input
-              disabled={!canEdit || isPending}
-              {...form.register("numberFormats.candidatePrefix")}
-            />
-            <p className="text-xs text-muted-foreground">
-              Preview: {previewNumberFormat(numberFormats?.candidatePrefix || "CAN")}
-            </p>
-          </Field>
-          <Field label="Job Opening Prefix">
-            <Input disabled={!canEdit || isPending} {...form.register("numberFormats.jobPrefix")} />
-            <p className="text-xs text-muted-foreground">
-              Preview: {previewNumberFormat(numberFormats?.jobPrefix || "JOB")}
-            </p>
-          </Field>
-          <Field label="Offer Prefix">
-            <Input
-              disabled={!canEdit || isPending}
-              {...form.register("numberFormats.offerPrefix")}
-            />
-            <p className="text-xs text-muted-foreground">
-              Preview: {previewNumberFormat(numberFormats?.offerPrefix || "OFF")}
-            </p>
-          </Field>
-        </div>
-      </SettingsSection>
-
-      {canEdit ? (
-        <StickyPageActions>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={!form.formState.isDirty || isPending}
-            onClick={() => form.reset(settings)}
-          >
-            Cancel changes
-          </Button>
-          <Button type="submit" disabled={!form.formState.isDirty || isPending}>
-            {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Save Settings
-          </Button>
-        </StickyPageActions>
-      ) : null}
+            >
+              <Plus className="mr-1 h-3.5 w-3.5" />
+              Add source
+            </Button>
+          ) : null}
+        </SettingsCard>
+      </div>
     </form>
   );
 }
 
-function SettingsSection({
+function SettingsCard({
   title,
   description,
   children,
+  className,
 }: {
   title: string;
-  description: string;
+  description?: string;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <section className="rounded-xl border bg-card p-5 shadow-sm">
-      <div className="mb-4">
+    <section className={cn("rounded-xl border bg-card p-3.5 shadow-sm", className)}>
+      <div className="mb-2.5">
         <h2 className="text-sm font-medium">{title}</h2>
-        <p className="text-xs text-muted-foreground">{description}</p>
+        {description ? <p className="text-[11px] text-muted-foreground">{description}</p> : null}
       </div>
       {children}
     </section>
@@ -438,41 +310,9 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-2">
-      <Label>{label}</Label>
+    <div className="space-y-1.5">
+      <Label className="text-xs">{label}</Label>
       {children}
     </div>
-  );
-}
-
-function Toggle({
-  label,
-  description,
-  checked,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  description?: string;
-  checked: boolean;
-  disabled?: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <label className="flex items-start gap-3 rounded-lg border px-4 py-3 text-sm">
-      <input
-        type="checkbox"
-        className="mt-0.5 size-4 rounded border-input"
-        checked={checked}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.checked)}
-      />
-      <span>
-        <span className="font-medium">{label}</span>
-        {description ? (
-          <span className="mt-0.5 block text-xs text-muted-foreground">{description}</span>
-        ) : null}
-      </span>
-    </label>
   );
 }

@@ -9,7 +9,7 @@ export default function RecruitmentLayout({
   return (
     <ModuleShell
       header={<HiringSubNav />}
-      contentClassName="pt-3 pb-3 [&>div]:gap-3"
+  contentClassName="pt-3 pb-3 [&>div]:gap-3 [&>div]:min-h-0"
     >
       {children}
     </ModuleShell>
