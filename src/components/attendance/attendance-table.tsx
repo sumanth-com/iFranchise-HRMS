@@ -10,20 +10,12 @@ import {
 } from "@tanstack/react-table";
 import { format, parseISO } from "date-fns";
 import {
-  BadgeCheck,
-  Briefcase,
-  Building2,
-  CalendarDays,
-  Clock3,
   Eye,
-  Hash,
-  LogIn,
-  LogOut,
   MoreHorizontal,
   Pencil,
   Plus,
   Trash2,
-  User,
+  CalendarDays,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -58,7 +50,6 @@ import {
   ATTENDANCE_STATUS_LABELS,
 } from "@/lib/attendance/constants";
 import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils";
-import type { LucideIcon } from "lucide-react";
 import type { AttendanceListItem, AttendanceLookups } from "@/types/attendance";
 import type { LookupOption } from "@/types/employee";
 import { cn } from "@/lib/utils";
@@ -112,64 +103,22 @@ function formatDateRangeLabel(
   return " · Today";
 }
 
-const TABLE_HEAD_CELL_CLASS = "h-11 whitespace-nowrap px-4 py-3";
-const TABLE_DATA_CELL_CLASS = "whitespace-nowrap px-4 py-3";
-const TABLE_ACTIONS_CELL_CLASS = "w-14 px-2 py-3";
-
 type AttendanceColumnMeta = {
   align?: "left" | "center";
-  headClassName?: string;
 };
 
-function HeadLabel({
-  label,
-  icon: Icon,
-  iconClassName,
-  centered,
-}: {
-  label: string;
-  icon: LucideIcon;
-  iconClassName?: string;
-  centered?: boolean;
-}) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-2 font-medium whitespace-nowrap text-white",
-        centered && "justify-center",
-      )}
-    >
-      <Icon className={cn("size-3.5 shrink-0 text-white", iconClassName)} />
-      <span>{label}</span>
-    </span>
-  );
-}
-
-function ColumnHead({
-  label,
-  icon,
-  centered,
-}: {
-  label: string;
-  icon: LucideIcon;
-  centered?: boolean;
-}) {
-  return (
-    <div className={cn("flex", centered ? "justify-center" : "justify-start")}>
-      <HeadLabel label={label} icon={icon} centered={centered} />
-    </div>
-  );
-}
-
-const TABLE_HEAD_CLASS =
-  "sticky top-0 z-20 bg-black text-white shadow-[0_1px_0_rgba(255,255,255,0.08)]";
-const TABLE_CELL_CLASS = "relative align-middle";
+const TABLE_HEAD_ROW_CLASS =
+  "border-white/10 bg-black hover:bg-black";
+const TABLE_HEAD_CELL_BASE =
+  "h-11 whitespace-nowrap bg-black px-4 py-3 align-middle font-medium text-white";
+const TABLE_DATA_CELL_BASE = "whitespace-nowrap px-4 py-3 align-middle";
+const TABLE_ACTIONS_CELL_CLASS = "w-16 min-w-16 px-3 py-3 text-center align-middle";
 
 const FILTER_CONTROL_CLASS =
   "h-10 w-full min-w-0 gap-2 rounded-lg [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-muted-foreground/70";
 const STATUS_FILTER_CLASS = cn(FILTER_CONTROL_CLASS, "w-full");
 const DATE_RANGE_CLASS =
-  "flex h-10 min-w-0 items-center gap-2 rounded-lg border border-input bg-background px-2.5";
+  "flex h-10 min-w-[15rem] shrink-0 items-center gap-2 rounded-lg border border-input bg-background px-2.5";
 const DATE_INPUT_CLASS =
   "h-7 min-w-0 w-full border-0 bg-transparent p-0 pr-5 text-sm shadow-none focus-visible:ring-0 data-[empty]:text-muted-foreground [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:top-1/2 [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:m-0 [&::-webkit-calendar-picker-indicator]:size-3.5 [&::-webkit-calendar-picker-indicator]:-translate-y-1/2 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0";
 
@@ -337,14 +286,14 @@ export function AttendanceTable({
       {
         id: "employeeCode",
         accessorKey: "employeeCode",
-        header: () => <ColumnHead label="Employee Code" icon={Hash} />,
+        header: "Employee Code",
         meta: { align: "left" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => row.original.employeeCode,
       },
       {
         id: "employeeName",
         accessorKey: "employeeName",
-        header: () => <ColumnHead label="Employee Name" icon={User} />,
+        header: "Employee Name",
         meta: { align: "left" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => (
           <span className="font-medium">{row.original.employeeName}</span>
@@ -352,41 +301,39 @@ export function AttendanceTable({
       },
       {
         id: "departmentName",
-        header: () => <ColumnHead label="Department" icon={Building2} />,
+        header: "Department",
         meta: { align: "left" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => row.original.departmentName ?? "—",
       },
       {
         id: "designationTitle",
-        header: () => <ColumnHead label="Designation" icon={Briefcase} />,
+        header: "Designation",
         meta: { align: "left" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => row.original.designationTitle ?? "—",
       },
       {
         id: "attendanceDate",
         accessorKey: "attendanceDate",
-        header: () => (
-          <ColumnHead label="Attendance Date" icon={CalendarDays} centered />
-        ),
+        header: "Attendance Date",
         meta: { align: "center" } satisfies AttendanceColumnMeta,
         cell: ({ row }) =>
           format(parseISO(row.original.attendanceDate), "dd MMM yyyy"),
       },
       {
         id: "checkInAt",
-        header: () => <ColumnHead label="Check In" icon={LogIn} centered />,
+        header: "Check In",
         meta: { align: "center" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => formatDateTime(row.original.checkInAt),
       },
       {
         id: "checkOutAt",
-        header: () => <ColumnHead label="Check Out" icon={LogOut} centered />,
+        header: "Check Out",
         meta: { align: "center" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => formatDateTime(row.original.checkOutAt),
       },
       {
         id: "workHours",
-        header: () => <ColumnHead label="Working Hours" icon={Clock3} centered />,
+        header: "Working Hours",
         meta: { align: "center" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => (
           <span className="tabular-nums">{row.original.workHours.toFixed(2)}h</span>
@@ -394,28 +341,18 @@ export function AttendanceTable({
       },
       {
         id: "attendanceStatus",
-        header: () => <ColumnHead label="Status" icon={BadgeCheck} centered />,
+        header: "Status",
         meta: { align: "center" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => (
-          <div className="flex justify-center">
-            <AttendanceStatusBadge status={row.original.attendanceStatus} />
-          </div>
+          <AttendanceStatusBadge status={row.original.attendanceStatus} />
         ),
       },
       {
         id: "actions",
-        header: () => (
-          <div className="flex justify-center">
-            <span className="text-sm font-medium text-white">Actions</span>
-          </div>
-        ),
-        meta: {
-          align: "center",
-          headClassName: "w-14",
-        } satisfies AttendanceColumnMeta,
+        header: "Actions",
+        meta: { align: "center" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => (
-          <div className="flex justify-center">
-            <DropdownMenu>
+          <DropdownMenu>
             <DropdownMenuTrigger
               render={
                 <Button variant="ghost" size="icon-sm" aria-label="Actions">
@@ -456,7 +393,6 @@ export function AttendanceTable({
               ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
-          </div>
         ),
       },
     ],
@@ -491,9 +427,9 @@ export function AttendanceTable({
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
-          <div className="grid flex-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="min-w-0">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-1 flex-wrap items-center gap-2 min-w-0">
+            <div className="w-full min-w-[11rem] sm:w-[14rem]">
               <Select
                 items={employeeItems}
                 value={employeeId ?? ""}
@@ -524,7 +460,7 @@ export function AttendanceTable({
               </Select>
             </div>
 
-            <div className="min-w-0">
+            <div className="w-full min-w-[9rem] sm:w-36">
               <Select
                 items={statusItems}
                 value={attendanceStatus ?? ""}
@@ -552,7 +488,7 @@ export function AttendanceTable({
               </Select>
             </div>
 
-            <div className={cn(DATE_RANGE_CLASS, "sm:col-span-2 lg:col-span-1")}>
+            <div className={DATE_RANGE_CLASS}>
               <div className="relative min-w-[6.75rem] flex-1">
                 <Input
                   type="date"
@@ -582,7 +518,7 @@ export function AttendanceTable({
               </div>
             </div>
 
-            <div className="min-w-0">
+            <div className="w-full min-w-[11rem] sm:w-[14rem]">
               <Select
                 items={departmentItems}
                 value={departmentId ?? ""}
@@ -669,36 +605,23 @@ export function AttendanceTable({
       <div className="overflow-auto rounded-lg border max-h-[min(70vh,calc(100dvh-16rem))] [scrollbar-gutter:stable]">
         <table
           data-slot="table"
-          className="w-full table-fixed caption-bottom text-sm"
+          className="w-full min-w-[72rem] caption-bottom text-sm"
         >
-          <colgroup>
-            <col style={{ width: "10%" }} />
-            <col style={{ width: "17%" }} />
-            <col style={{ width: "12%" }} />
-            <col style={{ width: "12%" }} />
-            <col style={{ width: "11%" }} />
-            <col style={{ width: "9%" }} />
-            <col style={{ width: "9%" }} />
-            <col style={{ width: "10%" }} />
-            <col style={{ width: "9%" }} />
-            <col style={{ width: "3.5rem" }} />
-          </colgroup>
-          <TableHeader className="sticky top-0 z-30 bg-black">
+          <TableHeader className="sticky top-0 z-30 bg-black shadow-[0_1px_0_rgba(255,255,255,0.08)]">
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="border-white/10 bg-black hover:bg-black">
+              <TableRow key={headerGroup.id} className={TABLE_HEAD_ROW_CLASS}>
                 {headerGroup.headers.map((header) => {
                   const meta = header.column.columnDef.meta as AttendanceColumnMeta | undefined;
                   const isActions = header.column.id === "actions";
+                  const isCenter = meta?.align === "center";
 
                   return (
                     <TableHead
                       key={header.id}
                       className={cn(
-                        TABLE_HEAD_CLASS,
-                        TABLE_CELL_CLASS,
-                        isActions ? TABLE_ACTIONS_CELL_CLASS : TABLE_HEAD_CELL_CLASS,
-                        meta?.align === "center" && "text-center",
-                        meta?.headClassName,
+                        TABLE_HEAD_CELL_BASE,
+                        isActions && TABLE_ACTIONS_CELL_CLASS,
+                        isCenter && "text-center",
                       )}
                     >
                       {header.isPlaceholder
@@ -715,7 +638,7 @@ export function AttendanceTable({
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-24 text-center text-muted-foreground"
+                  className="h-24 px-4 text-center text-muted-foreground"
                 >
                   {employeeId
                     ? "No attendance records found for this employee with the selected filters."
@@ -734,14 +657,14 @@ export function AttendanceTable({
                   {row.getVisibleCells().map((cell) => {
                     const meta = cell.column.columnDef.meta as AttendanceColumnMeta | undefined;
                     const isActions = cell.column.id === "actions";
+                    const isCenter = meta?.align === "center";
 
                     return (
                       <TableCell
                         key={cell.id}
                         className={cn(
-                          TABLE_CELL_CLASS,
-                          isActions ? TABLE_ACTIONS_CELL_CLASS : TABLE_DATA_CELL_CLASS,
-                          meta?.align === "center" && "text-center",
+                          isActions ? TABLE_ACTIONS_CELL_CLASS : TABLE_DATA_CELL_BASE,
+                          isCenter && "text-center",
                         )}
                         onClick={
                           isActions ? (event) => event.stopPropagation() : undefined
