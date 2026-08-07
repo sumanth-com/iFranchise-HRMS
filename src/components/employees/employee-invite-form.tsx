@@ -34,6 +34,7 @@ type EmployeeInviteFormProps = {
   formId?: string;
   onSuccess?: () => void;
   onPendingChange?: (pending: boolean) => void;
+  variant?: "button" | "panel";
 };
 
 export function EmployeeInviteForm({
@@ -247,6 +248,7 @@ export function EmployeeInviteSection({
   lookups,
   canInvite,
   inviteServiceReady,
+  variant = "button",
 }: EmployeeInviteFormProps) {
   const [open, setOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
@@ -258,6 +260,116 @@ export function EmployeeInviteSection({
   function handleInviteClick() {
     if (!canInvite) return;
     setOpen(true);
+  }
+
+  const inviteModal = (
+    <Modal
+      open={open}
+      onOpenChange={handleOpenChange}
+      title="Invite Employee"
+      description="Send a secure onboarding invitation. The selected role determines portal access automatically."
+      contentClassName="sm:max-w-2xl"
+      showCancel={false}
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isPending}
+            onClick={() => setOpen(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="employee-invite-form"
+            disabled={isPending || !canInvite || !inviteServiceReady}
+          >
+            {isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Mail className="size-4" />
+            )}
+            Send Invite
+          </Button>
+        </>
+      }
+    >
+      <EmployeeInviteForm
+        lookups={lookups}
+        canInvite={canInvite}
+        inviteServiceReady={inviteServiceReady}
+        onPendingChange={setIsPending}
+        onSuccess={() => setOpen(false)}
+      />
+    </Modal>
+  );
+
+  if (variant === "panel") {
+    return (
+      <>
+        <div
+          className={cn(
+            "group relative flex h-[14rem] min-h-[14rem] overflow-hidden rounded-xl border bg-card shadow-sm",
+            canInvite && "transition-shadow hover:shadow-md",
+          )}
+        >
+          <div
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,rgba(99,102,241,0.12),transparent_42%),radial-gradient(circle_at_100%_100%,rgba(16,185,129,0.08),transparent_38%)]"
+          />
+
+          <div className="relative flex w-[38%] min-w-[8.5rem] shrink-0 items-center justify-center border-r border-border/60 bg-gradient-to-br from-muted/40 via-background to-primary/[0.06]">
+            <div className="relative flex items-center justify-center">
+              <span
+                className="absolute size-[5.5rem] rounded-full bg-primary/15 blur-2xl"
+                aria-hidden
+              />
+              <span
+                className={cn(
+                  "relative flex size-[4.75rem] items-center justify-center rounded-[1.35rem] bg-gradient-to-br from-primary via-primary to-violet-600 text-primary-foreground shadow-[0_12px_30px_-12px_rgba(79,70,229,0.65)] ring-1 ring-white/25",
+                  canInvite && "transition-transform duration-300 group-hover:scale-[1.02]",
+                )}
+              >
+                <UserRoundPlus className="size-[2.1rem]" strokeWidth={1.6} />
+              </span>
+            </div>
+          </div>
+
+          <div className="relative flex min-w-0 flex-1 flex-col justify-between px-4 py-4 sm:px-5">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary/80">
+                Onboarding
+              </p>
+              <h3 className="mt-1 text-lg font-semibold tracking-tight text-foreground">
+                Invite employee
+              </h3>
+              <p className="mt-1.5 max-w-md text-sm leading-relaxed text-muted-foreground">
+                Send a secure portal invitation so they can activate their account and get started.
+              </p>
+            </div>
+
+            <div className="mt-3 space-y-2">
+              {!inviteServiceReady ? (
+                <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+                  Invite sending is not configured for this environment.
+                </p>
+              ) : null}
+              <Button
+                type="button"
+                size="lg"
+                className="h-10 gap-2 rounded-lg px-5 shadow-sm"
+                disabled={!canInvite || !inviteServiceReady}
+                onClick={handleInviteClick}
+              >
+                <Mail className="size-4" />
+                Send invitation
+              </Button>
+            </div>
+          </div>
+        </div>
+        {inviteModal}
+      </>
+    );
   }
 
   return (
@@ -298,46 +410,7 @@ export function EmployeeInviteSection({
         />
       </button>
 
-      <Modal
-        open={open}
-        onOpenChange={handleOpenChange}
-        title="Invite Employee"
-        description="Send a secure onboarding invitation. The selected role determines portal access automatically."
-        contentClassName="sm:max-w-2xl"
-        showCancel={false}
-        footer={
-          <>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isPending}
-              onClick={() => setOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              form="employee-invite-form"
-              disabled={isPending || !canInvite || !inviteServiceReady}
-            >
-              {isPending ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Mail className="size-4" />
-              )}
-              Send Invite
-            </Button>
-          </>
-        }
-      >
-        <EmployeeInviteForm
-          lookups={lookups}
-          canInvite={canInvite}
-          inviteServiceReady={inviteServiceReady}
-          onPendingChange={setIsPending}
-          onSuccess={() => setOpen(false)}
-        />
-      </Modal>
+      {inviteModal}
     </>
   );
 }

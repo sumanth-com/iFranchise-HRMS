@@ -9,7 +9,7 @@ import { Button, buttonVariants } from "@/components/common/button";
 import { ApplyLeaveDialog } from "@/components/leave/apply-leave-dialog";
 import { HrTeamLeaveView } from "@/components/leave/hr-team-leave-view";
 import { MyLeaveSelfServiceView } from "@/components/leave/my-leave-self-service-view";
-import { LEAVE_ROUTES } from "@/lib/leave/constants";
+import { LEAVE_ROUTES, SELF_LEAVE_ROUTES } from "@/lib/leave/constants";
 import { cn } from "@/lib/utils";
 import type {
   LeaveCalendarEntry,
@@ -92,23 +92,21 @@ export function HrLeaveHubView({
           <h1 className="text-2xl font-semibold tracking-tight">
             {isTeamView ? "Team Leave" : "Leave"}
           </h1>
-          {!isTeamView ? (
-            <div className="flex shrink-0 items-center gap-2">
-              <Link
-                href={LEAVE_ROUTES.policy}
-                className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}
-              >
-                <FileText className="size-4" />
-                Leave Policy
-              </Link>
-              {canApply && applyLeaveLookups ? (
-                <Button type="button" className="gap-1.5" onClick={() => setApplyOpen(true)}>
-                  <CalendarPlus className="size-4" />
-                  Apply Leave
-                </Button>
-              ) : null}
-            </div>
-          ) : null}
+          <div className="flex shrink-0 items-center gap-2">
+            <Link
+              href={isTeamView ? LEAVE_ROUTES.policy : SELF_LEAVE_ROUTES.policy}
+              className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}
+            >
+              <FileText className="size-4" />
+              Leave Policy
+            </Link>
+            {!isTeamView && canApply && applyLeaveLookups ? (
+              <Button type="button" className="gap-1.5" onClick={() => setApplyOpen(true)}>
+                <CalendarPlus className="size-4" />
+                Apply Leave
+              </Button>
+            ) : null}
+          </div>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
           {isTeamView

@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { EmployeeEditForm } from "@/components/employees/employee-edit-form";
 import { buttonVariants } from "@/components/common/button";
+import { PageScroll } from "@/components/common/sticky-layout";
 import { createClient } from "@/lib/supabase/server";
 import { getEmployeeById } from "@/lib/employees/services/employee-detail";
 import { getEmployeeLookups } from "@/lib/employees/services/employee-queries";
@@ -47,24 +48,26 @@ export default async function EmployeeEditPage({ params }: EmployeeEditPageProps
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Edit employee</h1>
-          <p className="text-sm text-muted-foreground">
-            Update employment and contact information for {employee.firstName}{" "}
-            {employee.lastName}.
-          </p>
+    <PageScroll>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Edit employee</h1>
+            <p className="text-sm text-muted-foreground">
+              Update employment and contact information for {employee.firstName}{" "}
+              {employee.lastName}.
+            </p>
+          </div>
+          <Link
+            href={EMPLOYEE_ROUTES.detail(employee)}
+            className={cn(buttonVariants({ variant: "outline" }))}
+          >
+            Cancel
+          </Link>
         </div>
-        <Link
-          href={EMPLOYEE_ROUTES.detail(employee)}
-          className={cn(buttonVariants({ variant: "outline" }))}
-        >
-          Cancel
-        </Link>
-      </div>
 
-      <EmployeeEditForm employee={employee} lookups={lookups} />
-    </div>
+        <EmployeeEditForm employee={employee} lookups={lookups} />
+      </div>
+    </PageScroll>
   );
 }

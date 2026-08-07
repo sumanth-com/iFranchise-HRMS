@@ -11,11 +11,13 @@ import {
   employeeRenameDocument,
 } from "@/lib/employee/services/employee-documents-mutations";
 import { createSignedDocumentUrl, uploadAndCreateDocument } from "@/lib/documents/services/document-mutations";
-import { fromHrms } from "@/lib/documents/services/documents-utils";
+import { fromHrms, unwrapRelation } from "@/lib/documents/services/documents-utils";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
+import { hasPermission } from "@/lib/permissions/utils";
 import { assertOrganizationStoragePath } from "@/lib/security/storage-path";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import type { UserProfile } from "@/types/auth";
 
 const uploadMetaSchema = z.object({
   documentTypeId: z.string().uuid(),
@@ -26,6 +28,23 @@ const uploadMetaSchema = z.object({
 function revalidate() {
   revalidatePath(EMPLOYEE_ROUTES.documents);
   revalidatePath(SELF_DOCUMENTS_ROUTES.list);
+}
+
+function canAccessEmployeeDocument(
+  profile: UserProfile,
+  employeeId: string,
+  organizationId: string | null | undefined,
+) {
+  if (organizationId !== profile.employee.organizationId) {
+    return false;
+  }
+
+  if (employeeId === profile.employee.id) {
+    return true;
+  }
+
+  return hasPermission(profile.permissionCodes, "documents.view")
+    || hasPermission(profile.permissionCodes, "documents.manage");
 }
 
 export async function employeeUploadDocumentAction(formData: FormData) {
@@ -116,13 +135,24 @@ export async function employeeGetDocumentUrlAction(storagePath: string) {
     assertOrganizationStoragePath(storagePath, profile.employee.organizationId);
 
     const { data: doc, error } = await fromHrms(supabase, "employee_documents")
-      .select("id, storage_path, employee_id")
+      .select("id, storage_path, employee_id, employees:employee_id!inner(organization_id)")
       .eq("storage_path", storagePath)
       .is("deleted_at", null)
       .maybeSingle();
 
     if (error) throw new Error(error.message);
-    if (!doc || doc.employee_id !== profile.employee.id) {
+    if (!doc) {
+      return { success: false as const, message: "Document not found" };
+    }
+
+    const employee = unwrapRelation(doc.employees);
+    if (
+      !canAccessEmployeeDocument(
+        profile,
+        doc.employee_id as string,
+        employee?.organization_id as string | undefined,
+      )
+    ) {
       return { success: false as const, message: "Document not found" };
     }
 
@@ -149,13 +179,26 @@ export async function employeeDownloadDocumentAction(storagePath: string, fileNa
     assertOrganizationStoragePath(storagePath, profile.employee.organizationId);
 
     const { data: doc, error } = await fromHrms(supabase, "employee_documents")
-      .select("id, storage_path, file_name, employee_id")
+      .select(
+        "id, storage_path, file_name, employee_id, employees:employee_id!inner(organization_id)",
+      )
       .eq("storage_path", storagePath)
       .is("deleted_at", null)
       .maybeSingle();
 
     if (error) throw new Error(error.message);
-    if (!doc || doc.employee_id !== profile.employee.id) {
+    if (!doc) {
+      return { success: false as const, message: "Document not found" };
+    }
+
+    const employee = unwrapRelation(doc.employees);
+    if (
+      !canAccessEmployeeDocument(
+        profile,
+        doc.employee_id as string,
+        employee?.organization_id as string | undefined,
+      )
+    ) {
       return { success: false as const, message: "Document not found" };
     }
 

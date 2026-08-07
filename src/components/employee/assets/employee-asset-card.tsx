@@ -23,6 +23,7 @@ type Props = {
   onViewDetails: (asset: EmployeeAsset) => void;
   onReportIssue: (asset: EmployeeAsset) => void;
   onRequestReplacement: (asset: EmployeeAsset) => void;
+  readOnly?: boolean;
 };
 
 export function EmployeeAssetCard({
@@ -30,6 +31,7 @@ export function EmployeeAssetCard({
   onViewDetails,
   onReportIssue,
   onRequestReplacement,
+  readOnly = false,
 }: Props) {
   const Icon = assetCategoryIcon(asset.categoryName);
   const isActive = asset.assignmentStatus === "active";
@@ -150,7 +152,7 @@ export function EmployeeAssetCard({
             <Eye className="size-3.5" />
             View Details
           </Button>
-          {isActive ? (
+          {isActive && !readOnly ? (
             <div className="flex items-center gap-2">
               <Button
                 variant="ghost"

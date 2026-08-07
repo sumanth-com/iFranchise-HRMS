@@ -37,7 +37,9 @@ export async function PayrollHubSection({
   const raw = await searchParams;
   const canViewTeam = hasAnyPermission(profile.permissionCodes, [...TEAM_PAYROLL_PERMISSIONS]);
 
-  const selfData = await getEmployeePayrollData(supabase, profile, siteConfig.url);
+  const selfData = await getEmployeePayrollData(supabase, profile, {
+    appOrigin: siteConfig.url,
+  });
 
   return (
     <HrPayrollHubView

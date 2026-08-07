@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/common/select";
+import { toEmployeeSelectItems, toLookupSelectItems } from "@/components/payroll/select-utils";
 import { updateEmployeeAction } from "@/lib/employees/actions";
 import {
   DESIGNATION_OTHER_VALUE,
@@ -37,9 +38,18 @@ type EmployeeEditFormProps = {
     employmentTypes: LookupOption[];
     managers: LookupOption[];
   };
+  variant?: "page" | "inline";
+  onCancel?: () => void;
+  onSaved?: () => void;
 };
 
-export function EmployeeEditForm({ employee, lookups }: EmployeeEditFormProps) {
+export function EmployeeEditForm({
+  employee,
+  lookups,
+  variant = "page",
+  onCancel,
+  onSaved,
+}: EmployeeEditFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -69,6 +79,22 @@ export function EmployeeEditForm({ employee, lookups }: EmployeeEditFormProps) {
     ([value, label]) => ({ value, label }),
   );
 
+  const employmentTypeItems = [
+    { value: "none", label: "None" },
+    ...toLookupSelectItems(lookups.employmentTypes),
+  ];
+
+  const managerItems = [
+    { value: "none", label: "None" },
+    ...toEmployeeSelectItems(lookups.managers),
+  ];
+
+  const primaryAddress =
+    employee.addresses.find((item) => item.isPrimary) ?? employee.addresses[0];
+  const primaryEmergency =
+    employee.emergencyContacts.find((item) => item.isPrimary) ??
+    employee.emergencyContacts[0];
+
   const form = useForm<EmployeeUpdateInput>({
     resolver: zodResolver(employeeUpdateSchema),
     defaultValues: {
@@ -94,6 +120,16 @@ export function EmployeeEditForm({ employee, lookups }: EmployeeEditFormProps) {
       personalEmail: employee.profile?.personalEmail ?? "",
       personalPhone: employee.profile?.personalPhone ?? "",
       bio: employee.profile?.bio ?? "",
+      addressLine1: primaryAddress?.addressLine1 ?? "",
+      addressLine2: primaryAddress?.addressLine2 ?? "",
+      city: primaryAddress?.city ?? "",
+      state: primaryAddress?.state ?? "",
+      postalCode: primaryAddress?.postalCode ?? "",
+      country: primaryAddress?.country ?? "",
+      emergencyContactName: primaryEmergency?.name ?? "",
+      emergencyContactRelationship: primaryEmergency?.relationship ?? "",
+      emergencyContactPhone: primaryEmergency?.phone ?? "",
+      emergencyContactEmail: primaryEmergency?.email ?? "",
     },
   });
 
@@ -122,6 +158,12 @@ export function EmployeeEditForm({ employee, lookups }: EmployeeEditFormProps) {
       }
 
       toast.success("Employee updated successfully");
+      if (variant === "inline") {
+        onSaved?.();
+        router.refresh();
+        return;
+      }
+
       router.push(
         EMPLOYEE_ROUTES.detail({
           employeeCode: values.employeeCode,
@@ -237,6 +279,48 @@ export function EmployeeEditForm({ employee, lookups }: EmployeeEditFormProps) {
           ) : null}
         </div>
         <div className="space-y-2">
+          <Label>Employment type</Label>
+          <Select
+            items={employmentTypeItems}
+            value={form.watch("employmentTypeId") || "none"}
+            onValueChange={(value) =>
+              form.setValue("employmentTypeId", value === "none" ? "" : value ?? "")
+            }
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select employment type" />
+            </SelectTrigger>
+            <SelectContent align="start" alignItemWithTrigger={false}>
+              {employmentTypeItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Reporting manager</Label>
+          <Select
+            items={managerItems}
+            value={form.watch("reportingManagerId") || "none"}
+            onValueChange={(value) =>
+              form.setValue("reportingManagerId", value === "none" ? "" : value ?? "")
+            }
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select manager" />
+            </SelectTrigger>
+            <SelectContent align="start" alignItemWithTrigger={false}>
+              {managerItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
           <Label>Employment status</Label>
           <Select
             items={employmentStatusItems}
@@ -271,10 +355,71 @@ export function EmployeeEditForm({ employee, lookups }: EmployeeEditFormProps) {
       </div>
 
       <div className="space-y-3">
+        <h2 className="text-base font-semibold">Address</h2>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="addressLine1">Address line 1</Label>
+            <Input id="addressLine1" {...form.register("addressLine1")} />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="addressLine2">Address line 2</Label>
+            <Input id="addressLine2" {...form.register("addressLine2")} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="city">City</Label>
+            <Input id="city" {...form.register("city")} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="state">State</Label>
+            <Input id="state" {...form.register("state")} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="postalCode">Postal code</Label>
+            <Input id="postalCode" {...form.register("postalCode")} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="country">Country</Label>
+            <Input id="country" {...form.register("country")} />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <h2 className="text-base font-semibold">Emergency contact</h2>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="emergencyContactName">Contact name</Label>
+            <Input id="emergencyContactName" {...form.register("emergencyContactName")} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="emergencyContactRelationship">Relationship</Label>
+            <Input
+              id="emergencyContactRelationship"
+              {...form.register("emergencyContactRelationship")}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="emergencyContactPhone">Phone</Label>
+            <Input id="emergencyContactPhone" {...form.register("emergencyContactPhone")} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="emergencyContactEmail">Email</Label>
+            <Input
+              id="emergencyContactEmail"
+              type="email"
+              {...form.register("emergencyContactEmail")}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-3">
         <div>
           <h2 className="text-base font-semibold">Profile details</h2>
           <p className="text-sm text-muted-foreground">
-            Update personal profile information shown on the Profile tab.
+            {variant === "inline"
+              ? "Personal details shown on the employee overview."
+              : "Update personal profile information."}
           </p>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
@@ -362,7 +507,13 @@ export function EmployeeEditForm({ employee, lookups }: EmployeeEditFormProps) {
         <Button
           type="button"
           variant="outline"
-          onClick={() => router.push(EMPLOYEE_ROUTES.detail(employee))}
+          onClick={() => {
+            if (variant === "inline") {
+              onCancel?.();
+              return;
+            }
+            router.push(EMPLOYEE_ROUTES.detail(employee));
+          }}
         >
           Cancel
         </Button>

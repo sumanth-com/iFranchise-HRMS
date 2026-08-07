@@ -1,6 +1,8 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type {
   CandidateSourceItem,
+  RecruitmentEmailTemplate,
+  RecruitmentOfferTemplate,
   RecruitmentSettings,
 } from "@/types/recruitment";
 import {
@@ -29,6 +31,29 @@ export const DEFAULT_RECRUITMENT_SETTINGS: RecruitmentSettings = {
     jobPrefix: "JOB",
     offerPrefix: "OFF",
   },
+  offerTemplates: [
+    {
+      id: "ifranchise_standard",
+      name: "iFranchise Standard Offer Letter",
+      body:
+        "Dear {{candidateName}},\n\nWe are pleased to offer you the position of {{position}} at {{companyName}} with compensation of {{salary}}, joining on {{joiningDate}}.\n\nRegards,\n{{manager}}",
+    },
+    {
+      id: "default",
+      name: "Standard Offer",
+      body:
+        "Dear {{candidateName}},\n\nWe are pleased to offer you the position of {{position}} in the {{department}} department at {{companyName}}.\n\nYour compensation will be {{salary}}, with a joining date of {{joiningDate}}.\n\nWarm regards,\n{{manager}}\n{{companyName}}",
+    },
+  ],
+  emailTemplates: [
+    {
+      id: "offer_sent",
+      name: "Offer Letter",
+      subject: "Offer of Employment — {{position}}",
+      body:
+        "Dear {{candidateName}},\n\nPlease find your offer details below.\n\nRegards,\nHR Team",
+    },
+  ],
 };
 
 function normalizeSources(raw: unknown): CandidateSourceItem[] {
@@ -52,6 +77,43 @@ function normalizeSources(raw: unknown): CandidateSourceItem[] {
       label: s.label.trim(),
       enabled: s.enabled !== false,
     }));
+}
+
+function normalizeOfferTemplates(raw: unknown): RecruitmentOfferTemplate[] {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return DEFAULT_RECRUITMENT_SETTINGS.offerTemplates;
+  }
+
+  return raw
+    .filter((item) => item && typeof item === "object")
+    .map((item, index) => {
+      const row = item as RecruitmentOfferTemplate;
+      return {
+        id: row.id || `offer_tpl_${index}`,
+        name: String(row.name || "Offer template").trim(),
+        body: String(row.body || "").trim(),
+      };
+    })
+    .filter((item) => item.body.length > 0);
+}
+
+function normalizeEmailTemplates(raw: unknown): RecruitmentEmailTemplate[] {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return DEFAULT_RECRUITMENT_SETTINGS.emailTemplates;
+  }
+
+  return raw
+    .filter((item) => item && typeof item === "object")
+    .map((item, index) => {
+      const row = item as RecruitmentEmailTemplate;
+      return {
+        id: row.id || `email_tpl_${index}`,
+        name: String(row.name || "Email template").trim(),
+        subject: String(row.subject || "").trim(),
+        body: String(row.body || "").trim(),
+      };
+    })
+    .filter((item) => item.subject.length > 0 && item.body.length > 0);
 }
 
 export function mergeRecruitmentSettings(
@@ -103,6 +165,8 @@ export function mergeRecruitmentSettings(
         .replace(/[^A-Z]/g, "")
         .slice(0, 10) || "OFF",
     },
+    offerTemplates: normalizeOfferTemplates(stored?.offerTemplates),
+    emailTemplates: normalizeEmailTemplates(stored?.emailTemplates),
   };
 }
 

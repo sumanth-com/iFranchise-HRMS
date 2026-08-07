@@ -275,6 +275,131 @@ export async function updateEmployee(
   if (profileError) {
     throw new Error(profileError.message);
   }
+
+  const primaryAddress =
+    await supabase
+      .schema("hrms")
+      .from("employee_addresses")
+      .select("id")
+      .eq("employee_id", employeeId)
+      .eq("is_primary", true)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+  const primaryContact =
+    await supabase
+      .schema("hrms")
+      .from("emergency_contacts")
+      .select("id")
+      .eq("employee_id", employeeId)
+      .eq("is_primary", true)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+  await upsertEmployeeAddressForUpdate(
+    supabase,
+    employeeId,
+    userId,
+    input,
+    primaryAddress.data?.id ?? null,
+  );
+  await upsertEmergencyContactForUpdate(
+    supabase,
+    employeeId,
+    userId,
+    input,
+    primaryContact.data?.id ?? null,
+  );
+}
+
+async function upsertEmployeeAddressForUpdate(
+  supabase: AuthSupabaseClient,
+  employeeId: string,
+  userId: string,
+  input: EmployeeUpdateInput,
+  existingId: string | null,
+) {
+  const hasAddress =
+    Boolean(input.addressLine1?.trim()) &&
+    Boolean(input.city?.trim()) &&
+    Boolean(input.country?.trim());
+
+  if (!hasAddress) return;
+
+  const payload = {
+    address_line1: input.addressLine1!.trim(),
+    address_line2: emptyToNull(input.addressLine2),
+    city: input.city!.trim(),
+    state: emptyToNull(input.state),
+    postal_code: emptyToNull(input.postalCode),
+    country: input.country!.trim(),
+    is_primary: true,
+    updated_by: userId,
+  };
+
+  if (existingId) {
+    const { error } = await supabase
+      .schema("hrms")
+      .from("employee_addresses")
+      .update(payload)
+      .eq("id", existingId);
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  const { error } = await supabase.schema("hrms").from("employee_addresses").insert({
+    employee_id: employeeId,
+    address_type: "current",
+    ...payload,
+    status: "active",
+    created_by: userId,
+  });
+  if (error) throw new Error(error.message);
+}
+
+async function upsertEmergencyContactForUpdate(
+  supabase: AuthSupabaseClient,
+  employeeId: string,
+  userId: string,
+  input: EmployeeUpdateInput,
+  existingId: string | null,
+) {
+  const name = input.emergencyContactName?.trim() ?? "";
+  const phone = input.emergencyContactPhone?.trim() ?? "";
+  const relationship = input.emergencyContactRelationship?.trim() ?? "";
+
+  if (!name && !phone && !relationship) return;
+
+  if (!name || !phone || !relationship) {
+    throw new Error("Emergency contact requires name, relationship, and phone");
+  }
+
+  const payload = {
+    name,
+    relationship,
+    phone,
+    email: emptyToNull(input.emergencyContactEmail)?.toLowerCase() ?? null,
+    is_primary: true,
+    updated_by: userId,
+  };
+
+  if (existingId) {
+    const { error } = await supabase
+      .schema("hrms")
+      .from("emergency_contacts")
+      .update(payload)
+      .eq("id", existingId);
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  const { error } = await supabase.schema("hrms").from("emergency_contacts").insert({
+    employee_id: employeeId,
+    ...payload,
+    status: "active",
+    created_by: userId,
+  });
+  if (error) throw new Error(error.message);
 }
 
 export async function softDeleteEmployee(

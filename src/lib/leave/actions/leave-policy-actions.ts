@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
-import { LEAVE_ROUTES } from "@/lib/leave/constants";
+import { LEAVE_ROUTES, SELF_LEAVE_ROUTES } from "@/lib/leave/constants";
 import { canEditLeavePolicy } from "@/lib/leave/leave-policy-permissions";
 import { saveLeavePolicyDocument } from "@/lib/leave/services/leave-policy-mutations";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
@@ -14,8 +14,11 @@ import type { LeavePolicyActionResult } from "@/types/leave-policy";
 function revalidateLeavePolicyPaths() {
   revalidatePath(EMPLOYEE_ROUTES.leavePolicy);
   revalidatePath(LEAVE_ROUTES.policy);
+  revalidatePath(SELF_LEAVE_ROUTES.policy);
   revalidatePath(EMPLOYEE_ROUTES.leave);
   revalidatePath(LEAVE_ROUTES.list);
+  revalidatePath(SELF_LEAVE_ROUTES.list);
+  revalidatePath(SELF_LEAVE_ROUTES.team);
 }
 
 export async function saveLeavePolicyDocumentAction(

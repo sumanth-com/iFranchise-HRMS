@@ -27,6 +27,17 @@ const EXPLORER_SELECT = `
 `;
 
 /**
+ * Aggregates document explorer data for a specific employee in the organization.
+ */
+export async function getEmployeeDocumentsExplorerForEmployee(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  employeeId: string,
+): Promise<EmployeeDocumentsExplorerData> {
+  return buildEmployeeDocumentsExplorer(supabase, organizationId, employeeId);
+}
+
+/**
  * Aggregates everything the Employee Self-Service document explorer needs, scoped
  * strictly to the signed-in employee. Includes archived rows so version history can
  * be reconstructed from the `replaced_by_id` chain without exposing them as folders.
@@ -35,9 +46,18 @@ export async function getEmployeeDocumentsExplorer(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
 ): Promise<EmployeeDocumentsExplorerData> {
-  const employeeId = profile.employee.id;
-  const organizationId = profile.employee.organizationId;
+  return buildEmployeeDocumentsExplorer(
+    supabase,
+    profile.employee.organizationId,
+    profile.employee.id,
+  );
+}
 
+async function buildEmployeeDocumentsExplorer(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  employeeId: string,
+): Promise<EmployeeDocumentsExplorerData> {
   const { data, error } = await fromHrms(supabase, "employee_documents")
     .select(EXPLORER_SELECT)
     .eq("employee_id", employeeId)

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { EmployeeAccountProvisioningPanel } from "@/components/employees/employee-account-provisioning-panel";
 import { EmployeeTable } from "@/components/employees/employee-table";
 import { PageSkeleton } from "@/components/common/page-skeleton";
+import { PageScroll } from "@/components/common/sticky-layout";
 import { createClient } from "@/lib/supabase/server";
 import { loadInviteableRoles } from "@/lib/auth/iam-roles";
 import { hasSupabaseServiceRoleEnv } from "@/lib/supabase/env";
@@ -110,52 +111,54 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
   );
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Employees</h1>
-        <p className="text-sm text-muted-foreground">
-          Manage employee records, employment details, and related information.
-        </p>
+    <PageScroll>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Employees</h1>
+          <p className="text-sm text-muted-foreground">
+            Manage employee records, employment details, and related information.
+          </p>
+        </div>
+
+        {(canInviteEmployee || canCancelEmployeeInvitation || canActivateEmployeeAccount) ? (
+          <EmployeeAccountProvisioningPanel
+            summary={accountProvisioning}
+            lookups={{
+              roles: inviteableRoles.map((role) => ({
+                id: role.id,
+                label: `${role.name} · ${role.portalLabel}`,
+                code: role.code,
+              })),
+              branches: inviteLookups.branches,
+              departments: inviteLookups.departments,
+              employmentTypes: inviteLookups.employmentTypes,
+              managers: inviteLookups.managers,
+            }}
+            canInvite={canInviteEmployee}
+            canCancelInvitation={canCancelEmployeeInvitation}
+            canActivate={canActivateEmployeeAccount}
+            inviteServiceReady={hasSupabaseServiceRoleEnv()}
+          />
+        ) : null}
+
+        <Suspense fallback={<PageSkeleton />}>
+          <EmployeeTable
+            employees={result.data}
+            total={result.total}
+            page={result.page}
+            pageSize={result.pageSize}
+            search={params.search ?? ""}
+            sortBy={params.sortBy}
+            sortOrder={params.sortOrder}
+            department={departmentCode}
+            employmentStatus={params.employmentStatus}
+            accountStatus={params.accountStatus}
+            departments={departments}
+            canEdit={hasPermission(profile.permissionCodes, "employee.edit")}
+            canDelete={hasPermission(profile.permissionCodes, "employee.delete")}
+          />
+        </Suspense>
       </div>
-
-      {(canInviteEmployee || canCancelEmployeeInvitation || canActivateEmployeeAccount) ? (
-        <EmployeeAccountProvisioningPanel
-          summary={accountProvisioning}
-          lookups={{
-            roles: inviteableRoles.map((role) => ({
-              id: role.id,
-              label: `${role.name} · ${role.portalLabel}`,
-              code: role.code,
-            })),
-            branches: inviteLookups.branches,
-            departments: inviteLookups.departments,
-            employmentTypes: inviteLookups.employmentTypes,
-            managers: inviteLookups.managers,
-          }}
-          canInvite={canInviteEmployee}
-          canCancelInvitation={canCancelEmployeeInvitation}
-          canActivate={canActivateEmployeeAccount}
-          inviteServiceReady={hasSupabaseServiceRoleEnv()}
-        />
-      ) : null}
-
-      <Suspense fallback={<PageSkeleton />}>
-        <EmployeeTable
-          employees={result.data}
-          total={result.total}
-          page={result.page}
-          pageSize={result.pageSize}
-          search={params.search ?? ""}
-          sortBy={params.sortBy}
-          sortOrder={params.sortOrder}
-          department={departmentCode}
-          employmentStatus={params.employmentStatus}
-          accountStatus={params.accountStatus}
-          departments={departments}
-          canEdit={hasPermission(profile.permissionCodes, "employee.edit")}
-          canDelete={hasPermission(profile.permissionCodes, "employee.delete")}
-        />
-      </Suspense>
-    </div>
+    </PageScroll>
   );
 }

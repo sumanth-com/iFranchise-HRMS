@@ -62,6 +62,7 @@ export const candidateListParamsSchema = recruitmentListParamsSchema.extend({
     .enum(["applied", "screening", "technical", "hr", "ceo", "offer", "joined", "rejected"])
     .optional(),
   source: z.string().trim().optional(),
+  offerQueue: z.enum(["all", "pending", "sent", "accepted"]).optional(),
 });
 
 export const candidateFormSchema = z.object({
@@ -130,16 +131,26 @@ export const offerListParamsSchema = recruitmentListParamsSchema.extend({
 
 export const offerFormSchema = z.object({
   candidateId: z.string().uuid(),
-  salary: z.coerce.number().min(1, "Salary is required"),
-  joiningDate: z.string().min(1, "Joining date is required"),
   departmentId: uuidOptional,
   designationId: uuidOptional,
-  branchId: z.string().uuid("Select a branch"),
+  branchId: uuidOptional,
   employmentTypeId: uuidOptional,
   reportingManagerId: uuidOptional,
   expiresAt: z.string().optional().nullable(),
   notes: z.string().max(5000).optional().nullable(),
+  emailSubject: z.string().min(1, "Email subject is required").max(500),
+  emailMessage: z.string().min(1, "Email message is required").max(10000),
+  sendNow: z.boolean().optional().default(true),
 });
+
+export const OFFER_LETTER_ALLOWED_EXTENSIONS = ["pdf", "doc", "docx"] as const;
+
+export function isAllowedOfferLetterFilename(filename: string): boolean {
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+  return OFFER_LETTER_ALLOWED_EXTENSIONS.includes(
+    ext as (typeof OFFER_LETTER_ALLOWED_EXTENSIONS)[number],
+  );
+}
 
 export const offerStatusSchema = z.object({
   offerId: z.string().uuid(),

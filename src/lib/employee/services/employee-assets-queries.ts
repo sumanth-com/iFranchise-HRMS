@@ -50,9 +50,26 @@ export async function getEmployeeAssetsData(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
 ): Promise<EmployeeAssetsData> {
-  const organizationId = profile.employee.organizationId;
-  const employeeId = profile.employee.id;
+  return buildEmployeeAssetsData(
+    supabase,
+    profile.employee.organizationId,
+    profile.employee.id,
+  );
+}
 
+export async function getEmployeeAssetsDataForEmployee(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  employeeId: string,
+): Promise<EmployeeAssetsData> {
+  return buildEmployeeAssetsData(supabase, organizationId, employeeId);
+}
+
+async function buildEmployeeAssetsData(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  employeeId: string,
+): Promise<EmployeeAssetsData> {
   const { data, error } = await fromHrms(supabase, "asset_assignments")
     .select(ASSIGNMENT_SELECT)
     .eq("organization_id", organizationId)

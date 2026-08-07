@@ -30,6 +30,7 @@ type FormValues = Omit<LeavePolicyDocument, "updatedAt">;
 
 export function LeavePolicyEditor({
   backHref,
+  backLabel = "Back to Leave",
   employeeName,
   initialDocument,
   mandatoryHolidays,
@@ -37,6 +38,7 @@ export function LeavePolicyEditor({
   holidayYear,
 }: {
   backHref: string;
+  backLabel?: string;
   employeeName: string;
   initialDocument: LeavePolicyDocument;
   mandatoryHolidays: LeavePolicyHolidayRow[];
@@ -80,7 +82,7 @@ export function LeavePolicyEditor({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="outline" size="sm" nativeButton={false} render={<Link href={backHref} />}>
           <ArrowLeft className="size-4" />
-          Back to Leave
+          {backLabel}
         </Button>
         <Button variant="outline" size="sm" nativeButton={false} render={<Link href={ORGANIZATION_ROUTES.holidays} />}>
           <ExternalLink className="size-4" />

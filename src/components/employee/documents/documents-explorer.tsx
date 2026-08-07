@@ -80,7 +80,13 @@ function FolderCard({
   );
 }
 
-export function DocumentsExplorer({ data }: { data: EmployeeDocumentsExplorerData }) {
+export function DocumentsExplorer({
+  data,
+  readOnly = false,
+}: {
+  data: EmployeeDocumentsExplorerData;
+  readOnly?: boolean;
+}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const fileActions = useEmployeeDocumentFile();
@@ -221,13 +227,14 @@ export function DocumentsExplorer({ data }: { data: EmployeeDocumentsExplorerDat
 
       {/* Content */}
       {openFolder ? (
-        filteredFiles.length > 0 || missingTypes.length > 0 ? (
+        filteredFiles.length > 0 || (!readOnly && missingTypes.length > 0) ? (
           <div className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filteredFiles.map((file) => (
               <DocumentFileCard
                 key={file.id}
                 file={file}
                 fileActions={fileActions}
+                readOnly={readOnly}
                 onReplace={(target) => {
                   setReplaceTarget(target);
                   setUploadTypeId(target.documentTypeId);
@@ -236,13 +243,27 @@ export function DocumentsExplorer({ data }: { data: EmployeeDocumentsExplorerDat
                 onDelete={(target) => setDeleteFile(target)}
               />
             ))}
-            {missingTypes.map((type) => (
+            {!readOnly
+              ? missingTypes.map((type) => (
               <DocumentMissingSlotCard
                 key={type.id}
                 typeName={type.name}
                 onUpload={() => openUpload(type.id)}
               />
-            ))}
+            ))
+              : null}
+          </div>
+        ) : readOnly ? (
+          <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed bg-muted/20 px-6 py-14 text-center">
+            <span className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <FileStack className="size-7" />
+            </span>
+            <div>
+              <p className="text-sm font-medium">This folder is empty</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                No documents in this category yet.
+              </p>
+            </div>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed bg-muted/20 px-6 py-14 text-center">
@@ -269,55 +290,59 @@ export function DocumentsExplorer({ data }: { data: EmployeeDocumentsExplorerDat
         </div>
       )}
 
-      <DocumentUploadDialog
-        open={uploadOpen}
-        onOpenChange={setUploadOpen}
-        documentTypes={uploadDocumentTypes}
-        maxUploadSizeMb={data.maxUploadSizeMb}
-        allowedFileTypes={data.allowedFileTypes}
-        defaultDocumentTypeId={uploadTypeId ?? folderDefaultType}
-        replaceTarget={
-          replaceTarget
-            ? {
-                documentId: replaceTarget.id,
-                documentTypeId: replaceTarget.documentTypeId,
-                title: replaceTarget.documentTypeName,
-              }
-            : null
-        }
-      />
+      {!readOnly ? (
+        <DocumentUploadDialog
+          open={uploadOpen}
+          onOpenChange={setUploadOpen}
+          documentTypes={uploadDocumentTypes}
+          maxUploadSizeMb={data.maxUploadSizeMb}
+          allowedFileTypes={data.allowedFileTypes}
+          defaultDocumentTypeId={uploadTypeId ?? folderDefaultType}
+          replaceTarget={
+            replaceTarget
+              ? {
+                  documentId: replaceTarget.id,
+                  documentTypeId: replaceTarget.documentTypeId,
+                  title: replaceTarget.documentTypeName,
+                }
+              : null
+          }
+        />
+      ) : null}
 
       <DocumentPreviewDialog
         target={fileActions.previewTarget}
         onOpenChange={(next) => !next && fileActions.setPreviewTarget(null)}
       />
 
-      <Modal
-        open={Boolean(deleteFile)}
-        onOpenChange={(next) => !next && setDeleteFile(null)}
-        title="Delete Document"
-        description={
-          deleteFile
-            ? `"${deleteFile.documentTypeName}" will be removed from your documents.`
-            : undefined
-        }
-        contentClassName="sm:max-w-md"
-        footer={
-          <Button variant="destructive" onClick={handleDelete} disabled={isPending}>
-            {isPending ? (
-              <Loader2 className="mr-2 size-4 animate-spin" />
-            ) : (
-              <Trash2 className="mr-2 size-4" />
-            )}
-            Delete
-          </Button>
-        }
-      >
-        <p className="text-sm text-muted-foreground">
-          Previous versions stay on record with HR. This only removes the file from your
-          own document library.
-        </p>
-      </Modal>
+      {!readOnly ? (
+        <Modal
+          open={Boolean(deleteFile)}
+          onOpenChange={(next) => !next && setDeleteFile(null)}
+          title="Delete Document"
+          description={
+            deleteFile
+              ? `"${deleteFile.documentTypeName}" will be removed from your documents.`
+              : undefined
+          }
+          contentClassName="sm:max-w-md"
+          footer={
+            <Button variant="destructive" onClick={handleDelete} disabled={isPending}>
+              {isPending ? (
+                <Loader2 className="mr-2 size-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 size-4" />
+              )}
+              Delete
+            </Button>
+          }
+        >
+          <p className="text-sm text-muted-foreground">
+            Previous versions stay on record with HR. This only removes the file from your
+            own document library.
+          </p>
+        </Modal>
+      ) : null}
     </div>
   );
 }

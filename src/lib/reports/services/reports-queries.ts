@@ -286,7 +286,7 @@ export async function getExecutiveDashboard(
     },
     charts: {
       employeeGrowth: Array.from(growthMap.entries()).map(([label, value]) => ({ label, value })),
-      hiringTrend: hiring.monthlyHiring.map((m) => ({ label: m.month, value: m.count })),
+      hiringTrend: hiring.monthlyOutcomes.map((m) => ({ label: m.month, value: m.hired })),
       attritionTrend: exitSummary.monthlyAttrition.map((m) => ({
         label: m.month,
         value: m.count,
@@ -306,7 +306,7 @@ export async function getExecutiveDashboard(
         value,
       })),
       performanceDistribution: ratingBuckets,
-      recruitmentFunnel: hiring.funnel.map((f) => ({
+      recruitmentFunnel: hiring.pipeline.map((f) => ({
         label: f.stage,
         value: f.count,
       })),
@@ -1127,7 +1127,7 @@ async function runRecruitmentReport(
           { key: "stage", header: "Stage" },
           { key: "count", header: "Count" },
         ],
-        analytics.funnel.map((f) => ({ stage: f.stage, count: f.count })),
+        analytics.pipeline.map((f) => ({ stage: f.stage, count: f.count })),
       );
     }
     return buildResult(
@@ -1138,8 +1138,11 @@ async function runRecruitmentReport(
         { key: "value", header: "Value" },
       ],
       [
+        { metric: "Total Applications", value: analytics.totalApplications },
+        { metric: "Selected / Hired", value: analytics.selectedHired },
+        { metric: "Rejected", value: analytics.rejected },
+        { metric: "Hiring Rate %", value: analytics.hiringRate },
         { metric: "Average Time to Hire (days)", value: analytics.averageTimeToHireDays },
-        { metric: "Interview Conversion %", value: analytics.interviewConversionRate },
         { metric: "Offer Acceptance %", value: analytics.offerAcceptanceRate },
       ],
     );

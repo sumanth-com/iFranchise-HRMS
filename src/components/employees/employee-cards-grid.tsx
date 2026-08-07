@@ -104,12 +104,12 @@ export function EmployeeCardsGrid({
             key={employee.id}
             className={cn(
               CARD_HEIGHT,
-              "group relative overflow-hidden rounded-2xl border bg-card shadow-sm transition-shadow hover:shadow-md",
+              "group relative cursor-pointer overflow-hidden rounded-2xl border bg-card shadow-sm transition-shadow hover:shadow-md",
             )}
           >
             <button
               type="button"
-              className="flex h-full w-full flex-col text-left"
+              className="flex h-full w-full cursor-pointer flex-col text-left"
               onClick={() => router.push(detailHref)}
             >
               <div className="relative h-[11.5rem] w-full shrink-0 bg-muted">

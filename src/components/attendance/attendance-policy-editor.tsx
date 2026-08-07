@@ -72,7 +72,7 @@ export function AttendancePolicyEditor({
       <div className="flex justify-start">
         <Button variant="outline" size="sm" nativeButton={false} render={<Link href={backHref} />}>
           <ArrowLeft className="size-4" />
-          Back to Attendance
+          Back to Team Attendance
         </Button>
       </div>
 

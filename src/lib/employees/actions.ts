@@ -24,6 +24,12 @@ import {
 } from "@/lib/employees/services/employee-detail";
 import { listEmployeeAssets } from "@/lib/assets/services/asset-queries";
 import {
+  EMPTY_EMPLOYEE_DOCUMENTS_EXPLORER,
+  getEmployeeDocumentsExplorerForEmployee,
+} from "@/lib/employee/services/employee-documents-queries";
+import { getEmployeeAssetsDataForEmployee } from "@/lib/employee/services/employee-assets-queries";
+import { getEmployeePayrollData } from "@/lib/employee/services/employee-payroll-queries";
+import {
   getEmployeeRoleAssignment,
   getRoleLookupOptions,
 } from "@/lib/roles/services/role-queries";
@@ -587,6 +593,9 @@ export async function getEmployeeDetailBundleAction(employeeRef: string) {
     attendanceSummaryResult,
     timelineResult,
     assetsResult,
+    documentsExplorerResult,
+    assetsDataResult,
+    payrollDataResult,
   ] = await Promise.allSettled([
     getEmployeeById(supabase, resolved.id),
     getEmployeeAttendance(supabase, resolved.id),
@@ -599,6 +608,17 @@ export async function getEmployeeDetailBundleAction(employeeRef: string) {
     getEmployeeAttendanceSummary(supabase, resolved.id),
     getEmployeeTimeline(supabase, resolved.id),
     listEmployeeAssets(supabase, profile.employee.organizationId, resolved.id),
+    getEmployeeDocumentsExplorerForEmployee(
+      supabase,
+      profile.employee.organizationId,
+      resolved.id,
+    ),
+    getEmployeeAssetsDataForEmployee(
+      supabase,
+      profile.employee.organizationId,
+      resolved.id,
+    ),
+    getEmployeePayrollData(supabase, profile, { targetEmployeeId: resolved.id }),
   ]);
 
   const employee =
@@ -633,14 +653,38 @@ export async function getEmployeeDetailBundleAction(employeeRef: string) {
   const timeline =
     timelineResult.status === "fulfilled" ? timelineResult.value : [];
   const assets = assetsResult.status === "fulfilled" ? assetsResult.value : [];
+  const documentsExplorer =
+    documentsExplorerResult.status === "fulfilled"
+      ? documentsExplorerResult.value
+      : EMPTY_EMPLOYEE_DOCUMENTS_EXPLORER;
+  const assetsData =
+    assetsDataResult.status === "fulfilled"
+      ? assetsDataResult.value
+      : {
+          assigned: [],
+          history: [],
+          summary: {
+            currentlyAssigned: 0,
+            previouslyReturned: 0,
+            underRepair: 0,
+            warrantyExpiringSoon: 0,
+            lostOrDamaged: 0,
+          },
+          categories: [],
+        };
+  const payrollData =
+    payrollDataResult.status === "fulfilled" ? payrollDataResult.value : null;
 
   const canChangeRole = canAssignUserRole(profile.permissionCodes);
-  const [roleAssignment, assignableRoles] = canChangeRole
-    ? await Promise.all([
-        getEmployeeRoleAssignment(supabase, profile.employee.organizationId, resolved.id),
-        getRoleLookupOptions(supabase, profile.employee.organizationId),
-      ])
-    : [null, []];
+  const [roleAssignment, assignableRoles, lookups] = await Promise.all([
+    canChangeRole
+      ? getEmployeeRoleAssignment(supabase, profile.employee.organizationId, resolved.id)
+      : Promise.resolve(null),
+    canChangeRole
+      ? getRoleLookupOptions(supabase, profile.employee.organizationId)
+      : Promise.resolve([]),
+    getEmployeeLookups(supabase, profile.employee.organizationId, resolved.id),
+  ]);
 
   let profileImageUrl: string | null = null;
   if (employee.profile?.profileImageStoragePath) {
@@ -663,10 +707,14 @@ export async function getEmployeeDetailBundleAction(employeeRef: string) {
     attendanceSummary,
     timeline,
     assets,
+    documentsExplorer,
+    assetsData,
+    payrollData,
     profileImageUrl,
     permissionCodes: profile.permissionCodes,
     roleAssignment,
     assignableRoles,
+    lookups,
   };
 }
 

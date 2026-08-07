@@ -42,6 +42,7 @@ type Props = {
   fileActions: DocumentFileActions;
   onReplace: (file: EmployeeDocFile) => void;
   onDelete: (file: EmployeeDocFile) => void;
+  readOnly?: boolean;
 };
 
 export function DocumentFileCard({
@@ -49,6 +50,7 @@ export function DocumentFileCard({
   fileActions,
   onReplace,
   onDelete,
+  readOnly = false,
 }: Props) {
   const { isBusy, preview, download } = fileActions;
   const kind = getFileKind(file.mimeType, file.fileName);
@@ -71,7 +73,7 @@ export function DocumentFileCard({
           </p>
         </div>
 
-        {!file.isReadOnly ? (
+        {!readOnly && !file.isReadOnly ? (
           <DropdownMenu>
             <DropdownMenuTrigger
               render={

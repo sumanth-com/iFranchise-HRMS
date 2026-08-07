@@ -20,7 +20,13 @@ function greetingForHour(hour: number) {
   return "Good Evening";
 }
 
-export function DashboardHeader({ showGreeting = true }: { showGreeting?: boolean }) {
+export function DashboardHeader({
+  showGreeting = true,
+  showToolbar = true,
+}: {
+  showGreeting?: boolean;
+  showToolbar?: boolean;
+}) {
   const router = useRouter();
   const { profile } = useAuth();
   const [now, setNow] = useState(() => new Date());
@@ -90,6 +96,10 @@ export function DashboardHeader({ showGreeting = true }: { showGreeting?: boolea
     }
   }
 
+  if (!showGreeting && !showToolbar) {
+    return null;
+  }
+
   return (
     <div className="flex shrink-0 flex-col gap-3">
       {showGreeting ? (
@@ -108,6 +118,7 @@ export function DashboardHeader({ showGreeting = true }: { showGreeting?: boolea
         </section>
       ) : null}
 
+      {showToolbar ? (
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <div ref={rootRef} className="relative min-w-0 flex-1">
           <form onSubmit={onSearch}>
@@ -167,6 +178,7 @@ export function DashboardHeader({ showGreeting = true }: { showGreeting?: boolea
           </Link>
         ) : null}
       </div>
+      ) : null}
     </div>
   );
 }

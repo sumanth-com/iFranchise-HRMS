@@ -15,14 +15,16 @@ import {
   createCandidate,
   createJobOpening,
   createOffer,
+  deleteJobOpening,
   duplicateJobOpening,
   moveCandidateStage,
   scheduleInterview,
   updateJobOpening,
   updateOfferStatus,
 } from "@/lib/recruitment/services/recruitment-mutations";
+import { getCandidateById } from "@/lib/recruitment/services/recruitment-queries";
 import { updateRecruitmentSettings } from "@/lib/recruitment/services/recruitment-settings";
-import type { RecruitmentSettings } from "@/types/recruitment";
+import type { CandidateDetail, RecruitmentSettings } from "@/types/recruitment";
 import {
   candidateFormSchema,
   interviewCompleteSchema,
@@ -48,7 +50,6 @@ function revalidateRecruitment() {
   revalidatePath(RECRUITMENT_ROUTES.candidates);
   revalidatePath(RECRUITMENT_ROUTES.interviews);
   revalidatePath(RECRUITMENT_ROUTES.offers);
-  revalidatePath(RECRUITMENT_ROUTES.analytics);
   revalidatePath("/dashboard/employees");
 }
 
@@ -117,6 +118,21 @@ export async function closeJobOpeningAction(id: string): Promise<ActionResult<vo
   }
 }
 
+export async function deleteJobOpeningAction(id: string): Promise<ActionResult<void>> {
+  try {
+    const profile = await requireServerPermission("recruitment.delete");
+    const supabase = await getAuthenticatedSupabase();
+    await deleteJobOpening(supabase, profile, id);
+    revalidateRecruitment();
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to delete job",
+    };
+  }
+}
+
 export async function createCandidateAction(input: unknown): Promise<ActionResult<string>> {
   try {
     const profile = await requireServerPermission("recruitment.create");
@@ -129,6 +145,25 @@ export async function createCandidateAction(input: unknown): Promise<ActionResul
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to create candidate",
+    };
+  }
+}
+
+export async function getCandidateDetailAction(
+  id: string,
+): Promise<ActionResult<CandidateDetail>> {
+  try {
+    const profile = await requireServerPermission("recruitment.view");
+    const supabase = await getAuthenticatedSupabase();
+    const detail = await getCandidateById(supabase, profile.employee.organizationId, id);
+    if (!detail) {
+      return { success: false, message: "Candidate not found" };
+    }
+    return { success: true, data: detail };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to load candidate",
     };
   }
 }
@@ -199,18 +234,35 @@ export async function cancelInterviewAction(id: string): Promise<ActionResult<vo
   }
 }
 
-export async function createOfferAction(input: unknown): Promise<ActionResult<string>> {
+export async function createOfferAction(formData: FormData): Promise<ActionResult<string>> {
   try {
     const profile = await requireServerPermission("recruitment.offer");
     const supabase = await getAuthenticatedSupabase();
-    const parsed = offerFormSchema.parse(input);
-    const id = await createOffer(supabase, profile, parsed);
+
+    const parsed = offerFormSchema.parse({
+      candidateId: formData.get("candidateId"),
+      emailSubject: formData.get("emailSubject"),
+      emailMessage: formData.get("emailMessage"),
+      sendNow: formData.get("sendNow") === "true",
+    });
+
+    const file = formData.get("offerFile");
+    let offerFile: { bytes: Uint8Array; filename: string } | undefined;
+
+    if (file instanceof File && file.size > 0) {
+      offerFile = {
+        bytes: new Uint8Array(await file.arrayBuffer()),
+        filename: file.name,
+      };
+    }
+
+    const id = await createOffer(supabase, profile, parsed, offerFile);
     revalidateRecruitment();
     return { success: true, data: id };
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to create offer",
+      message: error instanceof Error ? error.message : "Failed to send offer",
     };
   }
 }

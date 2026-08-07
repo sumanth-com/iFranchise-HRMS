@@ -22,6 +22,15 @@ import {
   notifyOfferStatus,
 } from "@/lib/recruitment/services/recruitment-notifications";
 import {
+  deliverOfferEmailToCandidate,
+  loadOfferEmailContext,
+} from "@/lib/recruitment/services/recruitment-offer-email";
+import {
+  downloadOfferLetterFile,
+  storeOfferLetterFile,
+} from "@/lib/recruitment/services/offer-letter-storage";
+import { isAllowedOfferLetterFilename } from "@/lib/validations/recruitment";
+import {
   getRecruitmentSettings,
   nextRecruitmentCode,
 } from "@/lib/recruitment/services/recruitment-settings";
@@ -229,6 +238,24 @@ export async function closeJobOpening(
     .is("deleted_at", null);
 
   if (error) throw new Error(error.message);
+}
+
+export async function deleteJobOpening(
+  supabase: AuthSupabaseClient,
+  _profile: UserProfile,
+  id: string,
+): Promise<void> {
+  const { data, error } = await supabase.schema("hrms").rpc("soft_delete_recruitment_job_opening", {
+    p_job_opening_id: id,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    throw new Error("Job opening not found or has already been deleted");
+  }
 }
 
 export async function createCandidate(
@@ -590,17 +617,23 @@ export async function updateInterview(
   });
 }
 
+export type OfferLetterUpload = {
+  bytes: Uint8Array;
+  filename: string;
+};
+
 export async function createOffer(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   input: z.infer<typeof offerFormSchema>,
+  offerFile?: OfferLetterUpload,
 ): Promise<string> {
   const organizationId = profile.employee.organizationId;
 
   const { data: candidate, error: candError } = await fromHrms(supabase, "recruitment_candidates")
     .select(
-      `id, job_opening_id, first_name, last_name,
-      job:job_opening_id(department_id, designation_id, employment_type_id, hiring_manager_id)`,
+      `id, job_opening_id, first_name, last_name, email, phone, expected_ctc,
+      job:job_opening_id(title, department_id, designation_id, employment_type_id, hiring_manager_id)`,
     )
     .eq("id", input.candidateId)
     .eq("organization_id", organizationId)
@@ -611,56 +644,209 @@ export async function createOffer(
   if (!candidate) throw new Error("Candidate not found");
 
   const job = unwrapRelation(candidate.job as PerfRow | null);
+  const departmentId =
+    emptyToNull(input.departmentId as string | null) ?? job?.department_id ?? null;
+  const designationId =
+    emptyToNull(input.designationId as string | null) ?? job?.designation_id ?? null;
+  const employmentTypeId =
+    emptyToNull(input.employmentTypeId as string | null) ?? job?.employment_type_id ?? null;
+  const reportingManagerId =
+    emptyToNull(input.reportingManagerId as string | null) ?? job?.hiring_manager_id ?? null;
+  const branchId = emptyToNull(input.branchId as string | null) ?? profile.employee.branchId ?? null;
+
   const settings = await getRecruitmentSettings(supabase, organizationId);
-  const offerCode = await nextRecruitmentCode(
+
+  const emailContext = await loadOfferEmailContext(
     supabase,
     organizationId,
-    "recruitment_offers",
-    "offer_code",
-    settings.numberFormats.offerPrefix,
+    input.candidateId,
+    candidate.job_opening_id,
+    reportingManagerId,
+    branchId,
+    departmentId,
+    designationId,
   );
 
-  const { data, error } = await fromHrms(supabase, "recruitment_offers")
-    .insert({
-      organization_id: organizationId,
-      offer_code: offerCode,
-      candidate_id: input.candidateId,
-      job_opening_id: candidate.job_opening_id,
-      department_id:
-        emptyToNull(input.departmentId as string | null) ?? job?.department_id ?? null,
-      designation_id:
-        emptyToNull(input.designationId as string | null) ?? job?.designation_id ?? null,
-      branch_id: input.branchId,
-      employment_type_id:
-        emptyToNull(input.employmentTypeId as string | null) ?? job?.employment_type_id ?? null,
-      reporting_manager_id:
-        emptyToNull(input.reportingManagerId as string | null) ?? job?.hiring_manager_id ?? null,
-      salary: input.salary,
-      joining_date: input.joiningDate,
-      expires_at: emptyToNull(input.expiresAt),
-      notes: emptyToNull(input.notes),
-      offer_status: "draft",
-      created_by: profile.userId,
-      updated_by: profile.userId,
-    })
-    .select("id")
-    .single();
+  const resolvedEmailSubject = input.emailSubject.trim();
+  const resolvedEmailMessage = input.emailMessage.trim();
+  const resolvedSalary = Number(candidate.expected_ctc ?? 0);
+  const resolvedJoiningDate = new Date().toISOString().slice(0, 10);
 
-  if (error) throw new Error(error.message);
+  const { data: existingDraft } = await fromHrms(supabase, "recruitment_offers")
+    .select("id, offer_letter_path, salary, joining_date")
+    .eq("candidate_id", input.candidateId)
+    .eq("organization_id", organizationId)
+    .eq("offer_status", "draft")
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (offerFile && !isAllowedOfferLetterFilename(offerFile.filename)) {
+    throw new Error("Offer letter must be a PDF, DOC, or DOCX file");
+  }
+
+  const hasStoredLetter = Boolean(existingDraft?.offer_letter_path);
+  if (input.sendNow && !offerFile && !hasStoredLetter) {
+    throw new Error("Upload an offer letter before sending");
+  }
+  if (!input.sendNow && !offerFile && !hasStoredLetter) {
+    throw new Error("Upload an offer letter to save the draft");
+  }
+
+  let offerId: string;
+  const offerSalary = existingDraft?.salary != null ? Number(existingDraft.salary) : resolvedSalary;
+  const offerJoiningDate = existingDraft?.joining_date ?? resolvedJoiningDate;
+
+  if (existingDraft?.id) {
+    const { data: updated, error: updateError } = await fromHrms(supabase, "recruitment_offers")
+      .update({
+        department_id: departmentId,
+        designation_id: designationId,
+        branch_id: branchId,
+        employment_type_id: employmentTypeId,
+        reporting_manager_id: reportingManagerId,
+        salary: offerSalary,
+        joining_date: offerJoiningDate,
+        expires_at: emptyToNull(input.expiresAt),
+        notes: emptyToNull(input.notes),
+        email_subject: resolvedEmailSubject,
+        offer_letter_body: resolvedEmailMessage,
+        updated_by: profile.userId,
+      })
+      .eq("id", existingDraft.id)
+      .eq("organization_id", organizationId)
+      .select("id")
+      .single();
+
+    if (updateError) throw new Error(updateError.message);
+    offerId = updated.id;
+  } else {
+    const offerCode = await nextRecruitmentCode(
+      supabase,
+      organizationId,
+      "recruitment_offers",
+      "offer_code",
+      settings.numberFormats.offerPrefix,
+    );
+
+    const { data, error } = await fromHrms(supabase, "recruitment_offers")
+      .insert({
+        organization_id: organizationId,
+        offer_code: offerCode,
+        candidate_id: input.candidateId,
+        job_opening_id: candidate.job_opening_id,
+        department_id: departmentId,
+        designation_id: designationId,
+        branch_id: branchId,
+        employment_type_id: employmentTypeId,
+        reporting_manager_id: reportingManagerId,
+        salary: offerSalary,
+        joining_date: offerJoiningDate,
+        expires_at: emptyToNull(input.expiresAt),
+        notes: emptyToNull(input.notes),
+        email_subject: resolvedEmailSubject,
+        offer_letter_body: resolvedEmailMessage,
+        offer_status: "draft",
+        created_by: profile.userId,
+        updated_by: profile.userId,
+      })
+      .select("id")
+      .single();
+
+    if (error) throw new Error(error.message);
+    offerId = data.id;
+  }
+
+  let offerLetterPath = existingDraft?.offer_letter_path ?? null;
+  let attachmentFilename = offerFile?.filename ?? null;
+
+  if (offerFile) {
+    offerLetterPath = await storeOfferLetterFile(
+      supabase,
+      organizationId,
+      offerId,
+      input.candidateId,
+      offerFile.bytes,
+      offerFile.filename,
+    );
+    attachmentFilename = offerFile.filename;
+
+    const { error: pathError } = await fromHrms(supabase, "recruitment_offers")
+      .update({
+        offer_letter_path: offerLetterPath,
+        updated_by: profile.userId,
+      })
+      .eq("id", offerId)
+      .eq("organization_id", organizationId);
+
+    if (pathError) throw new Error(pathError.message);
+  }
+
+  const candidateName = [candidate.first_name, candidate.last_name].filter(Boolean).join(" ");
 
   await moveCandidateStage(supabase, profile, {
     candidateId: input.candidateId,
     stage: "offer",
-    reason: "Offer created",
+    reason: input.sendNow ? "Offer sent" : "Offer created",
   });
 
-  await addTimeline(supabase, organizationId, input.candidateId, profile.userId, {
-    eventType: "offer",
-    title: "Offer drafted",
-    description: `Salary ${input.salary}, joining ${input.joiningDate}`,
-  });
+  if (input.sendNow) {
+    if (!offerLetterPath) {
+      throw new Error("Offer letter file is missing");
+    }
 
-  return data.id;
+    const fileBytes =
+      offerFile?.bytes ?? await downloadOfferLetterFile(supabase, offerLetterPath);
+    const emailFilename =
+      attachmentFilename ??
+      `Offer-${emailContext.candidateName.replace(/[^\w.-]+/g, "_")}-${emailContext.jobTitle.replace(/[^\w.-]+/g, "_")}.pdf`;
+
+    await deliverOfferEmailToCandidate({
+      to: emailContext.candidateEmail,
+      subject: resolvedEmailSubject,
+      messageText: resolvedEmailMessage,
+      fileBytes,
+      attachmentFilename: emailFilename,
+    });
+
+    const sentAt = new Date().toISOString();
+    const { error: sentError } = await fromHrms(supabase, "recruitment_offers")
+      .update({
+        offer_status: "sent",
+        sent_at: sentAt,
+        updated_by: profile.userId,
+      })
+      .eq("id", offerId)
+      .eq("organization_id", organizationId);
+
+    if (sentError) throw new Error(sentError.message);
+
+    await addTimeline(supabase, organizationId, input.candidateId, profile.userId, {
+      eventType: "offer",
+      title: "Offer sent",
+      description: `Offer emailed to ${emailContext.candidateEmail}`,
+    });
+
+    await notifyOfferStatus(
+      supabase,
+      profile,
+      reportingManagerId,
+      "offerSent",
+      "Offer sent",
+      `Offer sent to ${candidateName}.`,
+      offerId,
+      candidateName,
+    );
+  } else {
+    await addTimeline(supabase, organizationId, input.candidateId, profile.userId, {
+      eventType: "offer",
+      title: "Offer drafted",
+      description: "Offer letter draft saved",
+    });
+  }
+
+  return offerId;
 }
 
 export async function updateOfferStatus(

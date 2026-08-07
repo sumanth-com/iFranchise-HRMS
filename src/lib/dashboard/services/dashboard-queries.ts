@@ -701,9 +701,9 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
         label: format(parseISO(d), "dd MMM"),
         value: presentByDay.get(d) ?? 0,
       })),
-      monthlyHiring: hiring.monthlyHiring.map((m) => ({
+      monthlyHiring: hiring.monthlyOutcomes.map((m) => ({
         label: m.month,
-        value: m.count,
+        value: m.hired,
       })),
       monthlyAttrition: exitSummary.monthlyAttrition.map((m) => ({
         label: m.month,

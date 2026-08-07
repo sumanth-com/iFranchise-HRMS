@@ -11,7 +11,9 @@ export default async function ManagerPayrollPage() {
     "payslip.view",
   ]);
   const supabase = await createClient();
-  const data = await getEmployeePayrollData(supabase, profile, siteConfig.url);
+  const data = await getEmployeePayrollData(supabase, profile, {
+    appOrigin: siteConfig.url,
+  });
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-4 md:p-5">

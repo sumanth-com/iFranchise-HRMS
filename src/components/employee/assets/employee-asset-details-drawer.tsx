@@ -39,6 +39,7 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   onReportIssue: (asset: EmployeeAsset) => void;
   onRequestReplacement: (asset: EmployeeAsset) => void;
+  readOnly?: boolean;
 };
 
 export function EmployeeAssetDetailsDrawer({
@@ -47,6 +48,7 @@ export function EmployeeAssetDetailsDrawer({
   onOpenChange,
   onReportIssue,
   onRequestReplacement,
+  readOnly = false,
 }: Props) {
   const Icon = assetCategoryIcon(asset?.categoryName ?? null);
   const isActive = asset?.assignmentStatus === "active";
@@ -163,7 +165,7 @@ export function EmployeeAssetDetailsDrawer({
               </div>
             </div>
 
-            {isActive ? (
+            {isActive && !readOnly ? (
               <div className="flex items-center gap-2 border-t p-4">
                 <Button
                   variant="outline"

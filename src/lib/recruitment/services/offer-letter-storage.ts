@@ -1,0 +1,52 @@
+import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+
+const BUCKET = "employee-documents";
+
+const EXTENSION_CONTENT_TYPES: Record<string, string> = {
+  pdf: "application/pdf",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+};
+
+export function resolveOfferLetterExtension(filename: string): string {
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+  if (ext === "pdf" || ext === "doc" || ext === "docx") return ext;
+  return "pdf";
+}
+
+export function contentTypeForOfferLetterExtension(ext: string): string {
+  return EXTENSION_CONTENT_TYPES[ext] ?? "application/octet-stream";
+}
+
+export async function storeOfferLetterFile(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  offerId: string,
+  candidateId: string,
+  fileBytes: Uint8Array,
+  filename: string,
+): Promise<string> {
+  const ext = resolveOfferLetterExtension(filename);
+  const storagePath = `recruitment/offers/${organizationId}/${candidateId}/${offerId}.${ext}`;
+  const contentType = contentTypeForOfferLetterExtension(ext);
+
+  const { error: uploadError } = await supabase.storage.from(BUCKET).upload(storagePath, fileBytes, {
+    contentType,
+    upsert: true,
+  });
+
+  if (uploadError) {
+    throw new Error(uploadError.message);
+  }
+
+  return storagePath;
+}
+
+export async function downloadOfferLetterFile(
+  supabase: AuthSupabaseClient,
+  storagePath: string,
+): Promise<Uint8Array> {
+  const { data, error } = await supabase.storage.from(BUCKET).download(storagePath);
+  if (error) throw new Error(error.message);
+  return new Uint8Array(await data.arrayBuffer());
+}

@@ -1,3 +1,6 @@
+import { Suspense } from "react";
+
+import { PageSkeleton } from "@/components/common/page-skeleton";
 import { CandidatesManagement } from "@/components/recruitment/candidates-management";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -18,7 +21,7 @@ type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function CandidatesPage({ searchParams }: PageProps) {
+async function CandidatesPageContent({ searchParams }: PageProps) {
   const profile = await requireServerPermission("recruitment.view");
   const supabase = await createClient();
   const raw = await searchParams;
@@ -49,7 +52,7 @@ export default async function CandidatesPage({ searchParams }: PageProps) {
       page={result.page}
       pageSize={result.pageSize}
       lookups={lookups}
-      selected={selected}
+      initialSelected={selected}
       canCreate={canCreateRecruitment(profile.permissionCodes)}
       canEdit={canEditRecruitment(profile.permissionCodes)}
       canInterview={canInterviewRecruitment(profile.permissionCodes)}
@@ -61,5 +64,13 @@ export default async function CandidatesPage({ searchParams }: PageProps) {
         stage: params.stage,
       }}
     />
+  );
+}
+
+export default function CandidatesPage({ searchParams }: PageProps) {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <CandidatesPageContent searchParams={searchParams} />
+    </Suspense>
   );
 }

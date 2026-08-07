@@ -1,24 +1,24 @@
 "use client";
 
-import { formatDistanceToNow, parseISO } from "date-fns";
 import {
   BriefcaseBusiness,
-  CalendarCheck2,
+  Cake,
   ClipboardList,
   FileText,
+  Medal,
   UserCheck,
-  Users,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { format, parseISO } from "date-fns";
 
-import { EmptyState } from "@/components/common/empty-state";
-import { AUDIT_ROUTES } from "@/lib/audit/constants";
+import { HrUpcomingHolidaysPanel } from "@/components/dashboard/hr-today-pulse-section";
 import type {
-  DashboardActivityItem,
   DashboardChartItem,
   DashboardCharts,
+  DashboardListItem,
+  DashboardPersonEvent,
   DashboardTaskItem,
 } from "@/types/dashboard";
 import { cn } from "@/lib/utils";
@@ -30,95 +30,101 @@ const TASK_ICONS: Record<string, LucideIcon> = {
   "offers-pending": FileText,
 };
 
-const MODULE_LABELS: Record<string, string> = {
-  employees: "Employees",
-  attendance: "Attendance",
-  leave: "Leave",
-  payroll: "Payroll",
-  recruitment: "Recruitment",
-  exit: "Offboarding",
-  system: "System",
-};
-
-function moduleLabel(module: string) {
-  return MODULE_LABELS[module] ?? module.replace(/_/g, " ");
-}
-
-function formatActivityWhen(iso: string) {
-  try {
-    return formatDistanceToNow(parseISO(iso), { addSuffix: true });
-  } catch {
-    return "Recently";
-  }
-}
-
-const MODULE_ICONS: Record<string, LucideIcon> = {
-  employees: Users,
-  attendance: CalendarCheck2,
-  leave: ClipboardList,
-  payroll: Wallet,
-  recruitment: BriefcaseBusiness,
-  exit: Users,
-  system: Users,
-};
-
 function seriesMax(items: DashboardChartItem[]) {
   return Math.max(1, ...items.map((item) => item.value));
 }
 
-function shortLabel(label: string) {
-  if (/^\d{2}\s/.test(label)) return label.slice(0, 2);
-  return label.length > 8 ? `${label.slice(0, 7)}…` : label;
-}
-
-function VerticalBarChart({
-  title,
-  items,
-  barClassName,
-  empty,
-}: {
-  title: string;
-  items: DashboardChartItem[];
-  barClassName: string;
-  empty: string;
-}) {
-  const rows = items.slice(0, 7);
+function AttendanceSparkline({ items }: { items: DashboardChartItem[] }) {
+  const rows = items.slice(-7);
   const max = seriesMax(rows);
+  const total = rows.reduce((sum, item) => sum + item.value, 0);
+  const width = 280;
+  const height = 52;
+  const padX = 8;
+  const padY = 6;
+  const innerW = width - padX * 2;
+  const innerH = height - padY * 2;
+
+  const points =
+    rows.length === 0
+      ? []
+      : rows.map((item, index) => {
+          const x = padX + (rows.length === 1 ? innerW / 2 : (index / (rows.length - 1)) * innerW);
+          const y = padY + innerH - (item.value / max) * innerH;
+          return { x, y, item };
+        });
+
+  const linePath =
+    points.length > 0
+      ? points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ")
+      : "";
+  const areaPath =
+    points.length > 0
+      ? `${linePath} L ${points[points.length - 1].x} ${height - padY} L ${points[0].x} ${height - padY} Z`
+      : "";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col rounded-xl border bg-background p-3">
-      <h3 className="mb-2 shrink-0 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-        {title}
-      </h3>
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-gradient-to-br from-emerald-500/10 via-background to-teal-500/5 p-3">
+      <div className="pointer-events-none absolute -right-8 -top-8 size-24 rounded-full bg-emerald-400/20 blur-2xl" />
+      <div className="flex shrink-0 items-center justify-between gap-2">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+            Attendance pulse
+          </p>
+          <p className="mt-0.5 text-lg font-semibold tabular-nums tracking-tight">
+            {total}
+            <span className="ml-1 text-xs font-normal text-muted-foreground">present (7d)</span>
+          </p>
+        </div>
+        <span className="rounded-full border bg-background/80 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+          7 days
+        </span>
+      </div>
+
       {rows.length === 0 ? (
-        <p className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
-          {empty}
-        </p>
+        <p className="mt-2 text-xs text-muted-foreground">No attendance data yet.</p>
       ) : (
-        <div className="flex min-h-[7.5rem] flex-1 items-end gap-1.5 px-1 pt-1">
-          {rows.map((item) => {
-            const height = Math.max(item.value > 0 ? 8 : 2, (item.value / max) * 100);
-            return (
-              <div key={item.label} className="flex h-full min-w-0 flex-1 flex-col items-center gap-1">
-                <span className="shrink-0 text-[10px] font-medium tabular-nums text-muted-foreground">
-                  {item.value}
-                </span>
-                <div className="flex min-h-0 w-full flex-1 items-end justify-center">
-                  <div
-                    className={cn(
-                      "w-full max-w-7 rounded-t-md transition-all",
-                      item.value > 0 ? barClassName : "bg-muted",
-                    )}
-                    style={{ height: `${height}%` }}
-                    title={`${item.label}: ${item.value}`}
-                  />
-                </div>
-                <span className="w-full shrink-0 truncate text-center text-[9px] text-muted-foreground">
-                  {shortLabel(item.label)}
-                </span>
-              </div>
-            );
-          })}
+        <div className="mt-1.5 min-h-0 shrink-0">
+          <svg
+            viewBox={`0 0 ${width} ${height}`}
+            className="h-12 w-full"
+            preserveAspectRatio="none"
+            aria-hidden
+          >
+            <defs>
+              <linearGradient id="attendanceArea" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="rgb(16 185 129)" stopOpacity="0.35" />
+                <stop offset="100%" stopColor="rgb(16 185 129)" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            {areaPath ? <path d={areaPath} fill="url(#attendanceArea)" /> : null}
+            {linePath ? (
+              <path
+                d={linePath}
+                fill="none"
+                stroke="rgb(16 185 129)"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            ) : null}
+            {points.map((point) => (
+              <circle
+                key={point.item.label}
+                cx={point.x}
+                cy={point.y}
+                r={point.item.value > 0 ? 4 : 2.5}
+                className={point.item.value > 0 ? "fill-emerald-500" : "fill-muted-foreground/40"}
+              />
+            ))}
+          </svg>
+          <div className="mt-1 flex justify-between gap-1 text-[9px] text-muted-foreground">
+            {rows.map((item) => (
+              <span key={item.label} className="flex-1 truncate text-center tabular-nums">
+                {item.label.slice(0, 3)}
+              </span>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -127,11 +133,19 @@ function VerticalBarChart({
 
 function PriorityTasks({ items }: { items: DashboardTaskItem[] }) {
   return (
-    <section className="shrink-0 rounded-xl border bg-card p-3 shadow-sm md:p-4">
-      <h2 className="mb-3 text-xs font-semibold tracking-wide text-foreground uppercase">
-        Priority Tasks
-      </h2>
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+    <section className="flex h-full min-h-0 flex-col rounded-xl border bg-card p-3 shadow-sm md:p-4">
+      <div className="mb-3 flex shrink-0 items-center gap-2">
+        <span className="flex size-7 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+          <ClipboardList className="size-3.5" />
+        </span>
+        <div>
+          <h2 className="text-[11px] font-semibold tracking-wide text-foreground uppercase">
+            Priority Tasks
+          </h2>
+          <p className="text-[11px] text-muted-foreground">Items needing your attention</p>
+        </div>
+      </div>
+      <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-2 gap-2.5">
         {items.map((item) => {
           const Icon = TASK_ICONS[item.id] ?? ClipboardList;
           const hasWork = (item.count ?? 0) > 0;
@@ -141,15 +155,15 @@ function PriorityTasks({ items }: { items: DashboardTaskItem[] }) {
               key={item.id}
               href={item.href}
               className={cn(
-                "flex min-h-[4.5rem] flex-col justify-between rounded-xl border bg-background px-3.5 py-3 outline-none transition-colors",
+                "flex min-h-[4.25rem] flex-col justify-between rounded-lg border bg-muted/15 px-3 py-2.5 outline-none transition-colors",
                 "hover:border-primary/40 hover:bg-accent/30",
                 "focus-visible:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/40",
                 !hasWork && "opacity-80",
               )}
             >
               <div className="flex items-start justify-between gap-2">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-muted/40">
-                  <Icon className="size-4" />
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-md border bg-muted/40">
+                  <Icon className="size-3.5" />
                 </span>
                 <span
                   className={cn(
@@ -160,7 +174,7 @@ function PriorityTasks({ items }: { items: DashboardTaskItem[] }) {
                   {item.count ?? 0}
                 </span>
               </div>
-              <p className="mt-2.5 line-clamp-2 text-sm font-medium leading-snug">{item.label}</p>
+              <p className="mt-1.5 line-clamp-2 text-xs font-medium leading-snug">{item.label}</p>
             </Link>
           );
         })}
@@ -169,130 +183,156 @@ function PriorityTasks({ items }: { items: DashboardTaskItem[] }) {
   );
 }
 
-function RecentActivity({ items }: { items: DashboardActivityItem[] }) {
+function TeamCelebrationsPanel({
+  birthdays,
+  anniversaries,
+}: {
+  birthdays: DashboardPersonEvent[];
+  anniversaries: DashboardPersonEvent[];
+}) {
+  const events = [
+    ...birthdays.map((event) => ({ ...event, kind: "birthday" as const })),
+    ...anniversaries.map((event) => ({ ...event, kind: "anniversary" as const })),
+  ]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 4);
+
   return (
-    <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card p-3 shadow-sm md:p-4">
-      <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
-        <h2 className="text-xs font-semibold tracking-wide text-foreground uppercase">
-          Recent Activity
-        </h2>
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-gradient-to-br from-rose-500/10 via-background to-amber-500/5 p-3">
+      <div className="pointer-events-none absolute -right-6 top-0 size-20 rounded-full bg-rose-400/15 blur-2xl" />
+      <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="flex size-6 items-center justify-center rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400">
+            <Cake className="size-3" />
+          </span>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
+            Team celebrations
+          </p>
+        </div>
         <Link
-          href={AUDIT_ROUTES.logs}
-          className="inline-flex h-7 shrink-0 items-center rounded-full border bg-background px-3 text-[11px] font-medium text-foreground transition-colors hover:bg-muted"
+          href="/dashboard/employees"
+          className="rounded-full border bg-background/80 px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted"
         >
-          View all
+          View team
         </Link>
       </div>
 
-      {items.length === 0 ? (
-        <EmptyState
-          title="No recent activity"
-          description="Meaningful HR events will appear here."
-          className="flex-1 border-0 bg-transparent p-2 shadow-none"
-        />
+      {events.length === 0 ? (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center rounded-lg border border-dashed bg-background/50 px-3 py-4 text-center">
+          <Medal className="size-4 text-muted-foreground/60" />
+          <p className="mt-2 text-xs font-medium text-foreground">No celebrations soon</p>
+          <p className="mt-0.5 text-[10px] text-muted-foreground">
+            Birthdays and work anniversaries in the next 30 days appear here.
+          </p>
+        </div>
       ) : (
-        <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-0.5">
-          {items.map((item) => {
-            const Icon = MODULE_ICONS[item.module] ?? Users;
-            const row = (
-              <div className="flex items-start gap-2.5 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5 transition-colors hover:bg-muted/35">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-background shadow-sm">
-                  <Icon className="size-3.5 text-muted-foreground" />
-                </span>
+        <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain">
+          {events.map((event) => {
+            const Icon = event.kind === "birthday" ? Cake : Medal;
+            const accent =
+              event.kind === "birthday"
+                ? "text-rose-600 dark:text-rose-400"
+                : "text-amber-600 dark:text-amber-400";
+            const iconBg =
+              event.kind === "birthday" ? "bg-rose-500/10" : "bg-amber-500/10";
+            const kindLabel = event.kind === "birthday" ? "Birthday" : "Work anniversary";
 
+            const row = (
+              <div className="flex items-center gap-2.5 rounded-lg border bg-background/75 px-2.5 py-2 transition-colors hover:bg-background">
+                <span
+                  className={cn(
+                    "flex size-7 shrink-0 items-center justify-center rounded-md",
+                    iconBg,
+                    accent,
+                  )}
+                >
+                  <Icon className="size-3.5" />
+                </span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                      <p className="truncate text-sm font-medium leading-5 text-foreground">
-                        {item.user}
-                      </p>
-                      <span className="inline-flex shrink-0 items-center rounded-full border bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                        {moduleLabel(item.module)}
-                      </span>
-                    </div>
-                    <time
-                      className="shrink-0 text-[10px] leading-4 whitespace-nowrap text-muted-foreground tabular-nums"
-                      suppressHydrationWarning
-                    >
-                      {formatActivityWhen(item.occurredAt)}
-                    </time>
-                  </div>
-                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-                    <span className="font-medium text-foreground">{item.title}</span>
-                    {item.description ? <span> · {item.description}</span> : null}
+                  <p className="truncate text-xs font-medium text-foreground">{event.name}</p>
+                  <p className="truncate text-[10px] text-muted-foreground">
+                    {kindLabel}
+                    {event.subtitle ? ` · ${event.subtitle}` : ""}
                   </p>
                 </div>
+                <time
+                  className="shrink-0 text-[10px] font-medium tabular-nums text-muted-foreground"
+                  dateTime={event.date}
+                >
+                  {format(parseISO(event.date), "d MMM")}
+                </time>
               </div>
             );
 
             return (
-              <li key={item.id}>
-                {item.href ? (
-                  <Link
-                    href={item.href}
-                    className="block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-                  >
-                    {row}
-                  </Link>
-                ) : (
-                  row
-                )}
+              <li key={`${event.kind}-${event.id}`}>
+                <Link
+                  href={event.href}
+                  className="block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                >
+                  {row}
+                </Link>
               </li>
             );
           })}
         </ul>
       )}
-    </section>
+    </div>
   );
 }
 
-function HrInsightsPanel({ charts }: { charts: DashboardCharts }) {
+function HrInsightsPanel({
+  charts,
+  birthdays,
+  anniversaries,
+}: {
+  charts: DashboardCharts;
+  birthdays: DashboardPersonEvent[];
+  anniversaries: DashboardPersonEvent[];
+}) {
   return (
-    <section className="flex h-full min-h-0 flex-col gap-3 rounded-xl border bg-card p-3 shadow-sm md:p-4">
-      <div className="shrink-0">
-        <h2 className="text-xs font-semibold tracking-wide text-foreground uppercase">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border bg-card p-3 shadow-sm md:p-4">
+      <div className="mb-2 shrink-0">
+        <h2 className="text-[11px] font-semibold tracking-wide text-foreground uppercase">
           HR Insights
         </h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Attendance and hiring trends at a glance.
-        </p>
+        <p className="text-[11px] text-muted-foreground">Attendance pulse and upcoming celebrations</p>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-rows-2 gap-3">
-        <VerticalBarChart
-          title="Attendance (7 days)"
-          items={charts.attendanceTrend7Days}
-          barClassName="bg-gradient-to-t from-emerald-600 to-emerald-400"
-          empty="No attendance data yet."
-        />
-        <VerticalBarChart
-          title="Monthly hiring"
-          items={charts.monthlyHiring.slice(-6)}
-          barClassName="bg-gradient-to-t from-violet-600 to-violet-400"
-          empty="No hiring data yet."
-        />
+      <div className="grid min-h-0 flex-1 gap-2.5 lg:grid-cols-2 lg:items-stretch">
+        <AttendanceSparkline items={charts.attendanceTrend7Days} />
+        <TeamCelebrationsPanel birthdays={birthdays} anniversaries={anniversaries} />
       </div>
     </section>
   );
 }
 
 export function DashboardOperationsRow({
-  activities,
   tasks,
   charts,
+  upcomingHolidays,
+  upcomingBirthdays,
+  upcomingAnniversaries,
 }: {
-  activities: DashboardActivityItem[];
   tasks: DashboardTaskItem[];
   charts: DashboardCharts;
+  upcomingHolidays: DashboardListItem[];
+  upcomingBirthdays: DashboardPersonEvent[];
+  upcomingAnniversaries: DashboardPersonEvent[];
 }) {
   return (
-    <div className="grid h-full min-h-0 gap-3 overflow-hidden lg:grid-cols-2 lg:items-stretch">
-      <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
+    <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-3 overflow-hidden">
+      <div className="grid min-h-0 gap-3 overflow-hidden xl:grid-cols-2 xl:items-stretch">
         <PriorityTasks items={tasks} />
-        <RecentActivity items={activities} />
+        <HrUpcomingHolidaysPanel holidays={upcomingHolidays} />
       </div>
-      <div className="h-full min-h-0 overflow-hidden">
-        <HrInsightsPanel charts={charts} />
+
+      <div className="min-h-0 overflow-hidden">
+        <HrInsightsPanel
+          charts={charts}
+          birthdays={upcomingBirthdays}
+          anniversaries={upcomingAnniversaries}
+        />
       </div>
     </div>
   );

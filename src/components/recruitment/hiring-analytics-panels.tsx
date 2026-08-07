@@ -1,142 +1,175 @@
-import { CANDIDATE_STAGE_LABELS } from "@/lib/recruitment/constants";
+"use client";
+
+import { format } from "date-fns";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+import { LabeledSelect } from "@/components/payroll/payroll-select";
+import { RecruitmentPipelinePanel } from "@/components/recruitment/recruitment-pipeline-panel";
+import { RECRUITMENT_ROUTES } from "@/lib/recruitment/constants";
+import { cn } from "@/lib/utils";
 import type { AnalyticsSummary } from "@/types/recruitment";
 
-export function HiringAnalyticsPanels({ analytics }: { analytics: AnalyticsSummary }) {
-  const maxFunnel = Math.max(1, ...analytics.funnel.map((f) => f.count));
-  const maxDept = Math.max(1, ...analytics.hiringByDepartment.map((d) => d.count));
-  const maxSource = Math.max(1, ...analytics.sources.map((s) => s.count));
-  const maxMonth = Math.max(1, ...analytics.monthlyHiring.map((m) => m.count));
+const MONTH_OPTIONS = Array.from({ length: 12 }, (_, index) => {
+  const value = String(index + 1);
+  const label = format(new Date(2024, index, 1), "MMMM");
+  return { value, label };
+});
 
-  return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Hiring Analytics</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Funnel, conversion, sources, and hiring trends for leadership review.
-        </p>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Avg Time to Hire" value={`${analytics.averageTimeToHireDays} days`} />
-        <MetricCard
-          label="Interview Conversion"
-          value={`${analytics.interviewConversionRate}%`}
-        />
-        <MetricCard label="Offer Acceptance" value={`${analytics.offerAcceptanceRate}%`} />
-        <MetricCard
-          label="Total in Funnel"
-          value={String(analytics.funnel.reduce((s, f) => s + f.count, 0))}
-        />
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <ChartCard title="Hiring Funnel" subtitle="Candidates by stage">
-          {analytics.funnel.map((item) => (
-            <BarRow
-              key={item.stage}
-              label={CANDIDATE_STAGE_LABELS[item.stage]}
-              value={item.count}
-              max={maxFunnel}
-              color="bg-primary"
-            />
-          ))}
-        </ChartCard>
-
-        <ChartCard title="Hiring by Department" subtitle="Joined candidates">
-          {analytics.hiringByDepartment.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No hires yet.</p>
-          ) : (
-            analytics.hiringByDepartment.map((item) => (
-              <BarRow
-                key={item.departmentName}
-                label={item.departmentName}
-                value={item.count}
-                max={maxDept}
-                color="bg-emerald-500"
-              />
-            ))
-          )}
-        </ChartCard>
-
-        <ChartCard title="Recruitment Sources" subtitle="Where candidates come from">
-          {analytics.sources.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No source data yet.</p>
-          ) : (
-            analytics.sources.map((item) => (
-              <BarRow
-                key={item.source}
-                label={item.source}
-                value={item.count}
-                max={maxSource}
-                color="bg-violet-500"
-              />
-            ))
-          )}
-        </ChartCard>
-
-        <ChartCard title="Monthly Hiring" subtitle="Last 6 months">
-          {analytics.monthlyHiring.map((item) => (
-            <BarRow
-              key={item.month}
-              label={item.month}
-              value={item.count}
-              max={maxMonth}
-              color="bg-amber-500"
-            />
-          ))}
-        </ChartCard>
-      </div>
-    </div>
-  );
+function buildYearOptions(selectedYear: number) {
+  const currentYear = new Date().getFullYear();
+  const start = Math.min(selectedYear, currentYear) - 3;
+  const end = currentYear;
+  return Array.from({ length: end - start + 1 }, (_, index) => {
+    const year = end - index;
+    return { value: String(year), label: String(year) };
+  });
 }
 
-function MetricCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border bg-card p-4 shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-2 text-2xl font-semibold tracking-tight">{value}</p>
-    </div>
-  );
-}
-
-function ChartCard({
-  title,
-  subtitle,
-  children,
+export function HiringAnalyticsPanels({
+  analytics,
+  month,
+  year,
 }: {
-  title: string;
-  subtitle: string;
-  children: React.ReactNode;
+  analytics: AnalyticsSummary;
+  month: number;
+  year: number;
 }) {
+  const router = useRouter();
+  const periodLabel = format(new Date(year, month - 1, 1), "MMMM yyyy");
+  const yearOptions = buildYearOptions(year);
+
+  function updatePeriod(nextMonth: number, nextYear: number) {
+    const params = new URLSearchParams();
+    params.set("month", String(nextMonth));
+    params.set("year", String(nextYear));
+    router.push(`${RECRUITMENT_ROUTES.analytics}?${params.toString()}`);
+  }
+
   return (
-    <section className="rounded-xl border bg-card p-5 shadow-sm">
-      <h2 className="text-sm font-medium">{title}</h2>
-      <p className="mb-4 text-xs text-muted-foreground">{subtitle}</p>
-      <div className="space-y-3">{children}</div>
-    </section>
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold tracking-tight">Hiring Insights</h1>
+          <p className="text-xs text-muted-foreground">
+            Application funnel and hiring outcomes for {periodLabel}.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <LabeledSelect
+            items={MONTH_OPTIONS}
+            value={String(month)}
+            onValueChange={(value) => updatePeriod(Number(value), year)}
+            placeholder="Month"
+            triggerClassName="h-8 w-[8.5rem]"
+          />
+          <LabeledSelect
+            items={yearOptions}
+            value={String(year)}
+            onValueChange={(value) => updatePeriod(month, Number(value))}
+            placeholder="Year"
+            triggerClassName="h-8 w-[5.5rem]"
+          />
+        </div>
+      </div>
+
+      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:items-stretch">
+        <section className="flex min-h-[240px] flex-col rounded-xl border bg-card p-3 shadow-sm">
+          <RecruitmentPipelinePanel
+            stages={analytics.pipeline}
+            title="Application funnel"
+            subtitle={`Applicants from ${periodLabel} by current stage`}
+          />
+        </section>
+
+        <section className="flex flex-col rounded-xl border bg-card p-3 shadow-sm">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold text-foreground">Hiring outcomes</p>
+              <p className="text-[11px] text-muted-foreground">Rates and activity for {periodLabel}</p>
+            </div>
+            <Link
+              href={RECRUITMENT_ROUTES.offers}
+              className="text-[11px] font-medium text-primary hover:underline"
+            >
+              View offers
+            </Link>
+          </div>
+
+          <div className="space-y-2">
+            <OutcomeRow label="Applications" value={analytics.totalApplications} />
+            <OutcomeRow
+              label="Selected / hired"
+              value={analytics.selectedHired}
+              valueClassName="text-emerald-600"
+            />
+            <OutcomeRow
+              label="Rejected"
+              value={analytics.rejected}
+              valueClassName="text-red-600"
+            />
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 border-t pt-3">
+            <RateChip label="Hiring rate" value={`${analytics.hiringRate}%`} />
+            <RateChip label="Selection rate" value={`${analytics.selectionRate}%`} />
+            <RateChip label="Avg time to hire" value={`${analytics.averageTimeToHireDays}d`} />
+            <RateChip label="Open jobs" value={String(analytics.openJobCount)} />
+          </div>
+
+          <div className="mt-3 rounded-lg border bg-muted/20 px-3 py-2.5">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              {periodLabel}
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+              <span className="text-muted-foreground">New applications</span>
+              <span className="text-right font-semibold tabular-nums">
+                {analytics.applicationsThisMonth}
+              </span>
+              <span className="text-muted-foreground">Hired</span>
+              <span className="text-right font-semibold tabular-nums text-emerald-600">
+                {analytics.hiresThisMonth}
+              </span>
+              <span className="text-muted-foreground">Rejected</span>
+              <span className="text-right font-semibold tabular-nums text-red-600">
+                {analytics.rejectedThisMonth}
+              </span>
+              <span className="text-muted-foreground">Offers sent</span>
+              <span className="text-right font-semibold tabular-nums">{analytics.offersSent}</span>
+              <span className="text-muted-foreground">Offers accepted</span>
+              <span className="text-right font-semibold tabular-nums text-primary">
+                {analytics.offersAccepted} ({analytics.offerAcceptanceRate}%)
+              </span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
   );
 }
 
-function BarRow({
+function OutcomeRow({
   label,
   value,
-  max,
-  color,
+  valueClassName,
 }: {
   label: string;
   value: number;
-  max: number;
-  color: string;
+  valueClassName?: string;
 }) {
   return (
-    <div>
-      <div className="mb-1 flex justify-between text-xs">
-        <span>{label}</span>
-        <span className="text-muted-foreground">{value}</span>
-      </div>
-      <div className="h-2 overflow-hidden rounded-full bg-muted">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${(value / max) * 100}%` }} />
-      </div>
+    <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/15 px-3 py-2">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className={cn("text-lg font-semibold tabular-nums", valueClassName)}>{value}</span>
+    </div>
+  );
+}
+
+function RateChip({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border bg-muted/15 px-2.5 py-2">
+      <p className="text-[10px] text-muted-foreground">{label}</p>
+      <p className="text-sm font-semibold tabular-nums">{value}</p>
     </div>
   );
 }

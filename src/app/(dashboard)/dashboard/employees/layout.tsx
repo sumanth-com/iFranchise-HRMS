@@ -1,9 +1,13 @@
-import { PageScroll } from "@/components/common/sticky-layout";
+import { type ReactNode } from "react";
 
 export default function EmployeesLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
-  return <PageScroll>{children}</PageScroll>;
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      {children}
+    </div>
+  );
 }

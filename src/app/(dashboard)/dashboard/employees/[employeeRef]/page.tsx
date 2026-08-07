@@ -1,17 +1,11 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
-import { Pencil } from "lucide-react";
 
-import { EmployeeDetailView } from "@/components/employees/employee-detail-view";
-import { EmployeeAccountStatusBadge } from "@/components/employees/employee-account-status-badge";
+import { EmployeeDetailPageContent } from "@/components/employees/employee-detail-page-content";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
-import { buttonVariants } from "@/components/common/button";
 import { getEmployeeDetailBundleAction } from "@/lib/employees/actions";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
 import { buildEmployeeRouteRef, isEmployeeUuid } from "@/lib/employees/routing";
-import { hasPermission } from "@/lib/permissions/utils";
-import { cn } from "@/lib/utils";
 
 type EmployeeDetailPageProps = {
   params: Promise<{ employeeRef: string }>;
@@ -49,54 +43,32 @@ export default async function EmployeeDetailPage({
     );
   }
 
-  const canEdit = hasPermission(bundle.permissionCodes, "employee.edit");
-
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <Link
-          href={EMPLOYEE_ROUTES.list}
-          className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "px-0")}
-        >
-          ← Back to employees
-        </Link>
-        <div className="flex items-center gap-2">
-          <EmployeeAccountStatusBadge status={bundle.employee.accountStatus} />
-          {canEdit ? (
-            <Link
-              href={EMPLOYEE_ROUTES.edit(bundle.employee)}
-              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "shrink-0")}
-            >
-              <Pencil className="size-4" />
-              Edit employee
-            </Link>
-          ) : null}
-        </div>
-      </div>
-
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <Suspense
         fallback={
-          <div className="flex justify-center py-12">
+          <div className="flex flex-1 items-center justify-center py-12">
             <LoadingSpinner />
           </div>
         }
       >
-        <EmployeeDetailView
-          employee={bundle.employee}
-          profileImageUrl={bundle.profileImageUrl}
-          attendance={bundle.attendance}
-          leaveRequests={bundle.leaveRequests}
-          leaveApprovals={bundle.leaveApprovals}
-          payrollItems={bundle.payrollItems}
-          bankAccounts={bundle.bankAccounts}
-          leaveBalances={bundle.leaveBalances}
-          salaryStructure={bundle.salaryStructure}
-          attendanceSummary={bundle.attendanceSummary}
-          timeline={bundle.timeline}
-          assets={bundle.assets}
-          permissionCodes={bundle.permissionCodes}
-          roleAssignment={bundle.roleAssignment}
-          assignableRoles={bundle.assignableRoles}
+        <EmployeeDetailPageContent
+        employee={bundle.employee}
+        profileImageUrl={bundle.profileImageUrl}
+        attendance={bundle.attendance}
+        leaveRequests={bundle.leaveRequests}
+        leaveApprovals={bundle.leaveApprovals}
+        payrollItems={bundle.payrollItems}
+        bankAccounts={bundle.bankAccounts}
+        leaveBalances={bundle.leaveBalances}
+        salaryStructure={bundle.salaryStructure}
+        attendanceSummary={bundle.attendanceSummary}
+        assets={bundle.assets}
+        documentsExplorer={bundle.documentsExplorer}
+        assetsData={bundle.assetsData}
+        payrollData={bundle.payrollData}
+        permissionCodes={bundle.permissionCodes}
+        lookups={bundle.lookups}
         />
       </Suspense>
     </div>

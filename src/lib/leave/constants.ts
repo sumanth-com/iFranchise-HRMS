@@ -18,6 +18,7 @@ export const SELF_LEAVE_ROUTES = {
   list: "/dashboard/leave",
   team: "/dashboard/leave/team",
   new: "/dashboard/leave/new",
+  policy: "/dashboard/leave/policy",
 } as const;
 
 export function leaveTeamListUrl(

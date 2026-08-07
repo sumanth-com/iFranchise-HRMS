@@ -12,7 +12,13 @@ import { EmployeeAssetReplacementDialog } from "@/components/employee/assets/emp
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import type { EmployeeAsset, EmployeeAssetsData } from "@/types/employee-assets";
 
-export function EmployeeAssetsView({ data }: { data: EmployeeAssetsData }) {
+export function EmployeeAssetsView({
+  data,
+  readOnly = false,
+}: {
+  data: EmployeeAssetsData;
+  readOnly?: boolean;
+}) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
 
@@ -149,6 +155,7 @@ export function EmployeeAssetsView({ data }: { data: EmployeeAssetsData }) {
                   <EmployeeAssetCard
                     key={asset.assignmentId}
                     asset={asset}
+                    readOnly={readOnly}
                     onViewDetails={openDetails}
                     onReportIssue={openIssue}
                     onRequestReplacement={openReplace}
@@ -174,6 +181,7 @@ export function EmployeeAssetsView({ data }: { data: EmployeeAssetsData }) {
                   <EmployeeAssetCard
                     key={asset.assignmentId}
                     asset={asset}
+                    readOnly={readOnly}
                     onViewDetails={openDetails}
                     onReportIssue={openIssue}
                     onRequestReplacement={openReplace}
@@ -189,6 +197,7 @@ export function EmployeeAssetsView({ data }: { data: EmployeeAssetsData }) {
         asset={detailsAsset}
         open={detailsOpen}
         onOpenChange={setDetailsOpen}
+        readOnly={readOnly}
         onReportIssue={(asset) => {
           setDetailsOpen(false);
           openIssue(asset);
@@ -198,12 +207,16 @@ export function EmployeeAssetsView({ data }: { data: EmployeeAssetsData }) {
           openReplace(asset);
         }}
       />
-      <EmployeeAssetIssueDialog asset={issueAsset} open={issueOpen} onOpenChange={setIssueOpen} />
-      <EmployeeAssetReplacementDialog
-        asset={replaceAsset}
-        open={replaceOpen}
-        onOpenChange={setReplaceOpen}
-      />
+      {!readOnly ? (
+        <>
+          <EmployeeAssetIssueDialog asset={issueAsset} open={issueOpen} onOpenChange={setIssueOpen} />
+          <EmployeeAssetReplacementDialog
+            asset={replaceAsset}
+            open={replaceOpen}
+            onOpenChange={setReplaceOpen}
+          />
+        </>
+      ) : null}
     </div>
   );
 }

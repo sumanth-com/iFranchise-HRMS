@@ -215,6 +215,16 @@ export const employeeUpdateSchema = z
     personalEmail: z.string().email().optional().or(z.literal("")),
     personalPhone: z.string().max(30).optional().or(z.literal("")),
     bio: z.string().max(1000).optional().or(z.literal("")),
+    addressLine1: z.string().max(200).optional().or(z.literal("")),
+    addressLine2: z.string().max(200).optional().or(z.literal("")),
+    city: z.string().max(100).optional().or(z.literal("")),
+    state: z.string().max(100).optional().or(z.literal("")),
+    postalCode: z.string().max(20).optional().or(z.literal("")),
+    country: z.string().max(100).optional().or(z.literal("")),
+    emergencyContactName: z.string().max(100).optional().or(z.literal("")),
+    emergencyContactRelationship: z.string().max(100).optional().or(z.literal("")),
+    emergencyContactPhone: z.string().max(30).optional().or(z.literal("")),
+    emergencyContactEmail: z.string().email().optional().or(z.literal("")),
   })
   .superRefine((data, ctx) => {
     if (

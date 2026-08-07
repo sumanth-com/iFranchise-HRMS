@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
+import { ATTENDANCE_ROUTES, SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
 import { canEditAttendancePolicy } from "@/lib/attendance/attendance-policy-permissions";
 import { saveAttendancePolicyDocument } from "@/lib/attendance/services/attendance-policy-mutations";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
@@ -14,8 +14,10 @@ import type { AttendancePolicyActionResult } from "@/types/attendance-policy";
 function revalidateAttendancePolicyPaths() {
   revalidatePath(EMPLOYEE_ROUTES.attendancePolicy);
   revalidatePath(ATTENDANCE_ROUTES.policy);
+  revalidatePath(SELF_ATTENDANCE_ROUTES.policy);
   revalidatePath(EMPLOYEE_ROUTES.attendance);
   revalidatePath(ATTENDANCE_ROUTES.list);
+  revalidatePath(SELF_ATTENDANCE_ROUTES.list);
 }
 
 export async function saveAttendancePolicyDocumentAction(

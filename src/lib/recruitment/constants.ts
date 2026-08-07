@@ -23,10 +23,26 @@ export const RECRUITMENT_SUB_NAV = [
   { title: "Dashboard", href: RECRUITMENT_ROUTES.dashboard },
   { title: "Job Openings", href: RECRUITMENT_ROUTES.jobs },
   { title: "Candidates", href: RECRUITMENT_ROUTES.candidates },
-  { title: "Interviews", href: RECRUITMENT_ROUTES.interviews },
   { title: "Offers", href: RECRUITMENT_ROUTES.offers },
-  { title: "Analytics", href: RECRUITMENT_ROUTES.analytics },
   { title: "Settings", href: RECRUITMENT_ROUTES.settings },
+] as const;
+
+export const OFFER_QUEUE_FILTER_LABELS = {
+  all: "All offer candidates",
+  pending: "Pending send",
+  sent: "Sent",
+  accepted: "Accepted",
+} as const;
+
+export const OFFER_QUEUE_STAGE_LABELS = {
+  ceo: "Ready — CEO cleared",
+  offer: "At offer stage",
+} as const;
+
+/** Recruitment + onboarding tabs shown in the shared hiring module shell. */
+export const HIRING_SUB_NAV = [
+  ...RECRUITMENT_SUB_NAV,
+  { title: "Onboarding", href: "/dashboard/onboarding" },
 ] as const;
 
 export const JOB_STATUS_LABELS: Record<JobOpeningStatus, string> = {
@@ -61,6 +77,15 @@ export const CANDIDATE_PIPELINE: CandidateStage[] = [
   "ceo",
   "offer",
   "joined",
+];
+
+/** Screening → offer only — used on candidate profile pipeline track. */
+export const CANDIDATE_PROFILE_PIPELINE: CandidateStage[] = [
+  "screening",
+  "technical",
+  "hr",
+  "ceo",
+  "offer",
 ];
 
 export const INTERVIEW_TYPE_LABELS: Record<InterviewMeetingType, string> = {

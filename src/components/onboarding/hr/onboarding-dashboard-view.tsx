@@ -68,11 +68,11 @@ export function OnboardingDashboardView({
   );
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-4 text-center">
-        <div className="space-y-1">
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
           <h1 className="text-2xl font-semibold tracking-tight">Employee Onboarding</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground">
             Pre-joining onboarding for new hires before company account creation
           </p>
         </div>
@@ -82,7 +82,7 @@ export function OnboardingDashboardView({
         </Button>
       </div>
 
-      <div className="mx-auto grid w-full max-w-6xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid w-full gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {statCards.map((card) => (
           <button
             key={card.label}
@@ -96,7 +96,7 @@ export function OnboardingDashboardView({
         ))}
       </div>
 
-      <div className="mx-auto flex w-full max-w-6xl flex-wrap gap-3 items-center justify-center">
+      <div className="flex w-full flex-wrap items-center gap-3">
         <Input
           placeholder="Search name or email..."
           value={filters.search ?? ""}
@@ -121,7 +121,7 @@ export function OnboardingDashboardView({
           description="Create a new hire to send a pre-joining onboarding invitation."
         />
       ) : (
-        <div className="mx-auto w-full max-w-6xl rounded-xl border overflow-hidden">
+        <div className="w-full overflow-hidden rounded-xl border">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-left">
               <tr>

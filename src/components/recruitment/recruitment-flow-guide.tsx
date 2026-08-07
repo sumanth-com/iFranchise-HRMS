@@ -65,11 +65,8 @@ export function RecruitmentFlowGuide({ sources }: { sources: SourceItem[] }) {
       </div>
 
       <div className="mt-4 rounded-xl border bg-muted/20 px-4 py-3">
-        <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="mb-2">
           <p className="text-xs font-semibold">Lead sources</p>
-          <Link href={RECRUITMENT_ROUTES.analytics} className="text-[11px] font-medium text-primary">
-            View analytics
-          </Link>
         </div>
         {sources.length === 0 ? (
           <p className="text-xs text-muted-foreground">

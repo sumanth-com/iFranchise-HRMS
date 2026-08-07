@@ -6,6 +6,7 @@ import {
   paymentStatusLabel,
 } from "@/lib/payroll/services/payslip-history-queries";
 import {
+  canAccessPayslipDuringReview,
   resolvePayslipAvailability,
   resolvePayslipSchedule,
   SALARY_CREDIT_DAY,
@@ -200,16 +201,48 @@ function buildTimeline(payroll: {
 export async function getEmployeePayrollData(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
-  appOrigin?: string,
+  options?: { targetEmployeeId?: string; appOrigin?: string },
 ): Promise<EmployeePayrollData> {
-  const employeeId = profile.employee.id;
+  const employeeId = options?.targetEmployeeId ?? profile.employee.id;
   const organizationId = profile.employee.organizationId;
+  const appOrigin = options?.appOrigin;
 
-  if (appOrigin) {
+  if (appOrigin && employeeId === profile.employee.id) {
     void processDuePayslipPublications(supabase, profile, appOrigin).catch((error) => {
       console.error("[employee-payroll] publication worker failed", error);
     });
   }
+
+  const employeeMeta =
+    employeeId === profile.employee.id
+      ? {
+          employeeCode: profile.employee.employeeCode,
+          firstName: profile.employee.firstName,
+          lastName: profile.employee.lastName,
+        }
+      : await safe(async () => {
+          const { data, error } = await supabase
+            .schema("hrms")
+            .from("employees")
+            .select("employee_code, first_name, last_name")
+            .eq("id", employeeId)
+            .eq("organization_id", organizationId)
+            .is("deleted_at", null)
+            .maybeSingle();
+          if (error) throw new Error(error.message);
+          if (!data) throw new Error("Employee not found");
+          return {
+            employeeCode: data.employee_code as string,
+            firstName: data.first_name as string,
+            lastName: data.last_name as string,
+          };
+        }, {
+          employeeCode: profile.employee.employeeCode,
+          firstName: profile.employee.firstName,
+          lastName: profile.employee.lastName,
+        });
+
+  const hrPayslipAccess = canAccessPayslipDuringReview(profile.permissionCodes);
 
   const [payslipRows, structureRow, bankRow, settings, bonusResult, reimbursementResult] =
     await Promise.all([
@@ -359,8 +392,8 @@ export async function getEmployeePayrollData(
       id: row.id,
       payslipNumber: row.payslip_number,
       employeeId,
-      employeeCode: profile.employee.employeeCode,
-      employeeName: `${profile.employee.firstName} ${profile.employee.lastName}`.trim(),
+      employeeCode: employeeMeta.employeeCode,
+      employeeName: `${employeeMeta.firstName} ${employeeMeta.lastName}`.trim(),
       payrollMonth: payroll?.payroll_month ?? "",
       grossSalary: Number(item?.gross_salary ?? 0),
       netSalary: Number(item?.net_salary ?? 0),
@@ -369,7 +402,7 @@ export async function getEmployeePayrollData(
       salaryCreditDate: schedule.salaryCreditDate,
       publishedAt: schedule.publishedAt,
       availability: access.availability,
-      canEmployeeAccess: access.canEmployeeAccess,
+      canEmployeeAccess: access.canEmployeeAccess || hrPayslipAccess,
       reviewMessage: access.reviewMessage,
       payslipVersion: row.payslip_version ?? "1.0",
       paymentStatus: paymentStatusLabel(
@@ -430,12 +463,18 @@ export async function getEmployeePayrollData(
       salaryCreditDate: row.salary_credit_date ?? undefined,
       publishedAt: row.published_at ?? undefined,
     });
-    return resolvePayslipAvailability(schedule.publishedAt, profile.permissionCodes)
-      .canEmployeeAccess;
+    const access = resolvePayslipAvailability(schedule.publishedAt, profile.permissionCodes);
+    return access.canEmployeeAccess || hrPayslipAccess;
   });
 
   const latest = latestAccessible
-    ? await safe(() => getPayslipById(supabase, profile, latestAccessible.row.id), null)
+    ? await safe(
+        () =>
+          getPayslipById(supabase, profile, latestAccessible.row.id, {
+            bypassAccessCheck: hrPayslipAccess,
+          }),
+        null,
+      )
     : null;
 
   const latestTimeline = latestRow?.payroll

@@ -6,7 +6,6 @@ import {
   Building2,
   CalendarCheck,
   CalendarDays,
-  ClipboardList,
   FileText,
   LaptopMinimal,
   LayoutDashboard,
@@ -40,7 +39,7 @@ export type NavItem = {
 /**
  * HR portal sidebar.
  * Self-service (personal workspace) is listed first.
- * Administration (org-wide HR) follows — Onboarding is prioritized near the top.
+ * Administration (org-wide HR) follows — Employees sits directly after HR Overview.
  */
 export const mainNavItems: NavigationItem[] = [
   // ── Self-service (personal workspace) ────────────────────────────
@@ -115,18 +114,18 @@ export const mainNavItems: NavigationItem[] = [
     permissions: ["employee.view"],
   },
   {
-    title: "Onboarding",
-    href: "/dashboard/onboarding",
-    icon: ClipboardList,
-    section: "Administration",
-    permissions: ["onboarding.view", "onboarding.manage", "onboarding.review", "onboarding.activate"],
-  },
-  {
     title: "Employees",
     href: "/dashboard/employees",
     icon: Users,
     section: "Administration",
     permissions: ["employee.view"],
+  },
+  {
+    title: "Recruitment",
+    href: "/dashboard/recruitment",
+    icon: BriefcaseBusiness,
+    section: "Administration",
+    permissions: ["recruitment.view"],
   },
   {
     title: "Team Attendance",
@@ -162,13 +161,6 @@ export const mainNavItems: NavigationItem[] = [
     icon: LaptopMinimal,
     section: "Administration",
     permissions: ["asset.view"],
-  },
-  {
-    title: "Recruitment",
-    href: "/dashboard/recruitment",
-    icon: BriefcaseBusiness,
-    section: "Administration",
-    permissions: ["recruitment.view"],
   },
   {
     title: "Performance",

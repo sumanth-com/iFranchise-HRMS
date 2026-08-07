@@ -69,15 +69,13 @@ export function HrAttendanceHubView({
               : "Mark attendance, view your calendar, and track your working hours."}
           </p>
         </div>
-        {!isTeamView ? (
-          <Link
-            href={ATTENDANCE_ROUTES.policy}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
-          >
-            <FileText className="size-4" />
-            Attendance Policy
-          </Link>
-        ) : null}
+        <Link
+          href={isTeamView ? ATTENDANCE_ROUTES.policy : SELF_ATTENDANCE_ROUTES.policy}
+          className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
+        >
+          <FileText className="size-4" />
+          Attendance Policy
+        </Link>
       </div>
 
       {isTeamView ? (

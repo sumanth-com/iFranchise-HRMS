@@ -1,3 +1,5 @@
+import { ChevronRight } from "lucide-react";
+
 import { CANDIDATE_STAGE_LABELS } from "@/lib/recruitment/constants";
 import { cn } from "@/lib/utils";
 import type { CandidateStage } from "@/types/recruitment";
@@ -11,24 +13,60 @@ const PIPELINE_STAGES: CandidateStage[] = [
   "offer",
 ];
 
-const STAGE_STYLES: Record<CandidateStage, string> = {
-  applied: "from-sky-500 to-blue-500",
-  screening: "from-blue-500 to-indigo-500",
-  technical: "from-indigo-500 to-violet-500",
-  hr: "from-violet-500 to-purple-500",
-  ceo: "from-purple-500 to-fuchsia-500",
-  offer: "from-fuchsia-500 to-pink-500",
-  joined: "from-emerald-500 to-teal-500",
-  rejected: "from-rose-500 to-red-500",
+const STAGE_ACCENTS: Record<CandidateStage, { bar: string; chip: string; ring: string }> = {
+  applied: {
+    bar: "bg-sky-500",
+    chip: "bg-sky-50 text-sky-700 border-sky-200",
+    ring: "ring-sky-200",
+  },
+  screening: {
+    bar: "bg-blue-500",
+    chip: "bg-blue-50 text-blue-700 border-blue-200",
+    ring: "ring-blue-200",
+  },
+  technical: {
+    bar: "bg-indigo-500",
+    chip: "bg-indigo-50 text-indigo-700 border-indigo-200",
+    ring: "ring-indigo-200",
+  },
+  hr: {
+    bar: "bg-violet-500",
+    chip: "bg-violet-50 text-violet-700 border-violet-200",
+    ring: "ring-violet-200",
+  },
+  ceo: {
+    bar: "bg-purple-500",
+    chip: "bg-purple-50 text-purple-700 border-purple-200",
+    ring: "ring-purple-200",
+  },
+  offer: {
+    bar: "bg-fuchsia-500",
+    chip: "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200",
+    ring: "ring-fuchsia-200",
+  },
+  joined: {
+    bar: "bg-emerald-500",
+    chip: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    ring: "ring-emerald-200",
+  },
+  rejected: {
+    bar: "bg-rose-500",
+    chip: "bg-rose-50 text-rose-700 border-rose-200",
+    ring: "ring-rose-200",
+  },
 };
 
 type StageItem = { stage: CandidateStage; count: number };
 
 type CandidatesByStagePipelineProps = {
   stages: StageItem[];
+  variant?: "horizontal" | "bars";
 };
 
-export function CandidatesByStagePipeline({ stages }: CandidatesByStagePipelineProps) {
+export function CandidatesByStagePipeline({
+  stages,
+  variant = "horizontal",
+}: CandidatesByStagePipelineProps) {
   const pipeline = PIPELINE_STAGES.map((stage) => {
     const item = stages.find((entry) => entry.stage === stage);
     return { stage, count: item?.count ?? 0 };
@@ -36,44 +74,86 @@ export function CandidatesByStagePipeline({ stages }: CandidatesByStagePipelineP
   const total = pipeline.reduce((sum, item) => sum + item.count, 0);
   const max = Math.max(1, ...pipeline.map((item) => item.count));
 
+  if (variant === "bars") {
+    return (
+      <div className="space-y-2">
+        {pipeline.map((item) => {
+          const accent = STAGE_ACCENTS[item.stage];
+          const width = item.count > 0 ? Math.max((item.count / max) * 100, 12) : 0;
+          return (
+            <div key={item.stage} className="flex items-center gap-2">
+              <span className="w-[4.5rem] shrink-0 text-[10px] font-medium text-muted-foreground">
+                {CANDIDATE_STAGE_LABELS[item.stage]}
+              </span>
+              <div className="h-6 flex-1 rounded-md bg-muted/60">
+                {width > 0 ? (
+                  <div
+                    className={cn("flex h-full items-center rounded-md px-2", accent.bar)}
+                    style={{ width: `${width}%` }}
+                  >
+                    <span className="text-[10px] font-semibold tabular-nums text-white">
+                      {item.count}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+              <span className="w-5 shrink-0 text-right text-xs font-semibold tabular-nums">
+                {item.count}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
-    <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary/5 via-muted/20 to-violet-500/5 px-3 py-4">
-      <div className="mb-4 flex items-end justify-between gap-2">
-        <div>
-          <p className="text-2xl font-semibold tabular-nums">{total}</p>
-          <p className="text-[11px] text-muted-foreground">In active pipeline</p>
-        </div>
-        <p className="rounded-full bg-background/80 px-3 py-1 text-[11px] text-muted-foreground shadow-sm">
-          Applied → Offer
-        </p>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="mb-2 flex items-baseline justify-between gap-2">
+        <p className="text-lg font-semibold tabular-nums">{total}</p>
+        <p className="text-[10px] text-muted-foreground">in pipeline</p>
       </div>
 
-      <div className="flex flex-col items-center gap-1.5">
+      <div className="flex min-h-0 flex-1 items-stretch gap-0.5 overflow-x-auto pb-1">
         {pipeline.map((item, index) => {
-          const width = 100 - index * 8;
-          const intensity = item.count > 0 ? Math.max(28, (item.count / max) * 100) : 0;
+          const accent = STAGE_ACCENTS[item.stage];
+          const isLast = index === pipeline.length - 1;
 
           return (
-            <div
-              key={item.stage}
-              className="relative transition-all"
-              style={{ width: `${width}%` }}
-            >
+            <div key={item.stage} className="flex min-w-0 flex-1 items-center">
               <div
                 className={cn(
-                  "relative overflow-hidden rounded-xl border border-white/10 bg-gradient-to-r px-3 py-2.5 text-white shadow-sm",
-                  STAGE_STYLES[item.stage],
+                  "flex min-w-0 flex-1 flex-col items-center rounded-lg border bg-card px-1 py-2 text-center shadow-sm",
+                  item.count > 0 && `ring-1 ${accent.ring}`,
                 )}
               >
-                <div
-                  className="absolute inset-y-0 left-0 bg-white/15 transition-all"
-                  style={{ width: `${intensity}%` }}
-                />
-                <div className="relative flex items-center justify-between gap-2 text-xs">
-                  <span className="font-medium">{CANDIDATE_STAGE_LABELS[item.stage]}</span>
-                  <span className="text-sm font-semibold tabular-nums">{item.count}</span>
+                <span
+                  className={cn(
+                    "mb-1.5 inline-flex min-w-[1.75rem] items-center justify-center rounded-full border px-1.5 py-0.5 text-xs font-semibold tabular-nums",
+                    accent.chip,
+                  )}
+                >
+                  {item.count}
+                </span>
+                <span className="truncate text-[9px] font-medium leading-tight text-foreground">
+                  {CANDIDATE_STAGE_LABELS[item.stage]}
+                </span>
+                <div className="mt-1.5 h-1 w-full max-w-[2.5rem] rounded-full bg-muted/70">
+                  <div
+                    className={cn("h-full rounded-full transition-all", accent.bar)}
+                    style={{
+                      width:
+                        item.count > 0 ? `${Math.max((item.count / max) * 100, 20)}%` : "0%",
+                    }}
+                  />
                 </div>
               </div>
+              {!isLast ? (
+                <ChevronRight
+                  className="mx-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground/50"
+                  aria-hidden
+                />
+              ) : null}
             </div>
           );
         })}

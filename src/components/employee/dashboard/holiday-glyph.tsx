@@ -93,7 +93,10 @@ export function HolidayGlyph({
   }
 
   return (
-    <span className={cn("text-lg leading-none", className)} aria-hidden>
+    <span
+      className={cn("flex size-full items-center justify-center text-lg leading-none", className)}
+      aria-hidden
+    >
       {holidayEmoji(name)}
     </span>
   );

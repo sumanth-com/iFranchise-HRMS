@@ -8,10 +8,14 @@ import type {
   CandidateStage,
   InterviewListItem,
   InterviewListResult,
+  InterviewTrackItem,
+  InterviewTrackRound,
   JobOpeningItem,
   JobOpeningListResult,
   OfferListItem,
   OfferListResult,
+  OfferStatus,
+  OpenJobSnapshot,
   RecruitmentLookups,
   RecruitmentSettings,
   RecruitmentSummary,
@@ -35,7 +39,7 @@ export async function getRecruitmentLookups(
   supabase: AuthSupabaseClient,
   organizationId: string,
 ): Promise<RecruitmentLookups> {
-  const [departments, designations, employmentTypes, branches, employees, jobs, settings] =
+  const [departments, designations, employmentTypes, branches, employees, jobs, settings, docTemplates] =
     await Promise.all([
       supabase
         .schema("hrms")
@@ -83,6 +87,12 @@ export async function getRecruitmentLookups(
         .is("deleted_at", null)
         .order("created_at", { ascending: false }),
       getRecruitmentSettings(supabase, organizationId),
+      fromHrms(supabase, "document_templates")
+        .select("id, name, subject, body_html")
+        .eq("organization_id", organizationId)
+        .eq("letter_type", "offer_letter")
+        .is("deleted_at", null)
+        .order("name"),
     ]);
 
   return {
@@ -103,6 +113,14 @@ export async function getRecruitmentLookups(
     noticePeriodOptions: settings.noticePeriodOptions,
     defaultHiringManagerId: settings.defaultHiringManagerId,
     defaultInterviewDurationMinutes: settings.defaultInterviewDurationMinutes,
+    offerTemplates: settings.offerTemplates,
+    emailTemplates: settings.emailTemplates,
+    offerLetterDocumentTemplates: ((docTemplates.data ?? []) as PerfRow[]).map((row) => ({
+      id: row.id,
+      name: row.name,
+      subject: row.subject ?? "Offer Letter",
+      bodyHtml: row.body_html ?? "",
+    })),
   };
 }
 
@@ -120,16 +138,16 @@ export async function getRecruitmentSummary(
 
   const [jobs, candidates, interviews, offers, timeline] = await Promise.all([
     fromHrms(supabase, "recruitment_job_openings")
-      .select("id, job_status, open_positions")
+      .select("id, job_status, open_positions, title")
       .eq("organization_id", organizationId)
       .is("deleted_at", null),
     fromHrms(supabase, "recruitment_candidates")
-      .select("id, stage, joined_at, created_at, source")
+      .select("id, stage, joined_at, created_at, source, job_opening_id")
       .eq("organization_id", organizationId)
       .is("deleted_at", null),
     fromHrms(supabase, "recruitment_interviews")
       .select(
-        `id, interview_date, interview_time, interview_status, round_name, meeting_link, interview_type,
+        `id, candidate_id, job_opening_id, interviewer_employee_id, interview_date, interview_time, interview_status, round_name, meeting_link, interview_type,
         candidate:candidate_id(first_name, last_name),
         job:job_opening_id(title),
         interviewer:interviewer_employee_id(first_name, last_name)`,
@@ -230,6 +248,81 @@ export async function getRecruitmentSummary(
     mapInterviewRow,
   );
 
+  const candidateIds = [
+    ...new Set(
+      upcomingInterviews
+        .map((i) => i.candidateId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  let interviewTracks: InterviewTrackItem[] = [];
+
+  if (candidateIds.length > 0) {
+    const trackInterviewsRes = await fromHrms(supabase, "recruitment_interviews")
+      .select(
+        `id, candidate_id, job_opening_id, interviewer_employee_id, interview_date, interview_time, interview_status, round_name, meeting_link, interview_type,
+        candidate:candidate_id(first_name, last_name),
+        job:job_opening_id(title),
+        interviewer:interviewer_employee_id(first_name, last_name)`,
+      )
+      .eq("organization_id", organizationId)
+      .in("candidate_id", candidateIds)
+      .is("deleted_at", null)
+      .neq("interview_status", "cancelled")
+      .order("interview_date", { ascending: true });
+
+    const byCandidate = new Map<string, InterviewListItem[]>();
+    for (const row of (trackInterviewsRes.data ?? []) as PerfRow[]) {
+      const item = mapInterviewRow(row);
+      const list = byCandidate.get(item.candidateId) ?? [];
+      list.push(item);
+      byCandidate.set(item.candidateId, list);
+    }
+
+    interviewTracks = candidateIds.map((candidateId) => {
+      const items = byCandidate.get(candidateId) ?? [];
+      const roundMap = new Map<string, InterviewTrackRound>();
+      for (const item of items) {
+        roundMap.set(item.roundName, {
+          roundName: item.roundName,
+          interviewStatus: item.interviewStatus,
+          interviewDate: item.interviewDate,
+          interviewTime: item.interviewTime,
+        });
+      }
+      const rounds = Array.from(roundMap.values());
+      const nextScheduled = items.find((i) => i.interviewStatus === "scheduled");
+      const anchor = nextScheduled ?? items[items.length - 1];
+
+      return {
+        candidateId,
+        candidateName: anchor?.candidateName ?? "—",
+        jobTitle: anchor?.jobTitle ?? "—",
+        interviewerName: anchor?.interviewerName ?? "—",
+        interviewType: anchor?.interviewType ?? "offline",
+        nextDate: anchor?.interviewDate ?? today,
+        nextTime: anchor?.interviewTime ?? "",
+        rounds,
+      };
+    });
+  }
+
+  const activeCandidateCountByJob = new Map<string, number>();
+  for (const row of candidateRows) {
+    if (!row.job_opening_id || ["joined", "rejected"].includes(row.stage)) continue;
+    const jobId = String(row.job_opening_id);
+    activeCandidateCountByJob.set(jobId, (activeCandidateCountByJob.get(jobId) ?? 0) + 1);
+  }
+
+  const openJobSnapshots: OpenJobSnapshot[] = openJobs
+    .slice(0, 5)
+    .map((job) => ({
+      id: job.id,
+      title: String(job.title ?? "Untitled role"),
+      openPositions: Number(job.open_positions ?? 0),
+      candidateCount: activeCandidateCountByJob.get(job.id) ?? 0,
+    }));
+
   const recentActivity: TimelineItem[] = ((timeline.data ?? []) as PerfRow[]).map((row) => {
     const candidate = unwrapRelation(row.candidate);
     return {
@@ -258,80 +351,151 @@ export async function getRecruitmentSummary(
     hiringByDepartment: Array.from(deptMap.values()),
     upcomingInterviews,
     recentActivity,
+    openJobSnapshots,
+    interviewTracks,
   };
 }
 
 export async function getHiringAnalytics(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
+  options?: { month?: number; year?: number },
 ): Promise<AnalyticsSummary> {
-  const summary = await getRecruitmentSummary(supabase, profile);
   const organizationId = profile.employee.organizationId;
+  const now = new Date();
+  const month = options?.month ?? now.getMonth() + 1;
+  const year = options?.year ?? now.getFullYear();
+  const monthKey = `${year}-${String(month).padStart(2, "0")}`;
 
-  const [candidates, interviews, offers] = await Promise.all([
+  const [candidates, offers, openJobsRes] = await Promise.all([
     fromHrms(supabase, "recruitment_candidates")
-      .select("id, stage, source, joined_at, created_at")
-      .eq("organization_id", organizationId)
-      .is("deleted_at", null),
-    fromHrms(supabase, "recruitment_interviews")
-      .select("id, interview_status, recommendation")
+      .select("id, stage, joined_at, created_at, rejected_at")
       .eq("organization_id", organizationId)
       .is("deleted_at", null),
     fromHrms(supabase, "recruitment_offers")
-      .select("id, offer_status")
+      .select("id, offer_status, sent_at, responded_at, created_at")
       .eq("organization_id", organizationId)
+      .is("deleted_at", null),
+    fromHrms(supabase, "recruitment_job_openings")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("job_status", "open")
       .is("deleted_at", null),
   ]);
 
   const candidateRows = (candidates.data ?? []) as PerfRow[];
-  const interviewRows = (interviews.data ?? []) as PerfRow[];
   const offerRows = (offers.data ?? []) as PerfRow[];
 
-  const completedInterviews = interviewRows.filter((i) => i.interview_status === "completed");
-  const positive = completedInterviews.filter((i) =>
-    ["next_round", "offer"].includes(i.recommendation),
+  const cohort = candidateRows.filter((c) => String(c.created_at).slice(0, 7) === monthKey);
+  const totalApplications = cohort.length;
+  const selectedHired = candidateRows.filter(
+    (c) => c.stage === "joined" && c.joined_at && String(c.joined_at).slice(0, 7) === monthKey,
   ).length;
-  const interviewConversionRate =
-    completedInterviews.length > 0
-      ? Math.round((positive / completedInterviews.length) * 100)
+  const rejected = candidateRows.filter((c) => {
+    if (c.stage !== "rejected") return false;
+    const date = c.rejected_at ?? c.created_at;
+    return String(date).slice(0, 7) === monthKey;
+  }).length;
+  const activeInPipeline = cohort.filter((c) => !["joined", "rejected"].includes(c.stage)).length;
+  const atOfferStage = cohort.filter((c) => c.stage === "offer" || c.stage === "ceo").length;
+
+  const hiringRate =
+    totalApplications > 0 ? Math.round((selectedHired / totalApplications) * 100) : 0;
+  const decided = selectedHired + rejected;
+  const selectionRate = decided > 0 ? Math.round((selectedHired / decided) * 100) : 0;
+
+  const offersSent = offerRows.filter((o) => {
+    const sentAt = o.sent_at ?? o.created_at;
+    return (
+      sentAt &&
+      String(sentAt).slice(0, 7) === monthKey &&
+      ["sent", "accepted", "rejected", "expired"].includes(o.offer_status)
+    );
+  }).length;
+  const offersAccepted = offerRows.filter(
+    (o) =>
+      o.offer_status === "accepted" &&
+      o.responded_at &&
+      String(o.responded_at).slice(0, 7) === monthKey,
+  ).length;
+  const decidedOffers = offerRows.filter((o) => {
+    const respondedAt = o.responded_at ?? o.sent_at ?? o.created_at;
+    return (
+      respondedAt &&
+      String(respondedAt).slice(0, 7) === monthKey &&
+      ["accepted", "rejected", "expired"].includes(o.offer_status)
+    );
+  });
+  const offerAcceptanceRate =
+    decidedOffers.length > 0 ? Math.round((offersAccepted / decidedOffers.length) * 100) : 0;
+
+  const applicationsThisMonth = totalApplications;
+  const hiresThisMonth = selectedHired;
+  const rejectedThisMonth = rejected;
+
+  const joinedInPeriod = candidateRows.filter(
+    (c) => c.stage === "joined" && c.joined_at && c.created_at && String(c.joined_at).slice(0, 7) === monthKey,
+  );
+  const averageTimeToHireDays =
+    joinedInPeriod.length > 0
+      ? Math.round(
+          joinedInPeriod.reduce((sum, c) => {
+            const start = new Date(c.created_at).getTime();
+            const end = new Date(c.joined_at).getTime();
+            return sum + Math.max(0, (end - start) / (1000 * 60 * 60 * 24));
+          }, 0) / joinedInPeriod.length,
+        )
       : 0;
 
-  const decidedOffers = offerRows.filter((o) =>
-    ["accepted", "rejected", "expired"].includes(o.offer_status),
-  );
-  const accepted = offerRows.filter((o) => o.offer_status === "accepted").length;
-  const offerAcceptanceRate =
-    decidedOffers.length > 0 ? Math.round((accepted / decidedOffers.length) * 100) : 0;
-
-  const sourceMap = new Map<string, number>();
-  for (const c of candidateRows) {
-    const source = c.source || "Other";
-    sourceMap.set(source, (sourceMap.get(source) ?? 0) + 1);
-  }
-
-  const now = new Date();
-  const monthlyHiring = Array.from({ length: 6 }, (_, i) => {
+  const monthlyOutcomes = Array.from({ length: 6 }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     const label = d.toLocaleString("en-US", { month: "short", year: "2-digit" });
-    const count = candidateRows.filter((c) => {
-      if (c.stage !== "joined" || !c.joined_at) return false;
-      return String(c.joined_at).slice(0, 7) === key;
+    const applications = candidateRows.filter((c) => String(c.created_at).slice(0, 7) === key).length;
+    const hired = candidateRows.filter(
+      (c) => c.stage === "joined" && c.joined_at && String(c.joined_at).slice(0, 7) === key,
+    ).length;
+    const rejectedInMonth = candidateRows.filter((c) => {
+      if (c.stage !== "rejected") return false;
+      const date = c.rejected_at ?? c.created_at;
+      return String(date).slice(0, 7) === key;
     }).length;
-    return { month: label, count };
+    return { month: label, applications, hired, rejected: rejectedInMonth };
   });
 
+  const stageOrder: CandidateStage[] = [
+    "applied",
+    "screening",
+    "technical",
+    "hr",
+    "ceo",
+    "offer",
+    "joined",
+    "rejected",
+  ];
+  const pipeline = stageOrder.map((stage) => ({
+    stage,
+    count: cohort.filter((c) => c.stage === stage).length,
+  }));
+
   return {
-    funnel: summary.candidatesByStage,
-    hiringByDepartment: summary.hiringByDepartment.map((d) => ({
-      departmentName: d.departmentName,
-      count: d.count,
-    })),
-    averageTimeToHireDays: summary.averageHiringTimeDays,
-    interviewConversionRate,
+    totalApplications,
+    selectedHired,
+    rejected,
+    activeInPipeline,
+    atOfferStage,
+    hiringRate,
+    selectionRate,
+    averageTimeToHireDays,
+    offersSent,
+    offersAccepted,
     offerAcceptanceRate,
-    sources: Array.from(sourceMap.entries()).map(([source, count]) => ({ source, count })),
-    monthlyHiring,
+    openJobCount: openJobsRes.count ?? 0,
+    hiresThisMonth,
+    applicationsThisMonth,
+    rejectedThisMonth,
+    monthlyOutcomes,
+    pipeline,
   };
 }
 
@@ -477,6 +641,95 @@ function mapCandidateRow(row: PerfRow): CandidateListItem {
     notes: row.notes,
     employeeId: row.employee_id,
     createdAt: row.created_at,
+    latestOfferStatus: row.latestOfferStatus ?? undefined,
+  };
+}
+
+function matchesOfferQueue(
+  latestOfferStatus: OfferStatus | null | undefined,
+  offerQueue: string | undefined,
+): boolean {
+  if (!offerQueue || offerQueue === "all") return true;
+  if (offerQueue === "pending") {
+    return !latestOfferStatus || latestOfferStatus === "draft";
+  }
+  if (offerQueue === "sent") return latestOfferStatus === "sent";
+  if (offerQueue === "accepted") return latestOfferStatus === "accepted";
+  return true;
+}
+
+export async function listOfferQueueCandidates(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  params: unknown,
+): Promise<CandidateListResult> {
+  const parsed = candidateListParamsSchema.parse(params);
+  const { page, pageSize, search, departmentId, jobOpeningId, offerQueue } = parsed;
+  const organizationId = profile.employee.organizationId;
+  await archiveRejectedCandidates(supabase, organizationId).catch(() => 0);
+
+  let query = fromHrms(supabase, "recruitment_candidates")
+    .select(
+      `id, first_name, last_name, email, phone, experience_years, skills, current_company,
+      current_ctc, expected_ctc, notice_period_days, source, stage, job_opening_id, resume_path,
+      photo_path, notes, employee_id, created_at,
+      job:job_opening_id!inner(title, department_id, departments:department_id(name))`,
+    )
+    .eq("organization_id", organizationId)
+    .in("stage", ["ceo", "offer"])
+    .is("deleted_at", null)
+    .is("archived_at", null)
+    .order("created_at", { ascending: false });
+
+  if (jobOpeningId) query = query.eq("job_opening_id", jobOpeningId);
+  if (departmentId) query = query.eq("job.department_id", departmentId);
+  if (search) {
+    query = query.or(
+      `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`,
+    );
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  const candidateRows = (data ?? []) as PerfRow[];
+  const candidateIds = candidateRows.map((row) => row.id);
+
+  const offerStatusByCandidate = new Map<string, OfferStatus>();
+  if (candidateIds.length > 0) {
+    const { data: offers, error: offersError } = await fromHrms(supabase, "recruitment_offers")
+      .select("candidate_id, offer_status, created_at")
+      .in("candidate_id", candidateIds)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
+
+    if (offersError) throw new Error(offersError.message);
+
+    for (const offer of offers ?? []) {
+      const candidateId = String(offer.candidate_id);
+      if (!offerStatusByCandidate.has(candidateId)) {
+        offerStatusByCandidate.set(candidateId, offer.offer_status as OfferStatus);
+      }
+    }
+  }
+
+  const enriched = candidateRows
+    .map((row) => {
+      const mapped = mapCandidateRow(row);
+      const latestOfferStatus = offerStatusByCandidate.get(row.id) ?? null;
+      return { ...mapped, latestOfferStatus };
+    })
+    .filter((row) => matchesOfferQueue(row.latestOfferStatus, offerQueue));
+
+  const total = enriched.length;
+  const from = (page - 1) * pageSize;
+  const pageData = enriched.slice(from, from + pageSize);
+
+  return {
+    data: pageData,
+    total,
+    page,
+    pageSize,
   };
 }
 
@@ -549,7 +802,7 @@ export async function getCandidateById(
 
   const [timelineRes, interviewsRes, offersRes] = await Promise.all([
     fromHrms(supabase, "recruitment_candidate_timeline")
-      .select("id, event_type, title, description, created_at")
+      .select("id, event_type, title, description, from_stage, to_stage, created_at")
       .eq("candidate_id", id)
       .order("created_at", { ascending: false }),
     fromHrms(supabase, "recruitment_interviews")
@@ -568,7 +821,7 @@ export async function getCandidateById(
       .select(
         `id, candidate_id, job_opening_id, department_id, designation_id, branch_id,
         employment_type_id, reporting_manager_id, salary, joining_date, offer_letter_path,
-        offer_status, expires_at, employee_id, notes, created_at,
+        email_subject, offer_letter_body, offer_status, expires_at, employee_id, notes, created_at,
         candidate:candidate_id(first_name, last_name, email),
         job:job_opening_id(title),
         departments:department_id(name),
@@ -590,6 +843,8 @@ export async function getCandidateById(
       eventType: row.event_type,
       title: row.title,
       description: row.description,
+      fromStage: row.from_stage ?? null,
+      toStage: row.to_stage ?? null,
       createdAt: row.created_at,
     })),
     interviews: ((interviewsRes.data ?? []) as PerfRow[]).map(mapInterviewRow),
@@ -603,7 +858,7 @@ function mapInterviewRow(row: PerfRow): InterviewListItem {
   const interviewer = unwrapRelation(row.interviewer);
   return {
     id: row.id,
-    candidateId: row.candidate_id,
+    candidateId: String(row.candidate_id ?? ""),
     candidateName: candidate
       ? formatEmployeeName(candidate.first_name, candidate.last_name)
       : "—",
@@ -718,6 +973,8 @@ function mapOfferRow(row: PerfRow): OfferListItem {
     expiresAt: row.expires_at,
     employeeId: row.employee_id,
     notes: row.notes,
+    emailSubject: row.email_subject ?? null,
+    emailMessage: row.offer_letter_body ?? null,
     createdAt: row.created_at,
   };
 }
@@ -736,8 +993,8 @@ export async function listOffers(
   let query = fromHrms(supabase, "recruitment_offers")
     .select(
       `id, candidate_id, job_opening_id, department_id, designation_id, branch_id,
-      employment_type_id, reporting_manager_id, salary, joining_date, offer_letter_path,
-      offer_status, expires_at, employee_id, notes, created_at,
+        employment_type_id, reporting_manager_id, salary, joining_date, offer_letter_path,
+        email_subject, offer_letter_body, offer_status, expires_at, employee_id, notes, created_at,
       candidate:candidate_id!inner(first_name, last_name, email),
       job:job_opening_id(title),
       departments:department_id(name),

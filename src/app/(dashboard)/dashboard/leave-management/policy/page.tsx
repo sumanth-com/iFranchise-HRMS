@@ -1,7 +1,7 @@
 import { LeavePolicyEditor } from "@/components/leave/leave-policy-editor";
 import { LeavePolicyView } from "@/components/leave/leave-policy-view";
 import { getEmployeeById } from "@/lib/employees/services/employee-detail";
-import { LEAVE_ROUTES } from "@/lib/leave/constants";
+import { SELF_LEAVE_ROUTES } from "@/lib/leave/constants";
 import { canEditLeavePolicy } from "@/lib/leave/leave-policy-permissions";
 import { getLeavePolicyPageData } from "@/lib/leave/services/leave-policy-queries";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
@@ -35,7 +35,8 @@ export default async function HrLeavePolicyPage() {
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-6">
       {canEdit ? (
         <LeavePolicyEditor
-          backHref={LEAVE_ROUTES.list}
+          backHref={SELF_LEAVE_ROUTES.team}
+          backLabel="Back to Team Leave"
           employeeName={employeeName}
           initialDocument={policy.document}
           mandatoryHolidays={policy.mandatoryHolidays}
@@ -44,8 +45,8 @@ export default async function HrLeavePolicyPage() {
         />
       ) : (
         <LeavePolicyView
-          backHref={LEAVE_ROUTES.list}
-          backLabel="Back to Leave"
+          backHref={SELF_LEAVE_ROUTES.team}
+          backLabel="Back to Team Leave"
           employeeName={employeeName}
           document={policy.document}
           mandatoryHolidays={policy.mandatoryHolidays}

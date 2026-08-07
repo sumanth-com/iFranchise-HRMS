@@ -19,7 +19,6 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
-import { PageScroll } from "@/components/common/sticky-layout";
 import { OnboardingDocumentsPanel } from "@/components/onboarding/hr/onboarding-documents-panel";
 import { Input } from "@/components/common/input";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
@@ -218,8 +217,7 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
 
   return (
     <>
-      <PageScroll>
-        <div className="mx-auto w-full max-w-6xl space-y-6">
+      <div className="space-y-6">
           <div className="space-y-4">
             <Button
               variant="ghost"
@@ -594,8 +592,7 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
               </div>
             )}
           </section>
-        </div>
-      </PageScroll>
+      </div>
 
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
         <DialogContent className="sm:max-w-md">

@@ -47,20 +47,23 @@ export const EMPLOYEE_ACCOUNT_STATUS_LABELS: Record<string, string> = {
 
 export const EMPLOYEE_TABS = [
   "overview",
-  "account",
-  "profile",
-  "employment",
-  "address",
-  "emergency",
   "documents",
   "assets",
   "attendance",
   "leave",
   "payroll",
-  "timeline",
 ] as const;
 
 export type EmployeeTab = (typeof EMPLOYEE_TABS)[number];
+
+export const EMPLOYEE_TAB_LABELS: Record<EmployeeTab, string> = {
+  overview: "Profile",
+  documents: "Documents",
+  assets: "Assets",
+  attendance: "Attendance",
+  leave: "Leave",
+  payroll: "Payroll",
+};
 
 export const WIZARD_STEPS = [
   { id: 1, key: "basic", label: "Basic Details" },

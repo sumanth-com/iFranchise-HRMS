@@ -27,16 +27,60 @@ export type RecruitmentSummary = {
   hiringByDepartment: { departmentId: string; departmentName: string; count: number }[];
   upcomingInterviews: InterviewListItem[];
   recentActivity: TimelineItem[];
+  openJobSnapshots: OpenJobSnapshot[];
+  interviewTracks: InterviewTrackItem[];
+};
+
+export type OpenJobSnapshot = {
+  id: string;
+  title: string;
+  openPositions: number;
+  candidateCount: number;
+};
+
+export type InterviewTrackRound = {
+  roundName: string;
+  interviewStatus: InterviewStatus;
+  interviewDate: string;
+  interviewTime: string;
+};
+
+export type InterviewTrackItem = {
+  candidateId: string;
+  candidateName: string;
+  jobTitle: string;
+  interviewerName: string;
+  interviewType: InterviewMeetingType;
+  nextDate: string;
+  nextTime: string;
+  rounds: InterviewTrackRound[];
+};
+
+export type MonthlyHiringOutcome = {
+  month: string;
+  applications: number;
+  hired: number;
+  rejected: number;
 };
 
 export type AnalyticsSummary = {
-  funnel: { stage: CandidateStage; count: number }[];
-  hiringByDepartment: { departmentName: string; count: number }[];
+  totalApplications: number;
+  selectedHired: number;
+  rejected: number;
+  activeInPipeline: number;
+  atOfferStage: number;
+  hiringRate: number;
+  selectionRate: number;
   averageTimeToHireDays: number;
-  interviewConversionRate: number;
+  offersSent: number;
+  offersAccepted: number;
   offerAcceptanceRate: number;
-  sources: { source: string; count: number }[];
-  monthlyHiring: { month: string; count: number }[];
+  openJobCount: number;
+  hiresThisMonth: number;
+  applicationsThisMonth: number;
+  rejectedThisMonth: number;
+  monthlyOutcomes: MonthlyHiringOutcome[];
+  pipeline: { stage: CandidateStage; count: number }[];
 };
 
 export type JobOpeningItem = {
@@ -94,6 +138,7 @@ export type CandidateListItem = {
   notes: string | null;
   employeeId: string | null;
   createdAt: string;
+  latestOfferStatus?: OfferStatus | null;
 };
 
 export type CandidateListResult = {
@@ -110,6 +155,8 @@ export type TimelineItem = {
   eventType: string;
   title: string;
   description: string | null;
+  fromStage?: string | null;
+  toStage?: string | null;
   createdAt: string;
 };
 
@@ -170,6 +217,8 @@ export type OfferListItem = {
   expiresAt: string | null;
   employeeId: string | null;
   notes: string | null;
+  emailSubject: string | null;
+  emailMessage: string | null;
   createdAt: string;
 };
 
@@ -184,6 +233,26 @@ export type CandidateSourceItem = {
   id: string;
   label: string;
   enabled: boolean;
+};
+
+export type RecruitmentOfferTemplate = {
+  id: string;
+  name: string;
+  body: string;
+};
+
+export type RecruitmentEmailTemplate = {
+  id: string;
+  name: string;
+  subject: string;
+  body: string;
+};
+
+export type OfferLetterDocumentTemplate = {
+  id: string;
+  name: string;
+  subject: string;
+  bodyHtml: string;
 };
 
 export type RecruitmentEmailNotifications = {
@@ -210,6 +279,8 @@ export type RecruitmentSettings = {
   autoArchiveRejectedDays: 30 | 60 | 90 | 180;
   emailNotifications: RecruitmentEmailNotifications;
   numberFormats: RecruitmentNumberFormats;
+  offerTemplates: RecruitmentOfferTemplate[];
+  emailTemplates: RecruitmentEmailTemplate[];
 };
 
 export type RecruitmentLookups = {
@@ -223,4 +294,7 @@ export type RecruitmentLookups = {
   noticePeriodOptions: string[];
   defaultHiringManagerId: string | null;
   defaultInterviewDurationMinutes: number;
+  offerTemplates: RecruitmentOfferTemplate[];
+  emailTemplates: RecruitmentEmailTemplate[];
+  offerLetterDocumentTemplates: OfferLetterDocumentTemplate[];
 };

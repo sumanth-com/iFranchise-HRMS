@@ -1,6 +1,6 @@
 import { AttendancePolicyEditor } from "@/components/attendance/attendance-policy-editor";
 import { AttendancePolicyView } from "@/components/attendance/attendance-policy-view";
-import { ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
+import { SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
 import { canEditAttendancePolicy } from "@/lib/attendance/attendance-policy-permissions";
 import { getAttendancePolicyDocument } from "@/lib/attendance/services/attendance-policy-queries";
 import { getEmployeeById } from "@/lib/employees/services/employee-detail";
@@ -35,14 +35,14 @@ export default async function HrAttendancePolicyPage() {
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-6">
       {canEdit ? (
         <AttendancePolicyEditor
-          backHref={ATTENDANCE_ROUTES.list}
+          backHref={SELF_ATTENDANCE_ROUTES.team}
           employeeName={employeeName}
           initialDocument={document}
         />
       ) : (
         <AttendancePolicyView
-          backHref={ATTENDANCE_ROUTES.list}
-          backLabel="Back to Attendance"
+          backHref={SELF_ATTENDANCE_ROUTES.team}
+          backLabel="Back to Team Attendance"
           employeeName={employeeName}
           document={document}
         />

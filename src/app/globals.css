@@ -700,3 +700,89 @@
 .onboarding-section-enter {
   animation: onboarding-section-enter 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
+
+@keyframes interview-round-flow {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  65% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.interview-round-connector-flow {
+  position: absolute;
+  inset-y: 0;
+  left: 0;
+  width: 50%;
+  border-radius: 9999px;
+  background: hsl(var(--primary) / 0.55);
+  animation: interview-round-flow 1.8s ease-in-out infinite;
+}
+
+@keyframes hiring-node-pop {
+  0% {
+    transform: scale(0.88);
+    opacity: 0.7;
+  }
+  60% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes hiring-ring-soft {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0.28);
+  }
+  50% {
+    box-shadow: 0 0 0 5px hsl(var(--primary) / 0.08);
+  }
+}
+
+.hiring-stage-node {
+  transition:
+    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.hiring-stage-node:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.hiring-stage-node-current {
+  animation: hiring-ring-soft 2.4s ease-in-out infinite;
+}
+
+.hiring-stage-node-completed {
+  animation: hiring-node-pop 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.hiring-stage-connector-fill {
+  transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.hiring-stage-column {
+  transition: background-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .interview-round-connector-flow {
+    animation: none !important;
+  }
+}

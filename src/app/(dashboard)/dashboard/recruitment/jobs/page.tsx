@@ -2,6 +2,7 @@ import { JobsManagement } from "@/components/recruitment/jobs-management";
 import { createClient } from "@/lib/supabase/server";
 import {
   canCreateRecruitment,
+  canDeleteRecruitment,
   canEditRecruitment,
 } from "@/lib/recruitment/constants";
 import {
@@ -44,6 +45,7 @@ export default async function JobsPage({ searchParams }: PageProps) {
       lookups={lookups}
       canCreate={canCreateRecruitment(profile.permissionCodes)}
       canEdit={canEditRecruitment(profile.permissionCodes)}
+      canDelete={canDeleteRecruitment(profile.permissionCodes)}
       filters={{
         search: params.search,
         departmentId: params.departmentId,

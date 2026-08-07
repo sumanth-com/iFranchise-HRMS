@@ -145,6 +145,10 @@ function buildBreadcrumbItems(
       items.push({ label: "Team Attendance", href: "/dashboard/attendance/team" });
     }
 
+    if (segments[2] === "policy") {
+      items.push({ label: "Attendance Policy", href: pathname });
+    }
+
     return items;
   }
 
@@ -353,6 +357,11 @@ function buildBreadcrumbItems(
 
     if (segments[2] === "team") {
       items.push({ label: "Team Leave", href: "/dashboard/leave/team" });
+      return items;
+    }
+
+    if (segments[2] === "policy") {
+      items.push({ label: "Leave Policy", href: pathname });
       return items;
     }
 

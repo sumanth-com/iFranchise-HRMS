@@ -1,15 +1,12 @@
 "use client";
 
-import { format } from "date-fns";
 import {
   CalendarPlus,
-  FilePlus2,
   Loader2,
   UserPlus,
-  XCircle,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -22,11 +19,13 @@ import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/common/modal";
 import { EmployeeSelect, LabeledSelect } from "@/components/payroll/payroll-select";
 import { toSelectItems } from "@/components/payroll/select-utils";
+import { CandidateDetailPanel } from "@/components/recruitment/candidate-detail-panel";
+import { getUndoRejectStage } from "@/components/recruitment/candidate-pipeline-track";
 import { RecruitmentPagination } from "@/components/recruitment/recruitment-pagination";
 import { RecruitmentStatusBadge } from "@/components/recruitment/recruitment-status-badge";
 import {
   createCandidateAction,
-  createOfferAction,
+  getCandidateDetailAction,
   moveCandidateStageAction,
   scheduleInterviewAction,
 } from "@/lib/recruitment/actions";
@@ -35,12 +34,10 @@ import {
   INTERVIEW_DURATION_OPTIONS,
   INTERVIEW_TYPE_LABELS,
 } from "@/lib/recruitment/constants";
-import { formatCurrency } from "@/lib/recruitment/services/recruitment-utils";
+import { cn } from "@/lib/utils";
 import {
   candidateFormSchema,
   interviewFormSchema,
-  moveStageSchema,
-  offerFormSchema,
 } from "@/lib/validations/recruitment";
 import type {
   CandidateDetail,
@@ -73,7 +70,7 @@ export function CandidatesManagement({
   page,
   pageSize,
   lookups,
-  selected,
+  initialSelected,
   canCreate,
   canEdit,
   canInterview,
@@ -85,7 +82,7 @@ export function CandidatesManagement({
   page: number;
   pageSize: number;
   lookups: RecruitmentLookups;
-  selected: CandidateDetail | null;
+  initialSelected: CandidateDetail | null;
   canCreate: boolean;
   canEdit: boolean;
   canInterview: boolean;
@@ -101,15 +98,78 @@ export function CandidatesManagement({
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
   const [creating, setCreating] = useState(false);
-  const [moveOpen, setMoveOpen] = useState(false);
   const [interviewOpen, setInterviewOpen] = useState(false);
-  const [offerOpen, setOfferOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(Boolean(initialSelected));
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelected?.id ?? null);
+  const [selectedDetail, setSelectedDetail] = useState<CandidateDetail | null>(initialSelected);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
 
   useEffect(() => {
     if (searchParams.get("add") === "1" && filters.jobOpeningId && canCreate) {
       setCreating(true);
     }
   }, [searchParams, filters.jobOpeningId, canCreate]);
+
+  useEffect(() => {
+    if (!initialSelected || !selectedId || initialSelected.id !== selectedId) return;
+    setSelectedDetail((prev) => {
+      if (!prev || prev.id !== initialSelected.id) return initialSelected;
+      const richness =
+        (d: CandidateDetail) => d.interviews.length + d.offers.length + d.timeline.length;
+      return richness(initialSelected) >= richness(prev) ? initialSelected : prev;
+    });
+  }, [initialSelected, selectedId]);
+
+  const syncCandidateUrl = useCallback(
+    (candidateId: string | null) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (candidateId) params.set("candidateId", candidateId);
+      else params.delete("candidateId");
+      const query = params.toString();
+      startTransition(() => {
+        router.replace(query ? `?${query}` : "?", { scroll: false });
+      });
+    },
+    [router, searchParams, startTransition],
+  );
+
+  const refreshDetail = useCallback(async (candidateId: string) => {
+    const result = await getCandidateDetailAction(candidateId);
+    if (result.success) {
+      setSelectedDetail(result.data);
+    } else {
+      toast.error(result.message);
+    }
+    startTransition(() => {
+      router.refresh();
+    });
+  }, [router, startTransition]);
+
+  const loadCandidate = useCallback(
+    async (id: string) => {
+      setSelectedId(id);
+      setPanelOpen(true);
+      setDetailLoading(true);
+      syncCandidateUrl(id);
+
+      const result = await getCandidateDetailAction(id);
+      setDetailLoading(false);
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+      setSelectedDetail(result.data);
+    },
+    [syncCandidateUrl],
+  );
+
+  function closePanel() {
+    setPanelOpen(false);
+    setSelectedId(null);
+    setSelectedDetail(null);
+    syncCandidateUrl(null);
+  }
 
   function updateParams(updates: Record<string, string | undefined>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -121,15 +181,11 @@ export function CandidatesManagement({
     startTransition(() => router.push(`?${params.toString()}`));
   }
 
-  function selectCandidate(id: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("candidateId", id);
-    startTransition(() => router.push(`?${params.toString()}`));
-  }
+  const activeDetail = selectedDetail;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Candidates</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -144,7 +200,7 @@ export function CandidatesManagement({
         ) : null}
       </div>
 
-      <div className="rounded-xl border bg-card p-4 shadow-sm">
+      <div className="shrink-0 rounded-xl border bg-card p-4 shadow-sm">
         <div className="grid gap-3 lg:grid-cols-4">
           <Input
             placeholder="Search candidate..."
@@ -182,8 +238,16 @@ export function CandidatesManagement({
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
-        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+      <div
+        className={cn(
+          "grid min-h-0 flex-1 gap-4",
+          panelOpen ? "xl:grid-cols-[minmax(0,380px)_minmax(0,1fr)]" : "grid-cols-1",
+        )}
+      >
+        <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
+          <div className="shrink-0 border-b px-4 py-2.5 text-xs text-muted-foreground">
+            {total} candidate{total === 1 ? "" : "s"}
+          </div>
           {records.length === 0 ? (
             <EmptyState
               title="No candidates"
@@ -191,170 +255,102 @@ export function CandidatesManagement({
               className="border-0"
             />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/30 text-left text-muted-foreground">
-                    <th className="px-4 py-3">Candidate</th>
-                    <th className="px-4 py-3">Position</th>
-                    <th className="px-4 py-3">Experience</th>
-                    <th className="px-4 py-3">Source</th>
-                    <th className="px-4 py-3">Stage</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {records.map((row) => (
-                    <tr
-                      key={row.id}
-                      className={`cursor-pointer border-b hover:bg-muted/40 ${
-                        selected?.id === row.id ? "bg-muted/50" : ""
-                      }`}
-                      onClick={() => selectCandidate(row.id)}
+            <ul className="min-h-0 flex-1 divide-y overflow-y-auto overscroll-contain">
+              {records.map((row) => {
+                const isActive = panelOpen && selectedId === row.id;
+                return (
+                  <li key={row.id}>
+                    <button
+                      type="button"
+                      onClick={() => loadCandidate(row.id)}
+                      className={cn(
+                        "w-full px-4 py-3 text-left transition-colors hover:bg-muted/40",
+                        isActive && "bg-primary/5 ring-1 ring-inset ring-primary/20",
+                      )}
                     >
-                      <td className="px-4 py-3">
-                        <div className="font-medium">{row.fullName}</div>
-                        <div className="text-xs text-muted-foreground">{row.email}</div>
-                      </td>
-                      <td className="px-4 py-3">{row.jobTitle}</td>
-                      <td className="px-4 py-3">
-                        {row.experienceYears != null ? `${row.experienceYears} yrs` : "—"}
-                      </td>
-                      <td className="px-4 py-3">{row.source ?? "—"}</td>
-                      <td className="px-4 py-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{row.fullName}</p>
+                          <p className="truncate text-xs text-muted-foreground">{row.email}</p>
+                        </div>
                         <RecruitmentStatusBadge
                           label={CANDIDATE_STAGE_LABELS[row.stage]}
                           status={row.stage}
                         />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-xl border bg-card p-5 shadow-sm">
-          {!selected ? (
-            <EmptyState
-              title="Select a candidate"
-              description="Choose a candidate from the list to view profile, timeline, and actions."
-              className="border-0"
-            />
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold">{selected.fullName}</h2>
-                <p className="text-sm text-muted-foreground">
-                  {selected.email}
-                  {selected.phone ? ` · ${selected.phone}` : ""}
-                </p>
-                <div className="mt-2">
-                  <RecruitmentStatusBadge
-                    label={CANDIDATE_STAGE_LABELS[selected.stage]}
-                    status={selected.stage}
-                  />
-                </div>
-              </div>
-
-              <dl className="grid gap-3 sm:grid-cols-2 text-sm">
-                <Info label="Applied Position" value={selected.jobTitle} />
-                <Info label="Department" value={selected.departmentName ?? "—"} />
-                <Info
-                  label="Experience"
-                  value={
-                    selected.experienceYears != null ? `${selected.experienceYears} years` : "—"
-                  }
-                />
-                <Info label="Current Company" value={selected.currentCompany ?? "—"} />
-                <Info label="Current CTC" value={formatCurrency(selected.currentCtc)} />
-                <Info label="Expected CTC" value={formatCurrency(selected.expectedCtc)} />
-                <Info
-                  label="Notice Period"
-                  value={
-                    selected.noticePeriodDays != null
-                      ? `${selected.noticePeriodDays} days`
-                      : "—"
-                  }
-                />
-                <Info label="Source" value={selected.source ?? "—"} />
-                <Info
-                  label="Skills"
-                  value={selected.skills.length ? selected.skills.join(", ") : "—"}
-                  className="sm:col-span-2"
-                />
-                <Info label="Notes" value={selected.notes ?? "—"} className="sm:col-span-2" />
-              </dl>
-
-              <div className="flex flex-wrap gap-2">
-                {canEdit && !["joined", "rejected"].includes(selected.stage) ? (
-                  <Button size="sm" variant="outline" onClick={() => setMoveOpen(true)}>
-                    Move Stage
-                  </Button>
-                ) : null}
-                {canInterview && !["joined", "rejected"].includes(selected.stage) ? (
-                  <Button size="sm" variant="outline" onClick={() => setInterviewOpen(true)}>
-                    <CalendarPlus className="mr-1 h-3.5 w-3.5" />
-                    Schedule Interview
-                  </Button>
-                ) : null}
-                {canOffer && !["joined", "rejected"].includes(selected.stage) ? (
-                  <Button size="sm" onClick={() => setOfferOpen(true)}>
-                    <FilePlus2 className="mr-1 h-3.5 w-3.5" />
-                    Send Offer
-                  </Button>
-                ) : null}
-                {canEdit && selected.stage !== "rejected" && selected.stage !== "joined" ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      startTransition(async () => {
-                        const result = await moveCandidateStageAction({
-                          candidateId: selected.id,
-                          stage: "rejected",
-                          reason: "Rejected by HR",
-                        });
-                        if (!result.success) toast.error(result.message);
-                        else {
-                          toast.success("Candidate rejected");
-                          router.refresh();
-                        }
-                      });
-                    }}
-                  >
-                    <XCircle className="mr-1 h-3.5 w-3.5" />
-                    Reject
-                  </Button>
-                ) : null}
-              </div>
-
-              <div>
-                <h3 className="mb-2 text-sm font-medium">Timeline</h3>
-                <div className="space-y-3">
-                  {selected.timeline.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No events yet.</p>
-                  ) : (
-                    selected.timeline.map((item) => (
-                      <div key={item.id} className="border-l-2 border-primary/30 pl-3">
-                        <p className="text-sm font-medium">{item.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {format(new Date(item.createdAt), "MMM d, yyyy · h:mm a")}
-                        </p>
-                        {item.description ? (
-                          <p className="text-xs text-muted-foreground">{item.description}</p>
-                        ) : null}
                       </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
+                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                        <span>{row.jobTitle}</span>
+                        {row.experienceYears != null ? (
+                          <span>{row.experienceYears} yrs</span>
+                        ) : null}
+                        {row.source ? <span>{row.source}</span> : null}
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           )}
+          <div className="shrink-0 border-t px-2 py-2">
+            <RecruitmentPagination page={page} pageSize={pageSize} total={total} />
+          </div>
         </div>
-      </div>
 
-      <RecruitmentPagination page={page} pageSize={pageSize} total={total} />
+        {panelOpen ? (
+          <div className="min-h-0 overflow-hidden">
+            <CandidateDetailPanel
+            detail={activeDetail}
+            loading={detailLoading}
+            onClose={closePanel}
+            canEdit={canEdit}
+            canInterview={canInterview}
+            canOffer={canOffer}
+            onScheduleInterview={() => setInterviewOpen(true)}
+            onReject={() => {
+              if (!activeDetail) return;
+              setRejecting(true);
+              startTransition(async () => {
+                const result = await moveCandidateStageAction({
+                  candidateId: activeDetail.id,
+                  stage: "rejected",
+                  reason: "Rejected by HR",
+                });
+                setRejecting(false);
+                if (!result.success) toast.error(result.message);
+                else {
+                  toast.success("Candidate rejected");
+                  await refreshDetail(activeDetail.id);
+                }
+              });
+            }}
+            onUndoReject={() => {
+              if (!activeDetail) return;
+              const restoreStage = getUndoRejectStage(activeDetail);
+              setRejecting(true);
+              startTransition(async () => {
+                const result = await moveCandidateStageAction({
+                  candidateId: activeDetail.id,
+                  stage: restoreStage,
+                  reason: "Rejection undone by HR",
+                });
+                setRejecting(false);
+                if (!result.success) toast.error(result.message);
+                else {
+                  toast.success(
+                    `Rejection undone — restored to ${CANDIDATE_STAGE_LABELS[restoreStage]}`,
+                  );
+                  await refreshDetail(activeDetail.id);
+                }
+              });
+            }}
+            rejecting={rejecting}
+            onRefresh={() => {
+              if (activeDetail) void refreshDetail(activeDetail.id);
+            }}
+            />
+          </div>
+        ) : null}
+      </div>
 
       {creating ? (
         <CandidateFormModal
@@ -364,47 +360,17 @@ export function CandidatesManagement({
           defaultJobOpeningId={filters.jobOpeningId}
         />
       ) : null}
-      {selected && moveOpen ? (
-        <MoveStageModal
-          open={moveOpen}
-          onOpenChange={setMoveOpen}
-          candidateId={selected.id}
-          currentStage={selected.stage}
-        />
-      ) : null}
-      {selected && interviewOpen ? (
+      {activeDetail && interviewOpen ? (
         <ScheduleInterviewModal
           open={interviewOpen}
           onOpenChange={setInterviewOpen}
-          candidateId={selected.id}
+          candidateId={activeDetail.id}
           lookups={lookups}
+          onSuccess={() => {
+            void refreshDetail(activeDetail.id);
+          }}
         />
       ) : null}
-      {selected && offerOpen ? (
-        <CreateOfferModal
-          open={offerOpen}
-          onOpenChange={setOfferOpen}
-          candidate={selected}
-          lookups={lookups}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function Info({
-  label,
-  value,
-  className,
-}: {
-  label: string;
-  value: string;
-  className?: string;
-}) {
-  return (
-    <div className={className}>
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 font-medium">{value}</dd>
     </div>
   );
 }
@@ -527,81 +493,19 @@ function CandidateFormModal({
   );
 }
 
-function MoveStageModal({
-  open,
-  onOpenChange,
-  candidateId,
-  currentStage,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  candidateId: string;
-  currentStage: string;
-}) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const form = useForm<z.input<typeof moveStageSchema>>({
-    resolver: zodResolver(moveStageSchema),
-    defaultValues: { candidateId, stage: currentStage as z.infer<typeof moveStageSchema>["stage"] },
-  });
-
-  return (
-    <Modal
-      open={open}
-      onOpenChange={onOpenChange}
-      title="Move Candidate Stage"
-      contentClassName="sm:max-w-md"
-      footer={
-        <Button
-          disabled={isPending}
-          onClick={form.handleSubmit((values) => {
-            startTransition(async () => {
-              const result = await moveCandidateStageAction(values);
-              if (!result.success) toast.error(result.message);
-              else {
-                toast.success("Stage updated");
-                onOpenChange(false);
-                router.refresh();
-              }
-            });
-          })}
-        >
-          {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          Update Stage
-        </Button>
-      }
-    >
-      <div className="space-y-4">
-        <Field label="Stage">
-          <LabeledSelect
-            items={toSelectItems(CANDIDATE_STAGE_LABELS)}
-            value={form.watch("stage")}
-            onValueChange={(v) =>
-              form.setValue("stage", v as z.infer<typeof moveStageSchema>["stage"])
-            }
-            disabled={isPending}
-          />
-        </Field>
-        <Field label="Reason / Notes">
-          <Input disabled={isPending} {...form.register("reason")} />
-        </Field>
-      </div>
-    </Modal>
-  );
-}
-
 function ScheduleInterviewModal({
   open,
   onOpenChange,
   candidateId,
   lookups,
+  onSuccess,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   candidateId: string;
   lookups: RecruitmentLookups;
+  onSuccess: () => void;
 }) {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const form = useForm<z.input<typeof interviewFormSchema>>({
     resolver: zodResolver(interviewFormSchema),
@@ -632,7 +536,7 @@ function ScheduleInterviewModal({
               else {
                 toast.success("Interview scheduled");
                 onOpenChange(false);
-                router.refresh();
+                onSuccess();
               }
             });
           })}
@@ -687,125 +591,6 @@ function ScheduleInterviewModal({
         </Field>
         <Field label="Meeting Link">
           <Input disabled={isPending} placeholder="Optional" {...form.register("meetingLink")} />
-        </Field>
-      </div>
-    </Modal>
-  );
-}
-
-function CreateOfferModal({
-  open,
-  onOpenChange,
-  candidate,
-  lookups,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  candidate: CandidateDetail;
-  lookups: RecruitmentLookups;
-}) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const form = useForm<z.input<typeof offerFormSchema>>({
-    resolver: zodResolver(offerFormSchema),
-    defaultValues: {
-      candidateId: candidate.id,
-      salary: candidate.expectedCtc ?? undefined,
-      joiningDate: "",
-      branchId: lookups.branches[0]?.id ?? "",
-      notes: "",
-    },
-  });
-
-  return (
-    <Modal
-      open={open}
-      onOpenChange={onOpenChange}
-      title="Generate Offer"
-      description={`${candidate.fullName} · ${candidate.jobTitle}`}
-      contentClassName="sm:max-w-2xl"
-      footer={
-        <Button
-          disabled={isPending}
-          onClick={form.handleSubmit((values) => {
-            startTransition(async () => {
-              const result = await createOfferAction(values);
-              if (!result.success) toast.error(result.message);
-              else {
-                toast.success("Offer created");
-                onOpenChange(false);
-                router.refresh();
-              }
-            });
-          })}
-        >
-          {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          <FilePlus2 className="mr-1.5 h-4 w-4" />
-          Create Offer
-        </Button>
-      }
-    >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Salary">
-          <Input type="number" min={1} disabled={isPending} {...form.register("salary")} />
-        </Field>
-        <Field label="Joining Date">
-          <Input type="date" disabled={isPending} {...form.register("joiningDate")} />
-        </Field>
-        <Field label="Branch">
-          <LabeledSelect
-            items={lookups.branches.map((b) => ({ value: b.id, label: b.label }))}
-            value={form.watch("branchId")}
-            onValueChange={(v) => form.setValue("branchId", v, { shouldValidate: true })}
-            disabled={isPending}
-          />
-        </Field>
-        <Field label="Department">
-          <LabeledSelect
-            items={[
-              { value: "", label: "From job" },
-              ...lookups.departments.map((d) => ({ value: d.id, label: d.label })),
-            ]}
-            value={(form.watch("departmentId") as string) ?? ""}
-            onValueChange={(v) => form.setValue("departmentId", v)}
-            disabled={isPending}
-          />
-        </Field>
-        <Field label="Designation">
-          <LabeledSelect
-            items={[
-              { value: "", label: "From job" },
-              ...lookups.designations.map((d) => ({ value: d.id, label: d.label })),
-            ]}
-            value={(form.watch("designationId") as string) ?? ""}
-            onValueChange={(v) => form.setValue("designationId", v)}
-            disabled={isPending}
-          />
-        </Field>
-        <Field label="Employment Type">
-          <LabeledSelect
-            items={[
-              { value: "", label: "From job" },
-              ...lookups.employmentTypes.map((d) => ({ value: d.id, label: d.label })),
-            ]}
-            value={(form.watch("employmentTypeId") as string) ?? ""}
-            onValueChange={(v) => form.setValue("employmentTypeId", v)}
-            disabled={isPending}
-          />
-        </Field>
-        <Field label="Reporting Manager" className="sm:col-span-2">
-          <EmployeeSelect
-            employees={lookups.employees}
-            value={(form.watch("reportingManagerId") as string) ?? ""}
-            onValueChange={(v) => form.setValue("reportingManagerId", v)}
-            disabled={isPending}
-          />
-        </Field>
-        <Field label="Offer Expiry">
-          <Input type="date" disabled={isPending} {...form.register("expiresAt")} />
-        </Field>
-        <Field label="Notes">
-          <Input disabled={isPending} {...form.register("notes")} />
         </Field>
       </div>
     </Modal>
