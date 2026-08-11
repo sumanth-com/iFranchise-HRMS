@@ -15,14 +15,19 @@ import type { CompanySettingsBundle, CompanySettingsSection } from "@/types/comp
 type Props = {
   section: CompanySettingsSection;
   settings: CompanySettingsBundle;
+  logoUrl: string | null;
   canEdit: boolean;
 };
 
-export function CompanySettingsSectionView({ section, settings, canEdit }: Props) {
+export function CompanySettingsSectionView({ section, settings, logoUrl, canEdit }: Props) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {section === "profile" ? (
-        <CompanyProfileSettingsForm profile={settings.profile} canEdit={canEdit} />
+        <CompanyProfileSettingsForm
+          profile={settings.profile}
+          logoUrl={logoUrl}
+          canEdit={canEdit}
+        />
       ) : null}
 
       {section === "working" ? (

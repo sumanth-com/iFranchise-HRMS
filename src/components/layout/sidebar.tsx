@@ -1,11 +1,10 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useState } from "react";
 
 import { SidebarNavLink } from "@/components/layout/sidebar-nav-link";
+import { SidebarBrand } from "@/components/layout/sidebar-brand";
 import { useSidebarNavigation } from "@/hooks/use-sidebar-navigation";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { resolveActiveNavHref } from "@/lib/layout/sidebar-active";
@@ -14,13 +13,13 @@ import { cn } from "@/lib/utils";
 export function Sidebar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { isCollapsed, startNavigation } = useSidebar();
-  const { navigation, portalHome, portalLabel } = useSidebarNavigation();
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    "Self-service": true,
-    Administration: true,
-    "System Administration": true,
-  });
+  const {
+    isCollapsed,
+    startNavigation,
+    toggleSection,
+    isSectionOpen,
+  } = useSidebar();
+  const { navigation, portalHome } = useSidebarNavigation();
 
   const activeHref = resolveActiveNavHref(
     pathname,
@@ -28,13 +27,6 @@ export function Sidebar() {
     portalHome,
     navigation,
   );
-
-  function toggleSection(section: string) {
-    setOpenSections((current) => ({
-      ...current,
-      [section]: !(current[section] ?? true),
-    }));
-  }
 
   return (
     <aside
@@ -49,21 +41,13 @@ export function Sidebar() {
           isCollapsed && "justify-center px-2",
         )}
       >
-        <Link
+        <SidebarBrand
           href={portalHome}
-          prefetch
-          onClick={() => {
+          collapsed={isCollapsed}
+          onNavigate={() => {
             if (pathname !== portalHome) startNavigation(portalHome);
           }}
-          className="group/brand flex items-center gap-2 font-semibold"
-        >
-          <span className="sidebar-brand-mark flex size-8 items-center justify-center rounded-lg bg-primary text-xs text-primary-foreground">
-            IF
-          </span>
-          {!isCollapsed ? (
-            <span className="truncate text-sm">{portalLabel}</span>
-          ) : null}
-        </Link>
+        />
       </div>
 
       <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain p-2">
@@ -72,7 +56,7 @@ export function Sidebar() {
           const Icon = item.icon;
           const prevSection = index > 0 ? navigation[index - 1]?.section : undefined;
           const showSection = item.section && item.section !== prevSection && !isCollapsed;
-          const sectionOpen = item.section ? (openSections[item.section] ?? true) : true;
+          const sectionOpen = item.section ? isSectionOpen(item.section) : true;
 
           return (
             <div key={`${item.section ?? ""}-${item.href}`} className="shrink-0">
@@ -81,6 +65,7 @@ export function Sidebar() {
                   type="button"
                   onClick={() => toggleSection(item.section!)}
                   className="mb-2 mt-4 flex w-full items-center justify-between border-t px-3 pt-4 text-left text-sm font-medium text-sidebar-foreground first:mt-0 first:border-t-0 first:pt-0"
+                  aria-expanded={sectionOpen}
                 >
                   <span>{item.section}</span>
                   <ChevronDown

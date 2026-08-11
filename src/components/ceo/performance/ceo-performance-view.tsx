@@ -10,6 +10,7 @@ import { CeoPerformanceDrawer } from "@/components/ceo/performance/ceo-performan
 import { CeoPerformanceEmployeesTable } from "@/components/ceo/performance/ceo-performance-employees-table";
 import { CeoPerformanceFilters } from "@/components/ceo/performance/ceo-performance-filters";
 import { CeoPerformancePanels } from "@/components/ceo/performance/ceo-performance-panels";
+import { CeoPerformancePromotions } from "@/components/ceo/performance/ceo-performance-promotions";
 import { CeoPerformanceSummary } from "@/components/ceo/performance/ceo-performance-summary";
 import { CeoPerformanceTopPerformers } from "@/components/ceo/performance/ceo-performance-top-performers";
 import {
@@ -152,6 +153,11 @@ export function CeoPerformanceView({
       />
 
       <CeoPerformanceTopPerformers data={topPerformers} />
+
+      <CeoPerformancePromotions
+        promotions={promotions}
+        onChanged={() => refreshScopedData(filters)}
+      />
 
       {hasScopedFilters ? (
         <CeoPerformanceEmployeesTable

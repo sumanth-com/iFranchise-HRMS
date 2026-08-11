@@ -1,5 +1,8 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import {
+  extractMeetingLinkFromAgenda,
+} from "@/lib/performance/services/performance-meeting-link";
+import {
   formatEmployeeName,
   fromHrms,
   unwrapRelation,
@@ -270,6 +273,7 @@ export async function getTeamEmployeePerformanceProfile(
       const employeeRow = unwrap(row.employee);
       const managerRow = unwrap(row.manager);
       const actions = (row.performance_one_on_one_actions ?? []) as Array<{ is_completed: boolean }>;
+      const parsedAgenda = extractMeetingLinkFromAgenda(row.agenda);
       return {
         id: row.id,
         employeeId: row.employee_id,
@@ -280,7 +284,8 @@ export async function getTeamEmployeePerformanceProfile(
           ? formatEmployeeName(managerRow.first_name, managerRow.last_name)
           : "—",
         scheduledAt: row.scheduled_at,
-        agenda: row.agenda,
+        agenda: parsedAgenda.agenda,
+        meetingLink: parsedAgenda.meetingLink,
         notes: row.notes,
         followUpDate: row.follow_up_date,
         meetingStatus: row.meeting_status,
@@ -305,7 +310,9 @@ export async function getTeamEmployeePerformanceProfile(
           : "—",
         employeeCode: employeeRow?.employee_code ?? "—",
         departmentName: dept?.name ?? null,
+        currentDesignationId: row.current_designation_id ?? null,
         currentDesignation: currentDesignation?.title ?? null,
+        recommendedDesignationId: row.recommended_designation_id ?? null,
         recommendedDesignation: recommendedDesignation?.title ?? null,
         currentSalary: null,
         recommendedSalary:

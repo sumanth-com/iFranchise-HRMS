@@ -2,7 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 
+import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { createClient } from "@/lib/supabase/server";
+import { PAYROLL_ROUTES } from "@/lib/payroll/constants";
+import { getEmployeeSalaryStructure } from "@/lib/employees/services/employee-detail";
+import { fromHrms } from "@/lib/performance/services/performance-utils";
 import {
   requireServerAnyPermission,
   requireServerPermission,
@@ -19,7 +24,11 @@ import {
   createOneOnOne,
   createPromotion,
   createReview,
+  deleteFeedback,
   deleteGoal,
+  deleteKpi,
+  deleteOneOnOne,
+  deletePromotion,
   getGoalById,
   getOneOnOneById,
   getReviewById,
@@ -29,6 +38,7 @@ import {
   updateGoalProgress,
   updateKpiProgress,
   updateOneOnOne,
+  updatePromotion,
 } from "@/lib/performance/services/performance-mutations";
 import {
   getPerformanceLookups,
@@ -47,6 +57,7 @@ import {
   savePerformanceSettings,
 } from "@/lib/performance/services/performance-settings";
 import {
+  feedbackDeleteSchema,
   feedbackFormSchema,
   goalCommentSchema,
   goalDeleteSchema,
@@ -54,14 +65,18 @@ import {
   goalMilestoneToggleSchema,
   goalProgressSchema,
   goalUpdateSchema,
-  kpiAssignFormSchema,
+  kpiAssignPayloadSchema,
+  kpiDeleteSchema,
   kpiProgressSchema,
   kpiTemplateFormSchema,
+  oneOnOneDeleteSchema,
   oneOnOneFormSchema,
   oneOnOneUpdateSchema,
   performanceSettingsSchema,
   promotionApprovalSchema,
+  promotionDeleteSchema,
   promotionFormSchema,
+  promotionUpdateSchema,
   reviewApprovalSchema,
   reviewFormSchema,
   reviewSubmitSchema,
@@ -69,6 +84,7 @@ import {
 import type {
   GoalDetail,
   GoalListResult,
+  KpiListResult,
   OneOnOneDetail,
   PerformanceActionResult,
   PerformanceLookups,
@@ -91,6 +107,15 @@ function revalidatePerformancePaths() {
   revalidatePath(PERFORMANCE_ROUTES.promotions);
   revalidatePath(PERFORMANCE_ROUTES.history);
   revalidatePath(PERFORMANCE_ROUTES.settings);
+}
+
+function revalidatePromotionPayrollPaths() {
+  revalidatePath(PERFORMANCE_ROUTES.promotions);
+  revalidatePath(EMPLOYEE_ROUTES.payroll);
+  revalidatePath(EMPLOYEE_ROUTES.payrollHistory);
+  revalidatePath(EMPLOYEE_ROUTES.profile);
+  revalidatePath(PAYROLL_ROUTES.salaryStructures);
+  revalidatePath(PAYROLL_ROUTES.revisions);
 }
 
 export async function fetchPerformanceSummaryAction(): Promise<PerformanceSummary> {
@@ -269,11 +294,27 @@ export async function createKpiTemplateAction(
   }
 }
 
+export async function fetchKpisListAction(
+  params: unknown,
+): Promise<PerformanceActionResult<KpiListResult>> {
+  try {
+    const profile = await requireServerPermission("performance.view");
+    const supabase = await getAuthenticatedSupabase();
+    const data = await listKpis(supabase, profile, params);
+    return { success: true, data };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to load KPIs",
+    };
+  }
+}
+
 export async function assignKpiAction(input: unknown): Promise<PerformanceActionResult<string>> {
   try {
     const profile = await requireServerAnyPermission(["kpi.manage", "performance.create"]);
     const supabase = await getAuthenticatedSupabase();
-    const parsed = kpiAssignFormSchema.parse(input);
+    const parsed = kpiAssignPayloadSchema.parse(input);
     const id = await assignKpi(supabase, profile, parsed);
     revalidatePath(PERFORMANCE_ROUTES.kpis);
     revalidatePath(PERFORMANCE_ROUTES.dashboard);
@@ -282,6 +323,28 @@ export async function assignKpiAction(input: unknown): Promise<PerformanceAction
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to assign KPI",
+    };
+  }
+}
+
+export async function deleteKpiAction(
+  input: unknown,
+): Promise<PerformanceActionResult<void>> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "kpi.manage",
+      "performance.edit",
+      "performance.create",
+    ]);
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = kpiDeleteSchema.parse(input);
+    await deleteKpi(supabase, profile, parsed.kpiId);
+    revalidatePerformancePaths();
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to delete KPI",
     };
   }
 }
@@ -389,6 +452,28 @@ export async function createFeedbackAction(
   }
 }
 
+export async function deleteFeedbackAction(
+  input: unknown,
+): Promise<PerformanceActionResult<void>> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "performance.feedback",
+      "performance.edit",
+      "performance.create",
+    ]);
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = feedbackDeleteSchema.parse(input);
+    await deleteFeedback(supabase, profile, parsed.feedbackId);
+    revalidatePerformancePaths();
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to delete feedback",
+    };
+  }
+}
+
 export async function createOneOnOneAction(
   input: unknown,
 ): Promise<PerformanceActionResult<string>> {
@@ -407,6 +492,24 @@ export async function createOneOnOneAction(
   }
 }
 
+export async function deleteOneOnOneAction(
+  input: unknown,
+): Promise<PerformanceActionResult<void>> {
+  try {
+    const profile = await requireServerAnyPermission(["performance.edit", "performance.create"]);
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = oneOnOneDeleteSchema.parse(input);
+    await deleteOneOnOne(supabase, profile, parsed.meetingId);
+    revalidatePerformancePaths();
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to delete meeting",
+    };
+  }
+}
+
 export async function updateOneOnOneAction(
   input: unknown,
 ): Promise<PerformanceActionResult<void>> {
@@ -415,8 +518,8 @@ export async function updateOneOnOneAction(
     const supabase = await getAuthenticatedSupabase();
     const parsed = oneOnOneUpdateSchema.parse(input);
     await updateOneOnOne(supabase, profile, parsed.meetingId, {
-      notes: parsed.notes,
       agenda: parsed.agenda,
+      meetingLink: parsed.meetingLink,
       followUpDate: parsed.followUpDate,
       meetingStatus: parsed.meetingStatus,
     });
@@ -431,9 +534,19 @@ export async function updateOneOnOneAction(
 }
 
 export async function fetchOneOnOneDetailAction(meetingId: string): Promise<OneOnOneDetail | null> {
-  const profile = await requireServerPermission("performance.view");
+  const profile = await requireServerAnyPermission([
+    PORTAL_PERMISSIONS.employee,
+    "performance.view",
+  ]);
   const supabase = await getAuthenticatedSupabase();
-  return getOneOnOneById(supabase, profile.employee.organizationId, meetingId);
+  const detail = await getOneOnOneById(supabase, profile.employee.organizationId, meetingId);
+  if (
+    !profile.permissionCodes.includes("performance.view") &&
+    detail?.employeeId !== profile.employee.id
+  ) {
+    return null;
+  }
+  return detail;
 }
 
 export async function createPromotionAction(
@@ -444,7 +557,7 @@ export async function createPromotionAction(
     const supabase = await getAuthenticatedSupabase();
     const parsed = promotionFormSchema.parse(input);
     const id = await createPromotion(supabase, profile, parsed);
-    revalidatePath(PERFORMANCE_ROUTES.promotions);
+    revalidatePromotionPayrollPaths();
     return { success: true, data: id };
   } catch (error) {
     return {
@@ -462,7 +575,7 @@ export async function approvePromotionAction(
     const supabase = await getAuthenticatedSupabase();
     const parsed = promotionApprovalSchema.parse(input);
     await approvePromotionStep(supabase, profile, parsed.promotionId, parsed.comments);
-    revalidatePath(PERFORMANCE_ROUTES.promotions);
+    revalidatePromotionPayrollPaths();
     return { success: true, data: undefined };
   } catch (error) {
     return {
@@ -470,6 +583,65 @@ export async function approvePromotionAction(
       message: error instanceof Error ? error.message : "Failed to approve promotion",
     };
   }
+}
+
+export async function updatePromotionAction(
+  input: unknown,
+): Promise<PerformanceActionResult<void>> {
+  try {
+    const profile = await requireServerAnyPermission(["performance.edit", "performance.create"]);
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = promotionUpdateSchema.parse(input);
+    await updatePromotion(supabase, profile, parsed);
+    revalidatePromotionPayrollPaths();
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to update promotion",
+    };
+  }
+}
+
+export async function deletePromotionAction(
+  input: unknown,
+): Promise<PerformanceActionResult<void>> {
+  try {
+    const profile = await requireServerAnyPermission(["performance.edit", "performance.create"]);
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = promotionDeleteSchema.parse(input);
+    await deletePromotion(supabase, parsed.promotionId);
+    revalidatePath(PERFORMANCE_ROUTES.promotions);
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to delete promotion",
+    };
+  }
+}
+
+export async function fetchPromotionEmployeeContextAction(
+  employeeId: string,
+): Promise<{ designationId: string | null; currentSalary: number | null } | null> {
+  const profile = await requireServerPermission("performance.view");
+  const supabase = await getAuthenticatedSupabase();
+
+  const { data: employee, error } = await fromHrms(supabase, "employees")
+    .select("designation_id")
+    .eq("id", employeeId)
+    .eq("organization_id", profile.employee.organizationId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!employee) return null;
+
+  const salaryStructure = await getEmployeeSalaryStructure(supabase, employeeId);
+
+  return {
+    designationId: employee.designation_id ?? null,
+    currentSalary: salaryStructure?.grossSalary ?? null,
+  };
 }
 
 export async function fetchPerformanceSettingsAction(): Promise<PerformanceSettingsRecord> {

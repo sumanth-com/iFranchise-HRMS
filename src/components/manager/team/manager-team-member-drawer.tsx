@@ -35,7 +35,10 @@ import {
 } from "@/lib/manager/actions/team-actions";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { ASSIGNMENT_STATUS_LABELS } from "@/lib/assets/constants";
-import { FEEDBACK_TYPE_LABELS, FEEDBACK_VISIBILITY_LABELS } from "@/lib/performance/constants";
+import { FEEDBACK_TYPE_LABELS } from "@/lib/performance/constants";
+import {
+  getMinDateTimeLocalValue,
+} from "@/lib/performance/services/performance-utils";
 import { feedbackFormSchema, oneOnOneFormSchema, promotionFormSchema } from "@/lib/validations/performance";
 import type { LookupOption } from "@/types/employee";
 import type { TeamMemberDetailBundle } from "@/types/manager-team";
@@ -878,7 +881,6 @@ function FeedbackActionForm({
     defaultValues: {
       toEmployeeId: employeeId,
       feedbackType,
-      visibility: "private",
       message: "",
     },
   });
@@ -903,16 +905,6 @@ function FeedbackActionForm({
           value={form.watch("feedbackType")}
           onValueChange={(value) =>
             form.setValue("feedbackType", value as typeof feedbackType, { shouldValidate: true })
-          }
-          disabled={isPending}
-        />
-      </Field>
-      <Field label="Visibility">
-        <LabeledSelect
-          items={toSelectItems(FEEDBACK_VISIBILITY_LABELS)}
-          value={form.watch("visibility")}
-          onValueChange={(value) =>
-            form.setValue("visibility", value as "public" | "private", { shouldValidate: true })
           }
           disabled={isPending}
         />
@@ -966,13 +958,22 @@ function OneOnOneActionForm({
       })}
     >
       <Field label="Scheduled at">
-        <Input type="datetime-local" disabled={isPending} {...form.register("scheduledAt")} />
+        <Input
+          type="datetime-local"
+          min={getMinDateTimeLocalValue()}
+          disabled={isPending}
+          {...form.register("scheduledAt")}
+        />
       </Field>
       <Field label="Agenda">
         <Input disabled={isPending} {...form.register("agenda")} placeholder="Meeting agenda" />
       </Field>
-      <Field label="Notes">
-        <Input disabled={isPending} {...form.register("notes")} placeholder="Optional notes" />
+      <Field label="Meeting link">
+        <Input
+          disabled={isPending}
+          {...form.register("meetingLink")}
+          placeholder="https://meet.google.com/..."
+        />
       </Field>
       <input type="hidden" {...form.register("employeeId")} value={employeeId} />
       <input type="hidden" {...form.register("managerEmployeeId")} value={managerEmployeeId} />

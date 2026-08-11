@@ -1,8 +1,8 @@
 "use client";
 
 import { format } from "date-fns";
-import { Eye, Loader2, Pencil } from "lucide-react";
-import { useState, useTransition } from "react";
+import { Loader2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,38 +15,44 @@ import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/common/modal";
 import { KpiDetailModal } from "@/components/performance/kpi-detail-modal";
+import { KpiQuickAssign } from "@/components/performance/kpi-quick-assign";
+import { PerformanceConfirmModal } from "@/components/performance/performance-confirm-modal";
 import { KpiStatusBadge } from "@/components/performance/performance-status-badge";
-import { PerformancePagination } from "@/components/performance/performance-filters";
 import {
+  buildStatusItems,
+  PerformanceFilters,
+  PerformancePagination,
+} from "@/components/performance/performance-filters";
+import {
+  DeleteIconButton,
+  EditIconButton,
   PerformanceTableShell,
-  ProgressBar,
   TableActions,
+  ViewIconButton,
 } from "@/components/performance/performance-ui-primitives";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { toSelectItems } from "@/components/payroll/select-utils";
 import {
+  deleteKpiAction,
+  fetchKpisListAction,
   updateKpiProgressAction,
 } from "@/lib/performance/actions";
 import {
   KPI_MEASUREMENT_LABELS,
   KPI_PERIOD_LABELS,
   KPI_STATUS_LABELS,
+  PERFORMANCE_ROUTES,
 } from "@/lib/performance/constants";
-import { KpiQuickAssign } from "@/components/performance/kpi-quick-assign";
-import {
-  formatKpiTarget,
-} from "@/lib/performance/services/performance-utils";
-import {
-  kpiProgressSchema,
-} from "@/lib/validations/performance";
+import { formatKpiTarget } from "@/lib/performance/services/performance-utils";
+import { kpiProgressSchema } from "@/lib/validations/performance";
+import { cn } from "@/lib/utils";
 import type { KpiListItem, KpiTemplateItem } from "@/types/performance";
 import type { LookupOption } from "@/types/employee";
 
 const periodItems = toSelectItems(KPI_PERIOD_LABELS);
-const statusFilterItems = [
-  { value: "all", label: "All statuses" },
-  ...toSelectItems(KPI_STATUS_LABELS),
-];
+const statusItems = buildStatusItems(KPI_STATUS_LABELS);
+const FILTER_TRIGGER = "h-9 w-full min-w-0";
+const FILTER_CONTENT = "min-w-[var(--radix-select-trigger-width)]";
 
 
 type KpiWorkflowProps = {
@@ -56,21 +62,23 @@ type KpiWorkflowProps = {
   templates: KpiTemplateItem[];
   canManageTemplates: boolean;
   canAssign: boolean;
+  onAssigned?: () => void;
 };
 
 export function KpiWorkflow({
   employees,
   templates,
-  canManageTemplates,
   canAssign,
+  onAssigned,
 }: KpiWorkflowProps) {
-  if (!canManageTemplates && !canAssign) return null;
+  if (!canAssign) return null;
 
   return (
     <KpiQuickAssign
       employees={employees}
       templates={templates.filter((t) => t.isActive)}
       canAssign={canAssign}
+      onAssigned={onAssigned}
     />
   );
 }
@@ -89,6 +97,7 @@ type KpiTableProps = {
   kpiPeriod?: string;
   canManageKpis: boolean;
   currentEmployeeId: string;
+  onKpisChanged?: () => void;
 };
 
 export function KpiTable({
@@ -101,12 +110,14 @@ export function KpiTable({
   kpiPeriod,
   canManageKpis,
   currentEmployeeId,
+  onKpisChanged,
 }: KpiTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [editing, setEditing] = useState<KpiListItem | null>(null);
   const [viewing, setViewing] = useState<KpiListItem | null>(null);
+  const [deleting, setDeleting] = useState<KpiListItem | null>(null);
 
   function updateParams(updates: Record<string, string | undefined>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -118,40 +129,61 @@ export function KpiTable({
     startTransition(() => router.push(`?${params.toString()}`));
   }
 
+  function handleDelete() {
+    if (!deleting) return;
+    startTransition(async () => {
+      const result = await deleteKpiAction({ kpiId: deleting.id });
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+      toast.success("KPI deleted");
+      setDeleting(null);
+      onKpisChanged?.();
+      router.refresh();
+    });
+  }
+
   return (
-    <section className="space-y-4">
-      <div className="rounded-xl border bg-card p-4 shadow-sm">
-        <div className="grid gap-3 md:grid-cols-3">
-          <Input
-            placeholder="Search employee or KPI..."
-            defaultValue={search}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                updateParams({ search: (e.target as HTMLInputElement).value || undefined });
-              }
-            }}
-          />
-          <LabeledSelect
-            items={statusFilterItems}
-            value={kpiStatus ?? "all"}
-            onValueChange={(v) => updateParams({ kpiStatus: v === "all" ? undefined : v })}
-            placeholder="Status"
-          />
+    <div className="space-y-3">
+      <div>
+        <h2 className="text-sm font-semibold">Assigned KPIs</h2>
+        <p className="text-xs text-muted-foreground">
+          Your assignment history appears here. Click View to open details in a popup.
+        </p>
+      </div>
+
+      <PerformanceFilters
+        employees={[]}
+        statusItems={statusItems}
+        statusKey="kpiStatus"
+        statusValue={kpiStatus}
+        search={search}
+        searchPlaceholder="Search employee or KPI…"
+        variant="bar"
+        showEmployee={false}
+        showDepartment={false}
+        showCycle={false}
+        className="rounded-lg border bg-muted/10 p-3"
+        extraFilters={
           <LabeledSelect
             items={[{ value: "all", label: "All periods" }, ...periodItems]}
             value={kpiPeriod ?? "all"}
             onValueChange={(v) => updateParams({ kpiPeriod: v === "all" ? undefined : v })}
             placeholder="Review period"
+            triggerClassName={FILTER_TRIGGER}
+            contentClassName={FILTER_CONTENT}
           />
-        </div>
-      </div>
+        }
+      />
 
       <PerformanceTableShell
+        className="max-h-[min(36vh,320px)]"
         empty={
           <EmptyState
             title="No KPI assignments yet"
             description="Pick a template above and assign it to an employee to start tracking."
-            className="border-0"
+            className="border-0 py-8"
           />
         }
       >
@@ -159,46 +191,41 @@ export function KpiTable({
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
               <tr className="text-left text-muted-foreground">
-                <th className="px-4 py-3 font-medium">Employee</th>
-                <th className="px-4 py-3 font-medium">KPI</th>
-                <th className="px-4 py-3 font-medium">Target</th>
-                <th className="px-4 py-3 font-medium">Progress</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Due</th>
-                <th className="px-4 py-3" />
+                <th className="px-3 py-2.5 font-medium">Employee</th>
+                <th className="px-3 py-2.5 font-medium">Employee ID</th>
+                <th className="px-3 py-2.5 font-medium">KPI</th>
+                <th className="px-3 py-2.5 font-medium">Target</th>
+                <th className="px-3 py-2.5 font-medium">Status</th>
+                <th className="px-3 py-2.5 font-medium">Due</th>
+                <th className="px-3 py-2.5" />
               </tr>
             </thead>
             <tbody>
               {records.map((row) => (
                 <tr key={row.id} className="border-t align-middle">
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-2.5">
                     <div className="font-medium">{row.employeeName}</div>
                   </td>
-                  <td className="px-4 py-3 font-medium">{row.title}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td className="px-3 py-2.5 font-mono text-xs">{row.employeeCode}</td>
+                  <td className="px-3 py-2.5 font-medium">{row.title}</td>
+                  <td className="px-3 py-2.5 whitespace-nowrap">
                     {formatKpiTarget(row.targetValue, row.measurementType)}
                   </td>
-                  <td className="px-4 py-3">
-                    <ProgressBar value={row.completionPercentage} />
-                  </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-2.5">
                     <KpiStatusBadge status={row.kpiStatus} />
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td className="px-3 py-2.5 whitespace-nowrap text-xs">
                     {row.endDate ? format(new Date(row.endDate), "MMM d, yyyy") : "—"}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-2.5">
                     <TableActions>
-                      <Button size="sm" variant="outline" onClick={() => setViewing(row)}>
-                        <Eye className="mr-1 size-3.5" />
-                        View
-                      </Button>
+                      <ViewIconButton onClick={() => setViewing(row)} />
                       {row.kpiStatus !== "completed" &&
                       (canManageKpis || row.managerEmployeeId === currentEmployeeId) ? (
-                        <Button size="sm" variant="outline" onClick={() => setEditing(row)}>
-                          <Pencil className="mr-1 size-3.5" />
-                          Update
-                        </Button>
+                        <EditIconButton onClick={() => setEditing(row)} />
+                      ) : null}
+                      {canManageKpis ? (
+                        <DeleteIconButton onClick={() => setDeleting(row)} />
                       ) : null}
                     </TableActions>
                   </td>
@@ -223,6 +250,7 @@ export function KpiTable({
         record={viewing}
         open={!!viewing}
         onOpenChange={(open) => !open && setViewing(null)}
+        canManage={canManageKpis}
         canUpdate={
           viewing
             ? viewing.kpiStatus !== "completed" &&
@@ -232,7 +260,119 @@ export function KpiTable({
         onUpdateProgress={() => {
           if (viewing) setEditing(viewing);
         }}
+        onChanged={onKpisChanged}
       />
+
+      <PerformanceConfirmModal
+        open={!!deleting}
+        onOpenChange={(open) => !open && setDeleting(null)}
+        title="Delete this KPI?"
+        description="The employee will no longer see this assigned KPI."
+        confirmLabel="Delete KPI"
+        isPending={isPending}
+        onConfirm={handleDelete}
+      />
+    </div>
+  );
+}
+
+export function KpiWorkspace({
+  canAssign,
+  formProps,
+  tableProps,
+}: {
+  canAssign: boolean;
+  formProps: {
+    employees: LookupOption[];
+    templates: KpiTemplateItem[];
+  };
+  tableProps: Omit<Parameters<typeof KpiTable>[0], never>;
+}) {
+  const router = useRouter();
+  const skipServerSyncRef = useRef(false);
+  const [listState, setListState] = useState({
+    records: tableProps.records,
+    total: tableProps.total,
+    page: tableProps.page,
+    pageSize: tableProps.pageSize,
+    search: tableProps.search,
+    kpiStatus: tableProps.kpiStatus,
+    kpiPeriod: tableProps.kpiPeriod,
+  });
+
+  useEffect(() => {
+    if (skipServerSyncRef.current) {
+      skipServerSyncRef.current = false;
+      return;
+    }
+    setListState({
+      records: tableProps.records,
+      total: tableProps.total,
+      page: tableProps.page,
+      pageSize: tableProps.pageSize,
+      search: tableProps.search,
+      kpiStatus: tableProps.kpiStatus,
+      kpiPeriod: tableProps.kpiPeriod,
+    });
+  }, [
+    tableProps.records,
+    tableProps.total,
+    tableProps.page,
+    tableProps.pageSize,
+    tableProps.search,
+    tableProps.kpiStatus,
+    tableProps.kpiPeriod,
+  ]);
+
+  const refreshAssignedKpis = useCallback(async () => {
+    const result = await fetchKpisListAction({
+      page: 1,
+      pageSize: tableProps.pageSize,
+    });
+    if (!result.success) {
+      toast.error(result.message ?? "Could not refresh assigned KPIs");
+      return;
+    }
+    if (!result.data) return;
+
+    skipServerSyncRef.current = true;
+    setListState({
+      records: result.data.data,
+      total: result.data.total,
+      page: result.data.page,
+      pageSize: result.data.pageSize,
+      search: undefined,
+      kpiStatus: undefined,
+      kpiPeriod: undefined,
+    });
+    router.replace(PERFORMANCE_ROUTES.kpis);
+  }, [router, tableProps.pageSize]);
+
+  return (
+    <section className="rounded-xl border bg-card shadow-sm">
+      {canAssign ? (
+        <div className="p-4">
+          <KpiQuickAssign
+            employees={formProps.employees}
+            templates={formProps.templates.filter((t) => t.isActive)}
+            canAssign={canAssign}
+            onAssigned={refreshAssignedKpis}
+          />
+        </div>
+      ) : null}
+      <div className={cn("border-t p-4", !canAssign && "border-t-0")}>
+        <KpiTable
+          {...tableProps}
+          records={listState.records}
+          total={listState.total}
+          page={listState.page}
+          pageSize={listState.pageSize}
+          search={listState.search}
+          kpiStatus={listState.kpiStatus}
+          kpiPeriod={listState.kpiPeriod}
+          onKpisChanged={refreshAssignedKpis}
+        />
+      </div>
     </section>
   );
 }

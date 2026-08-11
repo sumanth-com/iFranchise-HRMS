@@ -12,6 +12,7 @@ import {
   workLocationFormSchema,
 } from "@/lib/validations/organization";
 import { emptyToNull } from "@/lib/organization/services/org-lookups";
+import { syncOrganizationBrandingToPayroll } from "@/lib/organization/services/org-branding-sync";
 import { wouldCreateCircularReporting } from "@/lib/organization/services/org-queries";
 
 type ProfileInput = z.infer<typeof organizationProfileSchema>;
@@ -86,6 +87,59 @@ export async function updateOrganizationProfile(
     .eq("organization_id", orgId);
 
   if (settingsError) throw new Error(settingsError.message);
+
+  const { data: orgRow, error: orgFetchError } = await supabase
+    .schema("hrms")
+    .from("organizations")
+    .select("name, logo_storage_path")
+    .eq("id", orgId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (orgFetchError) throw new Error(orgFetchError.message);
+
+  await syncOrganizationBrandingToPayroll(
+    supabase,
+    profile,
+    parsed.name,
+    orgRow?.logo_storage_path ?? null,
+  );
+}
+
+export async function updateOrganizationLogoPath(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  logoStoragePath: string | null,
+) {
+  const orgId = profile.employee.organizationId;
+
+  const { error } = await supabase
+    .schema("hrms")
+    .from("organizations")
+    .update({
+      logo_storage_path: logoStoragePath,
+      ...auditFields(profile),
+    })
+    .eq("id", orgId);
+
+  if (error) throw new Error(error.message);
+
+  const { data: orgRow, error: orgFetchError } = await supabase
+    .schema("hrms")
+    .from("organizations")
+    .select("name")
+    .eq("id", orgId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (orgFetchError) throw new Error(orgFetchError.message);
+
+  await syncOrganizationBrandingToPayroll(
+    supabase,
+    profile,
+    orgRow?.name ?? "",
+    logoStoragePath,
+  );
 }
 
 async function assertUniqueDepartmentName(

@@ -1,6 +1,6 @@
 import { FeedbackForm, FeedbackTable } from "@/components/performance/feedback-management";
 import { createClient } from "@/lib/supabase/server";
-import { canGiveFeedback } from "@/lib/performance/constants";
+import { canGiveFeedback, canEditPerformance } from "@/lib/performance/constants";
 import {
   getPerformanceLookups,
   listFeedback,
@@ -35,7 +35,7 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Continuous Feedback</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Appreciation, suggestions, coaching, and warnings with public or private visibility.
+          Appreciation, suggestions, coaching, and warnings — visible only in the employee&apos;s profile.
         </p>
       </div>
       {canGiveFeedback(profile.permissionCodes) ? (
@@ -49,6 +49,10 @@ export default async function FeedbackPage({ searchParams }: FeedbackPageProps) 
         employees={lookups.employees}
         employeeId={params.employeeId}
         feedbackType={params.feedbackType}
+        canDelete={
+          canGiveFeedback(profile.permissionCodes) ||
+          canEditPerformance(profile.permissionCodes)
+        }
       />
     </div>
   );

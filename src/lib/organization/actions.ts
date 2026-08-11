@@ -63,9 +63,13 @@ function revalidateOrganization() {
   for (const route of Object.values(ORGANIZATION_ROUTES)) {
     revalidatePath(route);
   }
+  revalidatePath("/dashboard/company-settings");
   revalidatePath("/dashboard/employees");
   revalidatePath("/dashboard/leave");
   revalidatePath("/dashboard/attendance");
+  revalidatePath("/employee");
+  revalidatePath("/manager");
+  revalidatePath("/ceo");
 }
 
 export async function saveOrganizationProfileAction(

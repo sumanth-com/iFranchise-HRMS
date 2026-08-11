@@ -29,6 +29,9 @@ type PerformanceFiltersProps = {
   className?: string;
   /** Aligned single-row filter bar (search + dropdowns same height). */
   variant?: "default" | "bar";
+  showEmployee?: boolean;
+  showDepartment?: boolean;
+  showCycle?: boolean;
 };
 
 export function PerformanceFilters({
@@ -46,6 +49,9 @@ export function PerformanceFilters({
   extraFilters,
   className,
   variant = "default",
+  showEmployee = true,
+  showDepartment = true,
+  showCycle = true,
 }: PerformanceFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -147,9 +153,9 @@ export function PerformanceFilters({
         )}
       >
         {searchField}
-        {employeeField}
-        {departmentField}
-        {cycleField}
+        {showEmployee ? employeeField : null}
+        {showDepartment ? departmentField : null}
+        {showCycle ? cycleField : null}
         {statusField}
         {extraFilters}
       </div>
@@ -166,9 +172,9 @@ export function PerformanceFilters({
     >
       <div className="relative w-full lg:w-[18rem] lg:shrink-0">{searchField}</div>
       <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 items-center">
-        {employeeField}
-        {departmentField}
-        {cycleField}
+        {showEmployee ? employeeField : null}
+        {showDepartment ? departmentField : null}
+        {showCycle ? cycleField : null}
         {statusField}
         {extraFilters}
       </div>

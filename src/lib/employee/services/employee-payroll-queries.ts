@@ -244,7 +244,7 @@ export async function getEmployeePayrollData(
 
   const hrPayslipAccess = canAccessPayslipDuringReview(profile.permissionCodes);
 
-  const [payslipRows, structureRow, bankRow, settings, bonusResult, reimbursementResult] =
+  const [payslipRows, structureRow, bankRow, settings, bonusResult, reimbursementResult, pendingPromotionRow] =
     await Promise.all([
     safe(async () => {
       const { data, error } = await supabase
@@ -325,6 +325,24 @@ export async function getEmployeePayrollData(
         listReimbursements(supabase, profile, { employeeId, page: 1, pageSize: 12 }),
       { data: [] as ReimbursementItem[], total: 0, page: 1, pageSize: 12 },
     ),
+    safe(async () => {
+      const { data, error } = await supabase
+        .schema("hrms")
+        .from("performance_promotions")
+        .select(
+          `promotion_status, current_salary, recommended_salary,
+           recommended_designation:recommended_designation_id(title)`,
+        )
+        .eq("organization_id", organizationId)
+        .eq("employee_id", employeeId)
+        .in("promotion_status", ["pending", "recommended"])
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return data;
+    }, null),
   ]);
 
   const bonuses = bonusResult.data;
@@ -523,6 +541,29 @@ export async function getEmployeePayrollData(
   const currentNet = latest?.netSalary ?? salaryStructure?.netSalary ?? null;
   const currentGross = latest?.grossSalary ?? salaryStructure?.grossSalary ?? null;
 
+  const recommendedDesignation = pendingPromotionRow?.recommended_designation as
+    | { title: string }
+    | { title: string }[]
+    | null;
+  const designationTitle = Array.isArray(recommendedDesignation)
+    ? recommendedDesignation[0]?.title
+    : recommendedDesignation?.title;
+
+  const pendingPromotion = pendingPromotionRow
+    ? {
+        status: String(pendingPromotionRow.promotion_status),
+        currentSalary:
+          pendingPromotionRow.current_salary != null
+            ? Number(pendingPromotionRow.current_salary)
+            : null,
+        recommendedSalary:
+          pendingPromotionRow.recommended_salary != null
+            ? Number(pendingPromotionRow.recommended_salary)
+            : null,
+        recommendedDesignation: designationTitle ?? null,
+      }
+    : null;
+
   return {
     currencyCode,
     hasAnyData:
@@ -547,6 +588,7 @@ export async function getEmployeePayrollData(
     bonuses,
     reimbursements,
     trend,
+    pendingPromotion,
     ytd: {
       earnings: ytdEarnings,
       deductions: ytdDeductions,

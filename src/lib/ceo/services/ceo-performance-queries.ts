@@ -1036,18 +1036,35 @@ export async function getCeoPerformancePromotionOverview(
       pending: 0,
       rejected: 0,
       pipeline: PROMOTION_PIPELINE.map((status) => ({ label: status, value: 0 })),
+      pendingQueue: [],
     };
   }
 
-  const { data, error } = await fromHrms(supabase, "performance_promotions")
-    .select("promotion_status")
-    .eq("organization_id", organizationId)
-    .in("employee_id", employeeIds)
-    .is("deleted_at", null);
+  const [countsRes, queueRes] = await Promise.all([
+    fromHrms(supabase, "performance_promotions")
+      .select("promotion_status")
+      .eq("organization_id", organizationId)
+      .in("employee_id", employeeIds)
+      .is("deleted_at", null),
+    fromHrms(supabase, "performance_promotions")
+      .select(
+        `id, promotion_status, current_salary, recommended_salary, created_at,
+         employees:employee_id(first_name, last_name, departments:department_id(name)),
+         current_designation:current_designation_id(title),
+         recommended_designation:recommended_designation_id(title)`,
+      )
+      .eq("organization_id", organizationId)
+      .in("employee_id", employeeIds)
+      .in("promotion_status", ["pending", "recommended"])
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(20),
+  ]);
 
-  if (error) throw new Error(error.message);
+  if (countsRes.error) throw new Error(countsRes.error.message);
+  if (queueRes.error) throw new Error(queueRes.error.message);
 
-  const rows = (data ?? []) as LooseRow[];
+  const rows = (countsRes.data ?? []) as LooseRow[];
   const counts = new Map<PromotionStatus, number>();
   for (const status of PROMOTION_PIPELINE) counts.set(status, 0);
   for (const row of rows) {
@@ -1064,6 +1081,26 @@ export async function getCeoPerformancePromotionOverview(
       label: status,
       value: counts.get(status) ?? 0,
     })),
+    pendingQueue: ((queueRes.data ?? []) as LooseRow[]).map((row) => {
+      const employee = unwrap(row.employees);
+      const dept = unwrap(employee?.departments ?? null);
+      const current = unwrap(row.current_designation);
+      const recommended = unwrap(row.recommended_designation);
+      return {
+        id: row.id as string,
+        employeeName: employee
+          ? formatEmployeeName(employee.first_name, employee.last_name)
+          : "—",
+        departmentName: dept?.name ?? null,
+        currentDesignation: current?.title ?? null,
+        recommendedDesignation: recommended?.title ?? null,
+        currentSalary: row.current_salary != null ? Number(row.current_salary) : null,
+        recommendedSalary:
+          row.recommended_salary != null ? Number(row.recommended_salary) : null,
+        promotionStatus: row.promotion_status as PromotionStatus,
+        createdAt: row.created_at as string,
+      };
+    }),
   };
 }
 

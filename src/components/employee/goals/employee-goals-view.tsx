@@ -1,16 +1,15 @@
 "use client";
 
 import { format } from "date-fns";
-import { Eye } from "lucide-react";
 import { useState } from "react";
 
 import { EmptyState } from "@/components/common/empty-state";
-import { Button } from "@/components/common/button";
 import { GoalDetailModal } from "@/components/performance/goal-detail-modal";
 import { GoalStatusBadge } from "@/components/performance/performance-status-badge";
 import {
   PerformanceTableShell,
   TableActions,
+  ViewIconButton,
 } from "@/components/performance/performance-ui-primitives";
 import type { GoalListItem } from "@/types/performance";
 
@@ -33,37 +32,34 @@ export function EmployeeGoalsView({ goals }: { goals: GoalListItem[] }) {
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
               <tr className="text-left text-muted-foreground">
-                <th className="px-3 py-2.5 font-medium">Goal</th>
-                <th className="px-3 py-2.5 font-medium">Key results</th>
-                <th className="px-3 py-2.5 font-medium">Status</th>
-                <th className="px-3 py-2.5 font-medium">Due</th>
-                <th className="px-3 py-2.5" />
+                <th className="px-4 py-3 font-medium">Goal</th>
+                <th className="px-4 py-3 font-medium">Key results</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Due</th>
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
               {goals.map((row) => (
                 <tr key={row.id} className="border-t align-middle">
-                  <td className="px-3 py-2.5">
+                  <td className="px-4 py-3">
                     <div className="font-medium">{row.title}</div>
                     {row.category ? (
                       <div className="text-xs text-muted-foreground">{row.category}</div>
                     ) : null}
                   </td>
-                  <td className="px-3 py-2.5 tabular-nums">
+                  <td className="px-4 py-3 tabular-nums">
                     {row.completedMilestones}/{row.milestoneCount}
                   </td>
-                  <td className="px-3 py-2.5">
+                  <td className="px-4 py-3">
                     <GoalStatusBadge status={row.goalStatus} />
                   </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap text-xs">
+                  <td className="px-4 py-3 whitespace-nowrap text-xs">
                     {row.dueDate ? format(new Date(row.dueDate), "MMM d, yyyy") : "—"}
                   </td>
-                  <td className="px-3 py-2.5">
+                  <td className="px-4 py-3">
                     <TableActions>
-                      <Button size="sm" variant="outline" onClick={() => setViewId(row.id)}>
-                        <Eye className="mr-1 size-3.5" />
-                        View
-                      </Button>
+                      <ViewIconButton onClick={() => setViewId(row.id)} />
                     </TableActions>
                   </td>
                 </tr>
@@ -88,7 +84,7 @@ export function EmployeeGoalsView({ goals }: { goals: GoalListItem[] }) {
 
 async function fetchMyGoalDetail(goalId: string) {
   const { fetchMyGoalDetailAction } = await import(
-    "@/lib/employee/actions/employee-goals-actions"
+    "@/lib/employee/actions/employee-performance-actions"
   );
   return fetchMyGoalDetailAction(goalId);
 }
@@ -99,7 +95,7 @@ async function toggleMyGoalMilestone(input: {
   isCompleted: boolean;
 }) {
   const { toggleMyGoalMilestoneAction } = await import(
-    "@/lib/employee/actions/employee-goals-actions"
+    "@/lib/employee/actions/employee-performance-actions"
   );
   return toggleMyGoalMilestoneAction(input);
 }

@@ -12,7 +12,6 @@ import {
   Package,
   Settings,
   Shield,
-  ScrollText,
   Target,
   UserRound,
   UserRoundPlus,
@@ -205,13 +204,6 @@ export const mainNavItems: NavigationItem[] = [
     icon: Shield,
     section: "Administration",
     permissions: ["role.view", "permission.view", "user_role.view"],
-  },
-  {
-    title: "Audit Trail",
-    href: "/dashboard/audit",
-    icon: ScrollText,
-    section: "Administration",
-    permissions: ["audit.view"],
   },
   {
     title: "Company Settings",

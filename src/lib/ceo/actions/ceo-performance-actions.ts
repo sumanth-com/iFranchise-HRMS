@@ -1,6 +1,9 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import { CEO_ROUTES } from "@/lib/ceo/constants";
 import {
   getCeoPerformanceEmployeeDetail,
   getCeoPerformanceInsights,
@@ -13,8 +16,14 @@ import {
   listCeoPerformanceDepartments,
   listCeoPerformanceEmployees,
 } from "@/lib/ceo/services/ceo-performance-queries";
+import { approvePromotionFully } from "@/lib/performance/services/performance-mutations";
+import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
+import { HR_HUB_ROUTES } from "@/lib/dashboard/hr-hub-routes";
+import { PAYROLL_ROUTES } from "@/lib/payroll/constants";
+import { PERFORMANCE_ROUTES } from "@/lib/performance/constants";
 import { requireServerPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
+import { promotionApprovalSchema } from "@/lib/validations/performance";
 import {
   ceoPerformanceEmployeeIdSchema,
   ceoPerformanceListParamsSchema,
@@ -162,6 +171,35 @@ export async function fetchCeoPerformanceEmployeeDetailAction(
         error instanceof Error
           ? error.message
           : "Failed to load employee performance profile.",
+    };
+  }
+}
+
+export async function approveCeoPromotionAction(
+  input: unknown,
+): Promise<{ success: true } | { success: false; message: string }> {
+  try {
+    const profile = await requireServerPermission(PORTAL_PERMISSIONS.ceo);
+    const supabase = await createClient();
+    const parsed = promotionApprovalSchema.parse(input);
+    await approvePromotionFully(supabase, profile, parsed.promotionId, parsed.comments);
+
+    revalidatePath(CEO_ROUTES.performance);
+    revalidatePath(CEO_ROUTES.approvals);
+    revalidatePath(PERFORMANCE_ROUTES.promotions);
+    revalidatePath(HR_HUB_ROUTES.myGoals);
+    revalidatePath(`${HR_HUB_ROUTES.myGoals}/promotions`);
+    revalidatePath(EMPLOYEE_ROUTES.goals);
+    revalidatePath(`${EMPLOYEE_ROUTES.goals}/promotions`);
+    revalidatePath(HR_HUB_ROUTES.myPayroll);
+    revalidatePath(EMPLOYEE_ROUTES.payroll);
+    revalidatePath(PAYROLL_ROUTES.salaryStructures);
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to approve promotion",
     };
   }
 }

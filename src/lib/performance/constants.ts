@@ -1,4 +1,5 @@
 import { hasAnyPermission } from "@/lib/permissions/utils";
+import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import type {
   FeedbackType,
   FeedbackVisibility,
@@ -221,8 +222,15 @@ export function canManagePerformanceSettings(codes: string[]) {
 export const PERFORMANCE_SUB_NAV = [
   { title: "Goals & OKRs", href: PERFORMANCE_ROUTES.goals },
   { title: "KPIs", href: PERFORMANCE_ROUTES.kpis },
-  { title: "Reviews", href: PERFORMANCE_ROUTES.reviews },
   { title: "Feedback", href: PERFORMANCE_ROUTES.feedback },
   { title: "1:1 Meetings", href: PERFORMANCE_ROUTES.oneOnOnes },
   { title: "Promotions", href: PERFORMANCE_ROUTES.promotions },
+] as const;
+
+export const EMPLOYEE_PERFORMANCE_SUB_NAV = [
+  { title: "Goals & OKRs", href: EMPLOYEE_ROUTES.goals },
+  { title: "KPIs", href: `${EMPLOYEE_ROUTES.goals}/kpis` },
+  { title: "Feedback", href: `${EMPLOYEE_ROUTES.goals}/feedback` },
+  { title: "1:1 Meetings", href: `${EMPLOYEE_ROUTES.goals}/one-on-ones` },
+  { title: "Promotions", href: `${EMPLOYEE_ROUTES.goals}/promotions` },
 ] as const;

@@ -1,5 +1,4 @@
 import { ASSETS_ROUTES, SELF_ASSETS_ROUTES, assetsTeamListUrl } from "@/lib/assets/constants";
-import { AUDIT_ROUTES } from "@/lib/audit/constants";
 import { COMPANY_SETTINGS_ROUTES } from "@/lib/company-settings/constants";
 import { DOCUMENTS_ROUTES, SELF_DOCUMENTS_ROUTES, documentsTeamListUrl } from "@/lib/documents/constants";
 import { HR_OVERVIEW_ROUTES } from "@/lib/dashboard/constants";
@@ -283,15 +282,7 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
     keywords: ["settings", "preferences", "profile"],
   },
   {
-    id: "audit",
-    label: "Audit Trail",
-    description: "System activity history",
-    href: AUDIT_ROUTES.logs,
-    keywords: ["audit trail", "audit", "log", "history", "activity"],
-    permission: "audit.view",
-  },
-  {
-    id: "settings",
+    id: "company-settings",
     label: "Company Settings",
     description: "Organization profile, HR policies, and platform controls",
     href: COMPANY_SETTINGS_ROUTES.base,

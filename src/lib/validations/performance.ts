@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  isFollowUpBeforeScheduled,
+  isPastDateLocal,
+  isPastDateTimeLocal,
+} from "@/lib/performance/services/performance-utils";
 import { paginationSchema } from "@/lib/validations/common";
 
 export const performanceListParamsSchema = paginationSchema.extend({
@@ -90,11 +95,24 @@ export const kpiListParamsSchema = performanceListParamsSchema.extend({
   kpiPeriod: z.enum(["monthly", "quarterly", "half_yearly", "annual"]).optional(),
 });
 
+/** Client assign form — templateId may be empty until a preset is saved as a template. */
 export const kpiAssignFormSchema = z.object({
+  employeeId: z.string().uuid(),
+  templateId: z.union([z.string().uuid(), z.literal("")]).default(""),
+  startDate: z.string().min(1),
+  endDate: z.string().min(1),
+});
+
+/** Server assign payload — template must exist before assignment. */
+export const kpiAssignPayloadSchema = z.object({
   employeeId: z.string().uuid(),
   templateId: z.string().uuid(),
   startDate: z.string().min(1),
   endDate: z.string().min(1),
+});
+
+export const kpiDeleteSchema = z.object({
+  kpiId: z.string().uuid(),
 });
 
 export const kpiProgressSchema = z.object({
@@ -144,8 +162,11 @@ export const feedbackListParamsSchema = performanceListParamsSchema.extend({
 export const feedbackFormSchema = z.object({
   toEmployeeId: z.string().uuid(),
   feedbackType: z.enum(["appreciation", "suggestion", "coaching", "warning"]),
-  visibility: z.enum(["public", "private"]).default("private"),
   message: z.string().min(1).max(5000),
+});
+
+export const feedbackDeleteSchema = z.object({
+  feedbackId: z.string().uuid(),
 });
 
 export const oneOnOneListParamsSchema = performanceListParamsSchema.extend({
@@ -155,9 +176,14 @@ export const oneOnOneListParamsSchema = performanceListParamsSchema.extend({
 export const oneOnOneFormSchema = z.object({
   employeeId: z.string().uuid(),
   managerEmployeeId: z.string().uuid(),
-  scheduledAt: z.string().min(1),
+  scheduledAt: z
+    .string()
+    .min(1)
+    .refine((value) => !isPastDateTimeLocal(value), {
+      message: "Scheduled time cannot be in the past",
+    }),
   agenda: z.string().max(5000).optional(),
-  notes: z.string().max(5000).optional(),
+  meetingLink: z.string().max(500).optional().nullable(),
   followUpDate: z.string().optional().nullable(),
   meetingStatus: z.enum(["scheduled", "completed", "cancelled", "rescheduled"]).default("scheduled"),
   actionItems: z
@@ -170,15 +196,55 @@ export const oneOnOneFormSchema = z.object({
     )
     .optional()
     .default([]),
+}).superRefine((data, ctx) => {
+  if (data.followUpDate) {
+    if (isPastDateLocal(data.followUpDate)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Follow-up date cannot be in the past",
+        path: ["followUpDate"],
+      });
+    }
+    if (data.scheduledAt && isFollowUpBeforeScheduled(data.followUpDate, data.scheduledAt)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Follow-up date cannot be before the scheduled meeting",
+        path: ["followUpDate"],
+      });
+    }
+  }
 });
 
-export const oneOnOneUpdateSchema = z.object({
+export const oneOnOneDeleteSchema = z.object({
   meetingId: z.string().uuid(),
-  notes: z.string().max(5000).optional(),
-  agenda: z.string().max(5000).optional(),
-  followUpDate: z.string().optional().nullable(),
-  meetingStatus: z.enum(["scheduled", "completed", "cancelled", "rescheduled"]).optional(),
 });
+
+export const oneOnOneUpdateSchema = z
+  .object({
+    meetingId: z.string().uuid(),
+    agenda: z.string().max(5000).optional(),
+    meetingLink: z.string().max(500).optional().nullable(),
+    followUpDate: z.string().optional().nullable(),
+    meetingStatus: z.enum(["scheduled", "completed", "cancelled", "rescheduled"]).optional(),
+    scheduledAt: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.followUpDate) return;
+    if (isPastDateLocal(data.followUpDate)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Follow-up date cannot be in the past",
+        path: ["followUpDate"],
+      });
+    }
+    if (data.scheduledAt && isFollowUpBeforeScheduled(data.followUpDate, data.scheduledAt)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Follow-up date cannot be before the scheduled meeting",
+        path: ["followUpDate"],
+      });
+    }
+  });
 
 export const promotionListParamsSchema = performanceListParamsSchema.extend({
   promotionStatus: z
@@ -198,6 +264,18 @@ export const promotionFormSchema = z.object({
 export const promotionApprovalSchema = z.object({
   promotionId: z.string().uuid(),
   comments: z.string().max(2000).optional(),
+});
+
+export const promotionUpdateSchema = z.object({
+  promotionId: z.string().uuid(),
+  recommendedDesignationId: z.string().uuid().optional().nullable(),
+  currentSalary: z.coerce.number().min(0).optional().nullable(),
+  recommendedSalary: z.coerce.number().min(0).optional().nullable(),
+  reason: z.string().max(5000).optional().nullable(),
+});
+
+export const promotionDeleteSchema = z.object({
+  promotionId: z.string().uuid(),
 });
 
 export const reviewCycleFormSchema = z.object({

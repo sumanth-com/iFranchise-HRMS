@@ -1,10 +1,6 @@
-import { KpiTable, KpiWorkflow } from "@/components/performance/kpi-management";
+import { KpiWorkspace } from "@/components/performance/kpi-management";
 import { createClient } from "@/lib/supabase/server";
-import {
-  canAssignKpis,
-  canManageKpiTemplates,
-  canManageKpis,
-} from "@/lib/performance/constants";
+import { canAssignKpis, canManageKpis } from "@/lib/performance/constants";
 import {
   getPerformanceLookups,
   listKpis,
@@ -38,11 +34,10 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     getPerformanceLookups(supabase, profile.employee.organizationId),
   ]);
 
-  const canManageTemplates = canManageKpiTemplates(profile.permissionCodes);
   const canAssign = canAssignKpis(profile.permissionCodes);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">KPI Management</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -50,29 +45,27 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         </p>
       </div>
 
-      <KpiWorkflow
-        departments={lookups.departments}
-        designations={lookups.designations}
-        employees={lookups.employees}
-        templates={templates}
-        canManageTemplates={canManageTemplates}
+      <KpiWorkspace
         canAssign={canAssign}
-      />
-
-      <KpiTable
-        records={result.data}
-        total={result.total}
-        page={result.page}
-        pageSize={result.pageSize}
-        departments={lookups.departments}
-        designations={lookups.designations}
-        search={params.search}
-        departmentId={params.departmentId}
-        designationId={params.designationId}
-        kpiStatus={params.kpiStatus}
-        kpiPeriod={params.kpiPeriod}
-        canManageKpis={canManageKpis(profile.permissionCodes)}
-        currentEmployeeId={profile.employee.id}
+        formProps={{
+          employees: lookups.employees,
+          templates: templates,
+        }}
+        tableProps={{
+          records: result.data,
+          total: result.total,
+          page: result.page,
+          pageSize: result.pageSize,
+          departments: lookups.departments,
+          designations: lookups.designations,
+          search: params.search,
+          departmentId: params.departmentId,
+          designationId: params.designationId,
+          kpiStatus: params.kpiStatus,
+          kpiPeriod: params.kpiPeriod,
+          canManageKpis: canManageKpis(profile.permissionCodes),
+          currentEmployeeId: profile.employee.id,
+        }}
       />
     </div>
   );

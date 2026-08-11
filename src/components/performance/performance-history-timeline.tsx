@@ -12,8 +12,8 @@ import {
 import { useState } from "react";
 
 import { EmptyState } from "@/components/common/empty-state";
-import { Button } from "@/components/common/button";
 import { HistoryEventModal } from "@/components/performance/history-event-modal";
+import { ViewIconButton } from "@/components/performance/performance-ui-primitives";
 import {
   buildStatusItems,
   PerformanceFilters,
@@ -102,23 +102,18 @@ export function PerformanceHistoryTimeline({
                         <h3 className="mt-1 font-medium">{event.title}</h3>
                         <p className="text-sm text-muted-foreground">{event.employeeName}</p>
                       </div>
-                      <time className="text-xs text-muted-foreground shrink-0">
-                        {format(new Date(event.occurredAt), "MMM d, yyyy")}
-                      </time>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <time className="text-xs text-muted-foreground">
+                          {format(new Date(event.occurredAt), "MMM d, yyyy")}
+                        </time>
+                        <ViewIconButton onClick={() => setViewEvent(event)} />
+                      </div>
                     </div>
                     {event.description ? (
                       <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
                         {event.description}
                       </p>
                     ) : null}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="mt-3"
-                      onClick={() => setViewEvent(event)}
-                    >
-                      View details
-                    </Button>
                   </div>
                 </div>
               );

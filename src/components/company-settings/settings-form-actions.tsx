@@ -13,6 +13,8 @@ type SettingsFormActionsProps = {
   isPending: boolean;
   onReset: () => void;
   saveLabel?: string;
+  resetLabel?: string;
+  placement?: "sticky" | "inline";
 };
 
 export function SettingsFormActions({
@@ -21,13 +23,39 @@ export function SettingsFormActions({
   isPending,
   onReset,
   saveLabel = "Save changes",
+  resetLabel = "Reset changes",
+  placement = "sticky",
 }: SettingsFormActionsProps) {
   if (!canEdit) {
+    if (placement === "inline") return null;
     return (
       <p className="text-sm text-muted-foreground">
         You have view-only access. Only Super Admin can edit company settings.
       </p>
     );
+  }
+
+  const buttons = (
+    <div className="flex shrink-0 flex-wrap items-center gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={!isDirty || isPending}
+        onClick={onReset}
+      >
+        <RotateCcw className="mr-2 size-4" />
+        {placement === "inline" ? "Reset" : resetLabel}
+      </Button>
+      <Button type="submit" size="sm" disabled={!isDirty || isPending}>
+        {isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+        {placement === "inline" ? "Save" : saveLabel}
+      </Button>
+    </div>
+  );
+
+  if (placement === "inline") {
+    return buttons;
   }
 
   return (
@@ -39,7 +67,7 @@ export function SettingsFormActions({
         onClick={onReset}
       >
         <RotateCcw className="mr-2 size-4" />
-        Reset changes
+        {resetLabel}
       </Button>
       <Button type="submit" disabled={!isDirty || isPending}>
         {isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}

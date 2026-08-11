@@ -60,6 +60,13 @@ export type EmployeePayrollKpis = {
   ytdTax: number;
 };
 
+export type EmployeePayrollPendingPromotion = {
+  status: string;
+  currentSalary: number | null;
+  recommendedSalary: number | null;
+  recommendedDesignation: string | null;
+};
+
 export type EmployeePayrollData = {
   currencyCode: string;
   hasAnyData: boolean;
@@ -73,6 +80,7 @@ export type EmployeePayrollData = {
   bonuses: BonusItem[];
   reimbursements: ReimbursementItem[];
   trend: EmployeePayrollTrendPoint[];
+  pendingPromotion: EmployeePayrollPendingPromotion | null;
   ytd: {
     earnings: number;
     deductions: number;

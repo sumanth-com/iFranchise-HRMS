@@ -141,9 +141,9 @@ export async function getPayslipBranding(
 
   return {
     companyName:
+      orgProfile?.name ||
       payrollConfig.payslip.companyName ||
       orgProfile?.legalName ||
-      orgProfile?.name ||
       "iFranchise",
     addressLines: formatOrganizationAddress(orgProfile),
     logoUrl,

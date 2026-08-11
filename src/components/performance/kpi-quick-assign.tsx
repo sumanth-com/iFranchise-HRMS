@@ -2,7 +2,6 @@
 
 import { Loader2 } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -21,10 +20,13 @@ import {
   type KpiPreset,
 } from "@/lib/performance/kpi-presets";
 import { kpiAssignFormSchema, kpiTemplateFormSchema } from "@/lib/validations/performance";
+import { cn } from "@/lib/utils";
 import type { KpiTemplateItem } from "@/types/performance";
 import type { LookupOption } from "@/types/employee";
 
 const periodItems = toSelectItems(KPI_PERIOD_LABELS);
+const FIELD_CLASS = "h-9";
+const EMPLOYEE_SELECT_TRIGGER = "h-9 w-full min-w-[14rem]";
 
 type TemplateSource =
   | { kind: "preset"; preset: KpiPreset }
@@ -34,10 +36,17 @@ type Props = {
   employees: LookupOption[];
   templates: KpiTemplateItem[];
   canAssign: boolean;
+  onAssigned?: () => void;
 };
 
-export function KpiQuickAssign({ employees, templates, canAssign }: Props) {
-  const router = useRouter();
+function assignFormErrorMessage(error: z.ZodError) {
+  const field = error.issues[0]?.path[0];
+  if (field === "employeeId") return "Please select an employee.";
+  if (field === "startDate" || field === "endDate") return "Please set start and end dates.";
+  return error.issues[0]?.message ?? "Please check the assign form.";
+}
+
+export function KpiQuickAssign({ employees, templates, canAssign, onAssigned }: Props) {
   const [isPending, startTransition] = useTransition();
   const [templateKey, setTemplateKey] = useState("");
   const [source, setSource] = useState<TemplateSource | null>(null);
@@ -156,7 +165,7 @@ export function KpiQuickAssign({ employees, templates, canAssign }: Props) {
       return;
     }
     if (!assignParsed.success) {
-      toast.error("Please select an employee.");
+      toast.error(assignFormErrorMessage(assignParsed.error));
       return;
     }
 
@@ -189,96 +198,116 @@ export function KpiQuickAssign({ employees, templates, canAssign }: Props) {
         isActive: true,
       });
       assignForm.reset({ employeeId: "", templateId: "", startDate: "", endDate: "" });
-      router.refresh();
+      onAssigned?.();
     });
   }
 
   if (!canAssign) return null;
 
   return (
-    <section className="rounded-xl border bg-card p-5 shadow-sm">
-      <div className="mb-4">
+    <div className="space-y-3">
+      <div>
         <h2 className="text-sm font-semibold">Assign KPI</h2>
         <p className="text-xs text-muted-foreground">
-          Choose a template, set the target, and assign to an employee.
+          Pick a template, set the target, and assign to an employee.
         </p>
       </div>
 
-      <div className="space-y-4">
-        <Field label="Template">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+        <CompactField label="Template" className="min-w-0 flex-1">
           <LabeledSelect
             items={[{ value: "", label: "Select a KPI template" }, ...templateOptions]}
             value={templateKey}
             onValueChange={applyTemplateKey}
             disabled={isPending}
           />
-        </Field>
-
-        {source ? (
-          <div className="grid gap-3 md:grid-cols-2">
-            <Field label="Employee">
-              <EmployeeSelect
-                employees={employees}
-                value={assignForm.watch("employeeId")}
-                onValueChange={(value) =>
-                  assignForm.setValue("employeeId", value, { shouldValidate: true })
-                }
-                disabled={isPending}
-              />
-            </Field>
-            <Field label="KPI name">
-              <Input disabled={isPending} {...templateForm.register("name")} />
-            </Field>
-            <Field label="Target">
-              <Input
-                type="number"
-                min={0}
-                step="0.01"
-                disabled={isPending}
-                {...templateForm.register("targetValue")}
-              />
-            </Field>
-            <Field label="Review period">
-              <LabeledSelect
-                items={periodItems}
-                value={templateForm.watch("kpiPeriod")}
-                onValueChange={(value) =>
-                  handlePeriodChange(
-                    value as z.input<typeof kpiTemplateFormSchema>["kpiPeriod"],
-                  )
-                }
-                disabled={isPending}
-              />
-            </Field>
-            <Field label="Start date">
-              <Input type="date" disabled={isPending} {...assignForm.register("startDate")} />
-            </Field>
-            <Field label="End date">
-              <Input type="date" disabled={isPending} {...assignForm.register("endDate")} />
-            </Field>
-            <div className="md:col-span-2">
-              <Button type="button" disabled={isPending} onClick={handleAssign}>
-                {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Assign KPI
-              </Button>
-            </div>
-          </div>
-        ) : null}
+        </CompactField>
+        <Button
+          type="button"
+          className="h-9 shrink-0 sm:w-auto"
+          disabled={
+            isPending || !templateKey || !assignForm.watch("employeeId") || !source
+          }
+          onClick={handleAssign}
+        >
+          {isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+          Assign KPI
+        </Button>
       </div>
-    </section>
+
+      {source ? (
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <CompactField label="Employee" className="min-w-[14rem]">
+            <EmployeeSelect
+              employees={employees}
+              value={assignForm.watch("employeeId")}
+              onValueChange={(value) =>
+                assignForm.setValue("employeeId", value, { shouldValidate: true })
+              }
+              disabled={isPending}
+              triggerClassName={EMPLOYEE_SELECT_TRIGGER}
+              contentClassName="min-w-[var(--radix-select-trigger-width)]"
+            />
+          </CompactField>
+          <CompactField label="KPI name">
+            <Input className={FIELD_CLASS} disabled={isPending} {...templateForm.register("name")} />
+          </CompactField>
+          <CompactField label="Target">
+            <Input
+              type="number"
+              min={0}
+              step="0.01"
+              className={FIELD_CLASS}
+              disabled={isPending}
+              {...templateForm.register("targetValue")}
+            />
+          </CompactField>
+          <CompactField label="Review period">
+            <LabeledSelect
+              items={periodItems}
+              value={templateForm.watch("kpiPeriod")}
+              onValueChange={(value) =>
+                handlePeriodChange(
+                  value as z.input<typeof kpiTemplateFormSchema>["kpiPeriod"],
+                )
+              }
+              disabled={isPending}
+            />
+          </CompactField>
+          <CompactField label="Start date">
+            <Input
+              type="date"
+              className={FIELD_CLASS}
+              disabled={isPending}
+              {...assignForm.register("startDate")}
+            />
+          </CompactField>
+          <CompactField label="End date">
+            <Input
+              type="date"
+              className={FIELD_CLASS}
+              disabled={isPending}
+              {...assignForm.register("endDate")}
+            />
+          </CompactField>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
-function Field({
+function CompactField({
   label,
   children,
+  className,
 }: {
   label: string;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="space-y-2">
-      <Label>{label}</Label>
+    <div className={cn("space-y-1", className)}>
+      <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
       {children}
     </div>
   );

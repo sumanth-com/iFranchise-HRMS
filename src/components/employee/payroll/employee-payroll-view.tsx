@@ -219,6 +219,28 @@ export function EmployeePayrollView({
     <>
       {header}
 
+      {data.pendingPromotion ? (
+        <section className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm">
+          <p className="font-medium text-amber-900 dark:text-amber-200">
+            Promotion pending approval
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            {data.pendingPromotion.recommendedDesignation
+              ? `Proposed role: ${data.pendingPromotion.recommendedDesignation}. `
+              : null}
+            {data.pendingPromotion.currentSalary != null &&
+            data.pendingPromotion.recommendedSalary != null
+              ? `Proposed salary: ${money(data.pendingPromotion.currentSalary)} → ${money(
+                  data.pendingPromotion.recommendedSalary,
+                )}. `
+              : data.pendingPromotion.recommendedSalary != null
+                ? `Proposed salary: ${money(data.pendingPromotion.recommendedSalary)}. `
+                : null}
+            Payroll uses your current approved salary until the CEO approves this promotion.
+          </p>
+        </section>
+      ) : null}
+
       {/* KPI cards */}
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-5">
         <EmployeeStatCard

@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { Eye, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
@@ -19,14 +19,21 @@ import {
   PerformancePagination,
 } from "@/components/performance/performance-filters";
 import { OneOnOneDetailModal } from "@/components/performance/one-on-one-detail-modal";
+import { PerformanceConfirmModal } from "@/components/performance/performance-confirm-modal";
 import { MeetingStatusBadge } from "@/components/performance/performance-status-badge";
 import {
+  DeleteIconButton,
   PerformanceTableShell,
   TableActions,
+  ViewIconButton,
 } from "@/components/performance/performance-ui-primitives";
 import { EmployeeSelect } from "@/components/payroll/payroll-select";
-import { createOneOnOneAction } from "@/lib/performance/actions";
+import { createOneOnOneAction, deleteOneOnOneAction } from "@/lib/performance/actions";
 import { MEETING_STATUS_LABELS } from "@/lib/performance/constants";
+import {
+  getMinDateTimeLocalValue,
+  getMinFollowUpDateLocal,
+} from "@/lib/performance/services/performance-utils";
 import { oneOnOneFormSchema } from "@/lib/validations/performance";
 import type { OneOnOneListItem } from "@/types/performance";
 import type { LookupOption } from "@/types/employee";
@@ -47,9 +54,11 @@ export function OneOnOneForm({ employees }: { employees: LookupOption[] }) {
     },
   });
 
+  const scheduledAt = form.watch("scheduledAt");
+  const minFollowUpDate = getMinFollowUpDateLocal(scheduledAt);
+
   return (
     <section className="rounded-xl border bg-card p-5 shadow-sm">
-      <h2 className="mb-4 text-sm font-medium">Schedule 1:1 meeting</h2>
       <form
         onSubmit={form.handleSubmit((values) => {
           startTransition(async () => {
@@ -62,8 +71,16 @@ export function OneOnOneForm({ employees }: { employees: LookupOption[] }) {
             }
           });
         })}
-        className="grid gap-4 md:grid-cols-2"
+        className="space-y-4"
       >
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-sm font-medium">Schedule 1:1 meeting</h2>
+          <Button type="submit" className="h-9 w-full shrink-0 sm:w-auto" disabled={isPending}>
+            {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Schedule meeting
+          </Button>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
         <Field label="Employee">
           <EmployeeSelect
             employees={employees}
@@ -81,22 +98,43 @@ export function OneOnOneForm({ employees }: { employees: LookupOption[] }) {
           />
         </Field>
         <Field label="Scheduled at">
-          <Input type="datetime-local" disabled={isPending} {...form.register("scheduledAt")} />
+          <Input
+            type="datetime-local"
+            min={getMinDateTimeLocalValue()}
+            disabled={isPending}
+            {...form.register("scheduledAt", {
+              onChange: (event) => {
+                const nextScheduledAt = event.target.value;
+                const followUpDate = form.getValues("followUpDate");
+                if (
+                  followUpDate &&
+                  nextScheduledAt &&
+                  followUpDate < getMinFollowUpDateLocal(nextScheduledAt)
+                ) {
+                  form.setValue("followUpDate", "");
+                }
+              },
+            })}
+          />
         </Field>
         <Field label="Follow-up date">
-          <Input type="date" disabled={isPending} {...form.register("followUpDate")} />
+          <Input
+            type="date"
+            min={minFollowUpDate}
+            disabled={isPending || !scheduledAt}
+            {...form.register("followUpDate")}
+          />
         </Field>
-        <Field label="Agenda" className="md:col-span-2">
+        <Field label="Agenda">
           <Input disabled={isPending} {...form.register("agenda")} placeholder="Meeting agenda" />
         </Field>
-        <Field label="Notes" className="md:col-span-2">
-          <Input disabled={isPending} {...form.register("notes")} placeholder="Pre-meeting notes" />
+        <Field label="Meeting link">
+          <Input
+            disabled={isPending}
+            {...form.register("meetingLink")}
+            placeholder="https://meet.google.com/..."
+          />
         </Field>
-        <div className="md:col-span-2">
-          <Button type="submit" disabled={isPending}>
-            {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Schedule meeting
-          </Button>
         </div>
       </form>
     </section>
@@ -112,6 +150,7 @@ export function OneOnOneTable({
   employeeId,
   meetingStatus,
   canEdit = false,
+  canDelete = false,
 }: {
   records: OneOnOneListItem[];
   total: number;
@@ -121,8 +160,26 @@ export function OneOnOneTable({
   employeeId?: string;
   meetingStatus?: string;
   canEdit?: boolean;
+  canDelete?: boolean;
 }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [viewId, setViewId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<OneOnOneListItem | null>(null);
+
+  function handleDelete() {
+    if (!deleting) return;
+    startTransition(async () => {
+      const result = await deleteOneOnOneAction({ meetingId: deleting.id });
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+      toast.success("Meeting deleted");
+      setDeleting(null);
+      router.refresh();
+    });
+  }
 
   return (
     <section className="space-y-4">
@@ -181,10 +238,10 @@ export function OneOnOneTable({
                   </td>
                   <td className="px-4 py-3">
                     <TableActions>
-                      <Button size="sm" variant="outline" onClick={() => setViewId(row.id)}>
-                        <Eye className="mr-1 size-3.5" />
-                        View
-                      </Button>
+                      <ViewIconButton onClick={() => setViewId(row.id)} />
+                      {canDelete ? (
+                        <DeleteIconButton onClick={() => setDeleting(row)} />
+                      ) : null}
                     </TableActions>
                   </td>
                 </tr>
@@ -200,6 +257,16 @@ export function OneOnOneTable({
         open={!!viewId}
         onOpenChange={(open) => !open && setViewId(null)}
         canEdit={canEdit}
+      />
+
+      <PerformanceConfirmModal
+        open={!!deleting}
+        onOpenChange={(open) => !open && setDeleting(null)}
+        title="Delete this meeting?"
+        description="The employee will no longer see this scheduled 1:1."
+        confirmLabel="Delete meeting"
+        isPending={isPending}
+        onConfirm={handleDelete}
       />
     </section>
   );

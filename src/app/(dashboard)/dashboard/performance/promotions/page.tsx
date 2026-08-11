@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   canApprovePerformance,
   canCreatePerformance,
+  canEditPerformance,
 } from "@/lib/performance/constants";
 import {
   getPerformanceLookups,
@@ -52,9 +53,18 @@ export default async function PromotionsPage({ searchParams }: PromotionsPagePro
         page={result.page}
         pageSize={result.pageSize}
         employees={lookups.employees}
+        designations={lookups.designations}
         employeeId={params.employeeId}
         promotionStatus={params.promotionStatus}
         canApprove={canApprovePerformance(profile.permissionCodes)}
+        canEdit={
+          canCreatePerformance(profile.permissionCodes) ||
+          canEditPerformance(profile.permissionCodes)
+        }
+        canDelete={
+          canCreatePerformance(profile.permissionCodes) ||
+          canEditPerformance(profile.permissionCodes)
+        }
       />
     </div>
   );

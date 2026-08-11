@@ -1,4 +1,7 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import {
+  extractMeetingLinkFromAgenda,
+} from "@/lib/performance/services/performance-meeting-link";
 import type { UserProfile } from "@/types/auth";
 import type {
   DepartmentPerformanceItem,
@@ -728,13 +731,15 @@ export async function listOneOnOnes(
     const emp = unwrapRelation(row.employee);
     const manager = unwrapRelation(row.manager);
     const actions = (row.performance_one_on_one_actions as Array<{ is_completed: boolean }>) ?? [];
+    const parsedAgenda = extractMeetingLinkFromAgenda(row.agenda);
     return {
       id: row.id,
       employeeId: row.employee_id,
       employeeName: emp ? formatEmployeeName(emp.first_name, emp.last_name) : "—",
       managerName: manager ? formatEmployeeName(manager.first_name, manager.last_name) : "—",
       scheduledAt: row.scheduled_at,
-      agenda: row.agenda,
+      agenda: parsedAgenda.agenda,
+      meetingLink: parsedAgenda.meetingLink,
       notes: row.notes,
       followUpDate: row.follow_up_date,
       meetingStatus: row.meeting_status,
@@ -765,6 +770,8 @@ export async function listPromotions(
         "employee_id",
         "current_salary",
         "recommended_salary",
+        "current_designation_id",
+        "recommended_designation_id",
         "promotion_status",
         "reason",
         "created_at",
@@ -800,7 +807,9 @@ export async function listPromotions(
       employeeName: emp ? formatEmployeeName(emp.first_name, emp.last_name) : "—",
       employeeCode: emp?.employee_code ?? "—",
       departmentName: dept?.name ?? null,
+      currentDesignationId: row.current_designation_id ?? null,
       currentDesignation: currentDesig?.title ?? null,
+      recommendedDesignationId: row.recommended_designation_id ?? null,
       recommendedDesignation: recommendedDesig?.title ?? null,
       currentSalary: row.current_salary !== null ? Number(row.current_salary) : null,
       recommendedSalary: row.recommended_salary !== null ? Number(row.recommended_salary) : null,

@@ -18,6 +18,12 @@ import {
   saveWorkingConfiguration,
 } from "@/lib/company-settings/services/company-settings-mutations";
 import { getCompanySettings } from "@/lib/company-settings/services/company-settings-queries";
+import { updateOrganizationLogoPath } from "@/lib/organization/services/org-mutations";
+import {
+  getOrganizationLogoSignedUrl,
+  removeOrganizationLogoFile,
+  uploadOrganizationLogo,
+} from "@/lib/organization/services/org-logo";
 import { savePayrollSettings } from "@/lib/payroll/services/payroll-settings";
 import { savePerformanceSettings } from "@/lib/performance/services/performance-settings";
 import { updateRecruitmentSettings } from "@/lib/recruitment/services/recruitment-settings";
@@ -43,6 +49,12 @@ import type { CompanySettingsActionResult } from "@/types/company-settings";
 
 function revalidateCompanySettings() {
   revalidatePath(COMPANY_SETTINGS_ROUTES.base);
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/organization");
+  revalidatePath("/dashboard/organization/profile");
+  revalidatePath("/employee");
+  revalidatePath("/manager");
+  revalidatePath("/ceo");
   revalidatePath("/dashboard/attendance");
   revalidatePath("/dashboard/attendance-management");
   revalidatePath("/dashboard/leave");
@@ -85,6 +97,69 @@ export async function saveCompanyProfileAction(
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to save company profile",
+    };
+  }
+}
+
+export async function uploadCompanyLogoAction(
+  formData: FormData,
+): Promise<CompanySettingsActionResult<{ logoUrl: string | null }>> {
+  try {
+    const profile = await requireCompanySettingsEdit();
+    const supabase = await createClient();
+    const file = formData.get("file");
+
+    if (!(file instanceof File) || file.size === 0) {
+      return { success: false, message: "Please choose an image file" };
+    }
+
+    const organizationId = profile.employee.organizationId;
+    const storagePath = await uploadOrganizationLogo(supabase, organizationId, file);
+    await updateOrganizationLogoPath(supabase, profile, storagePath);
+
+    const logoUrl = await getOrganizationLogoSignedUrl(supabase, storagePath);
+    revalidateCompanySettings();
+    return { success: true, data: { logoUrl } };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to upload company logo",
+    };
+  }
+}
+
+export async function removeCompanyLogoAction(): Promise<CompanySettingsActionResult> {
+  try {
+    const profile = await requireCompanySettingsEdit();
+    const supabase = await createClient();
+    const organizationId = profile.employee.organizationId;
+
+    const { data: orgRow, error: fetchError } = await supabase
+      .schema("hrms")
+      .from("organizations")
+      .select("logo_storage_path")
+      .eq("id", organizationId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (fetchError) throw new Error(fetchError.message);
+
+    const currentPath = orgRow?.logo_storage_path;
+    if (currentPath) {
+      try {
+        await removeOrganizationLogoFile(supabase, currentPath);
+      } catch {
+        // Ignore storage cleanup errors; DB path is still cleared.
+      }
+    }
+
+    await updateOrganizationLogoPath(supabase, profile, null);
+    revalidateCompanySettings();
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to remove company logo",
     };
   }
 }

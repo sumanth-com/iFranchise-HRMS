@@ -15,8 +15,11 @@ type SidebarContextValue = {
   isCollapsed: boolean;
   isMobileOpen: boolean;
   pendingHref: string | null;
+  openSections: Record<string, boolean>;
   toggleCollapsed: () => void;
   setMobileOpen: (open: boolean) => void;
+  toggleSection: (section: string) => void;
+  isSectionOpen: (section: string) => boolean;
   startNavigation: (href: string) => void;
   clearNavigation: () => void;
 };
@@ -32,6 +35,7 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     setPendingHref(null);
@@ -44,6 +48,18 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
   const setMobileOpen = useCallback((open: boolean) => {
     setIsMobileOpen(open);
   }, []);
+
+  const toggleSection = useCallback((section: string) => {
+    setOpenSections((current) => ({
+      ...current,
+      [section]: !(current[section] ?? false),
+    }));
+  }, []);
+
+  const isSectionOpen = useCallback(
+    (section: string) => openSections[section] ?? false,
+    [openSections],
+  );
 
   const startNavigation = useCallback((href: string) => {
     setPendingHref(href);
@@ -58,8 +74,11 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
       isCollapsed,
       isMobileOpen,
       pendingHref,
+      openSections,
       toggleCollapsed,
       setMobileOpen,
+      toggleSection,
+      isSectionOpen,
       startNavigation,
       clearNavigation,
     }),
@@ -67,8 +86,11 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
       isCollapsed,
       isMobileOpen,
       pendingHref,
+      openSections,
       toggleCollapsed,
       setMobileOpen,
+      toggleSection,
+      isSectionOpen,
       startNavigation,
       clearNavigation,
     ],

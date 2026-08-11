@@ -10,7 +10,7 @@ import {
   notifyRequesterOfDecision,
 } from "@/lib/ceo/services/ceo-approvals-sync";
 import { approvePayrollStep, rejectPayrollRun } from "@/lib/payroll/services/payroll-mutations";
-import { approvePromotionStep } from "@/lib/performance/services/performance-mutations";
+import { approvePromotionFully } from "@/lib/performance/services/performance-mutations";
 import { fromHrms } from "@/lib/reports/services/reports-utils";
 import { moveCandidateStage } from "@/lib/recruitment/services/recruitment-mutations";
 import {
@@ -75,7 +75,7 @@ async function applyDomainDecision(
 
   if (sourceModule === CEO_APPROVALS_SOURCE.performancePromotion) {
     if (decision === "approved") {
-      await approvePromotionStep(supabase, profile, sourceRecordId, reason);
+      await approvePromotionFully(supabase, profile, sourceRecordId, reason);
       return;
     }
 

@@ -263,6 +263,7 @@ export type OneOnOneListItem = {
   managerName: string;
   scheduledAt: string;
   agenda: string | null;
+  meetingLink: string | null;
   notes: string | null;
   followUpDate: string | null;
   meetingStatus: MeetingStatus;
@@ -296,7 +297,9 @@ export type PromotionListItem = {
   employeeName: string;
   employeeCode: string;
   departmentName: string | null;
+  currentDesignationId: string | null;
   currentDesignation: string | null;
+  recommendedDesignationId: string | null;
   recommendedDesignation: string | null;
   currentSalary: number | null;
   recommendedSalary: number | null;

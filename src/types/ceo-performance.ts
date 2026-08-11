@@ -98,12 +98,25 @@ export type CeoPerformanceInsights = {
   skillGapOverview: { label: string; value: number }[];
 };
 
+export type CeoPendingPromotionItem = {
+  id: string;
+  employeeName: string;
+  departmentName: string | null;
+  currentDesignation: string | null;
+  recommendedDesignation: string | null;
+  currentSalary: number | null;
+  recommendedSalary: number | null;
+  promotionStatus: PromotionStatus;
+  createdAt: string;
+};
+
 export type CeoPerformancePromotionOverview = {
   recommendations: number;
   approved: number;
   pending: number;
   rejected: number;
   pipeline: { label: string; value: number }[];
+  pendingQueue: CeoPendingPromotionItem[];
 };
 
 export type CeoPerformanceFilterLookups = {

@@ -44,6 +44,7 @@ const EMPTY_TEAM_SELF_PAYROLL: EmployeePayrollData = {
   bonuses: [],
   reimbursements: [],
   trend: [],
+  pendingPromotion: null,
   ytd: {
     earnings: 0,
     deductions: 0,

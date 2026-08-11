@@ -11,7 +11,7 @@ export const COMPANY_SETTINGS_ROUTES = {
 export const COMPANY_SETTINGS_VIEW_PERMISSIONS = ["settings.view"] as const;
 export const COMPANY_SETTINGS_EDIT_PERMISSIONS = ["settings.edit"] as const;
 
-/** HR-facing company settings shown in the portal (platform controls live under System Administration). */
+/** HR-facing company settings — single profile page in the portal UI. */
 export const COMPANY_SETTINGS_SECTIONS: {
   id: CompanySettingsSection;
   title: string;
@@ -20,63 +20,35 @@ export const COMPANY_SETTINGS_SECTIONS: {
   {
     id: "profile",
     title: "Company Profile",
-    description: "Legal name, registration, addresses, timezone, and regional defaults.",
-  },
-  {
-    id: "branding",
-    title: "Branding",
-    description: "Portal colors, login screen copy, and employee-facing identity.",
-  },
-  {
-    id: "working",
-    title: "Work & Attendance",
-    description: "Office hours, working days, grace time, weekends, and default shifts.",
-  },
-  {
-    id: "leave",
-    title: "Leave Policies",
-    description: "Leave year, approvals, half-day rules, carry forward, and encashment.",
-  },
-  {
-    id: "payroll",
-    title: "Payroll",
-    description: "Pay cycles, statutory defaults, approval workflow, and payslip rules.",
-  },
-  {
-    id: "recruitment",
-    title: "Hiring",
-    description: "Job numbering, interview defaults, offer rules, and hiring sources.",
-  },
-  {
-    id: "performance",
-    title: "Performance",
-    description: "Review cycles, goal categories, rating scales, and calibration rules.",
-  },
-  {
-    id: "notifications",
-    title: "Notifications",
-    description: "Organization-wide email and in-app delivery defaults.",
+    description: "Logo, legal name, contact details, and office address.",
   },
 ];
 
-/** Legacy section slugs removed from the HR settings UI. */
+/** Legacy section slugs — redirect to the main settings page. */
 export const DEPRECATED_COMPANY_SETTINGS_SECTIONS = [
   "security",
   "integrations",
   "backup",
+  "branding",
+  "working",
+  "leave",
+  "payroll",
+  "recruitment",
+  "performance",
+  "notifications",
 ] as const;
 
-export const MODULE_SETTINGS_REDIRECTS: Record<string, CompanySettingsSection> = {
-  "/dashboard/payroll-management/settings": "payroll",
-  "/dashboard/recruitment/settings": "recruitment",
-  "/dashboard/performance/settings": "performance",
-  "/dashboard/leave/settings": "leave",
-  "/dashboard/leave-management/settings": "leave",
-  "/dashboard/attendance-management/settings": "working",
-  "/dashboard/exit/settings": "leave",
-  "/dashboard/assets-management/settings": "working",
-  "/dashboard/documents-management/settings": "profile",
-  "/dashboard/reports/settings": "profile",
+export const MODULE_SETTINGS_REDIRECTS: Record<string, string> = {
+  "/dashboard/payroll-management/settings": COMPANY_SETTINGS_ROUTES.base,
+  "/dashboard/recruitment/settings": COMPANY_SETTINGS_ROUTES.base,
+  "/dashboard/performance/settings": COMPANY_SETTINGS_ROUTES.base,
+  "/dashboard/leave/settings": COMPANY_SETTINGS_ROUTES.base,
+  "/dashboard/leave-management/settings": COMPANY_SETTINGS_ROUTES.base,
+  "/dashboard/attendance-management/settings": COMPANY_SETTINGS_ROUTES.base,
+  "/dashboard/exit/settings": COMPANY_SETTINGS_ROUTES.base,
+  "/dashboard/assets-management/settings": COMPANY_SETTINGS_ROUTES.base,
+  "/dashboard/documents-management/settings": COMPANY_SETTINGS_ROUTES.base,
+  "/dashboard/reports/settings": COMPANY_SETTINGS_ROUTES.base,
 };
 
 export function isCompanySettingsSection(value: string | undefined): value is CompanySettingsSection {

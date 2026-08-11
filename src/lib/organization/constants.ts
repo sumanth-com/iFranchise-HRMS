@@ -1,5 +1,10 @@
 import { hasAnyPermission } from "@/lib/permissions/utils";
 
+export const ORGANIZATION_LOGO_BUCKET = "company-assets";
+export const ORGANIZATION_LOGO_PATH_PREFIX = "branding";
+/** Max logo upload size (matches company-assets bucket limit). */
+export const ORGANIZATION_LOGO_MAX_BYTES = 10 * 1024 * 1024;
+
 export const ORGANIZATION_ROUTES = {
   dashboard: "/dashboard/organization",
   profile: "/dashboard/organization/profile",

@@ -23,6 +23,9 @@ import {
   updateOneOnOneAction,
 } from "@/lib/performance/actions";
 import { MEETING_STATUS_LABELS } from "@/lib/performance/constants";
+import {
+  getMinFollowUpDateLocal,
+} from "@/lib/performance/services/performance-utils";
 import type { OneOnOneDetail } from "@/types/performance";
 
 const statusItems = toSelectItems(MEETING_STATUS_LABELS);
@@ -43,8 +46,8 @@ export function OneOnOneDetailModal({
   const router = useRouter();
   const [detail, setDetail] = useState<OneOnOneDetail | null>(null);
   const [loading, setLoading] = useState(false);
-  const [notes, setNotes] = useState("");
   const [agenda, setAgenda] = useState("");
+  const [meetingLink, setMeetingLink] = useState("");
   const [followUpDate, setFollowUpDate] = useState("");
   const [meetingStatus, setMeetingStatus] = useState<string>("scheduled");
   const [isPending, startTransition] = useTransition();
@@ -61,8 +64,8 @@ export function OneOnOneDetailModal({
       if (cancelled) return;
       setDetail(data);
       if (data) {
-        setNotes(data.notes ?? "");
         setAgenda(data.agenda ?? "");
+        setMeetingLink(data.meetingLink ?? "");
         setFollowUpDate(data.followUpDate ?? "");
         setMeetingStatus(data.meetingStatus);
       }
@@ -79,10 +82,11 @@ export function OneOnOneDetailModal({
     startTransition(async () => {
       const result = await updateOneOnOneAction({
         meetingId: detail.id,
-        notes,
         agenda,
+        meetingLink: meetingLink || null,
         followUpDate: followUpDate || null,
         meetingStatus: meetingStatus as OneOnOneDetail["meetingStatus"],
+        scheduledAt: detail.scheduledAt,
       });
       if (!result.success) toast.error(result.message);
       else {
@@ -141,19 +145,27 @@ export function OneOnOneDetailModal({
 
           {canEdit ? (
             <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Agenda</Label>
-                <Input value={agenda} disabled={isPending} onChange={(e) => setAgenda(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Discussion notes</Label>
-                <Input value={notes} disabled={isPending} onChange={(e) => setNotes(e.target.value)} />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Agenda</Label>
+                  <Input value={agenda} disabled={isPending} onChange={(e) => setAgenda(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Meeting link</Label>
+                  <Input
+                    value={meetingLink}
+                    disabled={isPending}
+                    placeholder="https://..."
+                    onChange={(e) => setMeetingLink(e.target.value)}
+                  />
+                </div>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Follow-up date</Label>
                   <Input
                     type="date"
+                    min={getMinFollowUpDateLocal(detail.scheduledAt)}
                     value={followUpDate}
                     disabled={isPending}
                     onChange={(e) => setFollowUpDate(e.target.value)}
@@ -173,7 +185,23 @@ export function OneOnOneDetailModal({
           ) : (
             <DetailGrid columns={1}>
               <DetailField label="Agenda" value={detail.agenda ?? "—"} />
-              <DetailField label="Notes" value={detail.notes ?? "—"} />
+              <DetailField
+                label="Meeting link"
+                value={
+                  detail.meetingLink ? (
+                    <a
+                      href={detail.meetingLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary underline-offset-4 hover:underline"
+                    >
+                      {detail.meetingLink}
+                    </a>
+                  ) : (
+                    "—"
+                  )
+                }
+              />
             </DetailGrid>
           )}
 

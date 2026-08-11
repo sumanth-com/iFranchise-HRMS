@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { Eye, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useMemo, useState, useTransition, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -25,6 +25,7 @@ import {
 import {
   PerformanceTableShell,
   TableActions,
+  ViewIconButton,
 } from "@/components/performance/performance-ui-primitives";
 import { EmployeeSelect, LabeledSelect } from "@/components/payroll/payroll-select";
 import { toSelectItems } from "@/components/payroll/select-utils";
@@ -377,10 +378,7 @@ export function GoalsTable({
                   </td>
                   <td className="px-3 py-2.5">
                     <TableActions>
-                      <Button size="sm" variant="outline" onClick={() => setViewId(row.id)}>
-                        <Eye className="mr-1 size-3.5" />
-                        View
-                      </Button>
+                      <ViewIconButton onClick={() => setViewId(row.id)} />
                     </TableActions>
                   </td>
                 </tr>

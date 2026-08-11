@@ -6,6 +6,53 @@ export function formatEmployeeName(firstName: string, lastName: string) {
   return `${firstName} ${lastName}`.trim();
 }
 
+/** Minimum value for `<input type="datetime-local" />` (local time, no past slots). */
+export function getMinDateTimeLocalValue(date = new Date()) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/** Minimum value for `<input type="date" />` (today, local). */
+export function getMinDateLocalValue(date = new Date()) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+export function isPastDateTimeLocal(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return true;
+  return parsed.getTime() < Date.now();
+}
+
+export function isPastDateLocal(value: string) {
+  return value < getMinDateLocalValue();
+}
+
+/** Local `YYYY-MM-DD` from a `datetime-local` or ISO datetime string. */
+export function getDateLocalFromDateTimeLocal(value: string) {
+  if (!value) return null;
+  const [datePart] = value.split("T");
+  if (datePart && /^\d{4}-\d{2}-\d{2}$/.test(datePart)) return datePart;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return getMinDateLocalValue(parsed);
+}
+
+/** Follow-up must be on/after the meeting day and not in the past. */
+export function getMinFollowUpDateLocal(scheduledAt?: string | null) {
+  const today = getMinDateLocalValue();
+  if (!scheduledAt) return today;
+  const scheduledDate = getDateLocalFromDateTimeLocal(scheduledAt);
+  if (!scheduledDate) return today;
+  return scheduledDate < today ? today : scheduledDate;
+}
+
+export function isFollowUpBeforeScheduled(followUpDate: string, scheduledAt: string) {
+  const scheduledDate = getDateLocalFromDateTimeLocal(scheduledAt);
+  if (!scheduledDate) return false;
+  return followUpDate < scheduledDate;
+}
+
 export function unwrapRelation<T>(value: T | T[] | null): T | null {
   if (!value) return null;
   return Array.isArray(value) ? (value[0] ?? null) : value;

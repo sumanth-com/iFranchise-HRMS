@@ -1,8 +1,12 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { Eye, Pencil, Trash2 } from "lucide-react";
 
+import { Button } from "@/components/common/button";
 import { cn } from "@/lib/utils";
+
+const ROW_ICON_BTN = "size-8 shrink-0";
 
 export function PerformanceSection({
   title,
@@ -113,6 +117,72 @@ export function PerformanceTableShell({
 
 export function TableActions({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2">{children}</div>
+    <div className="flex items-center justify-end gap-1">{children}</div>
+  );
+}
+
+export function ViewIconButton({
+  onClick,
+  disabled,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Button
+      type="button"
+      size="icon"
+      variant="outline"
+      className={ROW_ICON_BTN}
+      onClick={onClick}
+      disabled={disabled}
+      aria-label="View"
+    >
+      <Eye className="size-3.5" />
+    </Button>
+  );
+}
+
+export function DeleteIconButton({
+  onClick,
+  disabled,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Button
+      type="button"
+      size="icon"
+      variant="outline"
+      className={ROW_ICON_BTN}
+      onClick={onClick}
+      disabled={disabled}
+      aria-label="Delete"
+    >
+      <Trash2 className="size-3.5" />
+    </Button>
+  );
+}
+
+export function EditIconButton({
+  onClick,
+  disabled,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Button
+      type="button"
+      size="icon"
+      variant="outline"
+      className={ROW_ICON_BTN}
+      onClick={onClick}
+      disabled={disabled}
+      aria-label="Edit"
+    >
+      <Pencil className="size-3.5" />
+    </Button>
   );
 }

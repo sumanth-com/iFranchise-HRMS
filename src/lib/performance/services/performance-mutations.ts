@@ -6,6 +6,11 @@ import {
   reviewFormSchema,
 } from "@/lib/validations/performance";
 import {
+  agendaWithEmbeddedMeetingLink,
+  extractMeetingLinkFromAgenda,
+  isMissingMeetingLinkColumnError,
+} from "@/lib/performance/services/performance-meeting-link";
+import {
   calculateKpiCompletion,
   deriveKpiStatus,
   formatEmployeeName,
@@ -15,6 +20,11 @@ import {
 import { PERFORMANCE_ROUTES } from "@/lib/performance/constants";
 import { notifyPerformanceGoalAssigned } from "@/lib/performance/services/performance-notifications";
 import { notifyEmployee } from "@/lib/notifications/services/notification-service";
+import { getEmployeeSalaryStructure } from "@/lib/employees/services/employee-detail";
+import {
+  applyPromotionCompensation,
+  applyPromotionSalary,
+} from "@/lib/performance/services/performance-promotion-apply";
 import type { z } from "zod";
 
 const REVIEW_STAGES = ["self", "manager", "hr", "final"] as const;
@@ -218,22 +228,37 @@ export async function updateOneOnOne(
   profile: UserProfile,
   meetingId: string,
   input: {
-    notes?: string;
     agenda?: string;
+    meetingLink?: string | null;
     followUpDate?: string | null;
     meetingStatus?: string;
   },
 ): Promise<void> {
   const { error } = await fromHrms(supabase, "performance_one_on_ones")
     .update({
-      notes: input.notes ?? null,
       agenda: input.agenda ?? null,
+      meeting_link: input.meetingLink ?? null,
       follow_up_date: input.followUpDate ?? null,
       ...(input.meetingStatus ? { meeting_status: input.meetingStatus } : {}),
       updated_by: profile.userId,
     })
     .eq("id", meetingId)
     .eq("organization_id", profile.employee.organizationId);
+
+  if (error && isMissingMeetingLinkColumnError(error.message)) {
+    const agenda = agendaWithEmbeddedMeetingLink(input.agenda, input.meetingLink);
+    const { error: retryError } = await fromHrms(supabase, "performance_one_on_ones")
+      .update({
+        agenda,
+        follow_up_date: input.followUpDate ?? null,
+        ...(input.meetingStatus ? { meeting_status: input.meetingStatus } : {}),
+        updated_by: profile.userId,
+      })
+      .eq("id", meetingId)
+      .eq("organization_id", profile.employee.organizationId);
+    if (retryError) throw new Error(retryError.message);
+    return;
+  }
 
   if (error) throw new Error(error.message);
 }
@@ -269,7 +294,7 @@ export async function createKpiTemplate(
 export async function assignKpi(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
-  input: z.infer<typeof import("@/lib/validations/performance").kpiAssignFormSchema>,
+  input: z.infer<typeof import("@/lib/validations/performance").kpiAssignPayloadSchema>,
 ): Promise<string> {
   const { data: template, error: templateError } = await fromHrms(supabase, "performance_kpi_templates")
     .select(
@@ -323,6 +348,19 @@ export async function assignKpi(
 
   if (error) throw new Error(error.message);
   return data.id;
+}
+
+export async function deleteKpi(
+  supabase: AuthSupabaseClient,
+  _profile: UserProfile,
+  kpiId: string,
+): Promise<void> {
+  const { data, error } = await supabase.schema("hrms").rpc("soft_delete_performance_kpi", {
+    p_kpi_id: kpiId,
+  });
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("KPI not found or already deleted.");
 }
 
 export async function updateKpiProgress(
@@ -539,7 +577,7 @@ export async function createFeedback(
       from_employee_id: profile.employee.id,
       to_employee_id: input.toEmployeeId,
       feedback_type: input.feedbackType,
-      visibility: input.visibility,
+      visibility: "private",
       message: input.message,
       created_by: profile.userId,
       updated_by: profile.userId,
@@ -551,26 +589,60 @@ export async function createFeedback(
   return data.id;
 }
 
+export async function deleteFeedback(
+  supabase: AuthSupabaseClient,
+  _profile: UserProfile,
+  feedbackId: string,
+): Promise<void> {
+  const { data, error } = await supabase.schema("hrms").rpc("soft_delete_performance_feedback", {
+    p_feedback_id: feedbackId,
+  });
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Feedback not found or already deleted.");
+}
+
 export async function createOneOnOne(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   input: z.infer<typeof import("@/lib/validations/performance").oneOnOneFormSchema>,
 ): Promise<string> {
-  const { data, error } = await fromHrms(supabase, "performance_one_on_ones")
-    .insert({
-      organization_id: profile.employee.organizationId,
-      employee_id: input.employeeId,
-      manager_employee_id: input.managerEmployeeId,
-      scheduled_at: input.scheduledAt,
-      agenda: input.agenda ?? null,
-      notes: input.notes ?? null,
-      follow_up_date: input.followUpDate ?? null,
-      meeting_status: input.meetingStatus,
-      created_by: profile.userId,
-      updated_by: profile.userId,
-    })
+  const insertPayload = {
+    organization_id: profile.employee.organizationId,
+    employee_id: input.employeeId,
+    manager_employee_id: input.managerEmployeeId,
+    scheduled_at: input.scheduledAt,
+    agenda: input.agenda ?? null,
+    meeting_link: input.meetingLink ?? null,
+    follow_up_date: input.followUpDate ?? null,
+    meeting_status: input.meetingStatus,
+    created_by: profile.userId,
+    updated_by: profile.userId,
+  };
+
+  let { data, error } = await fromHrms(supabase, "performance_one_on_ones")
+    .insert(insertPayload)
     .select("id")
     .single();
+
+  if (error && isMissingMeetingLinkColumnError(error.message)) {
+    const fallback = await fromHrms(supabase, "performance_one_on_ones")
+      .insert({
+        organization_id: profile.employee.organizationId,
+        employee_id: input.employeeId,
+        manager_employee_id: input.managerEmployeeId,
+        scheduled_at: input.scheduledAt,
+        agenda: agendaWithEmbeddedMeetingLink(input.agenda, input.meetingLink),
+        follow_up_date: input.followUpDate ?? null,
+        meeting_status: input.meetingStatus,
+        created_by: profile.userId,
+        updated_by: profile.userId,
+      })
+      .select("id")
+      .single();
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   if (error) throw new Error(error.message);
 
@@ -592,19 +664,44 @@ export async function createOneOnOne(
   return data.id;
 }
 
+export async function deleteOneOnOne(
+  supabase: AuthSupabaseClient,
+  _profile: UserProfile,
+  meetingId: string,
+): Promise<void> {
+  const { data, error } = await supabase.schema("hrms").rpc("soft_delete_performance_one_on_one", {
+    p_meeting_id: meetingId,
+  });
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Meeting not found or already deleted.");
+}
+
 export async function createPromotion(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   input: z.infer<typeof import("@/lib/validations/performance").promotionFormSchema>,
 ): Promise<string> {
+  const { data: employee, error: employeeError } = await fromHrms(supabase, "employees")
+    .select("designation_id")
+    .eq("id", input.employeeId)
+    .eq("organization_id", profile.employee.organizationId)
+    .maybeSingle();
+
+  if (employeeError) throw new Error(employeeError.message);
+
+  const salaryStructure = await getEmployeeSalaryStructure(supabase, input.employeeId);
+  const currentSalary = input.currentSalary ?? salaryStructure?.grossSalary ?? null;
+  const currentDesignationId = input.currentDesignationId ?? employee?.designation_id ?? null;
+
   const { data, error } = await fromHrms(supabase, "performance_promotions")
     .insert({
       organization_id: profile.employee.organizationId,
       employee_id: input.employeeId,
       recommended_by_employee_id: profile.employee.id,
-      current_designation_id: input.currentDesignationId ?? null,
+      current_designation_id: currentDesignationId,
       recommended_designation_id: input.recommendedDesignationId ?? null,
-      current_salary: input.currentSalary ?? null,
+      current_salary: currentSalary,
       recommended_salary: input.recommendedSalary ?? null,
       promotion_status: "pending",
       reason: input.reason ?? null,
@@ -635,7 +732,102 @@ export async function createPromotion(
     );
 
   if (approvalError) throw new Error(approvalError.message);
+
   return data.id;
+}
+
+export async function updatePromotion(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: z.infer<typeof import("@/lib/validations/performance").promotionUpdateSchema>,
+): Promise<void> {
+  const { data: existing, error: fetchError } = await fromHrms(supabase, "performance_promotions")
+    .select(
+      "id, employee_id, promotion_status, recommended_salary, recommended_designation_id, reason",
+    )
+    .eq("id", input.promotionId)
+    .eq("organization_id", profile.employee.organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (fetchError) throw new Error(fetchError.message);
+  if (!existing) throw new Error("Promotion not found or already deleted.");
+
+  if (["rejected", "cancelled"].includes(existing.promotion_status)) {
+    throw new Error("Rejected or cancelled promotions cannot be edited.");
+  }
+
+  const recommendedSalary =
+    input.recommendedSalary !== undefined
+      ? input.recommendedSalary
+      : existing.recommended_salary !== null
+        ? Number(existing.recommended_salary)
+        : null;
+  const recommendedDesignationId =
+    input.recommendedDesignationId !== undefined
+      ? input.recommendedDesignationId
+      : existing.recommended_designation_id;
+  const reason =
+    input.reason !== undefined ? input.reason : existing.reason;
+
+  const updates: Record<string, unknown> = {
+    updated_by: profile.userId,
+  };
+
+  if (input.recommendedDesignationId !== undefined) {
+    updates.recommended_designation_id = input.recommendedDesignationId;
+  }
+  if (input.currentSalary !== undefined) {
+    updates.current_salary = input.currentSalary;
+  }
+  if (input.recommendedSalary !== undefined) {
+    updates.recommended_salary = input.recommendedSalary;
+  }
+  if (input.reason !== undefined) {
+    updates.reason = input.reason;
+  }
+
+  const { error } = await fromHrms(supabase, "performance_promotions")
+    .update(updates)
+    .eq("id", input.promotionId);
+
+  if (error) throw new Error(error.message);
+
+  const salaryChanged =
+    input.recommendedSalary !== undefined &&
+    (existing.recommended_salary === null ||
+      roundMoney(Number(existing.recommended_salary)) !== roundMoney(Number(input.recommendedSalary)));
+
+  if (
+    salaryChanged &&
+    recommendedSalary != null &&
+    recommendedSalary > 0 &&
+    ["approved", "applied"].includes(existing.promotion_status)
+  ) {
+    await applyPromotionSalary(
+      supabase,
+      profile,
+      existing.employee_id,
+      recommendedSalary,
+      reason?.trim() || "Salary revision from updated promotion recommendation",
+    );
+  }
+}
+
+function roundMoney(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+export async function deletePromotion(
+  supabase: AuthSupabaseClient,
+  promotionId: string,
+): Promise<void> {
+  const { data, error } = await supabase.schema("hrms").rpc("soft_delete_performance_promotion", {
+    p_promotion_id: promotionId,
+  });
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Promotion not found or already deleted.");
 }
 
 export async function approvePromotionStep(
@@ -688,11 +880,22 @@ export async function approvePromotionStep(
 
     if (!nextPending) {
       const { data: promotion } = await fromHrms(supabase, "performance_promotions")
-        .select("employee_id, recommended_salary, recommended_designation_id")
+        .select("employee_id, recommended_salary, recommended_designation_id, reason")
         .eq("id", promotionId)
         .maybeSingle();
 
       if (promotion?.employee_id) {
+        await applyPromotionCompensation(supabase, profile, {
+          promotionId,
+          employeeId: promotion.employee_id,
+          recommendedDesignationId: promotion.recommended_designation_id,
+          recommendedSalary:
+            promotion.recommended_salary != null ? Number(promotion.recommended_salary) : null,
+          reason: promotion.reason,
+          applyDesignation: true,
+          applySalary: true,
+        });
+
         const { autoGenerateLetterForEmployee } = await import(
           "@/lib/documents/services/document-mutations"
         );
@@ -715,10 +918,10 @@ export async function approvePromotionStep(
         let designationLabel = "new role";
         if (promotion.recommended_designation_id) {
           const { data: designation } = await fromHrms(supabase, "designations")
-            .select("name")
+            .select("title")
             .eq("id", promotion.recommended_designation_id)
             .maybeSingle();
-          if (designation?.name) designationLabel = designation.name;
+          if (designation?.title) designationLabel = designation.title;
         }
 
         await notifyEmployee(supabase, {
@@ -737,6 +940,29 @@ export async function approvePromotionStep(
         });
       }
     }
+  }
+}
+
+export async function approvePromotionFully(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  promotionId: string,
+  comments?: string,
+): Promise<void> {
+  const maxSteps = 10;
+  for (let step = 0; step < maxSteps; step += 1) {
+    const { data: pending, error } = await fromHrms(supabase, "performance_promotion_approvals")
+      .select("id")
+      .eq("promotion_id", promotionId)
+      .eq("approval_status", "pending")
+      .is("deleted_at", null)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    if (!pending) break;
+
+    await approvePromotionStep(supabase, profile, promotionId, comments);
   }
 }
 
@@ -913,6 +1139,10 @@ export async function getOneOnOneById(
   }>;
 
   const completedActions = actions.filter((a) => a.is_completed).length;
+  const parsedAgenda = extractMeetingLinkFromAgenda(
+    data.agenda,
+    (data as { meeting_link?: string | null }).meeting_link,
+  );
 
   return {
     id: data.id,
@@ -920,7 +1150,8 @@ export async function getOneOnOneById(
     employeeName: employee ? formatEmployeeName(employee.first_name, employee.last_name) : "—",
     managerName: manager ? formatEmployeeName(manager.first_name, manager.last_name) : "—",
     scheduledAt: data.scheduled_at,
-    agenda: data.agenda,
+    agenda: parsedAgenda.agenda,
+    meetingLink: parsedAgenda.meetingLink,
     notes: data.notes,
     followUpDate: data.follow_up_date,
     meetingStatus: data.meeting_status,

@@ -36,6 +36,8 @@ export type Organization = {
   legalName: string | null;
   email: string | null;
   logoStoragePath: string | null;
+  /** Signed URL for sidebar and portal branding (null when no custom logo). */
+  logoUrl: string | null;
   status: RecordStatus;
 };
 

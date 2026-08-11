@@ -8,6 +8,7 @@ import type {
   UserProfile,
 } from "@/types/auth";
 import { createClient } from "@/lib/supabase/server";
+import { getOrganizationLogoSignedUrl } from "@/lib/organization/services/org-logo";
 
 export type AuthSupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -47,6 +48,21 @@ type OrganizationRow = {
   status: Organization["status"];
 };
 
+function mapOrganization(
+  row: OrganizationRow,
+  logoUrl: string | null = null,
+): Organization {
+  return {
+    id: row.id,
+    name: row.name,
+    legalName: row.legal_name,
+    email: row.email,
+    logoStoragePath: row.logo_storage_path,
+    logoUrl,
+    status: row.status,
+  };
+}
+
 function mapEmployee(row: EmployeeRow): Employee {
   return {
     id: row.id,
@@ -58,17 +74,6 @@ function mapEmployee(row: EmployeeRow): Employee {
     email: row.email,
     employmentStatus: row.employment_status,
     accountStatus: row.account_status,
-    status: row.status,
-  };
-}
-
-function mapOrganization(row: OrganizationRow): Organization {
-  return {
-    id: row.id,
-    name: row.name,
-    legalName: row.legal_name,
-    email: row.email,
-    logoStoragePath: row.logo_storage_path,
     status: row.status,
   };
 }
@@ -169,6 +174,12 @@ export const loadUserProfile = cache(async function loadUserProfile(
     return { success: false, error: "ORGANIZATION_NOT_FOUND" };
   }
 
+  const organizationLogoUrl = await getOrganizationLogoSignedUrl(
+    supabase,
+    organizationRow.logo_storage_path,
+  );
+  const organization = mapOrganization(organizationRow, organizationLogoUrl);
+
   if (userRolesError || !userRoleRows?.length) {
     return { success: false, error: "NO_ROLES" };
   }
@@ -246,7 +257,7 @@ export const loadUserProfile = cache(async function loadUserProfile(
         userId,
         email,
         employee: mapEmployee(employeeRow),
-        organization: mapOrganization(organizationRow),
+        organization,
         roles,
         permissions: [],
         permissionCodes: [],
@@ -283,7 +294,7 @@ export const loadUserProfile = cache(async function loadUserProfile(
       userId,
       email,
       employee: mapEmployee(employeeRow),
-      organization: mapOrganization(organizationRow),
+      organization,
       roles,
       permissions,
       permissionCodes,

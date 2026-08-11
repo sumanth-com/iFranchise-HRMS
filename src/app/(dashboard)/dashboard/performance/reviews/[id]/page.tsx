@@ -8,5 +8,5 @@ type ReviewDetailPageProps = {
 
 export default async function ReviewDetailPage({ params }: ReviewDetailPageProps) {
   const { id } = await params;
-  redirect(`${PERFORMANCE_ROUTES.reviews}?openReview=${id}`);
+  redirect(PERFORMANCE_ROUTES.goals);
 }
