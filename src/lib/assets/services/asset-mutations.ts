@@ -2,16 +2,18 @@ import QRCode from "qrcode";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
-import { ASSET_IMAGE_BUCKET, ASSETS_ROUTES } from "@/lib/assets/constants";
+import { ASSET_IMAGE_BUCKET, ASSETS_ROUTES, HR_ASSIGN_ASSET_TYPES } from "@/lib/assets/constants";
 import { notifyEmployee } from "@/lib/notifications/services/notification-service";
 import {
   getAssetSettings,
   nextAssetCode,
 } from "@/lib/assets/services/asset-settings";
 import { emptyToNull, fromHrms } from "@/lib/assets/services/assets-utils";
+import { buildAssetNotes } from "@/lib/assets/asset-spec-utils";
 import type {
   AssetFormValues,
   AssignAssetValues,
+  CreateAndAssignAssetValues,
   MaintenanceFormValues,
   ReturnAssetValues,
   TransferAssetValues,
@@ -247,7 +249,7 @@ export async function assignAsset(
     notificationType: "asset_assigned",
     module: "assets",
     priority: "medium",
-    actionUrl: ASSETS_ROUTES.assignments,
+    actionUrl: "/employee/assets",
     sourceEventKey: `asset_assigned:${assignment.id}`,
     templateKey: "asset_assigned",
     templateVariables: { assetName: assetRow?.name ?? "Asset" },
@@ -317,7 +319,7 @@ export async function returnAsset(
       notificationType: "asset_returned",
       module: "assets",
       priority: "low",
-      actionUrl: ASSETS_ROUTES.assignments,
+      actionUrl: "/employee/assets",
       sourceEventKey: `asset_returned:${input.assignmentId}`,
       templateKey: "asset_returned",
       templateVariables: { assetName: assetRow?.name ?? "Asset" },
@@ -547,6 +549,140 @@ export async function deleteVendor(
     .eq("organization_id", profile.employee.organizationId);
 
   if (error) throw new Error(error.message);
+}
+
+function categoryCodeFromName(name: string) {
+  return name
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_|_$/g, "")
+    .slice(0, 40) || "OTHER";
+}
+
+async function findOrCreateCategory(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  userId: string,
+  name: string,
+): Promise<string> {
+  const trimmed = name.trim();
+  const { data: existing } = await fromHrms(supabase, "asset_categories")
+    .select("id, name")
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .ilike("name", trimmed)
+    .maybeSingle();
+
+  if (existing?.id) return existing.id;
+
+  const code = categoryCodeFromName(trimmed);
+  const { data: byCode } = await fromHrms(supabase, "asset_categories")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("code", code)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (byCode?.id) return byCode.id;
+
+  const { data: created, error } = await fromHrms(supabase, "asset_categories")
+    .insert({
+      organization_id: organizationId,
+      name: trimmed,
+      code,
+      status: "active",
+      created_by: userId,
+      updated_by: userId,
+    })
+    .select("id")
+    .single();
+
+  if (error || !created) throw new Error(error?.message ?? "Failed to create asset category");
+  return created.id;
+}
+
+async function resolveAssignCategoryId(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: CreateAndAssignAssetValues,
+): Promise<string> {
+  const organizationId = profile.employee.organizationId;
+  const typeDef = HR_ASSIGN_ASSET_TYPES.find((item) => item.key === input.assetType);
+
+  if (!typeDef) {
+    return findOrCreateCategory(supabase, organizationId, profile.userId, "Other");
+  }
+
+  for (const candidate of typeDef.categoryNames) {
+    const { data } = await fromHrms(supabase, "asset_categories")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .ilike("name", candidate)
+      .maybeSingle();
+    if (data?.id) return data.id;
+  }
+
+  return findOrCreateCategory(supabase, organizationId, profile.userId, typeDef.label);
+}
+
+function buildAssignAssetName(input: CreateAndAssignAssetValues): string {
+  const typeDef = HR_ASSIGN_ASSET_TYPES.find((item) => item.key === input.assetType);
+  const typeLabel = typeDef?.label ?? "Asset";
+  const parts = [typeLabel, input.brand?.trim(), input.model?.trim()].filter(Boolean);
+  return parts.join(" · ").slice(0, 150);
+}
+
+export async function createAndAssignAsset(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: CreateAndAssignAssetValues,
+): Promise<{ assetId: string; assignmentId: string }> {
+  const typeDef = HR_ASSIGN_ASSET_TYPES.find((item) => item.key === input.assetType);
+  const brand = input.brand?.trim() || typeDef?.defaultBrand || null;
+
+  const categoryId = await resolveAssignCategoryId(supabase, profile, input);
+  const name = buildAssignAssetName({ ...input, brand });
+
+  const notesParts = buildAssetNotes(
+    {
+      chip: input.specChip,
+      memory: input.specMemory,
+      storage: input.specStorage,
+      operatingSystem: input.specOperatingSystem,
+      accessories: input.specAccessories,
+      connectionType: input.specConnectionType,
+    },
+    input.remarks,
+  );
+
+  const assetInput: AssetFormValues = {
+    name,
+    categoryId,
+    brand,
+    model: emptyToNull(input.model),
+    serialNumber: emptyToNull(input.serialNumber),
+    purchaseDate: emptyToNull(input.purchaseDate),
+    purchaseCost: null,
+    warrantyExpiry: emptyToNull(input.warrantyExpiry),
+    vendorId: null,
+    assetStatus: "available",
+    officeLocation: null,
+    departmentId: null,
+    notes: notesParts,
+  };
+
+  const assetId = await createAsset(supabase, profile, assetInput, null);
+  const assignmentId = await assignAsset(supabase, profile, {
+    assetId,
+    employeeId: input.employeeId,
+    assignedDate: input.assignedDate,
+    expectedReturnDate: null,
+    conditionBefore: input.conditionBefore,
+    remarks: emptyToNull(input.remarks),
+  });
+
+  return { assetId, assignmentId };
 }
 
 export async function getAssetQrDataUrl(payload: string): Promise<string> {

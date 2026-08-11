@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
@@ -11,7 +11,7 @@ import {
   useReactTable,
   type ColumnDef,
 } from "@tanstack/react-table";
-import { CheckCircle2, Loader2, Paperclip } from "lucide-react";
+import { CheckCircle2, Loader2, Paperclip, Plus } from "lucide-react";
 import { toast } from "sonner";
 import type { z } from "zod";
 
@@ -19,6 +19,11 @@ import { EmptyState } from "@/components/common/empty-state";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
+import { BonusDialog } from "@/components/payroll/bonus-dialog";
+import { BonusMonthPicker } from "@/components/payroll/bonus-month-picker";
+import { EmployeeSelect, LabeledSelect } from "@/components/payroll/payroll-select";
+import { useTeamPayrollHeaderActions } from "@/components/payroll/team-payroll-header-actions";
+import { toSelectItems } from "@/components/payroll/select-utils";
 import {
   TableBody,
   TableCell,
@@ -26,9 +31,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { BonusMonthPicker } from "@/components/payroll/bonus-month-picker";
-import { EmployeeSelect, LabeledSelect } from "@/components/payroll/payroll-select";
-import { toSelectItems } from "@/components/payroll/select-utils";
 import {
   approveBonusAction,
   createBonusAction,
@@ -46,12 +48,33 @@ import type { LookupOption } from "@/types/employee";
 
 const bonusTypeItems = toSelectItems(BONUS_TYPE_LABELS);
 
-type BonusFormProps = {
-  employees: LookupOption[];
+const now = new Date();
+
+const EMPTY_BONUS_VALUES: z.input<typeof bonusFormSchema> = {
+  bonusType: "festival",
+  amount: 0,
+  employeeId: "",
+  reason: "",
+  remarks: "",
+  bonusMonth: now.getMonth() + 1,
+  bonusYear: now.getFullYear(),
 };
 
-export function BonusForm({ employees }: BonusFormProps) {
+type BonusFormProps = {
+  employees: LookupOption[];
+  variant?: "page" | "dialog";
+  onSuccess?: () => void;
+  onCancel?: () => void;
+};
+
+export function BonusForm({
+  employees,
+  variant = "page",
+  onSuccess,
+  onCancel,
+}: BonusFormProps) {
   const now = new Date();
+  const isDialog = variant === "dialog";
   const [isPending, startTransition] = useTransition();
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [bonusMonth, setBonusMonth] = useState(now.getMonth() + 1);
@@ -59,59 +82,58 @@ export function BonusForm({ employees }: BonusFormProps) {
 
   const form = useForm<z.input<typeof bonusFormSchema>>({
     resolver: zodResolver(bonusFormSchema),
-    defaultValues: {
-      bonusType: "festival",
-      amount: 0,
-      employeeId: "",
-      reason: "",
-      remarks: "",
-    },
+    defaultValues: EMPTY_BONUS_VALUES,
   });
 
+  const gridClass = isDialog ? "grid gap-3 md:grid-cols-2" : "grid gap-4 md:grid-cols-2";
+
+  function handleSubmit(values: z.input<typeof bonusFormSchema>) {
+    startTransition(async () => {
+      let attachmentPath: string | undefined;
+      if (attachmentFile) {
+        const uploadData = new FormData();
+        uploadData.append("file", attachmentFile);
+        const upload = await uploadBonusAttachmentAction(uploadData);
+        if (!upload.success) {
+          toast.error(upload.message);
+          return;
+        }
+        attachmentPath = upload.data;
+      }
+
+      const result = await createBonusAction({
+        ...values,
+        bonusMonth,
+        bonusYear,
+        attachmentPath,
+      });
+
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+
+      toast.success("Bonus submitted for approval");
+      form.reset(EMPTY_BONUS_VALUES);
+      setAttachmentFile(null);
+      setBonusMonth(now.getMonth() + 1);
+      setBonusYear(now.getFullYear());
+      onSuccess?.();
+    });
+  }
+
   return (
-    <section className="rounded-xl border bg-card p-5 shadow-sm">
-      <div className="mb-5">
-        <h2 className="text-sm font-medium">Create bonus</h2>
-        <p className="text-xs text-muted-foreground">
-          Bonuses follow HR → Finance → Super Admin approval before payroll inclusion.
-        </p>
-      </div>
+    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+      {!isDialog ? (
+        <div>
+          <h2 className="text-sm font-medium">Create bonus</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Bonuses follow HR → Finance → Super Admin approval before payroll inclusion.
+          </p>
+        </div>
+      ) : null}
 
-      <form
-        onSubmit={form.handleSubmit((values) => {
-          startTransition(async () => {
-            let attachmentPath: string | undefined;
-            if (attachmentFile) {
-              const uploadData = new FormData();
-              uploadData.append("file", attachmentFile);
-              const upload = await uploadBonusAttachmentAction(uploadData);
-              if (!upload.success) {
-                toast.error(upload.message);
-                return;
-              }
-              attachmentPath = upload.data;
-            }
-
-            const result = await createBonusAction({
-              ...values,
-              bonusMonth,
-              bonusYear,
-              attachmentPath,
-            });
-
-            if (!result.success) {
-              toast.error(result.message);
-              return;
-            }
-
-            toast.success("Bonus submitted for approval");
-            form.reset({ bonusType: "festival", amount: 0, employeeId: "", reason: "", remarks: "" });
-            setAttachmentFile(null);
-            window.location.reload();
-          });
-        })}
-        className="grid gap-4 md:grid-cols-2"
-      >
+      <div className={gridClass}>
         <Field label="Employee">
           <EmployeeSelect
             employees={employees}
@@ -142,18 +164,19 @@ export function BonusForm({ employees }: BonusFormProps) {
           />
         </div>
         <Field label="Amount">
-          <Input type="number" min={0} step="0.01" disabled={isPending} {...form.register("amount")} />
-        </Field>
-        <Field label="Approval status">
-          <div className="flex h-8 items-center rounded-lg border bg-muted/40 px-3 text-sm">
-            Pending
-          </div>
+          <Input
+            type="number"
+            min={0}
+            step="0.01"
+            disabled={isPending}
+            {...form.register("amount")}
+          />
         </Field>
         <Field label="Reason">
           <Input disabled={isPending} placeholder="Reason for bonus" {...form.register("reason")} />
         </Field>
-        <Field label="Remarks">
-          <Input disabled={isPending} placeholder="Internal remarks" {...form.register("remarks")} />
+        <Field label="Remarks" className="md:col-span-2">
+          <Input disabled={isPending} placeholder="Internal remarks (optional)" {...form.register("remarks")} />
         </Field>
         <Field label="Attachment (optional)" className="md:col-span-2">
           <Input
@@ -162,14 +185,25 @@ export function BonusForm({ employees }: BonusFormProps) {
             onChange={(event) => setAttachmentFile(event.target.files?.[0] ?? null)}
           />
         </Field>
-        <div className="md:col-span-2">
-          <Button type="submit" disabled={isPending}>
-            {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Create bonus
+      </div>
+
+      {isDialog ? (
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t pt-4">
+          <Button type="button" variant="outline" disabled={isPending} onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={isPending} className="gap-1.5">
+            {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+            Add bonus
           </Button>
         </div>
-      </form>
-    </section>
+      ) : (
+        <Button type="submit" disabled={isPending} className="gap-1.5">
+          {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+          Create bonus
+        </Button>
+      )}
+    </form>
   );
 }
 
@@ -188,6 +222,7 @@ type BonusTableProps = {
   employeeId?: string;
   departmentId?: string;
   canApprove: boolean;
+  canCreate?: boolean;
 };
 
 export function BonusTable({
@@ -196,18 +231,13 @@ export function BonusTable({
   page,
   pageSize,
   employees,
-  departments,
-  search = "",
-  month,
-  year,
-  bonusStatus,
-  bonusType,
-  employeeId,
-  departmentId,
   canApprove,
+  canCreate = false,
 }: BonusTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { setHeaderActions } = useTeamPayrollHeaderActions();
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const updateParams = useCallback(
@@ -223,6 +253,26 @@ export function BonusTable({
     [router, searchParams, startTransition],
   );
 
+  const openCreateDialog = useCallback(() => {
+    setDialogOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (!canCreate) {
+      setHeaderActions(null);
+      return;
+    }
+
+    setHeaderActions(
+      <Button type="button" size="sm" className="gap-1.5" onClick={openCreateDialog}>
+        <Plus className="size-4" />
+        Add bonus
+      </Button>,
+    );
+
+    return () => setHeaderActions(null);
+  }, [canCreate, openCreateDialog, setHeaderActions]);
+
   const columns = useMemo<ColumnDef<BonusItem>[]>(
     () => [
       {
@@ -235,31 +285,36 @@ export function BonusTable({
           </div>
         ),
       },
-      { accessorKey: "employeeCode", header: "Employee ID" },
-      { accessorKey: "departmentName", header: "Department", cell: ({ row }) => row.original.departmentName ?? "—" },
+      {
+        accessorKey: "departmentName",
+        header: "Department",
+        cell: ({ row }) => row.original.departmentName ?? "—",
+      },
       {
         accessorKey: "bonusType",
-        header: "Bonus Type",
+        header: "Type",
         cell: ({ row }) => BONUS_TYPE_LABELS[row.original.bonusType],
       },
       {
         accessorKey: "bonusMonth",
-        header: "Bonus Month",
+        header: "Period",
         cell: ({ row }) => formatPayrollMonthLabel(row.original.bonusMonth),
       },
       {
         accessorKey: "amount",
         header: "Amount",
-        cell: ({ row }) => formatCurrency(row.original.amount),
+        cell: ({ row }) => (
+          <span className="tabular-nums font-medium">{formatCurrency(row.original.amount)}</span>
+        ),
       },
       {
         accessorKey: "bonusStatus",
         header: "Status",
         cell: ({ row }) => (
           <div>
-            <div>{BONUS_STATUS_LABELS[row.original.bonusStatus]}</div>
+            <BonusStatusBadge status={row.original.bonusStatus} />
             {row.original.approvalLevel ? (
-              <div className="text-xs text-muted-foreground">
+              <div className="mt-1 text-xs text-muted-foreground">
                 {BONUS_APPROVAL_LEVEL_LABELS[row.original.approvalLevel]}
               </div>
             ) : null}
@@ -267,27 +322,23 @@ export function BonusTable({
         ),
       },
       {
-        accessorKey: "approverName",
-        header: "Approved By",
-        cell: ({ row }) => row.original.approverName ?? "—",
-      },
-      {
         accessorKey: "createdAt",
-        header: "Created Date",
+        header: "Created",
         cell: ({ row }) => format(new Date(row.original.createdAt), "MMM d, yyyy"),
       },
       {
         id: "actions",
-        header: "",
+        header: () => <span className="sr-only">Actions</span>,
         cell: ({ row }) => (
           <div className="flex items-center justify-end gap-2">
             {row.original.attachmentPath ? (
-              <Paperclip className="h-4 w-4 text-muted-foreground" aria-label="Attachment available" />
+              <Paperclip className="size-4 text-muted-foreground" aria-label="Attachment" />
             ) : null}
             {canApprove && row.original.bonusStatus === "pending" ? (
               <Button
                 size="sm"
                 variant="outline"
+                className="h-8 gap-1.5"
                 disabled={isPending}
                 onClick={() =>
                   startTransition(async () => {
@@ -300,7 +351,7 @@ export function BonusTable({
                   })
                 }
               >
-                <CheckCircle2 className="mr-1 h-4 w-4" />
+                <CheckCircle2 className="size-3.5" />
                 Approve
               </Button>
             ) : null}
@@ -315,13 +366,17 @@ export function BonusTable({
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
-    <section className="space-y-4">
+    <div className="space-y-4">
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
         {records.length === 0 ? (
           <EmptyState
-            title="No bonuses found"
-            description="Create a bonus to see records here."
-            className="border-0"
+            title="No bonuses yet"
+            description={
+              canCreate
+                ? "Add a bonus for an employee. Approved bonuses are included in the monthly payroll run."
+                : "Bonus records will appear here once they are created."
+            }
+            className="border-0 py-14"
           />
         ) : (
           <div className="overflow-x-auto">
@@ -330,7 +385,10 @@ export function BonusTable({
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id}>
                     {headerGroup.headers.map((header) => (
-                      <TableHead key={header.id} className="h-11 whitespace-nowrap px-4">
+                      <TableHead
+                        key={header.id}
+                        className={`h-11 whitespace-nowrap px-4 ${header.id === "actions" ? "text-right" : ""}`}
+                      >
                         {flexRender(header.column.columnDef.header, header.getContext())}
                       </TableHead>
                     ))}
@@ -339,9 +397,12 @@ export function BonusTable({
               </TableHeader>
               <TableBody>
                 {table.getRowModel().rows.map((row) => (
-                  <TableRow key={row.id}>
+                  <TableRow key={row.id} className="hover:bg-muted/30">
                     {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} className="px-4 py-3">
+                      <TableCell
+                        key={cell.id}
+                        className={`px-4 py-3 ${cell.column.id === "actions" ? "text-right" : ""}`}
+                      >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </TableCell>
                     ))}
@@ -359,16 +420,53 @@ export function BonusTable({
             Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total}
           </p>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => updateParams({ page: String(page - 1) })}>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => updateParams({ page: String(page - 1) })}
+            >
               Previous
             </Button>
-            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => updateParams({ page: String(page + 1) })}>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages}
+              onClick={() => updateParams({ page: String(page + 1) })}
+            >
               Next
             </Button>
           </div>
         </div>
       ) : null}
-    </section>
+
+      {canCreate ? (
+        <BonusDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          employees={employees}
+          onSaved={() => router.refresh()}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function BonusStatusBadge({ status }: { status: BonusStatus }) {
+  const styles: Record<BonusStatus, string> = {
+    pending: "bg-amber-500/15 text-amber-800 dark:text-amber-200",
+    approved: "bg-emerald-500/15 text-emerald-800 dark:text-emerald-200",
+    rejected: "bg-red-500/15 text-red-800 dark:text-red-200",
+    paid: "bg-primary/10 text-primary",
+    cancelled: "border text-muted-foreground",
+  };
+
+  return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${styles[status]}`}
+    >
+      {BONUS_STATUS_LABELS[status]}
+    </span>
   );
 }
 

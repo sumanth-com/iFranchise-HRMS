@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { Loader2, Pencil } from "lucide-react";
+import { Eye, Loader2, Pencil } from "lucide-react";
 import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -14,8 +14,14 @@ import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/common/modal";
+import { KpiDetailModal } from "@/components/performance/kpi-detail-modal";
 import { KpiStatusBadge } from "@/components/performance/performance-status-badge";
 import { PerformancePagination } from "@/components/performance/performance-filters";
+import {
+  PerformanceTableShell,
+  ProgressBar,
+  TableActions,
+} from "@/components/performance/performance-ui-primitives";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { toSelectItems } from "@/components/payroll/select-utils";
 import {
@@ -100,6 +106,7 @@ export function KpiTable({
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [editing, setEditing] = useState<KpiListItem | null>(null);
+  const [viewing, setViewing] = useState<KpiListItem | null>(null);
 
   function updateParams(updates: Record<string, string | undefined>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -139,70 +146,68 @@ export function KpiTable({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-        {records.length === 0 ? (
+      <PerformanceTableShell
+        empty={
           <EmptyState
             title="No KPI assignments yet"
             description="Pick a template above and assign it to an employee to start tracking."
             className="border-0"
           />
-        ) : (
-          <div className="max-h-[24rem] overflow-auto">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
-                <tr className="text-left text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Employee</th>
-                  <th className="px-4 py-3 font-medium">KPI</th>
-                  <th className="px-4 py-3 font-medium">Target</th>
-                  <th className="px-4 py-3 font-medium">Progress</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Due</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {records.map((row) => (
-                  <tr key={row.id} className="border-t align-middle">
-                    <td className="px-4 py-3">
-                      <div className="font-medium">{row.employeeName}</div>
-                    </td>
-                    <td className="px-4 py-3 font-medium">{row.title}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {formatKpiTarget(row.targetValue, row.measurementType)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-16 overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full rounded-full bg-primary"
-                            style={{ width: `${row.completionPercentage}%` }}
-                          />
-                        </div>
-                        <span className="tabular-nums">{row.completionPercentage}%</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <KpiStatusBadge status={row.kpiStatus} />
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {row.endDate ? format(new Date(row.endDate), "MMM d, yyyy") : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-right">
+        }
+      >
+        {records.length > 0 ? (
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
+              <tr className="text-left text-muted-foreground">
+                <th className="px-4 py-3 font-medium">Employee</th>
+                <th className="px-4 py-3 font-medium">KPI</th>
+                <th className="px-4 py-3 font-medium">Target</th>
+                <th className="px-4 py-3 font-medium">Progress</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Due</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {records.map((row) => (
+                <tr key={row.id} className="border-t align-middle">
+                  <td className="px-4 py-3">
+                    <div className="font-medium">{row.employeeName}</div>
+                  </td>
+                  <td className="px-4 py-3 font-medium">{row.title}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {formatKpiTarget(row.targetValue, row.measurementType)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <ProgressBar value={row.completionPercentage} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <KpiStatusBadge status={row.kpiStatus} />
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {row.endDate ? format(new Date(row.endDate), "MMM d, yyyy") : "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <TableActions>
+                      <Button size="sm" variant="outline" onClick={() => setViewing(row)}>
+                        <Eye className="mr-1 size-3.5" />
+                        View
+                      </Button>
                       {row.kpiStatus !== "completed" &&
                       (canManageKpis || row.managerEmployeeId === currentEmployeeId) ? (
                         <Button size="sm" variant="outline" onClick={() => setEditing(row)}>
-                          <Pencil className="mr-1 h-3.5 w-3.5" />
+                          <Pencil className="mr-1 size-3.5" />
                           Update
                         </Button>
                       ) : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                    </TableActions>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : null}
+      </PerformanceTableShell>
 
       <PerformancePagination page={page} pageSize={pageSize} total={total} />
 
@@ -213,6 +218,21 @@ export function KpiTable({
           onOpenChange={(open) => !open && setEditing(null)}
         />
       ) : null}
+
+      <KpiDetailModal
+        record={viewing}
+        open={!!viewing}
+        onOpenChange={(open) => !open && setViewing(null)}
+        canUpdate={
+          viewing
+            ? viewing.kpiStatus !== "completed" &&
+              (canManageKpis || viewing.managerEmployeeId === currentEmployeeId)
+            : false
+        }
+        onUpdateProgress={() => {
+          if (viewing) setEditing(viewing);
+        }}
+      />
     </section>
   );
 }

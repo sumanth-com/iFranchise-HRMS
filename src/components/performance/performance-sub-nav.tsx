@@ -13,9 +13,7 @@ export function PerformanceSubNav() {
     <nav className="flex flex-wrap gap-1 rounded-lg border bg-card p-1 shadow-sm">
       {PERFORMANCE_SUB_NAV.map((item) => {
         const isActive =
-          item.href === "/dashboard/performance"
-            ? pathname === item.href
-            : pathname === item.href || pathname.startsWith(`${item.href}/`);
+          pathname === item.href || pathname.startsWith(`${item.href}/`);
 
         return (
           <Link

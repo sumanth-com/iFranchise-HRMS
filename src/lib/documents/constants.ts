@@ -1,23 +1,86 @@
 import { hasAnyPermission } from "@/lib/permissions/utils";
+import { hubListUrl, hubTeamListUrl } from "@/lib/dashboard/hub-paths";
 import type { LetterType } from "@/types/documents";
-
-export const DOCUMENTS_ROUTES = {
-  dashboard: "/dashboard/documents-management",
-  employeeDocuments: "/dashboard/documents-management/employees",
-  employeeDocument: (employeeId: string) =>
-    `/dashboard/documents-management/employees/${employeeId}`,
-  letters: "/dashboard/documents-management/letters",
-  templates: "/dashboard/documents-management/templates",
-  expiring: "/dashboard/documents-management/expiring",
-  settings: "/dashboard/documents-management/settings",
-} as const;
-
-import { hubTeamListUrl } from "@/lib/dashboard/hub-paths";
 
 /** Personal / self-service documents in the HR portal main nav. */
 export const SELF_DOCUMENTS_ROUTES = {
   list: "/dashboard/documents",
   team: "/dashboard/documents/team",
+} as const;
+
+export const TEAM_DOCUMENTS_SECTIONS = {
+  employees: "employees",
+  letters: "letters",
+  templates: "templates",
+  expiring: "expiring",
+  settings: "settings",
+} as const;
+
+export type TeamDocumentsSection = keyof typeof TEAM_DOCUMENTS_SECTIONS;
+
+const TEAM_DOCUMENTS_SECTION_SET = new Set<string>(Object.values(TEAM_DOCUMENTS_SECTIONS));
+
+export function parseTeamDocumentsSection(value: string | undefined): TeamDocumentsSection | null {
+  if (value && TEAM_DOCUMENTS_SECTION_SET.has(value)) {
+    return value as TeamDocumentsSection;
+  }
+  return null;
+}
+
+export function teamDocumentsSectionPath(section: TeamDocumentsSection) {
+  return `${SELF_DOCUMENTS_ROUTES.team}/${section}`;
+}
+
+export const TEAM_DOCUMENTS_SECTION_DESCRIPTIONS: Record<
+  TeamDocumentsSection | "overview",
+  string
+> = {
+  overview:
+    "Organization-wide document stats, recent activity, and quick access to HR document workflows.",
+  employees: "Browse employee folders, upload files, and verify submitted documents.",
+  letters: "Generate, publish, and manage company letters for employees.",
+  templates: "Create and maintain letter templates used for document generation.",
+  expiring: "Track credentials and documents approaching expiry or already expired.",
+  settings: "Configure upload rules, categories, and document workflow defaults.",
+};
+
+export function teamDocumentsSectionDescription(
+  section: TeamDocumentsSection | "overview",
+) {
+  return TEAM_DOCUMENTS_SECTION_DESCRIPTIONS[section];
+}
+
+export function documentsHubUrl(
+  options?: {
+    section?: TeamDocumentsSection | "overview";
+    params?: Record<string, string | undefined>;
+  },
+) {
+  const section = options?.section ?? "overview";
+  const path =
+    section === "overview"
+      ? SELF_DOCUMENTS_ROUTES.team
+      : teamDocumentsSectionPath(section);
+
+  const filterParams: Record<string, string | undefined> = {};
+  if (options?.params) {
+    Object.entries(options.params).forEach(([key, value]) => {
+      if (value) filterParams[key] = value;
+    });
+  }
+
+  return hubListUrl(path, filterParams);
+}
+
+export const DOCUMENTS_ROUTES = {
+  dashboard: SELF_DOCUMENTS_ROUTES.team,
+  employeeDocuments: teamDocumentsSectionPath(TEAM_DOCUMENTS_SECTIONS.employees),
+  employeeDocument: (employeeId: string) =>
+    `${teamDocumentsSectionPath(TEAM_DOCUMENTS_SECTIONS.employees)}/${employeeId}`,
+  letters: teamDocumentsSectionPath(TEAM_DOCUMENTS_SECTIONS.letters),
+  templates: teamDocumentsSectionPath(TEAM_DOCUMENTS_SECTIONS.templates),
+  expiring: teamDocumentsSectionPath(TEAM_DOCUMENTS_SECTIONS.expiring),
+  settings: teamDocumentsSectionPath(TEAM_DOCUMENTS_SECTIONS.settings),
 } as const;
 
 /** Personal profile in the HR portal self-service section. */
@@ -31,14 +94,22 @@ export function documentsTeamListUrl(
   return hubTeamListUrl(SELF_DOCUMENTS_ROUTES.list, searchParams);
 }
 
-export const DOCUMENTS_SUB_NAV = [
-  { title: "Dashboard", href: DOCUMENTS_ROUTES.dashboard },
-  { title: "Employee Documents", href: DOCUMENTS_ROUTES.employeeDocuments },
-  { title: "Company Letters", href: DOCUMENTS_ROUTES.letters },
-  { title: "Templates", href: DOCUMENTS_ROUTES.templates },
-  { title: "Expiring Documents", href: DOCUMENTS_ROUTES.expiring },
-  { title: "Settings", href: DOCUMENTS_ROUTES.settings },
-] as const;
+export const TEAM_DOCUMENTS_SUB_NAV = [
+  { title: "Overview", section: "overview" as const },
+  { title: "Employees", section: TEAM_DOCUMENTS_SECTIONS.employees },
+  { title: "Letters", section: TEAM_DOCUMENTS_SECTIONS.letters },
+  { title: "Templates", section: TEAM_DOCUMENTS_SECTIONS.templates },
+  { title: "Expiring", section: TEAM_DOCUMENTS_SECTIONS.expiring },
+  { title: "Settings", section: TEAM_DOCUMENTS_SECTIONS.settings },
+].map((item) => ({
+  title: item.title,
+  section: item.section,
+  description: TEAM_DOCUMENTS_SECTION_DESCRIPTIONS[item.section],
+  href: documentsHubUrl({ section: item.section }),
+}));
+
+/** @deprecated Use TEAM_DOCUMENTS_SUB_NAV in the team documents hub. */
+export const DOCUMENTS_SUB_NAV = TEAM_DOCUMENTS_SUB_NAV;
 
 export const DOCUMENTS_STORAGE_BUCKET = "employee-documents";
 
@@ -53,16 +124,8 @@ export const LETTER_TYPE_OPTIONS: { value: LetterType; label: string; documentTy
   { value: "experience_letter", label: "Experience Letter", documentTypeCode: "EXPERIENCE_LETTER" },
   { value: "relieving_letter", label: "Relieving Letter", documentTypeCode: "RELIEVING_LETTER" },
   { value: "termination_letter", label: "Termination Letter", documentTypeCode: "TERMINATION_LETTER" },
-  {
-    value: "resignation_acceptance_letter",
-    label: "Acceptance of Resignation",
-    documentTypeCode: "RESIGNATION_ACCEPTANCE_LETTER",
-  },
-  {
-    value: "settlement_letter",
-    label: "Final Settlement Letter",
-    documentTypeCode: "SETTLEMENT_LETTER",
-  },
+  { value: "resignation_acceptance_letter", label: "Acceptance of Resignation", documentTypeCode: "RESIGNATION_ACCEPTANCE_LETTER" },
+  { value: "settlement_letter", label: "Final Settlement Letter", documentTypeCode: "SETTLEMENT_LETTER" },
 ];
 
 export const LETTER_TYPE_LABELS: Record<LetterType, string> = Object.fromEntries(

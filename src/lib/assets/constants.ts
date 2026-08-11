@@ -1,3 +1,10 @@
+import { hubTeamListUrl } from "@/lib/dashboard/hub-paths";
+import {
+  ASSET_DEVICE_CATALOG_KEYS,
+  ASSET_DEVICE_IMAGE_CATALOG,
+  type AssetDeviceCatalogKey,
+  type AssetDeviceImageConfig,
+} from "@/lib/assets/asset-device-images";
 import { hasAnyPermission } from "@/lib/permissions/utils";
 import type {
   AssetAssignmentStatus,
@@ -15,8 +22,6 @@ export const ASSETS_ROUTES = {
   reports: "/dashboard/assets-management/reports",
   settings: "/dashboard/assets-management/settings",
 } as const;
-
-import { hubTeamListUrl } from "@/lib/dashboard/hub-paths";
 
 /** Personal / self-service assets in the HR portal main nav. */
 export const SELF_ASSETS_ROUTES = {
@@ -111,6 +116,21 @@ export function canEditAssets(codes: string[]) {
 export function canAssignAssets(codes: string[]) {
   return hasAnyPermission(codes, ["asset.assign", "asset.edit"]);
 }
+
+/** All `src/assets` device images — keys match {@link ASSET_DEVICE_IMAGE_CATALOG}. */
+export const HR_ASSIGN_ASSET_TYPE_KEYS = ASSET_DEVICE_CATALOG_KEYS;
+
+export type HrAssignAssetTypeKey = AssetDeviceCatalogKey;
+
+export const HR_ASSIGN_ASSET_TYPES = HR_ASSIGN_ASSET_TYPE_KEYS.map((key) => {
+  const config: AssetDeviceImageConfig = ASSET_DEVICE_IMAGE_CATALOG[key];
+  return {
+    key,
+    label: config.label,
+    categoryNames: config.categoryNames,
+    defaultBrand: config.defaultBrand,
+  };
+});
 
 export function canReturnAssets(codes: string[]) {
   return hasAnyPermission(codes, ["asset.return", "asset.assign", "asset.edit"]);

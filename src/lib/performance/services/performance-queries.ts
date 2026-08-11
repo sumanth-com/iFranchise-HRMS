@@ -300,7 +300,7 @@ export async function getPerformanceSummary(
 }
 
 function employeeJoinSelect() {
-  return "employees:employee_id!inner(employee_code, first_name, last_name, department_id, departments:department_id(name))";
+  return "employees:employee_id(employee_code, first_name, last_name, department_id, departments:department_id(name))";
 }
 
 export async function listGoals(

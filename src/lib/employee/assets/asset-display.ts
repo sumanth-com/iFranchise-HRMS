@@ -1,5 +1,6 @@
 import { format, isValid, parseISO } from "date-fns";
 
+import { parseAssetRemarks, parseAssetSpecs } from "@/lib/assets/asset-spec-utils";
 import type { EmployeeAsset } from "@/types/employee-assets";
 
 export function formatAssetDate(value: string | null | undefined, fallback = "—"): string {
@@ -25,6 +26,18 @@ export function getAssetDisplaySubtitle(asset: EmployeeAsset): string | null {
 }
 
 export function getAssetConfigurationText(asset: EmployeeAsset): string | null {
-  const trimmed = asset.notes?.trim();
-  return trimmed || null;
+  const specs = parseAssetSpecs(asset.notes);
+  const lines = [
+    specs.chip ? `Chip: ${specs.chip}` : null,
+    specs.memory ? `Memory: ${specs.memory}` : null,
+    specs.storage ? `Storage: ${specs.storage}` : null,
+    specs.operatingSystem ? `OS: ${specs.operatingSystem}` : null,
+    specs.connectionType ? `Connection: ${specs.connectionType}` : null,
+    specs.accessories ? `Details: ${specs.accessories}` : null,
+  ].filter(Boolean);
+
+  if (lines.length > 0) return lines.join("\n");
+
+  const remarks = parseAssetRemarks(asset.notes);
+  return remarks ?? null;
 }

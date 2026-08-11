@@ -20,7 +20,6 @@ import {
   Layers,
   MoreHorizontal,
   Plus,
-  SlidersHorizontal,
   User,
   UserCheck,
   XCircle,
@@ -28,10 +27,6 @@ import {
 import { toast } from "sonner";
 
 import { LeaveStatusBadge } from "@/components/leave/leave-status-badge";
-import {
-  LeaveAdvancedFiltersSheet,
-  type LeaveAdvancedFilterValues,
-} from "@/components/leave/leave-advanced-filters-sheet";
 import { Button, buttonVariants } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
 import { Label } from "@/components/ui/label";
@@ -83,14 +78,12 @@ type LeaveTableProps = {
   leaveTypeId?: string;
   departmentId?: string;
   branchId?: string;
-  approverId?: string;
   reportingManagerId?: string;
   employeeId?: string;
   leaveTypes: LookupOption[];
   departments: LookupOption[];
   branches: LookupOption[];
   employees: LookupOption[];
-  approvers: LookupOption[];
   managers: LookupOption[];
   canCreate: boolean;
   canApprove: boolean;
@@ -188,14 +181,12 @@ export function LeaveTable({
   leaveTypeId,
   departmentId,
   branchId,
-  approverId,
   reportingManagerId,
   employeeId,
   leaveTypes,
   departments,
   branches,
   employees,
-  approvers,
   managers,
   canCreate,
   canApprove,
@@ -205,7 +196,6 @@ export function LeaveTable({
 }: LeaveTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [approveTarget, setApproveTarget] = useState<LeaveListItem | null>(null);
   const [rejectTarget, setRejectTarget] = useState<LeaveListItem | null>(null);
   const [cancelTarget, setCancelTarget] = useState<LeaveListItem | null>(null);
@@ -237,7 +227,6 @@ export function LeaveTable({
     leaveTypeId,
     departmentId,
     branchId,
-    approverId,
     reportingManagerId,
     employeeId,
   });
@@ -315,19 +304,13 @@ export function LeaveTable({
     [employees],
   );
 
-  const advancedValues: LeaveAdvancedFilterValues = {
-    departmentId: filters.departmentId,
-    branchId: filters.branchId,
-    reportingManagerId: filters.reportingManagerId,
-    approverId: filters.approverId,
-  };
-
-  const advancedFilterCount = [
-    filters.departmentId,
-    filters.branchId,
-    filters.reportingManagerId,
-    filters.approverId,
-  ].filter(Boolean).length;
+  const managerItems = useMemo(
+    () => [
+      { value: "", label: "All managers" },
+      ...managers.map((manager) => ({ value: manager.id, label: manager.label })),
+    ],
+    [managers],
+  );
 
   const isDefaultView =
     currentMonth === now.getMonth() + 1 &&
@@ -336,29 +319,11 @@ export function LeaveTable({
     !filters.employeeId &&
     !filters.leaveStatus &&
     !filters.leaveTypeId &&
-    advancedFilterCount === 0;
+    !filters.reportingManagerId &&
+    !filters.departmentId &&
+    !filters.branchId;
 
   const hasActiveFilters = !isDefaultView;
-
-  const applyAdvancedFilters = (values: LeaveAdvancedFilterValues) => {
-    updateParams({
-      departmentId: values.departmentId,
-      branchId: values.branchId,
-      reportingManagerId: values.reportingManagerId,
-      approverId: values.approverId,
-      page: "1",
-    });
-  };
-
-  const clearAdvancedFilters = () => {
-    updateParams({
-      departmentId: undefined,
-      branchId: undefined,
-      reportingManagerId: undefined,
-      approverId: undefined,
-      page: "1",
-    });
-  };
 
   const columns = useMemo<ColumnDef<LeaveListItem>[]>(
     () => [
@@ -407,11 +372,16 @@ export function LeaveTable({
         cell: ({ row }) =>
           format(parseISO(row.original.appliedAt), "dd MMM yyyy"),
       },
-      {
-        id: "approverName",
-        header: "Approver",
-        cell: ({ row }) => row.original.approverName ?? "—",
-      },
+      ...(embedded
+        ? []
+        : [
+            {
+              id: "approverName",
+              header: "Approver",
+              cell: ({ row }: { row: { original: LeaveListItem } }) =>
+                row.original.approverName ?? "—",
+            },
+          ]),
       {
         id: "leaveStatus",
         header: "Status",
@@ -445,7 +415,7 @@ export function LeaveTable({
                   <Eye className="size-4 shrink-0" />
                   View Leave
                 </DropdownMenuItem>
-                {canApprove && isPendingStatus ? (
+                {!embedded && canApprove && isPendingStatus ? (
                   <DropdownMenuItem
                     className="whitespace-nowrap"
                     onClick={() => setApproveTarget(row.original)}
@@ -454,7 +424,7 @@ export function LeaveTable({
                     Approve
                   </DropdownMenuItem>
                 ) : null}
-                {canReject && isPendingStatus ? (
+                {!embedded && canReject && isPendingStatus ? (
                   <DropdownMenuItem
                     className="whitespace-nowrap"
                     onClick={() => setRejectTarget(row.original)}
@@ -479,7 +449,7 @@ export function LeaveTable({
         },
       },
     ],
-    [canApprove, canCancel, canReject, router],
+    [canApprove, canCancel, canReject, embedded, router],
   );
 
   const table = useReactTable({
@@ -557,8 +527,9 @@ export function LeaveTable({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-2 lg:grid-cols-[minmax(15rem,1.35fr)_minmax(8rem,0.75fr)_minmax(6rem,0.55fr)_minmax(9rem,0.75fr)_minmax(10rem,0.9fr)_auto_auto_auto] lg:items-center">
-          <div className="min-w-0">
+      <div className="rounded-xl border bg-card p-3 shadow-sm">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="col-span-2 min-w-0 sm:col-span-1 lg:col-span-1">
             <Select
               items={employeeItems}
               value={filters.employeeId ?? ""}
@@ -674,73 +645,67 @@ export function LeaveTable({
             </Select>
           </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-10 shrink-0 gap-1.5 whitespace-nowrap"
-            onClick={() => setAdvancedOpen(true)}
-          >
-            <SlidersHorizontal className="size-3.5" />
-            Advanced
-            {advancedFilterCount > 0 ? (
-              <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] text-primary-foreground">
-                {advancedFilterCount}
-              </span>
-            ) : null}
-          </Button>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 lg:contents">
-          {hasActiveFilters ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-10 whitespace-nowrap"
-              disabled={isPending}
-              onClick={() =>
-                updateParams({
-                  search: undefined,
-                  employeeId: undefined,
-                  leaveStatus: undefined,
-                  leaveTypeId: undefined,
-                  departmentId: undefined,
-                  branchId: undefined,
-                  approverId: undefined,
-                  reportingManagerId: undefined,
-                  month: String(now.getMonth() + 1),
-                  year: String(now.getFullYear()),
-                  page: "1",
-                })
+          <div className="min-w-0">
+            <Select
+              items={managerItems}
+              value={filters.reportingManagerId ?? ""}
+              onValueChange={(value) =>
+                updateParams({ reportingManagerId: value || undefined, page: "1" })
               }
             >
-              Clear filters
-            </Button>
-          ) : null}
-
-          {canCreate ? (
-            <Link
-              href={LEAVE_ROUTES.new}
-              className={cn(
-                buttonVariants(),
-                "h-10 whitespace-nowrap px-4",
-              )}
-            >
-              <Plus className="size-4" />
-              Apply Leave
-            </Link>
-          ) : null}
+              <SelectTrigger className={FILTER_CONTROL_CLASS}>
+                <SelectValue placeholder="All managers" />
+              </SelectTrigger>
+              <SelectContent align="start" alignItemWithTrigger={false}>
+                {managerItems.map((item) => (
+                  <SelectItem key={item.value || "all-managers"} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-      </div>
 
-      <LeaveAdvancedFiltersSheet
-        open={advancedOpen}
-        onOpenChange={setAdvancedOpen}
-        values={advancedValues}
-        departments={departments}
-        branches={branches}
-        managers={managers}
-        approvers={approvers}
-        onApply={applyAdvancedFilters}
-        onClear={clearAdvancedFilters}
-      />
+        {(hasActiveFilters || (canCreate && !embedded)) && (
+          <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
+            {hasActiveFilters ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-10 whitespace-nowrap"
+                disabled={isPending}
+                onClick={() =>
+                  updateParams({
+                    search: undefined,
+                    employeeId: undefined,
+                    leaveStatus: undefined,
+                    leaveTypeId: undefined,
+                    departmentId: undefined,
+                    branchId: undefined,
+                    reportingManagerId: undefined,
+                    month: String(now.getMonth() + 1),
+                    year: String(now.getFullYear()),
+                    page: "1",
+                  })
+                }
+              >
+                Clear filters
+              </Button>
+            ) : null}
+
+            {canCreate && !embedded ? (
+              <Link
+                href={LEAVE_ROUTES.new}
+                className={cn(buttonVariants(), "h-10 whitespace-nowrap px-4")}
+              >
+                <Plus className="size-4" />
+                Apply Leave
+              </Link>
+            ) : null}
+          </div>
+        )}
+      </div>
 
       <div className="overflow-auto rounded-lg border max-h-[min(70vh,calc(100dvh-16rem))] [scrollbar-gutter:stable]">
         <table
@@ -818,16 +783,18 @@ export function LeaveTable({
               >
                 <HeadLabel label="Applied On" icon={CalendarDays} />
               </TableHead>
-              <TableHead
-                className={cn(
-                  "min-w-[10rem]",
-                  TABLE_HEAD_CLASS,
-                  TABLE_CELL_CLASS,
-                  TABLE_HEAD_CELL_CLASS,
-                )}
-              >
-                <HeadLabel label="Approver" icon={UserCheck} />
-              </TableHead>
+              {!embedded ? (
+                <TableHead
+                  className={cn(
+                    "min-w-[10rem]",
+                    TABLE_HEAD_CLASS,
+                    TABLE_CELL_CLASS,
+                    TABLE_HEAD_CELL_CLASS,
+                  )}
+                >
+                  <HeadLabel label="Approver" icon={UserCheck} />
+                </TableHead>
+              ) : null}
               <TableHead
                 className={cn(
                   "h-11 min-w-[8.5rem] whitespace-nowrap px-4 py-3.5 text-center",
@@ -848,7 +815,7 @@ export function LeaveTable({
             {table.getRowModel().rows.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={10}
+                  colSpan={embedded ? 9 : 10}
                   className="h-24 text-center text-muted-foreground"
                 >
                   No leave requests found.

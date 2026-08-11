@@ -219,13 +219,10 @@ export function canManagePerformanceSettings(codes: string[]) {
 }
 
 export const PERFORMANCE_SUB_NAV = [
-  { title: "Dashboard", href: PERFORMANCE_ROUTES.dashboard },
   { title: "Goals & OKRs", href: PERFORMANCE_ROUTES.goals },
   { title: "KPIs", href: PERFORMANCE_ROUTES.kpis },
   { title: "Reviews", href: PERFORMANCE_ROUTES.reviews },
   { title: "Feedback", href: PERFORMANCE_ROUTES.feedback },
   { title: "1:1 Meetings", href: PERFORMANCE_ROUTES.oneOnOnes },
   { title: "Promotions", href: PERFORMANCE_ROUTES.promotions },
-  { title: "History", href: PERFORMANCE_ROUTES.history },
-  { title: "Settings", href: PERFORMANCE_ROUTES.settings },
 ] as const;

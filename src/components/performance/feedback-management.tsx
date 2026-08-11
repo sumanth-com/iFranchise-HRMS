@@ -1,9 +1,9 @@
 "use client";
 
 import { format } from "date-fns";
-import { Loader2 } from "lucide-react";
+import { Eye, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -18,10 +18,15 @@ import {
   PerformanceFilters,
   PerformancePagination,
 } from "@/components/performance/performance-filters";
+import { FeedbackDetailModal } from "@/components/performance/feedback-detail-modal";
 import {
   FeedbackTypeBadge,
   FeedbackVisibilityBadge,
 } from "@/components/performance/performance-status-badge";
+import {
+  PerformanceTableShell,
+  TableActions,
+} from "@/components/performance/performance-ui-primitives";
 import { EmployeeSelect, LabeledSelect } from "@/components/payroll/payroll-select";
 import { toSelectItems } from "@/components/payroll/select-utils";
 import { createFeedbackAction } from "@/lib/performance/actions";
@@ -88,7 +93,12 @@ export function FeedbackForm({ employees }: { employees: LookupOption[] }) {
           />
         </Field>
         <Field label="Message" className="md:col-span-2">
-          <Input disabled={isPending} {...form.register("message")} placeholder="Your feedback..." />
+          <textarea
+            className="flex min-h-[5rem] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={isPending}
+            placeholder="Your feedback…"
+            {...form.register("message")}
+          />
         </Field>
         <div className="md:col-span-2">
           <Button type="submit" disabled={isPending}>
@@ -118,6 +128,8 @@ export function FeedbackTable({
   employeeId?: string;
   feedbackType?: string;
 }) {
+  const [viewRecord, setViewRecord] = useState<FeedbackListItem | null>(null);
+
   return (
     <section className="space-y-4">
       <div className="rounded-xl border bg-card p-4 shadow-sm">
@@ -130,37 +142,66 @@ export function FeedbackTable({
           searchPlaceholder="Search feedback..."
         />
       </div>
-      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-        {records.length === 0 ? (
-          <EmptyState title="No feedback yet" description="Start giving appreciation, coaching, or suggestions." className="border-0" />
-        ) : (
+      <PerformanceTableShell
+        empty={
+          <EmptyState
+            title="No feedback yet"
+            description="Start giving appreciation, coaching, or suggestions."
+            className="border-0"
+          />
+        }
+      >
+        {records.length > 0 ? (
           <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/30 text-left text-muted-foreground">
-                <th className="px-4 py-3">From</th>
-                <th className="px-4 py-3">To</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">Visibility</th>
-                <th className="px-4 py-3">Message</th>
-                <th className="px-4 py-3">Date</th>
+            <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
+              <tr className="text-left text-muted-foreground">
+                <th className="px-4 py-3 font-medium">From</th>
+                <th className="px-4 py-3 font-medium">To</th>
+                <th className="px-4 py-3 font-medium">Type</th>
+                <th className="px-4 py-3 font-medium">Visibility</th>
+                <th className="px-4 py-3 font-medium">Message</th>
+                <th className="px-4 py-3 font-medium">Date</th>
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
               {records.map((row) => (
-                <tr key={row.id} className="border-b">
+                <tr key={row.id} className="border-t align-middle">
                   <td className="px-4 py-3">{row.fromEmployeeName}</td>
                   <td className="px-4 py-3">{row.toEmployeeName}</td>
-                  <td className="px-4 py-3"><FeedbackTypeBadge type={row.feedbackType} /></td>
-                  <td className="px-4 py-3"><FeedbackVisibilityBadge visibility={row.visibility} /></td>
-                  <td className="max-w-xs truncate px-4 py-3">{row.message}</td>
-                  <td className="px-4 py-3">{format(new Date(row.createdAt), "MMM d, yyyy")}</td>
+                  <td className="px-4 py-3">
+                    <FeedbackTypeBadge type={row.feedbackType} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <FeedbackVisibilityBadge visibility={row.visibility} />
+                  </td>
+                  <td className="max-w-xs px-4 py-3">
+                    <span className="line-clamp-2">{row.message}</span>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {format(new Date(row.createdAt), "MMM d, yyyy")}
+                  </td>
+                  <td className="px-4 py-3">
+                    <TableActions>
+                      <Button size="sm" variant="outline" onClick={() => setViewRecord(row)}>
+                        <Eye className="mr-1 size-3.5" />
+                        View
+                      </Button>
+                    </TableActions>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        ) : null}
+      </PerformanceTableShell>
       <PerformancePagination page={page} pageSize={pageSize} total={total} />
+
+      <FeedbackDetailModal
+        record={viewRecord}
+        open={!!viewRecord}
+        onOpenChange={(open) => !open && setViewRecord(null)}
+      />
     </section>
   );
 }

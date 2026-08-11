@@ -1,29 +1,51 @@
 "use client";
 
-import {
-  AssetsDashboardPanels,
-  AssetsSummaryCards,
-} from "@/components/assets/assets-dashboard-panels";
-import type { AssetsSummary } from "@/types/assets";
+import { AssetActivitySection } from "@/components/assets/asset-activity-section";
+import { HrAssignAssetWizard } from "@/components/assets/hr-assign-asset-wizard";
+import type {
+  AssetActivityItem,
+  AssetListResult,
+  AssetsLookups,
+} from "@/types/assets";
 
 type HrTeamAssetsViewProps = {
-  summary: AssetsSummary;
+  lookups?: AssetsLookups | null;
+  inventory?: AssetListResult | null;
+  activity?: AssetActivityItem[];
+  canAssign?: boolean;
+  permissionCodes?: string[];
   embedded?: boolean;
 };
 
-export function HrTeamAssetsView({ summary, embedded = false }: HrTeamAssetsViewProps) {
+export function HrTeamAssetsView({
+  lookups = null,
+  inventory = null,
+  activity = [],
+  canAssign = false,
+  permissionCodes = [],
+  embedded = false,
+}: HrTeamAssetsViewProps) {
   return (
     <div className="space-y-6">
       {!embedded ? (
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Company Assets</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Track inventory, assignments, maintenance, warranties, and vendors.
+            Assign devices to employees, register assets, and review history.
           </p>
         </div>
       ) : null}
-      <AssetsSummaryCards summary={summary} />
-      <AssetsDashboardPanels summary={summary} />
+
+      {canAssign && lookups ? (
+        <HrAssignAssetWizard lookups={lookups} inventory={inventory?.data ?? []} />
+      ) : null}
+
+      <AssetActivitySection
+        activity={activity}
+        lookups={lookups}
+        inventory={inventory?.data ?? []}
+        permissionCodes={permissionCodes}
+      />
     </div>
   );
 }

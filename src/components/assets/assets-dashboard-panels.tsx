@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 
 import type { AssetsSummary } from "@/types/assets";
+import { cn } from "@/lib/utils";
 
 const CARDS = [
   { key: "totalAssets" as const, label: "Total Assets", icon: Boxes, accent: "text-blue-600", bg: "bg-blue-500/10" },
@@ -20,20 +21,23 @@ const CARDS = [
 
 export function AssetsSummaryCards({ summary }: { summary: AssetsSummary }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
       {CARDS.map((card) => {
         const Icon = card.icon;
         return (
           <div key={card.key} className="rounded-xl border bg-card p-4 shadow-sm">
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  {card.label}
-                </p>
+              <div className="min-w-0">
+                <p className="text-sm text-muted-foreground">{card.label}</p>
                 <p className="mt-2 text-2xl font-semibold tracking-tight">{summary[card.key]}</p>
               </div>
-              <div className={`rounded-lg p-2 ${card.bg}`}>
-                <Icon className={`h-5 w-5 ${card.accent}`} />
+              <div
+                className={cn(
+                  "flex size-10 shrink-0 items-center justify-center rounded-full",
+                  card.bg,
+                )}
+              >
+                <Icon className={cn("size-4", card.accent)} />
               </div>
             </div>
           </div>
@@ -48,9 +52,10 @@ export function AssetsDashboardPanels({ summary }: { summary: AssetsSummary }) {
   const maxDept = Math.max(1, ...summary.assetsByDepartment.map((d) => d.count));
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
-      <section className="rounded-xl border bg-card p-5 shadow-sm">
-        <h2 className="mb-4 text-sm font-medium">Assets by Category</h2>
+    <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
+      <section className="rounded-xl border bg-card p-4 shadow-sm">
+        <h2 className="text-sm font-semibold">Assets by category</h2>
+        <p className="mb-3 text-xs text-muted-foreground">Inventory breakdown</p>
         <div className="space-y-3">
           {summary.assetsByCategory.length === 0 ? (
             <p className="text-sm text-muted-foreground">No assets yet.</p>
@@ -73,8 +78,9 @@ export function AssetsDashboardPanels({ summary }: { summary: AssetsSummary }) {
         </div>
       </section>
 
-      <section className="rounded-xl border bg-card p-5 shadow-sm">
-        <h2 className="mb-4 text-sm font-medium">Assets by Department</h2>
+      <section className="rounded-xl border bg-card p-4 shadow-sm">
+        <h2 className="text-sm font-semibold">Assets by department</h2>
+        <p className="mb-3 text-xs text-muted-foreground">Where assets are used</p>
         <div className="space-y-3">
           {summary.assetsByDepartment.length === 0 ? (
             <p className="text-sm text-muted-foreground">No departmental assets.</p>
@@ -97,14 +103,18 @@ export function AssetsDashboardPanels({ summary }: { summary: AssetsSummary }) {
         </div>
       </section>
 
-      <section className="rounded-xl border bg-card p-5 shadow-sm">
-        <h2 className="mb-4 text-sm font-medium">Recent Assignments</h2>
+      <section className="rounded-xl border bg-card p-4 shadow-sm">
+        <h2 className="text-sm font-semibold">Recent assignments</h2>
+        <p className="mb-3 text-xs text-muted-foreground">Latest handovers</p>
         <div className="space-y-3">
           {summary.recentAssignments.length === 0 ? (
             <p className="text-sm text-muted-foreground">No recent assignments.</p>
           ) : (
             summary.recentAssignments.map((item) => (
-              <div key={item.id} className="border-b pb-3 last:border-0 last:pb-0">
+              <div
+                key={item.id}
+                className="rounded-lg border bg-background px-3 py-2.5 last:border-0"
+              >
                 <p className="text-sm font-medium">{item.assetName}</p>
                 <p className="text-xs text-muted-foreground">
                   {item.employeeName} · {item.assignedDate}
@@ -115,8 +125,9 @@ export function AssetsDashboardPanels({ summary }: { summary: AssetsSummary }) {
         </div>
       </section>
 
-      <section className="rounded-xl border bg-card p-5 shadow-sm">
-        <h2 className="mb-4 text-sm font-medium">Warranty Expiry Timeline</h2>
+      <section className="rounded-xl border bg-card p-4 shadow-sm">
+        <h2 className="text-sm font-semibold">Warranty timeline</h2>
+        <p className="mb-3 text-xs text-muted-foreground">Upcoming expiries</p>
         <div className="space-y-3">
           {summary.warrantyTimeline.length === 0 ? (
             <p className="text-sm text-muted-foreground">No upcoming warranty expiries.</p>

@@ -22,6 +22,8 @@ type ModalProps = {
   footer?: ReactNode;
   cancelLabel?: string;
   showCancel?: boolean;
+  /** Extra controls rendered in the header row (e.g. mode toggles). */
+  headerAddon?: ReactNode;
   /** Extra classes for DialogContent (e.g. wider layouts). */
   contentClassName?: string;
 };
@@ -35,6 +37,7 @@ export function Modal({
   footer,
   cancelLabel = "Cancel",
   showCancel = true,
+  headerAddon,
   contentClassName,
 }: ModalProps) {
   return (
@@ -46,8 +49,13 @@ export function Modal({
         )}
       >
         <DialogHeader className="shrink-0 border-b px-5 py-4 pr-12">
-          <DialogTitle>{title}</DialogTitle>
-          {description ? <DialogDescription>{description}</DialogDescription> : null}
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <DialogTitle>{title}</DialogTitle>
+              {description ? <DialogDescription>{description}</DialogDescription> : null}
+            </div>
+            {headerAddon ? <div className="shrink-0">{headerAddon}</div> : null}
+          </div>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>

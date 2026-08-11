@@ -4,7 +4,7 @@ import {
   resolvePayslipAvailability,
   resolvePayslipSchedule,
 } from "@/lib/payroll/services/payslip-publication";
-import { getPayrollMonthDate, parsePayrollMonthSearch } from "@/lib/payroll/services/payroll-utils";
+import { getPayrollMonthDate, parsePayrollMonthSearch, formatPayrollMonthLabel } from "@/lib/payroll/services/payroll-utils";
 import { payslipHistoryParamsSchema } from "@/lib/validations/payroll";
 import type { UserProfile } from "@/types/auth";
 import type {
@@ -71,12 +71,21 @@ function groupPayslipsByYear(payslips: PayslipListItem[]): PayslipHistoryYearGro
 
 function buildStats(rows: PayslipListItem[]): PayslipHistoryStats {
   const published = rows.filter((row) => row.availability === "available");
+  const credited = rows.filter(
+    (row) =>
+      row.payrollStatus === "paid" ||
+      row.paymentStatus === "Credited" ||
+      row.paymentStatus === "Approved",
+  );
+  const underReview = rows.filter((row) => row.availability === "under_review");
+  const employeeIds = new Set(rows.map((row) => row.employeeId).filter(Boolean));
   const years = Array.from(
     new Set(rows.map((row) => new Date(row.payrollMonth).getUTCFullYear())),
   ).sort((a, b) => b - a);
 
   const nets = published.map((row) => row.netSalary);
   const latest = published[0] ?? rows[0];
+  const totalNetDisbursed = credited.reduce((sum, row) => sum + row.netSalary, 0);
 
   return {
     totalPayslips: rows.length,
@@ -84,6 +93,13 @@ function buildStats(rows: PayslipListItem[]): PayslipHistoryStats {
     latestSalary: latest?.netSalary ?? null,
     highestSalary: nets.length ? Math.max(...nets) : null,
     latestPublished: latest?.publishedAt ?? null,
+    creditedCount: credited.length,
+    underReviewCount: underReview.length,
+    totalNetDisbursed,
+    uniqueEmployees: employeeIds.size,
+    latestMonthLabel: latest?.payrollMonth
+      ? formatPayrollMonthLabel(latest.payrollMonth)
+      : null,
   };
 }
 
@@ -269,6 +285,7 @@ export async function listPayslipHistory(
       .select(
         `
           id,
+          employee_id,
           published_at,
           employees!inner (organization_id),
           payroll_items:payroll_item_id (net_salary),
@@ -315,7 +332,7 @@ export async function listPayslipHistory(
       return {
         id: row.id,
         payslipNumber: "",
-        employeeId: "",
+        employeeId: row.employee_id ?? "",
         employeeCode: "",
         employeeName: "",
         payrollMonth: payroll?.payroll_month ?? "",
@@ -329,7 +346,10 @@ export async function listPayslipHistory(
         canEmployeeAccess: access.canEmployeeAccess,
         reviewMessage: null,
         payslipVersion: "1.0",
-        paymentStatus: "",
+        paymentStatus: paymentStatusLabel(
+          payroll?.payroll_status ?? "draft",
+          access.availability,
+        ),
         isArchived: false,
         versionCount: 1,
       };

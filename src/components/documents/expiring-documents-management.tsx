@@ -27,6 +27,7 @@ type Props = {
   result: EmployeeDocumentListResult;
   lookups: DocumentsLookups;
   permissionCodes: string[];
+  embedded?: boolean;
 };
 
 const WINDOW_CARDS = [
@@ -41,6 +42,7 @@ export function ExpiringDocumentsManagement({
   result,
   lookups,
   permissionCodes,
+  embedded = false,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -128,12 +130,14 @@ export function ExpiringDocumentsManagement({
 
   return (
     <>
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Expiring Documents</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Track passports, visas, licences, and certifications with expiry dates.
-        </p>
-      </div>
+      {!embedded ? (
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Expiring Documents</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Track passports, visas, licences, and certifications with expiry dates.
+          </p>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {WINDOW_CARDS.map((card) => (

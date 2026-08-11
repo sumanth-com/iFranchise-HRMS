@@ -56,6 +56,16 @@ export const goalProgressSchema = z.object({
     .optional(),
 });
 
+export const goalMilestoneToggleSchema = z.object({
+  goalId: z.string().uuid(),
+  milestoneId: z.string().uuid(),
+  isCompleted: z.boolean(),
+});
+
+export const goalUpdateSchema = goalFormSchema.extend({
+  goalId: z.string().uuid(),
+});
+
 export const kpiTemplateFormSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
@@ -154,6 +164,14 @@ export const oneOnOneFormSchema = z.object({
     )
     .optional()
     .default([]),
+});
+
+export const oneOnOneUpdateSchema = z.object({
+  meetingId: z.string().uuid(),
+  notes: z.string().max(5000).optional(),
+  agenda: z.string().max(5000).optional(),
+  followUpDate: z.string().optional().nullable(),
+  meetingStatus: z.enum(["scheduled", "completed", "cancelled", "rescheduled"]).optional(),
 });
 
 export const promotionListParamsSchema = performanceListParamsSchema.extend({

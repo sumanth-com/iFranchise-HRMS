@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { Input } from "@/components/common/input";
 import { EmployeeStatCard } from "@/components/employee/dashboard/employee-module-primitives";
 import { EmployeeAssetCard } from "@/components/employee/assets/employee-asset-card";
-import { EmployeeAssetDetailsDrawer } from "@/components/employee/assets/employee-asset-details-drawer";
+import { EmployeeAssetDetailsDialog } from "@/components/employee/assets/employee-asset-details-dialog";
 import { EmployeeAssetIssueDialog } from "@/components/employee/assets/employee-asset-issue-dialog";
 import { EmployeeAssetReplacementDialog } from "@/components/employee/assets/employee-asset-replacement-dialog";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
@@ -150,7 +150,7 @@ export function EmployeeAssetsView({
               <span className="text-xs text-muted-foreground">({assigned.length})</span>
             </div>
             {assigned.length > 0 ? (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid gap-4 lg:grid-cols-2">
                 {assigned.map((asset) => (
                   <EmployeeAssetCard
                     key={asset.assignmentId}
@@ -176,7 +176,7 @@ export function EmployeeAssetsView({
                 <h2 className="text-sm font-semibold tracking-tight">Return History</h2>
                 <span className="text-xs text-muted-foreground">({history.length})</span>
               </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid gap-4 lg:grid-cols-2">
                 {history.map((asset) => (
                   <EmployeeAssetCard
                     key={asset.assignmentId}
@@ -193,7 +193,7 @@ export function EmployeeAssetsView({
         </>
       )}
 
-      <EmployeeAssetDetailsDrawer
+      <EmployeeAssetDetailsDialog
         asset={detailsAsset}
         open={detailsOpen}
         onOpenChange={setDetailsOpen}

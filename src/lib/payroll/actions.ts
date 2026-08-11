@@ -9,7 +9,7 @@ import {
   requireServerAnyPermission,
   requireServerPermission,
 } from "@/lib/permissions/server";
-import { PAYROLL_ROUTES, SELF_PAYROLL_ROUTES } from "@/lib/payroll/constants";
+import { PAYROLL_ROUTES, payrollTeamSectionPath, SELF_PAYROLL_ROUTES, TEAM_PAYROLL_SECTIONS } from "@/lib/payroll/constants";
 import {
   getPayrollRunById,
   getPayslipById,
@@ -22,6 +22,7 @@ import {
   createReimbursement,
   createSalaryRevision,
   createSalaryStructure,
+  updateSalaryStructure,
   emailPayslip,
   generatePayrollRun,
   markPayrollPaid,
@@ -42,6 +43,7 @@ import {
   listReimbursements,
   listSalaryRevisions,
   listSalaryStructures,
+  getSalaryStructureById,
 } from "@/lib/payroll/services/payroll-queries";
 import {
   bonusFormSchema,
@@ -71,6 +73,7 @@ import type {
   PayslipListResult,
   ReimbursementListResult,
   SalaryRevisionListResult,
+  SalaryStructureItem,
   SalaryStructureListResult,
 } from "@/types/payroll";
 import type { PayrollSettingsRecord } from "@/types/payroll-settings";
@@ -231,6 +234,7 @@ export async function createSalaryStructureAction(
     salaryStructureFormSchema.parse(input);
     const id = await createSalaryStructure(supabase, profile, input);
     revalidatePath(PAYROLL_ROUTES.salaryStructures);
+    revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS["salary-structures"]));
     return { success: true, data: id };
   } catch (error) {
     return {
@@ -238,6 +242,41 @@ export async function createSalaryStructureAction(
       message: error instanceof Error ? error.message : "Failed to create salary structure",
     };
   }
+}
+
+export async function updateSalaryStructureAction(
+  structureId: string,
+  input: unknown,
+): Promise<PayrollActionResult<string>> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "salary.edit",
+      "salary_structure.edit",
+      "salary_structure.create",
+    ]);
+    const supabase = await getAuthenticatedSupabase();
+    salaryStructureFormSchema.parse(input);
+    await updateSalaryStructure(supabase, profile, structureId, input);
+    revalidatePath(PAYROLL_ROUTES.salaryStructures);
+    revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS["salary-structures"]));
+    return { success: true, data: structureId };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to update salary structure",
+    };
+  }
+}
+
+export async function fetchSalaryStructureAction(
+  structureId: string,
+): Promise<SalaryStructureItem | null> {
+  const profile = await requireServerAnyPermission([
+    "salary.view",
+    "salary_structure.view",
+  ]);
+  const supabase = await getAuthenticatedSupabase();
+  return getSalaryStructureById(supabase, profile, structureId);
 }
 
 export async function createSalaryRevisionAction(
@@ -374,17 +413,25 @@ export async function fetchPayrollSummaryAction(
 export async function fetchPayrollRunsAction(
   params: PayrollListParams,
 ): Promise<PayrollListResult> {
-  const profile = await requireServerPermission("payroll.view");
-  const supabase = await getAuthenticatedSupabase();
-  return listPayrollRuns(supabase, profile, payrollListParamsSchema.parse(params));
+  try {
+    const profile = await requireServerPermission("payroll.view");
+    const supabase = await getAuthenticatedSupabase();
+    return listPayrollRuns(supabase, profile, payrollListParamsSchema.parse(params));
+  } catch (error) {
+    throw new Error(toUserFriendlyError(error, "Failed to load payroll runs"));
+  }
 }
 
 export async function fetchPayrollDetailAction(
   payrollId: string,
 ): Promise<PayrollDetail | null> {
-  const profile = await requireServerPermission("payroll.view");
-  const supabase = await getAuthenticatedSupabase();
-  return getPayrollRunById(supabase, profile, payrollId);
+  try {
+    const profile = await requireServerPermission("payroll.view");
+    const supabase = await getAuthenticatedSupabase();
+    return getPayrollRunById(supabase, profile, payrollId);
+  } catch (error) {
+    throw new Error(toUserFriendlyError(error, "Failed to load payroll details"));
+  }
 }
 
 export async function fetchPayslipDetailAction(

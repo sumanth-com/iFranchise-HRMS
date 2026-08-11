@@ -1,9 +1,9 @@
 "use client";
 
 import { format } from "date-fns";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { Eye, Loader2 } from "lucide-react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -13,14 +13,19 @@ import { EmptyState } from "@/components/common/empty-state";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
+import { PromotionDetailModal } from "@/components/performance/promotion-detail-modal";
 import {
   buildStatusItems,
   PerformanceFilters,
   PerformancePagination,
 } from "@/components/performance/performance-filters";
 import { PromotionStatusBadge } from "@/components/performance/performance-status-badge";
+import {
+  PerformanceTableShell,
+  TableActions,
+} from "@/components/performance/performance-ui-primitives";
 import { EmployeeSelect, LabeledSelect } from "@/components/payroll/payroll-select";
-import { approvePromotionAction, createPromotionAction } from "@/lib/performance/actions";
+import { createPromotionAction } from "@/lib/performance/actions";
 import { PROMOTION_STATUS_LABELS } from "@/lib/performance/constants";
 import { promotionFormSchema } from "@/lib/validations/performance";
 import type { PromotionListItem } from "@/types/performance";
@@ -44,7 +49,10 @@ export function PromotionForm({
 
   return (
     <section className="rounded-xl border bg-card p-5 shadow-sm">
-      <h2 className="mb-4 text-sm font-medium">Promotion recommendation</h2>
+      <h2 className="mb-1 text-sm font-semibold">Promotion recommendation</h2>
+      <p className="mb-4 text-xs text-muted-foreground">
+        Nominate an employee for promotion with role and compensation details.
+      </p>
       <form
         onSubmit={form.handleSubmit((values) => {
           startTransition(async () => {
@@ -114,8 +122,7 @@ export function PromotionsTable({
   promotionStatus?: string;
   canApprove: boolean;
 }) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const [viewRecord, setViewRecord] = useState<PromotionListItem | null>(null);
 
   return (
     <section className="space-y-4">
@@ -129,67 +136,72 @@ export function PromotionsTable({
           searchPlaceholder="Search promotions..."
         />
       </div>
-      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-        {records.length === 0 ? (
-          <EmptyState title="No promotions" description="Submit a promotion recommendation." className="border-0" />
-        ) : (
+
+      <PerformanceTableShell
+        empty={
+          <EmptyState
+            title="No promotions"
+            description="Submit a promotion recommendation to start the approval workflow."
+            className="border-0"
+          />
+        }
+      >
+        {records.length > 0 ? (
           <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/30 text-left text-muted-foreground">
-                <th className="px-4 py-3">Employee</th>
-                <th className="px-4 py-3">Current role</th>
-                <th className="px-4 py-3">Recommended role</th>
-                <th className="px-4 py-3">Salary change</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Recommended by</th>
+            <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
+              <tr className="text-left text-muted-foreground">
+                <th className="px-4 py-3 font-medium">Employee</th>
+                <th className="px-4 py-3 font-medium">Current role</th>
+                <th className="px-4 py-3 font-medium">Recommended role</th>
+                <th className="px-4 py-3 font-medium">Salary change</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Recommended by</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
               {records.map((row) => (
-                <tr key={row.id} className="border-b">
+                <tr key={row.id} className="border-t align-middle">
                   <td className="px-4 py-3">
                     <div className="font-medium">{row.employeeName}</div>
-                    <div className="text-xs text-muted-foreground">{row.departmentName ?? row.employeeCode}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {row.departmentName ?? row.employeeCode}
+                    </div>
                   </td>
                   <td className="px-4 py-3">{row.currentDesignation ?? "—"}</td>
                   <td className="px-4 py-3">{row.recommendedDesignation ?? "—"}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 whitespace-nowrap">
                     {row.currentSalary != null && row.recommendedSalary != null
                       ? `₹${row.currentSalary.toLocaleString()} → ₹${row.recommendedSalary.toLocaleString()}`
                       : "—"}
                   </td>
-                  <td className="px-4 py-3"><PromotionStatusBadge status={row.promotionStatus} /></td>
+                  <td className="px-4 py-3">
+                    <PromotionStatusBadge status={row.promotionStatus} />
+                  </td>
                   <td className="px-4 py-3">{row.recommendedByName ?? "—"}</td>
-                  <td className="px-4 py-3 text-right">
-                    {canApprove && ["pending", "recommended"].includes(row.promotionStatus) ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={isPending}
-                        onClick={() =>
-                          startTransition(async () => {
-                            const result = await approvePromotionAction({ promotionId: row.id });
-                            if (!result.success) toast.error(result.message);
-                            else {
-                              toast.success("Promotion approved");
-                              router.refresh();
-                            }
-                          })
-                        }
-                      >
-                        <CheckCircle2 className="mr-1 h-4 w-4" />
-                        Approve
+                  <td className="px-4 py-3">
+                    <TableActions>
+                      <Button size="sm" variant="outline" onClick={() => setViewRecord(row)}>
+                        <Eye className="mr-1 size-3.5" />
+                        View
                       </Button>
-                    ) : null}
+                    </TableActions>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        ) : null}
+      </PerformanceTableShell>
+
       <PerformancePagination page={page} pageSize={pageSize} total={total} />
+
+      <PromotionDetailModal
+        record={viewRecord}
+        open={!!viewRecord}
+        onOpenChange={(open) => !open && setViewRecord(null)}
+        canApprove={canApprove}
+      />
     </section>
   );
 }

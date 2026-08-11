@@ -23,6 +23,8 @@ export const PAYROLL_ROUTES = {
   detail: (id: string) => `/dashboard/payroll-management/${id}`,
   salaryStructures: "/dashboard/payroll-management/salary-structures",
   newSalaryStructure: "/dashboard/payroll-management/salary-structures/new",
+  editSalaryStructure: (id: string) =>
+    `/dashboard/payroll-management/salary-structures/${id}/edit`,
   revisions: "/dashboard/payroll-management/revisions",
   bonuses: "/dashboard/payroll-management/bonuses",
   reimbursements: "/dashboard/payroll-management/reimbursements",
@@ -34,11 +36,8 @@ export const PAYROLL_ROUTES = {
 } as const;
 
 export const TEAM_PAYROLL_SECTIONS = {
-  dashboard: "dashboard",
   run: "run",
   "salary-structures": "salary-structures",
-  history: "history",
-  revisions: "revisions",
   bonuses: "bonuses",
   reimbursements: "reimbursements",
   payslips: "payslips",
@@ -49,11 +48,16 @@ export type TeamPayrollSection = keyof typeof TEAM_PAYROLL_SECTIONS;
 
 const TEAM_PAYROLL_SECTION_SET = new Set<string>(Object.values(TEAM_PAYROLL_SECTIONS));
 
+const REMOVED_TEAM_PAYROLL_SECTIONS = new Set(["dashboard", "history", "revisions"]);
+
 export function parseTeamPayrollSection(value: string | undefined): TeamPayrollSection {
+  if (value && REMOVED_TEAM_PAYROLL_SECTIONS.has(value)) {
+    return TEAM_PAYROLL_SECTIONS.run;
+  }
   if (value && TEAM_PAYROLL_SECTION_SET.has(value)) {
     return value as TeamPayrollSection;
   }
-  return TEAM_PAYROLL_SECTIONS.dashboard;
+  return TEAM_PAYROLL_SECTIONS.run;
 }
 
 export function payrollHubUrl(
@@ -67,11 +71,8 @@ export function payrollHubUrl(
   let path: string = SELF_PAYROLL_ROUTES.list;
 
   if (tab === "team") {
-    const section = options?.section ?? TEAM_PAYROLL_SECTIONS.dashboard;
-    path =
-      section === TEAM_PAYROLL_SECTIONS.dashboard
-        ? SELF_PAYROLL_ROUTES.team
-        : `${SELF_PAYROLL_ROUTES.team}/${section}`;
+    const section = options?.section ?? TEAM_PAYROLL_SECTIONS.run;
+    path = `${SELF_PAYROLL_ROUTES.team}/${section}`;
   }
 
   const filterParams: Record<string, string | undefined> = {};
@@ -87,14 +88,12 @@ export function payrollHubUrl(
 }
 
 export function payrollTeamSectionPath(section: TeamPayrollSection): string {
-  return section === TEAM_PAYROLL_SECTIONS.dashboard
-    ? SELF_PAYROLL_ROUTES.team
-    : `${SELF_PAYROLL_ROUTES.team}/${section}`;
+  return `${SELF_PAYROLL_ROUTES.team}/${section}`;
 }
 
 export function payrollTeamListUrl(
   searchParams?: Record<string, string | undefined>,
-  section: TeamPayrollSection = TEAM_PAYROLL_SECTIONS.dashboard,
+  section: TeamPayrollSection = TEAM_PAYROLL_SECTIONS.run,
 ) {
   return payrollHubUrl({ tab: "team", section, params: searchParams });
 }
@@ -256,18 +255,34 @@ export function canApproveReimbursement(codes: string[]) {
   return hasAnyPermission(codes, REIMBURSEMENT_APPROVE);
 }
 
+export const TEAM_PAYROLL_SECTION_DESCRIPTIONS: Record<TeamPayrollSection, string> = {
+  run: "Process monthly payroll — review attendance, finalize amounts, and release payslips for the selected period.",
+  "salary-structures":
+    "Set up and update employee salary structures, components, and effective dates across the organization.",
+  bonuses:
+    "Record one-time bonuses and track HR → Finance approval before they are included in the monthly run.",
+  reimbursements:
+    "Review employee expense claims and approve payouts to be settled through payroll.",
+  payslips:
+    "Access published payslips — preview, download PDFs, and email copies to employees.",
+  settings:
+    "Payroll cycle, processing schedule, and salary credit day for your organization.",
+};
+
+export function teamPayrollSectionDescription(section: TeamPayrollSection): string {
+  return TEAM_PAYROLL_SECTION_DESCRIPTIONS[section];
+}
+
 export const PAYROLL_SUB_NAV = [
-  { title: "Dashboard", section: TEAM_PAYROLL_SECTIONS.dashboard },
   { title: "Run Payroll", section: TEAM_PAYROLL_SECTIONS.run },
   { title: "Salary Structure", section: TEAM_PAYROLL_SECTIONS["salary-structures"] },
-  { title: "Payroll History", section: TEAM_PAYROLL_SECTIONS.history },
-  { title: "Salary Revisions", section: TEAM_PAYROLL_SECTIONS.revisions },
   { title: "Bonuses", section: TEAM_PAYROLL_SECTIONS.bonuses },
-  { title: "Reimbursements", section: TEAM_PAYROLL_SECTIONS.reimbursements },
+  { title: "Expense claims", section: TEAM_PAYROLL_SECTIONS.reimbursements },
   { title: "Payslips", section: TEAM_PAYROLL_SECTIONS.payslips },
   { title: "Settings", section: TEAM_PAYROLL_SECTIONS.settings },
 ].map((item) => ({
   title: item.title,
   section: item.section,
+  description: TEAM_PAYROLL_SECTION_DESCRIPTIONS[item.section as TeamPayrollSection],
   href: payrollHubUrl({ tab: "team", section: item.section }),
 }));

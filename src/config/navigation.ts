@@ -149,13 +149,6 @@ export const mainNavItems: NavigationItem[] = [
     permissions: ["payroll.view", "payslip.view"],
   },
   {
-    title: "HR Documents",
-    href: HR_HUB_ROUTES.teamDocuments,
-    icon: FileText,
-    section: "Administration",
-    permissions: ["documents.view"],
-  },
-  {
     title: "Company Assets",
     href: HR_HUB_ROUTES.teamAssets,
     icon: LaptopMinimal,
@@ -164,7 +157,7 @@ export const mainNavItems: NavigationItem[] = [
   },
   {
     title: "Performance",
-    href: "/dashboard/performance",
+    href: "/dashboard/performance/goals",
     icon: Target,
     section: "Administration",
     permissions: ["performance.view"],

@@ -27,6 +27,9 @@ import type {
   AssetsLookups,
   AssetsReportData,
   AssetsSummary,
+  AssetActivityItem,
+  AssetActivityKind,
+  AssetDetailBundle,
 } from "@/types/assets";
 
 function mapAsset(row: AssetRow): AssetItem {
@@ -536,4 +539,114 @@ export async function listEmployeeAssets(
 
   if (error) throw new Error(error.message);
   return (data ?? []).map(mapAssignment);
+}
+
+const ASSIGNMENT_ACTION_LABELS: Record<string, string> = {
+  active: "Asset assigned",
+  returned: "Asset returned",
+  transferred: "Asset reassigned",
+  lost: "Asset marked lost",
+  damaged: "Asset marked damaged",
+};
+
+function assignmentActivityKind(status: string): AssetActivityKind {
+  if (status === "active") return "assigned";
+  if (status === "returned") return "returned";
+  if (status === "transferred") return "transferred";
+  if (status === "lost") return "lost";
+  return "damaged";
+}
+
+export async function getAssetActivityFeed(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  limit = 40,
+): Promise<AssetActivityItem[]> {
+  const assignments = await listAssignments(supabase, profile, {
+    page: 1,
+    pageSize: limit,
+  });
+
+  const maintenance = await listMaintenance(supabase, profile, {
+    page: 1,
+    pageSize: Math.min(limit, 20),
+  });
+
+  const assignmentItems: AssetActivityItem[] = assignments.data.map((row) => ({
+    id: `assignment-${row.id}`,
+    kind: assignmentActivityKind(row.assignmentStatus),
+    assetId: row.assetId,
+    assetCode: row.assetCode,
+    assetName: row.assetName,
+    employeeId: row.employeeId,
+    employeeName: row.employeeName,
+    performedAt: row.returnedDate ?? row.assignedDate,
+    performedByName: "HR",
+    actionLabel: ASSIGNMENT_ACTION_LABELS[row.assignmentStatus] ?? "Assignment updated",
+    remarks: row.returnRemarks ?? row.remarks,
+    assignmentId: row.id,
+    maintenanceId: null,
+  }));
+
+  const maintenanceItems: AssetActivityItem[] = maintenance.data.map((row) => ({
+    id: `maintenance-${row.id}`,
+    kind:
+      row.maintenanceStatus === "completed" ? "maintenance_completed" : "maintenance_opened",
+    assetId: row.assetId,
+    assetCode: row.assetCode,
+    assetName: row.assetName,
+    employeeId: null,
+    employeeName: null,
+    performedAt: row.completedAt ?? row.maintenanceDate,
+    performedByName: "HR",
+    actionLabel:
+      row.maintenanceStatus === "completed"
+        ? "Maintenance completed"
+        : "Marked under maintenance",
+    remarks: row.issue,
+    assignmentId: null,
+    maintenanceId: row.id,
+  }));
+
+  return [...assignmentItems, ...maintenanceItems]
+    .sort((a, b) => (a.performedAt < b.performedAt ? 1 : -1))
+    .slice(0, limit);
+}
+
+export async function getAssetDetail(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  assetId: string,
+): Promise<AssetDetailBundle | null> {
+  const organizationId = profile.employee.organizationId;
+
+  const { data: row, error } = await fromHrms(supabase, "assets")
+    .select(ASSET_SELECT)
+    .eq("id", assetId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!row) return null;
+
+  const asset = mapAsset(row as AssetRow);
+
+  const assignments = await listAssignments(supabase, profile, {
+    page: 1,
+    pageSize: 50,
+    assetId,
+  });
+
+  const maintenance = await listMaintenance(supabase, profile, {
+    page: 1,
+    pageSize: 20,
+    assetId,
+  });
+
+  return {
+    asset,
+    assignments: assignments.data,
+    maintenance: maintenance.data,
+  };
 }

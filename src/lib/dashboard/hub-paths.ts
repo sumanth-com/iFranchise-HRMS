@@ -77,9 +77,16 @@ export function legacyHubTabRedirectUrl(
   let targetPath = basePath;
 
   if (tab === "team" || section) {
-    const subPath =
-      options?.teamSubPathFromSection && section && section !== "dashboard" ? section : undefined;
-    targetPath = subPath ? hubTeamListUrl(basePath, undefined, subPath).split("?")[0] : hubTeamPath(basePath);
+    const removedTeamSections = new Set(["dashboard", "history", "revisions"]);
+    let subPath: string | undefined;
+    if (options?.teamSubPathFromSection && section) {
+      subPath = removedTeamSections.has(section) ? "run" : section;
+    } else if (tab === "team") {
+      subPath = "run";
+    }
+    targetPath = subPath
+      ? hubTeamListUrl(basePath, undefined, subPath).split("?")[0]
+      : hubTeamPath(basePath);
   }
 
   return hubListUrl(targetPath, filters);

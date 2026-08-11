@@ -50,7 +50,6 @@ export async function LeaveHubSection({
     leaveTypeId: raw.leaveTypeId,
     departmentId: raw.departmentId,
     branchId: raw.branchId,
-    approverId: raw.approverId,
     reportingManagerId: raw.reportingManagerId,
     employeeId: raw.employeeId,
   });
@@ -107,14 +106,12 @@ export async function LeaveHubSection({
         leaveTypeId: teamParams.leaveTypeId,
         departmentId: teamParams.departmentId,
         branchId: teamParams.branchId,
-        approverId: teamParams.approverId,
         reportingManagerId: teamParams.reportingManagerId,
         employeeId: teamParams.employeeId,
         leaveTypes: teamLookups?.leaveTypes ?? [],
         departments: teamLookups?.departments ?? [],
         branches: teamLookups?.branches ?? [],
         employees: teamLookups?.employees ?? [],
-        approvers: teamLookups?.approvers ?? [],
         managers: teamLookups?.managers ?? [],
         canCreate: hasPermission(profile.permissionCodes, "leave.create"),
         canApprove: hasPermission(profile.permissionCodes, "leave.approve"),
@@ -123,6 +120,11 @@ export async function LeaveHubSection({
           hasPermission(profile.permissionCodes, "leave.cancel") ||
           hasPermission(profile.permissionCodes, "leave.withdraw"),
       }}
+      teamApplyLeaveLookups={
+        canViewTeam && hasPermission(profile.permissionCodes, "leave.create")
+          ? teamLookups
+          : null
+      }
     />
   );
 }

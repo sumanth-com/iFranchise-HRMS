@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download, Loader2 } from "lucide-react";
+import { Download, Loader2, Mail } from "lucide-react";
 
 import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
@@ -13,26 +13,50 @@ type EmployeeDetailPayslipDrawerProps = {
   payslipId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  canEmail?: boolean;
 };
 
 function PayslipDrawerFooter({
   payslip,
   onClose,
+  canEmail = false,
 }: {
   payslip: PayslipDetail;
   onClose: () => void;
+  canEmail?: boolean;
 }) {
-  const { handleDownload, showDownload } = usePayslipActions(payslip, {
+  const {
+    handleDownload,
+    handleEmail,
+    showDownload,
+    showEmail,
+    isPending,
+    isDownloading,
+  } = usePayslipActions(payslip, {
     canDownload: true,
-    canEmail: false,
+    canEmail,
   });
 
   return (
     <>
       {showDownload ? (
-        <Button variant="outline" onClick={() => void handleDownload()}>
-          <Download className="mr-2 h-4 w-4" />
+        <Button variant="outline" onClick={() => void handleDownload()} disabled={isDownloading}>
+          {isDownloading ? (
+            <Loader2 className="mr-2 size-4 animate-spin" />
+          ) : (
+            <Download className="mr-2 size-4" />
+          )}
           Download PDF
+        </Button>
+      ) : null}
+      {showEmail ? (
+        <Button onClick={handleEmail} disabled={isPending}>
+          {isPending ? (
+            <Loader2 className="mr-2 size-4 animate-spin" />
+          ) : (
+            <Mail className="mr-2 size-4" />
+          )}
+          Email payslip
         </Button>
       ) : null}
       <Button variant="outline" onClick={onClose}>
@@ -46,6 +70,7 @@ export function EmployeeDetailPayslipDrawer({
   payslipId,
   open,
   onOpenChange,
+  canEmail = false,
 }: EmployeeDetailPayslipDrawerProps) {
   const [detail, setDetail] = useState<PayslipDetail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -79,7 +104,7 @@ export function EmployeeDetailPayslipDrawer({
       showCancel={false}
       footer={
         detail ? (
-          <PayslipDrawerFooter payslip={detail} onClose={handleClose} />
+          <PayslipDrawerFooter payslip={detail} onClose={handleClose} canEmail={canEmail} />
         ) : (
           <Button variant="outline" onClick={handleClose}>
             Close

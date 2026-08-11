@@ -215,6 +215,11 @@ export type PayslipHistoryStats = {
   latestSalary: number | null;
   highestSalary: number | null;
   latestPublished: string | null;
+  creditedCount: number;
+  underReviewCount: number;
+  totalNetDisbursed: number;
+  uniqueEmployees: number;
+  latestMonthLabel: string | null;
 };
 
 export type PayslipHistoryYearGroup = {

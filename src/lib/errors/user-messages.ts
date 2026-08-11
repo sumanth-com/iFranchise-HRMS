@@ -24,7 +24,7 @@ export function toUserFriendlyError(
 
   if (pg.code === "23505" || DUPLICATE_PAYROLL_ITEM.test(raw)) {
     if (DUPLICATE_PAYROLL_ITEM.test(raw)) {
-      return "Payroll for the selected period has already been generated. Open Payroll History to review the existing run.";
+      return "Payroll for the selected period has already been generated. Open Run Payroll to review the existing run.";
     }
     return "This record already exists. Please review the existing entry before saving again.";
   }
@@ -39,6 +39,10 @@ export function toUserFriendlyError(
 
   if (/not authenticated/i.test(raw)) {
     return "Your session has expired. Please sign in again.";
+  }
+
+  if (/network error|failed to fetch|load failed|fetch failed/i.test(raw)) {
+    return "Connection lost. Refresh the page and try again.";
   }
 
   if (/violates foreign key constraint/i.test(raw)) {

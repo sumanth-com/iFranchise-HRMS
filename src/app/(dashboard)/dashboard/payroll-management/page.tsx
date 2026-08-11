@@ -21,7 +21,7 @@ export default async function PayrollManagementPage({
   redirect(
     payrollHubUrl({
       tab: "team",
-      section: TEAM_PAYROLL_SECTIONS.dashboard,
+      section: TEAM_PAYROLL_SECTIONS.run,
       params: {
         month: firstString(rawParams.month),
         year: firstString(rawParams.year),

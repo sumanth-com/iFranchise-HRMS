@@ -36,14 +36,12 @@ type TeamLeaveData = {
   leaveTypeId?: string;
   departmentId?: string;
   branchId?: string;
-  approverId?: string;
   reportingManagerId?: string;
   employeeId?: string;
   leaveTypes: LookupOption[];
   departments: LookupOption[];
   branches: LookupOption[];
   employees: LookupOption[];
-  approvers: LookupOption[];
   managers: LookupOption[];
   canCreate: boolean;
   canApprove: boolean;
@@ -64,6 +62,7 @@ type Props = {
   calendarLeaves: LeaveCalendarEntry[];
   calendarHolidays: LeaveHolidayEntry[];
   teamLeave: TeamLeaveData;
+  teamApplyLeaveLookups: LeaveLookups | null;
 };
 
 export function HrLeaveHubView({
@@ -79,9 +78,11 @@ export function HrLeaveHubView({
   calendarLeaves,
   calendarHolidays,
   teamLeave,
+  teamApplyLeaveLookups,
 }: Props) {
   const router = useRouter();
   const [applyOpen, setApplyOpen] = useState(false);
+  const [teamApplyOpen, setTeamApplyOpen] = useState(false);
   const section = initialSection === "team" && canViewTeam ? "team" : "my";
   const isTeamView = section === "team";
 
@@ -100,6 +101,12 @@ export function HrLeaveHubView({
               <FileText className="size-4" />
               Leave Policy
             </Link>
+            {isTeamView && teamLeave.canCreate && teamApplyLeaveLookups ? (
+              <Button type="button" className="gap-1.5" onClick={() => setTeamApplyOpen(true)}>
+                <CalendarPlus className="size-4" />
+                Apply Leave
+              </Button>
+            ) : null}
             {!isTeamView && canApply && applyLeaveLookups ? (
               <Button type="button" className="gap-1.5" onClick={() => setApplyOpen(true)}>
                 <CalendarPlus className="size-4" />
@@ -110,7 +117,7 @@ export function HrLeaveHubView({
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
           {isTeamView
-            ? "Review, approve, and manage leave requests across the organization."
+            ? "Review and manage leave requests across the organization."
             : "Apply for leave, track balances, and view your leave calendar."}
         </p>
       </div>
@@ -138,6 +145,17 @@ export function HrLeaveHubView({
           onOpenChange={setApplyOpen}
           lookups={applyLeaveLookups}
           employeeId={employeeId}
+          mode="self"
+          onSubmitted={() => router.refresh()}
+        />
+      ) : null}
+
+      {teamApplyLeaveLookups ? (
+        <ApplyLeaveDialog
+          open={teamApplyOpen}
+          onOpenChange={setTeamApplyOpen}
+          lookups={teamApplyLeaveLookups}
+          mode="team"
           onSubmitted={() => router.refresh()}
         />
       ) : null}

@@ -63,26 +63,37 @@ const CARDS = [
 
 export function PayrollSummaryCards({ summary, compact = false }: PayrollSummaryCardsProps) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+    <div className="grid grid-cols-2 items-stretch gap-3 sm:grid-cols-3 lg:grid-cols-6">
       {CARDS.map((card) => {
         const Icon = card.icon;
         const value = summary[card.key];
+
         return (
           <div
             key={card.key}
-            className="rounded-xl border bg-card p-3.5 shadow-sm"
+            className="flex min-h-[4.75rem] min-w-0 rounded-xl border bg-card p-3 shadow-sm"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <div className="flex w-full items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p
+                  className="line-clamp-2 h-8 text-[11px] font-medium leading-4 text-muted-foreground sm:text-xs"
+                >
                   {PAYROLL_SUMMARY_LABELS[card.key]}
                 </p>
-                <p className={compact ? "mt-1.5 text-xl font-semibold tracking-tight" : "mt-2 text-2xl font-semibold tracking-tight"}>
+                <p
+                  className={
+                    compact
+                      ? "text-lg font-semibold tracking-tight tabular-nums"
+                      : "text-xl font-semibold tracking-tight tabular-nums"
+                  }
+                >
                   {card.format(value)}
                 </p>
               </div>
-              <div className={`rounded-lg p-2 ${card.bg}`}>
-                <Icon className={`${compact ? "h-4 w-4" : "h-5 w-5"} ${card.accent}`} />
+              <div
+                className={`flex size-8 shrink-0 items-center justify-center rounded-full ${card.bg}`}
+              >
+                <Icon className={`size-3.5 ${card.accent}`} />
               </div>
             </div>
           </div>

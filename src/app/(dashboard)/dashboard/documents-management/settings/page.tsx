@@ -1,14 +1,7 @@
-import { DocumentsSettingsForm } from "@/components/documents/documents-settings-form";
-import { canManageDocumentSettings } from "@/lib/documents/constants";
-import { getDocumentSettings } from "@/lib/documents/services/document-settings";
-import { requireServerPermission } from "@/lib/permissions/server";
-import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
-export default async function DocumentsSettingsPage() {
-  const profile = await requireServerPermission("documents.view");
-  const supabase = await createClient();
-  const settings = await getDocumentSettings(supabase, profile.employee.organizationId);
-  const canEdit = canManageDocumentSettings(profile.permissionCodes);
+import { DOCUMENTS_ROUTES } from "@/lib/documents/constants";
 
-  return <DocumentsSettingsForm settings={settings} canEdit={canEdit} />;
+export default function DocumentsManagementSettingsRedirect() {
+  redirect(DOCUMENTS_ROUTES.settings);
 }

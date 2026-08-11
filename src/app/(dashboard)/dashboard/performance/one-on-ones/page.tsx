@@ -1,6 +1,6 @@
 import { OneOnOneForm, OneOnOneTable } from "@/components/performance/one-on-one-management";
 import { createClient } from "@/lib/supabase/server";
-import { canCreatePerformance } from "@/lib/performance/constants";
+import { canCreatePerformance, canEditPerformance } from "@/lib/performance/constants";
 import {
   getPerformanceLookups,
   listOneOnOnes,
@@ -48,6 +48,7 @@ export default async function OneOnOnesPage({ searchParams }: OneOnOnesPageProps
         employees={lookups.employees}
         employeeId={params.employeeId}
         meetingStatus={params.meetingStatus}
+        canEdit={canEditPerformance(profile.permissionCodes)}
       />
     </div>
   );

@@ -1,6 +1,6 @@
-import { GoalForm, GoalsTable } from "@/components/performance/goals-management";
+import { GoalsWorkspace } from "@/components/performance/goals-management";
 import { createClient } from "@/lib/supabase/server";
-import { canCreatePerformance } from "@/lib/performance/constants";
+import { canCreatePerformance, canEditPerformance } from "@/lib/performance/constants";
 import {
   getPerformanceLookups,
   listGoals,
@@ -29,6 +29,9 @@ export default async function GoalsPage({ searchParams }: GoalsPageProps) {
     goalPriority: rawParams.goalPriority,
   });
 
+  const openGoal =
+    typeof rawParams.openGoal === "string" ? rawParams.openGoal : undefined;
+
   const [result, lookups, settings] = await Promise.all([
     listGoals(supabase, profile, params),
     getPerformanceLookups(supabase, profile.employee.organizationId),
@@ -36,33 +39,36 @@ export default async function GoalsPage({ searchParams }: GoalsPageProps) {
   ]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Goals & OKRs</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Choose a template, assign to an employee, and track progress below.
+          Assign goals on this page and track them in the list below.
         </p>
       </div>
-      {canCreatePerformance(profile.permissionCodes) ? (
-        <GoalForm
-          employees={lookups.employees}
-          cycles={lookups.cycles}
-          categories={settings.settings.goalCategories}
-        />
-      ) : null}
-      <GoalsTable
-        records={result.data}
-        total={result.total}
-        page={result.page}
-        pageSize={result.pageSize}
-        employees={lookups.employees}
-        departments={lookups.departments}
-        cycles={lookups.cycles}
-        search={params.search}
-        employeeId={params.employeeId}
-        departmentId={params.departmentId}
-        cycleId={params.cycleId}
-        goalStatus={params.goalStatus}
+
+      <GoalsWorkspace
+        canCreate={canCreatePerformance(profile.permissionCodes)}
+        canEdit={canEditPerformance(profile.permissionCodes)}
+        formProps={{
+          employees: lookups.employees,
+          categories: settings.settings.goalCategories,
+        }}
+        tableProps={{
+          records: result.data,
+          total: result.total,
+          page: result.page,
+          pageSize: result.pageSize,
+          employees: lookups.employees,
+          departments: lookups.departments,
+          cycles: lookups.cycles,
+          search: params.search,
+          employeeId: params.employeeId,
+          departmentId: params.departmentId,
+          cycleId: params.cycleId,
+          goalStatus: params.goalStatus,
+          initialGoalId: openGoal,
+        }}
       />
     </div>
   );

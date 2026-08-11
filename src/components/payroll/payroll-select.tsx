@@ -18,6 +18,8 @@ type EmployeeSelectProps = {
   placeholder?: string;
   disabled?: boolean;
   id?: string;
+  triggerClassName?: string;
+  contentClassName?: string;
 };
 
 export function EmployeeSelect({
@@ -27,6 +29,8 @@ export function EmployeeSelect({
   placeholder = "Select employee",
   disabled,
   id,
+  triggerClassName,
+  contentClassName,
 }: EmployeeSelectProps) {
   const items = toEmployeeSelectItems(employees);
 
@@ -38,6 +42,8 @@ export function EmployeeSelect({
       placeholder={placeholder}
       disabled={disabled}
       id={id}
+      triggerClassName={triggerClassName}
+      contentClassName={contentClassName}
     />
   );
 }

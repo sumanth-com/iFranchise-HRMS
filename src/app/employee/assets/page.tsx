@@ -18,11 +18,10 @@ export default async function EmployeeAssetsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">My Assets</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            View, manage and track all company assets assigned to you throughout your
-            employment.
+            View company assets assigned to you.
           </p>
         </div>
-        <EmployeeAssetsView data={data} />
+        <EmployeeAssetsView data={data} readOnly />
       </div>
     </div>
   );

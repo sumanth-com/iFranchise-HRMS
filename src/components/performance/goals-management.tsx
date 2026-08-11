@@ -1,8 +1,8 @@
 "use client";
 
 import { format } from "date-fns";
-import { Loader2 } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import { Eye, Loader2 } from "lucide-react";
+import { useMemo, useState, useTransition, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/common/empty-state";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
+import { GoalDetailModal } from "@/components/performance/goal-detail-modal";
 import {
   buildStatusItems,
   PerformanceFilters,
@@ -22,44 +23,39 @@ import {
   GoalPriorityBadge,
   GoalStatusBadge,
 } from "@/components/performance/performance-status-badge";
+import {
+  PerformanceTableShell,
+  ProgressBar,
+  TableActions,
+} from "@/components/performance/performance-ui-primitives";
 import { EmployeeSelect, LabeledSelect } from "@/components/payroll/payroll-select";
-import { createGoalAction } from "@/lib/performance/actions";
-import { GOAL_STATUS_LABELS } from "@/lib/performance/constants";
+import { toSelectItems } from "@/components/payroll/select-utils";
+import { createGoalAction, fetchGoalsListAction } from "@/lib/performance/actions";
+import { PERFORMANCE_ROUTES } from "@/lib/performance/constants";
+import { GOAL_PRIORITY_LABELS, GOAL_STATUS_LABELS } from "@/lib/performance/constants";
 import {
   BUILTIN_GOAL_PRESETS,
   getDefaultGoalDueDate,
 } from "@/lib/performance/goal-presets";
 import { goalFormSchema } from "@/lib/validations/performance";
+import { cn } from "@/lib/utils";
 import type { GoalListItem } from "@/types/performance";
 import type { LookupOption } from "@/types/employee";
 
 const statusItems = buildStatusItems(GOAL_STATUS_LABELS);
-
-type GoalsManagementProps = {
-  records: GoalListItem[];
-  total: number;
-  page: number;
-  pageSize: number;
-  employees: LookupOption[];
-  departments: LookupOption[];
-  cycles: LookupOption[];
-  categories: string[];
-  search?: string;
-  employeeId?: string;
-  departmentId?: string;
-  cycleId?: string;
-  goalStatus?: string;
-  canCreate: boolean;
-};
+const priorityItems = toSelectItems(GOAL_PRIORITY_LABELS);
+const FIELD_CLASS = "h-9";
+const EMPLOYEE_SELECT_TRIGGER = "h-9 w-full min-w-[14rem]";
 
 export function GoalForm({
   employees,
+  categories,
+  onAssigned,
 }: {
   employees: LookupOption[];
-  cycles: LookupOption[];
   categories: string[];
+  onAssigned?: () => void;
 }) {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [templateId, setTemplateId] = useState("");
   const [keyResult1, setKeyResult1] = useState("");
@@ -78,6 +74,8 @@ export function GoalForm({
     },
   });
 
+  const selectedPreset = BUILTIN_GOAL_PRESETS.find((p) => p.id === templateId);
+
   const templateOptions = useMemo(
     () =>
       BUILTIN_GOAL_PRESETS.map((preset) => ({
@@ -85,6 +83,14 @@ export function GoalForm({
         label: preset.title,
       })),
     [],
+  );
+
+  const categoryItems = useMemo(
+    () =>
+      categories.length > 0
+        ? categories.map((c) => ({ value: c, label: c }))
+        : [{ value: "General", label: "General" }],
+    [categories],
   );
 
   function applyTemplate(id: string) {
@@ -96,7 +102,6 @@ export function GoalForm({
 
     form.reset({
       employeeId: form.getValues("employeeId"),
-      cycleId: form.getValues("cycleId"),
       title: preset.title,
       description: preset.description,
       category: preset.category,
@@ -138,72 +143,127 @@ export function GoalForm({
           goalStatus: "not_started",
           milestones: [],
         });
-        router.refresh();
+        onAssigned?.();
       });
     })();
   }
 
   return (
-    <section className="rounded-xl border bg-card p-5 shadow-sm">
-      <div className="mb-4">
+    <div className="space-y-3">
+      <div>
         <h2 className="text-sm font-semibold">Assign goal / OKR</h2>
         <p className="text-xs text-muted-foreground">
-          Choose a template, adjust if needed, and assign to an employee.
+          Pick a template, assign, then track progress in the list below.
         </p>
       </div>
 
-      <div className="space-y-4">
-        <Field label="Template">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+        <CompactField label="Template" className="min-w-0 flex-1">
           <LabeledSelect
             items={[{ value: "", label: "Select a goal template" }, ...templateOptions]}
             value={templateId}
             onValueChange={applyTemplate}
             disabled={isPending}
           />
-        </Field>
-
-        {templateId ? (
-          <div className="grid gap-3 md:grid-cols-2">
-            <Field label="Employee">
-              <EmployeeSelect
-                employees={employees}
-                value={form.watch("employeeId")}
-                onValueChange={(value) =>
-                  form.setValue("employeeId", value, { shouldValidate: true })
-                }
-                disabled={isPending}
-              />
-            </Field>
-            <Field label="Goal title">
-              <Input disabled={isPending} {...form.register("title")} />
-            </Field>
-            <Field label="Due date">
-              <Input type="date" disabled={isPending} {...form.register("dueDate")} />
-            </Field>
-            <Field label="Key result 1">
-              <Input
-                disabled={isPending}
-                value={keyResult1}
-                onChange={(event) => setKeyResult1(event.target.value)}
-              />
-            </Field>
-            <Field label="Key result 2" className="md:col-span-2">
-              <Input
-                disabled={isPending}
-                value={keyResult2}
-                onChange={(event) => setKeyResult2(event.target.value)}
-              />
-            </Field>
-            <div className="md:col-span-2">
-              <Button type="button" disabled={isPending} onClick={handleCreate}>
-                {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Assign goal
-              </Button>
-            </div>
-          </div>
-        ) : null}
+        </CompactField>
+        <Button
+          type="button"
+          className="h-9 shrink-0 sm:w-auto"
+          disabled={isPending || !templateId || !form.watch("employeeId")}
+          onClick={handleCreate}
+        >
+          {isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+          Assign goal
+        </Button>
       </div>
-    </section>
+
+      {selectedPreset ? (
+        <p className="text-xs leading-snug text-muted-foreground">
+          <span className="font-medium text-foreground">{selectedPreset.title}</span>
+          {" — "}
+          {selectedPreset.description}
+          <span className="text-muted-foreground/80">
+            {" "}
+            · {selectedPreset.dueInDays} days · {selectedPreset.weightage}% weight
+          </span>
+        </p>
+      ) : null}
+
+      {templateId ? (
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <CompactField label="Employee" className="min-w-[14rem]">
+            <EmployeeSelect
+              employees={employees}
+              value={form.watch("employeeId")}
+              onValueChange={(value) =>
+                form.setValue("employeeId", value, { shouldValidate: true })
+              }
+              disabled={isPending}
+              triggerClassName={EMPLOYEE_SELECT_TRIGGER}
+              contentClassName="min-w-[var(--radix-select-trigger-width)]"
+            />
+          </CompactField>
+          <CompactField label="Goal title">
+            <Input className={FIELD_CLASS} disabled={isPending} {...form.register("title")} />
+          </CompactField>
+          <CompactField label="Category">
+            <LabeledSelect
+              items={categoryItems}
+              value={form.watch("category") ?? ""}
+              onValueChange={(v) => form.setValue("category", v)}
+              disabled={isPending}
+            />
+          </CompactField>
+          <CompactField label="Priority">
+            <LabeledSelect
+              items={priorityItems}
+              value={form.watch("goalPriority")}
+              onValueChange={(v) =>
+                form.setValue(
+                  "goalPriority",
+                  v as z.input<typeof goalFormSchema>["goalPriority"],
+                )
+              }
+              disabled={isPending}
+            />
+          </CompactField>
+          <CompactField label="Weight %">
+            <Input
+              type="number"
+              min={0}
+              max={100}
+              className={FIELD_CLASS}
+              disabled={isPending}
+              {...form.register("weightage")}
+            />
+          </CompactField>
+          <CompactField label="Due date">
+            <Input
+              type="date"
+              className={FIELD_CLASS}
+              disabled={isPending}
+              {...form.register("dueDate")}
+            />
+          </CompactField>
+          <CompactField label="Key result 1">
+            <Input
+              className={FIELD_CLASS}
+              disabled={isPending}
+              value={keyResult1}
+              onChange={(event) => setKeyResult1(event.target.value)}
+            />
+          </CompactField>
+          <CompactField label="Key result 2" className="sm:col-span-2 lg:col-span-1">
+            <Input
+              className={FIELD_CLASS}
+              disabled={isPending}
+              value={keyResult2}
+              onChange={(event) => setKeyResult2(event.target.value)}
+            />
+          </CompactField>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -220,88 +280,229 @@ export function GoalsTable({
   departmentId,
   cycleId,
   goalStatus,
-}: Omit<GoalsManagementProps, "canCreate" | "categories">) {
+  canEdit = false,
+  initialGoalId,
+}: {
+  records: GoalListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  employees: LookupOption[];
+  departments: LookupOption[];
+  cycles: LookupOption[];
+  search?: string;
+  employeeId?: string;
+  departmentId?: string;
+  cycleId?: string;
+  goalStatus?: string;
+  canEdit?: boolean;
+  initialGoalId?: string;
+}) {
+  const [viewId, setViewId] = useState<string | null>(initialGoalId ?? null);
+
+  useEffect(() => {
+    if (initialGoalId) setViewId(initialGoalId);
+  }, [initialGoalId]);
+
   return (
-    <section className="space-y-4">
-      <div className="rounded-xl border bg-card p-4 shadow-sm">
-        <PerformanceFilters
-          employees={employees}
-          departments={departments}
-          cycles={cycles}
-          statusItems={statusItems}
-          statusKey="goalStatus"
-          statusValue={goalStatus}
-          employeeId={employeeId}
-          departmentId={departmentId}
-          cycleId={cycleId}
-          search={search}
-          searchPlaceholder="Search goals..."
-        />
+    <div className="space-y-3">
+      <div>
+        <h2 className="text-sm font-semibold">Assigned goals</h2>
+        <p className="text-xs text-muted-foreground">
+          Goals you assign appear here. Click View to open details in a popup.
+        </p>
       </div>
 
-      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-        {records.length === 0 ? (
+      <PerformanceFilters
+        employees={employees}
+        departments={departments}
+        cycles={cycles}
+        statusItems={statusItems}
+        statusKey="goalStatus"
+        statusValue={goalStatus}
+        employeeId={employeeId}
+        departmentId={departmentId}
+        cycleId={cycleId}
+        search={search}
+        searchPlaceholder="Search assigned goals…"
+        className="rounded-lg border bg-muted/10 p-3"
+      />
+
+      <PerformanceTableShell
+        className="max-h-[min(36vh,320px)]"
+        empty={
           <EmptyState
-            title="No goals yet"
-            description="Select a template above to assign a goal."
-            className="border-0"
+            title="No goals assigned yet"
+            description="Assign a goal using the form above."
+            className="border-0 py-8"
           />
-        ) : (
-          <div className="max-h-[24rem] overflow-auto">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
-                <tr className="text-left text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Employee</th>
-                  <th className="px-4 py-3 font-medium">Goal</th>
-                  <th className="px-4 py-3 font-medium">Progress</th>
-                  <th className="px-4 py-3 font-medium">Key results</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Due</th>
+        }
+      >
+        {records.length > 0 ? (
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
+              <tr className="text-left text-muted-foreground">
+                <th className="px-3 py-2.5 font-medium">Employee</th>
+                <th className="px-3 py-2.5 font-medium">Goal</th>
+                <th className="px-3 py-2.5 font-medium">Progress</th>
+                <th className="px-3 py-2.5 font-medium">Key results</th>
+                <th className="px-3 py-2.5 font-medium">Status</th>
+                <th className="px-3 py-2.5 font-medium">Due</th>
+                <th className="px-3 py-2.5" />
+              </tr>
+            </thead>
+            <tbody>
+              {records.map((row) => (
+                <tr key={row.id} className="border-t align-middle">
+                  <td className="px-3 py-2.5">
+                    <div className="font-medium">{row.employeeName}</div>
+                    <div className="text-xs text-muted-foreground">{row.departmentName}</div>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <div className="font-medium">{row.title}</div>
+                    <GoalPriorityBadge priority={row.goalPriority} />
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <ProgressBar value={row.currentProgress} />
+                  </td>
+                  <td className="px-3 py-2.5 tabular-nums">
+                    {row.completedMilestones}/{row.milestoneCount}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <GoalStatusBadge status={row.goalStatus} />
+                  </td>
+                  <td className="px-3 py-2.5 whitespace-nowrap text-xs">
+                    {row.dueDate ? format(new Date(row.dueDate), "MMM d, yyyy") : "—"}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <TableActions>
+                      <Button size="sm" variant="outline" onClick={() => setViewId(row.id)}>
+                        <Eye className="mr-1 size-3.5" />
+                        View
+                      </Button>
+                    </TableActions>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {records.map((row) => (
-                  <tr key={row.id} className="border-t align-middle">
-                    <td className="px-4 py-3">
-                      <div className="font-medium">{row.employeeName}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium">{row.title}</div>
-                      <GoalPriorityBadge priority={row.goalPriority} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-16 overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full rounded-full bg-primary"
-                            style={{ width: `${row.currentProgress}%` }}
-                          />
-                        </div>
-                        <span className="tabular-nums">{row.currentProgress}%</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 tabular-nums">
-                      {row.completedMilestones}/{row.milestoneCount}
-                    </td>
-                    <td className="px-4 py-3">
-                      <GoalStatusBadge status={row.goalStatus} />
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {row.dueDate ? format(new Date(row.dueDate), "MMM d, yyyy") : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+              ))}
+            </tbody>
+          </table>
+        ) : null}
+      </PerformanceTableShell>
+
       <PerformancePagination page={page} pageSize={pageSize} total={total} />
+
+      <GoalDetailModal
+        goalId={viewId}
+        open={!!viewId}
+        onOpenChange={(open) => !open && setViewId(null)}
+        canEdit={canEdit}
+      />
+    </div>
+  );
+}
+
+export function GoalsWorkspace({
+  canCreate,
+  canEdit,
+  formProps,
+  tableProps,
+}: {
+  canCreate: boolean;
+  canEdit: boolean;
+  formProps: {
+    employees: LookupOption[];
+    categories: string[];
+  };
+  tableProps: Omit<
+    Parameters<typeof GoalsTable>[0],
+    "canEdit"
+  >;
+}) {
+  const router = useRouter();
+  const [listState, setListState] = useState({
+    records: tableProps.records,
+    total: tableProps.total,
+    page: tableProps.page,
+    pageSize: tableProps.pageSize,
+    search: tableProps.search,
+    employeeId: tableProps.employeeId,
+    departmentId: tableProps.departmentId,
+    cycleId: tableProps.cycleId,
+    goalStatus: tableProps.goalStatus,
+  });
+
+  useEffect(() => {
+    setListState({
+      records: tableProps.records,
+      total: tableProps.total,
+      page: tableProps.page,
+      pageSize: tableProps.pageSize,
+      search: tableProps.search,
+      employeeId: tableProps.employeeId,
+      departmentId: tableProps.departmentId,
+      cycleId: tableProps.cycleId,
+      goalStatus: tableProps.goalStatus,
+    });
+  }, [
+    tableProps.records,
+    tableProps.total,
+    tableProps.page,
+    tableProps.pageSize,
+    tableProps.search,
+    tableProps.employeeId,
+    tableProps.departmentId,
+    tableProps.cycleId,
+    tableProps.goalStatus,
+  ]);
+
+  const refreshAssignedGoals = useCallback(async () => {
+    const result = await fetchGoalsListAction({
+      page: 1,
+      pageSize: tableProps.pageSize,
+    });
+    if (!result.success || !result.data) return;
+
+    setListState({
+      records: result.data.data,
+      total: result.data.total,
+      page: result.data.page,
+      pageSize: result.data.pageSize,
+      search: undefined,
+      employeeId: undefined,
+      departmentId: undefined,
+      cycleId: undefined,
+      goalStatus: undefined,
+    });
+    router.replace(PERFORMANCE_ROUTES.goals);
+  }, [router, tableProps.pageSize]);
+
+  return (
+    <section className="rounded-xl border bg-card shadow-sm">
+      {canCreate ? (
+        <div className="p-4">
+          <GoalForm {...formProps} onAssigned={refreshAssignedGoals} />
+        </div>
+      ) : null}
+      <div className={cn("border-t p-4", !canCreate && "border-t-0")}>
+        <GoalsTable
+          {...tableProps}
+          records={listState.records}
+          total={listState.total}
+          page={listState.page}
+          pageSize={listState.pageSize}
+          search={listState.search}
+          employeeId={listState.employeeId}
+          departmentId={listState.departmentId}
+          cycleId={listState.cycleId}
+          goalStatus={listState.goalStatus}
+          canEdit={canEdit}
+        />
+      </div>
     </section>
   );
 }
 
-function Field({
+function CompactField({
   label,
   children,
   className,
@@ -311,8 +512,8 @@ function Field({
   className?: string;
 }) {
   return (
-    <div className={className ? `${className} space-y-2` : "space-y-2"}>
-      <Label>{label}</Label>
+    <div className={cn("space-y-1", className)}>
+      <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
       {children}
     </div>
   );

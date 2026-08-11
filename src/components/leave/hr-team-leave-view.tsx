@@ -21,14 +21,12 @@ type HrTeamLeaveViewProps = {
   leaveTypeId?: string;
   departmentId?: string;
   branchId?: string;
-  approverId?: string;
   reportingManagerId?: string;
   employeeId?: string;
   leaveTypes: LookupOption[];
   departments: LookupOption[];
   branches: LookupOption[];
   employees: LookupOption[];
-  approvers: LookupOption[];
   managers: LookupOption[];
   canCreate: boolean;
   canApprove: boolean;
@@ -50,14 +48,12 @@ export function HrTeamLeaveView({
   leaveTypeId,
   departmentId,
   branchId,
-  approverId,
   reportingManagerId,
   employeeId,
   leaveTypes,
   departments,
   branches,
   employees,
-  approvers,
   managers,
   canCreate,
   canApprove,
@@ -77,7 +73,7 @@ export function HrTeamLeaveView({
         </div>
       ) : null}
 
-      <LeaveSummaryCards summary={summary} />
+      <LeaveSummaryCards summary={summary} embedded={embedded} />
 
       <Suspense
         fallback={
@@ -98,20 +94,18 @@ export function HrTeamLeaveView({
           leaveTypeId={leaveTypeId}
           departmentId={departmentId}
           branchId={branchId}
-          approverId={approverId}
           reportingManagerId={reportingManagerId}
           employeeId={employeeId}
           leaveTypes={leaveTypes}
           departments={departments}
           branches={branches}
           employees={employees}
-          approvers={approvers}
           managers={managers}
           canCreate={canCreate}
           canApprove={canApprove}
           canReject={canReject}
           canCancel={canCancel}
-          embedded
+          embedded={embedded}
         />
       </Suspense>
     </div>

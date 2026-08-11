@@ -1,8 +1,8 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
-import { PageSkeleton } from "@/components/common/page-skeleton";
 import { HrPayrollHubView } from "@/components/payroll/hr-payroll-hub-view";
+import { TeamPayrollContentSkeleton } from "@/components/payroll/team-payroll-content-skeleton";
 import { TeamPayrollSection } from "@/components/payroll/team-payroll-section";
 import { legacyHubTabRedirectUrl } from "@/lib/dashboard/hub-paths";
 import { getEmployeePayrollData } from "@/lib/employee/services/employee-payroll-queries";
@@ -15,6 +15,7 @@ import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { hasAnyPermission } from "@/lib/permissions/utils";
 import { createClient } from "@/lib/supabase/server";
 import { siteConfig } from "@/config/site";
+import type { EmployeePayrollData } from "@/types/employee-payroll";
 
 const TEAM_PAYROLL_PERMISSIONS = [
   "payroll.view",
@@ -23,18 +24,45 @@ const TEAM_PAYROLL_PERMISSIONS = [
   "payslip.view",
 ] as const;
 
+const EMPTY_TEAM_SELF_PAYROLL: EmployeePayrollData = {
+  currencyCode: "INR",
+  hasAnyData: false,
+  kpis: {
+    currentNetSalary: null,
+    currentGrossSalary: null,
+    nextSalaryDate: null,
+    lastPaymentDate: null,
+    latestStatus: null,
+    ytdEarnings: 0,
+    ytdTax: 0,
+  },
+  latest: null,
+  latestTimeline: null,
+  payslips: [],
+  salaryStructure: null,
+  bank: null,
+  bonuses: [],
+  reimbursements: [],
+  trend: [],
+  ytd: {
+    earnings: 0,
+    deductions: 0,
+    net: 0,
+    tax: 0,
+    monthsCount: 0,
+    financialYearLabel: "",
+  },
+};
+
 export async function PayrollHubSection({
   section,
-  teamSection = TEAM_PAYROLL_SECTIONS.dashboard,
   searchParams,
 }: {
-  section: "my" | "team";
-  teamSection?: TeamPayrollSectionKey;
+  section: "my";
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const profile = await requireServerAnyPermission(["payroll.view", "payslip.view"]);
   const supabase = await createClient();
-  const raw = await searchParams;
   const canViewTeam = hasAnyPermission(profile.permissionCodes, [...TEAM_PAYROLL_PERMISSIONS]);
 
   const selfData = await getEmployeePayrollData(supabase, profile, {
@@ -42,21 +70,7 @@ export async function PayrollHubSection({
   });
 
   return (
-    <HrPayrollHubView
-      initialSection={section}
-      initialTeamSection={teamSection}
-      canViewTeam={canViewTeam}
-      selfPayroll={selfData}
-    >
-      {canViewTeam && section === "team" ? (
-        <TeamPayrollSection
-          section={teamSection}
-          rawSearchParams={raw}
-          profile={profile}
-          supabase={supabase}
-        />
-      ) : null}
-    </HrPayrollHubView>
+    <HrPayrollHubView initialSection="my" canViewTeam={canViewTeam} selfPayroll={selfData} />
   );
 }
 
@@ -74,15 +88,25 @@ export async function PayrollTeamPage({
   });
   if (legacy) redirect(legacy);
 
-  const resolvedSection = teamSection ?? TEAM_PAYROLL_SECTIONS.dashboard;
+  const resolvedSection = teamSection ?? TEAM_PAYROLL_SECTIONS.run;
+  const profile = await requireServerAnyPermission(["payroll.view", "payslip.view"]);
+  const supabase = await createClient();
+  const canViewTeam = hasAnyPermission(profile.permissionCodes, [...TEAM_PAYROLL_PERMISSIONS]);
 
   return (
-    <Suspense fallback={<PageSkeleton />}>
-      <PayrollHubSection
-        section="team"
-        teamSection={resolvedSection}
-        searchParams={searchParams}
-      />
-    </Suspense>
+    <HrPayrollHubView
+      initialSection="team"
+      canViewTeam={canViewTeam}
+      selfPayroll={EMPTY_TEAM_SELF_PAYROLL}
+    >
+      <Suspense fallback={<TeamPayrollContentSkeleton />}>
+        <TeamPayrollSection
+          section={resolvedSection}
+          rawSearchParams={raw}
+          profile={profile}
+          supabase={supabase}
+        />
+      </Suspense>
+    </HrPayrollHubView>
   );
 }

@@ -9,6 +9,7 @@ import type {
   PayslipListResult,
   ReimbursementListResult,
   SalaryRevisionListResult,
+  SalaryStructureItem,
   SalaryStructureListResult,
 } from "@/types/payroll";
 import {
@@ -38,6 +39,128 @@ import {
 function unwrapRelation<T>(value: T | T[] | null): T | null {
   if (!value) return null;
   return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+type SalaryStructureEmployeeRow = {
+  employee_code: string;
+  first_name: string;
+  last_name: string;
+  organization_id: string;
+  departments?: { name: string } | { name: string }[] | null;
+};
+
+type SalaryStructureDbRow = {
+  id: string;
+  employee_id: string;
+  effective_from: string;
+  effective_to: string | null;
+  currency_code: string;
+  basic_salary: number;
+  hra_amount: number;
+  transport_allowance: number;
+  other_allowances: number;
+  gross_salary: number;
+  net_salary: number;
+  tax_deduction: number;
+  other_deductions: number;
+  components: Record<string, number> | null;
+};
+
+function mapSalaryStructureRow(
+  row: SalaryStructureDbRow,
+  employee: SalaryStructureEmployeeRow | null,
+  department: { name: string } | null,
+  components: Record<string, number>,
+  isCurrent: boolean,
+): SalaryStructureItem {
+  return {
+    id: row.id,
+    employeeId: row.employee_id,
+    employeeCode: employee?.employee_code ?? "",
+    employeeName: employee ? `${employee.first_name} ${employee.last_name}` : "",
+    departmentName: department?.name ?? null,
+    effectiveFrom: row.effective_from,
+    effectiveTo: row.effective_to,
+    currencyCode: row.currency_code,
+    basicSalary: Number(row.basic_salary),
+    hraAmount: Number(row.hra_amount),
+    transportAllowance: Number(row.transport_allowance),
+    otherAllowances: Number(row.other_allowances),
+    grossSalary: Number(row.gross_salary),
+    netSalary: Number(row.net_salary),
+    taxDeduction: Number(row.tax_deduction),
+    otherDeductions: Number(row.other_deductions),
+    components: {
+      specialAllowance: components.specialAllowance ?? 0,
+      medical: components.medical ?? 0,
+      pf: components.pf ?? 0,
+      esi: components.esi ?? 0,
+      professionalTax: components.professionalTax ?? 0,
+      incomeTax: components.incomeTax ?? 0,
+      other: components.other ?? 0,
+    },
+    isCurrent,
+  };
+}
+
+export async function getSalaryStructureById(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  structureId: string,
+): Promise<SalaryStructureItem | null> {
+  const organizationId = profile.employee.organizationId;
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("salary_structures")
+    .select(
+      `
+        id,
+        employee_id,
+        effective_from,
+        effective_to,
+        currency_code,
+        basic_salary,
+        hra_amount,
+        transport_allowance,
+        other_allowances,
+        gross_salary,
+        net_salary,
+        tax_deduction,
+        other_deductions,
+        components,
+        employees!inner (
+          employee_code,
+          first_name,
+          last_name,
+          organization_id,
+          departments:department_id (name)
+        )
+      `,
+    )
+    .eq("id", structureId)
+    .eq("employees.organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+
+  const employee = unwrapRelation(
+    data.employees as SalaryStructureEmployeeRow | SalaryStructureEmployeeRow[] | null,
+  );
+  const department = employee
+    ? unwrapRelation(
+        employee.departments as { name: string } | { name: string }[] | null,
+      )
+    : null;
+  const components = (data.components as Record<string, number>) ?? {};
+  const isCurrent =
+    data.effective_from <= today &&
+    (!data.effective_to || data.effective_to >= today);
+
+  return mapSalaryStructureRow(data, employee, department, components, isCurrent);
 }
 
 export async function getPayrollLookups(
@@ -416,36 +539,7 @@ export async function listSalaryStructures(
         row.effective_from <= today &&
         (!row.effective_to || row.effective_to >= today);
       const components = (row.components as Record<string, number>) ?? {};
-      return {
-        id: row.id,
-        employeeId: row.employee_id,
-        employeeCode: employee?.employee_code ?? "",
-        employeeName: employee
-          ? `${employee.first_name} ${employee.last_name}`
-          : "",
-        departmentName: department?.name ?? null,
-        effectiveFrom: row.effective_from,
-        effectiveTo: row.effective_to,
-        currencyCode: row.currency_code,
-        basicSalary: Number(row.basic_salary),
-        hraAmount: Number(row.hra_amount),
-        transportAllowance: Number(row.transport_allowance),
-        otherAllowances: Number(row.other_allowances),
-        grossSalary: Number(row.gross_salary),
-        netSalary: Number(row.net_salary),
-        taxDeduction: Number(row.tax_deduction),
-        otherDeductions: Number(row.other_deductions),
-        components: {
-          specialAllowance: components.specialAllowance ?? 0,
-          medical: components.medical ?? 0,
-          pf: components.pf ?? 0,
-          esi: components.esi ?? 0,
-          professionalTax: components.professionalTax ?? 0,
-          incomeTax: components.incomeTax ?? 0,
-          other: components.other ?? 0,
-        },
-        isCurrent,
-      };
+      return mapSalaryStructureRow(row, employee, department, components, isCurrent);
     }),
     total: count ?? 0,
     page,

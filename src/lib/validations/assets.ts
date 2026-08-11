@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+import {
+  ASSET_DEVICE_CATALOG_KEYS,
+  type AssetDeviceCatalogKey,
+} from "@/lib/assets/asset-device-images";
+
 export const assetListParamsSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
@@ -109,6 +114,27 @@ export const assetSettingsSchema = z.object({
   categories: z.array(z.string().trim().min(1)).min(1),
 });
 
+export const createAndAssignAssetSchema = z.object({
+  employeeId: z.string().uuid(),
+  assetType: z.enum(
+    ASSET_DEVICE_CATALOG_KEYS as [AssetDeviceCatalogKey, ...AssetDeviceCatalogKey[]],
+  ),
+  brand: z.string().trim().max(100).optional().nullable(),
+  model: z.string().trim().max(100).optional().nullable(),
+  serialNumber: z.string().trim().max(120).optional().nullable(),
+  specChip: z.string().trim().max(120).optional().nullable(),
+  specMemory: z.string().trim().max(120).optional().nullable(),
+  specStorage: z.string().trim().max(120).optional().nullable(),
+  specOperatingSystem: z.string().trim().max(120).optional().nullable(),
+  specAccessories: z.string().trim().max(500).optional().nullable(),
+  specConnectionType: z.string().trim().max(120).optional().nullable(),
+  warrantyExpiry: z.string().optional().nullable(),
+  purchaseDate: z.string().optional().nullable(),
+  conditionBefore: z.enum(["excellent", "good", "fair", "poor", "damaged"]).default("good"),
+  remarks: z.string().trim().max(2000).optional().nullable(),
+  assignedDate: z.string().min(1),
+});
+
 export type AssetListParams = z.infer<typeof assetListParamsSchema>;
 export type AssignmentListParams = z.infer<typeof assignmentListParamsSchema>;
 export type MaintenanceListParams = z.infer<typeof maintenanceListParamsSchema>;
@@ -120,3 +146,4 @@ export type MaintenanceFormValues = z.infer<typeof maintenanceFormSchema>;
 export type VendorFormValues = z.infer<typeof vendorFormSchema>;
 export type AssetSettingsFormValues = z.infer<typeof assetSettingsSchema>;
 export type AssetSettingsFormInput = z.input<typeof assetSettingsSchema>;
+export type CreateAndAssignAssetValues = z.infer<typeof createAndAssignAssetSchema>;

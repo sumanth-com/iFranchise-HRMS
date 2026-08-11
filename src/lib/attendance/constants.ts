@@ -49,9 +49,9 @@ export const ATTENDANCE_SOURCE_LABELS: Record<string, string> = {
 };
 
 export const ATTENDANCE_SUMMARY_LABELS = {
-  presentToday: "Present Today",
-  absentToday: "Absent Today",
-  lateToday: "Late Today",
+  presentToday: "Present",
+  absentToday: "Absent",
+  lateToday: "Late",
   halfDayToday: "Half Day",
   totalEmployees: "Total Employees",
 } as const;

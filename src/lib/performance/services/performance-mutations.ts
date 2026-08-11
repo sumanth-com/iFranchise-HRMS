@@ -1,6 +1,6 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
-import type { GoalDetail, ReviewDetail } from "@/types/performance";
+import type { GoalDetail, OneOnOneDetail, ReviewDetail } from "@/types/performance";
 import {
   goalFormSchema,
   reviewFormSchema,
@@ -97,6 +97,34 @@ export async function updateGoalProgress(
     })
     .eq("id", goalId)
     .eq("organization_id", profile.employee.organizationId);
+
+  if (error) throw new Error(error.message);
+}
+
+export async function toggleGoalMilestone(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  goalId: string,
+  milestoneId: string,
+  isCompleted: boolean,
+): Promise<void> {
+  const { data: goal, error: goalError } = await fromHrms(supabase, "performance_goals")
+    .select("id")
+    .eq("id", goalId)
+    .eq("organization_id", profile.employee.organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (goalError) throw new Error(goalError.message);
+  if (!goal) throw new Error("Goal not found");
+
+  const { error } = await fromHrms(supabase, "performance_goal_milestones")
+    .update({
+      is_completed: isCompleted,
+      completed_at: isCompleted ? new Date().toISOString() : null,
+    })
+    .eq("id", milestoneId)
+    .eq("goal_id", goalId);
 
   if (error) throw new Error(error.message);
 }
@@ -824,6 +852,63 @@ export async function getReviewById(
         approverName: approver ? formatEmployeeName(approver.first_name, approver.last_name) : "—",
         comments: a.comments,
         actedAt: a.acted_at,
+      };
+    }),
+  };
+}
+
+export async function getOneOnOneById(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  meetingId: string,
+): Promise<OneOnOneDetail | null> {
+  const { data, error } = await fromHrms(supabase, "performance_one_on_ones")
+    .select(
+      `*, employee:employee_id(first_name, last_name),
+      manager:manager_employee_id(first_name, last_name),
+      performance_one_on_one_actions(id, title, due_date, is_completed, assignee:assigned_to_employee_id(first_name, last_name))`,
+    )
+    .eq("id", meetingId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+
+  const employee = unwrapRelation(data.employee);
+  const manager = unwrapRelation(data.manager);
+  const actions = (data.performance_one_on_one_actions ?? []) as Array<{
+    id: string;
+    title: string;
+    due_date: string | null;
+    is_completed: boolean;
+    assignee: { first_name: string; last_name: string } | { first_name: string; last_name: string }[] | null;
+  }>;
+
+  const completedActions = actions.filter((a) => a.is_completed).length;
+
+  return {
+    id: data.id,
+    employeeId: data.employee_id,
+    employeeName: employee ? formatEmployeeName(employee.first_name, employee.last_name) : "—",
+    managerName: manager ? formatEmployeeName(manager.first_name, manager.last_name) : "—",
+    scheduledAt: data.scheduled_at,
+    agenda: data.agenda,
+    notes: data.notes,
+    followUpDate: data.follow_up_date,
+    meetingStatus: data.meeting_status,
+    actionItemCount: actions.length,
+    completedActions,
+    createdAt: data.created_at,
+    actions: actions.map((a) => {
+      const assignee = unwrapRelation(a.assignee);
+      return {
+        id: a.id,
+        title: a.title,
+        dueDate: a.due_date,
+        isCompleted: a.is_completed,
+        assignedToName: assignee ? formatEmployeeName(assignee.first_name, assignee.last_name) : null,
       };
     }),
   };

@@ -4,8 +4,8 @@ import { Suspense } from "react";
 
 import { HrAssetsHubView } from "@/components/assets/hr-assets-hub-view";
 import { PageSkeleton } from "@/components/common/page-skeleton";
-import { SELF_ASSETS_ROUTES } from "@/lib/assets/constants";
-import { getAssetsSummary } from "@/lib/assets/services/asset-queries";
+import { canAssignAssets, SELF_ASSETS_ROUTES } from "@/lib/assets/constants";
+import { getAssetsLookups, getAssetActivityFeed, listAssets } from "@/lib/assets/services/asset-queries";
 import { legacyHubTabRedirectUrl } from "@/lib/dashboard/hub-paths";
 import { getEmployeeAssetsData } from "@/lib/employee/services/employee-assets-queries";
 import { requireServerPermission } from "@/lib/permissions/server";
@@ -28,33 +28,29 @@ async function AssetsHubContent({
 }) {
   const profile = await requireServerPermission("asset.view");
   const supabase = await createClient();
-  const raw = await searchParams;
+  void (await searchParams);
   const canViewTeam = hasAnyPermission(profile.permissionCodes, [...TEAM_ASSETS_PERMISSIONS]);
+  const canAssign = canAssignAssets(profile.permissionCodes);
 
-  const [selfAssets, teamSummary] = await Promise.all([
+  const [selfAssets, lookups, inventory, activity] = await Promise.all([
     getEmployeeAssetsData(supabase, profile),
-    canViewTeam ? getAssetsSummary(supabase, profile) : Promise.resolve(null),
+    canViewTeam ? getAssetsLookups(supabase, profile) : Promise.resolve(null),
+    canViewTeam
+      ? listAssets(supabase, profile, { page: 1, pageSize: 100 })
+      : Promise.resolve(null),
+    canViewTeam ? getAssetActivityFeed(supabase, profile, 40) : Promise.resolve([]),
   ]);
 
   return (
     <HrAssetsHubView
       initialSection={section}
       canViewTeam={canViewTeam}
+      canAssign={canAssign}
       selfAssets={selfAssets}
-      teamAssets={
-        teamSummary ?? {
-          totalAssets: 0,
-          assignedAssets: 0,
-          availableAssets: 0,
-          underMaintenance: 0,
-          lostAssets: 0,
-          warrantyExpiring: 0,
-          assetsByCategory: [],
-          assetsByDepartment: [],
-          recentAssignments: [],
-          warrantyTimeline: [],
-        }
-      }
+      teamLookups={lookups}
+      teamInventory={inventory}
+      teamActivity={activity}
+      permissionCodes={profile.permissionCodes}
     />
   );
 }

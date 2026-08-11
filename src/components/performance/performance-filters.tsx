@@ -22,6 +22,7 @@ type PerformanceFiltersProps = {
   search?: string;
   searchPlaceholder?: string;
   extraFilters?: React.ReactNode;
+  className?: string;
 };
 
 export function PerformanceFilters({
@@ -37,6 +38,7 @@ export function PerformanceFilters({
   search = "",
   searchPlaceholder = "Search...",
   extraFilters,
+  className,
 }: PerformanceFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -56,7 +58,9 @@ export function PerformanceFilters({
   );
 
   return (
-    <div className={`flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center ${isPending ? "opacity-70" : ""}`}>
+    <div
+      className={`flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center ${isPending ? "opacity-70" : ""} ${className ?? ""}`}
+    >
       <div className="relative lg:w-[18rem]">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -71,13 +75,17 @@ export function PerformanceFilters({
         />
       </div>
       <div className="grid flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <EmployeeSelect
-          employees={[{ id: "all", label: "All employees" }, ...employees]}
-          value={employeeId ?? "all"}
-          onValueChange={(value) =>
-            updateParams({ employeeId: value === "all" ? undefined : value })
-          }
-        />
+        <div className="min-w-[14rem]">
+          <EmployeeSelect
+            employees={[{ id: "all", label: "All employees" }, ...employees]}
+            value={employeeId ?? "all"}
+            onValueChange={(value) =>
+              updateParams({ employeeId: value === "all" ? undefined : value })
+            }
+            triggerClassName="h-9 w-full min-w-[14rem]"
+            contentClassName="min-w-[var(--radix-select-trigger-width)]"
+          />
+        </div>
         {departments ? (
           <LabeledSelect
             items={[{ value: "all", label: "All departments" }, ...departments.map((d) => ({ value: d.id, label: d.label }))]}

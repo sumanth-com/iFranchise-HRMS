@@ -143,7 +143,7 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
     id: "performance",
     label: "Performance",
     description: "Goals, KPIs, and reviews",
-    href: PERFORMANCE_ROUTES.dashboard,
+    href: PERFORMANCE_ROUTES.goals,
     keywords: ["performance", "review", "kpi", "goal"],
     permission: "performance.view",
   },

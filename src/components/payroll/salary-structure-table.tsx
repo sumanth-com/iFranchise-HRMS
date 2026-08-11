@@ -1,6 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Plus, Pencil } from "lucide-react";
 import {
   flexRender,
   getCoreRowModel,
@@ -9,6 +11,9 @@ import {
 } from "@tanstack/react-table";
 import { format } from "date-fns";
 
+import { Button } from "@/components/common/button";
+import { SalaryStructureDialog } from "@/components/payroll/salary-structure-dialog";
+import { useTeamPayrollHeaderActions } from "@/components/payroll/team-payroll-header-actions";
 import {
   TableBody,
   TableCell,
@@ -16,15 +21,59 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PAYROLL_ROUTES } from "@/lib/payroll/constants";
 import { formatCurrency } from "@/lib/payroll/services/payroll-utils";
+import type { LookupOption } from "@/types/employee";
 import type { SalaryStructureItem } from "@/types/payroll";
+
+type DialogMode = "create" | "edit";
 
 export function SalaryStructureTable({
   records,
+  employees,
+  canEdit = false,
 }: {
   records: SalaryStructureItem[];
+  employees: LookupOption[];
+  canEdit?: boolean;
 }) {
+  const router = useRouter();
+  const { setHeaderActions } = useTeamPayrollHeaderActions();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<DialogMode>("create");
+  const [editingRecord, setEditingRecord] = useState<SalaryStructureItem | undefined>();
+
+  const registerAddAction = useCallback(() => {
+    setDialogMode("create");
+    setEditingRecord(undefined);
+    setDialogOpen(true);
+  }, []);
+
+  function openEditDialog(record: SalaryStructureItem) {
+    setDialogMode("edit");
+    setEditingRecord(record);
+    setDialogOpen(true);
+  }
+
+  function handleSaved() {
+    router.refresh();
+  }
+
+  useEffect(() => {
+    if (!canEdit) {
+      setHeaderActions(null);
+      return;
+    }
+
+    setHeaderActions(
+      <Button type="button" size="sm" className="gap-1.5" onClick={registerAddAction}>
+        <Plus className="size-4" />
+        Add salary structure
+      </Button>,
+    );
+
+    return () => setHeaderActions(null);
+  }, [canEdit, registerAddAction, setHeaderActions]);
+
   const columns: ColumnDef<SalaryStructureItem>[] = [
     {
       accessorKey: "employeeName",
@@ -67,6 +116,28 @@ export function SalaryStructureTable({
           </span>
         ),
     },
+    ...(canEdit
+      ? [
+          {
+            id: "actions",
+            header: () => <span className="sr-only">Actions</span>,
+            cell: ({ row }: { row: { original: SalaryStructureItem } }) => (
+              <div className="text-right">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 px-2.5"
+                  onClick={() => openEditDialog(row.original)}
+                >
+                  <Pencil className="size-3.5" />
+                  Edit
+                </Button>
+              </div>
+            ),
+          } as ColumnDef<SalaryStructureItem>,
+        ]
+      : []),
   ];
 
   const table = useReactTable({
@@ -77,21 +148,16 @@ export function SalaryStructureTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <Link
-          href={PAYROLL_ROUTES.newSalaryStructure}
-          className="text-sm font-medium text-primary hover:underline"
-        >
-          Add salary structure
-        </Link>
-      </div>
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
         <table className="w-full text-sm">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="px-4 py-3">
+                  <TableHead
+                    key={header.id}
+                    className={`px-4 py-3 ${header.id === "actions" ? "text-right" : ""}`}
+                  >
                     {flexRender(header.column.columnDef.header, header.getContext())}
                   </TableHead>
                 ))}
@@ -103,7 +169,10 @@ export function SalaryStructureTable({
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id}>
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="px-4 py-3">
+                    <TableCell
+                      key={cell.id}
+                      className={`px-4 py-3 ${cell.column.id === "actions" ? "text-right" : ""}`}
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -122,6 +191,17 @@ export function SalaryStructureTable({
           </TableBody>
         </table>
       </div>
+
+      {canEdit ? (
+        <SalaryStructureDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          employees={employees}
+          record={editingRecord}
+          mode={dialogMode}
+          onSaved={handleSaved}
+        />
+      ) : null}
     </div>
   );
 }

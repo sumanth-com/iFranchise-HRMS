@@ -1,9 +1,9 @@
 "use client";
 
 import { format } from "date-fns";
-import { Loader2 } from "lucide-react";
+import { Eye, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -18,7 +18,12 @@ import {
   PerformanceFilters,
   PerformancePagination,
 } from "@/components/performance/performance-filters";
+import { OneOnOneDetailModal } from "@/components/performance/one-on-one-detail-modal";
 import { MeetingStatusBadge } from "@/components/performance/performance-status-badge";
+import {
+  PerformanceTableShell,
+  TableActions,
+} from "@/components/performance/performance-ui-primitives";
 import { EmployeeSelect } from "@/components/payroll/payroll-select";
 import { createOneOnOneAction } from "@/lib/performance/actions";
 import { MEETING_STATUS_LABELS } from "@/lib/performance/constants";
@@ -106,6 +111,7 @@ export function OneOnOneTable({
   employees,
   employeeId,
   meetingStatus,
+  canEdit = false,
 }: {
   records: OneOnOneListItem[];
   total: number;
@@ -114,7 +120,10 @@ export function OneOnOneTable({
   employees: LookupOption[];
   employeeId?: string;
   meetingStatus?: string;
+  canEdit?: boolean;
 }) {
+  const [viewId, setViewId] = useState<string | null>(null);
+
   return (
     <section className="space-y-4">
       <div className="rounded-xl border bg-card p-4 shadow-sm">
@@ -127,41 +136,71 @@ export function OneOnOneTable({
           searchPlaceholder="Search meetings..."
         />
       </div>
-      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-        {records.length === 0 ? (
-          <EmptyState title="No meetings scheduled" description="Schedule a 1:1 to get started." className="border-0" />
-        ) : (
+      <PerformanceTableShell
+        empty={
+          <EmptyState
+            title="No meetings scheduled"
+            description="Schedule a 1:1 to discuss progress and action items."
+            className="border-0"
+          />
+        }
+      >
+        {records.length > 0 ? (
           <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/30 text-left text-muted-foreground">
-                <th className="px-4 py-3">Employee</th>
-                <th className="px-4 py-3">Manager</th>
-                <th className="px-4 py-3">Scheduled</th>
-                <th className="px-4 py-3">Agenda</th>
-                <th className="px-4 py-3">Actions</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Follow-up</th>
+            <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
+              <tr className="text-left text-muted-foreground">
+                <th className="px-4 py-3 font-medium">Employee</th>
+                <th className="px-4 py-3 font-medium">Manager</th>
+                <th className="px-4 py-3 font-medium">Scheduled</th>
+                <th className="px-4 py-3 font-medium">Agenda</th>
+                <th className="px-4 py-3 font-medium">Actions</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Follow-up</th>
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
               {records.map((row) => (
-                <tr key={row.id} className="border-b">
+                <tr key={row.id} className="border-t align-middle">
                   <td className="px-4 py-3">{row.employeeName}</td>
                   <td className="px-4 py-3">{row.managerName}</td>
-                  <td className="px-4 py-3">{format(new Date(row.scheduledAt), "MMM d, yyyy h:mm a")}</td>
-                  <td className="max-w-xs truncate px-4 py-3">{row.agenda ?? "—"}</td>
-                  <td className="px-4 py-3">{row.completedActions}/{row.actionItemCount}</td>
-                  <td className="px-4 py-3"><MeetingStatusBadge status={row.meetingStatus} /></td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {format(new Date(row.scheduledAt), "MMM d, yyyy h:mm a")}
+                  </td>
+                  <td className="max-w-xs px-4 py-3">
+                    <span className="line-clamp-2">{row.agenda ?? "—"}</span>
+                  </td>
+                  <td className="px-4 py-3 tabular-nums">
+                    {row.completedActions}/{row.actionItemCount}
+                  </td>
                   <td className="px-4 py-3">
+                    <MeetingStatusBadge status={row.meetingStatus} />
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
                     {row.followUpDate ? format(new Date(row.followUpDate), "MMM d, yyyy") : "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <TableActions>
+                      <Button size="sm" variant="outline" onClick={() => setViewId(row.id)}>
+                        <Eye className="mr-1 size-3.5" />
+                        View
+                      </Button>
+                    </TableActions>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        ) : null}
+      </PerformanceTableShell>
       <PerformancePagination page={page} pageSize={pageSize} total={total} />
+
+      <OneOnOneDetailModal
+        meetingId={viewId}
+        open={!!viewId}
+        onOpenChange={(open) => !open && setViewId(null)}
+        canEdit={canEdit}
+      />
     </section>
   );
 }

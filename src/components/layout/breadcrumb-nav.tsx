@@ -202,25 +202,22 @@ function buildBreadcrumbItems(
     }
 
     if (segments[2] === "team") {
-      const section = parseTeamPayrollSection(segments[3]) ?? TEAM_PAYROLL_SECTIONS.dashboard;
+      const section = parseTeamPayrollSection(segments[3]);
 
       const sectionLabels: Record<TeamPayrollSection, string> = {
-        dashboard: "Dashboard",
         run: "Run Payroll",
-        history: "Payroll History",
         "salary-structures": "Salary Structure",
-        revisions: "Salary Revisions",
         bonuses: "Bonuses",
-        reimbursements: "Reimbursements",
+        reimbursements: "Expense claims",
         payslips: "Payslips",
         settings: "Settings",
       };
 
       items.push({
         label: "Team Payroll",
-        href: payrollHubUrl({ tab: "team", section: TEAM_PAYROLL_SECTIONS.dashboard }),
+        href: payrollHubUrl({ tab: "team", section: TEAM_PAYROLL_SECTIONS.run }),
       });
-      if (section !== TEAM_PAYROLL_SECTIONS.dashboard) {
+      if (section !== TEAM_PAYROLL_SECTIONS.run) {
         items.push({
           label: sectionLabels[section],
           href: payrollHubUrl({ tab: "team", section }),

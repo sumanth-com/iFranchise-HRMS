@@ -271,6 +271,10 @@ export type OneOnOneListItem = {
   createdAt: string;
 };
 
+export type OneOnOneDetail = OneOnOneListItem & {
+  actions: OneOnOneActionItem[];
+};
+
 export type OneOnOneListResult = {
   data: OneOnOneListItem[];
   total: number;

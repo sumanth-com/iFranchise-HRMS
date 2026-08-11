@@ -165,3 +165,35 @@ export type AssetsLookups = {
   availableAssets: { id: string; label: string }[];
   allAssets: { id: string; label: string }[];
 };
+
+export type AssetActivityKind =
+  | "assigned"
+  | "returned"
+  | "transferred"
+  | "lost"
+  | "damaged"
+  | "maintenance_opened"
+  | "maintenance_completed"
+  | "asset_created";
+
+export type AssetActivityItem = {
+  id: string;
+  kind: AssetActivityKind;
+  assetId: string;
+  assetCode: string;
+  assetName: string;
+  employeeId: string | null;
+  employeeName: string | null;
+  performedAt: string;
+  performedByName: string | null;
+  actionLabel: string;
+  remarks: string | null;
+  assignmentId: string | null;
+  maintenanceId: string | null;
+};
+
+export type AssetDetailBundle = {
+  asset: AssetItem;
+  assignments: AssetAssignmentItem[];
+  maintenance: AssetMaintenanceItem[];
+};

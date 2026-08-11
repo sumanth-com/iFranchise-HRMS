@@ -56,9 +56,15 @@ type Props = {
   result: LetterListResult;
   lookups: DocumentsLookups;
   permissionCodes: string[];
+  embedded?: boolean;
 };
 
-export function CompanyLettersManagement({ result, lookups, permissionCodes }: Props) {
+export function CompanyLettersManagement({
+  result,
+  lookups,
+  permissionCodes,
+  embedded = false,
+}: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -263,12 +269,16 @@ export function CompanyLettersManagement({ result, lookups, permissionCodes }: P
   return (
     <>
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Company Letters</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Generate, preview, approve, and store polished company letters in employee folders.
-          </p>
-        </div>
+        {!embedded ? (
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Company Letters</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Generate, preview, approve, and store polished company letters in employee folders.
+            </p>
+          </div>
+        ) : (
+          <div className="min-w-0 flex-1" />
+        )}
         {canGenerate ? (
           <Button onClick={() => setOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />

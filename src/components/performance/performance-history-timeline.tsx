@@ -9,8 +9,11 @@ import {
   Target,
   TrendingUp,
 } from "lucide-react";
+import { useState } from "react";
 
 import { EmptyState } from "@/components/common/empty-state";
+import { Button } from "@/components/common/button";
+import { HistoryEventModal } from "@/components/performance/history-event-modal";
 import {
   buildStatusItems,
   PerformanceFilters,
@@ -56,6 +59,8 @@ export function PerformanceHistoryTimeline({
   employeeId?: string;
   eventType?: string;
 }) {
+  const [viewEvent, setViewEvent] = useState<HistoryEvent | null>(null);
+
   return (
     <section className="space-y-4">
       <div className="rounded-xl border bg-card p-4 shadow-sm">
@@ -90,14 +95,14 @@ export function PerformanceHistoryTimeline({
                   </div>
                   <div className="min-w-0 flex-1 rounded-lg border p-4">
                     <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                           {EVENT_TYPE_LABELS[event.eventType]}
                         </p>
                         <h3 className="mt-1 font-medium">{event.title}</h3>
                         <p className="text-sm text-muted-foreground">{event.employeeName}</p>
                       </div>
-                      <time className="text-xs text-muted-foreground">
+                      <time className="text-xs text-muted-foreground shrink-0">
                         {format(new Date(event.occurredAt), "MMM d, yyyy")}
                       </time>
                     </div>
@@ -106,6 +111,14 @@ export function PerformanceHistoryTimeline({
                         {event.description}
                       </p>
                     ) : null}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-3"
+                      onClick={() => setViewEvent(event)}
+                    >
+                      View details
+                    </Button>
                   </div>
                 </div>
               );
@@ -115,6 +128,12 @@ export function PerformanceHistoryTimeline({
       )}
 
       <PerformancePagination page={page} pageSize={pageSize} total={total} />
+
+      <HistoryEventModal
+        event={viewEvent}
+        open={!!viewEvent}
+        onOpenChange={(open) => !open && setViewEvent(null)}
+      />
     </section>
   );
 }

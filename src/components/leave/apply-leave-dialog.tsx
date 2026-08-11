@@ -10,7 +10,9 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   lookups: LeaveLookups;
-  employeeId: string;
+  /** Self-service: fixed to one employee. Team: optional pre-selected employee. */
+  employeeId?: string;
+  mode?: "self" | "team";
   onSubmitted?: () => void;
 };
 
@@ -19,31 +21,39 @@ export function ApplyLeaveDialog({
   onOpenChange,
   lookups,
   employeeId,
+  mode = "self",
   onSubmitted,
 }: Props) {
+  const isTeam = mode === "team";
+
   const scopedLookups = useMemo(() => {
+    if (isTeam || !employeeId) return lookups;
     const self =
       lookups.employees.find((employee) => employee.id === employeeId) ?? {
         id: employeeId,
         label: "You",
       };
     return { ...lookups, employees: [self] };
-  }, [lookups, employeeId]);
+  }, [isTeam, lookups, employeeId]);
 
   return (
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      title="Apply for Leave"
-      description="Submit a leave request for manager and HR approval."
-      contentClassName="sm:max-w-lg"
+      title={isTeam ? "Apply leave" : "Apply for Leave"}
+      description={
+        isTeam
+          ? "Create a leave request for an employee. It will follow the normal approval workflow."
+          : "Submit a leave request for manager and HR approval."
+      }
+      contentClassName={isTeam ? "sm:max-w-2xl" : "sm:max-w-lg"}
       showCancel={false}
     >
       {open ? (
         <LeaveForm
           lookups={scopedLookups}
-          defaultEmployeeId={employeeId}
-          variant="self"
+          defaultEmployeeId={isTeam ? employeeId : employeeId}
+          variant={isTeam ? "default" : "self"}
           onSuccess={() => {
             onOpenChange(false);
             onSubmitted?.();

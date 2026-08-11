@@ -6,6 +6,7 @@ import { ASSETS_ROUTES, SELF_ASSETS_ROUTES } from "@/lib/assets/constants";
 import {
   assignAsset,
   createAsset,
+  createAndAssignAsset,
   createMaintenance,
   createSignedAssetImageUrl,
   createVendor,
@@ -22,6 +23,7 @@ import {
   getAssetSettings,
   updateAssetSettings,
 } from "@/lib/assets/services/asset-settings";
+import { getAssetDetail } from "@/lib/assets/services/asset-queries";
 import { requireServerAnyPermission, requireServerPermission } from "@/lib/permissions/server";
 import { assertOrganizationStoragePath } from "@/lib/security/storage-path";
 import { createClient } from "@/lib/supabase/server";
@@ -29,6 +31,7 @@ import {
   assetFormSchema,
   assetSettingsSchema,
   assignAssetSchema,
+  createAndAssignAssetSchema,
   maintenanceFormSchema,
   returnAssetSchema,
   transferAssetSchema,
@@ -44,6 +47,8 @@ function revalidateAssets(employeeId?: string) {
   revalidatePath(ASSETS_ROUTES.reports);
   revalidatePath(ASSETS_ROUTES.settings);
   revalidatePath(SELF_ASSETS_ROUTES.list);
+  revalidatePath(SELF_ASSETS_ROUTES.team);
+  revalidatePath("/employee/assets");
   revalidatePath("/dashboard/employees");
   if (employeeId) {
     revalidatePath(`/dashboard/employees`);
@@ -112,6 +117,22 @@ export async function assignAssetAction(input: unknown) {
     const id = await assignAsset(supabase, profile, parsed);
     revalidateAssets(parsed.employeeId);
     return { success: true as const, data: id };
+  } catch (error) {
+    return {
+      success: false as const,
+      message: error instanceof Error ? error.message : "Failed to assign asset",
+    };
+  }
+}
+
+export async function createAndAssignAssetAction(input: unknown) {
+  try {
+    const profile = await requireServerAnyPermission(["asset.create", "asset.assign", "asset.edit"]);
+    const supabase = await createClient();
+    const parsed = createAndAssignAssetSchema.parse(input);
+    const result = await createAndAssignAsset(supabase, profile, parsed);
+    revalidateAssets(parsed.employeeId);
+    return { success: true as const, data: result };
   } catch (error) {
     return {
       success: false as const,
@@ -275,6 +296,23 @@ export async function getAssetImageUrlAction(path: string) {
     return {
       success: false as const,
       message: error instanceof Error ? error.message : "Failed to load image",
+    };
+  }
+}
+
+export async function getAssetDetailAction(assetId: string) {
+  try {
+    const profile = await requireServerPermission("asset.view");
+    const supabase = await createClient();
+    const data = await getAssetDetail(supabase, profile, assetId);
+    if (!data) {
+      return { success: false as const, message: "Asset not found" };
+    }
+    return { success: true as const, data };
+  } catch (error) {
+    return {
+      success: false as const,
+      message: error instanceof Error ? error.message : "Failed to load asset details",
     };
   }
 }

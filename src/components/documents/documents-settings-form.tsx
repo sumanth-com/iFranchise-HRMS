@@ -21,9 +21,10 @@ import type { DocumentSettings } from "@/types/documents";
 type Props = {
   settings: DocumentSettings;
   canEdit: boolean;
+  embedded?: boolean;
 };
 
-export function DocumentsSettingsForm({ settings, canEdit }: Props) {
+export function DocumentsSettingsForm({ settings, canEdit, embedded = false }: Props) {
   const [isPending, startTransition] = useTransition();
   const form = useForm<DocumentSettingsFormInput, unknown, DocumentSettingsFormValues>({
     resolver: zodResolver(documentSettingsSchema),
@@ -57,12 +58,14 @@ export function DocumentsSettingsForm({ settings, canEdit }: Props) {
       onSubmit={form.handleSubmit(onSubmit)}
       className="flex min-h-full flex-col gap-6"
     >
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Document Settings</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Categories, upload rules, numbering, verification, and retention.
-        </p>
-      </div>
+      {!embedded ? (
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Document Settings</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Categories, upload rules, numbering, verification, and retention.
+          </p>
+        </div>
+      ) : null}
 
       <section className="rounded-xl border bg-card p-5 shadow-sm">
         <h2 className="mb-1 text-sm font-medium">Document Categories</h2>

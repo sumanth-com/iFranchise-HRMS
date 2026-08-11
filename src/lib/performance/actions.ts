@@ -20,10 +20,14 @@ import {
   createPromotion,
   createReview,
   getGoalById,
+  getOneOnOneById,
   getReviewById,
   submitReview,
+  toggleGoalMilestone,
+  updateGoal,
   updateGoalProgress,
   updateKpiProgress,
+  updateOneOnOne,
 } from "@/lib/performance/services/performance-mutations";
 import {
   getPerformanceLookups,
@@ -45,11 +49,14 @@ import {
   feedbackFormSchema,
   goalCommentSchema,
   goalFormSchema,
+  goalMilestoneToggleSchema,
   goalProgressSchema,
+  goalUpdateSchema,
   kpiAssignFormSchema,
   kpiProgressSchema,
   kpiTemplateFormSchema,
   oneOnOneFormSchema,
+  oneOnOneUpdateSchema,
   performanceSettingsSchema,
   promotionApprovalSchema,
   promotionFormSchema,
@@ -58,21 +65,15 @@ import {
   reviewSubmitSchema,
 } from "@/lib/validations/performance";
 import type {
-  FeedbackListResult,
   GoalDetail,
   GoalListResult,
-  HistoryListResult,
-  KpiListResult,
-  OneOnOneListResult,
+  OneOnOneDetail,
   PerformanceActionResult,
   PerformanceLookups,
   PerformanceSettingsRecord,
   PerformanceSummary,
-  PromotionListResult,
   ReviewDetail,
-  ReviewListResult,
 } from "@/types/performance";
-import type { KpiTemplateItem } from "@/types/performance";
 
 async function getAuthenticatedSupabase() {
   return createClient();
@@ -164,6 +165,65 @@ export async function fetchGoalDetailAction(goalId: string): Promise<GoalDetail 
   const profile = await requireServerPermission("performance.view");
   const supabase = await getAuthenticatedSupabase();
   return getGoalById(supabase, profile.employee.organizationId, goalId);
+}
+
+export async function fetchGoalsListAction(
+  params: unknown,
+): Promise<PerformanceActionResult<GoalListResult>> {
+  try {
+    const profile = await requireServerPermission("performance.view");
+    const supabase = await getAuthenticatedSupabase();
+    const data = await listGoals(supabase, profile, params);
+    return { success: true, data };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to load goals",
+    };
+  }
+}
+
+export async function updateGoalAction(
+  input: unknown,
+): Promise<PerformanceActionResult<void>> {
+  try {
+    const profile = await requireServerPermission("performance.edit");
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = goalUpdateSchema.parse(input);
+    const { goalId, ...goalInput } = parsed;
+    await updateGoal(supabase, profile, goalId, goalInput);
+    revalidatePerformancePaths();
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to update goal",
+    };
+  }
+}
+
+export async function toggleGoalMilestoneAction(
+  input: unknown,
+): Promise<PerformanceActionResult<void>> {
+  try {
+    const profile = await requireServerAnyPermission(["performance.edit", "performance.create"]);
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = goalMilestoneToggleSchema.parse(input);
+    await toggleGoalMilestone(
+      supabase,
+      profile,
+      parsed.goalId,
+      parsed.milestoneId,
+      parsed.isCompleted,
+    );
+    revalidatePath(PERFORMANCE_ROUTES.goals);
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to update key result",
+    };
+  }
 }
 
 export async function createKpiTemplateAction(
@@ -327,6 +387,35 @@ export async function createOneOnOneAction(
   }
 }
 
+export async function updateOneOnOneAction(
+  input: unknown,
+): Promise<PerformanceActionResult<void>> {
+  try {
+    const profile = await requireServerAnyPermission(["performance.edit", "performance.create"]);
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = oneOnOneUpdateSchema.parse(input);
+    await updateOneOnOne(supabase, profile, parsed.meetingId, {
+      notes: parsed.notes,
+      agenda: parsed.agenda,
+      followUpDate: parsed.followUpDate,
+      meetingStatus: parsed.meetingStatus,
+    });
+    revalidatePath(PERFORMANCE_ROUTES.oneOnOnes);
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to update meeting",
+    };
+  }
+}
+
+export async function fetchOneOnOneDetailAction(meetingId: string): Promise<OneOnOneDetail | null> {
+  const profile = await requireServerPermission("performance.view");
+  const supabase = await getAuthenticatedSupabase();
+  return getOneOnOneById(supabase, profile.employee.organizationId, meetingId);
+}
+
 export async function createPromotionAction(
   input: unknown,
 ): Promise<PerformanceActionResult<string>> {
@@ -387,25 +476,3 @@ export async function savePerformanceSettingsAction(
     };
   }
 }
-
-export type {
-  GoalListResult,
-  KpiListResult,
-  ReviewListResult,
-  FeedbackListResult,
-  OneOnOneListResult,
-  PromotionListResult,
-  HistoryListResult,
-  KpiTemplateItem,
-};
-
-export {
-  listGoals,
-  listKpis,
-  listKpiTemplates,
-  listReviews,
-  listFeedback,
-  listOneOnOnes,
-  listPromotions,
-  listPerformanceHistory,
-};

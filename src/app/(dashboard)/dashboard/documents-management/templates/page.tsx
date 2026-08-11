@@ -1,17 +1,7 @@
-import { TemplatesManagement } from "@/components/documents/templates-management";
-import { createClient } from "@/lib/supabase/server";
-import { listTemplates } from "@/lib/documents/services/document-queries";
-import { requireServerPermission } from "@/lib/permissions/server";
+import { redirect } from "next/navigation";
 
-export default async function DocumentTemplatesPage() {
-  const profile = await requireServerPermission("documents.view");
-  const supabase = await createClient();
-  const templates = await listTemplates(supabase, profile);
+import { DOCUMENTS_ROUTES } from "@/lib/documents/constants";
 
-  return (
-    <TemplatesManagement
-      templates={templates}
-      permissionCodes={profile.permissionCodes}
-    />
-  );
+export default function DocumentsManagementTemplatesRedirect() {
+  redirect(DOCUMENTS_ROUTES.templates);
 }

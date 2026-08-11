@@ -331,7 +331,7 @@ export async function generatePayrollRun(
     existing.payroll_status !== "processing"
   ) {
     throw new Error(
-      "Payroll for the selected period has already been generated. Open Payroll History to review the existing run.",
+      "Payroll for the selected period has already been generated. Open Run Payroll to review the existing run.",
     );
   }
 
@@ -413,7 +413,7 @@ export async function generatePayrollRun(
     if (itemError) {
       if (itemError.code === "23505") {
         throw new Error(
-          "Payroll for the selected period has already been generated. Open Payroll History to review the existing run.",
+          "Payroll for the selected period has already been generated. Open Run Payroll to review the existing run.",
         );
       }
       throw new Error(itemError.message);
@@ -907,6 +907,59 @@ export async function createSalaryStructure(
 
   if (error) throw new Error(error.message);
   return data.id;
+}
+
+export async function updateSalaryStructure(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  structureId: string,
+  input: unknown,
+): Promise<void> {
+  const parsed = salaryStructureFormSchema.parse(input);
+
+  const { data: existing, error: fetchError } = await supabase
+    .schema("hrms")
+    .from("salary_structures")
+    .select("id, employee_id, employees!inner(organization_id)")
+    .eq("id", structureId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (fetchError) throw new Error(fetchError.message);
+  if (!existing) throw new Error("Salary structure not found");
+
+  const employee = unwrapRelation(
+    existing.employees as { organization_id: string } | { organization_id: string }[] | null,
+  );
+  if (employee?.organization_id !== profile.employee.organizationId) {
+    throw new Error("Salary structure not found");
+  }
+
+  if (parsed.employeeId !== existing.employee_id) {
+    throw new Error("Employee cannot be changed when editing a salary structure.");
+  }
+
+  const { error } = await supabase
+    .schema("hrms")
+    .from("salary_structures")
+    .update({
+      effective_from: parsed.effectiveFrom,
+      effective_to: parsed.effectiveTo ?? null,
+      currency_code: parsed.currencyCode,
+      basic_salary: parsed.basicSalary,
+      hra_amount: parsed.hraAmount,
+      transport_allowance: parsed.transportAllowance,
+      other_allowances: parsed.otherAllowances,
+      tax_deduction: parsed.taxDeduction,
+      other_deductions: parsed.otherDeductions,
+      gross_salary: parsed.grossSalary,
+      net_salary: parsed.netSalary,
+      components: parsed.components,
+      updated_by: profile.userId,
+    })
+    .eq("id", structureId);
+
+  if (error) throw new Error(error.message);
 }
 
 export async function createBonus(

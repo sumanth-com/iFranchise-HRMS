@@ -50,6 +50,7 @@ type TemplateFormInput = {
 type Props = {
   templates: TemplateItem[];
   permissionCodes: string[];
+  embedded?: boolean;
 };
 
 const SAMPLE_PLACEHOLDERS: Record<(typeof TEMPLATE_PLACEHOLDERS)[number], string> = {
@@ -333,7 +334,11 @@ function markersToTokens(text: string) {
   );
 }
 
-export function TemplatesManagement({ templates, permissionCodes }: Props) {
+export function TemplatesManagement({
+  templates,
+  permissionCodes,
+  embedded = false,
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
@@ -508,12 +513,16 @@ export function TemplatesManagement({ templates, permissionCodes }: Props) {
   return (
     <>
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Templates</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Create polished letter templates with live preview, placeholders, and quick editing.
-          </p>
-        </div>
+        {!embedded ? (
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Templates</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Create polished letter templates with live preview, placeholders, and quick editing.
+            </p>
+          </div>
+        ) : (
+          <div className="min-w-0 flex-1" />
+        )}
         {canManage ? (
           <Button onClick={openCreate}>
             <Plus className="mr-2 h-4 w-4" />

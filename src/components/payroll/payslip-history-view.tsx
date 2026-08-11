@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { format, parseISO } from "date-fns";
 import {
-  Archive,
   ChevronRight,
   Download,
   Eye,
@@ -18,8 +17,10 @@ import {
 import { toast } from "sonner";
 
 import { EmployeePayslipDrawer } from "@/components/employee/payroll/employee-payslip-drawer";
+import { EmployeeDetailPayslipDrawer } from "@/components/employees/employee-detail-payslip-drawer";
 import { Button, buttonVariants } from "@/components/common/button";
 import { Input } from "@/components/common/input";
+import { PayslipHistorySummaryCards } from "@/components/payroll/payslip-history-summary-cards";
 import {
   Select,
   SelectContent,
@@ -34,10 +35,7 @@ import {
   formatCurrency,
   formatPayrollMonthLabel,
 } from "@/lib/payroll/services/payroll-utils";
-import type {
-  PayslipHistoryResult,
-  PayslipListItem,
-} from "@/types/payroll";
+import type { PayslipHistoryResult, PayslipListItem } from "@/types/payroll";
 import { cn } from "@/lib/utils";
 
 const MONTHS = [
@@ -60,6 +58,8 @@ type Props = {
   mode: "employee" | "hr";
   basePath: string;
   currencyCode?: string;
+  /** When true, omits standalone page header (e.g. inside Team Payroll hub). */
+  embedded?: boolean;
 };
 
 function fmtDate(value: string | null | undefined): string {
@@ -69,6 +69,19 @@ function fmtDate(value: string | null | undefined): string {
   } catch {
     return "—";
   }
+}
+
+function getYearFilterLabel(value: string): string {
+  if (value === "all") return "Year";
+  if (value === "current") return "Current year";
+  if (value === "last") return "Last year";
+  return value;
+}
+
+function getMonthFilterLabel(value: string): string {
+  if (value === "all") return "Month";
+  const index = Number(value) - 1;
+  return MONTHS[index] ?? "Month";
 }
 
 function PayslipRowActions({
@@ -87,7 +100,10 @@ function PayslipRowActions({
     if (disabled) return;
     try {
       const response = await fetch(`/api/payslips/${row.id}/pdf`);
-      if (!response.ok) throw new Error("Download failed");
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+        throw new Error(payload?.message ?? "Download failed");
+      }
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
@@ -95,8 +111,8 @@ function PayslipRowActions({
       anchor.download = `Payslip-${row.payslipNumber}.pdf`;
       anchor.click();
       URL.revokeObjectURL(url);
-    } catch {
-      toast.error("Unable to download payslip PDF");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to download payslip PDF");
     }
   }
 
@@ -111,7 +127,11 @@ function PayslipRowActions({
         toast.error(result.message);
         return;
       }
-      toast.success("Payslip sent to registered email");
+      toast.success(
+        mode === "employee"
+          ? "Payslip sent to your registered email"
+          : "Payslip sent to employee's registered email",
+      );
     });
   }
 
@@ -186,10 +206,7 @@ function PayslipTable({
           {rows.map((row) => (
             <tr
               key={row.id}
-              className={cn(
-                "border-b last:border-0",
-                row.isArchived && "opacity-60",
-              )}
+              className={cn("border-b last:border-0", row.isArchived && "opacity-60")}
             >
               <td className="py-3 pr-3">
                 <div className="font-medium">{formatPayrollMonthLabel(row.payrollMonth)}</div>
@@ -241,12 +258,18 @@ function PayslipTable({
   );
 }
 
-export function PayslipHistoryView({ history, mode, basePath }: Props) {
+export function PayslipHistoryView({
+  history,
+  mode,
+  basePath,
+  embedded = false,
+}: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
   const [activePayslipId, setActivePayslipId] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [searchInput, setSearchInput] = useState(searchParams.get("search") ?? "");
 
   const currentYear = new Date().getFullYear();
   const yearOptions = useMemo(() => {
@@ -272,155 +295,158 @@ export function PayslipHistoryView({ history, mode, basePath }: Props) {
 
   const yearDefault =
     searchParams.get("yearFilter") ?? searchParams.get("year") ?? "all";
-  const monthDefault = searchParams.get("month") ?? "all";
+  const monthDefault = searchParams.get("month") || "all";
+  const hasActiveFilters =
+    Boolean(searchParams.get("search")) ||
+    yearDefault !== "all" ||
+    monthDefault !== "all";
 
   const underReview = history.data.find((row) => row.availability === "under_review");
 
   function openPreview(id: string) {
     setActivePayslipId(id);
-    setDrawerOpen(true);
+    setPreviewOpen(true);
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <History className="size-4" />
-            <span className="text-xs font-medium uppercase tracking-wide">
-              Payroll Archive
-            </span>
-          </div>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Payslip History</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Secure access to all salary statements issued during employment. Records are
-            permanently retained and never deleted.
-          </p>
-        </div>
-        {mode === "employee" ? (
-          <Link
-            href="/employee/payroll"
-            className={buttonVariants({ variant: "outline" })}
-          >
-            <ChevronRight className="mr-1 size-4 rotate-180" />
-            Back to Payroll
-          </Link>
-        ) : null}
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {[
-          { label: "Total Payslips", value: String(history.stats.totalPayslips) },
-          {
-            label: "Years Available",
-            value: String(history.stats.yearsAvailable.length || "—"),
-          },
-          {
-            label: "Latest Salary",
-            value:
-              history.stats.latestSalary != null
-                ? formatCurrency(history.stats.latestSalary)
-                : "—",
-          },
-          {
-            label: "Highest Salary",
-            value:
-              history.stats.highestSalary != null
-                ? formatCurrency(history.stats.highestSalary)
-                : "—",
-          },
-          {
-            label: "Latest Published",
-            value: fmtDate(history.stats.latestPublished),
-          },
-        ].map((stat) => (
-          <div
-            key={stat.label}
-            className="rounded-xl border bg-card px-4 py-3 shadow-sm"
-          >
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              {stat.label}
+    <div className="space-y-4">
+      {!embedded ? (
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <History className="size-4" />
+              <span className="text-xs font-medium uppercase tracking-wide">Payroll Archive</span>
+            </div>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Payslip History</h1>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              Secure access to all salary statements issued during employment. Records are
+              permanently retained and never deleted.
             </p>
-            <p className="mt-1 text-lg font-semibold tabular-nums">{stat.value}</p>
           </div>
-        ))}
-      </div>
+          {mode === "employee" ? (
+            <Link
+              href="/employee/payroll"
+              className={buttonVariants({ variant: "outline" })}
+            >
+              <ChevronRight className="mr-1 size-4 rotate-180" />
+              Back to Payroll
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
 
-      <div className="rounded-xl border bg-card p-4 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
-          <div className="relative min-w-[12rem] flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              className="pl-9"
-              placeholder="Search month, payslip number, year…"
-              defaultValue={searchParams.get("search") ?? ""}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  updateParams({ search: event.currentTarget.value || undefined });
+      <PayslipHistorySummaryCards stats={history.stats} mode={mode} />
+
+      <div
+        className={cn(
+          "sticky z-10 -mx-1 px-1",
+          embedded ? "top-0" : "top-0",
+        )}
+      >
+        <div
+          className="rounded-xl border bg-card/95 p-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/80"
+        >
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="relative min-w-[12rem] flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="pl-9"
+                placeholder="Search month, payslip number, year…"
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    updateParams({ search: searchInput.trim() || undefined });
+                  }
+                }}
+              />
+            </div>
+            <Select
+              value={yearDefault}
+              onValueChange={(value) => {
+                if (!value || value === "all" || value === "current" || value === "last") {
+                  updateParams({
+                    yearFilter: value === "current" || value === "last" ? value : undefined,
+                    year: undefined,
+                  });
+                } else {
+                  updateParams({ year: value, yearFilter: undefined });
                 }
               }}
-            />
-          </div>
-          <Select
-            defaultValue={yearDefault}
-            onValueChange={(value) => {
-              if (!value || value === "all" || value === "current" || value === "last") {
-                updateParams({
-                  yearFilter: value === "current" || value === "last" ? value : undefined,
-                  year: undefined,
-                });
-              } else {
-                updateParams({ year: value, yearFilter: undefined });
-              }
-            }}
-          >
-            <SelectTrigger className="w-full lg:w-40">
-              <SelectValue placeholder="Year" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Years</SelectItem>
-              <SelectItem value="current">Current Year</SelectItem>
-              <SelectItem value="last">Last Year</SelectItem>
-              {yearOptions.map((year) => (
-                <SelectItem key={year} value={String(year)}>
-                  {year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            defaultValue={monthDefault}
-            onValueChange={(value) => {
-              const month = value && value !== "all" ? value : undefined;
-              updateParams({ month });
-            }}
-          >
-            <SelectTrigger className="w-full lg:w-44">
-              <SelectValue placeholder="Month" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Months</SelectItem>
-              {MONTHS.map((label, index) => (
-                <SelectItem key={label} value={String(index + 1)}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {mode === "hr" ? (
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() =>
-                updateParams({
-                  includeArchived: searchParams.get("includeArchived") ? undefined : "true",
-                })
-              }
             >
-              <Archive className="size-4" />
-              {searchParams.get("includeArchived") ? "Hide Archived" : "Show Archived"}
-            </Button>
-          ) : null}
+              <SelectTrigger className="w-full lg:w-44">
+                <SelectValue placeholder="Year">
+                  {(value) => {
+                    const label = getYearFilterLabel(String(value ?? "all"));
+                    const isDefault = !value || value === "all";
+                    return (
+                      <span className={isDefault ? "text-muted-foreground" : undefined}>
+                        {label}
+                      </span>
+                    );
+                  }}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All years</SelectItem>
+                <SelectItem value="current">Current year</SelectItem>
+                <SelectItem value="last">Last year</SelectItem>
+                {yearOptions.map((year) => (
+                  <SelectItem key={year} value={String(year)}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={monthDefault}
+              onValueChange={(value) => {
+                const month = value && value !== "all" ? value : undefined;
+                updateParams({ month });
+              }}
+            >
+              <SelectTrigger className="w-full lg:w-44">
+                <SelectValue placeholder="Month">
+                  {(value) => {
+                    const label = getMonthFilterLabel(String(value ?? "all"));
+                    const isDefault = !value || value === "all";
+                    return (
+                      <span className={isDefault ? "text-muted-foreground" : undefined}>
+                        {label}
+                      </span>
+                    );
+                  }}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All months</SelectItem>
+                {MONTHS.map((label, index) => (
+                  <SelectItem key={label} value={String(index + 1)}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {hasActiveFilters ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                onClick={() => {
+                  setSearchInput("");
+                  updateParams({
+                    search: undefined,
+                    year: undefined,
+                    yearFilter: undefined,
+                    month: undefined,
+                  });
+                }}
+              >
+                Clear filters
+              </Button>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -495,11 +521,20 @@ export function PayslipHistoryView({ history, mode, basePath }: Props) {
         </div>
       ) : null}
 
-      <EmployeePayslipDrawer
-        payslipId={activePayslipId}
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-      />
+      {mode === "hr" ? (
+        <EmployeeDetailPayslipDrawer
+          payslipId={activePayslipId}
+          open={previewOpen}
+          onOpenChange={setPreviewOpen}
+          canEmail
+        />
+      ) : (
+        <EmployeePayslipDrawer
+          payslipId={activePayslipId}
+          open={previewOpen}
+          onOpenChange={setPreviewOpen}
+        />
+      )}
     </div>
   );
 }

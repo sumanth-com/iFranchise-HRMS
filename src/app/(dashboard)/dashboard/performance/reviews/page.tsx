@@ -30,6 +30,9 @@ export default async function ReviewsPage({ searchParams }: ReviewsPageProps) {
     reviewStage: rawParams.reviewStage,
   });
 
+  const openReview =
+    typeof rawParams.openReview === "string" ? rawParams.openReview : undefined;
+
   const [result, lookups] = await Promise.all([
     listReviews(supabase, profile, params),
     getPerformanceLookups(supabase, profile.employee.organizationId),
@@ -59,6 +62,7 @@ export default async function ReviewsPage({ searchParams }: ReviewsPageProps) {
         cycleId={params.cycleId}
         reviewStatus={params.reviewStatus}
         canApprove={canApprovePerformance(profile.permissionCodes)}
+        initialReviewId={openReview}
       />
     </div>
   );
