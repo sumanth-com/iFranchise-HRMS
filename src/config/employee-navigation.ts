@@ -6,6 +6,7 @@ import {
   LaptopMinimal,
   LayoutDashboard,
   Settings,
+  Target,
   UserRound,
   Users,
   Wallet,
@@ -55,6 +56,11 @@ export const employeeNavItems: NavigationItem[] = [
     href: EMPLOYEE_ROUTES.leave,
     icon: CalendarDays,
     permissions: ["leave.view"],
+  },
+  {
+    title: "My Goals",
+    href: EMPLOYEE_ROUTES.goals,
+    icon: Target,
   },
   {
     title: "Assets",

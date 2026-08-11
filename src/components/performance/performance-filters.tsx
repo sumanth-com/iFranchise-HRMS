@@ -7,7 +7,11 @@ import { Search } from "lucide-react";
 import { Input } from "@/components/common/input";
 import { EmployeeSelect, LabeledSelect } from "@/components/payroll/payroll-select";
 import { toSelectItems } from "@/components/payroll/select-utils";
+import { cn } from "@/lib/utils";
 import type { LookupOption } from "@/types/employee";
+
+const FILTER_TRIGGER = "h-9 w-full min-w-0";
+const FILTER_CONTENT = "min-w-[var(--radix-select-trigger-width)]";
 
 type PerformanceFiltersProps = {
   employees: LookupOption[];
@@ -23,6 +27,8 @@ type PerformanceFiltersProps = {
   searchPlaceholder?: string;
   extraFilters?: React.ReactNode;
   className?: string;
+  /** Aligned single-row filter bar (search + dropdowns same height). */
+  variant?: "default" | "bar";
 };
 
 export function PerformanceFilters({
@@ -39,6 +45,7 @@ export function PerformanceFilters({
   searchPlaceholder = "Search...",
   extraFilters,
   className,
+  variant = "default",
 }: PerformanceFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -57,65 +64,112 @@ export function PerformanceFilters({
     [router, searchParams, startTransition],
   );
 
+  const searchField = (
+    <div className="relative min-w-0">
+      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <Input
+        placeholder={searchPlaceholder}
+        defaultValue={search}
+        className="h-9 pl-9"
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            updateParams({ search: (event.target as HTMLInputElement).value || undefined });
+          }
+        }}
+      />
+    </div>
+  );
+
+  const employeeField = (
+    <EmployeeSelect
+      employees={[{ id: "all", label: "All employees" }, ...employees]}
+      value={employeeId ?? "all"}
+      onValueChange={(value) =>
+        updateParams({ employeeId: value === "all" ? undefined : value })
+      }
+      triggerClassName={FILTER_TRIGGER}
+      contentClassName={FILTER_CONTENT}
+    />
+  );
+
+  const departmentField = departments ? (
+    <LabeledSelect
+      items={[
+        { value: "all", label: "All departments" },
+        ...departments.map((d) => ({ value: d.id, label: d.label })),
+      ]}
+      value={departmentId ?? "all"}
+      onValueChange={(value) =>
+        updateParams({ departmentId: value === "all" ? undefined : value })
+      }
+      placeholder="All departments"
+      triggerClassName={FILTER_TRIGGER}
+      contentClassName={FILTER_CONTENT}
+    />
+  ) : null;
+
+  const cycleField = cycles ? (
+    <LabeledSelect
+      items={[
+        { value: "all", label: "All cycles" },
+        ...cycles.map((c) => ({ value: c.id, label: c.label })),
+      ]}
+      value={cycleId ?? "all"}
+      onValueChange={(value) =>
+        updateParams({ cycleId: value === "all" ? undefined : value })
+      }
+      placeholder="All cycles"
+      triggerClassName={FILTER_TRIGGER}
+      contentClassName={FILTER_CONTENT}
+    />
+  ) : null;
+
+  const statusField = statusItems ? (
+    <LabeledSelect
+      items={statusItems}
+      value={statusValue ?? "all"}
+      onValueChange={(value) =>
+        updateParams({ [statusKey]: value === "all" ? undefined : value })
+      }
+      placeholder="All statuses"
+      triggerClassName={FILTER_TRIGGER}
+      contentClassName={FILTER_CONTENT}
+    />
+  ) : null;
+
+  if (variant === "bar") {
+    return (
+      <div
+        className={cn(
+          "grid grid-cols-1 items-center gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,1.2fr)_repeat(4,minmax(10rem,1fr))]",
+          isPending && "opacity-70",
+          className,
+        )}
+      >
+        {searchField}
+        {employeeField}
+        {departmentField}
+        {cycleField}
+        {statusField}
+        {extraFilters}
+      </div>
+    );
+  }
+
   return (
     <div
-      className={`flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center ${isPending ? "opacity-70" : ""} ${className ?? ""}`}
+      className={cn(
+        "flex flex-col gap-3 lg:flex-row lg:items-center",
+        isPending && "opacity-70",
+        className,
+      )}
     >
-      <div className="relative lg:w-[18rem]">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder={searchPlaceholder}
-          defaultValue={search}
-          className="pl-9"
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              updateParams({ search: (event.target as HTMLInputElement).value || undefined });
-            }
-          }}
-        />
-      </div>
-      <div className="grid flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="min-w-[14rem]">
-          <EmployeeSelect
-            employees={[{ id: "all", label: "All employees" }, ...employees]}
-            value={employeeId ?? "all"}
-            onValueChange={(value) =>
-              updateParams({ employeeId: value === "all" ? undefined : value })
-            }
-            triggerClassName="h-9 w-full min-w-[14rem]"
-            contentClassName="min-w-[var(--radix-select-trigger-width)]"
-          />
-        </div>
-        {departments ? (
-          <LabeledSelect
-            items={[{ value: "all", label: "All departments" }, ...departments.map((d) => ({ value: d.id, label: d.label }))]}
-            value={departmentId ?? "all"}
-            onValueChange={(value) =>
-              updateParams({ departmentId: value === "all" ? undefined : value })
-            }
-            placeholder="Department"
-          />
-        ) : null}
-        {cycles ? (
-          <LabeledSelect
-            items={[{ value: "all", label: "All cycles" }, ...cycles.map((c) => ({ value: c.id, label: c.label }))]}
-            value={cycleId ?? "all"}
-            onValueChange={(value) =>
-              updateParams({ cycleId: value === "all" ? undefined : value })
-            }
-            placeholder="Review cycle"
-          />
-        ) : null}
-        {statusItems ? (
-          <LabeledSelect
-            items={statusItems}
-            value={statusValue ?? "all"}
-            onValueChange={(value) =>
-              updateParams({ [statusKey]: value === "all" ? undefined : value })
-            }
-            placeholder="Status"
-          />
-        ) : null}
+      <div className="relative w-full lg:w-[18rem] lg:shrink-0">{searchField}</div>
+      <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 items-center">
+        {employeeField}
+        {departmentField}
+        {cycleField}
+        {statusField}
         {extraFilters}
       </div>
     </div>

@@ -96,7 +96,9 @@ export function PerformanceTableShell({
   empty?: ReactNode;
   className?: string;
 }) {
-  if (empty) {
+  const hasTableContent = children != null && children !== false;
+
+  if (!hasTableContent && empty) {
     return (
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">{empty}</div>
     );

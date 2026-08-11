@@ -1,6 +1,7 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { PERFORMANCE_ROUTES } from "@/lib/performance/constants";
+import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { notifyEmployee } from "@/lib/notifications/services/notification-service";
 import type { UserProfile } from "@/types/auth";
 
@@ -59,11 +60,11 @@ export async function notifyPerformanceGoalAssigned(
     organizationId: profile.employee.organizationId,
     employeeId,
     title: "New goal assigned",
-    message: `Your manager assigned a new goal: ${goalTitle}.`,
+    message: `You have a new goal: ${goalTitle}.`,
     notificationType: "performance_goal_assigned",
     module: "performance",
     priority: "medium",
-    actionUrl: PERFORMANCE_ROUTES.goals,
+    actionUrl: EMPLOYEE_ROUTES.goals,
     sourceEventKey: `performance_goal_assigned:${goalId}:${employeeId}`,
     templateKey: "performance_goal_assigned",
     createdBy: profile.userId,

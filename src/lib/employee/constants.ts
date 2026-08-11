@@ -14,6 +14,7 @@ export const EMPLOYEE_ROUTES = {
   documents: "/employee/documents",
   profile: "/employee/profile",
   assets: "/employee/assets",
+  goals: "/employee/goals",
   notifications: "/employee/notifications",
   settings: "/employee/settings",
   help: "/employee/help",

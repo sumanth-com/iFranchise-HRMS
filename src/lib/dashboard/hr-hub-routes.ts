@@ -10,4 +10,5 @@ export const HR_HUB_ROUTES = {
   teamDocuments: "/dashboard/documents/team",
   myAssets: "/dashboard/assets",
   teamAssets: "/dashboard/assets/team",
+  myGoals: "/dashboard/my-goals",
 } as const;

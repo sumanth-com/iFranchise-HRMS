@@ -2,7 +2,7 @@
 
 import { format } from "date-fns";
 import { Eye, Loader2 } from "lucide-react";
-import { useMemo, useState, useTransition, useEffect, useCallback } from "react";
+import { useMemo, useState, useTransition, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,12 +20,10 @@ import {
   PerformancePagination,
 } from "@/components/performance/performance-filters";
 import {
-  GoalPriorityBadge,
   GoalStatusBadge,
 } from "@/components/performance/performance-status-badge";
 import {
   PerformanceTableShell,
-  ProgressBar,
   TableActions,
 } from "@/components/performance/performance-ui-primitives";
 import { EmployeeSelect, LabeledSelect } from "@/components/payroll/payroll-select";
@@ -280,8 +278,10 @@ export function GoalsTable({
   departmentId,
   cycleId,
   goalStatus,
-  canEdit = false,
   initialGoalId,
+  canManage = false,
+  categories = [],
+  onGoalsChanged,
 }: {
   records: GoalListItem[];
   total: number;
@@ -295,8 +295,10 @@ export function GoalsTable({
   departmentId?: string;
   cycleId?: string;
   goalStatus?: string;
-  canEdit?: boolean;
   initialGoalId?: string;
+  canManage?: boolean;
+  categories?: string[];
+  onGoalsChanged?: () => void;
 }) {
   const [viewId, setViewId] = useState<string | null>(initialGoalId ?? null);
 
@@ -309,7 +311,7 @@ export function GoalsTable({
       <div>
         <h2 className="text-sm font-semibold">Assigned goals</h2>
         <p className="text-xs text-muted-foreground">
-          Goals you assign appear here. Click View to open details in a popup.
+          Your assignment history appears here. Click View to open details in a popup.
         </p>
       </div>
 
@@ -325,6 +327,7 @@ export function GoalsTable({
         cycleId={cycleId}
         search={search}
         searchPlaceholder="Search assigned goals…"
+        variant="bar"
         className="rounded-lg border bg-muted/10 p-3"
       />
 
@@ -344,7 +347,6 @@ export function GoalsTable({
               <tr className="text-left text-muted-foreground">
                 <th className="px-3 py-2.5 font-medium">Employee</th>
                 <th className="px-3 py-2.5 font-medium">Goal</th>
-                <th className="px-3 py-2.5 font-medium">Progress</th>
                 <th className="px-3 py-2.5 font-medium">Key results</th>
                 <th className="px-3 py-2.5 font-medium">Status</th>
                 <th className="px-3 py-2.5 font-medium">Due</th>
@@ -360,10 +362,9 @@ export function GoalsTable({
                   </td>
                   <td className="px-3 py-2.5">
                     <div className="font-medium">{row.title}</div>
-                    <GoalPriorityBadge priority={row.goalPriority} />
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <ProgressBar value={row.currentProgress} />
+                    {row.category ? (
+                      <div className="text-xs text-muted-foreground">{row.category}</div>
+                    ) : null}
                   </td>
                   <td className="px-3 py-2.5 tabular-nums">
                     {row.completedMilestones}/{row.milestoneCount}
@@ -395,7 +396,10 @@ export function GoalsTable({
         goalId={viewId}
         open={!!viewId}
         onOpenChange={(open) => !open && setViewId(null)}
-        canEdit={canEdit}
+        variant="assigner"
+        canManage={canManage}
+        categories={categories}
+        onChanged={onGoalsChanged}
       />
     </div>
   );
@@ -403,22 +407,20 @@ export function GoalsTable({
 
 export function GoalsWorkspace({
   canCreate,
-  canEdit,
+  canManage,
   formProps,
   tableProps,
 }: {
   canCreate: boolean;
-  canEdit: boolean;
+  canManage: boolean;
   formProps: {
     employees: LookupOption[];
     categories: string[];
   };
-  tableProps: Omit<
-    Parameters<typeof GoalsTable>[0],
-    "canEdit"
-  >;
+  tableProps: Omit<Parameters<typeof GoalsTable>[0], never>;
 }) {
   const router = useRouter();
+  const skipServerSyncRef = useRef(false);
   const [listState, setListState] = useState({
     records: tableProps.records,
     total: tableProps.total,
@@ -432,6 +434,10 @@ export function GoalsWorkspace({
   });
 
   useEffect(() => {
+    if (skipServerSyncRef.current) {
+      skipServerSyncRef.current = false;
+      return;
+    }
     setListState({
       records: tableProps.records,
       total: tableProps.total,
@@ -459,9 +465,15 @@ export function GoalsWorkspace({
     const result = await fetchGoalsListAction({
       page: 1,
       pageSize: tableProps.pageSize,
+      assignedByMe: true,
     });
-    if (!result.success || !result.data) return;
+    if (!result.success) {
+      toast.error(result.message ?? "Could not refresh assigned goals");
+      return;
+    }
+    if (!result.data) return;
 
+    skipServerSyncRef.current = true;
     setListState({
       records: result.data.data,
       total: result.data.total,
@@ -495,7 +507,9 @@ export function GoalsWorkspace({
           departmentId={listState.departmentId}
           cycleId={listState.cycleId}
           goalStatus={listState.goalStatus}
-          canEdit={canEdit}
+          canManage={canManage}
+          categories={formProps.categories}
+          onGoalsChanged={refreshAssignedGoals}
         />
       </div>
     </section>

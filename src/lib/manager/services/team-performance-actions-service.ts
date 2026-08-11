@@ -13,7 +13,6 @@ import {
 } from "@/lib/performance/services/performance-mutations";
 import {
   notifyPerformanceFeedbackAdded,
-  notifyPerformanceGoalAssigned,
   notifyPerformanceOneOnOneScheduled,
   notifyPerformanceReviewDue,
   notifyPerformanceReviewPublished,
@@ -82,13 +81,6 @@ export async function createTeamPerformanceGoal(
   const parsed = goalFormSchema.parse(input);
   assertTeamMember(teamIds, parsed.employeeId);
   const goalId = await createGoal(supabase, profile, parsed);
-  await notifyPerformanceGoalAssigned(
-    supabase,
-    profile,
-    parsed.employeeId,
-    goalId,
-    parsed.title,
-  );
   return { success: true as const, message: "Goal created.", data: goalId };
 }
 

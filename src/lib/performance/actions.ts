@@ -19,6 +19,7 @@ import {
   createOneOnOne,
   createPromotion,
   createReview,
+  deleteGoal,
   getGoalById,
   getOneOnOneById,
   getReviewById,
@@ -48,6 +49,7 @@ import {
 import {
   feedbackFormSchema,
   goalCommentSchema,
+  goalDeleteSchema,
   goalFormSchema,
   goalMilestoneToggleSchema,
   goalProgressSchema,
@@ -187,7 +189,7 @@ export async function updateGoalAction(
   input: unknown,
 ): Promise<PerformanceActionResult<void>> {
   try {
-    const profile = await requireServerPermission("performance.edit");
+    const profile = await requireServerAnyPermission(["performance.edit", "performance.create"]);
     const supabase = await getAuthenticatedSupabase();
     const parsed = goalUpdateSchema.parse(input);
     const { goalId, ...goalInput } = parsed;
@@ -198,6 +200,24 @@ export async function updateGoalAction(
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to update goal",
+    };
+  }
+}
+
+export async function deleteGoalAction(
+  input: unknown,
+): Promise<PerformanceActionResult<void>> {
+  try {
+    const profile = await requireServerAnyPermission(["performance.edit", "performance.create"]);
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = goalDeleteSchema.parse(input);
+    await deleteGoal(supabase, profile, parsed.goalId);
+    revalidatePerformancePaths();
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to delete goal",
     };
   }
 }

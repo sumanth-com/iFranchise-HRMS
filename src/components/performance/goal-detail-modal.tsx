@@ -11,6 +11,7 @@ import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/common/modal";
 import { PerformanceConfirmModal } from "@/components/performance/performance-confirm-modal";
+import { buildStatusItems } from "@/components/performance/performance-filters";
 import {
   GoalPriorityBadge,
   GoalStatusBadge,
@@ -19,37 +20,78 @@ import {
   DetailField,
   DetailGrid,
   PerformanceSection,
-  ProgressBar,
 } from "@/components/performance/performance-ui-primitives";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { toSelectItems } from "@/components/payroll/select-utils";
 import {
   addGoalCommentAction,
+  deleteGoalAction,
   fetchGoalDetailAction,
   toggleGoalMilestoneAction,
+  updateGoalAction,
   updateGoalProgressAction,
 } from "@/lib/performance/actions";
-import { GOAL_STATUS_LABELS } from "@/lib/performance/constants";
-import type { GoalDetail } from "@/types/performance";
+import { GOAL_PRIORITY_LABELS, GOAL_STATUS_LABELS } from "@/lib/performance/constants";
+import type { GoalDetail, GoalPriority, GoalStatus } from "@/types/performance";
 
-const statusItems = toSelectItems(GOAL_STATUS_LABELS);
+const statusItems = buildStatusItems(GOAL_STATUS_LABELS);
+const priorityItems = toSelectItems(GOAL_PRIORITY_LABELS);
+
+type MilestoneToggleInput = {
+  goalId: string;
+  milestoneId: string;
+  isCompleted: boolean;
+};
 
 type Props = {
   goalId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   canEdit?: boolean;
+  /** HR assigner history: read-only summary. Employee: own goals with key-result updates. */
+  variant?: "default" | "assigner" | "employee";
+  fetchDetail?: (goalId: string) => Promise<GoalDetail | null>;
+  toggleMilestone?: (input: MilestoneToggleInput) => Promise<{ success: boolean; message?: string }>;
+  canManage?: boolean;
+  categories?: string[];
+  onChanged?: () => void;
 };
 
-export function GoalDetailModal({ goalId, open, onOpenChange, canEdit = false }: Props) {
+export function GoalDetailModal({
+  goalId,
+  open,
+  onOpenChange,
+  canEdit = false,
+  variant = "default",
+  fetchDetail = fetchGoalDetailAction,
+  toggleMilestone,
+  canManage = false,
+  categories = [],
+  onChanged,
+}: Props) {
   const router = useRouter();
   const [detail, setDetail] = useState<GoalDetail | null>(null);
   const [loading, setLoading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [status, setStatus] = useState<string>("not_started");
-  const [comment, setComment] = useState("");
+  const [editing, setEditing] = useState(false);
   const [confirmComplete, setConfirmComplete] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: "",
+    description: "",
+    category: "",
+    goalPriority: "medium" as GoalPriority,
+    weightage: 0,
+    dueDate: "",
+    goalStatus: "not_started" as GoalStatus,
+  });
   const [isPending, startTransition] = useTransition();
+
+  const isAssigner = variant === "assigner";
+  const isEmployee = variant === "employee";
+  const showProgressControls = variant === "default" && canEdit;
+  const showComments = variant === "default" && canEdit;
+  const canToggleMilestones =
+    (isEmployee && canEdit) || (variant === "default" && canEdit);
 
   useEffect(() => {
     if (!open || !goalId) {
@@ -59,66 +101,189 @@ export function GoalDetailModal({ goalId, open, onOpenChange, canEdit = false }:
 
     let cancelled = false;
     setLoading(true);
-    fetchGoalDetailAction(goalId).then((data) => {
+    fetchDetail(goalId).then((data) => {
       if (cancelled) return;
       setDetail(data);
       if (data) {
-        setProgress(data.currentProgress);
-        setStatus(data.goalStatus);
+        setEditForm({
+          title: data.title,
+          description: data.description ?? "",
+          category: data.category ?? "",
+          goalPriority: data.goalPriority,
+          weightage: data.weightage,
+          dueDate: data.dueDate ?? "",
+          goalStatus: data.goalStatus,
+        });
       }
+      setEditing(false);
       setLoading(false);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [open, goalId]);
+  }, [open, goalId, fetchDetail]);
 
   function refreshDetail() {
     if (!goalId) return;
-    fetchGoalDetailAction(goalId).then((data) => {
+    fetchDetail(goalId).then((data) => {
       setDetail(data);
       if (data) {
-        setProgress(data.currentProgress);
-        setStatus(data.goalStatus);
+        setEditForm({
+          title: data.title,
+          description: data.description ?? "",
+          category: data.category ?? "",
+          goalPriority: data.goalPriority,
+          weightage: data.weightage,
+          dueDate: data.dueDate ?? "",
+          goalStatus: data.goalStatus,
+        });
       }
       router.refresh();
+      onChanged?.();
     });
   }
 
-  function saveProgress(markComplete = false) {
-    if (!goalId) return;
+  function handleToggleMilestone(milestoneId: string, isCompleted: boolean) {
+    if (!goalId || !detail) return;
     startTransition(async () => {
-      const result = await updateGoalProgressAction({
-        goalId,
-        currentProgress: markComplete ? 100 : progress,
-        goalStatus: markComplete ? "completed" : status,
+      const toggleFn = toggleMilestone ?? toggleGoalMilestoneAction;
+      const result = await toggleFn({
+        goalId: detail.id,
+        milestoneId,
+        isCompleted,
+      });
+      if (!result.success) {
+        toast.error(result.message ?? "Failed to update key result");
+        return;
+      }
+      refreshDetail();
+    });
+  }
+
+  function saveEdit() {
+    if (!detail) return;
+    startTransition(async () => {
+      const result = await updateGoalAction({
+        goalId: detail.id,
+        employeeId: detail.employeeId,
+        title: editForm.title.trim(),
+        description: editForm.description.trim() || undefined,
+        category: editForm.category || undefined,
+        goalPriority: editForm.goalPriority,
+        weightage: editForm.weightage,
+        dueDate: editForm.dueDate || null,
+        goalStatus: editForm.goalStatus,
+        currentProgress: detail.currentProgress,
+        milestones: [],
       });
       if (!result.success) {
         toast.error(result.message);
         return;
       }
-      toast.success(markComplete ? "Goal marked complete" : "Progress updated");
+      toast.success("Goal updated");
+      setEditing(false);
+      refreshDetail();
+    });
+  }
+
+  function handleDelete() {
+    if (!detail) return;
+    startTransition(async () => {
+      const result = await deleteGoalAction({ goalId: detail.id });
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+      toast.success("Goal deleted");
+      setConfirmDelete(false);
+      onOpenChange(false);
+      onChanged?.();
+      router.refresh();
+    });
+  }
+
+  function markComplete() {
+    if (!goalId) return;
+    startTransition(async () => {
+      const result = await updateGoalProgressAction({
+        goalId,
+        currentProgress: 100,
+        goalStatus: "completed",
+      });
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+      toast.success("Goal marked complete");
       setConfirmComplete(false);
       refreshDetail();
     });
   }
+
+  const categoryItems =
+    categories.length > 0
+      ? categories.map((c) => ({ value: c, label: c }))
+      : [{ value: "General", label: "General" }];
+
+  const modalTitle = editing ? "Edit goal" : detail?.title ?? "Goal details";
+  const modalDescription = isEmployee
+    ? detail?.category
+      ? `${detail.category} goal`
+      : "Your assigned goal"
+    : detail
+      ? `${detail.employeeName} · ${detail.departmentName ?? "No department"}`
+      : "Loading goal information";
 
   return (
     <>
       <Modal
         open={open}
         onOpenChange={onOpenChange}
-        title={detail?.title ?? "Goal details"}
-        description={
-          detail
-            ? `${detail.employeeName} · ${detail.departmentName ?? "No department"}`
-            : "Loading goal information"
-        }
+        title={modalTitle}
+        description={modalDescription}
         contentClassName="sm:max-w-2xl"
         showCancel={false}
         footer={
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+          isAssigner && canManage && detail ? (
+            <div className="flex w-full flex-wrap items-center justify-between gap-2">
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={isPending || editing}
+                onClick={() => setConfirmDelete(true)}
+              >
+                Delete
+              </Button>
+              <div className="flex flex-wrap gap-2">
+                {editing ? (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isPending}
+                      onClick={() => setEditing(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button size="sm" disabled={isPending} onClick={saveEdit}>
+                      {isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                      Save changes
+                    </Button>
+                  </>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                    Edit
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+          )
         }
       >
         {loading ? (
@@ -132,79 +297,135 @@ export function GoalDetailModal({ goalId, open, onOpenChange, canEdit = false }:
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
               <GoalStatusBadge status={detail.goalStatus} />
-              <GoalPriorityBadge priority={detail.goalPriority} />
+              {variant === "default" ? (
+                <GoalPriorityBadge priority={detail.goalPriority} />
+              ) : null}
             </div>
 
-            <PerformanceSection title="Overview">
-              <DetailGrid>
-                <DetailField label="Employee" value={detail.employeeName} />
-                <DetailField label="Employee code" value={detail.employeeCode} />
-                <DetailField label="Cycle" value={detail.cycleName ?? "—"} />
-                <DetailField
-                  label="Due date"
-                  value={
-                    detail.dueDate ? format(new Date(detail.dueDate), "MMM d, yyyy") : "—"
-                  }
-                />
-                <DetailField label="Category" value={detail.category ?? "—"} />
-                <DetailField label="Weightage" value={`${detail.weightage}%`} />
-              </DetailGrid>
-              {detail.description ? (
-                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                  {detail.description}
-                </p>
-              ) : null}
-            </PerformanceSection>
-
-            <PerformanceSection title="Progress">
-              <ProgressBar value={detail.currentProgress} />
-              {canEdit ? (
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <PerformanceSection title="Details">
+              {editing && isAssigner ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label className="text-xs">Goal title</Label>
+                    <Input
+                      value={editForm.title}
+                      disabled={isPending}
+                      onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label className="text-xs">Description</Label>
+                    <textarea
+                      className="flex min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      value={editForm.description}
+                      disabled={isPending}
+                      onChange={(e) =>
+                        setEditForm((f) => ({ ...f, description: e.target.value }))
+                      }
+                    />
+                  </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Progress %</Label>
+                    <Label className="text-xs">Category</Label>
+                    <LabeledSelect
+                      items={categoryItems}
+                      value={editForm.category}
+                      onValueChange={(v) => setEditForm((f) => ({ ...f, category: v }))}
+                      disabled={isPending}
+                      triggerClassName="h-9 w-full"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Priority</Label>
+                    <LabeledSelect
+                      items={priorityItems}
+                      value={editForm.goalPriority}
+                      onValueChange={(v) =>
+                        setEditForm((f) => ({ ...f, goalPriority: v as GoalPriority }))
+                      }
+                      disabled={isPending}
+                      triggerClassName="h-9 w-full"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Weight %</Label>
                     <Input
                       type="number"
                       min={0}
                       max={100}
-                      value={progress}
+                      value={editForm.weightage}
                       disabled={isPending}
-                      onChange={(e) => setProgress(Number(e.target.value))}
+                      onChange={(e) =>
+                        setEditForm((f) => ({ ...f, weightage: Number(e.target.value) }))
+                      }
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Status</Label>
-                    <LabeledSelect
-                      items={statusItems}
-                      value={status}
-                      onValueChange={setStatus}
+                    <Label className="text-xs">Due date</Label>
+                    <Input
+                      type="date"
+                      value={editForm.dueDate}
                       disabled={isPending}
+                      onChange={(e) => setEditForm((f) => ({ ...f, dueDate: e.target.value }))}
                     />
                   </div>
-                  <div className="flex flex-wrap gap-2 sm:col-span-2">
-                    <Button
-                      size="sm"
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label className="text-xs">Status</Label>
+                    <LabeledSelect
+                      items={statusItems.filter((item) => item.value !== "all")}
+                      value={editForm.goalStatus}
+                      onValueChange={(v) =>
+                        setEditForm((f) => ({ ...f, goalStatus: v as GoalStatus }))
+                      }
                       disabled={isPending}
-                      onClick={() => saveProgress(false)}
-                    >
-                      {isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-                      Save progress
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={isPending}
-                      onClick={() => setConfirmComplete(true)}
-                    >
-                      Mark complete
-                    </Button>
+                      triggerClassName="h-9 w-full"
+                    />
                   </div>
                 </div>
-              ) : null}
+              ) : (
+                <>
+                  <DetailGrid>
+                    {!isEmployee ? (
+                      <>
+                        <DetailField label="Employee" value={detail.employeeName} />
+                        <DetailField label="Employee code" value={detail.employeeCode} />
+                      </>
+                    ) : null}
+                    <DetailField label="Category" value={detail.category ?? "—"} />
+                    <DetailField
+                      label="Priority"
+                      value={GOAL_PRIORITY_LABELS[detail.goalPriority]}
+                    />
+                    <DetailField label="Weightage" value={`${detail.weightage}%`} />
+                    <DetailField
+                      label="Due date"
+                      value={
+                        detail.dueDate ? format(new Date(detail.dueDate), "MMM d, yyyy") : "—"
+                      }
+                    />
+                    {!isAssigner && !isEmployee ? (
+                      <DetailField label="Review cycle" value={detail.cycleName ?? "—"} />
+                    ) : null}
+                    <DetailField
+                      label="Assigned on"
+                      value={format(new Date(detail.createdAt), "MMM d, yyyy")}
+                    />
+                  </DetailGrid>
+                  {detail.description ? (
+                    <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                      {detail.description}
+                    </p>
+                  ) : null}
+                </>
+              )}
             </PerformanceSection>
 
             <PerformanceSection
               title="Key results"
-              description="Track milestone completion for this objective."
+              description={
+                isEmployee
+                  ? "Mark key results as you complete them."
+                  : "Milestones linked to this goal."
+              }
             >
               {detail.milestones.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No key results defined.</p>
@@ -213,7 +434,7 @@ export function GoalDetailModal({ goalId, open, onOpenChange, canEdit = false }:
                   {detail.milestones.map((milestone) => (
                     <li
                       key={milestone.id}
-                      className="flex items-start justify-between gap-3 rounded-md border bg-background px-3 py-2"
+                      className="flex items-start justify-between gap-3 rounded-md border bg-background px-3 py-2.5"
                     >
                       <div className="min-w-0">
                         <p className="text-sm font-medium">{milestone.title}</p>
@@ -223,27 +444,19 @@ export function GoalDetailModal({ goalId, open, onOpenChange, canEdit = false }:
                           </p>
                         ) : null}
                       </div>
-                      {canEdit ? (
+                      {canToggleMilestones ? (
                         <Button
                           size="sm"
                           variant={milestone.isCompleted ? "default" : "outline"}
                           disabled={isPending}
                           onClick={() =>
-                            startTransition(async () => {
-                              const result = await toggleGoalMilestoneAction({
-                                goalId: detail.id,
-                                milestoneId: milestone.id,
-                                isCompleted: !milestone.isCompleted,
-                              });
-                              if (!result.success) toast.error(result.message);
-                              else refreshDetail();
-                            })
+                            handleToggleMilestone(milestone.id, !milestone.isCompleted)
                           }
                         >
                           <Check className="size-3.5" />
                         </Button>
                       ) : (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs font-medium text-muted-foreground">
                           {milestone.isCompleted ? "Done" : "Open"}
                         </span>
                       )}
@@ -253,40 +466,28 @@ export function GoalDetailModal({ goalId, open, onOpenChange, canEdit = false }:
               )}
             </PerformanceSection>
 
-            {canEdit ? (
-              <PerformanceSection title="Add comment">
-                <div className="space-y-2">
-                  <Input
-                    placeholder="Add a note about this goal…"
-                    value={comment}
-                    disabled={isPending}
-                    onChange={(e) => setComment(e.target.value)}
-                  />
+            {showProgressControls ? (
+              <PerformanceSection title="Progress management">
+                <div className="flex flex-wrap gap-2">
                   <Button
                     size="sm"
-                    disabled={isPending || !comment.trim()}
-                    onClick={() =>
-                      startTransition(async () => {
-                        const result = await addGoalCommentAction({
-                          goalId: detail.id,
-                          comment: comment.trim(),
-                        });
-                        if (!result.success) toast.error(result.message);
-                        else {
-                          setComment("");
-                          toast.success("Comment added");
-                          refreshDetail();
-                        }
-                      })
-                    }
+                    variant="outline"
+                    disabled={isPending}
+                    onClick={() => setConfirmComplete(true)}
                   >
-                    Add comment
+                    Mark complete
                   </Button>
                 </div>
               </PerformanceSection>
             ) : null}
 
-            {detail.comments.length > 0 ? (
+            {showComments ? (
+              <PerformanceSection title="Comments">
+                <EmployeeGoalComments goalId={detail.id} isPending={isPending} onAdded={refreshDetail} />
+              </PerformanceSection>
+            ) : null}
+
+            {variant === "default" && detail.comments.length > 0 ? (
               <PerformanceSection title="Activity">
                 <ul className="space-y-3">
                   {detail.comments.map((c) => (
@@ -300,13 +501,6 @@ export function GoalDetailModal({ goalId, open, onOpenChange, canEdit = false }:
                 </ul>
               </PerformanceSection>
             ) : null}
-
-            <DetailGrid columns={1}>
-              <DetailField
-                label="Created"
-                value={format(new Date(detail.createdAt), "MMM d, yyyy")}
-              />
-            </DetailGrid>
           </div>
         )}
       </Modal>
@@ -315,11 +509,66 @@ export function GoalDetailModal({ goalId, open, onOpenChange, canEdit = false }:
         open={confirmComplete}
         onOpenChange={setConfirmComplete}
         title="Mark goal complete?"
-        description="This will set progress to 100% and status to completed."
+        description="This will set status to completed."
         confirmLabel="Mark complete"
         isPending={isPending}
-        onConfirm={() => saveProgress(true)}
+        onConfirm={markComplete}
+      />
+
+      <PerformanceConfirmModal
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Delete this goal?"
+        description="The employee will no longer see this assigned goal."
+        confirmLabel="Delete goal"
+        isPending={isPending}
+        onConfirm={handleDelete}
       />
     </>
+  );
+}
+
+function EmployeeGoalComments({
+  goalId,
+  isPending: parentPending,
+  onAdded,
+}: {
+  goalId: string;
+  isPending: boolean;
+  onAdded: () => void;
+}) {
+  const [comment, setComment] = useState("");
+  const [isPending, startTransition] = useTransition();
+
+  return (
+    <div className="space-y-2">
+      <textarea
+        className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+        placeholder="Add a note about this goal…"
+        value={comment}
+        disabled={isPending || parentPending}
+        onChange={(e) => setComment(e.target.value)}
+      />
+      <Button
+        size="sm"
+        disabled={isPending || parentPending || !comment.trim()}
+        onClick={() => {
+          startTransition(async () => {
+            const result = await addGoalCommentAction({
+              goalId,
+              comment: comment.trim(),
+            });
+            if (!result.success) toast.error(result.message);
+            else {
+              setComment("");
+              toast.success("Comment added");
+              onAdded();
+            }
+          });
+        }}
+      >
+        Add comment
+      </Button>
+    </div>
   );
 }

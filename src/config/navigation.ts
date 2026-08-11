@@ -85,6 +85,13 @@ export const mainNavItems: NavigationItem[] = [
     permissions: ["leave.view"],
   },
   {
+    title: "My Goals",
+    href: HR_HUB_ROUTES.myGoals,
+    icon: Target,
+    section: "Self-service",
+    permissions: ["performance.view"],
+  },
+  {
     title: "Assets",
     href: HR_HUB_ROUTES.myAssets,
     icon: LaptopMinimal,

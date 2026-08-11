@@ -15,6 +15,8 @@ export const goalListParamsSchema = performanceListParamsSchema.extend({
     .enum(["draft", "not_started", "in_progress", "on_track", "at_risk", "completed", "cancelled"])
     .optional(),
   goalPriority: z.enum(["low", "medium", "high", "critical"]).optional(),
+  /** When true, only goals created by the current user (assigner history). */
+  assignedByMe: z.coerce.boolean().optional(),
 });
 
 export const goalFormSchema = z.object({
@@ -63,6 +65,10 @@ export const goalMilestoneToggleSchema = z.object({
 });
 
 export const goalUpdateSchema = goalFormSchema.extend({
+  goalId: z.string().uuid(),
+});
+
+export const goalDeleteSchema = z.object({
   goalId: z.string().uuid(),
 });
 

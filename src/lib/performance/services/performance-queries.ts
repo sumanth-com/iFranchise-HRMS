@@ -309,8 +309,17 @@ export async function listGoals(
   params: unknown,
 ): Promise<GoalListResult> {
   const parsed = goalListParamsSchema.parse(params);
-  const { page, pageSize, search, employeeId, departmentId, cycleId, goalStatus, goalPriority } =
-    parsed;
+  const {
+    page,
+    pageSize,
+    search,
+    employeeId,
+    departmentId,
+    cycleId,
+    goalStatus,
+    goalPriority,
+    assignedByMe,
+  } = parsed;
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
   const organizationId = profile.employee.organizationId;
@@ -347,6 +356,7 @@ export async function listGoals(
   if (goalStatus) query = query.eq("goal_status", goalStatus);
   if (goalPriority) query = query.eq("goal_priority", goalPriority);
   if (departmentId) query = query.eq("employees.department_id", departmentId);
+  if (assignedByMe) query = query.eq("created_by", profile.userId);
 
   const { data, error, count } = await query;
   if (error) throw new Error(error.message);

@@ -13,6 +13,7 @@ import {
   unwrapRelation,
 } from "@/lib/performance/services/performance-utils";
 import { PERFORMANCE_ROUTES } from "@/lib/performance/constants";
+import { notifyPerformanceGoalAssigned } from "@/lib/performance/services/performance-notifications";
 import { notifyEmployee } from "@/lib/notifications/services/notification-service";
 import type { z } from "zod";
 
@@ -61,6 +62,18 @@ export async function createGoal(
         })),
       );
     if (milestoneError) throw new Error(milestoneError.message);
+  }
+
+  try {
+    await notifyPerformanceGoalAssigned(
+      supabase,
+      profile,
+      parsed.employeeId,
+      data.id,
+      parsed.title,
+    );
+  } catch (notifyError) {
+    console.error("[createGoal] goal assigned notification failed:", notifyError);
   }
 
   return data.id;
@@ -157,6 +170,19 @@ export async function updateGoal(
     .eq("organization_id", profile.employee.organizationId);
 
   if (error) throw new Error(error.message);
+}
+
+export async function deleteGoal(
+  supabase: AuthSupabaseClient,
+  _profile: UserProfile,
+  goalId: string,
+): Promise<void> {
+  const { data, error } = await supabase.schema("hrms").rpc("soft_delete_performance_goal", {
+    p_goal_id: goalId,
+  });
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Goal not found or already deleted.");
 }
 
 export async function saveReviewDraft(

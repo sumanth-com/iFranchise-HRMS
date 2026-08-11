@@ -33,7 +33,7 @@ export default async function GoalsPage({ searchParams }: GoalsPageProps) {
     typeof rawParams.openGoal === "string" ? rawParams.openGoal : undefined;
 
   const [result, lookups, settings] = await Promise.all([
-    listGoals(supabase, profile, params),
+    listGoals(supabase, profile, { ...params, assignedByMe: true }),
     getPerformanceLookups(supabase, profile.employee.organizationId),
     getPerformanceSettings(supabase, profile.employee.organizationId),
   ]);
@@ -49,7 +49,10 @@ export default async function GoalsPage({ searchParams }: GoalsPageProps) {
 
       <GoalsWorkspace
         canCreate={canCreatePerformance(profile.permissionCodes)}
-        canEdit={canEditPerformance(profile.permissionCodes)}
+        canManage={
+          canEditPerformance(profile.permissionCodes) ||
+          canCreatePerformance(profile.permissionCodes)
+        }
         formProps={{
           employees: lookups.employees,
           categories: settings.settings.goalCategories,
