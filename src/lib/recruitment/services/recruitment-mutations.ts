@@ -22,6 +22,7 @@ import {
   notifyOfferStatus,
 } from "@/lib/recruitment/services/recruitment-notifications";
 import {
+  deliverInterviewInviteEmail,
   deliverOfferEmailToCandidate,
   loadOfferEmailContext,
 } from "@/lib/recruitment/services/recruitment-offer-email";
@@ -403,7 +404,7 @@ export async function scheduleInterview(
   const organizationId = profile.employee.organizationId;
 
   const { data: candidate, error: candError } = await fromHrms(supabase, "recruitment_candidates")
-    .select("id, job_opening_id, first_name, last_name")
+    .select("id, job_opening_id, first_name, last_name, email")
     .eq("id", input.candidateId)
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
@@ -452,6 +453,19 @@ export async function scheduleInterview(
     input.roundName,
     `${input.interviewDate} ${input.interviewTime}`,
   );
+
+  const emailSubject = input.emailSubject?.trim() ?? "";
+  const emailMessage = input.emailMessage?.trim() ?? "";
+  if (emailSubject && emailMessage && candidate.email) {
+    const emailResult = await deliverInterviewInviteEmail({
+      to: candidate.email,
+      subject: emailSubject,
+      messageText: emailMessage,
+    });
+    if (!emailResult.delivered) {
+      console.error("[recruitment] interview invite email failed", emailResult.error);
+    }
+  }
 
   return data.id;
 }

@@ -1,18 +1,7 @@
-import { EmploymentTypesManagement } from "@/components/organization/employment-types-management";
-import { ORGANIZATION_VIEW_PERMISSIONS } from "@/lib/organization/constants";
-import { listEmploymentTypes } from "@/lib/organization/services/org-queries";
-import { requireServerAnyPermission } from "@/lib/permissions/server";
-import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
-export default async function EmploymentTypesPage() {
-  const profile = await requireServerAnyPermission([...ORGANIZATION_VIEW_PERMISSIONS]);
-  const supabase = await createClient();
-  const items = await listEmploymentTypes(supabase, profile.employee.organizationId);
+import { ORGANIZATION_ROUTES } from "@/lib/organization/constants";
 
-  return (
-    <EmploymentTypesManagement
-      items={items}
-      permissionCodes={profile.permissionCodes}
-    />
-  );
+export default function EmploymentTypesPage() {
+  redirect(ORGANIZATION_ROUTES.designations);
 }

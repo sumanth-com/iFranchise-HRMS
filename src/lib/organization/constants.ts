@@ -19,15 +19,11 @@ export const ORGANIZATION_ROUTES = {
 } as const;
 
 export const ORGANIZATION_SUB_NAV = [
-  { title: "Dashboard", href: ORGANIZATION_ROUTES.dashboard },
   { title: "Company Profile", href: ORGANIZATION_ROUTES.profile },
   { title: "Branches", href: ORGANIZATION_ROUTES.branches },
   { title: "Departments", href: ORGANIZATION_ROUTES.departments },
   { title: "Designations", href: ORGANIZATION_ROUTES.designations },
-  { title: "Employment Types", href: ORGANIZATION_ROUTES.employmentTypes },
-  { title: "Work Locations", href: ORGANIZATION_ROUTES.workLocations },
   { title: "Holidays", href: ORGANIZATION_ROUTES.holidays },
-  { title: "Shift Templates", href: ORGANIZATION_ROUTES.shifts },
   { title: "Hierarchy", href: ORGANIZATION_ROUTES.hierarchy },
 ] as const;
 

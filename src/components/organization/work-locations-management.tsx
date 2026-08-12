@@ -10,7 +10,11 @@ import { toast } from "sonner";
 import type { z } from "zod";
 
 import { Button } from "@/components/common/button";
-import { DataTable, type DataTableColumn } from "@/components/common/data-table";
+import {
+  DATA_TABLE_SPLIT_SCROLL_MAX_HEIGHT,
+  DataTable,
+  type DataTableColumn,
+} from "@/components/common/data-table";
 import { EmptyState } from "@/components/common/empty-state";
 import { FilterSelect } from "@/components/common/filter-select";
 import { Input } from "@/components/common/input";
@@ -39,6 +43,11 @@ type Props = {
   permissionCodes: string[];
   search: string;
   status?: RecordStatus;
+  embedded?: boolean;
+  sectionScrollable?: boolean;
+  pageParam?: string;
+  searchParam?: string;
+  statusParam?: string;
 };
 
 const emptyForm: WorkLocationFormInput = {
@@ -58,12 +67,19 @@ export function WorkLocationsManagement({
   permissionCodes,
   search,
   status,
+  embedded = false,
+  sectionScrollable = false,
+  pageParam = "page",
+  searchParam = "search",
+  statusParam = "status",
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const [isDeletePending, startDeleteTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<WorkLocationListItem | null>(null);
+  const [deleting, setDeleting] = useState<WorkLocationListItem | null>(null);
 
   const canCreate = canCreateOrganization(permissionCodes);
   const canEdit = canEditOrganization(permissionCodes);
@@ -95,10 +111,18 @@ export function WorkLocationsManagement({
   function updateParams(patch: Record<string, string | undefined>) {
     const params = new URLSearchParams(searchParams.toString());
     Object.entries(patch).forEach(([key, value]) => {
-      if (!value || value === "all") params.delete(key);
-      else params.set(key, value);
+      const paramKey =
+        key === "page"
+          ? pageParam
+          : key === "search"
+            ? searchParam
+            : key === "status"
+              ? statusParam
+              : key;
+      if (!value || value === "all") params.delete(paramKey);
+      else params.set(paramKey, value);
     });
-    if (!patch.page) params.delete("page");
+    if (!patch.page) params.delete(pageParam);
     startTransition(() => {
       router.push(`?${params.toString()}`);
     });
@@ -166,21 +190,23 @@ type WorkingDay = WorkLocationFormInput["workingDays"][number];
     });
   }
 
-  const onDelete = useCallback(
-    (item: WorkLocationListItem) => {
-      if (!window.confirm(`Delete work location "${item.name}"?`)) return;
-      startTransition(async () => {
-        const res = await deleteWorkLocationAction(item.id);
-        if (!res.success) {
-          toast.error(res.message);
-          return;
-        }
-        toast.success("Work location deleted");
-        router.refresh();
-      });
-    },
-    [router],
-  );
+  const requestDelete = useCallback((item: WorkLocationListItem) => {
+    setDeleting(item);
+  }, []);
+
+  const confirmDelete = useCallback(() => {
+    if (!deleting) return;
+    startDeleteTransition(async () => {
+      const res = await deleteWorkLocationAction(deleting.id);
+      if (!res.success) {
+        toast.error(res.message);
+        return;
+      }
+      toast.success("Work location deleted");
+      setDeleting(null);
+      router.refresh();
+    });
+  }, [deleting, router]);
 
   const columns = useMemo<
     DataTableColumn<WorkLocationListItem & Record<string, unknown>>[]
@@ -189,8 +215,9 @@ type WorkingDay = WorkLocationFormInput["workingDays"][number];
       {
         key: "name",
         header: "Location",
+        className: "text-left",
         render: (row) => (
-          <div>
+          <div className="text-left">
             <p className="font-medium">{row.name}</p>
             <p className="text-xs text-muted-foreground">{row.branchName ?? "—"}</p>
           </div>
@@ -235,7 +262,7 @@ type WorkingDay = WorkLocationFormInput["workingDays"][number];
               <Button
                 size="icon-sm"
                 variant="ghost"
-                onClick={() => onDelete(row)}
+                onClick={() => requestDelete(row)}
                 aria-label="Delete"
               >
                 <Trash2 className="h-4 w-4 text-destructive" />
@@ -245,32 +272,41 @@ type WorkingDay = WorkLocationFormInput["workingDays"][number];
         ),
       },
     ],
-    [canDelete, canEdit, onDelete, openEdit],
+    [canDelete, canEdit, openEdit, requestDelete],
   );
 
   return (
-    <>
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="space-y-4">
+      {!embedded ? (
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Work Locations</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Configure office locations, working days, and timings.
+            </p>
+          </div>
+          {canCreate ? (
+            <Button onClick={openCreate} disabled={branches.length === 0}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Location
+            </Button>
+          ) : null}
+        </div>
+      ) : (
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Work Locations</h1>
+          <h2 className="text-lg font-semibold tracking-tight">Work Locations</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Configure office locations, working days, and timings.
+            Configure office locations, working days, and timings per branch.
           </p>
         </div>
-        {canCreate ? (
-          <Button onClick={openCreate} disabled={branches.length === 0}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Location
-          </Button>
-        ) : null}
-      </div>
+      )}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="relative">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative min-w-0 flex-1 sm:max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search locations…"
-            className="pl-9"
+            className="h-9 pl-9"
             defaultValue={search}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -283,8 +319,20 @@ type WorkingDay = WorkLocationFormInput["workingDays"][number];
           items={statusFilterItems}
           value={status ?? "all"}
           placeholder="All statuses"
+          className="sm:w-44"
+          triggerClassName="h-9"
           onValueChange={(v) => updateParams({ status: v === "all" ? undefined : v })}
         />
+        {canCreate ? (
+          <Button
+            onClick={openCreate}
+            disabled={branches.length === 0}
+            className="h-9 shrink-0 sm:ml-auto"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Location
+          </Button>
+        ) : null}
       </div>
 
       {isPending ? (
@@ -300,10 +348,21 @@ type WorkingDay = WorkLocationFormInput["workingDays"][number];
           description="Add a work location or adjust your filters."
         />
       ) : (
-        <DataTable columns={columns} data={result.data} />
+        <DataTable
+          columns={columns}
+          data={result.data}
+          align="center"
+          scrollable={sectionScrollable}
+          maxHeightClass={DATA_TABLE_SPLIT_SCROLL_MAX_HEIGHT}
+        />
       )}
 
-      <OrgPagination page={result.page} pageSize={result.pageSize} total={result.total} />
+      <OrgPagination
+        page={result.page}
+        pageSize={result.pageSize}
+        total={result.total}
+        pageParam={pageParam}
+      />
 
       <Modal
         open={open}
@@ -379,6 +438,33 @@ type WorkingDay = WorkLocationFormInput["workingDays"][number];
           </div>
         </div>
       </Modal>
-    </>
+
+      <Modal
+        open={deleting !== null}
+        onOpenChange={(open) => {
+          if (!open && !isDeletePending) setDeleting(null);
+        }}
+        title="Delete work location?"
+        description={
+          deleting ? `This will remove "${deleting.name}" from your organization.` : undefined
+        }
+        contentClassName="sm:max-w-md"
+        footer={
+          <Button
+            variant="destructive"
+            disabled={isDeletePending || !deleting}
+            onClick={confirmDelete}
+          >
+            {isDeletePending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Delete location
+          </Button>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          This action cannot be undone. The work location will be removed from lists and
+          reports.
+        </p>
+      </Modal>
+    </div>
   );
 }

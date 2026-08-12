@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
@@ -16,7 +16,11 @@ import { FilterSelect } from "@/components/common/filter-select";
 import { Input } from "@/components/common/input";
 import { Modal } from "@/components/common/modal";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
-import { toEmployeeSelectItems, toLookupSelectItems, withSelectOption } from "@/components/payroll/select-utils";
+import {
+  toEmployeeSelectItems,
+  toLookupSelectItems,
+  withSelectOption,
+} from "@/components/payroll/select-utils";
 import { Label } from "@/components/ui/label";
 import { RolesExportButtons } from "@/components/roles/roles-export-buttons";
 import { RolesPagination } from "@/components/roles/roles-pagination";
@@ -59,6 +63,7 @@ export function UserRoleAssignments({
   const [isPending, startTransition] = useTransition();
   const [assignOpen, setAssignOpen] = useState(false);
   const [changeTarget, setChangeTarget] = useState<UserRoleAssignment | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<UserRoleAssignment | null>(null);
 
   const canAssign = canAssignUserRole(permissionCodes);
 
@@ -130,103 +135,77 @@ export function UserRoleAssignments({
     });
   }
 
-  const onRemove = useCallback(
-    (item: UserRoleAssignment) => {
-      if (!window.confirm(`Remove role "${item.roleName}" from ${item.employeeName ?? "user"}?`))
+  const confirmRemove = useCallback(() => {
+    if (!removeTarget) return;
+    const id = removeTarget.id;
+    startTransition(async () => {
+      const res = await removeUserRoleAction(id);
+      if (!res.success) {
+        toast.error(res.message);
         return;
-      startTransition(async () => {
-        const res = await removeUserRoleAction(item.id);
-        if (!res.success) {
-          toast.error(res.message);
-          return;
-        }
-        toast.success("Role removed");
-        router.refresh();
-      });
-    },
-    [router],
-  );
+      }
+      toast.success("Role removed");
+      setRemoveTarget(null);
+      router.refresh();
+    });
+  }, [removeTarget, router]);
 
-  const columns = useMemo<
-    DataTableColumn<UserRoleAssignment & Record<string, unknown>>[]
-  >(
+  const columns = useMemo<DataTableColumn<UserRoleAssignment & Record<string, unknown>>[]>(
     () => [
       {
         key: "employeeName",
         header: "Employee",
         render: (row) => (
-          <div>
-            <p className="font-medium">{row.employeeName ?? "—"}</p>
-            <p className="text-xs text-muted-foreground">
-              {row.employeeCode ?? ""}
-              {row.employeeEmail ? ` · ${row.employeeEmail}` : ""}
-            </p>
+          <div className="min-w-0">
+            <p className="truncate font-medium">{row.employeeName ?? "—"}</p>
+            {row.employeeCode ? (
+              <p className="truncate text-xs text-muted-foreground">{row.employeeCode}</p>
+            ) : null}
           </div>
         ),
       },
       {
         key: "departmentName",
         header: "Department",
-        render: (row) => row.departmentName ?? "—",
+        render: (row) => (
+          <span className="text-sm text-muted-foreground">{row.departmentName ?? "—"}</span>
+        ),
       },
       {
         key: "roleName",
         header: "Role",
-        render: (row) => (
-          <div>
-            <p className="font-medium">{row.roleName}</p>
-            <p className="text-xs text-muted-foreground">{row.roleCode}</p>
-          </div>
-        ),
-      },
-      {
-        key: "permissionCodes",
-        header: "Permissions",
-        render: (row) => (
-          <div className="flex max-w-xs flex-wrap gap-1">
-            {row.permissionCodes.length === 0 ? (
-              <span className="text-muted-foreground">—</span>
-            ) : (
-              row.permissionCodes.slice(0, 5).map((code) => (
-                <span
-                  key={code}
-                  className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs"
-                >
-                  {code}
-                </span>
-              ))
-            )}
-            {row.permissionCodes.length > 5 ? (
-              <span className="text-xs text-muted-foreground">
-                +{row.permissionCodes.length - 5} more
-              </span>
-            ) : null}
-          </div>
-        ),
+        render: (row) => <span className="font-medium">{row.roleName}</span>,
       },
       {
         key: "assignedAt",
         header: "Assigned",
-        render: (row) => format(new Date(row.assignedAt), "dd MMM yyyy"),
+        render: (row) => (
+          <span className="text-sm text-muted-foreground">
+            {format(new Date(row.assignedAt), "dd MMM yyyy")}
+          </span>
+        ),
       },
       {
         key: "actions",
         header: "Actions",
         render: (row) =>
           canAssign ? (
-            <div className="flex gap-1">
+            <div className="flex items-center gap-1">
               <Button
-                size="sm"
-                variant="outline"
+                size="icon-sm"
+                variant="ghost"
                 onClick={() => openChange(row)}
+                aria-label="Change role"
+                title="Change role"
               >
-                Change
+                <Pencil className="h-4 w-4" />
               </Button>
               <Button
                 size="icon-sm"
                 variant="ghost"
-                onClick={() => onRemove(row)}
-                aria-label="Remove"
+                onClick={() => setRemoveTarget(row)}
+                aria-label="Remove role"
+                title="Remove role"
               >
                 <Trash2 className="h-4 w-4 text-destructive" />
               </Button>
@@ -234,49 +213,50 @@ export function UserRoleAssignments({
           ) : null,
       },
     ],
-    [canAssign, onRemove, openChange],
+    [canAssign, openChange],
   );
 
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">User Role Assignments</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Assign roles to employees and manage access across the organization.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <RolesExportButtons entity="assignments" />
-          {canAssign ? (
-            <Button onClick={openAssign}>
-              <Plus className="mr-2 h-4 w-4" />
-              Assign Role
-            </Button>
-          ) : null}
-        </div>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Assignments</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          See who has which role, and assign or change access.
+        </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="relative">
+      <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-0.5">
+        <div className="relative min-w-[180px] max-w-sm flex-1 basis-[220px]">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search employees…"
-            className="pl-9"
+            placeholder="Search by name or code…"
+            className="h-9 pl-9"
             defaultValue={search}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                updateParams({ search: (e.target as HTMLInputElement).value || undefined });
+                updateParams({
+                  search: (e.target as HTMLInputElement).value || undefined,
+                });
               }
             }}
           />
         </div>
         <FilterSelect
+          className="w-[180px] shrink-0"
           items={roleFilterItems}
           value={roleId ?? "all"}
           placeholder="All roles"
           onValueChange={(v) => updateParams({ roleId: v === "all" ? undefined : v })}
         />
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <RolesExportButtons entity="assignments" />
+          {canAssign ? (
+            <Button className="h-9 shrink-0" onClick={openAssign}>
+              <Plus className="mr-2 h-4 w-4" />
+              Assign Role
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {isPending ? (
@@ -288,8 +268,8 @@ export function UserRoleAssignments({
 
       {result.data.length === 0 ? (
         <EmptyState
-          title="No assignments found"
-          description="Assign a role to an employee or adjust your filters."
+          title="No assignments yet"
+          description="Assign a role to an employee, or adjust your filters."
         />
       ) : (
         <DataTable columns={columns} data={result.data} />
@@ -300,12 +280,13 @@ export function UserRoleAssignments({
       <Modal
         open={assignOpen}
         onOpenChange={setAssignOpen}
-        title="Assign Role"
-        contentClassName="sm:max-w-lg"
+        title="Assign role"
+        description="Pick an employee and the role they should have."
+        contentClassName="sm:max-w-md"
         footer={
           <Button onClick={assignForm.handleSubmit(onAssign)} disabled={isPending}>
             {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Assign Role
+            Assign role
           </Button>
         }
       >
@@ -317,6 +298,7 @@ export function UserRoleAssignments({
               value={assignForm.watch("employeeId")}
               onValueChange={(v) => assignForm.setValue("employeeId", v)}
               placeholder="Select employee"
+              triggerClassName="h-9 w-full"
             />
           </div>
           <div className="space-y-2">
@@ -326,37 +308,84 @@ export function UserRoleAssignments({
               value={assignForm.watch("roleId")}
               onValueChange={(v) => assignForm.setValue("roleId", v)}
               placeholder="Select role"
+              triggerClassName="h-9 w-full"
             />
           </div>
         </div>
       </Modal>
 
       <Modal
-        open={!!changeTarget}
+        open={Boolean(changeTarget)}
         onOpenChange={(open) => !open && setChangeTarget(null)}
-        title="Change Role"
-        contentClassName="sm:max-w-lg"
+        title="Change role"
+        description={
+          changeTarget
+            ? `Update the role for ${changeTarget.employeeName ?? "this employee"}.`
+            : undefined
+        }
+        contentClassName="sm:max-w-md"
         footer={
           <Button onClick={changeForm.handleSubmit(onChangeRole)} disabled={isPending}>
             {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Update Role
+            Save role
           </Button>
         }
       >
         {changeTarget ? (
-          <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Role</Label>
+            <LabeledSelect
+              items={roleItems}
+              value={changeForm.watch("roleId")}
+              onValueChange={(v) => changeForm.setValue("roleId", v)}
+              placeholder="Select role"
+              triggerClassName="h-9 w-full"
+            />
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={Boolean(removeTarget)}
+        onOpenChange={(open) => {
+          if (!open && !isPending) setRemoveTarget(null);
+        }}
+        title="Remove role?"
+        description={
+          removeTarget
+            ? `Remove “${removeTarget.roleName}” from ${removeTarget.employeeName ?? "this employee"}?`
+            : undefined
+        }
+        contentClassName="sm:max-w-md"
+        showCancel={false}
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPending}
+              onClick={() => setRemoveTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isPending || !removeTarget}
+              onClick={confirmRemove}
+            >
+              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Remove role
+            </Button>
+          </>
+        }
+      >
+        {removeTarget ? (
+          <div className="flex gap-3 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-3">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
             <p className="text-sm text-muted-foreground">
-              Change role for <span className="font-medium">{changeTarget.employeeName}</span>
+              They will lose access linked to this role until you assign another one.
             </p>
-            <div className="space-y-2">
-              <Label>New Role</Label>
-              <LabeledSelect
-                items={roleItems}
-                value={changeForm.watch("roleId")}
-                onValueChange={(v) => changeForm.setValue("roleId", v)}
-                placeholder="Select role"
-              />
-            </div>
           </div>
         ) : null}
       </Modal>

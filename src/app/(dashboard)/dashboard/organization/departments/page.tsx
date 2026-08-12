@@ -1,6 +1,6 @@
 import { DepartmentsManagement } from "@/components/organization/departments-management";
 import { ORGANIZATION_VIEW_PERMISSIONS } from "@/lib/organization/constants";
-import { getBranches, getDepartments, getEmployeeLookups } from "@/lib/organization/services/org-lookups";
+import { getBranches, getEmployeeLookups } from "@/lib/organization/services/org-lookups";
 import { listDepartments } from "@/lib/organization/services/org-queries";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -24,10 +24,9 @@ export default async function DepartmentsPage({ searchParams }: PageProps) {
     status: typeof raw.status === "string" ? raw.status : undefined,
   });
 
-  const [result, employees, departments, branches] = await Promise.all([
+  const [result, employees, branches] = await Promise.all([
     listDepartments(supabase, orgId, params),
     getEmployeeLookups(supabase, orgId),
-    getDepartments(supabase, orgId),
     getBranches(supabase, orgId),
   ]);
 
@@ -35,7 +34,6 @@ export default async function DepartmentsPage({ searchParams }: PageProps) {
     <DepartmentsManagement
       result={result}
       employees={employees}
-      departments={departments}
       branches={branches}
       permissionCodes={profile.permissionCodes}
       search={params.search ?? ""}

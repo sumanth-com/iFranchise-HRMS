@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
+import { useEffect } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/common/button";
@@ -25,6 +26,8 @@ export function MobileSidebar() {
     setMobileOpen,
     toggleSection,
     isSectionOpen,
+    sectionsReady,
+    ensureSectionOpenIfUnset,
   } = useSidebar();
   const { navigation, portalHome } = useSidebarNavigation();
 
@@ -34,6 +37,14 @@ export function MobileSidebar() {
     portalHome,
     navigation,
   );
+
+  useEffect(() => {
+    if (!sectionsReady || !activeHref) return;
+    const activeItem = navigation.find((item) => item.href === activeHref);
+    if (activeItem?.section) {
+      ensureSectionOpenIfUnset(activeItem.section);
+    }
+  }, [activeHref, ensureSectionOpenIfUnset, navigation, sectionsReady]);
 
   return (
     <Sheet open={isMobileOpen} onOpenChange={setMobileOpen}>

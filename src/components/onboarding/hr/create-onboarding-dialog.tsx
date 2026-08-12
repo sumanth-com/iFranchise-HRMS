@@ -289,7 +289,7 @@ export function CreateOnboardingDialog({
                 <p className="text-xs text-muted-foreground rounded-md border border-dashed px-3 py-2">
                   No work locations yet.{" "}
                   <Link
-                    href={ORGANIZATION_ROUTES.workLocations}
+                    href={`${ORGANIZATION_ROUTES.branches}#work-locations`}
                     className="font-medium text-primary underline-offset-2 hover:underline"
                   >
                     Add work locations

@@ -95,66 +95,67 @@ export async function reportToPdfBytes(result: ReportResult): Promise<Uint8Array
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  let page = pdf.addPage([842, 595]); // landscape A4
-  const margin = 36;
+  const landscape = result.columns.length > 6;
+  const pageSize: [number, number] = landscape ? [842, 595] : [595, 842];
+  let page = pdf.addPage(pageSize);
+  const margin = 28;
   let y = page.getHeight() - margin;
 
   const drawText = (text: string, x: number, size: number, useBold = false) => {
-    page.drawText(text.slice(0, 120), {
+    page.drawText(text, {
       x,
       y,
       size,
       font: useBold ? bold : font,
       color: rgb(0.1, 0.1, 0.12),
+      maxWidth: page.getWidth() - margin * 2,
     });
   };
 
-  drawText(result.title, margin, 14, true);
+  drawText(result.title, margin, 13, true);
+  y -= 16;
+  drawText(`Generated ${result.generatedAt} · ${result.total} rows`, margin, 8);
   y -= 18;
-  drawText(`Generated ${result.generatedAt} · ${result.total} rows`, margin, 9);
-  y -= 22;
 
-  const colCount = Math.min(result.columns.length, 8);
+  const cols = result.columns;
   const usable = page.getWidth() - margin * 2;
-  const colWidth = usable / colCount;
-  const cols = result.columns.slice(0, colCount);
+  const colWidth = usable / Math.max(cols.length, 1);
+  const fontSize = cols.length > 8 ? 6.5 : cols.length > 6 ? 7 : 8;
+  const maxChars = Math.max(8, Math.floor(colWidth / (fontSize * 0.55)));
 
   const paintHeader = () => {
     cols.forEach((c, i) => {
-      page.drawText(c.header.slice(0, 18), {
+      page.drawText(c.header.slice(0, maxChars), {
         x: margin + i * colWidth,
         y,
-        size: 8,
+        size: fontSize,
         font: bold,
         color: rgb(0.2, 0.2, 0.25),
+        maxWidth: colWidth - 4,
       });
     });
-    y -= 14;
+    y -= fontSize + 6;
   };
 
   paintHeader();
 
-  for (const row of result.rows.slice(0, 40)) {
-    if (y < margin + 20) {
-      page = pdf.addPage([842, 595]);
+  for (const row of result.rows) {
+    if (y < margin + 16) {
+      page = pdf.addPage(pageSize);
       y = page.getHeight() - margin;
       paintHeader();
     }
     cols.forEach((c, i) => {
-      page.drawText(toCell(row[c.key]).slice(0, 22), {
+      page.drawText(toCell(row[c.key]).slice(0, maxChars), {
         x: margin + i * colWidth,
         y,
-        size: 8,
+        size: fontSize,
         font,
         color: rgb(0.15, 0.15, 0.18),
+        maxWidth: colWidth - 4,
       });
     });
-    y -= 12;
-  }
-
-  if (result.rows.length > 40) {
-    y -= 8;
-    drawText(`…and ${result.rows.length - 40} more rows. Export CSV/Excel for full data.`, margin, 8);
+    y -= fontSize + 5;
   }
 
   return pdf.save();

@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
-import { CalendarDays, Clock3, FileStack, Pencil } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock3, FileStack, Hourglass, Pencil, Wallet } from "lucide-react";
 
 import { EmployeeIdCard } from "@/components/employees/employee-id-card";
 import {
@@ -14,6 +14,7 @@ import { EmployeeEditForm } from "@/components/employees/employee-edit-form";
 import { EmploymentStatusBadge } from "@/components/employees/employment-status-badge";
 import { buttonVariants } from "@/components/common/button";
 import { EmptyState } from "@/components/common/empty-state";
+import { FilterSelect } from "@/components/common/filter-select";
 import { DocumentsExplorer } from "@/components/employee/documents/documents-explorer";
 import { EmployeeAssetsView } from "@/components/employee/assets/employee-assets-view";
 import { EmployeeStatCard } from "@/components/employee/dashboard/employee-module-primitives";
@@ -23,9 +24,12 @@ import {
   type DataTableColumn,
 } from "@/components/common/data-table";
 import { LeaveStatusBadge } from "@/components/leave/leave-status-badge";
+import { ATTENDANCE_STATUS_LABELS } from "@/lib/attendance/constants";
 import { EMPLOYEE_ROUTES, EMPLOYEE_TABS, EMPLOYEE_ACCOUNT_STATUS_LABELS, type EmployeeTab } from "@/lib/employees/constants";
+import { getMonthSelectItems, getYearSelectItems } from "@/components/payroll/select-utils";
 import { buildEmployeeRouteRef } from "@/lib/employees/routing";
 import type {
+  EmployeeAttendancePeriod,
   EmployeeAttendanceSummary,
   EmployeeBankAccountDetail,
   EmployeeDetail,
@@ -54,6 +58,7 @@ type EmployeeDetailViewProps = {
   leaveBalances: EmployeeLeaveBalanceDetail[];
   salaryStructure: EmployeeSalaryStructureDetail | null;
   attendanceSummary: EmployeeAttendanceSummary;
+  attendancePeriod: EmployeeAttendancePeriod;
   assets: AssetAssignmentItem[];
   documentsExplorer: EmployeeDocumentsExplorerData;
   assetsData: EmployeeAssetsData;
@@ -213,6 +218,7 @@ export function EmployeeDetailView({
   leaveBalances,
   salaryStructure,
   attendanceSummary,
+  attendancePeriod,
   assets,
   documentsExplorer,
   assetsData,
@@ -437,181 +443,22 @@ export function EmployeeDetailView({
       ) : null}
 
       {activeTab === "attendance" ? (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-            <EmployeeStatCard
-              label="Present days"
-              value={String(attendanceSummary.presentDays)}
-              icon={CalendarDays}
-              accent="text-emerald-600 dark:text-emerald-400"
-              iconBg="bg-emerald-500/10"
-            />
-            <EmployeeStatCard
-              label="Total records"
-              value={String(attendanceSummary.totalRecords)}
-              icon={FileStack}
-              accent="text-indigo-600 dark:text-indigo-400"
-              iconBg="bg-indigo-500/10"
-            />
-            <EmployeeStatCard
-              label="Total work hours"
-              value={String(attendanceSummary.totalWorkHours)}
-              icon={Clock3}
-              accent="text-sky-600 dark:text-sky-400"
-              iconBg="bg-sky-500/10"
-            />
-          </div>
-          <section className="overflow-hidden rounded-xl border bg-card">
-            <OverviewSectionTitle>Attendance history</OverviewSectionTitle>
-            <div className="p-4">
-              <SimpleTable
-                columns={[
-                  { key: "attendance_date", header: "Date" },
-                  {
-                    key: "check_in_at",
-                    header: "Check in",
-                    render: (row) =>
-                      row.check_in_at
-                        ? format(new Date(String(row.check_in_at)), "PPp")
-                        : "—",
-                  },
-                  {
-                    key: "check_out_at",
-                    header: "Check out",
-                    render: (row) =>
-                      row.check_out_at
-                        ? format(new Date(String(row.check_out_at)), "PPp")
-                        : "—",
-                  },
-                  { key: "attendance_status", header: "Status" },
-                  { key: "work_hours", header: "Hours" },
-                ]}
-                data={attendance}
-                emptyTitle="No attendance records"
-                emptyDescription="Attendance history will appear here once records exist."
-              />
-            </div>
-          </section>
-        </div>
+        <EmployeeAttendanceTab
+          employee={employee}
+          attendance={attendance}
+          attendanceSummary={attendanceSummary}
+          attendancePeriod={attendancePeriod}
+        />
       ) : null}
 
       {activeTab === "leave" ? (
-        <div className="space-y-6">
-          <section className="overflow-hidden rounded-xl border bg-card">
-            <OverviewSectionTitle>Leave balances</OverviewSectionTitle>
-            <div className="p-4">
-              {leaveBalances.length > 0 ? (
-                <SimpleTable
-                  columns={[
-                    { key: "leaveTypeName", header: "Leave type" },
-                    { key: "balanceYear", header: "Year" },
-                    { key: "allocatedDays", header: "Allocated" },
-                    { key: "usedDays", header: "Used" },
-                    { key: "pendingDays", header: "Pending" },
-                    { key: "balanceDays", header: "Balance" },
-                  ]}
-                  data={leaveBalances as unknown as Array<Record<string, unknown>>}
-                  emptyTitle="No leave balances"
-                  emptyDescription="Leave balances will appear here once configured."
-                />
-              ) : (
-                <EmptyState
-                  title="No leave balances"
-                  description="Leave balances will appear here once configured."
-                />
-              )}
-            </div>
-          </section>
-
-          <section className="overflow-hidden rounded-xl border bg-card">
-            <OverviewSectionTitle>Recent requests</OverviewSectionTitle>
-            {leaveRequests.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="border-b bg-black text-left text-xs uppercase tracking-wide text-white">
-                    <tr>
-                      <th className="px-5 py-2.5 font-medium">Leave type</th>
-                      <th className="px-5 py-2.5 font-medium">Start</th>
-                      <th className="px-5 py-2.5 font-medium">End</th>
-                      <th className="px-5 py-2.5 font-medium">Days</th>
-                      <th className="px-5 py-2.5 font-medium">Applied</th>
-                      <th className="px-5 py-2.5 font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {leaveRequests.map((request) => (
-                      <tr key={request.id} className="border-b border-border/50 last:border-0">
-                        <td className="px-5 py-3">{request.leaveTypeName}</td>
-                        <td className="px-5 py-3">{formatDisplayDate(request.startDate)}</td>
-                        <td className="px-5 py-3">{formatDisplayDate(request.endDate)}</td>
-                        <td className="px-5 py-3">{request.totalDays}</td>
-                        <td className="px-5 py-3">{formatDisplayDate(request.appliedAt)}</td>
-                        <td className="px-5 py-3">
-                          <LeaveStatusBadge status={request.leaveStatus as LeaveStatus} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="p-4">
-                <EmptyState
-                  title="No leave requests"
-                  description="Leave history will appear here once requests exist."
-                />
-              </div>
-            )}
-          </section>
-
-          <section className="overflow-hidden rounded-xl border bg-card">
-            <OverviewSectionTitle>Approval history</OverviewSectionTitle>
-            {leaveApprovals.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="border-b bg-black text-left text-xs uppercase tracking-wide text-white">
-                    <tr>
-                      <th className="px-5 py-2.5 font-medium">Level</th>
-                      <th className="px-5 py-2.5 font-medium">Approver</th>
-                      <th className="px-5 py-2.5 font-medium">Leave period</th>
-                      <th className="px-5 py-2.5 font-medium">Status</th>
-                      <th className="px-5 py-2.5 font-medium">Acted on</th>
-                      <th className="px-5 py-2.5 font-medium">Comments</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {leaveApprovals.map((approval) => (
-                      <tr key={approval.id} className="border-b border-border/50 last:border-0">
-                        <td className="px-5 py-3">L{approval.approvalLevel}</td>
-                        <td className="px-5 py-3">{approval.approverName}</td>
-                        <td className="px-5 py-3">
-                          {formatDisplayDate(approval.leaveStartDate)} –{" "}
-                          {formatDisplayDate(approval.leaveEndDate)}
-                        </td>
-                        <td className="px-5 py-3">
-                          <LeaveStatusBadge
-                            status={approval.approvalStatus as LeaveStatus}
-                          />
-                        </td>
-                        <td className="px-5 py-3">{formatDisplayDate(approval.actedAt)}</td>
-                        <td className="px-5 py-3 text-muted-foreground">
-                          {approval.comments ?? "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="p-4">
-                <EmptyState
-                  title="No approval history"
-                  description="Approval steps will appear here once leave requests are processed."
-                />
-              </div>
-            )}
-          </section>
-        </div>
+        <EmployeeLeaveTab
+          employee={employee}
+          leaveRequests={leaveRequests}
+          leaveApprovals={leaveApprovals}
+          leaveBalances={leaveBalances}
+          attendancePeriod={attendancePeriod}
+        />
       ) : null}
 
       {activeTab === "payroll" ? (
@@ -627,15 +474,408 @@ function SimpleTable({
   data,
   emptyTitle,
   emptyDescription,
+  scrollable = false,
 }: {
   columns: DataTableColumn<Record<string, unknown>>[];
   data: Array<Record<string, unknown>>;
   emptyTitle: string;
   emptyDescription: string;
+  scrollable?: boolean;
 }) {
   if (data.length === 0) {
     return <EmptyState title={emptyTitle} description={emptyDescription} />;
   }
 
-  return <DataTable columns={columns} data={data} />;
+  return (
+    <DataTable
+      columns={columns}
+      data={data}
+      scrollable={scrollable}
+      maxHeightClass="max-h-[min(28rem,calc(100dvh-22rem))]"
+    />
+  );
+}
+
+const periodMonthItems = getMonthSelectItems();
+
+function periodYearItems(selectedYear: number | null) {
+  const current = new Date().getFullYear();
+  const years = new Set([
+    current - 2,
+    current - 1,
+    current,
+    current + 1,
+    current + 2,
+  ]);
+  if (selectedYear != null) {
+    years.add(selectedYear);
+  }
+  return getYearSelectItems([...years].sort((a, b) => a - b));
+}
+
+function PeriodMonthYearFilters({
+  employee,
+  period,
+  tab,
+}: {
+  employee: EmployeeDetail;
+  period: EmployeeAttendancePeriod;
+  tab: EmployeeTab;
+}) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  function updatePeriod(next: { month?: number | null; year?: number | null }) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", tab);
+
+    const month = next.month !== undefined ? next.month : period.month;
+    const year = next.year !== undefined ? next.year : period.year;
+
+    if (month != null) {
+      params.set("month", String(month));
+    } else {
+      params.delete("month");
+    }
+
+    if (year != null) {
+      params.set("year", String(year));
+    } else {
+      params.delete("year");
+    }
+
+    router.replace(`${EMPLOYEE_ROUTES.detail(employee)}?${params.toString()}`);
+  }
+
+  return (
+    <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2">
+      <div className="flex h-9 items-center gap-1.5 rounded-md border bg-background pl-2 pr-1">
+        <span className="shrink-0 text-xs text-muted-foreground">Month</span>
+        <FilterSelect
+          items={periodMonthItems}
+          value={period.month != null ? String(period.month) : ""}
+          onValueChange={(value) =>
+            updatePeriod({ month: Number.parseInt(value, 10) })
+          }
+          placeholder="Select month"
+          className="w-auto"
+          triggerClassName="h-8 min-w-[8.5rem] border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
+        />
+      </div>
+      <div className="flex h-9 items-center gap-1.5 rounded-md border bg-background pl-2 pr-1">
+        <span className="shrink-0 text-xs text-muted-foreground">Year</span>
+        <FilterSelect
+          items={periodYearItems(period.year)}
+          value={period.year != null ? String(period.year) : ""}
+          onValueChange={(value) =>
+            updatePeriod({ year: Number.parseInt(value, 10) })
+          }
+          placeholder="Select year"
+          className="w-auto"
+          triggerClassName="h-8 min-w-[6.5rem] border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
+        />
+      </div>
+    </div>
+  );
+}
+
+function PeriodEmptyPrompt({ description }: { description: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-xl border bg-card px-8 py-16 text-center">
+      <div className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+        <CalendarDays className="size-6" />
+      </div>
+      <h3 className="mt-4 text-sm font-medium">Select a month and year</h3>
+      <p className="mt-1 max-w-md text-sm text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
+function EmployeeAttendanceTab({
+  employee,
+  attendance,
+  attendanceSummary,
+  attendancePeriod,
+}: {
+  employee: EmployeeDetail;
+  attendance: Array<Record<string, unknown>>;
+  attendanceSummary: EmployeeAttendanceSummary;
+  attendancePeriod: EmployeeAttendancePeriod;
+}) {
+  const { month, year } = attendancePeriod;
+  const hasPeriod = month != null && year != null;
+  const monthLabel = hasPeriod
+    ? format(new Date(year, month - 1, 1), "MMMM yyyy")
+    : "";
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="grid min-w-0 flex-1 grid-cols-2 gap-3 lg:grid-cols-3">
+          <EmployeeStatCard
+            label="Present days"
+            value={String(hasPeriod ? attendanceSummary.presentDays : 0)}
+            icon={CalendarDays}
+            accent="text-emerald-600 dark:text-emerald-400"
+            iconBg="bg-emerald-500/10"
+          />
+          <EmployeeStatCard
+            label="Total records"
+            value={String(hasPeriod ? attendanceSummary.totalRecords : 0)}
+            icon={FileStack}
+            accent="text-indigo-600 dark:text-indigo-400"
+            iconBg="bg-indigo-500/10"
+          />
+          <EmployeeStatCard
+            label="Total work hours"
+            value={String(hasPeriod ? attendanceSummary.totalWorkHours : 0)}
+            icon={Clock3}
+            accent="text-sky-600 dark:text-sky-400"
+            iconBg="bg-sky-500/10"
+          />
+        </div>
+        <PeriodMonthYearFilters
+          employee={employee}
+          period={attendancePeriod}
+          tab="attendance"
+        />
+      </div>
+
+      {hasPeriod ? (
+        <section className="overflow-hidden rounded-xl border bg-card">
+          <OverviewSectionTitle>Attendance history</OverviewSectionTitle>
+          <div className="p-4">
+            <SimpleTable
+              columns={[
+                { key: "attendance_date", header: "Date" },
+                {
+                  key: "check_in_at",
+                  header: "Check in",
+                  render: (row) =>
+                    row.check_in_at
+                      ? format(new Date(String(row.check_in_at)), "PPp")
+                      : "—",
+                },
+                {
+                  key: "check_out_at",
+                  header: "Check out",
+                  render: (row) =>
+                    row.check_out_at
+                      ? format(new Date(String(row.check_out_at)), "PPp")
+                      : "—",
+                },
+                {
+                  key: "attendance_status",
+                  header: "Status",
+                  render: (row) => {
+                    const status = String(row.attendance_status ?? "");
+                    return (
+                      ATTENDANCE_STATUS_LABELS[
+                        status as keyof typeof ATTENDANCE_STATUS_LABELS
+                      ] ?? status
+                    );
+                  },
+                },
+                { key: "work_hours", header: "Hours" },
+              ]}
+              data={attendance}
+              emptyTitle={`No attendance records for ${monthLabel}`}
+              emptyDescription="Try another month, or records will appear here once attendance is marked."
+              scrollable
+            />
+          </div>
+        </section>
+      ) : (
+        <PeriodEmptyPrompt description="Choose a period above to view this employee's attendance summary and daily history." />
+      )}
+    </div>
+  );
+}
+
+function EmployeeLeaveTab({
+  employee,
+  leaveRequests,
+  leaveApprovals,
+  leaveBalances,
+  attendancePeriod,
+}: {
+  employee: EmployeeDetail;
+  leaveRequests: EmployeeLeaveRequestDetail[];
+  leaveApprovals: EmployeeLeaveApprovalDetail[];
+  leaveBalances: EmployeeLeaveBalanceDetail[];
+  attendancePeriod: EmployeeAttendancePeriod;
+}) {
+  const { month, year } = attendancePeriod;
+  const hasPeriod = month != null && year != null;
+  const monthLabel = hasPeriod
+    ? format(new Date(year, month - 1, 1), "MMMM yyyy")
+    : "";
+
+  const approvedDays = leaveRequests
+    .filter((request) => request.leaveStatus === "approved")
+    .reduce((total, request) => total + request.totalDays, 0);
+  const pendingCount = leaveRequests.filter(
+    (request) => request.leaveStatus === "pending",
+  ).length;
+  const availableDays = leaveBalances.reduce(
+    (total, balance) => total + balance.balanceDays,
+    0,
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="grid min-w-0 flex-1 grid-cols-2 gap-3 lg:grid-cols-4">
+          <EmployeeStatCard
+            label="Requests"
+            value={String(hasPeriod ? leaveRequests.length : 0)}
+            icon={FileStack}
+            accent="text-indigo-600 dark:text-indigo-400"
+            iconBg="bg-indigo-500/10"
+          />
+          <EmployeeStatCard
+            label="Approved days"
+            value={String(hasPeriod ? approvedDays : 0)}
+            icon={CheckCircle2}
+            accent="text-emerald-600 dark:text-emerald-400"
+            iconBg="bg-emerald-500/10"
+          />
+          <EmployeeStatCard
+            label="Pending requests"
+            value={String(hasPeriod ? pendingCount : 0)}
+            icon={Hourglass}
+            accent="text-amber-600 dark:text-amber-400"
+            iconBg="bg-amber-500/10"
+          />
+          <EmployeeStatCard
+            label="Available balance"
+            value={String(hasPeriod ? availableDays : 0)}
+            icon={Wallet}
+            accent="text-sky-600 dark:text-sky-400"
+            iconBg="bg-sky-500/10"
+          />
+        </div>
+        <PeriodMonthYearFilters
+          employee={employee}
+          period={attendancePeriod}
+          tab="leave"
+        />
+      </div>
+
+      {hasPeriod ? (
+        <div className="space-y-4">
+          <section className="overflow-hidden rounded-xl border bg-card">
+            <OverviewSectionTitle>Leave balances</OverviewSectionTitle>
+            <div className="p-4">
+              <SimpleTable
+                columns={[
+                  { key: "leaveTypeName", header: "Leave type" },
+                  { key: "balanceYear", header: "Year" },
+                  { key: "allocatedDays", header: "Allocated" },
+                  { key: "usedDays", header: "Used" },
+                  { key: "pendingDays", header: "Pending" },
+                  { key: "balanceDays", header: "Balance" },
+                ]}
+                data={leaveBalances as unknown as Array<Record<string, unknown>>}
+                emptyTitle={`No leave balances for ${year}`}
+                emptyDescription="Leave balances for this year will appear here once configured."
+                scrollable
+              />
+            </div>
+          </section>
+
+          <section className="overflow-hidden rounded-xl border bg-card">
+            <OverviewSectionTitle>Leave requests</OverviewSectionTitle>
+            <div className="p-4">
+              <SimpleTable
+                columns={[
+                  { key: "leaveTypeName", header: "Leave type" },
+                  {
+                    key: "startDate",
+                    header: "Start",
+                    render: (row) => formatDisplayDate(String(row.startDate ?? "")),
+                  },
+                  {
+                    key: "endDate",
+                    header: "End",
+                    render: (row) => formatDisplayDate(String(row.endDate ?? "")),
+                  },
+                  { key: "totalDays", header: "Days" },
+                  {
+                    key: "appliedAt",
+                    header: "Applied",
+                    render: (row) =>
+                      formatDisplayDate(
+                        row.appliedAt ? String(row.appliedAt) : null,
+                      ),
+                  },
+                  {
+                    key: "leaveStatus",
+                    header: "Status",
+                    render: (row) => (
+                      <LeaveStatusBadge
+                        status={String(row.leaveStatus ?? "") as LeaveStatus}
+                      />
+                    ),
+                  },
+                ]}
+                data={leaveRequests as unknown as Array<Record<string, unknown>>}
+                emptyTitle={`No leave requests for ${monthLabel}`}
+                emptyDescription="Leave requests that overlap this month will appear here."
+                scrollable
+              />
+            </div>
+          </section>
+
+          <section className="overflow-hidden rounded-xl border bg-card">
+            <OverviewSectionTitle>Approval history</OverviewSectionTitle>
+            <div className="p-4">
+              <SimpleTable
+                columns={[
+                  {
+                    key: "approvalLevel",
+                    header: "Level",
+                    render: (row) => `L${row.approvalLevel ?? ""}`,
+                  },
+                  { key: "approverName", header: "Approver" },
+                  {
+                    key: "leaveStartDate",
+                    header: "Leave period",
+                    render: (row) =>
+                      `${formatDisplayDate(String(row.leaveStartDate ?? ""))} – ${formatDisplayDate(String(row.leaveEndDate ?? ""))}`,
+                  },
+                  {
+                    key: "approvalStatus",
+                    header: "Status",
+                    render: (row) => (
+                      <LeaveStatusBadge
+                        status={String(row.approvalStatus ?? "") as LeaveStatus}
+                      />
+                    ),
+                  },
+                  {
+                    key: "actedAt",
+                    header: "Acted on",
+                    render: (row) =>
+                      formatDisplayDate(row.actedAt ? String(row.actedAt) : null),
+                  },
+                  {
+                    key: "comments",
+                    header: "Comments",
+                    render: (row) => String(row.comments ?? "—"),
+                  },
+                ]}
+                data={leaveApprovals as unknown as Array<Record<string, unknown>>}
+                emptyTitle={`No approval history for ${monthLabel}`}
+                emptyDescription="Approval steps for this month will appear here once leave requests are processed."
+                scrollable
+              />
+            </div>
+          </section>
+        </div>
+      ) : (
+        <PeriodEmptyPrompt description="Choose a period above to view this employee's leave balances, requests, and approval history." />
+      )}
+    </div>
+  );
 }

@@ -1,19 +1,30 @@
 "use client";
 
-import { Download, FileSpreadsheet, FileText, Loader2, Play, Printer } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import {
+  CalendarCheck,
+  CalendarDays,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  Laptop,
+  Loader2,
+  LogOut,
+  Play,
+  Target,
+  UserPlus,
+  Users,
+  Wallet,
+} from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
-import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
-import { DataTable, type DataTableColumn } from "@/components/common/data-table";
 import { EmptyState } from "@/components/common/empty-state";
 import { Input } from "@/components/common/input";
-import { Label } from "@/components/ui/label";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { getMonthSelectItems, getYearSelectItems } from "@/components/payroll/select-utils";
 import { canExportReports } from "@/lib/reports/constants";
-import { exportReportAction, runReportAction } from "@/lib/reports/actions";
+import { exportGeneratedReportAction, runReportAction } from "@/lib/reports/actions";
+import { cn } from "@/lib/utils";
 import type {
   ReportExportFormat,
   ReportFilters,
@@ -87,8 +98,10 @@ const MODULE_STATUS_OPTIONS: Partial<
   ],
   performance: [
     { value: "draft", label: "Draft" },
+    { value: "not_started", label: "Not Started" },
     { value: "in_progress", label: "In Progress" },
     { value: "completed", label: "Completed" },
+    { value: "overdue", label: "Overdue" },
   ],
   recruitment: [
     { value: "open", label: "Open" },
@@ -111,6 +124,130 @@ const MODULE_STATUS_OPTIONS: Partial<
   ],
 };
 
+const MODULE_TITLES: Record<ReportModuleKey, string> = {
+  hr: "HR Reports",
+  attendance: "Attendance Reports",
+  leave: "Leave Reports",
+  payroll: "Payroll Reports",
+  performance: "Performance Reports",
+  recruitment: "Recruitment Reports",
+  assets: "Asset Reports",
+  exit: "Exit Reports",
+};
+
+const MODULE_SUBTITLES: Record<ReportModuleKey, string> = {
+  hr: "Review workforce, joining, and probation data for the selected period.",
+  attendance: "Track daily presence, late marks, and working hours across the selected period.",
+  leave: "Monitor leave balances, utilization, and request status for the selected period.",
+  payroll: "Review salary, deductions, bonuses, and net pay for the selected month.",
+  performance: "Track KPIs, goals, reviews, and promotion readiness for the selected month.",
+  recruitment: "Review open roles, pipeline, offers, and hiring progress for the selected period.",
+  assets: "Track assigned, returned, and maintenance assets for the selected period.",
+  exit: "Review resignations, attrition, and settlement status for the selected period.",
+};
+
+const MODULE_EMPTY_STATE: Record<
+  ReportModuleKey,
+  { title: string; description: string }
+> = {
+  hr: {
+    title: "Workforce records will appear here",
+    description:
+      "Choose a report type and date range, then run the report to view and export HR data.",
+  },
+  attendance: {
+    title: "Attendance records will appear here",
+    description:
+      "Set the From and To dates, optionally choose a status or employee, then run the report to view and export attendance.",
+  },
+  leave: {
+    title: "Leave records will appear here",
+    description:
+      "Optionally filter by status or employee, then run the report to view and export leave data.",
+  },
+  payroll: {
+    title: "Payroll records will appear here",
+    description:
+      "Choose a report type, Month, and Year, then click Run to view and export payroll.",
+  },
+  performance: {
+    title: "Performance records will appear here",
+    description:
+      "Choose a report type, Month, and Year, then click Run to view and export performance data.",
+  },
+  recruitment: {
+    title: "Recruitment records will appear here",
+    description:
+      "Choose a report type and date range, then run the report to view and export hiring data.",
+  },
+  assets: {
+    title: "Asset records will appear here",
+    description:
+      "Choose a report type and date range, optionally filter by employee, then run the report to view and export asset data.",
+  },
+  exit: {
+    title: "Exit records will appear here",
+    description:
+      "Choose a report type and date range, then run the report to view and export offboarding data.",
+  },
+};
+
+const MODULE_NO_DATA: Record<ReportModuleKey, { title: string; description: string }> = {
+  hr: {
+    title: "No workforce records found",
+    description: "Try a different report type or date range, then click Run again.",
+  },
+  attendance: {
+    title: "No attendance records found",
+    description: "Try a different date range, status, or employee, then click Run again.",
+  },
+  leave: {
+    title: "No leave records found",
+    description: "Try a different status or employee, then click Run again.",
+  },
+  payroll: {
+    title: "No payroll records found",
+    description: "Try a different report type, month, or year, then click Run again.",
+  },
+  performance: {
+    title: "No performance records found",
+    description: "Try a different report type, month, or year, then click Run again.",
+  },
+  recruitment: {
+    title: "No recruitment records found",
+    description: "Try a different report type or date range, then click Run again.",
+  },
+  assets: {
+    title: "No asset records found",
+    description: "Try a different report type or date range, then click Run again.",
+  },
+  exit: {
+    title: "No exit records found",
+    description: "Try a different report type or date range, then click Run again.",
+  },
+};
+
+const GENERATE_FAILED = {
+  title: "Unable to generate report",
+  description: "Adjust the filters and click Run again to generate this report.",
+};
+
+const NEED_PERIOD = {
+  title: "Month and Year required",
+  description: "Select Month and Year, then click Run to generate this report.",
+};
+
+const MODULE_EMPTY_ICONS: Record<ReportModuleKey, typeof Users> = {
+  hr: Users,
+  attendance: CalendarCheck,
+  leave: CalendarDays,
+  payroll: Wallet,
+  performance: Target,
+  recruitment: UserPlus,
+  assets: Laptop,
+  exit: LogOut,
+};
+
 function downloadBase64(filename: string, mimeType: string, base64: string) {
   const bin = atob(base64);
   const bytes = new Uint8Array(bin.length);
@@ -124,60 +261,50 @@ function downloadBase64(filename: string, mimeType: string, base64: string) {
   URL.revokeObjectURL(url);
 }
 
-function showFiltersFor(key: ReportKey) {
+function showFiltersFor(module: ReportModuleKey) {
   return {
-    designation: key.startsWith("hr_") || key.startsWith("performance_"),
-    employee:
-      key.startsWith("attendance_") ||
-      key.startsWith("leave_") ||
-      key.startsWith("payroll_") ||
-      key.startsWith("performance_") ||
-      key.startsWith("assets_") ||
-      key.startsWith("exit_"),
-    monthYear:
-      key.startsWith("attendance_") ||
-      key.startsWith("payroll_") ||
-      key === "leave_trends" ||
-      key === "exit_attrition",
+    reportType: module !== "attendance" && module !== "leave",
+    dates: module !== "payroll" && module !== "performance",
+    monthYear: module === "payroll" || module === "performance",
+    designation: module === "hr",
+    employee: module !== "hr" && module !== "recruitment",
   };
 }
 
-const MONTH_ANY = "__any_month__";
-const YEAR_ANY = "__any_year__";
+function monthToDateRange(month: number, year: number) {
+  const paddedMonth = String(month).padStart(2, "0");
+  const lastDay = new Date(year, month, 0).getDate();
+  return {
+    dateFrom: `${year}-${paddedMonth}-01`,
+    dateTo: `${year}-${paddedMonth}-${String(lastDay).padStart(2, "0")}`,
+  };
+}
 
 function buildFilters(
   dateFrom: string,
   dateTo: string,
-  departmentId: string,
   designationId: string,
   employeeId: string,
   status: string,
-  month: string,
-  year: string,
+  month?: number,
+  year?: number,
 ): ReportFilters {
+  const hasPeriod = Boolean(month && year);
+  const period = hasPeriod ? monthToDateRange(month!, year!) : { dateFrom, dateTo };
+
   return {
-    dateFrom: dateFrom || undefined,
-    dateTo: dateTo || undefined,
-    departmentId: departmentId && departmentId !== ALL_OPTION.value ? departmentId : undefined,
+    dateFrom: period.dateFrom || undefined,
+    dateTo: period.dateTo || undefined,
     designationId:
       designationId && designationId !== ALL_OPTION.value ? designationId : undefined,
     employeeId: employeeId && employeeId !== ALL_OPTION.value ? employeeId : undefined,
     status: status && status !== ALL_OPTION.value ? status : undefined,
-    month: month && month !== MONTH_ANY ? Number(month) : undefined,
-    year: year && year !== YEAR_ANY ? Number(year) : undefined,
+    month: hasPeriod ? month : undefined,
+    year: hasPeriod ? year : undefined,
   };
 }
 
-const MODULE_TITLES: Record<ReportModuleKey, string> = {
-  hr: "HR Reports",
-  attendance: "Attendance Reports",
-  leave: "Leave Reports",
-  payroll: "Payroll Reports",
-  performance: "Performance Reports",
-  recruitment: "Recruitment Reports",
-  assets: "Asset Reports",
-  exit: "Exit Reports",
-};
+type ReportNotice = "idle" | "need-period" | "failed" | "empty";
 
 export function ModuleReportsView({
   module,
@@ -192,16 +319,21 @@ export function ModuleReportsView({
   const fallbackDates = defaultDateRange(30);
   const [isPending, startTransition] = useTransition();
   const [reportKey, setReportKey] = useState<ReportKey>(
-    initialReportKey ?? definitions[0]?.key ?? "hr_employee_master",
+    module === "attendance"
+      ? "attendance_daily"
+      : module === "leave"
+        ? "leave_balance"
+        : (initialReportKey ?? definitions[0]?.key ?? "hr_employee_master"),
   );
   const [result, setResult] = useState<ReportResult | null>(initialResult);
+  const [notice, setNotice] = useState<ReportNotice>("idle");
+  const [appliedFilters, setAppliedFilters] = useState<ReportFilters | null>(
+    initialResult ? defaultFilters ?? null : null,
+  );
   const [dateFrom, setDateFrom] = useState(
     defaultFilters?.dateFrom ?? fallbackDates.dateFrom,
   );
   const [dateTo, setDateTo] = useState(defaultFilters?.dateTo ?? fallbackDates.dateTo);
-  const [departmentId, setDepartmentId] = useState(
-    defaultFilters?.departmentId ?? ALL_OPTION.value,
-  );
   const [designationId, setDesignationId] = useState(
     defaultFilters?.designationId ?? ALL_OPTION.value,
   );
@@ -210,33 +342,23 @@ export function ModuleReportsView({
   );
   const [status, setStatus] = useState(defaultFilters?.status ?? ALL_OPTION.value);
   const [month, setMonth] = useState(
-    defaultFilters?.month ? String(defaultFilters.month) : MONTH_ANY,
+    defaultFilters?.month ? String(defaultFilters.month) : "",
   );
-  const [year, setYear] = useState(
-    defaultFilters?.year ? String(defaultFilters.year) : String(new Date().getFullYear()),
-  );
+  const [year, setYear] = useState(defaultFilters?.year ? String(defaultFilters.year) : "");
 
-  const selectedDef = definitions.find((d) => d.key === reportKey) ?? definitions[0];
-  const filterVisibility = showFiltersFor(reportKey);
+  const filterVisibility = showFiltersFor(module);
   const statusOptions = MODULE_STATUS_OPTIONS[module] ?? [];
 
-  const departmentItems = useMemo(
-    () => [
-      ALL_OPTION,
-      ...lookups.departments.map((d) => ({ value: d.id, label: d.label })),
-    ],
-    [lookups.departments],
-  );
   const designationItems = useMemo(
     () => [
-      ALL_OPTION,
+      { value: ALL_OPTION.value, label: "All designations" },
       ...lookups.designations.map((d) => ({ value: d.id, label: d.label })),
     ],
     [lookups.designations],
   );
   const employeeItems = useMemo(
     () => [
-      ALL_OPTION,
+      { value: ALL_OPTION.value, label: "All employees" },
       ...lookups.employees.map((e) => ({ value: e.id, label: e.label })),
     ],
     [lookups.employees],
@@ -246,299 +368,312 @@ export function ModuleReportsView({
     [definitions],
   );
   const statusItems = useMemo(
-    () => [ALL_OPTION, ...statusOptions],
+    () => [{ value: ALL_OPTION.value, label: "All statuses" }, ...statusOptions],
     [statusOptions],
   );
-  const monthItems = useMemo(
-    () => [{ value: MONTH_ANY, label: "Any month" }, ...getMonthSelectItems()],
-    [],
-  );
+  const monthItems = useMemo(() => getMonthSelectItems(), []);
   const yearItems = useMemo(() => {
     const current = new Date().getFullYear();
-    return [
-      { value: YEAR_ANY, label: "Any year" },
-      ...getYearSelectItems([current - 1, current, current + 1]),
-    ];
+    return getYearSelectItems([current - 1, current, current + 1]);
   }, []);
 
-  const columns = useMemo<DataTableColumn<Record<string, unknown>>[]>(() => {
-    if (!result) return [];
-    return result.columns.map((col) => ({
-      key: col.key,
-      header: col.header,
-      render: (row) => {
-        const value = row[col.key];
-        if (value == null || value === "") return "—";
-        return String(value);
-      },
-    }));
-  }, [result]);
-
-  const tableRows = useMemo(() => {
-    if (!result) return [];
-    return result.rows.map((row) => ({ ...row })) as Record<string, unknown>[];
-  }, [result]);
-
   function currentFilters() {
+    const selectedMonth = month ? Number(month) : undefined;
+    const selectedYear = year ? Number(year) : undefined;
     return buildFilters(
       dateFrom,
       dateTo,
-      departmentId,
       designationId,
       employeeId,
       status,
-      month,
-      year,
+      filterVisibility.monthYear ? selectedMonth : undefined,
+      filterVisibility.monthYear ? selectedYear : undefined,
     );
   }
 
+  function clearGenerated() {
+    setResult(null);
+    setAppliedFilters(null);
+    setNotice("idle");
+  }
+
+  function changeFilter(next: string, current: string, setValue: (value: string) => void) {
+    if (next === current) return;
+    setValue(next);
+    clearGenerated();
+  }
+
   function onRun() {
+    if (filterVisibility.monthYear && (!month || !year)) {
+      setResult(null);
+      setAppliedFilters(null);
+      setNotice("need-period");
+      return;
+    }
+
+    const filters = currentFilters();
     startTransition(async () => {
-      const res = await runReportAction(reportKey, currentFilters());
+      const res = await runReportAction(reportKey, filters);
       if (!res.success) {
-        toast.error(res.message);
+        setResult(null);
+        setAppliedFilters(null);
+        setNotice("failed");
         return;
       }
+      setAppliedFilters(filters);
       setResult(res.data);
-      toast.success(`Loaded ${res.data.total} row${res.data.total === 1 ? "" : "s"}`);
+      setNotice(res.data.total === 0 ? "empty" : "idle");
     });
   }
 
   function onExport(format: ReportExportFormat) {
+    if (!result || result.total === 0 || result.key !== reportKey) return;
+
     startTransition(async () => {
-      const res = await exportReportAction(reportKey, currentFilters(), format);
-      if (!res.success) {
-        toast.error(res.message);
-        return;
-      }
+      const res = await exportGeneratedReportAction(
+        result,
+        format,
+        appliedFilters?.dateFrom,
+        appliedFilters?.dateTo,
+      );
+      if (!res.success) return;
       downloadBase64(res.filename, res.mimeType, res.contentBase64);
-      toast.success(`Exported ${res.rowCount} row${res.rowCount === 1 ? "" : "s"}`);
     });
   }
 
-  function onPrint() {
-    window.print();
-  }
+  const emptyState = MODULE_EMPTY_STATE[module] ?? {
+    title: "Report results will appear here",
+    description: "Choose filters and click Run to view and export data.",
+  };
+  const EmptyIcon = MODULE_EMPTY_ICONS[module] ?? CalendarDays;
+  const growingFilter = filterVisibility.employee
+    ? "employee"
+    : filterVisibility.designation
+      ? "designation"
+      : "status";
+  const canDownload = Boolean(result && result.total > 0 && result.key === reportKey);
+  const showTable = Boolean(result && result.total > 0 && result.key === reportKey);
+  const panelCopy =
+    notice === "failed"
+      ? GENERATE_FAILED
+      : notice === "need-period"
+        ? NEED_PERIOD
+        : notice === "empty"
+          ? (MODULE_NO_DATA[module] ?? GENERATE_FAILED)
+          : emptyState;
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">{MODULE_TITLES[module]}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {selectedDef?.description ?? "Run filtered operational reports and export results."}
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">{MODULE_SUBTITLES[module]}</p>
       </div>
 
-      {selectedDef ? (
-        <section className="rounded-xl border bg-muted/20 p-4 text-sm">
-          <h2 className="text-sm font-semibold">{selectedDef.title}</h2>
-          <dl className="mt-3 grid gap-3 sm:grid-cols-2">
-            <div>
-              <dt className="text-xs font-medium text-muted-foreground uppercase">Purpose</dt>
-              <dd className="mt-1">{selectedDef.purpose}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-medium text-muted-foreground uppercase">Description</dt>
-              <dd className="mt-1">{selectedDef.description}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-medium text-muted-foreground uppercase">Filters</dt>
-              <dd className="mt-1">{selectedDef.filterSummary}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-medium text-muted-foreground uppercase">Export formats</dt>
-              <dd className="mt-1">{selectedDef.exportFormats.join(", ").toUpperCase()}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-medium text-muted-foreground uppercase">Last generated</dt>
-              <dd className="mt-1">
-                {result?.key === reportKey
-                  ? format(parseISO(result.generatedAt), "d MMM yyyy, HH:mm")
-                  : "Not run in this session"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs font-medium text-muted-foreground uppercase">Usage</dt>
-              <dd className="mt-1">{selectedDef.usageInformation}</dd>
-            </div>
-          </dl>
-        </section>
-      ) : null}
-
-      <section className="space-y-4 rounded-xl border bg-card p-5 shadow-sm">
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <div className="space-y-2">
-            <Label>Report type</Label>
+      <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-0.5">
+        {filterVisibility.reportType ? (
+          <div className="w-[170px] shrink-0">
             <LabeledSelect
               items={reportItems}
               value={reportKey}
               onValueChange={(value) => {
-                setReportKey(value as ReportKey);
-                setResult(null);
+                changeFilter(value, reportKey, (next) => setReportKey(next as ReportKey));
               }}
-              placeholder="Select report"
-              contentClassName="min-w-72"
+              placeholder="Report type"
+              triggerClassName="h-8 w-full"
+              contentClassName="w-max min-w-[var(--anchor-width)] max-w-[22rem] max-h-[min(18rem,calc(100dvh-8rem))]"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="dateFrom">From</Label>
-            <Input
-              id="dateFrom"
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="dateTo">To</Label>
-            <Input
-              id="dateTo"
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Department</Label>
-            <LabeledSelect
-              items={departmentItems}
-              value={departmentId}
-              onValueChange={setDepartmentId}
-              placeholder="All departments"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Status</Label>
-            <LabeledSelect
-              items={statusItems}
-              value={status}
-              onValueChange={setStatus}
-              placeholder="All statuses"
-            />
-          </div>
-          {filterVisibility.designation ? (
-            <div className="space-y-2">
-              <Label>Designation</Label>
-              <LabeledSelect
-                items={designationItems}
-                value={designationId}
-                onValueChange={setDesignationId}
-                placeholder="All designations"
-              />
-            </div>
-          ) : null}
-          {filterVisibility.employee ? (
-            <div className="space-y-2">
-              <Label>Employee</Label>
-              <LabeledSelect
-                items={employeeItems}
-                value={employeeId}
-                onValueChange={setEmployeeId}
-                placeholder="All employees"
-              />
-            </div>
-          ) : null}
-          {filterVisibility.monthYear ? (
-            <>
-              <div className="space-y-2">
-                <Label>Month</Label>
-                <LabeledSelect
-                  items={monthItems}
-                  value={month}
-                  onValueChange={setMonth}
-                  placeholder="Any month"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Year</Label>
-                <LabeledSelect
-                  items={yearItems}
-                  value={year}
-                  onValueChange={setYear}
-                  placeholder="Any year"
-                />
-              </div>
-            </>
-          ) : null}
-        </div>
+        ) : null}
 
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={onRun} disabled={isPending}>
-            {isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Play className="mr-2 h-4 w-4" />
+        {filterVisibility.dates ? (
+          <>
+            <div className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border bg-background px-2">
+              <span className="shrink-0 text-xs text-muted-foreground">From</span>
+              <Input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => changeFilter(e.target.value, dateFrom, setDateFrom)}
+                className="h-7 w-[124px] border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+                aria-label="From date"
+              />
+            </div>
+            <div className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border bg-background px-2">
+              <span className="shrink-0 text-xs text-muted-foreground">To</span>
+              <Input
+                type="date"
+                value={dateTo}
+                onChange={(e) => changeFilter(e.target.value, dateTo, setDateTo)}
+                className="h-7 w-[124px] border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+                aria-label="To date"
+              />
+            </div>
+          </>
+        ) : null}
+
+        {filterVisibility.monthYear ? (
+          <>
+            <div className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border bg-background pl-2 pr-1">
+              <span className="shrink-0 text-xs text-muted-foreground">Month</span>
+              <LabeledSelect
+                items={monthItems}
+                value={month}
+                onValueChange={(value) => changeFilter(value, month, setMonth)}
+                placeholder="Select"
+                triggerClassName="h-7 min-w-[7rem] border-0 bg-transparent px-1 shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
+              />
+            </div>
+            <div className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border bg-background pl-2 pr-1">
+              <span className="shrink-0 text-xs text-muted-foreground">Year</span>
+              <LabeledSelect
+                items={yearItems}
+                value={year}
+                onValueChange={(value) => changeFilter(value, year, setYear)}
+                placeholder="Select"
+                triggerClassName="h-7 min-w-[4.5rem] border-0 bg-transparent px-1 shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
+              />
+            </div>
+          </>
+        ) : null}
+
+        <div className={cn(growingFilter === "status" ? "min-w-[132px] flex-1" : "w-[132px] shrink-0")}>
+          <LabeledSelect
+            items={statusItems}
+            value={status}
+            onValueChange={(value) => changeFilter(value, status, setStatus)}
+            placeholder="All statuses"
+            triggerClassName="h-8 w-full"
+            contentClassName="w-max min-w-[var(--anchor-width)] max-w-[16rem] max-h-[min(18rem,calc(100dvh-8rem))]"
+          />
+        </div>
+        {filterVisibility.designation ? (
+          <div
+            className={cn(
+              growingFilter === "designation" ? "min-w-[150px] flex-1" : "w-[150px] shrink-0",
             )}
-            Run Report
+          >
+            <LabeledSelect
+              items={designationItems}
+              value={designationId}
+              onValueChange={(value) => changeFilter(value, designationId, setDesignationId)}
+              placeholder="All designations"
+              triggerClassName="h-8 w-full"
+              align="end"
+              contentClassName="w-max min-w-[18rem] max-w-[min(24rem,calc(100vw-2rem))] max-h-[min(18rem,calc(100dvh-8rem))]"
+            />
+          </div>
+        ) : null}
+        {filterVisibility.employee ? (
+          <div
+            className={cn(
+              growingFilter === "employee" ? "min-w-[170px] flex-1" : "w-[170px] shrink-0",
+            )}
+          >
+            <LabeledSelect
+              items={employeeItems}
+              value={employeeId}
+              onValueChange={(value) => changeFilter(value, employeeId, setEmployeeId)}
+              placeholder="All employees"
+              triggerClassName="h-8 w-full"
+              contentClassName="w-max min-w-[18rem] max-w-[min(24rem,calc(100vw-2rem))] max-h-[min(18rem,calc(100dvh-8rem))]"
+            />
+          </div>
+        ) : null}
+
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Button onClick={onRun} disabled={isPending} size="sm">
+            {isPending ? (
+              <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+            ) : (
+              <Play className="mr-1.5 size-3.5" />
+            )}
+            Run
           </Button>
           {canExport ? (
             <>
               <Button
                 type="button"
                 variant="outline"
-                disabled={isPending}
+                size="sm"
+                disabled={!canDownload || isPending}
                 onClick={() => onExport("csv")}
               >
-                <Download className="mr-2 h-4 w-4" />
+                <Download className="mr-1.5 size-3.5" />
                 CSV
               </Button>
               <Button
                 type="button"
                 variant="outline"
-                disabled={isPending}
+                size="sm"
+                disabled={!canDownload || isPending}
                 onClick={() => onExport("excel")}
               >
-                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                <FileSpreadsheet className="mr-1.5 size-3.5" />
                 Excel
               </Button>
               <Button
                 type="button"
                 variant="outline"
-                disabled={isPending}
+                size="sm"
+                disabled={!canDownload || isPending}
                 onClick={() => onExport("pdf")}
               >
-                <FileText className="mr-2 h-4 w-4" />
+                <FileText className="mr-1.5 size-3.5" />
                 PDF
               </Button>
             </>
           ) : null}
-          <Button
-            type="button"
-            variant="outline"
-            disabled={!result || isPending}
-            onClick={onPrint}
-          >
-            <Printer className="mr-2 h-4 w-4" />
-            Print
-          </Button>
         </div>
-      </section>
-
-      <div id="report-print-region" className="space-y-3">
-        {result ? (
-          <>
-            <div className="flex flex-wrap items-end justify-between gap-2">
-              <div>
-                <h2 className="text-lg font-medium">{result.title}</h2>
-                <p className="text-xs text-muted-foreground">
-                  {result.total} row{result.total === 1 ? "" : "s"} · Generated{" "}
-                  {new Date(result.generatedAt).toLocaleString("en-IN")}
-                </p>
-              </div>
-            </div>
-            <DataTable
-              columns={columns}
-              data={tableRows}
-              emptyMessage="Report returned no rows for the selected filters."
-            />
-          </>
-        ) : (
-          <EmptyState
-            title="No report loaded"
-            description="Choose a report type, adjust filters, and click Run Report."
-          />
-        )}
       </div>
+
+      {showTable && result ? (
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            {result.title} · {result.total} row{result.total === 1 ? "" : "s"}
+            {appliedFilters?.month && appliedFilters?.year
+              ? ` · ${String(appliedFilters.month).padStart(2, "0")}/${appliedFilters.year}`
+              : appliedFilters?.dateFrom && appliedFilters?.dateTo
+                ? ` · ${appliedFilters.dateFrom} to ${appliedFilters.dateTo}`
+                : ""}
+            {" · Generated "}
+            {new Date(result.generatedAt).toLocaleString("en-IN")}
+          </p>
+
+          <div className="overflow-auto rounded-xl border bg-card max-h-[min(70vh,calc(100dvh-16rem))] [scrollbar-gutter:stable]">
+            <table className="w-full min-w-[42rem] text-sm">
+              <thead className="sticky top-0 z-10 bg-muted/95 text-left text-xs tracking-wide text-muted-foreground uppercase backdrop-blur supports-[backdrop-filter]:bg-muted/80">
+                <tr className="border-b">
+                  {result.columns.map((col) => (
+                    <th key={col.key} className="px-4 py-3 font-medium whitespace-nowrap">
+                      {col.header}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {result.rows.map((row, rowIndex) => (
+                  <tr key={rowIndex} className="border-b last:border-b-0 hover:bg-muted/20">
+                    {result.columns.map((col) => {
+                      const value = row[col.key];
+                      return (
+                        <td key={col.key} className="px-4 py-2.5 whitespace-nowrap">
+                          {value == null || value === "" ? "—" : String(value)}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <EmptyState
+          icon={<EmptyIcon className="size-6" />}
+          title={panelCopy.title}
+          description={panelCopy.description}
+          className="min-h-[22rem]"
+        />
+      )}
     </div>
   );
 }

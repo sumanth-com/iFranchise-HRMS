@@ -3,14 +3,18 @@
 import { format } from "date-fns";
 import { Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import type { z } from "zod";
 
 import { Button } from "@/components/common/button";
-import { DataTable, type DataTableColumn } from "@/components/common/data-table";
+import {
+  DATA_TABLE_SCROLL_MAX_HEIGHT,
+  DataTable,
+  type DataTableColumn,
+} from "@/components/common/data-table";
 import { EmptyState } from "@/components/common/empty-state";
 import { FilterSelect } from "@/components/common/filter-select";
 import { Input } from "@/components/common/input";
@@ -19,7 +23,6 @@ import { OptionalEntitySelect } from "@/components/common/optional-entity-select
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { withSelectOption } from "@/components/payroll/select-utils";
 import { Label } from "@/components/ui/label";
-import { OrgExportButtons } from "@/components/organization/org-export-buttons";
 import { OrgPagination } from "@/components/organization/org-pagination";
 import { OrgStatusBadge } from "@/components/organization/org-status-badge";
 import { deleteDepartmentAction, saveDepartmentAction } from "@/lib/organization/actions";
@@ -38,7 +41,6 @@ type DepartmentFormInput = z.input<typeof departmentFormSchema>;
 type Props = {
   result: DepartmentListResult;
   employees: LookupOption[];
-  departments: LookupOption[];
   branches: LookupOption[];
   permissionCodes: string[];
   search: string;
@@ -47,7 +49,6 @@ type Props = {
 
 const emptyForm: DepartmentFormInput = {
   name: "",
-  code: "",
   description: "",
   departmentHeadId: null,
   parentDepartmentId: null,
@@ -58,7 +59,6 @@ const emptyForm: DepartmentFormInput = {
 export function DepartmentsManagement({
   result,
   employees,
-  departments,
   branches,
   permissionCodes,
   search,
@@ -69,15 +69,14 @@ export function DepartmentsManagement({
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<DepartmentListItem | null>(null);
+  const [deleting, setDeleting] = useState<DepartmentListItem | null>(null);
+  const [isDeletePending, startDeleteTransition] = useTransition();
+  const [searchInput, setSearchInput] = useState(search);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const canCreate = canCreateOrganization(permissionCodes);
   const canEdit = canEditOrganization(permissionCodes);
   const canDelete = canDeleteOrganization(permissionCodes);
-
-  const parentOptions = useMemo(
-    () => departments.filter((d) => d.id !== editing?.id),
-    [departments, editing?.id],
-  );
 
   const statusItems = useMemo(
     () => [
@@ -98,6 +97,10 @@ export function DepartmentsManagement({
     defaultValues: emptyForm,
   });
 
+  useEffect(() => {
+    setSearchInput(search);
+  }, [search]);
+
   function updateParams(patch: Record<string, string | undefined>) {
     const params = new URLSearchParams(searchParams.toString());
     Object.entries(patch).forEach(([key, value]) => {
@@ -108,6 +111,15 @@ export function DepartmentsManagement({
     startTransition(() => {
       router.push(`?${params.toString()}`);
     });
+  }
+
+  function handleSearchChange(value: string) {
+    setSearchInput(value);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      const trimmed = value.trim();
+      updateParams({ search: trimmed || undefined });
+    }, 300);
   }
 
   const openCreate = useCallback(() => {
@@ -121,10 +133,8 @@ export function DepartmentsManagement({
       setEditing(item);
       form.reset({
         name: item.name,
-        code: item.code,
         description: item.description ?? "",
         departmentHeadId: item.departmentHeadId,
-        parentDepartmentId: item.parentDepartmentId,
         branchId: item.branchId,
         status: item.status,
       });
@@ -140,7 +150,7 @@ export function DepartmentsManagement({
           ...values,
           description: values.description || null,
           departmentHeadId: values.departmentHeadId || null,
-          parentDepartmentId: values.parentDepartmentId || null,
+          parentDepartmentId: null,
           branchId: values.branchId || null,
         },
         editing?.id,
@@ -155,25 +165,23 @@ export function DepartmentsManagement({
     });
   }
 
-  const onDelete = useCallback(
-    (item: DepartmentListItem) => {
-      const warning =
-        item.employeeCount > 0
-          ? ` This department has ${item.employeeCount} employee(s) assigned.`
-          : "";
-      if (!window.confirm(`Delete department "${item.name}"?${warning}`)) return;
-      startTransition(async () => {
-        const res = await deleteDepartmentAction(item.id);
-        if (!res.success) {
-          toast.error(res.message);
-          return;
-        }
-        toast.success("Department deleted");
-        router.refresh();
-      });
-    },
-    [router],
-  );
+  const requestDelete = useCallback((item: DepartmentListItem) => {
+    setDeleting(item);
+  }, []);
+
+  function confirmDelete() {
+    if (!deleting) return;
+    startDeleteTransition(async () => {
+      const res = await deleteDepartmentAction(deleting.id);
+      if (!res.success) {
+        toast.error(res.message);
+        return;
+      }
+      toast.success("Department deleted");
+      setDeleting(null);
+      router.refresh();
+    });
+  }
 
   const columns = useMemo<
     DataTableColumn<DepartmentListItem & Record<string, unknown>>[]
@@ -182,12 +190,8 @@ export function DepartmentsManagement({
       {
         key: "name",
         header: "Department",
-        render: (row) => (
-          <div>
-            <p className="font-medium">{row.name}</p>
-            <p className="text-xs text-muted-foreground">{row.code}</p>
-          </div>
-        ),
+        className: "text-left",
+        render: (row) => <p className="font-medium text-left">{row.name}</p>,
       },
       {
         key: "departmentHeadName",
@@ -195,19 +199,9 @@ export function DepartmentsManagement({
         render: (row) => row.departmentHeadName ?? "—",
       },
       {
-        key: "parentDepartmentName",
-        header: "Parent",
-        render: (row) => row.parentDepartmentName ?? "—",
-      },
-      {
         key: "branchName",
         header: "Branch",
         render: (row) => row.branchName ?? "—",
-      },
-      {
-        key: "employeeCount",
-        header: "Employees",
-        render: (row) => row.employeeCount,
       },
       {
         key: "status",
@@ -223,7 +217,7 @@ export function DepartmentsManagement({
         key: "actions",
         header: "Actions",
         render: (row) => (
-          <div className="flex gap-1">
+          <div className="flex justify-center gap-1">
             {canEdit ? (
               <Button
                 size="icon-sm"
@@ -238,7 +232,7 @@ export function DepartmentsManagement({
               <Button
                 size="icon-sm"
                 variant="ghost"
-                onClick={() => onDelete(row)}
+                onClick={() => requestDelete(row)}
                 aria-label="Delete"
               >
                 <Trash2 className="h-4 w-4 text-destructive" />
@@ -248,49 +242,42 @@ export function DepartmentsManagement({
         ),
       },
     ],
-    [canDelete, canEdit, onDelete, openEdit],
+    [canDelete, canEdit, requestDelete, openEdit],
   );
 
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Departments</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Organize teams and reporting structure by department.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <OrgExportButtons entity="departments" />
-          {canCreate ? (
-            <Button onClick={openCreate}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Department
-            </Button>
-          ) : null}
-        </div>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Departments</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Organize teams and reporting structure by department.
+        </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="relative">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative min-w-0 flex-1 sm:max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search departments…"
-            className="pl-9"
-            defaultValue={search}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                updateParams({ search: (e.target as HTMLInputElement).value || undefined });
-              }
-            }}
+            className="h-9 pl-9"
+            value={searchInput}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
         </div>
         <FilterSelect
           items={statusFilterItems}
           value={status ?? "all"}
           placeholder="All statuses"
+          className="sm:w-44"
+          triggerClassName="h-9"
           onValueChange={(v) => updateParams({ status: v === "all" ? undefined : v })}
         />
+        {canCreate ? (
+          <Button onClick={openCreate} className="h-9 shrink-0 sm:ml-auto">
+            <Plus className="mr-2 h-4 w-4" />
+            Add Department
+          </Button>
+        ) : null}
       </div>
 
       {isPending ? (
@@ -302,11 +289,21 @@ export function DepartmentsManagement({
 
       {result.data.length === 0 ? (
         <EmptyState
-          title="No departments found"
-          description="Add a department or adjust your filters."
+          title={search.trim() ? "No matching departments" : "No departments found"}
+          description={
+            search.trim()
+              ? `Nothing matches "${search.trim()}". Try another spelling or clear the search.`
+              : "Add a department or adjust your filters."
+          }
         />
       ) : (
-        <DataTable columns={columns} data={result.data} />
+        <DataTable
+          columns={columns}
+          data={result.data}
+          align="center"
+          scrollable
+          maxHeightClass={DATA_TABLE_SCROLL_MAX_HEIGHT}
+        />
       )}
 
       <OrgPagination page={result.page} pageSize={result.pageSize} total={result.total} />
@@ -330,8 +327,12 @@ export function DepartmentsManagement({
               <Input {...form.register("name")} />
             </div>
             <div className="space-y-2">
-              <Label>Code</Label>
-              <Input {...form.register("code")} />
+              <Label>Status</Label>
+              <LabeledSelect
+                items={statusItems}
+                value={form.watch("status")}
+                onValueChange={(v) => form.setValue("status", v as RecordStatus)}
+              />
             </div>
           </div>
           <div className="space-y-2">
@@ -353,17 +354,6 @@ export function DepartmentsManagement({
               />
             </div>
             <div className="space-y-2">
-              <Label>Parent Department</Label>
-              <OptionalEntitySelect
-                options={parentOptions}
-                value={form.watch("parentDepartmentId")}
-                onValueChange={(v) => form.setValue("parentDepartmentId", v)}
-                placeholder="None"
-              />
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
               <Label>Branch</Label>
               <OptionalEntitySelect
                 options={branches}
@@ -372,16 +362,43 @@ export function DepartmentsManagement({
                 placeholder="None"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <LabeledSelect
-                items={statusItems}
-                value={form.watch("status")}
-                onValueChange={(v) => form.setValue("status", v as RecordStatus)}
-              />
-            </div>
           </div>
         </div>
+      </Modal>
+
+      <Modal
+        open={deleting !== null}
+        onOpenChange={(open) => {
+          if (!open && !isDeletePending) setDeleting(null);
+        }}
+        title="Delete department?"
+        description={
+          deleting
+            ? `This will remove "${deleting.name}" from your organization.`
+            : undefined
+        }
+        contentClassName="sm:max-w-md"
+        footer={
+          <Button
+            variant="destructive"
+            disabled={isDeletePending || !deleting}
+            onClick={confirmDelete}
+          >
+            {isDeletePending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Delete department
+          </Button>
+        }
+      >
+        {deleting && deleting.employeeCount > 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {deleting.employeeCount} employee(s) are assigned to this department. They will be
+            unassigned when you delete it.
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            This action cannot be undone. The department will be removed from lists and reports.
+          </p>
+        )}
       </Modal>
     </>
   );

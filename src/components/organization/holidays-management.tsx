@@ -18,17 +18,20 @@ import {
   Plus,
   Search,
   Trash2,
-  Upload,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import type { z } from "zod";
 
 import { Button } from "@/components/common/button";
-import { DataTable, type DataTableColumn } from "@/components/common/data-table";
+import {
+  DATA_TABLE_SCROLL_MAX_HEIGHT,
+  DataTable,
+  type DataTableColumn,
+} from "@/components/common/data-table";
 import { EmptyState } from "@/components/common/empty-state";
 import { Input } from "@/components/common/input";
 import { Modal } from "@/components/common/modal";
@@ -41,12 +44,10 @@ import {
   SelectValue,
 } from "@/components/common/select";
 import { Label } from "@/components/ui/label";
-import { OrgExportButtons } from "@/components/organization/org-export-buttons";
 import { OrgPagination } from "@/components/organization/org-pagination";
 import { OrgStatusBadge } from "@/components/organization/org-status-badge";
 import {
   deleteHolidayAction,
-  importHolidaysAction,
   saveHolidayAction,
 } from "@/lib/organization/actions";
 import {
@@ -133,7 +134,10 @@ export function HolidaysManagement({
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<HolidayListItem | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [deleting, setDeleting] = useState<HolidayListItem | null>(null);
+  const [isDeletePending, startDeleteTransition] = useTransition();
+  const [searchInput, setSearchInput] = useState(search);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const canCreate = canManageHolidays(permissionCodes);
   const canEdit = canEditOrganization(permissionCodes) || canManageHolidays(permissionCodes);
@@ -147,6 +151,10 @@ export function HolidaysManagement({
     defaultValues: emptyForm,
   });
 
+  useEffect(() => {
+    setSearchInput(search);
+  }, [search]);
+
   const selectedDepartments = form.watch("applicableDepartmentIds") ?? [];
 
   function updateParams(patch: Record<string, string | undefined>) {
@@ -159,6 +167,15 @@ export function HolidaysManagement({
     startTransition(() => {
       router.push(`?${params.toString()}`);
     });
+  }
+
+  function handleSearchChange(value: string) {
+    setSearchInput(value);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      const trimmed = value.trim();
+      updateParams({ search: trimmed || undefined });
+    }, 300);
   }
 
   const holidayMap = useMemo(() => {
@@ -237,31 +254,20 @@ export function HolidaysManagement({
     });
   }
 
-  const onDelete = useCallback(
-    (item: HolidayListItem) => {
-      if (!window.confirm(`Delete holiday "${item.name}"?`)) return;
-      startTransition(async () => {
-        const res = await deleteHolidayAction(item.id);
-        if (!res.success) {
-          toast.error(res.message);
-          return;
-        }
-        toast.success("Holiday deleted");
-        router.refresh();
-      });
-    },
-    [router],
-  );
+  const requestDelete = useCallback((item: HolidayListItem) => {
+    setDeleting(item);
+  }, []);
 
-  function handleImport(file: File) {
-    startTransition(async () => {
-      const csvContent = await file.text();
-      const res = await importHolidaysAction(csvContent);
+  function confirmDelete() {
+    if (!deleting) return;
+    startDeleteTransition(async () => {
+      const res = await deleteHolidayAction(deleting.id);
       if (!res.success) {
         toast.error(res.message);
         return;
       }
-      toast.success(`Imported ${res.data.imported} holiday(s)`);
+      toast.success("Holiday deleted");
+      setDeleting(null);
       router.refresh();
     });
   }
@@ -271,8 +277,9 @@ export function HolidaysManagement({
       {
         key: "name",
         header: "Holiday",
+        className: "text-left",
         render: (row) => (
-          <div>
+          <div className="text-left">
             <p className="font-medium">{row.name}</p>
             {row.isOptional ? (
               <p className="text-xs text-muted-foreground">Optional</p>
@@ -304,7 +311,7 @@ export function HolidaysManagement({
         key: "actions",
         header: "Actions",
         render: (row) => (
-          <div className="flex gap-1">
+          <div className="flex justify-center gap-1">
             {canEdit ? (
               <Button
                 size="icon-sm"
@@ -319,7 +326,7 @@ export function HolidaysManagement({
               <Button
                 size="icon-sm"
                 variant="ghost"
-                onClick={() => onDelete(row)}
+                onClick={() => requestDelete(row)}
                 aria-label="Delete"
               >
                 <Trash2 className="h-4 w-4 text-destructive" />
@@ -329,7 +336,7 @@ export function HolidaysManagement({
         ),
       },
     ],
-    [canDelete, canEdit, onDelete, openEdit],
+    [canDelete, canEdit, requestDelete, openEdit],
   );
 
   function goToPreviousMonth() {
@@ -350,59 +357,28 @@ export function HolidaysManagement({
 
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Holidays</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage company holidays for {result.year}.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <OrgExportButtons entity="holidays" year={result.year} />
-          {canCreate ? (
-            <>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".csv,text/csv"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleImport(file);
-                  e.target.value = "";
-                }}
-              />
-              <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={isPending}>
-                <Upload className="mr-2 h-4 w-4" />
-                Import CSV
-              </Button>
-              <Button onClick={openCreate}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Holiday
-              </Button>
-            </>
-          ) : null}
-        </div>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Holidays</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Manage company holidays for {result.year}.
+        </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative min-w-0 flex-1 sm:max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search holidays…"
-            className="pl-9"
-            defaultValue={search}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                updateParams({ search: (e.target as HTMLInputElement).value || undefined });
-              }
-            }}
+            className="h-9 pl-9"
+            value={searchInput}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
         </div>
-        <div className="flex gap-1 rounded-lg border p-1">
+        <div className="flex shrink-0 gap-1 rounded-lg border p-1">
           <Button
             variant={viewMode === "list" ? "secondary" : "ghost"}
             size="sm"
+            className="h-8"
             onClick={() => updateParams({ view: "list" })}
           >
             <List className="mr-1.5 h-4 w-4" />
@@ -411,12 +387,19 @@ export function HolidaysManagement({
           <Button
             variant={viewMode === "calendar" ? "secondary" : "ghost"}
             size="sm"
+            className="h-8"
             onClick={() => updateParams({ view: "calendar" })}
           >
             <Calendar className="mr-1.5 h-4 w-4" />
             Calendar
           </Button>
         </div>
+        {canCreate ? (
+          <Button onClick={openCreate} className="h-9 shrink-0 sm:ml-auto">
+            <Plus className="mr-2 h-4 w-4" />
+            Add Holiday
+          </Button>
+        ) : null}
       </div>
 
       {isPending ? (
@@ -430,11 +413,25 @@ export function HolidaysManagement({
         <>
           {result.data.length === 0 ? (
             <EmptyState
-              title="No holidays found"
-              description="Add holidays or import from CSV."
+              title={
+                search.trim()
+                  ? "No matching holidays"
+                  : "No holidays found"
+              }
+              description={
+                search.trim()
+                  ? `Nothing matches "${search.trim()}". Try another spelling or clear the search to see all holidays for ${result.year}.`
+                  : `Add a holiday to build your calendar for ${result.year}.`
+              }
             />
           ) : (
-            <DataTable columns={columns} data={result.data} />
+            <DataTable
+              columns={columns}
+              data={result.data}
+              align="center"
+              scrollable
+              maxHeightClass={DATA_TABLE_SCROLL_MAX_HEIGHT}
+            />
           )}
           <OrgPagination page={result.page ?? 1} pageSize={20} total={result.total} />
         </>
@@ -645,6 +642,35 @@ export function HolidaysManagement({
             </Select>
           </div>
         </div>
+      </Modal>
+
+      <Modal
+        open={deleting !== null}
+        onOpenChange={(open) => {
+          if (!open && !isDeletePending) setDeleting(null);
+        }}
+        title="Delete holiday?"
+        description={
+          deleting
+            ? `This will remove "${deleting.name}" from your holiday calendar.`
+            : undefined
+        }
+        contentClassName="sm:max-w-md"
+        footer={
+          <Button
+            variant="destructive"
+            disabled={isDeletePending || !deleting}
+            onClick={confirmDelete}
+          >
+            {isDeletePending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Delete holiday
+          </Button>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          This action cannot be undone. The holiday will be removed from lists and the calendar
+          view.
+        </p>
       </Modal>
     </>
   );

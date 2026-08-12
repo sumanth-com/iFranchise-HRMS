@@ -22,7 +22,6 @@ import {
   SelectValue,
 } from "@/components/common/select";
 import { Label } from "@/components/ui/label";
-import { OrgExportButtons } from "@/components/organization/org-export-buttons";
 import { OrgStatusBadge } from "@/components/organization/org-status-badge";
 import {
   deleteEmploymentTypeAction,
@@ -156,11 +155,6 @@ export function EmploymentTypesManagement({ items, permissionCodes }: Props) {
         render: (row) => row.defaultHoursPerWeek,
       },
       {
-        key: "employeeCount",
-        header: "Employees",
-        render: (row) => row.employeeCount,
-      },
-      {
         key: "status",
         header: "Status",
         render: (row) => <OrgStatusBadge status={row.status} />,
@@ -174,7 +168,7 @@ export function EmploymentTypesManagement({ items, permissionCodes }: Props) {
         key: "actions",
         header: "Actions",
         render: (row) => (
-          <div className="flex gap-1">
+          <div className="flex justify-center gap-1">
             {canEdit ? (
               <Button
                 size="icon-sm"
@@ -212,15 +206,12 @@ export function EmploymentTypesManagement({ items, permissionCodes }: Props) {
             Configure full-time, part-time, and contract employment categories.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <OrgExportButtons entity="employment-types" />
-          {canCreate ? (
-            <Button onClick={openCreate}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Employment Type
-            </Button>
-          ) : null}
-        </div>
+        {canCreate ? (
+          <Button onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Employment Type
+          </Button>
+        ) : null}
       </div>
 
       {items.length === 0 ? (
@@ -229,7 +220,7 @@ export function EmploymentTypesManagement({ items, permissionCodes }: Props) {
           description="Add employment types to classify employees."
         />
       ) : (
-        <DataTable columns={columns} data={items} />
+        <DataTable columns={columns} data={items} align="center" />
       )}
 
       <Modal

@@ -268,6 +268,11 @@ export type EmployeeSalaryStructureDetail = {
   components: Record<string, unknown>;
 };
 
+export type EmployeeAttendancePeriod = {
+  month: number | null;
+  year: number | null;
+};
+
 export type EmployeeAttendanceSummary = {
   totalRecords: number;
   presentDays: number;

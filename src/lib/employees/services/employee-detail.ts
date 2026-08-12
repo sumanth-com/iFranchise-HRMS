@@ -1,7 +1,10 @@
+import { format, lastDayOfMonth } from "date-fns";
+
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { LEAVE_BALANCE_DISPLAY_CODES } from "@/lib/leave/constants";
 import type {
   EmployeeAddressDetail,
+  EmployeeAttendancePeriod,
   EmployeeDetail,
   EmployeeDocumentDetail,
   EmployeeProfileDetail,
@@ -11,6 +14,38 @@ import type {
 function unwrapRelation<T>(value: T | T[] | null): T | null {
   if (!value) return null;
   return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+function firstSearchString(
+  value: string | string[] | undefined,
+): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+export function parseEmployeeAttendancePeriod(
+  raw: Record<string, string | string[] | undefined>,
+): EmployeeAttendancePeriod {
+  const monthRaw = Number.parseInt(firstSearchString(raw.month) ?? "", 10);
+  const yearRaw = Number.parseInt(firstSearchString(raw.year) ?? "", 10);
+
+  return {
+    month: monthRaw >= 1 && monthRaw <= 12 ? monthRaw : null,
+    year: yearRaw >= 2000 && yearRaw <= 2100 ? yearRaw : null,
+  };
+}
+
+export function isCompleteAttendancePeriod(
+  period: EmployeeAttendancePeriod,
+): period is { month: number; year: number } {
+  return period.month != null && period.year != null;
+}
+
+function attendanceMonthRange(period: { month: number; year: number }) {
+  const start = new Date(period.year, period.month - 1, 1);
+  return {
+    startDate: format(start, "yyyy-MM-dd"),
+    endDate: format(lastDayOfMonth(start), "yyyy-MM-dd"),
+  };
 }
 
 export async function getEmployeeById(
@@ -249,8 +284,13 @@ export async function getEmployeeById(
 export async function getEmployeeAttendance(
   supabase: AuthSupabaseClient,
   employeeId: string,
+  period?: EmployeeAttendancePeriod,
 ) {
-  const { data, error } = await supabase
+  if (period && !isCompleteAttendancePeriod(period)) {
+    return [];
+  }
+
+  let query = supabase
     .schema("hrms")
     .from("attendance")
     .select(
@@ -258,8 +298,16 @@ export async function getEmployeeAttendance(
     )
     .eq("employee_id", employeeId)
     .is("deleted_at", null)
-    .order("attendance_date", { ascending: false })
-    .limit(20);
+    .order("attendance_date", { ascending: false });
+
+  if (period && isCompleteAttendancePeriod(period)) {
+    const { startDate, endDate } = attendanceMonthRange(period);
+    query = query.gte("attendance_date", startDate).lte("attendance_date", endDate);
+  } else {
+    query = query.limit(20);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw new Error(error.message);
   return data ?? [];
@@ -268,8 +316,13 @@ export async function getEmployeeAttendance(
 export async function getEmployeeLeaveRequests(
   supabase: AuthSupabaseClient,
   employeeId: string,
+  period?: EmployeeAttendancePeriod,
 ) {
-  const { data, error } = await supabase
+  if (period && !isCompleteAttendancePeriod(period)) {
+    return [];
+  }
+
+  let query = supabase
     .schema("hrms")
     .from("leave_requests")
     .select(
@@ -277,8 +330,16 @@ export async function getEmployeeLeaveRequests(
     )
     .eq("employee_id", employeeId)
     .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-    .limit(20);
+    .order("created_at", { ascending: false });
+
+  if (period && isCompleteAttendancePeriod(period)) {
+    const { startDate, endDate } = attendanceMonthRange(period);
+    query = query.lte("start_date", endDate).gte("end_date", startDate);
+  } else {
+    query = query.limit(20);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw new Error(error.message);
 
@@ -306,8 +367,13 @@ export async function getEmployeeLeaveRequests(
 export async function getEmployeeLeaveApprovals(
   supabase: AuthSupabaseClient,
   employeeId: string,
+  period?: EmployeeAttendancePeriod,
 ) {
-  const { data, error } = await supabase
+  if (period && !isCompleteAttendancePeriod(period)) {
+    return [];
+  }
+
+  let query = supabase
     .schema("hrms")
     .from("leave_approvals")
     .select(
@@ -333,60 +399,77 @@ export async function getEmployeeLeaveApprovals(
     )
     .eq("leave_requests.employee_id", employeeId)
     .is("deleted_at", null)
-    .order("acted_at", { ascending: false })
-    .limit(30);
+    .order("acted_at", { ascending: false });
+
+  if (!period) {
+    query = query.limit(30);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw new Error(error.message);
 
-  return (data ?? []).map((row) => {
-    const leaveRequest = unwrapRelation(
-      row.leave_requests as
-        | {
-            id: string;
-            start_date: string;
-            end_date: string;
-            leave_status: string;
-          }
-        | {
-            id: string;
-            start_date: string;
-            end_date: string;
-            leave_status: string;
-          }[]
-        | null,
-    );
-    const approver = unwrapRelation(
-      row.approver as
-        | {
-            first_name: string;
-            last_name: string;
-            employee_code: string | null;
-          }
-        | {
-            first_name: string;
-            last_name: string;
-            employee_code: string | null;
-          }[]
-        | null,
-    );
+  const range =
+    period && isCompleteAttendancePeriod(period)
+      ? attendanceMonthRange(period)
+      : null;
 
-    const approverName = approver
-      ? [approver.first_name, approver.last_name].filter(Boolean).join(" ")
-      : "—";
+  return (data ?? [])
+    .map((row) => {
+      const leaveRequest = unwrapRelation(
+        row.leave_requests as
+          | {
+              id: string;
+              start_date: string;
+              end_date: string;
+              leave_status: string;
+            }
+          | {
+              id: string;
+              start_date: string;
+              end_date: string;
+              leave_status: string;
+            }[]
+          | null,
+      );
+      const approver = unwrapRelation(
+        row.approver as
+          | {
+              first_name: string;
+              last_name: string;
+              employee_code: string | null;
+            }
+          | {
+              first_name: string;
+              last_name: string;
+              employee_code: string | null;
+            }[]
+          | null,
+      );
 
-    return {
-      id: row.id,
-      leaveRequestId: leaveRequest?.id ?? "",
-      approvalLevel: row.approval_level,
-      approvalStatus: row.approval_status,
-      approverName,
-      comments: row.comments,
-      actedAt: row.acted_at,
-      leaveStartDate: leaveRequest?.start_date ?? "",
-      leaveEndDate: leaveRequest?.end_date ?? "",
-      leaveStatus: leaveRequest?.leave_status ?? "",
-    };
-  });
+      const approverName = approver
+        ? [approver.first_name, approver.last_name].filter(Boolean).join(" ")
+        : "—";
+
+      return {
+        id: row.id,
+        leaveRequestId: leaveRequest?.id ?? "",
+        approvalLevel: row.approval_level,
+        approvalStatus: row.approval_status,
+        approverName,
+        comments: row.comments,
+        actedAt: row.acted_at,
+        leaveStartDate: leaveRequest?.start_date ?? "",
+        leaveEndDate: leaveRequest?.end_date ?? "",
+        leaveStatus: leaveRequest?.leave_status ?? "",
+      };
+    })
+    .filter((row) => {
+      if (!range) return true;
+      return (
+        row.leaveStartDate <= range.endDate && row.leaveEndDate >= range.startDate
+      );
+    });
 }
 
 export async function getEmployeePayrollItems(
@@ -456,8 +539,13 @@ export async function getEmployeeBankAccounts(
 export async function getEmployeeLeaveBalances(
   supabase: AuthSupabaseClient,
   employeeId: string,
+  period?: EmployeeAttendancePeriod,
 ) {
-  const { data, error } = await supabase
+  if (period && !isCompleteAttendancePeriod(period)) {
+    return [];
+  }
+
+  let query = supabase
     .schema("hrms")
     .from("leave_balances")
     .select(
@@ -466,6 +554,12 @@ export async function getEmployeeLeaveBalances(
     .eq("employee_id", employeeId)
     .is("deleted_at", null)
     .order("balance_year", { ascending: false });
+
+  if (period && isCompleteAttendancePeriod(period)) {
+    query = query.eq("balance_year", period.year);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw new Error(error.message);
 
@@ -533,13 +627,25 @@ export async function getEmployeeSalaryStructure(
 export async function getEmployeeAttendanceSummary(
   supabase: AuthSupabaseClient,
   employeeId: string,
+  period?: EmployeeAttendancePeriod,
 ) {
-  const { data, error } = await supabase
+  if (period && !isCompleteAttendancePeriod(period)) {
+    return { totalRecords: 0, presentDays: 0, totalWorkHours: 0 };
+  }
+
+  let query = supabase
     .schema("hrms")
     .from("attendance")
     .select("attendance_status, work_hours")
     .eq("employee_id", employeeId)
     .is("deleted_at", null);
+
+  if (period && isCompleteAttendancePeriod(period)) {
+    const { startDate, endDate } = attendanceMonthRange(period);
+    query = query.gte("attendance_date", startDate).lte("attendance_date", endDate);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw new Error(error.message);
 

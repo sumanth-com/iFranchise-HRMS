@@ -112,6 +112,8 @@ export type DesignationListItem = {
   code: string;
   departmentId: string | null;
   departmentName: string | null;
+  employmentTypeId: string | null;
+  employmentTypeName: string | null;
   level: number;
   description: string | null;
   status: RecordStatus;

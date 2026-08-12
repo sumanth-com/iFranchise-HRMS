@@ -17,11 +17,13 @@ import {
   compareRoles,
   getAllPermissions,
   getRolePermissionDetail,
+  listAllRolesForExport,
   listRoles,
   listUserRoleAssignments,
   searchRolesModule,
 } from "@/lib/roles/services/role-queries";
-import { exportRoles, exportUserRoles } from "@/lib/roles/services/role-export";
+import { exportRolesPayload, exportUserRolesPayload } from "@/lib/roles/services/role-export";
+import type { RoleExportPayload } from "@/lib/roles/services/role-export";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -243,28 +245,40 @@ export async function searchRolesAction(
 export async function exportRolesDataAction(
   entity: "roles" | "assignments",
   format: RoleExportFormat,
-): Promise<RoleActionResult<{ content: string; filename: string; mimeType: string }>> {
+): Promise<RoleActionResult<RoleExportPayload>> {
   try {
+    if (format !== "csv" && format !== "excel") {
+      return { success: false, message: "Unsupported export format" };
+    }
+
     const profile = await requireServerAnyPermission(["role.view"]);
     const supabase = await createClient();
     const orgId = profile.employee.organizationId;
-
-    let content: string;
-    let filename: string;
-    const ext = format === "excel" ? "xls" : "csv";
-    const mimeType = format === "excel" ? "application/vnd.ms-excel" : "text/csv;charset=utf-8";
+    const stamp = new Date().toISOString().slice(0, 10);
 
     if (entity === "roles") {
-      const result = await listRoles(supabase, orgId, { page: 1, pageSize: 1000 });
-      content = exportRoles(result.data, format);
-      filename = `roles.${ext}`;
-    } else {
-      const result = await listUserRoleAssignments(supabase, orgId, { page: 1, pageSize: 1000 });
-      content = exportUserRoles(result.data, format);
-      filename = `user-role-assignments.${ext}`;
+      const roles = await listAllRolesForExport(supabase, orgId);
+      return { success: true, data: exportRolesPayload(roles, format, stamp) };
     }
 
-    return { success: true, data: { content, filename, mimeType } };
+    const first = await listUserRoleAssignments(supabase, orgId, {
+      page: 1,
+      pageSize: 100,
+    });
+    const assignments = [...first.data];
+    const totalPages = Math.max(1, Math.ceil(first.total / 100));
+    for (let page = 2; page <= totalPages; page += 1) {
+      const next = await listUserRoleAssignments(supabase, orgId, {
+        page,
+        pageSize: 100,
+      });
+      assignments.push(...next.data);
+    }
+
+    return {
+      success: true,
+      data: exportUserRolesPayload(assignments, format, stamp),
+    };
   } catch (error) {
     return {
       success: false,

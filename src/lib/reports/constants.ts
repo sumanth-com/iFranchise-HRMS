@@ -16,8 +16,6 @@ export const REPORTS_ROUTES = {
 } as const;
 
 export const REPORTS_SUB_NAV = [
-  { title: "Dashboard", href: REPORTS_ROUTES.dashboard },
-  { title: "HR Reports", href: REPORTS_ROUTES.hr },
   { title: "Attendance", href: REPORTS_ROUTES.attendance },
   { title: "Leave", href: REPORTS_ROUTES.leave },
   { title: "Payroll", href: REPORTS_ROUTES.payroll },
@@ -25,8 +23,6 @@ export const REPORTS_SUB_NAV = [
   { title: "Recruitment", href: REPORTS_ROUTES.recruitment },
   { title: "Assets", href: REPORTS_ROUTES.assets },
   { title: "Exit", href: REPORTS_ROUTES.exit },
-  { title: "Exports", href: REPORTS_ROUTES.exports },
-  { title: "Settings", href: REPORTS_ROUTES.settings },
 ] as const;
 
 export const DEFAULT_REPORTS_SETTINGS = {

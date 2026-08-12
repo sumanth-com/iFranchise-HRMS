@@ -92,8 +92,8 @@ export const SYSTEM_MODULE_LINKS: Record<string, { title: string; description: s
   },
   permissions: {
     title: "Permission Matrix",
-    description: "View and assign permissions across all roles.",
-    targetHref: ROLES_ROUTES.permissions,
+    description: "Manage roles and access control from Roles & Access.",
+    targetHref: ROLES_ROUTES.manage,
   },
   provisioning: {
     title: "User Provisioning",

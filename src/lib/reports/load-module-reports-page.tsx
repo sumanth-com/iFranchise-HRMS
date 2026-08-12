@@ -1,9 +1,6 @@
 import { ModuleReportsView } from "@/components/reports/module-reports-view";
 import { MODULE_REPORTS, REPORT_DEFINITIONS } from "@/lib/reports/constants";
-import {
-  getReportsLookups,
-  runReport,
-} from "@/lib/reports/services/reports-queries";
+import { getReportsLookups } from "@/lib/reports/services/reports-queries";
 import { defaultDateRange } from "@/lib/reports/services/reports-utils";
 import { requireServerPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -64,23 +61,14 @@ export async function loadModuleReportsPage(
   const filters = parseFilters(raw);
   const lookups = await getReportsLookups(supabase, profile);
 
-  let initialResult = null;
-  if (reportKey) {
-    try {
-      initialResult = await runReport(supabase, profile, reportKey, filters);
-    } catch {
-      initialResult = null;
-    }
-  }
-
   return (
     <ModuleReportsView
+      key={module}
       module={module}
       definitions={definitions}
       lookups={lookups}
       permissionCodes={profile.permissionCodes}
       initialReportKey={reportKey}
-      initialResult={initialResult}
       defaultFilters={filters}
     />
   );

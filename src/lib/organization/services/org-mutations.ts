@@ -15,6 +15,10 @@ import { emptyToNull } from "@/lib/organization/services/org-lookups";
 import { syncOrganizationBrandingToPayroll } from "@/lib/organization/services/org-branding-sync";
 import { wouldCreateCircularReporting } from "@/lib/organization/services/org-queries";
 
+function isMissingEmploymentTypeColumn(message: string) {
+  return message.includes("employment_type_id");
+}
+
 type ProfileInput = z.infer<typeof organizationProfileSchema>;
 type BranchInput = z.infer<typeof branchFormSchema>;
 type DepartmentInput = z.infer<typeof departmentFormSchema>;
@@ -270,6 +274,26 @@ export async function deleteBranch(supabase: AuthSupabaseClient, profile: UserPr
   if (error) throw new Error(error.message);
 }
 
+function deriveDepartmentCode(name: string) {
+  const normalized = name
+    .trim()
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toUpperCase();
+
+  return (normalized || "DEPT").slice(0, 20);
+}
+
+function deriveDesignationCode(title: string) {
+  const normalized = title
+    .trim()
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toUpperCase();
+
+  return (normalized || "ROLE").slice(0, 20);
+}
+
 export async function saveDepartment(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -286,7 +310,11 @@ export async function saveDepartment(
 
   const payload = {
     name: parsed.name,
-    code: parsed.code.toUpperCase(),
+    ...(parsed.code?.trim()
+      ? { code: parsed.code.trim().toUpperCase() }
+      : id
+        ? {}
+        : { code: deriveDepartmentCode(parsed.name) }),
     description: emptyToNull(parsed.description),
     department_head_id: parsed.departmentHeadId ?? null,
     parent_department_id: parsed.parentDepartmentId ?? null,
@@ -314,29 +342,15 @@ export async function saveDepartment(
 
 export async function deleteDepartment(
   supabase: AuthSupabaseClient,
-  profile: UserProfile,
+  _profile: UserProfile,
   id: string,
 ) {
-  const orgId = profile.employee.organizationId;
-  const { count } = await supabase
-    .schema("hrms")
-    .from("employees")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", orgId)
-    .eq("department_id", id)
-    .is("deleted_at", null);
-
-  if ((count ?? 0) > 0) {
-    throw new Error("Cannot delete department with assigned employees");
-  }
-
-  const { error } = await supabase
-    .schema("hrms")
-    .from("departments")
-    .update({ deleted_at: new Date().toISOString(), status: "archived", ...auditFields(profile) })
-    .eq("id", id);
+  const { data, error } = await supabase.schema("hrms").rpc("soft_delete_department", {
+    p_department_id: id,
+  });
 
   if (error) throw new Error(error.message);
+  if (!data) throw new Error("Department not found or already deleted.");
 }
 
 export async function saveDesignation(
@@ -351,56 +365,76 @@ export async function saveDesignation(
 
   const payload = {
     title: parsed.title,
-    code: parsed.code.toUpperCase(),
+    ...(parsed.code?.trim()
+      ? { code: parsed.code.trim().toUpperCase() }
+      : id
+        ? {}
+        : { code: deriveDesignationCode(parsed.title) }),
     department_id: parsed.departmentId ?? null,
-    level: parsed.level,
+    employment_type_id: parsed.employmentTypeId ?? null,
+    level: id ? undefined : 1,
     description: emptyToNull(parsed.description),
     status: parsed.status,
     ...auditFields(profile),
   };
 
   if (id) {
-    const { error } = await supabase.schema("hrms").from("designations").update(payload).eq("id", id);
+    const { level: _level, ...updatePayload } = payload;
+    let { error } = await supabase
+      .schema("hrms")
+      .from("designations")
+      .update(updatePayload)
+      .eq("id", id);
+
+    if (error && isMissingEmploymentTypeColumn(error.message)) {
+      const { employment_type_id: _employmentTypeId, ...legacyPayload } = updatePayload;
+      const retry = await supabase
+        .schema("hrms")
+        .from("designations")
+        .update(legacyPayload)
+        .eq("id", id);
+      error = retry.error;
+    }
+
     if (error) throw new Error(error.message);
     return id;
   }
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .schema("hrms")
     .from("designations")
     .insert({ ...payload, ...createFields(profile) })
     .select("id")
     .single();
 
+  if (error && isMissingEmploymentTypeColumn(error.message)) {
+    const { employment_type_id: _employmentTypeId, ...legacyPayload } = payload;
+    const retry = await supabase
+      .schema("hrms")
+      .from("designations")
+      .insert({ ...legacyPayload, ...createFields(profile) })
+      .select("id")
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
+
   if (error) throw new Error(error.message);
+  if (!data) throw new Error("Failed to create designation");
   return data.id;
 }
 
 export async function deleteDesignation(
   supabase: AuthSupabaseClient,
-  profile: UserProfile,
+  _profile: UserProfile,
   id: string,
 ) {
-  const orgId = profile.employee.organizationId;
-  const { count } = await supabase
-    .schema("hrms")
-    .from("employees")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", orgId)
-    .eq("designation_id", id)
-    .is("deleted_at", null);
-
-  if ((count ?? 0) > 0) {
-    throw new Error("Cannot delete designation currently assigned to employees");
-  }
-
-  const { error } = await supabase
-    .schema("hrms")
-    .from("designations")
-    .update({ deleted_at: new Date().toISOString(), status: "archived", ...auditFields(profile) })
-    .eq("id", id);
+  const { data, error } = await supabase.schema("hrms").rpc("soft_delete_designation", {
+    p_designation_id: id,
+  });
 
   if (error) throw new Error(error.message);
+  if (!data) throw new Error("Designation not found or already deleted.");
 }
 
 export async function saveEmploymentType(
@@ -556,14 +590,17 @@ export async function saveHoliday(
   return data.id;
 }
 
-export async function deleteHoliday(supabase: AuthSupabaseClient, profile: UserProfile, id: string) {
-  const { error } = await supabase
-    .schema("hrms")
-    .from("holidays")
-    .update({ deleted_at: new Date().toISOString(), status: "archived", ...auditFields(profile) })
-    .eq("id", id);
+export async function deleteHoliday(
+  supabase: AuthSupabaseClient,
+  _profile: UserProfile,
+  id: string,
+) {
+  const { data, error } = await supabase.schema("hrms").rpc("soft_delete_holiday", {
+    p_holiday_id: id,
+  });
 
   if (error) throw new Error(error.message);
+  if (!data) throw new Error("Holiday not found or already deleted.");
 }
 
 export async function saveShiftTemplate(

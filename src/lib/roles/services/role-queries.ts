@@ -312,6 +312,26 @@ export async function listRoles(
   return { data: rows, total: count ?? 0, page, pageSize };
 }
 
+/** Fetch every non-deleted role for CSV/Excel export (no UI page-size cap). */
+export async function listAllRolesForExport(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+): Promise<RoleListItem[]> {
+  const pageSize = 100;
+  let page = 1;
+  const all: RoleListItem[] = [];
+
+  while (true) {
+    const result = await listRoles(supabase, organizationId, { page, pageSize });
+    all.push(...result.data);
+    if (all.length >= result.total || result.data.length === 0) break;
+    page += 1;
+    if (page > 50) break;
+  }
+
+  return all;
+}
+
 export async function listUserRoleAssignments(
   supabase: AuthSupabaseClient,
   organizationId: string,

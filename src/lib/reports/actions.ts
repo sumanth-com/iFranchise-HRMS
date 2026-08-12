@@ -17,17 +17,19 @@ import {
 } from "@/lib/reports/services/reports-settings";
 import {
   reportToCsv,
-  reportToExcelXml,
   reportToPdfBytes,
+  toCell,
 } from "@/lib/reports/services/reports-utils";
+import { buildXlsxBuffer } from "@/lib/reports/services/xlsx-builder";
 import { requireServerAnyPermission, requireServerPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 import {
+  generatedReportSchema,
   reportFiltersSchema,
   reportScheduleSchema,
   reportsSettingsSchema,
 } from "@/lib/validations/reports";
-import type { ReportExportFormat, ReportKey } from "@/types/reports";
+import type { ReportExportFormat, ReportKey, ReportResult } from "@/types/reports";
 
 function revalidateReports() {
   Object.values(REPORTS_ROUTES).forEach((path) => revalidatePath(path));
@@ -48,6 +50,59 @@ export async function runReportAction(reportKey: ReportKey, filters: unknown) {
   }
 }
 
+function exportFilename(
+  reportKey: string,
+  format: ReportExportFormat,
+  dateFrom?: string,
+  dateTo?: string,
+) {
+  const base = reportKey.replace(/_/g, "-");
+  const range = dateFrom && dateTo ? `_${dateFrom}_to_${dateTo}` : "";
+  const ext = format === "excel" ? "xlsx" : format;
+  return `${base}${range}.${ext}`;
+}
+
+function serializeGeneratedReport(
+  result: ReportResult,
+  format: ReportExportFormat,
+  dateFrom?: string,
+  dateTo?: string,
+) {
+  const filename = exportFilename(result.key, format, dateFrom, dateTo);
+
+  if (format === "csv") {
+    return {
+      success: true as const,
+      filename,
+      mimeType: "text/csv;charset=utf-8",
+      contentBase64: Buffer.from(reportToCsv(result), "utf8").toString("base64"),
+      rowCount: result.total,
+    };
+  }
+
+  if (format === "excel") {
+    const headers = result.columns.map((column) => column.header);
+    const rows = result.rows.map((row) =>
+      result.columns.map((column) => {
+        const value = row[column.key];
+        if (typeof value === "number" && Number.isFinite(value)) return value;
+        if (typeof value === "boolean") return value;
+        return toCell(value);
+      }),
+    );
+
+    return {
+      success: true as const,
+      filename,
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      contentBase64: buildXlsxBuffer(result.title, headers, rows).toString("base64"),
+      rowCount: result.total,
+    };
+  }
+
+  return null;
+}
+
 export async function exportReportAction(
   reportKey: ReportKey,
   filters: unknown,
@@ -58,31 +113,46 @@ export async function exportReportAction(
     const supabase = await createClient();
     const parsed = reportFiltersSchema.parse(filters ?? {});
     const result = await runReport(supabase, profile, reportKey, parsed);
-
-    if (format === "csv") {
-      return {
-        success: true as const,
-        filename: `${reportKey}.csv`,
-        mimeType: "text/csv;charset=utf-8",
-        contentBase64: Buffer.from(reportToCsv(result), "utf8").toString("base64"),
-        rowCount: result.total,
-      };
-    }
-
-    if (format === "excel") {
-      return {
-        success: true as const,
-        filename: `${reportKey}.xls`,
-        mimeType: "application/vnd.ms-excel",
-        contentBase64: Buffer.from(reportToExcelXml(result), "utf8").toString("base64"),
-        rowCount: result.total,
-      };
-    }
+    const serialized = serializeGeneratedReport(
+      result,
+      format,
+      parsed.dateFrom || undefined,
+      parsed.dateTo || undefined,
+    );
+    if (serialized) return serialized;
 
     const pdf = await reportToPdfBytes(result);
     return {
       success: true as const,
-      filename: `${reportKey}.pdf`,
+      filename: exportFilename(reportKey, "pdf", parsed.dateFrom || undefined, parsed.dateTo || undefined),
+      mimeType: "application/pdf",
+      contentBase64: Buffer.from(pdf).toString("base64"),
+      rowCount: result.total,
+    };
+  } catch (error) {
+    return {
+      success: false as const,
+      message: error instanceof Error ? error.message : "Failed to export report",
+    };
+  }
+}
+
+export async function exportGeneratedReportAction(
+  generated: unknown,
+  format: ReportExportFormat,
+  dateFrom?: string,
+  dateTo?: string,
+) {
+  try {
+    await requireServerPermission("reports.export");
+    const result = generatedReportSchema.parse(generated) as ReportResult;
+    const serialized = serializeGeneratedReport(result, format, dateFrom, dateTo);
+    if (serialized) return serialized;
+
+    const pdf = await reportToPdfBytes(result);
+    return {
+      success: true as const,
+      filename: exportFilename(result.key, "pdf", dateFrom, dateTo),
       mimeType: "application/pdf",
       contentBase64: Buffer.from(pdf).toString("base64"),
       rowCount: result.total,

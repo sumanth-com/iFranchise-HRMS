@@ -19,6 +19,7 @@ type FilterSelectProps = {
   className?: string;
   triggerClassName?: string;
   contentClassName?: string;
+  itemClassName?: string;
 };
 
 /** Select with `items` mapping so labels display instead of raw values. */
@@ -31,12 +32,13 @@ export function FilterSelect({
   className,
   triggerClassName,
   contentClassName,
+  itemClassName,
 }: FilterSelectProps) {
   return (
     <div className={cn("w-full", className)}>
       <Select
         items={items}
-        value={value}
+        value={value || null}
         onValueChange={(next) => {
           if (next) onValueChange(next);
         }}
@@ -47,7 +49,7 @@ export function FilterSelect({
         </SelectTrigger>
         <SelectContent align="start" className={contentClassName}>
           {items.map((item) => (
-            <SelectItem key={item.value} value={item.value}>
+            <SelectItem key={item.value} value={item.value} className={itemClassName}>
               {item.label}
             </SelectItem>
           ))}

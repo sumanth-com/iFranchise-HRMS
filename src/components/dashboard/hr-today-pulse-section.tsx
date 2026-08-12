@@ -3,6 +3,7 @@ import { format, parseISO } from "date-fns";
 import { CalendarDays, ClipboardList, Users } from "lucide-react";
 
 import { HolidayGlyph } from "@/components/employee/dashboard/holiday-glyph";
+import { DASHBOARD_KPI_LINKS } from "@/lib/dashboard/constants";
 import type { DashboardListItem, HrTodayPulse } from "@/types/dashboard";
 import { cn } from "@/lib/utils";
 
@@ -197,31 +198,31 @@ export function HrTodayPulseSection({ pulse }: { pulse: HrTodayPulse }) {
         <PulseMetric
           label="Present Today"
           value={pulse.presentToday}
-          href="/dashboard/attendance"
+          href={DASHBOARD_KPI_LINKS.presentToday}
           accent="text-emerald-600 dark:text-emerald-400"
         />
         <PulseMetric
           label="Absent Today"
           value={pulse.absentToday}
-          href="/dashboard/attendance/team?attendanceStatus=absent"
+          href={DASHBOARD_KPI_LINKS.absentToday}
           accent="text-destructive"
         />
         <PulseMetric
           label="Late Employees"
           value={pulse.lateToday}
-          href="/dashboard/attendance"
+          href={DASHBOARD_KPI_LINKS.lateToday}
           accent="text-orange-600 dark:text-orange-400"
         />
         <PulseMetric
           label="Pending Approvals"
           value={pulse.pendingApprovals}
-          href="/dashboard/leave/team"
+          href={DASHBOARD_KPI_LINKS.pendingLeaveApprovals}
           accent="text-violet-600 dark:text-violet-400"
         />
         <PulseMetric
           label="Exit Requests"
           value={pulse.exitRequests}
-          href="/dashboard/exit"
+          href={DASHBOARD_KPI_LINKS.exitRequests}
           accent="text-rose-600 dark:text-rose-400"
         />
       </div>

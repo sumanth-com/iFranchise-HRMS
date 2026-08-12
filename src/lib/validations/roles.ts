@@ -14,17 +14,30 @@ export const userRoleListParamsSchema = paginationSchema.extend({
 
 export const roleFormSchema = z.object({
   name: z.string().trim().min(1, "Role name is required"),
+  /** Optional in UI — auto-generated from name when empty. */
   code: z
     .string()
     .trim()
-    .min(1, "Code is required")
     .max(50)
-    .regex(/^[a-z0-9_]+$/, "Use lowercase letters, numbers, and underscores"),
+    .regex(/^[a-z0-9_]*$/, "Use lowercase letters, numbers, and underscores")
+    .optional()
+    .nullable(),
   description: z.string().trim().optional().nullable(),
   parentRoleId: z.string().uuid().optional().nullable(),
   isDefault: z.boolean().default(false),
   status: z.enum(["active", "inactive", "archived"]).default("active"),
 });
+
+/** Build a stable role code from a display name. */
+export function slugifyRoleCode(name: string): string {
+  const base = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40);
+  return base || "role";
+}
 
 export const rolePermissionsSchema = z.object({
   roleId: z.string().uuid(),

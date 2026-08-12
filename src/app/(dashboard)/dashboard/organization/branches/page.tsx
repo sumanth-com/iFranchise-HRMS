@@ -1,7 +1,7 @@
-import { BranchesManagement } from "@/components/organization/branches-management";
+import { BranchesPageContent } from "@/components/organization/branches-page-content";
 import { ORGANIZATION_VIEW_PERMISSIONS } from "@/lib/organization/constants";
-import { getEmployeeLookups } from "@/lib/organization/services/org-lookups";
-import { listBranches } from "@/lib/organization/services/org-queries";
+import { getBranches, getEmployeeLookups } from "@/lib/organization/services/org-lookups";
+import { listBranches, listWorkLocations } from "@/lib/organization/services/org-queries";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 import { orgListParamsSchema } from "@/lib/validations/organization";
@@ -11,30 +11,48 @@ type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
+function firstString(value: string | string[] | undefined) {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
 export default async function BranchesPage({ searchParams }: PageProps) {
   const profile = await requireServerAnyPermission([...ORGANIZATION_VIEW_PERMISSIONS]);
   const supabase = await createClient();
+  const orgId = profile.employee.organizationId;
   const raw = await searchParams;
 
-  const params = orgListParamsSchema.parse({
+  const branchParams = orgListParamsSchema.parse({
     page: raw.page,
     pageSize: raw.pageSize,
-    search: typeof raw.search === "string" ? raw.search : undefined,
-    status: typeof raw.status === "string" ? raw.status : undefined,
+    search: firstString(raw.search),
+    status: firstString(raw.status),
   });
 
-  const [result, employees] = await Promise.all([
-    listBranches(supabase, profile.employee.organizationId, params),
-    getEmployeeLookups(supabase, profile.employee.organizationId),
+  const workLocationParams = orgListParamsSchema.parse({
+    page: raw.wlPage,
+    pageSize: raw.wlPageSize,
+    search: firstString(raw.wlSearch),
+    status: firstString(raw.wlStatus),
+  });
+
+  const [branchesResult, workLocationsResult, employees, branchLookups] = await Promise.all([
+    listBranches(supabase, orgId, branchParams),
+    listWorkLocations(supabase, orgId, workLocationParams),
+    getEmployeeLookups(supabase, orgId),
+    getBranches(supabase, orgId),
   ]);
 
   return (
-    <BranchesManagement
-      result={result}
+    <BranchesPageContent
+      branchesResult={branchesResult}
+      workLocationsResult={workLocationsResult}
       employees={employees}
+      branchLookups={branchLookups}
       permissionCodes={profile.permissionCodes}
-      search={params.search ?? ""}
-      status={params.status as RecordStatus | undefined}
+      branchSearch={branchParams.search ?? ""}
+      branchStatus={branchParams.status as RecordStatus | undefined}
+      workLocationSearch={workLocationParams.search ?? ""}
+      workLocationStatus={workLocationParams.status as RecordStatus | undefined}
     />
   );
 }

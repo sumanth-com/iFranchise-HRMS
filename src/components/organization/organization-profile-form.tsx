@@ -1,16 +1,22 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Loader2, Pencil, Save, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/common/select";
-import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/common/select";
+import { CompanyIdentityCard } from "@/components/organization/company-identity-card";
 import { saveOrganizationProfileAction } from "@/lib/organization/actions";
 import {
   CURRENCY_OPTIONS,
@@ -26,204 +32,375 @@ type ProfileFormInput = z.infer<typeof organizationProfileSchema>;
 
 type Props = {
   profile: OrganizationProfile;
+  logoUrl: string | null;
   canEdit: boolean;
 };
 
-export function OrganizationProfileForm({ profile, canEdit }: Props) {
+const SELECT_CONTENT_CLASS = "min-w-[14rem] max-w-[20rem]";
+
+function displayValue(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : "—";
+}
+
+function formatAddress(
+  line1: string,
+  line2: string,
+  city: string,
+  state: string,
+  postalCode: string,
+  country: string,
+) {
+  const parts = [line1, line2, city, state, postalCode, country]
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : "—";
+}
+
+function profileToValues(profile: OrganizationProfile): ProfileFormInput {
+  return {
+    name: profile.name,
+    legalName: profile.legalName ?? "",
+    email: profile.email ?? "",
+    phone: profile.phone ?? "",
+    website: profile.website ?? "",
+    gstNumber: profile.gstNumber ?? "",
+    panNumber: profile.panNumber ?? "",
+    cin: profile.cin ?? "",
+    registeredAddressLine1: profile.registeredAddressLine1 ?? "",
+    registeredAddressLine2: profile.registeredAddressLine2 ?? "",
+    registeredCity: profile.registeredCity ?? "",
+    registeredState: profile.registeredState ?? "",
+    registeredCountry: profile.registeredCountry ?? "IN",
+    registeredPostalCode: profile.registeredPostalCode ?? "",
+    corporateAddressLine1: profile.corporateAddressLine1 ?? "",
+    corporateAddressLine2: profile.corporateAddressLine2 ?? "",
+    corporateCity: profile.corporateCity ?? "",
+    corporateState: profile.corporateState ?? "",
+    corporateCountry: profile.corporateCountry ?? "IN",
+    corporatePostalCode: profile.corporatePostalCode ?? "",
+    timezone: profile.timezone,
+    currencyCode: profile.currencyCode,
+    dateFormat: profile.dateFormat,
+    fiscalYearStartMonth: profile.fiscalYearStartMonth,
+  };
+}
+
+function ProfileFieldControl({
+  children,
+  wide,
+}: {
+  children: ReactNode;
+  wide?: boolean;
+}) {
+  return <div className={wide ? "w-full max-w-md" : "w-full max-w-xs"}>{children}</div>;
+}
+
+function ProfileInfoRow({
+  label,
+  value,
+  editing,
+  children,
+  valueClassName,
+}: {
+  label: string;
+  value?: string;
+  editing?: boolean;
+  children?: ReactNode;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="flex items-start gap-4 border-b px-4 py-3 last:border-b-0 sm:gap-6">
+      <dt className="w-32 shrink-0 pt-0.5 text-sm text-muted-foreground sm:w-40">{label}</dt>
+      <dd className={`min-w-0 flex-1 text-right text-sm font-medium ${valueClassName ?? ""}`}>
+        {editing && children ? <div className="flex justify-end">{children}</div> : value ?? "—"}
+      </dd>
+    </div>
+  );
+}
+
+function SectionCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="space-y-2">
+      <h2 className="text-base font-semibold">{title}</h2>
+      <dl className="rounded-xl border bg-card">{children}</dl>
+    </section>
+  );
+}
+
+export function OrganizationProfileForm({ profile, logoUrl, canEdit }: Props) {
   const router = useRouter();
+  const [isEditing, setIsEditing] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const form = useForm({
     resolver: zodResolver(organizationProfileSchema),
-    defaultValues: {
-      name: profile.name,
-      legalName: profile.legalName ?? "",
-      email: profile.email ?? "",
-      phone: profile.phone ?? "",
-      website: profile.website ?? "",
-      gstNumber: profile.gstNumber ?? "",
-      panNumber: profile.panNumber ?? "",
-      cin: profile.cin ?? "",
-      registeredAddressLine1: profile.registeredAddressLine1 ?? "",
-      registeredAddressLine2: profile.registeredAddressLine2 ?? "",
-      registeredCity: profile.registeredCity ?? "",
-      registeredState: profile.registeredState ?? "",
-      registeredCountry: profile.registeredCountry ?? "IN",
-      registeredPostalCode: profile.registeredPostalCode ?? "",
-      corporateAddressLine1: profile.corporateAddressLine1 ?? "",
-      corporateAddressLine2: profile.corporateAddressLine2 ?? "",
-      corporateCity: profile.corporateCity ?? "",
-      corporateState: profile.corporateState ?? "",
-      corporateCountry: profile.corporateCountry ?? "IN",
-      corporatePostalCode: profile.corporatePostalCode ?? "",
-      timezone: profile.timezone,
-      currencyCode: profile.currencyCode,
-      dateFormat: profile.dateFormat,
-      fiscalYearStartMonth: profile.fiscalYearStartMonth,
-    },
+    defaultValues: profileToValues(profile),
   });
 
-  function onSubmit(values: ProfileFormInput) {
+  const values = form.watch();
+  const fiscalLabel =
+    FISCAL_MONTH_OPTIONS.find((month) => month.value === values.fiscalYearStartMonth)?.label ??
+    "—";
+
+  function onSubmit(formValues: ProfileFormInput) {
     startTransition(async () => {
-      const res = await saveOrganizationProfileAction(values);
+      const res = await saveOrganizationProfileAction(formValues);
       if (!res.success) {
         toast.error(res.message);
         return;
       }
       toast.success("Company profile updated");
+      form.reset(formValues);
+      setIsEditing(false);
       router.refresh();
     });
   }
 
+  function onCancel() {
+    form.reset(profileToValues(profile));
+    setIsEditing(false);
+  }
+
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">Company Information</h2>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Company Name</Label>
-            <Input {...form.register("name")} disabled={!canEdit} />
-          </div>
-          <div className="space-y-2">
-            <Label>Legal Name</Label>
-            <Input {...form.register("legalName")} disabled={!canEdit} />
-          </div>
-          <div className="space-y-2">
-            <Label>Email</Label>
-            <Input type="email" {...form.register("email")} disabled={!canEdit} />
-          </div>
-          <div className="space-y-2">
-            <Label>Phone</Label>
-            <Input {...form.register("phone")} disabled={!canEdit} />
-          </div>
-          <div className="space-y-2 sm:col-span-2">
-            <Label>Website</Label>
-            <Input {...form.register("website")} disabled={!canEdit} />
-          </div>
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Company Profile</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {isEditing
+              ? "Update company information, addresses, and regional settings."
+              : "View company information, addresses, and regional settings."}
+          </p>
         </div>
+
+        {canEdit ? (
+          <div className="flex items-center gap-2">
+            {isEditing ? (
+              <>
+                <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={onCancel}>
+                  <X className="size-4" />
+                  Cancel
+                </Button>
+                <Button type="button" size="sm" disabled={isPending} onClick={form.handleSubmit(onSubmit)}>
+                  {isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                  Save
+                </Button>
+              </>
+            ) : (
+              <Button type="button" size="sm" variant="outline" onClick={() => setIsEditing(true)}>
+                <Pencil className="size-4" />
+                Edit
+              </Button>
+            )}
+          </div>
+        ) : null}
       </div>
 
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">Tax & Registration</h2>
-        <div className="mt-4 grid gap-4 sm:grid-cols-3">
-          <div className="space-y-2">
-            <Label>GST Number</Label>
-            <Input {...form.register("gstNumber")} disabled={!canEdit} />
-          </div>
-          <div className="space-y-2">
-            <Label>PAN</Label>
-            <Input {...form.register("panNumber")} disabled={!canEdit} />
-          </div>
-          <div className="space-y-2">
-            <Label>CIN</Label>
-            <Input {...form.register("cin")} disabled={!canEdit} />
-          </div>
-        </div>
-      </div>
+      <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        className="grid items-start gap-x-8 gap-y-4 lg:grid-cols-[minmax(0,1fr)_minmax(360px,26rem)]"
+      >
+        <div className="space-y-4 lg:col-start-1">
+          <SectionCard title="Company Information">
+            <ProfileInfoRow label="Company name" value={displayValue(values.name)} editing={isEditing}>
+              <ProfileFieldControl>
+                <Input className="h-8 w-full text-right" disabled={isPending} {...form.register("name")} />
+              </ProfileFieldControl>
+            </ProfileInfoRow>
+            <ProfileInfoRow label="Legal name" value={displayValue(values.legalName)} editing={isEditing}>
+              <ProfileFieldControl>
+                <Input className="h-8 w-full text-right" disabled={isPending} {...form.register("legalName")} />
+              </ProfileFieldControl>
+            </ProfileInfoRow>
+            <ProfileInfoRow label="Email" value={displayValue(values.email)} editing={isEditing}>
+              <ProfileFieldControl>
+                <Input type="email" className="h-8 w-full text-right" disabled={isPending} {...form.register("email")} />
+              </ProfileFieldControl>
+            </ProfileInfoRow>
+            <ProfileInfoRow label="Phone" value={displayValue(values.phone)} editing={isEditing}>
+              <ProfileFieldControl>
+                <Input className="h-8 w-full text-right" disabled={isPending} {...form.register("phone")} />
+              </ProfileFieldControl>
+            </ProfileInfoRow>
+            <ProfileInfoRow label="Website" value={displayValue(values.website)} editing={isEditing}>
+              <ProfileFieldControl wide>
+                <Input className="h-8 w-full text-right" disabled={isPending} {...form.register("website")} />
+              </ProfileFieldControl>
+            </ProfileInfoRow>
+          </SectionCard>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border bg-card p-6 shadow-sm">
-          <h2 className="text-lg font-semibold">Registered Address</h2>
-          <div className="mt-4 space-y-4">
-            <Input placeholder="Address line 1" {...form.register("registeredAddressLine1")} disabled={!canEdit} />
-            <Input placeholder="Address line 2" {...form.register("registeredAddressLine2")} disabled={!canEdit} />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input placeholder="City" {...form.register("registeredCity")} disabled={!canEdit} />
-              <Input placeholder="State" {...form.register("registeredState")} disabled={!canEdit} />
-              <Input placeholder="Country" {...form.register("registeredCountry")} disabled={!canEdit} />
-              <Input placeholder="Postal code" {...form.register("registeredPostalCode")} disabled={!canEdit} />
-            </div>
-          </div>
-        </div>
-        <div className="rounded-xl border bg-card p-6 shadow-sm">
-          <h2 className="text-lg font-semibold">Corporate Address</h2>
-          <div className="mt-4 space-y-4">
-            <Input placeholder="Address line 1" {...form.register("corporateAddressLine1")} disabled={!canEdit} />
-            <Input placeholder="Address line 2" {...form.register("corporateAddressLine2")} disabled={!canEdit} />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input placeholder="City" {...form.register("corporateCity")} disabled={!canEdit} />
-              <Input placeholder="State" {...form.register("corporateState")} disabled={!canEdit} />
-              <Input placeholder="Country" {...form.register("corporateCountry")} disabled={!canEdit} />
-              <Input placeholder="Postal code" {...form.register("corporatePostalCode")} disabled={!canEdit} />
-            </div>
-          </div>
-        </div>
-      </div>
+          <SectionCard title="Tax & Registration">
+            <ProfileInfoRow label="GST number" value={displayValue(values.gstNumber)} editing={isEditing}>
+              <ProfileFieldControl>
+                <Input className="h-8 w-full text-right" disabled={isPending} {...form.register("gstNumber")} />
+              </ProfileFieldControl>
+            </ProfileInfoRow>
+            <ProfileInfoRow label="PAN" value={displayValue(values.panNumber)} editing={isEditing}>
+              <ProfileFieldControl>
+                <Input className="h-8 w-full text-right" disabled={isPending} {...form.register("panNumber")} />
+              </ProfileFieldControl>
+            </ProfileInfoRow>
+            <ProfileInfoRow label="CIN" value={displayValue(values.cin)} editing={isEditing}>
+              <ProfileFieldControl>
+                <Input className="h-8 w-full text-right" disabled={isPending} {...form.register("cin")} />
+              </ProfileFieldControl>
+            </ProfileInfoRow>
+          </SectionCard>
 
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">Regional Settings</h2>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="space-y-2">
-            <Label>Time Zone</Label>
-            <Select
-              value={form.watch("timezone")}
-              onValueChange={(v) => v && form.setValue("timezone", v)}
-              disabled={!canEdit}
+          <SectionCard title="Registered Address">
+            <ProfileInfoRow
+              label="Address"
+              value={formatAddress(
+                values.registeredAddressLine1 ?? "",
+                values.registeredAddressLine2 ?? "",
+                values.registeredCity ?? "",
+                values.registeredState ?? "",
+                values.registeredPostalCode ?? "",
+                values.registeredCountry ?? "",
+              )}
+              valueClassName="leading-snug whitespace-normal"
+              editing={isEditing}
             >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {TIMEZONE_OPTIONS.map((tz) => (
-                  <SelectItem key={tz} value={tz}>{tz}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Currency</Label>
-            <Select
-              value={form.watch("currencyCode")}
-              onValueChange={(v) => v && form.setValue("currencyCode", v)}
-              disabled={!canEdit}
-            >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {CURRENCY_OPTIONS.map((c) => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Date Format</Label>
-            <Select
-              value={form.watch("dateFormat")}
-              onValueChange={(v) => v && form.setValue("dateFormat", v)}
-              disabled={!canEdit}
-            >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {DATE_FORMAT_OPTIONS.map((d) => (
-                  <SelectItem key={d} value={d}>{d}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Financial Year Start</Label>
-            <Select
-              value={String(form.watch("fiscalYearStartMonth"))}
-              onValueChange={(v) => v && form.setValue("fiscalYearStartMonth", Number(v))}
-              disabled={!canEdit}
-            >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {FISCAL_MONTH_OPTIONS.map((m) => (
-                  <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
+              <ProfileFieldControl wide>
+                <div className="space-y-2">
+                  <Input placeholder="Address line 1" className="h-8 w-full text-right" disabled={isPending} {...form.register("registeredAddressLine1")} />
+                  <Input placeholder="Address line 2" className="h-8 w-full text-right" disabled={isPending} {...form.register("registeredAddressLine2")} />
+                  <Input placeholder="City" className="h-8 w-full text-right" disabled={isPending} {...form.register("registeredCity")} />
+                  <Input placeholder="State" className="h-8 w-full text-right" disabled={isPending} {...form.register("registeredState")} />
+                  <Input placeholder="Country" className="h-8 w-full text-right" disabled={isPending} {...form.register("registeredCountry")} />
+                  <Input placeholder="Postal code" className="h-8 w-full text-right" disabled={isPending} {...form.register("registeredPostalCode")} />
+                </div>
+              </ProfileFieldControl>
+            </ProfileInfoRow>
+          </SectionCard>
 
-      {canEdit ? (
-        <div className="flex justify-end">
-          <Button type="submit" disabled={isPending}>
-            {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Save Profile
-          </Button>
+          <SectionCard title="Corporate Address">
+            <ProfileInfoRow
+              label="Address"
+              value={formatAddress(
+                values.corporateAddressLine1 ?? "",
+                values.corporateAddressLine2 ?? "",
+                values.corporateCity ?? "",
+                values.corporateState ?? "",
+                values.corporatePostalCode ?? "",
+                values.corporateCountry ?? "",
+              )}
+              valueClassName="leading-snug whitespace-normal"
+              editing={isEditing}
+            >
+              <ProfileFieldControl wide>
+                <div className="space-y-2">
+                  <Input placeholder="Address line 1" className="h-8 w-full text-right" disabled={isPending} {...form.register("corporateAddressLine1")} />
+                  <Input placeholder="Address line 2" className="h-8 w-full text-right" disabled={isPending} {...form.register("corporateAddressLine2")} />
+                  <Input placeholder="City" className="h-8 w-full text-right" disabled={isPending} {...form.register("corporateCity")} />
+                  <Input placeholder="State" className="h-8 w-full text-right" disabled={isPending} {...form.register("corporateState")} />
+                  <Input placeholder="Country" className="h-8 w-full text-right" disabled={isPending} {...form.register("corporateCountry")} />
+                  <Input placeholder="Postal code" className="h-8 w-full text-right" disabled={isPending} {...form.register("corporatePostalCode")} />
+                </div>
+              </ProfileFieldControl>
+            </ProfileInfoRow>
+          </SectionCard>
+
+          <SectionCard title="Regional Settings">
+            <ProfileInfoRow label="Time zone" value={displayValue(values.timezone)} editing={isEditing}>
+              <ProfileFieldControl>
+                <Select
+                  value={values.timezone}
+                  onValueChange={(value) => value && form.setValue("timezone", value)}
+                  disabled={isPending}
+                >
+                  <SelectTrigger className="h-8 w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="end" alignItemWithTrigger={false} className={SELECT_CONTENT_CLASS}>
+                    {TIMEZONE_OPTIONS.map((tz) => (
+                      <SelectItem key={tz} value={tz}>
+                        {tz}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </ProfileFieldControl>
+            </ProfileInfoRow>
+            <ProfileInfoRow label="Currency" value={displayValue(values.currencyCode)} editing={isEditing}>
+              <ProfileFieldControl>
+                <Select
+                  value={values.currencyCode}
+                  onValueChange={(value) => value && form.setValue("currencyCode", value)}
+                  disabled={isPending}
+                >
+                  <SelectTrigger className="h-8 w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="end" alignItemWithTrigger={false} className={SELECT_CONTENT_CLASS}>
+                    {CURRENCY_OPTIONS.map((code) => (
+                      <SelectItem key={code} value={code}>
+                        {code}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </ProfileFieldControl>
+            </ProfileInfoRow>
+            <ProfileInfoRow label="Date format" value={displayValue(values.dateFormat)} editing={isEditing}>
+              <ProfileFieldControl>
+                <Select
+                  value={values.dateFormat}
+                  onValueChange={(value) => value && form.setValue("dateFormat", value)}
+                  disabled={isPending}
+                >
+                  <SelectTrigger className="h-8 w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="end" alignItemWithTrigger={false} className={SELECT_CONTENT_CLASS}>
+                    {DATE_FORMAT_OPTIONS.map((format) => (
+                      <SelectItem key={format} value={format}>
+                        {format}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </ProfileFieldControl>
+            </ProfileInfoRow>
+            <ProfileInfoRow label="Financial year" value={fiscalLabel} editing={isEditing}>
+              <ProfileFieldControl>
+                <Select
+                  value={String(values.fiscalYearStartMonth)}
+                  onValueChange={(value) => value && form.setValue("fiscalYearStartMonth", Number(value))}
+                  disabled={isPending}
+                >
+                  <SelectTrigger className="h-8 w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="end" alignItemWithTrigger={false} className={SELECT_CONTENT_CLASS}>
+                    {FISCAL_MONTH_OPTIONS.map((month) => (
+                      <SelectItem key={month.value} value={String(month.value)}>
+                        {month.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </ProfileFieldControl>
+            </ProfileInfoRow>
+          </SectionCard>
         </div>
-      ) : null}
-    </form>
+
+        <aside className="flex flex-col items-center self-start overflow-visible lg:sticky lg:top-4">
+          <CompanyIdentityCard
+            companyName={values.name || profile.name}
+            legalName={values.legalName || profile.legalName}
+            logoUrl={logoUrl}
+            hasCustomLogo={Boolean(profile.logoStoragePath)}
+            canEdit={canEdit}
+          />
+          {canEdit ? (
+            <p className="mt-3 max-w-[24rem] text-center text-xs text-muted-foreground">
+              Tap the logo to update the company image anytime.
+            </p>
+          ) : null}
+        </aside>
+      </form>
+    </div>
   );
 }

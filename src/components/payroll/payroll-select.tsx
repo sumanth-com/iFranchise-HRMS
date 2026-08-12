@@ -57,6 +57,8 @@ type LabeledSelectProps = {
   id?: string;
   triggerClassName?: string;
   contentClassName?: string;
+  align?: "start" | "center" | "end";
+  side?: "top" | "bottom" | "left" | "right";
 };
 
 export function LabeledSelect({
@@ -68,11 +70,15 @@ export function LabeledSelect({
   id,
   triggerClassName,
   contentClassName,
+  align = "start",
+  side = "bottom",
 }: LabeledSelectProps) {
+  const safeValue = items.some((item) => item.value === value) ? value : null;
+
   return (
     <Select
       items={items}
-      value={value || null}
+      value={safeValue}
       onValueChange={(next) => {
         if (next) onValueChange(next);
       }}
@@ -81,7 +87,12 @@ export function LabeledSelect({
       <SelectTrigger id={id} className={triggerClassName ?? "h-8 w-full min-w-0"}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
-      <SelectContent align="start" alignItemWithTrigger={false} className={contentClassName}>
+      <SelectContent
+        side={side}
+        align={align}
+        alignItemWithTrigger={false}
+        className={contentClassName}
+      >
         {items.map((item) => (
           <SelectItem key={item.value} value={item.value}>
             {item.label}

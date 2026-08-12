@@ -18,7 +18,7 @@ export default async function EmployeeDetailPage({
 }: EmployeeDetailPageProps) {
   const { employeeRef } = await params;
   const rawSearchParams = await searchParams;
-  const bundle = await getEmployeeDetailBundleAction(employeeRef);
+  const bundle = await getEmployeeDetailBundleAction(employeeRef, rawSearchParams);
 
   if (!bundle) {
     notFound();
@@ -63,6 +63,7 @@ export default async function EmployeeDetailPage({
         leaveBalances={bundle.leaveBalances}
         salaryStructure={bundle.salaryStructure}
         attendanceSummary={bundle.attendanceSummary}
+        attendancePeriod={bundle.attendancePeriod}
         assets={bundle.assets}
         documentsExplorer={bundle.documentsExplorer}
         assetsData={bundle.assetsData}

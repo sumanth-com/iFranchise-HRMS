@@ -1,8 +1,9 @@
 import { attendanceTeamListUrl } from "@/lib/attendance/constants";
 import { HR_PORTAL_HOME } from "@/lib/auth/portal-paths";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
+import { EXIT_ROUTES } from "@/lib/exit/constants";
 import { leaveTeamListUrl } from "@/lib/leave/constants";
-import { PAYROLL_ROUTES } from "@/lib/payroll/constants";
+import { payrollTeamListUrl } from "@/lib/payroll/constants";
 import { RECRUITMENT_ROUTES } from "@/lib/recruitment/constants";
 
 export const HR_SELF_SERVICE_HOME = HR_PORTAL_HOME;
@@ -19,17 +20,19 @@ export const DASHBOARD_QUICK_ACTIONS = [
   },
 ] as const;
 
-/** KPI cards only — no overlap with Priority Tasks. */
+/** KPI cards only — no overlap with Priority Tasks. Administration team routes. */
 export const DASHBOARD_KPI_LINKS = {
   totalEmployees: EMPLOYEE_ROUTES.list,
-  presentToday: attendanceTeamListUrl(),
+  presentToday: attendanceTeamListUrl({ attendanceStatus: "present" }),
   absentToday: attendanceTeamListUrl({ attendanceStatus: "absent" }),
-  pendingLeaveApprovals: leaveTeamListUrl(),
+  lateToday: attendanceTeamListUrl({ attendanceStatus: "late" }),
+  pendingLeaveApprovals: leaveTeamListUrl({ leaveStatus: "pending" }),
+  exitRequests: EXIT_ROUTES.clearance,
 } as const;
 
 export const DASHBOARD_ACTION_LINKS = {
   interviewsToday: RECRUITMENT_ROUTES.interviews,
   probation: EMPLOYEE_ROUTES.list,
-  payrollDue: PAYROLL_ROUTES.run,
+  payrollDue: payrollTeamListUrl(),
   offersPending: RECRUITMENT_ROUTES.offers,
 } as const;

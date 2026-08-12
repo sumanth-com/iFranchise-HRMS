@@ -11,6 +11,8 @@ import {
 } from "react";
 import { usePathname } from "next/navigation";
 
+const OPEN_SECTIONS_STORAGE_KEY = "hrms.sidebar.openSections";
+
 type SidebarContextValue = {
   isCollapsed: boolean;
   isMobileOpen: boolean;
@@ -18,7 +20,10 @@ type SidebarContextValue = {
   openSections: Record<string, boolean>;
   toggleCollapsed: () => void;
   setMobileOpen: (open: boolean) => void;
+  sectionsReady: boolean;
   toggleSection: (section: string) => void;
+  setSectionOpen: (section: string, open: boolean) => void;
+  ensureSectionOpenIfUnset: (section: string) => void;
   isSectionOpen: (section: string) => boolean;
   startNavigation: (href: string) => void;
   clearNavigation: () => void;
@@ -30,12 +35,46 @@ type SidebarProviderProps = {
   children: ReactNode;
 };
 
+function readStoredOpenSections(): Record<string, boolean> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(OPEN_SECTIONS_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const entries = Object.entries(parsed as Record<string, unknown>).filter(
+      ([, value]) => typeof value === "boolean",
+    );
+    return Object.fromEntries(entries) as Record<string, boolean>;
+  } catch {
+    return {};
+  }
+}
+
 export function SidebarProvider({ children }: SidebarProviderProps) {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const [sectionsHydrated, setSectionsHydrated] = useState(false);
+
+  useEffect(() => {
+    setOpenSections(readStoredOpenSections());
+    setSectionsHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!sectionsHydrated) return;
+    try {
+      window.localStorage.setItem(
+        OPEN_SECTIONS_STORAGE_KEY,
+        JSON.stringify(openSections),
+      );
+    } catch {
+      // Ignore quota / private-mode write failures.
+    }
+  }, [openSections, sectionsHydrated]);
 
   useEffect(() => {
     setPendingHref(null);
@@ -54,6 +93,20 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
       ...current,
       [section]: !(current[section] ?? false),
     }));
+  }, []);
+
+  const setSectionOpen = useCallback((section: string, open: boolean) => {
+    setOpenSections((current) => {
+      if ((current[section] ?? false) === open) return current;
+      return { ...current, [section]: open };
+    });
+  }, []);
+
+  const ensureSectionOpenIfUnset = useCallback((section: string) => {
+    setOpenSections((current) => {
+      if (section in current) return current;
+      return { ...current, [section]: true };
+    });
   }, []);
 
   const isSectionOpen = useCallback(
@@ -75,9 +128,12 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
       isMobileOpen,
       pendingHref,
       openSections,
+      sectionsReady: sectionsHydrated,
       toggleCollapsed,
       setMobileOpen,
       toggleSection,
+      setSectionOpen,
+      ensureSectionOpenIfUnset,
       isSectionOpen,
       startNavigation,
       clearNavigation,
@@ -87,9 +143,12 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
       isMobileOpen,
       pendingHref,
       openSections,
+      sectionsHydrated,
       toggleCollapsed,
       setMobileOpen,
       toggleSection,
+      setSectionOpen,
+      ensureSectionOpenIfUnset,
       isSectionOpen,
       startNavigation,
       clearNavigation,

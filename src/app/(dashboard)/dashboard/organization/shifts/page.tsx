@@ -1,18 +1,7 @@
-import { ShiftTemplatesManagement } from "@/components/organization/shift-templates-management";
-import { ORGANIZATION_VIEW_PERMISSIONS } from "@/lib/organization/constants";
-import { listShiftTemplates } from "@/lib/organization/services/org-queries";
-import { requireServerAnyPermission } from "@/lib/permissions/server";
-import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
-export default async function ShiftTemplatesPage() {
-  const profile = await requireServerAnyPermission([...ORGANIZATION_VIEW_PERMISSIONS]);
-  const supabase = await createClient();
-  const items = await listShiftTemplates(supabase, profile.employee.organizationId);
+import { ORGANIZATION_ROUTES } from "@/lib/organization/constants";
 
-  return (
-    <ShiftTemplatesManagement
-      items={items}
-      permissionCodes={profile.permissionCodes}
-    />
-  );
+export default function ShiftTemplatesPage() {
+  redirect(ORGANIZATION_ROUTES.branches);
 }

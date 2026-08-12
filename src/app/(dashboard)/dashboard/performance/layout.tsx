@@ -1,10 +1,9 @@
-import { ModuleShell } from "@/components/common/sticky-layout";
-import { PerformanceSubNav } from "@/components/performance/performance-sub-nav";
+import { PerformanceShell } from "@/components/performance/performance-shell";
 
 export default function PerformanceLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <ModuleShell header={<PerformanceSubNav />}>{children}</ModuleShell>;
+  return <PerformanceShell>{children}</PerformanceShell>;
 }

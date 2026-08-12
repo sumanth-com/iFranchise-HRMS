@@ -786,3 +786,217 @@
     animation: none !important;
   }
 }
+
+.scene-tree {
+  --scene-line: color-mix(in oklch, var(--foreground) 45%, var(--border));
+  --scene-gap: 2.75rem;
+  --scene-line-width: 2px;
+  --scene-dash: repeating-linear-gradient(
+    to bottom,
+    var(--scene-line) 0 7px,
+    transparent 7px 12px
+  );
+  --scene-dash-x: repeating-linear-gradient(
+    to right,
+    var(--scene-line) 0 7px,
+    transparent 7px 12px
+  );
+}
+
+.scene-tree ul {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: flex-start;
+  position: relative;
+  width: max-content;
+  padding-top: 0;
+  margin: 0;
+}
+
+.scene-tree ul::before {
+  display: none;
+}
+
+.scene-tree-children {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  width: max-content;
+  padding-top: var(--scene-gap);
+}
+
+.scene-tree-children::before,
+.scene-tree-row + .scene-tree-row::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: var(--scene-line-width);
+  height: var(--scene-gap);
+  margin-left: calc(var(--scene-line-width) / -2);
+  background: var(--scene-dash);
+  background-size: 100% 12px;
+  animation: scene-line-flow 0.9s linear infinite;
+}
+
+.scene-tree-children::before {
+  top: 0;
+}
+
+.scene-tree-row + .scene-tree-row {
+  margin-top: var(--scene-gap);
+}
+
+.scene-tree-row + .scene-tree-row::before {
+  display: block;
+  top: calc(var(--scene-gap) * -1);
+}
+
+.scene-tree li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  list-style: none;
+  padding: var(--scene-gap) 0.25rem 0.5rem;
+}
+
+.scene-tree li::before,
+.scene-tree li::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  height: var(--scene-line-width);
+  width: 50%;
+  background: var(--scene-dash-x);
+  background-size: 12px 100%;
+  animation: scene-line-flow-x 0.9s linear infinite;
+}
+
+.scene-tree li::before {
+  right: 50%;
+}
+
+.scene-tree li::after {
+  left: 50%;
+}
+
+.scene-tree li .scene-tree-drop {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 1;
+  width: var(--scene-line-width);
+  height: var(--scene-gap);
+  margin-left: calc(var(--scene-line-width) / -2);
+  background: var(--scene-dash);
+  background-size: 100% 12px;
+  animation: scene-line-flow 0.9s linear infinite;
+}
+
+.scene-tree li .scene-tree-arrow {
+  position: absolute;
+  top: calc(var(--scene-gap) - 0.2rem);
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  color: var(--scene-line);
+  background: var(--card);
+  line-height: 0;
+  transform: translateX(-50%);
+  animation: scene-arrow-bob 1.35s ease-in-out infinite;
+}
+
+.scene-tree li .scene-tree-leaf-stem {
+  display: block;
+  flex-shrink: 0;
+  width: var(--scene-line-width);
+  height: var(--scene-gap);
+  margin-top: 0.15rem;
+  background: var(--scene-dash);
+  background-size: 100% 12px;
+  animation: scene-line-flow 0.9s linear infinite;
+}
+
+.scene-tree li:first-child::before,
+.scene-tree li:last-child::after {
+  background: transparent;
+}
+
+.scene-tree li:only-child {
+  padding-top: 0;
+}
+
+.scene-tree li:only-child::before,
+.scene-tree li:only-child::after,
+.scene-tree li:only-child .scene-tree-drop {
+  display: none;
+}
+
+.scene-tree li:only-child .scene-tree-arrow {
+  top: -0.35rem;
+}
+
+.scene-tree ul.scene-tree-root {
+  padding-top: 0;
+}
+
+.scene-tree ul.scene-tree-root::before {
+  display: none;
+}
+
+.scene-tree ul.scene-tree-root > li {
+  padding-top: 0;
+  padding-bottom: 0.75rem;
+}
+
+.scene-tree ul.scene-tree-root > li::before,
+.scene-tree ul.scene-tree-root > li::after,
+.scene-tree ul.scene-tree-root > li .scene-tree-drop,
+.scene-tree ul.scene-tree-root > li .scene-tree-arrow,
+.scene-tree ul.scene-tree-root > li .scene-tree-leaf-stem {
+  display: none;
+}
+
+@keyframes scene-line-flow {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 0 12px;
+  }
+}
+
+@keyframes scene-line-flow-x {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 12px 0;
+  }
+}
+
+@keyframes scene-arrow-bob {
+  0%,
+  100% {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(-50%) translateY(4px);
+    opacity: 0.72;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-tree-children::before,
+  .scene-tree-row + .scene-tree-row::before,
+  .scene-tree li::before,
+  .scene-tree li::after,
+  .scene-tree li .scene-tree-drop,
+  .scene-tree li .scene-tree-leaf-stem,
+  .scene-tree li .scene-tree-arrow {
+    animation: none;
+  }
+}

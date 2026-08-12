@@ -1,7 +1,7 @@
 "use client";
 
 import { Download, Loader2 } from "lucide-react";
-import { useTransition } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
@@ -12,40 +12,97 @@ type Props = {
   entity: "roles" | "assignments";
 };
 
-function downloadFile(content: string, filename: string, mimeType: string) {
-  const blob = new Blob([content], { type: mimeType });
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function triggerDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
+  a.rel = "noopener";
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
 export function RolesExportButtons({ entity }: Props) {
-  const [isPending, startTransition] = useTransition();
+  const [pendingFormat, setPendingFormat] = useState<RoleExportFormat | null>(null);
+  const inFlightRef = useRef(false);
 
-  function handleExport(format: RoleExportFormat) {
-    startTransition(async () => {
+  async function downloadFormat(format: RoleExportFormat) {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+    setPendingFormat(format);
+
+    try {
       const res = await exportRolesDataAction(entity, format);
       if (!res.success) {
         toast.error(res.message);
         return;
       }
-      downloadFile(res.data.content, res.data.filename, res.data.mimeType);
-      toast.success(`Exported as ${format.toUpperCase()}`);
-    });
+
+      const payload = res.data;
+
+      if (format === "csv") {
+        if (payload.format !== "csv" || !payload.filename.endsWith(".csv")) {
+          toast.error("CSV export returned an unexpected file");
+          return;
+        }
+        const blob = new Blob([`\uFEFF${payload.content}`], {
+          type: "text/csv;charset=utf-8",
+        });
+        triggerDownload(blob, payload.filename);
+        toast.success("CSV downloaded");
+        return;
+      }
+
+      if (
+        payload.format !== "excel" ||
+        !payload.filename.endsWith(".xlsx") ||
+        payload.encoding !== "base64"
+      ) {
+        toast.error("Excel export returned an unexpected file");
+        return;
+      }
+
+      const bytes = base64ToUint8Array(payload.content);
+      const copy = new Uint8Array(bytes.byteLength);
+      copy.set(bytes);
+      const blob = new Blob([copy], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      triggerDownload(blob, payload.filename);
+      toast.success("Excel downloaded");
+    } catch {
+      toast.error(format === "csv" ? "CSV download failed" : "Excel download failed");
+    } finally {
+      inFlightRef.current = false;
+      setPendingFormat(null);
+    }
   }
 
+  const csvPending = pendingFormat === "csv";
+  const excelPending = pendingFormat === "excel";
+  const busy = pendingFormat !== null;
+
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex shrink-0 items-center gap-2">
       <Button
+        type="button"
         variant="outline"
         size="sm"
-        disabled={isPending}
-        onClick={() => handleExport("csv")}
+        disabled={busy}
+        onClick={() => void downloadFormat("csv")}
       >
-        {isPending ? (
+        {csvPending ? (
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
         ) : (
           <Download className="mr-2 h-4 w-4" />
@@ -53,11 +110,13 @@ export function RolesExportButtons({ entity }: Props) {
         CSV
       </Button>
       <Button
+        type="button"
         variant="outline"
         size="sm"
-        disabled={isPending}
-        onClick={() => handleExport("excel")}
+        disabled={busy}
+        onClick={() => void downloadFormat("excel")}
       >
+        {excelPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
         Excel
       </Button>
     </div>

@@ -19,9 +19,15 @@ import {
   saveHoliday,
   saveShiftTemplate,
   saveWorkLocation,
+  updateOrganizationLogoPath,
   updateOrganizationProfile,
   updateReportingManager,
 } from "@/lib/organization/services/org-mutations";
+import {
+  getOrganizationLogoSignedUrl,
+  removeOrganizationLogoFile,
+  uploadOrganizationLogo,
+} from "@/lib/organization/services/org-logo";
 import {
   listBranches,
   listDepartments,
@@ -86,6 +92,71 @@ export async function saveOrganizationProfileAction(
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to save profile",
+    };
+  }
+}
+
+export async function uploadOrganizationLogoAction(
+  formData: FormData,
+): Promise<OrganizationActionResult<{ logoUrl: string | null }>> {
+  try {
+    const profile = await requireServerAnyPermission(["organization.edit"]);
+    const supabase = await createClient();
+    const file = formData.get("file");
+
+    if (!(file instanceof File) || file.size === 0) {
+      return { success: false, message: "Please choose an image file" };
+    }
+
+    const storagePath = await uploadOrganizationLogo(
+      supabase,
+      profile.employee.organizationId,
+      file,
+    );
+    await updateOrganizationLogoPath(supabase, profile, storagePath);
+    const logoUrl = await getOrganizationLogoSignedUrl(supabase, storagePath);
+    revalidateOrganization();
+    return { success: true, data: { logoUrl } };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to upload company logo",
+    };
+  }
+}
+
+export async function removeOrganizationLogoAction(): Promise<OrganizationActionResult> {
+  try {
+    const profile = await requireServerAnyPermission(["organization.edit"]);
+    const supabase = await createClient();
+    const organizationId = profile.employee.organizationId;
+
+    const { data: orgRow, error: fetchError } = await supabase
+      .schema("hrms")
+      .from("organizations")
+      .select("logo_storage_path")
+      .eq("id", organizationId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (fetchError) throw new Error(fetchError.message);
+
+    const currentPath = orgRow?.logo_storage_path;
+    if (currentPath) {
+      try {
+        await removeOrganizationLogoFile(supabase, currentPath);
+      } catch {
+        // Ignore storage cleanup errors; DB path is still cleared.
+      }
+    }
+
+    await updateOrganizationLogoPath(supabase, profile, null);
+    revalidateOrganization();
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to remove company logo",
     };
   }
 }

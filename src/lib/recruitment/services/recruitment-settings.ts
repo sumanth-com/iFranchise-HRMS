@@ -11,6 +11,10 @@ import {
 } from "@/lib/recruitment/constants";
 import type { RecruitmentSettingsFormValues } from "@/lib/validations/recruitment";
 import {
+  DEFAULT_INTERVIEW_EMAIL_BODY,
+  DEFAULT_INTERVIEW_EMAIL_SUBJECT,
+} from "@/lib/recruitment/interview-email-content";
+import {
   DEFAULT_OFFER_EMAIL_MESSAGE_TEMPLATE,
   DEFAULT_OFFER_EMAIL_SUBJECT_TEMPLATE,
 } from "@/lib/recruitment/offer-email-content";
@@ -56,6 +60,12 @@ export const DEFAULT_RECRUITMENT_SETTINGS: RecruitmentSettings = {
     },
   ],
   emailTemplates: [
+    {
+      id: "interview_scheduled",
+      name: "Interview invitation",
+      subject: DEFAULT_INTERVIEW_EMAIL_SUBJECT,
+      body: DEFAULT_INTERVIEW_EMAIL_BODY,
+    },
     {
       id: "offer_sent",
       name: "Offer Letter",
@@ -108,22 +118,31 @@ function normalizeOfferTemplates(raw: unknown): RecruitmentOfferTemplate[] {
 }
 
 function normalizeEmailTemplates(raw: unknown): RecruitmentEmailTemplate[] {
-  if (!Array.isArray(raw) || raw.length === 0) {
+  const stored =
+    Array.isArray(raw) && raw.length > 0
+      ? raw
+          .filter((item) => item && typeof item === "object")
+          .map((item, index) => {
+            const row = item as RecruitmentEmailTemplate;
+            return {
+              id: row.id || `email_tpl_${index}`,
+              name: String(row.name || "Email template").trim(),
+              subject: String(row.subject || "").trim(),
+              body: String(row.body || "").trim(),
+            };
+          })
+          .filter((item) => item.subject.length > 0 && item.body.length > 0)
+      : [];
+
+  if (stored.length === 0) {
     return DEFAULT_RECRUITMENT_SETTINGS.emailTemplates;
   }
 
-  return raw
-    .filter((item) => item && typeof item === "object")
-    .map((item, index) => {
-      const row = item as RecruitmentEmailTemplate;
-      return {
-        id: row.id || `email_tpl_${index}`,
-        name: String(row.name || "Email template").trim(),
-        subject: String(row.subject || "").trim(),
-        body: String(row.body || "").trim(),
-      };
-    })
-    .filter((item) => item.subject.length > 0 && item.body.length > 0);
+  const byId = new Set(stored.map((item) => item.id));
+  const missingDefaults = DEFAULT_RECRUITMENT_SETTINGS.emailTemplates.filter(
+    (item) => !byId.has(item.id),
+  );
+  return [...missingDefaults, ...stored];
 }
 
 export function mergeRecruitmentSettings(

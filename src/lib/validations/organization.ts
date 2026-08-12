@@ -55,7 +55,7 @@ export const branchFormSchema = z.object({
 
 export const departmentFormSchema = z.object({
   name: z.string().trim().min(1, "Department name is required"),
-  code: z.string().trim().min(1, "Department code is required").max(20),
+  code: z.string().trim().max(20).optional(),
   description: z.string().trim().optional().nullable(),
   departmentHeadId: z.string().uuid().optional().nullable(),
   parentDepartmentId: z.string().uuid().optional().nullable(),
@@ -65,9 +65,9 @@ export const departmentFormSchema = z.object({
 
 export const designationFormSchema = z.object({
   title: z.string().trim().min(1, "Designation is required"),
-  code: z.string().trim().min(1, "Code is required").max(20),
+  code: z.string().trim().max(20).optional(),
   departmentId: z.string().uuid().optional().nullable(),
-  level: z.coerce.number().int().min(1).default(1),
+  employmentTypeId: z.string().uuid().optional().nullable(),
   description: z.string().trim().optional().nullable(),
   status: z.enum(["active", "inactive", "archived"]).default("active"),
 });

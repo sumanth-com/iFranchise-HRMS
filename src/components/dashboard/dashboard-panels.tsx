@@ -222,7 +222,7 @@ function TeamCelebrationsPanel({
           <Medal className="size-4 text-muted-foreground/60" />
           <p className="mt-2 text-xs font-medium text-foreground">No celebrations soon</p>
           <p className="mt-0.5 text-[10px] text-muted-foreground">
-            Birthdays and work anniversaries in the next 30 days appear here.
+            Birthdays in the next 7 days appear here.
           </p>
         </div>
       ) : (

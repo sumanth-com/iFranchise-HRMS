@@ -115,6 +115,71 @@ async function countEmployeesGrouped(
   return counts;
 }
 
+function isMissingEmploymentTypeColumn(message: string) {
+  return message.includes("employment_type_id");
+}
+
+async function employmentTypesByDesignationFromEmployees(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  designationIds: string[],
+): Promise<Map<string, { id: string | null; name: string | null }>> {
+  const result = new Map<string, { id: string | null; name: string | null }>();
+  if (designationIds.length === 0) return result;
+
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("employees")
+    .select(
+      "designation_id, employment_type_id, employment_types:employment_type_id (name)",
+    )
+    .eq("organization_id", organizationId)
+    .in("designation_id", designationIds)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+
+  const counts = new Map<string, Map<string, { name: string; count: number }>>();
+  for (const row of data ?? []) {
+    const designationId = row.designation_id as string | null;
+    const typeId = row.employment_type_id as string | null;
+    if (!designationId || !typeId) continue;
+
+    const type = unwrapRelation(
+      row.employment_types as { name: string } | { name: string }[] | null,
+    );
+    if (!type?.name) continue;
+
+    const byType = counts.get(designationId) ?? new Map<string, { name: string; count: number }>();
+    const existing = byType.get(typeId);
+    if (existing) existing.count += 1;
+    else byType.set(typeId, { name: type.name, count: 1 });
+    counts.set(designationId, byType);
+  }
+
+  for (const designationId of designationIds) {
+    const byType = counts.get(designationId);
+    if (!byType || byType.size === 0) {
+      result.set(designationId, { id: null, name: null });
+      continue;
+    }
+
+    let bestId: string | null = null;
+    let bestName: string | null = null;
+    let bestCount = -1;
+    for (const [typeId, entry] of byType.entries()) {
+      if (entry.count > bestCount) {
+        bestId = typeId;
+        bestName = entry.name;
+        bestCount = entry.count;
+      }
+    }
+    result.set(designationId, { id: bestId, name: bestName });
+  }
+
+  return result;
+}
+
 export async function getOrganizationDashboardStats(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -401,15 +466,13 @@ export async function listDesignations(
   const { page, pageSize, search, status, sortBy, sortOrder } = parseListParams(params);
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
+  const baseSelect =
+    "id, title, code, department_id, level, description, status, updated_at, departments:department_id (name)";
 
   let query = supabase
     .schema("hrms")
     .from("designations")
-    .select(
-      `id, title, code, department_id, level, description, status, updated_at,
-       departments:department_id (name)`,
-      { count: "exact" },
-    )
+    .select(`${baseSelect}, employment_type_id`, { count: "exact" })
     .eq("organization_id", organizationId)
     .is("deleted_at", null);
 
@@ -419,13 +482,74 @@ export async function listDesignations(
   }
   if (status) query = query.eq("status", status);
 
-  query = query.order(sortBy ?? "level", { ascending: sortOrder === "asc" });
+  query = query.order(sortBy ?? "updated_at", {
+    ascending: sortOrder === "asc",
+  });
   query = query.range(from, to);
 
-  const { data, error, count } = await query;
+  let { data, error, count } = await query;
+  let hasEmploymentTypeColumn = true;
+
+  if (error && isMissingEmploymentTypeColumn(error.message)) {
+    hasEmploymentTypeColumn = false;
+    let fallbackQuery = supabase
+      .schema("hrms")
+      .from("designations")
+      .select(baseSelect, { count: "exact" })
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null);
+
+    if (search) {
+      const term = `%${search}%`;
+      fallbackQuery = fallbackQuery.or(`title.ilike.${term},code.ilike.${term}`);
+    }
+    if (status) fallbackQuery = fallbackQuery.eq("status", status);
+
+    fallbackQuery = fallbackQuery.order(sortBy ?? "updated_at", {
+      ascending: sortOrder === "asc",
+    });
+    fallbackQuery = fallbackQuery.range(from, to);
+
+    const retry = await fallbackQuery;
+    data = retry.data as typeof data;
+    error = retry.error;
+    count = retry.count;
+  }
+
   if (error) throw new Error(error.message);
 
   const designationIds = (data ?? []).map((row) => row.id);
+  const employmentTypeNameById = new Map<string, string>();
+  const employmentTypeByDesignation = hasEmploymentTypeColumn
+    ? new Map<string, { id: string | null; name: string | null }>()
+    : await employmentTypesByDesignationFromEmployees(
+        supabase,
+        organizationId,
+        designationIds,
+      );
+
+  if (hasEmploymentTypeColumn) {
+    const employmentTypeIds = (data ?? [])
+      .map((row) => row.employment_type_id as string | null)
+      .filter((id): id is string => Boolean(id));
+
+    if (employmentTypeIds.length > 0) {
+      const { data: employmentTypes, error: employmentTypesError } = await supabase
+        .schema("hrms")
+        .from("employment_types")
+        .select("id, name")
+        .eq("organization_id", organizationId)
+        .in("id", employmentTypeIds)
+        .is("deleted_at", null);
+
+      if (employmentTypesError) throw new Error(employmentTypesError.message);
+
+      for (const type of employmentTypes ?? []) {
+        employmentTypeNameById.set(type.id, type.name);
+      }
+    }
+  }
+
   const employeeCounts = await countEmployeesGrouped(
     supabase,
     organizationId,
@@ -435,12 +559,23 @@ export async function listDesignations(
 
   const rows = (data ?? []).map((row) => {
     const dept = unwrapRelation(row.departments as { name: string } | { name: string }[] | null);
+    const fromColumn = hasEmploymentTypeColumn
+      ? ((row.employment_type_id as string | null) ?? null)
+      : null;
+    const fromEmployees = employmentTypeByDesignation.get(row.id);
+    const employmentTypeId = fromColumn ?? fromEmployees?.id ?? null;
+    const employmentTypeName = employmentTypeId
+      ? (employmentTypeNameById.get(employmentTypeId) ?? fromEmployees?.name ?? null)
+      : (fromEmployees?.name ?? null);
+
     return {
       id: row.id,
       title: row.title,
       code: row.code,
       departmentId: row.department_id,
       departmentName: dept?.name ?? null,
+      employmentTypeId,
+      employmentTypeName,
       level: row.level,
       description: row.description,
       status: row.status,

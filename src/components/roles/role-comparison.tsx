@@ -1,18 +1,32 @@
 "use client";
 
-import { GitCompare, Loader2, ShieldCheck, Sparkles } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import { Check, GitCompare, Loader2, Minus } from "lucide-react";
+import { Fragment, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { compareRolesAction } from "@/lib/roles/actions";
 import type { LookupOption } from "@/types/employee";
-import type { PermissionCatalogItem, RoleComparison } from "@/types/roles";
+import type { PermissionCatalogItem, RoleComparison as RoleComparisonData } from "@/types/roles";
 
 type Props = {
   roles: LookupOption[];
   permissionCodes: string[];
+};
+
+type ViewFilter = "differences" | "shared" | "all";
+
+type ComparisonRow = {
+  permission: PermissionCatalogItem;
+  inA: boolean;
+  inB: boolean;
+};
+
+type ModuleGroup = {
+  module: string;
+  label: string;
+  rows: ComparisonRow[];
 };
 
 function formatModuleName(module: string) {
@@ -23,106 +37,93 @@ function formatModuleName(module: string) {
     .join(" ");
 }
 
-function moduleSummary(items: PermissionCatalogItem[]) {
-  const map = new Map<string, number>();
-  for (const item of items) {
-    map.set(item.module, (map.get(item.module) ?? 0) + 1);
-  }
-  return Array.from(map.entries())
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, 5);
+function permissionLabel(perm: PermissionCatalogItem) {
+  if (perm.description?.trim()) return perm.description.trim();
+  const action = perm.action
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+  return `${action} · ${formatModuleName(perm.module)}`;
 }
 
-function PermissionList({
-  items,
-  emptyLabel,
-  accentClass,
-  badgeClass,
-}: {
-  items: PermissionCatalogItem[];
-  emptyLabel: string;
-  accentClass: string;
-  badgeClass: string;
-}) {
-  if (items.length === 0) {
+function buildGroups(
+  comparison: RoleComparisonData,
+  filter: ViewFilter,
+): ModuleGroup[] {
+  const map = new Map<string, ComparisonRow>();
+
+  for (const perm of comparison.onlyInA) {
+    map.set(perm.id, { permission: perm, inA: true, inB: false });
+  }
+  for (const perm of comparison.onlyInB) {
+    map.set(perm.id, { permission: perm, inA: false, inB: true });
+  }
+  for (const perm of comparison.shared) {
+    map.set(perm.id, { permission: perm, inA: true, inB: true });
+  }
+
+  const rows = Array.from(map.values()).filter((row) => {
+    if (filter === "shared") return row.inA && row.inB;
+    if (filter === "differences") return row.inA !== row.inB;
+    return true;
+  });
+
+  const byModule = new Map<string, ComparisonRow[]>();
+  for (const row of rows) {
+    const key = row.permission.module;
+    const list = byModule.get(key) ?? [];
+    list.push(row);
+    byModule.set(key, list);
+  }
+
+  return Array.from(byModule.entries())
+    .map(([module, moduleRows]) => ({
+      module,
+      label: formatModuleName(module),
+      rows: moduleRows.sort((a, b) =>
+        permissionLabel(a.permission).localeCompare(permissionLabel(b.permission)),
+      ),
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function AccessMark({ has }: { has: boolean }) {
+  if (has) {
     return (
-      <div className="flex min-h-32 items-center justify-center rounded-xl border border-dashed bg-muted/30 px-4 text-center text-sm text-muted-foreground">
-        {emptyLabel}
-      </div>
+      <span className="inline-flex size-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+        <Check className="size-3.5" strokeWidth={2.5} aria-label="Has access" />
+      </span>
     );
   }
 
   return (
-    <ul className="max-h-[26rem] space-y-2 overflow-y-auto pr-1">
-      {items.map((perm) => (
-        <li
-          key={perm.id}
-          className={`rounded-xl border px-3 py-2.5 text-sm shadow-sm transition-colors hover:bg-background ${accentClass}`}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="truncate font-medium">{perm.code}</p>
-              <p className="text-xs text-muted-foreground">
-                {formatModuleName(perm.module)} · {perm.action}
-              </p>
-            </div>
-            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badgeClass}`}>
-              {perm.action}
-            </span>
-          </div>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function PermissionSummaryCard({
-  label,
-  value,
-  helper,
-  className,
-}: {
-  label: string;
-  value: number;
-  helper: string;
-  className: string;
-}) {
-  return (
-    <div className={`rounded-2xl border p-4 shadow-sm ${className}`}>
-      <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</p>
-      <p className="mt-2 text-3xl font-semibold">{value}</p>
-      <p className="mt-1 text-xs opacity-80">{helper}</p>
-    </div>
-  );
-}
-
-function ModulePills({ items }: { items: PermissionCatalogItem[] }) {
-  const modules = moduleSummary(items);
-  if (modules.length === 0) return null;
-
-  return (
-    <div className="flex flex-wrap gap-2">
-      {modules.map(([module, count]) => (
-        <span
-          key={module}
-          className="rounded-full border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground"
-        >
-          {formatModuleName(module)} · {count}
-        </span>
-      ))}
-    </div>
+    <span className="inline-flex size-7 items-center justify-center rounded-full bg-muted text-muted-foreground">
+      <Minus className="size-3.5" aria-label="No access" />
+    </span>
   );
 }
 
 export function RoleComparison({ roles }: Props) {
   const [roleAId, setRoleAId] = useState<string>("");
   const [roleBId, setRoleBId] = useState<string>("");
-  const [comparison, setComparison] = useState<RoleComparison | null>(null);
+  const [comparison, setComparison] = useState<RoleComparisonData | null>(null);
+  const [filter, setFilter] = useState<ViewFilter>("differences");
   const [isPending, startTransition] = useTransition();
 
   const roleItems = useMemo(
     () => roles.map((role) => ({ value: role.id, label: role.label })),
     [roles],
+  );
+
+  const groups = useMemo(
+    () => (comparison ? buildGroups(comparison, filter) : []),
+    [comparison, filter],
+  );
+
+  const visibleCount = useMemo(
+    () => groups.reduce((sum, group) => sum + group.rows.length, 0),
+    [groups],
   );
 
   function onCompare() {
@@ -142,6 +143,7 @@ export function RoleComparison({ roles }: Props) {
         return;
       }
       setComparison(res.data);
+      setFilter("differences");
     });
   }
 
@@ -150,153 +152,162 @@ export function RoleComparison({ roles }: Props) {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Compare Roles</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Side-by-side comparison of effective permissions between two roles.
+          See what each role can do — and where they differ.
         </p>
       </div>
 
-      <div className="rounded-xl border bg-card p-4 shadow-sm">
-        <div className="grid items-end gap-4 md:grid-cols-[minmax(12rem,1fr)_minmax(12rem,1fr)_10rem]">
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Role A</p>
-            <LabeledSelect
-              items={roleItems}
-              value={roleAId}
-              onValueChange={setRoleAId}
-              placeholder="Select role"
-              triggerClassName="h-10 w-full"
-              contentClassName="min-w-64"
-            />
-          </div>
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Role B</p>
-            <LabeledSelect
-              items={roleItems}
-              value={roleBId}
-              onValueChange={setRoleBId}
-              placeholder="Select role"
-              triggerClassName="h-10 w-full"
-              contentClassName="min-w-64"
-            />
-          </div>
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-transparent">Action</p>
-            <Button onClick={onCompare} disabled={isPending} className="h-10 w-full justify-center">
-              {isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <GitCompare className="mr-2 h-4 w-4" />
-              )}
-              Compare
-            </Button>
-          </div>
+      <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-0.5">
+        <div className="min-w-[160px] max-w-xs flex-1 basis-[180px]">
+          <LabeledSelect
+            items={roleItems}
+            value={roleAId}
+            onValueChange={setRoleAId}
+            placeholder="Role A"
+            triggerClassName="h-9 w-full"
+            contentClassName="min-w-64"
+          />
+        </div>
+        <div className="min-w-[160px] max-w-xs flex-1 basis-[180px]">
+          <LabeledSelect
+            items={roleItems}
+            value={roleBId}
+            onValueChange={setRoleBId}
+            placeholder="Role B"
+            triggerClassName="h-9 w-full"
+            contentClassName="min-w-64"
+          />
+        </div>
+        <div className="ml-auto shrink-0">
+          <Button onClick={onCompare} disabled={isPending} className="h-9">
+            {isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <GitCompare className="mr-2 h-4 w-4" />
+            )}
+            Compare
+          </Button>
         </div>
       </div>
 
       {comparison ? (
         <div className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-3">
-            <PermissionSummaryCard
-              label={comparison.roleA.name}
-              value={comparison.onlyInA.length}
-              helper="Unique permissions"
-              className="border-blue-200 bg-blue-50 text-blue-900"
-            />
-            <PermissionSummaryCard
-              label="Shared Access"
-              value={comparison.shared.length}
-              helper="Permissions common to both roles"
-              className="border-emerald-200 bg-emerald-50 text-emerald-900"
-            />
-            <PermissionSummaryCard
-              label={comparison.roleB.name}
-              value={comparison.onlyInB.length}
-              helper="Unique permissions"
-              className="border-orange-200 bg-orange-50 text-orange-900"
-            />
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border bg-card px-4 py-3">
+              <p className="text-xs text-muted-foreground">Only in {comparison.roleA.name}</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums">
+                {comparison.onlyInA.length}
+              </p>
+            </div>
+            <div className="rounded-xl border bg-card px-4 py-3">
+              <p className="text-xs text-muted-foreground">Shared by both</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums">
+                {comparison.shared.length}
+              </p>
+            </div>
+            <div className="rounded-xl border bg-card px-4 py-3">
+              <p className="text-xs text-muted-foreground">Only in {comparison.roleB.name}</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums">
+                {comparison.onlyInB.length}
+              </p>
+            </div>
           </div>
 
-          <div className="rounded-2xl border bg-card p-4 shadow-sm">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="flex items-center gap-2 text-sm font-semibold">
-                  <Sparkles className="size-4 text-primary" />
-                  Permission Match Overview
-                </h2>
-                <p className="text-xs text-muted-foreground">
-                  Quickly see what is shared and what makes each role different.
-                </p>
+          <div className="flex flex-nowrap items-center gap-2">
+            <div className="w-full max-w-xs">
+              <LabeledSelect
+                items={[
+                  {
+                    value: "differences",
+                    label: `Where they differ (${comparison.onlyInA.length + comparison.onlyInB.length})`,
+                  },
+                  {
+                    value: "shared",
+                    label: `What both share (${comparison.shared.length})`,
+                  },
+                  {
+                    value: "all",
+                    label: `All permissions (${comparison.onlyInA.length + comparison.onlyInB.length + comparison.shared.length})`,
+                  },
+                ]}
+                value={filter}
+                onValueChange={(value) => setFilter(value as ViewFilter)}
+                placeholder="Show"
+                triggerClassName="h-9 w-full"
+              />
+            </div>
+            <p className="shrink-0 text-xs text-muted-foreground">
+              {visibleCount} shown
+            </p>
+          </div>
+
+          <div className="overflow-auto rounded-xl border bg-card max-h-[min(70vh,calc(100dvh-16rem))] [scrollbar-gutter:stable]">
+            {groups.length === 0 ? (
+              <div className="px-4 py-12 text-center text-sm text-muted-foreground">
+                {filter === "differences"
+                  ? "These roles have the same permissions."
+                  : filter === "shared"
+                    ? "These roles have nothing in common."
+                    : "No permissions to show."}
               </div>
-              <ModulePills items={comparison.shared} />
-            </div>
-
-            <div className="grid gap-4 xl:grid-cols-[1fr_1.15fr_1fr]">
-              <section className="rounded-2xl border border-blue-100 bg-blue-50/40 p-4">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-sm font-semibold text-blue-800">
-                      Only in {comparison.roleA.name}
-                    </h3>
-                    <p className="text-xs text-blue-700/70">Extra access on left role</p>
-                  </div>
-                  <span className="rounded-full bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white">
-                    {comparison.onlyInA.length}
-                  </span>
-                </div>
-                <PermissionList
-                  items={comparison.onlyInA}
-                  emptyLabel="This role has no extra permissions."
-                  accentClass="border-blue-200 bg-white/80"
-                  badgeClass="bg-blue-100 text-blue-700"
-                />
-              </section>
-
-              <section className="relative overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-4">
-                <div className="pointer-events-none absolute -right-12 -top-12 size-32 rounded-full bg-emerald-200/40 blur-2xl" />
-                <div className="relative mb-3 flex items-center justify-between gap-3">
-                  <div>
-                    <h3 className="flex items-center gap-2 text-sm font-semibold text-emerald-800">
-                      <ShieldCheck className="size-4" />
-                      Shared Permissions
-                    </h3>
-                    <p className="text-xs text-emerald-700/70">
-                      Access both roles already have in common
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white">
-                    {comparison.shared.length}
-                  </span>
-                </div>
-                <PermissionList
-                  items={comparison.shared}
-                  emptyLabel="No shared permissions between these roles."
-                  accentClass="border-emerald-200 bg-white/85"
-                  badgeClass="bg-emerald-100 text-emerald-700"
-                />
-              </section>
-
-              <section className="rounded-2xl border border-orange-100 bg-orange-50/40 p-4">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-sm font-semibold text-orange-800">
-                      Only in {comparison.roleB.name}
-                    </h3>
-                    <p className="text-xs text-orange-700/70">Extra access on right role</p>
-                  </div>
-                  <span className="rounded-full bg-orange-600 px-2.5 py-1 text-xs font-semibold text-white">
-                    {comparison.onlyInB.length}
-                  </span>
-                </div>
-                <PermissionList
-                  items={comparison.onlyInB}
-                  emptyLabel="This role has no extra permissions."
-                  accentClass="border-orange-200 bg-white/80"
-                  badgeClass="bg-orange-100 text-orange-700"
-                />
-              </section>
-            </div>
+            ) : (
+              <table className="w-full min-w-[36rem] text-sm">
+                <thead className="sticky top-0 z-10 bg-muted/95 text-left text-xs tracking-wide text-muted-foreground backdrop-blur supports-[backdrop-filter]:bg-muted/80">
+                  <tr className="border-b">
+                    <th className="px-4 py-3 font-medium">Permission</th>
+                    <th className="w-28 px-3 py-3 text-center font-medium">
+                      {comparison.roleA.name}
+                    </th>
+                    <th className="w-28 px-3 py-3 text-center font-medium">
+                      {comparison.roleB.name}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groups.map((group) => (
+                    <FragmentGroup key={group.module} group={group} />
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       ) : null}
     </div>
+  );
+}
+
+function FragmentGroup({ group }: { group: ModuleGroup }) {
+  return (
+    <Fragment>
+      <tr className="border-b bg-muted/20">
+        <td
+          colSpan={3}
+          className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+        >
+          {group.label}
+          <span className="ml-2 font-normal normal-case tracking-normal">
+            · {group.rows.length}
+          </span>
+        </td>
+      </tr>
+      {group.rows.map((row) => (
+        <tr key={row.permission.id} className="border-b last:border-b-0 hover:bg-muted/20">
+          <td className="px-4 py-2.5">
+            <p className="font-medium text-foreground">{permissionLabel(row.permission)}</p>
+            <p className="text-xs text-muted-foreground capitalize">{row.permission.action}</p>
+          </td>
+          <td className="px-3 py-2.5 text-center">
+            <div className="flex justify-center">
+              <AccessMark has={row.inA} />
+            </div>
+          </td>
+          <td className="px-3 py-2.5 text-center">
+            <div className="flex justify-center">
+              <AccessMark has={row.inB} />
+            </div>
+          </td>
+        </tr>
+      ))}
+    </Fragment>
   );
 }

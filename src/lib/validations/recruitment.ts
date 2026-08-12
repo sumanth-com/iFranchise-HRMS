@@ -114,6 +114,9 @@ export const interviewFormSchema = z.object({
   meetingLink: z.string().max(500).optional().nullable(),
   interviewType: z.enum(["offline", "google_meet", "zoom", "teams"]).default("offline"),
   durationMinutes: z.coerce.number().int().min(15).max(240).optional(),
+  emailTemplateId: z.string().max(80).optional().nullable(),
+  emailSubject: z.string().max(500).optional().nullable(),
+  emailMessage: z.string().max(10000).optional().nullable(),
 });
 
 export const interviewCompleteSchema = z.object({

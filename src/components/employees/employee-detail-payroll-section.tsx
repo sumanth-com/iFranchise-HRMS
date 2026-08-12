@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { format, parseISO } from "date-fns";
-import { Download, FileText, FileStack, IndianRupee, Wallet } from "lucide-react";
+import { CalendarDays, Download, FileText, FileStack, IndianRupee, Wallet } from "lucide-react";
 
 import { EmployeeDetailPayslipDrawer } from "@/components/employees/employee-detail-payslip-drawer";
 import { EmployeeStatCard } from "@/components/employee/dashboard/employee-module-primitives";
 import { Button } from "@/components/common/button";
-import { EmptyState } from "@/components/common/empty-state";
+import { FilterSelect } from "@/components/common/filter-select";
+import { getYearSelectItems } from "@/components/payroll/select-utils";
 import { PAYROLL_STATUS_LABELS } from "@/lib/payroll/constants";
 import { formatCurrency } from "@/lib/payroll/services/payroll-utils";
 import type { EmployeePayrollData } from "@/types/employee-payroll";
@@ -58,13 +60,49 @@ function money(value: number, currency = "INR") {
   return formatCurrency(value, currency);
 }
 
+function yearFromPayrollMonth(payrollMonth: string): number | null {
+  if (!payrollMonth) return null;
+  const value = payrollMonth.length === 7 ? `${payrollMonth}-01` : payrollMonth;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.getUTCFullYear();
+}
+
+function payrollYearItems(selectedYear: number | null) {
+  const current = new Date().getFullYear();
+  const years = new Set([
+    current - 2,
+    current - 1,
+    current,
+    current + 1,
+    current + 2,
+  ]);
+  if (selectedYear != null) {
+    years.add(selectedYear);
+  }
+  return getYearSelectItems([...years].sort((a, b) => a - b));
+}
+
 type EmployeeDetailPayrollSectionProps = {
   data: EmployeePayrollData | null;
 };
 
 export function EmployeeDetailPayrollSection({ data }: EmployeeDetailPayrollSectionProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [activePayslipId, setActivePayslipId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const yearRaw = Number.parseInt(searchParams.get("year") ?? "", 10);
+  const selectedYear = yearRaw >= 2000 && yearRaw <= 2100 ? yearRaw : null;
+
+  function setYear(year: number) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", "payroll");
+    params.set("year", String(year));
+    router.replace(`${pathname}?${params.toString()}`);
+  }
 
   function openPayslip(id: string) {
     setActivePayslipId(id);
@@ -88,16 +126,13 @@ export function EmployeeDetailPayrollSection({ data }: EmployeeDetailPayrollSect
     }
   }
 
-  if (!data || !data.hasAnyData) {
-    return (
-      <EmptyState
-        title="No payroll data"
-        description="Salary structure and payslip history will appear here once payroll is configured."
-      />
-    );
-  }
-
-  const currency = data.currencyCode;
+  const currency = data?.currencyCode ?? "INR";
+  const payslips = data?.payslips ?? [];
+  const yearPayslips =
+    selectedYear == null
+      ? []
+      : payslips.filter((row) => yearFromPayrollMonth(row.payrollMonth) === selectedYear);
+  const yearNetPay = yearPayslips.reduce((total, row) => total + row.netSalary, 0);
 
   return (
     <div className="flex flex-col gap-4">
@@ -105,7 +140,7 @@ export function EmployeeDetailPayrollSection({ data }: EmployeeDetailPayrollSect
         <EmployeeStatCard
           label="Current net salary"
           value={
-            data.kpis.currentNetSalary != null
+            data?.kpis.currentNetSalary != null
               ? money(data.kpis.currentNetSalary, currency)
               : "—"
           }
@@ -116,7 +151,7 @@ export function EmployeeDetailPayrollSection({ data }: EmployeeDetailPayrollSect
         <EmployeeStatCard
           label="Current gross salary"
           value={
-            data.kpis.currentGrossSalary != null
+            data?.kpis.currentGrossSalary != null
               ? money(data.kpis.currentGrossSalary, currency)
               : "—"
           }
@@ -126,25 +161,38 @@ export function EmployeeDetailPayrollSection({ data }: EmployeeDetailPayrollSect
         />
         <EmployeeStatCard
           label="YTD net pay"
-          value={money(data.ytd.net, currency)}
+          value={money(selectedYear != null ? yearNetPay : 0, currency)}
           icon={Wallet}
           accent="text-sky-600 dark:text-sky-400"
           iconBg="bg-sky-500/10"
         />
         <EmployeeStatCard
           label="Payslips issued"
-          value={String(data.payslips.length)}
+          value={String(selectedYear != null ? yearPayslips.length : 0)}
           icon={FileStack}
           accent="text-amber-600 dark:text-amber-400"
           iconBg="bg-amber-500/10"
         />
       </div>
 
-      {data.salaryStructure ? (
-        <section className="overflow-hidden rounded-xl border bg-card">
-          <p className="bg-black px-5 py-2.5 text-xs font-semibold uppercase tracking-wide text-white">
+      <section className="overflow-hidden rounded-xl border bg-card">
+        <div className="flex items-center justify-between gap-3 bg-black px-5 py-1.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-white">
             Salary structure
           </p>
+          <div className="flex h-8 items-center gap-1.5 rounded-md border border-white/15 bg-white pl-2 pr-1">
+            <span className="shrink-0 text-xs text-muted-foreground">Year</span>
+            <FilterSelect
+              items={payrollYearItems(selectedYear)}
+              value={selectedYear != null ? String(selectedYear) : ""}
+              onValueChange={(value) => setYear(Number.parseInt(value, 10))}
+              placeholder="Select year"
+              className="w-auto"
+              triggerClassName="h-7 min-w-[6.5rem] border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
+            />
+          </div>
+        </div>
+        {data?.salaryStructure ? (
           <div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
             <InfoTile
               label="Effective from"
@@ -171,10 +219,14 @@ export function EmployeeDetailPayrollSection({ data }: EmployeeDetailPayrollSect
               value={money(data.salaryStructure.transportAllowance, currency)}
             />
           </div>
-        </section>
-      ) : null}
+        ) : (
+          <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+            Salary structure will appear here once payroll is configured.
+          </div>
+        )}
+      </section>
 
-      {data.bank ? (
+      {data?.bank ? (
         <section className="overflow-hidden rounded-xl border bg-card">
           <p className="bg-black px-5 py-2.5 text-xs font-semibold uppercase tracking-wide text-white">
             Bank account
@@ -188,80 +240,92 @@ export function EmployeeDetailPayrollSection({ data }: EmployeeDetailPayrollSect
         </section>
       ) : null}
 
-      <section className="overflow-hidden rounded-xl border bg-card">
-        <p className="bg-black px-5 py-2.5 text-xs font-semibold uppercase tracking-wide text-white">
-          Payslip history
-        </p>
-        {data.payslips.length > 0 ? (
-          <div className="overflow-x-auto p-4">
-            <table className="w-full min-w-[44rem] text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="pb-2 pr-3 font-medium">Month</th>
-                  <th className="pb-2 pr-3 font-medium">Payslip #</th>
-                  <th className="pb-2 pr-3 font-medium">Gross</th>
-                  <th className="pb-2 pr-3 font-medium">Net</th>
-                  <th className="pb-2 pr-3 font-medium">Credit date</th>
-                  <th className="pb-2 pr-3 font-medium">Status</th>
-                  <th className="pb-2 font-medium text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.payslips.map((row) => (
-                  <tr key={row.id} className="border-b last:border-0">
-                    <td className="py-3 pr-3 font-medium">{fmtMonth(row.payrollMonth)}</td>
-                    <td className="py-3 pr-3 text-muted-foreground">{row.payslipNumber}</td>
-                    <td className="py-3 pr-3 tabular-nums">{money(row.grossSalary, currency)}</td>
-                    <td className="py-3 pr-3 tabular-nums font-medium">
-                      {money(row.netSalary, currency)}
-                    </td>
-                    <td className="py-3 pr-3 text-muted-foreground">
-                      {fmtDate(row.salaryCreditDate)}
-                    </td>
-                    <td className="py-3 pr-3">
-                      {row.availability === "under_review" ? (
-                        <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-800">
-                          HR Review
-                        </span>
-                      ) : (
-                        <StatusPill status={row.payrollStatus} />
-                      )}
-                    </td>
-                    <td className="py-3 text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-1.5"
-                          disabled={!row.canEmployeeAccess}
-                          onClick={() => openPayslip(row.id)}
-                        >
-                          <FileText className="size-3.5" />
-                          Preview
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-1.5"
-                          disabled={!row.canEmployeeAccess}
-                          onClick={() => void downloadPayslip(row)}
-                        >
-                          <Download className="size-3.5" />
-                          PDF
-                        </Button>
-                      </div>
-                    </td>
+      {selectedYear == null ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border bg-card px-8 py-16 text-center">
+          <div className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <CalendarDays className="size-6" />
+          </div>
+          <h3 className="mt-4 text-sm font-medium">Select a year</h3>
+          <p className="mt-1 max-w-md text-sm text-muted-foreground">
+            Choose a year to view this employee&apos;s payslip history and yearly pay summary.
+          </p>
+        </div>
+      ) : (
+        <section className="overflow-hidden rounded-xl border bg-card">
+          <p className="bg-black px-5 py-2.5 text-xs font-semibold uppercase tracking-wide text-white">
+            Payslip history
+          </p>
+          {yearPayslips.length > 0 ? (
+            <div className="max-h-[min(28rem,calc(100dvh-22rem))] overflow-auto p-4">
+              <table className="w-full min-w-[44rem] text-sm">
+                <thead className="sticky top-0 z-10 bg-card">
+                  <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <th className="pb-2 pr-3 font-medium">Month</th>
+                    <th className="pb-2 pr-3 font-medium">Payslip #</th>
+                    <th className="pb-2 pr-3 font-medium">Gross</th>
+                    <th className="pb-2 pr-3 font-medium">Net</th>
+                    <th className="pb-2 pr-3 font-medium">Credit date</th>
+                    <th className="pb-2 pr-3 font-medium">Status</th>
+                    <th className="pb-2 font-medium text-right">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-            No payslips issued yet.
-          </div>
-        )}
-      </section>
+                </thead>
+                <tbody>
+                  {yearPayslips.map((row) => (
+                    <tr key={row.id} className="border-b last:border-0">
+                      <td className="py-3 pr-3 font-medium">{fmtMonth(row.payrollMonth)}</td>
+                      <td className="py-3 pr-3 text-muted-foreground">{row.payslipNumber}</td>
+                      <td className="py-3 pr-3 tabular-nums">{money(row.grossSalary, currency)}</td>
+                      <td className="py-3 pr-3 tabular-nums font-medium">
+                        {money(row.netSalary, currency)}
+                      </td>
+                      <td className="py-3 pr-3 text-muted-foreground">
+                        {fmtDate(row.salaryCreditDate)}
+                      </td>
+                      <td className="py-3 pr-3">
+                        {row.availability === "under_review" ? (
+                          <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                            HR Review
+                          </span>
+                        ) : (
+                          <StatusPill status={row.payrollStatus} />
+                        )}
+                      </td>
+                      <td className="py-3 text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5"
+                            disabled={!row.canEmployeeAccess}
+                            onClick={() => openPayslip(row.id)}
+                          >
+                            <FileText className="size-3.5" />
+                            Preview
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5"
+                            disabled={!row.canEmployeeAccess}
+                            onClick={() => void downloadPayslip(row)}
+                          >
+                            <Download className="size-3.5" />
+                            PDF
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+              No payslips issued for {selectedYear}.
+            </div>
+          )}
+        </section>
+      )}
 
       <EmployeeDetailPayslipDrawer
         payslipId={activePayslipId}

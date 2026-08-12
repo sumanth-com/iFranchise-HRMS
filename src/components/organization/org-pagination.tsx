@@ -9,9 +9,10 @@ type Props = {
   page: number;
   pageSize: number;
   total: number;
+  pageParam?: string;
 };
 
-export function OrgPagination({ page, pageSize, total }: Props) {
+export function OrgPagination({ page, pageSize, total, pageParam = "page" }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -19,7 +20,7 @@ export function OrgPagination({ page, pageSize, total }: Props) {
   function goTo(nextPage: number) {
     startTransition(() => {
       const params = new URLSearchParams(window.location.search);
-      params.set("page", String(nextPage));
+      params.set(pageParam, String(nextPage));
       router.push(`?${params.toString()}`);
     });
   }

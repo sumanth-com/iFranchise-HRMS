@@ -99,12 +99,42 @@ async function fetchEmployees(
   return (data ?? []).map(mapEmployeeRow);
 }
 
+const EXECUTIVE_ROLE_CODES = new Set(["ceo", "founder", "co_founder"]);
+const EXECUTIVE_DESIGNATION_CODES = new Set([
+  "CEO",
+  "CO_FOUNDER",
+  "COFOUNDER",
+  "CHIEF_EXECUTIVE_OFFICER",
+  "FOUNDER",
+]);
+
+function isExecutiveLeadershipEmployee(row: ReportRowLoose) {
+  const designation = unwrapRelation(row.designations);
+  const title = String(designation?.title ?? "")
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .trim();
+  const code = String(designation?.code ?? "")
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+
+  if (EXECUTIVE_DESIGNATION_CODES.has(code)) return true;
+
+  return (
+    title === "ceo" ||
+    title.includes("chief executive") ||
+    title.includes("co founder") ||
+    title.includes("cofounder") ||
+    title === "founder"
+  );
+}
+
 export async function getReportsLookups(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
 ): Promise<ReportsLookups> {
   const organizationId = profile.employee.organizationId;
-  const [departments, designations, employees] = await Promise.all([
+  const [departments, designations, employees, executiveRoles] = await Promise.all([
     fromHrms(supabase, "departments")
       .select("id, name")
       .eq("organization_id", organizationId)
@@ -116,17 +146,32 @@ export async function getReportsLookups(
       .is("deleted_at", null)
       .order("title"),
     fromHrms(supabase, "employees")
-      .select("id, employee_code, first_name, last_name")
+      .select(
+        "id, employee_code, first_name, last_name, user_id, designations:designation_id(title, code)",
+      )
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
       .in("employment_status", ["active", "probation", "on_leave"])
       .order("first_name")
       .limit(500),
+    fromHrms(supabase, "user_roles")
+      .select("employee_id, user_id, roles:role_id(code)")
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null),
   ]);
 
   if (departments.error) throw new Error(departments.error.message);
   if (designations.error) throw new Error(designations.error.message);
   if (employees.error) throw new Error(employees.error.message);
+
+  const executiveEmployeeIds = new Set<string>();
+  const executiveUserIds = new Set<string>();
+  for (const row of (executiveRoles.data ?? []) as ReportRowLoose[]) {
+    const role = unwrapRelation(row.roles);
+    if (!EXECUTIVE_ROLE_CODES.has(String(role?.code ?? "").toLowerCase())) continue;
+    if (row.employee_id) executiveEmployeeIds.add(String(row.employee_id));
+    if (row.user_id) executiveUserIds.add(String(row.user_id));
+  }
 
   return {
     departments: (departments.data ?? []).map((d: ReportRowLoose) => ({
@@ -137,10 +182,16 @@ export async function getReportsLookups(
       id: d.id,
       label: d.title,
     })),
-    employees: (employees.data ?? []).map((e: ReportRowLoose) => ({
-      id: e.id,
-      label: `${e.employee_code} — ${formatEmployeeName(e.first_name, e.last_name)}`,
-    })),
+    employees: ((employees.data ?? []) as ReportRowLoose[])
+      .filter((row) => {
+        if (executiveEmployeeIds.has(String(row.id))) return false;
+        if (row.user_id && executiveUserIds.has(String(row.user_id))) return false;
+        return !isExecutiveLeadershipEmployee(row);
+      })
+      .map((e) => ({
+        id: e.id,
+        label: `${e.employee_code} — ${formatEmployeeName(e.first_name, e.last_name)}`,
+      })),
   };
 }
 
@@ -320,6 +371,16 @@ export async function getExecutiveDashboard(
   };
 }
 
+function isActiveDuringPeriod(
+  employee: EmployeeReportRow,
+  dateFrom: string,
+  dateTo: string,
+) {
+  const joinedOk = !employee.dateOfJoining || employee.dateOfJoining <= dateTo;
+  const leftOk = !employee.dateOfLeaving || employee.dateOfLeaving >= dateFrom;
+  return joinedOk && leftOk;
+}
+
 async function runHrReport(
   supabase: AuthSupabaseClient,
   organizationId: string,
@@ -329,6 +390,9 @@ async function runHrReport(
   const employees = await fetchEmployees(supabase, organizationId, filters);
   const { dateFrom, dateTo } = resolveDates(filters);
   const title = REPORT_KEY_LABELS[key];
+  const periodEmployees = employees.filter((employee) =>
+    isActiveDuringPeriod(employee, dateFrom, dateTo),
+  );
 
   if (key === "hr_employee_master") {
     return buildResult(
@@ -340,16 +404,15 @@ async function runHrReport(
         { key: "email", header: "Email" },
         { key: "department", header: "Department" },
         { key: "designation", header: "Designation" },
-        { key: "employmentStatus", header: "Status" },
         { key: "dateOfJoining", header: "Joined" },
       ],
-      employees,
+      periodEmployees,
     );
   }
 
   if (key === "hr_department") {
     const map = new Map<string, number>();
-    for (const e of employees.filter((x) =>
+    for (const e of periodEmployees.filter((x) =>
       ["active", "probation", "on_leave"].includes(x.employmentStatus),
     )) {
       map.set(e.department, (map.get(e.department) ?? 0) + 1);
@@ -367,7 +430,7 @@ async function runHrReport(
 
   if (key === "hr_designation") {
     const map = new Map<string, number>();
-    for (const e of employees.filter((x) =>
+    for (const e of periodEmployees.filter((x) =>
       ["active", "probation", "on_leave"].includes(x.employmentStatus),
     )) {
       map.set(e.designation, (map.get(e.designation) ?? 0) + 1);
@@ -395,7 +458,6 @@ async function runHrReport(
         { key: "employeeName", header: "Name" },
         { key: "department", header: "Department" },
         { key: "dateOfJoining", header: "Joined" },
-        { key: "employmentStatus", header: "Status" },
       ],
       rows,
     );
@@ -410,9 +472,8 @@ async function runHrReport(
       { key: "employeeName", header: "Name" },
       { key: "department", header: "Department" },
       { key: "dateOfJoining", header: "Joined" },
-      { key: "employmentStatus", header: "Status" },
     ],
-    employees.filter((e) => e.employmentStatus === "probation"),
+    periodEmployees.filter((e) => e.employmentStatus === "probation"),
   );
 }
 
@@ -533,10 +594,11 @@ async function runLeaveReport(
       .select(
         `
         balance_days, used_days, allocated_days,
-        employees:employee_id(employee_code, first_name, last_name, department_id),
+        employees:employee_id!inner(employee_code, first_name, last_name, department_id, organization_id),
         leave_types:leave_type_id(name)
       `,
       )
+      .eq("employees.organization_id", organizationId)
       .is("deleted_at", null)
       .limit(3000);
     if (filters.employeeId) query = query.eq("employee_id", filters.employeeId);
@@ -579,10 +641,11 @@ async function runLeaveReport(
     .select(
       `
       id, start_date, end_date, total_days, leave_status, reason,
-      employees:employee_id(employee_code, first_name, last_name, department_id),
+      employees:employee_id!inner(employee_code, first_name, last_name, department_id, organization_id),
       leave_types:leave_type_id(name)
     `,
     )
+    .eq("employees.organization_id", organizationId)
     .is("deleted_at", null)
     .gte("start_date", dateFrom)
     .lte("start_date", dateTo)
@@ -657,6 +720,16 @@ async function runLeaveReport(
   );
 }
 
+function resolvePayrollPeriod(filters: ReportFilters) {
+  if (filters.month && filters.year) {
+    const paddedMonth = String(filters.month).padStart(2, "0");
+    const dateFrom = `${filters.year}-${paddedMonth}-01`;
+    const dateTo = format(new Date(filters.year, filters.month, 0), "yyyy-MM-dd");
+    return { dateFrom, dateTo };
+  }
+  return resolveDates(filters, 365);
+}
+
 async function runPayrollReport(
   supabase: AuthSupabaseClient,
   organizationId: string,
@@ -664,17 +737,17 @@ async function runPayrollReport(
   filters: ReportFilters,
 ): Promise<ReportResult> {
   const title = REPORT_KEY_LABELS[key];
-  const { dateFrom, dateTo } = resolveDates(filters, 365);
+  const { dateFrom, dateTo } = resolvePayrollPeriod(filters);
 
   if (key === "payroll_salary") {
     let query = fromHrms(supabase, "salary_structures")
       .select(
         `
         gross_salary, net_salary, basic_salary, effective_from, effective_to,
-        employees:employee_id(employee_code, first_name, last_name, department_id)
+        employees:employee_id!inner(employee_code, first_name, last_name, department_id, organization_id)
       `,
       )
-      .eq("organization_id", organizationId)
+      .eq("employees.organization_id", organizationId)
       .is("deleted_at", null)
       .is("effective_to", null)
       .limit(2000);
@@ -803,12 +876,12 @@ async function runPayrollReport(
       .select(
         `
         issued_at,
-        employees:employee_id(employee_code, first_name, last_name),
+        employees:employee_id!inner(employee_code, first_name, last_name, organization_id),
         payroll_items:payroll_item_id(gross_salary, total_deductions, net_salary),
         payrolls:payroll_id(payroll_month, payroll_status)
       `,
       )
-      .eq("organization_id", organizationId)
+      .eq("employees.organization_id", organizationId)
       .is("deleted_at", null)
       .order("issued_at", { ascending: false })
       .limit(3000);
@@ -895,6 +968,7 @@ async function runPerformanceReport(
   filters: ReportFilters,
 ): Promise<ReportResult> {
   const title = REPORT_KEY_LABELS[key];
+  const { dateFrom, dateTo } = resolvePayrollPeriod(filters);
 
   if (key === "performance_kpi") {
     let query = fromHrms(supabase, "performance_kpis")
@@ -906,9 +980,13 @@ async function runPerformanceReport(
       )
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
+      .or(
+        `and(end_date.gte.${dateFrom},end_date.lte.${dateTo}),and(end_date.is.null,created_at.gte.${dateFrom},created_at.lte.${dateTo}T23:59:59)`,
+      )
       .limit(2000);
     if (filters.employeeId) query = query.eq("employee_id", filters.employeeId);
     if (filters.teamEmployeeIds?.length) query = query.in("employee_id", filters.teamEmployeeIds);
+    if (filters.status) query = query.eq("kpi_status", filters.status);
     const { data, error } = await query;
     if (error) throw new Error(error.message);
     return buildResult(
@@ -940,15 +1018,19 @@ async function runPerformanceReport(
     let query = fromHrms(supabase, "performance_goals")
       .select(
         `
-        title, goal_status, current_progress, target_date,
+        title, goal_status, current_progress, due_date,
         employees:employee_id(employee_code, first_name, last_name)
       `,
       )
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
+      .or(
+        `and(due_date.gte.${dateFrom},due_date.lte.${dateTo}),and(due_date.is.null,created_at.gte.${dateFrom},created_at.lte.${dateTo}T23:59:59)`,
+      )
       .limit(2000);
     if (filters.employeeId) query = query.eq("employee_id", filters.employeeId);
     if (filters.teamEmployeeIds?.length) query = query.in("employee_id", filters.teamEmployeeIds);
+    if (filters.status) query = query.eq("goal_status", filters.status);
     const { data, error } = await query;
     if (error) throw new Error(error.message);
     return buildResult(
@@ -960,7 +1042,7 @@ async function runPerformanceReport(
         { key: "title", header: "Goal" },
         { key: "status", header: "Status" },
         { key: "progress", header: "Progress %" },
-        { key: "targetDate", header: "Target" },
+        { key: "targetDate", header: "Due Date" },
       ],
       ((data ?? []) as ReportRowLoose[]).map((row) => {
         const emp = unwrapRelation(row.employees);
@@ -970,7 +1052,7 @@ async function runPerformanceReport(
           title: row.title,
           status: row.goal_status,
           progress: Number(row.current_progress ?? 0),
-          targetDate: row.target_date ?? "",
+          targetDate: row.due_date ?? "",
         };
       }),
     );
@@ -980,15 +1062,18 @@ async function runPerformanceReport(
     let query = fromHrms(supabase, "performance_reviews")
       .select(
         `
-        review_period, review_status, overall_rating, self_rating, manager_rating,
+        created_at, submitted_at, review_status, overall_rating,
         employees:employee_id(employee_code, first_name, last_name)
       `,
       )
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
+      .gte("created_at", dateFrom)
+      .lte("created_at", `${dateTo}T23:59:59`)
       .limit(2000);
     if (filters.employeeId) query = query.eq("employee_id", filters.employeeId);
     if (filters.teamEmployeeIds?.length) query = query.in("employee_id", filters.teamEmployeeIds);
+    if (filters.status) query = query.eq("review_status", filters.status);
     const { data, error } = await query;
     if (error) throw new Error(error.message);
     return buildResult(
@@ -997,22 +1082,18 @@ async function runPerformanceReport(
       [
         { key: "employeeCode", header: "Code" },
         { key: "employeeName", header: "Employee" },
-        { key: "period", header: "Period" },
+        { key: "period", header: "Submitted" },
         { key: "status", header: "Status" },
         { key: "overall", header: "Overall" },
-        { key: "self", header: "Self" },
-        { key: "manager", header: "Manager" },
       ],
       ((data ?? []) as ReportRowLoose[]).map((row) => {
         const emp = unwrapRelation(row.employees);
         return {
           employeeCode: emp?.employee_code ?? "—",
           employeeName: formatEmployeeName(emp?.first_name, emp?.last_name),
-          period: row.review_period ?? "",
+          period: row.submitted_at || row.created_at || "",
           status: row.review_status,
           overall: row.overall_rating ?? "",
-          self: row.self_rating ?? "",
-          manager: row.manager_rating ?? "",
         };
       }),
     );
@@ -1028,9 +1109,12 @@ async function runPerformanceReport(
     )
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
+    .gte("created_at", dateFrom)
+    .lte("created_at", `${dateTo}T23:59:59`)
     .limit(1000);
   if (filters.employeeId) promoQuery = promoQuery.eq("employee_id", filters.employeeId);
   if (filters.teamEmployeeIds?.length) promoQuery = promoQuery.in("employee_id", filters.teamEmployeeIds);
+  if (filters.status) promoQuery = promoQuery.eq("promotion_status", filters.status);
   const { data, error } = await promoQuery;
   if (error) throw new Error(error.message);
   return buildResult(

@@ -47,6 +47,38 @@ export async function deliverOfferEmailToCandidate(input: {
   }
 }
 
+export async function deliverInterviewInviteEmail(input: {
+  to: string;
+  subject: string;
+  messageText: string;
+}): Promise<{ delivered: boolean; error?: string }> {
+  const recipient = input.to.trim().toLowerCase();
+  if (!recipient) {
+    return { delivered: false, error: "Candidate email is required to send the interview invite" };
+  }
+
+  const messageText = input.messageText.trim();
+  const emailResult = await sendEmail({
+    to: recipient,
+    subject: input.subject.trim(),
+    html: buildOfferEmailHtmlFromMessage(messageText),
+    text: messageText,
+  });
+
+  if (emailResult.delivered) {
+    return { delivered: true };
+  }
+
+  return {
+    delivered: false,
+    error:
+      emailResult.error ??
+      (emailResult.skipped
+        ? "Interview email could not be sent — SMTP is not configured."
+        : "Failed to deliver interview email."),
+  };
+}
+
 export async function loadOfferEmailContext(
   supabase: AuthSupabaseClient,
   organizationId: string,

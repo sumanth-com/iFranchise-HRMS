@@ -120,37 +120,40 @@ export function PermissionMatrix({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Permission Matrix</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Assign direct permissions per role. Inherited permissions are read-only.
-          </p>
-        </div>
-        {canAssign ? (
-          <Button onClick={onSave} disabled={isPending || loadingDetail}>
-            {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Save Permissions
-          </Button>
-        ) : null}
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Permission Matrix</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Assign direct permissions per role. Inherited permissions are read-only.
+        </p>
       </div>
 
-      <div className="rounded-xl border bg-card p-4 shadow-sm">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Role</p>
-            <LabeledSelect
-              items={roleItems}
-              value={selectedRoleId}
-              onValueChange={handleRoleChange}
-              placeholder="Select role"
-            />
-          </div>
-          <div className="flex items-end">
-            <p className="text-sm text-muted-foreground">{inheritanceText}</p>
-          </div>
+      <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-0.5">
+        <div className="min-w-[180px] max-w-sm flex-1 basis-[220px]">
+          <LabeledSelect
+            items={roleItems}
+            value={selectedRoleId}
+            onValueChange={handleRoleChange}
+            placeholder="Select role"
+            triggerClassName="h-9 w-full"
+          />
+        </div>
+        <p className="hidden min-w-0 flex-1 truncate text-sm text-muted-foreground sm:block">
+          {inheritanceText}
+        </p>
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          {canAssign ? (
+            <Button
+              className="h-9 shrink-0"
+              onClick={onSave}
+              disabled={isPending || loadingDetail}
+            >
+              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Save Permissions
+            </Button>
+          ) : null}
         </div>
       </div>
+      <p className="text-sm text-muted-foreground sm:hidden">{inheritanceText}</p>
 
       {loadingDetail ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -205,8 +208,7 @@ export function PermissionMatrix({
                           onChange={(e) => togglePermission(perm.id, e.target.checked)}
                         />
                         <span>
-                          <span className="font-medium">{perm.action}</span>
-                          <span className="block text-xs text-muted-foreground">{perm.code}</span>
+                          <span className="font-medium capitalize">{perm.action}</span>
                           {isInherited ? (
                             <span className="mt-0.5 block text-xs text-violet-600">Inherited</span>
                           ) : null}

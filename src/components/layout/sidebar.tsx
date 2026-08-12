@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
+import { useEffect } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 import { SidebarNavLink } from "@/components/layout/sidebar-nav-link";
@@ -18,6 +19,8 @@ export function Sidebar() {
     startNavigation,
     toggleSection,
     isSectionOpen,
+    sectionsReady,
+    ensureSectionOpenIfUnset,
   } = useSidebar();
   const { navigation, portalHome } = useSidebarNavigation();
 
@@ -27,6 +30,14 @@ export function Sidebar() {
     portalHome,
     navigation,
   );
+
+  useEffect(() => {
+    if (!sectionsReady || !activeHref) return;
+    const activeItem = navigation.find((item) => item.href === activeHref);
+    if (activeItem?.section) {
+      ensureSectionOpenIfUnset(activeItem.section);
+    }
+  }, [activeHref, ensureSectionOpenIfUnset, navigation, sectionsReady]);
 
   return (
     <aside

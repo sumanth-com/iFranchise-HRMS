@@ -1,6 +1,7 @@
 import { hasAnyPermission } from "@/lib/permissions/utils";
 
 export const ROLES_ROUTES = {
+  /** Legacy dashboard URL — redirects to Roles list. */
   dashboard: "/dashboard/roles",
   manage: "/dashboard/roles/manage",
   permissions: "/dashboard/roles/permissions",
@@ -9,10 +10,8 @@ export const ROLES_ROUTES = {
 } as const;
 
 export const ROLES_SUB_NAV = [
-  { title: "Dashboard", href: ROLES_ROUTES.dashboard },
   { title: "Roles", href: ROLES_ROUTES.manage },
-  { title: "Permission Matrix", href: ROLES_ROUTES.permissions },
-  { title: "User Assignments", href: ROLES_ROUTES.assignments },
+  { title: "Assignments", href: ROLES_ROUTES.assignments },
   { title: "Compare Roles", href: ROLES_ROUTES.compare },
 ] as const;
 

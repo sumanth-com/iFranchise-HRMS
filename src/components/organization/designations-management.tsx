@@ -3,14 +3,18 @@
 import { format } from "date-fns";
 import { Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import type { z } from "zod";
 
 import { Button } from "@/components/common/button";
-import { DataTable, type DataTableColumn } from "@/components/common/data-table";
+import {
+  DATA_TABLE_SCROLL_MAX_HEIGHT,
+  DataTable,
+  type DataTableColumn,
+} from "@/components/common/data-table";
 import { EmptyState } from "@/components/common/empty-state";
 import { FilterSelect } from "@/components/common/filter-select";
 import { Input } from "@/components/common/input";
@@ -19,7 +23,6 @@ import { OptionalEntitySelect } from "@/components/common/optional-entity-select
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { withSelectOption } from "@/components/payroll/select-utils";
 import { Label } from "@/components/ui/label";
-import { OrgExportButtons } from "@/components/organization/org-export-buttons";
 import { OrgPagination } from "@/components/organization/org-pagination";
 import { OrgStatusBadge } from "@/components/organization/org-status-badge";
 import { deleteDesignationAction, saveDesignationAction } from "@/lib/organization/actions";
@@ -38,6 +41,7 @@ type DesignationFormInput = z.input<typeof designationFormSchema>;
 type Props = {
   result: DesignationListResult;
   departments: LookupOption[];
+  employmentTypes: LookupOption[];
   permissionCodes: string[];
   search: string;
   status?: RecordStatus;
@@ -45,9 +49,8 @@ type Props = {
 
 const emptyForm: DesignationFormInput = {
   title: "",
-  code: "",
   departmentId: null,
-  level: 1,
+  employmentTypeId: null,
   description: "",
   status: "active",
 };
@@ -55,6 +58,7 @@ const emptyForm: DesignationFormInput = {
 export function DesignationsManagement({
   result,
   departments,
+  employmentTypes,
   permissionCodes,
   search,
   status,
@@ -64,6 +68,10 @@ export function DesignationsManagement({
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<DesignationListItem | null>(null);
+  const [deleting, setDeleting] = useState<DesignationListItem | null>(null);
+  const [isDeletePending, startDeleteTransition] = useTransition();
+  const [searchInput, setSearchInput] = useState(search);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const canCreate = canCreateOrganization(permissionCodes);
   const canEdit = canEditOrganization(permissionCodes);
@@ -88,6 +96,10 @@ export function DesignationsManagement({
     defaultValues: emptyForm,
   });
 
+  useEffect(() => {
+    setSearchInput(search);
+  }, [search]);
+
   function updateParams(patch: Record<string, string | undefined>) {
     const params = new URLSearchParams(searchParams.toString());
     Object.entries(patch).forEach(([key, value]) => {
@@ -98,6 +110,15 @@ export function DesignationsManagement({
     startTransition(() => {
       router.push(`?${params.toString()}`);
     });
+  }
+
+  function handleSearchChange(value: string) {
+    setSearchInput(value);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      const trimmed = value.trim();
+      updateParams({ search: trimmed || undefined });
+    }, 300);
   }
 
   const openCreate = useCallback(() => {
@@ -111,9 +132,8 @@ export function DesignationsManagement({
       setEditing(item);
       form.reset({
         title: item.title,
-        code: item.code,
         departmentId: item.departmentId,
-        level: item.level,
+        employmentTypeId: item.employmentTypeId,
         description: item.description ?? "",
         status: item.status,
       });
@@ -128,6 +148,7 @@ export function DesignationsManagement({
         {
           ...values,
           departmentId: values.departmentId || null,
+          employmentTypeId: values.employmentTypeId || null,
           description: values.description || null,
         },
         editing?.id,
@@ -142,27 +163,23 @@ export function DesignationsManagement({
     });
   }
 
-  const onDelete = useCallback(
-    (item: DesignationListItem) => {
-      if (item.employeeCount > 0) {
-        toast.error(
-          `Cannot delete designation with ${item.employeeCount} assigned employee(s)`,
-        );
+  const requestDelete = useCallback((item: DesignationListItem) => {
+    setDeleting(item);
+  }, []);
+
+  function confirmDelete() {
+    if (!deleting) return;
+    startDeleteTransition(async () => {
+      const res = await deleteDesignationAction(deleting.id);
+      if (!res.success) {
+        toast.error(res.message);
         return;
       }
-      if (!window.confirm(`Delete designation "${item.title}"?`)) return;
-      startTransition(async () => {
-        const res = await deleteDesignationAction(item.id);
-        if (!res.success) {
-          toast.error(res.message);
-          return;
-        }
-        toast.success("Designation deleted");
-        router.refresh();
-      });
-    },
-    [router],
-  );
+      toast.success("Designation deleted");
+      setDeleting(null);
+      router.refresh();
+    });
+  }
 
   const columns = useMemo<
     DataTableColumn<DesignationListItem & Record<string, unknown>>[]
@@ -171,12 +188,8 @@ export function DesignationsManagement({
       {
         key: "title",
         header: "Designation",
-        render: (row) => (
-          <div>
-            <p className="font-medium">{row.title}</p>
-            <p className="text-xs text-muted-foreground">{row.code}</p>
-          </div>
-        ),
+        className: "text-left",
+        render: (row) => <p className="font-medium text-left">{row.title}</p>,
       },
       {
         key: "departmentName",
@@ -184,14 +197,9 @@ export function DesignationsManagement({
         render: (row) => row.departmentName ?? "—",
       },
       {
-        key: "level",
-        header: "Level",
-        render: (row) => row.level,
-      },
-      {
-        key: "employeeCount",
-        header: "Employees",
-        render: (row) => row.employeeCount,
+        key: "employmentTypeName",
+        header: "Employment Type",
+        render: (row) => row.employmentTypeName ?? "—",
       },
       {
         key: "status",
@@ -207,7 +215,7 @@ export function DesignationsManagement({
         key: "actions",
         header: "Actions",
         render: (row) => (
-          <div className="flex gap-1">
+          <div className="flex justify-center gap-1">
             {canEdit ? (
               <Button
                 size="icon-sm"
@@ -222,14 +230,8 @@ export function DesignationsManagement({
               <Button
                 size="icon-sm"
                 variant="ghost"
-                onClick={() => onDelete(row)}
+                onClick={() => requestDelete(row)}
                 aria-label="Delete"
-                disabled={row.employeeCount > 0}
-                title={
-                  row.employeeCount > 0
-                    ? "Remove employees before deleting"
-                    : "Delete designation"
-                }
               >
                 <Trash2 className="h-4 w-4 text-destructive" />
               </Button>
@@ -238,49 +240,42 @@ export function DesignationsManagement({
         ),
       },
     ],
-    [canDelete, canEdit, onDelete, openEdit],
+    [canDelete, canEdit, requestDelete, openEdit],
   );
 
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Designations</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Define job titles and levels across departments.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <OrgExportButtons entity="designations" />
-          {canCreate ? (
-            <Button onClick={openCreate}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Designation
-            </Button>
-          ) : null}
-        </div>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Designations</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Define job titles and employment types across departments.
+        </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="relative">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative min-w-0 flex-1 sm:max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search designations…"
-            className="pl-9"
-            defaultValue={search}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                updateParams({ search: (e.target as HTMLInputElement).value || undefined });
-              }
-            }}
+            className="h-9 pl-9"
+            value={searchInput}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
         </div>
         <FilterSelect
           items={statusFilterItems}
           value={status ?? "all"}
           placeholder="All statuses"
+          className="sm:w-44"
+          triggerClassName="h-9"
           onValueChange={(v) => updateParams({ status: v === "all" ? undefined : v })}
         />
+        {canCreate ? (
+          <Button onClick={openCreate} className="h-9 shrink-0 sm:ml-auto">
+            <Plus className="mr-2 h-4 w-4" />
+            Add Designation
+          </Button>
+        ) : null}
       </div>
 
       {isPending ? (
@@ -292,14 +287,30 @@ export function DesignationsManagement({
 
       {result.data.length === 0 ? (
         <EmptyState
-          title="No designations found"
-          description="Add a designation or adjust your filters."
+          title={search.trim() ? "No matching designations" : "No designations found"}
+          description={
+            search.trim()
+              ? `Nothing matches "${search.trim()}". Try another spelling or clear the search.`
+              : "Add a designation or adjust your filters."
+          }
         />
       ) : (
-        <DataTable columns={columns} data={result.data} />
+        <DataTable
+          columns={columns}
+          data={result.data}
+          align="center"
+          scrollable
+          maxHeightClass={DATA_TABLE_SCROLL_MAX_HEIGHT}
+        />
       )}
 
-      <OrgPagination page={result.page} pageSize={result.pageSize} total={result.total} />
+      {result.total > result.pageSize ? (
+        <OrgPagination
+          page={result.page}
+          pageSize={result.pageSize}
+          total={result.total}
+        />
+      ) : null}
 
       <Modal
         open={open}
@@ -320,8 +331,12 @@ export function DesignationsManagement({
               <Input {...form.register("title")} />
             </div>
             <div className="space-y-2">
-              <Label>Code</Label>
-              <Input {...form.register("code")} />
+              <Label>Status</Label>
+              <LabeledSelect
+                items={statusItems}
+                value={form.watch("status")}
+                onValueChange={(v) => form.setValue("status", v as RecordStatus)}
+              />
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -335,8 +350,13 @@ export function DesignationsManagement({
               />
             </div>
             <div className="space-y-2">
-              <Label>Level</Label>
-              <Input type="number" min={1} {...form.register("level")} />
+              <Label>Employment Type</Label>
+              <OptionalEntitySelect
+                options={employmentTypes}
+                value={form.watch("employmentTypeId")}
+                onValueChange={(v) => form.setValue("employmentTypeId", v)}
+                placeholder="None"
+              />
             </div>
           </div>
           <div className="space-y-2">
@@ -346,15 +366,42 @@ export function DesignationsManagement({
               {...form.register("description")}
             />
           </div>
-          <div className="space-y-2">
-            <Label>Status</Label>
-            <LabeledSelect
-              items={statusItems}
-              value={form.watch("status")}
-              onValueChange={(v) => form.setValue("status", v as RecordStatus)}
-            />
-          </div>
         </div>
+      </Modal>
+
+      <Modal
+        open={deleting !== null}
+        onOpenChange={(open) => {
+          if (!open && !isDeletePending) setDeleting(null);
+        }}
+        title="Delete designation?"
+        description={
+          deleting
+            ? `This will remove "${deleting.title}" from your organization.`
+            : undefined
+        }
+        contentClassName="sm:max-w-md"
+        footer={
+          <Button
+            variant="destructive"
+            disabled={isDeletePending || !deleting}
+            onClick={confirmDelete}
+          >
+            {isDeletePending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Delete designation
+          </Button>
+        }
+      >
+        {deleting && deleting.employeeCount > 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {deleting.employeeCount} employee(s) are assigned to this designation. They will be
+            unassigned when you delete it.
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            This action cannot be undone. The designation will be removed from lists and reports.
+          </p>
+        )}
       </Modal>
     </>
   );

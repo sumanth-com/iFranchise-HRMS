@@ -22,21 +22,48 @@ type DataTableProps<T> = {
   data: T[];
   className?: string;
   emptyMessage?: string;
+  align?: "left" | "center";
+  /** Enables a max-height scroll region with a sticky header (attendance-style tables). */
+  scrollable?: boolean;
+  maxHeightClass?: string;
 };
+
+export const DATA_TABLE_SCROLL_MAX_HEIGHT =
+  "max-h-[min(70vh,calc(100dvh-16rem))]";
+
+export const DATA_TABLE_SPLIT_SCROLL_MAX_HEIGHT =
+  "max-h-[min(32vh,calc(50dvh-14rem))]";
 
 export function DataTable<T extends Record<string, unknown>>({
   columns,
   data,
   className,
   emptyMessage = "No records to display.",
+  align = "left",
+  scrollable = false,
+  maxHeightClass = DATA_TABLE_SCROLL_MAX_HEIGHT,
 }: DataTableProps<T>) {
+  const headAlign = align === "center" ? "text-center" : "text-left";
+  const cellAlign = align === "center" ? "text-center" : "text-left";
+
   return (
-    <div className={cn("overflow-x-auto rounded-lg border", className)}>
+    <div
+      className={cn(
+        "rounded-lg border",
+        scrollable
+          ? cn("overflow-auto [scrollbar-gutter:stable]", maxHeightClass)
+          : "overflow-x-auto",
+        className,
+      )}
+    >
       <Table>
-        <TableHeader>
+        <TableHeader className={scrollable ? "sticky top-0 z-10 bg-background shadow-sm" : undefined}>
           <TableRow>
             {columns.map((column) => (
-              <TableHead key={String(column.key)} className={column.className}>
+              <TableHead
+                key={String(column.key)}
+                className={cn(headAlign, column.className)}
+              >
                 {column.header}
               </TableHead>
             ))}
@@ -47,7 +74,7 @@ export function DataTable<T extends Record<string, unknown>>({
             <TableRow>
               <TableCell
                 colSpan={columns.length}
-                className="h-24 text-center text-muted-foreground"
+                className={cn("h-24 text-muted-foreground", cellAlign)}
               >
                 {emptyMessage}
               </TableCell>
@@ -58,7 +85,7 @@ export function DataTable<T extends Record<string, unknown>>({
                 {columns.map((column) => (
                   <TableCell
                     key={String(column.key)}
-                    className={column.className}
+                    className={cn(cellAlign, column.className)}
                   >
                     {column.render
                       ? column.render(row)

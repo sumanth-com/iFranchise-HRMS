@@ -1,5 +1,6 @@
 import { OrganizationProfileForm } from "@/components/organization/organization-profile-form";
 import { canEditProfile } from "@/lib/organization/constants";
+import { getOrganizationLogoSignedUrl } from "@/lib/organization/services/org-logo";
 import { getOrganizationProfile } from "@/lib/organization/services/org-queries";
 import { ORGANIZATION_VIEW_PERMISSIONS } from "@/lib/organization/constants";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
@@ -14,18 +15,13 @@ export default async function OrganizationProfilePage() {
     return <p className="text-muted-foreground">Organization not found.</p>;
   }
 
+  const logoUrl = await getOrganizationLogoSignedUrl(supabase, orgProfile.logoStoragePath);
+
   return (
-    <>
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Company Profile</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Manage company information, addresses, and regional settings.
-        </p>
-      </div>
-      <OrganizationProfileForm
-        profile={orgProfile}
-        canEdit={canEditProfile(profile.permissionCodes)}
-      />
-    </>
+    <OrganizationProfileForm
+      profile={orgProfile}
+      logoUrl={logoUrl}
+      canEdit={canEditProfile(profile.permissionCodes)}
+    />
   );
 }

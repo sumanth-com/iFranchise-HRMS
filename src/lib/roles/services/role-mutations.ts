@@ -7,6 +7,7 @@ import {
   assignUserRoleSchema,
   roleFormSchema,
   rolePermissionsSchema,
+  slugifyRoleCode,
 } from "@/lib/validations/roles";
 import {
   getRoleAncestorIds,
@@ -66,7 +67,27 @@ export async function saveRole(
   const parsed = roleFormSchema.parse(input);
   const orgId = profile.employee.organizationId;
 
-  await assertUniqueRoleCode(supabase, orgId, parsed.code, id);
+  let code = (parsed.code?.trim() || slugifyRoleCode(parsed.name)).toLowerCase();
+
+  if (!id) {
+    // Ensure unique code when auto-generating from name.
+    let attempt = code;
+    let suffix = 1;
+    while (true) {
+      try {
+        await assertUniqueRoleCode(supabase, orgId, attempt);
+        code = attempt;
+        break;
+      } catch {
+        attempt = `${code.slice(0, 40)}_${suffix}`;
+        suffix += 1;
+        if (suffix > 50) throw new Error("Could not generate a unique role code");
+      }
+    }
+  } else if (parsed.code?.trim()) {
+    await assertUniqueRoleCode(supabase, orgId, code, id);
+  }
+
   if (id) {
     await assertNoCircularInheritance(supabase, id, parsed.parentRoleId ?? null, orgId);
   }
@@ -82,7 +103,7 @@ export async function saveRole(
 
   const payload = {
     name: parsed.name,
-    code: parsed.code.toLowerCase(),
+    code,
     description: parsed.description?.trim() || null,
     parent_role_id: parsed.parentRoleId ?? null,
     is_default: parsed.isDefault,
@@ -94,7 +115,7 @@ export async function saveRole(
     const { data: existing } = await supabase
       .schema("hrms")
       .from("roles")
-      .select("is_system_role")
+      .select("is_system_role, code")
       .eq("id", id)
       .maybeSingle();
 
@@ -115,7 +136,22 @@ export async function saveRole(
       return id;
     }
 
-    const { error } = await supabase.schema("hrms").from("roles").update(payload).eq("id", id);
+    const updatePayload = parsed.code?.trim()
+      ? payload
+      : {
+          name: payload.name,
+          description: payload.description,
+          parent_role_id: payload.parent_role_id,
+          is_default: payload.is_default,
+          status: payload.status,
+          ...auditFields(profile),
+        };
+
+    const { error } = await supabase
+      .schema("hrms")
+      .from("roles")
+      .update(updatePayload)
+      .eq("id", id);
     if (error) throw new Error(error.message);
     return id;
   }
@@ -146,35 +182,97 @@ export async function deleteRole(
   const { data: role } = await supabase
     .schema("hrms")
     .from("roles")
-    .select("is_system_role, code")
+    .select("is_system_role, code, name")
     .eq("id", roleId)
     .eq("organization_id", orgId)
+    .is("deleted_at", null)
     .maybeSingle();
 
   if (!role) throw new Error("Role not found");
-  if (role.is_system_role) throw new Error("System roles cannot be deleted");
-
-  const { count: userCount } = await supabase
-    .schema("hrms")
-    .from("user_roles")
-    .select("id", { count: "exact", head: true })
-    .eq("role_id", roleId)
-    .is("deleted_at", null)
-    .eq("status", "active");
-
-  if ((userCount ?? 0) > 0) {
-    throw new Error("Cannot delete a role assigned to users");
-  }
 
   if (role.code === "super_admin") {
     throw new Error("Cannot delete the Super Admin role");
   }
 
-  const { error } = await supabase
+  // App-layer auth already checked role.delete / role.manage.
+  // Soft-delete assignments + role with service role so RLS on user_roles
+  // (which requires user_role.assign) does not block role cleanup.
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
+  const now = new Date().toISOString();
+  const audit = {
+    updated_by: profile.userId,
+    updated_at: now,
+  };
+
+  const { data: assignments, error: assignmentFetchError } = await admin
+    .schema("hrms")
+    .from("user_roles")
+    .select("id, user_id")
+    .eq("organization_id", orgId)
+    .eq("role_id", roleId)
+    .is("deleted_at", null);
+
+  if (assignmentFetchError) throw new Error(assignmentFetchError.message);
+
+  if (assignments && assignments.length > 0) {
+    const { error: assignmentError } = await admin
+      .schema("hrms")
+      .from("user_roles")
+      .update({
+        deleted_at: now,
+        status: "inactive",
+        ...audit,
+      })
+      .eq("organization_id", orgId)
+      .eq("role_id", roleId)
+      .is("deleted_at", null);
+
+    if (assignmentError) throw new Error(assignmentError.message);
+
+    // Best-effort: point auth metadata at another remaining role for each user.
+    for (const assignment of assignments) {
+      try {
+        const { data: remaining } = await admin
+          .schema("hrms")
+          .from("user_roles")
+          .select("roles:role_id (code)")
+          .eq("organization_id", orgId)
+          .eq("user_id", assignment.user_id)
+          .is("deleted_at", null)
+          .eq("status", "active")
+          .limit(1)
+          .maybeSingle();
+
+        const remainingRole = remaining?.roles as
+          | { code: string }
+          | { code: string }[]
+          | null
+          | undefined;
+        const nextCode = Array.isArray(remainingRole)
+          ? remainingRole[0]?.code
+          : remainingRole?.code;
+
+        if (nextCode) {
+          await syncUserAuthRoleMetadata(assignment.user_id, orgId, nextCode);
+        }
+      } catch {
+        // Ignore metadata sync failures; role soft-delete still proceeds.
+      }
+    }
+  }
+
+  const { error } = await admin
     .schema("hrms")
     .from("roles")
-    .update({ deleted_at: new Date().toISOString(), status: "archived", ...auditFields(profile) })
-    .eq("id", roleId);
+    .update({
+      deleted_at: now,
+      status: "archived",
+      ...audit,
+    })
+    .eq("id", roleId)
+    .eq("organization_id", orgId)
+    .is("deleted_at", null);
 
   if (error) throw new Error(error.message);
 }

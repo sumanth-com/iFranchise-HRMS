@@ -7,6 +7,22 @@ const reportKeys = REPORT_DEFINITIONS.map((d) => d.key) as [
   ...(typeof REPORT_DEFINITIONS)[number]["key"][],
 ];
 
+export const generatedReportSchema = z.object({
+  key: z.string().min(1),
+  title: z.string().min(1),
+  generatedAt: z.string().min(1),
+  total: z.number().int().min(0),
+  columns: z.array(z.object({ key: z.string().min(1), header: z.string().min(1) })).min(1),
+  rows: z
+    .array(
+      z.record(
+        z.string(),
+        z.union([z.string(), z.number(), z.boolean(), z.null()]).optional(),
+      ),
+    )
+    .max(5000),
+});
+
 export const reportFiltersSchema = z.object({
   dateFrom: z.string().optional().or(z.literal("")),
   dateTo: z.string().optional().or(z.literal("")),

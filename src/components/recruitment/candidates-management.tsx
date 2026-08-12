@@ -6,7 +6,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -34,6 +34,11 @@ import {
   INTERVIEW_DURATION_OPTIONS,
   INTERVIEW_TYPE_LABELS,
 } from "@/lib/recruitment/constants";
+import {
+  applyInterviewEmailTemplate,
+  formatInterviewDateLabel,
+  formatInterviewTimeLabel,
+} from "@/lib/recruitment/interview-email-content";
 import { cn } from "@/lib/utils";
 import {
   candidateFormSchema,
@@ -42,6 +47,7 @@ import {
 import type {
   CandidateDetail,
   CandidateListItem,
+  RecruitmentEmailTemplate,
   RecruitmentLookups,
 } from "@/types/recruitment";
 
@@ -364,7 +370,7 @@ export function CandidatesManagement({
         <ScheduleInterviewModal
           open={interviewOpen}
           onOpenChange={setInterviewOpen}
-          candidateId={activeDetail.id}
+          candidate={activeDetail}
           lookups={lookups}
           onSuccess={() => {
             void refreshDetail(activeDetail.id);
@@ -493,48 +499,171 @@ function CandidateFormModal({
   );
 }
 
+function defaultInterviewTemplate(
+  templates: RecruitmentEmailTemplate[],
+): RecruitmentEmailTemplate | null {
+  return (
+    templates.find((item) => item.id === "interview_scheduled") ??
+    templates.find((item) => item.name.toLowerCase().includes("interview")) ??
+    null
+  );
+}
+
 function ScheduleInterviewModal({
   open,
   onOpenChange,
-  candidateId,
+  candidate,
   lookups,
   onSuccess,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  candidateId: string;
+  candidate: CandidateDetail;
   lookups: RecruitmentLookups;
   onSuccess: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
+  const emailTouchedRef = useRef(false);
+  const interviewTemplates = useMemo(
+    () =>
+      lookups.emailTemplates.filter(
+        (item) =>
+          item.id === "interview_scheduled" ||
+          item.name.toLowerCase().includes("interview"),
+      ),
+    [lookups.emailTemplates],
+  );
   const form = useForm<z.input<typeof interviewFormSchema>>({
     resolver: zodResolver(interviewFormSchema),
     defaultValues: {
-      candidateId,
+      candidateId: candidate.id,
       interviewerEmployeeId: "",
       roundName: "Technical Round",
       interviewDate: "",
       interviewTime: "10:00",
       interviewType: "offline",
       durationMinutes: lookups.defaultInterviewDurationMinutes ?? 60,
+      emailTemplateId: defaultInterviewTemplate(interviewTemplates)?.id ?? "",
+      emailSubject: "",
+      emailMessage: "",
     },
   });
+
+  const interviewerEmployeeId = form.watch("interviewerEmployeeId");
+  const roundName = form.watch("roundName");
+  const interviewDate = form.watch("interviewDate");
+  const interviewTime = form.watch("interviewTime");
+  const interviewType = form.watch("interviewType");
+  const durationMinutes = form.watch("durationMinutes");
+  const meetingLink = form.watch("meetingLink");
+  const emailTemplateId = form.watch("emailTemplateId");
+
+  const applySelectedTemplate = useCallback(
+    (templateId: string) => {
+      const template =
+        interviewTemplates.find((item) => item.id === templateId) ??
+        defaultInterviewTemplate(interviewTemplates);
+      if (!template) return;
+
+      const interviewer =
+        lookups.employees.find((item) => item.id === interviewerEmployeeId)?.label ?? "";
+      const variables = {
+        candidateName: candidate.fullName,
+        position: candidate.jobTitle,
+        roundName: roundName || "Interview",
+        interviewDate: formatInterviewDateLabel(interviewDate),
+        interviewTime: formatInterviewTimeLabel(interviewTime),
+        duration: String(durationMinutes ?? lookups.defaultInterviewDurationMinutes ?? 60),
+        interviewType:
+          INTERVIEW_TYPE_LABELS[interviewType ?? "offline"] ?? interviewType ?? "Offline",
+        meetingLink: meetingLink?.trim() ?? "",
+        interviewer,
+        hrEmail: lookups.offerEmailDefaults.hrEmail,
+        hrPhone: lookups.offerEmailDefaults.hrPhone,
+      };
+
+      form.setValue("emailTemplateId", template.id);
+      form.setValue("emailSubject", applyInterviewEmailTemplate(template.subject, variables));
+      form.setValue("emailMessage", applyInterviewEmailTemplate(template.body, variables));
+    },
+    [
+      candidate.fullName,
+      candidate.jobTitle,
+      durationMinutes,
+      form,
+      interviewDate,
+      interviewTime,
+      interviewType,
+      interviewTemplates,
+      interviewerEmployeeId,
+      lookups.defaultInterviewDurationMinutes,
+      lookups.employees,
+      lookups.offerEmailDefaults.hrEmail,
+      lookups.offerEmailDefaults.hrPhone,
+      meetingLink,
+      roundName,
+    ],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    emailTouchedRef.current = false;
+    form.setValue("candidateId", candidate.id);
+    const initial = defaultInterviewTemplate(interviewTemplates);
+    if (initial) {
+      applySelectedTemplate(initial.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, candidate.id]);
+
+  useEffect(() => {
+    if (!open || emailTouchedRef.current || !emailTemplateId) return;
+    applySelectedTemplate(emailTemplateId);
+  }, [
+    open,
+    emailTemplateId,
+    interviewerEmployeeId,
+    roundName,
+    interviewDate,
+    interviewTime,
+    interviewType,
+    durationMinutes,
+    meetingLink,
+    applySelectedTemplate,
+  ]);
+
+  const templateItems = interviewTemplates.map((item) => ({
+    value: item.id,
+    label: item.name,
+  }));
 
   return (
     <Modal
       open={open}
       onOpenChange={onOpenChange}
       title="Schedule Interview"
-      contentClassName="sm:max-w-xl"
+      contentClassName="sm:max-w-2xl"
       footer={
         <Button
           disabled={isPending}
           onClick={form.handleSubmit((values) => {
+            if (templateItems.length > 0) {
+              if (!emailTouchedRef.current && values.emailTemplateId) {
+                applySelectedTemplate(values.emailTemplateId);
+              }
+              const emailSubject = form.getValues("emailSubject")?.trim() ?? "";
+              const emailMessage = form.getValues("emailMessage")?.trim() ?? "";
+              if (!emailSubject || !emailMessage) {
+                toast.error("Email subject and message are required");
+                return;
+              }
+            }
+
             startTransition(async () => {
-              const result = await scheduleInterviewAction(values);
+              const result = await scheduleInterviewAction(form.getValues());
               if (!result.success) toast.error(result.message);
               else {
-                toast.success("Interview scheduled");
+                toast.success("Interview scheduled and invite sent");
                 onOpenChange(false);
                 onSuccess();
               }
@@ -543,7 +672,7 @@ function ScheduleInterviewModal({
         >
           {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
           <CalendarPlus className="mr-1.5 h-4 w-4" />
-          Schedule
+          Schedule & send
         </Button>
       }
     >
@@ -592,6 +721,46 @@ function ScheduleInterviewModal({
         <Field label="Meeting Link">
           <Input disabled={isPending} placeholder="Optional" {...form.register("meetingLink")} />
         </Field>
+        {templateItems.length > 0 ? (
+          <div className="space-y-4 sm:col-span-2">
+            <Field label="Mail template">
+              <LabeledSelect
+                items={templateItems}
+                value={emailTemplateId || templateItems[0]?.value || ""}
+                onValueChange={(value) => {
+                  if (!value) return;
+                  emailTouchedRef.current = false;
+                  applySelectedTemplate(value);
+                }}
+                disabled={isPending}
+              />
+            </Field>
+            <Field label="Email subject">
+              <Input
+                disabled={isPending}
+                {...form.register("emailSubject", {
+                  onChange: () => {
+                    emailTouchedRef.current = true;
+                  },
+                })}
+              />
+            </Field>
+            <Field label="Email message">
+              <textarea
+                className="min-h-[180px] w-full rounded-md border bg-background px-3 py-2 text-sm leading-relaxed"
+                disabled={isPending}
+                {...form.register("emailMessage", {
+                  onChange: () => {
+                    emailTouchedRef.current = true;
+                  },
+                })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Edit the invite above, then send to {candidate.email}.
+              </p>
+            </Field>
+          </div>
+        ) : null}
       </div>
     </Modal>
   );

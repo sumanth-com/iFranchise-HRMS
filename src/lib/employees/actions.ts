@@ -14,6 +14,7 @@ import {
   getEmployeeById,
   getEmployeeAttendance,
   getEmployeeAttendanceSummary,
+  parseEmployeeAttendancePeriod,
   getEmployeeBankAccounts,
   getEmployeeLeaveBalances,
   getEmployeeLeaveRequests,
@@ -234,6 +235,10 @@ export async function deleteEmployeeAction(
     const deleted = await permanentlyDeleteEmployee(profile, employeeId);
 
     revalidatePath(EMPLOYEE_ROUTES.list);
+    revalidatePath("/dashboard/hr-overview");
+    revalidatePath("/dashboard/directory");
+    revalidatePath("/employee");
+    revalidatePath("/manager");
 
     return { success: true, data: deleted };
   } catch (error) {
@@ -567,7 +572,10 @@ export async function getSignedUrlAction(
   }
 }
 
-export async function getEmployeeDetailBundleAction(employeeRef: string) {
+export async function getEmployeeDetailBundleAction(
+  employeeRef: string,
+  searchParams?: Record<string, string | string[] | undefined>,
+) {
   const profile = await requireServerPermission("employee.view");
   const supabase = await getAuthenticatedSupabase();
 
@@ -580,6 +588,8 @@ export async function getEmployeeDetailBundleAction(employeeRef: string) {
   if (!resolved) {
     return null;
   }
+
+  const attendancePeriod = parseEmployeeAttendancePeriod(searchParams ?? {});
 
   const [
     employeeResult,
@@ -598,14 +608,14 @@ export async function getEmployeeDetailBundleAction(employeeRef: string) {
     payrollDataResult,
   ] = await Promise.allSettled([
     getEmployeeById(supabase, resolved.id),
-    getEmployeeAttendance(supabase, resolved.id),
-    getEmployeeLeaveRequests(supabase, resolved.id),
-    getEmployeeLeaveApprovals(supabase, resolved.id),
+    getEmployeeAttendance(supabase, resolved.id, attendancePeriod),
+    getEmployeeLeaveRequests(supabase, resolved.id, attendancePeriod),
+    getEmployeeLeaveApprovals(supabase, resolved.id, attendancePeriod),
     getEmployeePayrollItems(supabase, resolved.id),
     getEmployeeBankAccounts(supabase, resolved.id),
-    getEmployeeLeaveBalances(supabase, resolved.id),
+    getEmployeeLeaveBalances(supabase, resolved.id, attendancePeriod),
     getEmployeeSalaryStructure(supabase, resolved.id),
-    getEmployeeAttendanceSummary(supabase, resolved.id),
+    getEmployeeAttendanceSummary(supabase, resolved.id, attendancePeriod),
     getEmployeeTimeline(supabase, resolved.id),
     listEmployeeAssets(supabase, profile.employee.organizationId, resolved.id),
     getEmployeeDocumentsExplorerForEmployee(
@@ -705,6 +715,7 @@ export async function getEmployeeDetailBundleAction(employeeRef: string) {
     leaveBalances,
     salaryStructure,
     attendanceSummary,
+    attendancePeriod,
     timeline,
     assets,
     documentsExplorer,

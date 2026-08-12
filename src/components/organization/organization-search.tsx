@@ -128,7 +128,9 @@ export function OrganizationSearch() {
                     <button
                       type="button"
                       className="text-sm text-primary hover:underline"
-                      onClick={() => router.push(ORGANIZATION_ROUTES.workLocations)}
+                      onClick={() =>
+                        router.push(`${ORGANIZATION_ROUTES.branches}#work-locations`)
+                      }
                     >
                       {l.name}
                     </button>

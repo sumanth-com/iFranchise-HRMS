@@ -14,6 +14,7 @@ import { getAttendanceSummary } from "@/lib/attendance/services/attendance-queri
 import { absentTodayIncludingLeave } from "@/lib/attendance/attendance-presence";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { ASSETS_ROUTES } from "@/lib/assets/constants";
+import { DASHBOARD_ACTION_LINKS } from "@/lib/dashboard/constants";
 import { DOCUMENTS_ROUTES } from "@/lib/documents/constants";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
 import { EXIT_ROUTES } from "@/lib/exit/constants";
@@ -405,7 +406,7 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
     dayKeys.map((day, index) => [day, attendanceTrendCountsRes[index]?.count ?? 0]),
   );
 
-  // Birthdays & anniversaries (next 30 days)
+  // Birthdays (next 7 days) & work anniversaries (next 30 days)
   const upcomingBirthdays: DashboardPersonEvent[] = [];
   const upcomingAnniversaries: DashboardPersonEvent[] = [];
   let probationEndingSoon = 0;
@@ -414,7 +415,7 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
     const href = employeeHref(e);
     const name = formatEmployeeName(e.first_name, e.last_name);
     const dob = profileByEmployee.get(e.id)?.date_of_birth as string | null | undefined;
-    const bday = upcomingWithinDays(dob, todayDate, 30);
+    const bday = upcomingWithinDays(dob, todayDate, 7);
     if (bday) {
       upcomingBirthdays.push({
         id: `bday-${e.id}`,
@@ -491,28 +492,28 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
       id: "interviews-today",
       label: "Interviews Today",
       count: interviewsToday,
-      href: RECRUITMENT_ROUTES.interviews,
+      href: DASHBOARD_ACTION_LINKS.interviewsToday,
       urgency: interviewsToday > 0 ? "medium" : "low",
     },
     {
       id: "probation-ending",
       label: "Employees Completing Probation",
       count: probationEndingSoon,
-      href: EMPLOYEE_ROUTES.list,
+      href: DASHBOARD_ACTION_LINKS.probation,
       urgency: probationEndingSoon > 0 ? "medium" : "low",
     },
     {
       id: "payroll-due",
       label: "Payroll Due This Month",
       count: payrollDue,
-      href: PAYROLL_ROUTES.run,
+      href: DASHBOARD_ACTION_LINKS.payrollDue,
       urgency: payrollDue > 0 ? "high" : "low",
     },
     {
       id: "offers-pending",
       label: "Pending Recruitment Offers",
       count: offersPending,
-      href: RECRUITMENT_ROUTES.offers,
+      href: DASHBOARD_ACTION_LINKS.offersPending,
       urgency: offersPending > 0 ? "medium" : "low",
     },
   ];

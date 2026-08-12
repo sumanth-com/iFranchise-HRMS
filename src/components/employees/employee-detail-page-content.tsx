@@ -8,6 +8,7 @@ import { EmployeeDetailView } from "@/components/employees/employee-detail-view"
 import { buttonVariants } from "@/components/common/button";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
 import type {
+  EmployeeAttendancePeriod,
   EmployeeAttendanceSummary,
   EmployeeBankAccountDetail,
   EmployeeDetail,
@@ -34,6 +35,7 @@ type EmployeeDetailPageContentProps = {
   leaveBalances: EmployeeLeaveBalanceDetail[];
   salaryStructure: EmployeeSalaryStructureDetail | null;
   attendanceSummary: EmployeeAttendanceSummary;
+  attendancePeriod: EmployeeAttendancePeriod;
   assets: AssetAssignmentItem[];
   documentsExplorer: EmployeeDocumentsExplorerData;
   assetsData: EmployeeAssetsData;
@@ -59,6 +61,7 @@ export function EmployeeDetailPageContent({
   leaveBalances,
   salaryStructure,
   attendanceSummary,
+  attendancePeriod,
   assets,
   documentsExplorer,
   assetsData,
@@ -108,6 +111,7 @@ export function EmployeeDetailPageContent({
           leaveBalances={leaveBalances}
           salaryStructure={salaryStructure}
           attendanceSummary={attendanceSummary}
+          attendancePeriod={attendancePeriod}
           assets={assets}
           documentsExplorer={documentsExplorer}
           assetsData={assetsData}

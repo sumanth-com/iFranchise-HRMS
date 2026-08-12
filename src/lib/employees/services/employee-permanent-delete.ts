@@ -65,7 +65,10 @@ export async function permanentlyDeleteEmployee(
 
   if (result.user_id) {
     const { error: authDeleteError } = await admin.auth.admin.deleteUser(result.user_id);
-    if (authDeleteError) {
+    if (
+      authDeleteError &&
+      !/user not found|user_not_found/i.test(authDeleteError.message)
+    ) {
       throw new Error(
         `Employee records were removed, but login access could not be revoked: ${authDeleteError.message}`,
       );
