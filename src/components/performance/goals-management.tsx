@@ -408,6 +408,7 @@ export function GoalsWorkspace({
   canManage,
   formProps,
   tableProps,
+  listBasePath = PERFORMANCE_ROUTES.goals,
 }: {
   canCreate: boolean;
   canManage: boolean;
@@ -416,6 +417,7 @@ export function GoalsWorkspace({
     categories: string[];
   };
   tableProps: Omit<Parameters<typeof GoalsTable>[0], never>;
+  listBasePath?: string;
 }) {
   const router = useRouter();
   const skipServerSyncRef = useRef(false);
@@ -483,8 +485,8 @@ export function GoalsWorkspace({
       cycleId: undefined,
       goalStatus: undefined,
     });
-    router.replace(PERFORMANCE_ROUTES.goals);
-  }, [router, tableProps.pageSize]);
+    router.replace(listBasePath);
+  }, [listBasePath, router, tableProps.pageSize]);
 
   return (
     <section className="rounded-xl border bg-card shadow-sm">

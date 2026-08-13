@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { createClient } from "@/lib/supabase/server";
 import {
   requireServerAnyPermission,
@@ -9,6 +10,8 @@ import {
 } from "@/lib/permissions/server";
 import { LEAVE_ROUTES, SELF_LEAVE_ROUTES } from "@/lib/leave/constants";
 import { getLeaveRequestById } from "@/lib/leave/services/leave-detail";
+import { getManagerTeamScope } from "@/lib/manager/services/team-queries";
+import { hasPermission } from "@/lib/permissions/utils";
 import {
   approveLeaveRequest,
   cancelLeaveRequest,
@@ -216,10 +219,23 @@ export async function getLeaveDetailAction(
   leaveRequestId: string,
 ): Promise<LeaveActionResult<LeaveDetail>> {
   try {
-    const profile = await requireServerPermission("leave.view");
+    const profile = await requireServerAnyPermission([
+      "leave.view",
+      PORTAL_PERMISSIONS.manager,
+    ]);
     const supabase = await getAuthenticatedSupabase();
     const data = await getLeaveRequestById(supabase, profile, leaveRequestId);
     if (!data) return { success: false, message: "Leave request not found" };
+
+    const isOwn = data.employeeId === profile.employee.id;
+    const hasHrAccess = hasPermission(profile.permissionCodes, PORTAL_PERMISSIONS.hr);
+    if (!isOwn && !hasHrAccess) {
+      const { teamIds } = await getManagerTeamScope(supabase, profile);
+      if (!teamIds.includes(data.employeeId)) {
+        return { success: false, message: "Leave request not found" };
+      }
+    }
+
     return { success: true, data };
   } catch (error) {
     return {

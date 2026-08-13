@@ -56,6 +56,7 @@ function revalidatePerformancePaths() {
   revalidatePath(MANAGER_ROUTES.performance);
   revalidatePath(MANAGER_ROUTES.team);
   revalidatePath(MANAGER_ROUTES.home);
+  revalidatePath(MANAGER_ROUTES.overview);
 }
 
 export async function fetchTeamPerformanceOverviewAction(

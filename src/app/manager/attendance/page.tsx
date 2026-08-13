@@ -1,14 +1,14 @@
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { LoadingSpinner } from "@/components/common/loading-spinner";
-import { ManagerAttendanceHubView } from "@/components/manager/attendance/manager-attendance-hub-view";
-import { getManagerTeamAttendancePageData } from "@/lib/manager/actions/manager-attendance-actions";
+import { EmployeeAttendanceView } from "@/components/employee/attendance/employee-attendance-view";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
-import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
+import { hubListUrl } from "@/lib/dashboard/hub-paths";
+import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { getManagerProfilePageData } from "@/lib/manager/services/manager-self-attendance-service";
 import { requireServerPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
-import { teamAttendanceListParamsSchema } from "@/lib/validations/manager-attendance";
 import { managerProfilePageParamsSchema } from "@/lib/validations/manager-self-attendance";
 
 type ManagerAttendancePageProps = {
@@ -19,8 +19,19 @@ function firstString(value: string | string[] | undefined) {
   return typeof value === "string" ? value : undefined;
 }
 
-function parseSection(value: string | undefined): "my" | "team" {
-  return value === "team" ? "team" : "my";
+function teamRedirect(
+  raw: Record<string, string | string[] | undefined>,
+): string | null {
+  const tab = firstString(raw.tab);
+  const employeeId = firstString(raw.employeeId);
+  if (tab !== "team" && !employeeId) return null;
+
+  const filters: Record<string, string | undefined> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (key === "tab" || typeof value !== "string" || !value) continue;
+    filters[key] = value;
+  }
+  return hubListUrl(MANAGER_ROUTES.attendanceTeam, filters);
 }
 
 export default async function ManagerAttendancePage({
@@ -29,8 +40,8 @@ export default async function ManagerAttendancePage({
   const profile = await requireServerPermission(PORTAL_PERMISSIONS.manager);
   const supabase = await createClient();
   const rawParams = await searchParams;
-  const today = getTodayDateString();
-  const section = parseSection(firstString(rawParams.tab));
+  const legacy = teamRedirect(rawParams);
+  if (legacy) redirect(legacy);
 
   const selfParams = managerProfilePageParamsSchema.parse({
     month: firstString(rawParams.month),
@@ -38,27 +49,10 @@ export default async function ManagerAttendancePage({
     date: firstString(rawParams.date),
     status: firstString(rawParams.status),
     searchDate: firstString(rawParams.searchDate),
-    page: section === "my" ? firstString(rawParams.page) : undefined,
+    page: firstString(rawParams.page),
   });
 
-  const teamParams = teamAttendanceListParamsSchema.parse({
-    page: section === "team" ? firstString(rawParams.page) : undefined,
-    pageSize: firstString(rawParams.pageSize),
-    search: firstString(rawParams.search),
-    sortBy: firstString(rawParams.sortBy),
-    sortOrder: firstString(rawParams.sortOrder),
-    dateFrom: firstString(rawParams.dateFrom),
-    dateTo: firstString(rawParams.dateTo),
-    departmentId: firstString(rawParams.departmentId),
-    employmentTypeId: firstString(rawParams.employmentTypeId),
-    attendanceStatus: firstString(rawParams.attendanceStatus),
-    employeeId: firstString(rawParams.employeeId),
-  });
-
-  const [selfData, teamData] = await Promise.all([
-    getManagerProfilePageData(supabase, profile, selfParams),
-    getManagerTeamAttendancePageData(teamParams),
-  ]);
+  const selfData = await getManagerProfilePageData(supabase, profile, selfParams);
 
   return (
     <Suspense
@@ -68,18 +62,11 @@ export default async function ManagerAttendancePage({
         </div>
       }
     >
-      <ManagerAttendanceHubView
-        initialSection={section}
-        selfAttendance={{
-          data: selfData,
-          status: selfParams.status,
-          searchDate: selfParams.searchDate,
-        }}
-        teamAttendance={{
-          ...teamData,
-          initialFilters: teamParams,
-          today,
-        }}
+      <EmployeeAttendanceView
+        data={selfData}
+        status={selfParams.status}
+        searchDate={selfParams.searchDate}
+        basePath={MANAGER_ROUTES.attendance}
       />
     </Suspense>
   );

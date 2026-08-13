@@ -59,48 +59,48 @@ function rolesTable(items: RoleListItem[]) {
     "Role Name",
     "Code",
     "Description",
+    "Type",
     "Inherits From",
-    "System Role",
-    "Default",
     "Users",
     "Permissions",
     "Status",
+    "Created",
     "Updated",
   ];
   const columns: ReportColumn[] = [
     { key: "name", header: "Role Name" },
     { key: "code", header: "Code" },
     { key: "description", header: "Description" },
+    { key: "roleType", header: "Type" },
     { key: "parentRoleName", header: "Inherits From" },
-    { key: "isSystemRole", header: "System Role" },
-    { key: "isDefault", header: "Default" },
     { key: "userCount", header: "Users" },
     { key: "permissionCount", header: "Permissions" },
     { key: "status", header: "Status" },
+    { key: "createdAt", header: "Created" },
     { key: "updatedAt", header: "Updated" },
   ];
   const records = items.map((item) => ({
     name: item.name,
     code: item.code,
     description: item.description ?? "",
+    roleType: item.isSystemRole ? "System" : "Custom",
     parentRoleName: item.parentRoleName ?? "",
-    isSystemRole: item.isSystemRole ? "Yes" : "No",
-    isDefault: item.isDefault ? "Yes" : "No",
     userCount: item.userCount,
     permissionCount: item.permissionCount,
     status: item.status,
+    createdAt: formatUpdatedAt(item.createdAt),
     updatedAt: formatUpdatedAt(item.updatedAt),
   }));
   const sheetRows = records.map((row) => [
     row.name,
     row.code,
     row.description,
+    row.roleType,
     row.parentRoleName,
-    row.isSystemRole,
-    row.isDefault,
     row.userCount,
     row.permissionCount,
     row.status,
+    row.createdAt,
     row.updatedAt,
   ]);
   return { headers, columns, records, sheetRows };
@@ -113,6 +113,9 @@ function assignmentsTable(items: UserRoleAssignment[]) {
     "Email",
     "Department",
     "Role",
+    "Portal",
+    "Account Status",
+    "Last Login",
     "Assigned At",
   ];
   const columns: ReportColumn[] = [
@@ -121,6 +124,9 @@ function assignmentsTable(items: UserRoleAssignment[]) {
     { key: "employeeEmail", header: "Email" },
     { key: "departmentName", header: "Department" },
     { key: "roleName", header: "Role" },
+    { key: "portal", header: "Portal" },
+    { key: "accountStatus", header: "Account Status" },
+    { key: "lastLoginAt", header: "Last Login" },
     { key: "assignedAt", header: "Assigned At" },
   ];
   const records = items.map((item) => ({
@@ -129,6 +135,9 @@ function assignmentsTable(items: UserRoleAssignment[]) {
     employeeEmail: item.employeeEmail ?? "",
     departmentName: item.departmentName ?? "",
     roleName: item.roleName,
+    portal: item.portalKey ?? "",
+    accountStatus: item.accountStatus ?? "",
+    lastLoginAt: formatUpdatedAt(item.lastLoginAt),
     assignedAt: formatUpdatedAt(item.assignedAt),
   }));
   const sheetRows = records.map((row) => [
@@ -137,6 +146,9 @@ function assignmentsTable(items: UserRoleAssignment[]) {
     row.employeeEmail,
     row.departmentName,
     row.roleName,
+    row.portal,
+    row.accountStatus,
+    row.lastLoginAt,
     row.assignedAt,
   ]);
   return { headers, columns, records, sheetRows };

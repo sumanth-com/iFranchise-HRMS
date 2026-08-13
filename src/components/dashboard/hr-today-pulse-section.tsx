@@ -180,7 +180,21 @@ export function HrUpcomingHolidaysPanel({
   );
 }
 
-export function HrTodayPulseSection({ pulse }: { pulse: HrTodayPulse }) {
+export function HrTodayPulseSection({
+  pulse,
+  subtitle = "Live workforce snapshot for today",
+  links = DASHBOARD_KPI_LINKS,
+}: {
+  pulse: HrTodayPulse;
+  subtitle?: string;
+  links?: {
+    presentToday: string;
+    absentToday: string;
+    lateToday: string;
+    pendingLeaveApprovals: string;
+    exitRequests: string;
+  };
+}) {
   return (
     <section
       className="rounded-xl border bg-card p-3 shadow-sm md:p-4"
@@ -190,7 +204,7 @@ export function HrTodayPulseSection({ pulse }: { pulse: HrTodayPulse }) {
         <Users className="size-3.5 text-primary" />
         <div>
           <h2 className="text-sm font-semibold tracking-tight">Today&apos;s Pulse</h2>
-          <p className="text-[11px] text-muted-foreground">Live workforce snapshot for today</p>
+          <p className="text-[11px] text-muted-foreground">{subtitle}</p>
         </div>
       </div>
 
@@ -198,31 +212,31 @@ export function HrTodayPulseSection({ pulse }: { pulse: HrTodayPulse }) {
         <PulseMetric
           label="Present Today"
           value={pulse.presentToday}
-          href={DASHBOARD_KPI_LINKS.presentToday}
+          href={links.presentToday}
           accent="text-emerald-600 dark:text-emerald-400"
         />
         <PulseMetric
           label="Absent Today"
           value={pulse.absentToday}
-          href={DASHBOARD_KPI_LINKS.absentToday}
+          href={links.absentToday}
           accent="text-destructive"
         />
         <PulseMetric
           label="Late Employees"
           value={pulse.lateToday}
-          href={DASHBOARD_KPI_LINKS.lateToday}
+          href={links.lateToday}
           accent="text-orange-600 dark:text-orange-400"
         />
         <PulseMetric
           label="Pending Approvals"
           value={pulse.pendingApprovals}
-          href={DASHBOARD_KPI_LINKS.pendingLeaveApprovals}
+          href={links.pendingLeaveApprovals}
           accent="text-violet-600 dark:text-violet-400"
         />
         <PulseMetric
           label="Exit Requests"
           value={pulse.exitRequests}
-          href={DASHBOARD_KPI_LINKS.exitRequests}
+          href={links.exitRequests}
           accent="text-rose-600 dark:text-rose-400"
         />
       </div>

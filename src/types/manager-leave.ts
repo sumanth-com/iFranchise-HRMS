@@ -51,6 +51,7 @@ export type TeamLeaveSummary = {
   employeesOnLeaveToday: number;
   upcomingPlannedLeaves: number;
   leaveConflicts: number;
+  balanceUtilizationPercent: number;
 };
 
 export type TeamLeaveConflict = {

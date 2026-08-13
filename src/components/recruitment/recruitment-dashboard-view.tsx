@@ -58,10 +58,12 @@ export function RecruitmentDashboardView({
   summary,
   basePath = RECRUITMENT_ROUTES.dashboard,
   readOnly = false,
+  showOnboarding = true,
 }: {
   summary: RecruitmentSummary;
   basePath?: string;
   readOnly?: boolean;
+  showOnboarding?: boolean;
 }) {
   void readOnly;
   const to = (href: string) =>
@@ -117,7 +119,11 @@ export function RecruitmentDashboardView({
           hint="Ready for onboarding"
           icon={CheckCircle2}
           iconBg="bg-emerald-100 text-emerald-600"
-          href={to(RECRUITMENT_ROUTES.onboarding)}
+          href={
+            showOnboarding
+              ? to(RECRUITMENT_ROUTES.onboarding)
+              : to(RECRUITMENT_ROUTES.offers)
+          }
         />
       </div>
 
@@ -158,7 +164,11 @@ export function RecruitmentDashboardView({
           }
           icon={UserPlus}
           iconBg="bg-emerald-100 text-emerald-600"
-          href={to(RECRUITMENT_ROUTES.onboarding)}
+          href={
+            showOnboarding
+              ? to(RECRUITMENT_ROUTES.onboarding)
+              : `${to(RECRUITMENT_ROUTES.candidates)}?stage=joined`
+          }
         />
         <MetricCard
           label="At offer stage"

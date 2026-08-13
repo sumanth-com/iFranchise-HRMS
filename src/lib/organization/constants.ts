@@ -18,6 +18,36 @@ export const ORGANIZATION_ROUTES = {
   hierarchy: "/dashboard/organization/hierarchy",
 } as const;
 
+export type OrganizationModuleRoutes = {
+  dashboard: string;
+  profile: string;
+  branches: string;
+  departments: string;
+  designations: string;
+  employmentTypes: string;
+  workLocations: string;
+  holidays: string;
+  shifts: string;
+  hierarchy: string;
+};
+
+/** Build organization routes under an alternate portal base (e.g. Super Admin). */
+export function buildOrganizationRoutes(basePath: string): OrganizationModuleRoutes {
+  const base = basePath.replace(/\/$/, "") || ORGANIZATION_ROUTES.dashboard;
+  return {
+    dashboard: base,
+    profile: `${base}/profile`,
+    branches: `${base}/branches`,
+    departments: `${base}/departments`,
+    designations: `${base}/designations`,
+    employmentTypes: `${base}/employment-types`,
+    workLocations: `${base}/work-locations`,
+    holidays: `${base}/holidays`,
+    shifts: `${base}/shifts`,
+    hierarchy: `${base}/hierarchy`,
+  };
+}
+
 export const ORGANIZATION_SUB_NAV = [
   { title: "Company Profile", href: ORGANIZATION_ROUTES.profile },
   { title: "Branches", href: ORGANIZATION_ROUTES.branches },
@@ -26,6 +56,20 @@ export const ORGANIZATION_SUB_NAV = [
   { title: "Holidays", href: ORGANIZATION_ROUTES.holidays },
   { title: "Hierarchy", href: ORGANIZATION_ROUTES.hierarchy },
 ] as const;
+
+/** Focused master-data nav for Super Admin — not a full HR config dump. */
+export function buildSuperAdminOrganizationSubNav(basePath: string) {
+  const routes = buildOrganizationRoutes(basePath);
+  return [
+    { title: "Company", href: routes.profile },
+    { title: "Branches", href: routes.branches },
+    { title: "Departments", href: routes.departments },
+    { title: "Designations", href: routes.designations },
+    { title: "Locations", href: `${routes.branches}#work-locations` },
+    { title: "Employment Types", href: routes.employmentTypes },
+    { title: "Hierarchy", href: routes.hierarchy },
+  ] as const;
+}
 
 export const ORGANIZATION_VIEW_PERMISSIONS = [
   "organization.view",

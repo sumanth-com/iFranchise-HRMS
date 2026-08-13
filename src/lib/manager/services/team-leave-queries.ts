@@ -500,6 +500,7 @@ export async function getTeamLeaveSummary(
       employeesOnLeaveToday: 0,
       upcomingPlannedLeaves: 0,
       leaveConflicts: 0,
+      balanceUtilizationPercent: 0,
     };
   }
 
@@ -516,6 +517,7 @@ export async function getTeamLeaveSummary(
     onLeaveResult,
     upcomingResult,
     pendingRowsResult,
+    balancesResult,
   ] = await Promise.all([
     supabase
       .schema("hrms")
@@ -577,6 +579,13 @@ export async function getTeamLeaveSummary(
       .in("employee_id", teamIds)
       .eq("leave_status", "pending")
       .is("deleted_at", null),
+    supabase
+      .schema("hrms")
+      .from("leave_balances")
+      .select("allocated_days, used_days")
+      .in("employee_id", teamIds)
+      .eq("balance_year", getCurrentBalanceYear(today))
+      .is("deleted_at", null),
   ]);
 
   if (pendingResult.error) throw new Error(pendingResult.error.message);
@@ -585,6 +594,22 @@ export async function getTeamLeaveSummary(
   if (onLeaveResult.error) throw new Error(onLeaveResult.error.message);
   if (upcomingResult.error) throw new Error(upcomingResult.error.message);
   if (pendingRowsResult.error) throw new Error(pendingRowsResult.error.message);
+  if (balancesResult.error) throw new Error(balancesResult.error.message);
+
+  let balanceUtilizationPercent = 0;
+  const balanceRows = balancesResult.data ?? [];
+  if (balanceRows.length > 0) {
+    const totals = balanceRows.reduce(
+      (acc, row) => ({
+        allocated: acc.allocated + Number(row.allocated_days ?? 0),
+        used: acc.used + Number(row.used_days ?? 0),
+      }),
+      { allocated: 0, used: 0 },
+    );
+    if (totals.allocated > 0) {
+      balanceUtilizationPercent = Math.round((totals.used / totals.allocated) * 100);
+    }
+  }
 
   const teamMeta = await loadTeamMemberMeta(supabase, organizationId, teamIds);
   const pendingRows = (pendingRowsResult.data ?? []) as LooseRow[];
@@ -629,6 +654,7 @@ export async function getTeamLeaveSummary(
     employeesOnLeaveToday: onLeaveResult.count ?? 0,
     upcomingPlannedLeaves: upcomingResult.count ?? 0,
     leaveConflicts,
+    balanceUtilizationPercent,
   };
 }
 

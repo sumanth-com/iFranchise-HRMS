@@ -1,19 +1,20 @@
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { LoadingSpinner } from "@/components/common/loading-spinner";
-import { ManagerLeaveView } from "@/components/manager/leave/manager-leave-view";
+import { MyLeaveSelfServiceView } from "@/components/leave/my-leave-self-service-view";
 import { safeServerCall } from "@/lib/errors/safe-server";
-import { getManagerTeamLeavePageData } from "@/lib/manager/actions/manager-leave-actions";
+import { hubListUrl } from "@/lib/dashboard/hub-paths";
 import {
   getEmployeeLeaveBalanceSnapshot,
   getEmployeeLeaveCalendarData,
   getLeaveLookups,
   listEmployeeOwnLeaveRequests,
 } from "@/lib/leave/services/leave-queries";
+import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { hasPermission } from "@/lib/permissions/utils";
 import { createClient } from "@/lib/supabase/server";
-import { teamLeaveListParamsSchema } from "@/lib/validations/manager-leave";
 
 type ManagerLeavePageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -23,8 +24,19 @@ function firstString(value: string | string[] | undefined) {
   return typeof value === "string" ? value : undefined;
 }
 
-function parseSection(value: string | undefined): "my" | "team" {
-  return value === "team" ? "team" : "my";
+function teamRedirect(
+  raw: Record<string, string | string[] | undefined>,
+): string | null {
+  const tab = firstString(raw.tab);
+  const leaveId = firstString(raw.leaveId);
+  if (tab !== "team" && !leaveId) return null;
+
+  const filters: Record<string, string | undefined> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (key === "tab" || typeof value !== "string" || !value) continue;
+    filters[key] = value;
+  }
+  return hubListUrl(MANAGER_ROUTES.leaveTeam, filters);
 }
 
 export default async function ManagerLeavePage({
@@ -36,53 +48,23 @@ export default async function ManagerLeavePage({
   ]);
   const supabase = await createClient();
   const rawParams = await searchParams;
-  const leaveId = firstString(rawParams.leaveId);
-  const section = leaveId ? "team" : parseSection(firstString(rawParams.tab));
-
-  const parsed = teamLeaveListParamsSchema.parse({
-    page: firstString(rawParams.page),
-    pageSize: firstString(rawParams.pageSize),
-    search: firstString(rawParams.search),
-    sortBy: firstString(rawParams.sortBy),
-    sortOrder: firstString(rawParams.sortOrder),
-    leaveStatus: firstString(rawParams.leaveStatus),
-    leaveTypeId: firstString(rawParams.leaveTypeId),
-    departmentId: firstString(rawParams.departmentId),
-    employeeId: firstString(rawParams.employeeId),
-    dateFrom: firstString(rawParams.dateFrom),
-    dateTo: firstString(rawParams.dateTo),
-  });
+  const legacy = teamRedirect(rawParams);
+  if (legacy) redirect(legacy);
 
   const employeeId = profile.employee.id;
   const now = new Date();
   const calendarMonth = now.getMonth() + 1;
   const calendarYear = now.getFullYear();
-
   const canApply = hasPermission(profile.permissionCodes, "leave.create");
+  const canEdit =
+    hasPermission(profile.permissionCodes, "leave.edit") ||
+    hasPermission(profile.permissionCodes, "leave.create");
+  const canDelete =
+    hasPermission(profile.permissionCodes, "leave.delete") ||
+    hasPermission(profile.permissionCodes, "leave.cancel") ||
+    hasPermission(profile.permissionCodes, "leave.withdraw");
 
-  const [teamData, balances, requests, calendar, applyLookups] = await Promise.all([
-    safeServerCall(
-      () => getManagerTeamLeavePageData(parsed),
-      {
-        summary: {
-          pendingRequests: 0,
-          approvedThisMonth: 0,
-          rejectedThisMonth: 0,
-          employeesOnLeaveToday: 0,
-          upcomingPlannedLeaves: 0,
-          leaveConflicts: 0,
-        },
-        records: { data: [], total: 0, page: 1, pageSize: 25 },
-        lookups: { leaveTypes: [], departments: [], employees: [] },
-        calendar: {
-          leaves: [],
-          holidays: [],
-          month: calendarMonth,
-          year: calendarYear,
-        },
-      },
-      "[manager/leave] team data",
-    ),
+  const [balances, requests, calendar, applyLookups] = await Promise.all([
     safeServerCall(
       () => getEmployeeLeaveBalanceSnapshot(supabase, employeeId),
       [],
@@ -123,23 +105,21 @@ export default async function ManagerLeavePage({
         </div>
       }
     >
-      <ManagerLeaveView
-        {...teamData}
-        initialFilters={parsed}
-        initialLeaveId={leaveId}
-        initialSection={section}
-        selfLeave={{
-          canApply,
-          employeeId,
-          applyLeaveLookups: applyLookups,
-          balances,
-          requests,
-          calendarMonth,
-          calendarYear,
-          calendarLeaves: calendar.leaves,
-          calendarHolidays: calendar.holidays,
-        }}
-      />
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-4 md:p-5">
+        <MyLeaveSelfServiceView
+          canApply={canApply}
+          canEdit={canEdit}
+          canDelete={canDelete}
+          employeeId={employeeId}
+          applyLeaveLookups={applyLookups}
+          balances={balances}
+          requests={requests}
+          calendarMonth={calendarMonth}
+          calendarYear={calendarYear}
+          calendarLeaves={calendar.leaves}
+          calendarHolidays={calendar.holidays}
+        />
+      </div>
     </Suspense>
   );
 }

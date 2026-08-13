@@ -3,6 +3,13 @@
 import { revalidatePath } from "next/cache";
 
 import { ceoOrViewPermission } from "@/lib/ceo/read-only-permissions";
+import { isManagerAllowedReportKey } from "@/lib/manager/reports/manager-report-definitions";
+import { isManagerOnlyProfile } from "@/lib/manager/portal-scope";
+import {
+  buildManagerScopedFilters,
+  getManagerScopedReportContext,
+} from "@/lib/manager/services/team-reports-queries";
+import { getManagerTeamScope } from "@/lib/manager/services/team-queries";
 import { REPORTS_ROUTES } from "@/lib/reports/constants";
 import { runReport } from "@/lib/reports/services/reports-queries";
 import {
@@ -36,11 +43,31 @@ function revalidateReports() {
   Object.values(REPORTS_ROUTES).forEach((path) => revalidatePath(path));
 }
 
+async function scopedReportFilters(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  profile: Awaited<ReturnType<typeof requireServerAnyPermission>>,
+  reportKey: ReportKey,
+  filters: ReturnType<typeof reportFiltersSchema.parse>,
+) {
+  if (!isManagerOnlyProfile(profile)) return filters;
+  if (!isManagerAllowedReportKey(reportKey)) {
+    throw new Error("This report is not available in the manager portal.");
+  }
+  const { teamIds } = await getManagerTeamScope(supabase, profile);
+  const scope = await getManagerScopedReportContext(supabase, profile, teamIds);
+  return buildManagerScopedFilters(filters, scope);
+}
+
 export async function runReportAction(reportKey: ReportKey, filters: unknown) {
   try {
     const profile = await requireServerAnyPermission(ceoOrViewPermission("reports.view"));
     const supabase = await createClient();
-    const parsed = reportFiltersSchema.parse(filters ?? {});
+    const parsed = await scopedReportFilters(
+      supabase,
+      profile,
+      reportKey,
+      reportFiltersSchema.parse(filters ?? {}),
+    );
     const result = await runReport(supabase, profile, reportKey, parsed);
     return { success: true as const, data: result };
   } catch (error) {
@@ -112,7 +139,12 @@ export async function exportReportAction(
   try {
     const profile = await requireServerAnyPermission(ceoOrViewPermission("reports.export"));
     const supabase = await createClient();
-    const parsed = reportFiltersSchema.parse(filters ?? {});
+    const parsed = await scopedReportFilters(
+      supabase,
+      profile,
+      reportKey,
+      reportFiltersSchema.parse(filters ?? {}),
+    );
     const result = await runReport(supabase, profile, reportKey, parsed);
     const serialized = serializeGeneratedReport(
       result,

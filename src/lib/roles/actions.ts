@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { ROLES_ROUTES } from "@/lib/roles/constants";
+import { ROLES_ROUTES, SYSTEM_ROLES_ROUTES } from "@/lib/roles/constants";
 import {
   assignUserRole,
   changeEmployeeRole,
@@ -16,9 +16,10 @@ import {
 import {
   compareRoles,
   getAllPermissions,
+  getRoleAccessDetail,
+  getRoleAccessPreview,
   getRolePermissionDetail,
   listAllRolesForExport,
-  listRoles,
   listUserRoleAssignments,
   searchRolesModule,
 } from "@/lib/roles/services/role-queries";
@@ -38,6 +39,9 @@ import type { RoleActionResult, RoleExportFormat } from "@/types/roles";
 
 function revalidateRoles() {
   for (const route of Object.values(ROLES_ROUTES)) {
+    revalidatePath(route);
+  }
+  for (const route of Object.values(SYSTEM_ROLES_ROUTES)) {
     revalidatePath(route);
   }
 }
@@ -300,6 +304,34 @@ export async function fetchRolePermissionDetailAction(roleId: string) {
     return {
       success: false as const,
       message: error instanceof Error ? error.message : "Failed to load permissions",
+    };
+  }
+}
+
+export async function fetchRoleAccessDetailAction(roleId: string) {
+  try {
+    const profile = await requireServerAnyPermission(["role.view", "permission.view", "user_role.view"]);
+    const supabase = await createClient();
+    const data = await getRoleAccessDetail(supabase, profile.employee.organizationId, roleId);
+    return { success: true as const, data };
+  } catch (error) {
+    return {
+      success: false as const,
+      message: error instanceof Error ? error.message : "Failed to load role details",
+    };
+  }
+}
+
+export async function fetchRoleAccessPreviewAction(roleId: string) {
+  try {
+    const profile = await requireServerAnyPermission(["role.view", "permission.view"]);
+    const supabase = await createClient();
+    const data = await getRoleAccessPreview(supabase, profile.employee.organizationId, roleId);
+    return { success: true as const, data };
+  } catch (error) {
+    return {
+      success: false as const,
+      message: error instanceof Error ? error.message : "Failed to load access preview",
     };
   }
 }

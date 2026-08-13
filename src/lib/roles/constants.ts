@@ -1,4 +1,5 @@
 import { hasAnyPermission } from "@/lib/permissions/utils";
+import { SYSTEM_ADMIN_ROUTES } from "@/lib/system-admin/constants";
 
 export const ROLES_ROUTES = {
   /** Legacy dashboard URL — redirects to Roles list. */
@@ -9,10 +10,25 @@ export const ROLES_ROUTES = {
   compare: "/dashboard/roles/compare",
 } as const;
 
+export const SYSTEM_ROLES_ROUTES = {
+  manage: SYSTEM_ADMIN_ROUTES.roles,
+  permissions: `${SYSTEM_ADMIN_ROUTES.roles}/permissions`,
+  assignments: `${SYSTEM_ADMIN_ROUTES.roles}/assignments`,
+  compare: `${SYSTEM_ADMIN_ROUTES.roles}/compare`,
+} as const;
+
 export const ROLES_SUB_NAV = [
   { title: "Roles", href: ROLES_ROUTES.manage },
+  { title: "Permissions", href: ROLES_ROUTES.permissions },
   { title: "Assignments", href: ROLES_ROUTES.assignments },
-  { title: "Compare Roles", href: ROLES_ROUTES.compare },
+  { title: "Compare", href: ROLES_ROUTES.compare },
+] as const;
+
+export const SYSTEM_ROLES_SUB_NAV = [
+  { title: "Roles", href: SYSTEM_ROLES_ROUTES.manage },
+  { title: "Permissions", href: SYSTEM_ROLES_ROUTES.permissions },
+  { title: "Assignments", href: SYSTEM_ROLES_ROUTES.assignments },
+  { title: "Compare", href: SYSTEM_ROLES_ROUTES.compare },
 ] as const;
 
 export const ROLE_VIEW_PERMISSIONS = [

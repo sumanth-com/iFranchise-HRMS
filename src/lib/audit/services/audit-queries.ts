@@ -2,7 +2,11 @@ import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
 import { getAuditModuleScope } from "@/lib/audit/constants";
 import { buildAuditLogRef, isAuditUuid } from "@/lib/audit/display";
-import { auditListParamsSchema, type AuditListParams } from "@/lib/validations/audit";
+import {
+  auditExportParamsSchema,
+  auditListParamsSchema,
+  type AuditListParams,
+} from "@/lib/validations/audit";
 import type {
   AuditDashboardStats,
   AuditDetail,
@@ -100,22 +104,38 @@ export async function listAuditLogs(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   params: AuditListParams,
+  options?: { forExport?: boolean },
 ): Promise<AuditListResult> {
-  const parsed = auditListParamsSchema.parse(params);
+  const parsed = options?.forExport
+    ? auditExportParamsSchema.parse(params)
+    : auditListParamsSchema.parse(params);
   const organizationId = profile.employee.organizationId;
   const from = (parsed.page - 1) * parsed.pageSize;
   const to = from + parsed.pageSize - 1;
 
   const scope = getAuditModuleScope(profile);
 
+  let roleUserIds: string[] | null = null;
+  if (parsed.roleId) {
+    const { data: roleUsers } = await supabase
+      .schema("hrms")
+      .from("user_roles")
+      .select("user_id")
+      .eq("organization_id", organizationId)
+      .eq("role_id", parsed.roleId)
+      .is("deleted_at", null);
+    roleUserIds = (roleUsers ?? []).map((r) => r.user_id).filter(Boolean) as string[];
+    if (roleUserIds.length === 0) {
+      return { items: [], total: 0, page: parsed.page, pageSize: parsed.pageSize };
+    }
+  }
+
   let query = supabase
     .schema("hrms")
     .from("audit_logs")
     .select(
       `id, occurred_at, user_id, table_name, record_id, module, action, description,
-       ip_address, device_type, browser, operating_system, user_agent, event_status, priority,
-       reason, old_record, new_record, operation`,
-      { count: "exact" },
+       ip_address, device_type, browser, event_status, priority, operation`,
     )
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
@@ -140,31 +160,22 @@ export async function listAuditLogs(
       `description.ilike.${term},record_id.ilike.${term},table_name.ilike.${term},action.ilike.${term}`,
     );
   }
+  if (roleUserIds) query = query.in("user_id", roleUserIds);
 
-  if (parsed.roleId) {
-    const { data: roleUsers } = await supabase
-      .schema("hrms")
-      .from("user_roles")
-      .select("user_id")
-      .eq("organization_id", organizationId)
-      .eq("role_id", parsed.roleId)
-      .is("deleted_at", null);
-    const ids = (roleUsers ?? []).map((r) => r.user_id).filter(Boolean) as string[];
-    if (ids.length === 0) {
-      return { items: [], total: 0, page: parsed.page, pageSize: parsed.pageSize };
-    }
-    query = query.in("user_id", ids);
-  }
-
-  const { data, error, count } = await query.range(from, to);
+  // Fetch one extra row instead of exact COUNT(*) — avoids statement timeouts on large audit tables.
+  const { data, error } = await query.range(from, to + 1);
   if (error) throw new Error(error.message);
 
-  const userIds = [...new Set((data ?? []).map((r) => r.user_id).filter(Boolean))] as string[];
+  const hasMore = (data?.length ?? 0) > parsed.pageSize;
+  const rows = (data ?? []).slice(0, parsed.pageSize);
+  const total = hasMore ? from + parsed.pageSize + 1 : from + rows.length;
+
+  const userIds = [...new Set(rows.map((r) => r.user_id).filter(Boolean))] as string[];
   const userMap = await loadUserMap(supabase, organizationId, userIds);
 
   return {
-    items: (data ?? []).map((row) => mapAuditRow(row as AuditRow, userMap)),
-    total: count ?? 0,
+    items: rows.map((row) => mapAuditRow(row as AuditRow, userMap)),
+    total,
     page: parsed.page,
     pageSize: parsed.pageSize,
   };
@@ -253,6 +264,55 @@ export async function getAuditLogDetail(
     oldRecord: (data.old_record as Record<string, unknown> | null) ?? null,
     newRecord: (data.new_record as Record<string, unknown> | null) ?? null,
     operation: data.operation,
+  };
+}
+
+/** Lightweight counts for the four summary cards (avoids full dashboard panel queries). */
+export async function getAuditSummaryCardStats(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+): Promise<
+  Pick<
+    AuditDashboardStats,
+    "totalToday" | "criticalActions" | "failedActions" | "loginEvents"
+  >
+> {
+  const organizationId = profile.employee.organizationId;
+  const todayStart = startOfTodayIso();
+  const scope = getAuditModuleScope(profile);
+
+  const base = () => {
+    let q = supabase
+      .schema("hrms")
+      .from("audit_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .is("archived_at", null);
+    if (scope && scope.length > 0) q = q.in("module", scope);
+    else if (scope && scope.length === 0) {
+      q = q.eq("id", "00000000-0000-0000-0000-000000000000");
+    }
+    return q;
+  };
+
+  const [
+    { count: totalToday },
+    { count: criticalActions },
+    { count: failedActions },
+    { count: loginEvents },
+  ] = await Promise.all([
+    base().gte("occurred_at", todayStart),
+    base().eq("priority", "critical").gte("occurred_at", todayStart),
+    base().eq("event_status", "failed").gte("occurred_at", todayStart),
+    base().eq("action", "login").gte("occurred_at", todayStart),
+  ]);
+
+  return {
+    totalToday: totalToday ?? 0,
+    criticalActions: criticalActions ?? 0,
+    failedActions: failedActions ?? 0,
+    loginEvents: loginEvents ?? 0,
   };
 }
 

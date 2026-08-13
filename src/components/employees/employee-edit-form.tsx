@@ -20,8 +20,9 @@ import { toEmployeeSelectItems, toLookupSelectItems } from "@/components/payroll
 import { updateEmployeeAction } from "@/lib/employees/actions";
 import {
   DESIGNATION_OTHER_VALUE,
-  EMPLOYEE_ROUTES,
   EMPLOYMENT_STATUS_LABELS,
+  resolveEmployeeModuleRoutes,
+  type EmployeeModuleRoutes,
 } from "@/lib/employees/constants";
 import {
   employeeUpdateSchema,
@@ -41,6 +42,10 @@ type EmployeeEditFormProps = {
   variant?: "page" | "inline";
   onCancel?: () => void;
   onSaved?: () => void;
+  /** Prefer this from RSC pages — route builders cannot cross the server/client boundary. */
+  routesBasePath?: string;
+  /** Client-to-client only. Prefer `routesBasePath` when rendering from a server page. */
+  routes?: EmployeeModuleRoutes;
 };
 
 export function EmployeeEditForm({
@@ -48,8 +53,11 @@ export function EmployeeEditForm({
   lookups,
   variant = "page",
   onCancel,
+  routesBasePath,
+  routes: routesProp,
   onSaved,
 }: EmployeeEditFormProps) {
+  const routes = routesProp ?? resolveEmployeeModuleRoutes(routesBasePath);
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -165,7 +173,7 @@ export function EmployeeEditForm({
       }
 
       router.push(
-        EMPLOYEE_ROUTES.detail({
+        routes.detail({
           employeeCode: values.employeeCode,
           firstName: values.firstName,
           lastName: values.lastName,
@@ -512,7 +520,7 @@ export function EmployeeEditForm({
               onCancel?.();
               return;
             }
-            router.push(EMPLOYEE_ROUTES.detail(employee));
+            router.push(routes.detail(employee));
           }}
         >
           Cancel

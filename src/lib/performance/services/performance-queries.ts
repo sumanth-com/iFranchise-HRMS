@@ -48,24 +48,68 @@ import {
   unwrapRelation,
 } from "@/lib/performance/services/performance-utils";
 import { canViewAllKpis } from "@/lib/performance/constants";
+import {
+  emptyPagedResult,
+  resolveTeamEmployeeIds,
+  scopedEmployeeIds,
+} from "@/lib/manager/portal-scope";
 
 /** Loose row type for performance tables until Supabase types are regenerated. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type PerfRow = any;
 
+async function resolveListTeamIds(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  explicit?: string[],
+  employeeId?: string,
+) {
+  const teamIds = explicit ?? (await resolveTeamEmployeeIds(supabase, profile));
+  return scopedEmployeeIds(teamIds, employeeId);
+}
+
 export async function getPerformanceLookups(
   supabase: AuthSupabaseClient,
   organizationId: string,
+  employeeIds?: string[] | null,
 ): Promise<PerformanceLookups> {
+  if (employeeIds && employeeIds.length === 0) {
+    const [departments, designations, cyclesResult] = await Promise.all([
+      getDepartments(supabase, organizationId),
+      getDesignations(supabase, organizationId),
+      fromHrms(supabase, "performance_review_cycles")
+        .select("id, name")
+        .eq("organization_id", organizationId)
+        .is("deleted_at", null)
+        .order("start_date", { ascending: false }),
+    ]);
+    if (cyclesResult.error) throw new Error(cyclesResult.error.message);
+    return {
+      employees: [],
+      departments,
+      designations,
+      cycles: (cyclesResult.data ?? []).map((row: { id: string; name: string }) => ({
+        id: row.id,
+        label: row.name,
+      })),
+    };
+  }
+
+  let employeesQuery = supabase
+    .schema("hrms")
+    .from("employees")
+    .select("id, first_name, last_name, employee_code")
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .in("employment_status", ["active", "probation", "on_leave"])
+    .order("first_name");
+
+  if (employeeIds?.length) {
+    employeesQuery = employeesQuery.in("id", employeeIds);
+  }
+
   const [employeesResult, departments, designations, cyclesResult] = await Promise.all([
-    supabase
-      .schema("hrms")
-      .from("employees")
-      .select("id, first_name, last_name, employee_code")
-      .eq("organization_id", organizationId)
-      .is("deleted_at", null)
-      .in("employment_status", ["active", "probation", "on_leave"])
-      .order("first_name"),
+    employeesQuery,
     getDepartments(supabase, organizationId),
     getDesignations(supabase, organizationId),
     fromHrms(supabase, "performance_review_cycles")
@@ -322,10 +366,21 @@ export async function listGoals(
     goalStatus,
     goalPriority,
     assignedByMe,
+    teamEmployeeIds: explicitTeamIds,
   } = parsed;
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
   const organizationId = profile.employee.organizationId;
+  const teamIds = await resolveListTeamIds(
+    supabase,
+    profile,
+    explicitTeamIds,
+    employeeId,
+  );
+
+  if (teamIds && teamIds.length === 0) {
+    return emptyPagedResult(page, pageSize);
+  }
 
   let query = fromHrms(supabase, "performance_goals")
     .select(
@@ -355,6 +410,7 @@ export async function listGoals(
     .range(from, to);
 
   if (employeeId) query = query.eq("employee_id", employeeId);
+  if (teamIds) query = query.in("employee_id", teamIds);
   if (cycleId) query = query.eq("cycle_id", cycleId);
   if (goalStatus) query = query.eq("goal_status", goalStatus);
   if (goalPriority) query = query.eq("goal_priority", goalPriority);
@@ -469,10 +525,21 @@ export async function listKpis(
     designationId,
     kpiStatus,
     kpiPeriod,
+    teamEmployeeIds: explicitTeamIds,
   } = parsed;
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
   const organizationId = profile.employee.organizationId;
+  const teamIds = await resolveListTeamIds(
+    supabase,
+    profile,
+    explicitTeamIds,
+    employeeId,
+  );
+
+  if (teamIds && teamIds.length === 0) {
+    return emptyPagedResult(page, pageSize);
+  }
 
   let query = fromHrms(supabase, "performance_kpis")
     .select(
@@ -504,7 +571,9 @@ export async function listKpis(
     .order("end_date", { ascending: true, nullsFirst: false })
     .range(from, to);
 
-  if (!canViewAllKpis(profile.permissionCodes)) {
+  if (teamIds) {
+    query = query.in("employee_id", teamIds);
+  } else if (!canViewAllKpis(profile.permissionCodes)) {
     const canProgress = profile.permissionCodes.some((code) =>
       ["kpi.progress", "performance.edit", "performance.review"].includes(code),
     );
@@ -655,10 +724,21 @@ export async function listFeedback(
   params: unknown,
 ): Promise<FeedbackListResult> {
   const parsed = feedbackListParamsSchema.parse(params);
-  const { page, pageSize, employeeId, feedbackType, visibility } = parsed;
+  const { page, pageSize, employeeId, feedbackType, visibility, teamEmployeeIds: explicitTeamIds } =
+    parsed;
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
   const organizationId = profile.employee.organizationId;
+  const teamIds = await resolveListTeamIds(
+    supabase,
+    profile,
+    explicitTeamIds,
+    employeeId,
+  );
+
+  if (teamIds && teamIds.length === 0) {
+    return emptyPagedResult(page, pageSize);
+  }
 
   let query = fromHrms(supabase, "performance_feedback")
     .select(
@@ -673,6 +753,7 @@ export async function listFeedback(
     .range(from, to);
 
   if (employeeId) query = query.eq("to_employee_id", employeeId);
+  if (teamIds) query = query.in("to_employee_id", teamIds);
   if (feedbackType) query = query.eq("feedback_type", feedbackType);
   if (visibility) query = query.eq("visibility", visibility);
 
@@ -703,10 +784,20 @@ export async function listOneOnOnes(
   params: unknown,
 ): Promise<OneOnOneListResult> {
   const parsed = oneOnOneListParamsSchema.parse(params);
-  const { page, pageSize, employeeId, meetingStatus } = parsed;
+  const { page, pageSize, employeeId, meetingStatus, teamEmployeeIds: explicitTeamIds } = parsed;
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
   const organizationId = profile.employee.organizationId;
+  const teamIds = await resolveListTeamIds(
+    supabase,
+    profile,
+    explicitTeamIds,
+    employeeId,
+  );
+
+  if (teamIds && teamIds.length === 0) {
+    return emptyPagedResult(page, pageSize);
+  }
 
   let query = fromHrms(supabase, "performance_one_on_ones")
     .select(
@@ -722,6 +813,7 @@ export async function listOneOnOnes(
     .range(from, to);
 
   if (employeeId) query = query.eq("employee_id", employeeId);
+  if (teamIds) query = query.in("employee_id", teamIds);
   if (meetingStatus) query = query.eq("meeting_status", meetingStatus);
 
   const { data, error, count } = await query;
@@ -758,10 +850,20 @@ export async function listPromotions(
   params: unknown,
 ): Promise<PromotionListResult> {
   const parsed = promotionListParamsSchema.parse(params);
-  const { page, pageSize, employeeId, promotionStatus } = parsed;
+  const { page, pageSize, employeeId, promotionStatus, teamEmployeeIds: explicitTeamIds } = parsed;
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
   const organizationId = profile.employee.organizationId;
+  const teamIds = await resolveListTeamIds(
+    supabase,
+    profile,
+    explicitTeamIds,
+    employeeId,
+  );
+
+  if (teamIds && teamIds.length === 0) {
+    return emptyPagedResult(page, pageSize);
+  }
 
   let query = fromHrms(supabase, "performance_promotions")
     .select(
@@ -789,6 +891,7 @@ export async function listPromotions(
     .range(from, to);
 
   if (employeeId) query = query.eq("employee_id", employeeId);
+  if (teamIds) query = query.in("employee_id", teamIds);
   if (promotionStatus) query = query.eq("promotion_status", promotionStatus);
 
   const { data, error, count } = await query;

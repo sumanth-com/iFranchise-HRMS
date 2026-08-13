@@ -13,6 +13,7 @@ export const performanceListParamsSchema = paginationSchema.extend({
   cycleId: z.string().uuid().optional(),
   month: z.coerce.number().int().min(1).max(12).optional(),
   year: z.coerce.number().int().min(2000).max(2100).optional(),
+  teamEmployeeIds: z.array(z.string().uuid()).optional(),
 });
 
 export const goalListParamsSchema = performanceListParamsSchema.extend({

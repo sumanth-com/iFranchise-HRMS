@@ -2,10 +2,14 @@ import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type {
   PermissionCatalogItem,
   PermissionMatrixModule,
+  RoleAccessDetail,
+  RoleAssignedUser,
+  RoleAuditEvent,
   RoleComparison,
   RoleListItem,
   RoleListParams,
   RoleListResult,
+  RoleLookupOption,
   RolePermissionDetail,
   RoleSearchResult,
   RolesDashboardStats,
@@ -13,6 +17,7 @@ import type {
   UserRoleListParams,
   UserRoleListResult,
 } from "@/types/roles";
+import { buildRoleAccessPreview } from "@/lib/roles/access-preview";
 import {
   MODULE_LABELS,
   ACTION_ORDER,
@@ -212,6 +217,9 @@ export async function getRolesDashboardStats(
         status: "active" as const,
         userCount,
         permissionCount,
+        portalKey: null,
+        portalRoute: null,
+        createdAt: r.updated_at,
         updatedAt: r.updated_at,
       };
     }),
@@ -258,7 +266,7 @@ export async function listRoles(
   organizationId: string,
   params: RoleListParams,
 ): Promise<RoleListResult> {
-  const { page, pageSize, search, status } = parseRoleListParams(params);
+  const { page, pageSize, search, status, roleType } = parseRoleListParams(params);
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
@@ -266,7 +274,8 @@ export async function listRoles(
     .schema("hrms")
     .from("roles")
     .select(
-      `id, name, code, description, is_system_role, is_default, parent_role_id, status, updated_at,
+      `id, name, code, description, is_system_role, is_default, parent_role_id, status,
+       portal_key, portal_route, created_at, updated_at,
        parent:parent_role_id (name)`,
       { count: "exact" },
     )
@@ -278,6 +287,8 @@ export async function listRoles(
     query = query.or(`name.ilike.${term},code.ilike.${term}`);
   }
   if (status) query = query.eq("status", status);
+  if (roleType === "system") query = query.eq("is_system_role", true);
+  if (roleType === "custom") query = query.eq("is_system_role", false);
 
   query = query.order("name").range(from, to);
 
@@ -304,6 +315,9 @@ export async function listRoles(
         status: row.status,
         userCount,
         permissionCount,
+        portalKey: row.portal_key ?? null,
+        portalRoute: row.portal_route ?? null,
+        createdAt: row.created_at,
         updatedAt: row.updated_at,
       };
     }),
@@ -346,8 +360,11 @@ export async function listUserRoleAssignments(
     .from("user_roles")
     .select(
       `id, user_id, employee_id, role_id, created_at,
-       roles:role_id (name, code),
-       employees:employee_id (employee_code, first_name, last_name, email, departments:department_id (name))`,
+       roles:role_id (name, code, is_system_role, portal_key, portal_route),
+       employees:employee_id (
+         employee_code, first_name, last_name, email, account_status, last_login_at,
+         departments:department_id (name)
+       )`,
       { count: "exact" },
     )
     .eq("organization_id", organizationId)
@@ -361,51 +378,48 @@ export async function listUserRoleAssignments(
   const { data, error, count } = await query;
   if (error) throw new Error(error.message);
 
-  let rows = await Promise.all(
-    (data ?? []).map(async (row) => {
-      const role = unwrap(row.roles as { name: string; code: string } | { name: string; code: string }[] | null);
-      const emp = unwrap(
-        row.employees as
-          | {
-              employee_code: string;
-              first_name: string;
-              last_name: string;
-              email: string;
-              departments: { name: string } | { name: string }[] | null;
-            }
-          | {
-              employee_code: string;
-              first_name: string;
-              last_name: string;
-              email: string;
-              departments: { name: string } | { name: string }[] | null;
-            }[]
-          | null,
-      );
-      const dept = emp ? unwrap(emp.departments) : null;
+  type AssignmentEmployee = {
+    employee_code: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    account_status: string | null;
+    last_login_at: string | null;
+    departments: { name: string } | { name: string }[] | null;
+  };
+  type AssignmentRole = {
+    name: string;
+    code: string;
+    is_system_role: boolean;
+    portal_key: string | null;
+    portal_route: string | null;
+  };
 
-      const permissionCodes = await getUserEffectivePermissionCodes(
-        supabase,
-        organizationId,
-        row.user_id,
-      );
+  let rows: UserRoleAssignment[] = (data ?? []).map((row) => {
+    const role = unwrap(row.roles as AssignmentRole | AssignmentRole[] | null);
+    const emp = unwrap(row.employees as AssignmentEmployee | AssignmentEmployee[] | null);
+    const dept = emp ? unwrap(emp.departments) : null;
 
-      return {
-        id: row.id,
-        userId: row.user_id,
-        employeeId: row.employee_id,
-        employeeCode: emp?.employee_code ?? null,
-        employeeName: emp ? `${emp.first_name} ${emp.last_name}` : null,
-        employeeEmail: emp?.email ?? null,
-        departmentName: dept?.name ?? null,
-        roleId: row.role_id,
-        roleName: role?.name ?? "—",
-        roleCode: role?.code ?? "",
-        assignedAt: row.created_at,
-        permissionCodes,
-      };
-    }),
-  );
+    return {
+      id: row.id,
+      userId: row.user_id,
+      employeeId: row.employee_id,
+      employeeCode: emp?.employee_code ?? null,
+      employeeName: emp ? `${emp.first_name} ${emp.last_name}` : null,
+      employeeEmail: emp?.email ?? null,
+      departmentName: dept?.name ?? null,
+      accountStatus: emp?.account_status ?? null,
+      lastLoginAt: emp?.last_login_at ?? null,
+      roleId: row.role_id,
+      roleName: role?.name ?? "—",
+      roleCode: role?.code ?? "",
+      isSystemRole: role?.is_system_role ?? false,
+      portalKey: role?.portal_key ?? null,
+      portalRoute: role?.portal_route ?? null,
+      assignedAt: row.created_at,
+      permissionCodes: [],
+    };
+  });
 
   if (search) {
     const term = search.toLowerCase();
@@ -559,18 +573,25 @@ export async function searchRolesModule(
 export async function getRoleLookupOptions(
   supabase: AuthSupabaseClient,
   organizationId: string,
-) {
+): Promise<RoleLookupOption[]> {
   const { data, error } = await supabase
     .schema("hrms")
     .from("roles")
-    .select("id, name, code")
+    .select("id, name, code, is_system_role, portal_key, portal_route")
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
     .eq("status", "active")
     .order("name");
 
   if (error) throw new Error(error.message);
-  return (data ?? []).map((r) => ({ id: r.id, label: r.name, code: r.code }));
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    label: r.name,
+    code: r.code,
+    isSystemRole: r.is_system_role,
+    portalKey: r.portal_key ?? null,
+    portalRoute: r.portal_route ?? null,
+  }));
 }
 
 export async function getAssignableEmployees(
@@ -649,5 +670,183 @@ export async function getEmployeeRoleAssignment(
     roleName: role.name,
     roleCode: role.code,
     portalRoute: role.portal_route,
+  };
+}
+
+async function listRoleAssignedUsers(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  roleId: string,
+): Promise<RoleAssignedUser[]> {
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("user_roles")
+    .select(
+      `id, user_id, employee_id, created_at,
+       employees:employee_id (employee_code, first_name, last_name, email)`,
+    )
+    .eq("organization_id", organizationId)
+    .eq("role_id", roleId)
+    .eq("status", "active")
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((row) => {
+    const emp = unwrap(
+      row.employees as
+        | {
+            employee_code: string;
+            first_name: string;
+            last_name: string;
+            email: string;
+          }
+        | {
+            employee_code: string;
+            first_name: string;
+            last_name: string;
+            email: string;
+          }[]
+        | null,
+    );
+    return {
+      assignmentId: row.id,
+      userId: row.user_id,
+      employeeId: row.employee_id,
+      name: emp ? `${emp.first_name} ${emp.last_name}` : null,
+      email: emp?.email ?? null,
+      employeeCode: emp?.employee_code ?? null,
+      assignedAt: row.created_at,
+    };
+  });
+}
+
+async function listRoleAuditEvents(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  roleId: string,
+): Promise<RoleAuditEvent[]> {
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("audit_logs")
+    .select("id, occurred_at, user_id, action, description, record_id, metadata")
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .or(`record_id.eq.${roleId},metadata->>roleId.eq.${roleId}`)
+    .order("occurred_at", { ascending: false })
+    .limit(25);
+
+  if (error) return [];
+
+  const userIds = [...new Set((data ?? []).map((row) => row.user_id).filter(Boolean))] as string[];
+  const actorMap = new Map<string, string>();
+
+  if (userIds.length > 0) {
+    const { data: employees } = await supabase
+      .schema("hrms")
+      .from("employees")
+      .select("user_id, first_name, last_name")
+      .eq("organization_id", organizationId)
+      .in("user_id", userIds)
+      .is("deleted_at", null);
+
+    for (const emp of employees ?? []) {
+      if (emp.user_id) {
+        actorMap.set(emp.user_id, `${emp.first_name} ${emp.last_name}`.trim());
+      }
+    }
+  }
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    occurredAt: row.occurred_at,
+    actorName: row.user_id ? actorMap.get(row.user_id) ?? null : null,
+    action: row.action ?? "update",
+    description: row.description,
+  }));
+}
+
+export async function getRoleAccessDetail(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  roleId: string,
+): Promise<RoleAccessDetail> {
+  const { data: role, error } = await supabase
+    .schema("hrms")
+    .from("roles")
+    .select(
+      `id, name, code, description, is_system_role, is_default, parent_role_id, status,
+       portal_key, portal_route, created_at, updated_at,
+       parent:parent_role_id (name)`,
+    )
+    .eq("id", roleId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!role) throw new Error("Role not found");
+
+  const parent = role.parent as { name: string } | { name: string }[] | null;
+  const parentName = Array.isArray(parent) ? parent[0]?.name : parent?.name;
+
+  const [userCount, permissionCount, assignedUsers, permissionDetail, catalog, auditEvents] =
+    await Promise.all([
+      countRoleUsers(supabase, organizationId, roleId),
+      countRolePermissions(supabase, roleId),
+      listRoleAssignedUsers(supabase, organizationId, roleId),
+      getRolePermissionDetail(supabase, organizationId, roleId),
+      getAllPermissions(supabase),
+      listRoleAuditEvents(supabase, organizationId, roleId),
+    ]);
+
+  const granted = catalog.filter((perm) =>
+    permissionDetail.effectivePermissionIds.includes(perm.id),
+  );
+
+  return {
+    role: {
+      id: role.id,
+      name: role.name,
+      code: role.code,
+      description: role.description,
+      isSystemRole: role.is_system_role,
+      isDefault: role.is_default ?? false,
+      parentRoleId: role.parent_role_id,
+      parentRoleName: parentName ?? null,
+      status: role.status,
+      userCount,
+      permissionCount,
+      portalKey: role.portal_key ?? null,
+      portalRoute: role.portal_route ?? null,
+      createdAt: role.created_at,
+      updatedAt: role.updated_at,
+    },
+    assignedUsers,
+    permissionSummary: buildPermissionMatrix(granted),
+    preview: buildRoleAccessPreview({
+      roleCode: role.code,
+      portalKey: role.portal_key ?? null,
+      portalRoute: role.portal_route ?? null,
+      grantedPermissions: granted,
+      catalogPermissions: catalog,
+    }),
+    auditEvents,
+  };
+}
+
+export async function getRoleAccessPreview(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  roleId: string,
+) {
+  const detail = await getRoleAccessDetail(supabase, organizationId, roleId);
+  return {
+    roleId: detail.role.id,
+    roleName: detail.role.name,
+    roleCode: detail.role.code,
+    preview: detail.preview,
   };
 }

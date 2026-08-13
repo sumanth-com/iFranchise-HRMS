@@ -6,7 +6,13 @@ import { LeaveSummaryCards } from "@/components/leave/leave-summary-cards";
 import { LeaveTable } from "@/components/leave/leave-table";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { getLeaveSummaryAction } from "@/lib/leave/actions";
-import type { LeaveListItem, LeaveSummary } from "@/types/leave";
+import type {
+  LeaveActionResult,
+  LeaveListItem,
+  LeaveListParams,
+  LeaveListResult,
+  LeaveSummary,
+} from "@/types/leave";
 import type { LookupOption } from "@/types/employee";
 
 type HrTeamLeaveViewProps = {
@@ -35,6 +41,12 @@ type HrTeamLeaveViewProps = {
   canCancel: boolean;
   canDelete: boolean;
   embedded?: boolean;
+  title?: string;
+  description?: string;
+  listBasePath?: string;
+  fetchRecords?: (
+    params: LeaveListParams,
+  ) => Promise<LeaveActionResult<LeaveListResult>>;
 };
 
 export function HrTeamLeaveView({
@@ -63,6 +75,10 @@ export function HrTeamLeaveView({
   canCancel,
   canDelete,
   embedded = false,
+  title = "Leave & Approvals",
+  description = "Track leave requests, approvals, balances, and workforce availability across the organization.",
+  listBasePath,
+  fetchRecords,
 }: HrTeamLeaveViewProps) {
   const [summaryState, setSummaryState] = useState(summary);
 
@@ -71,18 +87,18 @@ export function HrTeamLeaveView({
   }, [summary]);
 
   const refreshSummary = useCallback(async () => {
+    if (fetchRecords) return;
     const result = await getLeaveSummaryAction();
     if (result.success) setSummaryState(result.data);
-  }, []);
+  }, [fetchRecords]);
 
   return (
     <div className="space-y-6">
       {!embedded ? (
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Leave & Approvals</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Track leave requests, approvals, balances, and workforce availability across the
-            organization.
+            {description}
           </p>
         </div>
       ) : null}
@@ -121,6 +137,8 @@ export function HrTeamLeaveView({
           canCancel={canCancel}
           canDelete={canDelete}
           embedded={embedded}
+          listBasePath={listBasePath}
+          fetchRecords={fetchRecords}
           onMutated={() => {
             void refreshSummary();
           }}

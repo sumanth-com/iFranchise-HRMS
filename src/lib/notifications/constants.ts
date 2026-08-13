@@ -6,6 +6,7 @@ import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { getPortalVariantFromHome } from "@/lib/auth/portal-account-menu";
+import { SYSTEM_ADMIN_ROUTES } from "@/lib/system-admin/constants";
 
 export const NOTIFICATIONS_ROUTES = {
   dashboard: "/dashboard/notifications",
@@ -47,6 +48,13 @@ export type NotificationRouteSet = {
   preferences: string;
 };
 
+export const SUPER_ADMIN_NOTIFICATIONS_ROUTES = {
+  dashboard: SYSTEM_ADMIN_ROUTES.notifications,
+  center: SYSTEM_ADMIN_ROUTES.notificationsCenter,
+  history: SYSTEM_ADMIN_ROUTES.notificationsHistory,
+  preferences: `${SYSTEM_ADMIN_ROUTES.settings}#notifications`,
+} as const;
+
 export const EMPLOYEE_NOTIFICATIONS_ROUTES = {
   dashboard: EMPLOYEE_ROUTES.notifications,
   center: EMPLOYEE_ROUTES.notifications,
@@ -55,6 +63,20 @@ export const EMPLOYEE_NOTIFICATIONS_ROUTES = {
 } as const;
 
 export function getNotificationsRoutes(portalHome: string): NotificationRouteSet {
+  if (
+    portalHome === SYSTEM_ADMIN_ROUTES.home ||
+    portalHome.startsWith(`${SYSTEM_ADMIN_ROUTES.home}/`)
+  ) {
+    return {
+      dashboard: SUPER_ADMIN_NOTIFICATIONS_ROUTES.dashboard,
+      center: SUPER_ADMIN_NOTIFICATIONS_ROUTES.center,
+      history: SUPER_ADMIN_NOTIFICATIONS_ROUTES.history,
+      templates: NOTIFICATIONS_ROUTES.templates,
+      settings: NOTIFICATIONS_ROUTES.settings,
+      preferences: SUPER_ADMIN_NOTIFICATIONS_ROUTES.preferences,
+    };
+  }
+
   const variant = getPortalVariantFromHome(portalHome);
 
   if (variant === "manager") {
@@ -98,6 +120,9 @@ export function getNotificationsRoutesForPath(pathname: string, portalHome: stri
   if (pathname.startsWith("/ceo")) return getNotificationsRoutes("/ceo");
   if (pathname.startsWith("/manager")) return getNotificationsRoutes("/manager");
   if (pathname.startsWith("/employee")) return getNotificationsRoutes("/employee");
+  if (pathname === SYSTEM_ADMIN_ROUTES.home || pathname.startsWith(`${SYSTEM_ADMIN_ROUTES.home}/`)) {
+    return getNotificationsRoutes(SYSTEM_ADMIN_ROUTES.home);
+  }
   if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) {
     return getNotificationsRoutes("/dashboard");
   }

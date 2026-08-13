@@ -131,6 +131,11 @@ export function CeoUserProvisioningView({
     });
   }
 
+  const headerDescription =
+    variant === "hr"
+      ? "Invite and manage portal users, executives, and managers across the organization."
+      : "Invite and manage executive users across the organization.";
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5">
       {variant === "ceo" ? <CeoBackToDashboard /> : null}
@@ -139,14 +144,12 @@ export function CeoUserProvisioningView({
         {variant === "hr" ? (
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">User Provisioning</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Invite and manage portal users, executives, and managers across the organization.
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">{headerDescription}</p>
           </div>
         ) : (
           <CeoModulePageHeader
             title="User Provisioning"
-            description="Invite and manage executive users across the organization."
+            description={headerDescription}
           />
         )}
         <Button

@@ -1,16 +1,23 @@
-import { SystemDashboardLive } from "@/components/system-admin/system-admin-modules";
+import { Suspense } from "react";
+
+import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
+import { EmployeeDashboardView } from "@/components/employee/dashboard/employee-dashboard-view";
+import { getEmployeeDashboardData } from "@/lib/employee/services/employee-dashboard-queries";
 import { requireSuperAdminProfile } from "@/lib/system-admin/guards";
-import { getSystemDashboardStats } from "@/lib/system-admin/queries";
 import { createClient } from "@/lib/supabase/server";
 
-export default async function SystemAdminDashboardPage() {
+async function SuperAdminSelfServiceHomeContent() {
   const profile = await requireSuperAdminProfile();
   const supabase = await createClient();
-  const stats = await getSystemDashboardStats(supabase, profile.employee.organizationId);
+  const data = await getEmployeeDashboardData(supabase, profile);
 
+  return <EmployeeDashboardView {...data} subtitle="Super Admin Portal" />;
+}
+
+export default function SuperAdminPortalPage() {
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <SystemDashboardLive initialStats={stats} />
-    </div>
+    <Suspense fallback={<DashboardSkeleton />}>
+      <SuperAdminSelfServiceHomeContent />
+    </Suspense>
   );
 }

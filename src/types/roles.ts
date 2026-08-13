@@ -16,6 +16,9 @@ export type RoleListItem = {
   status: RecordStatus;
   userCount: number;
   permissionCount: number;
+  portalKey: string | null;
+  portalRoute: string | null;
+  createdAt: string;
   updatedAt: string;
 };
 
@@ -59,9 +62,14 @@ export type UserRoleAssignment = {
   employeeName: string | null;
   employeeEmail: string | null;
   departmentName: string | null;
+  accountStatus: string | null;
+  lastLoginAt: string | null;
   roleId: string;
   roleName: string;
   roleCode: string;
+  isSystemRole: boolean;
+  portalKey: string | null;
+  portalRoute: string | null;
   assignedAt: string;
   permissionCodes: string[];
 };
@@ -102,6 +110,48 @@ export type RoleListParams = {
   pageSize?: number;
   search?: string;
   status?: RecordStatus;
+  roleType?: "system" | "custom";
+};
+
+export type RoleAccessPreview = {
+  portals: { key: string; label: string; route: string | null }[];
+  modules: { module: string; label: string; actions: string[] }[];
+  restrictedModules: { module: string; label: string; actions: string[] }[];
+};
+
+export type RoleAssignedUser = {
+  assignmentId: string;
+  userId: string;
+  employeeId: string | null;
+  name: string | null;
+  email: string | null;
+  employeeCode: string | null;
+  assignedAt: string;
+};
+
+export type RoleAuditEvent = {
+  id: string;
+  occurredAt: string;
+  actorName: string | null;
+  action: string;
+  description: string | null;
+};
+
+export type RoleAccessDetail = {
+  role: RoleListItem;
+  assignedUsers: RoleAssignedUser[];
+  permissionSummary: PermissionMatrixModule[];
+  preview: RoleAccessPreview;
+  auditEvents: RoleAuditEvent[];
+};
+
+export type RoleLookupOption = {
+  id: string;
+  label: string;
+  code: string;
+  isSystemRole: boolean;
+  portalKey: string | null;
+  portalRoute: string | null;
 };
 
 export type UserRoleListParams = {

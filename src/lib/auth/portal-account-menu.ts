@@ -1,7 +1,8 @@
 import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
-import { HR_PORTAL_HOME, isHrPortalPath } from "@/lib/auth/portal-paths";
+import { isHrPortalPath } from "@/lib/auth/portal-paths";
+import { SYSTEM_ADMIN_ROUTES } from "@/lib/system-admin/constants";
 import type { PortalVariant } from "@/providers/auth-provider";
 
 export function getPortalVariantFromHome(portalHome: string): PortalVariant {
@@ -13,6 +14,12 @@ export function getPortalVariantFromHome(portalHome: string): PortalVariant {
 }
 
 export function getPortalHelpHref(portalHome: string): string {
+  if (
+    portalHome === SYSTEM_ADMIN_ROUTES.home ||
+    portalHome.startsWith(`${SYSTEM_ADMIN_ROUTES.home}/`)
+  ) {
+    return "/dashboard/help";
+  }
   switch (getPortalVariantFromHome(portalHome)) {
     case "manager":
       return "/manager/help";
@@ -26,6 +33,12 @@ export function getPortalHelpHref(portalHome: string): string {
 }
 
 export function getPortalSettingsHref(portalHome: string): string {
+  if (
+    portalHome === SYSTEM_ADMIN_ROUTES.home ||
+    portalHome.startsWith(`${SYSTEM_ADMIN_ROUTES.home}/`)
+  ) {
+    return SYSTEM_ADMIN_ROUTES.settings;
+  }
   switch (getPortalVariantFromHome(portalHome)) {
     case "manager":
       return MANAGER_ROUTES.settings;

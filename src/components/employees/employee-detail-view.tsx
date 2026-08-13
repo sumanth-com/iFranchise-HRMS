@@ -25,7 +25,7 @@ import {
 } from "@/components/common/data-table";
 import { LeaveStatusBadge } from "@/components/leave/leave-status-badge";
 import { ATTENDANCE_STATUS_LABELS } from "@/lib/attendance/constants";
-import { EMPLOYEE_ROUTES, EMPLOYEE_TABS, EMPLOYEE_ACCOUNT_STATUS_LABELS, type EmployeeTab } from "@/lib/employees/constants";
+import { EMPLOYEE_TABS, EMPLOYEE_ACCOUNT_STATUS_LABELS, resolveEmployeeModuleRoutes, type EmployeeTab } from "@/lib/employees/constants";
 import { getMonthSelectItems, getYearSelectItems } from "@/components/payroll/select-utils";
 import { buildEmployeeRouteRef } from "@/lib/employees/routing";
 import type {
@@ -75,6 +75,7 @@ type EmployeeDetailViewProps = {
   onToggleEdit?: () => void;
   onCancelEdit?: () => void;
   onSavedEdit?: () => void;
+  routesBasePath?: string;
 };
 
 function resolveActiveTab(tabParam: string | null): EmployeeTab {
@@ -229,6 +230,7 @@ export function EmployeeDetailView({
   onToggleEdit,
   onCancelEdit,
   onSavedEdit,
+  routesBasePath,
 }: EmployeeDetailViewProps) {
   const searchParams = useSearchParams();
   const activeTab = resolveActiveTab(searchParams.get("tab"));
@@ -273,6 +275,7 @@ export function EmployeeDetailView({
                   variant="inline"
                   onCancel={onCancelEdit}
                   onSaved={onSavedEdit}
+                  routesBasePath={routesBasePath}
                 />
               </div>
             ) : (
@@ -448,6 +451,7 @@ export function EmployeeDetailView({
           attendance={attendance}
           attendanceSummary={attendanceSummary}
           attendancePeriod={attendancePeriod}
+          routesBasePath={routesBasePath}
         />
       ) : null}
 
@@ -458,6 +462,7 @@ export function EmployeeDetailView({
           leaveApprovals={leaveApprovals}
           leaveBalances={leaveBalances}
           attendancePeriod={attendancePeriod}
+          routesBasePath={routesBasePath}
         />
       ) : null}
 
@@ -517,13 +522,16 @@ function PeriodMonthYearFilters({
   employee,
   period,
   tab,
+  routesBasePath,
 }: {
   employee: EmployeeDetail;
   period: EmployeeAttendancePeriod;
   tab: EmployeeTab;
+  routesBasePath?: string;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const routes = resolveEmployeeModuleRoutes(routesBasePath);
 
   function updatePeriod(next: { month?: number | null; year?: number | null }) {
     const params = new URLSearchParams(searchParams.toString());
@@ -544,7 +552,7 @@ function PeriodMonthYearFilters({
       params.delete("year");
     }
 
-    router.replace(`${EMPLOYEE_ROUTES.detail(employee)}?${params.toString()}`);
+    router.replace(`${routes.detail(employee)}?${params.toString()}`);
   }
 
   return (
@@ -596,11 +604,13 @@ function EmployeeAttendanceTab({
   attendance,
   attendanceSummary,
   attendancePeriod,
+  routesBasePath,
 }: {
   employee: EmployeeDetail;
   attendance: Array<Record<string, unknown>>;
   attendanceSummary: EmployeeAttendanceSummary;
   attendancePeriod: EmployeeAttendancePeriod;
+  routesBasePath?: string;
 }) {
   const { month, year } = attendancePeriod;
   const hasPeriod = month != null && year != null;
@@ -638,6 +648,7 @@ function EmployeeAttendanceTab({
           employee={employee}
           period={attendancePeriod}
           tab="attendance"
+          routesBasePath={routesBasePath}
         />
       </div>
 
@@ -698,12 +709,14 @@ function EmployeeLeaveTab({
   leaveApprovals,
   leaveBalances,
   attendancePeriod,
+  routesBasePath,
 }: {
   employee: EmployeeDetail;
   leaveRequests: EmployeeLeaveRequestDetail[];
   leaveApprovals: EmployeeLeaveApprovalDetail[];
   leaveBalances: EmployeeLeaveBalanceDetail[];
   attendancePeriod: EmployeeAttendancePeriod;
+  routesBasePath?: string;
 }) {
   const { month, year } = attendancePeriod;
   const hasPeriod = month != null && year != null;
@@ -759,6 +772,7 @@ function EmployeeLeaveTab({
           employee={employee}
           period={attendancePeriod}
           tab="leave"
+          routesBasePath={routesBasePath}
         />
       </div>
 

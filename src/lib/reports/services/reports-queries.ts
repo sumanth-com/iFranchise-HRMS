@@ -13,6 +13,8 @@ import {
   getRecruitmentSummary,
 } from "@/lib/recruitment/services/recruitment-queries";
 import { REPORT_KEY_LABELS } from "@/lib/reports/constants";
+import { resolveTeamEmployeeIds } from "@/lib/manager/portal-scope";
+import { getManagerReportsLookups } from "@/lib/manager/services/team-reports-queries";
 import {
   buildResult,
   defaultDateRange,
@@ -134,6 +136,10 @@ export async function getReportsLookups(
   profile: UserProfile,
 ): Promise<ReportsLookups> {
   const organizationId = profile.employee.organizationId;
+  const teamIds = await resolveTeamEmployeeIds(supabase, profile);
+  if (teamIds) {
+    return getManagerReportsLookups(supabase, organizationId, teamIds);
+  }
   const [departments, designations, employees, executiveRoles] = await Promise.all([
     fromHrms(supabase, "departments")
       .select("id, name")

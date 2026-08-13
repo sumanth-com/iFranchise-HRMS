@@ -25,6 +25,7 @@ import {
   applyPromotionCompensation,
   applyPromotionSalary,
 } from "@/lib/performance/services/performance-promotion-apply";
+import { assertManagerTeamEmployee } from "@/lib/manager/portal-scope";
 import type { z } from "zod";
 
 const REVIEW_STAGES = ["self", "manager", "hr", "final"] as const;
@@ -36,6 +37,7 @@ export async function createGoal(
 ): Promise<string> {
   const parsed = goalFormSchema.parse(input);
   const organizationId = profile.employee.organizationId;
+  await assertManagerTeamEmployee(supabase, profile, parsed.employeeId);
 
   const { data, error } = await fromHrms(supabase, "performance_goals")
     .insert({
@@ -159,6 +161,7 @@ export async function updateGoal(
   input: z.infer<typeof goalFormSchema>,
 ): Promise<void> {
   const parsed = goalFormSchema.parse(input);
+  await assertManagerTeamEmployee(supabase, profile, parsed.employeeId);
 
   const { error } = await fromHrms(supabase, "performance_goals")
     .update({
@@ -296,6 +299,7 @@ export async function assignKpi(
   profile: UserProfile,
   input: z.infer<typeof import("@/lib/validations/performance").kpiAssignPayloadSchema>,
 ): Promise<string> {
+  await assertManagerTeamEmployee(supabase, profile, input.employeeId);
   const { data: template, error: templateError } = await fromHrms(supabase, "performance_kpi_templates")
     .select(
       "id, name, description, weightage, kpi_period, target_value, measurement_type, is_active, status",
@@ -430,6 +434,7 @@ export async function createReview(
 ): Promise<string> {
   const parsed = reviewFormSchema.parse(input);
   const organizationId = profile.employee.organizationId;
+  await assertManagerTeamEmployee(supabase, profile, parsed.employeeId);
 
   const { data, error } = await fromHrms(supabase, "performance_reviews")
     .insert({
@@ -571,6 +576,7 @@ export async function createFeedback(
   profile: UserProfile,
   input: z.infer<typeof import("@/lib/validations/performance").feedbackFormSchema>,
 ): Promise<string> {
+  await assertManagerTeamEmployee(supabase, profile, input.toEmployeeId);
   const { data, error } = await fromHrms(supabase, "performance_feedback")
     .insert({
       organization_id: profile.employee.organizationId,
@@ -607,6 +613,7 @@ export async function createOneOnOne(
   profile: UserProfile,
   input: z.infer<typeof import("@/lib/validations/performance").oneOnOneFormSchema>,
 ): Promise<string> {
+  await assertManagerTeamEmployee(supabase, profile, input.employeeId);
   const insertPayload = {
     organization_id: profile.employee.organizationId,
     employee_id: input.employeeId,
@@ -682,6 +689,7 @@ export async function createPromotion(
   profile: UserProfile,
   input: z.infer<typeof import("@/lib/validations/performance").promotionFormSchema>,
 ): Promise<string> {
+  await assertManagerTeamEmployee(supabase, profile, input.employeeId);
   const { data: employee, error: employeeError } = await fromHrms(supabase, "employees")
     .select("designation_id")
     .eq("id", input.employeeId)

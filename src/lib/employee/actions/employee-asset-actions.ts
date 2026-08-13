@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
+import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import {
   employeeReportAssetIssue,
   employeeRequestAssetReplacement,
@@ -29,12 +30,14 @@ export async function employeeReportAssetIssueAction(input: unknown) {
   try {
     const profile = await requireServerAnyPermission([
       PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.manager,
       "asset.view",
     ]);
     const supabase = await createClient();
     const parsed = reportIssueSchema.parse(input);
     await employeeReportAssetIssue(supabase, profile, parsed);
     revalidatePath(EMPLOYEE_ROUTES.assets);
+    revalidatePath(MANAGER_ROUTES.assets);
     revalidatePath("/dashboard/assets");
     return { success: true as const };
   } catch (error) {
@@ -49,12 +52,14 @@ export async function employeeRequestAssetReplacementAction(input: unknown) {
   try {
     const profile = await requireServerAnyPermission([
       PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.manager,
       "asset.view",
     ]);
     const supabase = await createClient();
     const parsed = replacementSchema.parse(input);
     await employeeRequestAssetReplacement(supabase, profile, parsed);
     revalidatePath(EMPLOYEE_ROUTES.assets);
+    revalidatePath(MANAGER_ROUTES.assets);
     revalidatePath("/dashboard/assets");
     return { success: true as const };
   } catch (error) {

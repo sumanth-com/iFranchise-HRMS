@@ -7,12 +7,23 @@ import {
   AuditPriorityBadge,
   AuditStatusBadge,
 } from "@/components/audit/audit-status-badge";
-import { AUDIT_ROUTES, formatAuditAction, formatAuditModule } from "@/lib/audit/constants";
+import {
+  formatAuditAction,
+  formatAuditModule,
+  resolveAuditRoutes,
+} from "@/lib/audit/constants";
 import { formatAuditRecordLabel } from "@/lib/audit/display";
 import { humanizeActivityDescription } from "@/lib/common/display-text";
 import type { AuditListItem } from "@/types/audit";
 
-export function AuditTimeline({ items }: { items: AuditListItem[] }) {
+export function AuditTimeline({
+  items,
+  routesBasePath,
+}: {
+  items: AuditListItem[];
+  routesBasePath?: string;
+}) {
+  const routes = resolveAuditRoutes(routesBasePath);
   if (items.length === 0) {
     return (
       <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground shadow-sm">
@@ -51,7 +62,7 @@ export function AuditTimeline({ items }: { items: AuditListItem[] }) {
               {item.ipAddress ? <span>IP: {item.ipAddress}</span> : null}
               {item.browser ? <span>{item.browser}</span> : null}
             </div>
-            <Link href={AUDIT_ROUTES.detail(item.id)} className="mt-3 inline-block text-sm font-medium text-primary hover:underline">
+            <Link href={routes.detail(item.id)} className="mt-3 inline-block text-sm font-medium text-primary hover:underline">
               View details
             </Link>
           </div>

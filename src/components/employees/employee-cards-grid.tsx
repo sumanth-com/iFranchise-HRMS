@@ -13,11 +13,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getSignedUrlAction } from "@/lib/employees/actions";
-import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
-import { cn } from "@/lib/utils";
+import { resolveEmployeeModuleRoutes } from "@/lib/employees/constants";
 import type { EmployeeListItem } from "@/types/employee";
-
-const CARD_HEIGHT = "h-[21.5rem]";
 
 function initials(firstName: string, lastName: string) {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
@@ -70,6 +67,7 @@ type EmployeeCardsGridProps = {
   canEdit: boolean;
   canDelete: boolean;
   onDelete: (employee: EmployeeListItem) => void;
+  routesBasePath?: string;
 };
 
 export function EmployeeCardsGrid({
@@ -77,7 +75,9 @@ export function EmployeeCardsGrid({
   canEdit,
   canDelete,
   onDelete,
+  routesBasePath,
 }: EmployeeCardsGridProps) {
+  const routes = resolveEmployeeModuleRoutes(routesBasePath);
   const router = useRouter();
 
   if (employees.length === 0) {
@@ -96,34 +96,33 @@ export function EmployeeCardsGrid({
           firstName: employee.firstName,
           lastName: employee.lastName,
         };
-        const detailHref = EMPLOYEE_ROUTES.detail(routeIdentity);
-        const editHref = EMPLOYEE_ROUTES.edit(routeIdentity);
+        const detailHref = routes.detail(routeIdentity);
+        const editHref = routes.edit(routeIdentity);
 
         return (
           <article
             key={employee.id}
-            className={cn(
-              CARD_HEIGHT,
-              "group relative cursor-pointer overflow-hidden rounded-2xl border bg-card shadow-sm transition-shadow hover:shadow-md",
-            )}
+            className="group relative flex min-h-[22rem] min-w-0 cursor-pointer flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition-shadow hover:shadow-md"
           >
             <button
               type="button"
               className="flex h-full w-full cursor-pointer flex-col text-left"
               onClick={() => router.push(detailHref)}
             >
-              <div className="relative h-[11.5rem] w-full shrink-0 bg-muted">
-                <CardPhoto employee={employee} />
-                <div className="absolute left-3 top-3">
+              <div className="relative min-h-[15rem] w-full flex-1 bg-muted">
+                <div className="absolute inset-0">
+                  <CardPhoto employee={employee} />
+                </div>
+                <div className="absolute left-3 top-3 z-[1]">
                   <EmploymentStatusBadge status={employee.employmentStatus} />
                 </div>
               </div>
 
-              <div className="flex flex-1 flex-col justify-center px-4 text-center">
+              <div className="flex shrink-0 flex-col justify-center px-3 py-3.5 text-center">
                 <h3 className="line-clamp-1 text-[15px] font-semibold tracking-tight">
                   {employee.fullName}
                 </h3>
-                <p className="mt-1.5 line-clamp-1 text-xs text-muted-foreground">
+                <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
                   {employee.designationTitle || "Team Member"}
                   <span className="mx-1.5 text-muted-foreground/40">·</span>
                   <span className="font-mono text-[11px] font-medium">

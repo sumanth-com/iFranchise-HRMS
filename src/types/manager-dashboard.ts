@@ -1,4 +1,10 @@
 import type { TeamMemberSummary } from "@/lib/manager/services/team-hierarchy";
+import type {
+  DashboardCharts,
+  DashboardPersonEvent,
+  DashboardTaskItem,
+  HrTodayPulse,
+} from "@/types/dashboard";
 
 export type ManagerDashboardKpis = {
   teamSize: number;
@@ -61,4 +67,9 @@ export type ManagerDashboardData = {
   kpis: ManagerDashboardKpis;
   actionItems: ManagerActionItem[];
   activities: ManagerActivityItem[];
+  todayPulse: HrTodayPulse;
+  tasks: DashboardTaskItem[];
+  charts: DashboardCharts;
+  upcomingBirthdays: DashboardPersonEvent[];
+  upcomingAnniversaries: DashboardPersonEvent[];
 };

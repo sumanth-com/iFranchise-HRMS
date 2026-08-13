@@ -10,6 +10,36 @@ export const EMPLOYEE_ROUTES = {
     `/dashboard/employees/${buildEmployeeRouteRef(employee)}/edit`,
 } as const;
 
+/** Build employee module routes under an alternate portal base (e.g. Super Admin). */
+export function buildEmployeeModuleRoutes(basePath: string) {
+  const base = basePath.replace(/\/$/, "") || EMPLOYEE_ROUTES.list;
+  return {
+    list: base,
+    new: `${base}/new`,
+    detail: (employee: EmployeeRouteIdentity) =>
+      `${base}/${buildEmployeeRouteRef(employee)}`,
+    edit: (employee: EmployeeRouteIdentity) =>
+      `${base}/${buildEmployeeRouteRef(employee)}/edit`,
+  } as const;
+}
+
+export type EmployeeModuleRoutes = {
+  list: string;
+  new: string;
+  detail: (employee: EmployeeRouteIdentity) => string;
+  edit: (employee: EmployeeRouteIdentity) => string;
+};
+
+/** Resolve module routes on the client from a serializable base path (safe across RSC → client). */
+export function resolveEmployeeModuleRoutes(
+  routesBasePath?: string | null,
+): EmployeeModuleRoutes {
+  if (!routesBasePath || routesBasePath === EMPLOYEE_ROUTES.list) {
+    return EMPLOYEE_ROUTES;
+  }
+  return buildEmployeeModuleRoutes(routesBasePath);
+}
+
 export const EMPLOYEE_STORAGE_BUCKETS = {
   documents: "employee-documents",
   profileImages: "employee-profile-images",

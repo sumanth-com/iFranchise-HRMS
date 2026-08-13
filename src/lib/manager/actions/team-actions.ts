@@ -71,8 +71,11 @@ async function getAuthenticatedContext() {
 function revalidateTeamPaths() {
   revalidatePath(MANAGER_ROUTES.team);
   revalidatePath(MANAGER_ROUTES.home);
+  revalidatePath(MANAGER_ROUTES.overview);
   revalidatePath(MANAGER_ROUTES.attendance);
+  revalidatePath(MANAGER_ROUTES.attendanceTeam);
   revalidatePath(MANAGER_ROUTES.leave);
+  revalidatePath(MANAGER_ROUTES.leaveTeam);
   revalidatePath(MANAGER_ROUTES.performance);
   revalidatePath("/dashboard/payroll");
   revalidatePath("/dashboard/employees");
@@ -359,5 +362,3 @@ export async function getManagerTeamPageData(
     designationOptions,
   };
 }
-
-export type { TeamSummary };

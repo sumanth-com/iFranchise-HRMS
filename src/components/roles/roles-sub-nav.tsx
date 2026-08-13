@@ -6,8 +6,16 @@ import { usePathname } from "next/navigation";
 import { ROLES_SUB_NAV } from "@/lib/roles/constants";
 import { cn } from "@/lib/utils";
 
-export function RolesSubNav() {
+type NavItem = { title: string; href: string };
+
+type Props = {
+  items?: readonly NavItem[];
+  rootHref?: string;
+};
+
+export function RolesSubNav({ items = ROLES_SUB_NAV, rootHref }: Props) {
   const pathname = usePathname();
+  const root = rootHref ?? items[0]?.href;
 
   return (
     <div className="flex justify-center">
@@ -15,9 +23,11 @@ export function RolesSubNav() {
         className="inline-flex flex-wrap items-center justify-center gap-1 rounded-lg border bg-card p-1 shadow-sm"
         aria-label="Roles and access sections"
       >
-        {ROLES_SUB_NAV.map((item) => {
-          const isActive =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
+        {items.map((item) => {
+          const isRoot = Boolean(root) && item.href === root;
+          const isActive = isRoot
+            ? pathname === item.href
+            : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
           return (
             <Link

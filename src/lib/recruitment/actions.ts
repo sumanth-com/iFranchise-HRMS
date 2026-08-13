@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { ceoOrViewPermission } from "@/lib/ceo/read-only-permissions";
+import { managerOrPermissions } from "@/lib/manager/portal-scope";
 import { createClient } from "@/lib/supabase/server";
 import {
   requireServerAnyPermission,
@@ -57,7 +58,9 @@ function revalidateRecruitment() {
 
 export async function createJobOpeningAction(input: unknown): Promise<ActionResult<string>> {
   try {
-    const profile = await requireServerPermission("recruitment.create");
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("recruitment.create"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = jobFormSchema.parse(input);
     const id = await createJobOpening(supabase, profile, parsed);
@@ -76,7 +79,9 @@ export async function updateJobOpeningAction(
   input: unknown,
 ): Promise<ActionResult<void>> {
   try {
-    const profile = await requireServerPermission("recruitment.edit");
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("recruitment.edit"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = jobFormSchema.parse(input);
     await updateJobOpening(supabase, profile, id, parsed);
@@ -92,7 +97,9 @@ export async function updateJobOpeningAction(
 
 export async function duplicateJobOpeningAction(id: string): Promise<ActionResult<string>> {
   try {
-    const profile = await requireServerPermission("recruitment.create");
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("recruitment.create"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const newId = await duplicateJobOpening(supabase, profile, id);
     revalidateRecruitment();
@@ -107,7 +114,9 @@ export async function duplicateJobOpeningAction(id: string): Promise<ActionResul
 
 export async function closeJobOpeningAction(id: string): Promise<ActionResult<void>> {
   try {
-    const profile = await requireServerPermission("recruitment.edit");
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("recruitment.edit"),
+    );
     const supabase = await getAuthenticatedSupabase();
     await closeJobOpening(supabase, profile, id);
     revalidateRecruitment();
@@ -122,7 +131,9 @@ export async function closeJobOpeningAction(id: string): Promise<ActionResult<vo
 
 export async function deleteJobOpeningAction(id: string): Promise<ActionResult<void>> {
   try {
-    const profile = await requireServerPermission("recruitment.delete");
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("recruitment.delete"),
+    );
     const supabase = await getAuthenticatedSupabase();
     await deleteJobOpening(supabase, profile, id);
     revalidateRecruitment();
@@ -137,7 +148,9 @@ export async function deleteJobOpeningAction(id: string): Promise<ActionResult<v
 
 export async function createCandidateAction(input: unknown): Promise<ActionResult<string>> {
   try {
-    const profile = await requireServerPermission("recruitment.create");
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("recruitment.create"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = candidateFormSchema.parse(input);
     const id = await createCandidate(supabase, profile, parsed);
@@ -172,10 +185,9 @@ export async function getCandidateDetailAction(
 
 export async function moveCandidateStageAction(input: unknown): Promise<ActionResult<void>> {
   try {
-    const profile = await requireServerAnyPermission([
-      "recruitment.edit",
-      "recruitment.interview",
-    ]);
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("recruitment.edit", "recruitment.interview"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = moveStageSchema.parse(input);
     await moveCandidateStage(supabase, profile, parsed);
@@ -191,7 +203,9 @@ export async function moveCandidateStageAction(input: unknown): Promise<ActionRe
 
 export async function scheduleInterviewAction(input: unknown): Promise<ActionResult<string>> {
   try {
-    const profile = await requireServerPermission("recruitment.interview");
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("recruitment.interview"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = interviewFormSchema.parse(input);
     const id = await scheduleInterview(supabase, profile, parsed);
@@ -207,7 +221,9 @@ export async function scheduleInterviewAction(input: unknown): Promise<ActionRes
 
 export async function completeInterviewAction(input: unknown): Promise<ActionResult<void>> {
   try {
-    const profile = await requireServerPermission("recruitment.interview");
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("recruitment.interview"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = interviewCompleteSchema.parse(input);
     await completeInterview(supabase, profile, parsed);
@@ -223,7 +239,9 @@ export async function completeInterviewAction(input: unknown): Promise<ActionRes
 
 export async function cancelInterviewAction(id: string): Promise<ActionResult<void>> {
   try {
-    const profile = await requireServerPermission("recruitment.interview");
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("recruitment.interview"),
+    );
     const supabase = await getAuthenticatedSupabase();
     await cancelInterview(supabase, profile, id);
     revalidateRecruitment();
@@ -238,7 +256,9 @@ export async function cancelInterviewAction(id: string): Promise<ActionResult<vo
 
 export async function createOfferAction(formData: FormData): Promise<ActionResult<string>> {
   try {
-    const profile = await requireServerPermission("recruitment.offer");
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("recruitment.offer"),
+    );
     const supabase = await getAuthenticatedSupabase();
 
     const parsed = offerFormSchema.parse({
@@ -286,7 +306,9 @@ export async function updateOfferStatusAction(
   input: unknown,
 ): Promise<ActionResult<{ employeeId?: string }>> {
   try {
-    const profile = await requireServerPermission("recruitment.offer");
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("recruitment.offer"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = offerStatusSchema.parse(input);
     const result = await updateOfferStatus(supabase, profile, parsed);

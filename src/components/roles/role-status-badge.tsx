@@ -8,14 +8,16 @@ const STATUS_STYLES: Record<RecordStatus, string> = {
 };
 
 export function RoleStatusBadge({ status }: { status: RecordStatus }) {
+  const label = status === "inactive" || status === "archived" ? "Disabled" : "Active";
+  const tone = status === "active" ? STATUS_STYLES.active : STATUS_STYLES.inactive;
   return (
     <span
       className={cn(
-        "inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize",
-        STATUS_STYLES[status],
+        "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
+        tone,
       )}
     >
-      {status}
+      {label}
     </span>
   );
 }

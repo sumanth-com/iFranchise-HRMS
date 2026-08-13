@@ -74,6 +74,7 @@ type AttendanceTableProps = {
   listBasePath?: string;
   fixedQuery?: Record<string, string>;
   attendanceLookups?: AttendanceLookups;
+  onViewRecord?: (record: AttendanceListItem) => void;
 };
 
 function formatDateTime(value?: string | null) {
@@ -142,6 +143,7 @@ export function AttendanceTable({
   listBasePath,
   fixedQuery,
   attendanceLookups,
+  onViewRecord,
 }: AttendanceTableProps) {
   const router = useRouter();
   const initialParams = useSearchParams();
@@ -363,9 +365,13 @@ export function AttendanceTable({
             <DropdownMenuContent align="end" className="min-w-[11.5rem]">
               <DropdownMenuItem
                 className="whitespace-nowrap"
-                onClick={() =>
-                  router.push(ATTENDANCE_ROUTES.detail(row.original.id))
-                }
+                onClick={() => {
+                  if (onViewRecord) {
+                    onViewRecord(row.original);
+                    return;
+                  }
+                  router.push(ATTENDANCE_ROUTES.detail(row.original.id));
+                }}
               >
                 <Eye className="size-4 shrink-0" />
                 View Attendance
@@ -396,7 +402,7 @@ export function AttendanceTable({
         ),
       },
     ],
-    [canDelete, canEdit, router],
+    [canDelete, canEdit, onViewRecord, router],
   );
 
   const table = useReactTable({

@@ -56,6 +56,7 @@ async function getAuthenticatedContext() {
 function revalidateRecruitmentPaths() {
   revalidatePath(MANAGER_ROUTES.recruitment);
   revalidatePath(MANAGER_ROUTES.home);
+  revalidatePath(MANAGER_ROUTES.overview);
 }
 
 export async function fetchTeamRecruitmentSummaryAction(): Promise<TeamRecruitmentSummary> {

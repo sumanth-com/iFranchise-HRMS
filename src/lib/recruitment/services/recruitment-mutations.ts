@@ -16,6 +16,10 @@ import { suggestNextEmployeeCode } from "@/lib/employees/services/employee-queri
 import { CANDIDATE_STAGE_LABELS } from "@/lib/recruitment/constants";
 import { notifyManagerCandidateAssigned } from "@/lib/manager/services/manager-recruitment-notifications";
 import {
+  resolveManagerDepartmentIds,
+} from "@/lib/manager/portal-scope";
+import { assertRecruitmentDepartmentAccess } from "@/lib/manager/services/manager-recruitment-context";
+import {
   notifyInterviewCancelled,
   notifyInterviewScheduled,
   notifyJoiningReminder,
@@ -86,12 +90,53 @@ async function addTimeline(
   });
 }
 
+async function assertManagerJobOpeningAccess(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  jobOpeningId: string | null | undefined,
+) {
+  const departmentIds = await resolveManagerDepartmentIds(supabase, profile);
+  if (!departmentIds) return;
+  if (!jobOpeningId) {
+    assertRecruitmentDepartmentAccess(departmentIds, null);
+    return;
+  }
+  const { data, error } = await fromHrms(supabase, "recruitment_job_openings")
+    .select("department_id")
+    .eq("id", jobOpeningId)
+    .eq("organization_id", profile.employee.organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  assertRecruitmentDepartmentAccess(departmentIds, data?.department_id ?? null);
+}
+
+async function assertManagerCandidateAccess(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  candidateId: string,
+) {
+  const { data, error } = await fromHrms(supabase, "recruitment_candidates")
+    .select("job_opening_id")
+    .eq("id", candidateId)
+    .eq("organization_id", profile.employee.organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Candidate not found");
+  await assertManagerJobOpeningAccess(supabase, profile, data.job_opening_id);
+}
+
 export async function createJobOpening(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   input: z.infer<typeof jobFormSchema>,
 ): Promise<string> {
   const organizationId = profile.employee.organizationId;
+  const departmentIds = await resolveManagerDepartmentIds(supabase, profile);
+  if (departmentIds) {
+    assertRecruitmentDepartmentAccess(departmentIds, input.departmentId);
+  }
   const settings = await getRecruitmentSettings(supabase, organizationId);
   const designationId = await resolveJobDesignationId(supabase, profile, input);
   const jobCode = await nextRecruitmentCode(
@@ -142,6 +187,11 @@ export async function updateJobOpening(
   id: string,
   input: z.infer<typeof jobFormSchema>,
 ): Promise<void> {
+  await assertManagerJobOpeningAccess(supabase, profile, id);
+  const departmentIds = await resolveManagerDepartmentIds(supabase, profile);
+  if (departmentIds) {
+    assertRecruitmentDepartmentAccess(departmentIds, input.departmentId);
+  }
   const designationId = await resolveJobDesignationId(supabase, profile, input);
 
   const { error } = await fromHrms(supabase, "recruitment_job_openings")
@@ -176,6 +226,7 @@ export async function duplicateJobOpening(
   profile: UserProfile,
   id: string,
 ): Promise<string> {
+  await assertManagerJobOpeningAccess(supabase, profile, id);
   const { data, error } = await fromHrms(supabase, "recruitment_job_openings")
     .select("*")
     .eq("id", id)
@@ -229,6 +280,7 @@ export async function closeJobOpening(
   profile: UserProfile,
   id: string,
 ): Promise<void> {
+  await assertManagerJobOpeningAccess(supabase, profile, id);
   const { error } = await fromHrms(supabase, "recruitment_job_openings")
     .update({
       job_status: "closed",
@@ -244,9 +296,10 @@ export async function closeJobOpening(
 
 export async function deleteJobOpening(
   supabase: AuthSupabaseClient,
-  _profile: UserProfile,
+  profile: UserProfile,
   id: string,
 ): Promise<void> {
+  await assertManagerJobOpeningAccess(supabase, profile, id);
   const { data, error } = await supabase.schema("hrms").rpc("soft_delete_recruitment_job_opening", {
     p_job_opening_id: id,
   });
@@ -266,6 +319,7 @@ export async function createCandidate(
   input: z.infer<typeof candidateFormSchema>,
 ): Promise<string> {
   const organizationId = profile.employee.organizationId;
+  await assertManagerJobOpeningAccess(supabase, profile, input.jobOpeningId);
 
   const { data: job, error: jobError } = await fromHrms(supabase, "recruitment_job_openings")
     .select("id, job_status, title, hiring_manager_id")
@@ -351,6 +405,7 @@ export async function moveCandidateStage(
   input: z.infer<typeof moveStageSchema>,
 ): Promise<void> {
   const organizationId = profile.employee.organizationId;
+  await assertManagerCandidateAccess(supabase, profile, input.candidateId);
   const { data: candidate, error: fetchError } = await fromHrms(supabase, "recruitment_candidates")
     .select("id, stage")
     .eq("id", input.candidateId)
@@ -403,6 +458,7 @@ export async function scheduleInterview(
   input: z.infer<typeof interviewFormSchema>,
 ): Promise<string> {
   const organizationId = profile.employee.organizationId;
+  await assertManagerCandidateAccess(supabase, profile, input.candidateId);
 
   const { data: candidate, error: candError } = await fromHrms(supabase, "recruitment_candidates")
     .select("id, job_opening_id, first_name, last_name, email")
@@ -487,6 +543,7 @@ export async function completeInterview(
 
   if (fetchError) throw new Error(fetchError.message);
   if (!interview) throw new Error("Interview not found");
+  await assertManagerCandidateAccess(supabase, profile, interview.candidate_id);
 
   const { data: candidateRow, error: candError } = await fromHrms(
     supabase,
@@ -540,6 +597,7 @@ export async function cancelInterview(
 
   if (fetchError) throw new Error(fetchError.message);
   if (!interview) throw new Error("Interview not found");
+  await assertManagerCandidateAccess(supabase, profile, interview.candidate_id);
 
   const { data: candidate } = await fromHrms(supabase, "recruitment_candidates")
     .select("first_name, last_name")
@@ -595,6 +653,7 @@ export async function updateInterview(
 
   if (fetchError) throw new Error(fetchError.message);
   if (!interview) throw new Error("Interview not found");
+  await assertManagerCandidateAccess(supabase, profile, interview.candidate_id);
   if (interview.interview_status !== "scheduled") {
     throw new Error("Only scheduled interviews can be rescheduled.");
   }
@@ -644,6 +703,7 @@ export async function createOffer(
   offerFile?: OfferLetterUpload,
 ): Promise<string> {
   const organizationId = profile.employee.organizationId;
+  await assertManagerCandidateAccess(supabase, profile, input.candidateId);
 
   const { data: candidate, error: candError } = await fromHrms(supabase, "recruitment_candidates")
     .select(
@@ -883,6 +943,7 @@ export async function updateOfferStatus(
 
   if (fetchError) throw new Error(fetchError.message);
   if (!offer) throw new Error("Offer not found");
+  await assertManagerCandidateAccess(supabase, profile, offer.candidate_id);
 
   const settings = await getRecruitmentSettings(supabase, organizationId);
 

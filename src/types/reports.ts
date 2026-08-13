@@ -82,7 +82,7 @@ export type ReportFilters = {
   recruitmentDepartmentIds?: string[];
 };
 
-export type ReportColumn = { key: string; header: string };
+export type ReportColumn = { key: string; header: string; /** Relative width weight (default 1). */ width?: number };
 export type ReportRow = Record<string, string | number | null | undefined>;
 
 export type ReportResult = {

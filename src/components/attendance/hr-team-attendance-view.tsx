@@ -30,6 +30,10 @@ type HrTeamAttendanceViewProps = {
   canEdit: boolean;
   canDelete: boolean;
   embedded?: boolean;
+  title?: string;
+  description?: string;
+  listBasePath?: string;
+  onViewRecord?: (record: AttendanceListItem) => void;
 };
 
 export function HrTeamAttendanceView({
@@ -52,21 +56,24 @@ export function HrTeamAttendanceView({
   canEdit,
   canDelete,
   embedded = false,
+  title = "Team Attendance",
+  description = "Track daily attendance records, manual entries, and workforce presence across the organization.",
+  listBasePath = SELF_ATTENDANCE_ROUTES.team,
+  onViewRecord,
 }: HrTeamAttendanceViewProps) {
   return (
     <div className="space-y-4">
       {!embedded ? (
         <div>
           <div className="flex items-center justify-between gap-4">
-            <h1 className="text-2xl font-semibold tracking-tight">Team Attendance</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
             <span className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-foreground">
               <CalendarDays className="size-4 shrink-0" />
               Summary for {summary.date}
             </span>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Track daily attendance records, manual entries, and workforce presence across the
-            organization.
+            {description}
           </p>
         </div>
       ) : (
@@ -105,7 +112,8 @@ export function HrTeamAttendanceView({
           canCreate={canCreate}
           canEdit={canEdit}
           canDelete={canDelete}
-          listBasePath={SELF_ATTENDANCE_ROUTES.team}
+          listBasePath={listBasePath}
+          onViewRecord={onViewRecord}
         />
       </Suspense>
     </div>

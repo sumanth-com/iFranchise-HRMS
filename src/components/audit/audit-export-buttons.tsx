@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
@@ -19,6 +19,11 @@ function downloadBase64(filename: string, mimeType: string, contentBase64: strin
   URL.revokeObjectURL(url);
 }
 
+const EXPORT_OPTIONS: { format: AuditExportFormat; label: string }[] = [
+  { format: "excel", label: "Excel" },
+  { format: "pdf", label: "PDF" },
+];
+
 export function AuditExportButtons({
   filters,
   disabled,
@@ -27,33 +32,44 @@ export function AuditExportButtons({
   disabled?: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
+  const [pendingFormat, setPendingFormat] = useState<AuditExportFormat | null>(null);
 
   function exportAs(format: AuditExportFormat) {
+    setPendingFormat(format);
     startTransition(async () => {
-      const res = await exportAuditLogsAction(filters, format);
-      if (res.success) {
-        downloadBase64(res.filename, res.mimeType, res.contentBase64);
-        toast.success(`Exported ${res.rowCount} records`);
-      } else {
-        toast.error(res.message);
+      try {
+        const res = await exportAuditLogsAction(filters, format);
+        if (res.success) {
+          downloadBase64(res.filename, res.mimeType, res.contentBase64);
+          toast.success(`${format === "pdf" ? "PDF" : "Excel"} downloaded (${res.rowCount} records)`);
+        } else {
+          toast.error(res.message);
+        }
+      } catch {
+        toast.error(`Failed to download ${format === "pdf" ? "PDF" : "Excel"}`);
+      } finally {
+        setPendingFormat(null);
       }
     });
   }
 
   return (
     <div className="flex flex-wrap gap-2">
-      {(["csv", "excel", "pdf"] as const).map((format) => (
-        <Button
-          key={format}
-          variant="outline"
-          size="sm"
-          disabled={disabled || isPending}
-          onClick={() => exportAs(format)}
-        >
-          {isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-          {format.toUpperCase()}
-        </Button>
-      ))}
+      {EXPORT_OPTIONS.map(({ format, label }) => {
+        const busy = isPending && pendingFormat === format;
+        return (
+          <Button
+            key={format}
+            variant="outline"
+            size="sm"
+            disabled={disabled || isPending}
+            onClick={() => exportAs(format)}
+          >
+            {busy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+            {label}
+          </Button>
+        );
+      })}
     </div>
   );
 }

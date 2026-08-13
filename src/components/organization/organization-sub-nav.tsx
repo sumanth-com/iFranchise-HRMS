@@ -9,17 +9,17 @@ import { cn } from "@/lib/utils";
 
 type OrganizationSubNavProps = {
   basePath?: string;
+  items?: ReadonlyArray<{ title: string; href: string }>;
 };
 
 export function OrganizationSubNav({
   basePath = ORGANIZATION_ROUTES.dashboard,
+  items,
 }: OrganizationSubNavProps) {
   const pathname = usePathname();
-  const items = remapSubNavItems(
-    ORGANIZATION_SUB_NAV,
-    ORGANIZATION_ROUTES.dashboard,
-    basePath,
-  );
+  const navItems =
+    items ??
+    remapSubNavItems(ORGANIZATION_SUB_NAV, ORGANIZATION_ROUTES.dashboard, basePath);
 
   return (
     <div className="flex justify-center">
@@ -27,9 +27,10 @@ export function OrganizationSubNav({
         className="inline-flex flex-wrap items-center gap-1 rounded-lg border bg-card p-1 shadow-sm"
         aria-label="Organization sections"
       >
-        {items.map((item) => {
+        {navItems.map((item) => {
+          const hrefPath = item.href.split("#")[0] ?? item.href;
           const isActive =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
+            pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
 
           return (
             <Link

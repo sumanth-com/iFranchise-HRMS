@@ -17,8 +17,8 @@ import { EmployeeDeleteConfirmDialog } from "@/components/employees/employee-del
 import { deleteEmployeeAction, fetchEmployeesAction } from "@/lib/employees/actions";
 import {
   EMPLOYEE_ACCOUNT_STATUS_LABELS,
-  EMPLOYEE_ROUTES,
   EMPLOYMENT_STATUS_LABELS,
+  resolveEmployeeModuleRoutes,
 } from "@/lib/employees/constants";
 import type {
   EmployeeListItem,
@@ -41,6 +41,8 @@ type EmployeeTableProps = {
   departments: LookupOption[];
   canEdit: boolean;
   canDelete: boolean;
+  /** Serializable portal base (e.g. `/dashboard/system/employees`). Never pass route builders from RSC. */
+  routesBasePath?: string;
 };
 
 export function EmployeeTable({
@@ -57,7 +59,9 @@ export function EmployeeTable({
   departments,
   canEdit,
   canDelete,
+  routesBasePath,
 }: EmployeeTableProps) {
+  const routes = resolveEmployeeModuleRoutes(routesBasePath);
   const [isPending, startTransition] = useTransition();
   const [deleteTarget, setDeleteTarget] = useState<EmployeeListItem | null>(null);
   const [tableState, setTableState] = useState({
@@ -80,9 +84,9 @@ export function EmployeeTable({
 
   useEffect(() => {
     if (window.location.search) {
-      window.history.replaceState(null, "", EMPLOYEE_ROUTES.list);
+      window.history.replaceState(null, "", routes.list);
     }
-  }, []);
+  }, [routes.list]);
 
   const updateParams = useCallback(
     (updates: Record<string, string | undefined>) => {
@@ -293,6 +297,7 @@ export function EmployeeTable({
           canEdit={canEdit}
           canDelete={canDelete}
           onDelete={setDeleteTarget}
+          routesBasePath={routesBasePath}
         />
       </div>
 

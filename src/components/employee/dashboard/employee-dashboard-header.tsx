@@ -64,9 +64,7 @@ export function EmployeeDashboardHeader({
   subtitle?: string;
 }) {
   const { isSystemAdminPortal } = useSidebarNavigation();
-  const resolvedSubtitle =
-    subtitle ??
-    (isSystemAdminPortal ? "Super Admin · System Administration" : "Employee Portal");
+  const resolvedSubtitle = subtitle ?? (isSystemAdminPortal ? "Super Admin Portal" : "Employee Portal");
 
   const [now, setNow] = useState<Date | null>(null);
 

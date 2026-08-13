@@ -11,6 +11,39 @@ export const AUDIT_ROUTES = {
   detail: (id: string) => `/dashboard/audit/logs/${buildAuditLogRef(id)}`,
 } as const;
 
+export type AuditModuleRoutes = {
+  dashboard: string;
+  logs: string;
+  timeline: string;
+  settings: string;
+  detail: (id: string) => string;
+};
+
+/** Build audit routes under an alternate portal base (e.g. Super Admin). */
+export function buildAuditRoutes(basePath: string): AuditModuleRoutes {
+  const base = basePath.replace(/\/$/, "") || AUDIT_ROUTES.dashboard;
+  return {
+    dashboard: base,
+    logs: `${base}/logs`,
+    timeline: `${base}/timeline`,
+    settings: `${base}/settings`,
+    detail: (id: string) => `${base}/logs/${buildAuditLogRef(id)}`,
+  };
+}
+
+export function resolveAuditRoutes(routesBasePath?: string | null): AuditModuleRoutes {
+  if (!routesBasePath || routesBasePath === AUDIT_ROUTES.dashboard) {
+    return {
+      dashboard: AUDIT_ROUTES.dashboard,
+      logs: AUDIT_ROUTES.logs,
+      timeline: AUDIT_ROUTES.timeline,
+      settings: AUDIT_ROUTES.settings,
+      detail: AUDIT_ROUTES.detail,
+    };
+  }
+  return buildAuditRoutes(routesBasePath);
+}
+
 export const AUDIT_SUB_NAV = [
   { title: "Dashboard", href: AUDIT_ROUTES.dashboard },
   { title: "Audit Logs", href: AUDIT_ROUTES.logs },

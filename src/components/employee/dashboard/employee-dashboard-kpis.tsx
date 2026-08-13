@@ -11,6 +11,11 @@ import {
   EMPLOYEE_ROUTES,
   HR_SELF_SERVICE_DASHBOARD_KPI_LINKS,
 } from "@/lib/employee/constants";
+import { MANAGER_ROUTES, MANAGER_SELF_SERVICE_DASHBOARD_KPI_LINKS } from "@/lib/manager/constants";
+import {
+  SUPER_ADMIN_SELF_SERVICE_DASHBOARD_KPI_LINKS,
+  SYSTEM_ADMIN_ROUTES,
+} from "@/lib/system-admin/constants";
 import type { EmployeeDashboardKpis } from "@/types/employee-dashboard";
 
 function attendanceLabel(kpis: EmployeeDashboardKpis) {
@@ -32,6 +37,12 @@ function attendanceLabel(kpis: EmployeeDashboardKpis) {
 function resolveKpiLinks(pathname: string) {
   if (pathname.startsWith(EMPLOYEE_ROUTES.home)) {
     return EMPLOYEE_DASHBOARD_KPI_LINKS;
+  }
+  if (pathname.startsWith(MANAGER_ROUTES.home)) {
+    return MANAGER_SELF_SERVICE_DASHBOARD_KPI_LINKS;
+  }
+  if (pathname === SYSTEM_ADMIN_ROUTES.home || pathname.startsWith(`${SYSTEM_ADMIN_ROUTES.home}/`)) {
+    return SUPER_ADMIN_SELF_SERVICE_DASHBOARD_KPI_LINKS;
   }
   return HR_SELF_SERVICE_DASHBOARD_KPI_LINKS;
 }

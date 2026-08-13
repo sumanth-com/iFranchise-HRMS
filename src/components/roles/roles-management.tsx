@@ -1,7 +1,17 @@
 "use client";
 
 import { format } from "date-fns";
-import { AlertTriangle, Copy, Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  Ban,
+  Copy,
+  Eye,
+  Loader2,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
@@ -19,6 +29,7 @@ import { SearchableSelect } from "@/components/common/searchable-select";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { withSelectOption } from "@/components/payroll/select-utils";
 import { Label } from "@/components/ui/label";
+import { RoleDetailDrawer } from "@/components/roles/role-detail-drawer";
 import { RoleStatusBadge } from "@/components/roles/role-status-badge";
 import { RolesExportButtons } from "@/components/roles/roles-export-buttons";
 import { RolesPagination } from "@/components/roles/roles-pagination";
@@ -28,6 +39,10 @@ import {
   canDeleteRole,
   canEditRole,
 } from "@/lib/roles/constants";
+import {
+  canDeleteRoleRecord,
+  canDisableRoleRecord,
+} from "@/lib/roles/protected-roles";
 import { roleFormSchema } from "@/lib/validations/roles";
 import type { RecordStatus } from "@/types/auth";
 import type { LookupOption } from "@/types/employee";
@@ -41,6 +56,7 @@ type Props = {
   permissionCodes: string[];
   search: string;
   status?: RecordStatus;
+  roleType?: "system" | "custom";
 };
 
 const emptyForm: RoleFormInput = {
@@ -58,17 +74,22 @@ export function RolesManagement({
   permissionCodes,
   search,
   status,
+  roleType,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<RoleListItem | null>(null);
+  const [viewingId, setViewingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<RoleListItem | null>(null);
+  const [cloneTarget, setCloneTarget] = useState<RoleListItem | null>(null);
+  const [statusTarget, setStatusTarget] = useState<RoleListItem | null>(null);
 
   const canCreate = canCreateRole(permissionCodes);
   const canEdit = canEditRole(permissionCodes);
   const canDelete = canDeleteRole(permissionCodes);
+  const editingSystem = Boolean(editing?.isSystemRole);
 
   const parentOptions = useMemo(
     () =>
@@ -84,8 +105,7 @@ export function RolesManagement({
   const statusItems = useMemo(
     () => [
       { value: "active", label: "Active" },
-      { value: "inactive", label: "Inactive" },
-      { value: "archived", label: "Archived" },
+      { value: "inactive", label: "Disabled" },
     ],
     [],
   );
@@ -93,6 +113,15 @@ export function RolesManagement({
   const statusFilterItems = useMemo(
     () => withSelectOption(statusItems, { value: "all", label: "All statuses" }),
     [statusItems],
+  );
+
+  const typeFilterItems = useMemo(
+    () => [
+      { value: "all", label: "All types" },
+      { value: "system", label: "System" },
+      { value: "custom", label: "Custom" },
+    ],
+    [],
   );
 
   const form = useForm<RoleFormInput>({
@@ -156,7 +185,7 @@ export function RolesManagement({
   }
 
   const requestDelete = useCallback((item: RoleListItem) => {
-    if (item.code === "super_admin") {
+    if (!canDeleteRoleRecord(item)) {
       toast.error("Cannot delete the Super Admin role");
       return;
     }
@@ -178,20 +207,44 @@ export function RolesManagement({
     });
   }, [deleteTarget, router]);
 
-  const onClone = useCallback(
-    (item: RoleListItem) => {
-      startTransition(async () => {
-        const res = await cloneRoleAction(item.id);
-        if (!res.success) {
-          toast.error(res.message);
-          return;
-        }
-        toast.success("Role cloned");
-        router.refresh();
-      });
-    },
-    [router],
-  );
+  const confirmClone = useCallback(() => {
+    if (!cloneTarget) return;
+    const roleId = cloneTarget.id;
+    startTransition(async () => {
+      const res = await cloneRoleAction(roleId);
+      if (!res.success) {
+        toast.error(res.message);
+        return;
+      }
+      toast.success("Role duplicated as a custom role");
+      setCloneTarget(null);
+      router.refresh();
+    });
+  }, [cloneTarget, router]);
+
+  const confirmStatusChange = useCallback(() => {
+    if (!statusTarget) return;
+    const nextStatus: RecordStatus = statusTarget.status === "active" ? "inactive" : "active";
+    startTransition(async () => {
+      const res = await saveRoleAction(
+        {
+          name: statusTarget.name,
+          description: statusTarget.description,
+          parentRoleId: statusTarget.parentRoleId,
+          isDefault: statusTarget.isDefault,
+          status: nextStatus,
+        },
+        statusTarget.id,
+      );
+      if (!res.success) {
+        toast.error(res.message);
+        return;
+      }
+      toast.success(nextStatus === "active" ? "Role enabled" : "Role disabled");
+      setStatusTarget(null);
+      router.refresh();
+    });
+  }, [statusTarget, router]);
 
   const columns = useMemo<DataTableColumn<RoleListItem & Record<string, unknown>>[]>(
     () => [
@@ -202,25 +255,21 @@ export function RolesManagement({
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="font-medium">{row.name}</p>
-              {row.isSystemRole ? (
-                <span className="inline-flex rounded-full bg-violet-500/10 px-2 py-0.5 text-xs font-medium text-violet-700">
-                  System
-                </span>
-              ) : null}
-              {row.isDefault ? (
-                <span className="inline-flex rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-700">
-                  Default
-                </span>
-              ) : null}
+              <span
+                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                  row.isSystemRole
+                    ? "bg-violet-500/10 text-violet-700"
+                    : "bg-sky-500/10 text-sky-700"
+                }`}
+              >
+                {row.isSystemRole ? "System" : "Custom"}
+              </span>
             </div>
-            <p className="text-xs text-muted-foreground">{row.code}</p>
+            <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+              {row.description || row.code}
+            </p>
           </div>
         ),
-      },
-      {
-        key: "parentRoleName",
-        header: "Inherits From",
-        render: (row) => row.parentRoleName ?? "—",
       },
       {
         key: "userCount",
@@ -235,7 +284,14 @@ export function RolesManagement({
       {
         key: "status",
         header: "Status",
-        render: (row) => <RoleStatusBadge status={row.status} />,
+        render: (row) => (
+          <RoleStatusBadge status={row.status === "archived" ? "inactive" : row.status} />
+        ),
+      },
+      {
+        key: "createdAt",
+        header: "Created",
+        render: (row) => format(new Date(row.createdAt || row.updatedAt), "dd MMM yyyy"),
       },
       {
         key: "updatedAt",
@@ -246,9 +302,19 @@ export function RolesManagement({
         key: "actions",
         header: "Actions",
         render: (row) => {
-          const isSuperAdmin = row.code === "super_admin";
+          const allowDelete = canDelete && canDeleteRoleRecord(row);
+          const allowDisable = canEdit && canDisableRoleRecord(row);
           return (
             <div className="flex gap-1">
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                onClick={() => setViewingId(row.id)}
+                aria-label="View role"
+                title="View details"
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
               {canEdit ? (
                 <Button
                   size="icon-sm"
@@ -263,11 +329,22 @@ export function RolesManagement({
                 <Button
                   size="icon-sm"
                   variant="ghost"
-                  onClick={() => onClone(row)}
-                  aria-label="Clone"
-                  title="Clone role"
+                  onClick={() => setCloneTarget(row)}
+                  aria-label="Duplicate"
+                  title="Duplicate as custom role"
                 >
                   <Copy className="h-4 w-4" />
+                </Button>
+              ) : null}
+              {allowDisable ? (
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  onClick={() => setStatusTarget(row)}
+                  aria-label={row.status === "active" ? "Disable" : "Enable"}
+                  title={row.status === "active" ? "Disable role" : "Enable role"}
+                >
+                  <Ban className="h-4 w-4" />
                 </Button>
               ) : null}
               {canDelete ? (
@@ -275,16 +352,16 @@ export function RolesManagement({
                   size="icon-sm"
                   variant="ghost"
                   onClick={() => requestDelete(row)}
-                  disabled={isSuperAdmin}
+                  disabled={!allowDelete}
                   aria-label="Delete"
                   title={
-                    isSuperAdmin
-                      ? "Cannot delete the Super Admin role"
-                      : "Delete role"
+                    allowDelete
+                      ? "Delete role"
+                      : "Cannot delete the Super Admin role"
                   }
                 >
                   <Trash2
-                    className={`h-4 w-4 ${isSuperAdmin ? "text-muted-foreground" : "text-destructive"}`}
+                    className={`h-4 w-4 ${allowDelete ? "text-destructive" : "text-muted-foreground"}`}
                   />
                 </Button>
               ) : null}
@@ -293,15 +370,15 @@ export function RolesManagement({
         },
       },
     ],
-    [canCreate, canDelete, canEdit, onClone, openEdit, requestDelete],
+    [canCreate, canDelete, canEdit, openEdit, requestDelete],
   );
 
   return (
     <>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Roles</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Roles & Access</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Manage roles, inheritance, and access control definitions.
+          Control which roles exist, what they can do, and who is assigned to them.
         </p>
       </div>
 
@@ -320,7 +397,14 @@ export function RolesManagement({
           />
         </div>
         <FilterSelect
-          className="w-[160px] shrink-0"
+          className="w-[140px] shrink-0"
+          items={typeFilterItems}
+          value={roleType ?? "all"}
+          placeholder="All types"
+          onValueChange={(v) => updateParams({ roleType: v === "all" ? undefined : v })}
+        />
+        <FilterSelect
+          className="w-[150px] shrink-0"
           items={statusFilterItems}
           value={status ?? "all"}
           placeholder="All statuses"
@@ -331,7 +415,7 @@ export function RolesManagement({
           {canCreate ? (
             <Button className="h-9 shrink-0" onClick={openCreate}>
               <Plus className="mr-2 h-4 w-4" />
-              Add Role
+              Create role
             </Button>
           ) : null}
         </div>
@@ -347,7 +431,7 @@ export function RolesManagement({
       {result.data.length === 0 ? (
         <EmptyState
           title="No roles found"
-          description="Add a role or adjust your filters."
+          description="Create a custom role or adjust your filters."
         />
       ) : (
         <DataTable columns={columns} data={result.data} />
@@ -355,14 +439,24 @@ export function RolesManagement({
 
       <RolesPagination page={result.page} pageSize={result.pageSize} total={result.total} />
 
+      <RoleDetailDrawer
+        roleId={viewingId}
+        open={Boolean(viewingId)}
+        onOpenChange={(next) => {
+          if (!next) setViewingId(null);
+        }}
+      />
+
       <Modal
         open={open}
         onOpenChange={setOpen}
-        title={editing ? "Edit Role" : "Add Role"}
+        title={editing ? "Edit role" : "Create custom role"}
         description={
-          editing
-            ? "Update this role’s name, inheritance, and status."
-            : "Create a role. Inheritance is optional — pick a parent if this role should inherit permissions."
+          editingSystem
+            ? "System roles are protected. You can update the display name and description only."
+            : editing
+              ? "Update this custom role’s details and status."
+              : "Create a custom role. Inheritance is optional."
         }
         contentClassName="sm:max-w-lg"
         footer={
@@ -375,11 +469,7 @@ export function RolesManagement({
         <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="role-name">Role name</Label>
-            <Input
-              id="role-name"
-              placeholder="e.g. HR Manager"
-              {...form.register("name")}
-            />
+            <Input id="role-name" placeholder="e.g. HR Manager" {...form.register("name")} />
             {form.formState.errors.name ? (
               <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
             ) : null}
@@ -395,39 +485,99 @@ export function RolesManagement({
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Inherits from</Label>
-            <SearchableSelect
-              options={parentOptions}
-              value={form.watch("parentRoleId")}
-              onValueChange={(v) => form.setValue("parentRoleId", v, { shouldDirty: true })}
-              placeholder="Type to search roles…"
-              noneLabel="No parent (standalone role)"
-              emptyMessage="No matching roles"
-            />
-            <p className="text-xs text-muted-foreground">
-              Type to search, then select a parent role — or leave empty for a standalone role.
-            </p>
-          </div>
+          {!editingSystem ? (
+            <>
+              <div className="space-y-2">
+                <Label>Inherits from</Label>
+                <SearchableSelect
+                  options={parentOptions}
+                  value={form.watch("parentRoleId")}
+                  onValueChange={(v) => form.setValue("parentRoleId", v, { shouldDirty: true })}
+                  placeholder="Type to search roles…"
+                  noneLabel="No parent (standalone role)"
+                  emptyMessage="No matching roles"
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label>Status</Label>
-            <LabeledSelect
-              items={statusItems}
-              value={form.watch("status")}
-              onValueChange={(v) => form.setValue("status", v as RecordStatus, { shouldDirty: true })}
-            />
-          </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <LabeledSelect
+                  items={statusItems}
+                  value={form.watch("status")}
+                  onValueChange={(v) => form.setValue("status", v as RecordStatus, { shouldDirty: true })}
+                />
+              </div>
 
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="h-4 w-4 rounded border"
-              {...form.register("isDefault")}
-            />
-            Default role for new users
-          </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border"
+                  {...form.register("isDefault")}
+                />
+                Default role for new users
+              </label>
+            </>
+          ) : null}
         </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(cloneTarget)}
+        onOpenChange={(next) => {
+          if (!next && !isPending) setCloneTarget(null);
+        }}
+        title="Duplicate role?"
+        description={
+          cloneTarget
+            ? `Create a custom copy of “${cloneTarget.name}”, including its current permissions.`
+            : undefined
+        }
+        contentClassName="sm:max-w-md"
+        footer={
+          <Button onClick={confirmClone} disabled={isPending || !cloneTarget}>
+            {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Duplicate
+          </Button>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          The copy is always a custom role. System roles themselves are never overwritten.
+        </p>
+      </Modal>
+
+      <Modal
+        open={Boolean(statusTarget)}
+        onOpenChange={(next) => {
+          if (!next && !isPending) setStatusTarget(null);
+        }}
+        title={statusTarget?.status === "active" ? "Disable role?" : "Enable role?"}
+        description={
+          statusTarget
+            ? statusTarget.status === "active"
+              ? `“${statusTarget.name}” will stop granting access until you enable it again.`
+              : `“${statusTarget.name}” will grant access again to assigned users.`
+            : undefined
+        }
+        contentClassName="sm:max-w-md"
+        footer={
+          <Button
+            variant={statusTarget?.status === "active" ? "destructive" : "default"}
+            onClick={confirmStatusChange}
+            disabled={isPending || !statusTarget}
+          >
+            {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {statusTarget?.status === "active" ? "Disable role" : "Enable role"}
+          </Button>
+        }
+      >
+        {statusTarget?.userCount ? (
+          <p className="text-sm text-muted-foreground">
+            {statusTarget.userCount} assigned user
+            {statusTarget.userCount === 1 ? "" : "s"} will be affected immediately.
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">No users are currently assigned to this role.</p>
+        )}
       </Modal>
 
       <Modal
@@ -437,9 +587,7 @@ export function RolesManagement({
         }}
         title="Delete role?"
         description={
-          deleteTarget
-            ? `Are you sure you want to delete “${deleteTarget.name}”?`
-            : undefined
+          deleteTarget ? `Are you sure you want to delete “${deleteTarget.name}”?` : undefined
         }
         contentClassName="sm:max-w-md"
         showCancel={false}
@@ -472,7 +620,7 @@ export function RolesManagement({
               <div className="space-y-1 text-sm">
                 <p className="font-medium text-foreground">This cannot be undone</p>
                 <p className="text-muted-foreground">
-                  The role will be removed from Roles & Access. You can recreate it later if needed.
+                  Assigned users will lose this role. You can recreate a custom role later if needed.
                 </p>
               </div>
             </div>
@@ -484,7 +632,10 @@ export function RolesManagement({
                 ) : null}
               </li>
               {deleteTarget.isSystemRole ? (
-                <li>This is a system role. Delete only if you are sure.</li>
+                <li>
+                  This is a <span className="font-medium text-foreground">system role</span>.
+                  Deleting it can break portal access for existing users.
+                </li>
               ) : null}
               {deleteTarget.userCount > 0 ? (
                 <li>

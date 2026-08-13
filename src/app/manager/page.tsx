@@ -1,53 +1,24 @@
 import { Suspense } from "react";
 
-import { LoadingSpinner } from "@/components/common/loading-spinner";
-import { ManagerDashboard } from "@/components/manager/manager-dashboard";
+import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
+import { EmployeeDashboardView } from "@/components/employee/dashboard/employee-dashboard-view";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
-import { getManagerDashboardData } from "@/lib/manager/services/manager-dashboard-queries";
+import { getEmployeeDashboardData } from "@/lib/employee/services/employee-dashboard-queries";
 import { requireServerPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
-export default async function ManagerPortalPage() {
+async function ManagerSelfServiceHomeContent() {
   const profile = await requireServerPermission(PORTAL_PERMISSIONS.manager);
   const supabase = await createClient();
+  const data = await getEmployeeDashboardData(supabase, profile);
 
-  let data;
-  let error: string | null = null;
+  return <EmployeeDashboardView {...data} subtitle="Manager Portal" />;
+}
 
-  try {
-    data = await getManagerDashboardData(supabase, profile);
-  } catch (loadError) {
-    error =
-      loadError instanceof Error
-        ? loadError.message
-        : "Failed to load manager dashboard data.";
-    data = {
-      generatedAt: new Date().toISOString(),
-      teamMembers: [],
-      kpis: {
-        teamSize: 0,
-        presentToday: 0,
-        onLeaveToday: 0,
-        lateToday: 0,
-        pendingLeaveApprovals: 0,
-        pendingPerformanceReviews: 0,
-        openRecruitmentRequests: 0,
-        probationEndingSoon: 0,
-      },
-      actionItems: [],
-      activities: [],
-    };
-  }
-
+export default function ManagerPortalPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-1 items-center justify-center">
-          <LoadingSpinner />
-        </div>
-      }
-    >
-      <ManagerDashboard data={data} error={error} />
+    <Suspense fallback={<DashboardSkeleton />}>
+      <ManagerSelfServiceHomeContent />
     </Suspense>
   );
 }

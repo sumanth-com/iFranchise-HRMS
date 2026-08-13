@@ -15,7 +15,8 @@ const TEAM_ADMIN_PATH_PREFIXES: Record<string, string> = {
   "/dashboard/onboarding": "/dashboard/recruitment",
 };
 
-function navItemPath(href: string) {
+function navItemPath(href: string | null | undefined) {
+  if (typeof href !== "string" || href.length === 0) return "";
   return href.split("?")[0];
 }
 
@@ -44,11 +45,14 @@ export function resolveActiveNavHref(
 ): string | null {
   void searchParams;
 
-  const teamAdminMatch = resolvePrefixNavHref(pathname, TEAM_ADMIN_PATH_PREFIXES, items);
+  const navItems = items.filter((item) => typeof item?.href === "string" && item.href.length > 0);
+
+  const teamAdminMatch = resolvePrefixNavHref(pathname, TEAM_ADMIN_PATH_PREFIXES, navItems);
   if (teamAdminMatch) return teamAdminMatch;
 
-  const matches = items.filter((item) => {
+  const matches = navItems.filter((item) => {
     const itemPath = navItemPath(item.href);
+    if (!itemPath) return false;
     const itemIsTeam =
       itemPath.endsWith("/team") ||
       (itemPath.includes("/team/") && itemPath.split("/team").length > 1);

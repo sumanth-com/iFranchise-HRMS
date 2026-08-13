@@ -43,7 +43,7 @@ export async function notifyManagerFeedbackPending(
     notificationType: "recruitment_feedback_pending",
     module: "recruitment",
     priority: "high",
-    actionUrl: `${MANAGER_ROUTES.recruitment}?candidateId=${interviewId}`,
+    actionUrl: MANAGER_ROUTES.recruitmentDetail(interviewId),
     sourceEventKey: `manager_feedback_pending:${interviewId}:${managerEmployeeId}`,
     createdBy: profile.userId,
   });
@@ -65,7 +65,7 @@ export async function notifyManagerCandidateAssigned(
     notificationType: "recruitment_candidate_assigned",
     module: "recruitment",
     priority: "medium",
-    actionUrl: `${MANAGER_ROUTES.recruitment}?candidateId=${candidateId}`,
+    actionUrl: MANAGER_ROUTES.recruitmentDetail(candidateId),
     sourceEventKey: `manager_candidate_assigned:${candidateId}:${managerEmployeeId}`,
     createdBy: profile.userId,
   });
@@ -86,7 +86,7 @@ export async function notifyManagerOfferAwaitingRecommendation(
     notificationType: "recruitment_offer_approval",
     module: "recruitment",
     priority: "high",
-    actionUrl: `${MANAGER_ROUTES.recruitment}?candidateId=${offerId}`,
+    actionUrl: MANAGER_ROUTES.recruitmentDetail(offerId),
     sourceEventKey: `manager_offer_approval:${offerId}:${managerEmployeeId}`,
     createdBy: profile.userId,
   });

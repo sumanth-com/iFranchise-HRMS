@@ -1,8 +1,8 @@
 const CHUNK_RELOAD_KEY = "hrms.chunk-reload-at";
 const CHUNK_RELOAD_COOLDOWN_MS = 12_000;
 
-export function isChunkLoadError(error: unknown): boolean {
-  if (!error) return false;
+function errorHaystack(error: unknown): string {
+  if (!error) return "";
 
   const name = error instanceof Error ? error.name : "";
   const message = error instanceof Error ? error.message : String(error);
@@ -14,7 +14,14 @@ export function isChunkLoadError(error: unknown): boolean {
       ? (error as { digest: string }).digest
       : "";
 
-  const haystack = `${name} ${message} ${digest}`;
+  return `${name} ${message} ${digest}`;
+}
+
+export function isChunkLoadError(error: unknown): boolean {
+  if (!error) return false;
+
+  const name = error instanceof Error ? error.name : "";
+  const haystack = errorHaystack(error);
 
   return (
     name === "ChunkLoadError" ||
@@ -22,7 +29,24 @@ export function isChunkLoadError(error: unknown): boolean {
     /Loading chunk [\w.-]+ failed/i.test(haystack) ||
     /Loading CSS chunk/i.test(haystack) ||
     /\/_next\/static\/chunks\//i.test(haystack) ||
-    /ChunkLoadError/i.test(haystack)
+    /ChunkLoadError/i.test(haystack) ||
+    /Failed to fetch dynamically imported module/i.test(haystack) ||
+    /Importing a module script failed/i.test(haystack) ||
+    /error loading dynamically imported module/i.test(haystack)
+  );
+}
+
+/** Stale client bundles and interrupted RSC navigations should never strand the user. */
+export function isRecoverableRouteError(error: unknown): boolean {
+  if (isChunkLoadError(error)) return true;
+
+  const haystack = errorHaystack(error);
+  return (
+    /Failed to fetch/i.test(haystack) ||
+    /Load failed/i.test(haystack) ||
+    /NetworkError/i.test(haystack) ||
+    /The operation was aborted/i.test(haystack) ||
+    /AbortError/i.test(haystack)
   );
 }
 

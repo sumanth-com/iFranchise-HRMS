@@ -989,6 +989,191 @@
   }
 }
 
+/* System Dashboard — live database hero animation */
+@keyframes sys-db-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes sys-db-spin-rev {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes sys-db-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-9px);
+  }
+}
+
+@keyframes sys-db-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes sys-db-scan {
+  0% {
+    top: 8%;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    top: 78%;
+    opacity: 0;
+  }
+}
+
+@keyframes sys-db-shine {
+  0% {
+    transform: translateX(-150%) skewX(-18deg);
+  }
+  100% {
+    transform: translateX(280%) skewX(-18deg);
+  }
+}
+
+@keyframes sys-db-bar {
+  0%,
+  100% {
+    transform: scaleY(0.45);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes sys-db-ticker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes sys-db-spark {
+  0%,
+  100% {
+    transform: scaleX(0.35);
+    opacity: 0.25;
+  }
+  50% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+@keyframes sys-db-grid-move {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 0 10px;
+  }
+}
+
+@keyframes sys-db-load {
+  0%,
+  100% {
+    filter: brightness(0.9);
+  }
+  50% {
+    filter: brightness(1.25);
+  }
+}
+
+.sys-db-stage {
+  --sys-db-accent: #10b981;
+  --sys-db-accent-soft: rgba(16, 185, 129, 0.45);
+  --sys-db-accent-strong: #34d399;
+}
+
+.sys-db-stage[data-tone="critical"] {
+  --sys-db-accent: #ef4444;
+  --sys-db-accent-soft: rgba(239, 68, 68, 0.45);
+  --sys-db-accent-strong: #f87171;
+}
+
+.sys-db-orbit {
+  animation: sys-db-spin 12s linear infinite;
+}
+
+.sys-db-orbit-rev {
+  animation: sys-db-spin-rev 16s linear infinite;
+}
+
+.sys-db-core {
+  animation: sys-db-float 2.8s ease-in-out infinite;
+}
+
+.sys-db-scan {
+  animation: sys-db-scan 2.2s ease-in-out infinite;
+}
+
+.sys-db-shine {
+  animation: sys-db-shine 1.8s ease-in-out infinite;
+}
+
+.sys-db-breathe {
+  animation: sys-db-breathe 1.6s ease-in-out infinite;
+}
+
+.sys-db-bar {
+  transform-origin: bottom center;
+  animation: sys-db-bar 1.15s ease-in-out infinite;
+}
+
+.sys-db-ticker-track {
+  width: max-content;
+  animation: sys-db-ticker 16s linear infinite;
+}
+
+.sys-db-spark {
+  animation: sys-db-spark 1.4s ease-in-out infinite;
+}
+
+.sys-db-grid-move {
+  animation: sys-db-grid-move 1s linear infinite;
+}
+
+.sys-db-load {
+  animation: sys-db-load 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sys-db-orbit,
+  .sys-db-orbit-rev,
+  .sys-db-core,
+  .sys-db-scan,
+  .sys-db-shine,
+  .sys-db-breathe,
+  .sys-db-bar,
+  .sys-db-ticker-track,
+  .sys-db-spark,
+  .sys-db-grid-move,
+  .sys-db-load {
+    animation: none !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .scene-tree-children::before,
   .scene-tree-row + .scene-tree-row::before,

@@ -25,7 +25,7 @@ export function ManagerDashboardHeader() {
       <div className="pointer-events-none absolute -top-10 -right-10 size-36 rounded-full bg-primary/10 blur-2xl" />
       <div className="relative flex flex-col gap-1">
         <p className="text-xs font-medium tracking-wide text-primary uppercase">
-          Manager Dashboard
+          Team Overview
         </p>
         <div className="mt-1 flex items-center justify-between gap-4">
           <h1 className="min-w-0 text-2xl font-semibold tracking-tight lg:text-3xl">

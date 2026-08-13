@@ -1,7 +1,7 @@
 "use client";
 
-import { Loader2, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { Loader2 } from "lucide-react";
+import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
@@ -13,20 +13,16 @@ import {
   SystemModuleFrame,
   SystemPanel,
 } from "@/components/system-admin/system-module-frame";
-import type { SystemDashboardStats } from "@/lib/system-admin/queries";
 import {
   downloadBackupAction,
   exportModuleAction,
   getDatabaseHealthAction,
   getEmailSnapshotAction,
   getEnvironmentSnapshotAction,
-  getLicenseSnapshotAction,
   listBackupsAction,
   listImportJobsAction,
   listIntegrationsAction,
-  listStorageBucketsAction,
   listStorageObjectsAction,
-  refreshSystemDashboardAction,
   restoreBackupAction,
   retryFailedEmailsAction,
   runBackupAction,
@@ -59,99 +55,7 @@ const DEFAULT_FLAGS = [
   "emergency_kill_switch",
 ];
 
-export function SystemDashboardLive({ initialStats }: { initialStats: SystemDashboardStats }) {
-  const [stats, setStats] = useState(initialStats);
-  const [isPending, startTransition] = useTransition();
-
-  const refresh = useCallback(() => {
-    startTransition(async () => {
-      const res = await refreshSystemDashboardAction();
-      if (res.success) setStats(res.data);
-    });
-  }, []);
-
-  useEffect(() => {
-    const timer = window.setInterval(refresh, 30000);
-    return () => window.clearInterval(timer);
-  }, [refresh]);
-
-  const healthColor =
-    stats.systemHealth === "healthy"
-      ? "text-emerald-600"
-      : stats.systemHealth === "degraded"
-        ? "text-amber-600"
-        : "text-red-600";
-
-  return (
-    <SystemModuleFrame title="System Dashboard" description="Live operational monitoring">
-      <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
-        <div className="flex shrink-0 items-center justify-between">
-          <p className={cn("text-sm font-medium", healthColor)}>
-            Overall health: {stats.systemHealth.toUpperCase()}
-          </p>
-          <Button size="sm" variant="outline" disabled={isPending} onClick={refresh}>
-            {isPending ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-            Refresh
-          </Button>
-        </div>
-        <div className="grid shrink-0 gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-          <SystemMetric label="Active Users" value={stats.activeEmployees} />
-          <SystemMetric label="Sessions" value={stats.activeSessionsEstimate} />
-          <SystemMetric label="Logins Today" value={stats.loginsToday} />
-          <SystemMetric
-            label="Failed Logins"
-            value={stats.failedLogins24h}
-            variant={stats.failedLogins24h > 0 ? "warning" : "default"}
-          />
-          <SystemMetric
-            label="DB Response"
-            value={`${stats.databaseResponseMs}ms`}
-            variant={stats.databaseHealthy ? "success" : "danger"}
-          />
-          <SystemMetric label="Security Alerts" value={stats.securityAlerts24h} variant={stats.securityAlerts24h > 0 ? "warning" : "default"} />
-          <SystemMetric label="Audit (24h)" value={stats.auditEvents24h} />
-          <SystemMetric label="Storage Buckets" value={stats.storageBucketCount} />
-          <SystemMetric label="Email" value={stats.emailStatus} variant={stats.smtpConfigured ? "success" : "warning"} />
-          <SystemMetric label="API" value={stats.apiStatus} variant="success" />
-          <SystemMetric label="Backup" value={stats.backupStatus} />
-          <SystemMetric label="Maintenance" value={stats.maintenanceMode ? "ON" : "OFF"} variant={stats.maintenanceMode ? "warning" : "default"} />
-        </div>
-        <div className="grid min-h-0 flex-1 gap-3 overflow-hidden lg:grid-cols-3">
-          <SystemPanel title="Scheduled Jobs" className="min-h-0 overflow-hidden">
-            <ul className="max-h-[140px] space-y-1 overflow-y-auto text-xs">
-              {stats.scheduledJobs.map((job) => (
-                <li key={job.jobKey} className="flex justify-between gap-2">
-                  <span>{job.jobName}</span>
-                  <span className="text-muted-foreground">{job.lastStatus ?? "idle"}</span>
-                </li>
-              ))}
-            </ul>
-          </SystemPanel>
-          <SystemPanel title="Recent Audit" className="min-h-0 overflow-hidden">
-            <ul className="max-h-[140px] space-y-1 overflow-y-auto text-xs">
-              {stats.recentAuditEvents.map((e) => (
-                <li key={e.id}>
-                  <span className="font-medium">{e.action}</span> — {e.description}
-                </li>
-              ))}
-            </ul>
-          </SystemPanel>
-          <SystemPanel title="Recent Errors" className="min-h-0 overflow-hidden">
-            <ul className="max-h-[140px] space-y-1 overflow-y-auto text-xs">
-              {stats.recentErrors.length === 0 ? (
-                <li className="text-muted-foreground">No errors in 24h</li>
-              ) : (
-                stats.recentErrors.map((e) => (
-                  <li key={e.id}>{e.description}</li>
-                ))
-              )}
-            </ul>
-          </SystemPanel>
-        </div>
-      </div>
-    </SystemModuleFrame>
-  );
-}
+export { SystemDashboardLive } from "@/components/system-admin/system-dashboard-live";
 
 export function DatabaseHealthPanel({ initial }: { initial: DatabaseHealthSnapshot }) {
   const [data, setData] = useState(initial);
@@ -165,39 +69,64 @@ export function DatabaseHealthPanel({ initial }: { initial: DatabaseHealthSnapsh
     });
 
   return (
-    <SystemModuleFrame title="Database Health" description="Connection, tables, and remediation">
-      <div className="grid h-full min-h-0 gap-3 overflow-hidden lg:grid-cols-3">
-        <div className="space-y-2">
-          <SystemMetric label="Status" value={data.connected ? "Connected" : "Down"} variant={data.connected ? "success" : "danger"} />
+    <SystemModuleFrame title="Database Health" description="Connection status, table counts, and issues">
+      <div className="flex h-full min-h-0 flex-col gap-3">
+        <div className="grid shrink-0 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <SystemMetric
+            label="Status"
+            value={data.connected ? "Connected" : "Down"}
+            variant={data.connected ? "success" : "danger"}
+          />
           <SystemMetric label="Response" value={`${data.responseTimeMs}ms`} />
           <SystemMetric label="Total Records" value={data.totalRecords.toLocaleString()} />
-          <Button size="sm" variant="outline" disabled={isPending} onClick={refresh}>Recheck</Button>
+          <div className="flex items-end">
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full"
+              disabled={isPending}
+              onClick={refresh}
+            >
+              {isPending ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : null}
+              Recheck
+            </Button>
+          </div>
         </div>
-        <SystemPanel title="Tables" className="min-h-0 lg:col-span-1">
-          <ul className="max-h-[200px] space-y-1 overflow-y-auto text-xs">
-            {data.tables.map((t) => (
-              <li key={t.table} className="flex justify-between">
-                <span>{t.table}</span>
-                <span>{t.count.toLocaleString()}</span>
-              </li>
-            ))}
-          </ul>
-        </SystemPanel>
-        <SystemPanel title="Issues & Fixes" className="min-h-0 lg:col-span-1">
-          <ul className="max-h-[200px] space-y-2 overflow-y-auto text-xs">
-            {data.issues.length === 0 ? (
-              <li className="text-emerald-600">No issues detected</li>
+        <div className="grid min-h-0 flex-1 gap-3 overflow-hidden lg:grid-cols-2">
+          <SystemPanel title="Tables" className="min-h-0" bodyClassName="p-0">
+            {data.tables.length === 0 ? (
+              <p className="px-4 py-8 text-center text-sm text-muted-foreground">No tables listed.</p>
             ) : (
-              data.issues.map((issue, i) => (
-                <li key={i} className="rounded border p-2">
-                  <p className="font-semibold uppercase text-amber-600">{issue.severity}</p>
-                  <p className="mt-1">{issue.cause}</p>
-                  <p className="mt-1 text-muted-foreground">{issue.suggestedFix}</p>
-                </li>
-              ))
+              <ul className="divide-y">
+                {data.tables.map((t) => (
+                  <li key={t.table} className="flex justify-between gap-3 px-4 py-2 text-sm">
+                    <span className="truncate">{t.table}</span>
+                    <span className="tabular-nums text-muted-foreground">
+                      {t.count.toLocaleString()}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
-          </ul>
-        </SystemPanel>
+          </SystemPanel>
+          <SystemPanel title="Issues & Fixes" className="min-h-0" bodyClassName="p-0">
+            {data.issues.length === 0 ? (
+              <p className="px-4 py-8 text-center text-sm text-emerald-600">No issues detected</p>
+            ) : (
+              <ul className="divide-y">
+                {data.issues.map((issue, i) => (
+                  <li key={i} className="space-y-1 px-4 py-3 text-sm">
+                    <p className="text-xs font-semibold tracking-wide text-amber-600 uppercase">
+                      {issue.severity}
+                    </p>
+                    <p>{issue.cause}</p>
+                    <p className="text-xs text-muted-foreground">{issue.suggestedFix}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SystemPanel>
+        </div>
       </div>
     </SystemModuleFrame>
   );
@@ -243,27 +172,32 @@ export function StorageManagerPanel({
 
   return (
     <SystemModuleFrame title="Storage Manager" description="Browse organization files by folder">
-      <div className="grid h-full min-h-0 gap-3 lg:grid-cols-3">
-        <SystemPanel title="Buckets">
-          <ul className="space-y-1 text-xs">
-            {buckets.map((b) => (
-              <li key={b.id}>
-                <button
-                  type="button"
-                  className={cn(
-                    "w-full rounded px-2 py-1 text-left hover:bg-muted",
-                    selectedBucket === b.id && "bg-muted",
-                  )}
-                  onClick={() => setSelectedBucket(b.id)}
-                >
-                  {b.name} ({b.fileCount})
-                </button>
-              </li>
-            ))}
-          </ul>
+      <div className="grid h-full min-h-0 gap-3 overflow-hidden lg:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)]">
+        <SystemPanel title="Buckets" className="min-h-0" bodyClassName="p-0">
+          {buckets.length === 0 ? (
+            <p className="px-4 py-8 text-center text-sm text-muted-foreground">No buckets found.</p>
+          ) : (
+            <ul className="divide-y">
+              {buckets.map((b) => (
+                <li key={b.id}>
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-sm hover:bg-muted/60",
+                      selectedBucket === b.id && "bg-muted",
+                    )}
+                    onClick={() => setSelectedBucket(b.id)}
+                  >
+                    <span className="truncate font-medium">{b.name}</span>
+                    <span className="tabular-nums text-xs text-muted-foreground">{b.fileCount}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </SystemPanel>
-        <SystemPanel title="Files" className="min-h-0 lg:col-span-2">
-          <div className="mb-2 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+        <SystemPanel title="Files" className="min-h-0">
+          <div className="mb-3 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
             <button
               type="button"
               className="hover:text-foreground"
@@ -295,16 +229,19 @@ export function StorageManagerPanel({
               );
             })}
           </div>
-          <ul className="max-h-[220px] space-y-1 overflow-y-auto text-xs">
-            {objects.length === 0 ? (
-              <li className="text-muted-foreground">No items in this folder</li>
-            ) : (
-              objects.map((o) => (
-                <li key={o.path} className="flex items-center justify-between gap-2 rounded border px-2 py-1">
+          {objects.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">No items in this folder</p>
+          ) : (
+            <ul className="space-y-2">
+              {objects.map((o) => (
+                <li
+                  key={o.path}
+                  className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2"
+                >
                   <div className="min-w-0">
-                    <p className="truncate font-medium">{o.displayName}</p>
+                    <p className="truncate text-sm font-medium">{o.displayName}</p>
                     {!o.isFolder && o.sizeBytes ? (
-                      <p className="text-[10px] text-muted-foreground">
+                      <p className="text-[11px] text-muted-foreground">
                         {(o.sizeBytes / 1024).toFixed(1)} KB
                       </p>
                     ) : null}
@@ -323,7 +260,7 @@ export function StorageManagerPanel({
                         loadObjects(selectedBucket, o.relativePath);
                       }}
                     >
-                      Open folder
+                      Open
                     </Button>
                   ) : (
                     <Button
@@ -342,9 +279,9 @@ export function StorageManagerPanel({
                     </Button>
                   )}
                 </li>
-              ))
-            )}
-          </ul>
+              ))}
+            </ul>
+          )}
         </SystemPanel>
       </div>
     </SystemModuleFrame>
@@ -357,56 +294,113 @@ export function EmailServicesPanel({ snapshot: initial }: { snapshot: EmailServi
   const [isPending, startTransition] = useTransition();
 
   return (
-    <SystemModuleFrame title="Email Services" description="SMTP status, queue, and delivery logs">
-      <div className="grid h-full min-h-0 gap-3 lg:grid-cols-3">
-        <div className="space-y-2">
-          <SystemMetric label="Connection" value={snapshot.connectionStatus} variant={snapshot.connectionStatus === "connected" ? "success" : "warning"} />
+    <SystemModuleFrame
+      title="Email Services"
+      description="SMTP connection status, delivery metrics, and recent mail logs"
+    >
+      <div className="flex h-full min-h-0 flex-col gap-3">
+        <div className="grid shrink-0 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <SystemMetric
+            label="Connection"
+            value={snapshot.connectionStatus}
+            variant={snapshot.connectionStatus === "connected" ? "success" : "warning"}
+          />
           <SystemMetric label="Sent (24h)" value={snapshot.sentCount24h} />
-          <SystemMetric label="Failed (24h)" value={snapshot.failedCount24h} variant={snapshot.failedCount24h > 0 ? "warning" : "default"} />
+          <SystemMetric
+            label="Failed (24h)"
+            value={snapshot.failedCount24h}
+            variant={snapshot.failedCount24h > 0 ? "warning" : "default"}
+          />
           <SystemMetric label="Queued" value={snapshot.queuedCount} />
-          <p className="text-[11px] text-muted-foreground">{snapshot.connectionMessage}</p>
-          <div className="flex gap-2">
-            <Input placeholder="test@company.com" value={testEmail} onChange={(e) => setTestEmail(e.target.value)} />
-            <Button
-              size="sm"
-              disabled={isPending || !testEmail}
-              onClick={() =>
-                startTransition(async () => {
-                  const res = await sendTestEmailAction(testEmail);
-                  if (res.success) toast.success(res.message);
-                  else toast.error(res.message);
-                  const snap = await getEmailSnapshotAction();
-                  if (snap.success) setSnapshot(snap.data);
-                })
-              }
-            >
-              Test
-            </Button>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={isPending}
-            onClick={() =>
-              startTransition(async () => {
-                const res = await retryFailedEmailsAction();
-                if (res.success) toast.success(`Retried ${res.data} emails`);
-              })
-            }
-          >
-            Retry Failed
-          </Button>
         </div>
-        <SystemPanel title="Recent Logs" className="min-h-0 lg:col-span-2">
-          <ul className="max-h-[220px] space-y-1 overflow-y-auto text-xs">
-            {snapshot.recentLogs.map((log) => (
-              <li key={log.id} className="flex justify-between gap-2 border-b py-1">
-                <span className="truncate">{log.toEmail} — {log.subject}</span>
-                <span className={log.status === "failed" ? "text-red-600" : "text-emerald-600"}>{log.status}</span>
-              </li>
-            ))}
-          </ul>
-        </SystemPanel>
+
+        <div className="grid min-h-0 flex-1 gap-3 overflow-hidden lg:grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)]">
+          <SystemPanel title="Tools" className="min-h-0">
+            <div className="space-y-3">
+              {snapshot.connectionMessage ? (
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {snapshot.connectionMessage}
+                </p>
+              ) : null}
+              <div className="space-y-1.5">
+                <Label htmlFor="email-test-recipient">Send test email</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="email-test-recipient"
+                    type="email"
+                    placeholder="you@company.com"
+                    value={testEmail}
+                    onChange={(e) => setTestEmail(e.target.value)}
+                  />
+                  <Button
+                    size="sm"
+                    className="shrink-0"
+                    disabled={isPending || !testEmail.trim()}
+                    onClick={() =>
+                      startTransition(async () => {
+                        const res = await sendTestEmailAction(testEmail.trim());
+                        if (res.success) toast.success(res.message);
+                        else toast.error(res.message);
+                        const snap = await getEmailSnapshotAction();
+                        if (snap.success) setSnapshot(snap.data);
+                      })
+                    }
+                  >
+                    Test
+                  </Button>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full"
+                disabled={isPending || snapshot.failedCount24h === 0}
+                onClick={() =>
+                  startTransition(async () => {
+                    const res = await retryFailedEmailsAction();
+                    if (res.success) {
+                      toast.success(`Retried ${res.data} emails`);
+                      const snap = await getEmailSnapshotAction();
+                      if (snap.success) setSnapshot(snap.data);
+                    } else toast.error(res.message);
+                  })
+                }
+              >
+                Retry failed
+              </Button>
+            </div>
+          </SystemPanel>
+
+          <SystemPanel title="Recent Logs" className="min-h-0" bodyClassName="p-0">
+            {snapshot.recentLogs.length === 0 ? (
+              <div className="flex min-h-[12rem] items-center justify-center px-4 py-8 text-center">
+                <p className="text-sm text-muted-foreground">No recent email logs yet.</p>
+              </div>
+            ) : (
+              <ul className="divide-y">
+                {snapshot.recentLogs.map((log) => (
+                  <li
+                    key={log.id}
+                    className="flex items-start justify-between gap-3 px-4 py-2.5 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{log.toEmail}</p>
+                      <p className="truncate text-xs text-muted-foreground">{log.subject}</p>
+                    </div>
+                    <span
+                      className={cn(
+                        "shrink-0 text-xs font-medium capitalize",
+                        log.status === "failed" ? "text-red-600" : "text-emerald-600",
+                      )}
+                    >
+                      {log.status}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SystemPanel>
+        </div>
       </div>
     </SystemModuleFrame>
   );
@@ -419,33 +413,78 @@ export function IntegrationsPanel({ integrations: initial }: { integrations: Sys
   const [isPending, startTransition] = useTransition();
 
   return (
-    <SystemModuleFrame title="Integrations" description="Connect enterprise services">
-      <div className="grid max-h-[280px] gap-2 overflow-y-auto sm:grid-cols-2">
-        {items.map((item) => (
-          <div key={item.id} className="rounded-lg border p-3 text-sm">
-            <div className="flex items-center justify-between">
-              <p className="font-medium">{item.label}</p>
-              <span className={cn("text-xs", item.status === "connected" ? "text-emerald-600" : "text-muted-foreground")}>{item.status}</span>
+    <SystemModuleFrame
+      title="Integrations"
+      description="Available enterprise connectors. Status stays disconnected until credentials are configured."
+    >
+      {items.length === 0 ? (
+        <div className="flex h-full min-h-[12rem] items-center justify-center rounded-xl border bg-card">
+          <p className="text-sm text-muted-foreground">No integrations listed.</p>
+        </div>
+      ) : (
+        <div className="grid h-full min-h-0 auto-rows-min gap-3 overflow-y-auto overscroll-contain sm:grid-cols-2 xl:grid-cols-3">
+          {items.map((item) => (
+            <div key={item.id} className="rounded-xl border bg-card p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-semibold">{item.label}</p>
+                <span
+                  className={cn(
+                    "text-xs font-medium capitalize",
+                    item.status === "connected"
+                      ? "text-emerald-600"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {item.configured ? item.status : "Not configured"}
+                </span>
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                {item.configured
+                  ? "Credentials are present. Connect or sync when ready."
+                  : "No credentials configured yet — this connector is available but not connected."}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={isPending || !item.configured}
+                  onClick={() =>
+                    startTransition(async () => {
+                      const res = await toggleIntegrationAction(
+                        item.provider,
+                        item.status !== "connected",
+                      );
+                      if (res.success) {
+                        const list = await listIntegrationsAction();
+                        if (list.success) setItems(list.data);
+                        toast.success("Updated");
+                      } else toast.error(res.message);
+                    })
+                  }
+                >
+                  {item.status === "connected" ? "Disconnect" : "Connect"}
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={isPending || !item.configured || item.status !== "connected"}
+                  onClick={() =>
+                    startTransition(async () => {
+                      const res = await syncIntegrationAction(item.provider);
+                      if (res.success) toast.success("Sync completed");
+                      else toast.error(res.message);
+                    })
+                  }
+                >
+                  Sync
+                </Button>
+              </div>
+              {item.lastError ? (
+                <p className="mt-2 text-xs text-red-600">{item.lastError}</p>
+              ) : null}
             </div>
-            <div className="mt-2 flex gap-2">
-              <Button size="sm" variant="outline" disabled={isPending} onClick={() => startTransition(async () => {
-                const res = await toggleIntegrationAction(item.provider, item.status !== "connected");
-                if (res.success) {
-                  const list = await listIntegrationsAction();
-                  if (list.success) setItems(list.data);
-                  toast.success("Updated");
-                } else toast.error(res.message);
-              })}>{item.status === "connected" ? "Disconnect" : "Connect"}</Button>
-              <Button size="sm" disabled={isPending} onClick={() => startTransition(async () => {
-                const res = await syncIntegrationAction(item.provider);
-                if (res.success) toast.success("Sync completed");
-                else toast.error(res.message);
-              })}>Sync</Button>
-            </div>
-            {item.lastError ? <p className="mt-1 text-xs text-red-600">{item.lastError}</p> : null}
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </SystemModuleFrame>
   );
 }
@@ -588,39 +627,87 @@ export function BackupPanel({ jobs: initial }: { jobs: BackupJobRow[] }) {
   return (
     <SystemModuleFrame title="Backup & Restore" description="Export and restore organization data">
       <div className="flex h-full min-h-0 flex-col gap-3">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2">
           {(["full", "employees", "payroll", "audit_logs"] as const).map((type) => (
-            <Button key={type} size="sm" variant="outline" disabled={isPending} onClick={() => startTransition(async () => {
-              const res = await runBackupAction(type, "json");
-              if (res.success) { toast.success(`Backup ${type} completed`); reload(); }
-              else toast.error(res.message);
-            })}>{type} JSON</Button>
+            <Button
+              key={type}
+              size="sm"
+              variant="outline"
+              disabled={isPending}
+              onClick={() =>
+                startTransition(async () => {
+                  const res = await runBackupAction(type, "json");
+                  if (res.success) {
+                    toast.success(`Backup ${type} completed`);
+                    reload();
+                  } else toast.error(res.message);
+                })
+              }
+            >
+              {type.replace("_", " ")} JSON
+            </Button>
           ))}
         </div>
-        <SystemPanel className="min-h-0 flex-1">
-          <ul className="max-h-[200px] space-y-2 overflow-y-auto text-xs">
-            {jobs.map((job) => (
-              <li key={job.id} className="flex items-center justify-between gap-2 border-b py-1">
-                <span>{job.backupType} · {job.format} · {job.status} · {job.recordCount ?? 0} rows</span>
-                <div className="flex gap-1">
+        <SystemPanel title="Backup Jobs" className="min-h-0 flex-1" bodyClassName="p-0">
+          {jobs.length === 0 ? (
+            <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+              No backup jobs yet.
+            </p>
+          ) : (
+            <ul className="divide-y">
+              {jobs.map((job) => (
+                <li
+                  key={job.id}
+                  className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium capitalize">
+                      {job.backupType.replace("_", " ")} · {job.format}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {job.status} · {job.recordCount ?? 0} rows
+                    </p>
+                  </div>
                   {job.status === "completed" ? (
-                    <>
-                      <Button size="sm" variant="ghost" onClick={() => startTransition(async () => {
-                        const res = await downloadBackupAction(job.id);
-                        if (res.success) downloadBase64(res.data.filename, res.data.mimeType, res.data.contentBase64);
-                        else toast.error(res.message);
-                      })}>Download</Button>
-                      <Button size="sm" variant="ghost" onClick={() => startTransition(async () => {
-                        const res = await restoreBackupAction(job.id);
-                        if (res.success) toast.success(`Restored ${res.data.recordCount} records`);
-                        else toast.error(res.message);
-                      })}>Restore</Button>
-                    </>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          startTransition(async () => {
+                            const res = await downloadBackupAction(job.id);
+                            if (res.success) {
+                              downloadBase64(
+                                res.data.filename,
+                                res.data.mimeType,
+                                res.data.contentBase64,
+                              );
+                            } else toast.error(res.message);
+                          })
+                        }
+                      >
+                        Download
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          startTransition(async () => {
+                            const res = await restoreBackupAction(job.id);
+                            if (res.success) {
+                              toast.success(`Restored ${res.data.recordCount} records`);
+                            } else toast.error(res.message);
+                          })
+                        }
+                      >
+                        Restore
+                      </Button>
+                    </div>
                   ) : null}
-                </div>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+          )}
         </SystemPanel>
       </div>
     </SystemModuleFrame>

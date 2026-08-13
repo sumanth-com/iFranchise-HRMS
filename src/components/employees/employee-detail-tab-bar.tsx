@@ -3,9 +3,9 @@
 import { useRouter, useSearchParams } from "next/navigation";
 
 import {
-  EMPLOYEE_ROUTES,
   EMPLOYEE_TABS,
   EMPLOYEE_TAB_LABELS,
+  resolveEmployeeModuleRoutes,
   type EmployeeTab,
 } from "@/lib/employees/constants";
 import type { EmployeeRouteIdentity } from "@/types/employee";
@@ -21,19 +21,22 @@ function resolveActiveTab(tabParam: string | null): EmployeeTab {
 export function EmployeeDetailTabBar({
   employee,
   onTabChange,
+  routesBasePath,
 }: {
   employee: EmployeeRouteIdentity;
   onTabChange?: (tab: EmployeeTab) => void;
+  routesBasePath?: string;
 }) {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const routes = resolveEmployeeModuleRoutes(routesBasePath);
   const activeTab = resolveActiveTab(searchParams.get("tab"));
 
   function setTab(tab: EmployeeTab) {
     onTabChange?.(tab);
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", tab);
-    router.replace(`${EMPLOYEE_ROUTES.detail(employee)}?${params.toString()}`);
+    router.replace(`${routes.detail(employee)}?${params.toString()}`);
   }
 
   return (

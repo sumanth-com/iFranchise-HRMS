@@ -35,6 +35,7 @@ import {
   type ExportModule,
 } from "@/lib/system-admin/services/import-export-service";
 import {
+  integrationProviderLabel,
   listSystemIntegrations,
   setIntegrationStatus,
   syncIntegration,
@@ -545,8 +546,8 @@ export async function toggleIntegrationAction(
     );
     await writeSystemAudit(supabase, profile, {
       action: connect ? "integration_connected" : "integration_disconnected",
-      description: `${provider} ${connect ? "connected" : "disconnected"}`,
-      priority: "high",
+      description: `${integrationProviderLabel(provider)} ${connect ? "connected" : "disconnected"}`,
+      priority: "medium",
     });
     revalidateSystemAdmin();
     return { success: true as const };
@@ -565,7 +566,7 @@ export async function syncIntegrationAction(provider: IntegrationProvider) {
     await syncIntegration(supabase, profile.employee.organizationId, provider);
     await writeSystemAudit(supabase, profile, {
       action: "integration_sync",
-      description: `Manual sync for ${provider}`,
+      description: `Manual sync for ${integrationProviderLabel(provider)}`,
     });
     revalidateSystemAdmin();
     return { success: true as const };

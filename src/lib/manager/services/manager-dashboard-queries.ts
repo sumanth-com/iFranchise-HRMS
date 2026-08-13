@@ -1,20 +1,30 @@
 import {
   addDays,
+  differenceInYears,
   format,
   isWithinInterval,
   parseISO,
+  subDays,
 } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
-import { MANAGER_ROUTES } from "@/lib/manager/constants";
+import { MANAGER_DASHBOARD_KPI_LINKS, MANAGER_ROUTES } from "@/lib/manager/constants";
 import { getManagerTeamContext } from "@/lib/manager/services/team-hierarchy";
+import { listHolidays } from "@/lib/organization/services/org-queries";
 import {
   formatEmployeeName,
   fromHrms,
   unwrapRelation,
 } from "@/lib/reports/services/reports-utils";
 import type { UserProfile } from "@/types/auth";
+import type {
+  DashboardCharts,
+  DashboardListItem,
+  DashboardPersonEvent,
+  DashboardTaskItem,
+  HrTodayPulse,
+} from "@/types/dashboard";
 import type {
   ManagerActionItem,
   ManagerActivityItem,
@@ -55,7 +65,71 @@ function nextBirthdayWithinDays(
   return null;
 }
 
-function emptyDashboard(teamMembers: ManagerDashboardData["teamMembers"]): ManagerDashboardData {
+function emptyCharts(attendanceTrend7Days: DashboardCharts["attendanceTrend7Days"] = []): DashboardCharts {
+  return {
+    headcountByDepartment: [],
+    attendanceTrend7Days,
+    monthlyHiring: [],
+    monthlyAttrition: [],
+    leaveDistribution: [],
+    genderDistribution: [],
+    employmentTypeDistribution: [],
+  };
+}
+
+function emptyOverviewFields(upcomingHolidays: DashboardListItem[] = []): Pick<
+  ManagerDashboardData,
+  "todayPulse" | "tasks" | "charts" | "upcomingBirthdays" | "upcomingAnniversaries"
+> {
+  return {
+    todayPulse: {
+      presentToday: 0,
+      absentToday: 0,
+      lateToday: 0,
+      pendingApprovals: 0,
+      exitRequests: 0,
+      upcomingHolidays,
+    },
+    tasks: [
+      {
+        id: "interviews-today",
+        label: "Interviews Today",
+        count: 0,
+        href: MANAGER_ROUTES.recruitment,
+        urgency: "low",
+      },
+      {
+        id: "probation-ending",
+        label: "Employees Completing Probation",
+        count: 0,
+        href: MANAGER_DASHBOARD_KPI_LINKS.probationEndingSoon,
+        urgency: "low",
+      },
+      {
+        id: "leave-approvals",
+        label: "Pending Leave Approvals",
+        count: 0,
+        href: MANAGER_DASHBOARD_KPI_LINKS.pendingLeaveApprovals,
+        urgency: "low",
+      },
+      {
+        id: "offers-pending",
+        label: "Open Recruitment Requests",
+        count: 0,
+        href: MANAGER_DASHBOARD_KPI_LINKS.openRecruitmentRequests,
+        urgency: "low",
+      },
+    ],
+    charts: emptyCharts(),
+    upcomingBirthdays: [],
+    upcomingAnniversaries: [],
+  };
+}
+
+function emptyDashboard(
+  teamMembers: ManagerDashboardData["teamMembers"],
+  upcomingHolidays: DashboardListItem[] = [],
+): ManagerDashboardData {
   return {
     generatedAt: new Date().toISOString(),
     teamMembers,
@@ -71,6 +145,7 @@ function emptyDashboard(teamMembers: ManagerDashboardData["teamMembers"]): Manag
     },
     actionItems: [],
     activities: [],
+    ...emptyOverviewFields(upcomingHolidays),
   };
 }
 
@@ -307,7 +382,26 @@ export async function getManagerDashboardData(
   );
 
   if (teamIds.length === 0) {
-    return emptyDashboard(teamMembers);
+    const holidays = await listHolidays(supabase, organizationId, {
+      year: todayDate.getFullYear(),
+    });
+    const eventHorizon = format(addDays(todayDate, 30), "yyyy-MM-dd");
+    const upcomingHolidays: DashboardListItem[] = holidays.data
+      .filter((holiday) => holiday.holidayDate >= today && holiday.holidayDate <= eventHorizon)
+      .slice(0, 6)
+      .map((holiday) => ({
+        id: holiday.id,
+        primary: holiday.name,
+        secondary: holiday.holidayType.replaceAll("_", " "),
+        meta: holiday.holidayDate,
+        href: MANAGER_ROUTES.leaveTeam,
+      }));
+    return emptyDashboard(teamMembers, upcomingHolidays);
+  }
+
+  const dayKeys: string[] = [];
+  for (let i = 6; i >= 0; i -= 1) {
+    dayKeys.push(format(subDays(todayDate, i), "yyyy-MM-dd"));
   }
 
   const managerDepartmentPromise = supabase
@@ -433,7 +527,7 @@ export async function getManagerDashboardData(
     supabase
       .schema("hrms")
       .from("employees")
-      .select("id, first_name, last_name, employee_code, employment_status")
+      .select("id, first_name, last_name, employee_code, employment_status, date_of_joining")
       .eq("organization_id", organizationId)
       .in("id", teamIds)
       .in("employment_status", [...ACTIVE_EMPLOYMENT])
@@ -576,6 +670,29 @@ export async function getManagerDashboardData(
   if (recentPromotionsResult.error) throw new Error(recentPromotionsResult.error.message);
   if (completedInterviewsResult.error) throw new Error(completedInterviewsResult.error.message);
 
+  const [holidaysResult, attendanceTrendCountsRes, exitRequestsResult] = await Promise.all([
+    listHolidays(supabase, organizationId, { year: todayDate.getFullYear() }),
+    Promise.all(
+      dayKeys.map((day) =>
+        fromHrms(supabase, "attendance")
+          .select("id", { count: "exact", head: true })
+          .eq("organization_id", organizationId)
+          .eq("attendance_date", day)
+          .in("employee_id", teamIds)
+          .in("attendance_status", ["present", "late", "half_day"])
+          .is("deleted_at", null),
+      ),
+    ),
+    fromHrms(supabase, "exit_resignations")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .in("employee_id", teamIds)
+      .eq("exit_status", "submitted")
+      .is("deleted_at", null),
+  ]);
+
+  if (exitRequestsResult.error) throw new Error(exitRequestsResult.error.message);
+
   const attendanceCounts = {
     presentToday: 0,
     onLeaveToday: 0,
@@ -619,9 +736,13 @@ export async function getManagerDashboardData(
   let probationEndingSoon = 0;
   const probationActionItems: ManagerActionItem[] = [];
   const birthdayActionItems: ManagerActionItem[] = [];
+  const upcomingBirthdays: DashboardPersonEvent[] = [];
+  const upcomingAnniversaries: DashboardPersonEvent[] = [];
 
   for (const employee of probationEmployeesResult.data ?? []) {
     const probationEnd = probationEndByEmployee.get(employee.id);
+    const memberHref = MANAGER_ROUTES.teamMember(employee.id);
+    const fullName = formatEmployeeName(employee.first_name, employee.last_name);
 
     const endingSoon =
       (probationEnd && probationEnd >= today && probationEnd <= probationHorizon) ||
@@ -633,7 +754,7 @@ export async function getManagerDashboardData(
         probationActionItems.push({
           id: `probation-${employee.id}`,
           kind: "probation",
-          title: formatEmployeeName(employee.first_name, employee.last_name),
+          title: fullName,
           subtitle: employee.employee_code,
           meta: probationEnd
             ? `Probation ends ${format(parseISO(probationEnd), "d MMM yyyy")}`
@@ -647,17 +768,41 @@ export async function getManagerDashboardData(
 
     const dateOfBirth = profileDobByEmployee.get(employee.id);
     const birthday = nextBirthdayWithinDays(dateOfBirth, todayDate, 7);
-    if (birthday && birthdayActionItems.length < ACTION_LIMIT) {
-      birthdayActionItems.push({
-        id: `birthday-${employee.id}`,
-        kind: "birthday",
-        title: formatEmployeeName(employee.first_name, employee.last_name),
+    if (birthday) {
+      upcomingBirthdays.push({
+        id: `bday-${employee.id}`,
+        name: fullName,
+        date: format(birthday, "yyyy-MM-dd"),
         subtitle: employee.employee_code,
-        meta: format(birthday, "EEE, d MMM"),
-        urgency: "low",
-        employeeId: employee.id,
-        href: `${MANAGER_ROUTES.team}?search=${encodeURIComponent(formatEmployeeName(employee.first_name, employee.last_name))}`,
+        href: memberHref,
       });
+      if (birthdayActionItems.length < ACTION_LIMIT) {
+        birthdayActionItems.push({
+          id: `birthday-${employee.id}`,
+          kind: "birthday",
+          title: fullName,
+          subtitle: employee.employee_code,
+          meta: format(birthday, "EEE, d MMM"),
+          urgency: "low",
+          employeeId: employee.id,
+          href: memberHref,
+        });
+      }
+    }
+
+    const joiningDate = employee.date_of_joining as string | null | undefined;
+    const anniversary = nextBirthdayWithinDays(joiningDate, todayDate, 30);
+    if (anniversary && joiningDate) {
+      const years = differenceInYears(anniversary, parseISO(joiningDate));
+      if (years >= 1) {
+        upcomingAnniversaries.push({
+          id: `ann-${employee.id}`,
+          name: fullName,
+          date: format(anniversary, "yyyy-MM-dd"),
+          subtitle: `${years} year${years === 1 ? "" : "s"}`,
+          href: memberHref,
+        });
+      }
     }
   }
 
@@ -681,7 +826,7 @@ export async function getManagerDashboardData(
           : "Awaiting approval",
         urgency: "high" as const,
         employeeId: leave?.employee_id as string | undefined,
-        href: leave?.id ? MANAGER_ROUTES.leaveDetail(String(leave.id)) : MANAGER_ROUTES.leave,
+        href: leave?.id ? MANAGER_ROUTES.leaveDetail(String(leave.id)) : MANAGER_ROUTES.leaveTeam,
       };
     });
 
@@ -703,8 +848,8 @@ export async function getManagerDashboardData(
         urgency: "high" as const,
         employeeId: row.employee_id as string | undefined,
         href: row.employee_id
-          ? `${MANAGER_ROUTES.attendance}?employeeId=${row.employee_id}`
-          : MANAGER_ROUTES.attendance,
+          ? `${MANAGER_ROUTES.attendanceTeam}?employeeId=${row.employee_id}`
+          : MANAGER_ROUTES.attendanceTeam,
       };
     });
 
@@ -725,7 +870,7 @@ export async function getManagerDashboardData(
         employeeId: row.employee_id as string | undefined,
         href: row.employee_id
           ? MANAGER_ROUTES.performanceDetail(String(row.employee_id))
-          : MANAGER_ROUTES.performance,
+          : MANAGER_ROUTES.performanceGoals,
       };
     });
 
@@ -778,12 +923,86 @@ export async function getManagerDashboardData(
     completedInterviews: (completedInterviewsResult.data ?? []) as LooseRow[],
   });
 
+  upcomingBirthdays.sort((a, b) => a.date.localeCompare(b.date));
+  upcomingAnniversaries.sort((a, b) => a.date.localeCompare(b.date));
+
+  const eventHorizon = format(addDays(todayDate, 30), "yyyy-MM-dd");
+  const upcomingHolidays: DashboardListItem[] = holidaysResult.data
+    .filter((holiday) => holiday.holidayDate >= today && holiday.holidayDate <= eventHorizon)
+    .slice(0, 6)
+    .map((holiday) => ({
+      id: holiday.id,
+      primary: holiday.name,
+      secondary: holiday.holidayType.replaceAll("_", " "),
+      meta: holiday.holidayDate,
+      href: MANAGER_ROUTES.leaveTeam,
+    }));
+
+  const interviewsToday = ((interviewsResult.data ?? []) as LooseRow[]).filter(
+    (row) => row.interview_date === today,
+  ).length;
+  const pendingLeaveApprovals = kpis.pendingLeaveApprovals;
+  const openRecruitmentRequests = kpis.openRecruitmentRequests;
+  const exitRequests = exitRequestsResult.count ?? 0;
+
+  const todayPulse: HrTodayPulse = {
+    presentToday: kpis.presentToday,
+    absentToday: kpis.onLeaveToday,
+    lateToday: kpis.lateToday,
+    pendingApprovals: pendingLeaveApprovals,
+    exitRequests,
+    upcomingHolidays,
+  };
+
+  const tasks: DashboardTaskItem[] = [
+    {
+      id: "interviews-today",
+      label: "Interviews Today",
+      count: interviewsToday,
+      href: MANAGER_ROUTES.recruitment,
+      urgency: interviewsToday > 0 ? "medium" : "low",
+    },
+    {
+      id: "probation-ending",
+      label: "Employees Completing Probation",
+      count: probationEndingSoon,
+      href: MANAGER_DASHBOARD_KPI_LINKS.probationEndingSoon,
+      urgency: probationEndingSoon > 0 ? "medium" : "low",
+    },
+    {
+      id: "leave-approvals",
+      label: "Pending Leave Approvals",
+      count: pendingLeaveApprovals,
+      href: MANAGER_DASHBOARD_KPI_LINKS.pendingLeaveApprovals,
+      urgency: pendingLeaveApprovals > 0 ? "high" : "low",
+    },
+    {
+      id: "offers-pending",
+      label: "Open Recruitment Requests",
+      count: openRecruitmentRequests,
+      href: MANAGER_DASHBOARD_KPI_LINKS.openRecruitmentRequests,
+      urgency: openRecruitmentRequests > 0 ? "medium" : "low",
+    },
+  ];
+
+  const charts = emptyCharts(
+    dayKeys.map((day, index) => ({
+      label: format(parseISO(day), "dd MMM"),
+      value: attendanceTrendCountsRes[index]?.count ?? 0,
+    })),
+  );
+
   return {
     generatedAt: new Date().toISOString(),
     teamMembers,
     kpis,
     actionItems,
     activities,
+    todayPulse,
+    tasks,
+    charts,
+    upcomingBirthdays: upcomingBirthdays.slice(0, 6),
+    upcomingAnniversaries: upcomingAnniversaries.slice(0, 6),
   };
 }
 

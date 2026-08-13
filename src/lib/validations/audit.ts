@@ -17,6 +17,14 @@ export const auditListParamsSchema = z.object({
   dateTo: z.string().optional(),
 });
 
+/** Same filters as the list UI, with a higher pageSize for Excel/PDF export. */
+export const auditExportParamsSchema = auditListParamsSchema
+  .omit({ page: true, pageSize: true })
+  .extend({
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(5000).default(5000),
+  });
+
 export const auditSettingsFormSchema = z.object({
   retentionDays: z.coerce.number().int().min(30).max(3650),
 });

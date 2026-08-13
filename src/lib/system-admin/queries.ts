@@ -2,11 +2,11 @@ import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { hasEmailTransport } from "@/lib/email/mailer";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEnvironmentSnapshot } from "@/lib/system-admin/services/environment-service";
+import { reconcileFakeIntegrations } from "@/lib/system-admin/services/integrations-service";
 
 export type SystemDashboardStats = {
   totalUsers: number;
   activeEmployees: number;
-  activeSessionsEstimate: number;
   loginsToday: number;
   failedLogins24h: number;
   storageBucketCount: number;
@@ -25,7 +25,12 @@ export type SystemDashboardStats = {
   apiStatus: string;
   backupStatus: string;
   lastBackupAt: string | null;
-  scheduledJobs: Array<{ jobKey: string; jobName: string; lastStatus: string | null; lastRunAt: string | null }>;
+  scheduledJobs: Array<{
+    jobKey: string;
+    jobName: string;
+    lastStatus: string | null;
+    lastRunAt: string | null;
+  }>;
   systemHealth: "healthy" | "degraded" | "critical";
 };
 
@@ -33,6 +38,9 @@ export async function getSystemDashboardStats(
   supabase: AuthSupabaseClient,
   organizationId: string,
 ): Promise<SystemDashboardStats> {
+  // Drop fake integration toggles so Recent Activity stays natural.
+  await reconcileFakeIntegrations(organizationId);
+
   const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
@@ -71,51 +79,59 @@ export async function getSystemDashboardStats(
       .from("audit_logs")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .gte("created_at", since24h)
-      .is("deleted_at", null),
+      .gte("occurred_at", since24h)
+      .is("deleted_at", null)
+      .is("archived_at", null),
+    // Real security signal: failed auth/security actions — not all high-priority audits
     supabase
       .schema("hrms")
       .from("audit_logs")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .gte("created_at", since24h)
-      .in("priority", ["high", "critical"])
-      .is("deleted_at", null),
+      .gte("occurred_at", since24h)
+      .eq("event_status", "failed")
+      .in("action", ["login", "logout", "password_reset", "permission_change", "role_change"])
+      .is("deleted_at", null)
+      .is("archived_at", null),
     supabase
       .schema("hrms")
       .from("audit_logs")
-      .select("id, description, created_at")
+      .select("id, description, occurred_at")
       .eq("organization_id", organizationId)
-      .in("action", ["role_changed", "role_assigned", "portal_changed"])
+      .in("action", ["role_changed", "role_assigned", "portal_changed", "role_change"])
       .is("deleted_at", null)
-      .order("created_at", { ascending: false })
+      .is("archived_at", null)
+      .order("occurred_at", { ascending: false })
       .limit(6),
     supabase
       .schema("hrms")
       .from("audit_logs")
-      .select("id, description, action, created_at")
+      .select("id, description, action, occurred_at")
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
-      .order("created_at", { ascending: false })
+      .is("archived_at", null)
+      .order("occurred_at", { ascending: false })
+      .limit(10),
+    supabase
+      .schema("hrms")
+      .from("audit_logs")
+      .select("id, description, occurred_at")
+      .eq("organization_id", organizationId)
+      .eq("event_status", "failed")
+      .gte("occurred_at", since24h)
+      .is("deleted_at", null)
+      .is("archived_at", null)
+      .order("occurred_at", { ascending: false })
       .limit(8),
     supabase
       .schema("hrms")
       .from("audit_logs")
-      .select("id, description, created_at")
+      .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .eq("event_status", "failed")
-      .gte("created_at", since24h)
+      .eq("action", "login")
+      .gte("occurred_at", todayStart.toISOString())
       .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(6),
-    supabase
-      .schema("hrms")
-      .from("audit_logs")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .eq("action", "login")
-      .gte("created_at", todayStart.toISOString())
-      .is("deleted_at", null),
+      .is("archived_at", null),
     supabase
       .schema("hrms")
       .from("audit_logs")
@@ -123,8 +139,9 @@ export async function getSystemDashboardStats(
       .eq("organization_id", organizationId)
       .eq("action", "login")
       .eq("event_status", "failed")
-      .gte("created_at", since24h)
-      .is("deleted_at", null),
+      .gte("occurred_at", since24h)
+      .is("deleted_at", null)
+      .is("archived_at", null),
     supabase
       .schema("hrms")
       .from("system_settings")
@@ -170,15 +187,19 @@ export async function getSystemDashboardStats(
   const failedLogins24h = failedLoginsResult.count ?? 0;
   const maintenanceMode = Boolean(settingsResult.data?.maintenance_mode);
   const emergencyShutdown = Boolean(settingsResult.data?.emergency_shutdown);
+  const hasBackup = Boolean(lastBackupResult.data?.completed_at);
 
+  // Health reflects real platform risk — not routine high-priority audit volume.
   let systemHealth: SystemDashboardStats["systemHealth"] = "healthy";
-  if (!databaseHealthy || emergencyShutdown) systemHealth = "critical";
-  else if (securityAlerts24h > 0 || failedLogins24h > 5 || maintenanceMode) systemHealth = "degraded";
+  if (!databaseHealthy || emergencyShutdown) {
+    systemHealth = "critical";
+  } else if (failedLogins24h > 10 || securityAlerts24h > 20 || maintenanceMode) {
+    systemHealth = "degraded";
+  }
 
   return {
     totalUsers: employeesProbe.count ?? 0,
     activeEmployees: activeUsersResult.count ?? 0,
-    activeSessionsEstimate: activeUsersResult.count ?? 0,
     loginsToday: loginsTodayResult.count ?? 0,
     failedLogins24h,
     storageBucketCount,
@@ -187,19 +208,19 @@ export async function getSystemDashboardStats(
     securityAlerts24h,
     recentRoleChanges: (recentRoleChangesResult.data ?? []).map((row) => ({
       id: row.id as string,
-      description: row.description as string,
-      occurredAt: row.created_at as string,
+      description: (row.description as string) ?? "",
+      occurredAt: row.occurred_at as string,
     })),
     recentAuditEvents: (recentAuditResult.data ?? []).map((row) => ({
       id: row.id as string,
-      description: row.description as string,
-      action: row.action as string,
-      occurredAt: row.created_at as string,
+      description: (row.description as string) ?? "",
+      action: (row.action as string) ?? "",
+      occurredAt: row.occurred_at as string,
     })),
     recentErrors: (recentErrorsResult.data ?? []).map((row) => ({
       id: row.id as string,
-      description: row.description as string,
-      occurredAt: row.created_at as string,
+      description: (row.description as string) ?? "",
+      occurredAt: row.occurred_at as string,
     })),
     smtpConfigured,
     emailStatus: env.emailStatus,
@@ -207,8 +228,8 @@ export async function getSystemDashboardStats(
     emergencyShutdown,
     databaseHealthy,
     databaseResponseMs,
-    apiStatus: env.apiStatus,
-    backupStatus: lastBackupResult.data ? "Ready" : "No backup",
+    apiStatus: databaseHealthy ? "Healthy" : "Degraded",
+    backupStatus: hasBackup ? "Ready" : "No backup",
     lastBackupAt: (lastBackupResult.data?.completed_at as string | null) ?? null,
     scheduledJobs: (scheduledJobsResult.data ?? []).map((row) => ({
       jobKey: row.job_key as string,

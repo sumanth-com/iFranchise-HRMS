@@ -63,7 +63,12 @@ import {
   LEAVE_STATUS_LABELS,
 } from "@/lib/leave/constants";
 import { formatLeaveDate } from "@/lib/leave/services/leave-utils";
-import type { LeaveListItem, LeaveListParams } from "@/types/leave";
+import type {
+  LeaveActionResult,
+  LeaveListItem,
+  LeaveListParams,
+  LeaveListResult,
+} from "@/types/leave";
 import type { LookupOption } from "@/types/employee";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -93,6 +98,10 @@ type LeaveTableProps = {
   canCancel: boolean;
   canDelete?: boolean;
   embedded?: boolean;
+  listBasePath?: string;
+  fetchRecords?: (
+    params: LeaveListParams,
+  ) => Promise<LeaveActionResult<LeaveListResult>>;
   /** Called after approve/reject/cancel/delete so parents can refresh summary cards. */
   onMutated?: () => void;
 };
@@ -199,6 +208,8 @@ export function LeaveTable({
   canCancel,
   canDelete = false,
   embedded = false,
+  listBasePath,
+  fetchRecords = fetchLeaveRequestsAction,
   onMutated,
 }: LeaveTableProps) {
   const [isPending, startTransition] = useTransition();
@@ -218,11 +229,13 @@ export function LeaveTable({
     setViewOpen(true);
   }
 
+  const resolvedListPath = listBasePath ?? LEAVE_ROUTES.list;
+
   useEffect(() => {
     if (!embedded && window.location.search) {
-      window.history.replaceState(null, "", LEAVE_ROUTES.list);
+      window.history.replaceState(null, "", resolvedListPath);
     }
-  }, [embedded]);
+  }, [embedded, resolvedListPath]);
 
   const now = new Date();
   const defaultMonth = month ?? now.getMonth() + 1;
@@ -251,7 +264,7 @@ export function LeaveTable({
 
   const reloadTable = useCallback(
     async (nextFilters: LeaveListParams = filters) => {
-      const result = await fetchLeaveRequestsAction(nextFilters);
+      const result = await fetchRecords(nextFilters);
       if (!result.success) {
         toast.error(result.message);
         return false;
@@ -264,7 +277,7 @@ export function LeaveTable({
       });
       return true;
     },
-    [filters],
+    [fetchRecords, filters],
   );
 
   const patchRecordStatus = useCallback(
@@ -730,26 +743,28 @@ export function LeaveTable({
             </Select>
           </div>
 
-          <div className="min-w-0">
-            <Select
-              items={managerItems}
-              value={filters.reportingManagerId ?? ""}
-              onValueChange={(value) =>
-                updateParams({ reportingManagerId: value || undefined, page: "1" })
-              }
-            >
-              <SelectTrigger className={FILTER_CONTROL_CLASS}>
-                <SelectValue placeholder="All managers" />
-              </SelectTrigger>
-              <SelectContent align="start" alignItemWithTrigger={false}>
-                {managerItems.map((item) => (
-                  <SelectItem key={item.value || "all-managers"} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {managers.length > 0 ? (
+            <div className="min-w-0">
+              <Select
+                items={managerItems}
+                value={filters.reportingManagerId ?? ""}
+                onValueChange={(value) =>
+                  updateParams({ reportingManagerId: value || undefined, page: "1" })
+                }
+              >
+                <SelectTrigger className={FILTER_CONTROL_CLASS}>
+                  <SelectValue placeholder="All managers" />
+                </SelectTrigger>
+                <SelectContent align="start" alignItemWithTrigger={false}>
+                  {managerItems.map((item) => (
+                    <SelectItem key={item.value || "all-managers"} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
         </div>
 
         {(hasActiveFilters || (canCreate && !embedded)) && (

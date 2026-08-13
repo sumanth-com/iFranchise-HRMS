@@ -35,10 +35,15 @@ import {
   unwrapRelation,
 } from "@/lib/recruitment/services/recruitment-utils";
 import { getRecruitmentSettings, archiveRejectedCandidates } from "@/lib/recruitment/services/recruitment-settings";
+import {
+  emptyPagedResult,
+  resolveManagerDepartmentIds,
+} from "@/lib/manager/portal-scope";
 
 export async function getRecruitmentLookups(
   supabase: AuthSupabaseClient,
   organizationId: string,
+  departmentIds?: string[] | null,
 ): Promise<RecruitmentLookups> {
   const [departments, designations, employmentTypes, branches, employees, jobs, settings, docTemplates] =
     await Promise.all([
@@ -83,7 +88,7 @@ export async function getRecruitmentLookups(
         .in("employment_status", ["active", "probation"])
         .order("first_name"),
       fromHrms(supabase, "recruitment_job_openings")
-        .select("id, title, job_code, job_status")
+        .select("id, title, job_code, job_status, department_id")
         .eq("organization_id", organizationId)
         .is("deleted_at", null)
         .order("created_at", { ascending: false }),
@@ -96,8 +101,22 @@ export async function getRecruitmentLookups(
         .order("name"),
     ]);
 
+  let departmentRows = departments.data ?? [];
+  let jobRows = (jobs.data ?? []) as PerfRow[];
+  if (departmentIds) {
+    if (departmentIds.length === 0) {
+      departmentRows = [];
+      jobRows = [];
+    } else {
+      departmentRows = departmentRows.filter((row) => departmentIds.includes(row.id));
+      jobRows = jobRows.filter(
+        (row) => row.department_id && departmentIds.includes(row.department_id),
+      );
+    }
+  }
+
   return {
-    departments: (departments.data ?? []).map((d) => ({ id: d.id, label: d.name })),
+    departments: departmentRows.map((d) => ({ id: d.id, label: d.name })),
     designations: (designations.data ?? []).map((d) => ({ id: d.id, label: d.title })),
     employmentTypes: (employmentTypes.data ?? []).map((d) => ({ id: d.id, label: d.name })),
     branches: (branches.data ?? []).map((d) => ({ id: d.id, label: d.name })),
@@ -105,7 +124,7 @@ export async function getRecruitmentLookups(
       id: e.id,
       label: `${formatEmployeeName(e.first_name, e.last_name)} (${e.employee_code})`,
     })),
-    jobs: ((jobs.data ?? []) as PerfRow[]).map((j) => ({
+    jobs: jobRows.map((j) => ({
       id: j.id,
       label: j.job_code ? `${j.job_code} — ${j.title}` : j.title,
       status: j.job_status,
@@ -234,6 +253,7 @@ export async function getRecruitmentSummary(
   profile: UserProfile,
 ): Promise<RecruitmentSummary> {
   const organizationId = profile.employee.organizationId;
+  const departmentIds = await resolveManagerDepartmentIds(supabase, profile);
   // Apply auto-archive before summary/list metrics
   await archiveRejectedCandidates(supabase, organizationId).catch(() => 0);
   const today = new Date().toISOString().slice(0, 10);
@@ -243,7 +263,7 @@ export async function getRecruitmentSummary(
 
   const [jobs, candidates, interviews, offers, timeline] = await Promise.all([
     fromHrms(supabase, "recruitment_job_openings")
-      .select("id, job_status, open_positions, title")
+      .select("id, job_status, open_positions, title, department_id")
       .eq("organization_id", organizationId)
       .is("deleted_at", null),
     fromHrms(supabase, "recruitment_candidates")
@@ -263,7 +283,7 @@ export async function getRecruitmentSummary(
       .order("interview_date", { ascending: true })
       .limit(8),
     fromHrms(supabase, "recruitment_offers")
-      .select("id, offer_status, created_at, responded_at")
+      .select("id, offer_status, created_at, responded_at, candidate_id, job_opening_id")
       .eq("organization_id", organizationId)
       .is("deleted_at", null),
     fromHrms(supabase, "recruitment_candidate_timeline")
@@ -276,16 +296,34 @@ export async function getRecruitmentSummary(
       .limit(10),
   ]);
 
-  const jobRows = (jobs.data ?? []) as PerfRow[];
-  const candidateRows = (candidates.data ?? []) as PerfRow[];
-  const offerRows = (offers.data ?? []) as PerfRow[];
+  let jobRows = (jobs.data ?? []) as PerfRow[];
+  let candidateRows = (candidates.data ?? []) as PerfRow[];
+  let interviewRows = (interviews.data ?? []) as PerfRow[];
+  let offerRows = (offers.data ?? []) as PerfRow[];
+  if (departmentIds) {
+    if (departmentIds.length === 0) {
+      jobRows = [];
+      candidateRows = [];
+      interviewRows = [];
+      offerRows = [];
+    } else {
+      jobRows = jobRows.filter(
+        (row) => row.department_id && departmentIds.includes(row.department_id),
+      );
+      const allowedJobIds = new Set(jobRows.map((row) => row.id));
+      candidateRows = candidateRows.filter((row) => allowedJobIds.has(row.job_opening_id));
+      interviewRows = interviewRows.filter((row) => allowedJobIds.has(row.job_opening_id));
+      const allowedCandidateIds = new Set(candidateRows.map((row) => row.id));
+      offerRows = offerRows.filter((row) => allowedCandidateIds.has(row.candidate_id));
+    }
+  }
 
   const openJobs = jobRows.filter((j) => j.job_status === "open");
   const openPositions = openJobs.reduce((sum, j) => sum + Number(j.open_positions ?? 0), 0);
   const activeCandidates = candidateRows.filter(
     (c) => !["joined", "rejected"].includes(c.stage),
   ).length;
-  const interviewsToday = ((interviews.data ?? []) as PerfRow[]).filter(
+  const interviewsToday = interviewRows.filter(
     (i) => i.interview_date === today && i.interview_status === "scheduled",
   ).length;
   const offersPending = offerRows.filter((o) => ["draft", "sent"].includes(o.offer_status)).length;
@@ -343,15 +381,16 @@ export async function getRecruitmentSummary(
     const job = unwrapRelation(row.job);
     const dept = unwrapRelation(job?.departments ?? null);
     const id = job?.department_id ?? "unassigned";
+    if (departmentIds && (departmentIds.length === 0 || !departmentIds.includes(id))) {
+      continue;
+    }
     const name = dept?.name ?? "Unassigned";
     const existing = deptMap.get(id) ?? { departmentId: id, departmentName: name, count: 0 };
     existing.count += 1;
     deptMap.set(id, existing);
   }
 
-  const upcomingInterviews: InterviewListItem[] = ((interviews.data ?? []) as PerfRow[]).map(
-    mapInterviewRow,
-  );
+  const upcomingInterviews: InterviewListItem[] = interviewRows.map(mapInterviewRow);
 
   const candidateIds = [
     ...new Set(
@@ -651,6 +690,14 @@ export async function listJobOpenings(
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
   const organizationId = profile.employee.organizationId;
+  const departmentIds = await resolveManagerDepartmentIds(supabase, profile);
+
+  if (departmentIds && departmentIds.length === 0) {
+    return emptyPagedResult(page, pageSize);
+  }
+  if (departmentIds && departmentId && !departmentIds.includes(departmentId)) {
+    return emptyPagedResult(page, pageSize);
+  }
 
   let query = fromHrms(supabase, "recruitment_job_openings")
     .select(
@@ -669,6 +716,7 @@ export async function listJobOpenings(
     .range(from, to);
 
   if (departmentId) query = query.eq("department_id", departmentId);
+  else if (departmentIds) query = query.in("department_id", departmentIds);
   if (jobStatus) query = query.eq("job_status", jobStatus);
   if (employmentTypeId) query = query.eq("employment_type_id", employmentTypeId);
   if (location) query = query.ilike("location", `%${location}%`);
@@ -776,6 +824,14 @@ export async function listOfferQueueCandidates(
   const { page, pageSize, search, departmentId, jobOpeningId, offerQueue } = parsed;
   const organizationId = profile.employee.organizationId;
   await archiveRejectedCandidates(supabase, organizationId).catch(() => 0);
+  const departmentIds = await resolveManagerDepartmentIds(supabase, profile);
+
+  if (departmentIds && departmentIds.length === 0) {
+    return emptyPagedResult(page, pageSize);
+  }
+  if (departmentIds && departmentId && !departmentIds.includes(departmentId)) {
+    return emptyPagedResult(page, pageSize);
+  }
 
   let query = fromHrms(supabase, "recruitment_candidates")
     .select(
@@ -792,6 +848,7 @@ export async function listOfferQueueCandidates(
 
   if (jobOpeningId) query = query.eq("job_opening_id", jobOpeningId);
   if (departmentId) query = query.eq("job.department_id", departmentId);
+  else if (departmentIds) query = query.in("job.department_id", departmentIds);
   if (search) {
     query = query.or(
       `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`,
@@ -853,6 +910,14 @@ export async function listCandidates(
   const to = from + pageSize - 1;
   const organizationId = profile.employee.organizationId;
   await archiveRejectedCandidates(supabase, organizationId).catch(() => 0);
+  const departmentIds = await resolveManagerDepartmentIds(supabase, profile);
+
+  if (departmentIds && departmentIds.length === 0) {
+    return emptyPagedResult(page, pageSize);
+  }
+  if (departmentIds && departmentId && !departmentIds.includes(departmentId)) {
+    return emptyPagedResult(page, pageSize);
+  }
 
   let query = fromHrms(supabase, "recruitment_candidates")
     .select(
@@ -872,6 +937,7 @@ export async function listCandidates(
   if (stage) query = query.eq("stage", stage);
   if (source) query = query.eq("source", source);
   if (departmentId) query = query.eq("job.department_id", departmentId);
+  else if (departmentIds) query = query.in("job.department_id", departmentIds);
   if (search) {
     query = query.or(
       `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`,
@@ -1001,6 +1067,11 @@ export async function listInterviews(
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
   const organizationId = profile.employee.organizationId;
+  const departmentIds = await resolveManagerDepartmentIds(supabase, profile);
+
+  if (departmentIds && departmentIds.length === 0) {
+    return emptyPagedResult(page, pageSize);
+  }
 
   let query = fromHrms(supabase, "recruitment_interviews")
     .select(
@@ -1008,7 +1079,7 @@ export async function listInterviews(
       interview_time, meeting_link, interview_type, interview_status, rating, comments,
       recommendation, created_at,
       candidate:candidate_id!inner(first_name, last_name),
-      job:job_opening_id(title),
+      job:job_opening_id!inner(title, department_id),
       interviewer:interviewer_employee_id(first_name, last_name)`,
       { count: "exact" },
     )
@@ -1017,6 +1088,7 @@ export async function listInterviews(
     .order("interview_date", { ascending: false })
     .range(from, to);
 
+  if (departmentIds) query = query.in("job.department_id", departmentIds);
   if (jobOpeningId) query = query.eq("job_opening_id", jobOpeningId);
   if (interviewStatus) query = query.eq("interview_status", interviewStatus);
   if (interviewerId) query = query.eq("interviewer_employee_id", interviewerId);

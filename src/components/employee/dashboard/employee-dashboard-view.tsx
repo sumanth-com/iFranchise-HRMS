@@ -13,12 +13,13 @@ export function EmployeeDashboardView({
   kpis,
   referenceDate,
   upcomingHolidays,
-}: EmployeeDashboardData) {
+  subtitle,
+}: EmployeeDashboardData & { subtitle?: string }) {
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-5 lg:overflow-hidden">
       <div className="mx-auto flex h-full min-h-0 w-full max-w-[88rem] flex-col gap-3 md:gap-4 lg:overflow-hidden">
         <div className="shrink-0">
-          <EmployeeDashboardHeader greeting={greeting} />
+          <EmployeeDashboardHeader greeting={greeting} subtitle={subtitle} />
         </div>
 
         <div className="shrink-0">

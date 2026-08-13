@@ -50,12 +50,12 @@ export function focusModuleHref(
     case "leave": {
       const params = new URLSearchParams({ leaveStatus: "pending" });
       if (employeeId) params.set("employeeId", employeeId);
-      return `${MANAGER_ROUTES.leave}?${params.toString()}`;
+      return `${MANAGER_ROUTES.leaveTeam}?${params.toString()}`;
     }
     case "performance":
       return employeeId
         ? MANAGER_ROUTES.performanceDetail(employeeId)
-        : `${MANAGER_ROUTES.performance}?reviewStatus=pending`;
+        : MANAGER_ROUTES.performanceGoals;
     case "recruitment":
       return MANAGER_ROUTES.recruitment;
     default:

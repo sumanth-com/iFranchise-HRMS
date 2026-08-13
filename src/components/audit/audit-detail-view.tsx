@@ -21,35 +21,99 @@ function AuditDataPanel({
   data: Record<string, unknown> | null;
 }) {
   const rows = sanitizeAuditRecordData(data);
+  if (rows.length === 0) return null;
 
   return (
     <div className="rounded-lg border bg-muted/30 p-4">
       <h4 className="text-sm font-semibold">{title}</h4>
-      {rows.length === 0 ? (
-        <p className="mt-2 text-sm text-muted-foreground">No data recorded.</p>
-      ) : (
-        <dl className="mt-3 space-y-2">
-          {rows.map((row) => (
-            <div key={`${title}-${row.label}`} className="grid gap-1 sm:grid-cols-[10rem_1fr]">
-              <dt className="text-xs font-medium text-muted-foreground">{row.label}</dt>
-              <dd className="text-sm">{row.value}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
+      <dl className="mt-3 space-y-2">
+        {rows.map((row) => (
+          <div key={`${title}-${row.label}`} className="grid gap-1 sm:grid-cols-[10rem_1fr]">
+            <dt className="text-xs font-medium text-muted-foreground">{row.label}</dt>
+            <dd className="text-sm">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }
 
-export function AuditDetailView({ detail }: { detail: AuditDetail }) {
-  const recordLabel = formatAuditRecordLabel(detail);
+function DetailField({ label, value }: { label: string; value?: string | null }) {
+  const trimmed = value?.trim();
+  if (!trimmed || trimmed === "—") return null;
+  return (
+    <div>
+      <dt className="text-xs font-medium uppercase text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-sm text-foreground">{trimmed}</dd>
+    </div>
+  );
+}
+
+function isSyntheticRecordId(recordId: string | null | undefined) {
+  if (!recordId?.trim()) return true;
+  const id = recordId.trim().toLowerCase();
+  return (
+    id === "system" ||
+    id.startsWith("export-") ||
+    id.startsWith("bulk-delete-") ||
+    id.startsWith("view-")
+  );
+}
+
+function isLocalIp(ip: string | null | undefined) {
+  if (!ip?.trim()) return true;
+  const value = ip.trim().toLowerCase();
+  return value === "::1" || value === "127.0.0.1" || value === "localhost";
+}
+
+function isGenericSource(tableName: string | null | undefined) {
+  if (!tableName?.trim()) return true;
+  const value = tableName.trim().toLowerCase();
+  return value === "application" || value === "audit_logs";
+}
+
+function usefulRecordLabel(detail: AuditDetail): string | null {
+  if (isSyntheticRecordId(detail.recordId)) return null;
+
+  const label = formatAuditRecordLabel(detail).trim();
+  if (!label || label === "—" || label === "System" || label === "Audit log entry") {
+    return null;
+  }
+
+  const moduleAction = `${formatAuditModule(detail.module)} · ${formatAuditAction(detail.action)}`;
+  if (label === moduleAction) return null;
+
+  const description = humanizeActivityDescription(
+    detail.description,
+    formatAuditAction(detail.action),
+  );
+  if (label === description) return null;
+
+  return label;
+}
+
+export function AuditDetailView({
+  detail,
+  compact = false,
+}: {
+  detail: AuditDetail;
+  compact?: boolean;
+}) {
+  const recordLabel = usefulRecordLabel(detail);
+  const sourceLabel = isGenericSource(detail.tableName)
+    ? null
+    : formatAuditTableLabel(detail.tableName);
+  const ipLabel = isLocalIp(detail.ipAddress) ? null : detail.ipAddress;
+  const beforeRows = sanitizeAuditRecordData(detail.oldRecord);
+  const afterRows = sanitizeAuditRecordData(detail.newRecord);
+  const hasChangePanels = beforeRows.length > 0 || afterRows.length > 0;
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
+    <div className={compact ? "space-y-4" : "space-y-6"}>
+      <div className={compact ? "space-y-4" : "rounded-xl border bg-card p-6 shadow-sm"}>
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-semibold">
+          <div className="min-w-0">
+            <h2 className={compact ? "text-base font-semibold" : "text-xl font-semibold"}>
               {humanizeActivityDescription(
                 detail.description,
                 formatAuditAction(detail.action),
@@ -59,54 +123,37 @@ export function AuditDetailView({ detail }: { detail: AuditDetail }) {
               {format(new Date(detail.occurredAt), "EEEE, MMMM d, yyyy 'at' HH:mm:ss")}
             </p>
           </div>
-          <div className="flex gap-2">
-            <AuditPriorityBadge priority={detail.priority} />
+          <div className="flex shrink-0 gap-2">
+            {detail.priority === "high" || detail.priority === "critical" ? (
+              <AuditPriorityBadge priority={detail.priority} />
+            ) : null}
             <AuditStatusBadge status={detail.eventStatus} />
           </div>
         </div>
 
-        <dl className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <dl
+          className={
+            compact
+              ? "mt-4 grid gap-3 sm:grid-cols-2"
+              : "mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          }
+        >
           <div>
             <dt className="text-xs font-medium uppercase text-muted-foreground">Performed By</dt>
             <dd className="mt-1 text-sm font-medium">{detail.userName ?? "System"}</dd>
-            {detail.userEmail ? <dd className="text-xs text-muted-foreground">{detail.userEmail}</dd> : null}
+            {detail.userEmail ? (
+              <dd className="text-xs text-muted-foreground">{detail.userEmail}</dd>
+            ) : null}
           </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-muted-foreground">Role</dt>
-            <dd className="mt-1 text-sm">{detail.roleName ?? "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-muted-foreground">Module</dt>
-            <dd className="mt-1 text-sm">{formatAuditModule(detail.module)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-muted-foreground">Action</dt>
-            <dd className="mt-1 text-sm">{formatAuditAction(detail.action)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-muted-foreground">Record</dt>
-            <dd className="mt-1 text-sm font-medium">{recordLabel}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-muted-foreground">Source</dt>
-            <dd className="mt-1 text-sm">{formatAuditTableLabel(detail.tableName)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-muted-foreground">IP Address</dt>
-            <dd className="mt-1 text-sm">{detail.ipAddress ?? "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-muted-foreground">Browser</dt>
-            <dd className="mt-1 text-sm">{detail.browser ?? "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-muted-foreground">Operating System</dt>
-            <dd className="mt-1 text-sm">{detail.operatingSystem ?? "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-muted-foreground">Device Type</dt>
-            <dd className="mt-1 text-sm">{detail.deviceType ?? "—"}</dd>
-          </div>
+          <DetailField label="Role" value={detail.roleName} />
+          <DetailField label="Module" value={formatAuditModule(detail.module)} />
+          <DetailField label="Action" value={formatAuditAction(detail.action)} />
+          <DetailField label="Record" value={recordLabel} />
+          <DetailField label="Source" value={sourceLabel} />
+          <DetailField label="IP Address" value={ipLabel} />
+          <DetailField label="Browser" value={detail.browser} />
+          <DetailField label="Operating System" value={detail.operatingSystem} />
+          <DetailField label="Device Type" value={detail.deviceType} />
           {detail.reason ? (
             <div className="sm:col-span-2 lg:col-span-3">
               <dt className="text-xs font-medium uppercase text-muted-foreground">Reason</dt>
@@ -116,10 +163,20 @@ export function AuditDetailView({ detail }: { detail: AuditDetail }) {
         </dl>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <AuditDataPanel title="Before Values" data={detail.oldRecord} />
-        <AuditDataPanel title="After Values" data={detail.newRecord} />
-      </div>
+      {hasChangePanels ? (
+        <div
+          className={
+            beforeRows.length > 0 && afterRows.length > 0
+              ? compact
+                ? "grid gap-3"
+                : "grid gap-4 lg:grid-cols-2"
+              : "grid gap-3"
+          }
+        >
+          <AuditDataPanel title="Before Values" data={detail.oldRecord} />
+          <AuditDataPanel title="After Values" data={detail.newRecord} />
+        </div>
+      ) : null}
     </div>
   );
 }

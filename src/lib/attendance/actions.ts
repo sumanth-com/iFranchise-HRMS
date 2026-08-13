@@ -2,11 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 
+import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { createClient } from "@/lib/supabase/server";
 import { toUserFriendlyError } from "@/lib/errors/user-messages";
-import { requireServerPermission } from "@/lib/permissions/server";
+import { requireServerAnyPermission, requireServerPermission } from "@/lib/permissions/server";
 import { ATTENDANCE_ROUTES, SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
 import { getAttendanceById } from "@/lib/attendance/services/attendance-detail";
+import { getManagerTeamScope } from "@/lib/manager/services/team-queries";
+import { hasPermission } from "@/lib/permissions/utils";
 import {
   createAttendance,
   softDeleteAttendance,
@@ -57,12 +60,24 @@ export async function getAttendanceDetailAction(
   attendanceId: string,
 ): Promise<AttendanceActionResult<AttendanceDetail>> {
   try {
-    const profile = await requireServerPermission("attendance.view");
+    const profile = await requireServerAnyPermission([
+      "attendance.view",
+      PORTAL_PERMISSIONS.manager,
+    ]);
     const supabase = await getAuthenticatedSupabase();
     const data = await getAttendanceById(supabase, profile, attendanceId);
 
     if (!data) {
       return { success: false, message: "Attendance record not found" };
+    }
+
+    const isOwn = data.employeeId === profile.employee.id;
+    const hasHrAccess = hasPermission(profile.permissionCodes, PORTAL_PERMISSIONS.hr);
+    if (!isOwn && !hasHrAccess) {
+      const { teamIds } = await getManagerTeamScope(supabase, profile);
+      if (!teamIds.includes(data.employeeId)) {
+        return { success: false, message: "Attendance record not found" };
+      }
     }
 
     return { success: true, data };

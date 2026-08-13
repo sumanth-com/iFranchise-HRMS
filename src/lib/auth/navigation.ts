@@ -24,6 +24,7 @@ export function getSidebarNavigation(
     const roleAllowed = hasAnyRole(roles, item.roles ?? []);
 
     if (!permissionAllowed || !roleAllowed) return false;
+    if (typeof item.href !== "string" || item.href.length === 0) return false;
 
     if (seenHrefs.has(item.href)) return false;
     seenHrefs.add(item.href);

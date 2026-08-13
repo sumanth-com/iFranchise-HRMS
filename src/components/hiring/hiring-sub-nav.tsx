@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 
 type HiringSubNavProps = {
   basePath?: string;
+  items?: ReadonlyArray<{ title: string; href: string }>;
 };
 
 function isHiringNavActive(pathname: string, href: string, moduleRoot: string) {
@@ -23,14 +24,19 @@ function isHiringNavActive(pathname: string, href: string, moduleRoot: string) {
 
 export function HiringSubNav({
   basePath = RECRUITMENT_ROUTES.dashboard,
+  items,
 }: HiringSubNavProps) {
   const pathname = usePathname();
-  const items = remapSubNavItems(HIRING_SUB_NAV, RECRUITMENT_ROUTES.dashboard, basePath);
+  const navItems = remapSubNavItems(
+    items ?? HIRING_SUB_NAV,
+    RECRUITMENT_ROUTES.dashboard,
+    basePath,
+  );
 
   return (
     <div className="flex justify-center">
       <nav className="inline-flex flex-wrap items-center gap-1 rounded-lg border bg-card p-1 shadow-sm">
-        {items.map((item) => {
+        {navItems.map((item) => {
           const isActive = isHiringNavActive(pathname, item.href, basePath);
 
           return (

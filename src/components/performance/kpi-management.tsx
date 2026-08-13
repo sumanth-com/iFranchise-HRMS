@@ -280,6 +280,7 @@ export function KpiWorkspace({
   canAssign,
   formProps,
   tableProps,
+  listBasePath = PERFORMANCE_ROUTES.kpis,
 }: {
   canAssign: boolean;
   formProps: {
@@ -287,6 +288,7 @@ export function KpiWorkspace({
     templates: KpiTemplateItem[];
   };
   tableProps: Omit<Parameters<typeof KpiTable>[0], never>;
+  listBasePath?: string;
 }) {
   const router = useRouter();
   const skipServerSyncRef = useRef(false);
@@ -345,8 +347,8 @@ export function KpiWorkspace({
       kpiStatus: undefined,
       kpiPeriod: undefined,
     });
-    router.replace(PERFORMANCE_ROUTES.kpis);
-  }, [router, tableProps.pageSize]);
+    router.replace(listBasePath);
+  }, [listBasePath, router, tableProps.pageSize]);
 
   return (
     <section className="rounded-xl border bg-card shadow-sm">

@@ -49,6 +49,7 @@ function revalidateAssets(employeeId?: string) {
   revalidatePath(SELF_ASSETS_ROUTES.list);
   revalidatePath(SELF_ASSETS_ROUTES.team);
   revalidatePath("/employee/assets");
+  revalidatePath("/manager/assets");
   revalidatePath("/dashboard/employees");
   if (employeeId) {
     revalidatePath(`/dashboard/employees`);

@@ -6,7 +6,7 @@ import { useState } from "react";
 import { EmployeeDetailTabBar } from "@/components/employees/employee-detail-tab-bar";
 import { EmployeeDetailView } from "@/components/employees/employee-detail-view";
 import { buttonVariants } from "@/components/common/button";
-import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
+import { resolveEmployeeModuleRoutes } from "@/lib/employees/constants";
 import type {
   EmployeeAttendancePeriod,
   EmployeeAttendanceSummary,
@@ -48,6 +48,7 @@ type EmployeeDetailPageContentProps = {
     employmentTypes: LookupOption[];
     managers: LookupOption[];
   };
+  routesBasePath?: string;
 };
 
 export function EmployeeDetailPageContent({
@@ -68,7 +69,9 @@ export function EmployeeDetailPageContent({
   payrollData,
   permissionCodes,
   lookups,
+  routesBasePath,
 }: EmployeeDetailPageContentProps) {
+  const routes = resolveEmployeeModuleRoutes(routesBasePath);
   const [isEditing, setIsEditing] = useState(false);
 
   function toggleEditing() {
@@ -80,7 +83,7 @@ export function EmployeeDetailPageContent({
       <div className="shrink-0 border-b bg-background px-4 md:px-6">
         <div className="flex items-center pt-2.5 pb-1.5">
           <Link
-            href={EMPLOYEE_ROUTES.list}
+            href={routes.list}
             className={cn(
               buttonVariants({ variant: "ghost", size: "sm" }),
               "h-7 px-0 text-muted-foreground hover:text-foreground",
@@ -91,6 +94,7 @@ export function EmployeeDetailPageContent({
         </div>
         <EmployeeDetailTabBar
           employee={employee}
+          routesBasePath={routesBasePath}
           onTabChange={(tab) => {
             if (isEditing && tab !== "overview") {
               setIsEditing(false);
@@ -122,6 +126,7 @@ export function EmployeeDetailPageContent({
           onToggleEdit={toggleEditing}
           onCancelEdit={() => setIsEditing(false)}
           onSavedEdit={() => setIsEditing(false)}
+          routesBasePath={routesBasePath}
         />
       </div>
     </div>

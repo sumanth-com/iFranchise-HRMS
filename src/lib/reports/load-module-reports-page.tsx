@@ -1,7 +1,9 @@
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { ModuleReportsView } from "@/components/reports/module-reports-view";
 import { ceoOrViewPermission } from "@/lib/ceo/read-only-permissions";
-import { MODULE_REPORTS, REPORT_DEFINITIONS } from "@/lib/reports/constants";
+import { isManagerAllowedReportKey } from "@/lib/manager/reports/manager-report-definitions";
+import { isManagerOnlyProfile } from "@/lib/manager/portal-scope";
+import { REPORT_DEFINITIONS } from "@/lib/reports/constants";
 import { getReportsLookups } from "@/lib/reports/services/reports-queries";
 import { defaultDateRange } from "@/lib/reports/services/reports-utils";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
@@ -41,12 +43,17 @@ export async function loadModuleReportsPage(
   const supabase = await createClient();
   const raw = await searchParams;
   const isCeo = profile.permissionCodes.includes(PORTAL_PERMISSIONS.ceo);
-  const permissionCodes = isCeo
-    ? [...new Set([...profile.permissionCodes, "reports.view", "reports.export"])]
-    : profile.permissionCodes;
+  const isManager = isManagerOnlyProfile(profile);
+  const permissionCodes =
+    isCeo || isManager
+      ? [...new Set([...profile.permissionCodes, "reports.view", "reports.export"])]
+      : profile.permissionCodes;
 
-  const moduleKeys = MODULE_REPORTS[module];
-  const definitions = REPORT_DEFINITIONS.filter((d) => d.module === module).map(
+  const definitions = REPORT_DEFINITIONS.filter((d) => {
+    if (d.module !== module) return false;
+    if (isManager && !isManagerAllowedReportKey(d.key)) return false;
+    return true;
+  }).map(
     (d) => ({
       key: d.key,
       title: d.title,
@@ -60,7 +67,7 @@ export async function loadModuleReportsPage(
 
   const requested = firstString(raw.report) as ReportKey | undefined;
   const reportKey =
-    requested && moduleKeys.includes(requested)
+    requested && definitions.some((d) => d.key === requested)
       ? requested
       : (definitions[0]?.key as ReportKey | undefined);
 

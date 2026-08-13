@@ -60,6 +60,7 @@ type ManagerAttendanceDetailDrawerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onReviewComplete?: () => void;
+  readOnly?: boolean;
 };
 
 export function ManagerAttendanceDetailDrawer({
@@ -67,6 +68,7 @@ export function ManagerAttendanceDetailDrawer({
   open,
   onOpenChange,
   onReviewComplete,
+  readOnly = false,
 }: ManagerAttendanceDetailDrawerProps) {
   const [detail, setDetail] = useState<TeamAttendanceDetailBundle | null>(null);
   const [reviewNotes, setReviewNotes] = useState("");
@@ -268,7 +270,7 @@ export function ManagerAttendanceDetailDrawer({
                   <DetailField label="Review remarks" value={detail.correction.reviewNotes} />
                 ) : null}
 
-                {detail.correction.correctionStatus === "pending" ? (
+                {detail.correction.correctionStatus === "pending" && !readOnly ? (
                   <div className="space-y-3 border-t pt-3">
                     <div className="space-y-2">
                       <Label htmlFor="review-notes">Approval remarks (optional)</Label>

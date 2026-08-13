@@ -45,6 +45,13 @@ type Props = {
   tree: HierarchyNode[];
   employees: HierarchyEmployee[];
   permissionCodes: string[];
+  /** View the chart without add, edit, or remove actions. */
+  readOnly?: boolean;
+  /** Compact chart for use inside another module (no page title). */
+  embedded?: boolean;
+  title?: string;
+  description?: string;
+  onSelectLeaf?: (node: HierarchyNode) => void;
 };
 
 type AddMode = "head" | "member" | null;
@@ -121,6 +128,7 @@ type TreeNodeProps = {
   onEdit: (node: HierarchyNode) => void;
   onDelete: (node: HierarchyNode) => void;
   onAddMember: (node: HierarchyNode) => void;
+  onSelectLeaf?: (node: HierarchyNode) => void;
 };
 
 function TreeNode({
@@ -133,6 +141,7 @@ function TreeNode({
   onEdit,
   onDelete,
   onAddMember,
+  onSelectLeaf,
 }: TreeNodeProps) {
   const hasChildren = node.children.length > 0;
   const reports = countReports(node);
@@ -150,14 +159,16 @@ function TreeNode({
           type="button"
           onClick={() => {
             if (hasChildren) onFocus(node);
+            else onSelectLeaf?.(node);
           }}
           className={cn(
             "flex h-[3.75rem] w-56 shrink-0 items-center gap-2 rounded-xl border bg-background px-3 text-left shadow-sm transition-colors",
             showActions && "group-hover:pr-16",
             hasChildren && "cursor-pointer",
+            !hasChildren && onSelectLeaf && "cursor-pointer hover:border-primary/40",
             isRoot || hasChildren
               ? "border-primary/25 bg-primary/[0.03] hover:border-primary/40"
-              : "cursor-default border-border",
+              : cn("border-border", !onSelectLeaf && "cursor-default"),
           )}
         >
           <div
@@ -247,6 +258,7 @@ function TreeNode({
                   onEdit={onEdit}
                   onDelete={onDelete}
                   onAddMember={onAddMember}
+                  onSelectLeaf={onSelectLeaf}
                 />
               ))}
             </ul>
@@ -257,7 +269,16 @@ function TreeNode({
   );
 }
 
-export function HierarchyManagement({ tree, employees, permissionCodes }: Props) {
+export function HierarchyManagement({
+  tree,
+  employees,
+  permissionCodes,
+  readOnly = false,
+  embedded = false,
+  title = "Organization Hierarchy",
+  description = "Pick a head from the list to see that person with their team.",
+  onSelectLeaf,
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isDeletePending, startDeleteTransition] = useTransition();
@@ -316,9 +337,9 @@ export function HierarchyManagement({ tree, employees, permissionCodes }: Props)
     return () => observer.disconnect();
   }, [visibleTree]);
 
-  const canEdit = canEditOrganization(permissionCodes);
-  const canDelete = canDeleteOrganization(permissionCodes) || canEdit;
-  const canAdd = canCreateOrganization(permissionCodes) || canEdit;
+  const canEdit = !readOnly && canEditOrganization(permissionCodes);
+  const canDelete = !readOnly && (canDeleteOrganization(permissionCodes) || canEdit);
+  const canAdd = !readOnly && (canCreateOrganization(permissionCodes) || canEdit);
 
   const viewItems = useMemo(
     () =>
@@ -501,19 +522,24 @@ export function HierarchyManagement({ tree, employees, permissionCodes }: Props)
   }
 
   return (
-    <div className="flex h-[calc(100dvh-12.5rem)] min-h-0 flex-col gap-4">
+    <div
+      className={cn(
+        "flex min-h-0 flex-col gap-4",
+        embedded ? "min-h-[32rem] flex-1" : "h-[calc(100dvh-12.5rem)]",
+      )}
+    >
       <div className="shrink-0 space-y-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10">
-              <Network className="size-4 text-primary" />
+        {embedded ? null : (
+          <div>
+            <div className="flex items-center gap-2">
+              <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10">
+                <Network className="size-4 text-primary" />
+              </div>
+              <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
             </div>
-            <h1 className="text-2xl font-semibold tracking-tight">Organization Hierarchy</h1>
+            <p className="mt-2 text-sm text-muted-foreground">{description}</p>
           </div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Pick a head from the list to see that person with their team.
-          </p>
-        </div>
+        )}
         <div className="flex items-center gap-3">
           {heads.length > 0 ? (
             <FilterSelect
@@ -609,6 +635,7 @@ export function HierarchyManagement({ tree, employees, permissionCodes }: Props)
                         onEdit={openAssign}
                         onDelete={requestDelete}
                         onAddMember={openAddMember}
+                        onSelectLeaf={onSelectLeaf}
                       />
                     </ul>
                   ))}

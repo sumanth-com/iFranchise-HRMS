@@ -1,17 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 
 import { Button } from "@/components/common/button";
 import { ManagerTeamCards } from "@/components/manager/team/manager-team-cards";
-import { ManagerTeamHierarchy } from "@/components/manager/team/manager-team-hierarchy";
 import { ManagerTeamKpis } from "@/components/manager/team/manager-team-kpis";
-import { ManagerTeamQuickActions } from "@/components/manager/team/manager-team-quick-actions";
+import { HierarchyManagement } from "@/components/organization/hierarchy-management";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
-import { fetchTeamEmployeesAction, fetchTeamSummaryAction } from "@/lib/manager/actions/team-actions";
+import { fetchTeamEmployeesAction } from "@/lib/manager/actions/team-actions";
 import type { ManagerTeamPageData, TeamListParams } from "@/types/manager-team";
-import { cn } from "@/lib/utils";
+import type { HierarchyEmployee, HierarchyNode } from "@/types/organization";
 
 type ManagerTeamViewProps = ManagerTeamPageData & {
   managerEmployeeId: string;
@@ -26,6 +25,20 @@ const DEFAULT_LIST_PARAMS: TeamListParams = {
 
 type ViewMode = "directory" | "hierarchy";
 
+function flattenHierarchy(node: HierarchyNode): HierarchyEmployee[] {
+  return [
+    {
+      id: node.id,
+      employeeCode: node.employeeCode,
+      fullName: node.fullName,
+      designationTitle: node.designationTitle,
+      departmentName: node.departmentName,
+      reportingManagerId: node.reportingManagerId,
+    },
+    ...node.children.flatMap(flattenHierarchy),
+  ];
+}
+
 export function ManagerTeamView({
   summary: initialSummary,
   employees: initialEmployees,
@@ -34,9 +47,17 @@ export function ManagerTeamView({
 }: ManagerTeamViewProps) {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<ViewMode>("directory");
-  const [summary, setSummary] = useState(initialSummary);
   const [tableState, setTableState] = useState(initialEmployees);
   const [isPending, startTransition] = useTransition();
+
+  const tree = useMemo(
+    () => (hierarchyRoot ? [hierarchyRoot] : []),
+    [hierarchyRoot],
+  );
+  const hierarchyEmployees = useMemo(
+    () => (hierarchyRoot ? flattenHierarchy(hierarchyRoot) : []),
+    [hierarchyRoot],
+  );
 
   const refreshEmployees = useCallback((page: number) => {
     startTransition(async () => {
@@ -48,22 +69,13 @@ export function ManagerTeamView({
     });
   }, []);
 
-  function refreshTeamData() {
-    refreshEmployees(tableState.page);
-    startTransition(async () => {
-      const nextSummary = await fetchTeamSummaryAction();
-      setSummary(nextSummary);
-    });
-    router.refresh();
-  }
-
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4 md:p-5">
+      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">My Team</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Teammates</h1>
           <p className="text-sm text-muted-foreground">
-            Direct and indirect reports in your reporting hierarchy only.
+            Direct and indirect reports in your reporting hierarchy.
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-lg border bg-card p-1">
@@ -72,7 +84,7 @@ export function ManagerTeamView({
             variant={viewMode === "directory" ? "default" : "ghost"}
             onClick={() => setViewMode("directory")}
           >
-            Employee Directory
+            Directory
           </Button>
           <Button
             size="sm"
@@ -84,30 +96,31 @@ export function ManagerTeamView({
         </div>
       </div>
 
-      <ManagerTeamKpis summary={summary} />
-
-      <ManagerTeamQuickActions onRefresh={refreshTeamData} />
-
       {viewMode === "directory" ? (
-        <ManagerTeamCards
-          employees={tableState.data}
-          total={tableState.total}
-          page={tableState.page}
-          pageSize={tableState.pageSize}
-          isLoading={isPending}
-          onPageChange={refreshEmployees}
-        />
-      ) : (
-        <div className={cn("max-w-3xl")}>
-          <ManagerTeamHierarchy
-            root={hierarchyRoot}
-            onSelectEmployee={(node) => {
-              if (node.id !== managerEmployeeId) {
-                router.push(MANAGER_ROUTES.teamMember(node.employeeCode));
-              }
-            }}
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+          <ManagerTeamKpis summary={initialSummary} />
+          <ManagerTeamCards
+            employees={tableState.data}
+            total={tableState.total}
+            page={tableState.page}
+            pageSize={tableState.pageSize}
+            isLoading={isPending}
+            onPageChange={refreshEmployees}
           />
         </div>
+      ) : (
+        <HierarchyManagement
+          tree={tree}
+          employees={hierarchyEmployees}
+          permissionCodes={[]}
+          readOnly
+          embedded
+          onSelectLeaf={(node) => {
+            if (node.id !== managerEmployeeId) {
+              router.push(MANAGER_ROUTES.teamMember(node.employeeCode));
+            }
+          }}
+        />
       )}
     </div>
   );

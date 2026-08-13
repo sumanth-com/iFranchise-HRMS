@@ -2,7 +2,7 @@ import { format } from "date-fns";
 import Link from "next/link";
 
 import { BarRow } from "@/components/reports/report-chart-cards";
-import { AUDIT_ROUTES, formatAuditModule } from "@/lib/audit/constants";
+import { formatAuditModule, resolveAuditRoutes } from "@/lib/audit/constants";
 import { humanizeActivityDescription } from "@/lib/common/display-text";
 import { cn } from "@/lib/utils";
 import type { AuditDashboardStats } from "@/types/audit";
@@ -25,7 +25,7 @@ function AuditPanel({
   return (
     <section
       className={cn(
-        "flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card p-3 shadow-sm",
+        "flex h-full min-h-0 flex-col overflow-hidden rounded-xl border bg-card p-3 shadow-sm",
         className,
       )}
     >
@@ -42,19 +42,26 @@ function EmptyHint({ children }: { children: React.ReactNode }) {
   return <p className="text-xs text-muted-foreground">{children}</p>;
 }
 
-export function AuditDashboardPanels({ stats }: { stats: AuditDashboardStats }) {
+export function AuditDashboardPanels({
+  stats,
+  routesBasePath,
+}: {
+  stats: AuditDashboardStats;
+  routesBasePath?: string;
+}) {
+  const routes = resolveAuditRoutes(routesBasePath);
   const moduleMax = seriesMax(stats.activityByModule);
   const userMax = seriesMax(stats.activityByUser);
   const timelineMax = seriesMax(stats.activityTimeline);
 
   return (
-    <div className="grid min-h-0 flex-1 gap-3 overflow-hidden lg:grid-cols-2 xl:grid-cols-4 xl:items-stretch">
+    <div className="grid min-h-0 flex-1 auto-rows-[minmax(15rem,1fr)] grid-cols-1 gap-3 overflow-hidden md:grid-cols-2 md:grid-rows-2">
       <AuditPanel title="Activity by Module" subtitle="Last 7 days">
         {stats.activityByModule.length === 0 ? (
           <EmptyHint>No module activity yet.</EmptyHint>
         ) : (
           <div className="space-y-2">
-            {stats.activityByModule.slice(0, 6).map((item) => (
+            {stats.activityByModule.map((item) => (
               <BarRow
                 key={item.module}
                 label={formatAuditModule(item.module)}
@@ -71,7 +78,7 @@ export function AuditDashboardPanels({ stats }: { stats: AuditDashboardStats }) 
           <EmptyHint>No user activity today.</EmptyHint>
         ) : (
           <div className="space-y-2">
-            {stats.activityByUser.slice(0, 6).map((item) => (
+            {stats.activityByUser.map((item) => (
               <BarRow key={item.userId} label={item.userName} value={item.count} max={userMax} />
             ))}
           </div>
@@ -101,10 +108,10 @@ export function AuditDashboardPanels({ stats }: { stats: AuditDashboardStats }) 
           <EmptyHint>No recent audit entries.</EmptyHint>
         ) : (
           <ul className="divide-y divide-border/70">
-            {stats.recentChanges.slice(0, 8).map((item) => (
+            {stats.recentChanges.map((item) => (
               <li key={item.id}>
                 <Link
-                  href={AUDIT_ROUTES.detail(item.id)}
+                  href={routes.detail(item.id)}
                   className="block rounded-md py-2 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring/40"
                 >
                   <p className="line-clamp-1 text-sm font-medium text-foreground">

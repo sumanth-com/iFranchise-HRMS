@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
+import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import {
   getGoalById,
@@ -30,7 +31,13 @@ import type {
 } from "@/types/performance";
 
 async function requireEmployeeProfile() {
-  return requireServerAnyPermission([PORTAL_PERMISSIONS.employee, "performance.view"]);
+  return requireServerAnyPermission([
+    PORTAL_PERMISSIONS.employee,
+    PORTAL_PERMISSIONS.manager,
+    PORTAL_PERMISSIONS.hr,
+    PORTAL_PERMISSIONS.ceo,
+    "performance.view",
+  ]);
 }
 
 export async function fetchMyGoalsAction(): Promise<GoalListItem[]> {
@@ -73,6 +80,7 @@ export async function toggleMyGoalMilestoneAction(input: unknown) {
       parsed.isCompleted,
     );
     revalidatePath(EMPLOYEE_ROUTES.goals);
+    revalidatePath(MANAGER_ROUTES.goals);
     return { success: true as const };
   } catch (error) {
     return {

@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { formatEmployeeRouteRefLabel } from "@/lib/employees/routing";
 import { HR_PORTAL_HOME } from "@/lib/auth/portal-paths";
+import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import {
   parseTeamPayrollSection,
   payrollHubUrl,
@@ -48,6 +49,101 @@ function buildBreadcrumbItems(
 
   if (segments.length === 0) {
     return [{ label: "Home", href: HR_PORTAL_HOME }];
+  }
+
+  if (segments[0] === "dashboard" && segments[1] === "system") {
+    const items: BreadcrumbItemConfig[] = [
+      { label: "Dashboard", href: "/dashboard/system" },
+    ];
+
+    if (!segments[2]) {
+      return items;
+    }
+
+    const nestedLabels: Record<string, string> = {
+      overview: "System Dashboard",
+      "hr-overview": "HR Overview",
+      employees: "Employees",
+      provisioning: "User Provisioning",
+      organization: "Organization",
+      audit: "Audit Trail",
+      security: "Security",
+      integrations: "System / Integrations",
+      profile: "My Profile",
+      attendance: "Attendance",
+      payroll: "Payroll",
+      documents: "Documents",
+      leave: "Leave",
+      goals: "My Goals",
+      assets: "Assets",
+      notifications: "Notifications",
+      settings: "Settings",
+      database: "Database Health",
+      storage: "Storage Manager",
+      email: "Email Services",
+      "api-keys": "API Keys",
+      backup: "Backup & Restore",
+      roles: "Roles & Access",
+    };
+
+    items.push({
+      label: nestedLabels[segments[2]] ?? formatSegment(segments[2]),
+      href: `/dashboard/system/${segments[2]}`,
+    });
+
+    if (segments[2] === "employees" && segments[3]) {
+      const employeeHref = `/dashboard/system/employees/${segments[3]}`;
+
+      if (segments[4] === "edit") {
+        items.push({
+          label: formatEmployeeRouteRefLabel(segments[3]),
+          href: employeeHref,
+        });
+        items.push({ label: "Edit", href: pathname });
+        return items;
+      }
+
+      items.push({
+        label: formatEmployeeRouteRefLabel(segments[3]),
+        href: pathname,
+      });
+      return items;
+    }
+
+    if (segments[3]) {
+      // Audit Trail opens logs directly — skip the redundant "logs" crumb.
+      if (segments[2] === "audit" && segments[3] === "logs") {
+        if (segments[4]) {
+          items.push({ label: "Detail", href: pathname });
+        }
+        return items;
+      }
+
+      const deepLabels: Record<string, string> = {
+        kpis: "KPIs",
+        feedback: "Feedback",
+        "one-on-ones": "1:1 Meetings",
+        promotions: "Promotions",
+        center: "Notification Center",
+        history: "History",
+        permissions: "Permissions",
+        assignments: "Assignments",
+        compare: "Compare",
+        profile: "Company",
+        branches: "Branches",
+        departments: "Departments",
+        designations: "Designations",
+        "employment-types": "Employment Types",
+        hierarchy: "Hierarchy",
+        timeline: "Timeline",
+      };
+      items.push({
+        label: deepLabels[segments[3]] ?? formatSegment(segments[3]),
+        href: pathname,
+      });
+    }
+
+    return items;
   }
 
   if (segments[0] === "dashboard" && segments[1] === "hr-overview") {
@@ -411,11 +507,15 @@ function buildBreadcrumbItems(
     ];
 
     const sectionLabels: Record<string, string> = {
-      profile: "Attendance",
-      team: "My Team",
+      overview: "Manager Overview",
+      profile: "My Profile",
+      team: "Teammates",
       attendance: "Attendance",
       leave: "Leave",
       payroll: "Payroll",
+      documents: "Documents",
+      goals: "My Goals",
+      assets: "Assets",
       resignation: "Resignations",
       performance: "Performance",
       recruitment: "Recruitment",
@@ -423,6 +523,16 @@ function buildBreadcrumbItems(
       notifications: "Notifications",
       settings: "Settings",
     };
+
+    if (segments[1] === "attendance" && segments[2] === "team") {
+      items.push({ label: "Team Attendance", href: MANAGER_ROUTES.attendanceTeam });
+      return items;
+    }
+
+    if (segments[1] === "leave" && segments[2] === "team") {
+      items.push({ label: "Team Leave", href: MANAGER_ROUTES.leaveTeam });
+      return items;
+    }
 
     if (segments[1]) {
       const sectionLabel = sectionLabels[segments[1]] ?? formatSegment(segments[1]);
@@ -434,6 +544,49 @@ function buildBreadcrumbItems(
 
     if (segments[1] === "leave" && segments[2] === "new") {
       items.push({ label: "Apply leave", href: pathname });
+      return items;
+    }
+
+    if (segments[1] === "goals" && segments[2]) {
+      const goalLabels: Record<string, string> = {
+        kpis: "KPIs",
+        feedback: "Feedback",
+        "one-on-ones": "1:1 Meetings",
+        promotions: "Promotions",
+      };
+      items.push({
+        label: goalLabels[segments[2]] ?? formatSegment(segments[2]),
+        href: pathname,
+      });
+      return items;
+    }
+
+    if (
+      segments[2] &&
+      (segments[1] === "performance" ||
+        segments[1] === "recruitment" ||
+        segments[1] === "reports")
+    ) {
+      const nestedLabels: Record<string, string> = {
+        goals: "Goals & OKRs",
+        kpis: "KPIs",
+        feedback: "Feedback",
+        "one-on-ones": "1:1 Meetings",
+        promotions: "Promotions",
+        jobs: "Job Openings",
+        candidates: "Candidates",
+        offers: "Offers",
+        interviews: "Interviews",
+        attendance: "Attendance",
+        leave: "Leave",
+        performance: "Performance",
+        recruitment: "Recruitment",
+        hr: "Team",
+      };
+      items.push({
+        label: nestedLabels[segments[2]] ?? formatSegment(segments[2]),
+        href: pathname,
+      });
       return items;
     }
 

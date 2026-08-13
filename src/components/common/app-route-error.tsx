@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 import { ErrorState } from "@/components/common/error-state";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import {
-  isChunkLoadError,
+  isRecoverableRouteError,
   recoverFromChunkLoadError,
 } from "@/lib/next/chunk-load-recovery";
 
@@ -15,17 +16,29 @@ type AppRouteErrorProps = {
 };
 
 export function AppRouteError({ error, reset }: AppRouteErrorProps) {
-  const isChunkError = isChunkLoadError(error);
+  const pathname = usePathname();
+  const previousPathname = useRef(pathname);
+  const isRecoverable = isRecoverableRouteError(error);
+  const [reloadExhausted, setReloadExhausted] = useState(false);
 
   useEffect(() => {
-    if (isChunkError) {
-      recoverFromChunkLoadError();
+    if (previousPathname.current !== pathname) {
+      previousPathname.current = pathname;
+      setReloadExhausted(false);
+      reset();
       return;
     }
-    console.error("[route-error]", error);
-  }, [error, isChunkError]);
 
-  if (isChunkError) {
+    if (isRecoverable) {
+      const recovered = recoverFromChunkLoadError();
+      if (!recovered) setReloadExhausted(true);
+      return;
+    }
+
+    console.error("[route-error]", error);
+  }, [error, isRecoverable, pathname, reset]);
+
+  if (isRecoverable && !reloadExhausted) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 p-6 text-center">
         <LoadingSpinner />

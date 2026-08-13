@@ -45,6 +45,8 @@ async function getAuthenticatedContext() {
 
 function revalidateAttendancePaths() {
   revalidatePath(MANAGER_ROUTES.attendance);
+  revalidatePath(MANAGER_ROUTES.attendanceTeam);
+  revalidatePath(MANAGER_ROUTES.overview);
   revalidatePath(MANAGER_ROUTES.team);
   revalidatePath(MANAGER_ROUTES.home);
 }

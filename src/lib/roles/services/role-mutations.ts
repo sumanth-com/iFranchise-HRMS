@@ -1,6 +1,7 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { syncUserAuthRoleMetadata } from "@/lib/auth/sync-user-auth-role";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
+import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
 import type { UserProfile } from "@/types/auth";
 import type { z } from "zod";
 import {
@@ -11,14 +12,40 @@ import {
 } from "@/lib/validations/roles";
 import {
   getRoleAncestorIds,
-  getRolePermissionDetail,
+  getRolePermissionIds,
 } from "@/lib/roles/services/role-queries";
+import { canDeleteRoleRecord } from "@/lib/roles/protected-roles";
+import { SYSTEM_ADMIN_PERMISSION } from "@/lib/system-admin/constants";
 import { isSuperAdmin } from "@/lib/system-admin/is-super-admin";
 
 type RoleInput = z.infer<typeof roleFormSchema>;
 
 function auditFields(profile: UserProfile) {
   return { updated_by: profile.userId, updated_at: new Date().toISOString() };
+}
+
+async function writeRolesAudit(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: {
+    action: string;
+    description: string;
+    recordId: string;
+    metadata?: Record<string, unknown>;
+    priority?: "low" | "medium" | "high" | "critical";
+  },
+) {
+  const ctx = await getRequestAuditContext();
+  await writeApplicationAudit(supabase, {
+    organizationId: profile.employee.organizationId,
+    module: "roles",
+    action: input.action,
+    description: input.description,
+    recordId: input.recordId,
+    priority: input.priority ?? "high",
+    metadata: input.metadata ?? {},
+    ...ctx,
+  });
 }
 
 async function assertUniqueRoleCode(
@@ -115,24 +142,50 @@ export async function saveRole(
     const { data: existing } = await supabase
       .schema("hrms")
       .from("roles")
-      .select("is_system_role, code")
+      .select(
+        "id, name, code, description, is_system_role, parent_role_id, is_default, status",
+      )
       .eq("id", id)
+      .eq("organization_id", orgId)
+      .is("deleted_at", null)
       .maybeSingle();
 
-    if (existing?.is_system_role) {
+    if (!existing) throw new Error("Role not found");
+
+    if (existing.is_system_role) {
+      if (parsed.status !== existing.status) {
+        throw new Error("System roles cannot be enabled or disabled");
+      }
+      if ((parsed.parentRoleId ?? null) !== existing.parent_role_id) {
+        throw new Error("System role inheritance cannot be changed");
+      }
+      if (parsed.isDefault !== Boolean(existing.is_default)) {
+        throw new Error("System role default flag cannot be changed");
+      }
+
       const { error } = await supabase
         .schema("hrms")
         .from("roles")
         .update({
           name: payload.name,
           description: payload.description,
-          parent_role_id: payload.parent_role_id,
-          is_default: payload.is_default,
-          status: payload.status,
           ...auditFields(profile),
         })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("organization_id", orgId);
       if (error) throw new Error(error.message);
+
+      await writeRolesAudit(supabase, profile, {
+        action: "role_edited",
+        description: `System role “${existing.name}” details updated`,
+        recordId: id,
+        metadata: {
+          roleId: id,
+          roleCode: existing.code,
+          old: { name: existing.name, description: existing.description },
+          new: { name: payload.name, description: payload.description },
+        },
+      });
       return id;
     }
 
@@ -151,8 +204,34 @@ export async function saveRole(
       .schema("hrms")
       .from("roles")
       .update(updatePayload)
-      .eq("id", id);
+      .eq("id", id)
+      .eq("organization_id", orgId);
     if (error) throw new Error(error.message);
+
+    await writeRolesAudit(supabase, profile, {
+      action: existing.status !== parsed.status ? (parsed.status === "active" ? "role_enabled" : "role_disabled") : "role_edited",
+      description:
+        existing.status !== parsed.status
+          ? `Role “${payload.name}” ${parsed.status === "active" ? "enabled" : "disabled"}`
+          : `Role “${payload.name}” updated`,
+      recordId: id,
+      metadata: {
+        roleId: id,
+        roleCode: existing.code,
+        old: {
+          name: existing.name,
+          description: existing.description,
+          status: existing.status,
+          parentRoleId: existing.parent_role_id,
+        },
+        new: {
+          name: payload.name,
+          description: payload.description,
+          status: payload.status,
+          parentRoleId: payload.parent_role_id,
+        },
+      },
+    });
     return id;
   }
 
@@ -169,6 +248,20 @@ export async function saveRole(
     .single();
 
   if (error) throw new Error(error.message);
+
+  await writeRolesAudit(supabase, profile, {
+    action: "role_created",
+    description: `Custom role “${parsed.name}” created`,
+    recordId: data.id,
+    metadata: {
+      roleId: data.id,
+      roleCode: code,
+      name: parsed.name,
+      status: parsed.status,
+      parentRoleId: parsed.parentRoleId ?? null,
+    },
+  });
+
   return data.id;
 }
 
@@ -190,7 +283,7 @@ export async function deleteRole(
 
   if (!role) throw new Error("Role not found");
 
-  if (role.code === "super_admin") {
+  if (!canDeleteRoleRecord({ isSystemRole: role.is_system_role, code: role.code })) {
     throw new Error("Cannot delete the Super Admin role");
   }
 
@@ -275,6 +368,17 @@ export async function deleteRole(
     .is("deleted_at", null);
 
   if (error) throw new Error(error.message);
+
+  await writeRolesAudit(supabase, profile, {
+    action: "role_deleted",
+    description: `Role “${role.name}” deleted`,
+    recordId: roleId,
+    metadata: {
+      roleId,
+      roleCode: role.code,
+      userCount: assignments?.length ?? 0,
+    },
+  });
 }
 
 export async function saveRolePermissions(
@@ -296,6 +400,46 @@ export async function saveRolePermissions(
 
   if (!role) throw new Error("Role not found");
 
+  const grantedIds = parsed.permissionIds.filter((id, index, all) => all.indexOf(id) === index);
+
+  if (grantedIds.length > 0) {
+    const { data: catalog, error: catalogError } = await supabase
+      .schema("hrms")
+      .from("permissions")
+      .select("id")
+      .in("id", grantedIds)
+      .is("deleted_at", null)
+      .eq("status", "active");
+    if (catalogError) throw new Error(catalogError.message);
+    if ((catalog ?? []).length !== grantedIds.length) {
+      throw new Error("One or more permissions are not valid");
+    }
+  }
+
+  const ancestorIds = await getRoleAncestorIds(supabase, parsed.roleId, orgId);
+  const inheritedIds = ancestorIds.length
+    ? await getRolePermissionIds(supabase, ancestorIds)
+    : [];
+
+  if (role.code === "super_admin") {
+    const effectiveIds = new Set([...grantedIds, ...inheritedIds]);
+    if (effectiveIds.size === 0) {
+      throw new Error("Super Admin must retain at least one permission");
+    }
+
+    const { data: adminPerm } = await supabase
+      .schema("hrms")
+      .from("permissions")
+      .select("id")
+      .eq("code", SYSTEM_ADMIN_PERMISSION)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (adminPerm && !effectiveIds.has(adminPerm.id)) {
+      throw new Error("Super Admin must retain system administration access");
+    }
+  }
+
   const { data: existing } = await supabase
     .schema("hrms")
     .from("role_permissions")
@@ -304,9 +448,11 @@ export async function saveRolePermissions(
     .is("deleted_at", null);
 
   const existingMap = new Map((existing ?? []).map((r) => [r.permission_id, r.id]));
-  const targetSet = new Set(parsed.permissionIds);
+  const targetSet = new Set(grantedIds);
+  const granted: string[] = [];
+  const revoked: string[] = [];
 
-  for (const permId of parsed.permissionIds) {
+  for (const permId of grantedIds) {
     if (!existingMap.has(permId)) {
       const { error } = await supabase.schema("hrms").from("role_permissions").insert({
         role_id: parsed.roleId,
@@ -316,6 +462,7 @@ export async function saveRolePermissions(
         updated_by: profile.userId,
       });
       if (error) throw new Error(error.message);
+      granted.push(permId);
     } else {
       const { error } = await supabase
         .schema("hrms")
@@ -334,15 +481,22 @@ export async function saveRolePermissions(
         .update({ deleted_at: new Date().toISOString(), status: "inactive", ...auditFields(profile) })
         .eq("id", rowId);
       if (error) throw new Error(error.message);
+      revoked.push(permId);
     }
   }
 
-  if (role.code === "super_admin") {
-    const detail = await getRolePermissionDetail(supabase, orgId, parsed.roleId);
-    const hasAnyAdminPerm = detail.effectivePermissionIds.length > 0;
-    if (!hasAnyAdminPerm) {
-      throw new Error("Super Admin must retain at least one permission");
-    }
+  if (granted.length > 0 || revoked.length > 0) {
+    await writeRolesAudit(supabase, profile, {
+      action: "permissions_updated",
+      description: `Permissions updated for role ${role.code}`,
+      recordId: parsed.roleId,
+      metadata: {
+        roleId: parsed.roleId,
+        roleCode: role.code,
+        granted,
+        revoked,
+      },
+    });
   }
 }
 
@@ -368,13 +522,16 @@ export async function assignUserRole(
   const { data: role } = await supabase
     .schema("hrms")
     .from("roles")
-    .select("id, code")
+    .select("id, code, name, status, portal_key, portal_route")
     .eq("id", parsed.roleId)
     .eq("organization_id", orgId)
     .is("deleted_at", null)
     .maybeSingle();
 
   if (!role) throw new Error("Role not found");
+  if (role.status !== "active") {
+    throw new Error("Cannot assign a disabled role");
+  }
 
   if (role.code === "super_admin") {
     if (!isSuperAdmin(profile)) {
@@ -401,6 +558,19 @@ export async function assignUserRole(
       .eq("id", existing.id);
     if (error) throw new Error(error.message);
     await syncUserAuthRoleMetadata(employee.user_id, orgId, role.code);
+    await writeRolesAudit(supabase, profile, {
+      action: "user_role_assigned",
+      description: `Assigned “${role.name}” to user ${employee.user_id}`,
+      recordId: existing.id,
+      metadata: {
+        roleId: role.id,
+        roleCode: role.code,
+        userId: employee.user_id,
+        employeeId: employee.id,
+        portalKey: role.portal_key,
+        portalRoute: role.portal_route,
+      },
+    });
     return existing.id;
   }
 
@@ -421,6 +591,19 @@ export async function assignUserRole(
 
   if (error) throw new Error(error.message);
   await syncUserAuthRoleMetadata(employee.user_id, orgId, role.code);
+  await writeRolesAudit(supabase, profile, {
+    action: "user_role_assigned",
+    description: `Assigned “${role.name}” to user ${employee.user_id}`,
+    recordId: data.id,
+    metadata: {
+      roleId: role.id,
+      roleCode: role.code,
+      userId: employee.user_id,
+      employeeId: employee.id,
+      portalKey: role.portal_key,
+      portalRoute: role.portal_route,
+    },
+  });
   return data.id;
 }
 
@@ -453,9 +636,16 @@ export async function changeUserRole(
   const { data: newRole } = await supabase
     .schema("hrms")
     .from("roles")
-    .select("code, name, portal_route")
+    .select("id, code, name, portal_route, portal_key, status, is_system_role")
     .eq("id", newRoleId)
+    .eq("organization_id", orgId)
+    .is("deleted_at", null)
     .maybeSingle();
+
+  if (!newRole) throw new Error("Role not found");
+  if (newRole.status !== "active") {
+    throw new Error("Cannot assign a disabled role");
+  }
 
   if (newRole?.code === "super_admin" && oldCode !== "super_admin") {
     if (!isSuperAdmin(profile)) {
@@ -487,35 +677,31 @@ export async function changeUserRole(
       .eq("id", assignment.employee_id);
   }
 
-  await writeApplicationAudit(supabase, {
-    organizationId: orgId,
-    module: "security",
-    action: "role_changed",
-    description: `Role changed from ${oldRoleRow?.name ?? oldCode ?? "unknown"} to ${newRole?.name ?? newRole?.code ?? "unknown"}`,
+  await writeRolesAudit(supabase, profile, {
+    action: "user_role_changed",
+    description: `Role changed from ${oldRoleRow?.name ?? oldCode ?? "unknown"} to ${newRole.name}`,
     recordId: userRoleId,
-    priority: "high",
     metadata: {
+      roleId: newRole.id,
       userId: assignment.user_id,
       employeeId: assignment.employee_id,
       oldRoleCode: oldCode,
-      newRoleCode: newRole?.code,
+      newRoleCode: newRole.code,
       oldPortalRoute: oldRoleRow?.portal_route,
-      newPortalRoute: newRole?.portal_route,
+      newPortalRoute: newRole.portal_route,
     },
   });
 
-  if (oldRoleRow?.portal_route !== newRole?.portal_route) {
-    await writeApplicationAudit(supabase, {
-      organizationId: orgId,
-      module: "security",
+  if (oldRoleRow?.portal_route !== newRole.portal_route) {
+    await writeRolesAudit(supabase, profile, {
       action: "portal_changed",
-      description: `Portal route changed to ${newRole?.portal_route ?? "default"} for user ${assignment.user_id}`,
+      description: `Portal route changed to ${newRole.portal_route ?? "default"} for user ${assignment.user_id}`,
       recordId: userRoleId,
-      priority: "high",
       metadata: {
+        roleId: newRole.id,
         userId: assignment.user_id,
         employeeId: assignment.employee_id,
-        portalRoute: newRole?.portal_route,
+        portalRoute: newRole.portal_route,
       },
     });
   }
@@ -535,7 +721,7 @@ export async function removeUserRole(
   const { data: assignment } = await supabase
     .schema("hrms")
     .from("user_roles")
-    .select("id, user_id, roles:role_id (code)")
+    .select("id, user_id, employee_id, role_id, roles:role_id (id, code, name, is_system_role)")
     .eq("id", userRoleId)
     .eq("organization_id", orgId)
     .is("deleted_at", null)
@@ -543,11 +729,33 @@ export async function removeUserRole(
 
   if (!assignment) throw new Error("Assignment not found");
 
-  const role = assignment.roles as { code: string } | { code: string }[] | null;
-  const roleCode = Array.isArray(role) ? role[0]?.code : role?.code;
+  const role = assignment.roles as
+    | { id: string; code: string; name: string; is_system_role: boolean }
+    | { id: string; code: string; name: string; is_system_role: boolean }[]
+    | null;
+  const roleRow = Array.isArray(role) ? role[0] : role;
+  const roleCode = roleRow?.code;
+
+  if (roleRow?.is_system_role || roleCode === "super_admin") {
+    throw new Error("System role assignments cannot be removed. Change the role instead.");
+  }
 
   if (roleCode === "super_admin") {
     await assertSuperAdminRemains(supabase, orgId, assignment.user_id);
+  }
+
+  const { count: remainingCount } = await supabase
+    .schema("hrms")
+    .from("user_roles")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", orgId)
+    .eq("user_id", assignment.user_id)
+    .eq("status", "active")
+    .is("deleted_at", null)
+    .neq("id", userRoleId);
+
+  if ((remainingCount ?? 0) < 1) {
+    throw new Error("Assign another role before removing this one so the user is not locked out");
   }
 
   const { error } = await supabase
@@ -557,6 +765,18 @@ export async function removeUserRole(
     .eq("id", userRoleId);
 
   if (error) throw new Error(error.message);
+
+  await writeRolesAudit(supabase, profile, {
+    action: "user_role_removed",
+    description: `Removed “${roleRow?.name ?? roleCode ?? "role"}” from user ${assignment.user_id}`,
+    recordId: userRoleId,
+    metadata: {
+      roleId: roleRow?.id ?? assignment.role_id,
+      roleCode,
+      userId: assignment.user_id,
+      employeeId: assignment.employee_id,
+    },
+  });
 }
 
 async function assertSuperAdminRemains(
@@ -604,7 +824,7 @@ export async function cloneRole(
   const { data: source } = await supabase
     .schema("hrms")
     .from("roles")
-    .select("id, name, code, description, parent_role_id, is_default, status")
+    .select("id, name, code, description, parent_role_id, is_default, status, portal_key, portal_route")
     .eq("id", roleId)
     .eq("organization_id", orgId)
     .is("deleted_at", null)
@@ -627,7 +847,9 @@ export async function cloneRole(
       parent_role_id: source.parent_role_id,
       is_default: false,
       is_system_role: false,
-      status: source.status,
+      status: "active",
+      portal_key: source.portal_key,
+      portal_route: source.portal_route,
       created_by: profile.userId,
       updated_by: profile.userId,
     })
@@ -656,6 +878,18 @@ export async function cloneRole(
     );
     if (permError) throw new Error(permError.message);
   }
+
+  await writeRolesAudit(supabase, profile, {
+    action: "role_created",
+    description: `Role “${source.name}” duplicated as “${newName}”`,
+    recordId: created.id,
+    metadata: {
+      roleId: created.id,
+      roleCode: newCode,
+      sourceRoleId: source.id,
+      sourceRoleCode: source.code,
+    },
+  });
 
   return created.id;
 }

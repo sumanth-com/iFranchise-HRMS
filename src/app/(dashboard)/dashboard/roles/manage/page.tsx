@@ -21,6 +21,8 @@ export default async function RolesManagePage({ searchParams }: PageProps) {
     pageSize: raw.pageSize,
     search: typeof raw.search === "string" ? raw.search : undefined,
     status: typeof raw.status === "string" ? raw.status : undefined,
+    roleType:
+      raw.roleType === "system" || raw.roleType === "custom" ? raw.roleType : undefined,
   });
 
   const [result, roleOptions] = await Promise.all([
@@ -35,6 +37,7 @@ export default async function RolesManagePage({ searchParams }: PageProps) {
       permissionCodes={profile.permissionCodes}
       search={params.search ?? ""}
       status={params.status as RecordStatus | undefined}
+      roleType={params.roleType}
     />
   );
 }

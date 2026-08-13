@@ -97,19 +97,19 @@ const PORTAL_HELP: Record<PortalVariant, PortalHelpConfig> = {
     title: "quick help",
     description: "Quick answers for team management, attendance, and your account.",
     quickActions: [
-      { label: "My team", href: MANAGER_ROUTES.team, icon: Users },
+      { label: "Teammates", href: MANAGER_ROUTES.team, icon: Users },
       { label: "Team attendance", href: MANAGER_ROUTES.attendanceTeam, icon: CalendarCheck },
-      { label: "Leave approvals", href: MANAGER_ROUTES.leave, icon: ClipboardList },
+      { label: "Team leave", href: MANAGER_ROUTES.leaveTeam, icon: ClipboardList },
       { label: "Reset password", href: MANAGER_ROUTES.settings, icon: KeyRound },
     ],
     faqs: [
       {
-        q: "How do I approve leave?",
-        a: "Open Leave from the sidebar, review pending requests, and approve or reject.",
+        q: "How do I see my team's leave?",
+        a: "Open Team Leave from Administration to review leave requests for people who report to you. The page is read-only.",
       },
       {
-        q: "How do I view my team?",
-        a: "Open Team to see members, profiles, and reporting structure.",
+        q: "How do I view my teammates?",
+        a: "Open Teammates from Administration to see members, profiles, and reporting structure.",
       },
       {
         q: "How do I reset my password?",

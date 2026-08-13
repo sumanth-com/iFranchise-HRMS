@@ -9,13 +9,19 @@ import { cn } from "@/lib/utils";
 
 type ReportsSubNavProps = {
   basePath?: string;
+  items?: ReadonlyArray<{ title: string; href: string }>;
 };
 
 export function ReportsSubNav({
   basePath = REPORTS_ROUTES.dashboard,
+  items,
 }: ReportsSubNavProps) {
   const pathname = usePathname();
-  const items = remapSubNavItems(REPORTS_SUB_NAV, REPORTS_ROUTES.dashboard, basePath);
+  const navItems = remapSubNavItems(
+    items ?? REPORTS_SUB_NAV,
+    REPORTS_ROUTES.dashboard,
+    basePath,
+  );
 
   return (
     <div className="flex justify-center">
@@ -23,7 +29,7 @@ export function ReportsSubNav({
         className="inline-flex flex-wrap items-center justify-center gap-1 rounded-lg border bg-card p-1 shadow-sm"
         aria-label="Reports sections"
       >
-        {items.map((item) => {
+        {navItems.map((item) => {
           const isActive =
             pathname === item.href || pathname.startsWith(`${item.href}/`);
 

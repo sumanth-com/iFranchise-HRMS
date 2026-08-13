@@ -100,7 +100,7 @@ export type AuditHistoryParams = {
   dateTo?: string;
 };
 
-export type AuditExportFormat = "csv" | "excel" | "pdf";
+export type AuditExportFormat = "excel" | "pdf";
 
 export type AuditActionResult<T = void> =
   | { success: true; data: T }

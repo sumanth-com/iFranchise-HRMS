@@ -52,6 +52,7 @@ export async function inviteTeamMemberAction(input: unknown): Promise<
     });
 
     revalidatePath(MANAGER_ROUTES.home);
+    revalidatePath(MANAGER_ROUTES.overview);
     revalidatePath(MANAGER_ROUTES.team);
 
     return {

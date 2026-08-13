@@ -63,6 +63,7 @@ export function Sidebar() {
 
       <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain p-2">
         {navigation.map((item, index) => {
+          if (typeof item.href !== "string" || item.href.length === 0) return null;
           const isActive = activeHref === item.href;
           const Icon = item.icon;
           const prevSection = index > 0 ? navigation[index - 1]?.section : undefined;

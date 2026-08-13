@@ -10,6 +10,10 @@ import { getEmployeeSalaryStructure } from "@/lib/employees/services/employee-de
 import { fromHrms } from "@/lib/performance/services/performance-utils";
 import { ceoOrViewPermission } from "@/lib/ceo/read-only-permissions";
 import {
+  managerOrPermissions,
+  resolveTeamEmployeeIds,
+} from "@/lib/manager/portal-scope";
+import {
   requireServerAnyPermission,
   requireServerPermission,
 } from "@/lib/permissions/server";
@@ -120,20 +124,27 @@ function revalidatePromotionPayrollPaths() {
 }
 
 export async function fetchPerformanceSummaryAction(): Promise<PerformanceSummary> {
-  const profile = await requireServerPermission("performance.view");
+  const profile = await requireServerAnyPermission(
+    managerOrPermissions("performance.view"),
+  );
   const supabase = await getAuthenticatedSupabase();
   return getPerformanceSummary(supabase, profile);
 }
 
 export async function fetchPerformanceLookupsAction(): Promise<PerformanceLookups> {
-  const profile = await requireServerPermission("performance.view");
+  const profile = await requireServerAnyPermission(
+    managerOrPermissions("performance.view"),
+  );
   const supabase = await getAuthenticatedSupabase();
-  return getPerformanceLookups(supabase, profile.employee.organizationId);
+  const teamIds = await resolveTeamEmployeeIds(supabase, profile);
+  return getPerformanceLookups(supabase, profile.employee.organizationId, teamIds);
 }
 
 export async function createGoalAction(input: unknown): Promise<PerformanceActionResult<string>> {
   try {
-    const profile = await requireServerPermission("performance.create");
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("performance.create"),
+    );
     const supabase = await getAuthenticatedSupabase();
     goalFormSchema.parse(input);
     const id = await createGoal(supabase, profile, input);
@@ -151,7 +162,9 @@ export async function addGoalCommentAction(
   input: unknown,
 ): Promise<PerformanceActionResult<void>> {
   try {
-    const profile = await requireServerAnyPermission(["performance.create", "performance.edit"]);
+    const profile = await requireServerAnyPermission([
+      ...managerOrPermissions("performance.create", "performance.edit"),
+    ]);
     const supabase = await getAuthenticatedSupabase();
     const parsed = goalCommentSchema.parse(input);
     await addGoalComment(supabase, profile, parsed.goalId, parsed.comment);
@@ -169,7 +182,9 @@ export async function updateGoalProgressAction(
   input: unknown,
 ): Promise<PerformanceActionResult<void>> {
   try {
-    const profile = await requireServerPermission("performance.edit");
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("performance.edit"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = goalProgressSchema.parse(input);
     await updateGoalProgress(
@@ -199,7 +214,9 @@ export async function fetchGoalsListAction(
   params: unknown,
 ): Promise<PerformanceActionResult<GoalListResult>> {
   try {
-    const profile = await requireServerPermission("performance.view");
+    const profile = await requireServerAnyPermission(
+    managerOrPermissions("performance.view"),
+  );
     const supabase = await getAuthenticatedSupabase();
     const data = await listGoals(supabase, profile, params);
     return { success: true, data };
@@ -215,7 +232,9 @@ export async function updateGoalAction(
   input: unknown,
 ): Promise<PerformanceActionResult<void>> {
   try {
-    const profile = await requireServerAnyPermission(["performance.edit", "performance.create"]);
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("performance.edit", "performance.create"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = goalUpdateSchema.parse(input);
     const { goalId, ...goalInput } = parsed;
@@ -234,7 +253,9 @@ export async function deleteGoalAction(
   input: unknown,
 ): Promise<PerformanceActionResult<void>> {
   try {
-    const profile = await requireServerAnyPermission(["performance.edit", "performance.create"]);
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("performance.edit", "performance.create"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = goalDeleteSchema.parse(input);
     await deleteGoal(supabase, profile, parsed.goalId);
@@ -252,7 +273,9 @@ export async function toggleGoalMilestoneAction(
   input: unknown,
 ): Promise<PerformanceActionResult<void>> {
   try {
-    const profile = await requireServerAnyPermission(["performance.edit", "performance.create"]);
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("performance.edit", "performance.create"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = goalMilestoneToggleSchema.parse(input);
     await toggleGoalMilestone(
@@ -299,7 +322,9 @@ export async function fetchKpisListAction(
   params: unknown,
 ): Promise<PerformanceActionResult<KpiListResult>> {
   try {
-    const profile = await requireServerPermission("performance.view");
+    const profile = await requireServerAnyPermission(
+    managerOrPermissions("performance.view"),
+  );
     const supabase = await getAuthenticatedSupabase();
     const data = await listKpis(supabase, profile, params);
     return { success: true, data };
@@ -313,7 +338,9 @@ export async function fetchKpisListAction(
 
 export async function assignKpiAction(input: unknown): Promise<PerformanceActionResult<string>> {
   try {
-    const profile = await requireServerAnyPermission(["kpi.manage", "performance.create"]);
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("kpi.manage", "performance.create"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = kpiAssignPayloadSchema.parse(input);
     const id = await assignKpi(supabase, profile, parsed);
@@ -332,11 +359,9 @@ export async function deleteKpiAction(
   input: unknown,
 ): Promise<PerformanceActionResult<void>> {
   try {
-    const profile = await requireServerAnyPermission([
-      "kpi.manage",
-      "performance.edit",
-      "performance.create",
-    ]);
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("kpi.manage", "performance.edit", "performance.create"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = kpiDeleteSchema.parse(input);
     await deleteKpi(supabase, profile, parsed.kpiId);
@@ -354,12 +379,14 @@ export async function updateKpiProgressAction(
   input: unknown,
 ): Promise<PerformanceActionResult<void>> {
   try {
-    const profile = await requireServerAnyPermission([
-      "kpi.progress",
-      "kpi.manage",
-      "performance.edit",
-      "performance.review",
-    ]);
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions(
+        "kpi.progress",
+        "kpi.manage",
+        "performance.edit",
+        "performance.review",
+      ),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = kpiProgressSchema.parse(input);
     await updateKpiProgress(supabase, profile, parsed);
@@ -378,7 +405,9 @@ export async function createReviewAction(
   input: unknown,
 ): Promise<PerformanceActionResult<string>> {
   try {
-    const profile = await requireServerPermission("performance.review");
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("performance.review"),
+    );
     const supabase = await getAuthenticatedSupabase();
     reviewFormSchema.parse(input);
     const id = await createReview(supabase, profile, input);
@@ -396,7 +425,9 @@ export async function submitReviewAction(
   input: unknown,
 ): Promise<PerformanceActionResult<void>> {
   try {
-    const profile = await requireServerPermission("performance.review");
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("performance.review"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = reviewSubmitSchema.parse(input);
     await submitReview(supabase, profile, parsed.reviewId, parsed);
@@ -414,7 +445,9 @@ export async function approveReviewAction(
   input: unknown,
 ): Promise<PerformanceActionResult<void>> {
   try {
-    const profile = await requireServerPermission("performance.approve");
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("performance.approve"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = reviewApprovalSchema.parse(input);
     await approveReviewStep(supabase, profile, parsed.reviewId, parsed.comments);
@@ -429,7 +462,9 @@ export async function approveReviewAction(
 }
 
 export async function fetchReviewDetailAction(reviewId: string): Promise<ReviewDetail | null> {
-  const profile = await requireServerPermission("performance.view");
+  const profile = await requireServerAnyPermission(
+    managerOrPermissions("performance.view"),
+  );
   const supabase = await getAuthenticatedSupabase();
   return getReviewById(supabase, profile.employee.organizationId, reviewId);
 }
@@ -438,7 +473,9 @@ export async function createFeedbackAction(
   input: unknown,
 ): Promise<PerformanceActionResult<string>> {
   try {
-    const profile = await requireServerPermission("performance.feedback");
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("performance.feedback"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = feedbackFormSchema.parse(input);
     const id = await createFeedback(supabase, profile, parsed);
@@ -479,7 +516,9 @@ export async function createOneOnOneAction(
   input: unknown,
 ): Promise<PerformanceActionResult<string>> {
   try {
-    const profile = await requireServerPermission("performance.create");
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("performance.create"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = oneOnOneFormSchema.parse(input);
     const id = await createOneOnOne(supabase, profile, parsed);
@@ -497,7 +536,9 @@ export async function deleteOneOnOneAction(
   input: unknown,
 ): Promise<PerformanceActionResult<void>> {
   try {
-    const profile = await requireServerAnyPermission(["performance.edit", "performance.create"]);
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("performance.edit", "performance.create"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = oneOnOneDeleteSchema.parse(input);
     await deleteOneOnOne(supabase, profile, parsed.meetingId);
@@ -515,7 +556,9 @@ export async function updateOneOnOneAction(
   input: unknown,
 ): Promise<PerformanceActionResult<void>> {
   try {
-    const profile = await requireServerAnyPermission(["performance.edit", "performance.create"]);
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("performance.edit", "performance.create"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = oneOnOneUpdateSchema.parse(input);
     await updateOneOnOne(supabase, profile, parsed.meetingId, {
@@ -555,7 +598,9 @@ export async function createPromotionAction(
   input: unknown,
 ): Promise<PerformanceActionResult<string>> {
   try {
-    const profile = await requireServerPermission("performance.create");
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("performance.create"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = promotionFormSchema.parse(input);
     const id = await createPromotion(supabase, profile, parsed);
@@ -573,7 +618,9 @@ export async function approvePromotionAction(
   input: unknown,
 ): Promise<PerformanceActionResult<void>> {
   try {
-    const profile = await requireServerPermission("performance.approve");
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("performance.approve"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = promotionApprovalSchema.parse(input);
     await approvePromotionStep(supabase, profile, parsed.promotionId, parsed.comments);
@@ -591,7 +638,9 @@ export async function updatePromotionAction(
   input: unknown,
 ): Promise<PerformanceActionResult<void>> {
   try {
-    const profile = await requireServerAnyPermission(["performance.edit", "performance.create"]);
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("performance.edit", "performance.create"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = promotionUpdateSchema.parse(input);
     await updatePromotion(supabase, profile, parsed);
@@ -609,7 +658,9 @@ export async function deletePromotionAction(
   input: unknown,
 ): Promise<PerformanceActionResult<void>> {
   try {
-    const profile = await requireServerAnyPermission(["performance.edit", "performance.create"]);
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("performance.edit", "performance.create"),
+    );
     const supabase = await getAuthenticatedSupabase();
     const parsed = promotionDeleteSchema.parse(input);
     await deletePromotion(supabase, parsed.promotionId);
@@ -626,7 +677,9 @@ export async function deletePromotionAction(
 export async function fetchPromotionEmployeeContextAction(
   employeeId: string,
 ): Promise<{ designationId: string | null; currentSalary: number | null } | null> {
-  const profile = await requireServerPermission("performance.view");
+  const profile = await requireServerAnyPermission(
+    managerOrPermissions("performance.view"),
+  );
   const supabase = await getAuthenticatedSupabase();
 
   const { data: employee, error } = await fromHrms(supabase, "employees")
@@ -647,7 +700,9 @@ export async function fetchPromotionEmployeeContextAction(
 }
 
 export async function fetchPerformanceSettingsAction(): Promise<PerformanceSettingsRecord> {
-  const profile = await requireServerPermission("performance.view");
+  const profile = await requireServerAnyPermission(
+    managerOrPermissions("performance.view"),
+  );
   const supabase = await getAuthenticatedSupabase();
   return getPerformanceSettings(supabase, profile.employee.organizationId);
 }

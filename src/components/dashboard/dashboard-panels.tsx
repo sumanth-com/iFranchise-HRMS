@@ -186,9 +186,11 @@ function PriorityTasks({ items }: { items: DashboardTaskItem[] }) {
 function TeamCelebrationsPanel({
   birthdays,
   anniversaries,
+  teamHref = "/dashboard/employees",
 }: {
   birthdays: DashboardPersonEvent[];
   anniversaries: DashboardPersonEvent[];
+  teamHref?: string;
 }) {
   const events = [
     ...birthdays.map((event) => ({ ...event, kind: "birthday" as const })),
@@ -210,7 +212,7 @@ function TeamCelebrationsPanel({
           </p>
         </div>
         <Link
-          href="/dashboard/employees"
+          href={teamHref}
           className="rounded-full border bg-background/80 px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted"
         >
           View team
@@ -285,23 +287,33 @@ function HrInsightsPanel({
   charts,
   birthdays,
   anniversaries,
+  title = "HR Insights",
+  description = "Attendance pulse and upcoming celebrations",
+  celebrationsHref,
 }: {
   charts: DashboardCharts;
   birthdays: DashboardPersonEvent[];
   anniversaries: DashboardPersonEvent[];
+  title?: string;
+  description?: string;
+  celebrationsHref?: string;
 }) {
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border bg-card p-3 shadow-sm md:p-4">
       <div className="mb-2 shrink-0">
         <h2 className="text-[11px] font-semibold tracking-wide text-foreground uppercase">
-          HR Insights
+          {title}
         </h2>
-        <p className="text-[11px] text-muted-foreground">Attendance pulse and upcoming celebrations</p>
+        <p className="text-[11px] text-muted-foreground">{description}</p>
       </div>
 
       <div className="grid min-h-0 flex-1 gap-2.5 lg:grid-cols-2 lg:items-stretch">
         <AttendanceSparkline items={charts.attendanceTrend7Days} />
-        <TeamCelebrationsPanel birthdays={birthdays} anniversaries={anniversaries} />
+        <TeamCelebrationsPanel
+          birthdays={birthdays}
+          anniversaries={anniversaries}
+          teamHref={celebrationsHref}
+        />
       </div>
     </section>
   );
@@ -313,12 +325,18 @@ export function DashboardOperationsRow({
   upcomingHolidays,
   upcomingBirthdays,
   upcomingAnniversaries,
+  insightsTitle,
+  insightsDescription,
+  celebrationsHref,
 }: {
   tasks: DashboardTaskItem[];
   charts: DashboardCharts;
   upcomingHolidays: DashboardListItem[];
   upcomingBirthdays: DashboardPersonEvent[];
   upcomingAnniversaries: DashboardPersonEvent[];
+  insightsTitle?: string;
+  insightsDescription?: string;
+  celebrationsHref?: string;
 }) {
   return (
     <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-3 overflow-hidden">
@@ -332,6 +350,9 @@ export function DashboardOperationsRow({
           charts={charts}
           birthdays={upcomingBirthdays}
           anniversaries={upcomingAnniversaries}
+          title={insightsTitle}
+          description={insightsDescription}
+          celebrationsHref={celebrationsHref}
         />
       </div>
     </div>

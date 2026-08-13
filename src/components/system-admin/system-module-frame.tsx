@@ -40,13 +40,13 @@ export function SystemMetric({
   variant?: "default" | "success" | "warning" | "danger";
 }) {
   return (
-    <div className="rounded-lg border bg-card p-3 shadow-sm">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+    <div className="rounded-xl border bg-card px-3 py-2.5 shadow-sm">
+      <p className="truncate text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
         {label}
       </p>
       <p
         className={cn(
-          "mt-1 text-lg font-semibold tabular-nums",
+          "mt-0.5 text-xl font-semibold tabular-nums tracking-tight capitalize",
           variant === "success" && "text-emerald-600",
           variant === "warning" && "text-amber-600",
           variant === "danger" && "text-red-600",
@@ -63,19 +63,28 @@ export function SystemPanel({
   title,
   children,
   className,
+  bodyClassName,
 }: {
   title?: string;
   children: ReactNode;
   className?: string;
+  bodyClassName?: string;
 }) {
   return (
-    <div className={cn("rounded-lg border bg-card shadow-sm", className)}>
+    <div
+      className={cn(
+        "flex min-h-0 flex-col overflow-hidden rounded-xl border bg-card shadow-sm",
+        className,
+      )}
+    >
       {title ? (
-        <div className="border-b px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="shrink-0 border-b px-4 py-2.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
           {title}
         </div>
       ) : null}
-      <div className="p-3">{children}</div>
+      <div className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain p-3", bodyClassName)}>
+        {children}
+      </div>
     </div>
   );
 }

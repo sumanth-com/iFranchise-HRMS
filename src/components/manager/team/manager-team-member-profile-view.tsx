@@ -36,7 +36,7 @@ export function ManagerTeamMemberProfileView({
           className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted"
         >
           <ArrowLeft className="size-4" />
-          Back to My Team
+          Back to Teammates
         </Link>
         <ManagerTeamMemberTabBar
           tabs={MANAGER_TEAM_PROFILE_TABS}

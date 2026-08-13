@@ -108,71 +108,203 @@ function toPdfText(value: string) {
   });
 }
 
+function wrapPdfLines(
+  text: string,
+  maxWidth: number,
+  font: { widthOfTextAtSize: (t: string, size: number) => number },
+  fontSize: number,
+  maxLines: number,
+): string[] {
+  const cleaned = toPdfText(text).replace(/\s+/g, " ").trim();
+  if (!cleaned) return ["—"];
+
+  const fits = (value: string) => font.widthOfTextAtSize(value, fontSize) <= maxWidth;
+
+  const hardSplit = (token: string): string[] => {
+    const parts: string[] = [];
+    let chunk = "";
+    for (const ch of token) {
+      const next = chunk + ch;
+      if (!chunk || fits(next)) {
+        chunk = next;
+      } else {
+        parts.push(chunk);
+        chunk = ch;
+      }
+    }
+    if (chunk) parts.push(chunk);
+    return parts;
+  };
+
+  const tokens = cleaned.split(" ").flatMap((word) => (fits(word) ? [word] : hardSplit(word)));
+  const lines: string[] = [];
+  let current = "";
+
+  for (const token of tokens) {
+    const candidate = current ? `${current} ${token}` : token;
+    if (fits(candidate)) {
+      current = candidate;
+      continue;
+    }
+    if (current) lines.push(current);
+    current = token;
+    if (lines.length >= maxLines) break;
+  }
+
+  if (lines.length < maxLines && current) {
+    lines.push(current);
+  }
+
+  if (lines.length > maxLines) {
+    return lines.slice(0, maxLines);
+  }
+
+  // Ellipsis on last line when content was truncated
+  const consumed = lines.join(" ");
+  if (consumed.length < cleaned.length && lines.length > 0) {
+    const lastIdx = lines.length - 1;
+    let last = lines[lastIdx]!;
+    while (last.length > 1 && !fits(`${last}...`)) {
+      last = last.slice(0, -1).trimEnd();
+    }
+    lines[lastIdx] = `${last}...`;
+  }
+
+  return lines.length > 0 ? lines : ["—"];
+}
+
+function formatPdfGeneratedAt(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d);
+}
+
 export async function reportToPdfBytes(result: ReportResult): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const landscape = result.columns.length > 6;
+  const cols = result.columns;
+  const landscape = cols.length > 5;
   const pageSize: [number, number] = landscape ? [842, 595] : [595, 842];
   let page = pdf.addPage(pageSize);
-  const margin = 28;
-  let y = page.getHeight() - margin;
+  const marginX = 36;
+  const marginY = 32;
+  const usableWidth = page.getWidth() - marginX * 2;
+  let y = page.getHeight() - marginY;
 
-  const drawText = (text: string, x: number, size: number, useBold = false) => {
-    page.drawText(toPdfText(text), {
-      x,
+  const weightSum = cols.reduce((sum, c) => sum + (c.width ?? 1), 0);
+  const colWidths = cols.map((c) => ((c.width ?? 1) / weightSum) * usableWidth);
+  const fontSize = cols.length > 8 ? 7 : cols.length > 6 ? 7.5 : 8.5;
+  const lineHeight = fontSize + 2.5;
+  const cellPadX = 4;
+  const maxLinesPerCell = cols.length > 7 ? 2 : 3;
+
+  const drawTitle = () => {
+    page.drawText(toPdfText(result.title), {
+      x: marginX,
       y,
-      size,
-      font: useBold ? bold : font,
+      size: 14,
+      font: bold,
       color: rgb(0.1, 0.1, 0.12),
-      maxWidth: page.getWidth() - margin * 2,
     });
+    y -= 16;
+    page.drawText(
+      toPdfText(`Generated ${formatPdfGeneratedAt(result.generatedAt)}  ·  ${result.total} rows`),
+      {
+        x: marginX,
+        y,
+        size: 8,
+        font,
+        color: rgb(0.35, 0.35, 0.4),
+      },
+    );
+    y -= 14;
   };
-
-  drawText(result.title, margin, 13, true);
-  y -= 16;
-  drawText(`Generated ${result.generatedAt} · ${result.total} rows`, margin, 8);
-  y -= 18;
-
-  const cols = result.columns;
-  const usable = page.getWidth() - margin * 2;
-  const colWidth = usable / Math.max(cols.length, 1);
-  const fontSize = cols.length > 8 ? 6.5 : cols.length > 6 ? 7 : 8;
-  const maxChars = Math.max(8, Math.floor(colWidth / (fontSize * 0.55)));
 
   const paintHeader = () => {
+    const headerHeight = lineHeight + 8;
+    page.drawRectangle({
+      x: marginX,
+      y: y - headerHeight + 4,
+      width: usableWidth,
+      height: headerHeight,
+      color: rgb(0.93, 0.94, 0.96),
+    });
+
+    let x = marginX;
     cols.forEach((c, i) => {
-      page.drawText(toPdfText(c.header).slice(0, maxChars), {
-        x: margin + i * colWidth,
-        y,
+      const width = colWidths[i]!;
+      page.drawText(toPdfText(c.header), {
+        x: x + cellPadX,
+        y: y - fontSize,
         size: fontSize,
         font: bold,
-        color: rgb(0.2, 0.2, 0.25),
-        maxWidth: colWidth - 4,
+        color: rgb(0.2, 0.22, 0.28),
+        maxWidth: width - cellPadX * 2,
       });
+      x += width;
     });
-    y -= fontSize + 6;
+    y -= headerHeight + 2;
   };
 
+  drawTitle();
   paintHeader();
 
+  let rowIndex = 0;
   for (const row of result.rows) {
-    if (y < margin + 16) {
+    const cellLines = cols.map((c, i) =>
+      wrapPdfLines(
+        toCell(row[c.key]),
+        Math.max(12, colWidths[i]! - cellPadX * 2),
+        font,
+        fontSize,
+        maxLinesPerCell,
+      ),
+    );
+    const rowLines = Math.max(1, ...cellLines.map((lines) => lines.length));
+    const rowHeight = rowLines * lineHeight + 6;
+
+    if (y - rowHeight < marginY) {
       page = pdf.addPage(pageSize);
-      y = page.getHeight() - margin;
+      y = page.getHeight() - marginY;
+      drawTitle();
       paintHeader();
     }
-    cols.forEach((c, i) => {
-      page.drawText(toPdfText(toCell(row[c.key])).slice(0, maxChars), {
-        x: margin + i * colWidth,
-        y,
-        size: fontSize,
-        font,
-        color: rgb(0.15, 0.15, 0.18),
-        maxWidth: colWidth - 4,
+
+    if (rowIndex % 2 === 1) {
+      page.drawRectangle({
+        x: marginX,
+        y: y - rowHeight + 2,
+        width: usableWidth,
+        height: rowHeight,
+        color: rgb(0.97, 0.98, 0.99),
       });
+    }
+
+    let x = marginX;
+    cellLines.forEach((lines, i) => {
+      const width = colWidths[i]!;
+      lines.forEach((line, lineIdx) => {
+        page.drawText(line, {
+          x: x + cellPadX,
+          y: y - fontSize - lineIdx * lineHeight,
+          size: fontSize,
+          font,
+          color: rgb(0.15, 0.15, 0.18),
+          maxWidth: width - cellPadX * 2,
+        });
+      });
+      x += width;
     });
-    y -= fontSize + 5;
+
+    y -= rowHeight;
+    rowIndex += 1;
   }
 
   return pdf.save();

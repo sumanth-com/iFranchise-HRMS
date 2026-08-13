@@ -47,6 +47,7 @@ type ManagerLeaveViewProps = ManagerTeamLeavePageData & {
   initialFilters: TeamLeaveListParams;
   initialLeaveId?: string;
   initialSection?: LeaveSection;
+  hideSectionSwitch?: boolean;
   selfLeave: ManagerSelfLeaveData;
 };
 
@@ -58,6 +59,7 @@ export function ManagerLeaveView({
   initialFilters,
   initialLeaveId,
   initialSection = "my",
+  hideSectionSwitch = false,
   selfLeave,
 }: ManagerLeaveViewProps) {
   const router = useRouter();
@@ -174,9 +176,13 @@ export function ManagerLeaveView({
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Leave</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {hideSectionSwitch && section === "team" ? "Team Leave" : "Leave"}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Apply and track your own leave, and manage team requests.
+            {hideSectionSwitch && section === "team"
+              ? "Leave requests from your reporting hierarchy only."
+              : "Apply and track your own leave, and manage team requests."}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -186,22 +192,24 @@ export function ManagerLeaveView({
               Apply Leave
             </Button>
           ) : null}
-          <div className="flex items-center gap-2 rounded-lg border bg-card p-1">
-            <Button
-              size="sm"
-              variant={section === "my" ? "default" : "ghost"}
-              onClick={() => setSection("my")}
-            >
-              My Leave
-            </Button>
-            <Button
-              size="sm"
-              variant={section === "team" ? "default" : "ghost"}
-              onClick={() => setSection("team")}
-            >
-              Team Leave
-            </Button>
-          </div>
+          {hideSectionSwitch ? null : (
+            <div className="flex items-center gap-2 rounded-lg border bg-card p-1">
+              <Button
+                size="sm"
+                variant={section === "my" ? "default" : "ghost"}
+                onClick={() => setSection("my")}
+              >
+                My Leave
+              </Button>
+              <Button
+                size="sm"
+                variant={section === "team" ? "default" : "ghost"}
+                onClick={() => setSection("team")}
+              >
+                Team Leave
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -221,12 +229,16 @@ export function ManagerLeaveView({
       ) : (
         <>
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold tracking-tight">Team Leave</h2>
-              <p className="text-sm text-muted-foreground">
-                Leave requests from your reporting hierarchy only.
-              </p>
-            </div>
+            {hideSectionSwitch ? (
+              <div />
+            ) : (
+              <div>
+                <h2 className="text-lg font-semibold tracking-tight">Team Leave</h2>
+                <p className="text-sm text-muted-foreground">
+                  Leave requests from your reporting hierarchy only.
+                </p>
+              </div>
+            )}
             <div className="flex items-center gap-2 rounded-lg border bg-card p-1">
               <Button
                 size="sm"

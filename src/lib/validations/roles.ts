@@ -5,6 +5,7 @@ import { paginationSchema } from "@/lib/validations/common";
 export const roleListParamsSchema = paginationSchema.extend({
   search: z.string().trim().optional(),
   status: z.enum(["active", "inactive", "archived"]).optional(),
+  roleType: z.enum(["system", "custom"]).optional(),
 });
 
 export const userRoleListParamsSchema = paginationSchema.extend({
@@ -69,6 +70,7 @@ export const MODULE_LABELS: Record<string, string> = {
   designation: "Designations",
   employment_type: "Employment Types",
   employee: "Employees",
+  user_provisioning: "User Provisioning",
   attendance: "Attendance",
   leave: "Leave",
   payroll: "Payroll",
@@ -78,14 +80,19 @@ export const MODULE_LABELS: Record<string, string> = {
   documents: "Documents",
   asset: "Assets",
   exit: "Exit",
+  onboarding: "Onboarding",
   reports: "Reports",
   report: "Reports (Legacy)",
   security: "Roles & Permissions",
   notifications: "Notifications",
-  audit: "Audit Logs",
+  audit: "Audit",
   settings: "Settings",
+  system: "Security",
+  portal: "Portal Access",
   holiday: "Holidays",
   documents_module: "Documents",
+  integration: "Integrations",
+  integrations: "Integrations",
 };
 
 export const ACTION_ORDER = [

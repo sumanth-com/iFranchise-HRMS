@@ -55,6 +55,7 @@ export function InterviewsManagement({
   lookups,
   canInterview,
   filters,
+  candidatesHref = RECRUITMENT_ROUTES.candidates,
 }: {
   records: InterviewListItem[];
   total: number;
@@ -62,6 +63,7 @@ export function InterviewsManagement({
   pageSize: number;
   lookups: RecruitmentLookups;
   canInterview: boolean;
+  candidatesHref?: string;
   filters: {
     search?: string;
     jobOpeningId?: string;
@@ -97,7 +99,7 @@ export function InterviewsManagement({
         </div>
         {canInterview ? (
           <Link
-            href={RECRUITMENT_ROUTES.candidates}
+            href={candidatesHref}
             className={cn(buttonVariants(), "inline-flex items-center")}
           >
             <Users className="mr-1.5 h-4 w-4" />

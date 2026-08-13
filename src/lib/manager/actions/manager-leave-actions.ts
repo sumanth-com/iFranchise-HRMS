@@ -16,12 +16,14 @@ import {
   getTeamLeaveSummary,
   listTeamLeaveRequests,
 } from "@/lib/manager/services/team-leave-queries";
+import { getMonthDateRange } from "@/lib/leave/services/leave-utils";
 import { getManagerTeamScope } from "@/lib/manager/services/team-queries";
 import {
   requireServerAnyPermission,
   requireServerPermission,
 } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
+import { leaveListParamsSchema } from "@/lib/validations/leave";
 import {
   teamLeaveCalendarParamsSchema,
   teamLeaveIdSchema,
@@ -39,7 +41,13 @@ import type {
   TeamLeaveListResult,
   TeamLeaveSummary,
 } from "@/types/manager-leave";
-import type { LeaveCalendarEntry, LeaveHolidayEntry } from "@/types/leave";
+import type {
+  LeaveActionResult,
+  LeaveCalendarEntry,
+  LeaveHolidayEntry,
+  LeaveListParams,
+  LeaveListResult,
+} from "@/types/leave";
 
 async function getAuthenticatedContext() {
   const profile = await requireServerAnyPermission([
@@ -53,6 +61,8 @@ async function getAuthenticatedContext() {
 
 function revalidateLeavePaths() {
   revalidatePath(MANAGER_ROUTES.leave);
+  revalidatePath(MANAGER_ROUTES.leaveTeam);
+  revalidatePath(MANAGER_ROUTES.overview);
   revalidatePath(MANAGER_ROUTES.team);
   revalidatePath(MANAGER_ROUTES.home);
 }
@@ -63,6 +73,57 @@ export async function fetchTeamLeaveRequestsAction(
   const parsed = teamLeaveListParamsSchema.parse(params);
   const { profile, supabase, teamIds } = await getAuthenticatedContext();
   return listTeamLeaveRequests(supabase, profile, teamIds, parsed);
+}
+
+export async function fetchTeamLeaveRequestsForHrTableAction(
+  params: LeaveListParams,
+): Promise<LeaveActionResult<LeaveListResult>> {
+  try {
+    const parsed = leaveListParamsSchema.parse(params);
+    const { profile, supabase, teamIds } = await getAuthenticatedContext();
+
+    if (parsed.employeeId && !teamIds.includes(parsed.employeeId)) {
+      return {
+        success: true,
+        data: {
+          data: [],
+          total: 0,
+          page: parsed.page,
+          pageSize: parsed.pageSize,
+        },
+      };
+    }
+
+    let dateFrom = parsed.dateFrom;
+    let dateTo = parsed.dateTo;
+    if (!dateFrom && !dateTo && parsed.month && parsed.year) {
+      const range = getMonthDateRange(parsed.month, parsed.year);
+      dateFrom = range.start;
+      dateTo = range.end;
+    }
+
+    const result = await listTeamLeaveRequests(supabase, profile, teamIds, {
+      page: parsed.page,
+      pageSize: parsed.pageSize,
+      search: parsed.search,
+      sortBy: parsed.sortBy,
+      sortOrder: parsed.sortOrder,
+      leaveStatus: parsed.leaveStatus,
+      leaveTypeId: parsed.leaveTypeId,
+      departmentId: parsed.departmentId,
+      employeeId: parsed.employeeId,
+      dateFrom,
+      dateTo,
+    });
+
+    return { success: true, data: result };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "Failed to load team leave requests",
+    };
+  }
 }
 
 export async function fetchTeamLeaveSummaryAction(): Promise<TeamLeaveSummary> {
