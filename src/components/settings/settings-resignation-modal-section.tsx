@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
 import { SettingsResignationModalContent } from "@/components/settings/settings-resignation-modal-content";
+import { cn } from "@/lib/utils";
 import type { ExitResignationItem } from "@/types/exit";
 
 type Props = {
@@ -15,6 +16,7 @@ type Props = {
   employeeId: string;
   defaultNoticePeriodDays: number;
   activeResignation: ExitResignationItem | null;
+  className?: string;
 };
 
 export function SettingsResignationModalSection({
@@ -24,26 +26,37 @@ export function SettingsResignationModalSection({
   employeeId,
   defaultNoticePeriodDays,
   activeResignation,
+  className,
 }: Props) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <section className="rounded-xl border bg-card p-4 shadow-sm md:p-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-md border bg-muted/40">
-              <LogOut className="size-4 text-muted-foreground" />
-            </span>
-            <div>
-              <h2 className="text-sm font-semibold tracking-tight">{title}</h2>
-              <p className="mt-1 text-xs text-muted-foreground">{description}</p>
-            </div>
-          </div>
-          <Button variant="outline" className="shrink-0" onClick={() => setOpen(true)}>
+      <section
+        className={cn(
+          "flex h-full flex-col justify-center rounded-xl border bg-card p-4 shadow-sm md:p-5",
+          className,
+        )}
+      >
+        <div className="grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5">
+          <span className="col-start-1 row-span-2 flex size-9 items-center justify-center self-center rounded-md border bg-muted/40">
+            <LogOut className="size-4 text-muted-foreground" />
+          </span>
+          <h2 className="col-start-2 self-center text-sm font-semibold tracking-tight">
+            {title}
+          </h2>
+          <Button
+            variant="outline"
+            size="sm"
+            className="col-start-3 row-start-1 shrink-0 self-center"
+            onClick={() => setOpen(true)}
+          >
             Open {title}
             <ChevronRight className="size-4" />
           </Button>
+          <p className="col-span-2 col-start-2 text-xs leading-snug text-muted-foreground">
+            {description}
+          </p>
         </div>
       </section>
 

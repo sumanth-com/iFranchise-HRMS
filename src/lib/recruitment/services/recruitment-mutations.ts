@@ -28,9 +28,10 @@ import {
 } from "@/lib/recruitment/services/recruitment-offer-email";
 import {
   downloadOfferLetterFile,
+  resolveOfferLetterExtension,
   storeOfferLetterFile,
 } from "@/lib/recruitment/services/offer-letter-storage";
-import { isAllowedOfferLetterFilename } from "@/lib/validations/recruitment";
+import { assertOfferLetterFile } from "@/lib/validations/recruitment";
 import {
   getRecruitmentSettings,
   nextRecruitmentCode,
@@ -687,17 +688,17 @@ export async function createOffer(
   const resolvedJoiningDate = new Date().toISOString().slice(0, 10);
 
   const { data: existingDraft } = await fromHrms(supabase, "recruitment_offers")
-    .select("id, offer_letter_path, salary, joining_date")
+    .select("id, offer_letter_path, salary, joining_date, offer_status")
     .eq("candidate_id", input.candidateId)
     .eq("organization_id", organizationId)
-    .eq("offer_status", "draft")
+    .in("offer_status", ["draft", "sent"])
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (offerFile && !isAllowedOfferLetterFilename(offerFile.filename)) {
-    throw new Error("Offer letter must be a PDF, DOC, or DOCX file");
+  if (offerFile) {
+    assertOfferLetterFile({ name: offerFile.filename, size: offerFile.bytes.byteLength });
   }
 
   const hasStoredLetter = Boolean(existingDraft?.offer_letter_path);
@@ -812,9 +813,12 @@ export async function createOffer(
 
     const fileBytes =
       offerFile?.bytes ?? await downloadOfferLetterFile(supabase, offerLetterPath);
+    const storedExt = resolveOfferLetterExtension(
+      attachmentFilename ?? offerLetterPath,
+    );
     const emailFilename =
       attachmentFilename ??
-      `Offer-${emailContext.candidateName.replace(/[^\w.-]+/g, "_")}-${emailContext.jobTitle.replace(/[^\w.-]+/g, "_")}.pdf`;
+      `Offer-${emailContext.candidateName.replace(/[^\w.-]+/g, "_")}-${emailContext.jobTitle.replace(/[^\w.-]+/g, "_")}.${storedExt}`;
 
     await deliverOfferEmailToCandidate({
       to: emailContext.candidateEmail,
@@ -838,7 +842,7 @@ export async function createOffer(
 
     await addTimeline(supabase, organizationId, input.candidateId, profile.userId, {
       eventType: "offer",
-      title: "Offer sent",
+      title: existingDraft?.offer_status === "sent" ? "Offer resent" : "Offer sent",
       description: `Offer emailed to ${emailContext.candidateEmail}`,
     });
 
@@ -847,7 +851,7 @@ export async function createOffer(
       profile,
       reportingManagerId,
       "offerSent",
-      "Offer sent",
+      existingDraft?.offer_status === "sent" ? "Offer resent" : "Offer sent",
       `Offer sent to ${candidateName}.`,
       offerId,
       candidateName,

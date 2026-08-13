@@ -95,22 +95,44 @@ export function PerformanceTableShell({
   children,
   empty,
   className,
+  fill = false,
 }: {
   children: ReactNode;
   empty?: ReactNode;
   className?: string;
+  /** Fill remaining viewport height and scroll inside (self-service modules). */
+  fill?: boolean;
 }) {
   const hasTableContent = children != null && children !== false;
 
   if (!hasTableContent && empty) {
     return (
-      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">{empty}</div>
+      <div
+        className={cn(
+          "overflow-hidden rounded-xl border bg-card shadow-sm",
+          fill && "flex min-h-0 flex-1 flex-col",
+        )}
+      >
+        {empty}
+      </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-      <div className={cn("max-h-[28rem] overflow-auto", className)}>{children}</div>
+    <div
+      className={cn(
+        "overflow-hidden rounded-xl border bg-card shadow-sm",
+        fill && "flex min-h-0 flex-1 flex-col",
+      )}
+    >
+      <div
+        className={cn(
+          fill ? "min-h-0 flex-1 overflow-auto" : "max-h-[28rem] overflow-auto",
+          className,
+        )}
+      >
+        {children}
+      </div>
     </div>
   );
 }

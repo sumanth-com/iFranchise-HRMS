@@ -962,6 +962,19 @@ export async function updateSalaryStructure(
   if (error) throw new Error(error.message);
 }
 
+export async function deleteSalaryStructure(
+  supabase: AuthSupabaseClient,
+  _profile: UserProfile,
+  structureId: string,
+): Promise<void> {
+  const { data, error } = await supabase.schema("hrms").rpc("soft_delete_salary_structure", {
+    p_structure_id: structureId,
+  });
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Salary structure not found or already deleted.");
+}
+
 export async function createBonus(
   supabase: AuthSupabaseClient,
   profile: UserProfile,

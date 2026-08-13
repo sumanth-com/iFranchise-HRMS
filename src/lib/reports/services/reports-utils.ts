@@ -91,6 +91,23 @@ function escapeXml(value: string) {
     .replace(/"/g, "&quot;");
 }
 
+function toPdfText(value: string) {
+  return value.replace(/[^\u0000-\u00FF]/g, (char) => {
+    const replacements: Record<string, string> = {
+      "\u2013": "-",
+      "\u2014": "-",
+      "\u2018": "'",
+      "\u2019": "'",
+      "\u201C": '"',
+      "\u201D": '"',
+      "\u2022": "-",
+      "\u2026": "...",
+      "\u20B9": "Rs",
+    };
+    return replacements[char] ?? "?";
+  });
+}
+
 export async function reportToPdfBytes(result: ReportResult): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
@@ -102,7 +119,7 @@ export async function reportToPdfBytes(result: ReportResult): Promise<Uint8Array
   let y = page.getHeight() - margin;
 
   const drawText = (text: string, x: number, size: number, useBold = false) => {
-    page.drawText(text, {
+    page.drawText(toPdfText(text), {
       x,
       y,
       size,
@@ -125,7 +142,7 @@ export async function reportToPdfBytes(result: ReportResult): Promise<Uint8Array
 
   const paintHeader = () => {
     cols.forEach((c, i) => {
-      page.drawText(c.header.slice(0, maxChars), {
+      page.drawText(toPdfText(c.header).slice(0, maxChars), {
         x: margin + i * colWidth,
         y,
         size: fontSize,
@@ -146,7 +163,7 @@ export async function reportToPdfBytes(result: ReportResult): Promise<Uint8Array
       paintHeader();
     }
     cols.forEach((c, i) => {
-      page.drawText(toCell(row[c.key]).slice(0, maxChars), {
+      page.drawText(toPdfText(toCell(row[c.key])).slice(0, maxChars), {
         x: margin + i * colWidth,
         y,
         size: fontSize,

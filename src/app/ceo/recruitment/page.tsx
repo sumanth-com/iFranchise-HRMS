@@ -1,51 +1,32 @@
 import { Suspense } from "react";
 
-import { LoadingSpinner } from "@/components/common/loading-spinner";
-import { CeoRecruitmentView } from "@/components/ceo/recruitment/ceo-recruitment-view";
-import { getCeoRecruitmentModuleData } from "@/lib/ceo/actions/ceo-recruitment-actions";
-import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
-import { requireServerPermission } from "@/lib/permissions/server";
-import { ceoRecruitmentListParamsSchema } from "@/lib/validations/ceo-recruitment";
+import { PageSkeleton } from "@/components/common/page-skeleton";
+import { RecruitmentDashboardView } from "@/components/recruitment/recruitment-dashboard-view";
+import { CEO_ROUTES } from "@/lib/ceo/constants";
+import { requireCeoPortal } from "@/lib/ceo/read-only-permissions";
+import { getRecruitmentSummary } from "@/lib/recruitment/services/recruitment-queries";
+import { createClient } from "@/lib/supabase/server";
 
-type CeoRecruitmentPageProps = {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-};
-
-function firstString(value: string | string[] | undefined) {
-  return typeof value === "string" ? value : undefined;
-}
-
-export default async function CeoRecruitmentPage({
-  searchParams,
-}: CeoRecruitmentPageProps) {
-  await requireServerPermission(PORTAL_PERMISSIONS.ceo);
-  const rawParams = await searchParams;
-
-  const parsed = ceoRecruitmentListParamsSchema.parse({
-    page: firstString(rawParams.page),
-    pageSize: firstString(rawParams.pageSize),
-    search: firstString(rawParams.search),
-    candidateId: firstString(rawParams.candidateId),
-    departmentId: firstString(rawParams.departmentId),
-    jobOpeningId: firstString(rawParams.jobOpeningId),
-    recruiterId: firstString(rawParams.recruiterId),
-    stage: firstString(rawParams.stage),
-    employmentTypeId: firstString(rawParams.employmentTypeId),
-    dateFrom: firstString(rawParams.dateFrom),
-    dateTo: firstString(rawParams.dateTo),
-  });
-
-  const data = await getCeoRecruitmentModuleData(parsed);
+async function CeoRecruitmentDashboardContent() {
+  const profile = await requireCeoPortal();
+  const supabase = await createClient();
+  const summary = await getRecruitmentSummary(supabase, profile);
 
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-1 items-center justify-center">
-          <LoadingSpinner />
-        </div>
-      }
-    >
-      <CeoRecruitmentView {...data} initialFilters={parsed} />
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <RecruitmentDashboardView
+        summary={summary}
+        basePath={CEO_ROUTES.recruitment}
+        readOnly
+      />
+    </div>
+  );
+}
+
+export default function CeoRecruitmentDashboardPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <CeoRecruitmentDashboardContent />
     </Suspense>
   );
 }

@@ -18,6 +18,7 @@ import { PAYROLL_STATUS_LABELS } from "@/lib/payroll/constants";
 import { getPayrollSummary } from "@/lib/payroll/services/payroll-queries";
 import { getPerformanceSummary } from "@/lib/performance/services/performance-queries";
 import { getRecruitmentSummary } from "@/lib/recruitment/services/recruitment-queries";
+import { listHolidays } from "@/lib/organization/services/org-queries";
 import {
   fromHrms,
   unwrapRelation,
@@ -343,8 +344,10 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
         attendance.presentToday += 1;
         break;
       case "absent":
-      case "on_leave":
         attendance.absentToday += 1;
+        break;
+      case "on_leave":
+        attendance.onLeaveToday += 1;
         break;
       case "late":
         attendance.lateToday += 1;
@@ -534,6 +537,25 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
     }
   }
 
+  let holidayItems: CeoDashboardData["upcomingHolidays"] = [];
+  try {
+    const holidays = await listHolidays(supabase, organizationId, {
+      year: now.getFullYear(),
+    });
+    holidayItems = holidays.data
+      .filter((holiday) => holiday.holidayDate >= today)
+      .sort((a, b) => a.holidayDate.localeCompare(b.holidayDate))
+      .map((holiday) => ({
+        id: `holiday-${holiday.id}`,
+        type: "holiday" as const,
+        title: holiday.name,
+        subtitle: holiday.isOptional ? "Optional holiday" : "Company holiday",
+        date: holiday.holidayDate,
+      }));
+  } catch (error) {
+    console.error("[ceo-dashboard] holidays query failed", error);
+  }
+
   return {
     generatedAt: new Date().toISOString(),
     kpis: {
@@ -610,8 +632,9 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
       presentToday: attendance.presentToday,
       absentToday: attendance.absentToday,
       lateToday: attendance.lateToday,
-      onLeaveToday: 0,
+      onLeaveToday: attendance.onLeaveToday,
     },
+    upcomingHolidays: holidayItems,
     activities,
     approvals,
     charts: {

@@ -250,7 +250,7 @@ function PriorityTile({
   );
 }
 
-function PrioritiesPanel({
+export function PrioritiesPanel({
   kpis,
   recruitment,
   performance,
@@ -262,7 +262,7 @@ function PrioritiesPanel({
   payroll: CeoPayrollOverview;
 }) {
   return (
-    <Panel title="Priorities" subtitle="Key decisions and company status" href={CEO_ROUTES.approvals}>
+    <Panel title="Needs attention" subtitle="Approvals, hiring, and payroll" href={CEO_ROUTES.approvals}>
       <div className="grid h-full min-h-0 flex-1 grid-cols-2 gap-2">
         <PriorityTile
           label="Leave Approvals"
@@ -272,7 +272,7 @@ function PrioritiesPanel({
               ? "Leave requests awaiting you"
               : "No pending leave"
           }
-          href={CEO_ROUTES.leave}
+          href={CEO_ROUTES.approvalsLeave}
           icon={<CheckSquare className="size-3.5" />}
           tone={
             kpis.pendingLeaveApprovals > 0
@@ -301,7 +301,7 @@ function PrioritiesPanel({
           label="Payroll Status"
           value={payroll.status}
           detail={formatCurrencyInr(payroll.salaryCost)}
-          href={CEO_ROUTES.analytics}
+          href={CEO_ROUTES.payroll}
           icon={<Wallet className="size-3.5" />}
           tone={payroll.pending ? "text-amber-700 dark:text-amber-400" : undefined}
         />

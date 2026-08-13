@@ -3,6 +3,11 @@
 import { useEffect } from "react";
 
 import { ErrorState } from "@/components/common/error-state";
+import { LoadingSpinner } from "@/components/common/loading-spinner";
+import {
+  isChunkLoadError,
+  recoverFromChunkLoadError,
+} from "@/lib/next/chunk-load-recovery";
 
 type GlobalErrorProps = {
   error: Error & { digest?: string };
@@ -10,20 +15,33 @@ type GlobalErrorProps = {
 };
 
 export default function GlobalError({ error, reset }: GlobalErrorProps) {
+  const isChunkError = isChunkLoadError(error);
+
   useEffect(() => {
+    if (isChunkError) {
+      recoverFromChunkLoadError();
+      return;
+    }
     console.error("[global-error]", error);
-  }, [error]);
+  }, [error, isChunkError]);
 
   return (
     <html lang="en">
       <body className="min-h-screen bg-background font-sans antialiased">
         <div className="flex min-h-screen items-center justify-center p-6">
-          <ErrorState
-            title="Something went wrong"
-            description="We couldn't load this page. Please refresh or try again in a moment."
-            onRetry={reset}
-            retryLabel="Try again"
-          />
+          {isChunkError ? (
+            <div className="flex flex-col items-center gap-3 text-center">
+              <LoadingSpinner />
+              <p className="text-sm text-muted-foreground">Loading the latest page…</p>
+            </div>
+          ) : (
+            <ErrorState
+              title="Something went wrong"
+              description="We couldn't load this page. Please refresh or try again in a moment."
+              onRetry={reset}
+              retryLabel="Try again"
+            />
+          )}
         </div>
       </body>
     </html>

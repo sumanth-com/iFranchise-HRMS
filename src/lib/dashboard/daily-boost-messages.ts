@@ -1,135 +1,161 @@
-export type DailyBoostMessage = {
-  line1: string;
-  line2: string;
-};
+export type DailyBoostTone = "team" | "executive";
 
-export const DAILY_BOOST_MESSAGES: DailyBoostMessage[] = [
-  {
-    line1: "{name}, may your day be calm, happy, and full of small wins from home.",
-    line2: "You matter more than you know — keep shining in your own gentle way.",
-  },
-  {
-    line1: "{name}, hope today brings you peace, good energy, and a reason to smile.",
-    line2: "Your kindness reaches people even through a screen. Thank you for that.",
-  },
-  {
-    line1: "{name}, you're doing better than you think — one step at a time is enough.",
-    line2: "Wishing you a light heart and a productive, happy work-from-home day.",
-  },
-  {
-    line1: "{name}, may your coffee be warm and your mind feel clear today.",
-    line2: "You bring something special to this team — never forget that.",
-  },
-  {
-    line1: "{name}, hope today feels easy, meaningful, and a little brighter for you.",
-    line2: "Your effort counts, your presence counts, and so do you.",
-  },
-  {
-    line1: "{name}, sending you good vibes for a smooth and happy day ahead.",
-    line2: "Keep trusting yourself — you're growing in all the right ways.",
-  },
-  {
-    line1: "{name}, may today give you focus, comfort, and moments that make you happy.",
-    line2: "The team is better because you're part of it. Truly.",
-  },
-  {
-    line1: "{name}, hope you find joy in the little things while you work today.",
-    line2: "You deserve a day that feels as good as you make others feel.",
-  },
-  {
-    line1: "{name}, wishing you strength, patience, and a happy heart from home.",
-    line2: "You're appreciated — not just for what you do, but for who you are.",
-  },
-  {
-    line1: "{name}, may your day be balanced — work done, mind at ease, spirit lifted.",
-    line2: "Keep going; you're making a real difference, quietly and beautifully.",
-  },
-  {
-    line1: "{name}, hope today treats you with the same warmth you give others.",
-    line2: "You have a good heart, {name} — let that guide your day.",
-  },
-  {
-    line1: "{name}, may your home workspace feel cozy and your goals feel reachable.",
-    line2: "Believe in yourself today. You're more capable than yesterday's doubts.",
-  },
-  {
-    line1: "{name}, wishing you clarity, confidence, and a genuinely happy afternoon.",
-    line2: "Your consistency inspires people more than you realize.",
-  },
-  {
-    line1: "{name}, hope today leaves you proud of yourself in the softest, truest way.",
-    line2: "Take a breath — you're allowed to be happy while you work hard.",
-  },
-  {
-    line1: "{name}, may good news find you and stress stay far away today.",
-    line2: "You are valued here, today and every day.",
-  },
-  {
-    line1: "{name}, hope your day flows well — meetings, messages, and moments included.",
-    line2: "Keep being you; it's one of the best things about this team.",
-  },
-  {
-    line1: "{name}, wishing you a peaceful mind and a happily productive day.",
-    line2: "Someone is grateful for you today. Let that make you smile.",
-  },
-  {
-    line1: "{name}, may today feel lighter, kinder, and a little more yours.",
-    line2: "You've got this — and you've got people cheering for you too.",
-  },
-  {
-    line1: "{name}, hope you feel seen, supported, and happy while you work from home.",
-    line2: "Your good energy doesn't go unnoticed. It really doesn't.",
-  },
-  {
-    line1: "{name}, may your efforts today turn into progress you can feel good about.",
-    line2: "End the day knowing you gave your best — that's always enough.",
-  },
-  {
-    line1: "{name}, wishing you smiles between tasks and calm between calls.",
-    line2: "You make remote work feel more human. Thank you, {name}.",
-  },
-  {
-    line1: "{name}, hope today rewards your patience with something unexpectedly good.",
-    line2: "Stay hopeful — good days have a way of finding good people.",
-  },
-  {
-    line1: "{name}, may you feel healthy, happy, and proud of how far you've come.",
-    line2: "The best version of today includes you feeling at peace with yourself.",
-  },
-  {
-    line1: "{name}, sending a little sunshine your way for a warm, wonderful day.",
-    line2: "You're doing great, {name}. Keep going with that beautiful heart.",
-  },
-];
+/** All 9 chars — keeps every team line the same length. */
+const TEAM_WHO = [
+  "this crew",
+  "this team",
+  "this room",
+  "this hall",
+  "our group",
+  "our squad",
+  "the floor",
+  "this desk",
+] as const;
+
+/** All 8 chars. */
+const TEAM_FEEL = [
+  "brighter",
+  "stronger",
+  "steadier",
+  "composed",
+  "grounded",
+  "inspired",
+  "complete",
+  "grateful",
+] as const;
+
+/** All 16 chars. */
+const TEAM_WHEN = [
+  "when you walk in",
+  "when you show up",
+  "with you in here",
+  "by your side now",
+  "as you walked in",
+  "as you logged on",
+  "while you are in",
+  "next to us today",
+] as const;
+
+/** All 20 chars. */
+const EXEC_LEAD = [
+  "Aap ho the backbone.",
+  "System aap pe chale.",
+  "Aap the pillar, aaj.",
+  "Lead aap, speed hum.",
+  "Aapki spine pe fire.",
+  "Aapke hold pe chalo.",
+  "Aap ho backbone aaj.",
+  "Soch aapki, kaam ab.",
+  "Engine aapka, chalo.",
+  "Team follows aap ab.",
+  "Aap ho — hum strong.",
+  "Tum iska pillar ho —",
+  "Company aap par hai.",
+  "Vision aapka, chalo.",
+  "Poori company aapki.",
+  "Team aapke saath ab.",
+  "Dum aapka, chalo ab.",
+  "Aap captain, chalo —",
+  "Haath aapke, result.",
+  "Strength aapki, aaj.",
+] as const;
+
+/** All 21 chars. */
+const EXEC_PUSH = [
+  "Aaj crack karke jao —",
+  "Humko productive karo",
+  "Aaj aage le ke chalo.",
+  "Team ko sharp rakhna.",
+  "Speed do, clarity do.",
+  "Aaj ka din jeetna hai",
+  "Lead tight, move fast",
+  "Make us sharp aaj hi.",
+  "Pillar banke khade ho",
+  "Focus tight, go hard.",
+  "Crack it — next gear.",
+  "Productive mode on ab",
+  "Aaj fire on karke jao",
+  "Keep us moving aaj hi",
+  "Aaj results nikal do.",
+  "Chalo crack this day.",
+  "Aaj productive raho —",
+  "Humein aage le jao ab",
+  "Team ko fire do aaj —",
+  "Prove it, aaj dikhao.",
+] as const;
 
 function hashString(value: string) {
   let hash = 0;
-  for (let i = 0; i < value.length; i++) {
+  for (let i = 0; i < value.length; i += 1) {
     hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
   }
   return hash;
 }
 
-export function personalizeDailyBoostText(template: string, name: string) {
-  return template.replace(/\{name\}/g, name);
-}
-
-/** Picks a unique message per person per day so teammates never see the same line on the same date. */
-export function dailyBoostIndex(
-  referenceDate: string,
-  personKey: string,
-  poolSize = DAILY_BOOST_MESSAGES.length,
+function cartesian3<A extends string, B extends string, C extends string>(
+  a: readonly A[],
+  b: readonly B[],
+  c: readonly C[],
+  join: (left: A, mid: B, right: C) => string,
 ) {
-  const ms = Date.parse(`${referenceDate}T00:00:00`);
-  const day = Number.isNaN(ms) ? 0 : Math.floor(ms / 86_400_000);
-  const personHash = hashString(personKey.trim().toLowerCase());
-  return (day + personHash) % poolSize;
+  const out: string[] = [];
+  for (const left of a) {
+    for (const mid of b) {
+      for (const right of c) {
+        out.push(join(left, mid, right));
+      }
+    }
+  }
+  return out;
 }
 
-export function resolveDailyBoostMessage(referenceDate: string, personKey: string, name: string) {
-  const boost = DAILY_BOOST_MESSAGES[dailyBoostIndex(referenceDate, personKey)];
-  return {
-    line1: personalizeDailyBoostText(boost.line1, name),
-    line2: personalizeDailyBoostText(boost.line2, name),
-  };
+function cartesian2<A extends string, B extends string>(
+  a: readonly A[],
+  b: readonly B[],
+  join: (left: A, right: B) => string,
+) {
+  const out: string[] = [];
+  for (const left of a) {
+    for (const right of b) {
+      out.push(join(left, right));
+    }
+  }
+  return out;
 }
+
+const TEAM_BODIES = cartesian3(
+  TEAM_WHO,
+  TEAM_FEEL,
+  TEAM_WHEN,
+  (who, feel, when) => `${who} feels ${feel} ${when}.`,
+);
+
+const EXEC_BODIES = cartesian2(
+  EXEC_LEAD,
+  EXEC_PUSH,
+  (lead, push) => `${lead} ${push}`,
+);
+
+function dayIndex(referenceDate: string) {
+  const ms = Date.parse(`${referenceDate}T00:00:00`);
+  return Number.isNaN(ms) ? 0 : Math.floor(ms / 86_400_000);
+}
+
+/** One unique line per person per day. Does not repeat until the pool wraps. */
+export function resolveDailyBoostLine(options: {
+  tone: DailyBoostTone;
+  referenceDate: string;
+  personKey: string;
+  name: string;
+}) {
+  const pool = options.tone === "executive" ? EXEC_BODIES : TEAM_BODIES;
+  const start = hashString(options.personKey.trim().toLowerCase() || options.name) % pool.length;
+  const index = (start + dayIndex(options.referenceDate)) % pool.length;
+  const body = pool[index] ?? pool[0];
+  return `${options.name}, ${body}`;
+}
+
+export const DAILY_BOOST_POOL_SIZE = {
+  team: TEAM_BODIES.length,
+  executive: EXEC_BODIES.length,
+};

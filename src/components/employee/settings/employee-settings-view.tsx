@@ -2,7 +2,7 @@
 
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 import { AccountPasswordResetSection } from "@/components/auth/account-password-reset-section";
 import { cn } from "@/lib/utils";
@@ -68,11 +68,25 @@ function AppearanceSection() {
   );
 }
 
-export function EmployeeSettingsView({ email }: { email: string }) {
+export function EmployeeSettingsView({
+  email,
+  accountBeside,
+}: {
+  email: string;
+  /** Renders beside Account & security (e.g. Resignation) in the same row. */
+  accountBeside?: ReactNode;
+}) {
   return (
     <>
       <AppearanceSection />
-      <AccountPasswordResetSection email={email} />
+      {accountBeside ? (
+        <div className="grid gap-4 md:grid-cols-2 md:items-stretch">
+          <AccountPasswordResetSection email={email} className="h-full" />
+          {accountBeside}
+        </div>
+      ) : (
+        <AccountPasswordResetSection email={email} />
+      )}
     </>
   );
 }

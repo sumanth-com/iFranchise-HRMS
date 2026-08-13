@@ -469,7 +469,9 @@ function buildBreadcrumbItems(
       analytics: "Analytics",
       reports: "Reports",
       notifications: "Notifications",
-      profile: "Profile & Settings",
+      profile: "My Profile",
+      settings: "Settings",
+      "user-provisioning": "User Provisioning",
     };
 
     if (segments[1]) {
@@ -477,6 +479,36 @@ function buildBreadcrumbItems(
       items.push({
         label: sectionLabel,
         href: `/ceo/${segments[1]}`,
+      });
+    }
+
+    if (
+      segments[2] &&
+      (segments[1] === "organization" ||
+        segments[1] === "recruitment" ||
+        segments[1] === "performance" ||
+        segments[1] === "approvals" ||
+        segments[1] === "payroll" ||
+        segments[1] === "reports")
+    ) {
+      const nestedLabels: Record<string, string> = {
+        leave: "Leave",
+        exit: "Exit",
+        run: "Run Payroll",
+        "salary-structures": "Salary Structure",
+        bonuses: "Bonuses",
+        reimbursements: "Expense claims",
+        payslips: "Payslips",
+        settings: "Settings",
+        attendance: "Attendance",
+        payroll: "Payroll",
+        performance: "Performance",
+        recruitment: "Recruitment",
+        assets: "Assets",
+      };
+      items.push({
+        label: nestedLabels[segments[2]] ?? formatSegment(segments[2]),
+        href: pathname,
       });
     }
 

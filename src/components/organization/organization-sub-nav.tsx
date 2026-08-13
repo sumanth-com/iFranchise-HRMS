@@ -3,11 +3,23 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { ORGANIZATION_SUB_NAV } from "@/lib/organization/constants";
+import { ORGANIZATION_ROUTES, ORGANIZATION_SUB_NAV } from "@/lib/organization/constants";
+import { remapSubNavItems } from "@/lib/navigation/remap-sub-nav";
 import { cn } from "@/lib/utils";
 
-export function OrganizationSubNav() {
+type OrganizationSubNavProps = {
+  basePath?: string;
+};
+
+export function OrganizationSubNav({
+  basePath = ORGANIZATION_ROUTES.dashboard,
+}: OrganizationSubNavProps) {
   const pathname = usePathname();
+  const items = remapSubNavItems(
+    ORGANIZATION_SUB_NAV,
+    ORGANIZATION_ROUTES.dashboard,
+    basePath,
+  );
 
   return (
     <div className="flex justify-center">
@@ -15,7 +27,7 @@ export function OrganizationSubNav() {
         className="inline-flex flex-wrap items-center gap-1 rounded-lg border bg-card p-1 shadow-sm"
         aria-label="Organization sections"
       >
-        {ORGANIZATION_SUB_NAV.map((item) => {
+        {items.map((item) => {
           const isActive =
             pathname === item.href || pathname.startsWith(`${item.href}/`);
 

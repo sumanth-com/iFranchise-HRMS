@@ -141,7 +141,7 @@ export type CeoAnalyticsFilterLookups = {
   employmentTypes: LookupOption[];
 };
 
-export type CeoAnalyticsExportFormat = "csv" | "excel" | "pdf" | "summary_pdf";
+export type CeoAnalyticsExportFormat = "excel" | "pdf";
 
 export type CeoAnalyticsPageData = {
   kpis: CeoAnalyticsKpis;

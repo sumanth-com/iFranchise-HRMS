@@ -52,6 +52,8 @@ import type { OnboardingCaseDetail } from "@/types/onboarding";
 type OnboardingReviewViewProps = {
   detail: OnboardingCaseDetail;
   roles: { id: string; name: string; code: string }[];
+  readOnly?: boolean;
+  listHref?: string;
 };
 
 const SECTION_LABELS: Record<string, string> = {
@@ -100,7 +102,12 @@ function formatDateTime(value: string) {
   });
 }
 
-export function OnboardingReviewView({ detail: initialDetail, roles }: OnboardingReviewViewProps) {
+export function OnboardingReviewView({
+  detail: initialDetail,
+  roles,
+  readOnly = false,
+  listHref = ONBOARDING_ROUTES.hrList,
+}: OnboardingReviewViewProps) {
   const router = useRouter();
   const [detail, setDetail] = useState(initialDetail);
   const [hrComments, setHrComments] = useState("");
@@ -119,7 +126,7 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
     detail.sections.some((s) => s.sectionKey === key && s.completedAt),
   ).length;
 
-  const canReview = detail.status === "pending_hr_review";
+  const canReview = !readOnly && detail.status === "pending_hr_review";
   const cannotCancel =
     detail.status === "cancelled" ||
     detail.status === "archived" ||
@@ -224,7 +231,7 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
               variant="ghost"
               size="sm"
               className="-ml-2"
-              onClick={() => router.push(ONBOARDING_ROUTES.hrList)}
+              onClick={() => router.push(listHref)}
             >
               <ArrowLeft className="h-4 w-4 mr-1" />
               Back to list
@@ -248,6 +255,7 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
                 ) : null}
               </div>
 
+              {readOnly ? null : (
               <div className="flex flex-wrap gap-2 shrink-0">
                 <Button
                   variant="outline"
@@ -279,6 +287,7 @@ export function OnboardingReviewView({ detail: initialDetail, roles }: Onboardin
                   Archive
                 </Button>
               </div>
+              )}
             </div>
           </div>
           {detail.status === "cancelled" ? (

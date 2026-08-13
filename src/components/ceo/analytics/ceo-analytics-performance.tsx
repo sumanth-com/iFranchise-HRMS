@@ -2,6 +2,10 @@ import {
   CeoChartPanel,
   CeoStatCard,
 } from "@/components/ceo/ceo-module-primitives";
+import {
+  CeoAnalyticsEmptyNote,
+  CeoAnalyticsSectionHeading,
+} from "@/components/ceo/analytics/ceo-analytics-section-heading";
 import type { CeoAnalyticsPerformance } from "@/types/ceo-analytics";
 
 function hasChartData(items: { value: number }[]) {
@@ -42,16 +46,13 @@ export function CeoAnalyticsPerformancePanel({
     ) : null,
   ].filter(Boolean);
 
-  if (!hasStats && charts.length === 0) return null;
-
   return (
     <section className="w-full space-y-3">
-      <div>
-        <h2 className="text-sm font-semibold tracking-tight">Performance</h2>
-        <p className="text-xs text-muted-foreground">
-          Ratings, goals, and teams that need support
-        </p>
-      </div>
+      <CeoAnalyticsSectionHeading
+        title="Performance"
+        description="Ratings, goals, and teams that need support"
+        helpKey="performance"
+      />
 
       {hasStats ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -73,6 +74,10 @@ export function CeoAnalyticsPerformancePanel({
 
       {charts.length > 0 ? (
         <div className="grid gap-3 lg:grid-cols-2">{charts}</div>
+      ) : null}
+
+      {!hasStats && charts.length === 0 ? (
+        <CeoAnalyticsEmptyNote message="No performance data for this period." />
       ) : null}
     </section>
   );

@@ -35,7 +35,7 @@ export const CEO_NOTIFICATIONS_ROUTES = {
   dashboard: CEO_ROUTES.notifications,
   center: CEO_ROUTES.notifications,
   history: CEO_ROUTES.notifications,
-  preferences: `${CEO_ROUTES.profile}#notifications`,
+  preferences: `${CEO_ROUTES.settings}#notifications`,
 } as const;
 
 export type NotificationRouteSet = {
@@ -91,6 +91,17 @@ export function getNotificationsRoutes(portalHome: string): NotificationRouteSet
   }
 
   return NOTIFICATIONS_ROUTES;
+}
+
+/** Use the current URL so the bell opens this portal's Notifications module. */
+export function getNotificationsRoutesForPath(pathname: string, portalHome: string) {
+  if (pathname.startsWith("/ceo")) return getNotificationsRoutes("/ceo");
+  if (pathname.startsWith("/manager")) return getNotificationsRoutes("/manager");
+  if (pathname.startsWith("/employee")) return getNotificationsRoutes("/employee");
+  if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) {
+    return getNotificationsRoutes("/dashboard");
+  }
+  return getNotificationsRoutes(portalHome);
 }
 
 export const NOTIFICATION_CENTER_TABS = [

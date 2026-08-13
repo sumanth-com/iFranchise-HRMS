@@ -3,6 +3,10 @@ import {
   CeoStatCard,
   formatCeoPercent,
 } from "@/components/ceo/ceo-module-primitives";
+import {
+  CeoAnalyticsEmptyNote,
+  CeoAnalyticsSectionHeading,
+} from "@/components/ceo/analytics/ceo-analytics-section-heading";
 import type { CeoAnalyticsAttendance } from "@/types/ceo-analytics";
 
 function hasChartData(items: { value: number }[]) {
@@ -42,16 +46,13 @@ export function CeoAnalyticsAttendancePanel({
     ) : null,
   ].filter(Boolean);
 
-  if (!hasStats && charts.length === 0) return null;
-
   return (
     <section className="w-full space-y-3">
-      <div>
-        <h2 className="text-sm font-semibold tracking-tight">Attendance</h2>
-        <p className="text-xs text-muted-foreground">
-          Compliance, leave load, and team attendance
-        </p>
-      </div>
+      <CeoAnalyticsSectionHeading
+        title="Attendance"
+        description="Compliance, leave load, and team attendance"
+        helpKey="attendance"
+      />
 
       {hasStats ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -80,6 +81,10 @@ export function CeoAnalyticsAttendancePanel({
 
       {charts.length > 0 ? (
         <div className="grid gap-3 lg:grid-cols-2">{charts}</div>
+      ) : null}
+
+      {!hasStats && charts.length === 0 ? (
+        <CeoAnalyticsEmptyNote message="No attendance data for this period." />
       ) : null}
     </section>
   );

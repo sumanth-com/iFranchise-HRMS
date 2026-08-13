@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PAYROLL_ROUTES } from "@/lib/payroll/constants";
 import { getEmployeeSalaryStructure } from "@/lib/employees/services/employee-detail";
 import { fromHrms } from "@/lib/performance/services/performance-utils";
+import { ceoOrViewPermission } from "@/lib/ceo/read-only-permissions";
 import {
   requireServerAnyPermission,
   requireServerPermission,
@@ -189,7 +190,7 @@ export async function updateGoalProgressAction(
 }
 
 export async function fetchGoalDetailAction(goalId: string): Promise<GoalDetail | null> {
-  const profile = await requireServerPermission("performance.view");
+  const profile = await requireServerAnyPermission(ceoOrViewPermission("performance.view"));
   const supabase = await getAuthenticatedSupabase();
   return getGoalById(supabase, profile.employee.organizationId, goalId);
 }
@@ -536,14 +537,15 @@ export async function updateOneOnOneAction(
 export async function fetchOneOnOneDetailAction(meetingId: string): Promise<OneOnOneDetail | null> {
   const profile = await requireServerAnyPermission([
     PORTAL_PERMISSIONS.employee,
+    PORTAL_PERMISSIONS.ceo,
     "performance.view",
   ]);
   const supabase = await getAuthenticatedSupabase();
   const detail = await getOneOnOneById(supabase, profile.employee.organizationId, meetingId);
-  if (
-    !profile.permissionCodes.includes("performance.view") &&
-    detail?.employeeId !== profile.employee.id
-  ) {
+  const canViewOrg =
+    profile.permissionCodes.includes("performance.view") ||
+    profile.permissionCodes.includes(PORTAL_PERMISSIONS.ceo);
+  if (!canViewOrg && detail?.employeeId !== profile.employee.id) {
     return null;
   }
   return detail;

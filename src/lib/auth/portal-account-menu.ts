@@ -30,7 +30,7 @@ export function getPortalSettingsHref(portalHome: string): string {
     case "manager":
       return MANAGER_ROUTES.settings;
     case "ceo":
-      return CEO_ROUTES.profile;
+      return CEO_ROUTES.settings;
     case "employee":
       return EMPLOYEE_ROUTES.settings;
     default:

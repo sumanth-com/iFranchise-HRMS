@@ -63,7 +63,12 @@ export function EmployeeAttendanceWidget({ today }: { today: ManagerTodayAttenda
       description="Track your working hours for today."
       className="shrink-0"
       action={
-        today.attendanceStatus ? (
+        today.lateMinutes > 0 ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+            <AlarmClock className="size-3" />
+            Late by {formatLateByLabel(today.lateMinutes)}
+          </span>
+        ) : today.attendanceStatus ? (
           <AttendanceStatusBadge status={today.attendanceStatus} />
         ) : null
       }
@@ -73,15 +78,6 @@ export function EmployeeAttendanceWidget({ today }: { today: ManagerTodayAttenda
         <Stat label="Check-In" value={checkInLabel} />
         <Stat label="Check-Out" value={checkOutLabel} />
       </div>
-
-      {today.lateMinutes > 0 ? (
-        <div className="mt-3 flex justify-center">
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
-            <AlarmClock className="size-3" />
-            Late by {formatLateByLabel(today.lateMinutes)}
-          </span>
-        </div>
-      ) : null}
     </EmployeeSectionCard>
   );
 }

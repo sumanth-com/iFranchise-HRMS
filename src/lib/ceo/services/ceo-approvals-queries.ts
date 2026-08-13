@@ -561,6 +561,7 @@ export async function getCeoApprovalsDetail(
       };
     }),
     canAct: CEO_ACTIONABLE_APPROVAL_STATUSES.includes(status),
+    canDelete: true,
   };
 }
 

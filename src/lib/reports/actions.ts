@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { ceoOrViewPermission } from "@/lib/ceo/read-only-permissions";
 import { REPORTS_ROUTES } from "@/lib/reports/constants";
 import { runReport } from "@/lib/reports/services/reports-queries";
 import {
@@ -37,7 +38,7 @@ function revalidateReports() {
 
 export async function runReportAction(reportKey: ReportKey, filters: unknown) {
   try {
-    const profile = await requireServerPermission("reports.view");
+    const profile = await requireServerAnyPermission(ceoOrViewPermission("reports.view"));
     const supabase = await createClient();
     const parsed = reportFiltersSchema.parse(filters ?? {});
     const result = await runReport(supabase, profile, reportKey, parsed);
@@ -109,7 +110,7 @@ export async function exportReportAction(
   format: ReportExportFormat,
 ) {
   try {
-    const profile = await requireServerPermission("reports.export");
+    const profile = await requireServerAnyPermission(ceoOrViewPermission("reports.export"));
     const supabase = await createClient();
     const parsed = reportFiltersSchema.parse(filters ?? {});
     const result = await runReport(supabase, profile, reportKey, parsed);
@@ -144,7 +145,7 @@ export async function exportGeneratedReportAction(
   dateTo?: string,
 ) {
   try {
-    await requireServerPermission("reports.export");
+    await requireServerAnyPermission(ceoOrViewPermission("reports.export"));
     const result = generatedReportSchema.parse(generated) as ReportResult;
     const serialized = serializeGeneratedReport(result, format, dateFrom, dateTo);
     if (serialized) return serialized;

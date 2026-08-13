@@ -3,10 +3,8 @@
 import { format, parseISO } from "date-fns";
 import {
   AlertTriangle,
-  CheckCircle2,
   Eye,
   MoreHorizontal,
-  XCircle,
 } from "lucide-react";
 import { useMemo } from "react";
 import {
@@ -173,9 +171,6 @@ export function ManagerLeaveTable({
         id: "actions",
         header: "",
         cell: ({ row }) => {
-          const canAct =
-            row.original.leaveStatus === "pending" &&
-            row.original.workflowStatus === "pending";
           return (
             <DropdownMenu>
               <DropdownMenuTrigger
@@ -190,25 +185,13 @@ export function ManagerLeaveTable({
                   <Eye className="mr-2 size-4" />
                   View
                 </DropdownMenuItem>
-                {canAct ? (
-                  <>
-                    <DropdownMenuItem onClick={() => onApprove(row.original.id)}>
-                      <CheckCircle2 className="mr-2 size-4" />
-                      Approve
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onReject(row.original.id)}>
-                      <XCircle className="mr-2 size-4" />
-                      Reject
-                    </DropdownMenuItem>
-                  </>
-                ) : null}
               </DropdownMenuContent>
             </DropdownMenu>
           );
         },
       },
     ],
-    [onApprove, onReject, onViewDetails],
+    [onViewDetails],
   );
 
   const table = useReactTable({

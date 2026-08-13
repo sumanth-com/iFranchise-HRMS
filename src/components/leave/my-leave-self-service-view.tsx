@@ -9,15 +9,21 @@ import {
   CalendarClock,
   CalendarDays,
   CalendarPlus,
+  Eye,
   FileText,
 } from "lucide-react";
 
 import { Button, buttonVariants } from "@/components/common/button";
-import { DataTable, type DataTableColumn } from "@/components/common/data-table";
+import {
+  DataTable,
+  DATA_TABLE_SPLIT_SCROLL_MAX_HEIGHT,
+  type DataTableColumn,
+} from "@/components/common/data-table";
 import { EmployeeStatCard } from "@/components/employee/dashboard/employee-module-primitives";
 import { EmployeeLeaveCalendar } from "@/components/employee/leave/employee-leave-calendar";
 import { ApplyLeaveDialog } from "@/components/leave/apply-leave-dialog";
 import { LeaveStatusBadge } from "@/components/leave/leave-status-badge";
+import { MyLeaveDetailPopup } from "@/components/leave/my-leave-detail-popup";
 import { formatLeaveDate } from "@/lib/leave/services/leave-utils";
 import { cn } from "@/lib/utils";
 import type {
@@ -33,6 +39,8 @@ type Props = {
   description?: string;
   policyHref?: string;
   canApply: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
   employeeId?: string;
   applyLeaveLookups?: LeaveLookups | null;
   balances: LeaveEmployeeBalanceSnapshot[];
@@ -49,6 +57,8 @@ export function MyLeaveSelfServiceView({
   description = "Your leave balances and request history.",
   policyHref,
   canApply,
+  canEdit = false,
+  canDelete = false,
   employeeId,
   applyLeaveLookups,
   balances,
@@ -61,6 +71,8 @@ export function MyLeaveSelfServiceView({
 }: Props) {
   const router = useRouter();
   const [applyOpen, setApplyOpen] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [viewPreview, setViewPreview] = useState<LeaveListItem | null>(null);
   const canOpenApplyDialog = canApply && employeeId && applyLeaveLookups;
   const totalBalance = balances.reduce((sum, row) => sum + row.balanceDays, 0);
   const totalUsed = balances.reduce((sum, row) => sum + row.usedDays, 0);
@@ -76,6 +88,11 @@ export function MyLeaveSelfServiceView({
       ? formatLeaveDate(upcomingLeave.startDate)
       : `${formatLeaveDate(upcomingLeave.startDate)} – ${formatLeaveDate(upcomingLeave.endDate)}`
     : "None scheduled";
+
+  function openLeavePopup(row: LeaveListItem) {
+    setViewPreview(row);
+    setViewOpen(true);
+  }
 
   const columns: DataTableColumn<LeaveListItem>[] = [
     { key: "leaveTypeName", header: "Leave Type" },
@@ -100,6 +117,24 @@ export function MyLeaveSelfServiceView({
       key: "appliedAt",
       header: "Applied",
       render: (row) => formatLeaveDate(row.appliedAt),
+    },
+    {
+      key: "actions",
+      header: "",
+      className: "w-[1%] whitespace-nowrap text-right",
+      render: (row) => (
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="View leave"
+            onClick={() => openLeavePopup(row)}
+          >
+            <Eye className="size-4" />
+          </Button>
+        </div>
+      ),
     },
   ];
 
@@ -190,8 +225,24 @@ export function MyLeaveSelfServiceView({
           columns={columns}
           data={requests}
           emptyMessage="You haven't submitted any leave requests yet."
+          scrollable
+          maxHeightClass={DATA_TABLE_SPLIT_SCROLL_MAX_HEIGHT}
         />
       </section>
+
+      <MyLeaveDetailPopup
+        leaveRequestId={viewPreview?.id ?? null}
+        preview={viewPreview}
+        open={viewOpen}
+        onOpenChange={(open) => {
+          setViewOpen(open);
+          if (!open) setViewPreview(null);
+        }}
+        lookups={applyLeaveLookups}
+        canEdit={canEdit}
+        canDelete={canDelete}
+        onActionComplete={() => router.refresh()}
+      />
 
       {showPageHeading && applyLeaveLookups && employeeId ? (
         <ApplyLeaveDialog

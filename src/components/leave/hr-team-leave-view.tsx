@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 
 import { LeaveSummaryCards } from "@/components/leave/leave-summary-cards";
 import { LeaveTable } from "@/components/leave/leave-table";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
+import { getLeaveSummaryAction } from "@/lib/leave/actions";
 import type { LeaveListItem, LeaveSummary } from "@/types/leave";
 import type { LookupOption } from "@/types/employee";
 
@@ -32,6 +33,7 @@ type HrTeamLeaveViewProps = {
   canApprove: boolean;
   canReject: boolean;
   canCancel: boolean;
+  canDelete: boolean;
   embedded?: boolean;
 };
 
@@ -59,8 +61,20 @@ export function HrTeamLeaveView({
   canApprove,
   canReject,
   canCancel,
+  canDelete,
   embedded = false,
 }: HrTeamLeaveViewProps) {
+  const [summaryState, setSummaryState] = useState(summary);
+
+  useEffect(() => {
+    setSummaryState(summary);
+  }, [summary]);
+
+  const refreshSummary = useCallback(async () => {
+    const result = await getLeaveSummaryAction();
+    if (result.success) setSummaryState(result.data);
+  }, []);
+
   return (
     <div className="space-y-6">
       {!embedded ? (
@@ -73,7 +87,7 @@ export function HrTeamLeaveView({
         </div>
       ) : null}
 
-      <LeaveSummaryCards summary={summary} embedded={embedded} />
+      <LeaveSummaryCards summary={summaryState} embedded={embedded} />
 
       <Suspense
         fallback={
@@ -105,7 +119,11 @@ export function HrTeamLeaveView({
           canApprove={canApprove}
           canReject={canReject}
           canCancel={canCancel}
+          canDelete={canDelete}
           embedded={embedded}
+          onMutated={() => {
+            void refreshSummary();
+          }}
         />
       </Suspense>
     </div>

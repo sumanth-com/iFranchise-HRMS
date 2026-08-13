@@ -1,8 +1,10 @@
+import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { ModuleReportsView } from "@/components/reports/module-reports-view";
+import { ceoOrViewPermission } from "@/lib/ceo/read-only-permissions";
 import { MODULE_REPORTS, REPORT_DEFINITIONS } from "@/lib/reports/constants";
 import { getReportsLookups } from "@/lib/reports/services/reports-queries";
 import { defaultDateRange } from "@/lib/reports/services/reports-utils";
-import { requireServerPermission } from "@/lib/permissions/server";
+import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 import type { ReportFilters, ReportKey, ReportModuleKey } from "@/types/reports";
 
@@ -35,9 +37,13 @@ export async function loadModuleReportsPage(
   module: ReportModuleKey,
   searchParams: Promise<Record<string, string | string[] | undefined>>,
 ) {
-  const profile = await requireServerPermission("reports.view");
+  const profile = await requireServerAnyPermission(ceoOrViewPermission("reports.view"));
   const supabase = await createClient();
   const raw = await searchParams;
+  const isCeo = profile.permissionCodes.includes(PORTAL_PERMISSIONS.ceo);
+  const permissionCodes = isCeo
+    ? [...new Set([...profile.permissionCodes, "reports.view", "reports.export"])]
+    : profile.permissionCodes;
 
   const moduleKeys = MODULE_REPORTS[module];
   const definitions = REPORT_DEFINITIONS.filter((d) => d.module === module).map(
@@ -67,7 +73,7 @@ export async function loadModuleReportsPage(
       module={module}
       definitions={definitions}
       lookups={lookups}
-      permissionCodes={profile.permissionCodes}
+      permissionCodes={permissionCodes}
       initialReportKey={reportKey}
       defaultFilters={filters}
     />

@@ -51,6 +51,7 @@ export async function getLeaveRequestById(
           comments,
           acted_at,
           acted_via,
+          deleted_at,
           employees:approver_employee_id (first_name, last_name)
         )
       `,
@@ -68,6 +69,7 @@ export async function getLeaveRequestById(
   const branch = unwrapRelation(employee?.branches ?? null);
 
   const approvals = (data.leave_approvals ?? [])
+    .filter((row) => row.deleted_at == null)
     .map((row) => {
       const approver = unwrapRelation(row.employees);
       return {
@@ -86,21 +88,15 @@ export async function getLeaveRequestById(
     .sort((a, b) => a.approvalLevel - b.approvalLevel);
 
   const isPending = data.leave_status === "pending";
-  const pendingStep = approvals.find((a) => a.approvalStatus === "pending");
-  const isManager =
-    employee?.reporting_manager_id === profile.employee.id;
   const isHrOrAdmin = profile.roles.some((r) =>
-    ["hr_admin", "super_admin"].includes(r.code),
+    ["hr_admin", "hr_executive", "super_admin"].includes(r.code),
   );
 
   const canApprove =
-    isPending &&
-    hasPermission(profile.permissionCodes, "leave.approve") &&
-    ((isManager && pendingStep?.approverEmployeeId === profile.employee.id) ||
-      isHrOrAdmin);
+    isPending && hasPermission(profile.permissionCodes, "leave.approve");
 
   const canReject =
-    isPending && hasPermission(profile.permissionCodes, "leave.reject") && canApprove;
+    isPending && hasPermission(profile.permissionCodes, "leave.reject");
 
   const canCancel =
     ["pending", "approved"].includes(data.leave_status) &&
@@ -111,8 +107,17 @@ export async function getLeaveRequestById(
 
   const canEdit =
     data.leave_status === "pending" &&
-    hasPermission(profile.permissionCodes, "leave.edit") &&
+    (hasPermission(profile.permissionCodes, "leave.edit") ||
+      (data.employee_id === profile.employee.id &&
+        hasPermission(profile.permissionCodes, "leave.create"))) &&
     (data.employee_id === profile.employee.id || isHrOrAdmin);
+
+  const canDelete =
+    hasPermission(profile.permissionCodes, "leave.delete") ||
+    hasPermission(profile.permissionCodes, "leave.cancel") ||
+    (data.employee_id === profile.employee.id &&
+      data.leave_status === "pending" &&
+      hasPermission(profile.permissionCodes, "leave.withdraw"));
 
   return {
     id: data.id,
@@ -144,5 +149,6 @@ export async function getLeaveRequestById(
     canReject,
     canCancel,
     canEdit,
+    canDelete,
   };
 }

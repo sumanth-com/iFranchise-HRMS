@@ -17,6 +17,7 @@ import type {
   OfferStatus,
   OpenJobSnapshot,
   RecruitmentLookups,
+  RecruitmentOverview,
   RecruitmentSettings,
   RecruitmentSummary,
   TimelineItem,
@@ -122,6 +123,109 @@ export async function getRecruitmentLookups(
       subject: row.subject ?? "Offer Letter",
       bodyHtml: row.body_html ?? "",
     })),
+  };
+}
+
+function pad(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function buildRecruitmentOverview(createdAts: string[], now: Date): RecruitmentOverview {
+  const hours: RecruitmentOverview["hours"] = [];
+  const week: RecruitmentOverview["week"] = [];
+  const month: RecruitmentOverview["month"] = [];
+
+  const hourCounts = new Map<string, number>();
+  const dayCounts = new Map<string, number>();
+
+  for (const raw of createdAts) {
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) continue;
+    const hourKey = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}`;
+    const dayKey = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    hourCounts.set(hourKey, (hourCounts.get(hourKey) ?? 0) + 1);
+    dayCounts.set(dayKey, (dayCounts.get(dayKey) ?? 0) + 1);
+  }
+
+  for (let i = 23; i >= 0; i -= 1) {
+    const date = new Date(now);
+    date.setHours(now.getHours() - i, 0, 0, 0);
+    const key = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}`;
+    hours.push({
+      key,
+      label: date.toLocaleTimeString("en-IN", { hour: "numeric", hour12: true }),
+      value: hourCounts.get(key) ?? 0,
+    });
+  }
+
+  for (let i = 6; i >= 0; i -= 1) {
+    const date = new Date(now);
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() - i);
+    const key = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    week.push({
+      key,
+      label: date.toLocaleDateString("en-US", { weekday: "short" }),
+      value: dayCounts.get(key) ?? 0,
+    });
+  }
+
+  for (let i = 29; i >= 0; i -= 1) {
+    const date = new Date(now);
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() - i);
+    const key = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    month.push({
+      key,
+      label: date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      value: dayCounts.get(key) ?? 0,
+    });
+  }
+
+  let lastWeek = 0;
+  for (let i = 13; i >= 7; i -= 1) {
+    const date = new Date(now);
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() - i);
+    const key = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    lastWeek += dayCounts.get(key) ?? 0;
+  }
+
+  let lastHours = 0;
+  for (let i = 47; i >= 24; i -= 1) {
+    const date = new Date(now);
+    date.setHours(now.getHours() - i, 0, 0, 0);
+    const key = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}`;
+    lastHours += hourCounts.get(key) ?? 0;
+  }
+
+  const thisMonthKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+  const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthKey = `${lastMonthDate.getFullYear()}-${pad(lastMonthDate.getMonth() + 1)}`;
+
+  let thisMonth = 0;
+  let lastMonth = 0;
+  for (const raw of createdAts) {
+    const key = String(raw).slice(0, 7);
+    if (key === thisMonthKey) thisMonth += 1;
+    if (key === lastMonthKey) lastMonth += 1;
+  }
+
+  const thisWeek = week.reduce((sum, point) => sum + point.value, 0);
+  const thisHours = hours.reduce((sum, point) => sum + point.value, 0);
+
+  return {
+    hours,
+    week,
+    month,
+    thisMonth,
+    lastMonth,
+    thisWeek,
+    lastWeek,
+    thisHours,
+    lastHours,
+    maxThisMonth: Math.max(0, ...month.map((point) => point.value)),
+    updatedAt: now.toISOString(),
   };
 }
 
@@ -354,6 +458,10 @@ export async function getRecruitmentSummary(
     recentActivity,
     openJobSnapshots,
     interviewTracks,
+    overview: buildRecruitmentOverview(
+      candidateRows.map((row) => String(row.created_at ?? "")),
+      new Date(),
+    ),
   };
 }
 

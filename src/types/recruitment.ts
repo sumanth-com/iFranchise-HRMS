@@ -29,6 +29,27 @@ export type RecruitmentSummary = {
   recentActivity: TimelineItem[];
   openJobSnapshots: OpenJobSnapshot[];
   interviewTracks: InterviewTrackItem[];
+  overview: RecruitmentOverview;
+};
+
+export type RecruitmentOverviewPoint = {
+  key: string;
+  label: string;
+  value: number;
+};
+
+export type RecruitmentOverview = {
+  hours: RecruitmentOverviewPoint[];
+  week: RecruitmentOverviewPoint[];
+  month: RecruitmentOverviewPoint[];
+  thisMonth: number;
+  lastMonth: number;
+  thisWeek: number;
+  lastWeek: number;
+  thisHours: number;
+  lastHours: number;
+  maxThisMonth: number;
+  updatedAt: string;
 };
 
 export type OpenJobSnapshot = {

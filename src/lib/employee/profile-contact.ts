@@ -117,6 +117,7 @@ export function canEditSelfProfileContactDetails(permissionCodes: string[]): boo
   return (
     hasPermission(permissionCodes, "employee.edit") ||
     hasPermission(permissionCodes, "employee_profile.edit") ||
-    hasPermission(permissionCodes, PORTAL_PERMISSIONS.manager)
+    hasPermission(permissionCodes, PORTAL_PERMISSIONS.manager) ||
+    hasPermission(permissionCodes, PORTAL_PERMISSIONS.ceo)
   );
 }

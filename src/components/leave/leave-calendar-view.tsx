@@ -9,7 +9,7 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarHeart, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/common/button";
@@ -181,12 +181,12 @@ export function LeaveCalendarView({
   const calendarDays = isWeek ? weekCells : monthCells;
   const cellMinHeight = isWeek
     ? compact
-      ? "min-h-24"
+      ? "min-h-28"
       : "min-h-40"
     : compact
-      ? "min-h-16"
+      ? "min-h-20"
       : "min-h-28";
-  const maxVisibleLeaves = isWeek ? (compact ? 4 : 8) : compact ? 2 : 3;
+  const maxVisibleLeaves = isWeek ? (compact ? 4 : 8) : compact ? 3 : 3;
   const gridMinWidth = compact ? "w-full" : "min-w-[44rem]";
 
   const yearOptions = useMemo(() => {
@@ -201,6 +201,33 @@ export function LeaveCalendarView({
     });
     return map;
   }, [holidays]);
+
+  function leaveMarkLabel(leave: LeaveCalendarEntry) {
+    if (compact) {
+      const type = leave.leaveTypeName?.trim();
+      if (type) {
+        // Prefer a short pill label (e.g. "Casual Leave" → "Casual").
+        return type.split(/\s+/)[0] ?? type;
+      }
+    }
+    return leave.employeeName;
+  }
+
+  function leaveCellHighlight(dayLeaves: LeaveCalendarEntry[]) {
+    if (dayLeaves.length === 0) return null;
+    const hasPending = dayLeaves.some((leave) => leave.leaveStatus === "pending");
+    const hasApproved = dayLeaves.some((leave) => leave.leaveStatus === "approved");
+    if (hasPending && !hasApproved) {
+      return "bg-amber-500/10 ring-1 ring-inset ring-amber-500/30";
+    }
+    if (hasApproved && !hasPending) {
+      return "bg-emerald-500/10 ring-1 ring-inset ring-emerald-500/30";
+    }
+    if (hasPending && hasApproved) {
+      return "bg-sky-500/10 ring-1 ring-inset ring-sky-500/25";
+    }
+    return "bg-primary/5 ring-1 ring-inset ring-primary/20";
+  }
 
   const leavesByDate = useMemo(() => {
     const map = new Map<string, LeaveCalendarEntry[]>();
@@ -375,59 +402,113 @@ export function LeaveCalendarView({
             const holiday = holidayMap.get(day.date);
             const dayLeaves = leavesByDate.get(day.date) ?? [];
             const isWeekend = isWeekendDate(day.date);
+            const leaveHighlight =
+              day.isCurrentMonth && dayLeaves.length > 0
+                ? leaveCellHighlight(dayLeaves)
+                : null;
+            const holidayHighlight =
+              Boolean(holiday) && day.isCurrentMonth && !leaveHighlight
+                ? "bg-violet-500/10 ring-1 ring-inset ring-violet-500/25"
+                : null;
 
             return (
               <div
                 key={day.date}
                 className={cn(
                   "border-b border-r last:border-r-0",
-                  compact ? "p-1" : "p-2",
+                  compact ? "p-1.5" : "p-2",
                   cellMinHeight,
                   !day.isCurrentMonth && "bg-muted/20 text-muted-foreground",
-                  isWeekend && day.isCurrentMonth && "bg-muted/30",
-                  holiday && day.isCurrentMonth && "bg-violet-500/5",
+                  isWeekend &&
+                    day.isCurrentMonth &&
+                    !leaveHighlight &&
+                    !holidayHighlight &&
+                    "bg-muted/30",
+                  holidayHighlight,
+                  leaveHighlight,
                 )}
               >
-                <div className="mb-2 flex items-center justify-between gap-1">
+                <div className={cn("flex items-start justify-between gap-1", compact ? "mb-1" : "mb-2")}>
                   <span
                     className={cn(
-                      "font-medium",
+                      "font-medium tabular-nums",
                       compact ? "text-xs" : "text-sm",
                       !day.isCurrentMonth && "text-muted-foreground",
+                      (leaveHighlight || holidayHighlight) && "font-semibold",
+                      holidayHighlight && "text-violet-700 dark:text-violet-300",
                     )}
                   >
                     {day.dayNumber}
                   </span>
-                  {holiday ? (
-                    <span
-                      className="truncate text-[10px] font-medium text-violet-700 dark:text-violet-300"
-                      title={holiday.name}
-                    >
-                      {holiday.name}
-                    </span>
-                  ) : null}
                 </div>
 
-                <div className="space-y-1">
-                  {dayLeaves.slice(0, maxVisibleLeaves).map((leave) => (
+                <div className={cn("flex flex-col", compact ? "gap-0.5" : "gap-1")}>
+                  {holiday && day.isCurrentMonth ? (
                     <div
-                      key={`${day.date}-${leave.id}`}
                       className={cn(
-                        "truncate rounded px-1.5 py-0.5 text-[10px] font-medium text-white",
-                        leave.isHalfDay
-                          ? LEAVE_CALENDAR_LEGEND.halfDay.className
-                          : LEAVE_STATUS_COLORS[leave.leaveStatus],
+                        "flex min-w-0 items-center gap-1 text-violet-700 dark:text-violet-200",
+                        compact ? "text-[10px]" : "text-xs",
                       )}
-                      title={`${leave.employeeName} · ${leave.leaveTypeName}`}
+                      title={holiday.name}
                     >
-                      {leave.employeeName}
+                      <CalendarHeart
+                        className={cn(
+                          "shrink-0 text-violet-600 dark:text-violet-300",
+                          compact ? "size-3" : "size-3.5",
+                        )}
+                        aria-hidden
+                      />
+                      <span className="truncate font-bold leading-tight">
+                        {holiday.name}
+                      </span>
                     </div>
-                  ))}
-                  {dayLeaves.length > maxVisibleLeaves ? (
-                    <p className="text-[10px] text-muted-foreground">
-                      +{dayLeaves.length - maxVisibleLeaves} more
-                    </p>
                   ) : null}
+
+                  {compact ? (
+                    <div className="flex flex-wrap gap-0.5">
+                      {dayLeaves.slice(0, maxVisibleLeaves).map((leave) => (
+                        <span
+                          key={`${day.date}-${leave.id}`}
+                          className={cn(
+                            "inline-flex max-w-full truncate rounded-full px-1.5 py-0.5 text-[9px] font-semibold leading-none text-white",
+                            leave.isHalfDay
+                              ? LEAVE_CALENDAR_LEGEND.halfDay.className
+                              : LEAVE_STATUS_COLORS[leave.leaveStatus],
+                          )}
+                          title={`${leave.leaveTypeName} · ${leave.employeeName}`}
+                        >
+                          {leaveMarkLabel(leave)}
+                        </span>
+                      ))}
+                      {dayLeaves.length > maxVisibleLeaves ? (
+                        <span className="inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">
+                          +{dayLeaves.length - maxVisibleLeaves}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {dayLeaves.slice(0, maxVisibleLeaves).map((leave) => (
+                        <div
+                          key={`${day.date}-${leave.id}`}
+                          className={cn(
+                            "truncate rounded px-1.5 py-0.5 text-[10px] font-medium text-white",
+                            leave.isHalfDay
+                              ? LEAVE_CALENDAR_LEGEND.halfDay.className
+                              : LEAVE_STATUS_COLORS[leave.leaveStatus],
+                          )}
+                          title={`${leave.employeeName} · ${leave.leaveTypeName}`}
+                        >
+                          {leave.employeeName}
+                        </div>
+                      ))}
+                      {dayLeaves.length > maxVisibleLeaves ? (
+                        <p className="text-[10px] text-muted-foreground">
+                          +{dayLeaves.length - maxVisibleLeaves} more
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
               </div>
             );

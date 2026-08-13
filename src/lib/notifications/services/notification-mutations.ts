@@ -85,6 +85,18 @@ export async function deleteNotification(
   }
 }
 
+export async function deleteAllOwnNotifications(
+  supabase: AuthSupabaseClient,
+  _profile: UserProfile,
+): Promise<number> {
+  const { data, error } = await supabase.schema("hrms").rpc(
+    "soft_delete_all_own_notifications",
+  );
+
+  if (error) throw new Error(error.message);
+  return typeof data === "number" ? data : Number(data ?? 0);
+}
+
 export async function saveNotificationTemplate(
   supabase: AuthSupabaseClient,
   profile: UserProfile,

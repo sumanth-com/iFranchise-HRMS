@@ -20,6 +20,13 @@ export default async function EmployeeLeavePage() {
   const supabase = await createClient();
   const employeeId = profile.employee.id;
   const canApply = hasPermission(profile.permissionCodes, "leave.create");
+  const canEdit =
+    hasPermission(profile.permissionCodes, "leave.edit") ||
+    hasPermission(profile.permissionCodes, "leave.create");
+  const canDelete =
+    hasPermission(profile.permissionCodes, "leave.delete") ||
+    hasPermission(profile.permissionCodes, "leave.cancel") ||
+    hasPermission(profile.permissionCodes, "leave.withdraw");
 
   const now = new Date();
   const calendarMonth = now.getMonth() + 1;
@@ -41,7 +48,7 @@ export default async function EmployeeLeavePage() {
       { leaves: [], holidays: [] },
       "[employee/leave] calendar",
     ),
-    canApply
+    canApply || canEdit
       ? safeServerCall(
           () => getLeaveLookups(supabase, profile.employee.organizationId),
           {
@@ -63,6 +70,8 @@ export default async function EmployeeLeavePage() {
       <MyLeaveSelfServiceView
         policyHref={EMPLOYEE_ROUTES.leavePolicy}
         canApply={canApply}
+        canEdit={canEdit}
+        canDelete={canDelete}
         employeeId={employeeId}
         applyLeaveLookups={applyLookups}
         balances={balances}

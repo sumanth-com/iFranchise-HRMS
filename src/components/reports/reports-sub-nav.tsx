@@ -3,11 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { REPORTS_SUB_NAV } from "@/lib/reports/constants";
+import { REPORTS_ROUTES, REPORTS_SUB_NAV } from "@/lib/reports/constants";
+import { remapSubNavItems } from "@/lib/navigation/remap-sub-nav";
 import { cn } from "@/lib/utils";
 
-export function ReportsSubNav() {
+type ReportsSubNavProps = {
+  basePath?: string;
+};
+
+export function ReportsSubNav({
+  basePath = REPORTS_ROUTES.dashboard,
+}: ReportsSubNavProps) {
   const pathname = usePathname();
+  const items = remapSubNavItems(REPORTS_SUB_NAV, REPORTS_ROUTES.dashboard, basePath);
 
   return (
     <div className="flex justify-center">
@@ -15,7 +23,7 @@ export function ReportsSubNav() {
         className="inline-flex flex-wrap items-center justify-center gap-1 rounded-lg border bg-card p-1 shadow-sm"
         aria-label="Reports sections"
       >
-        {REPORTS_SUB_NAV.map((item) => {
+        {items.map((item) => {
           const isActive =
             pathname === item.href || pathname.startsWith(`${item.href}/`);
 

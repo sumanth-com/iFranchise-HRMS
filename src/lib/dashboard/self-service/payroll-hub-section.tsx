@@ -24,7 +24,7 @@ const TEAM_PAYROLL_PERMISSIONS = [
   "payslip.view",
 ] as const;
 
-const EMPTY_TEAM_SELF_PAYROLL: EmployeePayrollData = {
+export const EMPTY_TEAM_SELF_PAYROLL: EmployeePayrollData = {
   currencyCode: "INR",
   hasAnyData: false,
   kpis: {

@@ -47,7 +47,7 @@ export default async function CeoUserProvisioningPage({
         </div>
       }
     >
-      <CeoUserProvisioningView {...data} initialFilters={parsed} />
+      <CeoUserProvisioningView {...data} initialFilters={parsed} variant="hr" />
     </Suspense>
   );
 }

@@ -13,7 +13,9 @@ import {
   approveLeaveRequest,
   cancelLeaveRequest,
   createLeaveRequest,
+  deleteLeaveRequest,
   rejectLeaveRequest,
+  updateLeaveRequest,
 } from "@/lib/leave/services/leave-mutations";
 import {
   getLeaveCalendarData,
@@ -64,6 +66,32 @@ export async function createLeaveRequestAction(
   }
 }
 
+export async function updateLeaveRequestAction(
+  leaveRequestId: string,
+  input: unknown,
+): Promise<LeaveActionResult> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "leave.edit",
+      "leave.create",
+    ]);
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = leaveFormSchema.parse(input);
+    await updateLeaveRequest(supabase, profile, leaveRequestId, parsed);
+    revalidatePath(LEAVE_ROUTES.list);
+    revalidatePath(LEAVE_ROUTES.detail(leaveRequestId));
+    revalidatePath(LEAVE_ROUTES.balances);
+    revalidatePath(SELF_LEAVE_ROUTES.list);
+    revalidatePath(SELF_LEAVE_ROUTES.team);
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to update leave request",
+    };
+  }
+}
+
 export async function approveLeaveRequestAction(
   input: unknown,
 ): Promise<LeaveActionResult> {
@@ -81,6 +109,7 @@ export async function approveLeaveRequestAction(
     revalidatePath(LEAVE_ROUTES.detail(parsed.leaveRequestId));
     revalidatePath(LEAVE_ROUTES.balances);
     revalidatePath(SELF_LEAVE_ROUTES.list);
+    revalidatePath(SELF_LEAVE_ROUTES.team);
     return { success: true, data: undefined };
   } catch (error) {
     return {
@@ -107,6 +136,7 @@ export async function rejectLeaveRequestAction(
     revalidatePath(LEAVE_ROUTES.detail(parsed.leaveRequestId));
     revalidatePath(LEAVE_ROUTES.balances);
     revalidatePath(SELF_LEAVE_ROUTES.list);
+    revalidatePath(SELF_LEAVE_ROUTES.team);
     return { success: true, data: undefined };
   } catch (error) {
     return {
@@ -130,11 +160,37 @@ export async function cancelLeaveRequestAction(
     revalidatePath(LEAVE_ROUTES.detail(leaveRequestId));
     revalidatePath(LEAVE_ROUTES.balances);
     revalidatePath(SELF_LEAVE_ROUTES.list);
+    revalidatePath(SELF_LEAVE_ROUTES.team);
     return { success: true, data: undefined };
   } catch (error) {
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to cancel leave request",
+    };
+  }
+}
+
+export async function deleteLeaveRequestAction(
+  leaveRequestId: string,
+): Promise<LeaveActionResult> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "leave.delete",
+      "leave.cancel",
+      "leave.withdraw",
+    ]);
+    const supabase = await getAuthenticatedSupabase();
+    await deleteLeaveRequest(supabase, profile, leaveRequestId);
+    revalidatePath(LEAVE_ROUTES.list);
+    revalidatePath(LEAVE_ROUTES.detail(leaveRequestId));
+    revalidatePath(LEAVE_ROUTES.balances);
+    revalidatePath(SELF_LEAVE_ROUTES.list);
+    revalidatePath(SELF_LEAVE_ROUTES.team);
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to delete leave request",
     };
   }
 }

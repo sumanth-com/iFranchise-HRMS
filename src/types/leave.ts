@@ -136,6 +136,7 @@ export type LeaveDetail = {
   canReject: boolean;
   canCancel: boolean;
   canEdit: boolean;
+  canDelete: boolean;
 };
 
 export type LeaveCalendarEntry = {

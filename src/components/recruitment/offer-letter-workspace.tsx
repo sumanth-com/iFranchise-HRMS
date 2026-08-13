@@ -13,7 +13,10 @@ import {
   applyOfferEmailTemplate,
   buildDefaultOfferEmailSubject,
 } from "@/lib/recruitment/offer-email-content";
-import { isAllowedOfferLetterFilename } from "@/lib/validations/recruitment";
+import {
+  assertOfferLetterFile,
+  OFFER_LETTER_MAX_BYTES,
+} from "@/lib/validations/recruitment";
 import { cn } from "@/lib/utils";
 import type { CandidateDetail, OfferEmailDefaults } from "@/types/recruitment";
 
@@ -110,8 +113,11 @@ export function OfferLetterWorkspace({
       return;
     }
 
-    if (!isAllowedOfferLetterFilename(file.name)) {
-      toast.error("Please upload a PDF, DOC, or DOCX file");
+    try {
+      assertOfferLetterFile(file);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Invalid offer letter file");
+      if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
 
@@ -156,7 +162,11 @@ export function OfferLetterWorkspace({
       }
 
       toast.success(
-        sendNow ? "Offer letter sent to candidate email" : "Offer letter saved",
+        sendNow
+          ? latestOffer?.offerStatus === "sent"
+            ? "Offer letter resent to candidate email"
+            : "Offer letter sent to candidate email"
+          : "Offer letter saved",
       );
       onRefresh();
     });
@@ -165,7 +175,12 @@ export function OfferLetterWorkspace({
   const canSend =
     canOffer &&
     detail &&
-    (!detail.offers.length || detail.offers[0].offerStatus === "draft");
+    (!detail.offers.length ||
+      detail.offers[0].offerStatus === "draft" ||
+      detail.offers[0].offerStatus === "sent");
+  const sendLabel =
+    latestOffer?.offerStatus === "sent" ? "Resend offer" : "Send offer";
+  const maxSizeLabel = formatBytes(OFFER_LETTER_MAX_BYTES);
 
   if (loading && !detail) {
     return (
@@ -234,7 +249,6 @@ export function OfferLetterWorkspace({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             className="hidden"
             disabled={isPending || !canOffer}
             onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
@@ -321,7 +335,10 @@ export function OfferLetterWorkspace({
                 </div>
               ) : activeFileLabel ? (
                 <p className="text-xs text-muted-foreground">
-                  PDF preview is shown above. DOC and DOCX files can still be sent by email.
+                  {activeFile?.type === "application/pdf" ||
+                  activeFileLabel.toLowerCase().endsWith(".pdf")
+                    ? "PDF preview is shown above when available."
+                    : "Preview is available for PDF files. Any file type up to 10 MB can still be emailed."}
                 </p>
               ) : null}
             </div>
@@ -378,8 +395,8 @@ export function OfferLetterWorkspace({
                     Upload offer letter
                   </h3>
                   <p className="mt-1.5 max-w-md text-sm leading-relaxed text-muted-foreground">
-                    Drag & drop or browse to attach the candidate&apos;s offer letter. PDF, DOC, or
-                    DOCX — it will be emailed when you send the offer.
+                    Drag & drop or browse to attach the candidate&apos;s offer letter. Any file type
+                    up to {maxSizeLabel} — it will be emailed when you send the offer.
                   </p>
                 </div>
 
@@ -412,7 +429,7 @@ export function OfferLetterWorkspace({
           <Button size="sm" disabled={isPending} onClick={() => submit(true)}>
             {isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
             <Mail className="mr-1 h-3.5 w-3.5" />
-            Send offer
+            {sendLabel}
           </Button>
         ) : null}
       </div>

@@ -15,6 +15,7 @@ import type { z } from "zod";
 import { EmptyState } from "@/components/common/empty-state";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
+import { SectionHelpButton } from "@/components/common/section-help-button";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/common/modal";
 import { EmployeeSelect, LabeledSelect } from "@/components/payroll/payroll-select";
@@ -34,6 +35,7 @@ import {
   INTERVIEW_DURATION_OPTIONS,
   INTERVIEW_TYPE_LABELS,
 } from "@/lib/recruitment/constants";
+import { HIRING_SECTION_HELP } from "@/lib/recruitment/section-help";
 import {
   applyInterviewEmailTemplate,
   formatInterviewDateLabel,
@@ -193,7 +195,12 @@ export function CandidatesManagement({
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Candidates</h1>
+          <SectionHelpButton
+            title={HIRING_SECTION_HELP.candidates.title}
+            points={[...HIRING_SECTION_HELP.candidates.points]}
+          >
+            <h1 className="text-2xl font-semibold tracking-tight">Candidates</h1>
+          </SectionHelpButton>
           <p className="mt-1 text-sm text-muted-foreground">
             Track applicants across screening, interviews, offer, and joining.
           </p>
@@ -303,7 +310,7 @@ export function CandidatesManagement({
         </div>
 
         {panelOpen ? (
-          <div className="min-h-0 overflow-hidden">
+          <div className="flex h-full min-h-0 flex-col overflow-hidden">
             <CandidateDetailPanel
             detail={activeDetail}
             loading={detailLoading}

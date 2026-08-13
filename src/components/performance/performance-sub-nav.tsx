@@ -3,11 +3,23 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { PERFORMANCE_SUB_NAV } from "@/lib/performance/constants";
+import { PERFORMANCE_ROUTES, PERFORMANCE_SUB_NAV } from "@/lib/performance/constants";
+import { remapSubNavItems } from "@/lib/navigation/remap-sub-nav";
 import { cn } from "@/lib/utils";
 
-export function PerformanceSubNav() {
+type PerformanceSubNavProps = {
+  basePath?: string;
+};
+
+export function PerformanceSubNav({
+  basePath = PERFORMANCE_ROUTES.dashboard,
+}: PerformanceSubNavProps) {
   const pathname = usePathname();
+  const items = remapSubNavItems(
+    PERFORMANCE_SUB_NAV,
+    PERFORMANCE_ROUTES.dashboard,
+    basePath,
+  );
 
   return (
     <div className="flex justify-center">
@@ -15,7 +27,7 @@ export function PerformanceSubNav() {
         className="inline-flex flex-wrap items-center gap-1 rounded-lg border bg-card p-1 shadow-sm"
         aria-label="Performance sections"
       >
-        {PERFORMANCE_SUB_NAV.map((item) => {
+        {items.map((item) => {
           const isActive =
             pathname === item.href || pathname.startsWith(`${item.href}/`);
 

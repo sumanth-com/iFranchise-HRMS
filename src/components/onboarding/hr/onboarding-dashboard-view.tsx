@@ -10,6 +10,7 @@ import { Button } from "@/components/common/button";
 import { EmptyState } from "@/components/common/empty-state";
 import { Input } from "@/components/common/input";
 import { FilterSelect } from "@/components/common/filter-select";
+import { SectionHelpButton } from "@/components/common/section-help-button";
 import { CreateOnboardingDialog } from "@/components/onboarding/hr/create-onboarding-dialog";
 import {
   Dialog,
@@ -25,6 +26,7 @@ import {
 } from "@/lib/onboarding/actions/hr-onboarding-actions";
 import type { OnboardingModuleData } from "@/lib/onboarding/loaders/hr-onboarding-loaders";
 import { assignOnboardingRouteRefs } from "@/lib/onboarding/routing";
+import { HIRING_SECTION_HELP } from "@/lib/recruitment/section-help";
 import {
   ONBOARDING_ROUTES,
   ONBOARDING_STATUS_LABELS,
@@ -35,6 +37,8 @@ import type { OnboardingListParams } from "@/types/onboarding";
 
 type OnboardingDashboardViewProps = OnboardingModuleData & {
   initialFilters: OnboardingListParams;
+  readOnly?: boolean;
+  basePath?: string;
 };
 
 function statusBadgeClass(status: string) {
@@ -53,6 +57,8 @@ export function OnboardingDashboardView({
   cases: initialCases,
   lookups,
   initialFilters,
+  readOnly = false,
+  basePath = ONBOARDING_ROUTES.hrList,
 }: OnboardingDashboardViewProps) {
   const router = useRouter();
   const [cases, setCases] = useState(initialCases);
@@ -96,7 +102,12 @@ export function OnboardingDashboardView({
   return (
     <div className="flex flex-col gap-3">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Employee Onboarding</h1>
+        <SectionHelpButton
+          title={HIRING_SECTION_HELP.onboarding.title}
+          points={[...HIRING_SECTION_HELP.onboarding.points]}
+        >
+          <h1 className="text-2xl font-semibold tracking-tight">Employee Onboarding</h1>
+        </SectionHelpButton>
         <p className="mt-1 text-sm text-muted-foreground">
           Pre-joining onboarding for new hires before company account creation
         </p>
@@ -129,17 +140,23 @@ export function OnboardingDashboardView({
             ]}
           />
         </div>
-        <Button className="ml-auto shrink-0" onClick={() => setCreateOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Hire
-        </Button>
+        {readOnly ? null : (
+          <Button className="ml-auto shrink-0" onClick={() => setCreateOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Hire
+          </Button>
+        )}
       </div>
 
       {cases.data.length === 0 ? (
         <EmptyState
           icon={<UserPlus className="h-5 w-5" />}
           title="No onboarding cases"
-          description="Create a new hire to send a pre-joining onboarding invitation."
+          description={
+            readOnly
+              ? "No pre-joining onboarding cases to display."
+              : "Create a new hire to send a pre-joining onboarding invitation."
+          }
         />
       ) : (
         <div className="w-full overflow-hidden rounded-xl border">
@@ -172,13 +189,13 @@ export function OnboardingDashboardView({
                   <td className="p-3 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <Link
-                        href={ONBOARDING_ROUTES.hrDetail(routeRefs.get(row.id) ?? row.id)}
+                        href={`${basePath}/${routeRefs.get(row.id) ?? row.id}`}
                         className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-primary hover:bg-muted hover:text-primary"
                       >
                         <ClipboardList className="h-4 w-4" />
-                        Review
+                        {readOnly ? "View" : "Review"}
                       </Link>
-                      {canDeleteOnboardingCase(row.status) ? (
+                      {!readOnly && canDeleteOnboardingCase(row.status) ? (
                         <Button
                           type="button"
                           variant="ghost"
@@ -223,20 +240,22 @@ export function OnboardingDashboardView({
         </div>
       )}
 
-      <CreateOnboardingDialog
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        lookups={lookups}
-        onSuccess={(caseId, fullName) => {
-          setCreateOpen(false);
-          toast.success("Onboarding invitation sent");
-          const routeRef = assignOnboardingRouteRefs([
-            ...cases.data.map((row) => ({ id: row.id, fullName: row.fullName })),
-            { id: caseId, fullName },
-          ]).get(caseId) ?? caseId;
-          router.push(ONBOARDING_ROUTES.hrDetail(routeRef));
-        }}
-      />
+      {readOnly ? null : (
+        <CreateOnboardingDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          lookups={lookups}
+          onSuccess={(caseId, fullName) => {
+            setCreateOpen(false);
+            toast.success("Onboarding invitation sent");
+            const routeRef = assignOnboardingRouteRefs([
+              ...cases.data.map((row) => ({ id: row.id, fullName: row.fullName })),
+              { id: caseId, fullName },
+            ]).get(caseId) ?? caseId;
+            router.push(`${basePath}/${routeRef}`);
+          }}
+        />
+      )}
 
       <Dialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent className="sm:max-w-md">

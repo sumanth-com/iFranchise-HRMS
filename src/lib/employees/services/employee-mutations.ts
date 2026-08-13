@@ -425,6 +425,18 @@ export async function softDeleteEmployee(
   if (error) {
     throw new Error(error.message);
   }
+
+  // Trigger also cascades; call explicitly so admin-bypass paths stay consistent.
+  const { error: cascadeError } = await supabase
+    .schema("hrms")
+    .rpc("cascade_soft_delete_employee_related", {
+      p_employee_id: employeeId,
+      p_deleted_by: profile.userId,
+    });
+
+  if (cascadeError) {
+    throw new Error(cascadeError.message);
+  }
 }
 
 export async function uploadEmployeeDocument(

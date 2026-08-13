@@ -4,14 +4,13 @@ import {
   BriefcaseBusiness,
   Building2,
   CalendarCheck,
-  CalendarDays,
   CheckSquare,
   LayoutDashboard,
-  LineChart,
-  LogOut,
+  Settings,
   Target,
   UserRound,
   UserRoundPlus,
+  Wallet,
 } from "lucide-react";
 
 import type { NavigationItem } from "@/lib/auth/navigation";
@@ -22,6 +21,11 @@ export const ceoNavItems: NavigationItem[] = [
     title: "Dashboard",
     href: CEO_ROUTES.home,
     icon: LayoutDashboard,
+  },
+  {
+    title: "My Profile",
+    href: CEO_ROUTES.profile,
+    icon: UserRound,
   },
   {
     title: "Organization",
@@ -48,33 +52,19 @@ export const ceoNavItems: NavigationItem[] = [
     permissions: ["attendance.view"],
   },
   {
-    title: "Leave Approvals",
-    href: CEO_ROUTES.leave,
-    icon: CalendarDays,
-    permissions: ["leave.approve"],
-  },
-  {
-    title: "Exit Approvals",
-    href: CEO_ROUTES.exit,
-    icon: LogOut,
-    permissions: ["exit.view", "exit.approve"],
-  },
-  {
     title: "Approvals",
     href: CEO_ROUTES.approvals,
     icon: CheckSquare,
   },
   {
-    title: "Analytics",
-    href: CEO_ROUTES.analytics,
-    icon: LineChart,
-    permissions: ["reports.view"],
+    title: "Company Payroll",
+    href: CEO_ROUTES.payroll,
+    icon: Wallet,
   },
   {
     title: "Reports",
     href: CEO_ROUTES.reports,
     icon: BarChart3,
-    permissions: ["reports.view"],
   },
   {
     title: "Notifications",
@@ -86,11 +76,10 @@ export const ceoNavItems: NavigationItem[] = [
     title: "User Provisioning",
     href: CEO_ROUTES.userProvisioning,
     icon: UserRoundPlus,
-    permissions: ["user_provisioning.view", "user_provisioning.manage"],
   },
   {
-    title: "Profile & Settings",
-    href: CEO_ROUTES.profile,
-    icon: UserRound,
+    title: "Settings",
+    href: CEO_ROUTES.settings,
+    icon: Settings,
   },
 ];

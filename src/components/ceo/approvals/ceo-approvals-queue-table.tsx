@@ -12,6 +12,7 @@ import {
 
 import { formatCeoCurrency } from "@/components/ceo/ceo-module-primitives";
 import { Button } from "@/components/common/button";
+import { SectionHelpButton } from "@/components/common/section-help-button";
 import {
   Table,
   TableBody,
@@ -21,6 +22,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { EXECUTIVE_APPROVAL_PRIORITY_LABELS } from "@/lib/ceo/executive-approvals-constants";
+import {
+  CEO_APPROVALS_SECTION_HELP,
+  CEO_SECTION_HELP_DESCRIPTION,
+} from "@/lib/ceo/section-help";
 import { cn } from "@/lib/utils";
 import type { CeoApprovalsQueueRow } from "@/types/ceo-approvals";
 
@@ -29,7 +34,6 @@ type CeoApprovalsQueueTableProps = {
   total: number;
   page: number;
   pageSize: number;
-  isLoading?: boolean;
   onPageChange: (page: number) => void;
   onView: (requestId: string) => void;
 };
@@ -51,7 +55,6 @@ export function CeoApprovalsQueueTable({
   total,
   page,
   pageSize,
-  isLoading,
   onPageChange,
   onView,
 }: CeoApprovalsQueueTableProps) {
@@ -136,7 +139,11 @@ export function CeoApprovalsQueueTable({
             size="sm"
             variant="outline"
             className="gap-1.5"
-            onClick={() => onView(row.original.id)}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onView(row.original.id);
+            }}
           >
             <Eye className="size-3.5" />
             Review
@@ -158,7 +165,13 @@ export function CeoApprovalsQueueTable({
   return (
     <section className="w-full space-y-3">
       <div>
-        <h2 className="text-sm font-semibold tracking-tight">Approval Queue</h2>
+        <SectionHelpButton
+          title={CEO_APPROVALS_SECTION_HELP.queue.title}
+          points={[...CEO_APPROVALS_SECTION_HELP.queue.points]}
+          description={CEO_SECTION_HELP_DESCRIPTION}
+        >
+          <h2 className="text-sm font-semibold tracking-tight">Approval Queue</h2>
+        </SectionHelpButton>
         <p className="text-xs text-muted-foreground">
           Open a request to approve, reject, clarify, or forward
         </p>
@@ -190,17 +203,12 @@ export function CeoApprovalsQueueTable({
                     colSpan={columns.length}
                     className="h-24 text-center text-muted-foreground"
                   >
-                    {isLoading
-                      ? "Loading approvals…"
-                      : "No executive approvals match these filters."}
+                    No executive approvals match these filters.
                   </TableCell>
                 </TableRow>
               ) : (
                 table.getRowModel().rows.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    className={isLoading ? "opacity-60" : undefined}
-                  >
+                  <TableRow key={row.id}>
                     {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id}>
                         {flexRender(
@@ -227,7 +235,7 @@ export function CeoApprovalsQueueTable({
                 type="button"
                 size="sm"
                 variant="outline"
-                disabled={page <= 1 || isLoading}
+                disabled={page <= 1}
                 onClick={() => onPageChange(page - 1)}
               >
                 Previous
@@ -239,7 +247,7 @@ export function CeoApprovalsQueueTable({
                 type="button"
                 size="sm"
                 variant="outline"
-                disabled={page >= totalPages || isLoading}
+                disabled={page >= totalPages}
                 onClick={() => onPageChange(page + 1)}
               >
                 Next

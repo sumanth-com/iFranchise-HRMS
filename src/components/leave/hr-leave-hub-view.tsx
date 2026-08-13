@@ -47,12 +47,15 @@ type TeamLeaveData = {
   canApprove: boolean;
   canReject: boolean;
   canCancel: boolean;
+  canDelete: boolean;
 };
 
 type Props = {
   initialSection?: LeaveSection;
   canViewTeam: boolean;
   canApply: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
   employeeId: string;
   applyLeaveLookups: LeaveLookups | null;
   balances: LeaveEmployeeBalanceSnapshot[];
@@ -69,6 +72,8 @@ export function HrLeaveHubView({
   initialSection = "my",
   canViewTeam,
   canApply,
+  canEdit = false,
+  canDelete = false,
   employeeId,
   applyLeaveLookups,
   balances,
@@ -127,6 +132,8 @@ export function HrLeaveHubView({
       ) : (
         <MyLeaveSelfServiceView
           canApply={canApply}
+          canEdit={canEdit}
+          canDelete={canDelete}
           employeeId={employeeId}
           applyLeaveLookups={applyLeaveLookups}
           balances={balances}

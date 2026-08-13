@@ -1,3 +1,4 @@
+import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { hasAnyPermission } from "@/lib/permissions/utils";
 import { hubListUrl } from "@/lib/dashboard/hub-paths";
 import type {
@@ -183,7 +184,12 @@ export const PAYROLL_SUMMARY_LABELS = {
 const PAYROLL_VIEW = ["payroll.view"];
 const PAYROLL_CREATE = ["payroll.create", "payroll.generate"];
 const PAYROLL_EDIT = ["payroll.edit", "payroll.process"];
-const PAYROLL_RUN = ["payroll.run", "payroll.process", "payroll.generate"];
+const PAYROLL_RUN = [
+  "payroll.run",
+  "payroll.process",
+  "payroll.generate",
+  PORTAL_PERMISSIONS.ceo,
+];
 const PAYROLL_APPROVE = ["payroll.approve"];
 const PAYROLL_DOWNLOAD = ["payroll.download", "payslip.generate", "payslip.view"];
 const SALARY_VIEW = ["salary.view", "salary_structure.view"];
@@ -269,17 +275,36 @@ export const TEAM_PAYROLL_SECTION_DESCRIPTIONS: Record<TeamPayrollSection, strin
     "Payroll cycle, processing schedule, and salary credit day for your organization.",
 };
 
+export const TEAM_PAYROLL_SECTION_TITLES: Record<TeamPayrollSection, string> = {
+  run: "Run Payroll",
+  "salary-structures": "Salary Structure",
+  bonuses: "Bonuses",
+  reimbursements: "Expense claims",
+  payslips: "Payslips",
+  settings: "Settings",
+};
+
+export function teamPayrollSectionTitle(section: TeamPayrollSection): string {
+  return TEAM_PAYROLL_SECTION_TITLES[section];
+}
+
 export function teamPayrollSectionDescription(section: TeamPayrollSection): string {
   return TEAM_PAYROLL_SECTION_DESCRIPTIONS[section];
 }
 
 export const PAYROLL_SUB_NAV = [
-  { title: "Run Payroll", section: TEAM_PAYROLL_SECTIONS.run },
-  { title: "Salary Structure", section: TEAM_PAYROLL_SECTIONS["salary-structures"] },
-  { title: "Bonuses", section: TEAM_PAYROLL_SECTIONS.bonuses },
-  { title: "Expense claims", section: TEAM_PAYROLL_SECTIONS.reimbursements },
-  { title: "Payslips", section: TEAM_PAYROLL_SECTIONS.payslips },
-  { title: "Settings", section: TEAM_PAYROLL_SECTIONS.settings },
+  { title: TEAM_PAYROLL_SECTION_TITLES.run, section: TEAM_PAYROLL_SECTIONS.run },
+  {
+    title: TEAM_PAYROLL_SECTION_TITLES["salary-structures"],
+    section: TEAM_PAYROLL_SECTIONS["salary-structures"],
+  },
+  { title: TEAM_PAYROLL_SECTION_TITLES.bonuses, section: TEAM_PAYROLL_SECTIONS.bonuses },
+  {
+    title: TEAM_PAYROLL_SECTION_TITLES.reimbursements,
+    section: TEAM_PAYROLL_SECTIONS.reimbursements,
+  },
+  { title: TEAM_PAYROLL_SECTION_TITLES.payslips, section: TEAM_PAYROLL_SECTIONS.payslips },
+  { title: TEAM_PAYROLL_SECTION_TITLES.settings, section: TEAM_PAYROLL_SECTIONS.settings },
 ].map((item) => ({
   title: item.title,
   section: item.section,

@@ -1,12 +1,11 @@
 import { CeoStatCard } from "@/components/ceo/ceo-module-primitives";
 import type { CeoApprovalsKpis } from "@/types/ceo-approvals";
-import { cn } from "@/lib/utils";
 
 export function CeoApprovalsSummary({ kpis }: { kpis: CeoApprovalsKpis }) {
   return (
     <section
       aria-label="Executive approval KPIs"
-      className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
+      className="grid w-full grid-cols-2 gap-3 lg:grid-cols-4"
     >
       <CeoStatCard label="Pending" value={String(kpis.totalPending)} />
       <CeoStatCard
@@ -29,20 +28,6 @@ export function CeoApprovalsSummary({ kpis }: { kpis: CeoApprovalsKpis }) {
             ? "text-violet-600 dark:text-violet-400"
             : undefined
         }
-      />
-      <CeoStatCard
-        label="Approved MTD"
-        value={String(kpis.approvedThisMonth)}
-        accent="text-emerald-600 dark:text-emerald-400"
-      />
-      <CeoStatCard
-        label="Avg Time"
-        value={`${kpis.averageApprovalTimeHours.toFixed(1)}h`}
-        accent={cn(
-          kpis.averageApprovalTimeHours > 72
-            ? "text-amber-700 dark:text-amber-400"
-            : undefined,
-        )}
       />
     </section>
   );

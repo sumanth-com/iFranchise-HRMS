@@ -28,15 +28,19 @@ export default async function SettingsSelfServicePage() {
           </p>
         </div>
 
-        <EmployeeSettingsView email={profile.email} />
-
-        <SettingsResignationModalSection
-          title="Offboarding"
-          description="Submit your resignation and track approval status."
-          canApply={hasPermission(profile.permissionCodes, "exit.create")}
-          employeeId={profile.employee.id}
-          defaultNoticePeriodDays={exitSettings.defaultNoticePeriodDays}
-          activeResignation={snapshot.activeResignation}
+        <EmployeeSettingsView
+          email={profile.email}
+          accountBeside={
+            <SettingsResignationModalSection
+              title="Offboarding"
+              description="Submit your resignation and track approval status."
+              canApply={hasPermission(profile.permissionCodes, "exit.create")}
+              employeeId={profile.employee.id}
+              defaultNoticePeriodDays={exitSettings.defaultNoticePeriodDays}
+              activeResignation={snapshot.activeResignation}
+              className="h-full"
+            />
+          }
         />
 
         <section className="rounded-xl border bg-card p-4 shadow-sm md:p-5">

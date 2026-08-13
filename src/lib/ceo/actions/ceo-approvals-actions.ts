@@ -4,6 +4,7 @@ import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import {
   addExecutiveApprovalComment,
   approveExecutiveRequest,
+  deleteExecutiveRequest,
   forwardExecutiveRequest,
   rejectExecutiveRequest,
   requestClarificationOnExecutiveRequest,
@@ -212,5 +213,17 @@ export async function forwardCeoApprovalAction(input: {
   return runDecision(
     () => forwardExecutiveRequest(supabase, profile, parsed),
     "Request forwarded.",
+  );
+}
+
+export async function deleteCeoApprovalAction(input: {
+  requestId: string;
+}): Promise<CeoApprovalsActionResult> {
+  const profile = await requireServerPermission(PORTAL_PERMISSIONS.ceo);
+  const supabase = await createClient();
+  const parsed = ceoApprovalsRequestIdSchema.parse(input);
+  return runDecision(
+    () => deleteExecutiveRequest(supabase, profile, parsed),
+    "Request removed.",
   );
 }

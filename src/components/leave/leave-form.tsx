@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/common/select";
-import { createLeaveRequestAction, getEmployeeLeaveBalanceSnapshotAction } from "@/lib/leave/actions";
+import { createLeaveRequestAction, getEmployeeLeaveBalanceSnapshotAction, updateLeaveRequestAction } from "@/lib/leave/actions";
 import {
   HALF_DAY_PERIOD_LABELS,
   LEAVE_ROUTES,
@@ -28,12 +28,24 @@ import {
   leaveFormSchema,
   type LeaveFormInput,
 } from "@/lib/validations/leave";
-import type { LeaveEmployeeBalanceSnapshot, LeaveLookups } from "@/types/leave";
+import type { LeaveEmployeeBalanceSnapshot, LeaveListItem, LeaveLookups } from "@/types/leave";
 
 type LeaveFormProps = {
   lookups: LeaveLookups;
   defaultEmployeeId?: string;
-  mode?: "create";
+  mode?: "create" | "edit";
+  /** Existing request when editing. */
+  initialRequest?: Pick<
+    LeaveListItem,
+    | "id"
+    | "employeeId"
+    | "leaveTypeId"
+    | "startDate"
+    | "endDate"
+    | "isHalfDay"
+    | "halfDayPeriod"
+    | "reason"
+  > | null;
   /** When set, the form redirects here on success/cancel instead of the HR leave routes. */
   redirectPath?: string;
   /** Self-service modal: hide employee picker and optional fields. */
@@ -45,6 +57,8 @@ type LeaveFormProps = {
 export function LeaveForm({
   lookups,
   defaultEmployeeId,
+  mode = "create",
+  initialRequest = null,
   redirectPath,
   variant = "default",
   onSuccess,
@@ -73,17 +87,18 @@ export function LeaveForm({
   );
 
   const today = getTodayDateString();
+  const isEdit = mode === "edit" && Boolean(initialRequest?.id);
 
   const form = useForm<LeaveFormInput>({
     resolver: zodResolver(leaveFormSchema) as Resolver<LeaveFormInput>,
     defaultValues: {
-      employeeId: defaultEmployeeId ?? "",
-      leaveTypeId: "",
-      startDate: today,
-      endDate: today,
-      isHalfDay: false,
-      halfDayPeriod: "",
-      reason: "",
+      employeeId: initialRequest?.employeeId ?? defaultEmployeeId ?? "",
+      leaveTypeId: initialRequest?.leaveTypeId ?? "",
+      startDate: initialRequest?.startDate ?? today,
+      endDate: initialRequest?.endDate ?? today,
+      isHalfDay: initialRequest?.isHalfDay ?? false,
+      halfDayPeriod: initialRequest?.halfDayPeriod ?? "",
+      reason: initialRequest?.reason ?? "",
       emergencyContactName: "",
       emergencyContactPhone: "",
       attachmentPath: "",
@@ -119,14 +134,16 @@ export function LeaveForm({
 
   const onSubmit = form.handleSubmit((values) => {
     startTransition(async () => {
-      const result = await createLeaveRequestAction(values);
+      const result = isEdit
+        ? await updateLeaveRequestAction(initialRequest!.id, values)
+        : await createLeaveRequestAction(values);
 
       if (!result.success) {
         toast.error(result.message);
         return;
       }
 
-      toast.success("Leave request submitted successfully");
+      toast.success(isEdit ? "Leave request updated" : "Leave request submitted successfully");
 
       if (onSuccess) {
         onSuccess();
@@ -140,7 +157,7 @@ export function LeaveForm({
         return;
       }
 
-      if (result.data) {
+      if (!isEdit && result.data) {
         router.push(LEAVE_ROUTES.detail(result.data));
         router.refresh();
         return;
@@ -440,7 +457,11 @@ export function LeaveForm({
           Cancel
         </Button>
         <Button type="submit" disabled={isPending}>
-          {isSelfService ? "Submit request" : "Submit leave request"}
+          {isEdit
+            ? "Save changes"
+            : isSelfService
+              ? "Submit request"
+              : "Submit leave request"}
         </Button>
       </div>
     </form>

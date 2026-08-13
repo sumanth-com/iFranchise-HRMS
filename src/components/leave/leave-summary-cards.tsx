@@ -8,12 +8,11 @@ import {
 } from "lucide-react";
 
 import { LEAVE_SUMMARY_LABELS } from "@/lib/leave/constants";
-import { cn } from "@/lib/utils";
 import type { LeaveSummary } from "@/types/leave";
 
 type LeaveSummaryCardsProps = {
   summary: LeaveSummary;
-  /** Team leave hub: hide approved/rejected approval metrics. */
+  /** Kept for callers; approved/rejected cards always shown. */
   embedded?: boolean;
 };
 
@@ -103,35 +102,19 @@ function SummaryCard({
   );
 }
 
-export function LeaveSummaryCards({ summary, embedded = false }: LeaveSummaryCardsProps) {
-  const statusCards = embedded
-    ? STATUS_ROW.filter((item) => item.key === "pendingRequests")
-    : STATUS_ROW;
-
+export function LeaveSummaryCards({ summary }: LeaveSummaryCardsProps) {
   return (
     <div className="space-y-3">
-      <div
-        className={cn(
-          "grid gap-3 sm:grid-cols-2",
-          embedded ? "lg:grid-cols-4" : "lg:grid-cols-3",
-        )}
-      >
-        {statusCards.map((item) => (
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {STATUS_ROW.map((item) => (
           <SummaryCard key={item.key} item={item} value={summary[item.key]} />
         ))}
-        {embedded
-          ? WORKFORCE_ROW.map((item) => (
-              <SummaryCard key={item.key} item={item} value={summary[item.key]} />
-            ))
-          : null}
       </div>
-      {!embedded ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {WORKFORCE_ROW.map((item) => (
-            <SummaryCard key={item.key} item={item} value={summary[item.key]} />
-          ))}
-        </div>
-      ) : null}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {WORKFORCE_ROW.map((item) => (
+          <SummaryCard key={item.key} item={item} value={summary[item.key]} />
+        ))}
+      </div>
     </div>
   );
 }

@@ -162,19 +162,31 @@ function resolvePunchStatus(
     options?.finalizeHours ?? (Boolean(checkOutAt) || attendanceDate < today);
 
   // Until checkout is recorded, status follows check-in only (present / late).
-  // Hours-based half-day / absent apply once the workday has a checkout.
+  // Hours-based half-day applies once checkout is recorded for a short day.
+  // Checked-in + checked-out with real work time is never "absent" — that label
+  // is reserved for no-show / negligible presence.
   if (
     finalizeHours &&
     checkOutAt &&
     workHours > 0 &&
     workHours < rules.fullDayMinimumHours
   ) {
-    if (workHours < rules.halfDayMinimumHours) return "absent";
+    const negligibleHours = 0.25; // under 15 minutes
+    if (workHours < negligibleHours) return "absent";
     return "half_day";
   }
 
   if (lateMinutes > 0) return "late";
   return "present";
+}
+
+/** Regularization allowed for today, yesterday, and the day before only. */
+function isWithinRegularizationWindow(
+  attendanceDate: string,
+  today: string,
+): boolean {
+  const earliest = format(addDays(parseISO(today), -2), "yyyy-MM-dd");
+  return attendanceDate >= earliest && attendanceDate <= today;
 }
 
 function resolvePunchState(
@@ -217,7 +229,7 @@ function buildTodayPanel(
     ? Number(row.overtime_hours ?? 0)
     : computeOvertimeHours(workHours, rules);
 
-  // Prefer live punch status so an early checkout does not show Half Day until hours finalize.
+  // Live punch status so checkout hours map to half day / present without waiting on stored row.
   const attendanceStatus = checkInAt
     ? resolvePunchStatus(checkInAt, checkOutAt, attendanceDate, rules)
     : row?.attendance_status ?? null;
@@ -476,7 +488,6 @@ function buildCalendarDays(input: {
 
     let status: AttendanceStatus | null = null;
     if (attendance) {
-      // Live status: early checkout before lock should not appear as half day.
       status = resolvePunchStatus(
         attendance.check_in_at,
         attendance.check_out_at,
@@ -664,7 +675,7 @@ function buildHistoryRows(input: {
       attendance?.check_in_at && date === input.today,
     );
     const canRequestRegularization =
-      date <= input.today &&
+      isWithinRegularizationWindow(date, input.today) &&
       (!correction || correction.correction_status !== "pending");
 
     let remarks = attendance?.notes ?? null;
@@ -1097,6 +1108,13 @@ export async function requestManagerAttendanceRegularization(
   profile: UserProfile,
   input: ManagerAttendanceRegularizationInput,
 ) {
+  const today = getTodayDateString();
+  if (!isWithinRegularizationWindow(input.attendanceDate, today)) {
+    throw new Error(
+      "Regularization can only be requested for today, yesterday, or the day before yesterday.",
+    );
+  }
+
   const employeeId = profile.employee.id;
   let attendanceId = input.attendanceId;
 

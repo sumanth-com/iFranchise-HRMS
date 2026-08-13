@@ -1,28 +1,32 @@
 export const CEO_ROUTES = {
   home: "/ceo",
   organization: "/ceo/organization",
+  organizationProfile: "/ceo/organization/profile",
   recruitment: "/ceo/recruitment",
   performance: "/ceo/performance",
+  performanceGoals: "/ceo/performance/goals",
   payroll: "/ceo/payroll",
   attendance: "/ceo/attendance",
   leave: "/ceo/leave",
   exit: "/ceo/exit",
   analytics: "/ceo/analytics",
   approvals: "/ceo/approvals",
+  approvalsLeave: "/ceo/approvals/leave",
+  approvalsExit: "/ceo/approvals/exit",
   reports: "/ceo/reports",
   notifications: "/ceo/notifications",
   notificationsCenter: "/ceo/notifications/center",
   notificationsHistory: "/ceo/notifications/history",
   userProvisioning: "/ceo/user-provisioning",
   profile: "/ceo/profile",
-  settings: "/ceo/profile",
+  settings: "/ceo/settings",
 } as const;
 
 export const CEO_QUICK_ACTIONS = [
   {
     id: "create-department",
-    label: "Create Department",
-    description: "Review organization structure",
+    label: "View Organization",
+    description: "Company structure and departments",
     href: CEO_ROUTES.organization,
   },
   {
@@ -52,3 +56,20 @@ export const CEO_QUICK_ACTIONS = [
 ] as const;
 
 export type CeoQuickActionId = (typeof CEO_QUICK_ACTIONS)[number]["id"];
+
+export const CEO_APPROVALS_SUB_NAV = [
+  { title: "Executive", href: CEO_ROUTES.approvals },
+  { title: "Leave", href: CEO_ROUTES.approvalsLeave },
+  { title: "Exit", href: CEO_ROUTES.approvalsExit },
+] as const;
+
+export const CEO_ANALYTICS_SECTIONS = [
+  { id: "overview", title: "Overview" },
+  { id: "workforce", title: "Workforce" },
+  { id: "hiring", title: "Hiring" },
+  { id: "attendance", title: "Attendance" },
+  { id: "performance", title: "Performance" },
+  { id: "payroll", title: "Payroll" },
+] as const;
+
+export type CeoAnalyticsSectionId = (typeof CEO_ANALYTICS_SECTIONS)[number]["id"];

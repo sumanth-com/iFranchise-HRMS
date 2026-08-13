@@ -22,5 +22,5 @@ export const ceoAnalyticsListParamsSchema = z.object({
 });
 
 export const ceoAnalyticsExportSchema = ceoAnalyticsListParamsSchema.extend({
-  format: z.enum(["csv", "excel", "pdf", "summary_pdf"]),
+  format: z.enum(["excel", "pdf"]),
 });

@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 
 import { CEO_ROUTES } from "@/lib/ceo/constants";
-import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
-import { requireServerPermission } from "@/lib/permissions/server";
+import { TEAM_PAYROLL_SECTIONS } from "@/lib/payroll/constants";
+import { requireCeoPortal } from "@/lib/ceo/read-only-permissions";
 
-export default async function CeoPayrollPage() {
-  await requireServerPermission(PORTAL_PERMISSIONS.ceo);
-  redirect(CEO_ROUTES.analytics);
+export default async function CeoPayrollIndexPage() {
+  await requireCeoPortal();
+  redirect(`${CEO_ROUTES.payroll}/${TEAM_PAYROLL_SECTIONS.run}`);
 }

@@ -28,17 +28,17 @@ export function leaveTeamListUrl(
 }
 
 export const LEAVE_STATUS_LABELS: Record<LeaveStatus, string> = {
-  pending: "Pending",
-  approved: "Approved",
-  rejected: "Rejected",
+  pending: "Pending HR",
+  approved: "Approved by HR",
+  rejected: "Rejected by HR",
   cancelled: "Cancelled",
   withdrawn: "Withdrawn",
 };
 
 export const LEAVE_SUMMARY_LABELS = {
   pendingRequests: "Pending Requests",
-  approvedThisMonth: "Approved",
-  rejectedThisMonth: "Rejected",
+  approvedThisMonth: "Approved by HR",
+  rejectedThisMonth: "Rejected by HR",
   employeesOnLeaveToday: "Employees On Leave Today",
   balanceUtilizationPercent: "Leave Balance Utilization",
   upcomingPlannedLeaves: "Upcoming Planned Leaves",

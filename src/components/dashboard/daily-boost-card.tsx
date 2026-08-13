@@ -1,75 +1,90 @@
 "use client";
 
-import { format } from "date-fns";
-import { Sparkles } from "lucide-react";
+import Image from "next/image";
 
-import { resolveDailyBoostMessage } from "@/lib/dashboard/daily-boost-messages";
-import { getDailyBoostDisplayName } from "@/lib/employees/parse-employee-name";
+import dashboardImage from "@/assets/dashboard.png";
+import {
+  resolveDailyBoostLine,
+  type DailyBoostTone,
+} from "@/lib/dashboard/daily-boost-messages";
 import { cn } from "@/lib/utils";
 
 type DailyBoostCardProps = {
-  firstName: string;
+  firstName?: string;
   lastName?: string;
-  personKey: string;
+  personKey?: string;
   referenceDate?: string;
   className?: string;
   compact?: boolean;
+  tone?: DailyBoostTone;
 };
+
+function givenName(firstName?: string) {
+  const parts = firstName?.trim().split(/\s+/).filter(Boolean) ?? [];
+  return parts.at(-1) || "there";
+}
 
 export function DailyBoostCard({
   firstName,
-  lastName = "",
   personKey,
   referenceDate,
   className,
   compact = false,
+  tone = "team",
 }: DailyBoostCardProps) {
-  const dayKey = referenceDate ?? format(new Date(), "yyyy-MM-dd");
-  const displayName = getDailyBoostDisplayName(firstName, lastName);
-  const { line1, line2 } = resolveDailyBoostMessage(dayKey, personKey, displayName);
-
-  if (compact) {
-    return (
-      <section
-        className={cn(
-          "flex items-start gap-3 overflow-hidden rounded-xl border bg-gradient-to-r from-rose-500/10 via-amber-500/5 to-violet-500/10 px-4 py-3 shadow-sm",
-          className,
-        )}
-      >
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rose-400 to-amber-400 text-white shadow-sm">
-          <Sparkles className="size-3.5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-rose-600 dark:text-rose-400">
-            Daily Boost
-          </p>
-          <p className="mt-1 line-clamp-2 text-sm leading-snug text-foreground/90">
-            {line1} {line2}
-          </p>
-        </div>
-      </section>
-    );
-  }
+  const name = givenName(firstName);
+  const message = resolveDailyBoostLine({
+    tone,
+    referenceDate: referenceDate ?? "",
+    personKey: personKey ?? name,
+    name,
+  });
 
   return (
     <section
+      aria-label="Workspace"
       className={cn(
-        "flex flex-col overflow-hidden rounded-xl border bg-gradient-to-br from-rose-500/10 via-amber-500/5 to-violet-500/10 p-5 shadow-sm",
+        "relative overflow-hidden rounded-2xl border bg-card shadow-sm",
+        compact ? "min-h-[7.5rem]" : "min-h-[16rem]",
         className,
       )}
     >
-      <div className="flex items-center gap-2.5">
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rose-400 to-amber-400 text-white shadow-sm">
-          <Sparkles className="size-3.5" />
-        </span>
-        <p className="text-xs font-semibold uppercase tracking-wide text-rose-600 dark:text-rose-400">
-          Daily Boost
-        </p>
-      </div>
+      <Image
+        src={dashboardImage}
+        alt=""
+        fill
+        priority={false}
+        sizes="(max-width: 1024px) 100vw, 55vw"
+        className="object-cover object-[70%_center]"
+      />
 
-      <div className="mt-4 flex min-h-0 flex-1 flex-col justify-center space-y-2">
-        <p className="text-sm leading-6 text-foreground/90">{line1}</p>
-        <p className="text-sm leading-6 text-foreground/80">{line2}</p>
+      <div
+        className={cn(
+          "absolute inset-y-0 left-0 z-10 flex items-center",
+          compact ? "p-3" : "p-4 sm:p-5",
+        )}
+      >
+        <blockquote
+          className={cn(
+            "w-fit max-w-[min(22rem,52%)] rounded-2xl border border-white/50 bg-[linear-gradient(180deg,#fff8ea_0%,#f3e6c9_100%)] text-left shadow-[0_8px_28px_rgba(120,90,40,0.10),0_0_18px_rgba(255,248,232,0.55)]",
+            compact ? "px-3.5 py-2.5" : "px-4 py-3.5",
+          )}
+        >
+          <p
+            className={cn(
+              "font-sans font-medium not-italic leading-relaxed text-pretty text-[#4a3b28]",
+              compact ? "text-sm" : "text-[15px] sm:text-base",
+            )}
+          >
+            <span aria-hidden className="mr-0.5 text-[#b08950]">
+              “
+            </span>
+            {message}
+            <span aria-hidden className="ml-0.5 text-[#b08950]">
+              ”
+            </span>
+          </p>
+        </blockquote>
       </div>
     </section>
   );

@@ -125,7 +125,7 @@ const PORTAL_HELP: Record<PortalVariant, PortalHelpConfig> = {
       { label: "Approvals", href: CEO_ROUTES.approvals, icon: ClipboardList },
       { label: "User provisioning", href: CEO_ROUTES.userProvisioning, icon: UserRound },
       { label: "Reports", href: CEO_ROUTES.reports, icon: BarChart3 },
-      { label: "Reset password", href: CEO_ROUTES.profile, icon: KeyRound },
+      { label: "Reset password", href: CEO_ROUTES.settings, icon: KeyRound },
     ],
     faqs: [
       {
@@ -138,7 +138,7 @@ const PORTAL_HELP: Record<PortalVariant, PortalHelpConfig> = {
       },
       {
         q: "How do I reset my password?",
-        a: "Open Profile → Account & security → Reset password.",
+        a: "Open Settings → Account & security → Reset password.",
       },
     ],
   },

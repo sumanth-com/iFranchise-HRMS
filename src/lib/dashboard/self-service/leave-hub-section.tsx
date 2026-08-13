@@ -55,6 +55,13 @@ export async function LeaveHubSection({
   });
 
   const canApply = hasPermission(profile.permissionCodes, "leave.create");
+  const canEdit =
+    hasPermission(profile.permissionCodes, "leave.edit") ||
+    hasPermission(profile.permissionCodes, "leave.create");
+  const canDeleteOwn =
+    hasPermission(profile.permissionCodes, "leave.delete") ||
+    hasPermission(profile.permissionCodes, "leave.cancel") ||
+    hasPermission(profile.permissionCodes, "leave.withdraw");
 
   const [balances, requests, calendar, teamResult, teamLookups, summary, applyLookups] =
     await Promise.all([
@@ -68,7 +75,7 @@ export async function LeaveHubSection({
       canViewTeam
         ? getLeaveSummary(supabase, profile, teamParams.month, teamParams.year)
         : Promise.resolve(null),
-      canApply
+      canApply || canEdit
         ? getLeaveLookups(supabase, profile.employee.organizationId)
         : Promise.resolve(null),
     ]);
@@ -78,6 +85,8 @@ export async function LeaveHubSection({
       initialSection={section}
       canViewTeam={canViewTeam}
       canApply={canApply}
+      canEdit={canEdit}
+      canDelete={canDeleteOwn}
       employeeId={employeeId}
       applyLeaveLookups={applyLookups}
       balances={balances}
@@ -119,6 +128,9 @@ export async function LeaveHubSection({
         canCancel:
           hasPermission(profile.permissionCodes, "leave.cancel") ||
           hasPermission(profile.permissionCodes, "leave.withdraw"),
+        canDelete:
+          hasPermission(profile.permissionCodes, "leave.delete") ||
+          hasPermission(profile.permissionCodes, "leave.cancel"),
       }}
       teamApplyLeaveLookups={
         canViewTeam && hasPermission(profile.permissionCodes, "leave.create")

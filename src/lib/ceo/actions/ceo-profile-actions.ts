@@ -34,6 +34,7 @@ import { z } from "zod";
 
 function revalidateCeoProfile() {
   revalidatePath(CEO_ROUTES.profile);
+  revalidatePath(CEO_ROUTES.settings);
   revalidatePath("/", "layout");
 }
 

@@ -146,13 +146,23 @@ export const offerFormSchema = z.object({
   sendNow: z.boolean().optional().default(true),
 });
 
-export const OFFER_LETTER_ALLOWED_EXTENSIONS = ["pdf", "doc", "docx"] as const;
+export const OFFER_LETTER_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 
+/** Any non-empty filename is accepted; size is enforced separately. */
 export function isAllowedOfferLetterFilename(filename: string): boolean {
-  const ext = filename.split(".").pop()?.toLowerCase() ?? "";
-  return OFFER_LETTER_ALLOWED_EXTENSIONS.includes(
-    ext as (typeof OFFER_LETTER_ALLOWED_EXTENSIONS)[number],
-  );
+  return filename.trim().length > 0 && !filename.includes("..");
+}
+
+export function assertOfferLetterFile(file: { name: string; size: number }): void {
+  if (!isAllowedOfferLetterFilename(file.name)) {
+    throw new Error("Choose a valid offer letter file to upload");
+  }
+  if (file.size <= 0) {
+    throw new Error("The selected file is empty. Choose another file.");
+  }
+  if (file.size > OFFER_LETTER_MAX_BYTES) {
+    throw new Error("Offer letter must be 10 MB or smaller");
+  }
 }
 
 export const offerStatusSchema = z.object({

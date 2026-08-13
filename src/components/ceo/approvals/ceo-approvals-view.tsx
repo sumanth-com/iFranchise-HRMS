@@ -1,94 +1,50 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useState } from "react";
 
-import {
-  CeoBackToDashboard,
-  CeoModulePageHeader,
-} from "@/components/ceo/ceo-module-primitives";
+import { SectionHelpButton } from "@/components/common/section-help-button";
 import { CeoApprovalsDrawer } from "@/components/ceo/approvals/ceo-approvals-drawer";
 import { CeoApprovalsFilters } from "@/components/ceo/approvals/ceo-approvals-filters";
-import { CeoApprovalsPanels } from "@/components/ceo/approvals/ceo-approvals-panels";
 import { CeoApprovalsQueueTable } from "@/components/ceo/approvals/ceo-approvals-queue-table";
 import { CeoApprovalsSummary } from "@/components/ceo/approvals/ceo-approvals-summary";
 import {
-  fetchCeoApprovalsCategoriesAction,
   fetchCeoApprovalsKpisAction,
   fetchCeoApprovalsQueueAction,
-  getCeoApprovalsModuleData,
 } from "@/lib/ceo/actions/ceo-approvals-actions";
 import type {
   CeoApprovalsListParams,
   CeoApprovalsPageData,
 } from "@/types/ceo-approvals";
+import {
+  CEO_APPROVALS_SECTION_HELP,
+  CEO_SECTION_HELP_DESCRIPTION,
+} from "@/lib/ceo/section-help";
 
 type CeoApprovalsViewProps = CeoApprovalsPageData & {
   initialFilters: CeoApprovalsListParams;
 };
 
-function defaultFilters(): CeoApprovalsListParams {
-  return { page: 1, pageSize: 10 };
-}
-
 export function CeoApprovalsView({
   kpis: initialKpis,
-  categories: initialCategories,
   queue: initialQueue,
   lookups,
   initialFilters,
 }: CeoApprovalsViewProps) {
   const [kpis, setKpis] = useState(initialKpis);
-  const [categories, setCategories] = useState(initialCategories);
   const [queue, setQueue] = useState(initialQueue);
   const [filters, setFilters] = useState<CeoApprovalsListParams>(initialFilters);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [isPending, startTransition] = useTransition();
-  const searchTimerRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    return () => {
-      if (searchTimerRef.current) window.clearTimeout(searchTimerRef.current);
-    };
-  }, []);
-
-  const refreshScopedData = useCallback((nextFilters: CeoApprovalsListParams) => {
-    startTransition(async () => {
-      const [nextKpis, nextCategories, nextQueue] = await Promise.all([
-        fetchCeoApprovalsKpisAction(nextFilters),
-        fetchCeoApprovalsCategoriesAction(nextFilters),
-        fetchCeoApprovalsQueueAction(nextFilters),
-      ]);
-      setKpis(nextKpis);
-      setCategories(nextCategories);
-      setQueue(nextQueue);
-    });
+  const refreshQueue = useCallback(async (nextFilters: CeoApprovalsListParams) => {
+    const nextQueue = await fetchCeoApprovalsQueueAction(nextFilters);
+    setQueue(nextQueue);
   }, []);
 
   function updateFilters(next: Partial<CeoApprovalsListParams>) {
     const merged = { ...filters, ...next };
     setFilters(merged);
-
-    if ("search" in next) {
-      if (searchTimerRef.current) window.clearTimeout(searchTimerRef.current);
-      searchTimerRef.current = window.setTimeout(() => {
-        refreshScopedData(merged);
-      }, 250);
-      return;
-    }
-
-    refreshScopedData(merged);
-  }
-
-  function resetFilters() {
-    const next = defaultFilters();
-    setFilters(next);
-    startTransition(async () => {
-      const data = await getCeoApprovalsModuleData(next);
-      setKpis(data.kpis);
-      setCategories(data.categories);
-      setQueue(data.queue);
-    });
+    void refreshQueue(merged);
   }
 
   function openRequest(requestId: string) {
@@ -96,17 +52,29 @@ export function CeoApprovalsView({
     setDrawerOpen(true);
   }
 
-  function refreshAfterChange() {
-    refreshScopedData(filters);
+  async function refreshAfterChange() {
+    const [nextKpis, nextQueue] = await Promise.all([
+      fetchCeoApprovalsKpisAction(filters),
+      fetchCeoApprovalsQueueAction(filters),
+    ]);
+    setKpis(nextKpis);
+    setQueue(nextQueue);
   }
 
   return (
     <div className="flex w-full min-h-0 flex-1 flex-col gap-3 overflow-y-auto scroll-smooth p-3 pb-8 md:gap-4 md:p-4 md:pb-10 lg:p-5">
-      <CeoBackToDashboard />
-      <CeoModulePageHeader
-        title="Executive Approvals"
-        description="Review and decide on strategic approvals requiring CEO authorization."
-      />
+      <div>
+        <SectionHelpButton
+          title={CEO_APPROVALS_SECTION_HELP.executive.title}
+          points={[...CEO_APPROVALS_SECTION_HELP.executive.points]}
+          description={CEO_SECTION_HELP_DESCRIPTION}
+        >
+          <h1 className="text-2xl font-semibold tracking-tight">Executive Approvals</h1>
+        </SectionHelpButton>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Review and decide on strategic approvals requiring CEO authorization.
+        </p>
+      </div>
 
       <CeoApprovalsSummary kpis={kpis} />
 
@@ -114,17 +82,6 @@ export function CeoApprovalsView({
         filters={filters}
         lookups={lookups}
         onChange={updateFilters}
-        onReset={resetFilters}
-        disabled={isPending}
-      />
-
-      <CeoApprovalsPanels
-        categories={categories}
-        kpis={kpis}
-        queueRows={queue.data}
-        activeType={filters.approvalType}
-        onSelectType={(approvalType) => updateFilters({ approvalType, page: 1 })}
-        onView={openRequest}
       />
 
       <CeoApprovalsQueueTable
@@ -132,7 +89,6 @@ export function CeoApprovalsView({
         total={queue.total}
         page={queue.page}
         pageSize={queue.pageSize}
-        isLoading={isPending}
         onPageChange={(page) => updateFilters({ page })}
         onView={openRequest}
       />
@@ -142,7 +98,9 @@ export function CeoApprovalsView({
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
         forwardOptions={lookups.forwardTargets}
-        onChanged={refreshAfterChange}
+        onChanged={() => {
+          void refreshAfterChange();
+        }}
       />
     </div>
   );

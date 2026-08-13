@@ -2,6 +2,10 @@ import {
   CeoChartPanel,
   CeoStatCard,
 } from "@/components/ceo/ceo-module-primitives";
+import {
+  CeoAnalyticsEmptyNote,
+  CeoAnalyticsSectionHeading,
+} from "@/components/ceo/analytics/ceo-analytics-section-heading";
 import type { CeoAnalyticsWorkforce } from "@/types/ceo-analytics";
 
 function hasChartData(items: { value: number }[]) {
@@ -47,17 +51,16 @@ export function CeoAnalyticsWorkforcePanel({
     ) : null,
   ].filter(Boolean);
 
-  if (charts.length === 0 && workforce.averageTenureYears <= 0) return null;
+  const hasContent = charts.length > 0 || workforce.averageTenureYears > 0;
 
   return (
     <section className="w-full space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold tracking-tight">Workforce</h2>
-          <p className="text-xs text-muted-foreground">
-            Headcount, growth, and workforce mix
-          </p>
-        </div>
+        <CeoAnalyticsSectionHeading
+          title="Workforce"
+          description="Headcount, growth, and workforce mix"
+          helpKey="workforce"
+        />
         {workforce.averageTenureYears > 0 ? (
           <div className="w-full max-w-[10.5rem] sm:w-auto">
             <CeoStatCard
@@ -70,6 +73,10 @@ export function CeoAnalyticsWorkforcePanel({
 
       {charts.length > 0 ? (
         <div className="grid gap-3 lg:grid-cols-2">{charts}</div>
+      ) : null}
+
+      {!hasContent ? (
+        <CeoAnalyticsEmptyNote message="No workforce data for this period." />
       ) : null}
     </section>
   );

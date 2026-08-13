@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { remapSubNavHref } from "@/lib/navigation/remap-sub-nav";
 import { CANDIDATE_STAGE_LABELS, RECRUITMENT_ROUTES } from "@/lib/recruitment/constants";
 import { cn } from "@/lib/utils";
 import type { CandidateStage } from "@/types/recruitment";
@@ -73,11 +74,18 @@ export function RecruitmentPipelinePanel({
   stages,
   title = "Active pipeline",
   subtitle = "Candidates across hiring stages",
+  basePath = RECRUITMENT_ROUTES.dashboard,
 }: {
   stages: StageItem[];
   title?: string;
   subtitle?: string;
+  basePath?: string;
 }) {
+  const candidatesHref = remapSubNavHref(
+    RECRUITMENT_ROUTES.candidates,
+    RECRUITMENT_ROUTES.dashboard,
+    basePath,
+  );
   const pipeline = PIPELINE_STAGES.map((stage) => {
     const item = stages.find((entry) => entry.stage === stage);
     return { stage, count: item?.count ?? 0 };
@@ -100,7 +108,7 @@ export function RecruitmentPipelinePanel({
           </div>
         </div>
         <Link
-          href={RECRUITMENT_ROUTES.candidates}
+          href={candidatesHref}
           className="text-[11px] font-medium text-primary hover:underline"
         >
           View candidates

@@ -3,19 +3,34 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { PAYROLL_SUB_NAV, SELF_PAYROLL_ROUTES, TEAM_PAYROLL_SECTIONS } from "@/lib/payroll/constants";
+import {
+  parseTeamPayrollSection,
+  PAYROLL_SUB_NAV,
+  SELF_PAYROLL_ROUTES,
+  TEAM_PAYROLL_SECTIONS,
+  type TeamPayrollSection,
+} from "@/lib/payroll/constants";
 import { cn } from "@/lib/utils";
 
-export function PayrollSubNav() {
-  const pathname = usePathname();
-  const isTeamPayroll =
-    pathname === SELF_PAYROLL_ROUTES.team || pathname.startsWith(`${SELF_PAYROLL_ROUTES.team}/`);
+type PayrollSubNavProps = {
+  basePath?: string;
+  hiddenSections?: TeamPayrollSection[];
+};
 
+export function PayrollSubNav({
+  basePath = SELF_PAYROLL_ROUTES.team,
+  hiddenSections = [],
+}: PayrollSubNavProps) {
+  const pathname = usePathname();
+  const isTeamPayroll = pathname === basePath || pathname.startsWith(`${basePath}/`);
   const activeSection = isTeamPayroll
-    ? pathname === SELF_PAYROLL_ROUTES.team
+    ? pathname === basePath
       ? TEAM_PAYROLL_SECTIONS.run
-      : pathname.slice(SELF_PAYROLL_ROUTES.team.length + 1)
+      : parseTeamPayrollSection(pathname.slice(basePath.length + 1).split("/")[0])
     : TEAM_PAYROLL_SECTIONS.run;
+  const items = PAYROLL_SUB_NAV.filter(
+    (item) => !hiddenSections.includes(item.section as TeamPayrollSection),
+  );
 
   return (
     <div className="flex justify-center">
@@ -23,18 +38,14 @@ export function PayrollSubNav() {
         className="inline-flex flex-wrap items-center gap-1 rounded-lg border bg-card p-1 shadow-sm"
         aria-label="Team payroll sections"
       >
-        {PAYROLL_SUB_NAV.map((item) => {
-          const isActive =
-            isTeamPayroll &&
-            (item.section === activeSection ||
-              (item.section === TEAM_PAYROLL_SECTIONS.run &&
-                (activeSection === TEAM_PAYROLL_SECTIONS.run ||
-                  pathname === SELF_PAYROLL_ROUTES.team)));
+        {items.map((item) => {
+          const href = `${basePath}/${item.section}`;
+          const isActive = isTeamPayroll && item.section === activeSection;
 
           return (
             <Link
               key={item.section}
-              href={item.href}
+              href={href}
               className={cn(
                 "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                 isActive

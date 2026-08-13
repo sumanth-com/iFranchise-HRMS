@@ -1,8 +1,6 @@
 "use client";
 
-import { RotateCcw } from "lucide-react";
-
-import { Button } from "@/components/common/button";
+import { SectionHelpButton } from "@/components/common/section-help-button";
 import {
   Select,
   SelectContent,
@@ -29,13 +27,15 @@ import type {
   ExecutiveApprovalStatus,
   ExecutiveApprovalType,
 } from "@/types/ceo-approvals";
+import {
+  CEO_APPROVALS_SECTION_HELP,
+  CEO_SECTION_HELP_DESCRIPTION,
+} from "@/lib/ceo/section-help";
 
 type CeoApprovalsFiltersProps = {
   filters: CeoApprovalsListParams;
   lookups: CeoApprovalsFilterLookups;
   onChange: (next: Partial<CeoApprovalsListParams>) => void;
-  onReset: () => void;
-  disabled?: boolean;
 };
 
 const TYPE_LABEL = "All Types";
@@ -43,12 +43,17 @@ const PRIORITY_LABEL = "Any Priority";
 const STATUS_LABEL = "Any Status";
 const DEPARTMENT_LABEL = "All Departments";
 
+const CEO_STATUS_FILTERS: ExecutiveApprovalStatus[] = [
+  "pending_ceo",
+  "escalated",
+  "approved",
+  "rejected",
+];
+
 export function CeoApprovalsFilters({
   filters,
   lookups,
   onChange,
-  onReset,
-  disabled,
 }: CeoApprovalsFiltersProps) {
   const typeValue = filters.approvalType ?? FILTER_ANY_VALUE;
   const priorityValue = filters.priority ?? FILTER_ANY_VALUE;
@@ -66,6 +71,15 @@ export function CeoApprovalsFilters({
 
   return (
     <section className="w-full rounded-xl border bg-card p-3 shadow-sm sm:p-4">
+      <div className="mb-3">
+        <SectionHelpButton
+          title={CEO_APPROVALS_SECTION_HELP.filters.title}
+          points={[...CEO_APPROVALS_SECTION_HELP.filters.points]}
+          description={CEO_SECTION_HELP_DESCRIPTION}
+        >
+          <h2 className="text-sm font-semibold tracking-tight">Filters</h2>
+        </SectionHelpButton>
+      </div>
       <div className="flex w-full flex-wrap items-center gap-2 lg:flex-nowrap lg:gap-3">
         <Select
           value={typeValue}
@@ -78,7 +92,6 @@ export function CeoApprovalsFilters({
               page: 1,
             })
           }
-          disabled={disabled}
         >
           <SelectTrigger className="h-10 min-w-0 flex-1 basis-[10rem]">
             <SelectValue placeholder={TYPE_LABEL}>
@@ -109,7 +122,6 @@ export function CeoApprovalsFilters({
               page: 1,
             })
           }
-          disabled={disabled}
         >
           <SelectTrigger className="h-10 min-w-0 flex-1 basis-[9rem]">
             <SelectValue placeholder={PRIORITY_LABEL}>
@@ -149,7 +161,6 @@ export function CeoApprovalsFilters({
               page: 1,
             })
           }
-          disabled={disabled}
         >
           <SelectTrigger className="h-10 min-w-0 flex-1 basis-[9rem]">
             <SelectValue placeholder={STATUS_LABEL}>
@@ -165,14 +176,9 @@ export function CeoApprovalsFilters({
             className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
           >
             <SelectItem value={FILTER_ANY_VALUE}>{STATUS_LABEL}</SelectItem>
-            {(
-              Object.entries(EXECUTIVE_APPROVAL_STATUS_LABELS) as [
-                ExecutiveApprovalStatus,
-                string,
-              ][]
-            ).map(([value, label]) => (
+            {CEO_STATUS_FILTERS.map((value) => (
               <SelectItem key={value} value={value}>
-                {label}
+                {EXECUTIVE_APPROVAL_STATUS_LABELS[value]}
               </SelectItem>
             ))}
           </SelectContent>
@@ -186,7 +192,6 @@ export function CeoApprovalsFilters({
               page: 1,
             })
           }
-          disabled={disabled}
         >
           <SelectTrigger className="h-10 min-w-0 flex-1 basis-[10rem]">
             <SelectValue placeholder={DEPARTMENT_LABEL}>
@@ -205,18 +210,6 @@ export function CeoApprovalsFilters({
             ))}
           </SelectContent>
         </Select>
-
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={onReset}
-          disabled={disabled}
-          className="h-10 shrink-0 gap-1.5 px-3"
-        >
-          <RotateCcw className="size-3.5" />
-          Reset
-        </Button>
       </div>
     </section>
   );

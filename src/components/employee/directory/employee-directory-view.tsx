@@ -15,35 +15,61 @@ import {
 import type { LookupOption } from "@/types/employee";
 import type { EmployeeDirectoryPerson } from "@/types/employee-directory";
 
-const ALL_DEPARTMENTS = "__all_departments__";
+const ALL_DEPARTMENTS = "all";
+const ALL_DEPARTMENTS_LABEL = "All Departments";
 
 type EmployeeDirectoryViewProps = {
   people: EmployeeDirectoryPerson[];
   departments?: LookupOption[];
 };
 
+function personMatchesQuery(person: EmployeeDirectoryPerson, rawQuery: string): boolean {
+  const query = rawQuery.trim().toLowerCase();
+  if (!query) return true;
+
+  const fields = [
+    person.fullName,
+    person.firstName,
+    person.lastName,
+    person.employeeCode,
+    person.designationTitle,
+    person.departmentName,
+    person.verticalName,
+  ]
+    .filter(Boolean)
+    .map((value) => String(value).toLowerCase());
+
+  const tokens = query.split(/\s+/).filter(Boolean);
+
+  return tokens.every((token) =>
+    fields.some((field) => {
+      if (field.includes(token)) return true;
+      return field
+        .split(/[\s\-_/]+/)
+        .filter(Boolean)
+        .some((word) => word.startsWith(token));
+    }),
+  );
+}
+
 export function EmployeeDirectoryView({ people, departments = [] }: EmployeeDirectoryViewProps) {
   const [query, setQuery] = useState("");
   const [departmentId, setDepartmentId] = useState(ALL_DEPARTMENTS);
 
+  const departmentItems = useMemo(
+    () => [
+      { value: ALL_DEPARTMENTS, label: ALL_DEPARTMENTS_LABEL },
+      ...departments.map((dept) => ({ value: dept.id, label: dept.label })),
+    ],
+    [departments],
+  );
+
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
     return people.filter((person) => {
       if (departmentId !== ALL_DEPARTMENTS && person.departmentId !== departmentId) {
         return false;
       }
-      if (!q) return true;
-      const haystack = [
-        person.fullName,
-        person.employeeCode,
-        person.designationTitle,
-        person.departmentName,
-        person.verticalName,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(q);
+      return personMatchesQuery(person, query);
     });
   }, [people, query, departmentId]);
 
@@ -63,19 +89,19 @@ export function EmployeeDirectoryView({ people, departments = [] }: EmployeeDire
               <div className="flex w-full items-center gap-3 sm:w-auto">
                 {departments.length > 0 ? (
                   <Select
-                  value={departmentId}
-                  onValueChange={(value) => {
-                    if (value) setDepartmentId(value);
-                  }}
-                >
+                    items={departmentItems}
+                    value={departmentId}
+                    onValueChange={(value) => {
+                      if (value) setDepartmentId(value);
+                    }}
+                  >
                     <SelectTrigger className="h-10 w-full min-w-[11rem] sm:w-44">
-                      <SelectValue placeholder="All departments" />
+                      <SelectValue placeholder={ALL_DEPARTMENTS_LABEL} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={ALL_DEPARTMENTS}>All departments</SelectItem>
-                      {departments.map((dept) => (
-                        <SelectItem key={dept.id} value={dept.id}>
-                          {dept.label}
+                      {departmentItems.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>
+                          {item.label}
                         </SelectItem>
                       ))}
                     </SelectContent>

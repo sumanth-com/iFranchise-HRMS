@@ -13,6 +13,11 @@ type ModuleShellProps = {
   className?: string;
   /** Optional classes for the scrollable content region below the sticky header. */
   contentClassName?: string;
+  /**
+   * Fill the remaining viewport under the header and let children manage
+   * their own internal scroll (no page-level scroll in the content region).
+   */
+  fillContent?: boolean;
 };
 
 /**
@@ -25,19 +30,30 @@ export function ModuleShell({
   children,
   className,
   contentClassName,
+  fillContent = false,
 }: ModuleShellProps) {
   return (
-    <div className={cn("flex min-h-0 flex-1 flex-col", className)}>
+    <div className={cn("flex min-h-0 flex-1 flex-col overflow-hidden", className)}>
       <div className="z-40 shrink-0 border-b border-border bg-background px-4 pt-4 pb-3 md:px-6">
         {header}
       </div>
       <div
         className={cn(
-          "min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-6 pb-8 md:px-6",
+          "min-h-0 flex-1 overscroll-contain px-4 md:px-6",
+          fillContent
+            ? "flex flex-col overflow-hidden py-4"
+            : "overflow-y-auto pt-6 pb-8",
           contentClassName,
         )}
       >
-        <div className="flex min-h-full flex-col gap-6">{children}</div>
+        <div
+          className={cn(
+            "flex flex-col",
+            fillContent ? "min-h-0 flex-1 gap-0" : "min-h-full gap-6",
+          )}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );

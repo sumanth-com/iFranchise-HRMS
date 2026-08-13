@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil } from "lucide-react";
+import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import {
   flexRender,
   getCoreRowModel,
@@ -10,8 +10,10 @@ import {
   type ColumnDef,
 } from "@tanstack/react-table";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
+import { Modal } from "@/components/common/modal";
 import { SalaryStructureDialog } from "@/components/payroll/salary-structure-dialog";
 import { useTeamPayrollHeaderActions } from "@/components/payroll/team-payroll-header-actions";
 import {
@@ -21,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { deleteSalaryStructureAction } from "@/lib/payroll/actions";
 import { formatCurrency } from "@/lib/payroll/services/payroll-utils";
 import type { LookupOption } from "@/types/employee";
 import type { SalaryStructureItem } from "@/types/payroll";
@@ -41,6 +44,8 @@ export function SalaryStructureTable({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<DialogMode>("create");
   const [editingRecord, setEditingRecord] = useState<SalaryStructureItem | undefined>();
+  const [deleting, setDeleting] = useState<SalaryStructureItem | null>(null);
+  const [isDeletePending, startDeleteTransition] = useTransition();
 
   const registerAddAction = useCallback(() => {
     setDialogMode("create");
@@ -56,6 +61,20 @@ export function SalaryStructureTable({
 
   function handleSaved() {
     router.refresh();
+  }
+
+  function confirmDelete() {
+    if (!deleting) return;
+    startDeleteTransition(async () => {
+      const result = await deleteSalaryStructureAction(deleting.id);
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+      toast.success("Salary structure deleted");
+      setDeleting(null);
+      router.refresh();
+    });
   }
 
   useEffect(() => {
@@ -122,7 +141,7 @@ export function SalaryStructureTable({
             id: "actions",
             header: () => <span className="sr-only">Actions</span>,
             cell: ({ row }: { row: { original: SalaryStructureItem } }) => (
-              <div className="text-right">
+              <div className="flex justify-end gap-2">
                 <Button
                   type="button"
                   variant="outline"
@@ -132,6 +151,16 @@ export function SalaryStructureTable({
                 >
                   <Pencil className="size-3.5" />
                   Edit
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 px-2.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => setDeleting(row.original)}
+                >
+                  <Trash2 className="size-3.5" />
+                  Delete
                 </Button>
               </div>
             ),
@@ -202,6 +231,36 @@ export function SalaryStructureTable({
           onSaved={handleSaved}
         />
       ) : null}
+
+      <Modal
+        open={deleting !== null}
+        onOpenChange={(open) => {
+          if (!open && !isDeletePending) setDeleting(null);
+        }}
+        title="Delete salary structure?"
+        description={
+          deleting
+            ? `Remove the salary structure for ${deleting.employeeName} (${deleting.employeeCode}) effective ${format(new Date(deleting.effectiveFrom), "MMM d, yyyy")}.`
+            : undefined
+        }
+        contentClassName="sm:max-w-md"
+        footer={
+          <Button
+            variant="destructive"
+            disabled={isDeletePending || !deleting}
+            onClick={confirmDelete}
+          >
+            {isDeletePending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Delete
+          </Button>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          {deleting?.isCurrent
+            ? "This is the employee’s current structure. If an older structure exists, it will become current again after deletion."
+            : "This historical structure will be removed from the list. Payroll already processed with it is not changed."}
+        </p>
+      </Modal>
     </div>
   );
 }

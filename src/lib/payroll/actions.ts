@@ -3,6 +3,9 @@
 import { revalidatePath } from "next/cache";
 
 import { siteConfig } from "@/config/site";
+import { CEO_ROUTES } from "@/lib/ceo/constants";
+import { ceoOrViewPermission } from "@/lib/ceo/read-only-permissions";
+import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { createClient } from "@/lib/supabase/server";
 import { toUserFriendlyError } from "@/lib/errors/user-messages";
 import {
@@ -22,6 +25,7 @@ import {
   createReimbursement,
   createSalaryRevision,
   createSalaryStructure,
+  deleteSalaryStructure,
   updateSalaryStructure,
   emailPayslip,
   generatePayrollRun,
@@ -88,6 +92,7 @@ function revalidatePayrollPaths() {
   revalidatePath(PAYROLL_ROUTES.run);
   revalidatePath(PAYROLL_ROUTES.payslips);
   revalidatePath(SELF_PAYROLL_ROUTES.list);
+  revalidatePath(CEO_ROUTES.payroll);
 }
 
 export async function previewPayrollRunAction(
@@ -98,6 +103,7 @@ export async function previewPayrollRunAction(
       "payroll.run",
       "payroll.process",
       "payroll.generate",
+      PORTAL_PERMISSIONS.ceo,
     ]);
     const supabase = await getAuthenticatedSupabase();
     const parsed = payrollRunSchema.parse(input);
@@ -120,6 +126,7 @@ export async function generatePayrollRunAction(
       "payroll.process",
       "payroll.generate",
       "payroll.create",
+      PORTAL_PERMISSIONS.ceo,
     ]);
     const supabase = await getAuthenticatedSupabase();
     const parsed = payrollRunSchema.parse(input);
@@ -141,6 +148,7 @@ export async function processPayrollRunAction(
     const profile = await requireServerAnyPermission([
       "payroll.run",
       "payroll.process",
+      PORTAL_PERMISSIONS.ceo,
     ]);
     const supabase = await getAuthenticatedSupabase();
     await processPayrollRun(supabase, profile, payrollId);
@@ -264,6 +272,29 @@ export async function updateSalaryStructureAction(
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to update salary structure",
+    };
+  }
+}
+
+export async function deleteSalaryStructureAction(
+  structureId: string,
+): Promise<PayrollActionResult<string>> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "salary.edit",
+      "salary_structure.edit",
+      "salary_structure.create",
+      "salary_structure.delete",
+    ]);
+    const supabase = await getAuthenticatedSupabase();
+    await deleteSalaryStructure(supabase, profile, structureId);
+    revalidatePath(PAYROLL_ROUTES.salaryStructures);
+    revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS["salary-structures"]));
+    return { success: true, data: structureId };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to delete salary structure",
     };
   }
 }
@@ -405,7 +436,7 @@ export async function fetchPayrollSummaryAction(
   month?: number,
   year?: number,
 ): Promise<PayrollSummary> {
-  const profile = await requireServerPermission("payroll.view");
+  const profile = await requireServerAnyPermission(ceoOrViewPermission("payroll.view"));
   const supabase = await getAuthenticatedSupabase();
   return getPayrollSummary(supabase, profile, month, year);
 }
@@ -414,7 +445,7 @@ export async function fetchPayrollRunsAction(
   params: PayrollListParams,
 ): Promise<PayrollListResult> {
   try {
-    const profile = await requireServerPermission("payroll.view");
+    const profile = await requireServerAnyPermission(ceoOrViewPermission("payroll.view"));
     const supabase = await getAuthenticatedSupabase();
     return listPayrollRuns(supabase, profile, payrollListParamsSchema.parse(params));
   } catch (error) {
@@ -426,7 +457,7 @@ export async function fetchPayrollDetailAction(
   payrollId: string,
 ): Promise<PayrollDetail | null> {
   try {
-    const profile = await requireServerPermission("payroll.view");
+    const profile = await requireServerAnyPermission(ceoOrViewPermission("payroll.view"));
     const supabase = await getAuthenticatedSupabase();
     return getPayrollRunById(supabase, profile, payrollId);
   } catch (error) {
@@ -440,13 +471,14 @@ export async function fetchPayslipDetailAction(
   const profile = await requireServerAnyPermission([
     "payslip.view",
     "payroll.view",
+    ...ceoOrViewPermission("payroll.view"),
   ]);
   const supabase = await getAuthenticatedSupabase();
   return getPayslipById(supabase, profile, payslipId);
 }
 
 export async function fetchPayrollLookupsAction(): Promise<PayrollLookups> {
-  const profile = await requireServerPermission("payroll.view");
+  const profile = await requireServerAnyPermission(ceoOrViewPermission("payroll.view"));
   const supabase = await getAuthenticatedSupabase();
   return getPayrollLookups(supabase, profile.employee.organizationId);
 }
@@ -457,6 +489,7 @@ export async function fetchPayslipsAction(
   const profile = await requireServerAnyPermission([
     "payslip.view",
     "payroll.view",
+    ...ceoOrViewPermission("payroll.view"),
   ]);
   const supabase = await getAuthenticatedSupabase();
   return listPayslips(supabase, profile, payrollListParamsSchema.parse(params));
@@ -480,7 +513,11 @@ export async function fetchSalaryStructuresAction(
 export async function fetchBonusesAction(
   params: Record<string, unknown>,
 ): Promise<BonusListResult> {
-  const profile = await requireServerAnyPermission(["bonus.view", "payroll.view"]);
+  const profile = await requireServerAnyPermission([
+    "bonus.view",
+    "payroll.view",
+    ...ceoOrViewPermission("payroll.view"),
+  ]);
   const supabase = await getAuthenticatedSupabase();
   return listBonuses(supabase, profile, bonusListParamsSchema.parse(params));
 }
@@ -491,6 +528,7 @@ export async function fetchReimbursementsAction(
   const profile = await requireServerAnyPermission([
     "reimbursement.view",
     "payroll.view",
+    ...ceoOrViewPermission("payroll.view"),
   ]);
   const supabase = await getAuthenticatedSupabase();
   return listReimbursements(
@@ -516,7 +554,7 @@ export async function fetchSalaryRevisionsAction(
 }
 
 export async function fetchPayrollSettingsAction(): Promise<PayrollSettingsRecord> {
-  const profile = await requireServerPermission("payroll.view");
+  const profile = await requireServerAnyPermission(ceoOrViewPermission("payroll.view"));
   const supabase = await getAuthenticatedSupabase();
   return getPayrollSettings(supabase, profile.employee.organizationId);
 }

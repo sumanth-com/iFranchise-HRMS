@@ -69,12 +69,15 @@ function Button({
     )
   }
 
+  const buttonProps = props as ComponentProps<"button">
+
   return (
     <button
       data-slot="button"
       type={type ?? "button"}
       className={classes}
-      {...(props as ComponentProps<"button">)}
+      suppressHydrationWarning={typeof buttonProps.id === "string"}
+      {...buttonProps}
     />
   )
 }

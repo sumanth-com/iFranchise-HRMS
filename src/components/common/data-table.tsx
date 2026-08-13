@@ -46,18 +46,80 @@ export function DataTable<T extends Record<string, unknown>>({
   const headAlign = align === "center" ? "text-center" : "text-left";
   const cellAlign = align === "center" ? "text-center" : "text-left";
 
+  // Scrollable mode renders a plain table so sticky headers aren't blocked by the
+  // nested overflow wrapper inside the shared Table component.
+  if (scrollable) {
+    return (
+      <div
+        className={cn(
+          "rounded-lg border overflow-auto [scrollbar-gutter:stable]",
+          maxHeightClass,
+          className,
+        )}
+      >
+        <table className="w-full caption-bottom text-sm">
+          <thead className="sticky top-0 z-20 border-b bg-card shadow-sm">
+            <tr className="border-b">
+              {columns.map((column) => (
+                <th
+                  key={String(column.key)}
+                  className={cn(
+                    "h-10 bg-card px-2 text-left align-middle text-sm font-medium whitespace-nowrap text-foreground",
+                    headAlign,
+                    column.className,
+                  )}
+                >
+                  {column.header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {data.length === 0 ? (
+              <tr className="border-b">
+                <td
+                  colSpan={columns.length}
+                  className={cn(
+                    "h-24 p-2 align-middle text-sm text-muted-foreground",
+                    cellAlign,
+                  )}
+                >
+                  {emptyMessage}
+                </td>
+              </tr>
+            ) : (
+              data.map((row, rowIndex) => (
+                <tr
+                  key={rowIndex}
+                  className="border-b transition-colors hover:bg-muted/50"
+                >
+                  {columns.map((column) => (
+                    <td
+                      key={String(column.key)}
+                      className={cn(
+                        "p-2 align-middle text-sm whitespace-nowrap",
+                        cellAlign,
+                        column.className,
+                      )}
+                    >
+                      {column.render
+                        ? column.render(row)
+                        : String(row[column.key as keyof T] ?? "")}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
   return (
-    <div
-      className={cn(
-        "rounded-lg border",
-        scrollable
-          ? cn("overflow-auto [scrollbar-gutter:stable]", maxHeightClass)
-          : "overflow-x-auto",
-        className,
-      )}
-    >
+    <div className={cn("rounded-lg border overflow-x-auto", className)}>
       <Table>
-        <TableHeader className={scrollable ? "sticky top-0 z-10 bg-background shadow-sm" : undefined}>
+        <TableHeader>
           <TableRow>
             {columns.map((column) => (
               <TableHead

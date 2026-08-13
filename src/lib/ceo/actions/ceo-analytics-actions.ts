@@ -3,12 +3,10 @@
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import {
   buildCeoAnalyticsExportResult,
-  buildCeoAnalyticsSummaryPdf,
   getCeoAnalyticsPageData,
 } from "@/lib/ceo/services/ceo-analytics-queries";
 import { requireServerPermission } from "@/lib/permissions/server";
 import {
-  reportToCsv,
   reportToExcelXml,
   reportToPdfBytes,
 } from "@/lib/reports/services/reports-utils";
@@ -18,6 +16,7 @@ import {
   ceoAnalyticsListParamsSchema,
 } from "@/lib/validations/ceo-analytics";
 import type {
+  CeoAnalyticsExportFormat,
   CeoAnalyticsListParams,
   CeoAnalyticsPageData,
 } from "@/types/ceo-analytics";
@@ -40,9 +39,15 @@ export async function fetchCeoAnalyticsPageAction(
   return getCeoAnalyticsModuleData(params);
 }
 
-export async function exportCeoAnalyticsAction(input: CeoAnalyticsListParams & {
-  format: "csv" | "excel" | "pdf" | "summary_pdf";
-}) {
+function toBase64Bytes(bytes: Uint8Array) {
+  return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString(
+    "base64",
+  );
+}
+
+export async function exportCeoAnalyticsAction(
+  input: CeoAnalyticsListParams & { format: CeoAnalyticsExportFormat },
+) {
   try {
     const profile = await requireServerPermission(PORTAL_PERMISSIONS.ceo);
     const supabase = await createClient();
@@ -50,31 +55,13 @@ export async function exportCeoAnalyticsAction(input: CeoAnalyticsListParams & {
     const data = await getCeoAnalyticsPageData(supabase, profile, parsed);
     const result = buildCeoAnalyticsExportResult(data);
 
-    if (parsed.format === "csv") {
-      return {
-        success: true as const,
-        filename: "executive-analytics.csv",
-        mimeType: "text/csv;charset=utf-8",
-        contentBase64: Buffer.from(reportToCsv(result), "utf8").toString("base64"),
-      };
-    }
-
     if (parsed.format === "excel") {
+      const xml = reportToExcelXml(result);
       return {
         success: true as const,
         filename: "executive-analytics.xls",
         mimeType: "application/vnd.ms-excel",
-        contentBase64: Buffer.from(reportToExcelXml(result), "utf8").toString("base64"),
-      };
-    }
-
-    if (parsed.format === "summary_pdf") {
-      const pdf = await buildCeoAnalyticsSummaryPdf(data);
-      return {
-        success: true as const,
-        filename: "executive-analytics-summary.pdf",
-        mimeType: "application/pdf",
-        contentBase64: Buffer.from(pdf).toString("base64"),
+        contentBase64: Buffer.from(xml, "utf8").toString("base64"),
       };
     }
 
@@ -83,7 +70,7 @@ export async function exportCeoAnalyticsAction(input: CeoAnalyticsListParams & {
       success: true as const,
       filename: "executive-analytics.pdf",
       mimeType: "application/pdf",
-      contentBase64: Buffer.from(pdf).toString("base64"),
+      contentBase64: toBase64Bytes(pdf),
     };
   } catch (error) {
     return {

@@ -430,3 +430,47 @@ export async function forwardExecutiveRequest(
     });
   }
 }
+
+export async function deleteExecutiveRequest(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: { requestId: string },
+) {
+  const request = await loadRequest(
+    supabase,
+    profile.employee.organizationId,
+    input.requestId,
+  );
+  const status = request.request_status as ExecutiveApprovalStatus;
+
+  if (CEO_ACTIONABLE_APPROVAL_STATUSES.includes(status)) {
+    await applyDomainDecision(
+      supabase,
+      profile,
+      request,
+      "rejected",
+      "Removed by CEO",
+    );
+  }
+
+  const now = new Date().toISOString();
+  const { error } = await fromHrms(supabase, "executive_approval_requests")
+    .update({
+      deleted_at: now,
+      updated_by: profile.userId,
+    })
+    .eq("id", request.id)
+    .eq("organization_id", profile.employee.organizationId);
+
+  if (error) throw new Error(error.message);
+
+  await appendApprovalEvent(supabase, {
+    organizationId: profile.employee.organizationId,
+    requestId: request.id,
+    eventKey: "deleted",
+    title: "Removed",
+    description: "Request removed from the executive queue.",
+    actorEmployeeId: profile.employee.id,
+    actorUserId: profile.userId,
+  });
+}

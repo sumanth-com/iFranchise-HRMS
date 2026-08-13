@@ -74,6 +74,8 @@ function revalidateTeamPaths() {
   revalidatePath(MANAGER_ROUTES.attendance);
   revalidatePath(MANAGER_ROUTES.leave);
   revalidatePath(MANAGER_ROUTES.performance);
+  revalidatePath("/dashboard/payroll");
+  revalidatePath("/dashboard/employees");
 }
 
 export async function fetchTeamEmployeesAction(
@@ -294,6 +296,14 @@ export async function removeTeamMemberAction(
       .is("deleted_at", null);
 
     if (deleteError) throw new Error(deleteError.message);
+
+    const { error: cascadeError } = await admin
+      .schema("hrms")
+      .rpc("cascade_soft_delete_employee_related", {
+        p_employee_id: parsed.employeeId,
+        p_deleted_by: profile.userId,
+      });
+    if (cascadeError) throw new Error(cascadeError.message);
 
     revalidateTeamPaths();
     return {

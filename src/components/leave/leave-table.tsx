@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
   flexRender,
@@ -20,6 +19,7 @@ import {
   Layers,
   MoreHorizontal,
   Plus,
+  Trash2,
   User,
   UserCheck,
   XCircle,
@@ -27,6 +27,7 @@ import {
 import { toast } from "sonner";
 
 import { LeaveStatusBadge } from "@/components/leave/leave-status-badge";
+import { HrLeaveDetailPopup } from "@/components/leave/hr-leave-detail-popup";
 import { Button, buttonVariants } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
 import { Label } from "@/components/ui/label";
@@ -53,6 +54,7 @@ import {
 import {
   approveLeaveRequestAction,
   cancelLeaveRequestAction,
+  deleteLeaveRequestAction,
   fetchLeaveRequestsAction,
   rejectLeaveRequestAction,
 } from "@/lib/leave/actions";
@@ -89,7 +91,10 @@ type LeaveTableProps = {
   canApprove: boolean;
   canReject: boolean;
   canCancel: boolean;
+  canDelete?: boolean;
   embedded?: boolean;
+  /** Called after approve/reject/cancel/delete so parents can refresh summary cards. */
+  onMutated?: () => void;
 };
 
 const TABLE_HEAD_CELL_CLASS = "h-11 whitespace-nowrap py-3.5 pl-10 pr-4";
@@ -192,15 +197,26 @@ export function LeaveTable({
   canApprove,
   canReject,
   canCancel,
+  canDelete = false,
   embedded = false,
+  onMutated,
 }: LeaveTableProps) {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [approveTarget, setApproveTarget] = useState<LeaveListItem | null>(null);
   const [rejectTarget, setRejectTarget] = useState<LeaveListItem | null>(null);
   const [cancelTarget, setCancelTarget] = useState<LeaveListItem | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<LeaveListItem | null>(null);
+  const [viewLeaveId, setViewLeaveId] = useState<string | null>(null);
+  const [viewLeavePreview, setViewLeavePreview] = useState<LeaveListItem | null>(null);
+  const [viewOpen, setViewOpen] = useState(false);
   const [approveComments, setApproveComments] = useState("");
   const [rejectComments, setRejectComments] = useState("");
+
+  function openLeavePopup(row: LeaveListItem) {
+    setViewLeaveId(row.id);
+    setViewLeavePreview(row);
+    setViewOpen(true);
+  }
 
   useEffect(() => {
     if (!embedded && window.location.search) {
@@ -233,6 +249,56 @@ export function LeaveTable({
   const currentMonth = filters.month ?? defaultMonth;
   const currentYear = filters.year ?? defaultYear;
 
+  const reloadTable = useCallback(
+    async (nextFilters: LeaveListParams = filters) => {
+      const result = await fetchLeaveRequestsAction(nextFilters);
+      if (!result.success) {
+        toast.error(result.message);
+        return false;
+      }
+      setTableState({
+        records: result.data.data,
+        total: result.data.total,
+        page: result.data.page,
+        pageSize: result.data.pageSize,
+      });
+      return true;
+    },
+    [filters],
+  );
+
+  const patchRecordStatus = useCallback(
+    (leaveRequestId: string, nextStatus: LeaveListItem["leaveStatus"]) => {
+      setTableState((prev) => ({
+        ...prev,
+        records: prev.records.map((row) =>
+          row.id === leaveRequestId ? { ...row, leaveStatus: nextStatus } : row,
+        ),
+      }));
+      setViewLeavePreview((prev) =>
+        prev?.id === leaveRequestId ? { ...prev, leaveStatus: nextStatus } : prev,
+      );
+    },
+    [],
+  );
+
+  const afterMutation = useCallback(
+    async (leaveRequestId: string, nextStatus: LeaveListItem["leaveStatus"] | "deleted") => {
+      if (nextStatus === "deleted") {
+        setTableState((prev) => ({
+          ...prev,
+          records: prev.records.filter((row) => row.id !== leaveRequestId),
+          total: Math.max(0, prev.total - 1),
+        }));
+      } else {
+        patchRecordStatus(leaveRequestId, nextStatus);
+      }
+      await reloadTable();
+      onMutated?.();
+    },
+    [onMutated, patchRecordStatus, reloadTable],
+  );
+
   const updateParams = useCallback(
     (updates: Record<string, string | undefined>) => {
       const nextFilters: LeaveListParams = {
@@ -250,21 +316,10 @@ export function LeaveTable({
       setFilters(nextFilters);
 
       startTransition(async () => {
-        const result = await fetchLeaveRequestsAction(nextFilters);
-        if (!result.success) {
-          toast.error(result.message);
-          return;
-        }
-
-        setTableState({
-          records: result.data.data,
-          total: result.data.total,
-          page: result.data.page,
-          pageSize: result.data.pageSize,
-        });
+        await reloadTable(nextFilters);
       });
     },
-    [filters],
+    [filters, reloadTable],
   );
 
   const { records, total, page, pageSize } = tableState;
@@ -408,9 +463,7 @@ export function LeaveTable({
               <DropdownMenuContent align="end" className="min-w-[11.5rem]">
                 <DropdownMenuItem
                   className="whitespace-nowrap"
-                  onClick={() =>
-                    router.push(LEAVE_ROUTES.detail(row.original.id))
-                  }
+                  onClick={() => openLeavePopup(row.original)}
                 >
                   <Eye className="size-4 shrink-0" />
                   View Leave
@@ -433,7 +486,7 @@ export function LeaveTable({
                     Reject
                   </DropdownMenuItem>
                 ) : null}
-                {canCancel && isCancellable ? (
+                {!embedded && canCancel && isCancellable ? (
                   <DropdownMenuItem
                     variant="destructive"
                     className="whitespace-nowrap"
@@ -443,13 +496,23 @@ export function LeaveTable({
                     Cancel Leave
                   </DropdownMenuItem>
                 ) : null}
+                {!embedded && canDelete ? (
+                  <DropdownMenuItem
+                    variant="destructive"
+                    className="whitespace-nowrap"
+                    onClick={() => setDeleteTarget(row.original)}
+                  >
+                    <Trash2 className="size-4 shrink-0" />
+                    Delete
+                  </DropdownMenuItem>
+                ) : null}
               </DropdownMenuContent>
             </DropdownMenu>
           );
         },
       },
     ],
-    [canApprove, canCancel, canReject, embedded, router],
+    [canApprove, canCancel, canDelete, canReject, embedded],
   );
 
   const table = useReactTable({
@@ -463,10 +526,11 @@ export function LeaveTable({
 
   const handleApprove = () => {
     if (!approveTarget) return;
+    const targetId = approveTarget.id;
 
     startTransition(async () => {
       const result = await approveLeaveRequestAction({
-        leaveRequestId: approveTarget.id,
+        leaveRequestId: targetId,
         comments: approveComments || "",
       });
 
@@ -478,7 +542,7 @@ export function LeaveTable({
       toast.success("Leave request approved");
       setApproveTarget(null);
       setApproveComments("");
-      router.refresh();
+      await afterMutation(targetId, "approved");
     });
   };
 
@@ -490,9 +554,11 @@ export function LeaveTable({
       return;
     }
 
+    const targetId = rejectTarget.id;
+
     startTransition(async () => {
       const result = await rejectLeaveRequestAction({
-        leaveRequestId: rejectTarget.id,
+        leaveRequestId: targetId,
         comments: rejectComments,
       });
 
@@ -504,15 +570,16 @@ export function LeaveTable({
       toast.success("Leave request rejected");
       setRejectTarget(null);
       setRejectComments("");
-      router.refresh();
+      await afterMutation(targetId, "rejected");
     });
   };
 
   const handleCancel = () => {
     if (!cancelTarget) return;
+    const targetId = cancelTarget.id;
 
     startTransition(async () => {
-      const result = await cancelLeaveRequestAction(cancelTarget.id);
+      const result = await cancelLeaveRequestAction(targetId);
 
       if (!result.success) {
         toast.error(result.message);
@@ -521,7 +588,25 @@ export function LeaveTable({
 
       toast.success("Leave request cancelled");
       setCancelTarget(null);
-      router.refresh();
+      await afterMutation(targetId, "cancelled");
+    });
+  };
+
+  const handleDelete = () => {
+    if (!deleteTarget) return;
+    const targetId = deleteTarget.id;
+
+    startTransition(async () => {
+      const result = await deleteLeaveRequestAction(targetId);
+
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+
+      toast.success("Leave request deleted");
+      setDeleteTarget(null);
+      await afterMutation(targetId, "deleted");
     });
   };
 
@@ -826,9 +911,7 @@ export function LeaveTable({
                 <TableRow
                   key={row.id}
                   className="cursor-pointer hover:bg-muted/50"
-                  onClick={() =>
-                    router.push(LEAVE_ROUTES.detail(row.original.id))
-                  }
+                  onClick={() => openLeavePopup(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
@@ -890,6 +973,29 @@ export function LeaveTable({
           Showing {total} leave request{total === 1 ? "" : "s"}
         </p>
       )}
+
+      <HrLeaveDetailPopup
+        leaveRequestId={viewLeaveId}
+        preview={viewLeavePreview}
+        open={viewOpen}
+        onOpenChange={(open) => {
+          setViewOpen(open);
+          if (!open) {
+            setViewLeaveId(null);
+            setViewLeavePreview(null);
+          }
+        }}
+        canApprove={canApprove}
+        canReject={canReject}
+        canDelete={canDelete}
+        onActionComplete={(result) => {
+          if (result) {
+            void afterMutation(result.leaveRequestId, result.status);
+            return;
+          }
+          void reloadTable().then(() => onMutated?.());
+        }}
+      />
 
       <Modal
         open={Boolean(approveTarget)}
@@ -1002,6 +1108,32 @@ export function LeaveTable({
         <p className="text-sm text-muted-foreground">
           This will cancel the leave request and restore the employee&apos;s leave balance
           where applicable.
+        </p>
+      </Modal>
+
+      <Modal
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Delete leave request"
+        description={
+          deleteTarget
+            ? `Permanently remove leave for ${deleteTarget.employeeName}?`
+            : undefined
+        }
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Keep request
+            </Button>
+            <Button variant="destructive" disabled={isPending} onClick={handleDelete}>
+              Delete
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          This removes the leave request from Team Leave and restores balance for pending or
+          approved requests. This cannot be undone.
         </p>
       </Modal>
     </div>

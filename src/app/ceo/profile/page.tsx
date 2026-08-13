@@ -1,24 +1,49 @@
-import { Suspense } from "react";
-
-import { LoadingSpinner } from "@/components/common/loading-spinner";
-import { CeoProfileView } from "@/components/ceo/profile/ceo-profile-view";
-import { getCeoProfileModuleData } from "@/lib/ceo/actions/ceo-profile-actions";
+import { MyProfileView } from "@/components/employee/profile/my-profile-view";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
-import { requireServerPermission } from "@/lib/permissions/server";
+import { CEO_ROUTES } from "@/lib/ceo/constants";
+import { canEditSelfProfileContactDetails } from "@/lib/employee/profile-contact";
+import { getMyProfileBundle } from "@/lib/employee/services/my-profile";
+import { getEmployeeLookups } from "@/lib/employees/services/employee-queries";
+import { requireServerAnyPermission } from "@/lib/permissions/server";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function CeoProfilePage() {
-  await requireServerPermission(PORTAL_PERMISSIONS.ceo);
-  const data = await getCeoProfileModuleData();
+  const profile = await requireServerAnyPermission([
+    PORTAL_PERMISSIONS.ceo,
+    "employee_profile.view",
+  ]);
+  const supabase = await createClient();
+  const data = await getMyProfileBundle(supabase, profile, CEO_ROUTES.profile);
+
+  if (!data) {
+    return (
+      <div className="flex min-h-0 flex-1 items-center justify-center p-6 text-sm text-muted-foreground">
+        Profile not found.
+      </div>
+    );
+  }
+
+  const canEditContactDetails = canEditSelfProfileContactDetails(profile.permissionCodes);
+  const lookups = canEditContactDetails
+    ? await getEmployeeLookups(
+        supabase,
+        profile.employee.organizationId,
+        data.employeeId,
+      )
+    : null;
+
+  const managerOptions = lookups?.managers.map((manager) => ({
+    value: manager.id,
+    label: manager.label,
+  })) ?? [];
 
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-1 items-center justify-center">
-          <LoadingSpinner />
-        </div>
-      }
-    >
-      <CeoProfileView {...data} />
-    </Suspense>
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-4 md:p-5">
+      <MyProfileView
+        data={data}
+        canEditContactDetails={canEditContactDetails}
+        managerOptions={managerOptions}
+      />
+    </div>
   );
 }

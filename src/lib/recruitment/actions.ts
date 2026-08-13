@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { ceoOrViewPermission } from "@/lib/ceo/read-only-permissions";
 import { createClient } from "@/lib/supabase/server";
 import {
   requireServerAnyPermission,
@@ -33,6 +34,7 @@ import {
   moveStageSchema,
   offerFormSchema,
   offerStatusSchema,
+  assertOfferLetterFile,
   recruitmentSettingsSchema,
 } from "@/lib/validations/recruitment";
 
@@ -153,7 +155,7 @@ export async function getCandidateDetailAction(
   id: string,
 ): Promise<ActionResult<CandidateDetail>> {
   try {
-    const profile = await requireServerPermission("recruitment.view");
+    const profile = await requireServerAnyPermission(ceoOrViewPermission("recruitment.view"));
     const supabase = await getAuthenticatedSupabase();
     const detail = await getCandidateById(supabase, profile.employee.organizationId, id);
     if (!detail) {
@@ -250,9 +252,22 @@ export async function createOfferAction(formData: FormData): Promise<ActionResul
     let offerFile: { bytes: Uint8Array; filename: string } | undefined;
 
     if (file instanceof File && file.size > 0) {
+      try {
+        assertOfferLetterFile(file);
+      } catch (error) {
+        return {
+          success: false,
+          message: error instanceof Error ? error.message : "Invalid offer letter file",
+        };
+      }
       offerFile = {
         bytes: new Uint8Array(await file.arrayBuffer()),
         filename: file.name,
+      };
+    } else if (file instanceof File && file.size === 0) {
+      return {
+        success: false,
+        message: "The selected file is empty. Choose another file.",
       };
     }
 

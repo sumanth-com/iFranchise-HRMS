@@ -129,5 +129,12 @@ export type CeoDashboardData = {
   attendance: CeoAttendanceOverview;
   activities: CeoActivityItem[];
   approvals: CeoApprovalItem[];
+  upcomingHolidays: Array<{
+    id: string;
+    type: "holiday";
+    title: string;
+    subtitle: string | null;
+    date: string;
+  }>;
   charts: CeoDashboardCharts;
 };

@@ -95,41 +95,35 @@ export async function fetchTeamLeaveCalendarAction(input?: unknown): Promise<{
   return getTeamLeaveCalendarData(supabase, profile, teamIds, month, year);
 }
 
-export async function approveTeamLeaveRequestAction(input: unknown) {
+export async function approveTeamLeaveRequestAction(
+  input: unknown,
+): Promise<{ success: boolean; message: string }> {
   try {
     teamLeaveApprovalSchema.parse(input);
     const { profile, supabase, teamIds } = await getAuthenticatedContext();
-    const result = await approveTeamLeaveRequest(
-      supabase,
-      profile,
-      teamIds,
-      input,
-    );
+    await approveTeamLeaveRequest(supabase, profile, teamIds, input);
     revalidateLeavePaths();
-    return result;
+    return { success: true, message: "Leave approved." };
   } catch (error) {
     return {
-      success: false as const,
+      success: false,
       message: error instanceof Error ? error.message : "Failed to approve leave.",
     };
   }
 }
 
-export async function rejectTeamLeaveRequestAction(input: unknown) {
+export async function rejectTeamLeaveRequestAction(
+  input: unknown,
+): Promise<{ success: boolean; message: string }> {
   try {
     teamLeaveRejectSchema.parse(input);
     const { profile, supabase, teamIds } = await getAuthenticatedContext();
-    const result = await rejectTeamLeaveRequest(
-      supabase,
-      profile,
-      teamIds,
-      input,
-    );
+    await rejectTeamLeaveRequest(supabase, profile, teamIds, input);
     revalidateLeavePaths();
-    return result;
+    return { success: true, message: "Leave rejected." };
   } catch (error) {
     return {
-      success: false as const,
+      success: false,
       message: error instanceof Error ? error.message : "Failed to reject leave.",
     };
   }

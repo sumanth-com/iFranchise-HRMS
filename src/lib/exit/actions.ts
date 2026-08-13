@@ -44,6 +44,7 @@ function revalidateExit(employeeId?: string) {
   revalidatePath("/employee/resignation/apply");
   revalidatePath("/manager/resignation");
   revalidatePath("/ceo/exit");
+  revalidatePath("/ceo/approvals/exit");
   revalidatePath("/dashboard/employees");
   revalidatePath("/dashboard/assets");
   revalidatePath("/dashboard/assets-management");

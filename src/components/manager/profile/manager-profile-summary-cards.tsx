@@ -13,27 +13,32 @@ const CARDS: {
   key: keyof ManagerAttendanceMonthSummary;
   label: string;
   hint: string;
+  sidebarHint: string;
   format?: (value: number | string | null) => string;
 }[] = [
   {
     key: "present",
     label: "Present",
     hint: "Days marked present",
+    sidebarHint: "Present days",
   },
   {
     key: "absent",
     label: "Absent",
     hint: "Missed days",
+    sidebarHint: "Missed days",
   },
   {
     key: "late",
     label: "Late",
     hint: "Late check-ins",
+    sidebarHint: "Late check-ins",
   },
   {
     key: "averageWorkingHours",
     label: "Avg Hours",
     hint: "Average working time",
+    sidebarHint: "Avg work time",
     format: (value) => formatHoursLabel(Number(value ?? 0)),
   },
 ];
@@ -49,32 +54,49 @@ export function ManagerProfileSummaryCards({
     <section
       className={cn(
         isSidebar
-          ? "flex h-full min-h-[28rem] flex-col gap-3"
+          ? "flex h-full min-h-0 w-full flex-col gap-2"
           : "grid grid-cols-2 gap-3 lg:grid-cols-4",
         className,
       )}
     >
       {CARDS.map((card) => {
         const raw = summary[card.key];
-        const display = card.format
-          ? card.format(raw)
-          : String(raw ?? 0);
+        const display = card.format ? card.format(raw) : String(raw ?? 0);
 
         return (
           <div
             key={card.key}
             className={cn(
-              "rounded-2xl border bg-card px-5 py-4 shadow-sm",
-              isSidebar && "flex flex-1 flex-col justify-center min-h-[5.25rem]",
+              "rounded-xl border bg-card shadow-sm",
+              isSidebar
+                ? "flex min-h-0 flex-1 flex-col items-center justify-center px-2.5 py-2.5 text-center"
+                : "px-5 py-4",
             )}
           >
-            <p className="text-xs font-medium text-muted-foreground">
+            <p
+              className={cn(
+                "font-medium tracking-wide text-muted-foreground",
+                isSidebar ? "text-[10px]" : "text-[11px]",
+              )}
+            >
               {card.label}
             </p>
-            <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums">
+            <p
+              className={cn(
+                "font-semibold tracking-tight tabular-nums",
+                isSidebar ? "mt-0.5 text-lg leading-none" : "mt-2 text-2xl",
+              )}
+            >
               {display}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">{card.hint}</p>
+            <p
+              className={cn(
+                "leading-snug text-muted-foreground",
+                isSidebar ? "mt-1 text-[10px]" : "mt-0.5 text-[11px]",
+              )}
+            >
+              {isSidebar ? card.sidebarHint : card.hint}
+            </p>
           </div>
         );
       })}

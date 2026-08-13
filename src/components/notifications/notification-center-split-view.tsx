@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  deleteAllNotificationsAction,
   deleteNotificationAction,
   markAllNotificationsReadAction,
   markNotificationReadAction,
@@ -69,6 +70,7 @@ export function NotificationCenterSplitView({
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [deleteTarget, setDeleteTarget] = useState<NotificationListItem | null>(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   const selected =
     result.items.find((item) => item.id === selectedId) ??
@@ -115,6 +117,25 @@ export function NotificationCenterSplitView({
     });
   }
 
+  function confirmBulkDelete() {
+    startTransition(async () => {
+      const res = await deleteAllNotificationsAction();
+      if (res.success) {
+        const count = res.data?.deletedCount ?? 0;
+        toast.success(
+          count > 0
+            ? `${count} notification${count === 1 ? "" : "s"} deleted`
+            : "No notifications to delete",
+        );
+        setBulkDeleteOpen(false);
+        setParams({ id: undefined, page: "1" });
+        router.refresh();
+      } else {
+        toast.error(res.message);
+      }
+    });
+  }
+
   function selectNotification(item: NotificationListItem) {
     setParams({ id: item.id });
     if (item.status === "unread") markAsRead(item);
@@ -154,6 +175,17 @@ export function NotificationCenterSplitView({
                   {item.label}
                 </button>
               ))}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                disabled={isPending || result.total === 0}
+                onClick={() => setBulkDeleteOpen(true)}
+              >
+                <Trash2 className="size-3.5" />
+                Bulk delete
+              </Button>
             </div>
           ) : (
             <div />
@@ -305,6 +337,35 @@ export function NotificationCenterSplitView({
             Delete &ldquo;{deleteTarget.title}&rdquo;?
           </p>
         ) : null}
+      </Modal>
+
+      <Modal
+        open={bulkDeleteOpen}
+        onOpenChange={(open) => {
+          if (!open) setBulkDeleteOpen(false);
+        }}
+        title="Delete all notifications?"
+        description="This permanently removes every notification in your inbox."
+        contentClassName="sm:max-w-md"
+        showCancel={false}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setBulkDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={isPending}
+              onClick={confirmBulkDelete}
+            >
+              {isPending ? "Deleting…" : "Delete all"}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          All of your notifications will be deleted. This cannot be undone.
+        </p>
       </Modal>
     </div>
   );

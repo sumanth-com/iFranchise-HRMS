@@ -246,16 +246,17 @@ export function EmployeeAttendanceHistoryTable({
                     >
                       <Eye className="size-4" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-8"
-                      aria-label="Request regularization"
-                      disabled={!row.canRequestRegularization}
-                      onClick={() => setRegularizeRow(row)}
-                    >
-                      <FilePlus2 className="size-4" />
-                    </Button>
+                    {row.canRequestRegularization ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8"
+                        aria-label="Request regularization"
+                        onClick={() => setRegularizeRow(row)}
+                      >
+                        <FilePlus2 className="size-4" />
+                      </Button>
+                    ) : null}
                     {row.canUpdateCheckout ? (
                       <Button
                         variant="ghost"

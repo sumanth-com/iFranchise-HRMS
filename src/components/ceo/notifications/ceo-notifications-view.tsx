@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
+import { useSearchParams } from "next/navigation";
 
 import {
   CeoBackToDashboard,
@@ -27,12 +28,20 @@ export function CeoNotificationsView({
   list: initialList,
   initialFilters,
 }: Props) {
+  const searchParams = useSearchParams();
   const [kpis, setKpis] = useState(initialKpis);
   const [list, setList] = useState(initialList);
   const [filters, setFilters] = useState<CeoNotificationListParams>(initialFilters);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    () => searchParams.get("id"),
+  );
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    const id = searchParams.get("id");
+    if (id) setSelectedId(id);
+  }, [searchParams]);
 
   const refresh = useCallback((nextFilters: CeoNotificationListParams) => {
     startTransition(async () => {

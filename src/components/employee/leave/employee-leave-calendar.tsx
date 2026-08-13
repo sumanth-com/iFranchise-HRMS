@@ -58,6 +58,7 @@ export function EmployeeLeaveCalendar({
         enableWeekView
         showYearPicker
         currentMonthOnly
+        compact
       />
     </section>
   );

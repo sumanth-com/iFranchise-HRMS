@@ -8,6 +8,7 @@ export default function EmployeeGoalsLayout({
 }) {
   return (
     <ModuleShell
+      fillContent
       header={
         <div className="space-y-4">
           <div>

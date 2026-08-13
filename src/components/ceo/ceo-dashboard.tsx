@@ -4,11 +4,11 @@ import { format } from "date-fns";
 import { useState } from "react";
 
 import { ErrorState } from "@/components/common";
-import { CeoDashboardHeader } from "@/components/ceo/ceo-dashboard-header";
-import { CeoDashboardKpis } from "@/components/ceo/ceo-dashboard-kpis";
-import { CeoDashboardPanels } from "@/components/ceo/ceo-dashboard-panels";
-import { CeoDashboardSnapshot } from "@/components/ceo/ceo-dashboard-snapshot";
 import { DailyBoostCard } from "@/components/dashboard/daily-boost-card";
+import { CeoDashboardKpis } from "@/components/ceo/ceo-dashboard-kpis";
+import { CeoDashboardToday } from "@/components/ceo/ceo-dashboard-today";
+import { EmployeeDashboardHeader } from "@/components/employee/dashboard/employee-dashboard-header";
+import { EmployeeUpcomingEvents } from "@/components/employee/dashboard/employee-upcoming-events";
 import type { CeoDashboardData } from "@/types/ceo-dashboard";
 import { useAuth } from "@/providers/auth-provider";
 
@@ -30,32 +30,47 @@ export function CeoDashboard({ data, error }: CeoDashboardProps) {
   }
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-1 flex-col gap-2 overflow-y-auto p-3 md:p-4 lg:gap-3 lg:overflow-hidden lg:p-5">
-      <div className="flex shrink-0 flex-col gap-2 lg:gap-3">
-        <CeoDashboardHeader />
-        <CeoDashboardKpis kpis={data.kpis} />
-        <CeoDashboardSnapshot kpis={data.kpis} recruitment={data.recruitment} />
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-5 lg:overflow-hidden">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[88rem] flex-col gap-3 md:gap-4 lg:overflow-hidden">
+        <div className="shrink-0">
+          <EmployeeDashboardHeader
+            greeting={{
+              employeeId: profile.employee.id,
+              firstName: profile.employee.firstName,
+              lastName: profile.employee.lastName,
+              fullName: `${profile.employee.firstName} ${profile.employee.lastName}`.trim(),
+              employeeCode: profile.employee.employeeCode,
+              designation: null,
+              departmentName: null,
+              avatarUrl: null,
+            }}
+            subtitle="Executive Portal"
+          />
+        </div>
+
+        <div className="shrink-0">
+          <CeoDashboardKpis kpis={data.kpis} />
+        </div>
+
+        <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[3fr_2fr] lg:items-stretch lg:overflow-hidden">
+          <div className="flex min-h-0 flex-col gap-3 lg:h-full lg:gap-4">
+            <CeoDashboardToday attendance={data.attendance} />
+            <DailyBoostCard
+              firstName={profile.employee.firstName}
+              lastName={profile.employee.lastName}
+              personKey={profile.employee.id}
+              referenceDate={referenceDate}
+              tone="executive"
+              className="min-h-0 flex-1"
+            />
+          </div>
+          <EmployeeUpcomingEvents
+            events={data.upcomingHolidays}
+            referenceDate={referenceDate}
+            className="min-h-0 lg:h-full"
+          />
+        </div>
       </div>
-
-      <section className="flex min-h-0 flex-1 flex-col lg:overflow-hidden">
-        <CeoDashboardPanels
-          organization={data.organization}
-          recruitment={data.recruitment}
-          attendance={data.attendance}
-          kpis={data.kpis}
-          performance={data.performance}
-          payroll={data.payroll}
-        />
-      </section>
-
-      <DailyBoostCard
-        firstName={profile.employee.firstName}
-        lastName={profile.employee.lastName}
-        personKey={profile.employee.id}
-        referenceDate={referenceDate}
-        compact
-        className="shrink-0"
-      />
     </div>
   );
 }

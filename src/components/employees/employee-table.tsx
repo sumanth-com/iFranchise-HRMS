@@ -76,6 +76,7 @@ export function EmployeeTable({
     employmentStatus: initialEmploymentStatus as EmployeeListParams["employmentStatus"],
     accountStatus: initialAccountStatus as EmployeeListParams["accountStatus"],
   });
+  const [searchInput, setSearchInput] = useState(initialSearch ?? "");
 
   useEffect(() => {
     if (window.location.search) {
@@ -114,6 +115,21 @@ export function EmployeeTable({
     },
     [filters],
   );
+
+  useEffect(() => {
+    const trimmed = searchInput.trim();
+    const current = (filters.search ?? "").trim();
+    if (trimmed === current) return;
+
+    const timer = window.setTimeout(() => {
+      updateParams({
+        search: trimmed || undefined,
+        page: "1",
+      });
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [searchInput, filters.search, updateParams]);
 
   const { employees, total, page, pageSize } = tableState;
   const { search, department, employmentStatus, accountStatus } = filters;
@@ -187,12 +203,14 @@ export function EmployeeTable({
         <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
           <Input
             placeholder="Search by name, email, or code..."
-            defaultValue={search ?? ""}
+            value={searchInput}
             className="sm:max-w-xs"
+            onChange={(event) => setSearchInput(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") {
+                event.preventDefault();
                 updateParams({
-                  search: event.currentTarget.value || undefined,
+                  search: event.currentTarget.value.trim() || undefined,
                   page: "1",
                 });
               }

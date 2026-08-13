@@ -135,12 +135,14 @@ export async function getSalaryStructureById(
           first_name,
           last_name,
           organization_id,
+          deleted_at,
           departments:department_id (name)
         )
       `,
     )
     .eq("id", structureId)
     .eq("employees.organization_id", organizationId)
+    .is("employees.deleted_at", null)
     .is("deleted_at", null)
     .maybeSingle();
 
@@ -386,7 +388,8 @@ export async function listPayslips(
           employee_code,
           first_name,
           last_name,
-          organization_id
+          organization_id,
+          deleted_at
         ),
         payroll_items:payroll_item_id (
           gross_salary,
@@ -400,6 +403,7 @@ export async function listPayslips(
       { count: "exact" },
     )
     .eq("employees.organization_id", organizationId)
+    .is("employees.deleted_at", null)
     .is("deleted_at", null);
 
   if (employeeId) {
@@ -502,12 +506,14 @@ export async function listSalaryStructures(
           first_name,
           last_name,
           organization_id,
+          deleted_at,
           departments:department_id (name)
         )
       `,
       { count: "exact" },
     )
     .eq("employees.organization_id", organizationId)
+    .is("employees.deleted_at", null)
     .is("deleted_at", null);
 
   if (employeeId) {
@@ -598,6 +604,7 @@ export async function listBonuses(
           first_name,
           last_name,
           department_id,
+          deleted_at,
           departments:department_id (name)
         ),
         approver:approver_employee_id (
@@ -612,6 +619,7 @@ export async function listBonuses(
       { count: "exact" },
     )
     .eq("organization_id", organizationId)
+    .is("employees.deleted_at", null)
     .is("deleted_at", null);
 
   if (employeeId) query = query.eq("employee_id", employeeId);
@@ -726,12 +734,14 @@ export async function listReimbursements(
         employees:employee_id!inner (
           employee_code,
           first_name,
-          last_name
+          last_name,
+          deleted_at
         )
       `,
       { count: "exact" },
     )
     .eq("organization_id", organizationId)
+    .is("employees.deleted_at", null)
     .is("deleted_at", null);
 
   if (employeeId) query = query.eq("employee_id", employeeId);
@@ -816,7 +826,8 @@ export async function listSalaryRevisions(
         employees:employee_id!inner (
           employee_code,
           first_name,
-          last_name
+          last_name,
+          deleted_at
         ),
         approver:approver_employee_id (
           first_name,
@@ -826,6 +837,7 @@ export async function listSalaryRevisions(
       { count: "exact" },
     )
     .eq("organization_id", organizationId)
+    .is("employees.deleted_at", null)
     .is("deleted_at", null);
 
   if (employeeId) query = query.eq("employee_id", employeeId);

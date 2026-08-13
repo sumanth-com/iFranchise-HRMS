@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { ONBOARDING_PERMISSIONS } from "@/lib/onboarding/constants";
 import {
   loadOnboardingCaseDetail,
@@ -35,6 +36,7 @@ const VIEW_PERMISSIONS = [
   ONBOARDING_PERMISSIONS.manage,
   ONBOARDING_PERMISSIONS.review,
   ONBOARDING_PERMISSIONS.activate,
+  PORTAL_PERMISSIONS.ceo,
 ];
 
 function revalidateOnboarding() {

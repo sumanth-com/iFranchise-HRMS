@@ -154,6 +154,7 @@ export type CeoApprovalsDetail = {
   previousDecisions: CeoApprovalsHistoryItem[];
   comments: CeoApprovalsCommentItem[];
   canAct: boolean;
+  canDelete: boolean;
 };
 
 export type CeoApprovalsInsights = {

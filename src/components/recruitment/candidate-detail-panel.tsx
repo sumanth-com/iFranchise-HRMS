@@ -108,7 +108,7 @@ export function CandidateDetailPanel({
         </Button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-6">
         {loading && !detail ? (
           <div className="flex items-center justify-center gap-2 py-20 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />

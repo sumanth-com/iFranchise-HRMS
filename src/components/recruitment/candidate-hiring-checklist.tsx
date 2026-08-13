@@ -66,7 +66,9 @@ export function CandidateHiringChecklist({
         <div>
           <h3 className="text-sm font-semibold">Interview & offer hub</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Mark interviews done and move offers forward — no separate tabs needed.
+            {canInterview || canOffer
+              ? "Mark interviews done and move offers forward — no separate tabs needed."
+              : "Interview history and offer status for this candidate."}
           </p>
         </div>
       </div>

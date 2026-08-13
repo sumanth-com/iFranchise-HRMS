@@ -78,6 +78,7 @@ function emptyDashboard(): CeoDashboardData {
     },
     activities: [],
     approvals: [],
+    upcomingHolidays: [],
     charts: {
       employeeGrowth: [],
       hiringTrend: [],

@@ -5,16 +5,10 @@ import {
   calculateLeaveTotalDays,
   getCurrentBalanceYear,
 } from "@/lib/leave/services/leave-utils";
-import {
-  getEmployeeReportingManagerId,
-  getEmployeeRoleCodes,
-  getCeoApproverEmployeeId,
-  getHrApproverEmployeeId,
-} from "@/lib/leave/services/leave-queries";
+import { getEmployeeReportingManagerId, getHrApproverEmployeeId } from "@/lib/leave/services/leave-queries";
 import {
   notifyLeaveApproved,
   notifyLeaveCancelled,
-  notifyLeaveManagerApproved,
   notifyLeaveRejected,
   notifyLeaveSubmitted,
 } from "@/lib/leave/services/leave-notifications";
@@ -114,55 +108,21 @@ async function createApprovalSteps(
   employeeId: string,
 ) {
   const organizationId = profile.employee.organizationId;
-  const managerId = await getEmployeeReportingManagerId(supabase, employeeId);
   const hrId = await getHrApproverEmployeeId(supabase, organizationId);
-  const ceoId = await getCeoApproverEmployeeId(supabase, organizationId);
-  const requesterRoles = await getEmployeeRoleCodes(supabase, employeeId);
-  const isHrRequester = requesterRoles.some((code) =>
-    ["hr_admin", "hr_executive"].includes(code),
-  );
 
-  const steps: Array<{ level: number; approverId: string }> = [];
+  // HR-only approval chain — managers and executives do not approve leave.
+  const approverId =
+    hrId && hrId !== employeeId ? hrId : hrId ?? profile.employee.id;
 
-  if (managerId && managerId !== employeeId) {
-    steps.push({ level: 1, approverId: managerId });
-  }
-
-  if (isHrRequester) {
-    if (ceoId && ceoId !== employeeId && !steps.some((s) => s.approverId === ceoId)) {
-      steps.push({ level: steps.length + 1, approverId: ceoId });
-    }
-  } else if (
-    hrId &&
-    hrId !== employeeId &&
-    !steps.some((s) => s.approverId === hrId)
-  ) {
-    steps.push({ level: steps.length + 1, approverId: hrId });
-  }
-
-  if (
-    ceoId &&
-    ceoId !== employeeId &&
-    !steps.some((s) => s.approverId === ceoId)
-  ) {
-    steps.push({ level: steps.length + 1, approverId: ceoId });
-  }
-
-  if (steps.length === 0) {
-    steps.push({ level: 1, approverId: profile.employee.id });
-  }
-
-  const rows = steps.map((step) => ({
+  const { error } = await supabase.schema("hrms").from("leave_approvals").insert({
     leave_request_id: leaveRequestId,
-    approver_employee_id: step.approverId,
-    approval_level: step.level,
+    approver_employee_id: approverId,
+    approval_level: 1,
     approval_status: "pending" as const,
     status: "active" as const,
     created_by: profile.userId,
     updated_by: profile.userId,
-  }));
-
-  const { error } = await supabase.schema("hrms").from("leave_approvals").insert(rows);
+  });
   if (error) throw new Error(error.message);
 }
 
@@ -216,77 +176,14 @@ export async function createLeaveRequest(
   return data.id;
 }
 
-async function getPendingApprovalForActor(
-  supabase: AuthSupabaseClient,
-  leaveRequestId: string,
-  actorEmployeeId: string,
-) {
-  const { data, error } = await supabase
-    .schema("hrms")
-    .from("leave_approvals")
-    .select("id, approval_level, approval_status, approver_employee_id")
-    .eq("leave_request_id", leaveRequestId)
-    .eq("approver_employee_id", actorEmployeeId)
-    .eq("approval_status", "pending")
-    .is("deleted_at", null)
-    .order("approval_level", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) throw new Error(error.message);
-  return data;
+function canApproveLeave(profile: UserProfile): boolean {
+  // Manager/CEO leave.approve was revoked — anyone still holding this
+  // permission is an HR/admin approver for org leave.
+  return profile.permissionCodes.includes("leave.approve");
 }
 
-async function canActorApproveRequest(
-  supabase: AuthSupabaseClient,
-  profile: UserProfile,
-  leaveRequestId: string,
-  employeeId: string,
-): Promise<boolean> {
-  // An approver explicitly assigned to a pending step can always act on it —
-  // this covers direct managers, the CEO, and any approver a request was
-  // forwarded/reassigned to.
-  const assignedStep = await getPendingApprovalForActor(
-    supabase,
-    leaveRequestId,
-    profile.employee.id,
-  );
-  if (assignedStep) return true;
-
-  const codes = profile.permissionCodes;
-  const isHrOrAdmin =
-    codes.includes("leave.approve") &&
-    (codes.includes("leave_balance.manage") || profile.roles.some((r) =>
-      ["hr_admin", "super_admin"].includes(r.code),
-    ));
-
-  if (isHrOrAdmin) {
-    const pending = await getPendingApprovalForActor(
-      supabase,
-      leaveRequestId,
-      profile.employee.id,
-    );
-    if (pending) return true;
-
-    const { data } = await supabase
-      .schema("hrms")
-      .from("leave_approvals")
-      .select("id")
-      .eq("leave_request_id", leaveRequestId)
-      .eq("approval_status", "pending")
-      .is("deleted_at", null)
-      .limit(1)
-      .maybeSingle();
-
-    return Boolean(data);
-  }
-
-  const managerId = await getEmployeeReportingManagerId(supabase, employeeId);
-  if (managerId !== profile.employee.id) return false;
-
-  return Boolean(
-    await getPendingApprovalForActor(supabase, leaveRequestId, profile.employee.id),
-  );
+function canRejectLeave(profile: UserProfile): boolean {
+  return profile.permissionCodes.includes("leave.reject");
 }
 
 async function finalizeApprovalIfComplete(
@@ -312,11 +209,13 @@ async function finalizeApprovalIfComplete(
 
   if (approvalsError) throw new Error(approvalsError.message);
 
-  const allApproved = (approvals ?? []).every((a) => a.approval_status === "approved");
-  const anyRejected = (approvals ?? []).some((a) => a.approval_status === "rejected");
-
+  const rows = approvals ?? [];
+  const anyRejected = rows.some((a) => a.approval_status === "rejected");
   if (anyRejected) return;
 
+  // No approval rows (legacy) or every step approved → finalize.
+  const allApproved =
+    rows.length === 0 || rows.every((a) => a.approval_status === "approved");
   if (!allApproved) return;
 
   const balanceYear = getCurrentBalanceYear(request.start_date);
@@ -363,72 +262,28 @@ export async function approveLeaveRequest(
     throw new Error("Only pending requests can be approved");
   }
 
-  const canApprove = await canActorApproveRequest(
-    supabase,
-    profile,
-    leaveRequestId,
-    request.employee_id,
-  );
-  if (!canApprove) throw new Error("You are not authorized to approve this request");
-
-  let approval = await getPendingApprovalForActor(
-    supabase,
-    leaveRequestId,
-    profile.employee.id,
-  );
-
-  if (!approval) {
-    const { data: anyPending } = await supabase
-      .schema("hrms")
-      .from("leave_approvals")
-      .select("id, approval_level, approval_status, approver_employee_id")
-      .eq("leave_request_id", leaveRequestId)
-      .eq("approval_status", "pending")
-      .is("deleted_at", null)
-      .order("approval_level", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    if (!anyPending) throw new Error("No pending approval step found");
-    approval = anyPending;
+  if (!canApproveLeave(profile)) {
+    throw new Error("You are not authorized to approve this request");
   }
 
-  const approvalId = approval.id;
-
+  const actedAt = new Date().toISOString();
   const { error: updateError } = await supabase
     .schema("hrms")
     .from("leave_approvals")
     .update({
       approval_status: "approved",
       comments: emptyToNull(comments),
-      acted_at: new Date().toISOString(),
+      acted_at: actedAt,
       updated_by: profile.userId,
     })
-    .eq("id", approvalId);
+    .eq("leave_request_id", leaveRequestId)
+    .eq("approval_status", "pending")
+    .is("deleted_at", null);
 
   if (updateError) throw new Error(updateError.message);
 
+  // HR decision is final — approve even when older rows have no pending steps.
   await finalizeApprovalIfComplete(supabase, profile, leaveRequestId);
-
-  const { data: afterRequest, error: afterError } = await supabase
-    .schema("hrms")
-    .from("leave_requests")
-    .select("leave_status, employee_id")
-    .eq("id", leaveRequestId)
-    .single();
-
-  if (afterError) throw new Error(afterError.message);
-
-  if (afterRequest.leave_status === "pending") {
-    await notifyLeaveManagerApproved(
-      supabase,
-      profile,
-      leaveRequestId,
-      afterRequest.employee_id,
-    );
-    // Next approval level is now active — email that approver a secure link.
-    await dispatchLeaveApprovalEmails(leaveRequestId, profile.userId);
-  }
 }
 
 export async function rejectLeaveRequest(
@@ -449,32 +304,24 @@ export async function rejectLeaveRequest(
     throw new Error("Only pending requests can be rejected");
   }
 
-  const canApprove = await canActorApproveRequest(
-    supabase,
-    profile,
-    leaveRequestId,
-    request.employee_id,
-  );
-  if (!canApprove) throw new Error("You are not authorized to reject this request");
-
-  const approval = await getPendingApprovalForActor(
-    supabase,
-    leaveRequestId,
-    profile.employee.id,
-  );
-
-  if (approval) {
-    await supabase
-      .schema("hrms")
-      .from("leave_approvals")
-      .update({
-        approval_status: "rejected",
-        comments,
-        acted_at: new Date().toISOString(),
-        updated_by: profile.userId,
-      })
-      .eq("id", approval.id);
+  if (!canRejectLeave(profile)) {
+    throw new Error("You are not authorized to reject this request");
   }
+
+  const { error: approvalError } = await supabase
+    .schema("hrms")
+    .from("leave_approvals")
+    .update({
+      approval_status: "rejected",
+      comments,
+      acted_at: new Date().toISOString(),
+      updated_by: profile.userId,
+    })
+    .eq("leave_request_id", leaveRequestId)
+    .eq("approval_status", "pending")
+    .is("deleted_at", null);
+
+  if (approvalError) throw new Error(approvalError.message);
 
   const balanceYear = getCurrentBalanceYear(request.start_date);
   await adjustLeaveBalance(
@@ -562,3 +409,160 @@ export async function cancelLeaveRequest(
     managerId,
   );
 }
+
+export async function deleteLeaveRequest(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  leaveRequestId: string,
+): Promise<void> {
+  const codes = profile.permissionCodes;
+  const hasHrDelete =
+    codes.includes("leave.delete") || codes.includes("leave.cancel");
+  const hasWithdraw = codes.includes("leave.withdraw");
+
+  if (!hasHrDelete && !hasWithdraw) {
+    throw new Error("You are not authorized to delete this leave request");
+  }
+
+  if (!hasHrDelete) {
+    const { data: request, error: requestError } = await supabase
+      .schema("hrms")
+      .from("leave_requests")
+      .select("id, employee_id, leave_status")
+      .eq("id", leaveRequestId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (requestError || !request) {
+      throw new Error(requestError?.message ?? "Leave request not found");
+    }
+    if (request.employee_id !== profile.employee.id) {
+      throw new Error("You can only delete your own leave requests");
+    }
+    if (request.leave_status !== "pending") {
+      throw new Error("You can only delete pending leave requests");
+    }
+  }
+
+  const { data, error } = await supabase.schema("hrms").rpc("soft_delete_leave_request", {
+    p_leave_request_id: leaveRequestId,
+  });
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Leave request not found or already deleted.");
+}
+
+export async function updateLeaveRequest(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  leaveRequestId: string,
+  input: LeaveFormInput,
+): Promise<void> {
+  const { data: request, error } = await supabase
+    .schema("hrms")
+    .from("leave_requests")
+    .select(
+      "id, employee_id, leave_type_id, start_date, end_date, total_days, leave_status",
+    )
+    .eq("id", leaveRequestId)
+    .is("deleted_at", null)
+    .single();
+
+  if (error || !request) throw new Error(error?.message ?? "Leave request not found");
+  if (request.leave_status !== "pending") {
+    throw new Error("Only pending leave requests can be edited");
+  }
+
+  const isOwner = request.employee_id === profile.employee.id;
+  const isHrOrAdmin = profile.roles.some((r) =>
+    ["hr_admin", "hr_executive", "super_admin"].includes(r.code),
+  );
+  const hasEditPermission =
+    profile.permissionCodes.includes("leave.edit") ||
+    (isOwner && profile.permissionCodes.includes("leave.create"));
+
+  if (!hasEditPermission) {
+    throw new Error("You are not authorized to edit this leave request");
+  }
+  if (!isOwner && !isHrOrAdmin) {
+    throw new Error("You can only edit your own leave requests");
+  }
+  if (input.employeeId !== request.employee_id) {
+    throw new Error("Employee cannot be changed when editing a leave request");
+  }
+
+  const nextTotalDays = calculateLeaveTotalDays(
+    input.startDate,
+    input.endDate,
+    input.isHalfDay,
+  );
+  const previousTotalDays = Number(request.total_days);
+  const previousBalanceYear = getCurrentBalanceYear(request.start_date);
+  const nextBalanceYear = getCurrentBalanceYear(input.startDate);
+
+  // Release previous pending days, then apply the updated request.
+  await adjustLeaveBalance(
+    supabase,
+    request.employee_id,
+    request.leave_type_id,
+    previousBalanceYear,
+    { pending: -previousTotalDays },
+  );
+
+  try {
+    await adjustLeaveBalance(
+      supabase,
+      input.employeeId,
+      input.leaveTypeId,
+      nextBalanceYear,
+      { pending: nextTotalDays },
+    );
+  } catch (balanceError) {
+    await adjustLeaveBalance(
+      supabase,
+      request.employee_id,
+      request.leave_type_id,
+      previousBalanceYear,
+      { pending: previousTotalDays },
+    );
+    throw balanceError;
+  }
+
+  const { error: updateError } = await supabase
+    .schema("hrms")
+    .from("leave_requests")
+    .update({
+      leave_type_id: input.leaveTypeId,
+      start_date: input.startDate,
+      end_date: input.endDate,
+      total_days: nextTotalDays,
+      is_half_day: input.isHalfDay,
+      half_day_period: input.isHalfDay ? input.halfDayPeriod || null : null,
+      reason: input.reason,
+      emergency_contact_name: emptyToNull(input.emergencyContactName),
+      emergency_contact_phone: emptyToNull(input.emergencyContactPhone),
+      attachment_path: emptyToNull(input.attachmentPath),
+      updated_by: profile.userId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", leaveRequestId);
+
+  if (updateError) {
+    await adjustLeaveBalance(
+      supabase,
+      input.employeeId,
+      input.leaveTypeId,
+      nextBalanceYear,
+      { pending: -nextTotalDays },
+    );
+    await adjustLeaveBalance(
+      supabase,
+      request.employee_id,
+      request.leave_type_id,
+      previousBalanceYear,
+      { pending: previousTotalDays },
+    );
+    throw new Error(updateError.message);
+  }
+}
+

@@ -7,13 +7,10 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { EmptyState } from "@/components/common/empty-state";
-import { Input } from "@/components/common/input";
 import {
   approveTeamCorrectionAction,
-  approveTeamLeaveAction,
   fetchTeamPendingApprovalsAction,
   rejectTeamCorrectionAction,
-  rejectTeamLeaveAction,
 } from "@/lib/manager/actions/team-actions";
 import type {
   TeamPendingCorrection,
@@ -29,8 +26,6 @@ export function ManagerTeamQuickActions({ onRefresh }: ManagerTeamQuickActionsPr
   const [corrections, setCorrections] = useState<TeamPendingCorrection[]>([]);
   const [isLoading, startLoading] = useTransition();
   const [isPending, startAction] = useTransition();
-  const [rejectLeaveId, setRejectLeaveId] = useState<string | null>(null);
-  const [rejectReason, setRejectReason] = useState("");
 
   function loadPending() {
     startLoading(async () => {
@@ -43,36 +38,6 @@ export function ManagerTeamQuickActions({ onRefresh }: ManagerTeamQuickActionsPr
   useEffect(() => {
     loadPending();
   }, []);
-
-  function handleApproveLeave(leaveRequestId: string) {
-    startAction(async () => {
-      const result = await approveTeamLeaveAction({ leaveRequestId });
-      if (!result.success) toast.error(result.message);
-      else {
-        toast.success(result.message);
-        loadPending();
-        onRefresh?.();
-      }
-    });
-  }
-
-  function handleRejectLeave() {
-    if (!rejectLeaveId || !rejectReason.trim()) return;
-    startAction(async () => {
-      const result = await rejectTeamLeaveAction({
-        leaveRequestId: rejectLeaveId,
-        reason: rejectReason.trim(),
-      });
-      if (!result.success) toast.error(result.message);
-      else {
-        toast.success(result.message);
-        setRejectLeaveId(null);
-        setRejectReason("");
-        loadPending();
-        onRefresh?.();
-      }
-    });
-  }
 
   function handleCorrection(correctionId: string, approve: boolean) {
     startAction(async () => {
@@ -92,8 +57,10 @@ export function ManagerTeamQuickActions({ onRefresh }: ManagerTeamQuickActionsPr
       <div className="rounded-xl border bg-card p-4 shadow-sm">
         <div className="mb-3 flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold">Approve Leave</h2>
-            <p className="text-xs text-muted-foreground">Pending leave requests from your team.</p>
+            <h2 className="text-sm font-semibold">Team Leave (HR reviews)</h2>
+            <p className="text-xs text-muted-foreground">
+              Leave requests are approved or rejected by HR only. Managers can track status here.
+            </p>
           </div>
           {isLoading ? <Loader2 className="size-4 animate-spin text-muted-foreground" /> : null}
         </div>
@@ -106,42 +73,17 @@ export function ManagerTeamQuickActions({ onRefresh }: ManagerTeamQuickActionsPr
                   {item.leaveTypeName} · {format(new Date(item.startDate), "d MMM")} –{" "}
                   {format(new Date(item.endDate), "d MMM")} · {item.totalDays} day(s)
                 </p>
-                {rejectLeaveId === item.leaveRequestId ? (
-                  <div className="mt-3 space-y-2">
-                    <Input
-                      value={rejectReason}
-                      onChange={(event) => setRejectReason(event.target.value)}
-                      placeholder="Rejection reason"
-                    />
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="destructive" disabled={isPending} onClick={handleRejectLeave}>
-                        Confirm reject
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setRejectLeaveId(null)}>
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-3 flex gap-2">
-                    <Button size="sm" disabled={isPending} onClick={() => handleApproveLeave(item.leaveRequestId)}>
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={isPending}
-                      onClick={() => setRejectLeaveId(item.leaveRequestId)}
-                    >
-                      Reject
-                    </Button>
-                  </div>
-                )}
+                <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-300">
+                  Pending HR decision
+                </p>
               </div>
             ))}
           </div>
         ) : (
-          <EmptyState title="No pending leave approvals" description="Your team leave queue is clear." />
+          <EmptyState
+            title="No pending leave with HR"
+            description="New team leave requests will appear here until HR decides."
+          />
         )}
       </div>
 

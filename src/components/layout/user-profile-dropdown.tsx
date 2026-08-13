@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
@@ -35,11 +35,16 @@ export function UserProfileDropdown() {
   const { setTheme, resolvedTheme } = useTheme();
   const { profile, isLoading, signOut, portalHome } = useAuth();
   const [signOutOpen, setSignOutOpen] = useState(false);
+  const [themeReady, setThemeReady] = useState(false);
+
+  useEffect(() => {
+    setThemeReady(true);
+  }, []);
 
   const { employee, roles } = profile;
   const displayName = `${employee.firstName} ${employee.lastName}`;
   const primaryRole = roles[0]?.name ?? "User";
-  const isDark = resolvedTheme === "dark";
+  const isDark = themeReady && resolvedTheme === "dark";
   const helpHref = getPortalHelpHref(portalHome);
 
   async function handleSignOut() {

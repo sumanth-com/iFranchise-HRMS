@@ -149,7 +149,26 @@ async function setUserPrimaryRole(
       updated_by: actorUserId,
       deleted_at: null,
     });
-    if (error) throw new Error(error.message);
+    if (error) {
+      // Race: another invite may have created the active row; restore any matching row.
+      if (error.message.includes("user_roles_user_role_org_active_idx")) {
+        const { error: retryError } = await admin
+          .schema("hrms")
+          .from("user_roles")
+          .update({
+            employee_id: employee.id,
+            status: "active",
+            deleted_at: null,
+            updated_by: actorUserId,
+          })
+          .eq("organization_id", employee.organization_id)
+          .eq("user_id", userId)
+          .eq("role_id", role.id);
+        if (retryError) throw new Error(retryError.message);
+      } else {
+        throw new Error(error.message);
+      }
+    }
   }
 
   await updateEmployeeAccount(employee.id, {
@@ -193,20 +212,24 @@ async function notifyEmployeeAccount(
   actorUserId: string | null,
 ) {
   if (!employee.user_id) return;
-  const admin = createAdminClient();
-  await createNotification(admin as unknown as AuthSupabaseClient, {
-    organizationId: employee.organization_id,
-    userId: employee.user_id,
-    employeeId: employee.id,
-    title,
-    message,
-    notificationType: type,
-    module: "security",
-    priority: type.includes("suspended") ? "high" : "medium",
-    actionUrl: `/dashboard/employees`,
-    createdBy: actorUserId,
-    sourceEventKey: `${type}:${employee.id}:${Date.now()}`,
-  });
+  try {
+    const admin = createAdminClient();
+    await createNotification(admin as unknown as AuthSupabaseClient, {
+      organizationId: employee.organization_id,
+      userId: employee.user_id,
+      employeeId: employee.id,
+      title,
+      message,
+      notificationType: type,
+      module: "security",
+      priority: type.includes("suspended") ? "high" : "medium",
+      actionUrl: `/dashboard/employees`,
+      createdBy: actorUserId,
+      sourceEventKey: `${type}:${employee.id}:${Date.now()}`,
+    });
+  } catch (error) {
+    console.error("Employee account notification failed:", error);
+  }
 }
 
 function isInvitationColumnSchemaError(message: string) {
@@ -657,13 +680,30 @@ async function ensureEmployeeProfile(employeeId: string, actorUserId: string) {
   const { data: existing, error: findError } = await admin
     .schema("hrms")
     .from("employee_profiles")
-    .select("id")
+    .select("id, deleted_at")
     .eq("employee_id", employeeId)
-    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (findError) throw new Error(findError.message);
-  if (existing?.id) return;
+
+  if (existing?.id) {
+    if (existing.deleted_at) {
+      const { error: restoreError } = await admin
+        .schema("hrms")
+        .from("employee_profiles")
+        .update({
+          deleted_at: null,
+          status: "active",
+          updated_at: new Date().toISOString(),
+          updated_by: actorUserId,
+        })
+        .eq("id", existing.id);
+      if (restoreError) throw new Error(restoreError.message);
+    }
+    return;
+  }
 
   const { error: insertError } = await admin
     .schema("hrms")

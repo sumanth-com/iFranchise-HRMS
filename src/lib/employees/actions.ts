@@ -77,6 +77,7 @@ import { z } from "zod";
 
 import { permanentlyDeleteEmployee } from "@/lib/employees/services/employee-permanent-delete";
 import { loadInviteableRoles, getInviteableRoleByCode } from "@/lib/auth/iam-roles";
+import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertOrganizationStoragePath } from "@/lib/security/storage-path";
 import {
@@ -109,6 +110,7 @@ function revalidateSelfProfilePaths() {
   revalidatePath("/employee/profile");
   revalidatePath("/manager/profile");
   revalidatePath("/dashboard/profile");
+  revalidatePath("/ceo/profile");
 }
 
 export async function fetchEmployeesAction(
@@ -237,6 +239,7 @@ export async function deleteEmployeeAction(
     revalidatePath(EMPLOYEE_ROUTES.list);
     revalidatePath("/dashboard/hr-overview");
     revalidatePath("/dashboard/directory");
+    revalidatePath("/dashboard/payroll");
     revalidatePath("/employee");
     revalidatePath("/manager");
 
@@ -310,13 +313,14 @@ export async function inviteEmployeeAction(
   try {
     const profile = await requireServerPermission("employee_account.invite");
     const parsed = employeeInviteSchema.parse(input);
-    const supabase = await getAuthenticatedSupabase();
+    const admin = createAdminClient();
     const designationId = await resolveOrCreateDesignation(
-      supabase,
+      admin as unknown as AuthSupabaseClient,
       profile.employee.organizationId,
       profile.userId,
       parsed.designation,
     );
+    const supabase = await getAuthenticatedSupabase();
     const employeeId = await inviteEmployeeByEmail(supabase, profile, parsed.email, {
       fullName: parsed.fullName,
       roleId: parsed.roleId,

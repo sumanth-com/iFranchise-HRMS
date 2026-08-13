@@ -7,6 +7,7 @@ import {
   INTERVIEW_TYPE_LABELS,
   RECRUITMENT_ROUTES,
 } from "@/lib/recruitment/constants";
+import { remapSubNavHref } from "@/lib/navigation/remap-sub-nav";
 import { cn } from "@/lib/utils";
 import type { InterviewTrackItem } from "@/types/recruitment";
 
@@ -22,12 +23,21 @@ export function UpcomingInterviewsPanel({
   tracks,
   limit = 3,
   className,
+  basePath = RECRUITMENT_ROUTES.dashboard,
+  readOnly = false,
 }: {
   tracks: InterviewTrackItem[];
   limit?: number;
   className?: string;
+  basePath?: string;
+  readOnly?: boolean;
 }) {
   const items = tracks.slice(0, limit);
+  const interviewsHref = remapSubNavHref(
+    RECRUITMENT_ROUTES.interviews,
+    RECRUITMENT_ROUTES.dashboard,
+    basePath,
+  );
 
   return (
     <section
@@ -47,7 +57,7 @@ export function UpcomingInterviewsPanel({
           </div>
         </div>
         <Link
-          href={RECRUITMENT_ROUTES.interviews}
+          href={interviewsHref}
           className="text-[11px] font-medium text-primary hover:underline"
         >
           View all
@@ -59,12 +69,14 @@ export function UpcomingInterviewsPanel({
           <div className="flex h-full min-h-[8rem] flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 px-4 text-center">
             <Calendar className="mb-2 h-8 w-8 text-muted-foreground/40" />
             <p className="text-xs font-medium text-muted-foreground">No interviews scheduled</p>
-            <Link
-              href={RECRUITMENT_ROUTES.interviews}
-              className="mt-1 text-[11px] font-medium text-primary hover:underline"
-            >
-              Schedule one
-            </Link>
+            {readOnly ? null : (
+              <Link
+                href={interviewsHref}
+                className="mt-1 text-[11px] font-medium text-primary hover:underline"
+              >
+                Schedule one
+              </Link>
+            )}
           </div>
         ) : (
           items.map((track, index) => {

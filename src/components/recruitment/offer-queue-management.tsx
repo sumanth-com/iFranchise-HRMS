@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { EmptyState } from "@/components/common/empty-state";
 import { Input } from "@/components/common/input";
+import { SectionHelpButton } from "@/components/common/section-help-button";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { OfferLetterWorkspace } from "@/components/recruitment/offer-letter-workspace";
 import { RecruitmentPagination } from "@/components/recruitment/recruitment-pagination";
@@ -17,6 +18,7 @@ import {
   OFFER_QUEUE_STAGE_LABELS,
   OFFER_STATUS_LABELS,
 } from "@/lib/recruitment/constants";
+import { HIRING_SECTION_HELP } from "@/lib/recruitment/section-help";
 import { cn } from "@/lib/utils";
 import type {
   CandidateDetail,
@@ -44,6 +46,7 @@ export function OfferQueueManagement({
   lookups,
   initialSelected,
   canOffer,
+  listOnly = false,
   filters,
 }: {
   records: CandidateListItem[];
@@ -53,6 +56,7 @@ export function OfferQueueManagement({
   lookups: RecruitmentLookups;
   initialSelected: CandidateDetail | null;
   canOffer: boolean;
+  listOnly?: boolean;
   filters: {
     search?: string;
     departmentId?: string;
@@ -142,9 +146,16 @@ export function OfferQueueManagement({
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
       <div className="shrink-0">
-        <h1 className="text-2xl font-semibold tracking-tight">Offers</h1>
+        <SectionHelpButton
+          title={HIRING_SECTION_HELP.offers.title}
+          points={[...HIRING_SECTION_HELP.offers.points]}
+        >
+          <h1 className="text-2xl font-semibold tracking-tight">Offers</h1>
+        </SectionHelpButton>
         <p className="mt-1 text-sm text-muted-foreground">
-          Unlocks after CEO stage — select a candidate, upload their offer letter, and send by email.
+          {listOnly
+            ? "Candidates who have reached offer — view who is in the offer queue."
+            : "Unlocks after CEO stage — select a candidate, upload their offer letter, and send by email."}
         </p>
       </div>
 
@@ -186,7 +197,12 @@ export function OfferQueueManagement({
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
+      <div
+        className={cn(
+          "grid min-h-0 flex-1 gap-4",
+          listOnly ? "grid-cols-1" : "xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)]",
+        )}
+      >
         <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
           <div className="shrink-0 border-b px-4 py-2.5 text-xs text-muted-foreground">
             {total} ready for offer
@@ -199,39 +215,52 @@ export function OfferQueueManagement({
             />
           ) : (
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
-              <ul className="grid gap-2">
+              <ul className={cn("grid gap-2", listOnly && "md:grid-cols-2 xl:grid-cols-3")}>
                 {records.map((row) => {
-                  const isActive = selectedId === row.id;
+                  const isActive = !listOnly && selectedId === row.id;
                   const badge = offerQueueBadge(row);
+                  const cardClass = cn(
+                    "w-full rounded-lg border bg-background px-3 py-3 text-left",
+                    listOnly
+                      ? "cursor-default"
+                      : "transition-all hover:border-primary/30 hover:shadow-sm",
+                    isActive && "border-primary/40 bg-primary/5 ring-1 ring-primary/20 shadow-sm",
+                  );
+                  const body = (
+                    <>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold">{row.fullName}</p>
+                          <p className="truncate text-xs text-muted-foreground">{row.email}</p>
+                        </div>
+                        <RecruitmentStatusBadge label={badge.label} status={badge.status} />
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                        <span>{row.jobTitle}</span>
+                        <span>·</span>
+                        <span>{CANDIDATE_STAGE_LABELS[row.stage]}</span>
+                        {row.experienceYears != null ? (
+                          <>
+                            <span>·</span>
+                            <span>{row.experienceYears} yrs</span>
+                          </>
+                        ) : null}
+                      </div>
+                    </>
+                  );
                   return (
                     <li key={row.id}>
-                      <button
-                        type="button"
-                        onClick={() => loadCandidate(row.id)}
-                        className={cn(
-                          "w-full rounded-lg border bg-background px-3 py-3 text-left transition-all hover:border-primary/30 hover:shadow-sm",
-                          isActive && "border-primary/40 bg-primary/5 ring-1 ring-primary/20 shadow-sm",
-                        )}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold">{row.fullName}</p>
-                            <p className="truncate text-xs text-muted-foreground">{row.email}</p>
-                          </div>
-                          <RecruitmentStatusBadge label={badge.label} status={badge.status} />
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
-                          <span>{row.jobTitle}</span>
-                          <span>·</span>
-                          <span>{CANDIDATE_STAGE_LABELS[row.stage]}</span>
-                          {row.experienceYears != null ? (
-                            <>
-                              <span>·</span>
-                              <span>{row.experienceYears} yrs</span>
-                            </>
-                          ) : null}
-                        </div>
-                      </button>
+                      {listOnly ? (
+                        <div className={cardClass}>{body}</div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => loadCandidate(row.id)}
+                          className={cardClass}
+                        >
+                          {body}
+                        </button>
+                      )}
                     </li>
                   );
                 })}
@@ -243,18 +272,20 @@ export function OfferQueueManagement({
           </div>
         </div>
 
-        <div className="min-h-0 overflow-hidden">
-          <OfferLetterWorkspace
-            detail={selectedDetail}
-            loading={detailLoading}
-            canOffer={canOffer}
-            offerEmailDefaults={lookups.offerEmailDefaults}
-            onClose={closePanel}
-            onRefresh={() => {
-              if (selectedId) void refreshDetail(selectedId);
-            }}
-          />
-        </div>
+        {listOnly ? null : (
+          <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            <OfferLetterWorkspace
+              detail={selectedDetail}
+              loading={detailLoading}
+              canOffer={canOffer}
+              offerEmailDefaults={lookups.offerEmailDefaults}
+              onClose={closePanel}
+              onRefresh={() => {
+                if (selectedId) void refreshDetail(selectedId);
+              }}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

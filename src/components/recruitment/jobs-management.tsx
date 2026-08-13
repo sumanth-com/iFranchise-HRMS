@@ -11,6 +11,7 @@ import type { z } from "zod";
 import { EmptyState } from "@/components/common/empty-state";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
+import { SectionHelpButton } from "@/components/common/section-help-button";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -35,6 +36,7 @@ import {
   JOB_STATUS_LABELS,
   WORK_MODE_LABELS,
 } from "@/lib/recruitment/constants";
+import { HIRING_SECTION_HELP } from "@/lib/recruitment/section-help";
 import { DESIGNATION_OTHER_VALUE } from "@/lib/employees/constants";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/recruitment/services/recruitment-utils";
@@ -147,10 +149,15 @@ export function JobsManagement({
   const openCount = visibleJobs.filter((r) => r.jobStatus === "open").length;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Job Openings</h1>
+          <SectionHelpButton
+            title={HIRING_SECTION_HELP.jobs.title}
+            points={[...HIRING_SECTION_HELP.jobs.points]}
+          >
+            <h1 className="text-2xl font-semibold tracking-tight">Job Openings</h1>
+          </SectionHelpButton>
           <p className="mt-1 text-sm text-muted-foreground">
             {listTotal} role{listTotal === 1 ? "" : "s"} · {openCount} currently open
           </p>
@@ -163,7 +170,7 @@ export function JobsManagement({
         ) : null}
       </div>
 
-      <div className="rounded-xl border bg-card p-3 shadow-sm">
+      <div className="shrink-0 rounded-xl border bg-card p-3 shadow-sm">
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
           <Input
             placeholder="Search jobs..."
@@ -212,7 +219,7 @@ export function JobsManagement({
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-0.5">
         {visibleJobs.length === 0 ? (
           <EmptyState
             title="No job openings"
@@ -220,13 +227,13 @@ export function JobsManagement({
             className="rounded-xl border bg-card shadow-sm"
           />
         ) : (
-          visibleJobs.map((row) => (
-            <article
-              key={row.id}
-              className="group rounded-xl border bg-card p-4 shadow-sm transition hover:border-primary/25 hover:shadow-md animate-in fade-in duration-200"
-            >
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div className="flex min-w-0 gap-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {visibleJobs.map((row) => (
+              <article
+                key={row.id}
+                className="flex h-full flex-col rounded-xl border bg-card p-4 shadow-sm transition hover:border-primary/25 hover:shadow-md animate-in fade-in duration-200"
+              >
+                <div className="flex min-w-0 items-start gap-3">
                   <div
                     className={cn(
                       "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
@@ -244,91 +251,97 @@ export function JobsManagement({
 
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-base font-semibold tracking-tight">{row.title}</h2>
+                      <h2 className="truncate text-base font-semibold tracking-tight">
+                        {row.title}
+                      </h2>
                       <RecruitmentStatusBadge
                         label={JOB_STATUS_LABELS[row.jobStatus]}
                         status={row.jobStatus}
                       />
                     </div>
-                    <p className="mt-0.5 text-sm text-muted-foreground">
+                    <p className="mt-0.5 truncate text-sm text-muted-foreground">
                       {row.designationTitle ?? "No designation"} ·{" "}
                       {WORK_MODE_LABELS[row.workMode]}
                     </p>
-
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {row.departmentName ? (
-                        <span className="rounded-md border bg-muted/40 px-2 py-0.5 text-[11px] font-medium">
-                          {row.departmentName}
-                        </span>
-                      ) : null}
-                      {row.employmentTypeName ? (
-                        <span className="rounded-md border bg-muted/40 px-2 py-0.5 text-[11px] font-medium">
-                          {row.employmentTypeName}
-                        </span>
-                      ) : null}
-                      <span className="rounded-md border bg-muted/40 px-2 py-0.5 text-[11px] font-medium tabular-nums">
-                        {row.openPositions} position{row.openPositions === 1 ? "" : "s"}
-                      </span>
-                      {row.location ? (
-                        <span className="inline-flex items-center gap-1 rounded-md border bg-muted/40 px-2 py-0.5 text-[11px] font-medium">
-                          <MapPin className="h-3 w-3" />
-                          {row.location}
-                        </span>
-                      ) : null}
-                      <span className="rounded-md border bg-muted/40 px-2 py-0.5 text-[11px] font-medium tabular-nums">
-                        {formatCurrency(row.salaryMin)} – {formatCurrency(row.salaryMax)}
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded-md border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700">
-                        <Users className="h-3 w-3" />
-                        {row.candidateCount} candidate{row.candidateCount === 1 ? "" : "s"}
-                      </span>
-                    </div>
                   </div>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-1 lg:pt-1">
-                  {canEdit ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8"
-                      onClick={() => setEditing(row)}
-                    >
-                      <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                      Edit
-                    </Button>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {row.departmentName ? (
+                    <span className="rounded-md border bg-muted/40 px-2 py-0.5 text-[11px] font-medium">
+                      {row.departmentName}
+                    </span>
                   ) : null}
-                  {canDelete ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 w-8 p-0 text-muted-foreground hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive"
-                      onClick={() => setDeleting(row)}
-                      aria-label={`Delete ${row.title}`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                  {row.employmentTypeName ? (
+                    <span className="rounded-md border bg-muted/40 px-2 py-0.5 text-[11px] font-medium">
+                      {row.employmentTypeName}
+                    </span>
                   ) : null}
-                  {canEdit && row.jobStatus !== "closed" ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 text-muted-foreground hover:text-destructive"
-                      disabled={isPending}
-                      onClick={() => onClose(row.id)}
-                    >
-                      <XCircle className="mr-1.5 h-3.5 w-3.5" />
-                      Close
-                    </Button>
+                  <span className="rounded-md border bg-muted/40 px-2 py-0.5 text-[11px] font-medium tabular-nums">
+                    {row.openPositions} position{row.openPositions === 1 ? "" : "s"}
+                  </span>
+                  {row.location ? (
+                    <span className="inline-flex items-center gap-1 rounded-md border bg-muted/40 px-2 py-0.5 text-[11px] font-medium">
+                      <MapPin className="h-3 w-3" />
+                      {row.location}
+                    </span>
                   ) : null}
+                  <span className="rounded-md border bg-muted/40 px-2 py-0.5 text-[11px] font-medium tabular-nums">
+                    {formatCurrency(row.salaryMin)} – {formatCurrency(row.salaryMax)}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-md border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700">
+                    <Users className="h-3 w-3" />
+                    {row.candidateCount} candidate{row.candidateCount === 1 ? "" : "s"}
+                  </span>
                 </div>
-              </div>
-            </article>
-          ))
+
+                {canEdit || canDelete ? (
+                  <div className="mt-auto flex shrink-0 flex-wrap items-center gap-1 pt-3">
+                    {canEdit ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8"
+                        onClick={() => setEditing(row)}
+                      >
+                        <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                        Edit
+                      </Button>
+                    ) : null}
+                    {canDelete ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 w-8 p-0 text-muted-foreground hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive"
+                        onClick={() => setDeleting(row)}
+                        aria-label={`Delete ${row.title}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    ) : null}
+                    {canEdit && row.jobStatus !== "closed" ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-muted-foreground hover:text-destructive"
+                        disabled={isPending}
+                        onClick={() => onClose(row.id)}
+                      >
+                        <XCircle className="mr-1.5 h-3.5 w-3.5" />
+                        Close
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
         )}
       </div>
 
-      <RecruitmentPagination page={page} pageSize={pageSize} total={listTotal} />
+      <div className="shrink-0">
+        <RecruitmentPagination page={page} pageSize={pageSize} total={listTotal} />
+      </div>
 
       {creating ? (
         <JobFormModal

@@ -2,8 +2,7 @@
 
 import { formatDistanceToNow } from "date-fns";
 import { Bell, Loader2 } from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -34,7 +33,7 @@ import {
 import {
   formatNotificationDisplayText,
   formatNotificationModule,
-  getNotificationsRoutes,
+  getNotificationsRoutesForPath,
 } from "@/lib/notifications/constants";
 import {
   attachNotificationSoundUnlock,
@@ -51,10 +50,11 @@ const POLL_INTERVAL_MS = 30_000;
 
 export function NotificationBell() {
   const router = useRouter();
+  const pathname = usePathname();
   const { portalHome } = useAuth();
   const routes = useMemo(
-    () => getNotificationsRoutes(portalHome),
-    [portalHome],
+    () => getNotificationsRoutesForPath(pathname, portalHome),
+    [pathname, portalHome],
   );
   const [data, setData] = useState<NotificationBellData>({
     unreadCount: 0,
@@ -236,15 +236,14 @@ export function NotificationBell() {
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          render={
-            <Link
-              href={routes.center}
-              className="w-full justify-center text-center"
-            >
-              View all notifications
-            </Link>
-          }
-        />
+          className="justify-center text-center"
+          onClick={() => {
+            setOpen(false);
+            router.push(routes.center);
+          }}
+        >
+          View all notifications
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

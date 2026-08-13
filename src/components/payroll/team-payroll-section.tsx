@@ -42,6 +42,8 @@ type TeamPayrollSectionProps = {
   rawSearchParams: Record<string, string | string[] | undefined>;
   profile: Awaited<ReturnType<typeof requireServerAnyPermission>>;
   supabase: Awaited<ReturnType<typeof createClient>>;
+  teamBasePath?: string;
+  canRunPayrollOverride?: boolean;
 };
 
 export async function TeamPayrollSection({
@@ -49,6 +51,8 @@ export async function TeamPayrollSection({
   rawSearchParams,
   profile,
   supabase,
+  teamBasePath,
+  canRunPayrollOverride,
 }: TeamPayrollSectionProps) {
   const now = new Date();
 
@@ -56,7 +60,7 @@ export async function TeamPayrollSection({
     return (
       <PayrollRunForm
         defaultYear={now.getFullYear()}
-        canRun={canRunPayroll(profile.permissionCodes)}
+        canRun={canRunPayrollOverride ?? canRunPayroll(profile.permissionCodes)}
       />
     );
   }
@@ -166,7 +170,11 @@ export async function TeamPayrollSection({
         history={history}
         mode="hr"
         embedded
-        basePath={payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS.payslips)}
+        basePath={
+          teamBasePath
+            ? `${teamBasePath}/${TEAM_PAYROLL_SECTIONS.payslips}`
+            : payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS.payslips)
+        }
       />
     );
   }

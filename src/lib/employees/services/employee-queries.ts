@@ -131,10 +131,18 @@ export async function listEmployees(
     .is("deleted_at", null);
 
   if (search) {
-    const term = `%${search}%`;
-    query = query.or(
-      `first_name.ilike.${term},last_name.ilike.${term},email.ilike.${term},employee_code.ilike.${term}`,
-    );
+    const escaped = search.replace(/[%_,.()\"\\]/g, " ").trim();
+    if (escaped) {
+      const term = `%${escaped}%`;
+      query = query.or(
+        [
+          `first_name.ilike."${term}"`,
+          `last_name.ilike."${term}"`,
+          `email.ilike."${term}"`,
+          `employee_code.ilike."${term}"`,
+        ].join(","),
+      );
+    }
   }
 
   if (departmentId) {

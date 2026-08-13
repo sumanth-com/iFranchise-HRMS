@@ -17,9 +17,9 @@ export function EmployeeOneOnOnesView({ meetings }: { meetings: OneOnOneListItem
   const [viewId, setViewId] = useState<string | null>(null);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex min-h-0 flex-1 flex-col">
       <PerformanceTableShell
-        className="max-h-[min(50vh,420px)]"
+        fill
         empty={
           <EmptyState
             title="No 1:1 meetings scheduled"

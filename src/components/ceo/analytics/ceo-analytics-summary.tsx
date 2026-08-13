@@ -41,18 +41,6 @@ export function CeoAnalyticsSummary({ kpis }: { kpis: CeoAnalyticsKpis }) {
       ),
     },
     {
-      label: "Performance",
-      value: String(kpis.performanceIndex),
-      accent: undefined,
-      hint: deltaHint(kpis.performanceIndex, kpis.previous?.performanceIndex),
-    },
-    {
-      label: "Hiring Success",
-      value: formatCeoPercent(kpis.hiringSuccessRate),
-      accent: undefined,
-      hint: deltaHint(kpis.hiringSuccessRate, kpis.previous?.hiringSuccessRate),
-    },
-    {
       label: "Payroll Growth",
       value: formatCeoPercent(kpis.payrollGrowthPercent),
       accent:
@@ -66,7 +54,7 @@ export function CeoAnalyticsSummary({ kpis }: { kpis: CeoAnalyticsKpis }) {
   return (
     <section
       aria-label="Executive analytics KPIs"
-      className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
+      className="grid w-full grid-cols-2 gap-3 lg:grid-cols-4"
     >
       {cards.map((card) => (
         <div key={card.label} className="min-w-0 space-y-1">

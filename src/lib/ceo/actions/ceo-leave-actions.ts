@@ -1,9 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
-import { CEO_ROUTES } from "@/lib/ceo/constants";
 import {
   buildCeoLeaveInsights,
   countManagersOnLeaveNextWeek,
@@ -18,15 +15,7 @@ import {
   listCeoTodaysLeave,
   listCeoUpcomingLeave,
 } from "@/lib/ceo/services/ceo-leave-queries";
-import { forwardCeoLeaveApproval } from "@/lib/ceo/services/ceo-leave-mutations";
-import {
-  approveLeaveRequest,
-  rejectLeaveRequest,
-} from "@/lib/leave/services/leave-mutations";
-import {
-  requireServerAnyPermission,
-  requireServerPermission,
-} from "@/lib/permissions/server";
+import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 import type {
   CeoApprovalQueueItem,
@@ -40,10 +29,7 @@ import type {
 } from "@/types/ceo-leave";
 import {
   ceoLeaveCalendarSchema,
-  ceoLeaveDecisionSchema,
   ceoLeaveFiltersSchema,
-  ceoLeaveForwardSchema,
-  ceoLeaveRejectSchema,
 } from "@/lib/validations/ceo-leave";
 
 const VIEW_PERMISSIONS = [PORTAL_PERMISSIONS.ceo, "leave.view"];
@@ -187,61 +173,28 @@ export async function fetchCeoLeaveCalendarAction(
 }
 
 export async function approveCeoLeaveAction(
-  input: unknown,
+  _input: unknown,
 ): Promise<CeoLeaveActionResult> {
-  try {
-    const profile = await requireServerPermission("leave.approve");
-    const supabase = await createClient();
-    const parsed = ceoLeaveDecisionSchema.parse(input);
-    await approveLeaveRequest(supabase, profile, parsed.leaveRequestId, parsed.comments);
-    revalidatePath(CEO_ROUTES.leave);
-    return { success: true, data: undefined };
-  } catch (error) {
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : "Failed to approve leave request",
-    };
-  }
+  return {
+    success: false,
+    message: "Only HR can approve leave requests.",
+  };
 }
 
 export async function rejectCeoLeaveAction(
-  input: unknown,
+  _input: unknown,
 ): Promise<CeoLeaveActionResult> {
-  try {
-    const profile = await requireServerPermission("leave.reject");
-    const supabase = await createClient();
-    const parsed = ceoLeaveRejectSchema.parse(input);
-    await rejectLeaveRequest(supabase, profile, parsed.leaveRequestId, parsed.comments);
-    revalidatePath(CEO_ROUTES.leave);
-    return { success: true, data: undefined };
-  } catch (error) {
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : "Failed to reject leave request",
-    };
-  }
+  return {
+    success: false,
+    message: "Only HR can reject leave requests.",
+  };
 }
 
 export async function forwardCeoLeaveAction(
-  input: unknown,
+  _input: unknown,
 ): Promise<CeoLeaveActionResult> {
-  try {
-    const profile = await requireServerPermission("leave.approve");
-    const supabase = await createClient();
-    const parsed = ceoLeaveForwardSchema.parse(input);
-    await forwardCeoLeaveApproval(
-      supabase,
-      profile,
-      parsed.leaveRequestId,
-      parsed.targetEmployeeId,
-      parsed.note,
-    );
-    revalidatePath(CEO_ROUTES.leave);
-    return { success: true, data: undefined };
-  } catch (error) {
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : "Failed to forward leave request",
-    };
-  }
+  return {
+    success: false,
+    message: "Only HR can manage leave approval workflow.",
+  };
 }

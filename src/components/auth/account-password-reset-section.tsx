@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyRound, Loader2, MailCheck } from "lucide-react";
+import { KeyRound, Loader2, Lock, MailCheck } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -14,6 +14,7 @@ type AccountPasswordResetSectionProps = {
   email: string;
   description?: string;
   embedded?: boolean;
+  className?: string;
 };
 
 function PasswordResetContent({
@@ -59,49 +60,83 @@ function PasswordResetContent({
     <>
       <div
         className={cn(
-          "flex items-start justify-between gap-3",
-          embedded ? "" : "mb-4",
+          !embedded
+            ? "grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5"
+            : "flex items-center justify-between gap-3",
         )}
       >
         {!embedded ? (
-          <div>
-            <h2 className="text-sm font-semibold tracking-tight">Account & security</h2>
-            <p className="text-xs text-muted-foreground">
-              Signed in as <span className="font-medium text-foreground">{email}</span>
-            </p>
-          </div>
-        ) : (
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium">Password</p>
-            <p className="text-xs text-muted-foreground">{description}</p>
-          </div>
-        )}
-        {!sent ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={isPending}
-            onClick={requestReset}
-          >
-            {isPending ? (
-              <Loader2 className="size-3.5 animate-spin" />
+          <>
+            <span className="col-start-1 row-span-3 flex size-9 items-center justify-center self-center rounded-md border bg-muted/40">
+              <Lock className="size-4 text-muted-foreground" />
+            </span>
+            <h2 className="col-start-2 self-center text-sm font-semibold tracking-tight">
+              Account & security
+            </h2>
+            {!sent ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="col-start-3 row-start-1 shrink-0 self-center"
+                disabled={isPending}
+                onClick={requestReset}
+              >
+                {isPending ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <KeyRound className="size-3.5" />
+                )}
+                Reset password
+              </Button>
             ) : (
-              <KeyRound className="size-3.5" />
+              <span />
             )}
-            Reset password
-          </Button>
-        ) : null}
+            <p className="col-span-2 col-start-2 whitespace-nowrap text-xs text-muted-foreground">
+              Signed in as{" "}
+              <span className="font-medium text-foreground">{email}</span>
+            </p>
+            {description ? (
+              <p className="col-span-2 col-start-2 text-xs leading-snug text-muted-foreground">
+                {description}
+              </p>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <div className="min-w-0 flex-1 space-y-0.5">
+              <p className="text-sm font-medium">Password</p>
+              <p className="text-xs text-muted-foreground">{description}</p>
+            </div>
+            {!sent ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="shrink-0"
+                disabled={isPending}
+                onClick={requestReset}
+              >
+                {isPending ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <KeyRound className="size-3.5" />
+                )}
+                Reset password
+              </Button>
+            ) : null}
+          </>
+        )}
       </div>
 
       {error ? (
-        <div className="mb-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
         </div>
       ) : null}
 
       {sent ? (
-        <div className="flex gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-3">
+        <div className="mt-3 flex gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-3">
           <MailCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />
           <div className="space-y-1 text-sm">
             <p className="font-medium text-emerald-900 dark:text-emerald-100">
@@ -123,9 +158,7 @@ function PasswordResetContent({
             </Button>
           </div>
         </div>
-      ) : embedded ? null : (
-        <p className="text-xs text-muted-foreground">{description}</p>
-      )}
+      ) : null}
     </>
   );
 }
@@ -134,10 +167,11 @@ export function AccountPasswordResetSection({
   email,
   description = "Keep your account secure by using a strong, unique password.",
   embedded = false,
+  className,
 }: AccountPasswordResetSectionProps) {
   if (embedded) {
     return (
-      <div className="mt-4 rounded-lg border bg-muted/20 p-4">
+      <div className={cn("mt-4 rounded-lg border bg-muted/20 p-4", className)}>
         <PasswordResetContent
           email={email}
           description={description}
@@ -148,7 +182,12 @@ export function AccountPasswordResetSection({
   }
 
   return (
-    <section className="rounded-xl border bg-card p-4 shadow-sm md:p-5">
+    <section
+      className={cn(
+        "flex h-full flex-col justify-center rounded-xl border bg-card p-4 shadow-sm md:p-5",
+        className,
+      )}
+    >
       <PasswordResetContent email={email} description={description} />
     </section>
   );

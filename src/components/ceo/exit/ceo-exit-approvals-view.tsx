@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { DataTable, type DataTableColumn } from "@/components/common/data-table";
 import { Modal } from "@/components/common/modal";
+import { SectionHelpButton } from "@/components/common/section-help-button";
 import { Label } from "@/components/ui/label";
 import { ceoDecideResignationAction } from "@/lib/exit/actions";
 import { EXIT_STATUS_LABELS } from "@/lib/exit/constants";
@@ -19,6 +20,10 @@ import {
   type ResignationDecisionValues,
 } from "@/lib/validations/exit";
 import type { ExitResignationItem } from "@/types/exit";
+import {
+  CEO_APPROVALS_SECTION_HELP,
+  CEO_SECTION_HELP_DESCRIPTION,
+} from "@/lib/ceo/section-help";
 
 type Props = {
   pending: ExitResignationItem[];
@@ -104,7 +109,13 @@ export function CeoExitApprovalsView({ pending }: Props) {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Exit Approvals</h1>
+        <SectionHelpButton
+          title={CEO_APPROVALS_SECTION_HELP.exit.title}
+          points={[...CEO_APPROVALS_SECTION_HELP.exit.points]}
+          description={CEO_SECTION_HELP_DESCRIPTION}
+        >
+          <h1 className="text-2xl font-semibold tracking-tight">Exit Approvals</h1>
+        </SectionHelpButton>
         <p className="mt-1 text-sm text-muted-foreground">
           Final CEO approval for resignations already cleared by manager and HR.
         </p>
