@@ -65,6 +65,7 @@ export function AuditSubNav({
             <Link
               key={item.href}
               href={item.href}
+              prefetch
               className={cn(
                 "rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors",
                 isActive

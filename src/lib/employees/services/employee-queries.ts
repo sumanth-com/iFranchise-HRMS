@@ -230,51 +230,104 @@ export async function getEmployeeAccountProvisioningSummary(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
 ): Promise<EmployeeAccountProvisioningSummary> {
-  const { data, error } = await supabase
-    .schema("hrms")
-    .from("employees")
-    .select(
-      "id, employee_code, first_name, last_name, email, account_status, invitation_sent_at, last_login_at",
-    )
-    .eq("organization_id", profile.employee.organizationId)
-    .is("deleted_at", null)
-    .order("updated_at", { ascending: false })
-    .limit(500);
+  const organizationId = profile.employee.organizationId;
+  const base = () =>
+    supabase
+      .schema("hrms")
+      .from("employees")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null);
 
-  if (error) throw new Error(error.message);
+  const previewSelect =
+    "id, employee_code, first_name, last_name, email, account_status, invitation_sent_at, last_login_at";
 
-  const rows = (data ?? []) as EmployeeAccountProvisioningRow[];
-  const counts = {
-    draft: 0,
-    invited: 0,
-    invitationPending: 0,
-    invitationAccepted: 0,
-    active: 0,
-    inactive: 0,
-    suspended: 0,
-    archived: 0,
-  };
+  const [
+    draftCount,
+    invitedCount,
+    invitationPendingCount,
+    invitationAcceptedCount,
+    activeCount,
+    inactiveCount,
+    suspendedCount,
+    archivedCount,
+    readyToInviteResult,
+    pendingInvitationsResult,
+    suspendedAccountsResult,
+  ] = await Promise.all([
+    base().eq("account_status", "draft"),
+    base().eq("account_status", "invited"),
+    base().eq("account_status", "invitation_pending"),
+    base().eq("account_status", "invitation_accepted"),
+    base().eq("account_status", "active"),
+    base().eq("account_status", "inactive"),
+    base().eq("account_status", "suspended"),
+    base().eq("account_status", "archived"),
+    supabase
+      .schema("hrms")
+      .from("employees")
+      .select(previewSelect)
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .in("account_status", ["draft", "invited"])
+      .order("updated_at", { ascending: false })
+      .limit(5),
+    supabase
+      .schema("hrms")
+      .from("employees")
+      .select(previewSelect)
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .eq("account_status", "invitation_pending")
+      .order("updated_at", { ascending: false })
+      .limit(5),
+    supabase
+      .schema("hrms")
+      .from("employees")
+      .select(previewSelect)
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .eq("account_status", "suspended")
+      .order("updated_at", { ascending: false })
+      .limit(5),
+  ]);
 
-  for (const row of rows) {
-    if (row.account_status === "invitation_pending") counts.invitationPending += 1;
-    else if (row.account_status === "invitation_accepted") counts.invitationAccepted += 1;
-    else if (row.account_status in counts) counts[row.account_status as keyof typeof counts] += 1;
+  const countErrors = [
+    draftCount,
+    invitedCount,
+    invitationPendingCount,
+    invitationAcceptedCount,
+    activeCount,
+    inactiveCount,
+    suspendedCount,
+    archivedCount,
+    readyToInviteResult,
+    pendingInvitationsResult,
+    suspendedAccountsResult,
+  ].find((result) => result.error);
+
+  if (countErrors?.error) {
+    throw new Error(countErrors.error.message);
   }
 
   return {
-    ...counts,
-    readyToInvite: rows
-      .filter((row) => row.account_status === "draft" || row.account_status === "invited")
-      .slice(0, 5)
-      .map(mapProvisioningItem),
-    pendingInvitations: rows
-      .filter((row) => row.account_status === "invitation_pending")
-      .slice(0, 5)
-      .map(mapProvisioningItem),
-    suspendedAccounts: rows
-      .filter((row) => row.account_status === "suspended")
-      .slice(0, 5)
-      .map(mapProvisioningItem),
+    draft: draftCount.count ?? 0,
+    invited: invitedCount.count ?? 0,
+    invitationPending: invitationPendingCount.count ?? 0,
+    invitationAccepted: invitationAcceptedCount.count ?? 0,
+    active: activeCount.count ?? 0,
+    inactive: inactiveCount.count ?? 0,
+    suspended: suspendedCount.count ?? 0,
+    archived: archivedCount.count ?? 0,
+    readyToInvite: ((readyToInviteResult.data ?? []) as EmployeeAccountProvisioningRow[]).map(
+      mapProvisioningItem,
+    ),
+    pendingInvitations: (
+      (pendingInvitationsResult.data ?? []) as EmployeeAccountProvisioningRow[]
+    ).map(mapProvisioningItem),
+    suspendedAccounts: (
+      (suspendedAccountsResult.data ?? []) as EmployeeAccountProvisioningRow[]
+    ).map(mapProvisioningItem),
   };
 }
 

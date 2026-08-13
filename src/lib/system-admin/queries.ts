@@ -38,20 +38,21 @@ export async function getSystemDashboardStats(
   supabase: AuthSupabaseClient,
   organizationId: string,
 ): Promise<SystemDashboardStats> {
-  // Drop fake integration toggles so Recent Activity stays natural.
-  await reconcileFakeIntegrations(organizationId);
-
   const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
+  // Reconcile fake integrations in parallel with the DB health probe (was serial).
   const dbStarted = Date.now();
-  const employeesProbe = await supabase
-    .schema("hrms")
-    .from("employees")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", organizationId)
-    .is("deleted_at", null);
+  const [, employeesProbe] = await Promise.all([
+    reconcileFakeIntegrations(organizationId),
+    supabase
+      .schema("hrms")
+      .from("employees")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null),
+  ]);
   const databaseResponseMs = Date.now() - dbStarted;
 
   const [
@@ -66,6 +67,7 @@ export async function getSystemDashboardStats(
     settingsResult,
     lastBackupResult,
     scheduledJobsResult,
+    storageSnapshot,
   ] = await Promise.all([
     supabase
       .schema("hrms")
@@ -164,21 +166,30 @@ export async function getSystemDashboardStats(
       .select("job_key, job_name, last_status, last_run_at")
       .eq("organization_id", organizationId)
       .order("job_key"),
+    (async () => {
+      try {
+        const admin = createAdminClient();
+        const { data: buckets } = await admin.storage.listBuckets();
+        const objectCounts = await Promise.all(
+          (buckets ?? []).map(async (bucket) => {
+            const { data: objects } = await admin.storage
+              .from(bucket.id)
+              .list("", { limit: 100 });
+            return objects?.length ?? 0;
+          }),
+        );
+        return {
+          storageBucketCount: buckets?.length ?? 0,
+          storageObjectEstimate: objectCounts.reduce((sum, n) => sum + n, 0),
+        };
+      } catch {
+        return { storageBucketCount: 0, storageObjectEstimate: 0 };
+      }
+    })(),
   ]);
 
-  let storageBucketCount = 0;
-  let storageObjectEstimate = 0;
-  try {
-    const admin = createAdminClient();
-    const { data: buckets } = await admin.storage.listBuckets();
-    storageBucketCount = buckets?.length ?? 0;
-    for (const bucket of buckets ?? []) {
-      const { data: objects } = await admin.storage.from(bucket.id).list("", { limit: 100 });
-      storageObjectEstimate += objects?.length ?? 0;
-    }
-  } catch {
-    storageBucketCount = 0;
-  }
+  const storageBucketCount = storageSnapshot.storageBucketCount;
+  const storageObjectEstimate = storageSnapshot.storageObjectEstimate;
 
   const smtpConfigured = hasEmailTransport() || Boolean(settingsResult.data?.smtp_configured);
   const env = getEnvironmentSnapshot(smtpConfigured, !employeesProbe.error);

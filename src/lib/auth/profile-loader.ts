@@ -174,40 +174,45 @@ export const loadUserProfile = cache(async function loadUserProfile(
     return { success: false, error: "ORGANIZATION_NOT_FOUND" };
   }
 
-  const organizationLogoUrl = await getOrganizationLogoSignedUrl(
-    supabase,
-    organizationRow.logo_storage_path,
-  );
-  const organization = mapOrganization(organizationRow, organizationLogoUrl);
-
   if (userRolesError || !userRoleRows?.length) {
     return { success: false, error: "NO_ROLES" };
   }
 
   const roleIds = userRoleRows.map((row) => row.role_id);
 
+  // Overlap logo signing with role + permission resolution (was a serial wait).
+  const logoPromise = getOrganizationLogoSignedUrl(
+    supabase,
+    organizationRow.logo_storage_path,
+  );
+
+  const rolesPromise = supabase
+    .schema("hrms")
+    .from("roles")
+    .select("id, name, code, is_system_role, parent_role_id, status")
+    .in("id", roleIds)
+    .is("deleted_at", null)
+    .eq("status", "active");
+
+  const permissionCodesRpcPromise = supabase
+    .schema("hrms")
+    .rpc("get_user_permission_codes", { p_user_id: userId });
+
   const [
+    organizationLogoUrl,
     { data: roleRows, error: rolesError },
-    { data: orgRoles },
+    { data: rpcCodes, error: rpcCodesError },
   ] = await Promise.all([
-    supabase
-      .schema("hrms")
-      .from("roles")
-      .select("id, name, code, is_system_role, parent_role_id, status")
-      .in("id", roleIds)
-      .is("deleted_at", null)
-      .eq("status", "active"),
-    supabase
-      .schema("hrms")
-      .from("roles")
-      .select("id, parent_role_id")
-      .eq("organization_id", employeeRow.organization_id)
-      .is("deleted_at", null),
+    logoPromise,
+    rolesPromise,
+    permissionCodesRpcPromise,
   ]);
 
   if (rolesError || !roleRows?.length) {
     return { success: false, error: "NO_ROLES" };
   }
+
+  const organization = mapOrganization(organizationRow, organizationLogoUrl);
 
   const roles: Role[] = roleRows.map((role) => ({
     id: role.id,
@@ -217,76 +222,109 @@ export const loadUserProfile = cache(async function loadUserProfile(
     status: role.status,
   }));
 
-  const allRoleIds = new Set<string>(roleIds);
-  const parentMap = new Map(
-    (orgRoles ?? []).map((r) => [r.id, r.parent_role_id as string | null]),
-  );
+  let permissions: Permission[] = [];
+  let permissionCodes: string[] = [];
 
-  for (const roleId of roleIds) {
-    let parentId = parentMap.get(roleId) ?? null;
-    const visited = new Set<string>();
-    while (parentId && !visited.has(parentId)) {
-      visited.add(parentId);
-      allRoleIds.add(parentId);
-      parentId = parentMap.get(parentId) ?? null;
+  if (!rpcCodesError && Array.isArray(rpcCodes)) {
+    permissionCodes = rpcCodes.filter(
+      (code): code is string => typeof code === "string",
+    );
+
+    if (permissionCodes.length > 0) {
+      const { data: permissionRows, error: permissionRowsError } = await supabase
+        .schema("hrms")
+        .from("permissions")
+        .select("id, code, module, action, resource")
+        .in("code", permissionCodes)
+        .is("deleted_at", null)
+        .eq("status", "active");
+
+      if (permissionRowsError) {
+        return { success: false, error: "NO_ROLES" };
+      }
+
+      const byCode = new Map(
+        (permissionRows ?? []).map((permission) => [permission.code, permission]),
+      );
+      // Preserve RPC order while keeping only active permission rows.
+      permissions = permissionCodes
+        .map((code) => byCode.get(code))
+        .filter((permission): permission is NonNullable<typeof permission> =>
+          Boolean(permission),
+        )
+        .map((permission) => ({
+          id: permission.id,
+          code: permission.code,
+          module: permission.module,
+          action: permission.action,
+          resource: permission.resource,
+        }));
+      permissionCodes = permissions.map((permission) => permission.code);
+    }
+  } else {
+    const { data: orgRoles } = await supabase
+      .schema("hrms")
+      .from("roles")
+      .select("id, parent_role_id")
+      .eq("organization_id", employeeRow.organization_id)
+      .is("deleted_at", null);
+
+    const allRoleIds = new Set<string>(roleIds);
+    const parentMap = new Map(
+      (orgRoles ?? []).map((r) => [r.id, r.parent_role_id as string | null]),
+    );
+
+    for (const roleId of roleIds) {
+      let parentId = parentMap.get(roleId) ?? null;
+      const visited = new Set<string>();
+      while (parentId && !visited.has(parentId)) {
+        visited.add(parentId);
+        allRoleIds.add(parentId);
+        parentId = parentMap.get(parentId) ?? null;
+      }
+    }
+
+    const { data: rolePermissionRows, error: permissionsError } = await supabase
+      .schema("hrms")
+      .from("role_permissions")
+      .select("permission_id")
+      .in("role_id", [...allRoleIds])
+      .is("deleted_at", null)
+      .eq("status", "active");
+
+    if (permissionsError) {
+      return { success: false, error: "NO_ROLES" };
+    }
+
+    const permissionIds = [
+      ...new Set(
+        (rolePermissionRows ?? []).map((row) => row.permission_id),
+      ),
+    ];
+
+    if (permissionIds.length > 0) {
+      const { data: permissionRows, error: permissionRowsError } = await supabase
+        .schema("hrms")
+        .from("permissions")
+        .select("id, code, module, action, resource")
+        .in("id", permissionIds)
+        .is("deleted_at", null)
+        .eq("status", "active");
+
+      if (permissionRowsError) {
+        return { success: false, error: "NO_ROLES" };
+      }
+
+      permissions = (permissionRows ?? []).map((permission) => ({
+        id: permission.id,
+        code: permission.code,
+        module: permission.module,
+        action: permission.action,
+        resource: permission.resource,
+      }));
+      permissionCodes = permissions.map((p) => p.code);
     }
   }
-
-  const { data: rolePermissionRows, error: permissionsError } = await supabase
-    .schema("hrms")
-    .from("role_permissions")
-    .select("permission_id")
-    .in("role_id", [...allRoleIds])
-    .is("deleted_at", null)
-    .eq("status", "active");
-
-  if (permissionsError) {
-    return { success: false, error: "NO_ROLES" };
-  }
-
-  const permissionIds = [
-    ...new Set(
-      (rolePermissionRows ?? []).map((row) => row.permission_id),
-    ),
-  ];
-
-  if (permissionIds.length === 0) {
-    return {
-      success: true,
-      profile: {
-        userId,
-        email,
-        employee: mapEmployee(employeeRow),
-        organization,
-        roles,
-        permissions: [],
-        permissionCodes: [],
-      },
-    };
-  }
-
-  const { data: permissionRows, error: permissionRowsError } = await supabase
-    .schema("hrms")
-    .from("permissions")
-    .select("id, code, module, action, resource")
-    .in("id", permissionIds)
-    .is("deleted_at", null)
-    .eq("status", "active");
-
-  if (permissionRowsError) {
-    return { success: false, error: "NO_ROLES" };
-  }
-
-  const permissions: Permission[] = (permissionRows ?? []).map(
-    (permission) => ({
-      id: permission.id,
-      code: permission.code,
-      module: permission.module,
-      action: permission.action,
-      resource: permission.resource,
-    }),
-  );
-  const permissionCodes = permissions.map((p) => p.code);
 
   return {
     success: true,
@@ -302,7 +340,7 @@ export const loadUserProfile = cache(async function loadUserProfile(
   };
 });
 
-export async function getCurrentUserProfile(): Promise<UserProfile | null> {
+export const getCurrentUserProfile = cache(async function getCurrentUserProfile(): Promise<UserProfile | null> {
   const { getLayoutUserProfile } = await import("@/lib/auth/layout-profile");
   const { getServerSession } = await import("@/lib/supabase/server");
 
@@ -322,4 +360,4 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
   }
 
   return result.profile;
-}
+});

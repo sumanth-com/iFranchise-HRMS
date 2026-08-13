@@ -219,16 +219,23 @@ export async function getAttendanceSummary(
   const fromDate = dateFrom <= dateTo ? dateFrom : dateTo;
   const toDate = dateFrom <= dateTo ? dateTo : dateFrom;
 
-  const attendanceQuery = supabase
-    .schema("hrms")
-    .from("attendance")
-    .select("attendance_status")
-    .eq("organization_id", organizationId)
-    .is("deleted_at", null)
-    .gte("attendance_date", fromDate)
-    .lte("attendance_date", toDate);
+  const attendanceBase = () =>
+    supabase
+      .schema("hrms")
+      .from("attendance")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .gte("attendance_date", fromDate)
+      .lte("attendance_date", toDate);
 
-  const [employeesResult, attendanceResult] = await Promise.all([
+  const [
+    employeesResult,
+    presentResult,
+    absentResult,
+    lateResult,
+    halfDayResult,
+  ] = await Promise.all([
     supabase
       .schema("hrms")
       .from("employees")
@@ -236,48 +243,36 @@ export async function getAttendanceSummary(
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
       .in("employment_status", ["active", "probation", "on_leave"]),
-    attendanceQuery,
+    attendanceBase().eq("attendance_status", "present"),
+    // Preserve existing summary semantics: absent + on_leave both count as absentToday.
+    attendanceBase().in("attendance_status", ["absent", "on_leave"]),
+    attendanceBase().eq("attendance_status", "late"),
+    attendanceBase().eq("attendance_status", "half_day"),
   ]);
 
   if (employeesResult.error) {
     throw new Error(employeesResult.error.message);
   }
-
-  if (attendanceResult.error) {
-    throw new Error(attendanceResult.error.message);
+  if (presentResult.error) {
+    throw new Error(presentResult.error.message);
   }
-
-  const counts = {
-    presentToday: 0,
-    absentToday: 0,
-    lateToday: 0,
-    halfDayToday: 0,
-    onLeaveToday: 0,
-  };
-
-  for (const row of attendanceResult.data ?? []) {
-    switch (row.attendance_status as AttendanceStatus) {
-      case "present":
-        counts.presentToday += 1;
-        break;
-      case "absent":
-      case "on_leave":
-        counts.absentToday += 1;
-        break;
-      case "late":
-        counts.lateToday += 1;
-        break;
-      case "half_day":
-        counts.halfDayToday += 1;
-        break;
-      default:
-        break;
-    }
+  if (absentResult.error) {
+    throw new Error(absentResult.error.message);
+  }
+  if (lateResult.error) {
+    throw new Error(lateResult.error.message);
+  }
+  if (halfDayResult.error) {
+    throw new Error(halfDayResult.error.message);
   }
 
   return {
     date: fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`,
-    ...counts,
+    presentToday: presentResult.count ?? 0,
+    absentToday: absentResult.count ?? 0,
+    lateToday: lateResult.count ?? 0,
+    halfDayToday: halfDayResult.count ?? 0,
+    onLeaveToday: 0,
     totalEmployees: employeesResult.count ?? 0,
   };
 }

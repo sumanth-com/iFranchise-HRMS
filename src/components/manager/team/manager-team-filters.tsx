@@ -1,6 +1,7 @@
 "use client";
 
 import { Search } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { Input } from "@/components/common/input";
 import {
@@ -41,6 +42,23 @@ export function ManagerTeamFilters({
   const designationValue = filters.designationId ?? FILTER_ANY_VALUE;
   const employmentStatusValue = filters.employmentStatus ?? FILTER_ANY_VALUE;
   const employmentTypeValue = filters.employmentTypeId ?? FILTER_ANY_VALUE;
+  const [searchInput, setSearchInput] = useState(filters.search ?? "");
+
+  useEffect(() => {
+    setSearchInput(filters.search ?? "");
+  }, [filters.search]);
+
+  useEffect(() => {
+    const trimmed = searchInput.trim();
+    const current = (filters.search ?? "").trim();
+    if (trimmed === current) return;
+
+    const timer = window.setTimeout(() => {
+      onChange({ search: trimmed || undefined, page: 1 });
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [searchInput, filters.search, onChange]);
 
   const departmentOptions = lookups.departments.map((department) => ({
     value: department.id,
@@ -62,8 +80,16 @@ export function ManagerTeamFilters({
       <div className="relative xl:col-span-2">
         <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          value={filters.search ?? ""}
-          onChange={(event) => onChange({ search: event.target.value, page: 1 })}
+          value={searchInput}
+          onChange={(event) => setSearchInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              onChange({
+                search: event.currentTarget.value.trim() || undefined,
+                page: 1,
+              });
+            }
+          }}
           placeholder="Search employee..."
           className="pl-9"
           disabled={disabled}

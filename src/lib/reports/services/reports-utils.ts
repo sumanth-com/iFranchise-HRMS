@@ -1,5 +1,4 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 import type { ReportColumn, ReportResult, ReportRow } from "@/types/reports";
 
@@ -186,6 +185,7 @@ function formatPdfGeneratedAt(iso: string) {
 }
 
 export async function reportToPdfBytes(result: ReportResult): Promise<Uint8Array> {
+  const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);

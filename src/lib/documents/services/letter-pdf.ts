@@ -1,5 +1,3 @@
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-
 import { stripHtml } from "@/lib/documents/services/documents-utils";
 import type { LetterPlaceholders } from "@/types/documents";
 
@@ -19,6 +17,7 @@ export async function generateLetterPdfBytes(input: {
   letterNumber?: string | null;
   bodyHtml: string;
 }): Promise<Uint8Array> {
+  const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);

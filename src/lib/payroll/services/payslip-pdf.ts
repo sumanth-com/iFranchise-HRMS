@@ -1,5 +1,4 @@
 import { format, parseISO } from "date-fns";
-import QRCode from "qrcode";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 
 import { amountToIndianWords } from "@/lib/payroll/services/amount-in-words";
@@ -732,6 +731,7 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
   let qrImage: Awaited<ReturnType<PDFDocument["embedPng"]>> | undefined;
   try {
     const verifyUrl = buildPayslipVerificationUrl(payslip.payslipNumber);
+    const QRCode = (await import("qrcode")).default;
     const qrPng = await QRCode.toBuffer(verifyUrl, {
       margin: 1,
       width: 128,

@@ -33,6 +33,7 @@ export function RolesSubNav({ items = ROLES_SUB_NAV, rootHref }: Props) {
             <Link
               key={item.href}
               href={item.href}
+              prefetch
               className={cn(
                 "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                 isActive

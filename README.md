@@ -1,8 +1,37 @@
-# iFranchise HRMS
+<p align="center">
+  <img src="docs/brand/readme-banner.svg" alt="iFranchise HRMS" width="100%" />
+</p>
 
-Enterprise HR management platform built with Next.js 15 and Supabase.
+<p align="center">
+  <strong>Enterprise HR management</strong> for modern organizations — attendance, leave, payroll, performance, recruitment, and system administration in one secure platform.
+</p>
 
-## Local development
+<p align="center">
+  <img alt="Next.js" src="https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=nextdotjs" />
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
+  <img alt="Supabase" src="https://img.shields.io/badge/Supabase-Postgres-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white" />
+  <img alt="Vercel" src="https://img.shields.io/badge/Deploy-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white" />
+</p>
+
+---
+
+## Overview
+
+iFranchise HRMS is a production HRMS with role-based portals:
+
+| Portal | Audience |
+| --- | --- |
+| **Employee** | Self-service attendance, leave, payslips, documents, goals |
+| **Manager** | Team attendance, leave approvals, performance, recruitment |
+| **HR / Dashboard** | Organization HR operations and reporting |
+| **CEO** | Executive monitoring and approvals |
+| **Super Admin** | System health, security, integrations, audit, provisioning |
+
+Built with **Next.js 15**, **Supabase (Auth + Postgres + RLS)**, and **server actions** — no mock data in production paths.
+
+---
+
+## Quick start
 
 ```bash
 npm install
@@ -10,7 +39,9 @@ cp .env.example .env.local
 npm run generate:secrets
 ```
 
-Copy the generated secrets into `.env.local`, then fill in Supabase and SMTP values from your project dashboard.
+1. Copy generated secrets into `.env.local`
+2. Add Supabase URL/keys and SMTP settings
+3. Start the app:
 
 ```bash
 npm run dev
@@ -18,128 +49,85 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## Generate signing secrets
+---
 
-Production token flows use dedicated HMAC secrets (never the Supabase service role key):
+## Required secrets
+
+Signing secrets are **HMAC tokens** — never reuse the Supabase service role key.
+
+| Variable | Purpose |
+| --- | --- |
+| `ONBOARDING_TOKEN_SECRET` | Onboarding invitation links |
+| `APPROVAL_TOKEN_SECRET` | Email approve / reject links |
+| `RESET_PASSWORD_TOKEN_SECRET` | Password reset signing |
+| `EMAIL_VERIFICATION_TOKEN_SECRET` | Email verification / OTP flows |
+| `PERMISSION_CACHE_SECRET` | Signed permission cookies (middleware) |
+| `CRON_SECRET` | Bearer auth for `/api/cron/*` |
+
+Production **will not start** if any required secret is missing.
 
 ```bash
 npm run generate:secrets
 ```
 
-This prints values in `.env` format. Copy them into `.env.local` (development) or your hosting provider (production).
+---
 
-| Variable | Purpose |
-| --- | --- |
-| `ONBOARDING_TOKEN_SECRET` | Pre-joining onboarding invitation links |
-| `APPROVAL_TOKEN_SECRET` | Email approval / reject action links |
-| `RESET_PASSWORD_TOKEN_SECRET` | Password reset token signing |
-| `EMAIL_VERIFICATION_TOKEN_SECRET` | Email verification codes (onboarding OTP, future flows) |
-| `PERMISSION_CACHE_SECRET` | Signed permission cache cookies (middleware) |
-| `CRON_SECRET` | Bearer token for `/api/cron/*` endpoints |
+## Deploy (Vercel)
 
-In **production**, the application validates these on server startup and will not start if any are missing.
+1. Import this repository in [Vercel](https://vercel.com)
+2. Set environment variables for **Production** (and Preview if needed)
+3. Redeploy after any env change
 
-## Deploy on Vercel
-
-### 1. Connect the repository
-
-Import the GitHub repository in [Vercel](https://vercel.com) and deploy.
-
-### 2. Environment variables
-
-Go to **Vercel Dashboard → your project → Settings → Environment Variables**.
-
-Add each variable for the **Production** environment (and **Preview** if you use preview deployments).
-
-#### Required — application
-
-| Name | Example | Notes |
-| --- | --- | --- |
-| `NEXT_PUBLIC_APP_URL` | `https://hrmsifranchise.vercel.app` | Must match your Vercel domain |
-| `NEXT_PUBLIC_SUPABASE_URL` | `https://xxxx.supabase.co` | Supabase → Settings → API |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJ...` | Supabase anon public key |
-| `SUPABASE_SERVICE_ROLE_KEY` | `eyJ...` | Server-only; never expose client-side |
-
-#### Required — token signing (run `npm run generate:secrets` locally)
+### Application
 
 | Name | Notes |
 | --- | --- |
-| `ONBOARDING_TOKEN_SECRET` | Unique random secret |
-| `APPROVAL_TOKEN_SECRET` | Unique random secret |
-| `RESET_PASSWORD_TOKEN_SECRET` | Unique random secret |
-| `EMAIL_VERIFICATION_TOKEN_SECRET` | Unique random secret |
-| `PERMISSION_CACHE_SECRET` | Unique random secret |
-| `CRON_SECRET` | Unique random secret |
+| `NEXT_PUBLIC_APP_URL` | Exact production URL |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-only — never expose to the client |
 
-#### Required for email delivery
+### Email
 
 | Name | Notes |
 | --- | --- |
 | `EMAIL_FROM` | e.g. `iFranchise HRMS <noreply@yourdomain.com>` |
-| `SMTP_HOST` | Your SMTP provider hostname |
-| `SMTP_PORT` | Usually `587` |
-| `SMTP_USER` | SMTP username |
-| `SMTP_PASSWORD` | SMTP password |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` | SMTP provider credentials |
 
-#### Recommended optional
+### Rules
 
-| Name | Purpose |
-| --- | --- |
-| `APPROVAL_TOKEN_TTL_HOURS` | Email approval link lifetime (default 48) |
+- Keep secrets in Vercel / `.env.local` only — **never commit them**
+- Do not prefix signing secrets with `NEXT_PUBLIC_`
+- Use a unique value for each secret
+- Rotate and redeploy if a secret may be exposed
 
-### Secret management rules
-
-- Secrets live **only** in environment variables (`.env.local` locally, Vercel in production).
-- **Never** commit `.env`, `.env.local`, or generated secret values to git.
-- **Never** use `NEXT_PUBLIC_*` for signing secrets (they would ship to the browser).
-- Run `npm run generate:secrets` to create new values — do not reuse across variables.
-- Production startup **fails** if any required signing secret is missing.
-
-### 3. Where to paste in Vercel
-
-1. Open [vercel.com](https://vercel.com) → your **iFranchise-HRMS** project.
-2. **Settings** → **Environment Variables**.
-3. Click **Add New**.
-4. Enter **Key** (e.g. `ONBOARDING_TOKEN_SECRET`) and **Value** (paste from `npm run generate:secrets`).
-5. Select **Production** (and Preview/Development if needed).
-6. Click **Save**.
-7. Repeat for every variable in the tables above.
-
-### 4. Redeploy
-
-After adding or changing environment variables:
-
-**Deployments → latest deployment → ⋮ → Redeploy**
-
-Or push a new commit to trigger a fresh build.
-
-Vercel injects env vars at build and runtime; a redeploy is **required** after changes.
-
-### 5. Supabase Auth email templates
-
-Onboarding invitation emails are sent by the **app via SMTP** — not Supabase Auth templates.
-
-Supabase Dashboard → **Authentication → Email Templates** only applies to:
-
-- Invite user (employee company account password setup)
-- Password recovery (Supabase Auth flow)
-
-Mirror `supabase/templates/invite.html` and `recovery.html` in the Supabase Dashboard if you customize those flows.
+---
 
 ## Scripts
 
 | Command | Description |
 | --- | --- |
-| `npm run dev` | Start development server |
+| `npm run dev` | Development server (Turbopack) |
 | `npm run build` | Production build |
-| `npm run start` | Start production server |
+| `npm run start` | Run production server |
 | `npm run type-check` | TypeScript check |
-| `npm run generate:secrets` | Generate secure signing secrets |
-| `npm run supabase:link` | Link local CLI to remote project |
+| `npm run lint` | ESLint |
+| `npm run generate:secrets` | Generate signing secrets |
+| `npm run supabase:link` | Link Supabase CLI to remote project |
 
-## Security notes
+---
 
-- Never commit `.env`, `.env.local`, or generated secrets to git.
-- Use a unique value for each `*_SECRET` / `*_TOKEN_SECRET` variable.
-- Do not reuse `SUPABASE_SERVICE_ROLE_KEY` as a signing secret.
-- Rotate secrets if you suspect exposure; update Vercel env vars and redeploy.
+## Security
+
+- Row Level Security (RLS) on HRMS data
+- Role + permission checks on server routes and actions
+- Audit logging for sensitive operations
+- No service-role keys in client bundles
+
+Onboarding invitation email is sent by the **app via SMTP**. Supabase Auth email templates only cover invite-user and password-recovery flows (`supabase/templates/`).
+
+---
+
+<p align="center">
+  <sub>Built for reliability · Optimized for speed · Secured by design</sub>
+</p>
