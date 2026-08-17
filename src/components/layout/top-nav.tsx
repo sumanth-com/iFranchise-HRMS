@@ -19,7 +19,7 @@ export function TopNav() {
   const isPortalHome = pathname === portalHome;
 
   return (
-    <header data-tour="top-nav" className="flex h-14 shrink-0 items-center justify-between gap-4 border-b bg-background px-4">
+    <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b bg-background px-4">
       <div className="flex min-w-0 items-center gap-2">
         <Button
           variant="ghost"

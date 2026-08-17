@@ -24,7 +24,6 @@ export function CeoDashboardKpis({ kpis }: { kpis: CeoKpis }) {
   return (
     <section
       aria-label="Company at a glance"
-      data-tour="dashboard-kpis"
       className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
     >
       <EmployeeStatCard

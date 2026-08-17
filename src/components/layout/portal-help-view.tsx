@@ -3,18 +3,14 @@
 import Link from "next/link";
 import { CircleHelp, KeyRound, Mail } from "lucide-react";
 
-import { ProductTourCard } from "@/components/product-tour/product-tour-card";
 import { PortalManualCard } from "@/components/layout/portal-manual-card";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { PORTAL_MANUALS } from "@/lib/help/portal-manuals";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
-import { SYSTEM_ADMIN_ROUTES } from "@/lib/system-admin/constants";
 import type { PortalVariant } from "@/providers/auth-provider";
 
 const HR_EMAIL = "hr@ifranchise.in";
-
-type HelpPortalVariant = PortalVariant | "system";
 
 type HelpFaq = {
   q: string;
@@ -35,7 +31,7 @@ type PortalHelpConfig = {
   settingsHref: string;
 };
 
-const PORTAL_HELP: Record<HelpPortalVariant, PortalHelpConfig> = {
+const PORTAL_HELP: Record<PortalVariant, PortalHelpConfig> = {
   employee: {
     badge: "Employee Portal Help",
     title: "How can we help?",
@@ -244,57 +240,6 @@ const PORTAL_HELP: Record<HelpPortalVariant, PortalHelpConfig> = {
       },
     ],
   },
-  system: {
-    badge: "System Administration Help",
-    title: "How can we help?",
-    description:
-      "Quick answers for system oversight, security, audit, and platform administration.",
-    settingsHref: SYSTEM_ADMIN_ROUTES.settings,
-    steps: [
-      {
-        title: "Review system health",
-        detail: "Open System Dashboard for platform status and operational signals.",
-      },
-      {
-        title: "Manage access",
-        detail: "Use Roles & Access and User Provisioning for permissions and invites.",
-      },
-      {
-        title: "Secure the platform",
-        detail: "Audit Trail and Security modules help you monitor activity and controls.",
-      },
-    ],
-    faqs: [
-      {
-        q: "How do I switch between HR and System portals?",
-        a: "Use the portal switcher in the top navigation when you have access to both.",
-      },
-      {
-        q: "Where is the audit trail?",
-        a: "Open Audit Trail under System Administration.",
-      },
-      {
-        q: "How do I reset my password?",
-        a: "Settings → Account & security → Reset password (max 3 emails per day).",
-      },
-      {
-        q: "Can I edit employee records here?",
-        a: "Employee master data is managed in the HR portal. System admin focuses on platform controls.",
-      },
-      {
-        q: "Who do I contact for help?",
-        a: `Email ${HR_EMAIL} for access or account issues.`,
-      },
-      {
-        q: "Why can’t I request another password reset?",
-        a: "Password reset is limited to 3 requests per day. Try again tomorrow or contact HR.",
-      },
-      {
-        q: "Where can I learn every module?",
-        a: "Open Portal manual on this Help page, pick a module, and read what it is, why it helps, and what’s inside — no extra links.",
-      },
-    ],
-  },
 };
 
 export function PortalHelpView({
@@ -302,10 +247,9 @@ export function PortalHelpView({
   variant,
 }: {
   firstName: string;
-  variant: HelpPortalVariant;
+  variant: PortalVariant;
 }) {
   const config = PORTAL_HELP[variant];
-  const manual = PORTAL_MANUALS[variant === "system" ? "hr" : variant];
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
@@ -351,11 +295,8 @@ export function PortalHelpView({
                 </li>
               ))}
             </ol>
-            <div className="mt-5 shrink-0 space-y-4">
-              <ProductTourCard />
-            </div>
             <div className="mt-5 flex min-h-0 flex-1">
-              <PortalManualCard {...manual} />
+              <PortalManualCard {...PORTAL_MANUALS[variant]} />
             </div>
           </section>
 

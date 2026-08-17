@@ -44,7 +44,7 @@ export function PortalSwitcher() {
   );
 
   return (
-    <div className="relative" data-tour="portal-switcher">
+    <div className="relative">
       <Button
         variant="outline"
         size="sm"

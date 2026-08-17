@@ -46,7 +46,7 @@ export function SystemDashboardLive({ initialStats }: { initialStats: SystemDash
   );
 
   return (
-    <div data-tour="dashboard-kpis" className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
       <header className="flex shrink-0 flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-xl font-semibold tracking-tight md:text-2xl">System Dashboard</h1>

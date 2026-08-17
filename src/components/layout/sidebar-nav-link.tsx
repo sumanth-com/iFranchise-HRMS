@@ -18,7 +18,6 @@ type SidebarNavLinkProps = {
   icon: ComponentProps<typeof SidebarNavIcon>["icon"];
   onNavigate?: () => void;
   children?: ReactNode;
-  tourId?: string;
 };
 
 export function SidebarNavLink({
@@ -31,7 +30,6 @@ export function SidebarNavLink({
   icon,
   onNavigate,
   children,
-  tourId,
 }: SidebarNavLinkProps) {
   const pathname = usePathname();
   const { pendingHref, startNavigation } = useSidebar();
@@ -41,7 +39,6 @@ export function SidebarNavLink({
     <Link
       href={disabled ? "#" : href}
       prefetch
-      data-tour={tourId}
       aria-disabled={disabled}
       aria-current={active ? "page" : undefined}
       title={collapsed ? title : undefined}
