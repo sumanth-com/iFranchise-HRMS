@@ -16,7 +16,7 @@ import {
 import { SystemMetric, SystemPanel } from "@/components/system-admin/system-module-frame";
 import { fetchApiUsageLogsAction } from "@/lib/system-admin/actions";
 import type { ApiUsageLogRow, ApiUsageMetrics } from "@/lib/public-api/usage-types";
-import type { SystemApiKeyRow } from "@/lib/system-admin/services/api-keys-service";
+import type { SystemApiKeyRow } from "@/lib/system-admin/services/api-key-types";
 import { cn } from "@/lib/utils";
 
 export function ApiUsagePanel({

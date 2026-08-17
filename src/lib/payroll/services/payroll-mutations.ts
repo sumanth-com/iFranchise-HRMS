@@ -1,5 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
-import { emitHrmsWebhook } from "@/lib/public-api/webhooks";
+import { emitHrmsWebhook } from "@/lib/public-api/emit";
 import { getPayslipBranding } from "@/lib/payroll/services/payslip-branding";
 import { sendPayslipReadyEmail } from "@/lib/payroll/services/payslip-email-service";
 import { storePayslipPdf } from "@/lib/payroll/services/payslip-storage";

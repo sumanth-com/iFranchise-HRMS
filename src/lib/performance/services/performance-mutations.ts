@@ -18,7 +18,7 @@ import {
   unwrapRelation,
 } from "@/lib/performance/services/performance-utils";
 import { PERFORMANCE_ROUTES } from "@/lib/performance/constants";
-import { emitHrmsWebhook } from "@/lib/public-api/webhooks";
+import { emitHrmsWebhook } from "@/lib/public-api/emit";
 import { notifyPerformanceGoalAssigned } from "@/lib/performance/services/performance-notifications";
 import { notifyEmployee } from "@/lib/notifications/services/notification-service";
 import { getEmployeeSalaryStructure } from "@/lib/employees/services/employee-detail";

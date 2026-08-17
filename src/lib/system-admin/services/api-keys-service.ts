@@ -7,26 +7,9 @@ import {
   type PublicApiScope,
 } from "@/lib/public-api/constants";
 import { generateApiKey } from "@/lib/public-api/crypto";
+import type { SystemApiKeyRow } from "@/lib/system-admin/services/api-key-types";
 
-export type SystemApiKeyRow = {
-  id: string;
-  name: string;
-  description: string | null;
-  keyPrefix: string;
-  environment: "production" | "sandbox";
-  permissions: string[];
-  scopes: PublicApiScope[];
-  allowedIps: string[];
-  rateLimitTier: ApiRateLimitTier;
-  rateLimitPerMinute: number | null;
-  expiresAt: string | null;
-  lastUsedAt: string | null;
-  lastUsedIp: string | null;
-  usageCount: number;
-  status: "active" | "revoked" | "expired";
-  createdAt: string;
-  createdBy: string | null;
-};
+export type { SystemApiKeyRow };
 
 function resolveStatus(
   status: string,

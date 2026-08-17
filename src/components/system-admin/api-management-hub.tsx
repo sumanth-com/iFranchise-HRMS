@@ -8,7 +8,7 @@ import { ApiUsagePanel } from "@/components/system-admin/api-usage-panel";
 import { ApiWebhooksPanel } from "@/components/system-admin/api-webhooks-panel";
 import { Button } from "@/components/common/button";
 import { SystemMetric, SystemModuleFrame, SystemPanel } from "@/components/system-admin/system-module-frame";
-import type { ApiManagementSnapshot } from "@/lib/system-admin/services/api-management-queries";
+import type { ApiManagementSnapshot } from "@/lib/system-admin/services/api-management-types";
 import { updateApiSettingsAction } from "@/lib/system-admin/actions";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";

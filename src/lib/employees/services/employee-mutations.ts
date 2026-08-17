@@ -7,7 +7,9 @@ import {
   DOCUMENT_MAX_BYTES,
   PROFILE_IMAGE_MAX_BYTES,
 } from "@/lib/employees/constants";
-import { emitHrmsWebhook } from "@/lib/public-api/webhooks";
+import { emitHrmsWebhook } from "@/lib/public-api/emit";
+
+export { createSignedStorageUrl } from "@/lib/storage/signed-url";
 
 function emptyToNull(value?: string | null) {
   return value && value.trim().length > 0 ? value : null;
@@ -543,22 +545,6 @@ export async function removeProfileImage(
   if (error) {
     throw new Error(error.message);
   }
-}
-
-export async function createSignedStorageUrl(
-  supabase: AuthSupabaseClient,
-  bucket: string,
-  path: string,
-): Promise<string | null> {
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .createSignedUrl(path, 60 * 60);
-
-  if (error || !data?.signedUrl) {
-    return null;
-  }
-
-  return data.signedUrl;
 }
 
 export async function ensureDefaultDocumentTypes(

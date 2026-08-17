@@ -3,7 +3,7 @@ import { format, parseISO } from "date-fns";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
 import { buildEmployeeRouteRef } from "@/lib/employees/routing";
-import { createSignedStorageUrl } from "@/lib/employees/services/employee-mutations";
+import { createSignedStorageUrl } from "@/lib/storage/signed-url";
 import { resolveEmployeeFromRouteRefGlobal } from "@/lib/employees/services/employee-route-resolver";
 import { getMonthDateRange } from "@/lib/leave/services/leave-utils";
 import { createAdminClient } from "@/lib/supabase/admin";

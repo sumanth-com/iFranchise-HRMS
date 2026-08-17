@@ -12,7 +12,7 @@ import {
   notifyLeaveRejected,
   notifyLeaveSubmitted,
 } from "@/lib/leave/services/leave-notifications";
-import { emitHrmsWebhook } from "@/lib/public-api/webhooks";
+import { emitHrmsWebhook } from "@/lib/public-api/emit";
 
 function emptyToNull(value?: string | null) {
   return value && value.trim().length > 0 ? value.trim() : null;

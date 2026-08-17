@@ -4,10 +4,10 @@ import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
 import {
-  createSignedStorageUrl,
   removeProfileImage,
   uploadProfileImage,
 } from "@/lib/employees/services/employee-mutations";
+import { createSignedStorageUrl } from "@/lib/storage/signed-url";
 import {
   formatEmployeeName,
   fromHrms,

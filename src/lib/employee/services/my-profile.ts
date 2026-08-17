@@ -3,7 +3,7 @@ import type { UserProfile } from "@/types/auth";
 import type { MyProfileBundle } from "@/types/my-profile";
 import { getEmployeeAttendanceSummary, getEmployeeById } from "@/lib/employees/services/employee-detail";
 import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
-import { createSignedStorageUrl } from "@/lib/employees/services/employee-mutations";
+import { createSignedStorageUrl } from "@/lib/storage/signed-url";
 import { getEmployeeSelfProfileSettings } from "@/lib/employee/services/employee-self-profile";
 
 export async function getMyProfileBundle(

@@ -12,7 +12,7 @@ import {
   attendanceExistsForEmployeeDate,
   getEmployeeBranchId,
 } from "@/lib/attendance/services/attendance-queries";
-import { emitHrmsWebhook } from "@/lib/public-api/webhooks";
+import { emitHrmsWebhook } from "@/lib/public-api/emit";
 
 function emptyToNull(value?: string | null) {
   return value && value.trim().length > 0 ? value.trim() : null;

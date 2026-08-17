@@ -1,6 +1,6 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { ASSET_IMAGE_BUCKET } from "@/lib/assets/constants";
-import { createSignedStorageUrl } from "@/lib/employees/services/employee-mutations";
+import { createSignedStorageUrl } from "@/lib/storage/signed-url";
 import {
   ORGANIZATION_LOGO_MAX_BYTES,
   ORGANIZATION_LOGO_PATH_PREFIX,

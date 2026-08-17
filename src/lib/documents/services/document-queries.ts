@@ -16,7 +16,7 @@ import type {
   LetterListParams,
 } from "@/lib/validations/documents";
 import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
-import { createSignedStorageUrl } from "@/lib/employees/services/employee-mutations";
+import { createSignedStorageUrl } from "@/lib/storage/signed-url";
 import type {
   DocumentEmployeeCard,
   DocumentTypeItem,

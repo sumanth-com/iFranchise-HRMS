@@ -34,7 +34,7 @@ import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import { parseWorkingConfiguration } from "@/lib/company-settings/services/company-settings-parsers";
 import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
 import { getEmployeeById } from "@/lib/employees/services/employee-detail";
-import { createSignedStorageUrl } from "@/lib/employees/services/employee-mutations";
+import { createSignedStorageUrl } from "@/lib/storage/signed-url";
 import { buildEmployeeRouteRef } from "@/lib/employees/routing";
 import { expandDateRange, getMonthDateRange } from "@/lib/leave/services/leave-utils";
 import { hasPermission } from "@/lib/permissions/utils";

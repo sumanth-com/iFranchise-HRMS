@@ -37,7 +37,7 @@ import {
   type ApiRateLimitTier,
   type PublicApiScope,
 } from "@/lib/public-api/constants";
-import type { SystemApiKeyRow } from "@/lib/system-admin/services/api-keys-service";
+import type { SystemApiKeyRow } from "@/lib/system-admin/services/api-key-types";
 import { cn } from "@/lib/utils";
 
 type ExpiryOption = "never" | "30d" | "90d" | "1y";

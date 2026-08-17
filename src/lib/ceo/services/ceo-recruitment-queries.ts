@@ -10,7 +10,7 @@ import {
   fromHrms,
   unwrapRelation,
 } from "@/lib/reports/services/reports-utils";
-import { createSignedStorageUrl } from "@/lib/employees/services/employee-mutations";
+import { createSignedStorageUrl } from "@/lib/storage/signed-url";
 import { ceoRecruitmentListParamsSchema } from "@/lib/validations/ceo-recruitment";
 import type { UserProfile } from "@/types/auth";
 import type { CandidateStage } from "@/types/recruitment";

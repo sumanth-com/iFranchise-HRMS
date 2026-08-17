@@ -3,7 +3,7 @@ import QRCode from "qrcode";
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
 import { ASSET_IMAGE_BUCKET, ASSETS_ROUTES, HR_ASSIGN_ASSET_TYPES } from "@/lib/assets/constants";
-import { emitHrmsWebhook } from "@/lib/public-api/webhooks";
+import { emitHrmsWebhook } from "@/lib/public-api/emit";
 import { notifyEmployee } from "@/lib/notifications/services/notification-service";
 import {
   getAssetSettings,

@@ -10,7 +10,7 @@ import {
   IntegrationsPanel,
   StorageManagerPanel,
 } from "@/components/system-admin/system-admin-modules";
-import type { ApiManagementSnapshot } from "@/lib/system-admin/services/api-management-queries";
+import type { ApiManagementSnapshot } from "@/lib/system-admin/services/api-management-types";
 import type { BackupJobRow } from "@/lib/system-admin/services/backup-service";
 import type { DatabaseHealthSnapshot } from "@/lib/system-admin/services/database-health-service";
 import type { EmailServiceSnapshot } from "@/lib/system-admin/services/email-service";

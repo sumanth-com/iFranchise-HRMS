@@ -8,7 +8,7 @@ import {
 } from "@/lib/employees/services/employee-detail";
 import { listEmployeeAssets } from "@/lib/assets/services/asset-queries";
 import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
-import { createSignedStorageUrl } from "@/lib/employees/services/employee-mutations";
+import { createSignedStorageUrl } from "@/lib/storage/signed-url";
 import { assertTeamMember } from "@/lib/manager/services/team-queries";
 import { fromHrms, unwrapRelation } from "@/lib/reports/services/reports-utils";
 import type { TeamMemberDetailBundle } from "@/types/manager-team";

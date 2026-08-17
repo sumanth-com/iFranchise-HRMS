@@ -282,18 +282,6 @@ export async function dispatchWebhookEvent(
   }
 }
 
-export function emitHrmsWebhook(
-  organizationId: string,
-  event: WebhookEvent,
-  payload: Record<string, unknown>,
-) {
-  void dispatchWebhookEvent(organizationId, event, payload).catch((error) => {
-    if (process.env.NODE_ENV === "development") {
-      console.error("[webhooks]", error instanceof Error ? error.message : "dispatch failed");
-    }
-  });
-}
-
 export async function sendWebhookTest(
   supabase: AuthSupabaseClient,
   organizationId: string,

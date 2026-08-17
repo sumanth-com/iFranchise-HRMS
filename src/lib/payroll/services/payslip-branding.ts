@@ -125,7 +125,7 @@ export async function getPayslipBranding(
   if (orgProfile?.logoStoragePath) {
     try {
       const { createSignedStorageUrl } = await import(
-        "@/lib/employees/services/employee-mutations"
+        "@/lib/storage/signed-url"
       );
       logoUrl = await createSignedStorageUrl(
         supabase,

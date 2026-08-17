@@ -1,7 +1,7 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
-import { createSignedStorageUrl } from "@/lib/employees/services/employee-mutations";
+import { createSignedStorageUrl } from "@/lib/storage/signed-url";
 import { getEmployeeLeaveBalanceSnapshot } from "@/lib/leave/services/leave-queries";
 import { getManagerProfilePageData } from "@/lib/manager/services/manager-self-attendance-service";
 import { listHolidays } from "@/lib/organization/services/org-queries";
