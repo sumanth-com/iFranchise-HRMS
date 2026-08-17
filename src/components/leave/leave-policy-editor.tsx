@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
+import { PhoneInput } from "@/components/common/phone-input";
 import {
   LeavePolicyContactBar,
   LeavePolicyHolidayTables,
@@ -57,7 +58,7 @@ export function LeavePolicyEditor({
   );
 
   const form = useForm<FormValues>({ defaultValues });
-  const { register, handleSubmit, reset, watch, formState } = form;
+  const { register, handleSubmit, reset, watch, setValue, formState } = form;
   const watched = watch();
 
   const onSubmit = handleSubmit((values) => {
@@ -121,7 +122,12 @@ export function LeavePolicyEditor({
         <div className="grid gap-4 md:grid-cols-3">
           <div className="space-y-2">
             <label className="text-sm font-medium">Contact phone</label>
-            <Input {...register("contact.phone")} />
+            <PhoneInput
+              value={watch("contact.phone") ?? ""}
+              onChange={(value) => setValue("contact.phone", value, { shouldValidate: true })}
+              required
+              error={formState.errors.contact?.phone?.message}
+            />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Contact email</label>

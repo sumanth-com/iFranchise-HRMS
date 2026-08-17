@@ -44,7 +44,6 @@ export function CeoDashboard({ data, error }: CeoDashboardProps) {
               departmentName: null,
               avatarUrl: null,
             }}
-            subtitle="Executive Portal"
           />
         </div>
 

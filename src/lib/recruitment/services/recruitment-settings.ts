@@ -43,7 +43,7 @@ export const DEFAULT_RECRUITMENT_SETTINGS: RecruitmentSettings = {
     subjectTemplate: DEFAULT_OFFER_EMAIL_SUBJECT_TEMPLATE,
     messageTemplate: DEFAULT_OFFER_EMAIL_MESSAGE_TEMPLATE,
     hrEmail: "hr@ifranchise.in",
-    hrPhone: "+91-9247 536532",
+    hrPhone: "+91 9247536532",
   },
   offerTemplates: [
     {

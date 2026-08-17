@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
+import { PhoneInput } from "@/components/common/phone-input";
 import { Label } from "@/components/ui/label";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import {
@@ -271,7 +272,12 @@ export function EmployeeWizard({ lookups }: EmployeeWizardProps) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="phone">Phone</Label>
-            <Input id="phone" {...basicForm.register("phone")} />
+            <PhoneInput
+              id="phone"
+              value={basicForm.watch("phone") ?? ""}
+              onChange={(value) => basicForm.setValue("phone", value, { shouldValidate: true })}
+              error={basicForm.formState.errors.phone?.message}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="dateOfBirth">Date of birth</Label>
@@ -405,7 +411,15 @@ export function EmployeeWizard({ lookups }: EmployeeWizardProps) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="contactPhone">Phone</Label>
-            <Input id="contactPhone" {...emergencyForm.register("phone")} />
+            <PhoneInput
+              id="contactPhone"
+              value={emergencyForm.watch("phone") ?? ""}
+              onChange={(value) =>
+                emergencyForm.setValue("phone", value, { shouldValidate: true })
+              }
+              required
+              error={emergencyForm.formState.errors.phone?.message}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="contactEmail">Email</Label>

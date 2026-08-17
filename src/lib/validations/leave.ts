@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { optionalPhoneSchema } from "@/lib/validations/phone";
+
 export const leaveStatusSchema = z.enum([
   "pending",
   "approved",
@@ -69,7 +71,7 @@ export const leaveFormSchema = z
     halfDayPeriod: halfDayPeriodSchema.optional().or(z.literal("")),
     reason: z.string().min(3, "Reason is required").max(1000),
     emergencyContactName: z.string().max(120).optional().or(z.literal("")),
-    emergencyContactPhone: z.string().max(20).optional().or(z.literal("")),
+    emergencyContactPhone: optionalPhoneSchema,
     attachmentPath: z.string().max(500).optional().or(z.literal("")),
   })
   .superRefine((value, ctx) => {

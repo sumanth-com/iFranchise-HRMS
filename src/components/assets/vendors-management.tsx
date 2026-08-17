@@ -13,6 +13,7 @@ import { DataTable, type DataTableColumn } from "@/components/common/data-table"
 import { EmptyState } from "@/components/common/empty-state";
 import { Input } from "@/components/common/input";
 import { Modal } from "@/components/common/modal";
+import { PhoneInput } from "@/components/common/phone-input";
 import { Label } from "@/components/ui/label";
 import { deleteVendorAction, saveVendorAction } from "@/lib/assets/actions";
 import { canCreateAssets, canDeleteAssets, canEditAssets } from "@/lib/assets/constants";
@@ -227,7 +228,11 @@ export function VendorsManagement({ vendors, permissionCodes }: Props) {
             </div>
             <div className="space-y-2">
               <Label>Phone</Label>
-              <Input {...form.register("phone")} />
+              <PhoneInput
+                value={form.watch("phone") ?? ""}
+                onChange={(value) => form.setValue("phone", value, { shouldValidate: true })}
+                error={form.formState.errors.phone?.message}
+              />
             </div>
           </div>
           <div className="space-y-2">

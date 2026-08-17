@@ -63,6 +63,7 @@ export async function getAttendanceDetailAction(
     const profile = await requireServerAnyPermission([
       "attendance.view",
       PORTAL_PERMISSIONS.manager,
+      PORTAL_PERMISSIONS.ceo,
     ]);
     const supabase = await getAuthenticatedSupabase();
     const data = await getAttendanceById(supabase, profile, attendanceId);
@@ -73,7 +74,8 @@ export async function getAttendanceDetailAction(
 
     const isOwn = data.employeeId === profile.employee.id;
     const hasHrAccess = hasPermission(profile.permissionCodes, PORTAL_PERMISSIONS.hr);
-    if (!isOwn && !hasHrAccess) {
+    const hasCeoAccess = hasPermission(profile.permissionCodes, PORTAL_PERMISSIONS.ceo);
+    if (!isOwn && !hasHrAccess && !hasCeoAccess) {
       const { teamIds } = await getManagerTeamScope(supabase, profile);
       if (!teamIds.includes(data.employeeId)) {
         return { success: false, message: "Attendance record not found" };

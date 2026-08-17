@@ -9,6 +9,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
+import { PhoneInput } from "@/components/common/phone-input";
 import {
   Select,
   SelectContent,
@@ -219,8 +220,14 @@ export function OrganizationProfileForm({ profile, logoUrl, canEdit }: Props) {
               </ProfileFieldControl>
             </ProfileInfoRow>
             <ProfileInfoRow label="Phone" value={displayValue(values.phone)} editing={isEditing}>
-              <ProfileFieldControl>
-                <Input className="h-8 w-full text-right" disabled={isPending} {...form.register("phone")} />
+              <ProfileFieldControl wide>
+                <PhoneInput
+                  size="sm"
+                  value={form.watch("phone") ?? ""}
+                  onChange={(value) => form.setValue("phone", value, { shouldValidate: true })}
+                  disabled={isPending}
+                  error={form.formState.errors.phone?.message}
+                />
               </ProfileFieldControl>
             </ProfileInfoRow>
             <ProfileInfoRow label="Website" value={displayValue(values.website)} editing={isEditing}>

@@ -1,6 +1,10 @@
 import { z } from "zod";
 
 import { DESIGNATION_OTHER_VALUE } from "@/lib/employees/constants";
+import {
+  optionalPhoneSchema,
+  requiredPhoneSchema,
+} from "@/lib/validations/phone";
 import type { EmploymentStatus } from "@/types/auth";
 import type { EmployeeAccountStatus } from "@/types/employee";
 
@@ -100,7 +104,7 @@ export type EmployeeSelfPreferencesInput = z.infer<typeof employeeSelfPreference
 
 export const employeeSelfProfileSchema = z.object({
   personalEmail: z.string().email().optional().or(z.literal("")),
-  personalPhone: z.string().max(30).optional().or(z.literal("")),
+  personalPhone: optionalPhoneSchema,
   language: z.string().min(2).max(20),
   timezone: z.string().min(1).max(80),
   addressLine1: z.string().max(200).optional().or(z.literal("")),
@@ -111,7 +115,7 @@ export const employeeSelfProfileSchema = z.object({
   country: z.string().max(100).optional().or(z.literal("")),
   emergencyContactName: z.string().max(100).optional().or(z.literal("")),
   emergencyContactRelationship: z.string().max(100).optional().or(z.literal("")),
-  emergencyContactPhone: z.string().max(30).optional().or(z.literal("")),
+  emergencyContactPhone: optionalPhoneSchema,
   emergencyContactEmail: z.string().email().optional().or(z.literal("")),
   reportingManagerId: z.string().uuid().optional().or(z.literal("")),
 });
@@ -126,14 +130,14 @@ export const employeeBasicStepSchema = z.object({
   firstName: z.string().min(1, "First name is required").max(100),
   lastName: z.string().min(1, "Last name is required").max(100),
   email: z.string().email("Enter a valid email address"),
-  phone: z.string().max(30).optional(),
+  phone: optionalPhoneSchema,
   dateOfBirth: z.string().optional(),
   gender: genderTypeSchema.optional(),
   maritalStatus: maritalStatusSchema.optional(),
   nationality: z.string().max(100).optional(),
   bloodGroup: z.string().max(10).optional(),
   personalEmail: z.string().email().optional().or(z.literal("")),
-  personalPhone: z.string().max(30).optional(),
+  personalPhone: optionalPhoneSchema,
   bio: z.string().max(1000).optional(),
 });
 
@@ -162,7 +166,7 @@ export const employeeAddressStepSchema = z.object({
 export const employeeEmergencyContactStepSchema = z.object({
   name: z.string().min(1, "Contact name is required"),
   relationship: z.string().min(1, "Relationship is required"),
-  phone: z.string().min(1, "Phone number is required"),
+  phone: requiredPhoneSchema,
   email: z.string().email().optional().or(z.literal("")),
   isPrimary: z.boolean().default(true),
 });
@@ -192,7 +196,7 @@ export const employeeUpdateSchema = z
     firstName: z.string().min(1).max(100),
     lastName: z.string().min(1).max(100),
     email: z.string().email(),
-    phone: z.string().max(30).optional().or(z.literal("")),
+    phone: optionalPhoneSchema,
     branchId: z.string().uuid(),
     departmentId: z.string().uuid().optional().or(z.literal("")),
     designationId: z
@@ -213,7 +217,7 @@ export const employeeUpdateSchema = z
     nationality: z.string().max(100).optional().or(z.literal("")),
     bloodGroup: z.string().max(10).optional().or(z.literal("")),
     personalEmail: z.string().email().optional().or(z.literal("")),
-    personalPhone: z.string().max(30).optional().or(z.literal("")),
+    personalPhone: optionalPhoneSchema,
     bio: z.string().max(1000).optional().or(z.literal("")),
     addressLine1: z.string().max(200).optional().or(z.literal("")),
     addressLine2: z.string().max(200).optional().or(z.literal("")),
@@ -223,7 +227,7 @@ export const employeeUpdateSchema = z
     country: z.string().max(100).optional().or(z.literal("")),
     emergencyContactName: z.string().max(100).optional().or(z.literal("")),
     emergencyContactRelationship: z.string().max(100).optional().or(z.literal("")),
-    emergencyContactPhone: z.string().max(30).optional().or(z.literal("")),
+    emergencyContactPhone: optionalPhoneSchema,
     emergencyContactEmail: z.string().email().optional().or(z.literal("")),
   })
   .superRefine((data, ctx) => {

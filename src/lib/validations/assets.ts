@@ -4,6 +4,7 @@ import {
   ASSET_DEVICE_CATALOG_KEYS,
   type AssetDeviceCatalogKey,
 } from "@/lib/assets/asset-device-images";
+import { optionalNullablePhoneSchema } from "@/lib/validations/phone";
 
 export const assetListParamsSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -99,7 +100,7 @@ export const maintenanceFormSchema = z.object({
 export const vendorFormSchema = z.object({
   name: z.string().trim().min(2).max(150),
   contactPerson: z.string().trim().max(120).optional().nullable(),
-  phone: z.string().trim().max(40).optional().nullable(),
+  phone: optionalNullablePhoneSchema,
   email: z.string().trim().email().optional().nullable().or(z.literal("")),
   address: z.string().trim().max(500).optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { optionalNullablePhoneSchema, requiredPhoneSchema } from "@/lib/validations/phone";
+
 const uuidOptional = z.string().uuid().optional().nullable().or(z.literal(""));
 
 export const recruitmentListParamsSchema = z.object({
@@ -70,7 +72,7 @@ export const candidateFormSchema = z.object({
   firstName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
   email: z.string().email(),
-  phone: z.string().max(30).optional().nullable(),
+  phone: optionalNullablePhoneSchema,
   experienceYears: z.coerce.number().min(0).optional().nullable(),
   skills: z.string().max(2000).optional().nullable(),
   currentCompany: z.string().max(200).optional().nullable(),
@@ -224,7 +226,7 @@ export const recruitmentSettingsSchema = z.object({
     subjectTemplate: z.string().min(1, "Email subject is required").max(500),
     messageTemplate: z.string().min(1, "Email message is required").max(10000),
     hrEmail: z.string().email("Enter a valid HR email").max(200),
-    hrPhone: z.string().min(1, "HR phone is required").max(50),
+    hrPhone: requiredPhoneSchema,
   }),
 });
 

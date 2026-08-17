@@ -10,6 +10,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
+import { PhoneInput } from "@/components/common/phone-input";
 import {
   Select,
   SelectContent,
@@ -30,7 +31,6 @@ import { updateEmployeeSelfProfileAction } from "@/lib/employees/actions";
 import type { MyProfileBundle } from "@/types/my-profile";
 import { TIMEZONE_OPTIONS } from "@/lib/validations/organization";
 import {
-  employeeSelfPreferencesSchema,
   employeeSelfProfileSchema,
   type EmployeeSelfProfileInput,
 } from "@/lib/validations/employee";
@@ -127,9 +127,7 @@ export function MyProfileView({
     watch,
     formState: { errors },
   } = useForm<EmployeeSelfProfileInput>({
-    resolver: zodResolver(
-      canEditContactDetails ? employeeSelfProfileSchema : employeeSelfPreferencesSchema,
-    ),
+    resolver: zodResolver(employeeSelfProfileSchema),
     defaultValues: {
       personalEmail: data.profileSettings.personalEmail,
       personalPhone: data.profileSettings.personalPhone,
@@ -155,6 +153,8 @@ export function MyProfileView({
   const timezone = watch("timezone");
   const emergencyRelationship = watch("emergencyContactRelationship");
   const reportingManagerId = watch("reportingManagerId");
+  const personalPhone = watch("personalPhone") ?? "";
+  const emergencyContactPhone = watch("emergencyContactPhone") ?? "";
   const fullName = `${data.firstName} ${data.lastName}`.trim();
   const fullAddress = formatFullAddress(data.profileSettings.address);
   const relationshipDisplay = formatRelationshipLabel(
@@ -327,10 +327,16 @@ export function MyProfileView({
             editing={isEditing && canEditContactDetails}
           >
             <ProfileFieldControl>
-              <Input
+              <PhoneInput
+                id="personalPhone"
+                value={personalPhone}
+                onChange={(value) =>
+                  setValue("personalPhone", value, { shouldValidate: true })
+                }
                 disabled={isPending}
-                className="h-8 w-full text-right"
-                {...register("personalPhone")}
+                size="sm"
+                showHint
+                error={errors.personalPhone?.message}
               />
             </ProfileFieldControl>
           </ProfileInfoRow>
@@ -406,11 +412,16 @@ export function MyProfileView({
             editing={isEditing && canEditContactDetails}
           >
             <ProfileFieldControl>
-              <Input
-                placeholder="Phone"
+              <PhoneInput
+                id="emergencyContactPhone"
+                value={emergencyContactPhone}
+                onChange={(value) =>
+                  setValue("emergencyContactPhone", value, { shouldValidate: true })
+                }
                 disabled={isPending}
-                className="h-8 w-full text-right"
-                {...register("emergencyContactPhone")}
+                size="sm"
+                showHint
+                error={errors.emergencyContactPhone?.message}
               />
             </ProfileFieldControl>
           </ProfileInfoRow>

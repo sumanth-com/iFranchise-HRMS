@@ -1,7 +1,9 @@
 import { z } from "zod";
 
+import { requiredPhoneSchema } from "@/lib/validations/phone";
+
 const leavePolicyContactSchema = z.object({
-  phone: z.string().trim().min(1).max(40),
+  phone: requiredPhoneSchema,
   email: z.string().trim().email().max(200),
   address: z.string().trim().min(1).max(300),
 });

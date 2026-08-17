@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { paginationSchema } from "@/lib/validations/common";
+import { optionalNullablePhoneSchema } from "@/lib/validations/phone";
 
 export const orgListParamsSchema = paginationSchema.extend({
   search: z.string().trim().optional(),
@@ -13,7 +14,7 @@ export const organizationProfileSchema = z.object({
   name: z.string().trim().min(1, "Company name is required"),
   legalName: z.string().trim().optional().nullable(),
   email: z.string().trim().email("Invalid email").optional().nullable().or(z.literal("")),
-  phone: z.string().trim().optional().nullable(),
+  phone: optionalNullablePhoneSchema,
   website: z.string().trim().url("Invalid URL").optional().nullable().or(z.literal("")),
   gstNumber: z.string().trim().optional().nullable(),
   panNumber: z.string().trim().optional().nullable(),
@@ -46,7 +47,7 @@ export const branchFormSchema = z.object({
   state: z.string().trim().optional().nullable(),
   postalCode: z.string().trim().optional().nullable(),
   country: z.string().trim().min(1).default("IN"),
-  phone: z.string().trim().optional().nullable(),
+  phone: optionalNullablePhoneSchema,
   email: z.string().trim().email().optional().nullable().or(z.literal("")),
   branchHeadId: z.string().uuid().optional().nullable(),
   isHeadOffice: z.boolean().default(false),

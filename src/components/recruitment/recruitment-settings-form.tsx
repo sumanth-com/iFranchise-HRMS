@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
+import { PhoneInput } from "@/components/common/phone-input";
 import { Label } from "@/components/ui/label";
 import { updateRecruitmentSettingsAction } from "@/lib/recruitment/actions";
 import { DEFAULT_CANDIDATE_SOURCES } from "@/lib/recruitment/constants";
@@ -110,10 +111,13 @@ export function RecruitmentSettingsForm({ settings, canEdit }: Props) {
                 />
               </Field>
               <Field label="HR contact phone">
-                <Input
-                  className="h-9"
+                <PhoneInput
+                  value={form.watch("offerEmailDefaults.hrPhone") ?? ""}
+                  onChange={(value) =>
+                    form.setValue("offerEmailDefaults.hrPhone", value, { shouldValidate: true })
+                  }
                   disabled={!canEdit || isPending}
-                  {...form.register("offerEmailDefaults.hrPhone")}
+                  error={form.formState.errors.offerEmailDefaults?.hrPhone?.message}
                 />
               </Field>
             </div>

@@ -95,7 +95,10 @@ function formatDisplayDate(value: string | null | undefined): string {
 function formatIndianPhone(phone: string | null | undefined): string {
   if (!phone?.trim()) return "—";
 
-  const digits = phone.replace(/\D/g, "");
+  const trimmed = phone.trim();
+  if (trimmed.includes("+")) return trimmed;
+
+  const digits = trimmed.replace(/\D/g, "");
   if (!digits) return "—";
 
   let localNumber = digits;
@@ -106,7 +109,7 @@ function formatIndianPhone(phone: string | null | undefined): string {
   }
 
   if (localNumber.length !== 10) {
-    return phone.trim();
+    return trimmed;
   }
 
   return `(+91) ${localNumber.slice(0, 4)} ${localNumber.slice(4, 7)} ${localNumber.slice(7)}`;

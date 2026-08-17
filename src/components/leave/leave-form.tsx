@@ -9,6 +9,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
+import { PhoneInput } from "@/components/common/phone-input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
@@ -431,10 +432,14 @@ export function LeaveForm({
 
             <div className="space-y-2">
               <Label htmlFor="emergencyContactPhone">Emergency Contact Phone</Label>
-              <Input
+              <PhoneInput
                 id="emergencyContactPhone"
+                value={form.watch("emergencyContactPhone") ?? ""}
+                onChange={(value) =>
+                  form.setValue("emergencyContactPhone", value, { shouldValidate: true })
+                }
                 disabled={isPending}
-                {...form.register("emergencyContactPhone")}
+                error={form.formState.errors.emergencyContactPhone?.message}
               />
             </div>
           </>

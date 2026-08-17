@@ -1,9 +1,11 @@
 import { z } from "zod";
 
+import { optionalPhoneSchema } from "@/lib/validations/phone";
+
 export const ceoProfilePersonalSchema = z.object({
-  phone: z.string().max(30).optional().or(z.literal("")),
+  phone: optionalPhoneSchema,
   personalEmail: z.string().email().optional().or(z.literal("")),
-  personalPhone: z.string().max(30).optional().or(z.literal("")),
+  personalPhone: optionalPhoneSchema,
   bio: z.string().max(1000).optional().or(z.literal("")),
 });
 

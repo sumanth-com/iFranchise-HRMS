@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
+import { PhoneInput } from "@/components/common/phone-input";
 import {
   removeCeoProfileImageAction,
   updateCeoPersonalProfileAction,
@@ -124,9 +125,9 @@ export function CeoProfileExecutiveSection({
           <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
             Work phone
           </label>
-          <Input
+          <PhoneInput
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={setPhone}
             disabled={isPending}
             placeholder="Office number"
           />
@@ -135,9 +136,9 @@ export function CeoProfileExecutiveSection({
           <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
             Personal phone
           </label>
-          <Input
+          <PhoneInput
             value={personalPhone}
-            onChange={(e) => setPersonalPhone(e.target.value)}
+            onChange={setPersonalPhone}
             disabled={isPending}
             placeholder="Mobile number"
           />

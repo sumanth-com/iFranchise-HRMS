@@ -74,10 +74,23 @@ export function MyLeaveSelfServiceView({
   const [viewOpen, setViewOpen] = useState(false);
   const [viewPreview, setViewPreview] = useState<LeaveListItem | null>(null);
   const canOpenApplyDialog = canApply && employeeId && applyLeaveLookups;
+
+  const roundDays = (value: number) => Math.round(value * 100) / 100;
+
   const totalBalance = balances.reduce((sum, row) => sum + row.balanceDays, 0);
   const totalUsed = balances.reduce((sum, row) => sum + row.usedDays, 0);
-  const totalPendingDays = balances.reduce((sum, row) => sum + row.pendingDays, 0);
-  const pendingRequests = requests.filter((row) => row.leaveStatus === "pending").length;
+  const pendingFromBalances = balances.reduce((sum, row) => sum + row.pendingDays, 0);
+
+  const pendingRequestsList = requests.filter((row) => row.leaveStatus === "pending");
+  const pendingRequestCount = pendingRequestsList.length;
+  const pendingDaysFromRequests = pendingRequestsList.reduce(
+    (sum, row) => sum + Number(row.totalDays ?? 0),
+    0,
+  );
+  // Prefer live request totals so the cards match calendar / My Requests.
+  // Fall back to balance ledger when the request list is empty but balances still show holds.
+  const totalPendingDays =
+    pendingRequestCount > 0 ? pendingDaysFromRequests : pendingFromBalances;
 
   const today = format(new Date(), "yyyy-MM-dd");
   const upcomingLeave = requests
@@ -88,6 +101,13 @@ export function MyLeaveSelfServiceView({
       ? formatLeaveDate(upcomingLeave.startDate)
       : `${formatLeaveDate(upcomingLeave.startDate)} – ${formatLeaveDate(upcomingLeave.endDate)}`
     : "None scheduled";
+
+  const pendingHint =
+    totalPendingDays > 0
+      ? pendingRequestCount > 0
+        ? `${pendingRequestCount} request${pendingRequestCount === 1 ? "" : "s"} awaiting approval`
+        : "Days awaiting approval"
+      : "No requests awaiting approval";
 
   function openLeavePopup(row: LeaveListItem) {
     setViewPreview(row);
@@ -176,7 +196,7 @@ export function MyLeaveSelfServiceView({
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <EmployeeStatCard
           label="Available Balance"
-          value={`${Math.round(totalBalance * 100) / 100} days`}
+          value={`${roundDays(totalBalance)} days`}
           icon={CalendarCheck}
           accent="text-indigo-600 dark:text-indigo-400"
           iconBg="bg-indigo-500/10"
@@ -184,7 +204,7 @@ export function MyLeaveSelfServiceView({
         />
         <EmployeeStatCard
           label="Days Used"
-          value={`${Math.round(totalUsed * 100) / 100} days`}
+          value={`${roundDays(totalUsed)} days`}
           icon={CalendarDays}
           accent="text-sky-600 dark:text-sky-400"
           iconBg="bg-sky-500/10"
@@ -192,15 +212,11 @@ export function MyLeaveSelfServiceView({
         />
         <EmployeeStatCard
           label="Pending Approval"
-          value={String(pendingRequests)}
+          value={`${roundDays(totalPendingDays)} days`}
           icon={CalendarClock}
           accent="text-amber-600 dark:text-amber-400"
           iconBg="bg-amber-500/10"
-          hint={
-            totalPendingDays > 0
-              ? `${Math.round(totalPendingDays * 100) / 100} days awaiting HR`
-              : "Requests awaiting HR"
-          }
+          hint={pendingHint}
         />
         <EmployeeStatCard
           label="Upcoming Leave"

@@ -20,6 +20,7 @@ import { FilterSelect } from "@/components/common/filter-select";
 import { Input } from "@/components/common/input";
 import { Modal } from "@/components/common/modal";
 import { OptionalEntitySelect } from "@/components/common/optional-entity-select";
+import { PhoneInput } from "@/components/common/phone-input";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { withSelectOption } from "@/components/payroll/select-utils";
 import { Label } from "@/components/ui/label";
@@ -405,7 +406,11 @@ export function BranchesManagement({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Phone</Label>
-              <Input {...form.register("phone")} />
+              <PhoneInput
+                value={form.watch("phone") ?? ""}
+                onChange={(value) => form.setValue("phone", value, { shouldValidate: true })}
+                error={form.formState.errors.phone?.message}
+              />
             </div>
             <div className="space-y-2">
               <Label>Email</Label>

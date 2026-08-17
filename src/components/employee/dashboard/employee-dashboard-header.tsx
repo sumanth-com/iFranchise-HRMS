@@ -63,8 +63,9 @@ export function EmployeeDashboardHeader({
   greeting: EmployeeGreeting;
   subtitle?: string;
 }) {
-  const { isSystemAdminPortal } = useSidebarNavigation();
-  const resolvedSubtitle = subtitle ?? (isSystemAdminPortal ? "Super Admin Portal" : "Employee Portal");
+  const { portalLabel } = useSidebarNavigation();
+  // Always match the active portal (HR / Manager / Employee / Executive / Super Admin).
+  const resolvedSubtitle = subtitle ?? portalLabel;
 
   const [now, setNow] = useState<Date | null>(null);
 

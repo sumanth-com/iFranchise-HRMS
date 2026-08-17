@@ -26,6 +26,7 @@ import { resolveUserPortalRoute } from "@/lib/auth/permission-resolver";
 import { getPortalRedirectPath } from "@/lib/auth/portals";
 import { recordUserLoginSession } from "@/lib/ceo/services/ceo-profile-queries";
 import { requireAuthenticatedProfile } from "@/lib/permissions/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   forgotPasswordSchema,
@@ -271,12 +272,66 @@ export async function forgotPasswordAction(
 }
 
 export async function requestPasswordResetEmailAction(): Promise<AuthActionResult> {
+  const dailyLimitMessage =
+    "You've reached today's password reset limit (3 times). For your account's security, please try again tomorrow. If you still need help, contact your HR administrator.";
+
   try {
     const profile = await requireAuthenticatedProfile();
     const email = await resolveApprovedLoginEmail(profile.email);
     const supabase = await createClient();
-
     const ctx = await getRequestAuditContext();
+
+    const dayStart = new Date();
+    dayStart.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(dayStart);
+    endOfDay.setHours(23, 59, 59, 999);
+    const msUntilEndOfDay = Math.max(endOfDay.getTime() - Date.now(), 60_000);
+    const dailyLimit = 3;
+
+    // Persistent daily check (admin client — users may lack audit.view RLS).
+    // Scoped strictly to the authenticated user id from the session profile.
+    const admin = createAdminClient();
+    const { count: resetsToday, error: countError } = await admin
+      .schema("hrms")
+      .from("audit_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", profile.userId)
+      .eq("action", "password_reset")
+      .eq("module", "settings")
+      .gte("occurred_at", dayStart.toISOString())
+      .is("deleted_at", null)
+      .is("archived_at", null);
+
+    if (countError) {
+      console.error(
+        "[requestPasswordResetEmailAction] daily limit count failed:",
+        countError.message,
+      );
+    }
+
+    if (!countError && (resetsToday ?? 0) >= dailyLimit) {
+      return {
+        success: false,
+        error: "RATE_LIMITED",
+        message: dailyLimitMessage,
+      };
+    }
+
+    // In-process guard for rapid repeat clicks on the same instance.
+    try {
+      assertRateLimit({
+        key: `settings-password-reset:${profile.userId}`,
+        limit: dailyLimit,
+        windowMs: msUntilEndOfDay,
+      });
+    } catch {
+      return {
+        success: false,
+        error: "RATE_LIMITED",
+        message: dailyLimitMessage,
+      };
+    }
+
     await writeApplicationAudit(supabase, {
       organizationId: profile.employee?.organizationId ?? null,
       module: "settings",

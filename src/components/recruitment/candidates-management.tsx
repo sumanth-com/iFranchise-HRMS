@@ -15,6 +15,7 @@ import type { z } from "zod";
 import { EmptyState } from "@/components/common/empty-state";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
+import { PhoneInput } from "@/components/common/phone-input";
 import { SectionHelpButton } from "@/components/common/section-help-button";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/common/modal";
@@ -463,7 +464,12 @@ function CandidateFormModal({
           <Input type="email" disabled={isPending} {...form.register("email")} />
         </Field>
         <Field label="Phone">
-          <Input disabled={isPending} {...form.register("phone")} />
+          <PhoneInput
+            value={form.watch("phone") ?? ""}
+            onChange={(value) => form.setValue("phone", value, { shouldValidate: true })}
+            disabled={isPending}
+            error={form.formState.errors.phone?.message}
+          />
         </Field>
         <Field label="Experience (years)">
           <Input type="number" min={0} step="0.5" disabled={isPending} {...form.register("experienceYears")} />

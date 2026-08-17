@@ -1,5 +1,11 @@
 "use server";
 
+import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
+import {
+  getAttendanceLookups,
+  getAttendanceSummary,
+  listAttendance,
+} from "@/lib/attendance/services/attendance-queries";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import {
   getCeoAttendanceAnalytics,
@@ -12,8 +18,11 @@ import {
   listCeoAttendanceDepartments,
   listCeoAttendanceEmployees,
 } from "@/lib/ceo/services/ceo-attendance-queries";
+import { requireCeoPortal, toViewOnlyProfile } from "@/lib/ceo/read-only-permissions";
 import { requireServerPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
+import { attendanceListParamsSchema } from "@/lib/validations/attendance";
+import type { AttendanceListParams } from "@/types/attendance";
 import {
   ceoAttendanceEmployeeIdSchema,
   ceoAttendanceListParamsSchema,
@@ -151,4 +160,24 @@ export async function fetchCeoAttendanceEmployeeDetailAction(input: {
           : "Failed to load employee attendance profile.",
     };
   }
+}
+
+export async function getCeoTeamAttendancePageData(params: AttendanceListParams) {
+  const profile = await requireCeoPortal();
+  const supabase = await createClient();
+  const viewProfile = toViewOnlyProfile(profile);
+  const parsed = attendanceListParamsSchema.parse(params);
+  const [records, lookups, summary] = await Promise.all([
+    listAttendance(supabase, viewProfile, parsed),
+    getAttendanceLookups(supabase, viewProfile.employee.organizationId),
+    getAttendanceSummary(supabase, viewProfile, parsed.dateFrom, parsed.dateTo),
+  ]);
+
+  return {
+    records,
+    lookups,
+    summary,
+    today: getTodayDateString(),
+    params: parsed,
+  };
 }

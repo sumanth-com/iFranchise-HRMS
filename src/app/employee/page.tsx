@@ -15,7 +15,7 @@ async function EmployeeDashboardContent() {
   const supabase = await createClient();
   const data = await getEmployeeDashboardData(supabase, profile);
 
-  return <EmployeeDashboardView {...data} />;
+  return <EmployeeDashboardView {...data} subtitle="Employee Portal" />;
 }
 
 export default function EmployeeDashboardPage() {

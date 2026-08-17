@@ -62,7 +62,7 @@ const PORTAL_CONFIG: Record<
   hr: {
     navItems: mainNavItems,
     home: HR_PORTAL_HOME,
-    label: "iFranchise HRMS",
+    label: "HR Portal",
   },
   manager: {
     navItems: managerNavItems,
@@ -72,7 +72,7 @@ const PORTAL_CONFIG: Record<
   ceo: {
     navItems: ceoNavItems,
     home: CEO_ROUTES.home,
-    label: "CEO Portal",
+    label: "Executive Portal",
   },
   employee: {
     navItems: employeeNavItems,

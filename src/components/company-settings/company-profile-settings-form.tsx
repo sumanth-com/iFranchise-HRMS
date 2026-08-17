@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import type { z } from "zod";
 
 import { Input } from "@/components/common/input";
+import { PhoneInput } from "@/components/common/phone-input";
 import {
   SettingsField,
   SettingsFormActions,
@@ -323,7 +324,12 @@ export function CompanyProfileSettingsForm({
             />
           </SettingsField>
           <SettingsField label="Phone">
-            <Input {...form.register("phone")} disabled={!canEdit || isPending} />
+            <PhoneInput
+              value={form.watch("phone") ?? ""}
+              onChange={(value) => form.setValue("phone", value, { shouldValidate: true })}
+              disabled={!canEdit || isPending}
+              error={form.formState.errors.phone?.message}
+            />
           </SettingsField>
           <div className="sm:col-span-2">
             <SettingsField label="Website">

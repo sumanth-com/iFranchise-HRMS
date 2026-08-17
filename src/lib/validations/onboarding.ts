@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { MAX_SIGNATURE_DATA_LENGTH } from "@/lib/security/upload-validation";
+import { optionalNullablePhoneSchema } from "@/lib/validations/phone";
 
 const nullIfEmpty = (value: string | null | undefined) =>
   value === "" || value === undefined || value === null ? null : value;
@@ -23,7 +24,7 @@ const optionalTrimmedText = (max: number) =>
 export const createOnboardingCaseSchema = z.object({
   fullName: z.string().trim().min(2).max(200),
   personalEmail: z.string().trim().email().max(255),
-  mobileNumber: optionalTrimmedText(20),
+  mobileNumber: optionalNullablePhoneSchema.transform(nullIfEmpty),
   designationId: z.string().uuid(),
   departmentId: z.string().uuid(),
   reportingManagerId: optionalUuid,

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
+import { PhoneInput } from "@/components/common/phone-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -204,7 +205,13 @@ export function EmployeeEditForm({
         </div>
         <div className="space-y-2">
           <Label htmlFor="phone">Phone</Label>
-          <Input id="phone" {...form.register("phone")} />
+          <PhoneInput
+            id="phone"
+            value={form.watch("phone") ?? ""}
+            onChange={(value) => form.setValue("phone", value, { shouldValidate: true })}
+            disabled={isPending}
+            error={form.formState.errors.phone?.message}
+          />
         </div>
         <div className="space-y-2">
           <Label>Branch</Label>
@@ -408,7 +415,15 @@ export function EmployeeEditForm({
           </div>
           <div className="space-y-2">
             <Label htmlFor="emergencyContactPhone">Phone</Label>
-            <Input id="emergencyContactPhone" {...form.register("emergencyContactPhone")} />
+            <PhoneInput
+              id="emergencyContactPhone"
+              value={form.watch("emergencyContactPhone") ?? ""}
+              onChange={(value) =>
+                form.setValue("emergencyContactPhone", value, { shouldValidate: true })
+              }
+              disabled={isPending}
+              error={form.formState.errors.emergencyContactPhone?.message}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="emergencyContactEmail">Email</Label>
@@ -497,7 +512,15 @@ export function EmployeeEditForm({
           </div>
           <div className="space-y-2">
             <Label htmlFor="personalPhone">Personal phone</Label>
-            <Input id="personalPhone" {...form.register("personalPhone")} />
+            <PhoneInput
+              id="personalPhone"
+              value={form.watch("personalPhone") ?? ""}
+              onChange={(value) =>
+                form.setValue("personalPhone", value, { shouldValidate: true })
+              }
+              disabled={isPending}
+              error={form.formState.errors.personalPhone?.message}
+            />
           </div>
           <div className="space-y-2 md:col-span-2">
             <Label htmlFor="bio">Bio</Label>
