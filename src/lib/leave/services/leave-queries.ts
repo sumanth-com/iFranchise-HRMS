@@ -1,4 +1,6 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import { hasPermission } from "@/lib/permissions/utils";
 import type { UserProfile } from "@/types/auth";
 import type {
   LeaveBalanceItem,
@@ -219,6 +221,11 @@ export async function listLeaveRequests(
         ? unwrapRelation(pendingApproval.employees)
         : null;
 
+      const pendingApproverEmployeeId = pendingApproval?.approver_employee_id ?? null;
+      const isAssignedApprover =
+        pendingApproverEmployeeId === profile.employee.id &&
+        row.leave_status === "pending";
+
       return {
         id: row.id,
         employeeId: row.employee_id,
@@ -248,6 +255,13 @@ export async function listLeaveRequests(
           ? `${currentApprover.first_name} ${currentApprover.last_name}`
           : null,
         currentApprovalLevel: pendingApproval?.approval_level ?? null,
+        pendingApproverEmployeeId,
+        canActOnApproval:
+          isAssignedApprover &&
+          hasPermission(profile.permissionCodes, "leave.approve"),
+        canActOnRejection:
+          isAssignedApprover &&
+          hasPermission(profile.permissionCodes, "leave.reject"),
       };
     }),
     total: count ?? 0,
@@ -737,6 +751,32 @@ export async function getEmployeeReportingManagerId(
 
   if (error) throw new Error(error.message);
   return data?.reporting_manager_id ?? null;
+}
+
+export const HR_LEAVE_APPLICANT_ROLE_CODES = [
+  "hr_admin",
+  "hr_executive",
+  "super_admin",
+] as const;
+
+export const CEO_LEAVE_APPROVER_ROLE_CODES = [
+  "ceo",
+  "founder",
+  "co_founder",
+] as const;
+
+export function isHrLeaveApplicant(roleCodes: string[]): boolean {
+  return roleCodes.some((code) =>
+    (HR_LEAVE_APPLICANT_ROLE_CODES as readonly string[]).includes(code),
+  );
+}
+
+export function isCeoLeaveApprover(profile: UserProfile): boolean {
+  return (
+    profile.roles.some((role) =>
+      (CEO_LEAVE_APPROVER_ROLE_CODES as readonly string[]).includes(role.code),
+    ) || hasPermission(profile.permissionCodes, PORTAL_PERMISSIONS.ceo)
+  );
 }
 
 export async function getHrApproverEmployeeId(

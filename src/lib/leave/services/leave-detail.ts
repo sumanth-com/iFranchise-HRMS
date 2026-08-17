@@ -2,6 +2,11 @@ import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
 import type { LeaveDetail } from "@/types/leave";
 import { hasPermission } from "@/lib/permissions/utils";
+import {
+  getEmployeeRoleCodes,
+  isCeoLeaveApprover,
+  isHrLeaveApplicant,
+} from "@/lib/leave/services/leave-queries";
 
 function unwrapRelation<T>(value: T | T[] | null): T | null {
   if (!value) return null;
@@ -92,11 +97,27 @@ export async function getLeaveRequestById(
     ["hr_admin", "hr_executive", "super_admin"].includes(r.code),
   );
 
+  const pendingApproval = approvals
+    .filter((step) => step.approvalStatus === "pending")
+    .sort((a, b) => a.approvalLevel - b.approvalLevel)[0];
+  const isAssignedApprover =
+    pendingApproval?.approverEmployeeId === profile.employee.id;
+  const applicantRoles = await getEmployeeRoleCodes(supabase, data.employee_id);
+  const hrApplicant = isHrLeaveApplicant(applicantRoles);
+
   const canApprove =
-    isPending && hasPermission(profile.permissionCodes, "leave.approve");
+    isPending &&
+    isAssignedApprover &&
+    (hrApplicant
+      ? isCeoLeaveApprover(profile)
+      : hasPermission(profile.permissionCodes, "leave.approve"));
 
   const canReject =
-    isPending && hasPermission(profile.permissionCodes, "leave.reject");
+    isPending &&
+    isAssignedApprover &&
+    (hrApplicant
+      ? isCeoLeaveApprover(profile)
+      : hasPermission(profile.permissionCodes, "leave.reject"));
 
   const canCancel =
     ["pending", "approved"].includes(data.leave_status) &&

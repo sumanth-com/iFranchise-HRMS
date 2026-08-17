@@ -481,7 +481,7 @@ export function LeaveTable({
                   <Eye className="size-4 shrink-0" />
                   View Leave
                 </DropdownMenuItem>
-                {!embedded && canApprove && isPendingStatus ? (
+                {!embedded && canApprove && isPendingStatus && row.original.canActOnApproval ? (
                   <DropdownMenuItem
                     className="whitespace-nowrap"
                     onClick={() => setApproveTarget(row.original)}
@@ -490,7 +490,7 @@ export function LeaveTable({
                     Approve
                   </DropdownMenuItem>
                 ) : null}
-                {!embedded && canReject && isPendingStatus ? (
+                {!embedded && canReject && isPendingStatus && row.original.canActOnRejection ? (
                   <DropdownMenuItem
                     className="whitespace-nowrap"
                     onClick={() => setRejectTarget(row.original)}

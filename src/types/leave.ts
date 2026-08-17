@@ -33,6 +33,9 @@ export type LeaveListItem = {
   appliedAt: string;
   approverName: string | null;
   currentApprovalLevel: number | null;
+  pendingApproverEmployeeId?: string | null;
+  canActOnApproval?: boolean;
+  canActOnRejection?: boolean;
 };
 
 export type LeaveListResult = {

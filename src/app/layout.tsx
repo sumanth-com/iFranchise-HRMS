@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Lato } from "next/font/google";
 
 import { AppProviders } from "@/providers/app-providers";
 import { siteConfig } from "@/config/site";
 
 import "./globals.css";
 
-const inter = Inter({
+const lato = Lato({
   subsets: ["latin"],
+  weight: ["300", "400", "700", "900"],
   variable: "--font-sans",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -26,7 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} min-h-screen font-sans antialiased`}>
+      <body className={`${lato.variable} ${lato.className} min-h-screen font-sans antialiased`}>
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

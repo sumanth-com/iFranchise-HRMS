@@ -5,7 +5,7 @@ import {
   calculateLeaveTotalDays,
   getCurrentBalanceYear,
 } from "@/lib/leave/services/leave-utils";
-import { getEmployeeReportingManagerId, getHrApproverEmployeeId } from "@/lib/leave/services/leave-queries";
+import { getEmployeeReportingManagerId, getCeoApproverEmployeeId, getEmployeeRoleCodes, getHrApproverEmployeeId, isCeoLeaveApprover, isHrLeaveApplicant } from "@/lib/leave/services/leave-queries";
 import {
   notifyLeaveApproved,
   notifyLeaveCancelled,
@@ -108,11 +108,22 @@ async function createApprovalSteps(
   employeeId: string,
 ) {
   const organizationId = profile.employee.organizationId;
-  const hrId = await getHrApproverEmployeeId(supabase, organizationId);
+  const applicantRoles = await getEmployeeRoleCodes(supabase, employeeId);
+  const hrApplicant = isHrLeaveApplicant(applicantRoles);
 
-  // HR-only approval chain — managers and executives do not approve leave.
-  const approverId =
-    hrId && hrId !== employeeId ? hrId : hrId ?? profile.employee.id;
+  let approverId: string;
+  if (hrApplicant) {
+    const ceoId = await getCeoApproverEmployeeId(supabase, organizationId);
+    if (!ceoId) {
+      throw new Error("No CEO is configured to approve HR leave requests");
+    }
+    approverId = ceoId;
+  } else {
+    const hrId = await getHrApproverEmployeeId(supabase, organizationId);
+    // HR-only approval chain — managers and executives do not approve leave.
+    approverId =
+      hrId && hrId !== employeeId ? hrId : hrId ?? profile.employee.id;
+  }
 
   const { error } = await supabase.schema("hrms").from("leave_approvals").insert({
     leave_request_id: leaveRequestId,
@@ -184,6 +195,59 @@ function canApproveLeave(profile: UserProfile): boolean {
 
 function canRejectLeave(profile: UserProfile): boolean {
   return profile.permissionCodes.includes("leave.reject");
+}
+
+async function getPendingLeaveApproval(
+  supabase: AuthSupabaseClient,
+  leaveRequestId: string,
+) {
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("leave_approvals")
+    .select("id, approver_employee_id, approval_level")
+    .eq("leave_request_id", leaveRequestId)
+    .eq("approval_status", "pending")
+    .is("deleted_at", null)
+    .order("approval_level", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+async function assertCanActOnLeaveApproval(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  leaveRequestId: string,
+  employeeId: string,
+  action: "approve" | "reject",
+): Promise<void> {
+  const pendingApproval = await getPendingLeaveApproval(supabase, leaveRequestId);
+  if (!pendingApproval) {
+    throw new Error("No pending approval step for this request");
+  }
+
+  if (pendingApproval.approver_employee_id !== profile.employee.id) {
+    throw new Error("You are not the assigned approver for this request");
+  }
+
+  const applicantRoles = await getEmployeeRoleCodes(supabase, employeeId);
+  const hrApplicant = isHrLeaveApplicant(applicantRoles);
+
+  if (hrApplicant) {
+    if (!isCeoLeaveApprover(profile)) {
+      throw new Error("Only the CEO can approve or reject HR leave requests");
+    }
+    return;
+  }
+
+  if (action === "approve" && !canApproveLeave(profile)) {
+    throw new Error("You are not authorized to approve this request");
+  }
+  if (action === "reject" && !canRejectLeave(profile)) {
+    throw new Error("You are not authorized to reject this request");
+  }
 }
 
 async function finalizeApprovalIfComplete(
@@ -262,9 +326,13 @@ export async function approveLeaveRequest(
     throw new Error("Only pending requests can be approved");
   }
 
-  if (!canApproveLeave(profile)) {
-    throw new Error("You are not authorized to approve this request");
-  }
+  await assertCanActOnLeaveApproval(
+    supabase,
+    profile,
+    leaveRequestId,
+    request.employee_id,
+    "approve",
+  );
 
   const actedAt = new Date().toISOString();
   const { error: updateError } = await supabase
@@ -277,6 +345,7 @@ export async function approveLeaveRequest(
       updated_by: profile.userId,
     })
     .eq("leave_request_id", leaveRequestId)
+    .eq("approver_employee_id", profile.employee.id)
     .eq("approval_status", "pending")
     .is("deleted_at", null);
 
@@ -304,9 +373,13 @@ export async function rejectLeaveRequest(
     throw new Error("Only pending requests can be rejected");
   }
 
-  if (!canRejectLeave(profile)) {
-    throw new Error("You are not authorized to reject this request");
-  }
+  await assertCanActOnLeaveApproval(
+    supabase,
+    profile,
+    leaveRequestId,
+    request.employee_id,
+    "reject",
+  );
 
   const { error: approvalError } = await supabase
     .schema("hrms")
@@ -318,6 +391,7 @@ export async function rejectLeaveRequest(
       updated_by: profile.userId,
     })
     .eq("leave_request_id", leaveRequestId)
+    .eq("approver_employee_id", profile.employee.id)
     .eq("approval_status", "pending")
     .is("deleted_at", null);
 

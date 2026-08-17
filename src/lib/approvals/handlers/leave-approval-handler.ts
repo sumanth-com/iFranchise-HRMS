@@ -2,6 +2,7 @@ import { format } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { LEAVE_ROUTES } from "@/lib/leave/constants";
+import { CEO_ROUTES } from "@/lib/ceo/constants";
 import {
   approveLeaveRequest,
   rejectLeaveRequest,
@@ -199,6 +200,9 @@ export const leaveApprovalHandler: ApprovalHandler = {
   },
 
   detailPath(sourceRecordId, roleCode) {
+    if (["ceo", "founder", "co_founder"].includes(roleCode)) {
+      return CEO_ROUTES.approvalsLeave;
+    }
     if (roleCode === "manager") return MANAGER_ROUTES.leaveDetail(sourceRecordId);
     return LEAVE_ROUTES.detail(sourceRecordId);
   },
