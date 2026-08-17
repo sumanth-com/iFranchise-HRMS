@@ -2,7 +2,7 @@
 
 import { format, formatDistanceToNow, parseISO } from "date-fns";
 import { AlertTriangle, Copy, KeyRound, Loader2, Plus } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/common/select";
-import { SystemModuleFrame, SystemPanel } from "@/components/system-admin/system-module-frame";
+import { SystemPanel } from "@/components/system-admin/system-module-frame";
 import {
   Dialog,
   DialogContent,
@@ -32,17 +32,15 @@ import {
   revokeApiKeyAction,
   rotateApiKeyAction,
 } from "@/lib/system-admin/actions";
+import {
+  PUBLIC_API_SCOPE_GROUPS,
+  type ApiRateLimitTier,
+  type PublicApiScope,
+} from "@/lib/public-api/constants";
 import type { SystemApiKeyRow } from "@/lib/system-admin/services/api-keys-service";
 import { cn } from "@/lib/utils";
 
-type PermissionLevel = "read" | "read_write" | "admin";
 type ExpiryOption = "never" | "30d" | "90d" | "1y";
-
-function permissionsForLevel(level: PermissionLevel): string[] {
-  if (level === "read") return ["read"];
-  if (level === "read_write") return ["read", "write"];
-  return ["read", "write", "admin"];
-}
 
 function expiryDateForOption(option: ExpiryOption): string | null {
   if (option === "never") return null;
@@ -52,21 +50,23 @@ function expiryDateForOption(option: ExpiryOption): string | null {
   return date.toISOString();
 }
 
-function formatPermissions(permissions: string[]): string {
-  if (permissions.includes("admin") || permissions.includes("write")) {
-    return permissions.includes("admin") ? "Full access" : "Read & write";
-  }
-  return "Read only";
+function parseIpList(value: string): string[] {
+  return value
+    .split(/[\s,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function ApiKeyRevealDialog({
   open,
-  keyName,
+  title,
+  secretLabel,
   rawKey,
   onDone,
 }: {
   open: boolean;
-  keyName: string;
+  title: string;
+  secretLabel: string;
   rawKey: string;
   onDone: () => void;
 }) {
@@ -76,10 +76,10 @@ function ApiKeyRevealDialog({
     try {
       await navigator.clipboard.writeText(rawKey);
       setCopied(true);
-      toast.success("API key copied to clipboard");
+      toast.success("Copied to clipboard");
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error("Could not copy — copy the key manually");
+      toast.error("Could not copy — copy the value manually");
     }
   }
 
@@ -92,45 +92,38 @@ function ApiKeyRevealDialog({
     >
       <DialogContent className="sm:max-w-lg" showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle>Save your API key</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            Your new key for <span className="font-medium text-foreground">{keyName}</span> is ready.
-            Store it somewhere secure before closing this dialog.
+            Store {secretLabel} now. It cannot be retrieved later.
           </DialogDescription>
         </DialogHeader>
-
         <div className="space-y-4">
           <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" />
             <p>
-              This is the <strong>only time</strong> your full API key will be shown. Copy it now — you
-              cannot view or recover it later. If lost, rotate or create a new key.
+              This is the <strong>only time</strong> the full secret is shown. Applications using
+              the previous secret will stop working after rotation.
             </p>
           </div>
-
           <div className="space-y-2">
-            <Label>API key</Label>
+            <Label>Secret</Label>
             <div className="flex gap-2">
               <Input
                 readOnly
                 value={rawKey}
                 className="font-mono text-xs"
-                onFocus={(e) => e.currentTarget.select()}
+                onFocus={(event) => event.currentTarget.select()}
               />
               <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={handleCopy}>
                 <Copy className="mr-1 size-3.5" />
                 {copied ? "Copied" : "Copy"}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Prefix shown in the list: <span className="font-mono">{rawKey.slice(0, 14)}…</span>
-            </p>
           </div>
         </div>
-
         <DialogFooter>
           <Button type="button" onClick={onDone}>
-            I&apos;ve saved the key
+            I&apos;ve saved the secret
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -138,388 +131,423 @@ function ApiKeyRevealDialog({
   );
 }
 
-export function ApiKeysPanel({ keys: initial }: { keys: SystemApiKeyRow[] }) {
+export function ApiKeysPanel({
+  keys: initial,
+  autoOpenCreate = false,
+}: {
+  keys: SystemApiKeyRow[];
+  autoOpenCreate?: boolean;
+}) {
   const [keys, setKeys] = useState(initial);
   const [isPending, startTransition] = useTransition();
-
-  const [createOpen, setCreateOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(autoOpenCreate);
   const [name, setName] = useState("");
-  const [permissionLevel, setPermissionLevel] = useState<PermissionLevel>("read");
+  const [description, setDescription] = useState("");
+  const [environment, setEnvironment] = useState<"production" | "sandbox">("production");
+  const [scopes, setScopes] = useState<PublicApiScope[]>(["employees:read", "departments:read"]);
   const [expiryOption, setExpiryOption] = useState<ExpiryOption>("never");
-
-  const [revealOpen, setRevealOpen] = useState(false);
-  const [revealedKey, setRevealedKey] = useState<string | null>(null);
-  const [revealedKeyName, setRevealedKeyName] = useState("");
-
-  const [rotateTarget, setRotateTarget] = useState<SystemApiKeyRow | null>(null);
+  const [ipText, setIpText] = useState("");
+  const [rateLimitTier, setRateLimitTier] = useState<ApiRateLimitTier>("standard");
+  const [customLimit, setCustomLimit] = useState("120");
+  const [reveal, setReveal] = useState<{ name: string; rawKey: string } | null>(null);
+  const [detail, setDetail] = useState<SystemApiKeyRow | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<SystemApiKeyRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SystemApiKeyRow | null>(null);
 
+  useEffect(() => {
+    setKeys(initial);
+  }, [initial]);
+
   function reload() {
     startTransition(async () => {
-      const res = await listApiKeysAction();
-      if (res.success) setKeys(res.data);
+      const result = await listApiKeysAction();
+      if (result.success) setKeys(result.data);
     });
   }
 
-  function resetCreateForm() {
-    setName("");
-    setPermissionLevel("read");
-    setExpiryOption("never");
-  }
-
-  function showRevealedKey(keyName: string, rawKey: string) {
-    setRevealedKeyName(keyName);
-    setRevealedKey(rawKey);
-    setRevealOpen(true);
+  function toggleScope(scope: PublicApiScope) {
+    setScopes((current) =>
+      current.includes(scope) ? current.filter((item) => item !== scope) : [...current, scope],
+    );
   }
 
   function handleCreate() {
-    const trimmed = name.trim();
-    if (!trimmed) {
-      toast.error("Enter a name for this API key");
+    if (!name.trim()) {
+      toast.error("Name is required");
       return;
     }
-
+    if (scopes.length === 0) {
+      toast.error("Select at least one scope");
+      return;
+    }
     startTransition(async () => {
-      const res = await createApiKeyAction({
-        name: trimmed,
-        permissions: permissionsForLevel(permissionLevel),
-        allowedIps: [],
+      const result = await createApiKeyAction({
+        name: name.trim(),
+        description: description.trim() || null,
+        environment,
+        scopes,
+        allowedIps: parseIpList(ipText),
         expiresAt: expiryDateForOption(expiryOption),
+        rateLimitTier,
+        rateLimitPerMinute:
+          rateLimitTier === "custom" ? Number.parseInt(customLimit, 10) || 60 : null,
       });
-
-      if (res.success) {
-        setCreateOpen(false);
-        resetCreateForm();
-        reload();
-        showRevealedKey(trimmed, res.data.rawKey);
-      } else {
-        toast.error(res.message);
+      if (!result.success) {
+        toast.error(result.message);
+        return;
       }
-    });
-  }
-
-  function handleRotateConfirm() {
-    if (!rotateTarget) return;
-
-    startTransition(async () => {
-      const res = await rotateApiKeyAction(rotateTarget.id);
-      if (res.success) {
-        const targetName = rotateTarget.name;
-        setRotateTarget(null);
-        reload();
-        showRevealedKey(targetName, res.data.rawKey);
-      } else {
-        toast.error(res.message);
-      }
-    });
-  }
-
-  function handleRevokeConfirm() {
-    if (!revokeTarget) return;
-
-    startTransition(async () => {
-      const res = await revokeApiKeyAction(revokeTarget.id);
-      if (res.success) {
-        setRevokeTarget(null);
-        toast.success("API key revoked");
-        reload();
-      } else {
-        toast.error(res.message);
-      }
-    });
-  }
-
-  function handleDeleteConfirm() {
-    if (!deleteTarget) return;
-
-    startTransition(async () => {
-      const res = await deleteApiKeyAction(deleteTarget.id);
-      if (res.success) {
-        setDeleteTarget(null);
-        toast.success("API key deleted");
-        reload();
-      } else {
-        toast.error(res.message);
-      }
+      setCreateOpen(false);
+      setName("");
+      setDescription("");
+      setReveal({ name: name.trim(), rawKey: result.data.rawKey });
+      reload();
     });
   }
 
   return (
-    <SystemModuleFrame
-      title="API Keys"
-      description="Create secret keys for integrations and automation. Keys are shown once at creation — store them securely."
-    >
-      <div className="flex h-full min-h-0 flex-col gap-3">
-        <div className="flex shrink-0 items-center justify-between gap-2">
-          <p className="text-xs text-muted-foreground">
-            {keys.length} key{keys.length === 1 ? "" : "s"} · only prefixes are stored in the list
-          </p>
-          <Button size="sm" onClick={() => setCreateOpen(true)} disabled={isPending}>
-            <Plus className="mr-1 size-3.5" />
-            Create new API key
-          </Button>
-        </div>
-
-        <SystemPanel className="min-h-0 flex-1 overflow-hidden">
-          {keys.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-10 text-center text-sm text-muted-foreground">
-              <KeyRound className="size-8 opacity-40" />
-              <p>No API keys yet</p>
-              <p className="text-xs">Create a key to connect external services to your HRMS.</p>
-            </div>
-          ) : (
-            <ul className="max-h-[280px] space-y-2 overflow-y-auto">
-              {keys.map((key) => (
-                <li
-                  key={key.id}
-                  className="rounded-lg border p-3 text-sm"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium">{key.name}</p>
-                        <span
-                          className={cn(
-                            "rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
-                            key.status === "active"
-                              ? "bg-emerald-50 text-emerald-700"
-                              : "bg-muted text-muted-foreground",
-                          )}
-                        >
-                          {key.status}
-                        </span>
-                      </div>
-                      <p className="font-mono text-xs text-muted-foreground">
-                        {key.keyPrefix}…
-                      </p>
-                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                        <span>{formatPermissions(key.permissions)}</span>
-                        <span>
-                          Created {formatDistanceToNow(parseISO(key.createdAt), { addSuffix: true })}
-                        </span>
-                        {key.lastUsedAt ? (
-                          <span>
-                            Last used {formatDistanceToNow(parseISO(key.lastUsedAt), { addSuffix: true })}
-                          </span>
-                        ) : (
-                          <span>Never used</span>
-                        )}
-                        {key.expiresAt ? (
-                          <span>Expires {format(parseISO(key.expiresAt), "dd MMM yyyy")}</span>
-                        ) : null}
-                        <span>Used {key.usageCount}x</span>
-                      </div>
-                    </div>
-
-                    <div className="flex shrink-0 gap-1">
-                      {key.status === "active" ? (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={isPending}
-                            onClick={() => setRotateTarget(key)}
-                          >
-                            Rotate
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={isPending}
-                            onClick={() => setRevokeTarget(key)}
-                          >
-                            Revoke
-                          </Button>
-                        </>
-                      ) : null}
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        disabled={isPending}
-                        onClick={() => setDeleteTarget(key)}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </SystemPanel>
+    <div className="flex h-full min-h-0 flex-col gap-3">
+      <div className="flex shrink-0 items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">
+          {keys.length} key{keys.length === 1 ? "" : "s"} · only prefixes are stored in the list.
+        </p>
+        <Button size="sm" onClick={() => setCreateOpen(true)}>
+          <Plus className="size-3.5" />
+          Create API Key
+        </Button>
       </div>
+
+      <SystemPanel className="min-h-0 flex-1" bodyClassName="p-0">
+        {keys.length === 0 ? (
+          <div className="flex h-full min-h-[12rem] flex-col items-center justify-center gap-2 px-4 text-center">
+            <KeyRound className="size-8 text-muted-foreground" />
+            <p className="text-sm font-medium">No API keys yet</p>
+            <p className="max-w-sm text-xs text-muted-foreground">
+              Create a least-privilege key for CRM or another system. The full secret is shown once.
+            </p>
+          </div>
+        ) : (
+          <ul className="divide-y">
+            {keys.map((key) => (
+              <li key={key.id} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
+                <div className="min-w-0 space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold">{key.name}</p>
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase",
+                        key.status === "active" && "bg-emerald-500/10 text-emerald-700",
+                        key.status === "revoked" && "bg-red-500/10 text-red-700",
+                        key.status === "expired" && "bg-amber-500/10 text-amber-700",
+                      )}
+                    >
+                      {key.status}
+                    </span>
+                    <span className="text-[10px] font-medium uppercase text-muted-foreground">
+                      {key.environment}
+                    </span>
+                  </div>
+                  <p className="font-mono text-xs text-muted-foreground">{key.keyPrefix}…</p>
+                  <p className="text-xs text-muted-foreground">
+                    {key.scopes.slice(0, 4).join(", ")}
+                    {key.scopes.length > 4 ? ` +${key.scopes.length - 4}` : ""}
+                    {" · "}
+                    Created {formatDistanceToNow(parseISO(key.createdAt), { addSuffix: true })}
+                    {" · "}
+                    {key.lastUsedAt
+                      ? `Last used ${formatDistanceToNow(parseISO(key.lastUsedAt), { addSuffix: true })}`
+                      : "Never used"}
+                    {" · "}
+                    {key.usageCount} req
+                    {key.expiresAt
+                      ? ` · Expires ${format(parseISO(key.expiresAt), "d MMM yyyy")}`
+                      : ""}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  <Button size="sm" variant="ghost" onClick={() => setDetail(key)}>
+                    View
+                  </Button>
+                  {key.status !== "revoked" ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={isPending}
+                      onClick={() =>
+                        startTransition(async () => {
+                          const result = await rotateApiKeyAction(key.id);
+                          if (!result.success) {
+                            toast.error(result.message);
+                            return;
+                          }
+                          setReveal({ name: key.name, rawKey: result.data.rawKey });
+                          reload();
+                        })
+                      }
+                    >
+                      Rotate
+                    </Button>
+                  ) : null}
+                  {key.status === "active" ? (
+                    <Button size="sm" variant="ghost" onClick={() => setRevokeTarget(key)}>
+                      Revoke
+                    </Button>
+                  ) : null}
+                  <Button size="sm" variant="ghost" className="text-red-600" onClick={() => setDeleteTarget(key)}>
+                    Delete
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </SystemPanel>
 
       <Modal
         open={createOpen}
-        onOpenChange={(open) => {
-          if (!isPending) {
-            setCreateOpen(open);
-            if (!open) resetCreateForm();
-          }
-        }}
-        title="Create a new API key"
-        description="Name your key and choose access level. You will see the full secret only once after creation."
-        showCancel
-        cancelLabel="Cancel"
+        onOpenChange={setCreateOpen}
+        title="Create API key"
+        description="Least privilege only. The secret is shown once."
         footer={
-          <Button type="button" disabled={isPending || !name.trim()} onClick={handleCreate}>
-            {isPending ? <Loader2 className="mr-1 size-3.5 animate-spin" /> : null}
-            Create API key
+          <Button disabled={isPending} onClick={handleCreate}>
+            {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+            Create key
           </Button>
         }
       >
-        <div className="space-y-4">
-          <div className="space-y-2">
+        <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
+          <div className="space-y-1.5">
             <Label htmlFor="api-key-name">Name</Label>
+            <Input id="api-key-name" value={name} onChange={(event) => setName(event.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="api-key-description">Description</Label>
             <Input
-              id="api-key-name"
-              placeholder="e.g. Payroll sync, Mobile app"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoFocus
+              id="api-key-description"
+              value={description}
+              placeholder="CRM production sync"
+              onChange={(event) => setDescription(event.target.value)}
             />
-            <p className="text-xs text-muted-foreground">
-              A descriptive name to identify this key in your organization.
-            </p>
           </div>
-
-          <div className="space-y-2">
-            <Label>Permissions</Label>
-            <Select
-              value={permissionLevel}
-              onValueChange={(value) => setPermissionLevel(value as PermissionLevel)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="read">Read only — fetch data without changes</SelectItem>
-                <SelectItem value="read_write">Read & write — create and update records</SelectItem>
-                <SelectItem value="admin">Full access — all API operations</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Environment</Label>
+              <Select
+                value={environment}
+                onValueChange={(value) => value && setEnvironment(value as "production" | "sandbox")}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="production">Production</SelectItem>
+                  <SelectItem value="sandbox">Test / Sandbox</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Expiration</Label>
+              <Select value={expiryOption} onValueChange={(value) => value && setExpiryOption(value as ExpiryOption)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="never">No expiry</SelectItem>
+                  <SelectItem value="30d">30 days</SelectItem>
+                  <SelectItem value="90d">90 days</SelectItem>
+                  <SelectItem value="1y">1 year</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Rate limit</Label>
+              <Select
+                value={rateLimitTier}
+                onValueChange={(value) => value && setRateLimitTier(value as ApiRateLimitTier)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="standard">Standard (60/min)</SelectItem>
+                  <SelectItem value="high_volume">High volume (300/min)</SelectItem>
+                  <SelectItem value="custom">Custom</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {rateLimitTier === "custom" ? (
+              <div className="space-y-1.5">
+                <Label>Requests / minute</Label>
+                <Input value={customLimit} onChange={(event) => setCustomLimit(event.target.value)} />
+              </div>
+            ) : null}
+          </div>
+          <div className="space-y-1.5">
+            <Label>IP allowlist (optional)</Label>
+            <Input
+              value={ipText}
+              placeholder="203.0.113.10, 198.51.100.0"
+              onChange={(event) => setIpText(event.target.value)}
+            />
+          </div>
           <div className="space-y-2">
-            <Label>Expiration</Label>
-            <Select
-              value={expiryOption}
-              onValueChange={(value) => setExpiryOption(value as ExpiryOption)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="never">Never expires</SelectItem>
-                <SelectItem value="30d">30 days</SelectItem>
-                <SelectItem value="90d">90 days</SelectItem>
-                <SelectItem value="1y">1 year</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label>Scopes</Label>
+            {PUBLIC_API_SCOPE_GROUPS.map((group) => (
+              <div key={group.id} className="space-y-1">
+                <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                  {group.label}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {group.scopes.map((scope) => (
+                    <button
+                      key={scope}
+                      type="button"
+                      onClick={() => toggleScope(scope)}
+                      className={cn(
+                        "rounded-full border px-2.5 py-1 text-xs",
+                        scopes.includes(scope)
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:bg-muted",
+                      )}
+                    >
+                      {scope}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
             <p className="text-xs text-muted-foreground">
-              Expired keys are rejected automatically. Rotate before expiry to avoid downtime.
+              Write scopes can be granted now; write HTTP routes are not published in v1 yet.
             </p>
           </div>
         </div>
       </Modal>
 
-      {revealedKey ? (
-        <ApiKeyRevealDialog
-          open={revealOpen}
-          keyName={revealedKeyName}
-          rawKey={revealedKey}
-          onDone={() => {
-            setRevealOpen(false);
-            setRevealedKey(null);
-            setRevealedKeyName("");
-          }}
-        />
-      ) : null}
+      <Modal
+        open={Boolean(detail)}
+        onOpenChange={(open) => (open ? undefined : setDetail(null))}
+        title={detail?.name ?? "API key"}
+      >
+        {detail ? (
+          <dl className="grid gap-2 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-xs text-muted-foreground">Prefix</dt>
+              <dd className="font-mono">{detail.keyPrefix}…</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">Environment</dt>
+              <dd className="capitalize">{detail.environment}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">Status</dt>
+              <dd className="capitalize">{detail.status}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">Usage</dt>
+              <dd>{detail.usageCount} requests</dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-xs text-muted-foreground">Scopes</dt>
+              <dd>{detail.scopes.join(", ")}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">Created</dt>
+              <dd>{format(parseISO(detail.createdAt), "d MMM yyyy, HH:mm")}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">Last used</dt>
+              <dd>
+                {detail.lastUsedAt
+                  ? format(parseISO(detail.lastUsedAt), "d MMM yyyy, HH:mm")
+                  : "Never"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">Expires</dt>
+              <dd>
+                {detail.expiresAt
+                  ? format(parseISO(detail.expiresAt), "d MMM yyyy")
+                  : "No expiry"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">IP allowlist</dt>
+              <dd>{detail.allowedIps.length ? detail.allowedIps.join(", ") : "None"}</dd>
+            </div>
+          </dl>
+        ) : null}
+      </Modal>
 
-      <Dialog open={Boolean(rotateTarget)} onOpenChange={(open) => !open && setRotateTarget(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Rotate API key?</DialogTitle>
-            <DialogDescription>
-              {rotateTarget
-                ? `A new secret will be generated for "${rotateTarget.name}". The current key stops working immediately — update any apps using it.`
-                : ""}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isPending}
-              onClick={() => setRotateTarget(null)}
-            >
-              Cancel
-            </Button>
-            <Button type="button" disabled={isPending} onClick={handleRotateConfirm}>
-              {isPending ? "Rotating…" : "Rotate key"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <Modal
+        open={Boolean(revokeTarget)}
+        onOpenChange={(open) => (open ? undefined : setRevokeTarget(null))}
+        title="Revoke API key"
+        description="Applications using this key will immediately lose API access. This cannot be undone."
+        footer={
+          <Button
+            variant="destructive"
+            disabled={isPending}
+            onClick={() => {
+              if (!revokeTarget) return;
+              startTransition(async () => {
+                const result = await revokeApiKeyAction(revokeTarget.id);
+                if (!result.success) {
+                  toast.error(result.message);
+                  return;
+                }
+                toast.success("API key revoked");
+                setRevokeTarget(null);
+                reload();
+              });
+            }}
+          >
+            Revoke key
+          </Button>
+        }
+      >
+        <p className="text-sm">
+          Revoke <span className="font-medium">{revokeTarget?.name}</span> ({revokeTarget?.keyPrefix}…)?
+        </p>
+      </Modal>
 
-      <Dialog open={Boolean(revokeTarget)} onOpenChange={(open) => !open && setRevokeTarget(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Revoke API key?</DialogTitle>
-            <DialogDescription>
-              {revokeTarget
-                ? `Applications using "${revokeTarget.name}" will lose access immediately. The key stays in the list until you delete it.`
-                : ""}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isPending}
-              onClick={() => setRevokeTarget(null)}
-            >
-              Cancel
-            </Button>
-            <Button type="button" disabled={isPending} onClick={handleRevokeConfirm}>
-              {isPending ? "Revoking…" : "Revoke key"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <Modal
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => (open ? undefined : setDeleteTarget(null))}
+        title="Delete API key"
+        description="The key will be revoked and hidden from the list."
+        footer={
+          <Button
+            variant="destructive"
+            disabled={isPending}
+            onClick={() => {
+              if (!deleteTarget) return;
+              startTransition(async () => {
+                const result = await deleteApiKeyAction(deleteTarget.id);
+                if (!result.success) {
+                  toast.error(result.message);
+                  return;
+                }
+                toast.success("API key deleted");
+                setDeleteTarget(null);
+                reload();
+              });
+            }}
+          >
+            Delete
+          </Button>
+        }
+      >
+        <p className="text-sm">Delete {deleteTarget?.name}?</p>
+      </Modal>
 
-      <Dialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Delete API key?</DialogTitle>
-            <DialogDescription>
-              {deleteTarget
-                ? `"${deleteTarget.name}" will be permanently removed from your organization. This cannot be undone.`
-                : ""}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isPending}
-              onClick={() => setDeleteTarget(null)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={isPending}
-              onClick={handleDeleteConfirm}
-            >
-              {isPending ? "Deleting…" : "Delete key"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </SystemModuleFrame>
+      <ApiKeyRevealDialog
+        open={Boolean(reveal)}
+        title="Save your API key"
+        secretLabel="this API key"
+        rawKey={reveal?.rawKey ?? ""}
+        onDone={() => setReveal(null)}
+      />
+    </div>
   );
 }

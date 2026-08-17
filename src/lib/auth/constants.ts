@@ -17,6 +17,7 @@ export const PUBLIC_ROUTES = [
   AUTH_ROUTES.callback,
   APPROVAL_PUBLIC_ROUTE,
   "/api/cron",
+  "/api/v1",
   "/e",
   "/verify/payslip",
   "/onboarding",

@@ -18,6 +18,7 @@ import {
   unwrapRelation,
 } from "@/lib/performance/services/performance-utils";
 import { PERFORMANCE_ROUTES } from "@/lib/performance/constants";
+import { emitHrmsWebhook } from "@/lib/public-api/webhooks";
 import { notifyPerformanceGoalAssigned } from "@/lib/performance/services/performance-notifications";
 import { notifyEmployee } from "@/lib/notifications/services/notification-service";
 import { getEmployeeSalaryStructure } from "@/lib/employees/services/employee-detail";
@@ -559,6 +560,9 @@ export async function approveReviewStep(
           updated_by: profile.userId,
         })
         .eq("id", reviewId);
+      emitHrmsWebhook(profile.employee.organizationId, "performance.review_completed", {
+        id: reviewId,
+      });
     }
   } else {
     await fromHrms(supabase, "performance_reviews")
@@ -568,6 +572,9 @@ export async function approveReviewStep(
         updated_by: profile.userId,
       })
       .eq("id", reviewId);
+    emitHrmsWebhook(profile.employee.organizationId, "performance.review_completed", {
+      id: reviewId,
+    });
   }
 }
 

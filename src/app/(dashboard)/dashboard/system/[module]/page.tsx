@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 
 import { SystemModuleView } from "@/components/system-admin/system-module-view";
+import { ApiManagementHub } from "@/components/system-admin/api-management-hub";
 import {
-  ApiKeysPanel,
   BackupPanel,
   DatabaseHealthPanel,
   EmailServicesPanel,
@@ -16,7 +16,8 @@ import {
 } from "@/components/system-admin/system-admin-modules";
 import { SYSTEM_MODULE_LINKS } from "@/config/system-admin-navigation";
 import { requireSuperAdminProfile } from "@/lib/system-admin/guards";
-import { listSystemApiKeys } from "@/lib/system-admin/services/api-keys-service";
+import { siteConfig } from "@/config/site";
+import { getApiManagementSnapshot } from "@/lib/system-admin/services/api-management-queries";
 import { listBackupJobs } from "@/lib/system-admin/services/backup-service";
 import { getDatabaseHealthDetail } from "@/lib/system-admin/services/database-health-service";
 import { getEmailServiceSnapshot } from "@/lib/system-admin/services/email-service";
@@ -72,8 +73,8 @@ const MODULE_META: Record<string, { title: string; description: string }> = {
     description: "In-app notifications, templates, and delivery history.",
   },
   "api-keys": {
-    title: "API Keys",
-    description: "Generate, rotate, and revoke API credentials.",
+    title: "API Management",
+    description: "Keys, documentation, usage logs, and webhooks for CRM and system integrations.",
   },
   audit: {
     title: "Audit Center",
@@ -178,10 +179,10 @@ export default async function SystemModulePage({ params }: SystemModulePageProps
   }
 
   if (module === "api-keys") {
-    const keys = await listSystemApiKeys(supabase, orgId);
+    const snapshot = await getApiManagementSnapshot(supabase, orgId);
     return (
-      <div className="h-full min-h-0 overflow-hidden">
-        <ApiKeysPanel keys={keys} />
+      <div className="h-full min-h-0 overflow-hidden p-4 md:p-5">
+        <ApiManagementHub snapshot={snapshot} origin={siteConfig.url} />
       </div>
     );
   }

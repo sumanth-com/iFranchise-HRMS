@@ -12,6 +12,7 @@ import {
   attendanceExistsForEmployeeDate,
   getEmployeeBranchId,
 } from "@/lib/attendance/services/attendance-queries";
+import { emitHrmsWebhook } from "@/lib/public-api/webhooks";
 
 function emptyToNull(value?: string | null) {
   return value && value.trim().length > 0 ? value.trim() : null;
@@ -112,6 +113,12 @@ export async function createAttendance(
     throw new Error(error?.message ?? "Failed to create attendance");
   }
 
+  emitHrmsWebhook(profile.employee.organizationId, "attendance.updated", {
+    id: data.id,
+    employeeId: input.employeeId,
+    date: input.attendanceDate,
+  });
+
   return data.id;
 }
 
@@ -171,6 +178,12 @@ export async function updateAttendance(
     }
     throw new Error(error.message);
   }
+
+  emitHrmsWebhook(profile.employee.organizationId, "attendance.updated", {
+    id: attendanceId,
+    employeeId: input.employeeId,
+    date: input.attendanceDate,
+  });
 }
 
 export async function softDeleteAttendance(

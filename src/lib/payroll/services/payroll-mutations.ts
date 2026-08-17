@@ -1,4 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { emitHrmsWebhook } from "@/lib/public-api/webhooks";
 import { getPayslipBranding } from "@/lib/payroll/services/payslip-branding";
 import { sendPayslipReadyEmail } from "@/lib/payroll/services/payslip-email-service";
 import { storePayslipPdf } from "@/lib/payroll/services/payslip-storage";
@@ -481,6 +482,9 @@ export async function processPayrollRun(
   if (updateError) throw new Error(updateError.message);
 
   await initializePayrollApprovals(supabase, profile, payrollId);
+  emitHrmsWebhook(profile.employee.organizationId, "payroll.processed", {
+    id: payrollId,
+  });
 }
 
 async function initializePayrollApprovals(

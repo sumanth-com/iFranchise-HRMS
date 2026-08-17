@@ -2,15 +2,15 @@
 
 import { useState } from "react";
 
+import { ApiManagementHub } from "@/components/system-admin/api-management-hub";
 import {
-  ApiKeysPanel,
   BackupPanel,
   DatabaseHealthPanel,
   EmailServicesPanel,
   IntegrationsPanel,
   StorageManagerPanel,
 } from "@/components/system-admin/system-admin-modules";
-import type { SystemApiKeyRow } from "@/lib/system-admin/services/api-keys-service";
+import type { ApiManagementSnapshot } from "@/lib/system-admin/services/api-management-queries";
 import type { BackupJobRow } from "@/lib/system-admin/services/backup-service";
 import type { DatabaseHealthSnapshot } from "@/lib/system-admin/services/database-health-service";
 import type { EmailServiceSnapshot } from "@/lib/system-admin/services/email-service";
@@ -22,7 +22,7 @@ const TABS = [
   { id: "email", label: "Email / SMTP" },
   { id: "storage", label: "Storage" },
   { id: "integrations", label: "Integrations" },
-  { id: "api-keys", label: "API Keys" },
+  { id: "api", label: "API" },
   { id: "backup", label: "Backup" },
   { id: "database", label: "Database" },
 ] as const;
@@ -34,7 +34,8 @@ type Props = {
   buckets: StorageBucketSnapshot[];
   organizationId: string;
   integrations: SystemIntegrationRow[];
-  apiKeys: SystemApiKeyRow[];
+  apiManagement: ApiManagementSnapshot;
+  origin: string;
   backupJobs: BackupJobRow[];
   database: DatabaseHealthSnapshot;
 };
@@ -44,11 +45,12 @@ export function SystemIntegrationsHub({
   buckets,
   organizationId,
   integrations,
-  apiKeys,
+  apiManagement,
+  origin,
   backupJobs,
   database,
 }: Props) {
-  const [tab, setTab] = useState<TabId>("email");
+  const [tab, setTab] = useState<TabId>("api");
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-4 md:gap-4 md:p-5">
@@ -93,7 +95,9 @@ export function SystemIntegrationsHub({
         {tab === "integrations" ? (
           <IntegrationsPanel integrations={integrations} />
         ) : null}
-        {tab === "api-keys" ? <ApiKeysPanel keys={apiKeys} /> : null}
+        {tab === "api" ? (
+          <ApiManagementHub snapshot={apiManagement} origin={origin} />
+        ) : null}
         {tab === "backup" ? <BackupPanel jobs={backupJobs} /> : null}
         {tab === "database" ? <DatabaseHealthPanel initial={database} /> : null}
       </div>

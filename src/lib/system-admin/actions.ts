@@ -12,8 +12,10 @@ import {
   listSystemApiKeys,
   revokeSystemApiKey,
   rotateSystemApiKey,
+  type CreateSystemApiKeyInput,
 } from "@/lib/system-admin/services/api-keys-service";
 import { writeSystemAudit } from "@/lib/system-admin/services/audit-helper";
+import { WEBHOOK_EVENTS, type WebhookEvent } from "@/lib/public-api/constants";
 import {
   getBackupDownloadPayload,
   listBackupJobs,
@@ -213,12 +215,7 @@ export async function updateEnvironmentLabelAction(label: string) {
   }
 }
 
-export async function createApiKeyAction(input: {
-  name: string;
-  permissions: string[];
-  allowedIps: string[];
-  expiresAt: string | null;
-}) {
+export async function createApiKeyAction(input: CreateSystemApiKeyInput) {
   try {
     const profile = await requireSuperAdminProfile();
     const supabase = await createClient();
@@ -228,6 +225,11 @@ export async function createApiKeyAction(input: {
       description: `API key created: ${input.name}`,
       recordId: result.id,
       priority: "high",
+      metadata: {
+        environment: input.environment,
+        scopes: input.scopes,
+        rateLimitTier: input.rateLimitTier,
+      },
     });
     revalidateSystemAdmin();
     return { success: true as const, data: result };
@@ -312,6 +314,167 @@ export async function listApiKeysAction() {
     return {
       success: false as const,
       message: error instanceof Error ? error.message : "Failed to load API keys",
+    };
+  }
+}
+
+export async function fetchApiUsageLogsAction(filters: {
+  apiKeyId?: string;
+  endpoint?: string;
+  status?: "success" | "failed" | "rate_limited";
+  method?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+}) {
+  try {
+    const profile = await requireSuperAdminProfile();
+    const supabase = await createClient();
+    const { listApiUsageLogs } = await import("@/lib/public-api/usage");
+    const data = await listApiUsageLogs(supabase, profile.employee.organizationId, filters);
+    return { success: true as const, data };
+  } catch (error) {
+    return {
+      success: false as const,
+      message: error instanceof Error ? error.message : "Failed to load API logs",
+    };
+  }
+}
+
+export async function updateApiSettingsAction(input: {
+  enabled?: boolean;
+  defaultRateLimitPerMinute?: number;
+  allowedEnvironments?: Array<"production" | "sandbox">;
+  webhooksEnabled?: boolean;
+}) {
+  try {
+    const profile = await requireSuperAdminProfile();
+    const supabase = await createClient();
+    const { updateSystemApiConfig } = await import("@/lib/public-api/settings");
+    const data = await updateSystemApiConfig(
+      supabase,
+      profile.employee.organizationId,
+      profile.userId,
+      input,
+    );
+    await writeSystemAudit(supabase, profile, {
+      action: "api_configuration_changed",
+      description: "API settings updated",
+      priority: "high",
+      metadata: input,
+    });
+    revalidateSystemAdmin();
+    return { success: true as const, data };
+  } catch (error) {
+    return {
+      success: false as const,
+      message: error instanceof Error ? error.message : "Failed to update API settings",
+    };
+  }
+}
+
+export async function createWebhookAction(input: {
+  name: string;
+  endpointUrl: string;
+  events: string[];
+}) {
+  try {
+    const profile = await requireSuperAdminProfile();
+    const supabase = await createClient();
+    const { createSystemWebhook } = await import("@/lib/public-api/webhooks");
+    const events = input.events.filter((event): event is WebhookEvent =>
+      (WEBHOOK_EVENTS as readonly string[]).includes(event),
+    );
+    const result = await createSystemWebhook(supabase, profile, {
+      name: input.name,
+      endpointUrl: input.endpointUrl,
+      events,
+    });
+    await writeSystemAudit(supabase, profile, {
+      action: "webhook_created",
+      description: `Webhook created: ${input.name}`,
+      recordId: result.id,
+      priority: "high",
+      metadata: { events },
+    });
+    revalidateSystemAdmin();
+    return { success: true as const, data: result };
+  } catch (error) {
+    return {
+      success: false as const,
+      message: error instanceof Error ? error.message : "Failed to create webhook",
+    };
+  }
+}
+
+export async function updateWebhookAction(input: {
+  webhookId: string;
+  name?: string;
+  endpointUrl?: string;
+  events?: string[];
+  isActive?: boolean;
+}) {
+  try {
+    const profile = await requireSuperAdminProfile();
+    const supabase = await createClient();
+    const { updateSystemWebhook } = await import("@/lib/public-api/webhooks");
+    await updateSystemWebhook(supabase, profile.employee.organizationId, input.webhookId, {
+      name: input.name,
+      endpointUrl: input.endpointUrl,
+      isActive: input.isActive,
+      events: input.events?.filter((event): event is WebhookEvent =>
+        (WEBHOOK_EVENTS as readonly string[]).includes(event),
+      ),
+    });
+    await writeSystemAudit(supabase, profile, {
+      action: input.isActive === false ? "webhook_disabled" : "webhook_modified",
+      description: "Webhook updated",
+      recordId: input.webhookId,
+      priority: "high",
+    });
+    revalidateSystemAdmin();
+    return { success: true as const };
+  } catch (error) {
+    return {
+      success: false as const,
+      message: error instanceof Error ? error.message : "Failed to update webhook",
+    };
+  }
+}
+
+export async function deleteWebhookAction(webhookId: string) {
+  try {
+    const profile = await requireSuperAdminProfile();
+    const supabase = await createClient();
+    const { deleteSystemWebhook } = await import("@/lib/public-api/webhooks");
+    await deleteSystemWebhook(supabase, profile.employee.organizationId, webhookId);
+    await writeSystemAudit(supabase, profile, {
+      action: "webhook_disabled",
+      description: "Webhook deleted",
+      recordId: webhookId,
+      priority: "high",
+    });
+    revalidateSystemAdmin();
+    return { success: true as const };
+  } catch (error) {
+    return {
+      success: false as const,
+      message: error instanceof Error ? error.message : "Failed to delete webhook",
+    };
+  }
+}
+
+export async function testWebhookAction(webhookId: string) {
+  try {
+    const profile = await requireSuperAdminProfile();
+    const supabase = await createClient();
+    const { sendWebhookTest } = await import("@/lib/public-api/webhooks");
+    await sendWebhookTest(supabase, profile.employee.organizationId, webhookId);
+    return { success: true as const };
+  } catch (error) {
+    return {
+      success: false as const,
+      message: error instanceof Error ? error.message : "Failed to send test webhook",
     };
   }
 }

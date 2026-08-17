@@ -7,6 +7,7 @@ import {
   DOCUMENT_MAX_BYTES,
   PROFILE_IMAGE_MAX_BYTES,
 } from "@/lib/employees/constants";
+import { emitHrmsWebhook } from "@/lib/public-api/webhooks";
 
 function emptyToNull(value?: string | null) {
   return value && value.trim().length > 0 ? value : null;
@@ -207,6 +208,12 @@ export async function createEmployeeFromWizard(
     }
   }
 
+  emitHrmsWebhook(organizationId, "employee.created", {
+    id: employeeId,
+    employeeCode: basic.employeeCode.trim(),
+    employmentStatus: employment.employmentStatus,
+  });
+
   return employeeId;
 }
 
@@ -217,6 +224,14 @@ export async function updateEmployee(
   input: EmployeeUpdateInput,
 ) {
   const userId = profile.userId;
+  const organizationId = profile.employee.organizationId;
+
+  const { data: previous } = await supabase
+    .schema("hrms")
+    .from("employees")
+    .select("employment_status")
+    .eq("id", employeeId)
+    .maybeSingle();
 
   let designationId = emptyToNull(input.designationId);
 
@@ -310,6 +325,19 @@ export async function updateEmployee(
     input,
     primaryContact.data?.id ?? null,
   );
+
+  emitHrmsWebhook(organizationId, "employee.updated", {
+    id: employeeId,
+    employeeCode: input.employeeCode.trim(),
+    employmentStatus: input.employmentStatus,
+  });
+  if (previous?.employment_status && previous.employment_status !== input.employmentStatus) {
+    emitHrmsWebhook(organizationId, "employee.status_changed", {
+      id: employeeId,
+      from: previous.employment_status,
+      to: input.employmentStatus,
+    });
+  }
 }
 
 async function upsertEmployeeAddressForUpdate(
@@ -437,6 +465,10 @@ export async function softDeleteEmployee(
   if (cascadeError) {
     throw new Error(cascadeError.message);
   }
+
+  emitHrmsWebhook(profile.employee.organizationId, "employee.deleted", {
+    id: employeeId,
+  });
 }
 
 export async function uploadEmployeeDocument(

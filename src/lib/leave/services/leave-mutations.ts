@@ -12,6 +12,7 @@ import {
   notifyLeaveRejected,
   notifyLeaveSubmitted,
 } from "@/lib/leave/services/leave-notifications";
+import { emitHrmsWebhook } from "@/lib/public-api/webhooks";
 
 function emptyToNull(value?: string | null) {
   return value && value.trim().length > 0 ? value.trim() : null;
@@ -183,6 +184,12 @@ export async function createLeaveRequest(
   await createApprovalSteps(supabase, profile, data.id, input.employeeId);
   await notifyLeaveSubmitted(supabase, profile, data.id, input.employeeId);
   await dispatchLeaveApprovalEmails(data.id, profile.userId);
+  emitHrmsWebhook(profile.employee.organizationId, "leave.created", {
+    id: data.id,
+    employeeId: input.employeeId,
+    startDate: input.startDate,
+    endDate: input.endDate,
+  });
 
   return data.id;
 }
@@ -306,6 +313,10 @@ async function finalizeApprovalIfComplete(
   if (error) throw new Error(error.message);
 
   await notifyLeaveApproved(supabase, profile, leaveRequestId, request.employee_id);
+  emitHrmsWebhook(profile.employee.organizationId, "leave.approved", {
+    id: leaveRequestId,
+    employeeId: request.employee_id,
+  });
 }
 
 export async function approveLeaveRequest(
@@ -419,6 +430,10 @@ export async function rejectLeaveRequest(
   if (updateError) throw new Error(updateError.message);
 
   await notifyLeaveRejected(supabase, profile, leaveRequestId, request.employee_id);
+  emitHrmsWebhook(profile.employee.organizationId, "leave.rejected", {
+    id: leaveRequestId,
+    employeeId: request.employee_id,
+  });
 }
 
 export async function cancelLeaveRequest(

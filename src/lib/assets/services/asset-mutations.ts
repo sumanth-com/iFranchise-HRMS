@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
 import { ASSET_IMAGE_BUCKET, ASSETS_ROUTES, HR_ASSIGN_ASSET_TYPES } from "@/lib/assets/constants";
+import { emitHrmsWebhook } from "@/lib/public-api/webhooks";
 import { notifyEmployee } from "@/lib/notifications/services/notification-service";
 import {
   getAssetSettings,
@@ -256,6 +257,12 @@ export async function assignAsset(
     createdBy: profile.userId,
   });
 
+  emitHrmsWebhook(organizationId, "asset.assigned", {
+    assetId: input.assetId,
+    employeeId: input.employeeId,
+    assignmentId: assignment.id,
+  });
+
   return assignment.id;
 }
 
@@ -326,6 +333,12 @@ export async function returnAsset(
       createdBy: profile.userId,
     });
   }
+
+  emitHrmsWebhook(organizationId, "asset.returned", {
+    assetId: assignment.asset_id,
+    employeeId: assignment.employee_id,
+    assignmentId: assignment.id,
+  });
 }
 
 export async function transferAsset(

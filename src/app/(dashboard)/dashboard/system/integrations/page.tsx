@@ -1,6 +1,7 @@
 import { SystemIntegrationsHub } from "@/components/system-admin/system-integrations-hub";
+import { siteConfig } from "@/config/site";
 import { requireSuperAdminProfile } from "@/lib/system-admin/guards";
-import { listSystemApiKeys } from "@/lib/system-admin/services/api-keys-service";
+import { getApiManagementSnapshot } from "@/lib/system-admin/services/api-management-queries";
 import { listBackupJobs } from "@/lib/system-admin/services/backup-service";
 import { getDatabaseHealthDetail } from "@/lib/system-admin/services/database-health-service";
 import { getEmailServiceSnapshot } from "@/lib/system-admin/services/email-service";
@@ -13,12 +14,12 @@ export default async function SuperAdminIntegrationsPage() {
   const supabase = await createClient();
   const orgId = profile.employee.organizationId;
 
-  const [email, buckets, integrations, apiKeys, backupJobs, database] =
+  const [email, buckets, integrations, apiManagement, backupJobs, database] =
     await Promise.all([
       getEmailServiceSnapshot(supabase, orgId),
       listStorageBuckets(orgId),
       listSystemIntegrations(supabase, orgId),
-      listSystemApiKeys(supabase, orgId),
+      getApiManagementSnapshot(supabase, orgId),
       listBackupJobs(supabase, orgId),
       getDatabaseHealthDetail(supabase, orgId),
     ]);
@@ -30,7 +31,8 @@ export default async function SuperAdminIntegrationsPage() {
         buckets={buckets}
         organizationId={orgId}
         integrations={integrations}
-        apiKeys={apiKeys}
+        apiManagement={apiManagement}
+        origin={siteConfig.url}
         backupJobs={backupJobs}
         database={database}
       />
