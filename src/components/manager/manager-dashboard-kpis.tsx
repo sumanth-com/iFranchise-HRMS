@@ -52,7 +52,7 @@ export function ManagerDashboardKpis({
   const showLeaveApprovals = permissions?.leaveApprove ?? true;
 
   return (
-    <section aria-label="Team KPIs" className="shrink-0">
+    <section aria-label="Team KPIs" data-tour="dashboard-kpis" className="shrink-0">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-2.5">
         <KpiCard
           label="Team Size"

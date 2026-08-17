@@ -61,6 +61,7 @@ export function UserProfileDropdown() {
               variant="ghost"
               className="h-9 gap-2 rounded-xl px-1.5 pr-2.5"
               aria-label={`${displayName} account menu`}
+              data-tour="user-menu"
             >
               <Avatar className="h-8 w-9 rounded-lg after:rounded-lg">
                 <AvatarFallback className="rounded-lg bg-neutral-900 text-[0.7rem] font-semibold tracking-wide text-white">

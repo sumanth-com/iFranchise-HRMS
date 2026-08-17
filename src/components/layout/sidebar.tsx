@@ -9,6 +9,7 @@ import { SidebarBrand } from "@/components/layout/sidebar-brand";
 import { useSidebarNavigation } from "@/hooks/use-sidebar-navigation";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { resolveActiveNavHref } from "@/lib/layout/sidebar-active";
+import { navTourId } from "@/lib/product-tour/constants";
 import { cn } from "@/lib/utils";
 
 export function Sidebar() {
@@ -41,6 +42,7 @@ export function Sidebar() {
 
   return (
     <aside
+      data-tour="sidebar"
       className={cn(
         "hidden h-full shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground transition-[width] duration-200 md:flex",
         isCollapsed ? "w-16" : "w-64",
@@ -97,6 +99,7 @@ export function Sidebar() {
                   collapsed={isCollapsed}
                   indented={Boolean(item.section) && !isCollapsed}
                   icon={Icon}
+                  tourId={navTourId(item.href)}
                 />
               ) : null}
             </div>

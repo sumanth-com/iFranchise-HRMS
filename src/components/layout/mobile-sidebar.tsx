@@ -15,6 +15,7 @@ import { OrganizationBrandTitle } from "@/components/layout/sidebar-brand";
 import { SidebarNavLink } from "@/components/layout/sidebar-nav-link";
 import { useSidebarNavigation } from "@/hooks/use-sidebar-navigation";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { navTourId } from "@/lib/product-tour/constants";
 import { resolveActiveNavHref } from "@/lib/layout/sidebar-active";
 import { cn } from "@/lib/utils";
 
@@ -52,7 +53,7 @@ export function MobileSidebar() {
         <SheetHeader className="shrink-0 border-b px-4 py-4">
           <SheetTitle><OrganizationBrandTitle /></SheetTitle>
         </SheetHeader>
-        <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain p-2">
+        <nav data-tour="sidebar" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain p-2">
           {navigation.map((item, index) => {
             const isActive = activeHref === item.href;
             const Icon = item.icon;
@@ -87,6 +88,7 @@ export function MobileSidebar() {
                     indented={Boolean(item.section)}
                     icon={Icon}
                     onNavigate={() => setMobileOpen(false)}
+                    tourId={navTourId(item.href)}
                   />
                 ) : null}
               </div>

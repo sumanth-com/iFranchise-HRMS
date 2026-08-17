@@ -54,6 +54,7 @@ export function EmployeeDashboardKpiCards({ kpis }: { kpis: EmployeeDashboardKpi
   return (
     <section
       aria-label="Your day at a glance"
+      data-tour="dashboard-kpis"
       className="grid grid-cols-2 gap-3 lg:grid-cols-4"
     >
       <EmployeeStatCard

@@ -1,7 +1,7 @@
-import { PortalHelpView } from "@/components/layout/portal-help-view";
+import { DashboardPortalHelpPage } from "@/components/layout/dashboard-portal-help-page";
 import { requireAuthenticatedProfile } from "@/lib/permissions/server";
 
 export default async function DashboardHelpPage() {
   const profile = await requireAuthenticatedProfile();
-  return <PortalHelpView firstName={profile.employee.firstName} variant="hr" />;
+  return <DashboardPortalHelpPage firstName={profile.employee.firstName} />;
 }
