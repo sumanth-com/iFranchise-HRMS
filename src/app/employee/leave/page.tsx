@@ -8,6 +8,7 @@ import {
   getLeaveLookups,
   listEmployeeOwnLeaveRequests,
 } from "@/lib/leave/services/leave-queries";
+import { DEFAULT_LEAVE_CALENDAR } from "@/lib/leave/services/leave-calendar-engine";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { hasPermission } from "@/lib/permissions/utils";
 import { createClient } from "@/lib/supabase/server";
@@ -45,7 +46,7 @@ export default async function EmployeeLeavePage() {
     ),
     safeServerCall(
       () => getEmployeeLeaveCalendarData(supabase, profile, calendarMonth, calendarYear),
-      { leaves: [], holidays: [] },
+      { leaves: [], holidays: [], calendar: DEFAULT_LEAVE_CALENDAR },
       "[employee/leave] calendar",
     ),
     canApply || canEdit
@@ -80,6 +81,7 @@ export default async function EmployeeLeavePage() {
         calendarYear={calendarYear}
         calendarLeaves={calendar.leaves}
         calendarHolidays={calendar.holidays}
+        calendarContext={calendar.calendar}
       />
     </div>
   );

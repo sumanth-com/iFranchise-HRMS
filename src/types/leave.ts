@@ -125,6 +125,7 @@ export type LeaveDetail = {
   startDate: string;
   endDate: string;
   totalDays: number;
+  durationBreakdown?: import("@/lib/leave/services/leave-calendar-engine").LeaveDurationBreakdown | null;
   isHalfDay: boolean;
   halfDayPeriod: HalfDayPeriod | null;
   reason: string | null;
@@ -178,6 +179,25 @@ export type LeaveLookups = {
   managers: LookupOption[];
   approvers: LookupOption[];
   employmentTypes: LookupOption[];
+};
+
+export type LeaveApplyContext = {
+  calendar: import("@/lib/leave/services/leave-calendar-engine").LeaveCalendarContext;
+  employee: import("@/lib/leave/services/leave-policy-engine").LeaveEmployeePolicyState;
+  probation: import("@/lib/leave/services/leave-policy-engine").LeaveProbationSnapshot;
+  probationRules: import("@/lib/leave/services/leave-policy-engine").LeaveProbationRules;
+  notice: import("@/lib/leave/services/leave-policy-engine").LeavePolicyNoticeHours;
+  allowHalfDay: boolean;
+  maxConsecutiveDays: number;
+  approvalLevels: number;
+  leaveTypes: Array<{
+    id: string;
+    code: string;
+    name: string;
+    isPaid: boolean;
+  }>;
+  balances: LeaveEmployeeBalanceSnapshot[];
+  policyDocument: import("@/types/leave-policy").LeavePolicyDocument;
 };
 
 export type LeaveActionResult<T = void> =

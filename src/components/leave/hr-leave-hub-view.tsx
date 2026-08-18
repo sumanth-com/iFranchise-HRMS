@@ -64,6 +64,7 @@ type Props = {
   calendarYear: number;
   calendarLeaves: LeaveCalendarEntry[];
   calendarHolidays: LeaveHolidayEntry[];
+  calendarContext?: import("@/lib/leave/services/leave-calendar-engine").LeaveCalendarContext;
   teamLeave: TeamLeaveData;
   teamApplyLeaveLookups: LeaveLookups | null;
 };
@@ -82,6 +83,7 @@ export function HrLeaveHubView({
   calendarYear,
   calendarLeaves,
   calendarHolidays,
+  calendarContext,
   teamLeave,
   teamApplyLeaveLookups,
 }: Props) {
@@ -142,6 +144,7 @@ export function HrLeaveHubView({
           calendarYear={calendarYear}
           calendarLeaves={calendarLeaves}
           calendarHolidays={calendarHolidays}
+          calendarContext={calendarContext}
           showPageHeading={false}
         />
       )}

@@ -183,6 +183,7 @@ export async function getTeamLeaveDetailBundle(
     startDate: leave.startDate,
     endDate: leave.endDate,
     totalDays: leave.totalDays,
+    durationBreakdown: leave.durationBreakdown ?? null,
     isHalfDay: leave.isHalfDay,
     halfDayPeriod: leave.halfDayPeriod,
     reason: leave.reason,

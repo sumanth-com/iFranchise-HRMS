@@ -21,7 +21,13 @@ import {
   SelectValue,
 } from "@/components/common/select";
 import { LEAVE_CALENDAR_LEGEND } from "@/lib/leave/constants";
-import { expandDateRange, isWeekendDate } from "@/lib/leave/services/leave-utils";
+import { expandDateRange } from "@/lib/leave/services/leave-utils";
+import {
+  calculateLeaveDuration,
+  classifyCalendarDay,
+  DEFAULT_LEAVE_CALENDAR,
+  type LeaveCalendarContext,
+} from "@/lib/leave/services/leave-calendar-engine";
 import type {
   LeaveCalendarEntry,
   LeaveHolidayEntry,
@@ -45,6 +51,7 @@ type LeaveCalendarViewProps = {
   enableWeekView?: boolean;
   /** Smaller calendar for self-service layouts. */
   compact?: boolean;
+  calendar?: LeaveCalendarContext;
 };
 
 type CalendarViewMode = "month" | "week";
@@ -142,6 +149,7 @@ export function LeaveCalendarView({
   hideLegend = false,
   enableWeekView = false,
   compact = false,
+  calendar = DEFAULT_LEAVE_CALENDAR,
 }: LeaveCalendarViewProps) {
   const [view, setView] = useState<CalendarViewMode>("month");
   const [anchor, setAnchor] = useState<string>(() =>
@@ -242,6 +250,34 @@ export function LeaveCalendarView({
 
     return map;
   }, [leaves]);
+
+  const calendarWithHolidays = useMemo<LeaveCalendarContext>(
+    () => ({
+      ...calendar,
+      holidays: Array.from(
+        new Set([
+          ...calendar.holidays,
+          ...holidays.filter((item) => !item.isOptional).map((item) => item.holidayDate),
+        ]),
+      ),
+    }),
+    [calendar, holidays],
+  );
+
+  const sandwichDates = useMemo(() => {
+    const dates = new Set<string>();
+    leaves.forEach((leave) => {
+      calculateLeaveDuration({
+        startDate: leave.startDate,
+        endDate: leave.endDate,
+        isHalfDay: leave.isHalfDay,
+        calendar: calendarWithHolidays,
+      }).days.forEach((day) => {
+        if (day.kind === "sandwich") dates.add(day.date);
+      });
+    });
+    return dates;
+  }, [leaves, calendarWithHolidays]);
 
   const monthLabel = format(new Date(year, month - 1, 1), "MMMM");
 
@@ -401,7 +437,10 @@ export function LeaveCalendarView({
 
             const holiday = holidayMap.get(day.date);
             const dayLeaves = leavesByDate.get(day.date) ?? [];
-            const isWeekend = isWeekendDate(day.date);
+            const dayClass = classifyCalendarDay(day.date, calendarWithHolidays);
+            const isWeeklyHoliday = dayClass === "weekly_off";
+            const isHalfDayCalendar = dayClass === "half_day";
+            const sandwichOnDay = sandwichDates.has(day.date);
             const leaveHighlight =
               day.isCurrentMonth && dayLeaves.length > 0
                 ? leaveCellHighlight(dayLeaves)
@@ -419,11 +458,19 @@ export function LeaveCalendarView({
                   compact ? "p-1.5" : "p-2",
                   cellMinHeight,
                   !day.isCurrentMonth && "bg-muted/20 text-muted-foreground",
-                  isWeekend &&
+                  isWeeklyHoliday &&
                     day.isCurrentMonth &&
                     !leaveHighlight &&
                     !holidayHighlight &&
                     "bg-muted/30",
+                  isHalfDayCalendar &&
+                    day.isCurrentMonth &&
+                    !leaveHighlight &&
+                    !holidayHighlight &&
+                    "bg-orange-500/10",
+                  sandwichOnDay && day.isCurrentMonth && !leaveHighlight
+                    ? "ring-1 ring-inset ring-sky-500/40"
+                    : null,
                   holidayHighlight,
                   leaveHighlight,
                 )}
@@ -440,6 +487,15 @@ export function LeaveCalendarView({
                   >
                     {day.dayNumber}
                   </span>
+                  {day.isCurrentMonth && isHalfDayCalendar && !holiday ? (
+                    <span className="rounded bg-orange-500/15 px-1 py-px text-[9px] font-medium text-orange-700 dark:text-orange-300">
+                      Half
+                    </span>
+                  ) : sandwichOnDay && day.isCurrentMonth && dayLeaves.length === 0 ? (
+                    <span className="rounded bg-sky-500/15 px-1 py-px text-[9px] font-medium text-sky-800 dark:text-sky-300">
+                      Sandwich
+                    </span>
+                  ) : null}
                 </div>
 
                 <div className={cn("flex flex-col", compact ? "gap-0.5" : "gap-1")}>

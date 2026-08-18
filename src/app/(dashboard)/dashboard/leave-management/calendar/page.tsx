@@ -17,7 +17,7 @@ export default async function LeaveCalendarPage({
   const month = rawParams.month ? Number(rawParams.month) : now.getMonth() + 1;
   const year = rawParams.year ? Number(rawParams.year) : now.getFullYear();
 
-  const { leaves, holidays } = await getLeaveCalendarData(
+  const { leaves, holidays, calendar } = await getLeaveCalendarData(
     supabase,
     profile,
     month,
@@ -29,7 +29,7 @@ export default async function LeaveCalendarPage({
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Leave Calendar</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Monthly view of approved and pending leaves, holidays, and weekends.
+          Monthly view of approved and pending leaves, holidays, half days, and sandwich-counted days.
         </p>
       </div>
       <LeaveCalendarShell
@@ -37,6 +37,7 @@ export default async function LeaveCalendarPage({
         holidays={holidays}
         month={month}
         year={year}
+        calendar={calendar}
       />
     </div>
   );

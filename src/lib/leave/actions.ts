@@ -322,3 +322,65 @@ export async function getEmployeeLeaveBalanceSnapshotAction(
     };
   }
 }
+
+export async function getLeaveApplyContextAction(
+  employeeId: string,
+): Promise<LeaveActionResult<import("@/types/leave").LeaveApplyContext>> {
+  try {
+    const profile = await requireServerPermission("leave.create");
+    const supabase = await getAuthenticatedSupabase();
+    const { getTodayDateString } = await import(
+      "@/lib/attendance/services/attendance-utils"
+    );
+    const { getProbationSnapshot } = await import(
+      "@/lib/leave/services/leave-policy-engine"
+    );
+    const {
+      loadLeaveEmployeePolicyState,
+      loadLeavePolicyRuntime,
+    } = await import("@/lib/leave/services/leave-policy-runtime");
+    const { getLeavePolicyPageData } = await import(
+      "@/lib/leave/services/leave-policy-queries"
+    );
+
+    const [runtime, employee, balances, policy] = await Promise.all([
+      loadLeavePolicyRuntime(supabase, profile.employee.organizationId),
+      loadLeaveEmployeePolicyState(
+        supabase,
+        employeeId,
+        undefined,
+        profile.employee.organizationId,
+      ),
+      getEmployeeLeaveBalanceSnapshot(supabase, employeeId),
+      getLeavePolicyPageData(supabase, profile.employee.organizationId),
+    ]);
+
+    return {
+      success: true,
+      data: {
+        calendar: runtime.calendar,
+        employee,
+        probation: getProbationSnapshot(employee, getTodayDateString(), runtime.probation),
+        probationRules: runtime.probation,
+        notice: runtime.notice,
+        allowHalfDay: runtime.allowHalfDay,
+        maxConsecutiveDays: runtime.maxConsecutiveDays,
+        approvalLevels: runtime.approvalLevels,
+        leaveTypes: runtime.leaveTypes.map((item) => ({
+          id: item.id,
+          code: item.code,
+          name: item.name,
+          isPaid: item.isPaid,
+        })),
+        balances,
+        policyDocument: policy.document,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "Failed to load leave policy context",
+    };
+  }
+}

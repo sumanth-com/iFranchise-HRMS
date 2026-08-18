@@ -10,7 +10,7 @@ const workingDaySchema = z.enum([
   "saturday",
   "sunday",
 ]);
-const weekendRuleSchema = z.enum(["off", "working", "half_day"]);
+const weekendRuleSchema = z.enum(["off", "working", "half_day", "nth_half"]);
 
 export const companySettingsSectionSchema = z.enum([
   "profile",
@@ -43,6 +43,7 @@ export const workingConfigurationSchema = z.object({
   weekendRules: z.object({
     saturday: weekendRuleSchema,
     sunday: weekendRuleSchema,
+    saturdayHalfDayWeeks: z.array(z.number().int().min(1).max(5)).default([2, 4]),
   }),
   workWeekStartDay: z.coerce.number().int().min(0).max(6),
   defaultShiftTemplateId: z.string().uuid().nullable().default(null),
@@ -64,6 +65,14 @@ export const leavePoliciesSchema = z.object({
     enabled: z.boolean(),
     includeWeekends: z.boolean(),
     includeHolidays: z.boolean(),
+  }),
+  probation: z.object({
+    durationMonths: z.coerce.number().int().min(1).max(12),
+    firstMonthLeaveAllowed: z.boolean(),
+    casualLeaveCap: z.coerce.number().min(0).max(30),
+    periodLeaveCap: z.coerce.number().min(0).max(30),
+    periodLeaveFemaleOnly: z.boolean(),
+    carryForwardAllowed: z.boolean(),
   }),
   carryForward: z.object({
     enabled: z.boolean(),

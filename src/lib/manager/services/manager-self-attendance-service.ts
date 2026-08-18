@@ -37,6 +37,7 @@ import { getEmployeeById } from "@/lib/employees/services/employee-detail";
 import { createSignedStorageUrl } from "@/lib/storage/signed-url";
 import { buildEmployeeRouteRef } from "@/lib/employees/routing";
 import { expandDateRange, getMonthDateRange } from "@/lib/leave/services/leave-utils";
+import { classifyCalendarDay } from "@/lib/leave/services/leave-calendar-engine";
 import { hasPermission } from "@/lib/permissions/utils";
 import type {
   ManagerAttendancePunchInput,
@@ -396,19 +397,23 @@ async function loadWeekendRules(
 
 function weekendStatusForDate(
   date: string,
-  weekendRules: { saturday: WeekendDayRule; sunday: WeekendDayRule },
+  weekendRules: {
+    saturday: WeekendDayRule;
+    sunday: WeekendDayRule;
+    saturdayHalfDayWeeks?: number[];
+  },
 ): AttendanceStatus | null {
-  const dow = getDay(parseISO(date));
-  if (dow === 6) {
-    if (weekendRules.saturday === "off") return "week_off";
-    if (weekendRules.saturday === "half_day") return "half_day";
-    return null;
-  }
-  if (dow === 0) {
-    if (weekendRules.sunday === "off") return "week_off";
-    if (weekendRules.sunday === "half_day") return "half_day";
-    return null;
-  }
+  const dayClass = classifyCalendarDay(date, {
+    holidays: [],
+    weekendRules: {
+      saturday: weekendRules.saturday,
+      sunday: weekendRules.sunday,
+      saturdayHalfDayWeeks: weekendRules.saturdayHalfDayWeeks ?? [2, 4],
+    },
+    sandwich: { enabled: false, includeWeekends: false, includeHolidays: false },
+  });
+  if (dayClass === "weekly_off") return "week_off";
+  if (dayClass === "half_day") return "half_day";
   return null;
 }
 

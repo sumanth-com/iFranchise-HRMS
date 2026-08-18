@@ -28,9 +28,9 @@ export function leaveTeamListUrl(
 }
 
 export const LEAVE_STATUS_LABELS: Record<LeaveStatus, string> = {
-  pending: "Pending HR",
-  approved: "Approved by HR",
-  rejected: "Rejected by HR",
+  pending: "Pending approval",
+  approved: "Approved",
+  rejected: "Rejected",
   cancelled: "Cancelled",
   withdrawn: "Withdrawn",
 };
@@ -53,8 +53,9 @@ export const LEAVE_CALENDAR_LEGEND = {
   approved: { label: "Approved", className: "bg-emerald-500" },
   pending: { label: "Pending", className: "bg-amber-500" },
   holiday: { label: "Holiday", className: "bg-violet-500" },
-  weekend: { label: "Weekend", className: "bg-muted-foreground/40" },
-  halfDay: { label: "Half Day", className: "bg-orange-500" },
+  weekend: { label: "Weekly holiday", className: "bg-muted-foreground/40" },
+  halfDay: { label: "Half day", className: "bg-orange-500" },
+  sandwich: { label: "Sandwich", className: "bg-sky-500" },
 } as const;
 
 export const APPROVAL_LEVEL_LABELS: Record<number, string> = {
@@ -63,7 +64,7 @@ export const APPROVAL_LEVEL_LABELS: Record<number, string> = {
 };
 
 /** iFranchise leave policy — active leave types (including LOP for requests/payroll). */
-export const ALLOWED_LEAVE_TYPE_CODES = ["CL", "SL", "EL", "OH", "LOP"] as const;
+export const ALLOWED_LEAVE_TYPE_CODES = ["CL", "SL", "EL", "OH", "PL", "LOP"] as const;
 
 /** Leave balance UI — actual balances only; LOP appears in payroll, not leave balance. */
-export const LEAVE_BALANCE_DISPLAY_CODES = ["CL", "SL", "EL", "OH"] as const;
+export const LEAVE_BALANCE_DISPLAY_CODES = ["CL", "SL", "EL", "OH", "PL"] as const;

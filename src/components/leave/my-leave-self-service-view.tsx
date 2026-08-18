@@ -33,6 +33,7 @@ import type {
   LeaveListItem,
   LeaveLookups,
 } from "@/types/leave";
+import type { LeaveCalendarContext } from "@/lib/leave/services/leave-calendar-engine";
 
 type Props = {
   title?: string;
@@ -49,6 +50,7 @@ type Props = {
   calendarYear: number;
   calendarLeaves: LeaveCalendarEntry[];
   calendarHolidays: LeaveHolidayEntry[];
+  calendarContext?: LeaveCalendarContext;
   showPageHeading?: boolean;
 };
 
@@ -67,6 +69,7 @@ export function MyLeaveSelfServiceView({
   calendarYear,
   calendarLeaves,
   calendarHolidays,
+  calendarContext,
   showPageHeading = true,
 }: Props) {
   const router = useRouter();
@@ -96,18 +99,21 @@ export function MyLeaveSelfServiceView({
   const upcomingLeave = requests
     .filter((row) => row.leaveStatus === "approved" && row.startDate >= today)
     .sort((a, b) => a.startDate.localeCompare(b.startDate))[0];
-  const upcomingLeaveLabel = upcomingLeave
-    ? upcomingLeave.startDate === upcomingLeave.endDate
-      ? formatLeaveDate(upcomingLeave.startDate)
-      : `${formatLeaveDate(upcomingLeave.startDate)} – ${formatLeaveDate(upcomingLeave.endDate)}`
-    : "None scheduled";
 
+  const availableHint =
+    balances
+      .filter((row) => row.balanceDays > 0)
+      .map((row) => `${row.leaveTypeCode} ${roundDays(row.balanceDays)}`)
+      .join(" · ") || "No days left";
+
+  const pendingValue =
+    pendingRequestCount > 0
+      ? `${pendingRequestCount} ${pendingRequestCount === 1 ? "request" : "requests"}`
+      : "None";
   const pendingHint =
-    totalPendingDays > 0
-      ? pendingRequestCount > 0
-        ? `${pendingRequestCount} request${pendingRequestCount === 1 ? "" : "s"} awaiting approval`
-        : "Days awaiting approval"
-      : "No requests awaiting approval";
+    pendingRequestCount > 0
+      ? `${roundDays(totalPendingDays)} ${roundDays(totalPendingDays) === 1 ? "day" : "days"} waiting`
+      : "Nothing waiting";
 
   function openLeavePopup(row: LeaveListItem) {
     setViewPreview(row);
@@ -195,36 +201,36 @@ export function MyLeaveSelfServiceView({
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <EmployeeStatCard
-          label="Available Balance"
+          label="Available"
           value={`${roundDays(totalBalance)} days`}
           icon={CalendarCheck}
           accent="text-indigo-600 dark:text-indigo-400"
           iconBg="bg-indigo-500/10"
-          hint="Days you can still apply for"
+          hint={availableHint}
         />
         <EmployeeStatCard
-          label="Days Used"
+          label="Used"
           value={`${roundDays(totalUsed)} days`}
           icon={CalendarDays}
           accent="text-sky-600 dark:text-sky-400"
           iconBg="bg-sky-500/10"
-          hint="Approved leave taken this year"
+          hint="Taken this year"
         />
         <EmployeeStatCard
-          label="Pending Approval"
-          value={`${roundDays(totalPendingDays)} days`}
+          label="Pending"
+          value={pendingValue}
           icon={CalendarClock}
           accent="text-amber-600 dark:text-amber-400"
           iconBg="bg-amber-500/10"
           hint={pendingHint}
         />
         <EmployeeStatCard
-          label="Upcoming Leave"
-          value={upcomingLeave ? formatLeaveDate(upcomingLeave.startDate) : "—"}
+          label="Next leave"
+          value={upcomingLeave ? formatLeaveDate(upcomingLeave.startDate) : "None"}
           icon={CalendarCheck}
           accent="text-emerald-600 dark:text-emerald-400"
           iconBg="bg-emerald-500/10"
-          hint={upcomingLeave ? upcomingLeave.leaveTypeName : upcomingLeaveLabel}
+          hint={upcomingLeave ? upcomingLeave.leaveTypeName : "Nothing scheduled"}
         />
       </div>
 
@@ -233,6 +239,7 @@ export function MyLeaveSelfServiceView({
         initialYear={calendarYear}
         initialLeaves={calendarLeaves}
         initialHolidays={calendarHolidays}
+        initialCalendar={calendarContext}
       />
 
       <section className="rounded-xl border bg-card p-4 shadow-sm">

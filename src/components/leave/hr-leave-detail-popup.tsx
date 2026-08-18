@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
 import { LeaveStatusBadge } from "@/components/leave/leave-status-badge";
+import { LeaveDurationBreakdownCard } from "@/components/leave/leave-apply-policy-panel";
 import { Label } from "@/components/ui/label";
 import {
   approveLeaveRequestAction,
@@ -463,6 +464,14 @@ export function HrLeaveDetailPopup({
                   : `${detail.totalDays} day${detail.totalDays === 1 ? "" : "s"}`
               }
             />
+            {detail.durationBreakdown ? (
+              <div className="sm:col-span-2 rounded-lg border bg-muted/20 px-3 py-2.5">
+                <p className="text-xs text-muted-foreground">How this was calculated</p>
+                <div className="mt-2">
+                  <LeaveDurationBreakdownCard breakdown={detail.durationBreakdown} />
+                </div>
+              </div>
+            ) : null}
             <DetailField label="Start date" value={formatLeaveDate(detail.startDate)} />
             <DetailField label="End date" value={formatLeaveDate(detail.endDate)} />
             <DetailField label="Branch" value={detail.branchName ?? "—"} />

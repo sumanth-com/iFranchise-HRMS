@@ -7,6 +7,7 @@ import { Ban, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import { LeaveStatusBadge } from "@/components/leave/leave-status-badge";
+import { LeaveDurationBreakdownCard } from "@/components/leave/leave-apply-policy-panel";
 import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
 import { Label } from "@/components/ui/label";
@@ -213,6 +214,12 @@ export function LeaveDetailView({ leave }: LeaveDetailViewProps) {
                   : `${leave.totalDays} day${leave.totalDays === 1 ? "" : "s"}`
               }
             />
+            {leave.durationBreakdown ? (
+              <div className="border-b py-3 last:border-b-0">
+                <p className="mb-2 text-sm text-muted-foreground">How this was calculated</p>
+                <LeaveDurationBreakdownCard breakdown={leave.durationBreakdown} />
+              </div>
+            ) : null}
             <DetailRow
               label="Status"
               value={<LeaveStatusBadge status={leave.leaveStatus} />}

@@ -19,17 +19,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/common/select";
-import { createLeaveRequestAction, getEmployeeLeaveBalanceSnapshotAction, updateLeaveRequestAction } from "@/lib/leave/actions";
+import { createLeaveRequestAction, getLeaveApplyContextAction, updateLeaveRequestAction } from "@/lib/leave/actions";
 import {
   HALF_DAY_PERIOD_LABELS,
   LEAVE_ROUTES,
 } from "@/lib/leave/constants";
+import { LeaveDurationPreview, LeavePolicyInfo } from "@/components/leave/leave-apply-policy-panel";
+import { PERIOD_LEAVE_CODE } from "@/lib/leave/services/leave-policy-engine";
+import { previewLeaveApplication } from "@/lib/leave/services/leave-apply-preview";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import {
   leaveFormSchema,
   type LeaveFormInput,
 } from "@/lib/validations/leave";
-import type { LeaveEmployeeBalanceSnapshot, LeaveListItem, LeaveLookups } from "@/types/leave";
+import type { LeaveApplyContext, LeaveListItem, LeaveLookups } from "@/types/leave";
 
 type LeaveFormProps = {
   lookups: LeaveLookups;
@@ -68,7 +71,7 @@ export function LeaveForm({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  const [balances, setBalances] = useState<LeaveEmployeeBalanceSnapshot[]>([]);
+  const [applyContext, setApplyContext] = useState<LeaveApplyContext | null>(null);
   const [balancesLoading, setBalancesLoading] = useState(false);
 
   const employeeItems = lookups.employees.map((employee) => ({
@@ -78,10 +81,25 @@ export function LeaveForm({
       : employee.label,
   }));
 
-  const leaveTypeItems = lookups.leaveTypes.map((leaveType) => ({
-    value: leaveType.id,
-    label: leaveType.label,
-  }));
+  const sourceLeaveTypes = applyContext
+    ? applyContext.leaveTypes.map((item) => ({
+        id: item.id,
+        label: item.name,
+        code: item.code,
+      }))
+    : lookups.leaveTypes;
+
+  const leaveTypeItems = sourceLeaveTypes
+    .filter((leaveType) => {
+      if (leaveType.code === PERIOD_LEAVE_CODE && applyContext?.employee.gender?.toLowerCase() !== "female") {
+        return false;
+      }
+      return Boolean(leaveType.id);
+    })
+    .map((leaveType) => ({
+      value: leaveType.id,
+      label: leaveType.label,
+    }));
 
   const halfDayPeriodItems = Object.entries(HALF_DAY_PERIOD_LABELS).map(
     ([value, label]) => ({ value, label }),
@@ -108,24 +126,28 @@ export function LeaveForm({
 
   const isHalfDay = form.watch("isHalfDay");
   const selectedEmployeeId = form.watch("employeeId");
+  const selectedLeaveTypeId = form.watch("leaveTypeId");
+  const startDate = form.watch("startDate");
+  const endDate = form.watch("endDate");
+  const balances = applyContext?.balances ?? [];
 
   useEffect(() => {
     if (!selectedEmployeeId) {
-      setBalances([]);
+      setApplyContext(null);
       return;
     }
 
     let cancelled = false;
     setBalancesLoading(true);
 
-    void getEmployeeLeaveBalanceSnapshotAction(selectedEmployeeId).then((result) => {
+    void getLeaveApplyContextAction(selectedEmployeeId).then((result) => {
       if (cancelled) return;
       setBalancesLoading(false);
       if (result.success) {
-        setBalances(result.data);
+        setApplyContext(result.data);
         return;
       }
-      setBalances([]);
+      setApplyContext(null);
     });
 
     return () => {
@@ -170,9 +192,29 @@ export function LeaveForm({
   });
 
   const isSelfService = variant === "self";
+  const applyPreview =
+    applyContext && selectedLeaveTypeId && startDate && endDate
+      ? previewLeaveApplication({
+          context: applyContext,
+          leaveTypeId: selectedLeaveTypeId,
+          startDate,
+          endDate,
+          isHalfDay,
+        })
+      : null;
+  const policyBlocksSubmit = Boolean(applyPreview?.issues.length);
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      {applyContext ? (
+        <LeavePolicyInfo
+          context={applyContext}
+          employeeName={
+            lookups.employees.find((employee) => employee.id === selectedEmployeeId)?.label ??
+            "Employee"
+          }
+        />
+      ) : null}
       <div className="grid gap-4 md:grid-cols-2">
         {!isSelfService ? (
           <div className="space-y-2">
@@ -346,6 +388,18 @@ export function LeaveForm({
           ) : null}
         </div>
 
+        {applyContext && selectedLeaveTypeId && startDate && endDate ? (
+          <div className="md:col-span-2">
+            <LeaveDurationPreview
+              context={applyContext}
+              leaveTypeId={selectedLeaveTypeId}
+              startDate={startDate}
+              endDate={endDate}
+              isHalfDay={isHalfDay}
+            />
+          </div>
+        ) : null}
+
         <div className="space-y-2 md:col-span-2">
           <label className="flex items-center gap-2 text-sm">
             <input
@@ -461,7 +515,7 @@ export function LeaveForm({
         >
           Cancel
         </Button>
-        <Button type="submit" disabled={isPending}>
+        <Button type="submit" disabled={isPending || policyBlocksSubmit}>
           {isEdit
             ? "Save changes"
             : isSelfService

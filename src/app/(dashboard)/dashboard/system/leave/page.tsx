@@ -9,6 +9,7 @@ import {
   getLeaveLookups,
   listEmployeeOwnLeaveRequests,
 } from "@/lib/leave/services/leave-queries";
+import { DEFAULT_LEAVE_CALENDAR } from "@/lib/leave/services/leave-calendar-engine";
 import { requireSuperAdminProfile } from "@/lib/system-admin/guards";
 import { hasPermission } from "@/lib/permissions/utils";
 import { createClient } from "@/lib/supabase/server";
@@ -42,7 +43,7 @@ export default async function SuperAdminLeavePage() {
     ),
     safeServerCall(
       () => getEmployeeLeaveCalendarData(supabase, profile, calendarMonth, calendarYear),
-      { leaves: [], holidays: [] },
+      { leaves: [], holidays: [], calendar: DEFAULT_LEAVE_CALENDAR },
       "[system-admin/leave] calendar",
     ),
     canApply
@@ -83,6 +84,7 @@ export default async function SuperAdminLeavePage() {
           calendarYear={calendarYear}
           calendarLeaves={calendar.leaves}
           calendarHolidays={calendar.holidays}
+          calendarContext={calendar.calendar}
         />
       </div>
     </Suspense>

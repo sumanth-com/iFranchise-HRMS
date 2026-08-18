@@ -15,6 +15,8 @@ import type {
 } from "@/types/leave";
 import { leaveListParamsSchema } from "@/lib/validations/leave";
 import { ALLOWED_LEAVE_TYPE_CODES, LEAVE_BALANCE_DISPLAY_CODES } from "@/lib/leave/constants";
+import { loadLeavePolicyRuntime } from "@/lib/leave/services/leave-policy-runtime";
+import type { LeaveCalendarContext } from "@/lib/leave/services/leave-calendar-engine";
 import {
   getBranches,
   getDepartments,
@@ -256,12 +258,8 @@ export async function listLeaveRequests(
           : null,
         currentApprovalLevel: pendingApproval?.approval_level ?? null,
         pendingApproverEmployeeId,
-        canActOnApproval:
-          isAssignedApprover &&
-          hasPermission(profile.permissionCodes, "leave.approve"),
-        canActOnRejection:
-          isAssignedApprover &&
-          hasPermission(profile.permissionCodes, "leave.reject"),
+        canActOnApproval: isAssignedApprover,
+        canActOnRejection: isAssignedApprover,
       };
     }),
     total: count ?? 0,
@@ -548,11 +546,15 @@ export async function getLeaveCalendarData(
   profile: UserProfile,
   month: number,
   year: number,
-): Promise<{ leaves: LeaveCalendarEntry[]; holidays: LeaveHolidayEntry[] }> {
+): Promise<{
+  leaves: LeaveCalendarEntry[];
+  holidays: LeaveHolidayEntry[];
+  calendar: LeaveCalendarContext;
+}> {
   const organizationId = profile.employee.organizationId;
   const range = getMonthDateRange(month, year);
 
-  const [leavesResult, holidaysResult] = await Promise.all([
+  const [leavesResult, holidaysResult, runtime] = await Promise.all([
     supabase
       .schema("hrms")
       .from("leave_requests")
@@ -582,6 +584,7 @@ export async function getLeaveCalendarData(
       .gte("holiday_date", range.start)
       .lte("holiday_date", range.end)
       .is("deleted_at", null),
+    loadLeavePolicyRuntime(supabase, organizationId),
   ]);
 
   if (leavesResult.error) throw new Error(leavesResult.error.message);
@@ -612,7 +615,7 @@ export async function getLeaveCalendarData(
     isOptional: row.is_optional,
   }));
 
-  return { leaves, holidays };
+  return { leaves, holidays, calendar: runtime.calendar };
 }
 
 /**
@@ -625,12 +628,16 @@ export async function getEmployeeLeaveCalendarData(
   profile: UserProfile,
   month: number,
   year: number,
-): Promise<{ leaves: LeaveCalendarEntry[]; holidays: LeaveHolidayEntry[] }> {
+): Promise<{
+  leaves: LeaveCalendarEntry[];
+  holidays: LeaveHolidayEntry[];
+  calendar: LeaveCalendarContext;
+}> {
   const employeeId = profile.employee.id;
   const organizationId = profile.employee.organizationId;
   const range = getMonthDateRange(month, year);
 
-  const [leavesResult, holidaysResult] = await Promise.all([
+  const [leavesResult, holidaysResult, runtime] = await Promise.all([
     supabase
       .schema("hrms")
       .from("leave_requests")
@@ -651,6 +658,7 @@ export async function getEmployeeLeaveCalendarData(
       .gte("holiday_date", range.start)
       .lte("holiday_date", range.end)
       .is("deleted_at", null),
+    loadLeavePolicyRuntime(supabase, organizationId),
   ]);
 
   if (leavesResult.error) throw new Error(leavesResult.error.message);
@@ -680,7 +688,7 @@ export async function getEmployeeLeaveCalendarData(
     isOptional: row.is_optional,
   }));
 
-  return { leaves, holidays };
+  return { leaves, holidays, calendar: runtime.calendar };
 }
 
 export async function getLeaveLookups(

@@ -95,6 +95,7 @@ export async function LeaveHubSection({
       calendarYear={calendarYear}
       calendarLeaves={calendar.leaves}
       calendarHolidays={calendar.holidays}
+      calendarContext={calendar.calendar}
       teamLeave={{
         summary: summary ?? {
           pendingRequests: 0,

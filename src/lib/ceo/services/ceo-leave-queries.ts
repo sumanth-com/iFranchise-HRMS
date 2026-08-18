@@ -711,8 +711,8 @@ export async function getCeoLeaveCalendar(
   month: number,
   year: number,
 ): Promise<CeoLeaveCalendar> {
-  const { leaves, holidays } = await getLeaveCalendarData(supabase, profile, month, year);
-  return { month, year, leaves, holidays };
+  const { leaves, holidays, calendar } = await getLeaveCalendarData(supabase, profile, month, year);
+  return { month, year, leaves, holidays, calendar };
 }
 
 export async function getCeoLeaveLookups(

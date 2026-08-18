@@ -39,6 +39,7 @@ export function CeoLeaveCalendarPanel({ initial }: { initial: CeoLeaveCalendar }
         currentMonthOnly
         showYearPicker
         enableWeekView
+        calendar={calendar.calendar}
       />
     </section>
   );

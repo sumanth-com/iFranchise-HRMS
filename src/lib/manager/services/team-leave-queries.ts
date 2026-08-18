@@ -6,11 +6,12 @@ import { ALLOWED_LEAVE_TYPE_CODES } from "@/lib/leave/constants";
 import {
   getEmployeeLeaveBalanceSnapshot,
 } from "@/lib/leave/services/leave-queries";
+import { classifyCalendarDay, DEFAULT_LEAVE_CALENDAR } from "@/lib/leave/services/leave-calendar-engine";
+import { loadLeavePolicyRuntime } from "@/lib/leave/services/leave-policy-runtime";
 import {
   expandDateRange,
   getCurrentBalanceYear,
   getMonthDateRange,
-  isWeekendDate,
 } from "@/lib/leave/services/leave-utils";
 import { getTeamFilterLookups } from "@/lib/manager/services/team-queries";
 import { teamLeaveListParamsSchema } from "@/lib/validations/manager-leave";
@@ -107,12 +108,17 @@ export async function detectTeamLeaveConflicts(
 ): Promise<TeamLeaveConflict[]> {
   const conflicts: TeamLeaveConflict[] = [];
   const requestDates = expandDateRange(input.startDate, input.endDate);
+  const holidayDates = holidays.map((item) => item.holidayDate);
+  const calendar = {
+    ...DEFAULT_LEAVE_CALENDAR,
+    holidays: holidayDates,
+  };
 
   for (const date of requestDates) {
-    if (isWeekendDate(date)) {
+    if (classifyCalendarDay(date, calendar) === "weekly_off") {
       conflicts.push({
         type: "weekend",
-        message: `Leave includes weekend date ${format(parseISO(date), "d MMM yyyy")}.`,
+        message: `${format(parseISO(date), "EEEE d MMM yyyy")} is a weekly holiday and may be counted under Sandwich Leave Policy.`,
         severity: "info",
       });
       break;
@@ -473,6 +479,13 @@ export async function listTeamLeaveRequests(
           ? `${currentApprover.first_name} ${currentApprover.last_name}`
           : null,
         currentApprovalLevel: pendingApproval?.approval_level ?? null,
+        pendingApproverEmployeeId: pendingApproval?.approver_employee_id ?? null,
+        canActOnApproval:
+          pendingApproval?.approver_employee_id === profile.employee.id &&
+          row.leave_status === "pending",
+        canActOnRejection:
+          pendingApproval?.approver_employee_id === profile.employee.id &&
+          row.leave_status === "pending",
         workflowStatus,
         hasConflicts: conflicts.some((item) => item.severity === "warning"),
       };
@@ -666,13 +679,14 @@ export async function getTeamLeaveCalendarData(
   year: number,
 ) {
   if (teamIds.length === 0) {
-    return { leaves: [], holidays: [] };
+    const runtime = await loadLeavePolicyRuntime(supabase, profile.employee.organizationId);
+    return { leaves: [], holidays: [], calendar: runtime.calendar };
   }
 
   const organizationId = profile.employee.organizationId;
   const range = getMonthDateRange(month, year);
 
-  const [leavesResult, holidaysResult] = await Promise.all([
+  const [leavesResult, holidaysResult, runtime] = await Promise.all([
     supabase
       .schema("hrms")
       .from("leave_requests")
@@ -703,6 +717,7 @@ export async function getTeamLeaveCalendarData(
       .gte("holiday_date", range.start)
       .lte("holiday_date", range.end)
       .is("deleted_at", null),
+    loadLeavePolicyRuntime(supabase, organizationId),
   ]);
 
   if (leavesResult.error) throw new Error(leavesResult.error.message);
@@ -733,7 +748,7 @@ export async function getTeamLeaveCalendarData(
     isOptional: row.is_optional,
   }));
 
-  return { leaves, holidays };
+  return { leaves, holidays, calendar: runtime.calendar };
 }
 
 export async function getTeamLeaveFilterLookups(

@@ -25,14 +25,18 @@ export type WorkingDay =
   | "saturday"
   | "sunday";
 
-export type WeekendDayRule = "off" | "working" | "half_day";
+export type WeekendDayRule = "off" | "working" | "half_day" | "nth_half";
 
 export type WorkingConfiguration = {
   officeWorkingDays: WorkingDay[];
   officeHours: { start: string; end: string; timezone: string };
   breakHours: { start: string; end: string };
   graceTime: { checkIn: string };
-  weekendRules: { saturday: WeekendDayRule; sunday: WeekendDayRule };
+  weekendRules: {
+    saturday: WeekendDayRule;
+    sunday: WeekendDayRule;
+    saturdayHalfDayWeeks: number[];
+  };
   workWeekStartDay: number;
   defaultShiftTemplateId: string | null;
 };
@@ -53,6 +57,14 @@ export type LeavePoliciesConfiguration = {
     enabled: boolean;
     includeWeekends: boolean;
     includeHolidays: boolean;
+  };
+  probation: {
+    durationMonths: number;
+    firstMonthLeaveAllowed: boolean;
+    casualLeaveCap: number;
+    periodLeaveCap: number;
+    periodLeaveFemaleOnly: boolean;
+    carryForwardAllowed: boolean;
   };
   carryForward: {
     enabled: boolean;

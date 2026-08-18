@@ -79,9 +79,10 @@ const WORKING_DAYS: { value: WorkingDay; label: string }[] = [
 ];
 
 const WEEKEND_RULES = [
-  { value: "off", label: "Off" },
-  { value: "working", label: "Working day" },
-  { value: "half_day", label: "Half day" },
+  { value: "off", label: "Weekly holiday" },
+  { value: "working", label: "Full working day" },
+  { value: "half_day", label: "Half day every week" },
+  { value: "nth_half", label: "2nd & 4th Saturday half day" },
 ];
 
 function useSettingsFormSubmit<TValues>(
@@ -213,7 +214,7 @@ export function WorkingConfigurationForm({
             <Select
               value={form.watch("weekendRules.saturday")}
               onValueChange={(v) =>
-                v && form.setValue("weekendRules.saturday", v as "off" | "working" | "half_day", {
+                v && form.setValue("weekendRules.saturday", v as "off" | "working" | "half_day" | "nth_half", {
                   shouldDirty: true,
                 })
               }
@@ -231,7 +232,7 @@ export function WorkingConfigurationForm({
             <Select
               value={form.watch("weekendRules.sunday")}
               onValueChange={(v) =>
-                v && form.setValue("weekendRules.sunday", v as "off" | "working" | "half_day", {
+                v && form.setValue("weekendRules.sunday", v as "off" | "working" | "half_day" | "nth_half", {
                   shouldDirty: true,
                 })
               }
@@ -247,6 +248,9 @@ export function WorkingConfigurationForm({
           </SettingsField>
         </div>
         <p className="mt-3 text-sm text-muted-foreground">
+          2nd and 4th Saturdays are half days when Saturday is set to that option. Other Saturdays stay full working days unless a company holiday applies.
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
           <Link href={ORGANIZATION_ROUTES.holidays} className="text-primary underline">
             Open holiday calendar
           </Link>
@@ -349,6 +353,28 @@ export function LeavePoliciesForm({
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <SettingsToggle label="Include weekends" disabled={!canEdit || isPending} {...form.register("sandwichLeave.includeWeekends")} />
           <SettingsToggle label="Include holidays" disabled={!canEdit || isPending} {...form.register("sandwichLeave.includeHolidays")} />
+        </div>
+      </SettingsSectionCard>
+
+      <SettingsSectionCard
+        title="Probation Leave Rules"
+        description="Applied during the configured probation window from the date of joining."
+      >
+        <div className="grid gap-4 md:grid-cols-3">
+          <SettingsField label="Probation months">
+            <Input type="number" {...form.register("probation.durationMonths")} disabled={!canEdit || isPending} />
+          </SettingsField>
+          <SettingsField label="Casual leave cap">
+            <Input type="number" {...form.register("probation.casualLeaveCap")} disabled={!canEdit || isPending} />
+          </SettingsField>
+          <SettingsField label="Period leave cap">
+            <Input type="number" {...form.register("probation.periodLeaveCap")} disabled={!canEdit || isPending} />
+          </SettingsField>
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <SettingsToggle label="Allow leave in first month" disabled={!canEdit || isPending} {...form.register("probation.firstMonthLeaveAllowed")} />
+          <SettingsToggle label="Period leave for female employees only" disabled={!canEdit || isPending} {...form.register("probation.periodLeaveFemaleOnly")} />
+          <SettingsToggle label="Allow carry forward during probation" disabled={!canEdit || isPending} {...form.register("probation.carryForwardAllowed")} />
         </div>
       </SettingsSectionCard>
 

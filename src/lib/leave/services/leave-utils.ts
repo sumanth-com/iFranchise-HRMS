@@ -1,33 +1,27 @@
-import {
-  addDays,
-  eachDayOfInterval,
-  format,
-  getDay,
-  parseISO,
-} from "date-fns";
+import { eachDayOfInterval, format, parseISO } from "date-fns";
 
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import type { HalfDayPeriod } from "@/types/leave";
+import {
+  calculateLeaveDuration,
+  DEFAULT_LEAVE_CALENDAR,
+  getNextWorkingDate,
+  isWeeklyHolidayDate,
+  type LeaveCalendarContext,
+} from "@/lib/leave/services/leave-calendar-engine";
 
 export function calculateLeaveTotalDays(
   startDate: string,
   endDate: string,
   isHalfDay: boolean,
+  calendar: LeaveCalendarContext = DEFAULT_LEAVE_CALENDAR,
 ): number {
-  if (isHalfDay) {
-    return 0.5;
-  }
-
-  const start = parseISO(startDate);
-  const end = parseISO(endDate);
-  const days = eachDayOfInterval({ start, end });
-
-  const workingDays = days.filter((day) => {
-    const dow = getDay(day);
-    return dow !== 0 && dow !== 6;
-  });
-
-  return workingDays.length;
+  return calculateLeaveDuration({
+    startDate,
+    endDate,
+    isHalfDay,
+    calendar,
+  }).totalLeaveDays;
 }
 
 export function getCurrentBalanceYear(date = getTodayDateString()) {
@@ -50,9 +44,11 @@ export function getMonthDateRange(month: number, year: number) {
   return { start, end };
 }
 
-export function isWeekendDate(date: string) {
-  const dow = getDay(parseISO(date));
-  return dow === 0 || dow === 6;
+export function isWeekendDate(
+  date: string,
+  calendar: LeaveCalendarContext = DEFAULT_LEAVE_CALENDAR,
+) {
+  return isWeeklyHolidayDate(date, calendar);
 }
 
 export function expandDateRange(startDate: string, endDate: string) {
@@ -62,10 +58,10 @@ export function expandDateRange(startDate: string, endDate: string) {
   }).map((day) => format(day, "yyyy-MM-dd"));
 }
 
-export function getNextBusinessDay(date: string) {
-  let current = parseISO(date);
-  while (getDay(current) === 0 || getDay(current) === 6) {
-    current = addDays(current, 1);
-  }
-  return format(current, "yyyy-MM-dd");
+export function getNextBusinessDay(
+  date: string,
+  calendar: LeaveCalendarContext = DEFAULT_LEAVE_CALENDAR,
+) {
+  return getNextWorkingDate(date, calendar);
 }
+

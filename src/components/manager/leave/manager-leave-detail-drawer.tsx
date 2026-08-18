@@ -6,6 +6,7 @@ import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { LeaveStatusBadge } from "@/components/leave/leave-status-badge";
+import { LeaveDurationBreakdownCard } from "@/components/leave/leave-apply-policy-panel";
 import { Button } from "@/components/common/button";
 import { EmptyState } from "@/components/common/empty-state";
 import { Input } from "@/components/common/input";
@@ -223,6 +224,14 @@ export function ManagerLeaveDetailDrawer({
                 <DetailField label="Leave Type" value={detail.leaveTypeName} />
                 <DetailField label="Duration" value={dateRangeLabel} />
                 <DetailField label="Total Days" value={`${detail.totalDays} day(s)`} />
+                {detail.durationBreakdown ? (
+                  <div className="sm:col-span-2 rounded-lg border bg-muted/20 px-3 py-2.5">
+                    <p className="text-xs text-muted-foreground">How this was calculated</p>
+                    <div className="mt-2">
+                      <LeaveDurationBreakdownCard breakdown={detail.durationBreakdown} />
+                    </div>
+                  </div>
+                ) : null}
                 <DetailField
                   label="Applied Date"
                   value={format(parseISO(detail.appliedAt), "d MMM yyyy, h:mm a")}

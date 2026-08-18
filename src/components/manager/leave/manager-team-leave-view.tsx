@@ -73,14 +73,14 @@ export function ManagerTeamLeaveView({
       employees={employees}
       managers={[]}
       canCreate={false}
-      canApprove={false}
-      canReject={false}
+      canApprove
+      canReject
       canCancel={false}
       canDelete={false}
       listBasePath={MANAGER_ROUTES.leaveTeam}
       fetchRecords={fetchTeamLeaveRequestsForHrTableAction}
       title="Team Leave"
-      description="View leave requests and balances for people in your reporting hierarchy. This page is read-only."
+      description="Review team leave, approve or reject requests assigned to you, and check coverage."
     />
   );
 }

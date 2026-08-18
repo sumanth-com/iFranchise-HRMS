@@ -6,12 +6,14 @@ import { toast } from "sonner";
 import { LeaveCalendarView } from "@/components/leave/leave-calendar-view";
 import { getEmployeeLeaveCalendarAction } from "@/lib/employee/actions/employee-leave-actions";
 import type { LeaveCalendarEntry, LeaveHolidayEntry } from "@/types/leave";
+import type { LeaveCalendarContext } from "@/lib/leave/services/leave-calendar-engine";
 
 type Props = {
   initialMonth: number;
   initialYear: number;
   initialLeaves: LeaveCalendarEntry[];
   initialHolidays: LeaveHolidayEntry[];
+  initialCalendar?: LeaveCalendarContext;
 };
 
 export function EmployeeLeaveCalendar({
@@ -19,11 +21,13 @@ export function EmployeeLeaveCalendar({
   initialYear,
   initialLeaves,
   initialHolidays,
+  initialCalendar,
 }: Props) {
   const [month, setMonth] = useState(initialMonth);
   const [year, setYear] = useState(initialYear);
   const [leaves, setLeaves] = useState(initialLeaves);
   const [holidays, setHolidays] = useState(initialHolidays);
+  const [calendar, setCalendar] = useState(initialCalendar);
   const [isPending, startTransition] = useTransition();
 
   function handleMonthChange(nextMonth: number, nextYear: number) {
@@ -34,6 +38,7 @@ export function EmployeeLeaveCalendar({
         const data = await getEmployeeLeaveCalendarAction(nextMonth, nextYear);
         setLeaves(data.leaves);
         setHolidays(data.holidays);
+        if (data.calendar) setCalendar(data.calendar);
       } catch {
         toast.error("Could not load the calendar for that month.");
       }
@@ -55,6 +60,7 @@ export function EmployeeLeaveCalendar({
         month={month}
         year={year}
         onMonthChange={handleMonthChange}
+        calendar={calendar}
         enableWeekView
         showYearPicker
         currentMonthOnly

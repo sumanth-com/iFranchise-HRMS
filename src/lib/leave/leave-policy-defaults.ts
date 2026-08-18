@@ -32,6 +32,15 @@ Pre-Planned or Prior Commitments
 Failure to follow the above communication process may be treated as unauthorized leave.`,
     },
     {
+      id: "sandwich",
+      title: "Sandwich Leave Policy",
+      content: `If leave is taken immediately before or after a weekly holiday, the intervening weekly holiday or company holiday is counted as leave.
+
+Sunday is a weekly holiday. The 2nd and 4th Saturdays are half days. Other Saturdays are full working days.
+
+Sandwich days are calculated automatically and shown before you submit.`,
+    },
+    {
       id: "carry-forward",
       title: "Leave Carry Forward Policy",
       content: `- No leave balance will be carried forward until the successful completion of the probation period.

@@ -12,7 +12,8 @@ import { useMemo } from "react";
 import { LeaveCalendarView } from "@/components/leave/leave-calendar-view";
 import { Button } from "@/components/common/button";
 import { LEAVE_CALENDAR_LEGEND } from "@/lib/leave/constants";
-import { expandDateRange, isWeekendDate } from "@/lib/leave/services/leave-utils";
+import { expandDateRange } from "@/lib/leave/services/leave-utils";
+import { classifyCalendarDay, DEFAULT_LEAVE_CALENDAR } from "@/lib/leave/services/leave-calendar-engine";
 import type {
   LeaveCalendarEntry,
   LeaveHolidayEntry,
@@ -143,7 +144,12 @@ export function ManagerLeaveCalendar({
             {weekDays.map((day) => {
               const dayLeaves = leavesByDate.get(day.date) ?? [];
               const holiday = holidayMap.get(day.date);
-              const weekend = isWeekendDate(day.date);
+              const dayClass = classifyCalendarDay(day.date, {
+                ...DEFAULT_LEAVE_CALENDAR,
+                holidays: holidays.filter((item) => !item.isOptional).map((item) => item.holidayDate),
+              });
+              const weekend = dayClass === "weekly_off";
+              const halfDay = dayClass === "half_day";
 
               return (
                 <div
@@ -151,6 +157,7 @@ export function ManagerLeaveCalendar({
                   className={cn(
                     "min-h-36 rounded-lg border p-2",
                     weekend && "bg-muted/30",
+                    halfDay && "bg-orange-500/10",
                     holiday && "border-violet-300 bg-violet-500/5",
                   )}
                 >
@@ -160,6 +167,12 @@ export function ManagerLeaveCalendar({
                       <p className="truncate text-[10px] text-violet-700 dark:text-violet-300">
                         {holiday.name}
                       </p>
+                    ) : halfDay ? (
+                      <p className="text-[10px] font-medium text-orange-700 dark:text-orange-300">
+                        Half day
+                      </p>
+                    ) : weekend ? (
+                      <p className="text-[10px] text-muted-foreground">Weekly holiday</p>
                     ) : null}
                   </div>
                   <div className="space-y-1">

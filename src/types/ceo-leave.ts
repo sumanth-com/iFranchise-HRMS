@@ -94,6 +94,7 @@ export type CeoLeaveCalendar = {
   year: number;
   leaves: LeaveCalendarEntry[];
   holidays: LeaveHolidayEntry[];
+  calendar?: import("@/lib/leave/services/leave-calendar-engine").LeaveCalendarContext;
 };
 
 export type CeoLeaveDetail = {

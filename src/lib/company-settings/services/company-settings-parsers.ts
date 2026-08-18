@@ -12,11 +12,11 @@ import type {
 } from "@/types/company-settings";
 
 export const DEFAULT_WORKING_CONFIGURATION: WorkingConfiguration = {
-  officeWorkingDays: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+  officeWorkingDays: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday"],
   officeHours: { start: "10:00", end: "19:00", timezone: "Asia/Kolkata" },
   breakHours: { start: "14:00", end: "15:00" },
   graceTime: { checkIn: "10:05" },
-  weekendRules: { saturday: "off", sunday: "off" },
+  weekendRules: { saturday: "nth_half", sunday: "off", saturdayHalfDayWeeks: [2, 4] },
   workWeekStartDay: 1,
   defaultShiftTemplateId: null,
 };
@@ -27,16 +27,24 @@ export const DEFAULT_LEAVE_POLICIES: LeavePoliciesConfiguration = {
   maxConsecutiveDays: 30,
   allowHalfDay: true,
   allowCarryForward: true,
-  approvalLevels: 1,
+  approvalLevels: 2,
   halfDayRules: {
     enabled: true,
     morningEnd: "13:00",
     afternoonStart: "14:00",
   },
   sandwichLeave: {
-    enabled: false,
+    enabled: true,
     includeWeekends: true,
     includeHolidays: true,
+  },
+  probation: {
+    durationMonths: 3,
+    firstMonthLeaveAllowed: false,
+    casualLeaveCap: 2,
+    periodLeaveCap: 1,
+    periodLeaveFemaleOnly: true,
+    carryForwardAllowed: false,
   },
   carryForward: {
     enabled: true,
@@ -114,7 +122,9 @@ function asWorkingDays(value: unknown): WorkingDay[] {
 }
 
 function asWeekendRule(value: unknown, fallback: WeekendDayRule): WeekendDayRule {
-  if (value === "off" || value === "working" || value === "half_day") return value;
+  if (value === "off" || value === "working" || value === "half_day" || value === "nth_half") {
+    return value;
+  }
   return fallback;
 }
 
@@ -154,6 +164,11 @@ export function parseWorkingConfiguration(
     weekendRules: {
       saturday: asWeekendRule(weekendRules.saturday, DEFAULT_WORKING_CONFIGURATION.weekendRules.saturday),
       sunday: asWeekendRule(weekendRules.sunday, DEFAULT_WORKING_CONFIGURATION.weekendRules.sunday),
+      saturdayHalfDayWeeks: Array.isArray(weekendRules.saturday_half_day_weeks)
+        ? weekendRules.saturday_half_day_weeks.filter(
+            (item): item is number => typeof item === "number" && item >= 1 && item <= 5,
+          )
+        : DEFAULT_WORKING_CONFIGURATION.weekendRules.saturdayHalfDayWeeks,
     },
     workWeekStartDay:
       typeof columns?.workWeekStartDay === "number"
@@ -173,6 +188,7 @@ export function parseLeavePolicies(
   const leavePolicies = (settings?.leave_policies as Record<string, unknown> | undefined) ?? {};
   const halfDay = (leavePolicies.half_day_rules as Record<string, unknown> | undefined) ?? {};
   const sandwich = (leavePolicies.sandwich_leave as Record<string, unknown> | undefined) ?? {};
+  const probation = (leavePolicies.probation as Record<string, unknown> | undefined) ?? {};
   const carry = (leavePolicies.carry_forward as Record<string, unknown> | undefined) ?? {};
   const encash = (leavePolicies.encashment as Record<string, unknown> | undefined) ?? {};
 
@@ -217,6 +233,26 @@ export function parseLeavePolicies(
         typeof sandwich.include_holidays === "boolean"
           ? sandwich.include_holidays
           : DEFAULT_LEAVE_POLICIES.sandwichLeave.includeHolidays,
+    },
+    probation: {
+      durationMonths:
+        Number(probation.duration_months) || DEFAULT_LEAVE_POLICIES.probation.durationMonths,
+      firstMonthLeaveAllowed:
+        typeof probation.first_month_leave_allowed === "boolean"
+          ? probation.first_month_leave_allowed
+          : DEFAULT_LEAVE_POLICIES.probation.firstMonthLeaveAllowed,
+      casualLeaveCap:
+        Number(probation.casual_leave_cap) || DEFAULT_LEAVE_POLICIES.probation.casualLeaveCap,
+      periodLeaveCap:
+        Number(probation.period_leave_cap) || DEFAULT_LEAVE_POLICIES.probation.periodLeaveCap,
+      periodLeaveFemaleOnly:
+        typeof probation.period_leave_female_only === "boolean"
+          ? probation.period_leave_female_only
+          : DEFAULT_LEAVE_POLICIES.probation.periodLeaveFemaleOnly,
+      carryForwardAllowed:
+        typeof probation.carry_forward_allowed === "boolean"
+          ? probation.carry_forward_allowed
+          : DEFAULT_LEAVE_POLICIES.probation.carryForwardAllowed,
     },
     carryForward: {
       enabled:
@@ -380,6 +416,7 @@ export function toStoredWorkingConfiguration(working: WorkingConfiguration) {
     weekend_rules: {
       saturday: working.weekendRules.saturday,
       sunday: working.weekendRules.sunday,
+      saturday_half_day_weeks: working.weekendRules.saturdayHalfDayWeeks,
     },
     shift_defaults: {
       default_shift_template_id: working.defaultShiftTemplateId,
@@ -407,6 +444,14 @@ export function toStoredLeavePolicies(leave: LeavePoliciesConfiguration) {
         enabled: leave.sandwichLeave.enabled,
         include_weekends: leave.sandwichLeave.includeWeekends,
         include_holidays: leave.sandwichLeave.includeHolidays,
+      },
+      probation: {
+        duration_months: leave.probation.durationMonths,
+        first_month_leave_allowed: leave.probation.firstMonthLeaveAllowed,
+        casual_leave_cap: leave.probation.casualLeaveCap,
+        period_leave_cap: leave.probation.periodLeaveCap,
+        period_leave_female_only: leave.probation.periodLeaveFemaleOnly,
+        carry_forward_allowed: leave.probation.carryForwardAllowed,
       },
       carry_forward: {
         enabled: leave.carryForward.enabled,

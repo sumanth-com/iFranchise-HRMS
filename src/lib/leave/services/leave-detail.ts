@@ -35,6 +35,7 @@ export async function getLeaveRequestById(
         emergency_contact_name,
         emergency_contact_phone,
         attachment_path,
+        duration_breakdown,
         leave_status,
         created_at,
         updated_at,
@@ -108,16 +109,12 @@ export async function getLeaveRequestById(
   const canApprove =
     isPending &&
     isAssignedApprover &&
-    (hrApplicant
-      ? isCeoLeaveApprover(profile)
-      : hasPermission(profile.permissionCodes, "leave.approve"));
+    (hrApplicant ? isCeoLeaveApprover(profile) : true);
 
   const canReject =
     isPending &&
     isAssignedApprover &&
-    (hrApplicant
-      ? isCeoLeaveApprover(profile)
-      : hasPermission(profile.permissionCodes, "leave.reject"));
+    (hrApplicant ? isCeoLeaveApprover(profile) : true);
 
   const canCancel =
     ["pending", "approved"].includes(data.leave_status) &&
@@ -153,6 +150,10 @@ export async function getLeaveRequestById(
     startDate: data.start_date,
     endDate: data.end_date,
     totalDays: Number(data.total_days),
+    durationBreakdown:
+      data.duration_breakdown && typeof data.duration_breakdown === "object"
+        ? (data.duration_breakdown as LeaveDetail["durationBreakdown"])
+        : null,
     isHalfDay: data.is_half_day,
     halfDayPeriod:
       data.half_day_period === "morning" || data.half_day_period === "afternoon"

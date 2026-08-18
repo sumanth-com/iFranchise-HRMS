@@ -86,6 +86,7 @@ export type TeamLeaveDetailBundle = {
   startDate: string;
   endDate: string;
   totalDays: number;
+  durationBreakdown?: import("@/lib/leave/services/leave-calendar-engine").LeaveDurationBreakdown | null;
   isHalfDay: boolean;
   halfDayPeriod: "morning" | "afternoon" | null;
   reason: string | null;

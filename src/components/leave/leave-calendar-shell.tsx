@@ -8,12 +8,14 @@ import type {
   LeaveCalendarEntry,
   LeaveHolidayEntry,
 } from "@/types/leave";
+import type { LeaveCalendarContext } from "@/lib/leave/services/leave-calendar-engine";
 
 type LeaveCalendarShellProps = {
   leaves: LeaveCalendarEntry[];
   holidays: LeaveHolidayEntry[];
   month: number;
   year: number;
+  calendar?: LeaveCalendarContext;
 };
 
 export function LeaveCalendarShell({
@@ -21,6 +23,7 @@ export function LeaveCalendarShell({
   holidays,
   month,
   year,
+  calendar,
 }: LeaveCalendarShellProps) {
   const router = useRouter();
 
@@ -38,6 +41,7 @@ export function LeaveCalendarShell({
       month={month}
       year={year}
       onMonthChange={handleMonthChange}
+      calendar={calendar}
     />
   );
 }
