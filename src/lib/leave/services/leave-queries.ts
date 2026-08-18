@@ -5,6 +5,7 @@ import type { UserProfile } from "@/types/auth";
 import type {
   LeaveBalanceItem,
   LeaveCalendarEntry,
+  LeaveEmployeeBalanceSnapshot,
   LeaveHolidayEntry,
   LeaveListItem,
   LeaveListParams,
@@ -14,9 +15,21 @@ import type {
   LeaveSummary,
 } from "@/types/leave";
 import { leaveListParamsSchema } from "@/lib/validations/leave";
-import { ALLOWED_LEAVE_TYPE_CODES, LEAVE_BALANCE_DISPLAY_CODES } from "@/lib/leave/constants";
+import {
+  ALLOWED_LEAVE_TYPE_CODES,
+  LEAVE_BALANCE_DISPLAY_CODES,
+  LEAVE_BALANCE_DISPLAY_LABELS,
+  sortByLeaveTypeCode,
+} from "@/lib/leave/constants";
 import { loadLeavePolicyRuntime } from "@/lib/leave/services/leave-policy-runtime";
-import type { LeaveCalendarContext } from "@/lib/leave/services/leave-calendar-engine";
+import {
+  DEFAULT_LEAVE_CALENDAR,
+  type LeaveCalendarContext,
+} from "@/lib/leave/services/leave-calendar-engine";
+import {
+  countLeaveDaysInRange,
+  roundLeaveDays,
+} from "@/lib/leave/services/leave-usage";
 import {
   getBranches,
   getDepartments,
@@ -432,45 +445,164 @@ export async function getEmployeeLeaveBalanceSnapshot(
   supabase: AuthSupabaseClient,
   employeeId: string,
   balanceYear = getCurrentBalanceYear(),
-) {
-  const { data, error } = await supabase
-    .schema("hrms")
-    .from("leave_balances")
-    .select(
-      "allocated_days, used_days, pending_days, balance_days, leave_types:leave_type_id (name, code)",
-    )
-    .eq("employee_id", employeeId)
-    .eq("balance_year", balanceYear)
-    .is("deleted_at", null);
+  monthYear?: { month: number; year: number },
+): Promise<LeaveEmployeeBalanceSnapshot[]> {
+  const now = new Date();
+  const month = monthYear?.month ?? now.getMonth() + 1;
+  const year = monthYear?.year ?? now.getFullYear();
+  const monthRange = getMonthDateRange(month, year);
+  const yearRange = { start: `${balanceYear}-01-01`, end: `${balanceYear}-12-31` };
 
-  if (error) throw new Error(error.message);
+  const [employeeResult, balancesResult] = await Promise.all([
+    supabase
+      .schema("hrms")
+      .from("employees")
+      .select("organization_id")
+      .eq("id", employeeId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    supabase
+      .schema("hrms")
+      .from("leave_balances")
+      .select(
+        "allocated_days, used_days, pending_days, balance_days, leave_types:leave_type_id (name, code, days_per_year)",
+      )
+      .eq("employee_id", employeeId)
+      .eq("balance_year", balanceYear)
+      .is("deleted_at", null),
+  ]);
 
-  const priorityCodes: string[] = [...LEAVE_BALANCE_DISPLAY_CODES];
+  if (employeeResult.error) throw new Error(employeeResult.error.message);
+  if (balancesResult.error) throw new Error(balancesResult.error.message);
 
-  return (data ?? [])
-    .map((row) => {
-      const leaveType = unwrapRelation(
-        row.leave_types as
-          | { name: string; code: string }
-          | { name: string; code: string }[]
-          | null,
-      );
+  const organizationId = employeeResult.data?.organization_id as string | undefined;
+  let typeRows: Array<{ code: string; name: string; days_per_year: number | string | null }> = [];
+  let requestRows: Array<{
+    start_date: string;
+    end_date: string;
+    is_half_day: boolean;
+    leave_status: string;
+    duration_breakdown: unknown;
+    leave_types: { code: string } | { code: string }[] | null;
+  }> = [];
+  let calendar = DEFAULT_LEAVE_CALENDAR;
 
-      return {
-        leaveTypeCode: leaveType?.code ?? "",
-        leaveTypeName: leaveType?.name ?? "Leave",
-        allocatedDays: Number(row.allocated_days),
-        usedDays: Number(row.used_days),
-        pendingDays: Number(row.pending_days),
-        balanceDays: Number(row.balance_days),
-      };
-    })
-    .filter((row) => priorityCodes.includes(row.leaveTypeCode))
-    .sort(
-      (a, b) =>
-        priorityCodes.indexOf(a.leaveTypeCode) -
-        priorityCodes.indexOf(b.leaveTypeCode),
+  if (organizationId) {
+    const [typesResult, requestsResult, runtime] = await Promise.all([
+      supabase
+        .schema("hrms")
+        .from("leave_types")
+        .select("code, name, days_per_year")
+        .eq("organization_id", organizationId)
+        .in("code", [...LEAVE_BALANCE_DISPLAY_CODES])
+        .is("deleted_at", null),
+      supabase
+        .schema("hrms")
+        .from("leave_requests")
+        .select(
+          `start_date, end_date, is_half_day, leave_status, duration_breakdown,
+           leave_types:leave_type_id (code)`,
+        )
+        .eq("employee_id", employeeId)
+        .in("leave_status", ["approved", "pending"])
+        .lte("start_date", yearRange.end)
+        .gte("end_date", yearRange.start)
+        .is("deleted_at", null),
+      loadLeavePolicyRuntime(supabase, organizationId),
+    ]);
+
+    if (typesResult.error) throw new Error(typesResult.error.message);
+    if (requestsResult.error) throw new Error(requestsResult.error.message);
+
+    typeRows = typesResult.data ?? [];
+    requestRows = (requestsResult.data ?? []) as typeof requestRows;
+    calendar = runtime.calendar;
+  }
+  const monthUsedByCode: Record<string, number> = {};
+  const yearUsedByCode: Record<string, number> = {};
+
+  for (const row of requestRows) {
+    const leaveType = unwrapRelation(
+      row.leave_types as { code: string } | { code: string }[] | null,
     );
+    const code = leaveType?.code;
+    if (!code) continue;
+
+    const request = {
+      startDate: row.start_date,
+      endDate: row.end_date,
+      isHalfDay: Boolean(row.is_half_day),
+      durationBreakdown: row.duration_breakdown,
+    };
+    monthUsedByCode[code] =
+      (monthUsedByCode[code] ?? 0) + countLeaveDaysInRange(request, monthRange, calendar);
+    if (row.leave_status === "approved") {
+      yearUsedByCode[code] =
+        (yearUsedByCode[code] ?? 0) + countLeaveDaysInRange(request, yearRange, calendar);
+    }
+  }
+
+  const balanceByCode = new Map<
+    string,
+    {
+      leaveTypeName: string;
+      allocatedDays: number;
+      usedDays: number;
+      pendingDays: number;
+      balanceDays: number;
+      daysPerYear: number;
+    }
+  >();
+
+  for (const row of balancesResult.data ?? []) {
+    const leaveType = unwrapRelation(
+      row.leave_types as
+        | { name: string; code: string; days_per_year?: number | string }
+        | { name: string; code: string; days_per_year?: number | string }[]
+        | null,
+    );
+    const code = leaveType?.code ?? "";
+    if (!code) continue;
+    balanceByCode.set(code, {
+      leaveTypeName: leaveType?.name ?? LEAVE_BALANCE_DISPLAY_LABELS[code as keyof typeof LEAVE_BALANCE_DISPLAY_LABELS] ?? "Leave",
+      allocatedDays: Number(row.allocated_days),
+      usedDays: Number(row.used_days),
+      pendingDays: Number(row.pending_days),
+      balanceDays: Number(row.balance_days),
+      daysPerYear: Number(leaveType?.days_per_year ?? 0),
+    });
+  }
+
+  const typeByCode = new Map(
+    typeRows.map((row) => [
+      row.code,
+      { name: row.name, daysPerYear: Number(row.days_per_year ?? 0) },
+    ]),
+  );
+
+  return LEAVE_BALANCE_DISPLAY_CODES.map((code) => {
+    const balance = balanceByCode.get(code);
+    const type = typeByCode.get(code);
+    const daysPerYear = balance?.daysPerYear || type?.daysPerYear || 0;
+    const allocatedDays = balance?.allocatedDays || daysPerYear;
+    const usedFromRequests = yearUsedByCode[code] ?? 0;
+    const usedDays = Math.max(balance?.usedDays ?? 0, usedFromRequests);
+    const pendingDays = balance?.pendingDays ?? 0;
+    const balanceDays =
+      balance?.balanceDays ?? Math.max(0, roundLeaveDays(allocatedDays - usedDays - pendingDays));
+
+    return {
+      leaveTypeCode: code,
+      leaveTypeName:
+        balance?.leaveTypeName || type?.name || LEAVE_BALANCE_DISPLAY_LABELS[code],
+      allocatedDays,
+      usedDays: roundLeaveDays(usedDays),
+      pendingDays: roundLeaveDays(pendingDays),
+      balanceDays: roundLeaveDays(balanceDays),
+      monthUsedDays: roundLeaveDays(monthUsedByCode[code] ?? 0),
+      monthTotalDays: roundLeaveDays(allocatedDays),
+    };
+  });
 }
 
 export async function listLeaveBalances(
@@ -700,12 +832,9 @@ export async function getLeaveLookups(
       supabase
         .schema("hrms")
         .from("leave_types")
-        .select("id, name, code")
+        .select("id, name, code, deleted_at")
         .eq("organization_id", organizationId)
-        .eq("status", "active")
-        .is("deleted_at", null)
-        .in("code", [...ALLOWED_LEAVE_TYPE_CODES])
-        .order("name"),
+        .in("code", [...ALLOWED_LEAVE_TYPE_CODES]),
       getDepartments(supabase, organizationId),
       getBranches(supabase, organizationId),
       supabase
@@ -723,11 +852,19 @@ export async function getLeaveLookups(
   if (leaveTypesResult.error) throw new Error(leaveTypesResult.error.message);
   if (employeesResult.error) throw new Error(employeesResult.error.message);
 
-  const leaveTypes = (leaveTypesResult.data ?? []).map((row) => ({
-    id: row.id,
-    label: row.name,
-    code: row.code,
-  }));
+  const leaveTypesByCode = new Map<string, { id: string; label: string; code: string }>();
+  for (const row of leaveTypesResult.data ?? []) {
+    const current = leaveTypesByCode.get(row.code);
+    const isLive = row.deleted_at == null;
+    if (!current || isLive) {
+      leaveTypesByCode.set(row.code, {
+        id: row.id,
+        label: row.name,
+        code: row.code,
+      });
+    }
+  }
+  const leaveTypes = sortByLeaveTypeCode([...leaveTypesByCode.values()]);
 
   const employees = (employeesResult.data ?? []).map((row) => ({
     id: row.id,

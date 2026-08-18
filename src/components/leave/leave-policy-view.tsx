@@ -7,7 +7,9 @@ import {
   LeavePolicyHolidayTables,
   LeavePolicyPageHeader,
   LeavePolicySections,
+  LeavePolicyYearUsage,
 } from "@/components/leave/leave-policy-content";
+import type { LeaveEmployeeBalanceSnapshot } from "@/types/leave";
 import type { LeavePolicyDocument, LeavePolicyHolidayRow } from "@/types/leave-policy";
 
 export function LeavePolicyView({
@@ -18,6 +20,7 @@ export function LeavePolicyView({
   mandatoryHolidays,
   optionalHolidays,
   holidayYear,
+  yearUsage,
 }: {
   backHref: string;
   backLabel?: string;
@@ -26,6 +29,7 @@ export function LeavePolicyView({
   mandatoryHolidays: LeavePolicyHolidayRow[];
   optionalHolidays: LeavePolicyHolidayRow[];
   holidayYear: number;
+  yearUsage?: LeaveEmployeeBalanceSnapshot[];
 }) {
   return (
     <div className="flex w-full flex-col gap-6">
@@ -40,6 +44,8 @@ export function LeavePolicyView({
         title="Leave Policy"
         description="Probation period policies, leave entitlement, confirmation criteria, and holiday list."
       />
+
+      {yearUsage ? <LeavePolicyYearUsage year={holidayYear} balances={yearUsage} /> : null}
 
       <LeavePolicySections
         intro={document.intro}

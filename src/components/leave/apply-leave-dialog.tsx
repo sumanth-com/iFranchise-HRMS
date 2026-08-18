@@ -1,10 +1,41 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Modal } from "@/components/common/modal";
 import { LeaveForm } from "@/components/leave/leave-form";
-import type { LeaveLookups } from "@/types/leave";
+import { getLeaveApplyContextAction } from "@/lib/leave/actions";
+import type { LeaveApplyContext, LeaveEmployeeBalanceSnapshot, LeaveLookups } from "@/types/leave";
+
+const applyContextCache = new Map<string, LeaveApplyContext>();
+const applyContextInflight = new Map<string, Promise<LeaveApplyContext | null>>();
+
+function prefetchLeaveApplyContext(employeeId: string) {
+  const cached = applyContextCache.get(employeeId);
+  if (cached) return Promise.resolve(cached);
+
+  const pending = applyContextInflight.get(employeeId);
+  if (pending) return pending;
+
+  const request = getLeaveApplyContextAction(employeeId).then((result) => {
+    applyContextInflight.delete(employeeId);
+    if (!result.success) return null;
+    applyContextCache.set(employeeId, result.data);
+    return result.data;
+  });
+  applyContextInflight.set(employeeId, request);
+  return request;
+}
+
+export function clearLeaveApplyContextCache(employeeId?: string) {
+  if (employeeId) {
+    applyContextCache.delete(employeeId);
+    applyContextInflight.delete(employeeId);
+    return;
+  }
+  applyContextCache.clear();
+  applyContextInflight.clear();
+}
 
 type Props = {
   open: boolean;
@@ -13,6 +44,7 @@ type Props = {
   /** Self-service: fixed to one employee. Team: optional pre-selected employee. */
   employeeId?: string;
   mode?: "self" | "team";
+  balances?: LeaveEmployeeBalanceSnapshot[];
   onSubmitted?: () => void;
 };
 
@@ -22,9 +54,13 @@ export function ApplyLeaveDialog({
   lookups,
   employeeId,
   mode = "self",
+  balances = [],
   onSubmitted,
 }: Props) {
   const isTeam = mode === "team";
+  const [applyContext, setApplyContext] = useState<LeaveApplyContext | null>(
+    () => (employeeId ? applyContextCache.get(employeeId) ?? null : null),
+  );
 
   const scopedLookups = useMemo(() => {
     if (isTeam || !employeeId) return lookups;
@@ -35,6 +71,13 @@ export function ApplyLeaveDialog({
       };
     return { ...lookups, employees: [self] };
   }, [isTeam, lookups, employeeId]);
+
+  useEffect(() => {
+    if (!employeeId) return;
+    void prefetchLeaveApplyContext(employeeId).then((context) => {
+      if (context) setApplyContext(context);
+    });
+  }, [employeeId]);
 
   return (
     <Modal
@@ -54,7 +97,10 @@ export function ApplyLeaveDialog({
           lookups={scopedLookups}
           defaultEmployeeId={isTeam ? employeeId : employeeId}
           variant={isTeam ? "default" : "self"}
+          initialApplyContext={applyContext}
+          initialBalances={balances}
           onSuccess={() => {
+            clearLeaveApplyContextCache(employeeId);
             onOpenChange(false);
             onSubmitted?.();
           }}

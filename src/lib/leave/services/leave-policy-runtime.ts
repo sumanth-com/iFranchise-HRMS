@@ -20,6 +20,7 @@ import {
   type LeavePolicyNoticeHours,
   type LeaveProbationRules,
 } from "@/lib/leave/services/leave-policy-engine";
+import { ALLOWED_LEAVE_TYPE_CODES, sortByLeaveTypeCode } from "@/lib/leave/constants";
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
 
 export type LeaveTypePolicyRow = {
@@ -102,10 +103,9 @@ export async function loadLeavePolicyRuntime(
     supabase
       .schema("hrms")
       .from("leave_types")
-      .select("id, code, name, is_paid, is_carry_forward")
+      .select("id, code, name, is_paid, is_carry_forward, deleted_at")
       .eq("organization_id", organizationId)
-      .eq("status", "active")
-      .is("deleted_at", null),
+      .in("code", [...ALLOWED_LEAVE_TYPE_CODES]),
   ]);
 
   if (settingsResult.error) throw new Error(settingsResult.error.message);
@@ -145,6 +145,21 @@ export async function loadLeavePolicyRuntime(
         : DEFAULT_LEAVE_PROBATION_RULES.carryForwardAllowed,
   };
 
+  const leaveTypesByCode = new Map<string, LeaveTypePolicyRow>();
+  for (const row of typesResult.data ?? []) {
+    const isLive = row.deleted_at == null;
+    const current = leaveTypesByCode.get(row.code);
+    if (!current || isLive) {
+      leaveTypesByCode.set(row.code, {
+        id: row.id,
+        code: row.code,
+        name: row.name,
+        isPaid: Boolean(row.is_paid),
+        isCarryForward: Boolean(row.is_carry_forward),
+      });
+    }
+  }
+
   return {
     calendar: calendarContextFromSettings(settings, holidays),
     notice: {
@@ -156,13 +171,7 @@ export async function loadLeavePolicyRuntime(
     allowHalfDay: leave.allowHalfDay,
     maxConsecutiveDays: leave.maxConsecutiveDays,
     approvalLevels: leave.approvalLevels,
-    leaveTypes: (typesResult.data ?? []).map((row) => ({
-      id: row.id,
-      code: row.code,
-      name: row.name,
-      isPaid: Boolean(row.is_paid),
-      isCarryForward: Boolean(row.is_carry_forward),
-    })),
+    leaveTypes: sortByLeaveTypeCode([...leaveTypesByCode.values()]),
   };
 }
 

@@ -156,6 +156,7 @@ export function HrLeaveHubView({
           lookups={applyLeaveLookups}
           employeeId={employeeId}
           mode="self"
+          balances={balances}
           onSubmitted={() => router.refresh()}
         />
       ) : null}

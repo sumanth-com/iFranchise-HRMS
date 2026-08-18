@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { LucideIcon } from "lucide-react";
+import { CalendarDays, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 export function EmployeeStatCard({
   label,
   value,
-  icon: Icon,
+  icon: Icon = CalendarDays,
   accent = "text-foreground",
   iconBg = "bg-muted",
   hint,
@@ -17,7 +17,7 @@ export function EmployeeStatCard({
 }: {
   label: string;
   value: string;
-  icon: LucideIcon;
+  icon?: LucideIcon;
   accent?: string;
   iconBg?: string;
   hint?: string;

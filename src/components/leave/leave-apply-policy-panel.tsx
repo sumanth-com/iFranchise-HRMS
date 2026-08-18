@@ -14,6 +14,7 @@ import {
   LeavePolicyContactBar,
   LeavePolicySections,
 } from "@/components/leave/leave-policy-content";
+import { DEFAULT_LEAVE_POLICY_DOCUMENT } from "@/lib/leave/leave-policy-defaults";
 import { previewLeaveApplication } from "@/lib/leave/services/leave-apply-preview";
 import { formatLeaveDate } from "@/lib/leave/services/leave-utils";
 import type { LeaveDurationBreakdown } from "@/lib/leave/services/leave-calendar-engine";
@@ -24,10 +25,12 @@ export function LeavePolicyInfo({
   context,
   employeeName,
 }: {
-  context: LeaveApplyContext;
+  context?: LeaveApplyContext | null;
   employeeName: string;
 }) {
   const [open, setOpen] = useState(false);
+  const approvalLevels = context?.approvalLevels ?? 2;
+  const document = context?.policyDocument ?? DEFAULT_LEAVE_POLICY_DOCUMENT;
 
   return (
     <div className="rounded-xl border bg-muted/20 px-4 py-3">
@@ -39,7 +42,7 @@ export function LeavePolicyInfo({
             <li>Leave requests may require prior intimation depending on leave type.</li>
             <li>Weekly holidays may be counted under the Sandwich Leave Policy.</li>
             <li>
-              {context.approvalLevels >= 2
+              {approvalLevels >= 2
                 ? "Your request is subject to Manager and HR approval."
                 : "Your request is subject to approval."}
             </li>
@@ -60,11 +63,11 @@ export function LeavePolicyInfo({
           </DialogHeader>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
             <LeavePolicySections
-              intro={context.policyDocument.intro}
-              sections={context.policyDocument.sections}
+              intro={document.intro}
+              sections={document.sections}
               employeeName={employeeName}
             />
-            <LeavePolicyContactBar contact={context.policyDocument.contact} />
+            <LeavePolicyContactBar contact={document.contact} />
           </div>
         </DialogContent>
       </Dialog>

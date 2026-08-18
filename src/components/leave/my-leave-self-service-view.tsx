@@ -1,17 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import {
-  CalendarCheck,
-  CalendarClock,
-  CalendarDays,
-  CalendarPlus,
-  Eye,
-  FileText,
-} from "lucide-react";
+import { format } from "date-fns";
+import { CalendarDays, CalendarPlus, Eye, FileText, type LucideIcon } from "lucide-react";
 
 import { Button, buttonVariants } from "@/components/common/button";
 import {
@@ -24,6 +17,12 @@ import { EmployeeLeaveCalendar } from "@/components/employee/leave/employee-leav
 import { ApplyLeaveDialog } from "@/components/leave/apply-leave-dialog";
 import { LeaveStatusBadge } from "@/components/leave/leave-status-badge";
 import { MyLeaveDetailPopup } from "@/components/leave/my-leave-detail-popup";
+import {
+  LEAVE_BALANCE_CARD_TONES,
+  LEAVE_BALANCE_DISPLAY_CODES,
+  LEAVE_BALANCE_DISPLAY_LABELS,
+} from "@/lib/leave/constants";
+import { formatLeaveDayCount } from "@/lib/leave/services/leave-usage";
 import { formatLeaveDate } from "@/lib/leave/services/leave-utils";
 import { cn } from "@/lib/utils";
 import type {
@@ -34,6 +33,33 @@ import type {
   LeaveLookups,
 } from "@/types/leave";
 import type { LeaveCalendarContext } from "@/lib/leave/services/leave-calendar-engine";
+
+type LeaveSummaryCard = {
+  key: string;
+  label: string;
+  value: string;
+  icon: LucideIcon;
+  tone: (typeof LEAVE_BALANCE_CARD_TONES)[(typeof LEAVE_BALANCE_DISPLAY_CODES)[number]];
+};
+
+function buildLeaveSummaryCards(balances: LeaveEmployeeBalanceSnapshot[]): LeaveSummaryCard[] {
+  const remainingByCode = new Map(
+    balances.map((row) => [row.leaveTypeCode, row] as const),
+  );
+
+  return LEAVE_BALANCE_DISPLAY_CODES.map((code) => {
+    const row = remainingByCode.get(code);
+    const used = row?.monthUsedDays ?? 0;
+    const total = row?.monthTotalDays ?? 0;
+    return {
+      key: code,
+      label: row?.leaveTypeName || LEAVE_BALANCE_DISPLAY_LABELS[code],
+      value: `${formatLeaveDayCount(used)} / ${formatLeaveDayCount(total)}`,
+      icon: CalendarDays,
+      tone: LEAVE_BALANCE_CARD_TONES[code],
+    };
+  });
+}
 
 type Props = {
   title?: string;
@@ -78,42 +104,7 @@ export function MyLeaveSelfServiceView({
   const [viewPreview, setViewPreview] = useState<LeaveListItem | null>(null);
   const canOpenApplyDialog = canApply && employeeId && applyLeaveLookups;
 
-  const roundDays = (value: number) => Math.round(value * 100) / 100;
-
-  const totalBalance = balances.reduce((sum, row) => sum + row.balanceDays, 0);
-  const totalUsed = balances.reduce((sum, row) => sum + row.usedDays, 0);
-  const pendingFromBalances = balances.reduce((sum, row) => sum + row.pendingDays, 0);
-
-  const pendingRequestsList = requests.filter((row) => row.leaveStatus === "pending");
-  const pendingRequestCount = pendingRequestsList.length;
-  const pendingDaysFromRequests = pendingRequestsList.reduce(
-    (sum, row) => sum + Number(row.totalDays ?? 0),
-    0,
-  );
-  // Prefer live request totals so the cards match calendar / My Requests.
-  // Fall back to balance ledger when the request list is empty but balances still show holds.
-  const totalPendingDays =
-    pendingRequestCount > 0 ? pendingDaysFromRequests : pendingFromBalances;
-
-  const today = format(new Date(), "yyyy-MM-dd");
-  const upcomingLeave = requests
-    .filter((row) => row.leaveStatus === "approved" && row.startDate >= today)
-    .sort((a, b) => a.startDate.localeCompare(b.startDate))[0];
-
-  const availableHint =
-    balances
-      .filter((row) => row.balanceDays > 0)
-      .map((row) => `${row.leaveTypeCode} ${roundDays(row.balanceDays)}`)
-      .join(" · ") || "No days left";
-
-  const pendingValue =
-    pendingRequestCount > 0
-      ? `${pendingRequestCount} ${pendingRequestCount === 1 ? "request" : "requests"}`
-      : "None";
-  const pendingHint =
-    pendingRequestCount > 0
-      ? `${roundDays(totalPendingDays)} ${roundDays(totalPendingDays) === 1 ? "day" : "days"} waiting`
-      : "Nothing waiting";
+  const remainingCards = buildLeaveSummaryCards(balances);
 
   function openLeavePopup(row: LeaveListItem) {
     setViewPreview(row);
@@ -199,40 +190,25 @@ export function MyLeaveSelfServiceView({
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <EmployeeStatCard
-          label="Available"
-          value={`${roundDays(totalBalance)} days`}
-          icon={CalendarCheck}
-          accent="text-indigo-600 dark:text-indigo-400"
-          iconBg="bg-indigo-500/10"
-          hint={availableHint}
-        />
-        <EmployeeStatCard
-          label="Used"
-          value={`${roundDays(totalUsed)} days`}
-          icon={CalendarDays}
-          accent="text-sky-600 dark:text-sky-400"
-          iconBg="bg-sky-500/10"
-          hint="Taken this year"
-        />
-        <EmployeeStatCard
-          label="Pending"
-          value={pendingValue}
-          icon={CalendarClock}
-          accent="text-amber-600 dark:text-amber-400"
-          iconBg="bg-amber-500/10"
-          hint={pendingHint}
-        />
-        <EmployeeStatCard
-          label="Next leave"
-          value={upcomingLeave ? formatLeaveDate(upcomingLeave.startDate) : "None"}
-          icon={CalendarCheck}
-          accent="text-emerald-600 dark:text-emerald-400"
-          iconBg="bg-emerald-500/10"
-          hint={upcomingLeave ? upcomingLeave.leaveTypeName : "Nothing scheduled"}
-        />
-      </div>
+      {remainingCards.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            {format(new Date(calendarYear, calendarMonth - 1, 1), "MMMM yyyy")} · used this month / total
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+            {remainingCards.map((card) => (
+              <EmployeeStatCard
+                key={card.key}
+                label={card.label}
+                value={card.value}
+                icon={card.icon}
+                accent={card.tone.accent}
+                iconBg={card.tone.iconBg}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <EmployeeLeaveCalendar
         initialMonth={calendarMonth}
@@ -274,6 +250,7 @@ export function MyLeaveSelfServiceView({
           lookups={applyLeaveLookups}
           employeeId={employeeId}
           onSubmitted={() => router.refresh()}
+          balances={balances}
         />
       ) : null}
     </div>

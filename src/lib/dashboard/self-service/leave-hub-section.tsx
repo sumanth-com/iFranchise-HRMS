@@ -65,7 +65,10 @@ export async function LeaveHubSection({
 
   const [balances, requests, calendar, teamResult, teamLookups, summary, applyLookups] =
     await Promise.all([
-      getEmployeeLeaveBalanceSnapshot(supabase, employeeId),
+      getEmployeeLeaveBalanceSnapshot(supabase, employeeId, undefined, {
+        month: calendarMonth,
+        year: calendarYear,
+      }),
       listLeaveRequests(supabase, profile, { employeeId, page: 1, pageSize: 25 }),
       getEmployeeLeaveCalendarData(supabase, profile, calendarMonth, calendarYear),
       canViewTeam ? listLeaveRequests(supabase, profile, teamParams) : Promise.resolve(null),

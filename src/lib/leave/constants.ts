@@ -66,5 +66,39 @@ export const APPROVAL_LEVEL_LABELS: Record<number, string> = {
 /** iFranchise leave policy — active leave types (including LOP for requests/payroll). */
 export const ALLOWED_LEAVE_TYPE_CODES = ["CL", "SL", "EL", "OH", "PL", "LOP"] as const;
 
+const LEAVE_TYPE_CODE_RANK = new Map(
+  ALLOWED_LEAVE_TYPE_CODES.map((code, index) => [code, index]),
+);
+
+export function sortByLeaveTypeCode<T extends { code?: string | null }>(items: T[]) {
+  return [...items].sort((left, right) => {
+    const leftRank = left.code ? LEAVE_TYPE_CODE_RANK.get(left.code as (typeof ALLOWED_LEAVE_TYPE_CODES)[number]) : undefined;
+    const rightRank = right.code ? LEAVE_TYPE_CODE_RANK.get(right.code as (typeof ALLOWED_LEAVE_TYPE_CODES)[number]) : undefined;
+    return (leftRank ?? 99) - (rightRank ?? 99);
+  });
+}
+
 /** Leave balance UI — actual balances only; LOP appears in payroll, not leave balance. */
 export const LEAVE_BALANCE_DISPLAY_CODES = ["CL", "SL", "EL", "OH", "PL"] as const;
+
+export const LEAVE_BALANCE_DISPLAY_LABELS: Record<
+  (typeof LEAVE_BALANCE_DISPLAY_CODES)[number],
+  string
+> = {
+  CL: "Casual Leave",
+  SL: "Sick Leave",
+  EL: "Earned Leave",
+  OH: "Optional Holiday",
+  PL: "Period Leave",
+};
+
+export const LEAVE_BALANCE_CARD_TONES: Record<
+  (typeof LEAVE_BALANCE_DISPLAY_CODES)[number],
+  { accent: string; iconBg: string }
+> = {
+  CL: { accent: "text-indigo-600 dark:text-indigo-400", iconBg: "bg-indigo-500/10" },
+  SL: { accent: "text-sky-600 dark:text-sky-400", iconBg: "bg-sky-500/10" },
+  EL: { accent: "text-emerald-600 dark:text-emerald-400", iconBg: "bg-emerald-500/10" },
+  OH: { accent: "text-violet-600 dark:text-violet-400", iconBg: "bg-violet-500/10" },
+  PL: { accent: "text-rose-600 dark:text-rose-400", iconBg: "bg-rose-500/10" },
+};

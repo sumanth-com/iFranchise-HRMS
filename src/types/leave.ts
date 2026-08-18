@@ -169,6 +169,8 @@ export type LeaveEmployeeBalanceSnapshot = {
   usedDays: number;
   pendingDays: number;
   balanceDays: number;
+  monthUsedDays: number;
+  monthTotalDays: number;
 };
 
 export type LeaveLookups = {

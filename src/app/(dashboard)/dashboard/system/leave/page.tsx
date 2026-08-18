@@ -32,7 +32,11 @@ export default async function SuperAdminLeavePage() {
 
   const [balances, requests, calendar, applyLookups] = await Promise.all([
     safeServerCall(
-      () => getEmployeeLeaveBalanceSnapshot(supabase, employeeId),
+      () =>
+        getEmployeeLeaveBalanceSnapshot(supabase, employeeId, undefined, {
+          month: calendarMonth,
+          year: calendarYear,
+        }),
       [],
       "[system-admin/leave] balances",
     ),

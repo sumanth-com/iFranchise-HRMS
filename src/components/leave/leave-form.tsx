@@ -21,11 +21,13 @@ import {
 } from "@/components/common/select";
 import { createLeaveRequestAction, getLeaveApplyContextAction, updateLeaveRequestAction } from "@/lib/leave/actions";
 import {
+  ALLOWED_LEAVE_TYPE_CODES,
   HALF_DAY_PERIOD_LABELS,
   LEAVE_ROUTES,
+  sortByLeaveTypeCode,
 } from "@/lib/leave/constants";
 import { LeaveDurationPreview, LeavePolicyInfo } from "@/components/leave/leave-apply-policy-panel";
-import { PERIOD_LEAVE_CODE } from "@/lib/leave/services/leave-policy-engine";
+import { formatLeaveDayCount } from "@/lib/leave/services/leave-usage";
 import { previewLeaveApplication } from "@/lib/leave/services/leave-apply-preview";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import {
@@ -54,6 +56,8 @@ type LeaveFormProps = {
   redirectPath?: string;
   /** Self-service modal: hide employee picker and optional fields. */
   variant?: "default" | "self";
+  initialApplyContext?: LeaveApplyContext | null;
+  initialBalances?: import("@/types/leave").LeaveEmployeeBalanceSnapshot[];
   onSuccess?: () => void;
   onCancel?: () => void;
 };
@@ -65,14 +69,16 @@ export function LeaveForm({
   initialRequest = null,
   redirectPath,
   variant = "default",
+  initialApplyContext = null,
+  initialBalances = [],
   onSuccess,
   onCancel,
 }: LeaveFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  const [applyContext, setApplyContext] = useState<LeaveApplyContext | null>(null);
-  const [balancesLoading, setBalancesLoading] = useState(false);
+  const [applyContext, setApplyContext] = useState<LeaveApplyContext | null>(initialApplyContext);
+  const [balancesLoading, setBalancesLoading] = useState(!initialApplyContext && initialBalances.length === 0);
 
   const employeeItems = lookups.employees.map((employee) => ({
     value: employee.id,
@@ -81,24 +87,16 @@ export function LeaveForm({
       : employee.label,
   }));
 
-  const sourceLeaveTypes = applyContext
-    ? applyContext.leaveTypes.map((item) => ({
-        id: item.id,
-        label: item.name,
-        code: item.code,
-      }))
-    : lookups.leaveTypes;
-
-  const leaveTypeItems = sourceLeaveTypes
-    .filter((leaveType) => {
-      if (leaveType.code === PERIOD_LEAVE_CODE && applyContext?.employee.gender?.toLowerCase() !== "female") {
-        return false;
-      }
-      return Boolean(leaveType.id);
-    })
+  const leaveTypeItems = sortByLeaveTypeCode(
+    lookups.leaveTypes.filter((leaveType) => Boolean(leaveType.id)),
+  )
+    .filter((leaveType) =>
+      !leaveType.code ||
+      ALLOWED_LEAVE_TYPE_CODES.includes(leaveType.code as (typeof ALLOWED_LEAVE_TYPE_CODES)[number]),
+    )
     .map((leaveType) => ({
       value: leaveType.id,
-      label: leaveType.label,
+      label: leaveType.code ? `${leaveType.label} (${leaveType.code})` : leaveType.label,
     }));
 
   const halfDayPeriodItems = Object.entries(HALF_DAY_PERIOD_LABELS).map(
@@ -129,7 +127,14 @@ export function LeaveForm({
   const selectedLeaveTypeId = form.watch("leaveTypeId");
   const startDate = form.watch("startDate");
   const endDate = form.watch("endDate");
-  const balances = applyContext?.balances ?? [];
+  const balances = applyContext?.balances ?? initialBalances;
+
+  useEffect(() => {
+    if (!startDate) return;
+    if (!endDate || endDate < startDate) {
+      form.setValue("endDate", startDate, { shouldValidate: true });
+    }
+  }, [endDate, form, startDate]);
 
   useEffect(() => {
     if (!selectedEmployeeId) {
@@ -137,23 +142,30 @@ export function LeaveForm({
       return;
     }
 
+    if (
+      initialApplyContext &&
+      initialApplyContext.employee.employeeId === selectedEmployeeId
+    ) {
+      setApplyContext(initialApplyContext);
+      setBalancesLoading(false);
+      return;
+    }
+
     let cancelled = false;
-    setBalancesLoading(true);
+    if (initialBalances.length === 0) setBalancesLoading(true);
 
     void getLeaveApplyContextAction(selectedEmployeeId).then((result) => {
       if (cancelled) return;
       setBalancesLoading(false);
       if (result.success) {
         setApplyContext(result.data);
-        return;
       }
-      setApplyContext(null);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [selectedEmployeeId]);
+  }, [selectedEmployeeId, initialApplyContext, initialBalances.length]);
 
   const onSubmit = form.handleSubmit((values) => {
     startTransition(async () => {
@@ -206,15 +218,13 @@ export function LeaveForm({
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      {applyContext ? (
-        <LeavePolicyInfo
-          context={applyContext}
-          employeeName={
-            lookups.employees.find((employee) => employee.id === selectedEmployeeId)?.label ??
-            "Employee"
-          }
-        />
-      ) : null}
+      <LeavePolicyInfo
+        context={applyContext}
+        employeeName={
+          lookups.employees.find((employee) => employee.id === selectedEmployeeId)?.label ??
+          "Employee"
+        }
+      />
       <div className="grid gap-4 md:grid-cols-2">
         {!isSelfService ? (
           <div className="space-y-2">
@@ -281,7 +291,7 @@ export function LeaveForm({
             balancesLoading || balances.length > 0 ? (
               <div className="flex flex-wrap items-center gap-2 md:col-span-2">
                 <span className="text-xs font-medium text-muted-foreground">Your balance:</span>
-                {balancesLoading ? (
+                {balancesLoading && balances.length === 0 ? (
                   <span className="text-xs text-muted-foreground">Loading…</span>
                 ) : (
                   balances.map((balance) => (
@@ -289,7 +299,8 @@ export function LeaveForm({
                       key={balance.leaveTypeCode}
                       className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium"
                     >
-                      {balance.leaveTypeName}: {balance.balanceDays} days
+                      {balance.leaveTypeName}: {formatLeaveDayCount(balance.usedDays)} /{" "}
+                      {formatLeaveDayCount(balance.allocatedDays)}
                     </span>
                   ))
                 )}
@@ -327,13 +338,10 @@ export function LeaveForm({
                         {balance.leaveTypeName}
                       </p>
                       <p className="mt-1 text-2xl font-semibold tabular-nums">
-                        {balance.balanceDays}
-                        <span className="ml-1 text-xs font-normal text-muted-foreground">
-                          days
-                        </span>
+                        {formatLeaveDayCount(balance.usedDays)} / {formatLeaveDayCount(balance.allocatedDays)}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {balance.usedDays} used · {balance.pendingDays} pending
+                        {formatLeaveDayCount(balance.balanceDays)} available
                       </p>
                     </div>
                   ))}
@@ -378,6 +386,7 @@ export function LeaveForm({
           <Input
             id="endDate"
             type="date"
+            min={startDate || undefined}
             disabled={isPending || isHalfDay}
             {...form.register("endDate")}
           />

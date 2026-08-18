@@ -5,6 +5,7 @@ import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { getEmployeeById } from "@/lib/employees/services/employee-detail";
 import { canEditLeavePolicy } from "@/lib/leave/leave-policy-permissions";
 import { getLeavePolicyPageData } from "@/lib/leave/services/leave-policy-queries";
+import { getEmployeeLeaveBalanceSnapshot } from "@/lib/leave/services/leave-queries";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -23,9 +24,10 @@ function resolveEmployeeGreetingName(
 export default async function EmployeeLeavePolicyPage() {
   const profile = await requireServerAnyPermission([PORTAL_PERMISSIONS.employee, "leave.view"]);
   const supabase = await createClient();
-  const [employee, policy] = await Promise.all([
+  const [employee, policy, yearUsage] = await Promise.all([
     getEmployeeById(supabase, profile.employee.id),
     getLeavePolicyPageData(supabase, profile.employee.organizationId),
+    getEmployeeLeaveBalanceSnapshot(supabase, profile.employee.id),
   ]);
 
   return (
@@ -37,6 +39,7 @@ export default async function EmployeeLeavePolicyPage() {
         mandatoryHolidays={policy.mandatoryHolidays}
         optionalHolidays={policy.optionalHolidays}
         holidayYear={policy.holidayYear}
+        yearUsage={yearUsage}
       />
     </div>
   );

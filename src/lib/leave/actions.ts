@@ -3,12 +3,15 @@
 import { revalidatePath } from "next/cache";
 
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { createClient } from "@/lib/supabase/server";
 import {
   requireServerAnyPermission,
   requireServerPermission,
 } from "@/lib/permissions/server";
 import { LEAVE_ROUTES, SELF_LEAVE_ROUTES } from "@/lib/leave/constants";
+import { MANAGER_ROUTES } from "@/lib/manager/constants";
+import { SYSTEM_ADMIN_ROUTES } from "@/lib/system-admin/constants";
 import { getLeaveRequestById } from "@/lib/leave/services/leave-detail";
 import { getManagerTeamScope } from "@/lib/manager/services/team-queries";
 import { hasPermission } from "@/lib/permissions/utils";
@@ -44,9 +47,30 @@ import type {
   LeaveLookups,
   LeaveSummary,
 } from "@/types/leave";
+import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
+import { DEFAULT_LEAVE_POLICY_DOCUMENT } from "@/lib/leave/leave-policy-defaults";
+import { getProbationSnapshot } from "@/lib/leave/services/leave-policy-engine";
+import {
+  loadLeaveEmployeePolicyState,
+  loadLeavePolicyRuntime,
+} from "@/lib/leave/services/leave-policy-runtime";
 
 async function getAuthenticatedSupabase() {
   return createClient();
+}
+
+function revalidateLeaveSelfServicePaths(leaveRequestId?: string) {
+  revalidatePath(LEAVE_ROUTES.list);
+  revalidatePath(LEAVE_ROUTES.balances);
+  revalidatePath(SELF_LEAVE_ROUTES.list);
+  revalidatePath(SELF_LEAVE_ROUTES.team);
+  revalidatePath(EMPLOYEE_ROUTES.leave);
+  revalidatePath(MANAGER_ROUTES.leave);
+  revalidatePath(MANAGER_ROUTES.leaveTeam);
+  revalidatePath(SYSTEM_ADMIN_ROUTES.leave);
+  if (leaveRequestId) {
+    revalidatePath(LEAVE_ROUTES.detail(leaveRequestId));
+  }
 }
 
 export async function createLeaveRequestAction(
@@ -57,9 +81,7 @@ export async function createLeaveRequestAction(
     const supabase = await getAuthenticatedSupabase();
     const parsed = leaveFormSchema.parse(input);
     const id = await createLeaveRequest(supabase, profile, parsed);
-    revalidatePath(LEAVE_ROUTES.list);
-    revalidatePath(LEAVE_ROUTES.balances);
-    revalidatePath(SELF_LEAVE_ROUTES.list);
+    revalidateLeaveSelfServicePaths(id);
     return { success: true, data: id };
   } catch (error) {
     return {
@@ -81,11 +103,7 @@ export async function updateLeaveRequestAction(
     const supabase = await getAuthenticatedSupabase();
     const parsed = leaveFormSchema.parse(input);
     await updateLeaveRequest(supabase, profile, leaveRequestId, parsed);
-    revalidatePath(LEAVE_ROUTES.list);
-    revalidatePath(LEAVE_ROUTES.detail(leaveRequestId));
-    revalidatePath(LEAVE_ROUTES.balances);
-    revalidatePath(SELF_LEAVE_ROUTES.list);
-    revalidatePath(SELF_LEAVE_ROUTES.team);
+    revalidateLeaveSelfServicePaths(leaveRequestId);
     return { success: true, data: undefined };
   } catch (error) {
     return {
@@ -108,11 +126,7 @@ export async function approveLeaveRequestAction(
       parsed.leaveRequestId,
       parsed.comments,
     );
-    revalidatePath(LEAVE_ROUTES.list);
-    revalidatePath(LEAVE_ROUTES.detail(parsed.leaveRequestId));
-    revalidatePath(LEAVE_ROUTES.balances);
-    revalidatePath(SELF_LEAVE_ROUTES.list);
-    revalidatePath(SELF_LEAVE_ROUTES.team);
+    revalidateLeaveSelfServicePaths(parsed.leaveRequestId);
     return { success: true, data: undefined };
   } catch (error) {
     return {
@@ -135,11 +149,7 @@ export async function rejectLeaveRequestAction(
       parsed.leaveRequestId,
       parsed.comments ?? "",
     );
-    revalidatePath(LEAVE_ROUTES.list);
-    revalidatePath(LEAVE_ROUTES.detail(parsed.leaveRequestId));
-    revalidatePath(LEAVE_ROUTES.balances);
-    revalidatePath(SELF_LEAVE_ROUTES.list);
-    revalidatePath(SELF_LEAVE_ROUTES.team);
+    revalidateLeaveSelfServicePaths(parsed.leaveRequestId);
     return { success: true, data: undefined };
   } catch (error) {
     return {
@@ -159,11 +169,7 @@ export async function cancelLeaveRequestAction(
     ]);
     const supabase = await getAuthenticatedSupabase();
     await cancelLeaveRequest(supabase, profile, leaveRequestId);
-    revalidatePath(LEAVE_ROUTES.list);
-    revalidatePath(LEAVE_ROUTES.detail(leaveRequestId));
-    revalidatePath(LEAVE_ROUTES.balances);
-    revalidatePath(SELF_LEAVE_ROUTES.list);
-    revalidatePath(SELF_LEAVE_ROUTES.team);
+    revalidateLeaveSelfServicePaths(leaveRequestId);
     return { success: true, data: undefined };
   } catch (error) {
     return {
@@ -184,11 +190,7 @@ export async function deleteLeaveRequestAction(
     ]);
     const supabase = await getAuthenticatedSupabase();
     await deleteLeaveRequest(supabase, profile, leaveRequestId);
-    revalidatePath(LEAVE_ROUTES.list);
-    revalidatePath(LEAVE_ROUTES.detail(leaveRequestId));
-    revalidatePath(LEAVE_ROUTES.balances);
-    revalidatePath(SELF_LEAVE_ROUTES.list);
-    revalidatePath(SELF_LEAVE_ROUTES.team);
+    revalidateLeaveSelfServicePaths(leaveRequestId);
     return { success: true, data: undefined };
   } catch (error) {
     return {
@@ -329,21 +331,7 @@ export async function getLeaveApplyContextAction(
   try {
     const profile = await requireServerPermission("leave.create");
     const supabase = await getAuthenticatedSupabase();
-    const { getTodayDateString } = await import(
-      "@/lib/attendance/services/attendance-utils"
-    );
-    const { getProbationSnapshot } = await import(
-      "@/lib/leave/services/leave-policy-engine"
-    );
-    const {
-      loadLeaveEmployeePolicyState,
-      loadLeavePolicyRuntime,
-    } = await import("@/lib/leave/services/leave-policy-runtime");
-    const { getLeavePolicyPageData } = await import(
-      "@/lib/leave/services/leave-policy-queries"
-    );
-
-    const [runtime, employee, balances, policy] = await Promise.all([
+    const [runtime, employee, balances] = await Promise.all([
       loadLeavePolicyRuntime(supabase, profile.employee.organizationId),
       loadLeaveEmployeePolicyState(
         supabase,
@@ -352,7 +340,6 @@ export async function getLeaveApplyContextAction(
         profile.employee.organizationId,
       ),
       getEmployeeLeaveBalanceSnapshot(supabase, employeeId),
-      getLeavePolicyPageData(supabase, profile.employee.organizationId),
     ]);
 
     return {
@@ -373,7 +360,7 @@ export async function getLeaveApplyContextAction(
           isPaid: item.isPaid,
         })),
         balances,
-        policyDocument: policy.document,
+        policyDocument: DEFAULT_LEAVE_POLICY_DOCUMENT,
       },
     };
   } catch (error) {
