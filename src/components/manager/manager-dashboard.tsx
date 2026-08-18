@@ -50,7 +50,6 @@ export function ManagerDashboard({ data, error }: ManagerDashboardProps) {
           upcomingAnniversaries={data.upcomingAnniversaries}
           insightsTitle="Team Insights"
           insightsDescription="Attendance pulse and upcoming celebrations"
-          celebrationsHref={MANAGER_ROUTES.team}
         />
       </section>
     </div>

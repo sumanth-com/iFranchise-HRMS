@@ -281,14 +281,12 @@ function HrInsightsPanel({
   anniversaries,
   title = "HR Insights",
   description = "Attendance pulse and upcoming celebrations",
-  celebrationsHref,
 }: {
   charts: DashboardCharts;
   birthdays: DashboardPersonEvent[];
   anniversaries: DashboardPersonEvent[];
   title?: string;
   description?: string;
-  celebrationsHref?: string;
 }) {
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border bg-card p-3 shadow-sm md:p-4">
@@ -304,7 +302,6 @@ function HrInsightsPanel({
         <TeamCelebrationsPanel
           birthdays={birthdays}
           anniversaries={anniversaries}
-          teamHref={celebrationsHref}
         />
       </div>
     </section>
@@ -319,7 +316,6 @@ export function DashboardOperationsRow({
   upcomingAnniversaries,
   insightsTitle,
   insightsDescription,
-  celebrationsHref,
 }: {
   tasks: DashboardTaskItem[];
   charts: DashboardCharts;
@@ -328,7 +324,6 @@ export function DashboardOperationsRow({
   upcomingAnniversaries: DashboardPersonEvent[];
   insightsTitle?: string;
   insightsDescription?: string;
-  celebrationsHref?: string;
 }) {
   return (
     <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-3 overflow-hidden">
@@ -344,7 +339,6 @@ export function DashboardOperationsRow({
           anniversaries={upcomingAnniversaries}
           title={insightsTitle}
           description={insightsDescription}
-          celebrationsHref={celebrationsHref}
         />
       </div>
     </div>
