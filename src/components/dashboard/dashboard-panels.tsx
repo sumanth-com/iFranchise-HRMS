@@ -186,11 +186,9 @@ function PriorityTasks({ items }: { items: DashboardTaskItem[] }) {
 function TeamCelebrationsPanel({
   birthdays,
   anniversaries,
-  teamHref = "/dashboard/employees",
 }: {
   birthdays: DashboardPersonEvent[];
   anniversaries: DashboardPersonEvent[];
-  teamHref?: string;
 }) {
   const events = [
     ...birthdays.map((event) => ({ ...event, kind: "birthday" as const })),
@@ -211,12 +209,6 @@ function TeamCelebrationsPanel({
             Team celebrations
           </p>
         </div>
-        <Link
-          href={teamHref}
-          className="rounded-full border bg-background/80 px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted"
-        >
-          View team
-        </Link>
       </div>
 
       {events.length === 0 ? (
