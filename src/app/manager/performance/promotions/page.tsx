@@ -1,24 +1,18 @@
 import { PromotionForm, PromotionsTable } from "@/components/performance/promotion-management";
 import { loadManagerPerformancePage } from "@/lib/manager/load-admin-context";
+import {
+  PERFORMANCE_CLIENT_FETCH_SIZE,
+  PERFORMANCE_TABLE_PAGE_SIZE,
+} from "@/lib/performance/constants";
 import { listPromotions } from "@/lib/performance/services/performance-queries";
-import { promotionListParamsSchema } from "@/lib/validations/performance";
 
-type PromotionsPageProps = {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-};
-
-export default async function ManagerPromotionsPage({ searchParams }: PromotionsPageProps) {
+export default async function ManagerPromotionsPage() {
   const { profile, supabase, lookups } = await loadManagerPerformancePage();
-  const rawParams = await searchParams;
 
-  const params = promotionListParamsSchema.parse({
-    page: rawParams.page,
-    pageSize: rawParams.pageSize,
-    employeeId: rawParams.employeeId,
-    promotionStatus: rawParams.promotionStatus,
+  const result = await listPromotions(supabase, profile, {
+    page: 1,
+    pageSize: PERFORMANCE_CLIENT_FETCH_SIZE,
   });
-
-  const result = await listPromotions(supabase, profile, params);
 
   return (
     <div className="space-y-6">
@@ -34,13 +28,9 @@ export default async function ManagerPromotionsPage({ searchParams }: Promotions
       />
       <PromotionsTable
         records={result.data}
-        total={result.total}
-        page={result.page}
-        pageSize={result.pageSize}
+        pageSize={PERFORMANCE_TABLE_PAGE_SIZE}
         employees={lookups.employees}
         designations={lookups.designations}
-        employeeId={params.employeeId}
-        promotionStatus={params.promotionStatus}
         canApprove
         canEdit
         canDelete

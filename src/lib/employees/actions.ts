@@ -945,3 +945,25 @@ export async function updateEmployeeSelfProfileAction(
     };
   }
 }
+
+export async function getEmployeePeriodDataAction(
+  employeeId: string,
+  month: number,
+  year: number,
+) {
+  await requireServerPermission("employee.view");
+  const supabase = await getAuthenticatedSupabase();
+
+  const period = { month, year };
+
+  const [attendance, leaveRequests, leaveApprovals, leaveBalances, attendanceSummary] =
+    await Promise.all([
+      getEmployeeAttendance(supabase, employeeId, period),
+      getEmployeeLeaveRequests(supabase, employeeId, period),
+      getEmployeeLeaveApprovals(supabase, employeeId, period),
+      getEmployeeLeaveBalances(supabase, employeeId, period),
+      getEmployeeAttendanceSummary(supabase, employeeId, period),
+    ]);
+
+  return { attendance, leaveRequests, leaveApprovals, leaveBalances, attendanceSummary };
+}

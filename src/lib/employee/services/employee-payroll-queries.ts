@@ -6,6 +6,7 @@ import {
   paymentStatusLabel,
 } from "@/lib/payroll/services/payslip-history-queries";
 import {
+  PAYSLIP_PUBLISH_DAY,
   canAccessPayslipDuringReview,
   resolvePayslipAvailability,
   resolvePayslipSchedule,
@@ -14,10 +15,15 @@ import {
 import { processDuePayslipPublications } from "@/lib/payroll/services/payslip-publication-worker";
 import { listBonuses, listReimbursements } from "@/lib/payroll/services/payroll-queries";
 import { getPayrollSettings } from "@/lib/payroll/services/payroll-settings";
-import { maskAccountNumber } from "@/lib/payroll/services/payroll-utils";
+import { maskAccountNumber, roundCurrency, toEmployeeFacingEarnings } from "@/lib/payroll/services/payroll-utils";
+import {
+  BONUS_TYPE_LABELS,
+  REIMBURSEMENT_CATEGORY_LABELS,
+} from "@/lib/payroll/constants";
 import type { UserProfile } from "@/types/auth";
 import type {
   EmployeePayrollData,
+  EmployeePayrollDisplaySummary,
   EmployeePayrollTimeline,
   EmployeeSalaryStructure,
 } from "@/types/employee-payroll";
@@ -151,6 +157,182 @@ function buildStructureLines(row: {
   };
 }
 
+const PAYABLE_EXTRA_STATUSES = new Set(["pending", "approved", "paid"]);
+
+function monthKey(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (trimmed.length >= 7) return trimmed.slice(0, 7);
+  return null;
+}
+
+function extraLineKey(code: string, amount: number) {
+  return `${code}:${amount.toFixed(2)}`;
+}
+
+function countExtraKeys(lines: PayrollBreakdownLine[]) {
+  const counts = new Map<string, number>();
+  for (const line of lines) {
+    if (!line.code.startsWith("bonus_") && !line.code.startsWith("reimb_")) continue;
+    const key = extraLineKey(line.code, Number(line.amount));
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function consumeExtraKey(counts: Map<string, number>, code: string, amount: number) {
+  const key = extraLineKey(code, amount);
+  const remaining = counts.get(key) ?? 0;
+  if (remaining <= 0) return false;
+  counts.set(key, remaining - 1);
+  return true;
+}
+
+function extrasForMonth(
+  bonuses: BonusItem[],
+  reimbursements: ReimbursementItem[],
+  period: string,
+) {
+  return {
+    bonuses: bonuses.filter(
+      (item) =>
+        PAYABLE_EXTRA_STATUSES.has(item.bonusStatus) &&
+        monthKey(item.bonusMonth) === period,
+    ),
+    reimbursements: reimbursements.filter(
+      (item) =>
+        PAYABLE_EXTRA_STATUSES.has(item.reimbursementStatus) &&
+        monthKey(item.expenseDate) === period,
+    ),
+  };
+}
+
+function buildDisplaySummary(input: {
+  latest: EmployeePayrollData["latest"];
+  salaryStructure: EmployeeSalaryStructure | null;
+  bonuses: BonusItem[];
+  reimbursements: ReimbursementItem[];
+}): EmployeePayrollDisplaySummary {
+  const currentMonth = format(new Date(), "yyyy-MM");
+  const latestMonth = monthKey(input.latest?.payrollMonth);
+  const extraMonths = [
+    ...input.bonuses
+      .filter((item) => PAYABLE_EXTRA_STATUSES.has(item.bonusStatus))
+      .map((item) => monthKey(item.bonusMonth)),
+    ...input.reimbursements
+      .filter((item) => PAYABLE_EXTRA_STATUSES.has(item.reimbursementStatus))
+      .map((item) => monthKey(item.expenseDate)),
+  ].filter((value): value is string => Boolean(value));
+
+  const newestExtraMonth = extraMonths.sort().at(-1) ?? null;
+  const periodMonth =
+    extraMonths.includes(currentMonth)
+      ? currentMonth
+      : (newestExtraMonth ?? latestMonth ?? currentMonth);
+  const useProjectedCurrent = Boolean(periodMonth && periodMonth !== latestMonth);
+  const extras = extrasForMonth(input.bonuses, input.reimbursements, periodMonth);
+
+  const structureAvailable = Boolean(input.salaryStructure);
+  const usingStructure = useProjectedCurrent ? structureAvailable : !input.latest;
+
+  const latestEarnings = input.latest?.breakdown?.earnings ?? [];
+  const latestDeductions = input.latest?.breakdown?.deductions ?? [];
+  const recurringEarnings = (useProjectedCurrent
+    ? structureAvailable
+      ? input.salaryStructure?.earnings ?? []
+      : latestEarnings.filter(
+          (line) =>
+            !line.code.startsWith("bonus_") && !line.code.startsWith("reimb_"),
+        )
+    : usingStructure
+      ? input.salaryStructure?.earnings ?? []
+      : latestEarnings.length
+        ? latestEarnings
+        : (input.salaryStructure?.earnings ?? [])
+  );
+
+  const baseEarnings: PayrollBreakdownLine[] = [...recurringEarnings];
+  const baseDeductions: PayrollBreakdownLine[] = [
+    ...(useProjectedCurrent
+      ? structureAvailable
+        ? input.salaryStructure?.deductions ?? []
+        : latestDeductions
+      : usingStructure
+        ? input.salaryStructure?.deductions ?? []
+        : latestDeductions.length
+          ? latestDeductions
+          : (input.salaryStructure?.deductions ?? [])),
+  ];
+
+  const alreadyIncluded = usingStructure
+    ? new Map<string, number>()
+    : countExtraKeys(baseEarnings);
+
+  const extraLines: PayrollBreakdownLine[] = [];
+
+  for (const bonus of extras.bonuses) {
+    const code = `bonus_${bonus.bonusType}`;
+    const amount = roundCurrency(Number(bonus.amount));
+    if (consumeExtraKey(alreadyIncluded, code, amount)) continue;
+    extraLines.push({
+      code,
+      label: BONUS_TYPE_LABELS[bonus.bonusType] ?? `Bonus (${bonus.bonusType})`,
+      amount,
+      type: "earning",
+    });
+  }
+
+  for (const claim of extras.reimbursements) {
+    const code = `reimb_${claim.category}`;
+    const amount = roundCurrency(Number(claim.amount));
+    if (consumeExtraKey(alreadyIncluded, code, amount)) continue;
+    extraLines.push({
+      code,
+      label: `${REIMBURSEMENT_CATEGORY_LABELS[claim.category] ?? claim.category} reimbursement`,
+      amount,
+      type: "earning",
+    });
+  }
+
+  const earnings = [...baseEarnings, ...extraLines];
+  const deductions = baseDeductions;
+  const extraTotal = roundCurrency(
+    extraLines.reduce((sum, line) => sum + line.amount, 0),
+  );
+  const baseGross = usingStructure
+    ? Number(input.salaryStructure?.grossSalary ?? 0)
+    : Number(input.latest?.grossSalary ?? input.salaryStructure?.grossSalary ?? 0);
+  const baseDeductionsTotal = usingStructure
+    ? roundCurrency(
+        Number(input.salaryStructure?.grossSalary ?? 0) -
+          Number(input.salaryStructure?.netSalary ?? 0),
+      )
+    : Number(
+        input.latest?.totalDeductions ??
+          (input.salaryStructure
+            ? input.salaryStructure.grossSalary - input.salaryStructure.netSalary
+            : 0),
+      );
+  const baseNet = usingStructure
+    ? Number(input.salaryStructure?.netSalary ?? 0)
+    : Number(input.latest?.netSalary ?? input.salaryStructure?.netSalary ?? 0);
+
+  const grossSalary = roundCurrency(baseGross + extraTotal);
+  const totalDeductions = roundCurrency(baseDeductionsTotal);
+  const netSalary = roundCurrency(baseNet + extraTotal);
+
+  return {
+    earnings: toEmployeeFacingEarnings([...baseEarnings, ...extraLines]),
+    deductions: deductions.filter((line) => Number(line.amount) > 0),
+    grossSalary,
+    totalDeductions,
+    netSalary,
+    periodMonth,
+    usingStructure,
+    extrasIncluded: extraLines.length > 0,
+  };
+}
+
 const TIMELINE_STATUS_ORDER: PayrollStatus[] = [
   "draft",
   "processing",
@@ -242,7 +424,9 @@ export async function getEmployeePayrollData(
           lastName: profile.employee.lastName,
         });
 
-  const hrPayslipAccess = canAccessPayslipDuringReview(profile.permissionCodes);
+  const viewingOwnPayroll = employeeId === profile.employee.id;
+  const hrPayslipAccess =
+    !viewingOwnPayroll && canAccessPayslipDuringReview(profile.permissionCodes);
 
   const [payslipRows, structureRow, bankRow, settings, bonusResult, reimbursementResult, pendingPromotionRow] =
     await Promise.all([
@@ -317,12 +501,12 @@ export async function getEmployeePayrollData(
     }, null),
     safe(() => getPayrollSettings(supabase, organizationId), null),
     safe(
-      () => listBonuses(supabase, profile, { employeeId, page: 1, pageSize: 12 }),
+      () => listBonuses(supabase, profile, { employeeId, page: 1, pageSize: 50 }),
       { data: [] as BonusItem[], total: 0, page: 1, pageSize: 12 },
     ),
     safe(
       () =>
-        listReimbursements(supabase, profile, { employeeId, page: 1, pageSize: 12 }),
+        listReimbursements(supabase, profile, { employeeId, page: 1, pageSize: 50 }),
       { data: [] as ReimbursementItem[], total: 0, page: 1, pageSize: 12 },
     ),
     safe(async () => {
@@ -397,14 +581,29 @@ export async function getEmployeePayrollData(
     return { row, item, payroll };
   });
 
+  const currencyCode = settings?.settings.currency ?? "INR";
+  const creditDay = settings?.settings.salaryCreditDate ?? SALARY_CREDIT_DAY;
+  const publishDay = settings?.settings.payslipAvailableDay ?? PAYSLIP_PUBLISH_DAY;
+  const fyStartMonth = settings?.settings.financialYearStartMonth ?? 4;
+  const scheduleOptions = {
+    salaryCreditDay: creditDay,
+    publishDay,
+  };
+
   const payslips: PayslipListItem[] = rows.map(({ row, item, payroll }) => {
-    const schedule = resolvePayslipSchedule(payroll?.payroll_month ?? "", {
-      salaryCreditDate: row.salary_credit_date ?? undefined,
-      publishedAt: row.published_at ?? undefined,
-    });
+    const schedule = resolvePayslipSchedule(
+      payroll?.payroll_month ?? "",
+      {
+        salaryCreditDate: row.salary_credit_date ?? undefined,
+        publishedAt: row.published_at ?? undefined,
+      },
+      scheduleOptions,
+    );
     const access = resolvePayslipAvailability(
       schedule.publishedAt,
       profile.permissionCodes,
+      new Date(),
+      { employeeFacing: viewingOwnPayroll },
     );
     return {
       id: row.id,
@@ -420,7 +619,7 @@ export async function getEmployeePayrollData(
       salaryCreditDate: schedule.salaryCreditDate,
       publishedAt: schedule.publishedAt,
       availability: access.availability,
-      canEmployeeAccess: access.canEmployeeAccess || hrPayslipAccess,
+      canEmployeeAccess: access.canEmployeeAccess,
       reviewMessage: access.reviewMessage,
       payslipVersion: row.payslip_version ?? "1.0",
       paymentStatus: paymentStatusLabel(
@@ -431,10 +630,6 @@ export async function getEmployeePayrollData(
       versionCount: 1,
     };
   });
-
-  const currencyCode = settings?.settings.currency ?? "INR";
-  const creditDay = settings?.settings.salaryCreditDate ?? SALARY_CREDIT_DAY;
-  const fyStartMonth = settings?.settings.financialYearStartMonth ?? 4;
 
   // Financial year window that contains today.
   const now = new Date();
@@ -477,11 +672,20 @@ export async function getEmployeePayrollData(
   const latestRow = rows[0] ?? null;
 
   const latestAccessible = rows.find(({ row, payroll }) => {
-    const schedule = resolvePayslipSchedule(payroll?.payroll_month ?? "", {
-      salaryCreditDate: row.salary_credit_date ?? undefined,
-      publishedAt: row.published_at ?? undefined,
-    });
-    const access = resolvePayslipAvailability(schedule.publishedAt, profile.permissionCodes);
+    const schedule = resolvePayslipSchedule(
+      payroll?.payroll_month ?? "",
+      {
+        salaryCreditDate: row.salary_credit_date ?? undefined,
+        publishedAt: row.published_at ?? undefined,
+      },
+      scheduleOptions,
+    );
+    const access = resolvePayslipAvailability(
+      schedule.publishedAt,
+      profile.permissionCodes,
+      new Date(),
+      { employeeFacing: viewingOwnPayroll },
+    );
     return access.canEmployeeAccess || hrPayslipAccess;
   });
 
@@ -538,8 +742,15 @@ export async function getEmployeePayrollData(
       }
     : null;
 
-  const currentNet = latest?.netSalary ?? salaryStructure?.netSalary ?? null;
-  const currentGross = latest?.grossSalary ?? salaryStructure?.grossSalary ?? null;
+  const displaySummary = buildDisplaySummary({
+    latest,
+    salaryStructure,
+    bonuses,
+    reimbursements,
+  });
+
+  const currentNet = displaySummary.netSalary;
+  const currentGross = displaySummary.grossSalary;
 
   const recommendedDesignation = pendingPromotionRow?.recommended_designation as
     | { title: string }
@@ -587,6 +798,7 @@ export async function getEmployeePayrollData(
     bank,
     bonuses,
     reimbursements,
+    displaySummary,
     trend,
     pendingPromotion,
     ytd: {

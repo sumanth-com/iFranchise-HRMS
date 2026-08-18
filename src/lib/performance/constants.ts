@@ -29,6 +29,11 @@ export const PERFORMANCE_ROUTES = {
   settings: "/dashboard/performance/settings",
 } as const;
 
+/** Fetch enough rows for instant client-side filters (no server round-trip). */
+export const PERFORMANCE_CLIENT_FETCH_SIZE = 100;
+/** Visible page size after local filtering. */
+export const PERFORMANCE_TABLE_PAGE_SIZE = 10;
+
 export const GOAL_PRIORITY_LABELS: Record<GoalPriority, string> = {
   low: "Low",
   medium: "Medium",

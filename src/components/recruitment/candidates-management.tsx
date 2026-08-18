@@ -33,6 +33,7 @@ import {
 } from "@/lib/recruitment/actions";
 import {
   CANDIDATE_STAGE_LABELS,
+  getCandidateStageBadge,
   INTERVIEW_DURATION_OPTIONS,
   INTERVIEW_TYPE_LABELS,
 } from "@/lib/recruitment/constants";
@@ -113,6 +114,10 @@ export function CandidatesManagement({
   const [selectedDetail, setSelectedDetail] = useState<CandidateDetail | null>(initialSelected);
   const [detailLoading, setDetailLoading] = useState(false);
   const [rejecting, setRejecting] = useState(false);
+  const [visibleCandidates, setVisibleCandidates] = useState(records);
+  const [listTotal, setListTotal] = useState(total);
+  const [localFilters, setLocalFilters] = useState(filters);
+  const [searchFocused, setSearchFocused] = useState(false);
 
   useEffect(() => {
     if (searchParams.get("add") === "1" && filters.jobOpeningId && canCreate) {
@@ -129,6 +134,50 @@ export function CandidatesManagement({
       return richness(initialSelected) >= richness(prev) ? initialSelected : prev;
     });
   }, [initialSelected, selectedId]);
+
+  useEffect(() => {
+    setVisibleCandidates(records);
+    setListTotal(total);
+    setLocalFilters(filters);
+  }, [records, total, filters]);
+
+  useEffect(() => {
+    let filtered = records;
+
+    if (localFilters.search?.trim()) {
+      const q = localFilters.search.trim().toLowerCase();
+      filtered = filtered.filter((row) =>
+        [
+          row.fullName,
+          row.email,
+          row.jobTitle,
+          row.departmentName,
+          row.source,
+          row.phone,
+        ]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(q)),
+      );
+    }
+
+    if (localFilters.departmentId) {
+      const departmentLabel = lookups.departments.find(
+        (department) => department.id === localFilters.departmentId,
+      )?.label;
+      filtered = filtered.filter((row) => row.departmentName === departmentLabel);
+    }
+
+    if (localFilters.jobOpeningId) {
+      filtered = filtered.filter((row) => row.jobOpeningId === localFilters.jobOpeningId);
+    }
+
+    if (localFilters.stage) {
+      filtered = filtered.filter((row) => row.stage === localFilters.stage);
+    }
+
+    setVisibleCandidates(filtered);
+    setListTotal(filtered.length);
+  }, [localFilters, lookups.departments, records]);
 
   const syncCandidateUrl = useCallback(
     (candidateId: string | null) => {
@@ -181,16 +230,45 @@ export function CandidatesManagement({
   }
 
   function updateParams(updates: Record<string, string | undefined>) {
+    setLocalFilters((prev) => {
+      const next = { ...prev };
+      for (const [key, value] of Object.entries(updates)) {
+        if (!value || value === "all") {
+          delete (next as Record<string, string | undefined>)[key];
+        } else {
+          (next as Record<string, string | undefined>)[key] = value;
+        }
+      }
+      return next;
+    });
+
     const params = new URLSearchParams(searchParams.toString());
     for (const [key, value] of Object.entries(updates)) {
       if (!value || value === "all") params.delete(key);
       else params.set(key, value);
     }
     params.set("page", "1");
-    startTransition(() => router.push(`?${params.toString()}`));
+    window.history.replaceState(null, "", `?${params.toString()}`);
   }
 
   const activeDetail = selectedDetail;
+  const searchSuggestions = useMemo(() => {
+    const values = new Set<string>();
+    for (const row of records) {
+      if (row.fullName) values.add(row.fullName);
+      if (row.email) values.add(row.email);
+      if (row.jobTitle) values.add(row.jobTitle);
+      if (row.source) values.add(row.source);
+    }
+    return [...values].sort((a, b) => a.localeCompare(b));
+  }, [records]);
+  const visibleSearchSuggestions = useMemo(() => {
+    const query = localFilters.search?.trim().toLowerCase() ?? "";
+    if (query.length < 2) return [];
+    return searchSuggestions
+      .filter((value) => value.toLowerCase().includes(query))
+      .slice(0, 5);
+  }, [localFilters.search, searchSuggestions]);
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
@@ -216,21 +294,41 @@ export function CandidatesManagement({
 
       <div className="shrink-0 rounded-xl border bg-card p-4 shadow-sm">
         <div className="grid gap-3 lg:grid-cols-4">
-          <Input
-            placeholder="Search candidate..."
-            defaultValue={filters.search}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                updateParams({ search: (e.target as HTMLInputElement).value || undefined });
-              }
-            }}
-          />
+          <div className="relative">
+            <Input
+              placeholder="Search candidate..."
+              value={localFilters.search ?? ""}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => {
+                window.setTimeout(() => setSearchFocused(false), 120);
+              }}
+              onChange={(e) => updateParams({ search: e.target.value || undefined })}
+            />
+            {searchFocused && visibleSearchSuggestions.length > 0 ? (
+              <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover p-1 shadow-lg">
+                {visibleSearchSuggestions.map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className="block w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-muted"
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      updateParams({ search: value });
+                      setSearchFocused(false);
+                    }}
+                  >
+                    {value}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
           <LabeledSelect
             items={[
               { value: "all", label: "All departments" },
               ...lookups.departments.map((d) => ({ value: d.id, label: d.label })),
             ]}
-            value={filters.departmentId ?? "all"}
+            value={localFilters.departmentId ?? "all"}
             onValueChange={(v) => updateParams({ departmentId: v === "all" ? undefined : v })}
           />
           <LabeledSelect
@@ -238,7 +336,7 @@ export function CandidatesManagement({
               { value: "all", label: "All positions" },
               ...lookups.jobs.map((j) => ({ value: j.id, label: j.label })),
             ]}
-            value={filters.jobOpeningId ?? "all"}
+            value={localFilters.jobOpeningId ?? "all"}
             onValueChange={(v) => updateParams({ jobOpeningId: v === "all" ? undefined : v })}
           />
           <LabeledSelect
@@ -246,7 +344,7 @@ export function CandidatesManagement({
               { value: "all", label: "All stages" },
               ...toSelectItems(CANDIDATE_STAGE_LABELS),
             ]}
-            value={filters.stage ?? "all"}
+            value={localFilters.stage ?? "all"}
             onValueChange={(v) => updateParams({ stage: v === "all" ? undefined : v })}
           />
         </div>
@@ -260,9 +358,9 @@ export function CandidatesManagement({
       >
         <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
           <div className="shrink-0 border-b px-4 py-2.5 text-xs text-muted-foreground">
-            {total} candidate{total === 1 ? "" : "s"}
+            {listTotal} candidate{listTotal === 1 ? "" : "s"}
           </div>
-          {records.length === 0 ? (
+          {visibleCandidates.length === 0 ? (
             <EmptyState
               title="No candidates"
               description="Add a candidate against an open job to start the hiring pipeline."
@@ -270,7 +368,7 @@ export function CandidatesManagement({
             />
           ) : (
             <ul className="min-h-0 flex-1 divide-y overflow-y-auto overscroll-contain">
-              {records.map((row) => {
+              {visibleCandidates.map((row) => {
                 const isActive = panelOpen && selectedId === row.id;
                 return (
                   <li key={row.id}>
@@ -288,8 +386,7 @@ export function CandidatesManagement({
                           <p className="truncate text-xs text-muted-foreground">{row.email}</p>
                         </div>
                         <RecruitmentStatusBadge
-                          label={CANDIDATE_STAGE_LABELS[row.stage]}
-                          status={row.stage}
+                          {...getCandidateStageBadge(row.stage, row.latestOfferStatus)}
                         />
                       </div>
                       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -306,7 +403,7 @@ export function CandidatesManagement({
             </ul>
           )}
           <div className="shrink-0 border-t px-2 py-2">
-            <RecruitmentPagination page={page} pageSize={pageSize} total={total} />
+            <RecruitmentPagination page={page} pageSize={pageSize} total={listTotal} />
           </div>
         </div>
 

@@ -15,6 +15,7 @@ import {
   getDepartments,
   getManagers,
 } from "@/lib/employees/services/employee-queries";
+import { cleanDisplayText, formatCleanEmployeeName } from "@/lib/employees/parse-employee-name";
 
 type AttendanceRow = {
   id: string;
@@ -187,7 +188,7 @@ export async function listAttendance(
         employeeId: row.employee_id,
         employeeCode: employee?.employee_code ?? "",
         employeeName: employee
-          ? `${employee.first_name} ${employee.last_name}`
+          ? formatCleanEmployeeName(employee.first_name, employee.last_name)
           : "",
         departmentId: employee?.department_id ?? null,
         departmentName: department?.name ?? null,
@@ -287,7 +288,14 @@ export async function getAttendanceLookups(
     getManagers(supabase, organizationId),
   ]);
 
-  return { branches, departments, employees };
+  return {
+    branches,
+    departments,
+    employees: employees.map((employee) => ({
+      ...employee,
+      label: cleanDisplayText(employee.label),
+    })),
+  };
 }
 
 export async function getEmployeeBranchId(

@@ -155,12 +155,17 @@ const SECTION_HELP: Record<
       {
         label: "What this page is for",
         detail:
-          "Configure the organization payroll cycle, processing schedule, and salary credit day used across Team Payroll.",
+          "Configure the organization payroll cycle, processing schedule, salary credit day, and when employees can open payslips.",
       },
       {
         label: "Salary credit day",
         detail:
           "Controls when salaries are expected to credit. Keep this aligned with Finance so employees see the correct credit date on payslips.",
+      },
+      {
+        label: "Payslip available day",
+        detail:
+          "Employees in every portal can open their payslip from this day of the payroll month. Default is the 5th.",
       },
       {
         label: "Who should change this",

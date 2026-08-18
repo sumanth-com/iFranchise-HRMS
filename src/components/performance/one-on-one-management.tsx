@@ -3,7 +3,7 @@
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -15,8 +15,11 @@ import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import {
   buildStatusItems,
+  matchesTextQuery,
+  paginateItems,
   PerformanceFilters,
   PerformancePagination,
+  type PerformanceFilterUpdates,
 } from "@/components/performance/performance-filters";
 import { OneOnOneDetailModal } from "@/components/performance/one-on-one-detail-modal";
 import { PerformanceConfirmModal } from "@/components/performance/performance-confirm-modal";
@@ -143,18 +146,14 @@ export function OneOnOneForm({ employees }: { employees: LookupOption[] }) {
 
 export function OneOnOneTable({
   records,
-  total,
-  page,
   pageSize,
   employees,
-  employeeId,
-  meetingStatus,
   canEdit = false,
   canDelete = false,
 }: {
   records: OneOnOneListItem[];
-  total: number;
-  page: number;
+  total?: number;
+  page?: number;
   pageSize: number;
   employees: LookupOption[];
   employeeId?: string;
@@ -166,6 +165,41 @@ export function OneOnOneTable({
   const [isPending, startTransition] = useTransition();
   const [viewId, setViewId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<OneOnOneListItem | null>(null);
+  const [search, setSearch] = useState("");
+  const [employeeId, setEmployeeId] = useState<string | undefined>();
+  const [meetingStatus, setMeetingStatus] = useState<string | undefined>();
+  const [page, setPage] = useState(1);
+
+  const filtered = useMemo(() => {
+    return records.filter((row) => {
+      if (employeeId && row.employeeId !== employeeId) return false;
+      if (meetingStatus && row.meetingStatus !== meetingStatus) return false;
+      return matchesTextQuery(
+        [row.employeeName, row.managerName, row.agenda, row.notes],
+        search,
+      );
+    });
+  }, [records, search, employeeId, meetingStatus]);
+
+  const paged = useMemo(
+    () => paginateItems(filtered, page, pageSize),
+    [filtered, page, pageSize],
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, employeeId, meetingStatus]);
+
+  useEffect(() => {
+    if (page !== paged.page) setPage(paged.page);
+  }, [page, paged.page]);
+
+  function handleFiltersChange(updates: PerformanceFilterUpdates) {
+    if ("search" in updates) setSearch(updates.search ?? "");
+    if ("employeeId" in updates) setEmployeeId(updates.employeeId);
+    if ("meetingStatus" in updates) setMeetingStatus(updates.meetingStatus);
+    setPage(1);
+  }
 
   function handleDelete() {
     if (!deleting) return;
@@ -190,7 +224,11 @@ export function OneOnOneTable({
           statusKey="meetingStatus"
           statusValue={meetingStatus}
           employeeId={employeeId}
+          search={search}
           searchPlaceholder="Search meetings..."
+          showDepartment={false}
+          showCycle={false}
+          onFiltersChange={handleFiltersChange}
         />
       </div>
       <PerformanceTableShell
@@ -202,7 +240,7 @@ export function OneOnOneTable({
           />
         }
       >
-        {records.length > 0 ? (
+        {paged.rows.length > 0 ? (
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
               <tr className="text-left text-muted-foreground">
@@ -217,7 +255,7 @@ export function OneOnOneTable({
               </tr>
             </thead>
             <tbody>
-              {records.map((row) => (
+              {paged.rows.map((row) => (
                 <tr key={row.id} className="border-t align-middle">
                   <td className="px-4 py-3">{row.employeeName}</td>
                   <td className="px-4 py-3">{row.managerName}</td>
@@ -250,7 +288,12 @@ export function OneOnOneTable({
           </table>
         ) : null}
       </PerformanceTableShell>
-      <PerformancePagination page={page} pageSize={pageSize} total={total} />
+      <PerformancePagination
+        page={paged.page}
+        pageSize={pageSize}
+        total={paged.total}
+        onPageChange={setPage}
+      />
 
       <OneOnOneDetailModal
         meetingId={viewId}

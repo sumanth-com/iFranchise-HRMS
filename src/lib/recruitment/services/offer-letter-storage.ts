@@ -1,4 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const BUCKET = "employee-documents";
 
@@ -27,7 +28,7 @@ export function contentTypeForOfferLetterExtension(ext: string): string {
 }
 
 export async function storeOfferLetterFile(
-  supabase: AuthSupabaseClient,
+  _supabase: AuthSupabaseClient,
   organizationId: string,
   offerId: string,
   candidateId: string,
@@ -35,10 +36,11 @@ export async function storeOfferLetterFile(
   filename: string,
 ): Promise<string> {
   const ext = resolveOfferLetterExtension(filename);
-  const storagePath = `recruitment/offers/${organizationId}/${candidateId}/${offerId}.${ext}`;
+  const storagePath = `${organizationId}/recruitment/offers/${candidateId}/${offerId}.${ext}`;
   const contentType = contentTypeForOfferLetterExtension(ext);
+  const admin = createAdminClient();
 
-  const { error: uploadError } = await supabase.storage.from(BUCKET).upload(storagePath, fileBytes, {
+  const { error: uploadError } = await admin.storage.from(BUCKET).upload(storagePath, fileBytes, {
     contentType,
     upsert: true,
   });
@@ -55,10 +57,11 @@ export async function storeOfferLetterFile(
 }
 
 export async function downloadOfferLetterFile(
-  supabase: AuthSupabaseClient,
+  _supabase: AuthSupabaseClient,
   storagePath: string,
 ): Promise<Uint8Array> {
-  const { data, error } = await supabase.storage.from(BUCKET).download(storagePath);
+  const admin = createAdminClient();
+  const { data, error } = await admin.storage.from(BUCKET).download(storagePath);
   if (error) throw new Error(error.message);
   return new Uint8Array(await data.arrayBuffer());
 }

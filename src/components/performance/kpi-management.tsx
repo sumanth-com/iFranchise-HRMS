@@ -2,8 +2,8 @@
 
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -20,8 +20,11 @@ import { PerformanceConfirmModal } from "@/components/performance/performance-co
 import { KpiStatusBadge } from "@/components/performance/performance-status-badge";
 import {
   buildStatusItems,
+  matchesTextQuery,
+  paginateItems,
   PerformanceFilters,
   PerformancePagination,
+  type PerformanceFilterUpdates,
 } from "@/components/performance/performance-filters";
 import {
   DeleteIconButton,
@@ -41,6 +44,7 @@ import {
   KPI_MEASUREMENT_LABELS,
   KPI_PERIOD_LABELS,
   KPI_STATUS_LABELS,
+  PERFORMANCE_CLIENT_FETCH_SIZE,
   PERFORMANCE_ROUTES,
 } from "@/lib/performance/constants";
 import { formatKpiTarget } from "@/lib/performance/services/performance-utils";
@@ -85,11 +89,11 @@ export function KpiWorkflow({
 
 type KpiTableProps = {
   records: KpiListItem[];
-  total: number;
-  page: number;
+  total?: number;
+  page?: number;
   pageSize: number;
-  departments: LookupOption[];
-  designations: LookupOption[];
+  departments?: LookupOption[];
+  designations?: LookupOption[];
   search?: string;
   departmentId?: string;
   designationId?: string;
@@ -102,31 +106,49 @@ type KpiTableProps = {
 
 export function KpiTable({
   records,
-  total,
-  page,
   pageSize,
-  search = "",
-  kpiStatus,
-  kpiPeriod,
   canManageKpis,
   currentEmployeeId,
   onKpisChanged,
 }: KpiTableProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [editing, setEditing] = useState<KpiListItem | null>(null);
   const [viewing, setViewing] = useState<KpiListItem | null>(null);
   const [deleting, setDeleting] = useState<KpiListItem | null>(null);
+  const [search, setSearch] = useState("");
+  const [kpiStatus, setKpiStatus] = useState<string | undefined>();
+  const [kpiPeriod, setKpiPeriod] = useState<string | undefined>();
+  const [page, setPage] = useState(1);
 
-  function updateParams(updates: Record<string, string | undefined>) {
-    const params = new URLSearchParams(searchParams.toString());
-    for (const [key, value] of Object.entries(updates)) {
-      if (!value || value === "all") params.delete(key);
-      else params.set(key, value);
-    }
-    params.set("page", "1");
-    startTransition(() => router.push(`?${params.toString()}`));
+  const filtered = useMemo(() => {
+    return records.filter((row) => {
+      if (kpiStatus && row.kpiStatus !== kpiStatus) return false;
+      if (kpiPeriod && row.kpiPeriod !== kpiPeriod) return false;
+      return matchesTextQuery(
+        [row.title, row.employeeName, row.employeeCode, row.departmentName],
+        search,
+      );
+    });
+  }, [records, search, kpiStatus, kpiPeriod]);
+
+  const paged = useMemo(
+    () => paginateItems(filtered, page, pageSize),
+    [filtered, page, pageSize],
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, kpiStatus, kpiPeriod]);
+
+  useEffect(() => {
+    if (page !== paged.page) setPage(paged.page);
+  }, [page, paged.page]);
+
+  function handleFiltersChange(updates: PerformanceFilterUpdates) {
+    if ("search" in updates) setSearch(updates.search ?? "");
+    if ("kpiStatus" in updates) setKpiStatus(updates.kpiStatus);
+    setPage(1);
   }
 
   function handleDelete() {
@@ -165,11 +187,15 @@ export function KpiTable({
         showDepartment={false}
         showCycle={false}
         className="rounded-lg border bg-muted/10 p-3"
+        onFiltersChange={handleFiltersChange}
         extraFilters={
           <LabeledSelect
             items={[{ value: "all", label: "All periods" }, ...periodItems]}
             value={kpiPeriod ?? "all"}
-            onValueChange={(v) => updateParams({ kpiPeriod: v === "all" ? undefined : v })}
+            onValueChange={(v) => {
+              setKpiPeriod(v === "all" ? undefined : v);
+              setPage(1);
+            }}
             placeholder="Review period"
             triggerClassName={FILTER_TRIGGER}
             contentClassName={FILTER_CONTENT}
@@ -187,7 +213,7 @@ export function KpiTable({
           />
         }
       >
-        {records.length > 0 ? (
+        {paged.rows.length > 0 ? (
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
               <tr className="text-left text-muted-foreground">
@@ -201,7 +227,7 @@ export function KpiTable({
               </tr>
             </thead>
             <tbody>
-              {records.map((row) => (
+              {paged.rows.map((row) => (
                 <tr key={row.id} className="border-t align-middle">
                   <td className="px-3 py-2.5">
                     <div className="font-medium">{row.employeeName}</div>
@@ -236,7 +262,12 @@ export function KpiTable({
         ) : null}
       </PerformanceTableShell>
 
-      <PerformancePagination page={page} pageSize={pageSize} total={total} />
+      <PerformancePagination
+        page={paged.page}
+        pageSize={pageSize}
+        total={paged.total}
+        onPageChange={setPage}
+      />
 
       {editing ? (
         <KpiProgressModal
@@ -292,44 +323,20 @@ export function KpiWorkspace({
 }) {
   const router = useRouter();
   const skipServerSyncRef = useRef(false);
-  const [listState, setListState] = useState({
-    records: tableProps.records,
-    total: tableProps.total,
-    page: tableProps.page,
-    pageSize: tableProps.pageSize,
-    search: tableProps.search,
-    kpiStatus: tableProps.kpiStatus,
-    kpiPeriod: tableProps.kpiPeriod,
-  });
+  const [records, setRecords] = useState(tableProps.records);
 
   useEffect(() => {
     if (skipServerSyncRef.current) {
       skipServerSyncRef.current = false;
       return;
     }
-    setListState({
-      records: tableProps.records,
-      total: tableProps.total,
-      page: tableProps.page,
-      pageSize: tableProps.pageSize,
-      search: tableProps.search,
-      kpiStatus: tableProps.kpiStatus,
-      kpiPeriod: tableProps.kpiPeriod,
-    });
-  }, [
-    tableProps.records,
-    tableProps.total,
-    tableProps.page,
-    tableProps.pageSize,
-    tableProps.search,
-    tableProps.kpiStatus,
-    tableProps.kpiPeriod,
-  ]);
+    setRecords(tableProps.records);
+  }, [tableProps.records]);
 
   const refreshAssignedKpis = useCallback(async () => {
     const result = await fetchKpisListAction({
       page: 1,
-      pageSize: tableProps.pageSize,
+      pageSize: PERFORMANCE_CLIENT_FETCH_SIZE,
     });
     if (!result.success) {
       toast.error(result.message ?? "Could not refresh assigned KPIs");
@@ -338,17 +345,9 @@ export function KpiWorkspace({
     if (!result.data) return;
 
     skipServerSyncRef.current = true;
-    setListState({
-      records: result.data.data,
-      total: result.data.total,
-      page: result.data.page,
-      pageSize: result.data.pageSize,
-      search: undefined,
-      kpiStatus: undefined,
-      kpiPeriod: undefined,
-    });
+    setRecords(result.data.data);
     router.replace(listBasePath);
-  }, [listBasePath, router, tableProps.pageSize]);
+  }, [listBasePath, router]);
 
   return (
     <section className="rounded-xl border bg-card shadow-sm">
@@ -365,13 +364,7 @@ export function KpiWorkspace({
       <div className={cn("border-t p-4", !canAssign && "border-t-0")}>
         <KpiTable
           {...tableProps}
-          records={listState.records}
-          total={listState.total}
-          page={listState.page}
-          pageSize={listState.pageSize}
-          search={listState.search}
-          kpiStatus={listState.kpiStatus}
-          kpiPeriod={listState.kpiPeriod}
+          records={records}
           onKpisChanged={refreshAssignedKpis}
         />
       </div>

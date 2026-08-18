@@ -19,6 +19,23 @@ export function parseEmployeeFullName(fullName: string): {
   };
 }
 
+export function cleanDisplayText(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/\p{M}+/gu, "")
+    .replace(/[ıİ]/g, "i")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function formatCleanEmployeeName(first?: string | null, last?: string | null) {
+  return [first, last]
+    .filter(Boolean)
+    .map((part) => cleanDisplayText(String(part)))
+    .join(" ")
+    .trim();
+}
+
 export function getEmployeeGreetingName(
   firstName: string,
   lastName: string,

@@ -7,6 +7,15 @@ import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { OfferStageCelebration } from "@/components/recruitment/offer-stage-celebration";
 import { createOfferAction } from "@/lib/recruitment/actions";
 import { OFFER_STATUS_LABELS } from "@/lib/recruitment/constants";
 import {
@@ -51,6 +60,8 @@ export function OfferLetterWorkspace({
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [sentCelebration, setSentCelebration] = useState(false);
+  const [missingFilePrompt, setMissingFilePrompt] = useState<"save" | "send" | null>(null);
 
   const latestOffer = detail?.offers[0];
   const hasStoredLetter = Boolean(latestOffer?.offerLetterPath);
@@ -140,7 +151,7 @@ export function OfferLetterWorkspace({
       return;
     }
     if (!uploadedFile && !hasStoredLetter) {
-      toast.error("Upload an offer letter before saving");
+      setMissingFilePrompt(sendNow ? "send" : "save");
       return;
     }
 
@@ -161,13 +172,11 @@ export function OfferLetterWorkspace({
         return;
       }
 
-      toast.success(
-        sendNow
-          ? latestOffer?.offerStatus === "sent"
-            ? "Offer letter resent to candidate email"
-            : "Offer letter sent to candidate email"
-          : "Offer letter saved",
-      );
+      if (sendNow) {
+        setSentCelebration(true);
+      } else {
+        toast.success("Offer letter saved");
+      }
       onRefresh();
     });
   }
@@ -433,6 +442,50 @@ export function OfferLetterWorkspace({
           </Button>
         ) : null}
       </div>
+
+      <OfferStageCelebration
+        open={sentCelebration}
+        candidateName={detail.fullName}
+        title="Offer sent"
+        description={`The offer letter was emailed to ${detail.email} with the subject, message, and attached file.`}
+        onClose={() => setSentCelebration(false)}
+      />
+
+      <Dialog
+        open={missingFilePrompt !== null}
+        onOpenChange={(open) => {
+          if (!open) setMissingFilePrompt(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload the offer letter</DialogTitle>
+            <DialogDescription>
+              {missingFilePrompt === "send"
+                ? "Attach the offer letter first, then send it to the candidate with the email subject and message."
+                : "Attach the offer letter first, then save the draft."}
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            PDF, Word, or any other file up to 10 MB is supported.
+          </p>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setMissingFilePrompt(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                setMissingFilePrompt(null);
+                openFilePicker();
+              }}
+            >
+              <UploadCloud className="mr-1.5 h-4 w-4" />
+              Choose file
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

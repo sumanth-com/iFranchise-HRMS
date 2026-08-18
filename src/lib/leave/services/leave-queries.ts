@@ -15,6 +15,7 @@ import type {
   LeaveSummary,
 } from "@/types/leave";
 import { leaveListParamsSchema } from "@/lib/validations/leave";
+import { formatCleanEmployeeName } from "@/lib/employees/parse-employee-name";
 import {
   ALLOWED_LEAVE_TYPE_CODES,
   LEAVE_BALANCE_DISPLAY_CODES,
@@ -115,6 +116,7 @@ export async function listLeaveRequests(
     dateFrom,
     dateTo,
     createdByEmployeeId,
+    summaryFilter,
   } = parseListParams(params);
 
   const from = (page - 1) * pageSize;
@@ -162,7 +164,30 @@ export async function listLeaveRequests(
     .eq("employees.organization_id", organizationId)
     .is("deleted_at", null);
 
-  if (dateFrom && dateTo) {
+  const today = getTodayDateString();
+
+  if (summaryFilter === "pendingRequests") {
+    query = query.eq("leave_status", "pending");
+  } else if (summaryFilter === "approvedThisMonth") {
+    const range = getMonthDateRange(month ?? Number.parseInt(today.slice(5, 7), 10), year ?? Number.parseInt(today.slice(0, 4), 10));
+    query = query
+      .eq("leave_status", "approved")
+      .gte("start_date", range.start)
+      .lte("start_date", range.end);
+  } else if (summaryFilter === "rejectedThisMonth") {
+    const range = getMonthDateRange(month ?? Number.parseInt(today.slice(5, 7), 10), year ?? Number.parseInt(today.slice(0, 4), 10));
+    query = query
+      .eq("leave_status", "rejected")
+      .gte("created_at", `${range.start}T00:00:00`)
+      .lte("created_at", `${range.end}T23:59:59`);
+  } else if (summaryFilter === "employeesOnLeaveToday") {
+    query = query
+      .eq("leave_status", "approved")
+      .lte("start_date", today)
+      .gte("end_date", today);
+  } else if (summaryFilter === "upcomingPlannedLeaves") {
+    query = query.eq("leave_status", "approved").gt("start_date", today);
+  } else if (dateFrom && dateTo) {
     query = query.lte("start_date", dateTo).gte("end_date", dateFrom);
   } else if (month && year) {
     const range = getMonthDateRange(month, year);
@@ -175,7 +200,7 @@ export async function listLeaveRequests(
       .lte("end_date", `${year}-12-31`);
   }
 
-  if (leaveStatus) query = query.eq("leave_status", leaveStatus);
+  if (!summaryFilter && leaveStatus) query = query.eq("leave_status", leaveStatus);
   if (leaveTypeId) query = query.eq("leave_type_id", leaveTypeId);
   if (employeeId) query = query.eq("employee_id", employeeId);
   if (createdByEmployeeId) query = query.eq("employee_id", createdByEmployeeId);
@@ -246,7 +271,7 @@ export async function listLeaveRequests(
         employeeId: row.employee_id,
         employeeCode: employee?.employee_code ?? "",
         employeeName: employee
-          ? `${employee.first_name} ${employee.last_name}`
+          ? formatCleanEmployeeName(employee.first_name, employee.last_name)
           : "",
         departmentId: employee?.department_id ?? null,
         departmentName: department?.name ?? null,
@@ -653,7 +678,7 @@ export async function listLeaveBalances(
         employeeId: row.employee_id,
         employeeCode: employee?.employee_code ?? "",
         employeeName: employee
-          ? `${employee.first_name} ${employee.last_name}`
+          ? formatCleanEmployeeName(employee.first_name, employee.last_name)
           : "",
         departmentName: department?.name ?? null,
         leaveTypeId: row.leave_type_id,
@@ -729,7 +754,7 @@ export async function getLeaveCalendarData(
       id: row.id,
       employeeId: row.employee_id,
       employeeName: employee
-        ? `${employee.first_name} ${employee.last_name}`
+        ? formatCleanEmployeeName(employee.first_name, employee.last_name)
         : "",
       leaveTypeName: leaveType?.name ?? "",
       startDate: row.start_date,

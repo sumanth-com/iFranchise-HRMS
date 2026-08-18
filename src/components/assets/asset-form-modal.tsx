@@ -149,11 +149,6 @@ export function AssetFormModal({
 
   const targetEmployee = lookups.employees.find((e) => e.id === targetEmployeeId);
 
-  const canToggleAssign =
-    canAssign &&
-    Boolean(editing?.assignedEmployeeId || assignToEmployeeId) &&
-    Boolean(targetEmployeeId || editing?.assignedEmployeeId);
-
   const categoryItems = lookups.categories.map((c) => ({ value: c.id, label: c.name }));
   const statusItems = Object.entries(ASSET_STATUS_LABELS).map(([value, label]) => ({
     value,
@@ -349,32 +344,6 @@ export function AssetFormModal({
       ? `Assign another device to ${targetEmployee?.label ?? "employee"}.`
       : "Register hardware with structured specifications.";
 
-  const headerAddon =
-    editing && canToggleAssign
-      ? (
-          <div className="flex shrink-0 rounded-lg border bg-muted/30 p-0.5">
-            <Button
-              type="button"
-              size="sm"
-              variant={panelMode === "edit" ? "default" : "ghost"}
-              className="h-8 px-3"
-              onClick={() => setPanelMode("edit")}
-            >
-              Edit asset
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={panelMode === "assignAnother" ? "default" : "ghost"}
-              className="h-8 px-3"
-              onClick={() => setPanelMode("assignAnother")}
-            >
-              Add asset
-            </Button>
-          </div>
-        )
-      : undefined;
-
   const footer =
     panelMode === "assignAnother"
       ? (
@@ -413,7 +382,6 @@ export function AssetFormModal({
       description={modalDescription}
       contentClassName="w-[min(96vw,48rem)] !max-w-[min(96vw,48rem)]"
       showCancel={false}
-      headerAddon={headerAddon}
       footer={footer}
     >
       {panelMode === "assignAnother" ? (

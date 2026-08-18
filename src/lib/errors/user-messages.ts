@@ -29,7 +29,7 @@ export function toUserFriendlyError(
     return "This record already exists. Please review the existing entry before saving again.";
   }
 
-  if (pg.code === "42501" || RLS_VIOLATION.test(raw)) {
+  if (pg.code === "42501" || RLS_VIOLATION.test(raw) || /violat(es|ing) row/i.test(raw)) {
     return "You do not have permission to perform this action. Contact your administrator if you need access.";
   }
 
@@ -49,7 +49,11 @@ export function toUserFriendlyError(
     return "This action cannot be completed because related records depend on it.";
   }
 
-  if (/invalid input syntax/i.test(raw)) {
+  if (/invalid input syntax for type date/i.test(raw)) {
+    return "Please enter a valid date and try again.";
+  }
+
+  if (error.name === "ZodError" || /invalid_type|too_small|too_big/i.test(raw)) {
     return "Some of the entered values are invalid. Please review the form and try again.";
   }
 

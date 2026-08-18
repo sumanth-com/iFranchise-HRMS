@@ -11,6 +11,7 @@ const STYLES: Record<string, string> = {
   hr: "bg-cyan-100 text-cyan-800",
   ceo: "bg-purple-100 text-purple-800",
   offer: "bg-orange-100 text-orange-800",
+  offer_sent: "bg-emerald-100 text-emerald-800",
   joined: "bg-emerald-100 text-emerald-800",
   rejected: "bg-red-100 text-red-700",
   scheduled: "bg-blue-100 text-blue-700",

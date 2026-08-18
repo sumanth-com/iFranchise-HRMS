@@ -2,7 +2,7 @@
 
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -15,8 +15,11 @@ import { Label } from "@/components/ui/label";
 import { PromotionDetailModal } from "@/components/performance/promotion-detail-modal";
 import {
   buildStatusItems,
+  matchesTextQuery,
+  paginateItems,
   PerformanceFilters,
   PerformancePagination,
+  type PerformanceFilterUpdates,
 } from "@/components/performance/performance-filters";
 import { PerformanceConfirmModal } from "@/components/performance/performance-confirm-modal";
 import { PromotionStatusBadge } from "@/components/performance/performance-status-badge";
@@ -154,20 +157,16 @@ function Field({
 
 export function PromotionsTable({
   records,
-  total,
-  page,
   pageSize,
   employees,
   designations,
-  employeeId,
-  promotionStatus,
   canApprove,
   canEdit,
   canDelete,
 }: {
   records: PromotionListItem[];
-  total: number;
-  page: number;
+  total?: number;
+  page?: number;
   pageSize: number;
   employees: LookupOption[];
   designations: LookupOption[];
@@ -182,6 +181,47 @@ export function PromotionsTable({
   const [viewRecord, setViewRecord] = useState<PromotionListItem | null>(null);
   const [editRecord, setEditRecord] = useState<PromotionListItem | null>(null);
   const [deleting, setDeleting] = useState<PromotionListItem | null>(null);
+  const [search, setSearch] = useState("");
+  const [employeeId, setEmployeeId] = useState<string | undefined>();
+  const [promotionStatus, setPromotionStatus] = useState<string | undefined>();
+  const [page, setPage] = useState(1);
+
+  const filtered = useMemo(() => {
+    return records.filter((row) => {
+      if (employeeId && row.employeeId !== employeeId) return false;
+      if (promotionStatus && row.promotionStatus !== promotionStatus) return false;
+      return matchesTextQuery(
+        [
+          row.employeeName,
+          row.employeeCode,
+          row.departmentName,
+          row.currentDesignation,
+          row.recommendedDesignation,
+        ],
+        search,
+      );
+    });
+  }, [records, search, employeeId, promotionStatus]);
+
+  const paged = useMemo(
+    () => paginateItems(filtered, page, pageSize),
+    [filtered, page, pageSize],
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, employeeId, promotionStatus]);
+
+  useEffect(() => {
+    if (page !== paged.page) setPage(paged.page);
+  }, [page, paged.page]);
+
+  function handleFiltersChange(updates: PerformanceFilterUpdates) {
+    if ("search" in updates) setSearch(updates.search ?? "");
+    if ("employeeId" in updates) setEmployeeId(updates.employeeId);
+    if ("promotionStatus" in updates) setPromotionStatus(updates.promotionStatus);
+    setPage(1);
+  }
 
   function handleDelete() {
     if (!deleting) return;
@@ -205,7 +245,11 @@ export function PromotionsTable({
           statusKey="promotionStatus"
           statusValue={promotionStatus}
           employeeId={employeeId}
+          search={search}
           searchPlaceholder="Search promotions..."
+          showDepartment={false}
+          showCycle={false}
+          onFiltersChange={handleFiltersChange}
         />
       </div>
 
@@ -218,7 +262,7 @@ export function PromotionsTable({
           />
         }
       >
-        {records.length > 0 ? (
+        {paged.rows.length > 0 ? (
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
               <tr className="text-left text-muted-foreground">
@@ -232,7 +276,7 @@ export function PromotionsTable({
               </tr>
             </thead>
             <tbody>
-              {records.map((row) => (
+              {paged.rows.map((row) => (
                 <tr key={row.id} className="border-t align-middle">
                   <td className="px-4 py-3">
                     <div className="font-medium">{row.employeeName}</div>
@@ -265,7 +309,12 @@ export function PromotionsTable({
         ) : null}
       </PerformanceTableShell>
 
-      <PerformancePagination page={page} pageSize={pageSize} total={total} />
+      <PerformancePagination
+        page={paged.page}
+        pageSize={pageSize}
+        total={paged.total}
+        onPageChange={setPage}
+      />
 
       <PromotionDetailModal
         record={viewRecord}

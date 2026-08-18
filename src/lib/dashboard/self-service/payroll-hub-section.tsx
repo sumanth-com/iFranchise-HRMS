@@ -43,6 +43,16 @@ export const EMPTY_TEAM_SELF_PAYROLL: EmployeePayrollData = {
   bank: null,
   bonuses: [],
   reimbursements: [],
+  displaySummary: {
+    earnings: [],
+    deductions: [],
+    grossSalary: 0,
+    totalDeductions: 0,
+    netSalary: 0,
+    periodMonth: null,
+    usingStructure: true,
+    extrasIncluded: false,
+  },
   trend: [],
   pendingPromotion: null,
   ytd: {

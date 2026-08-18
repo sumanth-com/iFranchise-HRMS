@@ -4,7 +4,7 @@ import { PAYROLL_ROUTES } from "@/lib/payroll/constants";
 import { getPayslipById } from "@/lib/payroll/services/payroll-mutations";
 import { sendPayslipReadyEmail } from "@/lib/payroll/services/payslip-email-service";
 import { storePayslipPdf } from "@/lib/payroll/services/payslip-storage";
-import { isPayslipPublishedToEmployee } from "@/lib/payroll/services/payslip-publication";
+import { computePublishedAt, isPayslipPublishedToEmployee } from "@/lib/payroll/services/payslip-publication";
 import { formatPayrollMonthLabel } from "@/lib/payroll/services/payroll-utils";
 import type { UserProfile } from "@/types/auth";
 
@@ -24,16 +24,16 @@ export async function processDuePayslipPublications(
   appOrigin: string,
   organizationId?: string,
 ): Promise<PayslipPublicationResult> {
-  const now = new Date().toISOString();
   const scopedOrganizationId = organizationId ?? profile.employee.organizationId;
 
   const { data: dueRows, error } = await supabase
     .schema("hrms")
     .from("payslips")
-    .select("id, employee_id, payslip_number, published_at, email_sent_at, payrolls!inner(organization_id)")
+    .select(
+      "id, employee_id, payslip_number, published_at, email_sent_at, payrolls!inner(organization_id, payroll_month)",
+    )
     .is("deleted_at", null)
     .is("email_sent_at", null)
-    .lte("published_at", now)
     .eq("payrolls.organization_id", scopedOrganizationId);
 
   if (error) throw new Error(error.message);
@@ -43,7 +43,10 @@ export async function processDuePayslipPublications(
   let skipped = 0;
 
   for (const row of dueRows ?? []) {
-    if (!row.published_at || !isPayslipPublishedToEmployee(row.published_at)) {
+    const payroll = Array.isArray(row.payrolls) ? row.payrolls[0] : row.payrolls;
+    const payrollMonth = payroll?.payroll_month as string | undefined;
+    const publishedAt = payrollMonth ? computePublishedAt(payrollMonth) : row.published_at;
+    if (!publishedAt || !isPayslipPublishedToEmployee(publishedAt)) {
       skipped += 1;
       continue;
     }

@@ -2,6 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/common/button";
 
 import {
   HiringStageTrack,
@@ -28,14 +37,24 @@ type PipelinePosition = {
   effectiveIndex: number;
   isRejected: boolean;
   isJoined: boolean;
+  offerCompleted: boolean;
 };
 
-function getPipelinePosition(stage: CandidateStage, timeline: TimelineItem[]): PipelinePosition {
+function hasSentOfferLetter(offers: OfferListItem[]): boolean {
+  return offers.some((offer) => offer.offerStatus === "sent" || offer.offerStatus === "accepted");
+}
+
+function getPipelinePosition(
+  stage: CandidateStage,
+  timeline: TimelineItem[],
+  offerCompleted = false,
+): PipelinePosition {
   if (stage === "joined") {
     return {
       effectiveIndex: CANDIDATE_PROFILE_PIPELINE.length,
       isRejected: false,
       isJoined: true,
+      offerCompleted: true,
     };
   }
 
@@ -50,11 +69,20 @@ function getPipelinePosition(stage: CandidateStage, timeline: TimelineItem[]): P
         }
       }
     }
-    return { effectiveIndex: maxIdx, isRejected: true, isJoined: false };
+    return { effectiveIndex: maxIdx, isRejected: true, isJoined: false, offerCompleted: false };
   }
 
   if (stage === "applied") {
-    return { effectiveIndex: -1, isRejected: false, isJoined: false };
+    return { effectiveIndex: -1, isRejected: false, isJoined: false, offerCompleted: false };
+  }
+
+  if (stage === "offer" && offerCompleted) {
+    return {
+      effectiveIndex: CANDIDATE_PROFILE_PIPELINE.length,
+      isRejected: false,
+      isJoined: false,
+      offerCompleted: true,
+    };
   }
 
   const idx = CANDIDATE_PROFILE_PIPELINE.indexOf(stage);
@@ -62,13 +90,14 @@ function getPipelinePosition(stage: CandidateStage, timeline: TimelineItem[]): P
     effectiveIndex: idx >= 0 ? idx : -1,
     isRejected: false,
     isJoined: false,
+    offerCompleted: false,
   };
 }
 
 function stepState(index: number, position: PipelinePosition): StepState {
-  const { effectiveIndex, isRejected, isJoined } = position;
+  const { effectiveIndex, isRejected, isJoined, offerCompleted } = position;
 
-  if (isJoined) return "completed";
+  if (isJoined || offerCompleted) return "completed";
 
   if (isRejected && index === effectiveIndex) return "rejected";
   if (isRejected && index < effectiveIndex) return "completed";
@@ -116,6 +145,13 @@ type CandidatePipelineTrackProps = {
   onRefresh: () => void;
 };
 
+type PendingMove = {
+  stage: CandidateStage;
+  title: string;
+  description: string;
+  reason?: string;
+} | null;
+
 export function CandidatePipelineTrack({
   detail,
   className,
@@ -124,7 +160,9 @@ export function CandidatePipelineTrack({
 }: CandidatePipelineTrackProps) {
   const [isPending, startTransition] = useTransition();
   const [celebrate, setCelebrate] = useState(false);
-  const position = getPipelinePosition(detail.stage, detail.timeline);
+  const [pendingMove, setPendingMove] = useState<PendingMove>(null);
+  const offerCompleted = hasSentOfferLetter(detail.offers);
+  const position = getPipelinePosition(detail.stage, detail.timeline, offerCompleted);
   const canManage = canEdit;
   const isRejected = detail.stage === "rejected";
 
@@ -156,27 +194,49 @@ export function CandidatePipelineTrack({
     const state = stepState(index, position);
 
     if (isRejected && state === "rejected") {
-      moveToStage(pipelineStage, "Rejection undone from pipeline");
+      setPendingMove({
+        stage: pipelineStage,
+        reason: "Rejection undone from pipeline",
+        title: `Restore to ${CANDIDATE_STAGE_LABELS[pipelineStage]}?`,
+        description: `This will undo the rejection and move the candidate back to ${CANDIDATE_STAGE_LABELS[pipelineStage]}.`,
+      });
       return;
     }
 
     if (!isRejected) {
       if (state === "completed") {
-        moveToStage(pipelineStage);
+        setPendingMove({
+          stage: pipelineStage,
+          title: `Move back to ${CANDIDATE_STAGE_LABELS[pipelineStage]}?`,
+          description: `This will move the candidate back to the ${CANDIDATE_STAGE_LABELS[pipelineStage]} stage.`,
+        });
         return;
       }
 
       if (state === "pending") {
-        moveToStage(pipelineStage);
+        setPendingMove({
+          stage: pipelineStage,
+          title: `Move to ${CANDIDATE_STAGE_LABELS[pipelineStage]}?`,
+          description: `This will mark the candidate as ${CANDIDATE_STAGE_LABELS[pipelineStage]}.`,
+        });
         return;
       }
 
       if (state === "current") {
         const nextStage = CANDIDATE_PROFILE_PIPELINE[index + 1];
         if (nextStage) {
-          moveToStage(nextStage);
+          setPendingMove({
+            stage: nextStage,
+            title: `Complete ${CANDIDATE_STAGE_LABELS[pipelineStage]}?`,
+            description: `This will mark ${CANDIDATE_STAGE_LABELS[pipelineStage]} as completed and move the candidate to ${CANDIDATE_STAGE_LABELS[nextStage]}.`,
+          });
         } else if (index > 0) {
-          moveToStage(CANDIDATE_PROFILE_PIPELINE[index - 1]);
+          const previousStage = CANDIDATE_PROFILE_PIPELINE[index - 1];
+          setPendingMove({
+            stage: previousStage,
+            title: `Move back to ${CANDIDATE_STAGE_LABELS[previousStage]}?`,
+            description: `This will move the candidate back to ${CANDIDATE_STAGE_LABELS[previousStage]}.`,
+          });
         }
       }
     }
@@ -197,8 +257,10 @@ export function CandidatePipelineTrack({
     const actionHint =
       isRejected && state === "rejected"
         ? "Undo reject"
-        : state === "completed"
-          ? "Undo"
+        : offerCompleted && pipelineStage === "offer" && state === "completed"
+          ? "Completed"
+          : state === "completed"
+            ? "Undo"
           : state === "current" && nextStage
             ? `Now · → ${CANDIDATE_STAGE_LABELS[nextStage]}`
             : state === "current" && isLast
@@ -257,6 +319,33 @@ export function CandidatePipelineTrack({
         candidateName={detail.fullName}
         onClose={() => setCelebrate(false)}
       />
+      <Dialog open={!!pendingMove} onOpenChange={(open) => !open && setPendingMove(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{pendingMove?.title ?? "Confirm stage update"}</DialogTitle>
+            <DialogDescription>
+              {pendingMove?.description ?? "Are you sure you want to update this candidate stage?"}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setPendingMove(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={isPending || !pendingMove}
+              onClick={() => {
+                if (!pendingMove) return;
+                const nextMove = pendingMove;
+                setPendingMove(null);
+                moveToStage(nextMove.stage, nextMove.reason);
+              }}
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

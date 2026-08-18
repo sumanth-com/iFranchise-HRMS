@@ -1,18 +1,13 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
-import { EmployeeAccountProvisioningPanel } from "@/components/employees/employee-account-provisioning-panel";
 import { EmployeeTable } from "@/components/employees/employee-table";
 import { PageSkeleton } from "@/components/common/page-skeleton";
 import { PageScroll } from "@/components/common/sticky-layout";
 import { createClient } from "@/lib/supabase/server";
-import { loadInviteableRoles } from "@/lib/auth/iam-roles";
-import { hasSupabaseServiceRoleEnv } from "@/lib/supabase/env";
 import { requireServerPermission } from "@/lib/permissions/server";
 import {
   getDepartments,
-  getEmployeeAccountProvisioningSummary,
-  getEmployeeLookups,
   listEmployees,
 } from "@/lib/employees/services/employee-queries";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
@@ -94,21 +89,7 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
     accountStatus: firstString(rawParams.accountStatus),
   });
 
-  const [result, accountProvisioning, inviteLookups, inviteableRoles] = await Promise.all([
-    listEmployees(supabase, profile, params),
-    getEmployeeAccountProvisioningSummary(supabase, profile),
-    getEmployeeLookups(supabase, profile.employee.organizationId),
-    loadInviteableRoles(supabase, profile.employee.organizationId),
-  ]);
-  const canInviteEmployee = hasPermission(profile.permissionCodes, "employee_account.invite");
-  const canCancelEmployeeInvitation = hasPermission(
-    profile.permissionCodes,
-    "employee_account.cancel_invitation",
-  );
-  const canActivateEmployeeAccount = hasPermission(
-    profile.permissionCodes,
-    "employee_account.activate",
-  );
+  const result = await listEmployees(supabase, profile, params);
 
   return (
     <PageScroll>
@@ -119,27 +100,6 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
             Manage employee records, employment details, and related information.
           </p>
         </div>
-
-        {(canInviteEmployee || canCancelEmployeeInvitation || canActivateEmployeeAccount) ? (
-          <EmployeeAccountProvisioningPanel
-            summary={accountProvisioning}
-            lookups={{
-              roles: inviteableRoles.map((role) => ({
-                id: role.id,
-                label: `${role.name} · ${role.portalLabel}`,
-                code: role.code,
-              })),
-              branches: inviteLookups.branches,
-              departments: inviteLookups.departments,
-              employmentTypes: inviteLookups.employmentTypes,
-              managers: inviteLookups.managers,
-            }}
-            canInvite={canInviteEmployee}
-            canCancelInvitation={canCancelEmployeeInvitation}
-            canActivate={canActivateEmployeeAccount}
-            inviteServiceReady={hasSupabaseServiceRoleEnv()}
-          />
-        ) : null}
 
         <Suspense fallback={<PageSkeleton />}>
           <EmployeeTable

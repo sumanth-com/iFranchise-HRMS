@@ -8,6 +8,7 @@ import {
   listOnboardingCases,
   resolveOnboardingCaseId,
 } from "@/lib/onboarding/services/onboarding-queries";
+import { syncOnboardingCasesFromSentOffers } from "@/lib/onboarding/services/onboarding-mutations";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -39,6 +40,13 @@ export async function loadOnboardingModuleData(
   const supabase = await createClient();
   const parsed = onboardingListParamsSchema.parse(params);
   const organizationId = profile.employee.organizationId;
+
+  await syncOnboardingCasesFromSentOffers(supabase, profile).catch((error) => {
+    console.error(
+      "[onboarding] sync from sent offers failed",
+      error instanceof Error ? error.message : error,
+    );
+  });
 
   const [stats, cases, lookups] = await Promise.all([
     getOnboardingDashboardStats(supabase, organizationId),

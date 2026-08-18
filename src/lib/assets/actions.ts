@@ -25,6 +25,7 @@ import {
 } from "@/lib/assets/services/asset-settings";
 import { getAssetDetail } from "@/lib/assets/services/asset-queries";
 import { requireServerAnyPermission, requireServerPermission } from "@/lib/permissions/server";
+import { toUserFriendlyError } from "@/lib/errors/user-messages";
 import { assertOrganizationStoragePath } from "@/lib/security/storage-path";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -50,6 +51,7 @@ function revalidateAssets(employeeId?: string) {
   revalidatePath(SELF_ASSETS_ROUTES.team);
   revalidatePath("/employee/assets");
   revalidatePath("/manager/assets");
+  revalidatePath("/dashboard/assets");
   revalidatePath("/dashboard/employees");
   if (employeeId) {
     revalidatePath(`/dashboard/employees`);
@@ -121,7 +123,7 @@ export async function assignAssetAction(input: unknown) {
   } catch (error) {
     return {
       success: false as const,
-      message: error instanceof Error ? error.message : "Failed to assign asset",
+      message: toUserFriendlyError(error, "Failed to assign asset"),
     };
   }
 }
@@ -137,7 +139,7 @@ export async function createAndAssignAssetAction(input: unknown) {
   } catch (error) {
     return {
       success: false as const,
-      message: error instanceof Error ? error.message : "Failed to assign asset",
+      message: toUserFriendlyError(error, "Failed to assign asset"),
     };
   }
 }

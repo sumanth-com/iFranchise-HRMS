@@ -97,21 +97,71 @@ export function JobsManagement({
   const [deleting, setDeleting] = useState<JobOpeningItem | null>(null);
   const [visibleJobs, setVisibleJobs] = useState(records);
   const [listTotal, setListTotal] = useState(total);
+  const [localFilters, setLocalFilters] = useState(filters);
+  const [searchFocused, setSearchFocused] = useState(false);
 
   useEffect(() => {
     setVisibleJobs(records);
     setListTotal(total);
-  }, [records, total]);
+    setLocalFilters(filters);
+  }, [records, total, filters]);
+
+  useEffect(() => {
+    let filtered = records;
+    if (localFilters.search) {
+      const q = localFilters.search.toLowerCase();
+      filtered = filtered.filter((r) => r.title.toLowerCase().includes(q));
+    }
+    if (localFilters.departmentId) {
+      filtered = filtered.filter((r) => r.departmentId === localFilters.departmentId);
+    }
+    if (localFilters.jobStatus) {
+      filtered = filtered.filter((r) => r.jobStatus === localFilters.jobStatus);
+    }
+    if (localFilters.employmentTypeId) {
+      filtered = filtered.filter((r) => r.employmentTypeId === localFilters.employmentTypeId);
+    }
+    if (localFilters.location) {
+      const loc = localFilters.location.toLowerCase();
+      filtered = filtered.filter((r) => r.location?.toLowerCase().includes(loc));
+    }
+    setVisibleJobs(filtered);
+    setListTotal(filtered.length);
+  }, [localFilters, records]);
 
   function updateParams(updates: Record<string, string | undefined>) {
+    setLocalFilters((prev) => {
+      const next = { ...prev };
+      for (const [key, value] of Object.entries(updates)) {
+        if (!value || value === "all") delete (next as Record<string, string | undefined>)[key];
+        else (next as Record<string, string | undefined>)[key] = value;
+      }
+      return next;
+    });
     const params = new URLSearchParams(searchParams.toString());
     for (const [key, value] of Object.entries(updates)) {
       if (!value || value === "all") params.delete(key);
       else params.set(key, value);
     }
     params.set("page", "1");
-    startTransition(() => router.push(`?${params.toString()}`));
+    window.history.replaceState(null, "", `?${params.toString()}`);
   }
+
+  const searchSuggestions = Array.from(
+    new Set(
+      records.flatMap((row) =>
+        [row.title, row.departmentName, row.location, row.designationTitle].filter(Boolean),
+      ),
+    ),
+  ).sort((a, b) => String(a).localeCompare(String(b)));
+  const visibleSearchSuggestions =
+    (localFilters.search?.trim().length ?? 0) < 2
+      ? []
+      : searchSuggestions
+          .filter((value) =>
+            String(value).toLowerCase().includes((localFilters.search ?? "").trim().toLowerCase()),
+          )
+          .slice(0, 5);
 
   async function onClose(id: string) {
     startTransition(async () => {
@@ -172,21 +222,41 @@ export function JobsManagement({
 
       <div className="shrink-0 rounded-xl border bg-card p-3 shadow-sm">
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          <Input
-            placeholder="Search jobs..."
-            defaultValue={filters.search}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                updateParams({ search: (e.target as HTMLInputElement).value || undefined });
-              }
-            }}
-          />
+          <div className="relative">
+            <Input
+              placeholder="Search jobs..."
+              value={localFilters.search ?? ""}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => {
+                window.setTimeout(() => setSearchFocused(false), 120);
+              }}
+              onChange={(e) => updateParams({ search: e.target.value || undefined })}
+            />
+            {searchFocused && visibleSearchSuggestions.length > 0 ? (
+              <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover p-1 shadow-lg">
+                {visibleSearchSuggestions.map((value) => (
+                  <button
+                    key={String(value)}
+                    type="button"
+                    className="block w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-muted"
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      updateParams({ search: String(value) });
+                      setSearchFocused(false);
+                    }}
+                  >
+                    {String(value)}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
           <LabeledSelect
             items={[
               { value: "all", label: "All departments" },
               ...lookups.departments.map((d) => ({ value: d.id, label: d.label })),
             ]}
-            value={filters.departmentId ?? "all"}
+            value={localFilters.departmentId ?? "all"}
             onValueChange={(v) => updateParams({ departmentId: v === "all" ? undefined : v })}
           />
           <LabeledSelect
@@ -194,7 +264,7 @@ export function JobsManagement({
               { value: "all", label: "All statuses" },
               ...toSelectItems(JOB_STATUS_LABELS),
             ]}
-            value={filters.jobStatus ?? "all"}
+            value={localFilters.jobStatus ?? "all"}
             onValueChange={(v) => updateParams({ jobStatus: v === "all" ? undefined : v })}
           />
           <LabeledSelect
@@ -202,19 +272,15 @@ export function JobsManagement({
               { value: "all", label: "All employment types" },
               ...lookups.employmentTypes.map((d) => ({ value: d.id, label: d.label })),
             ]}
-            value={filters.employmentTypeId ?? "all"}
+            value={localFilters.employmentTypeId ?? "all"}
             onValueChange={(v) =>
               updateParams({ employmentTypeId: v === "all" ? undefined : v })
             }
           />
           <Input
             placeholder="Location"
-            defaultValue={filters.location}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                updateParams({ location: (e.target as HTMLInputElement).value || undefined });
-              }
-            }}
+            value={localFilters.location ?? ""}
+            onChange={(e) => updateParams({ location: e.target.value || undefined })}
           />
         </div>
       </div>

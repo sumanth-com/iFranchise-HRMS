@@ -1,12 +1,15 @@
 import { GoalsWorkspace } from "@/components/performance/goals-management";
 import { requireCeoPortal } from "@/lib/ceo/read-only-permissions";
 import {
+  PERFORMANCE_CLIENT_FETCH_SIZE,
+  PERFORMANCE_TABLE_PAGE_SIZE,
+} from "@/lib/performance/constants";
+import {
   getPerformanceLookups,
   listGoals,
 } from "@/lib/performance/services/performance-queries";
 import { getPerformanceSettings } from "@/lib/performance/services/performance-settings";
 import { createClient } from "@/lib/supabase/server";
-import { goalListParamsSchema } from "@/lib/validations/performance";
 
 type GoalsPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -17,22 +20,14 @@ export default async function CeoGoalsPage({ searchParams }: GoalsPageProps) {
   const supabase = await createClient();
   const rawParams = await searchParams;
 
-  const params = goalListParamsSchema.parse({
-    page: rawParams.page,
-    pageSize: rawParams.pageSize,
-    search: typeof rawParams.search === "string" ? rawParams.search : undefined,
-    employeeId: rawParams.employeeId,
-    departmentId: rawParams.departmentId,
-    cycleId: rawParams.cycleId,
-    goalStatus: rawParams.goalStatus,
-    goalPriority: rawParams.goalPriority,
-  });
-
   const openGoal =
     typeof rawParams.openGoal === "string" ? rawParams.openGoal : undefined;
 
   const [result, lookups, settings] = await Promise.all([
-    listGoals(supabase, profile, params),
+    listGoals(supabase, profile, {
+      page: 1,
+      pageSize: PERFORMANCE_CLIENT_FETCH_SIZE,
+    }),
     getPerformanceLookups(supabase, profile.employee.organizationId),
     getPerformanceSettings(supabase, profile.employee.organizationId),
   ]);
@@ -55,17 +50,8 @@ export default async function CeoGoalsPage({ searchParams }: GoalsPageProps) {
         }}
         tableProps={{
           records: result.data,
-          total: result.total,
-          page: result.page,
-          pageSize: result.pageSize,
+          pageSize: PERFORMANCE_TABLE_PAGE_SIZE,
           employees: lookups.employees,
-          departments: lookups.departments,
-          cycles: lookups.cycles,
-          search: params.search,
-          employeeId: params.employeeId,
-          departmentId: params.departmentId,
-          cycleId: params.cycleId,
-          goalStatus: params.goalStatus,
           initialGoalId: openGoal,
         }}
       />

@@ -1,5 +1,3 @@
-import { format } from "date-fns";
-
 import { canDownloadPayroll, canViewPayroll } from "@/lib/payroll/constants";
 import type { PayslipAvailability } from "@/types/payroll";
 
@@ -15,40 +13,66 @@ export type PayslipScheduleDates = {
   publishedAt: string;
 };
 
+function clampDayOfMonth(day: number | undefined, fallback: number): number {
+  if (!Number.isFinite(day) || !day) return fallback;
+  return Math.min(28, Math.max(1, Math.trunc(day)));
+}
+
 function payrollMonthParts(payrollMonth: string): { year: number; month: number } {
   const value = payrollMonth.length === 7 ? `${payrollMonth}-01` : payrollMonth;
-  const date = new Date(value);
+  const date = new Date(`${value.slice(0, 10)}T00:00:00.000Z`);
   return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1 };
 }
 
-/** Salary is always credited on the 2nd of the payroll month. */
-export function computeSalaryCreditDate(payrollMonth: string): string {
-  const { year, month } = payrollMonthParts(payrollMonth);
-  return `${year}-${String(month).padStart(2, "0")}-${String(SALARY_CREDIT_DAY).padStart(2, "0")}`;
+function formatPublishDate(publishedAt: string): string {
+  return new Date(publishedAt).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Kolkata",
+  });
 }
 
-/** Employees may access payslips from the 5th at 00:00 IST. */
-export function computePublishedAt(payrollMonth: string): string {
+/** Salary is credited on the configured day of the payroll month (default 2nd). */
+export function computeSalaryCreditDate(
+  payrollMonth: string,
+  salaryCreditDay = SALARY_CREDIT_DAY,
+): string {
   const { year, month } = payrollMonthParts(payrollMonth);
-  const istMidnight = Date.UTC(year, month - 1, PAYSLIP_PUBLISH_DAY, 0, 0, 0) - IST_OFFSET_MS;
+  const day = clampDayOfMonth(salaryCreditDay, SALARY_CREDIT_DAY);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/** Employees may access payslips from the 5th of the payroll month at 00:00 IST. */
+export function computePublishedAt(
+  payrollMonth: string,
+  publishDay = PAYSLIP_PUBLISH_DAY,
+): string {
+  const { year, month } = payrollMonthParts(payrollMonth);
+  const day = clampDayOfMonth(publishDay, PAYSLIP_PUBLISH_DAY);
+  const istMidnight = Date.UTC(year, month - 1, day, 0, 0, 0) - IST_OFFSET_MS;
   return new Date(istMidnight).toISOString();
 }
 
-export function computePayslipSchedule(payrollMonth: string): PayslipScheduleDates {
+export function computePayslipSchedule(
+  payrollMonth: string,
+  options?: { salaryCreditDay?: number; publishDay?: number },
+): PayslipScheduleDates {
   return {
-    salaryCreditDate: computeSalaryCreditDate(payrollMonth),
-    publishedAt: computePublishedAt(payrollMonth),
+    salaryCreditDate: computeSalaryCreditDate(payrollMonth, options?.salaryCreditDay),
+    publishedAt: computePublishedAt(payrollMonth, options?.publishDay),
   };
 }
 
 export function resolvePayslipSchedule(
   payrollMonth: string,
   stored?: Partial<PayslipScheduleDates>,
+  options?: { salaryCreditDay?: number; publishDay?: number },
 ): PayslipScheduleDates {
-  const computed = computePayslipSchedule(payrollMonth);
+  const computed = computePayslipSchedule(payrollMonth, options);
   return {
     salaryCreditDate: stored?.salaryCreditDate ?? computed.salaryCreditDate,
-    publishedAt: stored?.publishedAt ?? computed.publishedAt,
+    publishedAt: computed.publishedAt,
   };
 }
 
@@ -67,19 +91,21 @@ export function resolvePayslipAvailability(
   publishedAt: string,
   permissionCodes: string[],
   now: Date = new Date(),
+  options?: { employeeFacing?: boolean },
 ): {
   availability: PayslipAvailability;
   canEmployeeAccess: boolean;
   reviewMessage: string | null;
 } {
-  const hrAccess = canAccessPayslipDuringReview(permissionCodes);
   const published = isPayslipPublishedToEmployee(publishedAt, now);
+  const hrAccess =
+    !options?.employeeFacing && canAccessPayslipDuringReview(permissionCodes);
 
   if (published || hrAccess) {
     return { availability: "available", canEmployeeAccess: published, reviewMessage: null };
   }
 
-  const publishDate = format(new Date(publishedAt), "dd MMM yyyy");
+  const publishDate = formatPublishDate(publishedAt);
   return {
     availability: "under_review",
     canEmployeeAccess: false,
@@ -88,6 +114,6 @@ export function resolvePayslipAvailability(
 }
 
 export function formatReviewBannerMessage(publishedAt: string): string {
-  const publishDate = format(new Date(publishedAt), "dd MMM yyyy");
+  const publishDate = formatPublishDate(publishedAt);
   return `Payroll is currently under review by HR. Your salary has already been credited. Your official payslip will be available after payroll verification on ${publishDate}.`;
 }

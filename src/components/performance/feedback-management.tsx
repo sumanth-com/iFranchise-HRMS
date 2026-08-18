@@ -3,7 +3,7 @@
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -14,8 +14,11 @@ import { Button } from "@/components/common/button";
 import { Label } from "@/components/ui/label";
 import {
   buildStatusItems,
+  matchesTextQuery,
+  paginateItems,
   PerformanceFilters,
   PerformancePagination,
+  type PerformanceFilterUpdates,
 } from "@/components/performance/performance-filters";
 import { FeedbackDetailModal } from "@/components/performance/feedback-detail-modal";
 import { PerformanceConfirmModal } from "@/components/performance/performance-confirm-modal";
@@ -101,17 +104,13 @@ export function FeedbackForm({ employees }: { employees: LookupOption[] }) {
 
 export function FeedbackTable({
   records,
-  total,
-  page,
   pageSize,
   employees,
-  employeeId,
-  feedbackType,
   canDelete = false,
 }: {
   records: FeedbackListItem[];
-  total: number;
-  page: number;
+  total?: number;
+  page?: number;
   pageSize: number;
   employees: LookupOption[];
   employeeId?: string;
@@ -122,6 +121,41 @@ export function FeedbackTable({
   const [isPending, startTransition] = useTransition();
   const [viewRecord, setViewRecord] = useState<FeedbackListItem | null>(null);
   const [deleting, setDeleting] = useState<FeedbackListItem | null>(null);
+  const [search, setSearch] = useState("");
+  const [employeeId, setEmployeeId] = useState<string | undefined>();
+  const [feedbackType, setFeedbackType] = useState<string | undefined>();
+  const [page, setPage] = useState(1);
+
+  const filtered = useMemo(() => {
+    return (records ?? []).filter((row) => {
+      if (employeeId && row.toEmployeeId !== employeeId) return false;
+      if (feedbackType && row.feedbackType !== feedbackType) return false;
+      return matchesTextQuery(
+        [row.fromEmployeeName, row.toEmployeeName, row.message],
+        search,
+      );
+    });
+  }, [records, search, employeeId, feedbackType]);
+
+  const paged = useMemo(
+    () => paginateItems(filtered, page, pageSize),
+    [filtered, page, pageSize],
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, employeeId, feedbackType]);
+
+  useEffect(() => {
+    if (page !== paged.page) setPage(paged.page);
+  }, [page, paged.page]);
+
+  function handleFiltersChange(updates: PerformanceFilterUpdates) {
+    if ("search" in updates) setSearch(updates.search ?? "");
+    if ("employeeId" in updates) setEmployeeId(updates.employeeId);
+    if ("feedbackType" in updates) setFeedbackType(updates.feedbackType);
+    setPage(1);
+  }
 
   function handleDelete() {
     if (!deleting) return;
@@ -146,7 +180,11 @@ export function FeedbackTable({
           statusKey="feedbackType"
           statusValue={feedbackType}
           employeeId={employeeId}
+          search={search}
           searchPlaceholder="Search feedback..."
+          showDepartment={false}
+          showCycle={false}
+          onFiltersChange={handleFiltersChange}
         />
       </div>
       <PerformanceTableShell
@@ -158,7 +196,7 @@ export function FeedbackTable({
           />
         }
       >
-        {records.length > 0 ? (
+        {paged.rows.length > 0 ? (
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
               <tr className="text-left text-muted-foreground">
@@ -171,7 +209,7 @@ export function FeedbackTable({
               </tr>
             </thead>
             <tbody>
-              {records.map((row) => (
+              {paged.rows.map((row) => (
                 <tr key={row.id} className="border-t align-middle">
                   <td className="px-4 py-3">{row.fromEmployeeName}</td>
                   <td className="px-4 py-3">{row.toEmployeeName}</td>
@@ -198,7 +236,12 @@ export function FeedbackTable({
           </table>
         ) : null}
       </PerformanceTableShell>
-      <PerformancePagination page={page} pageSize={pageSize} total={total} />
+      <PerformancePagination
+        page={paged.page}
+        pageSize={pageSize}
+        total={paged.total}
+        onPageChange={setPage}
+      />
 
       <FeedbackDetailModal
         record={viewRecord}

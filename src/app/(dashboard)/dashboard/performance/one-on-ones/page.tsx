@@ -1,31 +1,26 @@
 import { OneOnOneForm, OneOnOneTable } from "@/components/performance/one-on-one-management";
 import { createClient } from "@/lib/supabase/server";
-import { canCreatePerformance, canEditPerformance } from "@/lib/performance/constants";
+import {
+  canCreatePerformance,
+  canEditPerformance,
+  PERFORMANCE_CLIENT_FETCH_SIZE,
+  PERFORMANCE_TABLE_PAGE_SIZE,
+} from "@/lib/performance/constants";
 import {
   getPerformanceLookups,
   listOneOnOnes,
 } from "@/lib/performance/services/performance-queries";
-import { oneOnOneListParamsSchema } from "@/lib/validations/performance";
 import { requireServerPermission } from "@/lib/permissions/server";
 
-type OneOnOnesPageProps = {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-};
-
-export default async function OneOnOnesPage({ searchParams }: OneOnOnesPageProps) {
+export default async function OneOnOnesPage() {
   const profile = await requireServerPermission("performance.view");
   const supabase = await createClient();
-  const rawParams = await searchParams;
-
-  const params = oneOnOneListParamsSchema.parse({
-    page: rawParams.page,
-    pageSize: rawParams.pageSize,
-    employeeId: rawParams.employeeId,
-    meetingStatus: rawParams.meetingStatus,
-  });
 
   const [result, lookups] = await Promise.all([
-    listOneOnOnes(supabase, profile, params),
+    listOneOnOnes(supabase, profile, {
+      page: 1,
+      pageSize: PERFORMANCE_CLIENT_FETCH_SIZE,
+    }),
     getPerformanceLookups(supabase, profile.employee.organizationId),
   ]);
 
@@ -42,12 +37,8 @@ export default async function OneOnOnesPage({ searchParams }: OneOnOnesPageProps
       ) : null}
       <OneOnOneTable
         records={result.data}
-        total={result.total}
-        page={result.page}
-        pageSize={result.pageSize}
+        pageSize={PERFORMANCE_TABLE_PAGE_SIZE}
         employees={lookups.employees}
-        employeeId={params.employeeId}
-        meetingStatus={params.meetingStatus}
         canEdit={canEditPerformance(profile.permissionCodes)}
         canDelete={
           canCreatePerformance(profile.permissionCodes) ||

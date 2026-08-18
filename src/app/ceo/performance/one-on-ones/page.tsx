@@ -1,30 +1,24 @@
 import { OneOnOneTable } from "@/components/performance/one-on-one-management";
 import { requireCeoPortal } from "@/lib/ceo/read-only-permissions";
 import {
+  PERFORMANCE_CLIENT_FETCH_SIZE,
+  PERFORMANCE_TABLE_PAGE_SIZE,
+} from "@/lib/performance/constants";
+import {
   getPerformanceLookups,
   listOneOnOnes,
 } from "@/lib/performance/services/performance-queries";
 import { createClient } from "@/lib/supabase/server";
-import { oneOnOneListParamsSchema } from "@/lib/validations/performance";
 
-type OneOnOnesPageProps = {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-};
-
-export default async function CeoOneOnOnesPage({ searchParams }: OneOnOnesPageProps) {
+export default async function CeoOneOnOnesPage() {
   const profile = await requireCeoPortal();
   const supabase = await createClient();
-  const rawParams = await searchParams;
-
-  const params = oneOnOneListParamsSchema.parse({
-    page: rawParams.page,
-    pageSize: rawParams.pageSize,
-    employeeId: rawParams.employeeId,
-    meetingStatus: rawParams.meetingStatus,
-  });
 
   const [result, lookups] = await Promise.all([
-    listOneOnOnes(supabase, profile, params),
+    listOneOnOnes(supabase, profile, {
+      page: 1,
+      pageSize: PERFORMANCE_CLIENT_FETCH_SIZE,
+    }),
     getPerformanceLookups(supabase, profile.employee.organizationId),
   ]);
 
@@ -38,12 +32,8 @@ export default async function CeoOneOnOnesPage({ searchParams }: OneOnOnesPagePr
       </div>
       <OneOnOneTable
         records={result.data}
-        total={result.total}
-        page={result.page}
-        pageSize={result.pageSize}
+        pageSize={PERFORMANCE_TABLE_PAGE_SIZE}
         employees={lookups.employees}
-        employeeId={params.employeeId}
-        meetingStatus={params.meetingStatus}
         canEdit={false}
         canDelete={false}
       />

@@ -74,6 +74,12 @@ export type LeaveListParams = {
   dateFrom?: string;
   dateTo?: string;
   createdByEmployeeId?: string;
+  summaryFilter?:
+    | "pendingRequests"
+    | "approvedThisMonth"
+    | "rejectedThisMonth"
+    | "employeesOnLeaveToday"
+    | "upcomingPlannedLeaves";
 };
 
 export type LeaveSummary = {

@@ -85,11 +85,9 @@ export function HrLeaveHubView({
   calendarHolidays,
   calendarContext,
   teamLeave,
-  teamApplyLeaveLookups,
 }: Props) {
   const router = useRouter();
   const [applyOpen, setApplyOpen] = useState(false);
-  const [teamApplyOpen, setTeamApplyOpen] = useState(false);
   const section = initialSection === "team" && canViewTeam ? "team" : "my";
   const isTeamView = section === "team";
 
@@ -108,12 +106,6 @@ export function HrLeaveHubView({
               <FileText className="size-4" />
               Leave Policy
             </Link>
-            {isTeamView && teamLeave.canCreate && teamApplyLeaveLookups ? (
-              <Button type="button" className="gap-1.5" onClick={() => setTeamApplyOpen(true)}>
-                <CalendarPlus className="size-4" />
-                Apply Leave
-              </Button>
-            ) : null}
             {!isTeamView && canApply && applyLeaveLookups ? (
               <Button type="button" className="gap-1.5" onClick={() => setApplyOpen(true)}>
                 <CalendarPlus className="size-4" />
@@ -157,16 +149,6 @@ export function HrLeaveHubView({
           employeeId={employeeId}
           mode="self"
           balances={balances}
-          onSubmitted={() => router.refresh()}
-        />
-      ) : null}
-
-      {teamApplyLeaveLookups ? (
-        <ApplyLeaveDialog
-          open={teamApplyOpen}
-          onOpenChange={setTeamApplyOpen}
-          lookups={teamApplyLeaveLookups}
-          mode="team"
           onSubmitted={() => router.refresh()}
         />
       ) : null}

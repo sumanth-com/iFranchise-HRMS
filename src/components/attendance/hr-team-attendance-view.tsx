@@ -1,13 +1,18 @@
 "use client";
 
-import { Suspense } from "react";
-import { CalendarDays } from "lucide-react";
+import { Suspense, useCallback, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { AttendanceSummaryCards } from "@/components/attendance/attendance-summary-cards";
 import { AttendanceTable } from "@/components/attendance/attendance-table";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
-import type { AttendanceListItem, AttendanceLookups, AttendanceSummary } from "@/types/attendance";
+import type {
+  AttendanceListItem,
+  AttendanceLookups,
+  AttendanceStatus,
+  AttendanceSummary,
+} from "@/types/attendance";
 import type { LookupOption } from "@/types/employee";
 
 type HrTeamAttendanceViewProps = {
@@ -61,31 +66,48 @@ export function HrTeamAttendanceView({
   listBasePath = SELF_ATTENDANCE_ROUTES.team,
   onViewRecord,
 }: HrTeamAttendanceViewProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [isCardPending, startCardTransition] = useTransition();
+
+  const applyStatusFilter = useCallback(
+    (status: AttendanceStatus | undefined) => {
+      const params = new URLSearchParams(searchParams.toString());
+      const nextStatus =
+        status && status === attendanceStatus ? undefined : status;
+
+      if (nextStatus) {
+        params.set("attendanceStatus", nextStatus);
+      } else {
+        params.delete("attendanceStatus");
+      }
+      params.set("page", "1");
+      if (dateFrom && !params.get("dateFrom")) params.set("dateFrom", dateFrom);
+      if (dateTo && !params.get("dateTo")) params.set("dateTo", dateTo);
+
+      const query = params.toString();
+      startCardTransition(() => {
+        router.push(query ? `${listBasePath}?${query}` : listBasePath, { scroll: false });
+      });
+    },
+    [attendanceStatus, dateFrom, dateTo, listBasePath, router, searchParams],
+  );
+
   return (
     <div className="space-y-4">
       {!embedded ? (
         <div>
-          <div className="flex items-center justify-between gap-4">
-            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-            <span className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-foreground">
-              <CalendarDays className="size-4 shrink-0" />
-              Summary for {summary.date}
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {description}
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         </div>
-      ) : (
-        <div className="flex items-center justify-end">
-          <span className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-foreground">
-            <CalendarDays className="size-4 shrink-0" />
-            Summary for {summary.date}
-          </span>
-        </div>
-      )}
+      ) : null}
 
-      <AttendanceSummaryCards summary={summary} />
+      <AttendanceSummaryCards
+        summary={summary}
+        activeStatus={attendanceStatus}
+        disabled={isCardPending}
+        onSelect={applyStatusFilter}
+      />
 
       <Suspense
         fallback={
@@ -114,6 +136,7 @@ export function HrTeamAttendanceView({
           canDelete={canDelete}
           listBasePath={listBasePath}
           onViewRecord={onViewRecord}
+          summaryDate={summary.date}
         />
       </Suspense>
     </div>

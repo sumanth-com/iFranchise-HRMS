@@ -6,6 +6,7 @@ export type PayrollSettingsData = {
   payrollCycle: PayrollCycle;
   payrollProcessingDay: string;
   salaryCreditDate: number;
+  payslipAvailableDay: number;
   financialYearStartMonth: number;
   financialYearEndMonth: number;
   currency: string;

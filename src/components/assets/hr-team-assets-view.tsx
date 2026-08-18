@@ -2,6 +2,7 @@
 
 import { AssetActivitySection } from "@/components/assets/asset-activity-section";
 import { HrAssignAssetWizard } from "@/components/assets/hr-assign-asset-wizard";
+import { canCreateAssets } from "@/lib/assets/constants";
 import type {
   AssetActivityItem,
   AssetListResult,
@@ -37,7 +38,11 @@ export function HrTeamAssetsView({
       ) : null}
 
       {canAssign && lookups ? (
-        <HrAssignAssetWizard lookups={lookups} inventory={inventory?.data ?? []} />
+        <HrAssignAssetWizard
+          lookups={lookups}
+          inventory={inventory?.data ?? []}
+          canCreate={canCreateAssets(permissionCodes)}
+        />
       ) : null}
 
       <AssetActivitySection
@@ -45,6 +50,7 @@ export function HrTeamAssetsView({
         lookups={lookups}
         inventory={inventory?.data ?? []}
         permissionCodes={permissionCodes}
+        showAddButton={!canAssign}
       />
     </div>
   );

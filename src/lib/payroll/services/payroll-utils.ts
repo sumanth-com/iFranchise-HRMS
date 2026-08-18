@@ -1,5 +1,7 @@
 import { format, lastDayOfMonth } from "date-fns";
 
+import type { PayrollBreakdownLine } from "@/types/payroll";
+
 export function getPayrollMonthDate(month: number, year: number): string {
   return format(new Date(year, month - 1, 1), "yyyy-MM-dd");
 }
@@ -109,6 +111,68 @@ export function formatPayslipCurrency(value: number, currencyCode = "INR"): stri
 
 export function roundCurrency(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+export function toEmployeeFacingEarnings(
+  lines: PayrollBreakdownLine[],
+): PayrollBreakdownLine[] {
+  let salary = 0;
+  let bonus = 0;
+  let claims = 0;
+  const other: PayrollBreakdownLine[] = [];
+
+  for (const line of lines) {
+    const amount = Number(line.amount) || 0;
+    if (amount <= 0) continue;
+    const code = line.code.toLowerCase();
+    const label = line.label.toLowerCase();
+    if (code.startsWith("bonus") || label.includes("bonus")) {
+      bonus += amount;
+      continue;
+    }
+    if (
+      code.startsWith("reimb") ||
+      code === "claims" ||
+      label.includes("reimburs") ||
+      label.includes("claim")
+    ) {
+      claims += amount;
+      continue;
+    }
+    if (code === "overtime" || label.includes("overtime")) {
+      other.push({ ...line, amount: roundCurrency(amount) });
+      continue;
+    }
+    salary += amount;
+  }
+
+  const earnings: PayrollBreakdownLine[] = [];
+  if (salary > 0) {
+    earnings.push({
+      code: "salary",
+      label: "Salary",
+      amount: roundCurrency(salary),
+      type: "earning",
+    });
+  }
+  if (bonus > 0) {
+    earnings.push({
+      code: "bonus",
+      label: "Bonus",
+      amount: roundCurrency(bonus),
+      type: "earning",
+    });
+  }
+  if (claims > 0) {
+    earnings.push({
+      code: "claims",
+      label: "Claims",
+      amount: roundCurrency(claims),
+      type: "earning",
+    });
+  }
+  earnings.push(...other);
+  return earnings;
 }
 
 export function generatePayslipNumber(

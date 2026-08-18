@@ -3,6 +3,7 @@ import type {
   LeaveEmployeeBalanceSnapshot,
   LeaveHolidayEntry,
   LeaveListItem,
+  LeaveListParams,
   LeaveListResult,
   LeaveStatus,
 } from "@/types/leave";
@@ -33,6 +34,7 @@ export type TeamLeaveListParams = {
   employeeId?: string;
   dateFrom?: string;
   dateTo?: string;
+  summaryFilter?: LeaveListParams["summaryFilter"];
 };
 
 export type TeamLeaveListItem = LeaveListItem & {

@@ -1,12 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { EmployeeDetailTabBar } from "@/components/employees/employee-detail-tab-bar";
 import { EmployeeDetailView } from "@/components/employees/employee-detail-view";
 import { buttonVariants } from "@/components/common/button";
-import { resolveEmployeeModuleRoutes } from "@/lib/employees/constants";
+import {
+  resolveEmployeeModuleRoutes,
+  resolveEmployeeTab,
+  type EmployeeTab,
+} from "@/lib/employees/constants";
 import type {
   EmployeeAttendancePeriod,
   EmployeeAttendanceSummary,
@@ -72,10 +77,24 @@ export function EmployeeDetailPageContent({
   routesBasePath,
 }: EmployeeDetailPageContentProps) {
   const routes = resolveEmployeeModuleRoutes(routesBasePath);
+  const searchParams = useSearchParams();
   const [isEditing, setIsEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState<EmployeeTab>(() =>
+    resolveEmployeeTab(searchParams.get("tab")),
+  );
 
   function toggleEditing() {
     setIsEditing((current) => !current);
+  }
+
+  function handleTabChange(tab: EmployeeTab) {
+    if (isEditing && tab !== "overview") {
+      setIsEditing(false);
+    }
+    setActiveTab(tab);
+    const params = new URLSearchParams(window.location.search);
+    params.set("tab", tab);
+    window.history.replaceState(null, "", `${routes.detail(employee)}?${params.toString()}`);
   }
 
   return (
@@ -92,15 +111,7 @@ export function EmployeeDetailPageContent({
             ← Back to employees
           </Link>
         </div>
-        <EmployeeDetailTabBar
-          employee={employee}
-          routesBasePath={routesBasePath}
-          onTabChange={(tab) => {
-            if (isEditing && tab !== "overview") {
-              setIsEditing(false);
-            }
-          }}
-        />
+        <EmployeeDetailTabBar activeTab={activeTab} onTabChange={handleTabChange} />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-6 pb-8 md:px-6">
@@ -127,6 +138,7 @@ export function EmployeeDetailPageContent({
           onCancelEdit={() => setIsEditing(false)}
           onSavedEdit={() => setIsEditing(false)}
           routesBasePath={routesBasePath}
+          activeTab={activeTab}
         />
       </div>
     </div>

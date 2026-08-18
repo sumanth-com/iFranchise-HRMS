@@ -5,6 +5,7 @@ import {
   PackagePlus,
   ClipboardCheck,
   Layers,
+  Plus,
   SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react";
@@ -12,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { AssetFormModal } from "@/components/assets/asset-form-modal";
 import { AssetDeviceSpecFormFields } from "@/components/assets/asset-device-spec-form-fields";
 import { AssetDeviceVisual } from "@/components/assets/asset-device-visual";
 import { AssetDeviceEmptyPreview } from "@/components/assets/asset-device-empty-preview";
@@ -69,6 +71,7 @@ type Props = {
   lookups: AssetsLookups;
   inventory?: AssetItem[];
   onAssigned?: () => void;
+  canCreate?: boolean;
 };
 
 type AssignMode = "existing" | "register";
@@ -82,9 +85,15 @@ function todayIso() {
 
 const FIELD_CLASS = "h-9";
 
-export function HrAssignAssetWizard({ lookups, inventory = [], onAssigned }: Props) {
+export function HrAssignAssetWizard({
+  lookups,
+  inventory = [],
+  onAssigned,
+  canCreate = false,
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [createOpen, setCreateOpen] = useState(false);
   const [assetSelection, setAssetSelection] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [brand, setBrand] = useState("");
@@ -228,6 +237,16 @@ export function HrAssignAssetWizard({ lookups, inventory = [], onAssigned }: Pro
           assignedDate: todayIso(),
           conditionBefore,
           remarks: null,
+          brand: brand.trim() || null,
+          model: model.trim() || null,
+          serialNumber: serialNumber.trim() || null,
+          specChip: specChip.trim() || null,
+          specMemory: specMemory.trim() || null,
+          specStorage: specStorage.trim() || null,
+          specOperatingSystem: specOs.trim() || null,
+          specAccessories: specAccessories.trim() || null,
+          specConnectionType: specConnectionType.trim() || null,
+          warrantyExpiry: warrantyExpiry || null,
         });
 
         if (!result.success) {
@@ -286,7 +305,6 @@ export function HrAssignAssetWizard({ lookups, inventory = [], onAssigned }: Pro
   }));
 
   const canSubmit = employeeId && hasAssetSelection;
-  const configReadOnly = mode === "existing";
 
   return (
     <section className="rounded-xl border bg-card shadow-sm">
@@ -298,32 +316,47 @@ export function HrAssignAssetWizard({ lookups, inventory = [], onAssigned }: Pro
       </div>
 
       <div className="space-y-5 p-5">
-        <div className="grid gap-3 sm:grid-cols-3 sm:items-center">
-          <EmployeeSelect
-            employees={lookups.employees}
-            value={employeeId}
-            onValueChange={setEmployeeId}
-            placeholder="Select employee…"
-          />
-          <LabeledSelect
-            items={assetItems}
-            value={assetSelection}
-            onValueChange={handleAssetChange}
-            placeholder="Select asset…"
-          />
-          <Button
-            type="button"
-            className="h-9 w-full gap-2"
-            disabled={isPending || !canSubmit}
-            onClick={handleAssign}
-          >
-            {isPending ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <PackagePlus className="size-4" />
-            )}
-            Assign asset
-          </Button>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2">
+            <EmployeeSelect
+              employees={lookups.employees}
+              value={employeeId}
+              onValueChange={setEmployeeId}
+              placeholder="Select employee…"
+            />
+            <LabeledSelect
+              items={assetItems}
+              value={assetSelection}
+              onValueChange={handleAssetChange}
+              placeholder="Select asset…"
+            />
+          </div>
+          <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center">
+            <Button
+              type="button"
+              className="h-9 w-full gap-2 sm:w-auto"
+              disabled={isPending || !canSubmit}
+              onClick={handleAssign}
+            >
+              {isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <PackagePlus className="size-4" />
+              )}
+              Assign asset
+            </Button>
+            {canCreate ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-9 w-full gap-1.5 sm:w-auto"
+                onClick={() => setCreateOpen(true)}
+              >
+                <Plus className="size-4" />
+                Add asset
+              </Button>
+            ) : null}
+          </div>
         </div>
 
         <p className="text-xs text-muted-foreground">
@@ -390,7 +423,6 @@ export function HrAssignAssetWizard({ lookups, inventory = [], onAssigned }: Pro
                       className={FIELD_CLASS}
                       value={warrantyExpiry}
                       onChange={(e) => setWarrantyExpiry(e.target.value)}
-                      disabled={configReadOnly}
                     />
                   </div>
                 ) : null}
@@ -422,7 +454,6 @@ export function HrAssignAssetWizard({ lookups, inventory = [], onAssigned }: Pro
                   className={FIELD_CLASS}
                   value={brand}
                   onChange={(e) => setBrand(e.target.value)}
-                  disabled={configReadOnly}
                 />
               </div>
               <div className="space-y-1.5">
@@ -431,7 +462,6 @@ export function HrAssignAssetWizard({ lookups, inventory = [], onAssigned }: Pro
                   className={FIELD_CLASS}
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
-                  disabled={configReadOnly}
                 />
               </div>
               <div className="space-y-1.5 sm:col-span-2">
@@ -440,7 +470,6 @@ export function HrAssignAssetWizard({ lookups, inventory = [], onAssigned }: Pro
                   className={FIELD_CLASS}
                   value={serialNumber}
                   onChange={(e) => setSerialNumber(e.target.value)}
-                  disabled={configReadOnly}
                 />
               </div>
             </div>
@@ -464,7 +493,6 @@ export function HrAssignAssetWizard({ lookups, inventory = [], onAssigned }: Pro
                     if (field === "accessories") setSpecAccessories(value);
                     if (field === "connectionType") setSpecConnectionType(value);
                   }}
-                  disabled={configReadOnly}
                   fieldClass={FIELD_CLASS}
                 />
               </div>
@@ -473,6 +501,15 @@ export function HrAssignAssetWizard({ lookups, inventory = [], onAssigned }: Pro
           </div>
         </div>
       </div>
+
+      {canCreate ? (
+        <AssetFormModal
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          lookups={lookups}
+          initialMode="create"
+        />
+      ) : null}
     </section>
   );
 }

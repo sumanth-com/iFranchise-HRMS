@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -18,7 +17,6 @@ import {
   Eye,
   Layers,
   MoreHorizontal,
-  Plus,
   Trash2,
   User,
   UserCheck,
@@ -28,7 +26,10 @@ import { toast } from "sonner";
 
 import { LeaveStatusBadge } from "@/components/leave/leave-status-badge";
 import { HrLeaveDetailPopup } from "@/components/leave/hr-leave-detail-popup";
-import { Button, buttonVariants } from "@/components/common/button";
+import {
+  type LeaveSummaryFilterKey,
+} from "@/components/leave/leave-summary-cards";
+import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
 import { Label } from "@/components/ui/label";
 import {
@@ -62,6 +63,9 @@ import {
   LEAVE_ROUTES,
   LEAVE_STATUS_LABELS,
 } from "@/lib/leave/constants";
+import { formatCleanEmployeeName } from "@/lib/employees/parse-employee-name";
+import { FILTER_ANY_VALUE } from "@/lib/manager/filter-select";
+import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { formatLeaveDate } from "@/lib/leave/services/leave-utils";
 import type {
   LeaveActionResult,
@@ -87,6 +91,8 @@ type LeaveTableProps = {
   branchId?: string;
   reportingManagerId?: string;
   employeeId?: string;
+  summaryFilter?: LeaveSummaryFilterKey;
+  onSummaryFilterChange?: (key: LeaveSummaryFilterKey | undefined) => void;
   leaveTypes: LookupOption[];
   departments: LookupOption[];
   branches: LookupOption[];
@@ -115,7 +121,7 @@ const TABLE_HEAD_CLASS =
 const TABLE_CELL_CLASS = "relative align-middle";
 
 const FILTER_CONTROL_CLASS =
-  "h-10 w-full min-w-0 gap-2 rounded-lg [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-muted-foreground/70";
+  "h-10 w-max gap-2 rounded-lg whitespace-nowrap [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-muted-foreground/70 *:data-[slot=select-value]:line-clamp-none *:data-[slot=select-value]:min-w-max *:data-[slot=select-value]:flex-none *:data-[slot=select-value]:overflow-visible *:data-[slot=select-value]:text-clip";
 
 const MONTH_ITEMS = [
   { value: "1", label: "January" },
@@ -183,6 +189,15 @@ function buildYearItems(currentYear: number) {
   });
 }
 
+function leaveStatusForSummaryFilter(
+  key: LeaveSummaryFilterKey | undefined,
+): LeaveListParams["leaveStatus"] | undefined {
+  if (key === "pendingRequests") return "pending";
+  if (key === "approvedThisMonth") return "approved";
+  if (key === "rejectedThisMonth") return "rejected";
+  return undefined;
+}
+
 export function LeaveTable({
   records: initialRecords,
   total: initialTotal,
@@ -197,12 +212,12 @@ export function LeaveTable({
   branchId,
   reportingManagerId,
   employeeId,
+  summaryFilter,
+  onSummaryFilterChange,
   leaveTypes,
   departments,
   branches,
   employees,
-  managers,
-  canCreate,
   canApprove,
   canReject,
   canCancel,
@@ -258,9 +273,13 @@ export function LeaveTable({
     branchId,
     reportingManagerId,
     employeeId,
+    summaryFilter,
   });
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
   const currentMonth = filters.month ?? defaultMonth;
   const currentYear = filters.year ?? defaultYear;
+  const today = getTodayDateString();
 
   const reloadTable = useCallback(
     async (nextFilters: LeaveListParams = filters) => {
@@ -323,7 +342,8 @@ export function LeaveTable({
 
       Object.entries(updates).forEach(([key, value]) => {
         if (["page", "month", "year"].includes(key)) return;
-        (nextFilters as Record<string, unknown>)[key] = value || undefined;
+        (nextFilters as Record<string, unknown>)[key] =
+          !value || value === FILTER_ANY_VALUE ? undefined : value;
       });
 
       setFilters(nextFilters);
@@ -335,6 +355,27 @@ export function LeaveTable({
     [filters, reloadTable],
   );
 
+  useEffect(() => {
+    const previous = filtersRef.current;
+    if ((previous.summaryFilter ?? undefined) === (summaryFilter ?? undefined)) {
+      return;
+    }
+
+    const nextFilters: LeaveListParams = {
+      ...previous,
+      summaryFilter,
+      leaveStatus: summaryFilter
+        ? leaveStatusForSummaryFilter(summaryFilter)
+        : undefined,
+      page: 1,
+    };
+
+    setFilters(nextFilters);
+    startTransition(async () => {
+      await reloadTable(nextFilters);
+    });
+  }, [reloadTable, summaryFilter]);
+
   const { records, total, page, pageSize } = tableState;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -342,7 +383,7 @@ export function LeaveTable({
 
   const statusItems = useMemo(
     () => [
-      { value: "", label: "All statuses" },
+      { value: FILTER_ANY_VALUE, label: "All statuses" },
       ...Object.entries(LEAVE_STATUS_LABELS).map(([value, label]) => ({
         value,
         label,
@@ -353,7 +394,7 @@ export function LeaveTable({
 
   const leaveTypeItems = useMemo(
     () => [
-      { value: "", label: "All types" },
+      { value: FILTER_ANY_VALUE, label: "All types" },
       ...leaveTypes.map((item) => ({ value: item.id, label: item.label })),
     ],
     [leaveTypes],
@@ -361,37 +402,16 @@ export function LeaveTable({
 
   const employeeItems = useMemo(
     () => [
-      { value: "", label: "All employees" },
+      { value: FILTER_ANY_VALUE, label: "All employees" },
       ...employees.map((employee) => ({
         value: employee.id,
         label: employee.code
-          ? `${employee.label} (${employee.code})`
-          : employee.label,
+          ? `${formatCleanEmployeeName(employee.label)} (${employee.code})`
+          : formatCleanEmployeeName(employee.label),
       })),
     ],
     [employees],
   );
-
-  const managerItems = useMemo(
-    () => [
-      { value: "", label: "All managers" },
-      ...managers.map((manager) => ({ value: manager.id, label: manager.label })),
-    ],
-    [managers],
-  );
-
-  const isDefaultView =
-    currentMonth === now.getMonth() + 1 &&
-    currentYear === now.getFullYear() &&
-    !filters.search &&
-    !filters.employeeId &&
-    !filters.leaveStatus &&
-    !filters.leaveTypeId &&
-    !filters.reportingManagerId &&
-    !filters.departmentId &&
-    !filters.branchId;
-
-  const hasActiveFilters = !isDefaultView;
 
   const columns = useMemo<ColumnDef<LeaveListItem>[]>(
     () => [
@@ -400,7 +420,9 @@ export function LeaveTable({
         header: "Employee",
         cell: ({ row }) => (
           <div className="min-w-[12rem]">
-            <p className="font-medium">{row.original.employeeName}</p>
+            <p className="font-medium tracking-normal not-italic">
+              {formatCleanEmployeeName(row.original.employeeName)}
+            </p>
             <p className="text-xs text-muted-foreground">{row.original.employeeCode}</p>
           </div>
         ),
@@ -625,186 +647,148 @@ export function LeaveTable({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border bg-card p-3 shadow-sm">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-          <div className="col-span-2 min-w-0 sm:col-span-1 lg:col-span-1">
-            <Select
-              items={employeeItems}
-              value={filters.employeeId ?? ""}
-              onValueChange={(value) =>
-                updateParams({
-                  employeeId: value || undefined,
-                  search: undefined,
-                  departmentId: undefined,
-                  branchId: undefined,
-                  reportingManagerId: undefined,
-                  page: "1",
-                })
-              }
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <div className="shrink-0">
+          <Select
+            items={employeeItems}
+            value={filters.employeeId ?? FILTER_ANY_VALUE}
+            onValueChange={(value) =>
+              updateParams({
+                employeeId:
+                  !value || value === FILTER_ANY_VALUE ? undefined : value,
+                search: undefined,
+                departmentId: undefined,
+                branchId: undefined,
+                reportingManagerId: undefined,
+                page: "1",
+              })
+            }
+          >
+            <SelectTrigger className={cn(FILTER_CONTROL_CLASS, "min-w-[10.75rem] max-w-[16rem]")}>
+              <SelectValue
+                placeholder="All employees"
+                className="overflow-visible text-clip whitespace-nowrap"
+              />
+            </SelectTrigger>
+            <SelectContent
+              align="start"
+              alignItemWithTrigger={false}
+              className="min-w-[18rem] max-w-[24rem]"
             >
-              <SelectTrigger className={FILTER_CONTROL_CLASS}>
-                <SelectValue placeholder="All employees" />
-              </SelectTrigger>
-              <SelectContent
-                align="start"
-                alignItemWithTrigger={false}
-                className="min-w-[18rem] max-w-[24rem]"
-              >
-                {employeeItems.map((item) => (
-                  <SelectItem key={item.value || "all-employees"} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="min-w-0">
-            <Select
-              items={MONTH_ITEMS}
-              value={String(currentMonth)}
-              onValueChange={(value) =>
-                updateParams({ month: value ?? undefined, page: "1" })
-              }
-            >
-              <SelectTrigger className={FILTER_CONTROL_CLASS}>
-                <SelectValue placeholder="Month" />
-              </SelectTrigger>
-              <SelectContent align="start" alignItemWithTrigger={false}>
-                {MONTH_ITEMS.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="min-w-0">
-            <Select
-              items={yearItems}
-              value={String(currentYear)}
-              onValueChange={(value) =>
-                updateParams({ year: value ?? undefined, page: "1" })
-              }
-            >
-              <SelectTrigger className={FILTER_CONTROL_CLASS}>
-                <SelectValue placeholder="Year" />
-              </SelectTrigger>
-              <SelectContent align="start" alignItemWithTrigger={false}>
-                {yearItems.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="min-w-0">
-            <Select
-              items={statusItems}
-              value={filters.leaveStatus ?? ""}
-              onValueChange={(value) =>
-                updateParams({ leaveStatus: value || undefined, page: "1" })
-              }
-            >
-              <SelectTrigger className={FILTER_CONTROL_CLASS}>
-                <SelectValue placeholder="All statuses" />
-              </SelectTrigger>
-              <SelectContent align="start" alignItemWithTrigger={false}>
-                {statusItems.map((item) => (
-                  <SelectItem key={item.value || "all-statuses"} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="min-w-0">
-            <Select
-              items={leaveTypeItems}
-              value={filters.leaveTypeId ?? ""}
-              onValueChange={(value) =>
-                updateParams({ leaveTypeId: value || undefined, page: "1" })
-              }
-            >
-              <SelectTrigger className={FILTER_CONTROL_CLASS}>
-                <SelectValue placeholder="All types" />
-              </SelectTrigger>
-              <SelectContent align="start" alignItemWithTrigger={false}>
-                {leaveTypeItems.map((item) => (
-                  <SelectItem key={item.value || "all-leave-types"} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {managers.length > 0 ? (
-            <div className="min-w-0">
-              <Select
-                items={managerItems}
-                value={filters.reportingManagerId ?? ""}
-                onValueChange={(value) =>
-                  updateParams({ reportingManagerId: value || undefined, page: "1" })
-                }
-              >
-                <SelectTrigger className={FILTER_CONTROL_CLASS}>
-                  <SelectValue placeholder="All managers" />
-                </SelectTrigger>
-                <SelectContent align="start" alignItemWithTrigger={false}>
-                  {managerItems.map((item) => (
-                    <SelectItem key={item.value || "all-managers"} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          ) : null}
+              {employeeItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        {(hasActiveFilters || (canCreate && !embedded)) && (
-          <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
-            {hasActiveFilters ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-10 whitespace-nowrap"
-                disabled={isPending}
-                onClick={() =>
-                  updateParams({
-                    search: undefined,
-                    employeeId: undefined,
-                    leaveStatus: undefined,
-                    leaveTypeId: undefined,
-                    departmentId: undefined,
-                    branchId: undefined,
-                    reportingManagerId: undefined,
-                    month: String(now.getMonth() + 1),
-                    year: String(now.getFullYear()),
-                    page: "1",
-                  })
-                }
-              >
-                Clear filters
-              </Button>
-            ) : null}
+        <div className="shrink-0">
+          <Select
+            items={MONTH_ITEMS}
+            value={String(currentMonth)}
+            onValueChange={(value) =>
+              updateParams({ month: value ?? undefined, page: "1" })
+            }
+          >
+            <SelectTrigger className={cn(FILTER_CONTROL_CLASS, "min-w-[9rem]")}>
+              <SelectValue placeholder="Month" className="overflow-visible whitespace-nowrap" />
+            </SelectTrigger>
+            <SelectContent align="start" alignItemWithTrigger={false}>
+              {MONTH_ITEMS.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-            {canCreate && !embedded ? (
-              <Link
-                href={LEAVE_ROUTES.new}
-                className={cn(buttonVariants(), "h-10 whitespace-nowrap px-4")}
-              >
-                <Plus className="size-4" />
-                Apply Leave
-              </Link>
-            ) : null}
-          </div>
-        )}
+        <div className="shrink-0">
+          <Select
+            items={yearItems}
+            value={String(currentYear)}
+            onValueChange={(value) =>
+              updateParams({ year: value ?? undefined, page: "1" })
+            }
+          >
+            <SelectTrigger className={cn(FILTER_CONTROL_CLASS, "min-w-[6.25rem]")}>
+              <SelectValue placeholder="Year" className="overflow-visible whitespace-nowrap" />
+            </SelectTrigger>
+            <SelectContent align="start" alignItemWithTrigger={false}>
+              {yearItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="shrink-0">
+          <Select
+            items={statusItems}
+            value={filters.leaveStatus ?? FILTER_ANY_VALUE}
+            onValueChange={(value) => {
+              if (summaryFilter) {
+                onSummaryFilterChange?.(undefined);
+              }
+              updateParams({
+                leaveStatus:
+                  !value || value === FILTER_ANY_VALUE ? undefined : value,
+                summaryFilter: undefined,
+                page: "1",
+              });
+            }}
+          >
+            <SelectTrigger className={cn(FILTER_CONTROL_CLASS, "min-w-[11.25rem]")}>
+              <SelectValue placeholder="All statuses" className="overflow-visible whitespace-nowrap" />
+            </SelectTrigger>
+            <SelectContent align="start" alignItemWithTrigger={false}>
+              {statusItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="shrink-0">
+          <Select
+            items={leaveTypeItems}
+            value={filters.leaveTypeId ?? FILTER_ANY_VALUE}
+            onValueChange={(value) =>
+              updateParams({
+                leaveTypeId:
+                  !value || value === FILTER_ANY_VALUE ? undefined : value,
+                page: "1",
+              })
+            }
+          >
+            <SelectTrigger className={cn(FILTER_CONTROL_CLASS, "min-w-[10rem]")}>
+              <SelectValue
+                placeholder="All types"
+                className="overflow-visible text-clip whitespace-nowrap"
+              />
+            </SelectTrigger>
+            <SelectContent align="start" alignItemWithTrigger={false}>
+              {leaveTypeItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        </div>
+
+        <span className="ml-auto inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap text-sm font-semibold text-foreground">
+          <CalendarDays className="size-4 shrink-0" />
+          Summary for {today}
+        </span>
       </div>
 
       <div className="overflow-auto rounded-lg border max-h-[min(70vh,calc(100dvh-16rem))] [scrollbar-gutter:stable]">

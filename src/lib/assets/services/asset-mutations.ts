@@ -10,7 +10,7 @@ import {
   nextAssetCode,
 } from "@/lib/assets/services/asset-settings";
 import { emptyToNull, fromHrms } from "@/lib/assets/services/assets-utils";
-import { buildAssetNotes } from "@/lib/assets/asset-spec-utils";
+import { buildAssetNotes, parseAssetRemarks } from "@/lib/assets/asset-spec-utils";
 import type {
   AssetFormValues,
   AssignAssetValues,
@@ -176,6 +176,41 @@ export async function deleteAsset(
   if (error) throw new Error(error.message);
 }
 
+function hasAssignConfig(input: AssignAssetValues) {
+  return (
+    input.brand !== undefined ||
+    input.model !== undefined ||
+    input.serialNumber !== undefined ||
+    input.warrantyExpiry !== undefined ||
+    input.specChip !== undefined ||
+    input.specMemory !== undefined ||
+    input.specStorage !== undefined ||
+    input.specOperatingSystem !== undefined ||
+    input.specAccessories !== undefined ||
+    input.specConnectionType !== undefined
+  );
+}
+
+function configPatch(input: AssignAssetValues, existingNotes: string | null) {
+  return {
+    brand: emptyToNull(input.brand),
+    model: emptyToNull(input.model),
+    serial_number: emptyToNull(input.serialNumber),
+    warranty_expiry: emptyToNull(input.warrantyExpiry),
+    notes: buildAssetNotes(
+      {
+        chip: input.specChip,
+        memory: input.specMemory,
+        storage: input.specStorage,
+        operatingSystem: input.specOperatingSystem,
+        accessories: input.specAccessories,
+        connectionType: input.specConnectionType,
+      },
+      parseAssetRemarks(existingNotes),
+    ),
+  };
+}
+
 export async function assignAsset(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -184,7 +219,7 @@ export async function assignAsset(
   const organizationId = profile.employee.organizationId;
 
   const { data: asset, error: assetError } = await fromHrms(supabase, "assets")
-    .select("id, asset_status, current_assignment_id, department_id")
+    .select("id, asset_status, current_assignment_id, department_id, notes")
     .eq("id", input.assetId)
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
@@ -192,9 +227,6 @@ export async function assignAsset(
 
   if (assetError) throw new Error(assetError.message);
   if (!asset) throw new Error("Asset not found");
-  if (asset.asset_status !== "available" || asset.current_assignment_id) {
-    throw new Error("Asset is not available for assignment");
-  }
 
   const { data: employee, error: empError } = await fromHrms(supabase, "employees")
     .select("id, department_id")
@@ -205,6 +237,34 @@ export async function assignAsset(
 
   if (empError) throw new Error(empError.message);
   if (!employee) throw new Error("Employee not found");
+
+  if (hasAssignConfig(input)) {
+    const { error: configError } = await fromHrms(supabase, "assets")
+      .update({
+        ...configPatch(input, asset.notes),
+        updated_by: profile.userId,
+      })
+      .eq("id", input.assetId);
+    if (configError) throw new Error(configError.message);
+  }
+
+  if (asset.current_assignment_id) {
+    const { data: current } = await fromHrms(supabase, "asset_assignments")
+      .select("id, employee_id, assignment_status")
+      .eq("id", asset.current_assignment_id)
+      .maybeSingle();
+    if (
+      current?.employee_id === input.employeeId &&
+      current.assignment_status === "active"
+    ) {
+      return current.id;
+    }
+    throw new Error("This asset is already assigned. Return it before assigning it again.");
+  }
+
+  if (asset.asset_status !== "available") {
+    throw new Error("This asset is not available for assignment.");
+  }
 
   const { data: assignment, error } = await fromHrms(supabase, "asset_assignments")
     .insert({
@@ -242,20 +302,24 @@ export async function assignAsset(
     .eq("id", input.assetId)
     .maybeSingle();
 
-  await notifyEmployee(supabase, {
-    organizationId,
-    employeeId: input.employeeId,
-    title: "Asset assigned",
-    message: `Asset ${assetRow?.name ?? "item"} has been assigned to you.`,
-    notificationType: "asset_assigned",
-    module: "assets",
-    priority: "medium",
-    actionUrl: "/employee/assets",
-    sourceEventKey: `asset_assigned:${assignment.id}`,
-    templateKey: "asset_assigned",
-    templateVariables: { assetName: assetRow?.name ?? "Asset" },
-    createdBy: profile.userId,
-  });
+  try {
+    await notifyEmployee(supabase, {
+      organizationId,
+      employeeId: input.employeeId,
+      title: "Asset assigned",
+      message: `Asset ${assetRow?.name ?? "item"} has been assigned to you.`,
+      notificationType: "asset_assigned",
+      module: "assets",
+      priority: "medium",
+      actionUrl: "/employee/assets",
+      sourceEventKey: `asset_assigned:${assignment.id}`,
+      templateKey: "asset_assigned",
+      templateVariables: { assetName: assetRow?.name ?? "Asset" },
+      createdBy: profile.userId,
+    });
+  } catch (notifyError) {
+    console.error("[assets] notify after assign failed", notifyError);
+  }
 
   emitHrmsWebhook(organizationId, "asset.assigned", {
     assetId: input.assetId,
@@ -693,6 +757,16 @@ export async function createAndAssignAsset(
     expectedReturnDate: null,
     conditionBefore: input.conditionBefore,
     remarks: emptyToNull(input.remarks),
+    brand,
+    model: emptyToNull(input.model),
+    serialNumber: emptyToNull(input.serialNumber),
+    specChip: emptyToNull(input.specChip),
+    specMemory: emptyToNull(input.specMemory),
+    specStorage: emptyToNull(input.specStorage),
+    specOperatingSystem: emptyToNull(input.specOperatingSystem),
+    specAccessories: emptyToNull(input.specAccessories),
+    specConnectionType: emptyToNull(input.specConnectionType),
+    warrantyExpiry: emptyToNull(input.warrantyExpiry),
   });
 
   return { assetId, assignmentId };

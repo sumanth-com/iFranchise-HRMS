@@ -10,6 +10,7 @@ export const DEFAULT_PAYROLL_SETTINGS: PayrollSettingsData = {
   payrollCycle: "monthly",
   payrollProcessingDay: "last_working_day",
   salaryCreditDate: 2,
+  payslipAvailableDay: 5,
   financialYearStartMonth: 4,
   financialYearEndMonth: 3,
   currency: "INR",
@@ -97,6 +98,10 @@ function parseStoredPayrollSettings(raw: unknown): PayrollSettingsData {
       stored.salary_credit_date ??
       stored.salaryCreditDate ??
       DEFAULT_PAYROLL_SETTINGS.salaryCreditDate,
+    payslipAvailableDay:
+      stored.payslip_available_day ??
+      stored.payslipAvailableDay ??
+      DEFAULT_PAYROLL_SETTINGS.payslipAvailableDay,
     financialYearStartMonth:
       stored.financial_year_start_month ??
       stored.financialYearStartMonth ??
@@ -166,6 +171,7 @@ function toStoredPayrollSettings(settings: PayrollSettingsData) {
     payroll_cycle: settings.payrollCycle,
     payroll_processing_day: settings.payrollProcessingDay,
     salary_credit_date: settings.salaryCreditDate,
+    payslip_available_day: settings.payslipAvailableDay,
     financial_year_start_month: settings.financialYearStartMonth,
     financial_year_end_month: settings.financialYearEndMonth,
     currency: settings.currency,

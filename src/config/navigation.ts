@@ -163,7 +163,7 @@ export const mainNavItems: NavigationItem[] = [
   },
   {
     title: "Performance",
-    href: "/dashboard/performance/goals",
+    href: "/dashboard/performance",
     icon: Target,
     section: "Administration",
     permissions: ["performance.view"],

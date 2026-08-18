@@ -30,6 +30,7 @@ type Props = {
   inventory?: AssetItem[];
   permissionCodes?: string[];
   className?: string;
+  showAddButton?: boolean;
 };
 
 function formatActivityWhen(value: string) {
@@ -44,6 +45,7 @@ export function AssetActivitySection({
   inventory = [],
   permissionCodes = [],
   className,
+  showAddButton = true,
 }: Props) {
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -182,7 +184,7 @@ export function AssetActivitySection({
             Register assets, review activity, and update specifications.
           </p>
         </div>
-        {canCreate && lookups ? (
+        {showAddButton && canCreate && lookups ? (
           <Button type="button" size="sm" className="shrink-0 gap-1.5" onClick={openCreate}>
             <Plus className="size-4" />
             Add asset
@@ -207,28 +209,6 @@ export function AssetActivitySection({
           setDetailOpen(open);
           if (!open) setSelectedAssetId(null);
         }}
-        canEdit={canEdit}
-        canAssign={canAssign}
-        onEdit={
-          canEdit
-            ? (asset) => {
-                setDetailOpen(false);
-                setEditingAsset(asset);
-                setAssignToEmployeeId(null);
-                setFormInitialMode("edit");
-                setFormOpen(true);
-              }
-            : undefined
-        }
-        onAssignAnother={
-          canAssign
-            ? (asset) => {
-                if (!asset.assignedEmployeeId) return;
-                setDetailOpen(false);
-                openAssignForEmployee(asset.assignedEmployeeId, asset);
-              }
-            : undefined
-        }
       />
 
       {lookups ? (

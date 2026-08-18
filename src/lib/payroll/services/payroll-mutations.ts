@@ -21,6 +21,7 @@ import type {
   PayrollDetail,
   PayrollPreviewResult,
   PayslipDetail,
+  EmployeePayrollRunBreakdown,
 } from "@/types/payroll";
 import {
   calculateEmployeePayroll,
@@ -28,6 +29,7 @@ import {
 } from "@/lib/payroll/services/payroll-calculator";
 import {
   generatePayslipNumber,
+  formatPayrollMonth,
   formatPayrollMonthLabel,
   getMonthDateRange,
   getPayrollMonthDate,
@@ -35,6 +37,7 @@ import {
   roundCurrency,
 } from "@/lib/payroll/services/payroll-utils";
 import { PAYROLL_ROUTES } from "@/lib/payroll/constants";
+import { getPayrollSettings } from "@/lib/payroll/services/payroll-settings";
 import { notifyEmployee } from "@/lib/notifications/services/notification-service";
 import type { PayrollRunInput } from "@/lib/validations/payroll";
 import {
@@ -187,46 +190,73 @@ async function getLeaveLopDays(
   return (data ?? []).reduce((sum, row) => sum + Number(row.total_days), 0);
 }
 
-async function getApprovedBonuses(
-  supabase: AuthSupabaseClient,
-  employeeId: string,
-  month: number,
-  year: number,
-) {
-  const { data, error } = await supabase
-    .schema("hrms")
-    .from("employee_bonuses")
-    .select("amount, bonus_type")
-    .eq("employee_id", employeeId)
-    .eq("bonus_month", getPayrollMonthDate(month, year))
-    .eq("bonus_status", "approved")
-    .is("payroll_id", null)
-    .is("deleted_at", null);
-
-  if (error) throw new Error(error.message);
-  return data ?? [];
+function monthKey(value: string | null | undefined): string {
+  return String(value ?? "").slice(0, 7);
 }
 
-async function getApprovedReimbursements(
+async function getPayableBonuses(
   supabase: AuthSupabaseClient,
   employeeId: string,
-  month: number,
-  year: number,
+  monthDates: string[],
+  options?: { includeAttached?: boolean },
 ) {
-  const range = getMonthDateRange(month, year);
-  const { data, error } = await supabase
+  const dates = [...new Set(monthDates.filter(Boolean))];
+  if (dates.length === 0) return [];
+  const monthKeys = new Set(dates.map((date) => monthKey(date)));
+
+  let query = supabase
     .schema("hrms")
-    .from("employee_reimbursements")
-    .select("amount, category")
+    .from("employee_bonuses")
+    .select("amount, bonus_type, bonus_month")
     .eq("employee_id", employeeId)
-    .eq("reimbursement_status", "approved")
-    .is("payroll_id", null)
-    .gte("expense_date", range.startDate)
-    .lte("expense_date", range.endDate)
+    .in("bonus_status", ["pending", "approved"])
+    .in("bonus_month", dates)
     .is("deleted_at", null);
 
+  if (!options?.includeAttached) {
+    query = query.is("payroll_id", null);
+  }
+
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return data ?? [];
+
+  return (data ?? []).filter((row) => monthKeys.has(monthKey(row.bonus_month)));
+}
+
+async function getPayableReimbursements(
+  supabase: AuthSupabaseClient,
+  employeeId: string,
+  ranges: Array<{ startDate: string; endDate: string }>,
+  options?: { includeAttached?: boolean },
+) {
+  const uniqueRanges = ranges.filter(
+    (range, index, all) =>
+      all.findIndex(
+        (item) => item.startDate === range.startDate && item.endDate === range.endDate,
+      ) === index,
+  );
+  if (uniqueRanges.length === 0) return [];
+
+  let query = supabase
+    .schema("hrms")
+    .from("employee_reimbursements")
+    .select("amount, category, expense_date")
+    .eq("employee_id", employeeId)
+    .in("reimbursement_status", ["pending", "approved"])
+    .is("deleted_at", null);
+
+  if (!options?.includeAttached) {
+    query = query.is("payroll_id", null);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).filter((row) =>
+    uniqueRanges.some(
+      (range) => row.expense_date >= range.startDate && row.expense_date <= range.endDate,
+    ),
+  );
 }
 
 export async function buildPayrollPreview(
@@ -248,8 +278,8 @@ export async function buildPayrollPreview(
           getEffectiveSalaryStructure(supabase, employee.id, month, year),
           getAttendanceSummary(supabase, employee.id, month, year),
           getLeaveLopDays(supabase, employee.id, month, year),
-          getApprovedBonuses(supabase, employee.id, month, year),
-          getApprovedReimbursements(supabase, employee.id, month, year),
+          getPayableBonuses(supabase, employee.id, [getPayrollMonthDate(month, year)]),
+          getPayableReimbursements(supabase, employee.id, [getMonthDateRange(month, year)]),
         ]);
 
       const calc = calculateEmployeePayroll({
@@ -302,6 +332,99 @@ export async function previewPayrollRun(
   input: PayrollRunInput,
 ): Promise<PayrollPreviewResult> {
   return buildPayrollPreview(supabase, profile, input);
+}
+
+export async function getEmployeeRunBreakdown(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: { employeeId: string; month: number; year: number },
+): Promise<EmployeePayrollRunBreakdown> {
+  const { employeeId, month, year } = input;
+  const organizationId = profile.employee.organizationId;
+  const selectedMonthDate = getPayrollMonthDate(month, year);
+  const today = new Date();
+  const currentMonthDate = getPayrollMonthDate(today.getMonth() + 1, today.getFullYear());
+
+  const { data: employee, error } = await supabase
+    .schema("hrms")
+    .from("employees")
+    .select(
+      `
+        id,
+        employee_code,
+        first_name,
+        last_name,
+        departments:department_id (name)
+      `,
+    )
+    .eq("id", employeeId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!employee) throw new Error("Employee not found");
+
+  const department = unwrapRelation(
+    employee.departments as { name: string } | { name: string }[] | null,
+  );
+
+  const [salaryStructure, attendance, leaveLopDays, bonuses, reimbursements] =
+    await Promise.all([
+      getEffectiveSalaryStructure(supabase, employeeId, month, year),
+      getAttendanceSummary(supabase, employeeId, month, year),
+      getLeaveLopDays(supabase, employeeId, month, year),
+      getPayableBonuses(
+        supabase,
+        employeeId,
+        [selectedMonthDate, currentMonthDate],
+        { includeAttached: true },
+      ),
+      getPayableReimbursements(
+        supabase,
+        employeeId,
+        [
+          getMonthDateRange(month, year),
+          getMonthDateRange(today.getMonth() + 1, today.getFullYear()),
+        ],
+        { includeAttached: true },
+      ),
+    ]);
+
+  const calc = calculateEmployeePayroll({
+    month,
+    year,
+    salaryStructure,
+    attendance,
+    leaveLopDays,
+    bonuses,
+    reimbursements,
+  });
+
+  const bonusTotal = roundCurrency(
+    bonuses.reduce((sum, row) => sum + Number(row.amount || 0), 0),
+  );
+  const claimsTotal = roundCurrency(
+    reimbursements.reduce((sum, row) => sum + Number(row.amount || 0), 0),
+  );
+
+  return {
+    employeeId: employee.id,
+    employeeCode: employee.employee_code,
+    employeeName: `${employee.first_name} ${employee.last_name}`.trim(),
+    departmentName: department?.name ?? null,
+    basicSalary: calc.basicSalary,
+    totalAllowances: calc.totalAllowances,
+    totalDeductions: calc.totalDeductions,
+    grossSalary: calc.grossSalary,
+    netSalary: calc.netSalary,
+    bonusTotal,
+    claimsTotal,
+    salaryTotal: roundCurrency(calc.grossSalary - bonusTotal - claimsTotal),
+    breakdown: calc.breakdown,
+    hasSalaryStructure: Boolean(salaryStructure),
+    periodLabel: formatPayrollMonth(month, year),
+  };
 }
 
 export async function generatePayrollRun(
@@ -431,7 +554,7 @@ export async function generatePayrollRun(
       .update({ payroll_id: payrollId, updated_by: profile.userId })
       .eq("employee_id", employee.id)
       .eq("bonus_month", payrollMonth)
-      .eq("bonus_status", "approved")
+      .in("bonus_status", ["pending", "approved"])
       .is("payroll_id", null);
 
     const range = getMonthDateRange(month, year);
@@ -440,7 +563,7 @@ export async function generatePayrollRun(
       .from("employee_reimbursements")
       .update({ payroll_id: payrollId, updated_by: profile.userId })
       .eq("employee_id", employee.id)
-      .eq("reimbursement_status", "approved")
+      .in("reimbursement_status", ["pending", "approved"])
       .is("payroll_id", null)
       .gte("expense_date", range.startDate)
       .lte("expense_date", range.endDate);
@@ -681,7 +804,14 @@ export async function generatePayslips(
 
   if (!payroll) throw new Error("Payroll not found.");
 
-  const schedule = computePayslipSchedule(payroll.payroll_month);
+  const payrollSettings = await getPayrollSettings(
+    supabase,
+    profile.employee.organizationId,
+  );
+  const schedule = computePayslipSchedule(payroll.payroll_month, {
+    salaryCreditDay: payrollSettings.settings.salaryCreditDate,
+    publishDay: payrollSettings.settings.payslipAvailableDay,
+  });
 
   const { data: items, error } = await supabase
     .schema("hrms")
@@ -747,8 +877,11 @@ export async function emailPayslip(
   });
   if (!payslip) throw new Error("Payslip not found.");
 
-  if (!payslip.canEmployeeAccess && !canAccessPayslipDuringReview(profile.permissionCodes)) {
-    throw new Error("Payslip is not yet published to employees.");
+  if (!payslip.canEmployeeAccess) {
+    const isOwnPayslip = payslip.employee.id === profile.employee.id;
+    if (isOwnPayslip || !canAccessPayslipDuringReview(profile.permissionCodes)) {
+      throw new Error("Payslip is not yet published to employees.");
+    }
   }
 
   if (!payslip.storagePath) {
@@ -1436,20 +1569,33 @@ export async function getPayslipById(
     return null;
   }
 
-  const schedule = resolvePayslipSchedule(payroll.payroll_month, {
-    salaryCreditDate: payslip.salary_credit_date ?? undefined,
-    publishedAt: payslip.published_at ?? undefined,
-  });
+  const payrollSettings = await getPayrollSettings(supabase, organizationId);
+  const schedule = resolvePayslipSchedule(
+    payroll.payroll_month,
+    {
+      salaryCreditDate: payslip.salary_credit_date ?? undefined,
+      publishedAt: payslip.published_at ?? undefined,
+    },
+    {
+      salaryCreditDay: payrollSettings.settings.salaryCreditDate,
+      publishDay: payrollSettings.settings.payslipAvailableDay,
+    },
+  );
 
+  const isOwnPayslip = payslip.employee_id === profile.employee.id;
   const access = resolvePayslipAvailability(
     schedule.publishedAt,
     profile.permissionCodes,
+    new Date(),
+    { employeeFacing: isOwnPayslip },
   );
 
   if (
     !options?.bypassAccessCheck &&
     !access.canEmployeeAccess &&
-    !canAccessPayslipDuringReview(profile.permissionCodes)
+    !(
+      !isOwnPayslip && canAccessPayslipDuringReview(profile.permissionCodes)
+    )
   ) {
     return null;
   }

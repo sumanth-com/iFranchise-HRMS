@@ -16,8 +16,11 @@ import { Label } from "@/components/ui/label";
 import { GoalDetailModal } from "@/components/performance/goal-detail-modal";
 import {
   buildStatusItems,
+  matchesTextQuery,
+  paginateItems,
   PerformanceFilters,
   PerformancePagination,
+  type PerformanceFilterUpdates,
 } from "@/components/performance/performance-filters";
 import {
   GoalStatusBadge,
@@ -30,7 +33,7 @@ import {
 import { EmployeeSelect, LabeledSelect } from "@/components/payroll/payroll-select";
 import { toSelectItems } from "@/components/payroll/select-utils";
 import { createGoalAction, fetchGoalsListAction } from "@/lib/performance/actions";
-import { PERFORMANCE_ROUTES } from "@/lib/performance/constants";
+import { PERFORMANCE_CLIENT_FETCH_SIZE, PERFORMANCE_ROUTES } from "@/lib/performance/constants";
 import { GOAL_PRIORITY_LABELS, GOAL_STATUS_LABELS } from "@/lib/performance/constants";
 import {
   BUILTIN_GOAL_PRESETS,
@@ -268,29 +271,20 @@ export function GoalForm({
 
 export function GoalsTable({
   records,
-  total,
-  page,
   pageSize,
   employees,
-  departments,
-  cycles,
-  search,
-  employeeId,
-  departmentId,
-  cycleId,
-  goalStatus,
-  initialGoalId,
   canManage = false,
   categories = [],
   onGoalsChanged,
+  initialGoalId,
 }: {
   records: GoalListItem[];
-  total: number;
-  page: number;
+  total?: number;
+  page?: number;
   pageSize: number;
   employees: LookupOption[];
-  departments: LookupOption[];
-  cycles: LookupOption[];
+  departments?: LookupOption[];
+  cycles?: LookupOption[];
   search?: string;
   employeeId?: string;
   departmentId?: string;
@@ -302,10 +296,45 @@ export function GoalsTable({
   onGoalsChanged?: () => void;
 }) {
   const [viewId, setViewId] = useState<string | null>(initialGoalId ?? null);
+  const [search, setSearch] = useState("");
+  const [employeeId, setEmployeeId] = useState<string | undefined>();
+  const [goalStatus, setGoalStatus] = useState<string | undefined>();
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     if (initialGoalId) setViewId(initialGoalId);
   }, [initialGoalId]);
+
+  const filtered = useMemo(() => {
+    return records.filter((row) => {
+      if (employeeId && row.employeeId !== employeeId) return false;
+      if (goalStatus && row.goalStatus !== goalStatus) return false;
+      return matchesTextQuery(
+        [row.title, row.employeeName, row.employeeCode, row.category, row.description],
+        search,
+      );
+    });
+  }, [records, search, employeeId, goalStatus]);
+
+  const paged = useMemo(
+    () => paginateItems(filtered, page, pageSize),
+    [filtered, page, pageSize],
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, employeeId, goalStatus]);
+
+  useEffect(() => {
+    if (page !== paged.page) setPage(paged.page);
+  }, [page, paged.page]);
+
+  function handleFiltersChange(updates: PerformanceFilterUpdates) {
+    if ("search" in updates) setSearch(updates.search ?? "");
+    if ("employeeId" in updates) setEmployeeId(updates.employeeId);
+    if ("goalStatus" in updates) setGoalStatus(updates.goalStatus);
+    setPage(1);
+  }
 
   return (
     <div className="space-y-3">
@@ -318,18 +347,17 @@ export function GoalsTable({
 
       <PerformanceFilters
         employees={employees}
-        departments={departments}
-        cycles={cycles}
         statusItems={statusItems}
         statusKey="goalStatus"
         statusValue={goalStatus}
         employeeId={employeeId}
-        departmentId={departmentId}
-        cycleId={cycleId}
         search={search}
         searchPlaceholder="Search assigned goals…"
         variant="bar"
+        showDepartment={false}
+        showCycle={false}
         className="rounded-lg border bg-muted/10 p-3"
+        onFiltersChange={handleFiltersChange}
       />
 
       <PerformanceTableShell
@@ -342,7 +370,7 @@ export function GoalsTable({
           />
         }
       >
-        {records.length > 0 ? (
+        {paged.rows.length > 0 ? (
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
               <tr className="text-left text-muted-foreground">
@@ -355,7 +383,7 @@ export function GoalsTable({
               </tr>
             </thead>
             <tbody>
-              {records.map((row) => (
+              {paged.rows.map((row) => (
                 <tr key={row.id} className="border-t align-middle">
                   <td className="px-3 py-2.5">
                     <div className="font-medium">{row.employeeName}</div>
@@ -388,7 +416,12 @@ export function GoalsTable({
         ) : null}
       </PerformanceTableShell>
 
-      <PerformancePagination page={page} pageSize={pageSize} total={total} />
+      <PerformancePagination
+        page={paged.page}
+        pageSize={pageSize}
+        total={paged.total}
+        onPageChange={setPage}
+      />
 
       <GoalDetailModal
         goalId={viewId}
@@ -416,56 +449,28 @@ export function GoalsWorkspace({
     employees: LookupOption[];
     categories: string[];
   };
-  tableProps: Omit<Parameters<typeof GoalsTable>[0], never>;
+  tableProps: Omit<Parameters<typeof GoalsTable>[0], never> & {
+    assignedByMe?: boolean;
+  };
   listBasePath?: string;
 }) {
   const router = useRouter();
   const skipServerSyncRef = useRef(false);
-  const [listState, setListState] = useState({
-    records: tableProps.records,
-    total: tableProps.total,
-    page: tableProps.page,
-    pageSize: tableProps.pageSize,
-    search: tableProps.search,
-    employeeId: tableProps.employeeId,
-    departmentId: tableProps.departmentId,
-    cycleId: tableProps.cycleId,
-    goalStatus: tableProps.goalStatus,
-  });
+  const [records, setRecords] = useState(tableProps.records);
 
   useEffect(() => {
     if (skipServerSyncRef.current) {
       skipServerSyncRef.current = false;
       return;
     }
-    setListState({
-      records: tableProps.records,
-      total: tableProps.total,
-      page: tableProps.page,
-      pageSize: tableProps.pageSize,
-      search: tableProps.search,
-      employeeId: tableProps.employeeId,
-      departmentId: tableProps.departmentId,
-      cycleId: tableProps.cycleId,
-      goalStatus: tableProps.goalStatus,
-    });
-  }, [
-    tableProps.records,
-    tableProps.total,
-    tableProps.page,
-    tableProps.pageSize,
-    tableProps.search,
-    tableProps.employeeId,
-    tableProps.departmentId,
-    tableProps.cycleId,
-    tableProps.goalStatus,
-  ]);
+    setRecords(tableProps.records);
+  }, [tableProps.records]);
 
   const refreshAssignedGoals = useCallback(async () => {
     const result = await fetchGoalsListAction({
       page: 1,
-      pageSize: tableProps.pageSize,
-      assignedByMe: true,
+      pageSize: PERFORMANCE_CLIENT_FETCH_SIZE,
+      assignedByMe: tableProps.assignedByMe ?? false,
     });
     if (!result.success) {
       toast.error(result.message ?? "Could not refresh assigned goals");
@@ -474,19 +479,9 @@ export function GoalsWorkspace({
     if (!result.data) return;
 
     skipServerSyncRef.current = true;
-    setListState({
-      records: result.data.data,
-      total: result.data.total,
-      page: result.data.page,
-      pageSize: result.data.pageSize,
-      search: undefined,
-      employeeId: undefined,
-      departmentId: undefined,
-      cycleId: undefined,
-      goalStatus: undefined,
-    });
+    setRecords(result.data.data);
     router.replace(listBasePath);
-  }, [listBasePath, router, tableProps.pageSize]);
+  }, [listBasePath, router, tableProps.assignedByMe]);
 
   return (
     <section className="rounded-xl border bg-card shadow-sm">
@@ -498,15 +493,7 @@ export function GoalsWorkspace({
       <div className={cn("border-t p-4", !canCreate && "border-t-0")}>
         <GoalsTable
           {...tableProps}
-          records={listState.records}
-          total={listState.total}
-          page={listState.page}
-          pageSize={listState.pageSize}
-          search={listState.search}
-          employeeId={listState.employeeId}
-          departmentId={listState.departmentId}
-          cycleId={listState.cycleId}
-          goalStatus={listState.goalStatus}
+          records={records}
           canManage={canManage}
           categories={formProps.categories}
           onGoalsChanged={refreshAssignedGoals}

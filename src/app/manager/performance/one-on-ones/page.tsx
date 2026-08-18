@@ -1,24 +1,18 @@
 import { OneOnOneForm, OneOnOneTable } from "@/components/performance/one-on-one-management";
 import { loadManagerPerformancePage } from "@/lib/manager/load-admin-context";
+import {
+  PERFORMANCE_CLIENT_FETCH_SIZE,
+  PERFORMANCE_TABLE_PAGE_SIZE,
+} from "@/lib/performance/constants";
 import { listOneOnOnes } from "@/lib/performance/services/performance-queries";
-import { oneOnOneListParamsSchema } from "@/lib/validations/performance";
 
-type OneOnOnesPageProps = {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-};
-
-export default async function ManagerOneOnOnesPage({ searchParams }: OneOnOnesPageProps) {
+export default async function ManagerOneOnOnesPage() {
   const { profile, supabase, lookups } = await loadManagerPerformancePage();
-  const rawParams = await searchParams;
 
-  const params = oneOnOneListParamsSchema.parse({
-    page: rawParams.page,
-    pageSize: rawParams.pageSize,
-    employeeId: rawParams.employeeId,
-    meetingStatus: rawParams.meetingStatus,
+  const result = await listOneOnOnes(supabase, profile, {
+    page: 1,
+    pageSize: PERFORMANCE_CLIENT_FETCH_SIZE,
   });
-
-  const result = await listOneOnOnes(supabase, profile, params);
 
   return (
     <div className="space-y-6">
@@ -31,12 +25,8 @@ export default async function ManagerOneOnOnesPage({ searchParams }: OneOnOnesPa
       <OneOnOneForm employees={lookups.employees} />
       <OneOnOneTable
         records={result.data}
-        total={result.total}
-        page={result.page}
-        pageSize={result.pageSize}
+        pageSize={PERFORMANCE_TABLE_PAGE_SIZE}
         employees={lookups.employees}
-        employeeId={params.employeeId}
-        meetingStatus={params.meetingStatus}
         canEdit
         canDelete
       />

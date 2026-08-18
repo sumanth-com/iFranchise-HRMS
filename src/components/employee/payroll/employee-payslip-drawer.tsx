@@ -7,12 +7,15 @@ import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
 import { PayslipView, usePayslipActions } from "@/components/payroll/payslip-view";
 import { getEmployeePayslipDetailAction } from "@/lib/employee/actions/employee-payroll-actions";
+import type { EmployeePayrollDisplaySummary } from "@/types/employee-payroll";
 import type { PayslipDetail } from "@/types/payroll";
 
 type Props = {
   payslipId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  overlaySummary?: EmployeePayrollDisplaySummary | null;
+  overlayPayslipId?: string | null;
 };
 
 function PayslipDrawerFooter({
@@ -42,7 +45,13 @@ function PayslipDrawerFooter({
   );
 }
 
-export function EmployeePayslipDrawer({ payslipId, open, onOpenChange }: Props) {
+export function EmployeePayslipDrawer({
+  payslipId,
+  open,
+  onOpenChange,
+  overlaySummary = null,
+  overlayPayslipId = null,
+}: Props) {
   const [detail, setDetail] = useState<PayslipDetail | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -65,6 +74,22 @@ export function EmployeePayslipDrawer({ payslipId, open, onOpenChange }: Props) 
     };
   }, [open, payslipId]);
 
+  const displayDetail =
+    detail && overlaySummary && overlayPayslipId === detail.id
+      ? {
+          ...detail,
+          breakdown: {
+            ...detail.breakdown,
+            earnings: overlaySummary.earnings,
+            deductions: overlaySummary.deductions,
+          },
+          grossSalary: overlaySummary.grossSalary,
+          totalEarnings: overlaySummary.grossSalary,
+          totalDeductions: overlaySummary.totalDeductions,
+          netSalary: overlaySummary.netSalary,
+        }
+      : detail;
+
   return (
     <Modal
       open={open}
@@ -74,7 +99,9 @@ export function EmployeePayslipDrawer({ payslipId, open, onOpenChange }: Props) 
       contentClassName="sm:max-w-5xl"
       showCancel={false}
       footer={
-        detail ? <PayslipDrawerFooter payslip={detail} onClose={handleClose} /> : (
+        displayDetail ? (
+          <PayslipDrawerFooter payslip={displayDetail} onClose={handleClose} />
+        ) : (
           <Button variant="outline" onClick={handleClose}>
             Close
           </Button>
@@ -86,10 +113,10 @@ export function EmployeePayslipDrawer({ payslipId, open, onOpenChange }: Props) 
           <Loader2 className="mr-2 size-4 animate-spin" />
           Loading payslip…
         </div>
-      ) : detail ? (
+      ) : displayDetail ? (
         <PayslipView
-          payslip={detail}
-          canDownload={detail.canEmployeeAccess}
+          payslip={displayDetail}
+          canDownload={displayDetail.canEmployeeAccess}
           canEmail={false}
           hideActions
         />

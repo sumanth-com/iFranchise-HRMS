@@ -319,7 +319,7 @@ export async function getRecruitmentSummary(
   }
 
   const openJobs = jobRows.filter((j) => j.job_status === "open");
-  const openPositions = openJobs.reduce((sum, j) => sum + Number(j.open_positions ?? 0), 0);
+  const openPositions = openJobs.length;
   const activeCandidates = candidateRows.filter(
     (c) => !["joined", "rejected"].includes(c.stage),
   ).length;
@@ -947,8 +947,29 @@ export async function listCandidates(
   const { data, error, count } = await query;
   if (error) throw new Error(error.message);
 
+  const rows = (data ?? []) as PerfRow[];
+  const candidateIds = rows.map((row) => row.id);
+  const offerStatusByCandidate = new Map<string, OfferStatus>();
+  if (candidateIds.length > 0) {
+    const { data: offers } = await fromHrms(supabase, "recruitment_offers")
+      .select("candidate_id, offer_status, created_at")
+      .eq("organization_id", organizationId)
+      .in("candidate_id", candidateIds)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
+    for (const offer of (offers ?? []) as PerfRow[]) {
+      const candidateId = String(offer.candidate_id);
+      if (!offerStatusByCandidate.has(candidateId)) {
+        offerStatusByCandidate.set(candidateId, offer.offer_status as OfferStatus);
+      }
+    }
+  }
+
   return {
-    data: ((data ?? []) as PerfRow[]).map(mapCandidateRow),
+    data: rows.map((row) => ({
+      ...mapCandidateRow(row),
+      latestOfferStatus: offerStatusByCandidate.get(row.id) ?? undefined,
+    })),
     total: count ?? 0,
     page,
     pageSize,
@@ -1011,8 +1032,10 @@ export async function getCandidateById(
   ]);
 
   const base = mapCandidateRow(data as PerfRow);
+  const offers = ((offersRes.data ?? []) as PerfRow[]).map(mapOfferRow);
   return {
     ...base,
+    latestOfferStatus: offers[0]?.offerStatus ?? base.latestOfferStatus,
     timeline: ((timelineRes.data ?? []) as PerfRow[]).map((row) => ({
       id: row.id,
       eventType: row.event_type,
@@ -1023,7 +1046,7 @@ export async function getCandidateById(
       createdAt: row.created_at,
     })),
     interviews: ((interviewsRes.data ?? []) as PerfRow[]).map(mapInterviewRow),
-    offers: ((offersRes.data ?? []) as PerfRow[]).map(mapOfferRow),
+    offers,
   };
 }
 

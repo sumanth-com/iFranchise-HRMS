@@ -68,12 +68,16 @@ function ConfettiBurst() {
 type OfferStageCelebrationProps = {
   open: boolean;
   candidateName: string;
+  title?: string;
+  description?: string;
   onClose?: () => void;
 };
 
 export function OfferStageCelebration({
   open,
   candidateName,
+  title = "Offer stage reached!",
+  description,
   onClose,
 }: OfferStageCelebrationProps) {
   const [mounted, setMounted] = useState(false);
@@ -150,10 +154,10 @@ export function OfferStageCelebration({
               />
             </svg>
           </div>
-          <p className="text-lg font-semibold tracking-tight">Offer stage reached!</p>
+          <p className="text-lg font-semibold tracking-tight">{title}</p>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            {candidateName} is at the offer stage. Send the offer letter from the hub below when
-            ready.
+            {description ??
+              `${candidateName} is at the offer stage. Send the offer letter from the hub below when ready.`}
           </p>
         </div>
       </div>

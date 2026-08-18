@@ -6,6 +6,7 @@ export const payrollSettingsSchema = z.object({
   payrollCycle: z.enum(["monthly", "semi_monthly", "weekly"]),
   payrollProcessingDay: z.string().min(1).max(50),
   salaryCreditDate: z.coerce.number().int().min(1).max(31),
+  payslipAvailableDay: z.coerce.number().int().min(1).max(28).default(5),
   financialYearStartMonth: z.coerce.number().int().min(1).max(12),
   financialYearEndMonth: z.coerce.number().int().min(1).max(12),
   currency: z.string().length(3),

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -11,15 +11,18 @@ import {
 import { format, parseISO } from "date-fns";
 import {
   Eye,
+  Loader2,
   MoreHorizontal,
   Pencil,
-  Plus,
   Trash2,
   CalendarDays,
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { AddAttendanceDialog } from "@/components/attendance/add-attendance-dialog";
+import {
+  AttendanceEditDialog,
+  AttendanceViewDialog,
+} from "@/components/attendance/attendance-record-dialogs";
 import { AttendanceStatusBadge } from "@/components/attendance/attendance-status-badge";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
@@ -50,6 +53,7 @@ import {
   ATTENDANCE_STATUS_LABELS,
 } from "@/lib/attendance/constants";
 import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils";
+import { FILTER_ANY_VALUE } from "@/lib/manager/filter-select";
 import type { AttendanceListItem, AttendanceLookups } from "@/types/attendance";
 import type { LookupOption } from "@/types/employee";
 import { cn } from "@/lib/utils";
@@ -75,6 +79,7 @@ type AttendanceTableProps = {
   fixedQuery?: Record<string, string>;
   attendanceLookups?: AttendanceLookups;
   onViewRecord?: (record: AttendanceListItem) => void;
+  summaryDate?: string;
 };
 
 function formatDateTime(value?: string | null) {
@@ -137,20 +142,29 @@ export function AttendanceTable({
   employeeId,
   departments,
   employees,
-  canCreate,
+  canCreate: _canCreate,
   canEdit,
   canDelete,
   listBasePath,
   fixedQuery,
   attendanceLookups,
   onViewRecord,
+  summaryDate,
 }: AttendanceTableProps) {
   const router = useRouter();
-  const initialParams = useSearchParams();
-  const filterParamsRef = useRef(initialParams.toString());
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [rows, setRows] = useState(records);
+  const [rowTotal, setRowTotal] = useState(total);
   const [deleteTarget, setDeleteTarget] = useState<AttendanceListItem | null>(null);
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [viewId, setViewId] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setRows(records);
+    setRowTotal(total);
+  }, [records, total]);
 
   const resolvedListPath = listBasePath ?? ATTENDANCE_ROUTES.list;
 
@@ -168,15 +182,9 @@ export function AttendanceTable({
     [fixedQuery, resolvedListPath],
   );
 
-  useEffect(() => {
-    if (!fixedQuery && window.location.search) {
-      window.history.replaceState(null, "", resolvedListPath);
-    }
-  }, [fixedQuery, resolvedListPath]);
-
   const updateParams = useCallback(
     (updates: Record<string, string | undefined>) => {
-      const params = new URLSearchParams(filterParamsRef.current);
+      const params = new URLSearchParams(searchParams.toString());
 
       Object.entries(updates).forEach(([key, value]) => {
         if (!value) {
@@ -186,26 +194,21 @@ export function AttendanceTable({
         }
       });
 
-      filterParamsRef.current = params.toString();
+      if (dateFrom && !params.get("dateFrom")) params.set("dateFrom", dateFrom);
+      if (dateTo && !params.get("dateTo")) params.set("dateTo", dateTo);
 
       startTransition(() => {
-        const url = buildListUrl(params.toString());
-        router.push(url);
-        if (!fixedQuery) {
-          window.setTimeout(() => {
-            window.history.replaceState(null, "", resolvedListPath);
-          }, 0);
-        }
+        router.push(buildListUrl(params.toString()), { scroll: false });
       });
     },
-    [buildListUrl, fixedQuery, resolvedListPath, router, startTransition],
+    [buildListUrl, dateFrom, dateTo, router, searchParams],
   );
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const totalPages = Math.max(1, Math.ceil(rowTotal / pageSize));
 
   const departmentItems = useMemo(
     () => [
-      { value: "", label: "All departments" },
+      { value: FILTER_ANY_VALUE, label: "All departments" },
       ...departments.map((department) => ({
         value: department.id,
         label: department.label,
@@ -216,7 +219,7 @@ export function AttendanceTable({
 
   const statusItems = useMemo(
     () => [
-      { value: "", label: "All statuses" },
+      { value: FILTER_ANY_VALUE, label: "All statuses" },
       ...Object.entries(ATTENDANCE_STATUS_LABELS).map(([value, label]) => ({
         value,
         label,
@@ -227,7 +230,7 @@ export function AttendanceTable({
 
   const employeeItems = useMemo(
     () => [
-      { value: "", label: "All employees" },
+      { value: FILTER_ANY_VALUE, label: "All employees" },
       ...employees.map((employee) => ({
         value: employee.id,
         label: employee.code
@@ -242,15 +245,6 @@ export function AttendanceTable({
     if (!employeeId) return null;
     return employeeItems.find((item) => item.value === employeeId)?.label ?? null;
   }, [employeeId, employeeItems]);
-
-  const isDefaultTodayView =
-    dateFrom === today &&
-    dateTo === today &&
-    !departmentId &&
-    !attendanceStatus &&
-    !employeeId;
-
-  const hasActiveFilters = !isDefaultTodayView;
 
   const isEmployeeHistoryView = Boolean(employeeId && dateFrom && dateTo);
   const showPagination = !isEmployeeHistoryView && totalPages > 1;
@@ -298,7 +292,9 @@ export function AttendanceTable({
         header: "Employee Name",
         meta: { align: "left" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => (
-          <span className="font-medium">{row.original.employeeName}</span>
+          <span className="font-medium tracking-normal not-italic">
+            {row.original.employeeName}
+          </span>
         ),
       },
       {
@@ -370,7 +366,7 @@ export function AttendanceTable({
                     onViewRecord(row.original);
                     return;
                   }
-                  router.push(ATTENDANCE_ROUTES.detail(row.original.id));
+                  setViewId(row.original.id);
                 }}
               >
                 <Eye className="size-4 shrink-0" />
@@ -379,9 +375,7 @@ export function AttendanceTable({
               {canEdit ? (
                 <DropdownMenuItem
                   className="whitespace-nowrap"
-                  onClick={() =>
-                    router.push(ATTENDANCE_ROUTES.edit(row.original.id))
-                  }
+                  onClick={() => setEditId(row.original.id)}
                 >
                   <Pencil className="size-4 shrink-0" />
                   Edit Attendance
@@ -402,11 +396,11 @@ export function AttendanceTable({
         ),
       },
     ],
-    [canDelete, canEdit, onViewRecord, router],
+    [canDelete, canEdit, onViewRecord],
   );
 
   const table = useReactTable({
-    data: records,
+    data: rows,
     columns,
     getCoreRowModel: getCoreRowModel(),
     manualPagination: true,
@@ -414,199 +408,174 @@ export function AttendanceTable({
     pageCount: totalPages,
   });
 
-  const handleDelete = () => {
-    if (!deleteTarget) return;
+  const handleDelete = async () => {
+    if (!deleteTarget || isDeleting) return;
+    const targetId = deleteTarget.id;
+    setIsDeleting(true);
+    const result = await deleteAttendanceAction(targetId);
+    setIsDeleting(false);
+    if (!result.success) {
+      toast.error(result.message);
+      return;
+    }
 
-    startTransition(async () => {
-      const result = await deleteAttendanceAction(deleteTarget.id);
-      if (!result.success) {
-        toast.error(result.message);
-        return;
-      }
-
-      toast.success("Attendance deleted");
-      setDeleteTarget(null);
-      router.refresh();
-    });
+    setRows((current) => current.filter((row) => row.id !== targetId));
+    setRowTotal((current) => Math.max(0, current - 1));
+    setDeleteTarget(null);
+    toast.success("Attendance deleted");
+    router.refresh();
   };
+
+  function openRecord(record: AttendanceListItem) {
+    if (onViewRecord) {
+      onViewRecord(record);
+      return;
+    }
+    setViewId(record.id);
+  }
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-1 flex-wrap items-center gap-2 min-w-0">
-            <div className="w-full min-w-[11rem] sm:w-[14rem]">
-              <Select
-                items={employeeItems}
-                value={employeeId ?? ""}
-                onValueChange={(value) =>
-                  updateParams({
-                    employeeId: value || undefined,
-                    search: undefined,
-                    departmentId: undefined,
-                    branchId: undefined,
-                    page: "1",
-                  })
-                }
-              >
-                <SelectTrigger className={FILTER_CONTROL_CLASS}>
-                  <SelectValue placeholder="All employees" />
-                </SelectTrigger>
-                <SelectContent
-                  align="start"
-                  alignItemWithTrigger={false}
-                  className="min-w-[18rem] max-w-[24rem]"
-                >
-                  {employeeItems.map((item) => (
-                    <SelectItem key={item.value || "all-employees"} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+      <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+        <div className="w-[13.5rem] shrink-0">
+          <Select
+            items={employeeItems}
+            value={employeeId ?? FILTER_ANY_VALUE}
+            onValueChange={(value) =>
+              updateParams({
+                employeeId:
+                  !value || value === FILTER_ANY_VALUE ? undefined : value,
+                search: undefined,
+                departmentId: undefined,
+                branchId: undefined,
+                page: "1",
+              })
+            }
+          >
+            <SelectTrigger className={FILTER_CONTROL_CLASS}>
+              <SelectValue placeholder="All employees" />
+            </SelectTrigger>
+            <SelectContent
+              align="start"
+              alignItemWithTrigger={false}
+              className="min-w-[18rem] max-w-[24rem]"
+            >
+              {employeeItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-            <div className="w-full min-w-[9rem] sm:w-36">
-              <Select
-                items={statusItems}
-                value={attendanceStatus ?? ""}
-                onValueChange={(value) =>
-                  updateParams({
-                    attendanceStatus: value || undefined,
-                    page: "1",
-                  })
-                }
-              >
-                <SelectTrigger className={STATUS_FILTER_CLASS}>
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent
-                  align="start"
-                  alignItemWithTrigger={false}
-                  className="min-w-[8.25rem]"
-                >
-                  {statusItems.map((item) => (
-                    <SelectItem key={item.value || "all-statuses"} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        <div className="w-[9.5rem] shrink-0">
+          <Select
+            items={statusItems}
+            value={attendanceStatus ?? FILTER_ANY_VALUE}
+            onValueChange={(value) =>
+              updateParams({
+                attendanceStatus:
+                  !value || value === FILTER_ANY_VALUE ? undefined : value,
+                page: "1",
+              })
+            }
+          >
+            <SelectTrigger className={STATUS_FILTER_CLASS}>
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent
+              align="start"
+              alignItemWithTrigger={false}
+              className="min-w-[8.25rem]"
+            >
+              {statusItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-            <div className={DATE_RANGE_CLASS}>
-              <div className="relative min-w-[6.75rem] flex-1">
-                <Input
-                  type="date"
-                  value={dateFrom ?? ""}
-                  max={today}
-                  data-empty={!dateFrom}
-                  className={DATE_INPUT_CLASS}
-                  title="From date"
-                  onChange={(event) => updateDateFrom(event.currentTarget.value)}
-                />
-                <CalendarDays className="pointer-events-none absolute top-1/2 right-0 size-3.5 -translate-y-1/2 text-muted-foreground/70" />
-              </div>
-              <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
-                to
-              </span>
-              <div className="relative min-w-[6.75rem] flex-1">
-                <Input
-                  type="date"
-                  value={dateTo ?? ""}
-                  max={today}
-                  data-empty={!dateTo}
-                  className={DATE_INPUT_CLASS}
-                  title="To date"
-                  onChange={(event) => updateDateTo(event.currentTarget.value)}
-                />
-                <CalendarDays className="pointer-events-none absolute top-1/2 right-0 size-3.5 -translate-y-1/2 text-muted-foreground/70" />
-              </div>
-            </div>
-
-            <div className="w-full min-w-[11rem] sm:w-[14rem]">
-              <Select
-                items={departmentItems}
-                value={departmentId ?? ""}
-                onValueChange={(value) =>
-                  updateParams({
-                    departmentId: value || undefined,
-                    employeeId: undefined,
-                    page: "1",
-                  })
-                }
-              >
-                <SelectTrigger className={FILTER_CONTROL_CLASS}>
-                  <SelectValue placeholder="All departments" />
-                </SelectTrigger>
-                <SelectContent
-                  align="start"
-                  alignItemWithTrigger={false}
-                  className="min-w-40"
-                >
-                  {departmentItems.map((item) => (
-                    <SelectItem
-                      key={item.value || "all-departments"}
-                      value={item.value}
-                    >
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        <div className={DATE_RANGE_CLASS}>
+          <div className="relative min-w-[6.75rem] flex-1">
+            <Input
+              type="date"
+              value={dateFrom ?? ""}
+              max={today}
+              data-empty={!dateFrom}
+              className={DATE_INPUT_CLASS}
+              title="From date"
+              onChange={(event) => updateDateFrom(event.currentTarget.value)}
+            />
+            <CalendarDays className="pointer-events-none absolute top-1/2 right-0 size-3.5 -translate-y-1/2 text-muted-foreground/70" />
           </div>
-
-          <div className="flex shrink-0 items-center justify-end gap-2">
-            {hasActiveFilters ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-10 min-w-[8.5rem] whitespace-nowrap"
-                disabled={isPending}
-                onClick={() =>
-                  updateParams({
-                    dateFrom: today,
-                    dateTo: today,
-                    branchId: undefined,
-                    departmentId: undefined,
-                    attendanceStatus: undefined,
-                    employeeId: undefined,
-                    search: undefined,
-                    page: "1",
-                  })
-                }
-              >
-                Clear filters
-              </Button>
-            ) : null}
-
-            {canCreate ? (
-              <Button
-                className="h-10 min-w-[10.5rem] whitespace-nowrap px-4"
-                disabled={!attendanceLookups}
-                onClick={() => setAddDialogOpen(true)}
-              >
-                <Plus className="size-4" />
-                Add Attendance
-              </Button>
-            ) : null}
+          <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
+            to
+          </span>
+          <div className="relative min-w-[6.75rem] flex-1">
+            <Input
+              type="date"
+              value={dateTo ?? ""}
+              max={today}
+              data-empty={!dateTo}
+              className={DATE_INPUT_CLASS}
+              title="To date"
+              onChange={(event) => updateDateTo(event.currentTarget.value)}
+            />
+            <CalendarDays className="pointer-events-none absolute top-1/2 right-0 size-3.5 -translate-y-1/2 text-muted-foreground/70" />
           </div>
         </div>
 
-        {selectedEmployeeLabel ? (
-          <p className="text-sm text-muted-foreground">
-            Showing attendance history for{" "}
-            <span className="font-medium text-foreground">
-              {selectedEmployeeLabel}
-            </span>
-            {attendanceStatus
-              ? ` · ${ATTENDANCE_STATUS_LABELS[attendanceStatus as keyof typeof ATTENDANCE_STATUS_LABELS]}`
-              : " · All statuses"}
-            {formatDateRangeLabel(dateFrom, dateTo, today)}
-          </p>
-        ) : null}
+        <div className="w-[13.5rem] shrink-0">
+          <Select
+            items={departmentItems}
+            value={departmentId ?? FILTER_ANY_VALUE}
+            onValueChange={(value) =>
+              updateParams({
+                departmentId:
+                  !value || value === FILTER_ANY_VALUE ? undefined : value,
+                employeeId: undefined,
+                page: "1",
+              })
+            }
+          >
+            <SelectTrigger className={FILTER_CONTROL_CLASS}>
+              <SelectValue placeholder="All departments" />
+            </SelectTrigger>
+            <SelectContent
+              align="start"
+              alignItemWithTrigger={false}
+              className="min-w-40"
+            >
+              {departmentItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <span className="inline-flex ml-auto h-10 shrink-0 items-center gap-2 whitespace-nowrap text-sm font-semibold text-foreground">
+          <CalendarDays className="size-4 shrink-0" />
+          Summary for {summaryDate ?? dateFrom ?? today}
+        </span>
       </div>
+
+      {selectedEmployeeLabel ? (
+        <p className="text-sm text-muted-foreground">
+          Showing attendance history for{" "}
+          <span className="font-medium text-foreground">
+            {selectedEmployeeLabel}
+          </span>
+          {attendanceStatus
+            ? ` · ${ATTENDANCE_STATUS_LABELS[attendanceStatus as keyof typeof ATTENDANCE_STATUS_LABELS]}`
+            : " · All statuses"}
+          {formatDateRangeLabel(dateFrom, dateTo, today)}
+        </p>
+      ) : null}
 
       <div className="overflow-auto rounded-lg border max-h-[min(70vh,calc(100dvh-16rem))] [scrollbar-gutter:stable]">
         <table
@@ -656,9 +625,7 @@ export function AttendanceTable({
                 <TableRow
                   key={row.id}
                   className="cursor-pointer hover:bg-muted/50"
-                  onClick={() =>
-                    router.push(ATTENDANCE_ROUTES.detail(row.original.id))
-                  }
+                  onClick={() => openRecord(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => {
                     const meta = cell.column.columnDef.meta as AttendanceColumnMeta | undefined;
@@ -690,8 +657,8 @@ export function AttendanceTable({
       {showPagination ? (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
-            Showing {records.length === 0 ? 0 : (page - 1) * pageSize + 1}–
-            {Math.min(page * pageSize, total)} of {total}
+            Showing {rows.length === 0 ? 0 : (page - 1) * pageSize + 1}–
+            {Math.min(page * pageSize, rowTotal)} of {rowTotal}
           </p>
           <div className="flex items-center gap-2">
             <Button
@@ -717,40 +684,73 @@ export function AttendanceTable({
         </div>
       ) : (
         <p className="text-sm text-muted-foreground">
-          Showing {total} attendance record{total === 1 ? "" : "s"}
+          Showing {rowTotal} attendance record{rowTotal === 1 ? "" : "s"}
           {isEmployeeHistoryView ? " for selected employee and date range" : ""}
         </p>
       )}
 
+      <AttendanceViewDialog
+        attendanceId={viewId}
+        open={Boolean(viewId)}
+        onOpenChange={(open) => {
+          if (!open) setViewId(null);
+        }}
+        canEdit={canEdit && Boolean(attendanceLookups)}
+        onEdit={
+          canEdit && attendanceLookups
+            ? (detail) => {
+                setViewId(null);
+                setEditId(detail.id);
+              }
+            : undefined
+        }
+      />
+
       {attendanceLookups ? (
-        <AddAttendanceDialog
-          open={addDialogOpen}
-          onOpenChange={setAddDialogOpen}
+        <AttendanceEditDialog
+          attendanceId={editId}
+          open={Boolean(editId)}
+          onOpenChange={(open) => {
+            if (!open) setEditId(null);
+          }}
           lookups={attendanceLookups}
         />
       ) : null}
 
       <Modal
         open={Boolean(deleteTarget)}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="Delete attendance"
+        onOpenChange={(open) => !open && !isDeleting && setDeleteTarget(null)}
+        title="Delete attendance?"
         description={
           deleteTarget
-            ? `Soft delete attendance for ${deleteTarget.employeeName} on ${format(parseISO(deleteTarget.attendanceDate), "dd MMM yyyy")}?`
+            ? `Remove the attendance record for ${deleteTarget.employeeName} on ${format(parseISO(deleteTarget.attendanceDate), "dd MMM yyyy")}? This cannot be undone from this list.`
             : undefined
         }
         footer={
           <>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+            <Button
+              variant="outline"
+              disabled={isDeleting}
+              onClick={() => setDeleteTarget(null)}
+            >
               Cancel
             </Button>
-            <Button variant="destructive" disabled={isPending} onClick={handleDelete}>
-              Delete
+            <Button variant="destructive" disabled={isDeleting} onClick={() => void handleDelete()}>
+              {isDeleting ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Deleting…
+                </>
+              ) : (
+                "Delete"
+              )}
             </Button>
           </>
         }
       >
-        <span />
+        <p className="text-sm text-muted-foreground">
+          The row will disappear from Team Attendance as soon as deletion completes.
+        </p>
       </Modal>
     </div>
   );

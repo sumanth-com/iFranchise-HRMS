@@ -32,6 +32,10 @@ export const payrollRunSchema = monthYearSchema.extend({
   notes: z.string().trim().max(500).optional(),
 });
 
+export const employeePayrollBreakdownSchema = monthYearSchema.extend({
+  employeeId: z.string().uuid(),
+});
+
 export const payrollApprovalSchema = z.object({
   payrollId: z.string().uuid(),
   comments: z.string().trim().max(500).optional(),

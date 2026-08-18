@@ -437,6 +437,8 @@ export async function listPayslips(
       const access = resolvePayslipAvailability(
         schedule.publishedAt,
         profile.permissionCodes,
+        new Date(),
+        { employeeFacing: row.employee_id === profile.employee.id },
       );
       return {
         id: row.id,

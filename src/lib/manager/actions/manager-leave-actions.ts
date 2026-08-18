@@ -96,7 +96,12 @@ export async function fetchTeamLeaveRequestsForHrTableAction(
 
     let dateFrom = parsed.dateFrom;
     let dateTo = parsed.dateTo;
-    if (!dateFrom && !dateTo && parsed.month && parsed.year) {
+    const skipMonthRange =
+      parsed.summaryFilter === "pendingRequests" ||
+      parsed.summaryFilter === "employeesOnLeaveToday" ||
+      parsed.summaryFilter === "upcomingPlannedLeaves";
+
+    if (!skipMonthRange && !dateFrom && !dateTo && parsed.month && parsed.year) {
       const range = getMonthDateRange(parsed.month, parsed.year);
       dateFrom = range.start;
       dateTo = range.end;
@@ -108,12 +113,13 @@ export async function fetchTeamLeaveRequestsForHrTableAction(
       search: parsed.search,
       sortBy: parsed.sortBy,
       sortOrder: parsed.sortOrder,
-      leaveStatus: parsed.leaveStatus,
+      leaveStatus: parsed.summaryFilter ? undefined : parsed.leaveStatus,
       leaveTypeId: parsed.leaveTypeId,
       departmentId: parsed.departmentId,
       employeeId: parsed.employeeId,
-      dateFrom,
-      dateTo,
+      dateFrom: skipMonthRange ? undefined : dateFrom,
+      dateTo: skipMonthRange ? undefined : dateTo,
+      summaryFilter: parsed.summaryFilter,
     });
 
     return { success: true, data: result };

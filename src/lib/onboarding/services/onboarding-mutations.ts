@@ -1,5 +1,4 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
-import { getInviteableRoleByCode } from "@/lib/auth/iam-roles";
 import type { UserProfile } from "@/types/auth";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import { allocateNextEmployeeCode } from "@/lib/employees/services/employee-code";
@@ -122,8 +121,27 @@ async function resolveOnboardingBranchId(
 
 async function resolveDefaultEmployeeRoleId(organizationId: string): Promise<string> {
   const admin = createAdminClient();
-  const role = await getInviteableRoleByCode(admin, organizationId, "employee");
-  return role.id;
+  const { data: roles, error } = await admin
+    .schema("hrms")
+    .from("roles")
+    .select("id, code, name, portal_key, is_default")
+    .eq("organization_id", organizationId)
+    .eq("status", "active")
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+
+  const list = roles ?? [];
+  const match =
+    list.find((role) => String(role.code ?? "").toLowerCase() === "employee") ??
+    list.find((role) => String(role.portal_key ?? "").toLowerCase() === "employee") ??
+    list.find((role) => role.is_default === true && String(role.code ?? "").toLowerCase() !== "super_admin") ??
+    list.find((role) => String(role.code ?? "").toLowerCase() !== "super_admin");
+
+  if (!match?.id) {
+    throw new Error("No active role is configured for new hires.");
+  }
+  return match.id;
 }
 
 async function refreshCompletionPercent(caseId: string) {
@@ -306,6 +324,120 @@ export async function createOrUpdateOnboardingCaseForInvite(
 
   const caseId = await createOnboardingCase(supabase, profile, input);
   return { caseId, resent: false };
+}
+
+export async function ensureOnboardingCaseFromOffer(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: {
+    fullName: string;
+    personalEmail: string;
+    mobileNumber?: string | null;
+    designationId?: string | null;
+    departmentId?: string | null;
+    reportingManagerId?: string | null;
+    employmentTypeId?: string | null;
+    joiningDate?: string | null;
+    offerReferenceNumber?: string | null;
+  },
+): Promise<string | null> {
+  const email = input.personalEmail?.trim().toLowerCase() ?? "";
+  const fullName = input.fullName.trim();
+  if (!email || !fullName) return null;
+
+  const organizationId = profile.employee.organizationId;
+  const existing = await findActiveOnboardingCaseByEmail(supabase, organizationId, email);
+  if (existing) return existing.id;
+
+  const branchId = await resolveOnboardingBranchId(supabase, profile);
+  const intendedRoleId = await resolveDefaultEmployeeRoleId(organizationId);
+
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("onboarding_cases")
+    .insert({
+      organization_id: organizationId,
+      status: "draft",
+      full_name: fullName,
+      personal_email: email,
+      mobile_number: input.mobileNumber?.trim() || null,
+      designation_id: input.designationId || null,
+      department_id: input.departmentId || null,
+      reporting_manager_id: input.reportingManagerId || null,
+      employment_type_id: input.employmentTypeId || null,
+      joining_date: input.joiningDate || null,
+      branch_id: branchId,
+      offer_reference_number: input.offerReferenceNumber?.trim() || null,
+      intended_role_id: intendedRoleId,
+      created_by: profile.userId,
+      updated_by: profile.userId,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    if (error.message.includes("onboarding_cases_org_personal_email_active_idx")) {
+      const duplicate = await findActiveOnboardingCaseByEmail(supabase, organizationId, email);
+      return duplicate?.id ?? null;
+    }
+    throw new Error(error.message);
+  }
+
+  await addTimelineEvent(supabase, data.id, {
+    eventType: "case_created",
+    title: "Ready for onboarding",
+    description: `${fullName} added after offer letter was sent`,
+    actorUserId: profile.userId,
+  });
+
+  return data.id;
+}
+
+export async function syncOnboardingCasesFromSentOffers(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+): Promise<void> {
+  const organizationId = profile.employee.organizationId;
+  const { data: offers, error } = await supabase
+    .schema("hrms")
+    .from("recruitment_offers")
+    .select(
+      `offer_code, joining_date, reporting_manager_id,
+      candidate:candidate_id(first_name, last_name, email, phone),
+      job:job_opening_id(title, department_id, designation_id, employment_type_id, hiring_manager_id)`,
+    )
+    .eq("organization_id", organizationId)
+    .in("offer_status", ["sent", "accepted"])
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+
+  for (const offer of offers ?? []) {
+    const candidate = Array.isArray(offer.candidate) ? offer.candidate[0] : offer.candidate;
+    const job = Array.isArray(offer.job) ? offer.job[0] : offer.job;
+    if (!candidate?.email) continue;
+
+    const fullName = [candidate.first_name, candidate.last_name].filter(Boolean).join(" ").trim();
+    try {
+      await ensureOnboardingCaseFromOffer(supabase, profile, {
+        fullName: fullName || candidate.email,
+        personalEmail: candidate.email,
+        mobileNumber: candidate.phone ?? null,
+        designationId: job?.designation_id ?? null,
+        departmentId: job?.department_id ?? null,
+        reportingManagerId: offer.reporting_manager_id ?? job?.hiring_manager_id ?? null,
+        employmentTypeId: job?.employment_type_id ?? null,
+        joiningDate: offer.joining_date ?? null,
+        offerReferenceNumber: offer.offer_code ?? null,
+      });
+    } catch (error) {
+      console.error(
+        "[onboarding] failed to add sent offer to onboarding",
+        candidate.email,
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
 }
 
 export async function sendOnboardingInvitation(

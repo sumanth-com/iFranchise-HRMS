@@ -5,6 +5,7 @@ import {
   computeLateMinutes,
   parseAttendanceRules,
 } from "@/lib/attendance/services/attendance-utils";
+import { formatCleanEmployeeName } from "@/lib/employees/parse-employee-name";
 
 type AttendanceDetailRow = {
   id: string;
@@ -170,7 +171,9 @@ export async function getAttendanceById(
     branchName: branch?.name ?? null,
     employeeId: row.employee_id,
     employeeCode: employee?.employee_code ?? "",
-    employeeName: employee ? `${employee.first_name} ${employee.last_name}` : "",
+    employeeName: employee
+      ? formatCleanEmployeeName(employee.first_name, employee.last_name)
+      : "",
     employeeEmail: employee?.email ?? null,
     departmentId: employee?.department_id ?? null,
     departmentName: department?.name ?? null,

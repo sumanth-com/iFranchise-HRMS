@@ -109,11 +109,24 @@ export const RECOMMENDATION_LABELS: Record<InterviewRecommendation, string> = {
 
 export const OFFER_STATUS_LABELS: Record<OfferStatus, string> = {
   draft: "Draft",
-  sent: "Sent",
+  sent: "Offer sent",
   accepted: "Accepted",
   rejected: "Rejected",
   expired: "Expired",
 };
+
+export function getCandidateStageBadge(
+  stage: CandidateStage,
+  latestOfferStatus?: OfferStatus | null,
+): { label: string; status: string } {
+  if (stage === "offer" && latestOfferStatus === "accepted") {
+    return { label: "Offer accepted", status: "accepted" };
+  }
+  if (stage === "offer" && latestOfferStatus === "sent") {
+    return { label: "Offer sent", status: "offer_sent" };
+  }
+  return { label: CANDIDATE_STAGE_LABELS[stage], status: stage };
+}
 
 export const DEFAULT_CANDIDATE_SOURCES = [
   { id: "linkedin", label: "LinkedIn", enabled: true },

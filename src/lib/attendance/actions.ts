@@ -139,6 +139,7 @@ export async function createAttendanceAction(
     const id = await createAttendance(supabase, profile, parsed);
     revalidatePath(ATTENDANCE_ROUTES.list);
     revalidatePath(SELF_ATTENDANCE_ROUTES.list);
+    revalidatePath(SELF_ATTENDANCE_ROUTES.team);
     return { success: true, data: { id } };
   } catch (error) {
     return {
@@ -162,6 +163,7 @@ export async function updateAttendanceAction(
     revalidatePath(ATTENDANCE_ROUTES.detail(attendanceId));
     revalidatePath(ATTENDANCE_ROUTES.edit(attendanceId));
     revalidatePath(SELF_ATTENDANCE_ROUTES.list);
+    revalidatePath(SELF_ATTENDANCE_ROUTES.team);
     return { success: true, data: null };
   } catch (error) {
     return {
@@ -181,6 +183,7 @@ export async function deleteAttendanceAction(
     await softDeleteAttendance(supabase, profile, attendanceId);
     revalidatePath(ATTENDANCE_ROUTES.list);
     revalidatePath(SELF_ATTENDANCE_ROUTES.list);
+    revalidatePath(SELF_ATTENDANCE_ROUTES.team);
     return { success: true, data: null };
   } catch (error) {
     return {

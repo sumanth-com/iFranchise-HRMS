@@ -2,119 +2,117 @@ import {
   CalendarClock,
   CheckCircle2,
   Clock3,
-  Palmtree,
-  Percent,
   XCircle,
 } from "lucide-react";
 
 import { LEAVE_SUMMARY_LABELS } from "@/lib/leave/constants";
 import type { LeaveSummary } from "@/types/leave";
+import { cn } from "@/lib/utils";
+
+export type LeaveSummaryFilterKey =
+  | "pendingRequests"
+  | "approvedThisMonth"
+  | "rejectedThisMonth"
+  | "upcomingPlannedLeaves";
 
 type LeaveSummaryCardsProps = {
   summary: LeaveSummary;
-  /** Kept for callers; approved/rejected cards always shown. */
-  embedded?: boolean;
+  activeKey?: LeaveSummaryFilterKey;
+  onSelect?: (key: LeaveSummaryFilterKey) => void;
+  disabled?: boolean;
 };
 
-type SummaryCardConfig = {
-  key: keyof LeaveSummary;
-  icon: typeof Clock3;
-  accent: string;
-  bg: string;
-  format: (value: number) => string;
-};
-
-const STATUS_ROW: SummaryCardConfig[] = [
+const SUMMARY_CONFIG = [
   {
-    key: "pendingRequests",
+    key: "pendingRequests" as const,
     icon: Clock3,
     accent: "text-amber-600 dark:text-amber-400",
     bg: "bg-amber-500/10",
-    format: (value) => String(value),
+    ring: "hover:border-amber-500/40 data-[active=true]:border-amber-500 data-[active=true]:bg-amber-500/10",
   },
   {
-    key: "approvedThisMonth",
+    key: "approvedThisMonth" as const,
     icon: CheckCircle2,
     accent: "text-emerald-600 dark:text-emerald-400",
     bg: "bg-emerald-500/10",
-    format: (value) => String(value),
+    ring: "hover:border-emerald-500/40 data-[active=true]:border-emerald-500 data-[active=true]:bg-emerald-500/10",
   },
   {
-    key: "rejectedThisMonth",
+    key: "rejectedThisMonth" as const,
     icon: XCircle,
     accent: "text-destructive",
     bg: "bg-destructive/10",
-    format: (value) => String(value),
-  },
-];
-
-const WORKFORCE_ROW: SummaryCardConfig[] = [
-  {
-    key: "employeesOnLeaveToday",
-    icon: Palmtree,
-    accent: "text-blue-600 dark:text-blue-400",
-    bg: "bg-blue-500/10",
-    format: (value) => String(value),
+    ring: "hover:border-destructive/40 data-[active=true]:border-destructive data-[active=true]:bg-destructive/10",
   },
   {
-    key: "balanceUtilizationPercent",
-    icon: Percent,
-    accent: "text-orange-600 dark:text-orange-400",
-    bg: "bg-orange-500/10",
-    format: (value) => `${value}%`,
-  },
-  {
-    key: "upcomingPlannedLeaves",
+    key: "upcomingPlannedLeaves" as const,
     icon: CalendarClock,
     accent: "text-violet-600 dark:text-violet-400",
     bg: "bg-violet-500/10",
-    format: (value) => String(value),
+    ring: "hover:border-violet-500/40 data-[active=true]:border-violet-500 data-[active=true]:bg-violet-500/10",
   },
 ];
 
-function SummaryCard({
-  item,
-  value,
-}: {
-  item: SummaryCardConfig;
-  value: number;
-}) {
-  const Icon = item.icon;
+export function LeaveSummaryCards({
+  summary,
+  activeKey,
+  onSelect,
+  disabled = false,
+}: LeaveSummaryCardsProps) {
+  const clickable = Boolean(onSelect);
 
   return (
-    <div className="rounded-xl border bg-card p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            {LEAVE_SUMMARY_LABELS[item.key]}
-          </p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight">
-            {item.format(value)}
-          </p>
-        </div>
-        <div
-          className={`flex size-10 shrink-0 items-center justify-center rounded-full ${item.bg}`}
-        >
-          <Icon className={`size-4 ${item.accent}`} />
-        </div>
-      </div>
-    </div>
-  );
-}
+    <div className="grid grid-cols-4 items-stretch gap-3">
+      {SUMMARY_CONFIG.map((item) => {
+        const Icon = item.icon;
+        const isActive = activeKey === item.key;
+        const className = cn(
+          "h-full min-w-0 rounded-xl border bg-card px-3 py-3.5 text-left shadow-sm transition-colors",
+          clickable &&
+            "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-60",
+          clickable && item.ring,
+        );
 
-export function LeaveSummaryCards({ summary }: LeaveSummaryCardsProps) {
-  return (
-    <div className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {STATUS_ROW.map((item) => (
-          <SummaryCard key={item.key} item={item} value={summary[item.key]} />
-        ))}
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {WORKFORCE_ROW.map((item) => (
-          <SummaryCard key={item.key} item={item} value={summary[item.key]} />
-        ))}
-      </div>
+        const content = (
+          <div className="flex h-full items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="overflow-visible text-sm leading-snug font-medium break-normal hyphens-none text-muted-foreground">
+                {LEAVE_SUMMARY_LABELS[item.key]}
+              </p>
+              <p className="mt-1 text-xl font-semibold tracking-tight tabular-nums">
+                {summary[item.key]}
+              </p>
+            </div>
+            <div
+              className={`flex size-9 shrink-0 items-center justify-center rounded-full ${item.bg}`}
+            >
+              <Icon className={`size-4 ${item.accent}`} />
+            </div>
+          </div>
+        );
+
+        if (!clickable) {
+          return (
+            <div key={item.key} className={className}>
+              {content}
+            </div>
+          );
+        }
+
+        return (
+          <button
+            key={item.key}
+            type="button"
+            className={className}
+            data-active={isActive ? "true" : "false"}
+            aria-pressed={isActive}
+            disabled={disabled}
+            onClick={() => onSelect?.(item.key)}
+          >
+            {content}
+          </button>
+        );
+      })}
     </div>
   );
 }

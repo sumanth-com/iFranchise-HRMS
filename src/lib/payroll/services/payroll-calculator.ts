@@ -73,14 +73,32 @@ export function calculateEmployeePayroll(
   const { workingDays } = getMonthDateRange(month, year);
 
   if (!salaryStructure) {
+    const extraEarnings = [
+      ...bonuses.map((bonus) => ({
+        code: `bonus_${bonus.bonus_type}`,
+        label: `Bonus (${bonus.bonus_type})`,
+        amount: roundCurrency(num(bonus.amount)),
+        type: "earning" as const,
+      })),
+      ...reimbursements.map((reimbursement) => ({
+        code: `reimb_${reimbursement.category}`,
+        label: `Reimbursement (${reimbursement.category})`,
+        amount: roundCurrency(num(reimbursement.amount)),
+        type: "earning" as const,
+      })),
+    ].filter((line) => line.amount > 0);
+    const extraTotal = roundCurrency(
+      extraEarnings.reduce((sum, line) => sum + line.amount, 0),
+    );
+
     return {
       basicSalary: 0,
-      totalAllowances: 0,
+      totalAllowances: extraTotal,
       totalDeductions: 0,
-      grossSalary: 0,
-      netSalary: 0,
+      grossSalary: extraTotal,
+      netSalary: extraTotal,
       breakdown: {
-        earnings: [],
+        earnings: extraEarnings,
         deductions: [],
         attendance: {
           workingDays,
@@ -90,7 +108,9 @@ export function calculateEmployeePayroll(
           leaveLopDays,
           overtimeHours: attendance.overtimeHours,
         },
-        notes: ["No salary structure configured"],
+        notes: extraEarnings.length
+          ? ["No salary structure configured. Totals include bonuses and expense claims."]
+          : ["No salary structure configured"],
       },
     };
   }

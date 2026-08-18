@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { ArrowDown, ArrowUp, CalendarDays, Coins, Loader2, Wallet } from "lucide-react";
+import { ArrowDown, ArrowUp, CalendarDays, Coins, FileText, Loader2, Wallet } from "lucide-react";
 import { useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -97,6 +97,7 @@ export function PayrollSettingsForm({
   const payrollCycle = form.watch("payrollCycle");
   const payrollProcessingDay = form.watch("payrollProcessingDay");
   const salaryCreditDate = form.watch("salaryCreditDate");
+  const payslipAvailableDay = form.watch("payslipAvailableDay");
 
   function onSubmit(values: PayrollSettingsFormValues) {
     startTransition(async () => {
@@ -106,6 +107,7 @@ export function PayrollSettingsForm({
             payrollCycle: values.payrollCycle,
             payrollProcessingDay: values.payrollProcessingDay,
             salaryCreditDate: values.salaryCreditDate,
+            payslipAvailableDay: values.payslipAvailableDay,
           }
         : values;
 
@@ -135,7 +137,7 @@ export function PayrollSettingsForm({
     >
       {isTeam ? (
         <div className="rounded-xl border bg-card shadow-sm">
-          <div className="grid gap-3 border-b bg-muted/20 p-4 sm:grid-cols-3">
+          <div className="grid gap-3 border-b bg-muted/20 p-4 sm:grid-cols-2 lg:grid-cols-4">
             <TeamSettingsSnapshot
               icon={CalendarDays}
               label="Payroll cycle"
@@ -151,17 +153,22 @@ export function PayrollSettingsForm({
               label="Salary credit"
               value={`Day ${salaryCreditDate}`}
             />
+            <TeamSettingsSnapshot
+              icon={FileText}
+              label="Payslip available"
+              value={`Day ${payslipAvailableDay}`}
+            />
           </div>
 
           <div className="space-y-4 p-5 md:p-6">
             <div>
               <h2 className="text-sm font-medium">Payroll schedule</h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                When payroll runs and when salaries are credited each month.
+                When payroll runs, when salaries are credited, and when employees can open payslips.
               </p>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Field label="Payroll cycle">
                 <LabeledSelect
                   items={cycleItems}
@@ -193,6 +200,18 @@ export function PayrollSettingsForm({
                   {...form.register("salaryCreditDate")}
                 />
                 <p className="text-xs text-muted-foreground">Day of month salary is credited.</p>
+              </Field>
+              <Field label="Payslip available day">
+                <Input
+                  type="number"
+                  min={1}
+                  max={28}
+                  disabled={!canEdit || isPending}
+                  {...form.register("payslipAvailableDay")}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Day of month employees can view payslips in every portal.
+                </p>
               </Field>
             </div>
           </div>
@@ -253,6 +272,15 @@ export function PayrollSettingsForm({
                   max={31}
                   disabled={!canEdit || isPending}
                   {...form.register("salaryCreditDate")}
+                />
+              </Field>
+              <Field label="Payslip available day">
+                <Input
+                  type="number"
+                  min={1}
+                  max={28}
+                  disabled={!canEdit || isPending}
+                  {...form.register("payslipAvailableDay")}
                 />
               </Field>
               <Field label="Financial year start">

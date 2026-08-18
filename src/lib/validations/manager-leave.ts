@@ -29,6 +29,15 @@ export const teamLeaveListParamsSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date")
     .optional(),
+  summaryFilter: z
+    .enum([
+      "pendingRequests",
+      "approvedThisMonth",
+      "rejectedThisMonth",
+      "employeesOnLeaveToday",
+      "upcomingPlannedLeaves",
+    ])
+    .optional(),
 });
 
 export const teamLeaveIdSchema = z.object({

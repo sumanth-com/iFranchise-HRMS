@@ -21,11 +21,14 @@ export async function GET(_request: Request, context: RouteContext) {
       return NextResponse.json({ message: "Payslip not found" }, { status: 404 });
     }
 
-    if (!payslip.canEmployeeAccess && !canAccessPayslipDuringReview(profile.permissionCodes)) {
-      return NextResponse.json(
-        { message: "Payslip is under HR review and not yet available" },
-        { status: 403 },
-      );
+    if (!payslip.canEmployeeAccess) {
+      const isOwnPayslip = payslip.employee.id === profile.employee.id;
+      if (isOwnPayslip || !canAccessPayslipDuringReview(profile.permissionCodes)) {
+        return NextResponse.json(
+          { message: "Payslip is under HR review and not yet available" },
+          { status: 403 },
+        );
+      }
     }
 
     const pdfBytes = await generatePayslipPdfBytes(payslip);

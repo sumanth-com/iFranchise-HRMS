@@ -1,7 +1,7 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { CalendarDays, CheckCircle2, Clock3, FileStack, Hourglass, Pencil, Wallet } from "lucide-react";
 
@@ -25,7 +25,7 @@ import {
 } from "@/components/common/data-table";
 import { LeaveStatusBadge } from "@/components/leave/leave-status-badge";
 import { ATTENDANCE_STATUS_LABELS } from "@/lib/attendance/constants";
-import { EMPLOYEE_TABS, EMPLOYEE_ACCOUNT_STATUS_LABELS, resolveEmployeeModuleRoutes, type EmployeeTab } from "@/lib/employees/constants";
+import { EMPLOYEE_ACCOUNT_STATUS_LABELS, type EmployeeTab } from "@/lib/employees/constants";
 import { getMonthSelectItems, getYearSelectItems } from "@/components/payroll/select-utils";
 import { buildEmployeeRouteRef } from "@/lib/employees/routing";
 import type {
@@ -76,14 +76,8 @@ type EmployeeDetailViewProps = {
   onCancelEdit?: () => void;
   onSavedEdit?: () => void;
   routesBasePath?: string;
+  activeTab: EmployeeTab;
 };
-
-function resolveActiveTab(tabParam: string | null): EmployeeTab {
-  if (tabParam && EMPLOYEE_TABS.includes(tabParam as EmployeeTab)) {
-    return tabParam as EmployeeTab;
-  }
-  return "overview";
-}
 
 function formatDisplayDate(value: string | null | undefined): string {
   if (!value) return "—";
@@ -234,9 +228,8 @@ export function EmployeeDetailView({
   onCancelEdit,
   onSavedEdit,
   routesBasePath,
+  activeTab,
 }: EmployeeDetailViewProps) {
-  const searchParams = useSearchParams();
-  const activeTab = resolveActiveTab(searchParams.get("tab"));
   const canEditEmployee = hasPermission(permissionCodes, "employee.edit");
   const canEditProfile = hasPermission(permissionCodes, "employee_profile.edit");
   const statutory = salaryStructure?.components ?? {};
@@ -522,68 +515,44 @@ function periodYearItems(selectedYear: number | null) {
 }
 
 function PeriodMonthYearFilters({
-  employee,
   period,
-  tab,
-  routesBasePath,
+  onPeriodChange,
 }: {
-  employee: EmployeeDetail;
   period: EmployeeAttendancePeriod;
-  tab: EmployeeTab;
-  routesBasePath?: string;
+  onPeriodChange: (next: { month: number | null; year: number | null }) => void;
 }) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const routes = resolveEmployeeModuleRoutes(routesBasePath);
-
-  function updatePeriod(next: { month?: number | null; year?: number | null }) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("tab", tab);
-
-    const month = next.month !== undefined ? next.month : period.month;
-    const year = next.year !== undefined ? next.year : period.year;
-
-    if (month != null) {
-      params.set("month", String(month));
-    } else {
-      params.delete("month");
-    }
-
-    if (year != null) {
-      params.set("year", String(year));
-    } else {
-      params.delete("year");
-    }
-
-    router.replace(`${routes.detail(employee)}?${params.toString()}`);
-  }
-
   return (
-    <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2">
-      <div className="flex h-9 items-center gap-1.5 rounded-md border bg-background pl-2 pr-1">
-        <span className="shrink-0 text-xs text-muted-foreground">Month</span>
+    <div className="flex w-full flex-col gap-2">
+      <div className="grid h-9 grid-cols-[3rem_1fr] items-center rounded-lg border bg-muted/30 px-3">
+        <span className="text-xs font-medium text-muted-foreground">Month</span>
         <FilterSelect
           items={periodMonthItems}
           value={period.month != null ? String(period.month) : ""}
           onValueChange={(value) =>
-            updatePeriod({ month: Number.parseInt(value, 10) })
+            onPeriodChange({
+              month: Number.parseInt(value, 10),
+              year: period.year,
+            })
           }
-          placeholder="Select month"
-          className="w-auto"
-          triggerClassName="h-8 min-w-[8.5rem] border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
+          placeholder="Select"
+          className="w-full"
+          triggerClassName="h-7 w-full border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
         />
       </div>
-      <div className="flex h-9 items-center gap-1.5 rounded-md border bg-background pl-2 pr-1">
-        <span className="shrink-0 text-xs text-muted-foreground">Year</span>
+      <div className="grid h-9 grid-cols-[3rem_1fr] items-center rounded-lg border bg-muted/30 px-3">
+        <span className="text-xs font-medium text-muted-foreground">Year</span>
         <FilterSelect
           items={periodYearItems(period.year)}
           value={period.year != null ? String(period.year) : ""}
           onValueChange={(value) =>
-            updatePeriod({ year: Number.parseInt(value, 10) })
+            onPeriodChange({
+              month: period.month,
+              year: Number.parseInt(value, 10),
+            })
           }
-          placeholder="Select year"
-          className="w-auto"
-          triggerClassName="h-8 min-w-[6.5rem] border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
+          placeholder="Select"
+          className="w-full"
+          triggerClassName="h-7 w-full border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
         />
       </div>
     </div>
@@ -604,8 +573,8 @@ function PeriodEmptyPrompt({ description }: { description: string }) {
 
 function EmployeeAttendanceTab({
   employee,
-  attendance,
-  attendanceSummary,
+  attendance: initialAttendance,
+  attendanceSummary: initialAttendanceSummary,
   attendancePeriod,
   routesBasePath,
 }: {
@@ -615,47 +584,91 @@ function EmployeeAttendanceTab({
   attendancePeriod: EmployeeAttendancePeriod;
   routesBasePath?: string;
 }) {
-  const { month, year } = attendancePeriod;
+  const [period, setPeriod] = useState<EmployeeAttendancePeriod>(attendancePeriod);
+  const [attendance, setAttendance] = useState(initialAttendance);
+  const [attendanceSummary, setAttendanceSummary] = useState(initialAttendanceSummary);
+  const [loading, setLoading] = useState(false);
+
+  async function handlePeriodChange(next: { month: number | null; year: number | null }) {
+    setPeriod(next);
+    const params = new URLSearchParams(window.location.search);
+    params.set("tab", "attendance");
+    if (next.month != null) params.set("month", String(next.month));
+    else params.delete("month");
+    if (next.year != null) params.set("year", String(next.year));
+    else params.delete("year");
+    window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+
+    if (next.month != null && next.year != null) {
+      setLoading(true);
+      try {
+        const { getEmployeePeriodDataAction } = await import("@/lib/employees/actions");
+        const data = await getEmployeePeriodDataAction(employee.id, next.month, next.year);
+        setAttendance(data.attendance);
+        setAttendanceSummary(data.attendanceSummary);
+      } catch {
+        // keep existing data
+      } finally {
+        setLoading(false);
+      }
+    }
+  }
+
+  const { month, year } = period;
   const hasPeriod = month != null && year != null;
   const monthLabel = hasPeriod
     ? format(new Date(year, month - 1, 1), "MMMM yyyy")
     : "";
 
+  const avgHoursPerDay =
+    hasPeriod && attendanceSummary.presentDays > 0
+      ? (attendanceSummary.totalWorkHours / attendanceSummary.presentDays).toFixed(1)
+      : "0";
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="grid min-w-0 flex-1 grid-cols-2 gap-3 lg:grid-cols-3">
-          <EmployeeStatCard
-            label="Present days"
-            value={String(hasPeriod ? attendanceSummary.presentDays : 0)}
-            icon={CalendarDays}
-            accent="text-emerald-600 dark:text-emerald-400"
-            iconBg="bg-emerald-500/10"
-          />
-          <EmployeeStatCard
-            label="Total records"
-            value={String(hasPeriod ? attendanceSummary.totalRecords : 0)}
-            icon={FileStack}
-            accent="text-indigo-600 dark:text-indigo-400"
-            iconBg="bg-indigo-500/10"
-          />
-          <EmployeeStatCard
-            label="Total work hours"
-            value={String(hasPeriod ? attendanceSummary.totalWorkHours : 0)}
-            icon={Clock3}
-            accent="text-sky-600 dark:text-sky-400"
-            iconBg="bg-sky-500/10"
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <EmployeeStatCard
+          label="Present days"
+          value={String(hasPeriod ? attendanceSummary.presentDays : 0)}
+          icon={CalendarDays}
+          accent="text-emerald-600 dark:text-emerald-400"
+          iconBg="bg-emerald-500/10"
+        />
+        <EmployeeStatCard
+          label="Absent days"
+          value={String(hasPeriod ? Math.max(0, attendanceSummary.totalRecords - attendanceSummary.presentDays) : 0)}
+          icon={Hourglass}
+          accent="text-rose-600 dark:text-rose-400"
+          iconBg="bg-rose-500/10"
+        />
+        <EmployeeStatCard
+          label="Total work hours"
+          value={String(hasPeriod ? attendanceSummary.totalWorkHours : 0)}
+          icon={Clock3}
+          accent="text-sky-600 dark:text-sky-400"
+          iconBg="bg-sky-500/10"
+        />
+        <EmployeeStatCard
+          label="Avg hours/day"
+          value={avgHoursPerDay}
+          icon={Clock3}
+          accent="text-violet-600 dark:text-violet-400"
+          iconBg="bg-violet-500/10"
+        />
+        <div className="flex items-center justify-center rounded-xl border bg-card p-3">
+          <PeriodMonthYearFilters
+            period={period}
+            onPeriodChange={handlePeriodChange}
           />
         </div>
-        <PeriodMonthYearFilters
-          employee={employee}
-          period={attendancePeriod}
-          tab="attendance"
-          routesBasePath={routesBasePath}
-        />
       </div>
 
-      {hasPeriod ? (
+      {loading ? (
+        <div className="flex items-center justify-center rounded-xl border bg-card px-8 py-16">
+          <div className="size-5 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+        </div>
+      ) : hasPeriod ? (
         <section className="overflow-hidden rounded-xl border bg-card">
           <OverviewSectionTitle>Attendance history</OverviewSectionTitle>
           <div className="p-4">
@@ -708,9 +721,9 @@ function EmployeeAttendanceTab({
 
 function EmployeeLeaveTab({
   employee,
-  leaveRequests,
-  leaveApprovals,
-  leaveBalances,
+  leaveRequests: initialLeaveRequests,
+  leaveApprovals: initialLeaveApprovals,
+  leaveBalances: initialLeaveBalances,
   attendancePeriod,
   routesBasePath,
 }: {
@@ -721,7 +734,39 @@ function EmployeeLeaveTab({
   attendancePeriod: EmployeeAttendancePeriod;
   routesBasePath?: string;
 }) {
-  const { month, year } = attendancePeriod;
+  const [period, setPeriod] = useState<EmployeeAttendancePeriod>(attendancePeriod);
+  const [leaveRequests, setLeaveRequests] = useState(initialLeaveRequests);
+  const [leaveApprovals, setLeaveApprovals] = useState(initialLeaveApprovals);
+  const [leaveBalances, setLeaveBalances] = useState(initialLeaveBalances);
+  const [loading, setLoading] = useState(false);
+
+  async function handlePeriodChange(next: { month: number | null; year: number | null }) {
+    setPeriod(next);
+    const params = new URLSearchParams(window.location.search);
+    params.set("tab", "leave");
+    if (next.month != null) params.set("month", String(next.month));
+    else params.delete("month");
+    if (next.year != null) params.set("year", String(next.year));
+    else params.delete("year");
+    window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+
+    if (next.month != null && next.year != null) {
+      setLoading(true);
+      try {
+        const { getEmployeePeriodDataAction } = await import("@/lib/employees/actions");
+        const data = await getEmployeePeriodDataAction(employee.id, next.month, next.year);
+        setLeaveRequests(data.leaveRequests);
+        setLeaveApprovals(data.leaveApprovals);
+        setLeaveBalances(data.leaveBalances);
+      } catch {
+        // keep existing data on error
+      } finally {
+        setLoading(false);
+      }
+    }
+  }
+
+  const { month, year } = period;
   const hasPeriod = month != null && year != null;
   const monthLabel = hasPeriod
     ? format(new Date(year, month - 1, 1), "MMMM yyyy")
@@ -740,46 +785,48 @@ function EmployeeLeaveTab({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="grid min-w-0 flex-1 grid-cols-2 gap-3 lg:grid-cols-4">
-          <EmployeeStatCard
-            label="Requests"
-            value={String(hasPeriod ? leaveRequests.length : 0)}
-            icon={FileStack}
-            accent="text-indigo-600 dark:text-indigo-400"
-            iconBg="bg-indigo-500/10"
-          />
-          <EmployeeStatCard
-            label="Approved days"
-            value={String(hasPeriod ? approvedDays : 0)}
-            icon={CheckCircle2}
-            accent="text-emerald-600 dark:text-emerald-400"
-            iconBg="bg-emerald-500/10"
-          />
-          <EmployeeStatCard
-            label="Pending requests"
-            value={String(hasPeriod ? pendingCount : 0)}
-            icon={Hourglass}
-            accent="text-amber-600 dark:text-amber-400"
-            iconBg="bg-amber-500/10"
-          />
-          <EmployeeStatCard
-            label="Available balance"
-            value={String(hasPeriod ? availableDays : 0)}
-            icon={Wallet}
-            accent="text-sky-600 dark:text-sky-400"
-            iconBg="bg-sky-500/10"
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <EmployeeStatCard
+          label="Requests"
+          value={String(hasPeriod ? leaveRequests.length : 0)}
+          icon={FileStack}
+          accent="text-indigo-600 dark:text-indigo-400"
+          iconBg="bg-indigo-500/10"
+        />
+        <EmployeeStatCard
+          label="Approved days"
+          value={String(hasPeriod ? approvedDays : 0)}
+          icon={CheckCircle2}
+          accent="text-emerald-600 dark:text-emerald-400"
+          iconBg="bg-emerald-500/10"
+        />
+        <EmployeeStatCard
+          label="Pending requests"
+          value={String(hasPeriod ? pendingCount : 0)}
+          icon={Hourglass}
+          accent="text-amber-600 dark:text-amber-400"
+          iconBg="bg-amber-500/10"
+        />
+        <EmployeeStatCard
+          label="Available balance"
+          value={String(hasPeriod ? availableDays : 0)}
+          icon={Wallet}
+          accent="text-sky-600 dark:text-sky-400"
+          iconBg="bg-sky-500/10"
+        />
+        <div className="flex items-center justify-center rounded-xl border bg-card p-3">
+          <PeriodMonthYearFilters
+            period={period}
+            onPeriodChange={handlePeriodChange}
           />
         </div>
-        <PeriodMonthYearFilters
-          employee={employee}
-          period={attendancePeriod}
-          tab="leave"
-          routesBasePath={routesBasePath}
-        />
       </div>
 
-      {hasPeriod ? (
+      {loading ? (
+        <div className="flex items-center justify-center rounded-xl border bg-card px-8 py-16">
+          <div className="size-5 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+        </div>
+      ) : hasPeriod ? (
         <div className="space-y-4">
           <section className="overflow-hidden rounded-xl border bg-card">
             <OverviewSectionTitle>Leave balances</OverviewSectionTitle>

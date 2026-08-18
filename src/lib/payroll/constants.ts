@@ -272,7 +272,7 @@ export const TEAM_PAYROLL_SECTION_DESCRIPTIONS: Record<TeamPayrollSection, strin
   payslips:
     "Access published payslips — preview, download PDFs, and email copies to employees.",
   settings:
-    "Payroll cycle, processing schedule, and salary credit day for your organization.",
+    "Payroll cycle, processing schedule, salary credit day, and payslip availability for your organization.",
 };
 
 export const TEAM_PAYROLL_SECTION_TITLES: Record<TeamPayrollSection, string> = {

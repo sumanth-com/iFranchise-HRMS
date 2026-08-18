@@ -39,7 +39,6 @@ import { formatReviewBannerMessage } from "@/lib/payroll/services/payslip-public
 import type { EmployeePayrollData } from "@/types/employee-payroll";
 import type {
   BonusItem,
-  PayrollBreakdownLine,
   PayrollStatus,
   PayslipListItem,
   ReimbursementItem,
@@ -194,24 +193,14 @@ export function EmployeePayrollView({
     );
   }
 
-  const breakdownSource = data.latest?.breakdown ?? null;
-  const earnings: PayrollBreakdownLine[] =
-    breakdownSource?.earnings?.length
-      ? breakdownSource.earnings
-      : (data.salaryStructure?.earnings ?? []);
-  const deductions: PayrollBreakdownLine[] =
-    breakdownSource?.deductions?.length
-      ? breakdownSource.deductions
-      : (data.salaryStructure?.deductions ?? []);
-
-  const gross = data.latest?.grossSalary ?? data.salaryStructure?.grossSalary ?? 0;
-  const totalDeductions =
-    data.latest?.totalDeductions ??
-    (data.salaryStructure
-      ? data.salaryStructure.grossSalary - data.salaryStructure.netSalary
-      : 0);
-  const net = data.latest?.netSalary ?? data.salaryStructure?.netSalary ?? 0;
-  const usingStructure = !data.latest && Boolean(data.salaryStructure);
+  const breakdown = data.displaySummary;
+  const earnings = breakdown.earnings;
+  const deductions = breakdown.deductions;
+  const gross = breakdown.grossSalary;
+  const totalDeductions = breakdown.totalDeductions;
+  const net = breakdown.netSalary;
+  const usingStructure = breakdown.usingStructure;
+  const extrasIncluded = breakdown.extrasIncluded;
 
   const maxTrend = Math.max(1, ...data.trend.map((point) => point.gross));
 
@@ -269,7 +258,13 @@ export function EmployeePayrollView({
         <EmployeeStatCard
           label="Total Deductions"
           value={money(totalDeductions)}
-          hint={usingStructure ? "From salary structure" : "Latest payslip"}
+          hint={
+            extrasIncluded
+              ? "Includes bonuses and claims"
+              : usingStructure
+                ? "From salary structure"
+                : "Latest payslip"
+          }
           icon={ReceiptText}
           accent="text-amber-600 dark:text-amber-400"
           iconBg="bg-amber-500/10"
@@ -287,16 +282,26 @@ export function EmployeePayrollView({
       <div className="grid gap-4 xl:grid-cols-3 xl:items-stretch">
         <div className="flex flex-col gap-4 xl:col-span-2">
           <EmployeeSectionCard
-            title={usingStructure ? "Salary Structure" : "Current Payroll Summary"}
+            title={
+              extrasIncluded || !usingStructure
+                ? "Current Payroll Summary"
+                : "Salary Structure"
+            }
             description={
-              usingStructure
-                ? "Based on your current salary structure. Payslips appear once payroll is processed."
-                : `${fmtMonth(data.latest?.payrollMonth ?? "")} · Payslip ${
-                    data.latest?.payslipNumber ?? ""
-                  }`
+              extrasIncluded
+                ? `${fmtMonth(breakdown.periodMonth ?? "")} · Includes bonuses and expense claims`
+                : usingStructure
+                  ? "Based on your current salary structure. Payslips appear once payroll is processed."
+                  : `${fmtMonth(data.latest?.payrollMonth ?? "")} · Payslip ${
+                      data.latest?.payslipNumber ?? ""
+                    }`
             }
             action={
-              data.latest ? <StatusPill status={data.latest.payrollStatus} /> : null
+              data.latest &&
+              breakdown.periodMonth &&
+              data.latest.payrollMonth.slice(0, 7) === breakdown.periodMonth ? (
+                <StatusPill status={data.latest.payrollStatus} />
+              ) : null
             }
             bodyClassName="flex flex-col gap-4"
           >
@@ -613,6 +618,8 @@ export function EmployeePayrollView({
         payslipId={activePayslipId}
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
+        overlaySummary={data.displaySummary}
+        overlayPayslipId={data.latest?.id ?? null}
       />
     </>
   );

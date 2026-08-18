@@ -67,6 +67,17 @@ export type EmployeePayrollPendingPromotion = {
   recommendedDesignation: string | null;
 };
 
+export type EmployeePayrollDisplaySummary = {
+  earnings: PayrollBreakdownLine[];
+  deductions: PayrollBreakdownLine[];
+  grossSalary: number;
+  totalDeductions: number;
+  netSalary: number;
+  periodMonth: string | null;
+  usingStructure: boolean;
+  extrasIncluded: boolean;
+};
+
 export type EmployeePayrollData = {
   currencyCode: string;
   hasAnyData: boolean;
@@ -79,6 +90,8 @@ export type EmployeePayrollData = {
   bank: EmployeePayrollBankDetails | null;
   bonuses: BonusItem[];
   reimbursements: ReimbursementItem[];
+  /** Live earnings/net including approved bonuses and expense claims. */
+  displaySummary: EmployeePayrollDisplaySummary;
   trend: EmployeePayrollTrendPoint[];
   pendingPromotion: EmployeePayrollPendingPromotion | null;
   ytd: {

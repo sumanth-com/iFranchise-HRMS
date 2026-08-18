@@ -15,6 +15,7 @@ import { resolveOrCreateDesignation } from "@/lib/employees/services/employee-mu
 import { suggestNextEmployeeCode } from "@/lib/employees/services/employee-queries";
 import { CANDIDATE_STAGE_LABELS } from "@/lib/recruitment/constants";
 import { notifyManagerCandidateAssigned } from "@/lib/manager/services/manager-recruitment-notifications";
+import { ensureOnboardingCaseFromOffer } from "@/lib/onboarding/services/onboarding-mutations";
 import {
   resolveManagerDepartmentIds,
 } from "@/lib/manager/portal-scope";
@@ -748,7 +749,7 @@ export async function createOffer(
   const resolvedJoiningDate = new Date().toISOString().slice(0, 10);
 
   const { data: existingDraft } = await fromHrms(supabase, "recruitment_offers")
-    .select("id, offer_letter_path, salary, joining_date, offer_status")
+    .select("id, offer_code, offer_letter_path, salary, joining_date, offer_status")
     .eq("candidate_id", input.candidateId)
     .eq("organization_id", organizationId)
     .in("offer_status", ["draft", "sent"])
@@ -770,6 +771,7 @@ export async function createOffer(
   }
 
   let offerId: string;
+  let offerCodeValue = existingDraft?.offer_code ?? null;
   const offerSalary = existingDraft?.salary != null ? Number(existingDraft.salary) : resolvedSalary;
   const offerJoiningDate = existingDraft?.joining_date ?? resolvedJoiningDate;
 
@@ -804,6 +806,7 @@ export async function createOffer(
       "offer_code",
       settings.numberFormats.offerPrefix,
     );
+    offerCodeValue = offerCode;
 
     const { data, error } = await fromHrms(supabase, "recruitment_offers")
       .insert({
@@ -916,6 +919,20 @@ export async function createOffer(
       offerId,
       candidateName,
     );
+
+    await ensureOnboardingCaseFromOffer(supabase, profile, {
+      fullName: candidateName,
+      personalEmail: candidate.email,
+      mobileNumber: candidate.phone ?? null,
+      designationId,
+      departmentId,
+      reportingManagerId,
+      employmentTypeId,
+      joiningDate: offerJoiningDate,
+      offerReferenceNumber: offerCodeValue,
+    }).catch((error) => {
+      console.error("[recruitment] failed to add candidate to onboarding", error);
+    });
   } else {
     await addTimeline(supabase, organizationId, input.candidateId, profile.userId, {
       eventType: "offer",

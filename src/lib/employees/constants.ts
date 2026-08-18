@@ -86,6 +86,13 @@ export const EMPLOYEE_TABS = [
 
 export type EmployeeTab = (typeof EMPLOYEE_TABS)[number];
 
+export function resolveEmployeeTab(tabParam: string | null | undefined): EmployeeTab {
+  if (tabParam && EMPLOYEE_TABS.includes(tabParam as EmployeeTab)) {
+    return tabParam as EmployeeTab;
+  }
+  return "overview";
+}
+
 export const EMPLOYEE_TAB_LABELS: Record<EmployeeTab, string> = {
   overview: "Profile",
   documents: "Documents",

@@ -8,6 +8,7 @@ import { PAYSLIP_ENGINE_NAME } from "@/lib/payroll/services/payslip-publication"
 import {
   formatPayrollMonthLabel,
   formatPayslipCurrency,
+  toEmployeeFacingEarnings,
 } from "@/lib/payroll/services/payroll-utils";
 import { EarningsDeductionsTable } from "@/components/payroll/earnings-deductions-table";
 import type { PayslipDetail } from "@/types/payroll";
@@ -55,7 +56,7 @@ export function PayslipTemplate({
 }) {
   const money = (value: number) => formatPayslipCurrency(value, payslip.currencyCode);
   const employeeName = `${payslip.employee.firstName} ${payslip.employee.lastName}`.trim();
-  const earnings =
+  const earnings = toEmployeeFacingEarnings(
     payslip.breakdown.earnings.length > 0
       ? payslip.breakdown.earnings
       : [
@@ -65,7 +66,11 @@ export function PayslipTemplate({
             amount: payslip.grossSalary,
             type: "earning" as const,
           },
-        ];
+        ],
+  );
+  const deductions = payslip.breakdown.deductions.filter(
+    (line) => Number(line.amount) > 0,
+  );
   const displayAddress = formatPayslipDisplayAddress(payslip.organization.addressLines);
 
   return (
@@ -190,7 +195,7 @@ export function PayslipTemplate({
         <section className="mt-8">
           <EarningsDeductionsTable
             earnings={earnings}
-            deductions={payslip.breakdown.deductions}
+            deductions={deductions}
             grossSalary={payslip.grossSalary}
             totalDeductions={payslip.totalDeductions}
             money={money}

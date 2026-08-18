@@ -2,7 +2,10 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 
-import { LeaveSummaryCards } from "@/components/leave/leave-summary-cards";
+import {
+  LeaveSummaryCards,
+  type LeaveSummaryFilterKey,
+} from "@/components/leave/leave-summary-cards";
 import { LeaveTable } from "@/components/leave/leave-table";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { getLeaveSummaryAction } from "@/lib/leave/actions";
@@ -81,6 +84,7 @@ export function HrTeamLeaveView({
   fetchRecords,
 }: HrTeamLeaveViewProps) {
   const [summaryState, setSummaryState] = useState(summary);
+  const [summaryFilter, setSummaryFilter] = useState<LeaveSummaryFilterKey>();
 
   useEffect(() => {
     setSummaryState(summary);
@@ -91,6 +95,10 @@ export function HrTeamLeaveView({
     const result = await getLeaveSummaryAction();
     if (result.success) setSummaryState(result.data);
   }, [fetchRecords]);
+
+  const applySummaryFilter = useCallback((key: LeaveSummaryFilterKey) => {
+    setSummaryFilter((current) => (current === key ? undefined : key));
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -103,7 +111,11 @@ export function HrTeamLeaveView({
         </div>
       ) : null}
 
-      <LeaveSummaryCards summary={summaryState} embedded={embedded} />
+      <LeaveSummaryCards
+        summary={summaryState}
+        activeKey={summaryFilter}
+        onSelect={applySummaryFilter}
+      />
 
       <Suspense
         fallback={
@@ -126,6 +138,8 @@ export function HrTeamLeaveView({
           branchId={branchId}
           reportingManagerId={reportingManagerId}
           employeeId={employeeId}
+          summaryFilter={summaryFilter}
+          onSummaryFilterChange={setSummaryFilter}
           leaveTypes={leaveTypes}
           departments={departments}
           branches={branches}

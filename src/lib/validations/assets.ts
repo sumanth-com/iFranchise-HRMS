@@ -6,6 +6,25 @@ import {
 } from "@/lib/assets/asset-device-images";
 import { optionalNullablePhoneSchema } from "@/lib/validations/phone";
 
+const optionalText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .optional()
+    .nullable()
+    .transform((value) => (value ? value : null));
+
+const optionalIsoDate = z
+  .string()
+  .optional()
+  .nullable()
+  .transform((value) => {
+    const trimmed = value?.trim() ?? "";
+    if (!trimmed) return null;
+    return /^\d{4}-\d{2}-\d{2}/.test(trimmed) ? trimmed.slice(0, 10) : null;
+  });
+
 export const assetListParamsSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
@@ -64,7 +83,17 @@ export const assignAssetSchema = z.object({
   assignedDate: z.string().min(1),
   expectedReturnDate: z.string().optional().nullable(),
   conditionBefore: z.enum(["excellent", "good", "fair", "poor", "damaged"]).default("good"),
-  remarks: z.string().trim().max(2000).optional().nullable(),
+  remarks: optionalText(2000),
+  brand: optionalText(100),
+  model: optionalText(100),
+  serialNumber: optionalText(120),
+  specChip: optionalText(120),
+  specMemory: optionalText(120),
+  specStorage: optionalText(120),
+  specOperatingSystem: optionalText(120),
+  specAccessories: optionalText(500),
+  specConnectionType: optionalText(120),
+  warrantyExpiry: optionalIsoDate,
 });
 
 export const returnAssetSchema = z.object({
@@ -120,16 +149,16 @@ export const createAndAssignAssetSchema = z.object({
   assetType: z.enum(
     ASSET_DEVICE_CATALOG_KEYS as [AssetDeviceCatalogKey, ...AssetDeviceCatalogKey[]],
   ),
-  brand: z.string().trim().max(100).optional().nullable(),
-  model: z.string().trim().max(100).optional().nullable(),
-  serialNumber: z.string().trim().max(120).optional().nullable(),
-  specChip: z.string().trim().max(120).optional().nullable(),
-  specMemory: z.string().trim().max(120).optional().nullable(),
-  specStorage: z.string().trim().max(120).optional().nullable(),
-  specOperatingSystem: z.string().trim().max(120).optional().nullable(),
-  specAccessories: z.string().trim().max(500).optional().nullable(),
-  specConnectionType: z.string().trim().max(120).optional().nullable(),
-  warrantyExpiry: z.string().optional().nullable(),
+  brand: optionalText(100),
+  model: optionalText(100),
+  serialNumber: optionalText(120),
+  specChip: optionalText(120),
+  specMemory: optionalText(120),
+  specStorage: optionalText(120),
+  specOperatingSystem: optionalText(120),
+  specAccessories: optionalText(500),
+  specConnectionType: optionalText(120),
+  warrantyExpiry: optionalIsoDate,
   purchaseDate: z.string().optional().nullable(),
   conditionBefore: z.enum(["excellent", "good", "fair", "poor", "damaged"]).default("good"),
   remarks: z.string().trim().max(2000).optional().nullable(),

@@ -22,6 +22,7 @@ import {
 } from "@/components/recruitment/candidate-pipeline-track";
 import {
   CANDIDATE_STAGE_LABELS,
+  getCandidateStageBadge,
 } from "@/lib/recruitment/constants";
 import { formatCurrency } from "@/lib/recruitment/services/recruitment-utils";
 import { cn } from "@/lib/utils";
@@ -127,8 +128,10 @@ export function CandidateDetailPanel({
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-base font-semibold">{detail.fullName}</p>
                   <RecruitmentStatusBadge
-                    label={CANDIDATE_STAGE_LABELS[detail.stage]}
-                    status={detail.stage}
+                    {...getCandidateStageBadge(
+                      detail.stage,
+                      detail.latestOfferStatus ?? detail.offers[0]?.offerStatus,
+                    )}
                   />
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">

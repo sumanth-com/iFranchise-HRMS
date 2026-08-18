@@ -2,6 +2,7 @@ import { format, parseISO } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
+import { formatCleanEmployeeName } from "@/lib/employees/parse-employee-name";
 import { ALLOWED_LEAVE_TYPE_CODES } from "@/lib/leave/constants";
 import {
   getEmployeeLeaveBalanceSnapshot,
@@ -361,10 +362,49 @@ export async function listTeamLeaveRequests(
     .in("employee_id", teamIds)
     .is("deleted_at", null);
 
-  if (parsed.dateFrom && parsed.dateTo) {
+  const today = getTodayDateString();
+  const summaryFilter = parsed.summaryFilter;
+
+  if (summaryFilter === "pendingRequests") {
+    query = query.eq("leave_status", "pending");
+  } else if (summaryFilter === "approvedThisMonth") {
+    const range =
+      parsed.dateFrom && parsed.dateTo
+        ? { start: parsed.dateFrom, end: parsed.dateTo }
+        : getMonthDateRange(
+            Number.parseInt(today.slice(5, 7), 10),
+            Number.parseInt(today.slice(0, 4), 10),
+          );
+    query = query
+      .eq("leave_status", "approved")
+      .gte("start_date", range.start)
+      .lte("start_date", range.end);
+  } else if (summaryFilter === "rejectedThisMonth") {
+    const range =
+      parsed.dateFrom && parsed.dateTo
+        ? { start: parsed.dateFrom, end: parsed.dateTo }
+        : getMonthDateRange(
+            Number.parseInt(today.slice(5, 7), 10),
+            Number.parseInt(today.slice(0, 4), 10),
+          );
+    query = query
+      .eq("leave_status", "rejected")
+      .gte("created_at", `${range.start}T00:00:00`)
+      .lte("created_at", `${range.end}T23:59:59`);
+  } else if (summaryFilter === "employeesOnLeaveToday") {
+    query = query
+      .eq("leave_status", "approved")
+      .lte("start_date", today)
+      .gte("end_date", today);
+  } else if (summaryFilter === "upcomingPlannedLeaves") {
+    query = query.eq("leave_status", "approved").gt("start_date", today);
+  } else if (parsed.dateFrom && parsed.dateTo) {
     query = query.lte("start_date", parsed.dateTo).gte("end_date", parsed.dateFrom);
   }
-  if (parsed.leaveStatus) query = query.eq("leave_status", parsed.leaveStatus);
+
+  if (!summaryFilter && parsed.leaveStatus) {
+    query = query.eq("leave_status", parsed.leaveStatus);
+  }
   if (parsed.leaveTypeId) query = query.eq("leave_type_id", parsed.leaveTypeId);
   if (parsed.employeeId) query = query.eq("employee_id", parsed.employeeId);
   if (parsed.departmentId) query = query.eq("employees.department_id", parsed.departmentId);
@@ -455,7 +495,7 @@ export async function listTeamLeaveRequests(
         employeeId: row.employee_id,
         employeeCode: employee?.employee_code ?? "",
         employeeName: employee
-          ? `${employee.first_name} ${employee.last_name}`
+          ? formatCleanEmployeeName(employee.first_name, employee.last_name)
           : "",
         departmentId: employee?.department_id ?? null,
         departmentName: department?.name ?? null,

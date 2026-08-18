@@ -244,6 +244,8 @@ export async function listPayslipHistory(
     const access = resolvePayslipAvailability(
       schedule.publishedAt,
       profile.permissionCodes,
+      new Date(),
+      { employeeFacing: row.employee_id === profile.employee.id },
     );
     const versionCount = (versionCounts.get(row.id) ?? 0) + 1;
 
@@ -328,6 +330,8 @@ export async function listPayslipHistory(
       const access = resolvePayslipAvailability(
         schedule.publishedAt,
         profile.permissionCodes,
+        new Date(),
+        { employeeFacing: row.employee_id === profile.employee.id },
       );
       return {
         id: row.id,

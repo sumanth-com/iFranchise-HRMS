@@ -15,6 +15,13 @@ const TEAM_ADMIN_PATH_PREFIXES: Record<string, string> = {
   "/dashboard/onboarding": "/dashboard/recruitment",
 };
 
+/** Module roots so nested tabs (e.g. Performance > Feedback) keep the sidebar item active. */
+const MODULE_SECTION_ROOTS = [
+  "/dashboard/performance",
+  "/manager/performance",
+  "/ceo/performance",
+] as const;
+
 function navItemPath(href: string | null | undefined) {
   if (typeof href !== "string" || href.length === 0) return "";
   return href.split("?")[0];
@@ -34,6 +41,25 @@ function resolvePrefixNavHref(
   return null;
 }
 
+function resolveModuleSectionHref(
+  pathname: string,
+  items: NavHrefItem[],
+): string | null {
+  for (const root of MODULE_SECTION_ROOTS) {
+    if (pathname !== root && !pathname.startsWith(`${root}/`)) continue;
+
+    const exact = items.find((item) => navItemPath(item.href) === root);
+    if (exact) return exact.href;
+
+    const nested = items.find((item) => {
+      const itemPath = navItemPath(item.href);
+      return itemPath === root || itemPath.startsWith(`${root}/`);
+    });
+    if (nested) return nested.href;
+  }
+  return null;
+}
+
 /**
  * Pick the sidebar link that matches the current path (my vs team hub sections).
  */
@@ -49,6 +75,9 @@ export function resolveActiveNavHref(
 
   const teamAdminMatch = resolvePrefixNavHref(pathname, TEAM_ADMIN_PATH_PREFIXES, navItems);
   if (teamAdminMatch) return teamAdminMatch;
+
+  const moduleSectionMatch = resolveModuleSectionHref(pathname, navItems);
+  if (moduleSectionMatch) return moduleSectionMatch;
 
   const matches = navItems.filter((item) => {
     const itemPath = navItemPath(item.href);

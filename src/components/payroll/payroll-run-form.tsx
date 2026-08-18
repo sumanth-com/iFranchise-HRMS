@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import {
   Banknote,
   CalendarClock,
@@ -25,6 +25,7 @@ import { PayrollStatusBadge } from "@/components/payroll/payroll-status-badge";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { getMonthSelectItems, getYearSelectItems } from "@/components/payroll/select-utils";
 import {
+  fetchEmployeePayrollBreakdownAction,
   fetchPayrollDetailAction,
   fetchPayrollRunsAction,
   generatePayrollRunAction,
@@ -102,6 +103,8 @@ export function PayrollRunForm({
   const [breakdownEmployee, setBreakdownEmployee] =
     useState<PayrollEmployeeBreakdownData | null>(null);
   const [breakdownOpen, setBreakdownOpen] = useState(false);
+  const [breakdownLoading, setBreakdownLoading] = useState(false);
+  const breakdownRequestId = useRef(0);
   const [isPending, startTransition] = useTransition();
 
   const hasPeriod = month.length > 0 && year.length > 0;
@@ -235,22 +238,53 @@ export function PayrollRunForm({
     });
   }
 
-  function openBreakdown(row: EmployeeTableRow) {
+  async function openBreakdown(row: EmployeeTableRow) {
+    if (!hasPeriod) return;
+    const requestId = ++breakdownRequestId.current;
+    setBreakdownOpen(true);
+    setBreakdownLoading(true);
     setBreakdownEmployee({
       employeeId: row.id,
       employeeCode: row.code,
       employeeName: row.name,
       departmentName: row.department,
-      basicSalary: row.basicSalary,
-      totalAllowances: row.totalAllowances,
-      totalDeductions: row.deductions,
-      grossSalary: row.gross,
-      netSalary: row.net,
-      breakdown: row.breakdown,
-      hasSalaryStructure: row.hasSalaryStructure,
+      basicSalary: 0,
+      totalAllowances: 0,
+      totalDeductions: 0,
+      grossSalary: 0,
+      netSalary: 0,
+      bonusTotal: 0,
+      claimsTotal: 0,
+      salaryTotal: 0,
+      breakdown: {
+        earnings: [],
+        deductions: [],
+        attendance: {
+          workingDays: 0,
+          presentDays: 0,
+          absentDays: 0,
+          lopDays: 0,
+          leaveLopDays: 0,
+          overtimeHours: 0,
+        },
+      },
+      hasSalaryStructure: true,
       periodLabel,
     });
-    setBreakdownOpen(true);
+
+    const result = await fetchEmployeePayrollBreakdownAction({
+      employeeId: row.id,
+      month: monthNumber,
+      year: yearNumber,
+    });
+    if (requestId !== breakdownRequestId.current) return;
+    setBreakdownLoading(false);
+    if (!result.success) {
+      toast.error(result.message);
+      setBreakdownEmployee(null);
+      return;
+    }
+    setBreakdownEmployee(result.data);
   }
 
   function mapRunItemToRow(item: PayrollDetail["items"][number]): EmployeeTableRow {
@@ -406,6 +440,7 @@ export function PayrollRunForm({
         employee={breakdownEmployee}
         open={breakdownOpen}
         onOpenChange={setBreakdownOpen}
+        loading={breakdownLoading}
       />
     </div>
   );

@@ -1,44 +1,19 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
-
 import {
   EMPLOYEE_TABS,
   EMPLOYEE_TAB_LABELS,
-  resolveEmployeeModuleRoutes,
   type EmployeeTab,
 } from "@/lib/employees/constants";
-import type { EmployeeRouteIdentity } from "@/types/employee";
 import { cn } from "@/lib/utils";
 
-function resolveActiveTab(tabParam: string | null): EmployeeTab {
-  if (tabParam && EMPLOYEE_TABS.includes(tabParam as EmployeeTab)) {
-    return tabParam as EmployeeTab;
-  }
-  return "overview";
-}
-
 export function EmployeeDetailTabBar({
-  employee,
+  activeTab,
   onTabChange,
-  routesBasePath,
 }: {
-  employee: EmployeeRouteIdentity;
-  onTabChange?: (tab: EmployeeTab) => void;
-  routesBasePath?: string;
+  activeTab: EmployeeTab;
+  onTabChange: (tab: EmployeeTab) => void;
 }) {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const routes = resolveEmployeeModuleRoutes(routesBasePath);
-  const activeTab = resolveActiveTab(searchParams.get("tab"));
-
-  function setTab(tab: EmployeeTab) {
-    onTabChange?.(tab);
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("tab", tab);
-    router.replace(`${routes.detail(employee)}?${params.toString()}`);
-  }
-
   return (
     <div className="-mx-1 overflow-x-auto">
       <div className="flex min-w-max gap-6 px-1">
@@ -46,7 +21,7 @@ export function EmployeeDetailTabBar({
           <button
             key={tab}
             type="button"
-            onClick={() => setTab(tab)}
+            onClick={() => onTabChange(tab)}
             className={cn(
               "shrink-0 border-b-2 px-1 py-3 text-sm transition-colors",
               activeTab === tab

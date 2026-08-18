@@ -53,6 +53,15 @@ export const leaveListParamsSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
   createdByEmployeeId: z.string().uuid().optional(),
+  summaryFilter: z
+    .enum([
+      "pendingRequests",
+      "approvedThisMonth",
+      "rejectedThisMonth",
+      "employeesOnLeaveToday",
+      "upcomingPlannedLeaves",
+    ])
+    .optional(),
 });
 
 export const leaveFormSchema = z

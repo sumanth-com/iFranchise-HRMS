@@ -5,7 +5,7 @@ import { format, parseISO } from "date-fns";
 import { Pencil } from "lucide-react";
 
 import { AttendanceStatusBadge } from "@/components/attendance/attendance-status-badge";
-import { buttonVariants } from "@/components/common/button";
+import { Button, buttonVariants } from "@/components/common/button";
 import { ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
 import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils";
 import type { AttendanceDetail } from "@/types/attendance";
@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 type AttendanceDetailViewProps = {
   attendance: AttendanceDetail;
   canEdit: boolean;
+  compact?: boolean;
+  onEdit?: () => void;
 };
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -40,35 +42,63 @@ function formatAuditActor(
 export function AttendanceDetailView({
   attendance,
   canEdit,
+  compact = false,
+  onEdit,
 }: AttendanceDetailViewProps) {
-  return (
-    <div className="space-y-6">
-      <div className="overflow-hidden rounded-xl border bg-card">
-        <div className="flex flex-col gap-4 border-b px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-6">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold tracking-tight">
-                {attendance.employeeName}
-              </h1>
-              <AttendanceStatusBadge status={attendance.attendanceStatus} />
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {attendance.employeeCode} ·{" "}
-              {format(parseISO(attendance.attendanceDate), "dd MMM yyyy")}
-            </p>
-          </div>
-          {canEdit ? (
-            <Link
-              href={ATTENDANCE_ROUTES.edit(attendance.id)}
-              className={cn(buttonVariants({ variant: "outline" }), "shrink-0")}
-            >
-              <Pencil className="size-4" />
-              Edit attendance
-            </Link>
-          ) : null}
+  const heading = compact ? (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-lg font-semibold tracking-tight">{attendance.employeeName}</h2>
+          <AttendanceStatusBadge status={attendance.attendanceStatus} />
         </div>
+        <p className="text-sm text-muted-foreground">
+          {attendance.employeeCode} · {format(parseISO(attendance.attendanceDate), "dd MMM yyyy")}
+        </p>
+      </div>
+      {canEdit && onEdit ? (
+        <Button type="button" variant="outline" size="sm" onClick={onEdit}>
+          <Pencil className="size-4" />
+          Edit
+        </Button>
+      ) : null}
+    </div>
+  ) : (
+    <div className="flex flex-col gap-4 border-b px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-6">
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight">{attendance.employeeName}</h1>
+          <AttendanceStatusBadge status={attendance.attendanceStatus} />
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {attendance.employeeCode} · {format(parseISO(attendance.attendanceDate), "dd MMM yyyy")}
+        </p>
+      </div>
+      {canEdit ? (
+        onEdit ? (
+          <Button type="button" variant="outline" className="shrink-0" onClick={onEdit}>
+            <Pencil className="size-4" />
+            Edit attendance
+          </Button>
+        ) : (
+          <Link
+            href={ATTENDANCE_ROUTES.edit(attendance.id)}
+            className={cn(buttonVariants({ variant: "outline" }), "shrink-0")}
+          >
+            <Pencil className="size-4" />
+            Edit attendance
+          </Link>
+        )
+      ) : null}
+    </div>
+  );
 
-        <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-2">
+  return (
+    <div className={compact ? "space-y-4" : "space-y-6"}>
+      <div className={compact ? "space-y-4" : "overflow-hidden rounded-xl border bg-card"}>
+        {heading}
+
+        <div className={compact ? "grid gap-4 lg:grid-cols-2" : "grid gap-6 p-5 sm:p-6 lg:grid-cols-2"}>
           <section className="rounded-xl border p-4">
             <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               Employee Information
@@ -122,7 +152,7 @@ export function AttendanceDetailView({
           </section>
         </div>
 
-        <div className="border-t px-5 py-5 sm:px-6">
+        <div className={compact ? undefined : "border-t px-5 py-5 sm:px-6"}>
           <section className="rounded-xl border p-4">
             <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               Audit Information

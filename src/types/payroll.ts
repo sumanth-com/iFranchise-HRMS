@@ -185,6 +185,24 @@ export type PayrollPreviewResult = {
   employeeCount: number;
 };
 
+export type EmployeePayrollRunBreakdown = {
+  employeeId: string;
+  employeeCode: string;
+  employeeName: string;
+  departmentName: string | null;
+  basicSalary: number;
+  totalAllowances: number;
+  totalDeductions: number;
+  grossSalary: number;
+  netSalary: number;
+  bonusTotal: number;
+  claimsTotal: number;
+  salaryTotal: number;
+  breakdown: PayrollBreakdown;
+  hasSalaryStructure: boolean;
+  periodLabel: string;
+};
+
 export type PayslipAvailability = "available" | "under_review";
 
 export type PayslipListItem = {

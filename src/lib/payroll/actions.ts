@@ -29,6 +29,7 @@ import {
   updateSalaryStructure,
   emailPayslip,
   generatePayrollRun,
+  getEmployeeRunBreakdown,
   markPayrollPaid,
   previewPayrollRun,
   processPayrollRun,
@@ -52,6 +53,7 @@ import {
 import {
   bonusFormSchema,
   bonusListParamsSchema,
+  employeePayrollBreakdownSchema,
   payrollApprovalSchema,
   payrollListParamsSchema,
   payrollRejectSchema,
@@ -66,6 +68,7 @@ import {
 import { payrollSettingsSchema } from "@/lib/validations/payroll-settings";
 import type {
   BonusListResult,
+  EmployeePayrollRunBreakdown,
   PayrollActionResult,
   PayrollDetail,
   PayrollListParams,
@@ -84,6 +87,15 @@ import type { PayrollSettingsRecord } from "@/types/payroll-settings";
 
 async function getAuthenticatedSupabase() {
   return createClient();
+}
+
+function revalidateEmployeePayrollViews() {
+  revalidatePath(SELF_PAYROLL_ROUTES.list);
+  revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS.bonuses));
+  revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS.reimbursements));
+  revalidatePath("/employee/payroll");
+  revalidatePath("/manager/payroll");
+  revalidatePath("/dashboard/system/payroll");
 }
 
 function revalidatePayrollPaths() {
@@ -113,6 +125,29 @@ export async function previewPayrollRunAction(
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to preview payroll",
+    };
+  }
+}
+
+export async function fetchEmployeePayrollBreakdownAction(
+  input: unknown,
+): Promise<PayrollActionResult<EmployeePayrollRunBreakdown>> {
+  try {
+    const profile = await requireServerAnyPermission([
+      ...ceoOrViewPermission("payroll.view"),
+      "payroll.run",
+      "payroll.process",
+      "payroll.generate",
+    ]);
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = employeePayrollBreakdownSchema.parse(input);
+    const data = await getEmployeeRunBreakdown(supabase, profile, parsed);
+    return { success: true, data };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "Failed to load employee payroll breakdown",
     };
   }
 }
@@ -345,6 +380,7 @@ export async function createBonusAction(
     const parsed = bonusFormSchema.parse(input);
     const id = await createBonus(supabase, profile, parsed);
     revalidatePath(PAYROLL_ROUTES.bonuses);
+    revalidateEmployeePayrollViews();
     return { success: true, data: id };
   } catch (error) {
     return {
@@ -363,6 +399,7 @@ export async function approveBonusAction(bonusId: string): Promise<PayrollAction
     const supabase = await getAuthenticatedSupabase();
     await approveBonus(supabase, profile, bonusId);
     revalidatePath(PAYROLL_ROUTES.bonuses);
+    revalidateEmployeePayrollViews();
     return { success: true, data: undefined };
   } catch (error) {
     return {
@@ -384,6 +421,7 @@ export async function createReimbursementAction(
     const parsed = reimbursementFormSchema.parse(input);
     const id = await createReimbursement(supabase, profile, parsed);
     revalidatePath(PAYROLL_ROUTES.reimbursements);
+    revalidateEmployeePayrollViews();
     return { success: true, data: id };
   } catch (error) {
     return {
@@ -404,6 +442,7 @@ export async function approveReimbursementAction(
     const supabase = await getAuthenticatedSupabase();
     await approveReimbursement(supabase, profile, reimbursementId);
     revalidatePath(PAYROLL_ROUTES.reimbursements);
+    revalidateEmployeePayrollViews();
     return { success: true, data: undefined };
   } catch (error) {
     return {

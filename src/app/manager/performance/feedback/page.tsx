@@ -1,25 +1,18 @@
 import { FeedbackForm, FeedbackTable } from "@/components/performance/feedback-management";
 import { loadManagerPerformancePage } from "@/lib/manager/load-admin-context";
+import {
+  PERFORMANCE_CLIENT_FETCH_SIZE,
+  PERFORMANCE_TABLE_PAGE_SIZE,
+} from "@/lib/performance/constants";
 import { listFeedback } from "@/lib/performance/services/performance-queries";
-import { feedbackListParamsSchema } from "@/lib/validations/performance";
 
-type FeedbackPageProps = {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-};
-
-export default async function ManagerFeedbackPage({ searchParams }: FeedbackPageProps) {
+export default async function ManagerFeedbackPage() {
   const { profile, supabase, lookups } = await loadManagerPerformancePage();
-  const rawParams = await searchParams;
 
-  const params = feedbackListParamsSchema.parse({
-    page: rawParams.page,
-    pageSize: rawParams.pageSize,
-    employeeId: rawParams.employeeId,
-    feedbackType: rawParams.feedbackType,
-    visibility: rawParams.visibility,
+  const result = await listFeedback(supabase, profile, {
+    page: 1,
+    pageSize: PERFORMANCE_CLIENT_FETCH_SIZE,
   });
-
-  const result = await listFeedback(supabase, profile, params);
 
   return (
     <div className="space-y-6">
@@ -32,12 +25,8 @@ export default async function ManagerFeedbackPage({ searchParams }: FeedbackPage
       <FeedbackForm employees={lookups.employees} />
       <FeedbackTable
         records={result.data}
-        total={result.total}
-        page={result.page}
-        pageSize={result.pageSize}
+        pageSize={PERFORMANCE_TABLE_PAGE_SIZE}
         employees={lookups.employees}
-        employeeId={params.employeeId}
-        feedbackType={params.feedbackType}
         canDelete
       />
     </div>

@@ -1,35 +1,27 @@
 import { KpiWorkspace } from "@/components/performance/kpi-management";
 import { createClient } from "@/lib/supabase/server";
-import { canAssignKpis, canManageKpis } from "@/lib/performance/constants";
+import {
+  canAssignKpis,
+  canManageKpis,
+  PERFORMANCE_CLIENT_FETCH_SIZE,
+  PERFORMANCE_TABLE_PAGE_SIZE,
+} from "@/lib/performance/constants";
 import {
   getPerformanceLookups,
   listKpis,
   listKpiTemplates,
 } from "@/lib/performance/services/performance-queries";
-import { kpiListParamsSchema } from "@/lib/validations/performance";
 import { requireServerPermission } from "@/lib/permissions/server";
 
-type KpisPageProps = {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-};
-
-export default async function KpisPage({ searchParams }: KpisPageProps) {
+export default async function KpisPage() {
   const profile = await requireServerPermission("performance.view");
   const supabase = await createClient();
-  const rawParams = await searchParams;
-
-  const params = kpiListParamsSchema.parse({
-    page: rawParams.page,
-    pageSize: rawParams.pageSize,
-    search: typeof rawParams.search === "string" ? rawParams.search : undefined,
-    departmentId: rawParams.departmentId,
-    designationId: rawParams.designationId,
-    kpiStatus: rawParams.kpiStatus,
-    kpiPeriod: rawParams.kpiPeriod,
-  });
 
   const [result, templates, lookups] = await Promise.all([
-    listKpis(supabase, profile, params),
+    listKpis(supabase, profile, {
+      page: 1,
+      pageSize: PERFORMANCE_CLIENT_FETCH_SIZE,
+    }),
     listKpiTemplates(supabase, profile.employee.organizationId),
     getPerformanceLookups(supabase, profile.employee.organizationId),
   ]);
@@ -53,16 +45,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         }}
         tableProps={{
           records: result.data,
-          total: result.total,
-          page: result.page,
-          pageSize: result.pageSize,
-          departments: lookups.departments,
-          designations: lookups.designations,
-          search: params.search,
-          departmentId: params.departmentId,
-          designationId: params.designationId,
-          kpiStatus: params.kpiStatus,
-          kpiPeriod: params.kpiPeriod,
+          pageSize: PERFORMANCE_TABLE_PAGE_SIZE,
           canManageKpis: canManageKpis(profile.permissionCodes),
           currentEmployeeId: profile.employee.id,
         }}

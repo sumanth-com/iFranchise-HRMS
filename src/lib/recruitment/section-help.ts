@@ -102,17 +102,17 @@ export const HIRING_SECTION_HELP = {
       {
         label: "What this page is for",
         detail:
-          "Run pre-joining onboarding for new hires — documents, acknowledgements, and reviews before company account creation.",
+          "After an offer is sent, the person appears here. HR sends a secure onboarding link so they can complete documents before a company account is created.",
       },
       {
         label: "Who appears here",
         detail:
-          "Candidates with accepted offers (or HR-started cases) show until onboarding is completed or cancelled.",
+          "Anyone with a sent or accepted offer is listed automatically. Use Send invitation or Resend invitation on that row — there is no separate New Hire form.",
       },
       {
         label: "Statuses",
         detail:
-          "Track each case through in-progress, review, completed, rejected, or cancelled so nothing is missed before day one.",
+          "Draft means the offer is in, but the invite is not sent yet. Invitation sent / viewed, documents uploaded, then HR review through to employee created.",
       },
       {
         label: "After completion",
