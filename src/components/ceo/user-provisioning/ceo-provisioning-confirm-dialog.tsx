@@ -32,11 +32,11 @@ const COPY: Record<
     body: "You can send a new invitation later if needed.",
   },
   delete: {
-    title: "Delete user record?",
+    title: "Delete user permanently?",
     description: (name, email) =>
-      `This will permanently remove ${name} (${email}) from User Provisioning and delete their pending profile.`,
-    confirm: "Yes, delete user",
-    body: "This action cannot be undone. Use this to fully remove a pending or cancelled invite.",
+      `This will permanently remove ${name} (${email}) from the entire portal.`,
+    confirm: "Delete permanently",
+    body: "This will remove their account, login access, pending invitations, profile, and all associated HRMS records. This action cannot be undone. The same email can be re-invited later as a fresh user.",
   },
   deactivate: {
     title: "Deactivate user?",
