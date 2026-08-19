@@ -15,9 +15,11 @@ import {
   UserRound,
   Users,
 } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import { CeoProvisioningStatusBadge } from "@/components/ceo/user-provisioning/ceo-provisioning-status-badge";
 import { Button } from "@/components/common/button";
+import { FilterSelect } from "@/components/common/filter-select";
 import { EmployeeAvatar } from "@/components/employees/employee-avatar";
 import {
   DropdownMenu,
@@ -241,6 +243,12 @@ export function CeoProvisioningPeople({
   onAction,
 }: CeoProvisioningPeopleProps) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  const filteredUsers = useMemo(() => {
+    if (statusFilter === "all") return users;
+    return users.filter((u) => u.invitationStatus === statusFilter);
+  }, [users, statusFilter]);
 
   return (
     <section className="rounded-xl border bg-card p-4 shadow-sm">
@@ -252,12 +260,24 @@ export function CeoProvisioningPeople({
             Invited and active portal users, including pending invitations.
           </p>
         </div>
+        <FilterSelect
+          className="w-[140px] shrink-0"
+          items={[
+            { value: "all", label: "All statuses" },
+            { value: "pending", label: "Pending" },
+            { value: "accepted", label: "Accepted" },
+            { value: "deactivated", label: "Deactivated" },
+          ]}
+          value={statusFilter}
+          placeholder="All statuses"
+          onValueChange={setStatusFilter}
+        />
         {isRefreshing && users.length > 0 ? (
           <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
         ) : null}
       </div>
 
-      {users.length === 0 ? (
+      {filteredUsers.length === 0 ? (
         <p className="py-12 text-center text-sm text-muted-foreground">
           No executive users yet. Use “Invite User” to get started.
         </p>
@@ -269,7 +289,7 @@ export function CeoProvisioningPeople({
               : "grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
           }
         >
-          {users.map((user) => (
+          {filteredUsers.map((user) => (
             <PersonCard
               key={user.employeeId}
               user={user}
