@@ -193,7 +193,7 @@ export function GoalDetailModal({
         return {
           ...prev,
           milestones,
-          goalStatus: snapshot?.goalStatus ?? prev.goalStatus,
+          goalStatus: (snapshot?.goalStatus as typeof prev.goalStatus) ?? prev.goalStatus,
           currentProgress: snapshot?.currentProgress ?? prev.currentProgress,
           completedMilestones:
             snapshot?.completedMilestones ??
@@ -204,7 +204,7 @@ export function GoalDetailModal({
       if (snapshot) {
         onChanged?.({
           goalId: detail.id,
-          goalStatus: snapshot.goalStatus,
+          goalStatus: snapshot.goalStatus as GoalStatus,
           currentProgress: snapshot.currentProgress,
           completedMilestones: snapshot.completedMilestones,
           milestoneCount: snapshot.milestoneCount,
