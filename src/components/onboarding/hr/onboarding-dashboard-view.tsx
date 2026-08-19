@@ -47,6 +47,10 @@ function statusBadgeClass(status: string) {
   if (status === "rejected" || status === "cancelled") return "bg-red-100 text-red-800";
   if (status === "corrections_requested") return "bg-orange-100 text-orange-800";
   if (status === "draft") return "bg-sky-100 text-sky-800";
+  if (status === "invitation_sent") return "bg-blue-100 text-blue-800";
+  if (status === "invitation_viewed") return "bg-violet-100 text-violet-800";
+  if (status === "in_progress" || status === "documents_uploaded") return "bg-indigo-100 text-indigo-800";
+  if (status === "approved") return "bg-emerald-100 text-emerald-800";
   return "bg-slate-100 text-slate-700";
 }
 
@@ -218,11 +222,11 @@ export function OnboardingDashboardView({
                 <th className="p-3 font-medium">Joining</th>
                 <th className="p-3 font-medium">Progress</th>
                 <th className="p-3 font-medium">Status</th>
-                <th className="p-3 font-medium" />
+                <th className="w-[220px] p-3 font-medium" />
               </tr>
             </thead>
             <tbody>
-              {cases.data.map((row) => (
+              {cases.data.filter((row) => !["cancelled", "archived"].includes(row.status)).map((row) => (
                 <tr key={row.id} className="border-t hover:bg-muted/30">
                   <td className="p-3">
                     <div className="font-medium">{row.fullName}</div>
@@ -232,7 +236,7 @@ export function OnboardingDashboardView({
                   <td className="p-3">{row.joiningDate ?? "—"}</td>
                   <td className="p-3">{row.completionPercent}%</td>
                   <td className="p-3">
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(row.status)}`}>
+                    <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${statusBadgeClass(row.status)}`}>
                       {ONBOARDING_STATUS_LABELS[row.status]}
                     </span>
                   </td>
