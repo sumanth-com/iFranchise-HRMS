@@ -112,11 +112,8 @@ export function OfferLetterWorkspace({
     setPreviewUrl(null);
   }, [activeFile]);
 
-  useEffect(() => {
-    if (!latestOffer?.id || activeFile || !hasStoredLetter || !canPreviewPdf) return;
-
-    setPreviewUrl(`/api/recruitment/offers/${latestOffer.id}/pdf`);
-  }, [latestOffer?.id, activeFile, hasStoredLetter, canPreviewPdf]);
+  // Only show preview for locally uploaded files (blob URLs work reliably)
+  // Server-stored PDFs are not previewed to avoid CSP/iframe blocking issues
 
   function handleFileChange(file: File | null) {
     if (!file) {

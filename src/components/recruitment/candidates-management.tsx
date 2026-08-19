@@ -325,14 +325,6 @@ export function CandidatesManagement({
           </div>
           <LabeledSelect
             items={[
-              { value: "all", label: "All departments" },
-              ...lookups.departments.map((d) => ({ value: d.id, label: d.label })),
-            ]}
-            value={localFilters.departmentId ?? "all"}
-            onValueChange={(v) => updateParams({ departmentId: v === "all" ? undefined : v })}
-          />
-          <LabeledSelect
-            items={[
               { value: "all", label: "All positions" },
               ...lookups.jobs.map((j) => ({ value: j.id, label: j.label })),
             ]}

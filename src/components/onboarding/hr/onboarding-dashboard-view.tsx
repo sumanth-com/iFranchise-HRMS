@@ -138,6 +138,12 @@ export function OnboardingDashboardView({
         return;
       }
       toast.success(result.message);
+      // Immediately remove from local state
+      setCases((prev) => ({
+        ...prev,
+        data: prev.data.filter((c) => c.id !== deleteTarget.id),
+        total: prev.total - 1,
+      }));
       setDeleteTarget(null);
       refresh(filters);
     });
