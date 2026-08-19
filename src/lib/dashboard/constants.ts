@@ -1,5 +1,6 @@
 import { attendanceTeamListUrl } from "@/lib/attendance/constants";
 import { HR_PORTAL_HOME } from "@/lib/auth/portal-paths";
+import { HR_HUB_ROUTES } from "@/lib/dashboard/hr-hub-routes";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
 import { EXIT_ROUTES } from "@/lib/exit/constants";
 import { leaveTeamListUrl } from "@/lib/leave/constants";
@@ -20,7 +21,7 @@ export const DASHBOARD_QUICK_ACTIONS = [
   },
 ] as const;
 
-/** KPI cards only — no overlap with Priority Tasks. Administration team routes. */
+/** KPI cards only — no overlap with action cards. Administration team routes. */
 export const DASHBOARD_KPI_LINKS = {
   totalEmployees: EMPLOYEE_ROUTES.list,
   presentToday: attendanceTeamListUrl({ attendanceStatus: "present" }),
@@ -30,9 +31,10 @@ export const DASHBOARD_KPI_LINKS = {
   exitRequests: EXIT_ROUTES.clearance,
 } as const;
 
+/** Priority focus card on HR Overview — single most useful actionable task. */
 export const DASHBOARD_ACTION_LINKS = {
-  interviewsToday: RECRUITMENT_ROUTES.interviews,
-  probation: EMPLOYEE_ROUTES.list,
+  onboardingReview: RECRUITMENT_ROUTES.onboarding,
+  documentsExpiring: `${HR_HUB_ROUTES.teamDocuments}/expiring`,
+  activeCandidates: RECRUITMENT_ROUTES.candidates,
   payrollDue: payrollTeamListUrl(),
-  offersPending: RECRUITMENT_ROUTES.offers,
 } as const;

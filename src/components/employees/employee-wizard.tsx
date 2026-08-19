@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { PhoneInput } from "@/components/common/phone-input";
+import { SearchableSelect } from "@/components/common/searchable-select";
 import { Label } from "@/components/ui/label";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import {
@@ -27,6 +28,7 @@ import {
   EMPLOYMENT_STATUS_LABELS,
   WIZARD_STEPS,
 } from "@/lib/employees/constants";
+import { COUNTRIES, INDIAN_STATES, STATE_DISTRICTS } from "@/lib/geo/india";
 import {
   employeeAddressStepSchema,
   employeeBasicStepSchema,
@@ -133,7 +135,11 @@ export function EmployeeWizard({ lookups }: EmployeeWizardProps) {
     [lookups.designations],
   );
   const employmentTypeItems = useMemo(
-    () => withSelectOption(toLookupSelectItems(lookups.employmentTypes), { value: "none", label: "None" }),
+    () =>
+      withSelectOption(toLookupSelectItems(lookups.employmentTypes, { showCode: false }), {
+        value: "none",
+        label: "None",
+      }),
     [lookups.employmentTypes],
   );
   const managerItems = useMemo(
@@ -381,20 +387,51 @@ export function EmployeeWizard({ lookups }: EmployeeWizardProps) {
             <Input id="addressLine2" {...addressForm.register("addressLine2")} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="city">City</Label>
-            <Input id="city" {...addressForm.register("city")} />
+            <Label>State</Label>
+            <SearchableSelect
+              options={INDIAN_STATES.map((state) => ({ value: state, label: state }))}
+              value={addressForm.watch("state") || null}
+              onValueChange={(value) => {
+                addressForm.setValue("state", value ?? "", { shouldValidate: true });
+                addressForm.setValue("city", "");
+              }}
+              placeholder="Search state…"
+              allowNone={false}
+            />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="state">State</Label>
-            <Input id="state" {...addressForm.register("state")} />
+            <Label>City / District</Label>
+            <SearchableSelect
+              options={(STATE_DISTRICTS[addressForm.watch("state") || ""] ?? []).map((district) => ({
+                value: district,
+                label: district,
+              }))}
+              value={addressForm.watch("city") || null}
+              onValueChange={(value) =>
+                addressForm.setValue("city", value ?? "", { shouldValidate: true })
+              }
+              placeholder="Search city…"
+              allowNone={false}
+              emptyMessage={
+                addressForm.watch("state") ? "No districts found" : "Select a state first"
+              }
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="postalCode">Postal code</Label>
             <Input id="postalCode" {...addressForm.register("postalCode")} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="country">Country</Label>
-            <Input id="country" {...addressForm.register("country")} />
+            <Label>Country</Label>
+            <SearchableSelect
+              options={COUNTRIES.map((country) => ({ value: country, label: country }))}
+              value={addressForm.watch("country") || null}
+              onValueChange={(value) =>
+                addressForm.setValue("country", value ?? "", { shouldValidate: true })
+              }
+              placeholder="Search country…"
+              allowNone={false}
+            />
           </div>
         </div>
       ) : null}

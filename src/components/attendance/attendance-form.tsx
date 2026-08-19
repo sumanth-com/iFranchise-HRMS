@@ -178,6 +178,7 @@ export function AttendanceForm({
           <Input
             id="attendanceDate"
             type="date"
+            max={new Date().toISOString().slice(0, 10)}
             disabled={isPending}
             {...form.register("attendanceDate")}
           />
@@ -203,6 +204,11 @@ export function AttendanceForm({
           <Input
             id="checkOutAt"
             type="time"
+            max={
+              form.watch("attendanceDate") === new Date().toISOString().slice(0, 10)
+                ? new Date().toTimeString().slice(0, 5)
+                : undefined
+            }
             disabled={isPending}
             {...form.register("checkOutAt")}
           />

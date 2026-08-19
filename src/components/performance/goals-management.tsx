@@ -414,7 +414,7 @@ export function GoalsTable({
         variant="bar"
         showDepartment={false}
         showCycle={false}
-        className="rounded-lg border bg-muted/10 p-3 xl:grid-cols-[minmax(14rem,1.2fr)_repeat(4,minmax(8.5rem,1fr))]"
+        className="rounded-lg border bg-muted/10 p-3 xl:grid-cols-[minmax(12rem,1fr)_minmax(11rem,1.2fr)_repeat(3,minmax(8rem,1fr))]"
         onFiltersChange={handleFiltersChange}
         extraFilters={
           <div className="contents">

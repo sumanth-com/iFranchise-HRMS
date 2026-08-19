@@ -5,10 +5,14 @@ export type SelectItemOption = {
   label: string;
 };
 
-export function toLookupSelectItems(options: LookupOption[]): SelectItemOption[] {
+export function toLookupSelectItems(
+  options: LookupOption[],
+  config?: { showCode?: boolean },
+): SelectItemOption[] {
+  const showCode = config?.showCode ?? true;
   return options.map((option) => ({
     value: option.id,
-    label: option.code ? `${option.label} (${option.code})` : option.label,
+    label: showCode && option.code ? `${option.label} (${option.code})` : option.label,
   }));
 }
 
@@ -37,7 +41,7 @@ export function getMonthSelectItems(): SelectItemOption[] {
 }
 
 export function getYearSelectItems(
-  years: number[] = [2025, 2026, 2027],
+  years: number[] = [2025, 2026, 2027, 2028],
 ): SelectItemOption[] {
   return years.map((year) => ({
     value: String(year),

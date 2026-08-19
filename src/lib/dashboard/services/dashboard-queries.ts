@@ -16,6 +16,7 @@ import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { ASSETS_ROUTES } from "@/lib/assets/constants";
 import { DASHBOARD_ACTION_LINKS } from "@/lib/dashboard/constants";
 import { DOCUMENTS_ROUTES } from "@/lib/documents/constants";
+import { getExpiringSummary } from "@/lib/documents/services/document-queries";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
 import { EXIT_ROUTES } from "@/lib/exit/constants";
 import { getExitSummary } from "@/lib/exit/services/exit-queries";
@@ -25,6 +26,7 @@ import { ORGANIZATION_ROUTES } from "@/lib/organization/constants";
 import { listHolidays } from "@/lib/organization/services/org-queries";
 import { PAYROLL_ROUTES, PAYROLL_STATUS_LABELS } from "@/lib/payroll/constants";
 import { getPayrollSummary } from "@/lib/payroll/services/payroll-queries";
+import { getOnboardingDashboardStats } from "@/lib/onboarding/services/onboarding-queries";
 import { RECRUITMENT_ROUTES } from "@/lib/recruitment/constants";
 import {
   getHiringAnalytics,
@@ -237,6 +239,8 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
     recentPayrollRes,
     auditRes,
     salaryMetaRes,
+    onboardingStats,
+    expiringDocs,
   ] = await Promise.all([
     getAttendanceSummary(supabase, profile),
     getLeaveSummary(supabase, profile),
@@ -325,6 +329,8 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
       .eq("employees.organization_id", organizationId)
       .is("deleted_at", null)
       .eq("status", "active"),
+    getOnboardingDashboardStats(supabase, organizationId),
+    getExpiringSummary(supabase, profile),
   ]);
 
   if (employeesRes.error) throw new Error(employeesRes.error.message);
@@ -484,23 +490,26 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
     (interview) => interview.interviewDate === today,
   ).length;
 
-  const offersPending = recruitment.offersPending ?? 0;
+  const onboardingAwaitingReview = onboardingStats.pendingReview;
+  const documentsExpiring =
+    expiringDocs.next30Days + expiringDocs.expired + expiringDocs.expiringToday;
+  const activeCandidates = recruitment.activeCandidates ?? 0;
 
-  // Priority Tasks — actionable HR items only (no KPI duplicates).
-  const tasks: DashboardTaskItem[] = [
+  // Single priority card — first actionable item by HR urgency order.
+  const actionCandidates: DashboardTaskItem[] = [
     {
-      id: "interviews-today",
-      label: "Interviews Today",
-      count: interviewsToday,
-      href: DASHBOARD_ACTION_LINKS.interviewsToday,
-      urgency: interviewsToday > 0 ? "medium" : "low",
+      id: "onboarding-review",
+      label: "Onboarding Awaiting Review",
+      count: onboardingAwaitingReview,
+      href: DASHBOARD_ACTION_LINKS.onboardingReview,
+      urgency: onboardingAwaitingReview > 0 ? "high" : "low",
     },
     {
-      id: "probation-ending",
-      label: "Employees Completing Probation",
-      count: probationEndingSoon,
-      href: DASHBOARD_ACTION_LINKS.probation,
-      urgency: probationEndingSoon > 0 ? "medium" : "low",
+      id: "documents-expiring",
+      label: "Documents Expiring Soon",
+      count: documentsExpiring,
+      href: DASHBOARD_ACTION_LINKS.documentsExpiring,
+      urgency: documentsExpiring > 0 ? "high" : "low",
     },
     {
       id: "payroll-due",
@@ -510,13 +519,20 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
       urgency: payrollDue > 0 ? "high" : "low",
     },
     {
-      id: "offers-pending",
-      label: "Pending Recruitment Offers",
-      count: offersPending,
-      href: DASHBOARD_ACTION_LINKS.offersPending,
-      urgency: offersPending > 0 ? "medium" : "low",
+      id: "active-candidates",
+      label: "Candidates in Pipeline",
+      count: activeCandidates,
+      href: DASHBOARD_ACTION_LINKS.activeCandidates,
+      urgency: activeCandidates > 0 ? "medium" : "low",
     },
   ];
+
+  const priorityTask =
+    actionCandidates.find((item) => (item.count ?? 0) > 0) ??
+    actionCandidates.find((item) => item.id === "payroll-due") ??
+    actionCandidates[0];
+
+  const tasks: DashboardTaskItem[] = [priorityTask];
 
   const auditRows = ((auditRes.data ?? []) as LooseRow[]).filter(isMeaningfulActivity);
   const activityUserIds = [
@@ -686,7 +702,7 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
       upcomingBirthdaysCount: upcomingBirthdays.length,
       upcomingAnniversariesCount: upcomingAnniversaries.length,
       probationEndingSoon,
-      documentsExpiring: 0,
+      documentsExpiring,
       assetsPendingReturn: exitSummary.assetsPendingReturn || 0,
       interviewsToday,
       birthdaysToday: upcomingBirthdays.filter((event) => event.date === today).length,

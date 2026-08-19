@@ -68,16 +68,21 @@ export function KpiQuickAssign({ employees, templates, canAssign, onAssigned }: 
   });
 
   const templateOptions = useMemo(
-    () => [
-      ...BUILTIN_KPI_PRESETS.map((preset) => ({
-        value: `preset:${preset.id}`,
-        label: preset.name,
-      })),
-      ...templates.map((template) => ({
-        value: `saved:${template.id}`,
-        label: `${template.name} (saved)`,
-      })),
-    ],
+    () => {
+      const presetNames = new Set(BUILTIN_KPI_PRESETS.map((p) => p.name.toLowerCase()));
+      return [
+        ...BUILTIN_KPI_PRESETS.map((preset) => ({
+          value: `preset:${preset.id}`,
+          label: preset.name,
+        })),
+        ...templates
+          .filter((t) => !presetNames.has(t.name.toLowerCase()))
+          .map((template) => ({
+            value: `saved:${template.id}`,
+            label: template.name,
+          })),
+      ];
+    },
     [templates],
   );
 

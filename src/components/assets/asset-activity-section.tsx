@@ -50,7 +50,7 @@ const TYPE_ITEMS = [
   { value: "all", label: "All activity" },
   { value: "report", label: "Reports" },
   { value: "replace", label: "Replace" },
-  { value: "status", label: "Status" },
+  { value: "assigned", label: "Assigned" },
 ];
 
 const MONTH_ITEMS = [
@@ -126,7 +126,7 @@ export function AssetActivitySection({
     return activity.filter((row) => {
       if (activityType === "report" && row.kind !== "issue_reported") return false;
       if (activityType === "replace" && row.kind !== "replacement_requested") return false;
-      if (activityType === "status" && row.kind !== "status_reported") return false;
+      if (activityType === "assigned" && row.kind !== "assigned") return false;
       const parsed = parseISO(row.performedAt);
       if (isValid(parsed)) {
         if (month !== "all" && parsed.getMonth() + 1 !== Number(month)) return false;

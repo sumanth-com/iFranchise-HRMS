@@ -240,6 +240,23 @@ export function BonusTable({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
+  const now = new Date();
+  const [monthFilter, setMonthFilter] = useState(String(now.getMonth() + 1));
+  const [yearFilter, setYearFilter] = useState(String(now.getFullYear()));
+
+  const filteredRecords = useMemo(() => {
+    return records.filter((r) => {
+      const parts = r.bonusMonth?.match(/(\w+)\s+(\d{4})/);
+      if (!parts) return true;
+      const monthNames = ["january","february","march","april","may","june","july","august","september","october","november","december"];
+      const rMonth = monthNames.indexOf(parts[1].toLowerCase()) + 1;
+      const rYear = Number(parts[2]);
+      if (monthFilter && monthFilter !== "all" && rMonth !== Number(monthFilter)) return false;
+      if (yearFilter && yearFilter !== "all" && rYear !== Number(yearFilter)) return false;
+      return true;
+    });
+  }, [records, monthFilter, yearFilter]);
+
   const updateParams = useCallback(
     (updates: Record<string, string | undefined>) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -362,13 +379,33 @@ export function BonusTable({
     [canApprove, isPending, router, startTransition],
   );
 
-  const table = useReactTable({ data: records, columns, getCoreRowModel: getCoreRowModel() });
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const table = useReactTable({ data: filteredRecords, columns, getCoreRowModel: getCoreRowModel() });
+  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / pageSize));
+
+  const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => ({
+    value: String(i + 1),
+    label: new Date(2000, i, 1).toLocaleString("en-IN", { month: "long" }),
+  }));
+  const YEAR_OPTIONS = [2025, 2026, 2027, 2028].map((y) => ({ value: String(y), label: String(y) }));
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <LabeledSelect
+          items={[{ value: "all", label: "All months" }, ...MONTH_OPTIONS]}
+          value={monthFilter}
+          onValueChange={setMonthFilter}
+          triggerClassName="w-[140px]"
+        />
+        <LabeledSelect
+          items={[{ value: "all", label: "All years" }, ...YEAR_OPTIONS]}
+          value={yearFilter}
+          onValueChange={setYearFilter}
+          triggerClassName="w-[100px]"
+        />
+      </div>
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-        {records.length === 0 ? (
+        {filteredRecords.length === 0 ? (
           <EmptyState
             title="No bonuses yet"
             description={

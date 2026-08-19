@@ -72,6 +72,7 @@ export type ReportFilters = {
   departmentId?: string;
   designationId?: string;
   employeeId?: string;
+  leaveTypeId?: string;
   status?: string;
   month?: number;
   year?: number;
@@ -130,6 +131,7 @@ export type ReportsLookups = {
   departments: { id: string; label: string }[];
   designations: { id: string; label: string }[];
   employees: { id: string; label: string }[];
+  leaveTypes: { id: string; label: string }[];
 };
 
 export type ReportScheduleItem = {

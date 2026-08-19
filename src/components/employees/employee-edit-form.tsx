@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { PhoneInput } from "@/components/common/phone-input";
+import { SearchableSelect } from "@/components/common/searchable-select";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -25,6 +26,7 @@ import {
   resolveEmployeeModuleRoutes,
   type EmployeeModuleRoutes,
 } from "@/lib/employees/constants";
+import { COUNTRIES, INDIAN_STATES, STATE_DISTRICTS } from "@/lib/geo/india";
 import {
   employeeUpdateSchema,
   type EmployeeUpdateInput,
@@ -90,7 +92,7 @@ export function EmployeeEditForm({
 
   const employmentTypeItems = [
     { value: "none", label: "None" },
-    ...toLookupSelectItems(lookups.employmentTypes),
+    ...toLookupSelectItems(lookups.employmentTypes, { showCode: false }),
   ];
 
   const managerItems = [
@@ -381,20 +383,49 @@ export function EmployeeEditForm({
             <Input id="addressLine2" {...form.register("addressLine2")} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="city">City</Label>
-            <Input id="city" {...form.register("city")} />
+            <Label>State</Label>
+            <SearchableSelect
+              options={INDIAN_STATES.map((state) => ({ value: state, label: state }))}
+              value={form.watch("state") || null}
+              onValueChange={(value) => {
+                form.setValue("state", value ?? "", { shouldValidate: true });
+                form.setValue("city", "");
+              }}
+              placeholder="Search state…"
+              allowNone={false}
+            />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="state">State</Label>
-            <Input id="state" {...form.register("state")} />
+            <Label>City / District</Label>
+            <SearchableSelect
+              options={(STATE_DISTRICTS[form.watch("state") || ""] ?? []).map((district) => ({
+                value: district,
+                label: district,
+              }))}
+              value={form.watch("city") || null}
+              onValueChange={(value) =>
+                form.setValue("city", value ?? "", { shouldValidate: true })
+              }
+              placeholder="Search city…"
+              allowNone={false}
+              emptyMessage={form.watch("state") ? "No districts found" : "Select a state first"}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="postalCode">Postal code</Label>
             <Input id="postalCode" {...form.register("postalCode")} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="country">Country</Label>
-            <Input id="country" {...form.register("country")} />
+            <Label>Country</Label>
+            <SearchableSelect
+              options={COUNTRIES.map((country) => ({ value: country, label: country }))}
+              value={form.watch("country") || null}
+              onValueChange={(value) =>
+                form.setValue("country", value ?? "", { shouldValidate: true })
+              }
+              placeholder="Search country…"
+              allowNone={false}
+            />
           </div>
         </div>
       </div>

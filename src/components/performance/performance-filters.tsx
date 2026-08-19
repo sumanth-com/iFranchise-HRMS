@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import type { LookupOption } from "@/types/employee";
 
 const FILTER_TRIGGER = "h-9 w-full min-w-0";
-const FILTER_CONTENT = "min-w-[var(--anchor-width)] w-[var(--anchor-width)] max-h-60";
+const FILTER_CONTENT = "min-w-[18rem] w-max max-h-60";
 
 export const PERFORMANCE_MONTH_ITEMS = [
   { value: "all", label: "All months" },
@@ -271,10 +271,10 @@ function PerformanceFiltersView({
 
   const barGridClass =
     dropdownCount <= 2
-      ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-[minmax(14rem,1.5fr)_repeat(2,minmax(10rem,1fr))]"
+      ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-[minmax(14rem,1.5fr)_minmax(13rem,1.4fr)_minmax(10rem,1fr)]"
       : dropdownCount === 3
-        ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-[minmax(14rem,1.4fr)_repeat(3,minmax(10rem,1fr))]"
-        : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-[minmax(14rem,1.3fr)_repeat(4,minmax(9.5rem,1fr))]";
+        ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-[minmax(14rem,1.4fr)_minmax(12rem,1.2fr)_repeat(2,minmax(10rem,1fr))]"
+        : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-[minmax(14rem,1.3fr)_minmax(12rem,1.2fr)_repeat(3,minmax(9.5rem,1fr))]";
 
   if (variant === "bar") {
     return (

@@ -29,6 +29,7 @@ export const reportFiltersSchema = z.object({
   departmentId: z.string().uuid().optional().or(z.literal("")),
   designationId: z.string().uuid().optional().or(z.literal("")),
   employeeId: z.string().uuid().optional().or(z.literal("")),
+  leaveTypeId: z.string().uuid().optional().or(z.literal("")),
   status: z.string().optional().or(z.literal("")),
   month: z.coerce.number().int().min(1).max(12).optional(),
   year: z.coerce.number().int().min(2000).max(2100).optional(),

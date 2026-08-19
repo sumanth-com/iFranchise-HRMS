@@ -140,7 +140,7 @@ export async function getReportsLookups(
   if (teamIds) {
     return getManagerReportsLookups(supabase, organizationId, teamIds);
   }
-  const [departments, designations, employees, executiveRoles] = await Promise.all([
+  const [departments, designations, employees, executiveRoles, leaveTypes] = await Promise.all([
     fromHrms(supabase, "departments")
       .select("id, name")
       .eq("organization_id", organizationId)
@@ -164,11 +164,17 @@ export async function getReportsLookups(
       .select("employee_id, user_id, roles:role_id(code)")
       .eq("organization_id", organizationId)
       .is("deleted_at", null),
+    fromHrms(supabase, "leave_types")
+      .select("id, name")
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .order("name"),
   ]);
 
   if (departments.error) throw new Error(departments.error.message);
   if (designations.error) throw new Error(designations.error.message);
   if (employees.error) throw new Error(employees.error.message);
+  if (leaveTypes.error) throw new Error(leaveTypes.error.message);
 
   const executiveEmployeeIds = new Set<string>();
   const executiveUserIds = new Set<string>();
@@ -198,6 +204,10 @@ export async function getReportsLookups(
         id: e.id,
         label: `${e.employee_code} — ${formatEmployeeName(e.first_name, e.last_name)}`,
       })),
+    leaveTypes: (leaveTypes.data ?? []).map((row: ReportRowLoose) => ({
+      id: row.id,
+      label: row.name,
+    })),
   };
 }
 
@@ -557,15 +567,29 @@ async function runAttendanceReport(
     .map((row) => {
       const emp = unwrapRelation(row.employees);
       const dept = unwrapRelation(emp?.departments);
+      const statusMap: Record<string, string> = {
+        present: "Present",
+        absent: "Absent",
+        late: "Late",
+        half_day: "Half Day",
+        holiday: "Holiday",
+        week_off: "Week Off",
+        on_leave: "On Leave",
+      };
+      const fmtTs = (ts: string | null) => {
+        if (!ts) return "—";
+        const d = new Date(ts);
+        return d.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+      };
       return {
         date: row.attendance_date,
         employeeCode: emp?.employee_code ?? "—",
         employeeName: formatEmployeeName(emp?.first_name, emp?.last_name),
         department: dept?.name ?? "—",
-        status: row.attendance_status,
-        checkIn: row.check_in_at ?? "",
-        checkOut: row.check_out_at ?? "",
-        overtimeHours: Number(row.overtime_hours ?? 0),
+        status: statusMap[row.attendance_status] ?? row.attendance_status,
+        checkIn: fmtTs(row.check_in_at),
+        checkOut: fmtTs(row.check_out_at),
+        overtimeHours: Number(row.overtime_hours ?? 0) > 0 ? `${Number(row.overtime_hours).toFixed(1)} hrs` : "—",
       };
     });
 
@@ -599,6 +623,7 @@ async function runLeaveReport(
     let query = fromHrms(supabase, "leave_balances")
       .select(
         `
+        leave_type_id,
         balance_days, used_days, allocated_days,
         employees:employee_id!inner(employee_code, first_name, last_name, department_id, organization_id),
         leave_types:leave_type_id(name)
@@ -608,10 +633,15 @@ async function runLeaveReport(
       .is("deleted_at", null)
       .limit(3000);
     if (filters.employeeId) query = query.eq("employee_id", filters.employeeId);
+    if (filters.leaveTypeId) query = query.eq("leave_type_id", filters.leaveTypeId);
     if (filters.teamEmployeeIds?.length) query = query.in("employee_id", filters.teamEmployeeIds);
     const { data, error } = await query;
     if (error) throw new Error(error.message);
     const rows = ((data ?? []) as ReportRowLoose[])
+      .filter((row) => {
+        if (!filters.leaveTypeId) return true;
+        return String(row.leave_type_id ?? "") === String(filters.leaveTypeId);
+      })
       .filter((row) => {
         if (!filters.departmentId) return true;
         return unwrapRelation(row.employees)?.department_id === filters.departmentId;
@@ -646,7 +676,7 @@ async function runLeaveReport(
   let query = fromHrms(supabase, "leave_requests")
     .select(
       `
-      id, start_date, end_date, total_days, leave_status, reason,
+      id, start_date, end_date, total_days, leave_status, reason, leave_type_id,
       employees:employee_id!inner(employee_code, first_name, last_name, department_id, organization_id),
       leave_types:leave_type_id(name)
     `,
@@ -659,6 +689,7 @@ async function runLeaveReport(
     .limit(3000);
 
   if (filters.employeeId) query = query.eq("employee_id", filters.employeeId);
+  if (filters.leaveTypeId) query = query.eq("leave_type_id", filters.leaveTypeId);
   if (filters.teamEmployeeIds?.length) query = query.in("employee_id", filters.teamEmployeeIds);
   if (key === "leave_rejected") query = query.eq("leave_status", "rejected");
   if (key === "leave_pending") query = query.eq("leave_status", "pending");
@@ -690,6 +721,10 @@ async function runLeaveReport(
   }
 
   const rows = ((data ?? []) as ReportRowLoose[])
+    .filter((row) => {
+      if (!filters.leaveTypeId) return true;
+      return String(row.leave_type_id ?? "") === String(filters.leaveTypeId);
+    })
     .filter((row) => {
       if (!filters.departmentId) return true;
       return unwrapRelation(row.employees)?.department_id === filters.departmentId;
@@ -986,9 +1021,10 @@ async function runPerformanceReport(
       )
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
-      .or(
-        `and(end_date.gte.${dateFrom},end_date.lte.${dateTo}),and(end_date.is.null,created_at.gte.${dateFrom},created_at.lte.${dateTo}T23:59:59)`,
-      )
+      // KPI completion report should be driven by when the KPI record was created/assigned in the selected month.
+      // Filtering only by `end_date` can return 0 rows even when there are KPIs active/assigned in that month.
+      .gte("created_at", dateFrom)
+      .lte("created_at", `${dateTo}T23:59:59`)
       .limit(2000);
     if (filters.employeeId) query = query.eq("employee_id", filters.employeeId);
     if (filters.teamEmployeeIds?.length) query = query.in("employee_id", filters.teamEmployeeIds);
@@ -1008,11 +1044,19 @@ async function runPerformanceReport(
       ],
       ((data ?? []) as ReportRowLoose[]).map((row) => {
         const emp = unwrapRelation(row.employees);
+        const kpiStatusRaw = String(row.kpi_status ?? "");
+        const statusLabel = kpiStatusRaw
+          ? kpiStatusRaw
+              .split("_")
+              .filter(Boolean)
+              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(" ")
+          : "—";
         return {
           employeeCode: emp?.employee_code ?? "—",
           employeeName: formatEmployeeName(emp?.first_name, emp?.last_name),
           title: row.title,
-          status: row.kpi_status,
+          status: statusLabel,
           completion: Number(row.completion_percentage ?? 0),
           endDate: row.end_date ?? "",
         };

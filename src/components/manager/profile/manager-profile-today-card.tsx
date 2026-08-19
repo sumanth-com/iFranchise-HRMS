@@ -17,11 +17,25 @@ import {
   formatWorkingDuration,
   getElapsedWorkingSeconds,
 } from "@/lib/manager/services/manager-self-attendance-service";
-import type { ManagerTodayAttendance } from "@/types/manager-self-attendance";
+import type {
+  ManagerAttendancePunchState,
+  ManagerTodayAttendance,
+} from "@/types/manager-self-attendance";
 
 type Props = {
   today: ManagerTodayAttendance;
 };
+
+function workflowHint(punchState: ManagerAttendancePunchState) {
+  switch (punchState) {
+    case "checked_in":
+      return "You're checked in. Tap Check Out when you finish for the day.";
+    case "checked_out":
+      return "Checked out for today. Update Check Out if you left later than recorded.";
+    default:
+      return "Tap Check In when you start work. Check-out stays available all day.";
+  }
+}
 
 export function ManagerProfileTodayCard({ today }: Props) {
   const router = useRouter();
@@ -47,6 +61,8 @@ export function ManagerProfileTodayCard({ today }: Props) {
   }, [today.checkInAt, today.checkOutAt]);
 
   const dateLabel = format(parseISO(today.attendanceDate), "do MMM yyyy");
+  const punchState =
+    today.punchState === "locked" ? "not_checked_in" : today.punchState;
 
   function runAction(action: "in" | "out" | "update") {
     startTransition(async () => {
@@ -86,7 +102,7 @@ export function ManagerProfileTodayCard({ today }: Props) {
               <span className="font-medium text-foreground">
                 {formatWorkingDuration(elapsedSeconds)}
               </span>
-              {today.lockMessage ? `. ${today.lockMessage}` : null}
+              . {workflowHint(punchState)}
             </p>
           </div>
 
@@ -110,40 +126,37 @@ export function ManagerProfileTodayCard({ today }: Props) {
         </div>
 
         <div className="shrink-0">
-          {today.punchState === "not_checked_in" ? (
+          {punchState === "not_checked_in" ? (
             <Button
-              disabled={isPending || today.isLocked}
+              disabled={isPending}
               onClick={() => runAction("in")}
-              className="min-w-40"
+              className="min-w-40 gap-2"
             >
+              <LogIn className="size-4" />
               Check In
             </Button>
           ) : null}
 
-          {today.punchState === "checked_in" ? (
+          {punchState === "checked_in" ? (
             <Button
               disabled={isPending}
               onClick={() => runAction("out")}
-              className="min-w-40"
+              className="min-w-40 gap-2"
             >
+              <LogOut className="size-4" />
               Check Out
             </Button>
           ) : null}
 
-          {today.punchState === "checked_out" ? (
+          {punchState === "checked_out" ? (
             <Button
               disabled={isPending}
               onClick={() => runAction("update")}
+              variant="outline"
               className="min-w-40 gap-2"
             >
               <RefreshCw className="size-4" />
               Update Check Out
-            </Button>
-          ) : null}
-
-          {today.punchState === "locked" ? (
-            <Button disabled className="min-w-40">
-              Attendance locked
             </Button>
           ) : null}
         </div>

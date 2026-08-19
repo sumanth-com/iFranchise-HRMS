@@ -390,7 +390,7 @@ export function BranchesManagement({
               <Input {...form.register("addressLine2")} />
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(11rem,1fr)_minmax(11rem,1fr)_minmax(7rem,0.7fr)_minmax(7rem,0.7fr)]">
             <div className="space-y-2">
               <Label>State</Label>
               <SearchableSelect

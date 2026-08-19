@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import {
@@ -14,6 +14,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
+import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { SalaryStructureDialog } from "@/components/payroll/salary-structure-dialog";
 import { useTeamPayrollHeaderActions } from "@/components/payroll/team-payroll-header-actions";
 import {
@@ -46,6 +47,25 @@ export function SalaryStructureTable({
   const [editingRecord, setEditingRecord] = useState<SalaryStructureItem | undefined>();
   const [deleting, setDeleting] = useState<SalaryStructureItem | null>(null);
   const [isDeletePending, startDeleteTransition] = useTransition();
+
+  const now = new Date();
+  const [monthFilter, setMonthFilter] = useState(String(now.getMonth() + 1));
+  const [yearFilter, setYearFilter] = useState(String(now.getFullYear()));
+
+  const filteredRecords = useMemo(() => {
+    return records.filter((r) => {
+      const d = new Date(r.effectiveFrom);
+      if (monthFilter && monthFilter !== "all" && d.getMonth() + 1 !== Number(monthFilter)) return false;
+      if (yearFilter && yearFilter !== "all" && d.getFullYear() !== Number(yearFilter)) return false;
+      return true;
+    });
+  }, [records, monthFilter, yearFilter]);
+
+  const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => ({
+    value: String(i + 1),
+    label: new Date(2000, i, 1).toLocaleString("en-IN", { month: "long" }),
+  }));
+  const YEAR_OPTIONS = [2025, 2026, 2027, 2028].map((y) => ({ value: String(y), label: String(y) }));
 
   const registerAddAction = useCallback(() => {
     setDialogMode("create");
@@ -170,13 +190,27 @@ export function SalaryStructureTable({
   ];
 
   const table = useReactTable({
-    data: records,
+    data: filteredRecords,
     columns,
     getCoreRowModel: getCoreRowModel(),
   });
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <LabeledSelect
+          items={[{ value: "all", label: "All months" }, ...MONTH_OPTIONS]}
+          value={monthFilter}
+          onValueChange={setMonthFilter}
+          triggerClassName="w-[140px]"
+        />
+        <LabeledSelect
+          items={[{ value: "all", label: "All years" }, ...YEAR_OPTIONS]}
+          value={yearFilter}
+          onValueChange={setYearFilter}
+          triggerClassName="w-[100px]"
+        />
+      </div>
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
         <table className="w-full text-sm">
           <TableHeader>

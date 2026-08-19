@@ -271,6 +271,7 @@ function showFiltersFor(module: ReportModuleKey) {
     monthYear: module === "payroll" || module === "performance",
     designation: module === "hr",
     employee: module !== "hr" && module !== "recruitment",
+    leaveType: module === "leave",
   };
 }
 
@@ -296,6 +297,7 @@ function buildFilters(
   dateTo: string,
   designationId: string,
   employeeId: string,
+  leaveTypeId: string,
   status: string,
   month?: number,
   year?: number,
@@ -309,6 +311,7 @@ function buildFilters(
     designationId:
       designationId && designationId !== ALL_OPTION.value ? designationId : undefined,
     employeeId: employeeId && employeeId !== ALL_OPTION.value ? employeeId : undefined,
+    leaveTypeId: leaveTypeId && leaveTypeId !== ALL_OPTION.value ? leaveTypeId : undefined,
     status: status && status !== ALL_OPTION.value ? status : undefined,
     month: hasPeriod ? month : undefined,
     year: hasPeriod ? year : undefined,
@@ -338,6 +341,7 @@ export function ModuleReportsView({
   );
   const [result, setResult] = useState<ReportResult | null>(initialResult);
   const [notice, setNotice] = useState<ReportNotice>("idle");
+  const [failedMessage, setFailedMessage] = useState<string | null>(null);
   const [appliedFilters, setAppliedFilters] = useState<ReportFilters | null>(
     initialResult ? defaultFilters ?? null : null,
   );
@@ -350,6 +354,9 @@ export function ModuleReportsView({
   );
   const [employeeId, setEmployeeId] = useState(
     defaultFilters?.employeeId ?? ALL_OPTION.value,
+  );
+  const [leaveTypeId, setLeaveTypeId] = useState(
+    defaultFilters?.leaveTypeId ?? ALL_OPTION.value,
   );
   const [status, setStatus] = useState(defaultFilters?.status ?? ALL_OPTION.value);
   const [month, setMonth] = useState(
@@ -382,6 +389,14 @@ export function ModuleReportsView({
     () => dedupeByValue(definitions.map((d) => ({ value: d.key, label: d.title }))),
     [definitions],
   );
+  const leaveTypeItems = useMemo(
+    () =>
+      dedupeByValue([
+        { value: ALL_OPTION.value, label: "All leave types" },
+        ...lookups.leaveTypes.map((item) => ({ value: item.id, label: item.label })),
+      ]),
+    [lookups.leaveTypes],
+  );
   const statusItems = useMemo(
     () =>
       dedupeByValue([
@@ -404,6 +419,7 @@ export function ModuleReportsView({
       dateTo,
       designationId,
       employeeId,
+      leaveTypeId,
       status,
       filterVisibility.monthYear ? selectedMonth : undefined,
       filterVisibility.monthYear ? selectedYear : undefined,
@@ -414,6 +430,7 @@ export function ModuleReportsView({
     setResult(null);
     setAppliedFilters(null);
     setNotice("idle");
+    setFailedMessage(null);
   }
 
   function changeFilter(next: string, current: string, setValue: (value: string) => void) {
@@ -437,11 +454,13 @@ export function ModuleReportsView({
         setResult(null);
         setAppliedFilters(null);
         setNotice("failed");
+        setFailedMessage(res.message);
         return;
       }
       setAppliedFilters(filters);
       setResult(res.data);
       setNotice(res.data.total === 0 ? "empty" : "idle");
+      setFailedMessage(null);
     });
   }
 
@@ -467,6 +486,8 @@ export function ModuleReportsView({
   const EmptyIcon = MODULE_EMPTY_ICONS[module] ?? CalendarDays;
   const growingFilter = filterVisibility.employee
     ? "employee"
+    : filterVisibility.leaveType
+      ? "leaveType"
     : filterVisibility.designation
       ? "designation"
       : "status";
@@ -474,7 +495,12 @@ export function ModuleReportsView({
   const showTable = Boolean(result && result.total > 0 && result.key === reportKey);
   const panelCopy =
     notice === "failed"
-      ? GENERATE_FAILED
+      ? {
+          ...GENERATE_FAILED,
+          description: failedMessage
+            ? `${GENERATE_FAILED.description} ${failedMessage}`
+            : GENERATE_FAILED.description,
+        }
       : notice === "need-period"
         ? NEED_PERIOD
         : notice === "empty"
@@ -592,6 +618,22 @@ export function ModuleReportsView({
               value={employeeId}
               onValueChange={(value) => changeFilter(value, employeeId, setEmployeeId)}
               placeholder="All employees"
+              triggerClassName="h-8 w-full"
+              contentClassName="w-max min-w-[18rem] max-w-[min(24rem,calc(100vw-2rem))] max-h-[min(18rem,calc(100dvh-8rem))]"
+            />
+          </div>
+        ) : null}
+        {filterVisibility.leaveType ? (
+          <div
+            className={cn(
+              growingFilter === "leaveType" ? "min-w-[170px] flex-1" : "w-[170px] shrink-0",
+            )}
+          >
+            <LabeledSelect
+              items={leaveTypeItems}
+              value={leaveTypeId}
+              onValueChange={(value) => changeFilter(value, leaveTypeId, setLeaveTypeId)}
+              placeholder="All leave types"
               triggerClassName="h-8 w-full"
               contentClassName="w-max min-w-[18rem] max-w-[min(24rem,calc(100vw-2rem))] max-h-[min(18rem,calc(100dvh-8rem))]"
             />

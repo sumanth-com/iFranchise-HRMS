@@ -2,7 +2,7 @@ import { differenceInMinutes, parseISO } from "date-fns";
 
 export const OFFICE_TIMEZONE = "Asia/Kolkata";
 export const OFFICE_CHECK_IN_TIME = "10:00";
-/** Check-in closes automatically at this office time. Checkout is never auto-locked. */
+/** Check-in closes automatically at this office time (legacy; self-service punch no longer locks). */
 export const OFFICE_CHECK_IN_LOCK_TIME = "10:07";
 export const OFFICE_CHECK_OUT_TIME = "19:00";
 

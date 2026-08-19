@@ -97,7 +97,7 @@ export function PayrollRunForm({
   defaultYear,
   canRun,
 }: PayrollRunFormProps) {
-  const [month, setMonth] = useState("");
+  const [month, setMonth] = useState(String(new Date().getMonth() + 1));
   const [year, setYear] = useState(String(defaultYear));
   const [panel, setPanel] = useState<PanelState>({ kind: "idle" });
   const [breakdownEmployee, setBreakdownEmployee] =

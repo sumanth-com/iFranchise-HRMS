@@ -109,9 +109,9 @@ export function AttendanceSummaryCards({
           </div>
         );
 
-        if (!clickable) {
+        if (!clickable || item.key === "totalEmployees") {
           return (
-            <div key={item.key} className={className}>
+            <div key={item.key} className={cn("min-w-0 rounded-xl border bg-card p-3.5 text-left shadow-sm", item.key === "totalEmployees" && item.bg)}>
               {content}
             </div>
           );

@@ -122,7 +122,7 @@ export function HrLeaveHubView({
       </div>
 
       {isTeamView ? (
-        <HrTeamLeaveView {...teamLeave} embedded />
+        <HrTeamLeaveView {...teamLeave} />
       ) : (
         <MyLeaveSelfServiceView
           canApply={canApply}

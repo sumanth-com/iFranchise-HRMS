@@ -277,17 +277,6 @@ export function HrLeaveDetailPopup({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Close
             </Button>
-            {showDelete ? (
-              <Button
-                type="button"
-                variant="destructive"
-                disabled={isPending}
-                onClick={() => setActionMode("delete")}
-              >
-                <Trash2 className="size-4" />
-                Delete
-              </Button>
-            ) : null}
             {showReject ? (
               <Button
                 type="button"
@@ -438,12 +427,6 @@ export function HrLeaveDetailPopup({
         </div>
       ) : (
         <div className="space-y-4">
-          {isFetching ? (
-            <p className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 className="size-3.5 animate-spin" />
-              Refreshing full details…
-            </p>
-          ) : null}
           {loadError ? (
             <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
               {loadError}
@@ -512,9 +495,9 @@ export function HrLeaveDetailPopup({
             </div>
           ) : null}
 
-          {(showApprove || showReject || showDelete) && (
+          {(showApprove || showReject) && (
             <p className="text-xs text-muted-foreground">
-              Use Accept, Reject, or Delete below to take action without leaving this page.
+              Use Accept or Reject below to take action without leaving this page.
             </p>
           )}
         </div>
