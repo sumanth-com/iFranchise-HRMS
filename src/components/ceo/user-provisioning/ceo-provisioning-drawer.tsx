@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { Ban, Loader2, Power, RotateCw, ShieldX } from "lucide-react";
+import { Ban, Loader2, Power, RotateCw, ShieldX, Trash2 } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 
 import { CeoProvisioningStatusBadge } from "@/components/ceo/user-provisioning/ceo-provisioning-status-badge";
@@ -72,9 +72,19 @@ export function CeoProvisioningDrawer({
   const accountStatus = user?.accountStatus;
   const showResend = accountStatus === "invitation_pending";
   const showCancel = accountStatus === "invitation_pending";
+  const showDelete =
+    user != null &&
+    !user.isSelf &&
+    (accountStatus === "invitation_pending" ||
+      accountStatus === "draft" ||
+      accountStatus === "invited" ||
+      user.invitationStatus === "cancelled" ||
+      user.invitationStatus === "pending" ||
+      user.invitationStatus === "expired");
   const showDeactivate = accountStatus === "active" && !user?.isSelf;
   const showReactivate = accountStatus === "suspended" || accountStatus === "inactive";
-  const hasQuickActions = showResend || showCancel || showDeactivate || showReactivate;
+  const hasQuickActions =
+    showResend || showCancel || showDelete || showDeactivate || showReactivate;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -209,6 +219,18 @@ export function CeoProvisioningDrawer({
                     >
                       <ShieldX className="size-3.5" />
                       Cancel invitation
+                    </Button>
+                  ) : null}
+                  {showDelete ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 text-destructive hover:text-destructive"
+                      onClick={() => onAction("delete", detail)}
+                    >
+                      <Trash2 className="size-3.5" />
+                      Delete user
                     </Button>
                   ) : null}
                   {showDeactivate ? (

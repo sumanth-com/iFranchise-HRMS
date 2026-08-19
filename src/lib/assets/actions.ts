@@ -11,6 +11,8 @@ import {
   createSignedAssetImageUrl,
   createVendor,
   deleteAsset,
+  deleteAssignedAsset,
+  deleteMaintenance,
   deleteVendor,
   getAssetQrDataUrl,
   returnAsset,
@@ -93,6 +95,36 @@ export async function saveAssetAction(formData: FormData, assetId?: string) {
     return {
       success: false as const,
       message: error instanceof Error ? error.message : "Failed to save asset",
+    };
+  }
+}
+
+export async function deleteAssignedAssetAction(assignmentId: string) {
+  try {
+    const profile = await requireServerAnyPermission(["asset.delete", "asset.edit"]);
+    const supabase = await createClient();
+    await deleteAssignedAsset(supabase, profile, assignmentId);
+    revalidateAssets();
+    return { success: true as const };
+  } catch (error) {
+    return {
+      success: false as const,
+      message: error instanceof Error ? error.message : "Failed to delete assigned asset",
+    };
+  }
+}
+
+export async function deleteMaintenanceAction(maintenanceId: string) {
+  try {
+    const profile = await requireServerAnyPermission(["asset.edit", "asset.delete"]);
+    const supabase = await createClient();
+    await deleteMaintenance(supabase, profile, maintenanceId);
+    revalidateAssets();
+    return { success: true as const };
+  } catch (error) {
+    return {
+      success: false as const,
+      message: error instanceof Error ? error.message : "Failed to delete record",
     };
   }
 }

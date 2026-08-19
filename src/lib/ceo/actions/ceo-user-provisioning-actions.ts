@@ -15,6 +15,7 @@ import {
 import {
   cancelExecutiveInvitation,
   deactivateExecutiveUser,
+  deleteProvisioningUser,
   inviteExecutiveUser,
   reactivateExecutiveUser,
   resendExecutiveInvitation,
@@ -85,6 +86,23 @@ export async function fetchCeoProvisioningUsersAction(
   const supabase = await createClient();
   const parsed = ceoProvisioningListParamsSchema.parse(params);
   return listCeoProvisioningUsers(supabase, profile, parsed);
+}
+
+export async function fetchUserProvisioningInviteRolesAction(): Promise<
+  | { success: true; roles: CeoUserProvisioningPageData["lookups"]["roles"] }
+  | { success: false; message: string }
+> {
+  try {
+    const profile = await requireServerAnyPermission(VIEW_PERMISSIONS);
+    const supabase = await createClient();
+    const lookups = await getCeoProvisioningLookups(supabase, profile);
+    return { success: true, roles: lookups.roles };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to load invite roles.",
+    };
+  }
 }
 
 export async function fetchCeoProvisioningUserDetailAction(
@@ -185,6 +203,17 @@ export async function cancelProvisioningInvitationAction(
     employeeId,
     cancelExecutiveInvitation,
     "Invitation cancelled.",
+    true,
+  );
+}
+
+export async function deleteProvisioningUserAction(
+  employeeId: string,
+): Promise<ActionResult> {
+  return runManageAction(
+    employeeId,
+    deleteProvisioningUser,
+    "User deleted successfully.",
     true,
   );
 }

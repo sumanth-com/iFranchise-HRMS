@@ -7,9 +7,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/common/select";
+import { cn } from "@/lib/utils";
 import type { LookupOption } from "@/types/employee";
 
 import { toEmployeeSelectItems, type SelectItemOption } from "./select-utils";
+
+export const FORM_SELECT_TRIGGER = "h-10 w-full min-w-0 bg-background";
+export const FORM_SELECT_CONTENT =
+  "min-w-[var(--anchor-width)] w-[var(--anchor-width)] max-h-60";
 
 type EmployeeSelectProps = {
   employees: LookupOption[];
@@ -59,6 +64,7 @@ type LabeledSelectProps = {
   contentClassName?: string;
   align?: "start" | "center" | "end";
   side?: "top" | "bottom" | "left" | "right";
+  alignItemWithTrigger?: boolean;
 };
 
 export function LabeledSelect({
@@ -72,6 +78,7 @@ export function LabeledSelect({
   contentClassName,
   align = "start",
   side = "bottom",
+  alignItemWithTrigger = true,
 }: LabeledSelectProps) {
   const safeValue = items.some((item) => item.value === value) ? value : null;
 
@@ -90,12 +97,13 @@ export function LabeledSelect({
       <SelectContent
         side={side}
         align={align}
-        alignItemWithTrigger={false}
-        className={contentClassName}
+        sideOffset={6}
+        alignItemWithTrigger={alignItemWithTrigger}
+        className={cn(FORM_SELECT_CONTENT, contentClassName)}
       >
         {items.map((item) => (
-          <SelectItem key={item.value} value={item.value}>
-            {item.label}
+          <SelectItem key={item.value} value={item.value} className="py-2">
+            <span className="block whitespace-normal leading-snug">{item.label}</span>
           </SelectItem>
         ))}
       </SelectContent>

@@ -9,6 +9,8 @@ import { EmployeeAssetCard } from "@/components/employee/assets/employee-asset-c
 import { EmployeeAssetDetailsDialog } from "@/components/employee/assets/employee-asset-details-dialog";
 import { EmployeeAssetIssueDialog } from "@/components/employee/assets/employee-asset-issue-dialog";
 import { EmployeeAssetReplacementDialog } from "@/components/employee/assets/employee-asset-replacement-dialog";
+import { EmployeeAssetStatusDialog } from "@/components/employee/assets/employee-asset-status-dialog";
+import { EmployeeAssetRequestsSection } from "@/components/employee/assets/employee-asset-requests-section";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import type { EmployeeAsset, EmployeeAssetsData } from "@/types/employee-assets";
 
@@ -30,6 +32,9 @@ export function EmployeeAssetsView({
 
   const [replaceAsset, setReplaceAsset] = useState<EmployeeAsset | null>(null);
   const [replaceOpen, setReplaceOpen] = useState(false);
+
+  const [statusAsset, setStatusAsset] = useState<EmployeeAsset | null>(null);
+  const [statusOpen, setStatusOpen] = useState(false);
 
   const query = search.trim().toLowerCase();
 
@@ -68,6 +73,10 @@ export function EmployeeAssetsView({
   const openReplace = (asset: EmployeeAsset) => {
     setReplaceAsset(asset);
     setReplaceOpen(true);
+  };
+  const openStatus = (asset: EmployeeAsset) => {
+    setStatusAsset(asset);
+    setStatusOpen(true);
   };
 
   const hasAnyAssets = data.assigned.length > 0 || data.history.length > 0;
@@ -157,6 +166,7 @@ export function EmployeeAssetsView({
                     asset={asset}
                     readOnly={readOnly}
                     onViewDetails={openDetails}
+                    onSendStatus={openStatus}
                     onReportIssue={openIssue}
                     onRequestReplacement={openReplace}
                   />
@@ -183,6 +193,7 @@ export function EmployeeAssetsView({
                     asset={asset}
                     readOnly={readOnly}
                     onViewDetails={openDetails}
+                    onSendStatus={openStatus}
                     onReportIssue={openIssue}
                     onRequestReplacement={openReplace}
                   />
@@ -193,11 +204,21 @@ export function EmployeeAssetsView({
         </>
       )}
 
+      <EmployeeAssetRequestsSection
+        requests={data.requests}
+        assets={[...data.assigned, ...data.history]}
+        readOnly={readOnly}
+      />
+
       <EmployeeAssetDetailsDialog
         asset={detailsAsset}
         open={detailsOpen}
         onOpenChange={setDetailsOpen}
         readOnly={readOnly}
+        onSendStatus={(asset) => {
+          setDetailsOpen(false);
+          openStatus(asset);
+        }}
         onReportIssue={(asset) => {
           setDetailsOpen(false);
           openIssue(asset);
@@ -209,6 +230,11 @@ export function EmployeeAssetsView({
       />
       {!readOnly ? (
         <>
+          <EmployeeAssetStatusDialog
+            asset={statusAsset}
+            open={statusOpen}
+            onOpenChange={setStatusOpen}
+          />
           <EmployeeAssetIssueDialog asset={issueAsset} open={issueOpen} onOpenChange={setIssueOpen} />
           <EmployeeAssetReplacementDialog
             asset={replaceAsset}

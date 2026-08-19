@@ -11,6 +11,7 @@ import {
   Power,
   RotateCw,
   ShieldX,
+  Trash2,
   UserRound,
   Users,
 } from "lucide-react";
@@ -35,7 +36,7 @@ type CeoProvisioningPeopleProps = {
   total: number;
   page: number;
   pageSize: number;
-  isLoading?: boolean;
+  isRefreshing?: boolean;
   busyEmployeeId?: string | null;
   onPageChange: (page: number) => void;
   onAction: (action: ProvisioningRowAction, user: CeoProvisioningUser) => void;
@@ -56,6 +57,18 @@ function canDeactivate(user: CeoProvisioningUser) {
 }
 function canReactivate(user: CeoProvisioningUser) {
   return user.accountStatus === "suspended" || user.accountStatus === "inactive";
+}
+
+function canDelete(user: CeoProvisioningUser) {
+  if (user.isSelf) return false;
+  return (
+    user.accountStatus === "invitation_pending" ||
+    user.accountStatus === "draft" ||
+    user.accountStatus === "invited" ||
+    user.invitationStatus === "cancelled" ||
+    user.invitationStatus === "pending" ||
+    user.invitationStatus === "expired"
+  );
 }
 
 function MetaRow({
@@ -83,7 +96,11 @@ function PersonCard({
   onAction: (action: ProvisioningRowAction, user: CeoProvisioningUser) => void;
 }) {
   const hasActions =
-    canResend(user) || canCancel(user) || canDeactivate(user) || canReactivate(user);
+    canResend(user) ||
+    canCancel(user) ||
+    canDelete(user) ||
+    canDeactivate(user) ||
+    canReactivate(user);
 
   return (
     <article className="group relative flex flex-col overflow-hidden rounded-xl border bg-card shadow-sm transition-all hover:border-primary/40 hover:shadow-md">
@@ -126,6 +143,15 @@ function PersonCard({
               >
                 <ShieldX className="mr-2 size-4" />
                 Cancel invitation
+              </DropdownMenuItem>
+            ) : null}
+            {canDelete(user) ? (
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => onAction("delete", user)}
+              >
+                <Trash2 className="mr-2 size-4" />
+                Delete user
               </DropdownMenuItem>
             ) : null}
             {canDeactivate(user) ? (
@@ -209,7 +235,7 @@ export function CeoProvisioningPeople({
   total,
   page,
   pageSize,
-  isLoading,
+  isRefreshing,
   busyEmployeeId,
   onPageChange,
   onAction,
@@ -220,24 +246,29 @@ export function CeoProvisioningPeople({
     <section className="rounded-xl border bg-card p-4 shadow-sm">
       <div className="mb-4 flex items-center gap-2">
         <Users className="size-4 text-muted-foreground" />
-        <div>
-          <h2 className="text-sm font-semibold">Executive Users</h2>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-semibold">Portal Users</h2>
           <p className="text-xs text-muted-foreground">
-            Invited and active high-privilege users · click a card to view details.
+            Invited and active portal users, including pending invitations.
           </p>
         </div>
+        {isRefreshing && users.length > 0 ? (
+          <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
+        ) : null}
       </div>
 
-      {isLoading ? (
-        <p className="py-12 text-center text-sm text-muted-foreground">
-          <Loader2 className="mx-auto size-4 animate-spin" />
-        </p>
-      ) : users.length === 0 ? (
+      {users.length === 0 ? (
         <p className="py-12 text-center text-sm text-muted-foreground">
           No executive users yet. Use “Invite User” to get started.
         </p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div
+          className={
+            isRefreshing
+              ? "grid gap-4 opacity-80 transition-opacity sm:grid-cols-2 xl:grid-cols-3"
+              : "grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+          }
+        >
           {users.map((user) => (
             <PersonCard
               key={user.employeeId}
@@ -259,7 +290,7 @@ export function CeoProvisioningPeople({
               type="button"
               variant="outline"
               size="sm"
-              disabled={page <= 1 || isLoading}
+              disabled={page <= 1 || isRefreshing}
               onClick={() => onPageChange(page - 1)}
             >
               Previous
@@ -271,7 +302,7 @@ export function CeoProvisioningPeople({
               type="button"
               variant="outline"
               size="sm"
-              disabled={page >= totalPages || isLoading}
+              disabled={page >= totalPages || isRefreshing}
               onClick={() => onPageChange(page + 1)}
             >
               Next

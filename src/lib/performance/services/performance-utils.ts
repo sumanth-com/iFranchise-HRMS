@@ -1,9 +1,10 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { formatCleanEmployeeName } from "@/lib/employees/parse-employee-name";
 
-import type { KpiAssignmentStatus, KpiMeasurementType } from "@/types/performance";
+import type { GoalStatus, KpiAssignmentStatus, KpiMeasurementType } from "@/types/performance";
 
 export function formatEmployeeName(firstName: string, lastName: string) {
-  return `${firstName} ${lastName}`.trim();
+  return formatCleanEmployeeName(firstName, lastName);
 }
 
 /** Minimum value for `<input type="datetime-local" />` (local time, no past slots). */
@@ -63,6 +64,29 @@ export function calculateCompletionRate(completed: number, total: number) {
   return Math.round((completed / total) * 100);
 }
 
+export function deriveGoalProgressStatus(input: {
+  goalStatus: GoalStatus;
+  completedMilestones: number;
+  milestoneCount: number;
+}): GoalStatus {
+  if (input.goalStatus === "cancelled") return "cancelled";
+  if (input.milestoneCount > 0 && input.completedMilestones >= input.milestoneCount) {
+    return "completed";
+  }
+  if (input.completedMilestones > 0) {
+    if (
+      input.goalStatus === "not_started" ||
+      input.goalStatus === "draft" ||
+      input.goalStatus === "completed"
+    ) {
+      return "in_progress";
+    }
+    return input.goalStatus;
+  }
+  if (input.goalStatus === "completed") return "not_started";
+  return input.goalStatus;
+}
+
 export function calculateKpiCompletion(
   current: number,
   target: number | null,
@@ -82,12 +106,13 @@ export function calculateKpiCompletion(
 export function deriveKpiStatus(
   completionPercentage: number,
   endDate: string | null,
-  currentValue: number,
+  _currentValue: number,
+  startDate?: string | null,
 ): KpiAssignmentStatus {
   const today = new Date().toISOString().slice(0, 10);
   if (completionPercentage >= 100) return "completed";
-  if (endDate && endDate < today && completionPercentage < 100) return "overdue";
-  if (currentValue > 0) return "in_progress";
+  if (endDate && endDate < today) return "overdue";
+  if (startDate && startDate <= today) return "in_progress";
   return "not_started";
 }
 

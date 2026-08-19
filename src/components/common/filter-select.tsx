@@ -47,9 +47,9 @@ export function FilterSelect({
         <SelectTrigger className={cn("h-9 w-full", triggerClassName)}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
-        <SelectContent align="start" className={contentClassName}>
+        <SelectContent align="start" sideOffset={4} className={cn("min-w-[10rem] p-1", contentClassName)}>
           {items.map((item) => (
-            <SelectItem key={item.value} value={item.value} className={itemClassName}>
+            <SelectItem key={item.value} value={item.value} className={cn("py-2", itemClassName)}>
               {item.label}
             </SelectItem>
           ))}

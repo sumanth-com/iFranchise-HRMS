@@ -35,9 +35,7 @@ export const inviteExecutiveUserSchema = z.object({
     .trim()
     .min(1, "Designation is required")
     .max(120, "Designation must be 120 characters or fewer"),
-  branchId: z.string().uuid("Select a branch"),
   employmentTypeId: z.string().uuid("Select an employment type"),
-  notes: z.string().trim().max(1000).optional(),
 });
 
 export const ceoProvisioningEmployeeIdSchema = z.object({

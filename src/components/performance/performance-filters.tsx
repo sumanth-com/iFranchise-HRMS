@@ -1,8 +1,10 @@
 "use client";
 
+import { format, isValid, parseISO } from "date-fns";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   useCallback,
+  useMemo,
   useTransition,
   type ChangeEvent,
   type KeyboardEvent,
@@ -17,7 +19,80 @@ import { cn } from "@/lib/utils";
 import type { LookupOption } from "@/types/employee";
 
 const FILTER_TRIGGER = "h-9 w-full min-w-0";
-const FILTER_CONTENT = "min-w-[var(--radix-select-trigger-width)]";
+const FILTER_CONTENT = "min-w-[var(--anchor-width)] w-[var(--anchor-width)] max-h-60";
+
+export const PERFORMANCE_MONTH_ITEMS = [
+  { value: "all", label: "All months" },
+  ...Array.from({ length: 12 }, (_, index) => ({
+    value: String(index + 1),
+    label: format(new Date(2026, index, 1), "MMMM"),
+  })),
+];
+
+export function currentMonthValue() {
+  return String(new Date().getMonth() + 1);
+}
+
+export function currentYearValue() {
+  return String(new Date().getFullYear());
+}
+
+export function buildYearItems() {
+  const currentYear = new Date().getFullYear();
+  return [
+    { value: "all", label: "All years" },
+    ...Array.from({ length: 5 }, (_, index) => ({
+      value: String(currentYear - index),
+      label: String(currentYear - index),
+    })),
+  ];
+}
+
+export function matchesAssignedPeriod(
+  isoDate: string | null | undefined,
+  month: string,
+  year: string,
+) {
+  if (month === "all" && year === "all") return true;
+  if (!isoDate) return false;
+  const parsed = parseISO(isoDate);
+  if (!isValid(parsed)) return false;
+  if (month !== "all" && parsed.getMonth() + 1 !== Number(month)) return false;
+  if (year !== "all" && parsed.getFullYear() !== Number(year)) return false;
+  return true;
+}
+
+export function MonthYearFilterFields({
+  month,
+  year,
+  onMonthChange,
+  onYearChange,
+}: {
+  month: string;
+  year: string;
+  onMonthChange: (value: string) => void;
+  onYearChange: (value: string) => void;
+}) {
+  const yearItems = useMemo(() => buildYearItems(), []);
+  return (
+    <div className="contents">
+      <LabeledSelect
+        items={PERFORMANCE_MONTH_ITEMS}
+        value={month}
+        onValueChange={onMonthChange}
+        triggerClassName={FILTER_TRIGGER}
+        contentClassName={FILTER_CONTENT}
+      />
+      <LabeledSelect
+        items={yearItems}
+        value={year}
+        onValueChange={onYearChange}
+        triggerClassName={FILTER_TRIGGER}
+        contentClassName={FILTER_CONTENT}
+      />
+    </div>
+  );
+}
 
 export type PerformanceFilterUpdates = Record<string, string | undefined>;
 

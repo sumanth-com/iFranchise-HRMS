@@ -2,7 +2,7 @@
 
 import { format } from "date-fns";
 import { Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -74,12 +74,13 @@ export function WorkLocationsManagement({
   statusParam = "status",
 }: Props) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [isDeletePending, startDeleteTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<WorkLocationListItem | null>(null);
   const [deleting, setDeleting] = useState<WorkLocationListItem | null>(null);
+  const [searchInput, setSearchInput] = useState(search);
+  const [statusFilter, setStatusFilter] = useState<string>(status ?? "all");
 
   const canCreate = canCreateOrganization(permissionCodes);
   const canEdit = canEditOrganization(permissionCodes);
@@ -101,32 +102,28 @@ export function WorkLocationsManagement({
     [statusItems],
   );
 
+  const filteredData = useMemo(() => {
+    let items = result.data;
+    const q = searchInput.trim().toLowerCase();
+    if (q) {
+      items = items.filter(
+        (loc) =>
+          loc.name.toLowerCase().includes(q) ||
+          (loc.branchName && loc.branchName.toLowerCase().includes(q)),
+      );
+    }
+    if (statusFilter && statusFilter !== "all") {
+      items = items.filter((loc) => loc.status === statusFilter);
+    }
+    return items;
+  }, [result.data, searchInput, statusFilter]);
+
   const form = useForm<WorkLocationFormInput>({
     resolver: zodResolver(workLocationFormSchema) as never,
     defaultValues: emptyForm,
   });
 
   const workingDays = form.watch("workingDays") ?? [];
-
-  function updateParams(patch: Record<string, string | undefined>) {
-    const params = new URLSearchParams(searchParams.toString());
-    Object.entries(patch).forEach(([key, value]) => {
-      const paramKey =
-        key === "page"
-          ? pageParam
-          : key === "search"
-            ? searchParam
-            : key === "status"
-              ? statusParam
-              : key;
-      if (!value || value === "all") params.delete(paramKey);
-      else params.set(paramKey, value);
-    });
-    if (!patch.page) params.delete(pageParam);
-    startTransition(() => {
-      router.push(`?${params.toString()}`);
-    });
-  }
 
 type WorkingDay = WorkLocationFormInput["workingDays"][number];
 
@@ -307,21 +304,17 @@ type WorkingDay = WorkLocationFormInput["workingDays"][number];
           <Input
             placeholder="Search locations…"
             className="h-9 pl-9"
-            defaultValue={search}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                updateParams({ search: (e.target as HTMLInputElement).value || undefined });
-              }
-            }}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
           />
         </div>
         <FilterSelect
           items={statusFilterItems}
-          value={status ?? "all"}
+          value={statusFilter}
           placeholder="All statuses"
           className="sm:w-44"
           triggerClassName="h-9"
-          onValueChange={(v) => updateParams({ status: v === "all" ? undefined : v })}
+          onValueChange={(v) => setStatusFilter(v)}
         />
         {canCreate ? (
           <Button
@@ -342,7 +335,7 @@ type WorkingDay = WorkLocationFormInput["workingDays"][number];
         </div>
       ) : null}
 
-      {result.data.length === 0 ? (
+      {filteredData.length === 0 ? (
         <EmptyState
           title="No work locations found"
           description="Add a work location or adjust your filters."
@@ -350,7 +343,7 @@ type WorkingDay = WorkLocationFormInput["workingDays"][number];
       ) : (
         <DataTable
           columns={columns}
-          data={result.data}
+          data={filteredData}
           align="center"
           scrollable={sectionScrollable}
           maxHeightClass={DATA_TABLE_SPLIT_SCROLL_MAX_HEIGHT}
@@ -360,7 +353,7 @@ type WorkingDay = WorkLocationFormInput["workingDays"][number];
       <OrgPagination
         page={result.page}
         pageSize={result.pageSize}
-        total={result.total}
+        total={filteredData.length}
         pageParam={pageParam}
       />
 

@@ -2,6 +2,7 @@ import { format, lastDayOfMonth } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { LEAVE_BALANCE_DISPLAY_CODES } from "@/lib/leave/constants";
+import { cleanDisplayText } from "@/lib/employees/parse-employee-name";
 import type {
   EmployeeAddressDetail,
   EmployeeAttendancePeriod,
@@ -248,8 +249,8 @@ export async function getEmployeeById(
     reportingManagerId: employee.reporting_manager_id,
     userId: employee.user_id,
     employeeCode: employee.employee_code,
-    firstName: employee.first_name,
-    lastName: employee.last_name,
+    firstName: cleanDisplayText(employee.first_name),
+    lastName: cleanDisplayText(employee.last_name),
     email: employee.email,
     phone: employee.phone,
     employmentStatus: employee.employment_status,

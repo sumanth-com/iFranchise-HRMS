@@ -46,7 +46,7 @@ export const branchFormSchema = z.object({
   city: z.string().trim().optional().nullable(),
   state: z.string().trim().optional().nullable(),
   postalCode: z.string().trim().optional().nullable(),
-  country: z.string().trim().min(1).default("IN"),
+  country: z.string().trim().min(1).default("India"),
   phone: optionalNullablePhoneSchema,
   email: z.string().trim().email().optional().nullable().or(z.literal("")),
   branchHeadId: z.string().uuid().optional().nullable(),

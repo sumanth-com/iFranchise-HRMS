@@ -1,3 +1,4 @@
+import { formatCleanEmployeeName } from "@/lib/employees/parse-employee-name";
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
 
@@ -15,7 +16,7 @@ export function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
 }
 
 export function formatEmployeeName(first?: string | null, last?: string | null) {
-  return [first, last].filter(Boolean).join(" ").trim() || "—";
+  return formatCleanEmployeeName(first, last) || "—";
 }
 
 export function emptyToNull(value?: string | null) {

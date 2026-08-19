@@ -3,7 +3,6 @@
 import {
   CalendarCheck,
   CalendarDays,
-  Download,
   FileSpreadsheet,
   FileText,
   Laptop,
@@ -24,6 +23,7 @@ import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { getMonthSelectItems, getYearSelectItems } from "@/components/payroll/select-utils";
 import { canExportReports } from "@/lib/reports/constants";
 import { exportGeneratedReportAction, runReportAction } from "@/lib/reports/actions";
+import { defaultDateRangeForCurrentMonth } from "@/lib/reports/services/reports-utils";
 import { cn } from "@/lib/utils";
 import type {
   ReportExportFormat,
@@ -56,14 +56,17 @@ type Props = {
 
 const ALL_OPTION = { value: "__all__", label: "All" };
 
-function defaultDateRange(days = 30) {
-  const to = new Date();
-  const from = new Date();
-  from.setDate(from.getDate() - days);
-  return {
-    dateFrom: from.toISOString().slice(0, 10),
-    dateTo: to.toISOString().slice(0, 10),
-  };
+const GENERATE_LABEL = "Generate";
+
+function dedupeByValue<T extends { value: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const item of items) {
+    if (seen.has(item.value)) continue;
+    seen.add(item.value);
+    out.push(item);
+  }
+  return out;
 }
 
 const MODULE_STATUS_OPTIONS: Partial<
@@ -153,88 +156,88 @@ const MODULE_EMPTY_STATE: Record<
   hr: {
     title: "Workforce records will appear here",
     description:
-      "Choose a report type and date range, then run the report to view and export HR data.",
+      "Choose a report type and date range, then generate the report to view and export HR data.",
   },
   attendance: {
     title: "Attendance records will appear here",
     description:
-      "Set the From and To dates, optionally choose a status or employee, then run the report to view and export attendance.",
+      "Set the From and To dates, optionally choose a status or employee, then generate the report to view and export attendance.",
   },
   leave: {
     title: "Leave records will appear here",
     description:
-      "Optionally filter by status or employee, then run the report to view and export leave data.",
+      "Optionally filter by status or employee, then generate the report to view and export leave data.",
   },
   payroll: {
     title: "Payroll records will appear here",
     description:
-      "Choose a report type, Month, and Year, then click Run to view and export payroll.",
+      "Choose a report type, Month, and Year, then click Generate to view and export payroll.",
   },
   performance: {
     title: "Performance records will appear here",
     description:
-      "Choose a report type, Month, and Year, then click Run to view and export performance data.",
+      "Choose a report type, Month, and Year, then click Generate to view and export performance data.",
   },
   recruitment: {
     title: "Recruitment records will appear here",
     description:
-      "Choose a report type and date range, then run the report to view and export hiring data.",
+      "Choose a report type and date range, then generate the report to view and export hiring data.",
   },
   assets: {
     title: "Asset records will appear here",
     description:
-      "Choose a report type and date range, optionally filter by employee, then run the report to view and export asset data.",
+      "Choose a report type and date range, optionally filter by employee, then generate the report to view and export asset data.",
   },
   exit: {
     title: "Exit records will appear here",
     description:
-      "Choose a report type and date range, then run the report to view and export offboarding data.",
+      "Choose a report type and date range, then generate the report to view and export offboarding data.",
   },
 };
 
 const MODULE_NO_DATA: Record<ReportModuleKey, { title: string; description: string }> = {
   hr: {
     title: "No workforce records found",
-    description: "Try a different report type or date range, then click Run again.",
+    description: "Try a different report type or date range, then click Generate again.",
   },
   attendance: {
     title: "No attendance records found",
-    description: "Try a different date range, status, or employee, then click Run again.",
+    description: "Try a different date range, status, or employee, then click Generate again.",
   },
   leave: {
     title: "No leave records found",
-    description: "Try a different status or employee, then click Run again.",
+    description: "Try a different status or employee, then click Generate again.",
   },
   payroll: {
     title: "No payroll records found",
-    description: "Try a different report type, month, or year, then click Run again.",
+    description: "Try a different report type, month, or year, then click Generate again.",
   },
   performance: {
     title: "No performance records found",
-    description: "Try a different report type, month, or year, then click Run again.",
+    description: "Try a different report type, month, or year, then click Generate again.",
   },
   recruitment: {
     title: "No recruitment records found",
-    description: "Try a different report type or date range, then click Run again.",
+    description: "Try a different report type or date range, then click Generate again.",
   },
   assets: {
     title: "No asset records found",
-    description: "Try a different report type or date range, then click Run again.",
+    description: "Try a different report type or date range, then click Generate again.",
   },
   exit: {
     title: "No exit records found",
-    description: "Try a different report type or date range, then click Run again.",
+    description: "Try a different report type or date range, then click Generate again.",
   },
 };
 
 const GENERATE_FAILED = {
   title: "Unable to generate report",
-  description: "Adjust the filters and click Run again to generate this report.",
+  description: "Adjust the filters and click Generate again to generate this report.",
 };
 
 const NEED_PERIOD = {
   title: "Month and Year required",
-  description: "Select Month and Year, then click Run to generate this report.",
+  description: "Select Month and Year, then click Generate to generate this report.",
 };
 
 const MODULE_EMPTY_ICONS: Record<ReportModuleKey, typeof Users> = {
@@ -273,10 +276,18 @@ function showFiltersFor(module: ReportModuleKey) {
 
 function monthToDateRange(month: number, year: number) {
   const paddedMonth = String(month).padStart(2, "0");
+  const now = new Date();
+  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
   const lastDay = new Date(year, month, 0).getDate();
+
+  // If user is viewing the current month, show records only "till now".
+  // For other months, keep full month range.
+  const dateTo = isCurrentMonth
+    ? now.toISOString().slice(0, 10)
+    : `${year}-${paddedMonth}-${String(lastDay).padStart(2, "0")}`;
   return {
     dateFrom: `${year}-${paddedMonth}-01`,
-    dateTo: `${year}-${paddedMonth}-${String(lastDay).padStart(2, "0")}`,
+    dateTo,
   };
 }
 
@@ -316,7 +327,7 @@ export function ModuleReportsView({
   defaultFilters,
 }: Props) {
   const canExport = canExportReports(permissionCodes);
-  const fallbackDates = defaultDateRange(30);
+  const periodDefault = defaultDateRangeForCurrentMonth();
   const [isPending, startTransition] = useTransition();
   const [reportKey, setReportKey] = useState<ReportKey>(
     module === "attendance"
@@ -331,9 +342,9 @@ export function ModuleReportsView({
     initialResult ? defaultFilters ?? null : null,
   );
   const [dateFrom, setDateFrom] = useState(
-    defaultFilters?.dateFrom ?? fallbackDates.dateFrom,
+    defaultFilters?.dateFrom ?? periodDefault.dateFrom,
   );
-  const [dateTo, setDateTo] = useState(defaultFilters?.dateTo ?? fallbackDates.dateTo);
+  const [dateTo, setDateTo] = useState(defaultFilters?.dateTo ?? periodDefault.dateTo);
   const [designationId, setDesignationId] = useState(
     defaultFilters?.designationId ?? ALL_OPTION.value,
   );
@@ -342,33 +353,41 @@ export function ModuleReportsView({
   );
   const [status, setStatus] = useState(defaultFilters?.status ?? ALL_OPTION.value);
   const [month, setMonth] = useState(
-    defaultFilters?.month ? String(defaultFilters.month) : "",
+    defaultFilters?.month ? String(defaultFilters.month) : String(periodDefault.month),
   );
-  const [year, setYear] = useState(defaultFilters?.year ? String(defaultFilters.year) : "");
+  const [year, setYear] = useState(
+    defaultFilters?.year ? String(defaultFilters.year) : String(periodDefault.year),
+  );
 
   const filterVisibility = showFiltersFor(module);
   const statusOptions = MODULE_STATUS_OPTIONS[module] ?? [];
 
   const designationItems = useMemo(
-    () => [
-      { value: ALL_OPTION.value, label: "All designations" },
-      ...lookups.designations.map((d) => ({ value: d.id, label: d.label })),
-    ],
+    () =>
+      dedupeByValue([
+        { value: ALL_OPTION.value, label: "All designations" },
+        ...lookups.designations.map((d) => ({ value: d.id, label: d.label })),
+      ]),
     [lookups.designations],
   );
   const employeeItems = useMemo(
-    () => [
-      { value: ALL_OPTION.value, label: "All employees" },
-      ...lookups.employees.map((e) => ({ value: e.id, label: e.label })),
-    ],
+    () =>
+      dedupeByValue([
+        { value: ALL_OPTION.value, label: "All employees" },
+        ...lookups.employees.map((e) => ({ value: e.id, label: e.label })),
+      ]),
     [lookups.employees],
   );
   const reportItems = useMemo(
-    () => definitions.map((d) => ({ value: d.key, label: d.title })),
+    () => dedupeByValue(definitions.map((d) => ({ value: d.key, label: d.title }))),
     [definitions],
   );
   const statusItems = useMemo(
-    () => [{ value: ALL_OPTION.value, label: "All statuses" }, ...statusOptions],
+    () =>
+      dedupeByValue([
+        { value: ALL_OPTION.value, label: "All statuses" },
+        ...statusOptions,
+      ]),
     [statusOptions],
   );
   const monthItems = useMemo(() => getMonthSelectItems(), []);
@@ -443,7 +462,7 @@ export function ModuleReportsView({
 
   const emptyState = MODULE_EMPTY_STATE[module] ?? {
     title: "Report results will appear here",
-    description: "Choose filters and click Run to view and export data.",
+    description: "Choose filters and click Generate to view and export data.",
   };
   const EmptyIcon = MODULE_EMPTY_ICONS[module] ?? CalendarDays;
   const growingFilter = filterVisibility.employee
@@ -586,20 +605,10 @@ export function ModuleReportsView({
             ) : (
               <Play className="mr-1.5 size-3.5" />
             )}
-            Run
+            {GENERATE_LABEL}
           </Button>
           {canExport ? (
             <>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={!canDownload || isPending}
-                onClick={() => onExport("csv")}
-              >
-                <Download className="mr-1.5 size-3.5" />
-                CSV
-              </Button>
               <Button
                 type="button"
                 variant="outline"

@@ -1,9 +1,10 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { fromHrms, unwrapRelation } from "@/lib/reports/services/reports-utils";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   derivePortalFromRoleCode,
   loadExecutiveDirectoryRoleCodes,
-  loadProvisionableRoles,
+  loadUserProvisioningInviteRoles,
 } from "@/lib/user-provisioning/provisionable-roles";
 import type { UserProfile } from "@/types/auth";
 import type { LookupOption } from "@/types/employee";
@@ -28,6 +29,7 @@ const ROLE_PRIORITY: Record<string, number> = {
   hr_admin: 3,
   hr_executive: 4,
   manager: 5,
+  employee: 6,
 };
 
 function rolePriority(code: string) {
@@ -72,6 +74,196 @@ function deriveInvitationStatus(row: LooseRow): ProvisioningInvitationStatus {
   return "pending";
 }
 
+function buildProvisioningUserRow(
+  employee: LooseRow,
+  role: LooseRow,
+  profile: UserProfile,
+): NormalizedExecutiveUser {
+  const roleCode = String(role.code);
+  const portalKey =
+    normalizePortalKey(role.portal_key) ?? derivePortalFromRoleCode(roleCode);
+  const department = unwrapRelation<LooseRow>(employee.departments);
+  const branch = unwrapRelation<LooseRow>(employee.branches);
+  const designation = unwrapRelation<LooseRow>(employee.designations);
+  const employmentType = unwrapRelation<LooseRow>(employee.employment_types);
+  const manager = unwrapRelation<LooseRow>(employee.manager);
+
+  return {
+    employeeId: employee.id,
+    userId: employee.user_id ?? null,
+    employeeCode: employee.employee_code,
+    firstName: employee.first_name,
+    lastName: employee.last_name,
+    fullName: fullName(employee.first_name, employee.last_name),
+    email: employee.email,
+    roleCode,
+    portalKey,
+    roleLabel: ROLE_LABELS[roleCode] ?? role.name ?? roleCode,
+    departmentName: department?.name ?? null,
+    branchName: branch?.name ?? null,
+    designationTitle: designation?.title ?? null,
+    reportingManagerName: manager
+      ? fullName(manager.first_name, manager.last_name) || null
+      : null,
+    invitationStatus: deriveInvitationStatus(employee),
+    accountStatus: String(employee.account_status ?? "draft"),
+    sentByName: null,
+    invitationSentAt: employee.invitation_sent_at ?? null,
+    acceptedAt: employee.account_activated_at ?? employee.first_login_at ?? null,
+    lastActivityAt: employee.last_login_at ?? employee.updated_at ?? null,
+    isSelf: employee.id === profile.employee.id,
+    employmentTypeId: employee.employment_type_id ?? null,
+    employmentTypeName: employmentType?.name ?? null,
+    joiningDate: employee.date_of_joining ?? null,
+    firstLoginAt: employee.first_login_at ?? null,
+    invitationCancelledAt: employee.invitation_cancelled_at ?? null,
+  };
+}
+
+const EMPLOYEE_SELECT_FIELDS = `
+  id, user_id, employee_code, first_name, last_name, email,
+  account_status, invitation_sent_at, invitation_cancelled_at,
+  first_login_at, last_login_at, account_activated_at,
+  account_deactivated_at, account_suspended_at, created_by,
+  updated_at, date_of_joining, employment_type_id, invited_role_id,
+  department_id, branch_id, designation_id, reporting_manager_id, deleted_at,
+  departments:department_id ( name ),
+  branches:branch_id ( name ),
+  designations:designation_id ( title ),
+  employment_types:employment_type_id ( name ),
+  manager:reporting_manager_id ( first_name, last_name )
+`;
+
+const PENDING_ACCOUNT_STATUSES = new Set([
+  "invitation_pending",
+  "draft",
+  "invited",
+  "invitation_accepted",
+]);
+
+function isPendingProvisioningAccount(status: string | null | undefined) {
+  return PENDING_ACCOUNT_STATUSES.has(String(status ?? ""));
+}
+
+async function loadRolesById(
+  admin: ReturnType<typeof createAdminClient>,
+  organizationId: string,
+  roleIds: string[],
+): Promise<Map<string, LooseRow>> {
+  const uniqueIds = [...new Set(roleIds.filter(Boolean))];
+  if (uniqueIds.length === 0) return new Map();
+
+  const { data, error } = await admin
+    .schema("hrms")
+    .from("roles")
+    .select("id, code, name, portal_key")
+    .eq("organization_id", organizationId)
+    .in("id", uniqueIds);
+
+  if (error) throw new Error(error.message);
+
+  return new Map(
+    ((data ?? []) as LooseRow[]).map((role) => [String(role.id), role]),
+  );
+}
+
+async function loadEmployeeRolesFromUserRoles(
+  admin: ReturnType<typeof createAdminClient>,
+  organizationId: string,
+  employeeIds: string[],
+): Promise<Map<string, LooseRow>> {
+  const uniqueIds = [...new Set(employeeIds.filter(Boolean))];
+  if (uniqueIds.length === 0) return new Map();
+
+  const { data, error } = await admin
+    .schema("hrms")
+    .from("user_roles")
+    .select("employee_id, roles:role_id ( code, name, portal_key )")
+    .eq("organization_id", organizationId)
+    .in("employee_id", uniqueIds)
+    .eq("status", "active")
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+
+  const byEmployee = new Map<string, LooseRow>();
+  for (const row of (data ?? []) as LooseRow[]) {
+    const employeeId = row.employee_id ? String(row.employee_id) : null;
+    const role = unwrapRelation<LooseRow>(row.roles);
+    if (!employeeId || !role?.code) continue;
+
+    const roleCode = String(role.code);
+    const existing = byEmployee.get(employeeId);
+    if (existing && rolePriority(String(existing.code)) <= rolePriority(roleCode)) {
+      continue;
+    }
+    byEmployee.set(employeeId, role);
+  }
+
+  return byEmployee;
+}
+
+function resolveEmployeeRole(
+  employee: LooseRow,
+  rolesById: Map<string, LooseRow>,
+  rolesByEmployeeId: Map<string, LooseRow>,
+  rolesByInvitation: Map<string, LooseRow>,
+): LooseRow {
+  const joinedRole = unwrapRelation<LooseRow>(employee.invited_role);
+  if (joinedRole?.code) return joinedRole;
+
+  const invitedRoleId = employee.invited_role_id ? String(employee.invited_role_id) : null;
+  if (invitedRoleId && rolesById.has(invitedRoleId)) {
+    return rolesById.get(invitedRoleId)!;
+  }
+
+  const fromUserRole = rolesByEmployeeId.get(String(employee.id));
+  if (fromUserRole?.code) return fromUserRole;
+
+  const fromInvitation = rolesByInvitation.get(String(employee.id));
+  if (fromInvitation?.code) return fromInvitation;
+
+  // Always keep pending/draft invites visible even if role metadata was cleared.
+  return {
+    code: "employee",
+    name: ROLE_LABELS.employee,
+    portal_key: "employee",
+  };
+}
+
+async function loadRolesFromInvitations(
+  admin: ReturnType<typeof createAdminClient>,
+  organizationId: string,
+  employeeIds: string[],
+): Promise<Map<string, LooseRow>> {
+  const uniqueIds = [...new Set(employeeIds.filter(Boolean))];
+  if (uniqueIds.length === 0) return new Map();
+
+  const { data, error } = await admin
+    .schema("hrms")
+    .from("employee_invitations")
+    .select("employee_id, created_at, roles:role_id ( code, name, portal_key )")
+    .eq("organization_id", organizationId)
+    .in("employee_id", uniqueIds)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    // Table may be unavailable in some environments; fall back gracefully.
+    return new Map();
+  }
+
+  const byEmployee = new Map<string, LooseRow>();
+  for (const row of (data ?? []) as LooseRow[]) {
+    const employeeId = row.employee_id ? String(row.employee_id) : null;
+    if (!employeeId || byEmployee.has(employeeId)) continue;
+    const role = unwrapRelation<LooseRow>(row.roles);
+    if (!role?.code) continue;
+    byEmployee.set(employeeId, role);
+  }
+
+  return byEmployee;
+}
+
 /**
  * Loads every executive user (one row per employee, keeping the
  * highest-privilege role) scoped to the CEO's organization.
@@ -82,8 +274,11 @@ async function loadExecutiveUsers(
 ): Promise<NormalizedExecutiveUser[]> {
   const organizationId = profile.employee.organizationId;
   const directoryRoleCodes = await loadExecutiveDirectoryRoleCodes(supabase, organizationId);
+  const admin = createAdminClient();
 
-  const { data, error } = await fromHrms(supabase, "user_roles")
+  const { data, error } = await admin
+    .schema("hrms")
+    .from("user_roles")
     .select(
       `
       user_id,
@@ -93,7 +288,7 @@ async function loadExecutiveUsers(
         account_status, invitation_sent_at, invitation_cancelled_at,
         first_login_at, last_login_at, account_activated_at,
         account_deactivated_at, account_suspended_at, created_by,
-        updated_at, date_of_joining, employment_type_id,
+        updated_at, date_of_joining, employment_type_id, invited_role_id,
         department_id, branch_id, designation_id, reporting_manager_id, deleted_at,
         departments:department_id ( name ),
         branches:branch_id ( name ),
@@ -120,61 +315,80 @@ async function loadExecutiveUsers(
     const roleCode = String(role.code);
     if (!directoryRoleCodes.has(roleCode.toLowerCase())) continue;
 
-    const portalKey =
-      normalizePortalKey(role.portal_key) ?? derivePortalFromRoleCode(roleCode);
-
     const existing = byEmployee.get(employee.id);
     if (existing && rolePriority(existing.roleCode) <= rolePriority(roleCode)) {
       continue;
     }
 
-    const department = unwrapRelation<LooseRow>(employee.departments);
-    const branch = unwrapRelation<LooseRow>(employee.branches);
-    const designation = unwrapRelation<LooseRow>(employee.designations);
-    const employmentType = unwrapRelation<LooseRow>(employee.employment_types);
-    const manager = unwrapRelation<LooseRow>(employee.manager);
-
     if (employee.created_by) createdByIds.add(String(employee.created_by));
 
-    byEmployee.set(employee.id, {
-      employeeId: employee.id,
-      userId: employee.user_id ?? null,
-      employeeCode: employee.employee_code,
-      firstName: employee.first_name,
-      lastName: employee.last_name,
-      fullName: fullName(employee.first_name, employee.last_name),
-      email: employee.email,
-      roleCode,
-      portalKey,
-      roleLabel: ROLE_LABELS[roleCode] ?? role.name ?? roleCode,
-      departmentName: department?.name ?? null,
-      branchName: branch?.name ?? null,
-      designationTitle: designation?.title ?? null,
-      reportingManagerName: manager
-        ? fullName(manager.first_name, manager.last_name) || null
-        : null,
-      invitationStatus: deriveInvitationStatus(employee),
-      accountStatus: String(employee.account_status ?? "draft"),
-      sentByName: null,
-      invitationSentAt: employee.invitation_sent_at ?? null,
-      acceptedAt: employee.account_activated_at ?? employee.first_login_at ?? null,
-      lastActivityAt: employee.last_login_at ?? employee.updated_at ?? null,
-      isSelf: employee.id === profile.employee.id,
-      employmentTypeId: employee.employment_type_id ?? null,
-      employmentTypeName: employmentType?.name ?? null,
-      joiningDate: employee.date_of_joining ?? null,
-      firstLoginAt: employee.first_login_at ?? null,
-      invitationCancelledAt: employee.invitation_cancelled_at ?? null,
-    });
+    byEmployee.set(employee.id, buildProvisioningUserRow(employee, role, profile));
+  }
+
+  const { data: pendingEmployees, error: pendingError } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select(
+      `
+      ${EMPLOYEE_SELECT_FIELDS},
+      invited_role:invited_role_id ( code, name, portal_key )
+    `,
+    )
+    .eq("organization_id", organizationId)
+    .in("account_status", [...PENDING_ACCOUNT_STATUSES])
+    .is("deleted_at", null);
+
+  if (pendingError) throw new Error(pendingError.message);
+
+  const pendingRows = (pendingEmployees ?? []) as LooseRow[];
+  const missingEmployees = pendingRows.filter(
+    (employee) => !employee.deleted_at && !byEmployee.has(employee.id),
+  );
+  const missingRoleEmployeeIds = missingEmployees.map((employee) => String(employee.id));
+
+  const [rolesById, rolesByEmployeeId, rolesByInvitation] = await Promise.all([
+    loadRolesById(
+      admin,
+      organizationId,
+      pendingRows
+        .map((employee) => (employee.invited_role_id ? String(employee.invited_role_id) : null))
+        .filter((value): value is string => Boolean(value)),
+    ),
+    loadEmployeeRolesFromUserRoles(admin, organizationId, missingRoleEmployeeIds),
+    loadRolesFromInvitations(admin, organizationId, missingRoleEmployeeIds),
+  ]);
+
+  for (const employee of missingEmployees) {
+    const role = resolveEmployeeRole(
+      employee,
+      rolesById,
+      rolesByEmployeeId,
+      rolesByInvitation,
+    );
+    const roleCode = String(role.code).toLowerCase();
+    // Keep invite records visible even when role metadata was cleared after cancel.
+    if (
+      !directoryRoleCodes.has(roleCode) &&
+      !isPendingProvisioningAccount(employee.account_status)
+    ) {
+      continue;
+    }
+
+    if (employee.created_by) createdByIds.add(String(employee.created_by));
+    byEmployee.set(employee.id, buildProvisioningUserRow(employee, role, profile));
   }
 
   // Resolve "Sent by" display names from created_by auth user ids.
   if (createdByIds.size > 0) {
-    const { data: inviters } = await fromHrms(supabase, "employees")
+    const { data: inviters, error: invitersError } = await admin
+      .schema("hrms")
+      .from("employees")
       .select("user_id, first_name, last_name")
       .eq("organization_id", organizationId)
       .in("user_id", [...createdByIds])
       .is("deleted_at", null);
+
+    if (invitersError) throw new Error(invitersError.message);
 
     const inviterMap = new Map<string, string>();
     for (const inviter of (inviters ?? []) as LooseRow[]) {
@@ -195,31 +409,52 @@ async function loadExecutiveUsers(
         target.sentByName = inviterMap.get(String(employee.created_by)) ?? null;
       }
     }
+
+    for (const employee of pendingRows) {
+      if (!employee.created_by) continue;
+      const target = byEmployee.get(employee.id);
+      if (target && !target.sentByName) {
+        target.sentByName = inviterMap.get(String(employee.created_by)) ?? null;
+      }
+    }
   }
 
-  return [...byEmployee.values()].sort((a, b) =>
-    a.fullName.localeCompare(b.fullName),
-  );
+  return [...byEmployee.values()].sort((a, b) => {
+    const aPending = isPendingProvisioningAccount(a.accountStatus) ? 0 : 1;
+    const bPending = isPendingProvisioningAccount(b.accountStatus) ? 0 : 1;
+    if (aPending !== bPending) return aPending - bPending;
+    return a.fullName.localeCompare(b.fullName);
+  });
 }
 
 export function summarizeExecutiveUsers(
   users: NormalizedExecutiveUser[],
 ): CeoProvisioningSummary {
+  const isActive = (user: NormalizedExecutiveUser) => user.accountStatus === "active";
+  const isDeactivated = (user: NormalizedExecutiveUser) =>
+    user.accountStatus === "inactive" ||
+    user.accountStatus === "suspended" ||
+    user.invitationStatus === "revoked" ||
+    user.invitationStatus === "inactive";
+
   return {
-    totalExecutiveUsers: users.length,
-    pendingInvitations: users.filter((u) => u.invitationStatus === "pending").length,
-    acceptedInvitations: users.filter((u) => u.invitationStatus === "accepted").length,
-    expiredInvitations: users.filter((u) => u.invitationStatus === "expired").length,
-    activeManagers: users.filter(
-      (u) => u.roleCode === "manager" && u.accountStatus === "active",
+    executiveUsers: users.filter(
+      (user) =>
+        isActive(user) &&
+        ["ceo", "co_founder", "founder"].includes(user.roleCode.toLowerCase()),
     ).length,
-    activeHrUsers: users.filter(
-      (u) =>
-        (u.roleCode === "hr_admin" || u.roleCode === "hr_executive") &&
-        u.accountStatus === "active",
+    hrUsers: users.filter(
+      (user) =>
+        isActive(user) &&
+        ["hr_admin", "hr_executive"].includes(user.roleCode.toLowerCase()),
     ).length,
-    coFounders: users.filter((u) => u.roleCode === "co_founder").length,
-    founders: users.filter((u) => u.roleCode === "founder").length,
+    managers: users.filter(
+      (user) => isActive(user) && user.roleCode.toLowerCase() === "manager",
+    ).length,
+    employees: users.filter(
+      (user) => isActive(user) && user.roleCode.toLowerCase() === "employee",
+    ).length,
+    deactivatedUsers: users.filter(isDeactivated).length,
   };
 }
 
@@ -323,9 +558,14 @@ export async function getCeoProvisioningLookups(
 ): Promise<CeoProvisioningLookups> {
   const organizationId = profile.employee.organizationId;
 
-  const [provisionableRoles, departmentsRes, branchesRes, employmentTypesRes, managersRes] =
-    await Promise.all([
-      loadProvisionableRoles(supabase, organizationId),
+  const [
+    inviteRoles,
+    departmentsRes,
+    branchesRes,
+    employmentTypesRes,
+    managersRes,
+  ] = await Promise.all([
+      loadUserProvisioningInviteRoles(supabase, organizationId),
       fromHrms(supabase, "departments")
         .select("id, name")
         .eq("organization_id", organizationId)
@@ -382,6 +622,7 @@ export async function getCeoProvisioningLookups(
     { id: "ceo", label: "Executive Portal" },
     { id: "hr", label: "HR Portal" },
     { id: "manager", label: "Manager Portal" },
+    { id: "employee", label: "Self-Service Portal" },
   ];
 
   const statusOptions: LookupOption[] = [
@@ -394,7 +635,7 @@ export async function getCeoProvisioningLookups(
   ];
 
   return {
-    roles: provisionableRoles.map((role) => ({
+    roles: inviteRoles.map((role) => ({
       id: role.code,
       code: role.code,
       name: role.name,

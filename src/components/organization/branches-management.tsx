@@ -2,7 +2,7 @@
 
 import { format } from "date-fns";
 import { Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,9 +23,11 @@ import { OptionalEntitySelect } from "@/components/common/optional-entity-select
 import { PhoneInput } from "@/components/common/phone-input";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { withSelectOption } from "@/components/payroll/select-utils";
+import { SearchableSelect } from "@/components/common/searchable-select";
 import { Label } from "@/components/ui/label";
 import { OrgPagination } from "@/components/organization/org-pagination";
 import { OrgStatusBadge } from "@/components/organization/org-status-badge";
+import { COUNTRIES, INDIAN_STATES, STATE_DISTRICTS } from "@/lib/geo/india";
 import { deleteBranchAction, saveBranchAction } from "@/lib/organization/actions";
 import {
   canCreateOrganization,
@@ -58,7 +60,7 @@ const emptyForm: BranchFormInput = {
   city: "",
   state: "",
   postalCode: "",
-  country: "IN",
+  country: "India",
   phone: "",
   email: "",
   branchHeadId: null,
@@ -76,12 +78,13 @@ export function BranchesManagement({
   sectionScrollable = false,
 }: Props) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [isDeletePending, startDeleteTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<BranchListItem | null>(null);
   const [deleting, setDeleting] = useState<BranchListItem | null>(null);
+  const [searchInput, setSearchInput] = useState(search);
+  const [statusFilter, setStatusFilter] = useState<string>(status ?? "all");
 
   const canCreate = canCreateOrganization(permissionCodes);
   const canEdit = canEditOrganization(permissionCodes);
@@ -101,22 +104,28 @@ export function BranchesManagement({
     [statusItems],
   );
 
+  const filteredData = useMemo(() => {
+    let items = result.data;
+    const q = searchInput.trim().toLowerCase();
+    if (q) {
+      items = items.filter(
+        (b) =>
+          b.name.toLowerCase().includes(q) ||
+          b.code.toLowerCase().includes(q) ||
+          (b.location && b.location.toLowerCase().includes(q)) ||
+          (b.city && b.city.toLowerCase().includes(q)),
+      );
+    }
+    if (statusFilter && statusFilter !== "all") {
+      items = items.filter((b) => b.status === statusFilter);
+    }
+    return items;
+  }, [result.data, searchInput, statusFilter]);
+
   const form = useForm<BranchFormInput>({
     resolver: zodResolver(branchFormSchema) as never,
     defaultValues: emptyForm,
   });
-
-  function updateParams(patch: Record<string, string | undefined>) {
-    const params = new URLSearchParams(searchParams.toString());
-    Object.entries(patch).forEach(([key, value]) => {
-      if (!value || value === "all") params.delete(key);
-      else params.set(key, value);
-    });
-    if (!patch.page) params.delete("page");
-    startTransition(() => {
-      router.push(`?${params.toString()}`);
-    });
-  }
 
   const openCreate = useCallback(() => {
     setEditing(null);
@@ -136,7 +145,7 @@ export function BranchesManagement({
         city: item.city ?? "",
         state: item.state ?? "",
         postalCode: item.postalCode ?? "",
-        country: item.country,
+        country: item.country === "IN" ? "India" : item.country,
         phone: item.phone ?? "",
         email: item.email ?? "",
         branchHeadId: item.branchHeadId,
@@ -297,21 +306,17 @@ export function BranchesManagement({
           <Input
             placeholder="Search branches…"
             className="h-9 pl-9"
-            defaultValue={search}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                updateParams({ search: (e.target as HTMLInputElement).value || undefined });
-              }
-            }}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
           />
         </div>
         <FilterSelect
           items={statusFilterItems}
-          value={status ?? "all"}
+          value={statusFilter}
           placeholder="All statuses"
           className="sm:w-44"
           triggerClassName="h-9"
-          onValueChange={(v) => updateParams({ status: v === "all" ? undefined : v })}
+          onValueChange={(v) => setStatusFilter(v)}
         />
         {canCreate ? (
           <Button
@@ -331,7 +336,7 @@ export function BranchesManagement({
         </div>
       ) : null}
 
-      {result.data.length === 0 ? (
+      {filteredData.length === 0 ? (
         <EmptyState
           title="No branches found"
           description="Add a branch or adjust your filters."
@@ -339,14 +344,14 @@ export function BranchesManagement({
       ) : (
         <DataTable
           columns={columns}
-          data={result.data}
+          data={filteredData}
           align="center"
           scrollable={sectionScrollable}
           maxHeightClass={DATA_TABLE_SPLIT_SCROLL_MAX_HEIGHT}
         />
       )}
 
-      <OrgPagination page={result.page} pageSize={result.pageSize} total={result.total} />
+      <OrgPagination page={result.page} pageSize={result.pageSize} total={filteredData.length} />
 
       <Modal
         open={open}
@@ -387,12 +392,28 @@ export function BranchesManagement({
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-2">
-              <Label>City</Label>
-              <Input {...form.register("city")} />
+              <Label>State</Label>
+              <SearchableSelect
+                options={INDIAN_STATES.map((s) => ({ value: s, label: s }))}
+                value={form.watch("state") || null}
+                onValueChange={(v) => {
+                  form.setValue("state", v ?? "", { shouldValidate: true });
+                  form.setValue("city", "");
+                }}
+                placeholder="Search state…"
+                allowNone={false}
+              />
             </div>
             <div className="space-y-2">
-              <Label>State</Label>
-              <Input {...form.register("state")} />
+              <Label>City / District</Label>
+              <SearchableSelect
+                options={(STATE_DISTRICTS[form.watch("state") || ""] ?? []).map((d: string) => ({ value: d, label: d }))}
+                value={form.watch("city") || null}
+                onValueChange={(v) => form.setValue("city", v ?? "", { shouldValidate: true })}
+                placeholder="Search city…"
+                allowNone={false}
+                emptyMessage={form.watch("state") ? "No districts found" : "Select a state first"}
+              />
             </div>
             <div className="space-y-2">
               <Label>Postal Code</Label>
@@ -400,7 +421,13 @@ export function BranchesManagement({
             </div>
             <div className="space-y-2">
               <Label>Country</Label>
-              <Input {...form.register("country")} />
+              <SearchableSelect
+                options={COUNTRIES.map((c) => ({ value: c, label: c }))}
+                value={form.watch("country") || null}
+                onValueChange={(v) => form.setValue("country", v ?? "India", { shouldValidate: true })}
+                placeholder="Select country…"
+                allowNone={false}
+              />
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">

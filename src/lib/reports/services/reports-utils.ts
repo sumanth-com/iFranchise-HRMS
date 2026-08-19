@@ -1,4 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { formatCleanEmployeeName } from "@/lib/employees/parse-employee-name";
 
 import type { ReportColumn, ReportResult, ReportRow } from "@/types/reports";
 
@@ -16,7 +17,7 @@ export function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
 }
 
 export function formatEmployeeName(first?: string | null, last?: string | null) {
-  return [first, last].filter(Boolean).join(" ").trim() || "—";
+  return formatCleanEmployeeName(first, last) || "—";
 }
 
 export function emptyToNull(value?: string | null) {
@@ -344,6 +345,21 @@ export function defaultDateRange(days = 30) {
   return {
     dateFrom: from.toISOString().slice(0, 10),
     dateTo: to.toISOString().slice(0, 10),
+  };
+}
+
+/** First and last day of the current calendar month, plus month/year for period filters. */
+export function defaultDateRangeForCurrentMonth() {
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const year = now.getFullYear();
+  const paddedMonth = String(month).padStart(2, "0");
+  return {
+    dateFrom: `${year}-${paddedMonth}-01`,
+    // Show "till now" instead of the full month, to match expectation in reports UI.
+    dateTo: now.toISOString().slice(0, 10),
+    month,
+    year,
   };
 }
 

@@ -57,6 +57,17 @@ export const maintenanceListParamsSchema = z.object({
   maintenanceStatus: z
     .enum(["pending", "in_progress", "completed", "cancelled", ""])
     .optional(),
+  month: z.coerce.number().int().min(1).max(12).optional(),
+  year: z.coerce.number().int().min(2000).max(2100).optional(),
+  activityType: z.enum(["all", "report", "replace", "status"]).optional(),
+  createdByUserId: z.string().uuid().optional(),
+});
+
+export const assetActivityFeedParamsSchema = z.object({
+  limit: z.coerce.number().int().positive().max(100).default(40),
+  activityType: z.enum(["all", "report", "replace", "status"]).default("all"),
+  month: z.coerce.number().int().min(1).max(12).optional(),
+  year: z.coerce.number().int().min(2000).max(2100).optional(),
 });
 
 export const assetFormSchema = z.object({
@@ -168,6 +179,7 @@ export const createAndAssignAssetSchema = z.object({
 export type AssetListParams = z.infer<typeof assetListParamsSchema>;
 export type AssignmentListParams = z.infer<typeof assignmentListParamsSchema>;
 export type MaintenanceListParams = z.infer<typeof maintenanceListParamsSchema>;
+export type AssetActivityFeedParamsInput = z.infer<typeof assetActivityFeedParamsSchema>;
 export type AssetFormValues = z.infer<typeof assetFormSchema>;
 export type AssignAssetValues = z.infer<typeof assignAssetSchema>;
 export type ReturnAssetValues = z.infer<typeof returnAssetSchema>;

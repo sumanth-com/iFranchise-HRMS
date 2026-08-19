@@ -2,10 +2,8 @@ import Link from "next/link";
 import {
   Briefcase,
   Calendar,
-  CheckCircle2,
   FileText,
   Send,
-  UserCheck,
   UserPlus,
   Users,
   type LucideIcon,
@@ -69,10 +67,7 @@ export function RecruitmentDashboardView({
   const to = (href: string) =>
     remapSubNavHref(href, RECRUITMENT_ROUTES.dashboard, basePath);
 
-  const ceoReviews =
-    summary.candidatesByStage.find((item) => item.stage === "ceo")?.count ?? 0;
-  const offerStage =
-    summary.candidatesByStage.find((item) => item.stage === "offer")?.count ?? 0;
+  const offerStage = summary.pendingOfferCount;
 
   return (
     <div className="flex h-[calc(100dvh-11.75rem)] min-h-0 flex-col gap-2 overflow-hidden">
@@ -88,7 +83,7 @@ export function RecruitmentDashboardView({
         </p>
       </div>
 
-      <div className="grid shrink-0 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid shrink-0 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         <MetricCard
           label="Open roles"
           value={String(summary.openPositions)}
@@ -113,18 +108,6 @@ export function RecruitmentDashboardView({
           iconBg="bg-amber-100 text-amber-600"
           href={to(RECRUITMENT_ROUTES.offers)}
         />
-        <MetricCard
-          label="Accepted offers"
-          value={String(summary.offersAccepted)}
-          hint="Ready for onboarding"
-          icon={CheckCircle2}
-          iconBg="bg-emerald-100 text-emerald-600"
-          href={
-            showOnboarding
-              ? to(RECRUITMENT_ROUTES.onboarding)
-              : to(RECRUITMENT_ROUTES.offers)
-          }
-        />
       </div>
 
       <div className="grid min-h-0 flex-1 gap-2 lg:grid-cols-2">
@@ -137,7 +120,7 @@ export function RecruitmentDashboardView({
         </div>
       </div>
 
-      <div className="grid shrink-0 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid shrink-0 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         <MetricCard
           label="Interviews today"
           value={String(summary.interviewsToday)}
@@ -145,14 +128,6 @@ export function RecruitmentDashboardView({
           icon={Calendar}
           iconBg="bg-sky-100 text-sky-600"
           href={to(RECRUITMENT_ROUTES.interviews)}
-        />
-        <MetricCard
-          label="CEO reviews"
-          value={String(ceoReviews)}
-          hint="Awaiting executive review"
-          icon={UserCheck}
-          iconBg="bg-violet-100 text-violet-600"
-          href={`${to(RECRUITMENT_ROUTES.candidates)}?stage=ceo`}
         />
         <MetricCard
           label="Hires this month"

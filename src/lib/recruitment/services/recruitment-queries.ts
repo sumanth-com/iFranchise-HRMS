@@ -320,17 +320,28 @@ export async function getRecruitmentSummary(
 
   const openJobs = jobRows.filter((j) => j.job_status === "open");
   const openPositions = openJobs.length;
+
+  const offerSentCandidateIds = new Set(
+    offerRows
+      .filter((o) => ["sent", "accepted"].includes(o.offer_status))
+      .map((o) => String(o.candidate_id)),
+  );
+
   const activeCandidates = candidateRows.filter(
-    (c) => !["joined", "rejected"].includes(c.stage),
+    (c) => !["joined", "rejected"].includes(c.stage) && !offerSentCandidateIds.has(String(c.id)),
   ).length;
   const interviewsToday = interviewRows.filter(
     (i) => i.interview_date === today && i.interview_status === "scheduled",
   ).length;
-  const offersPending = offerRows.filter((o) => ["draft", "sent"].includes(o.offer_status)).length;
   const offersAccepted = offerRows.filter((o) => o.offer_status === "accepted").length;
   const hiresThisMonth = candidateRows.filter(
     (c) => c.stage === "joined" && c.joined_at && String(c.joined_at).slice(0, 10) >= monthStartStr,
   ).length;
+
+  const pendingOfferCount = candidateRows.filter(
+    (c) => c.stage === "offer" && !offerSentCandidateIds.has(String(c.id)),
+  ).length;
+  const offersPending = pendingOfferCount;
 
   const joined = candidateRows.filter((c) => c.stage === "joined" && c.joined_at && c.created_at);
   const averageHiringTimeDays =
@@ -490,6 +501,7 @@ export async function getRecruitmentSummary(
     offersAccepted,
     hiresThisMonth,
     averageHiringTimeDays,
+    pendingOfferCount,
     candidatesByStage,
     candidateSources,
     hiringByDepartment: Array.from(deptMap.values()),
@@ -841,7 +853,7 @@ export async function listOfferQueueCandidates(
       job:job_opening_id!inner(title, department_id, departments:department_id(name))`,
     )
     .eq("organization_id", organizationId)
-    .in("stage", ["ceo", "offer"])
+    .eq("stage", "offer")
     .is("deleted_at", null)
     .is("archived_at", null)
     .order("created_at", { ascending: false });
@@ -885,7 +897,10 @@ export async function listOfferQueueCandidates(
       const latestOfferStatus = offerStatusByCandidate.get(row.id) ?? null;
       return { ...mapped, latestOfferStatus };
     })
-    .filter((row) => matchesOfferQueue(row.latestOfferStatus, offerQueue));
+    .filter((row) => {
+      if (row.latestOfferStatus === "accepted") return false;
+      return matchesOfferQueue(row.latestOfferStatus, offerQueue);
+    });
 
   const total = enriched.length;
   const from = (page - 1) * pageSize;
@@ -965,12 +980,16 @@ export async function listCandidates(
     }
   }
 
-  return {
-    data: rows.map((row) => ({
+  const mapped = rows
+    .map((row) => ({
       ...mapCandidateRow(row),
       latestOfferStatus: offerStatusByCandidate.get(row.id) ?? undefined,
-    })),
-    total: count ?? 0,
+    }))
+    .filter((row) => row.latestOfferStatus !== "sent" && row.latestOfferStatus !== "accepted");
+
+  return {
+    data: mapped,
+    total: mapped.length,
     page,
     pageSize,
   };

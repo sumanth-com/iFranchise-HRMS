@@ -1495,7 +1495,8 @@ async function runExitReport(
   }
 
   if (key === "exit_settlement") {
-    const { data, error } = await fromHrms(supabase, "exit_settlements")
+    const { dateFrom, dateTo } = resolveDates(filters);
+    let settlementQuery = fromHrms(supabase, "exit_settlements")
       .select(
         `
         settlement_status, net_payable, approved_at,
@@ -1505,7 +1506,11 @@ async function runExitReport(
       )
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
+      .gte("approved_at", dateFrom)
+      .lte("approved_at", dateTo)
       .limit(1000);
+    if (filters.status) settlementQuery = settlementQuery.eq("settlement_status", filters.status);
+    const { data, error } = await settlementQuery;
     if (error) throw new Error(error.message);
     return buildResult(
       key,
@@ -1533,6 +1538,7 @@ async function runExitReport(
     );
   }
 
+  const { dateFrom, dateTo } = resolveDates(filters);
   let query = fromHrms(supabase, "exit_resignations")
     .select(
       `
@@ -1542,6 +1548,8 @@ async function runExitReport(
     )
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
+    .gte("resignation_date", dateFrom)
+    .lte("resignation_date", dateTo)
     .order("resignation_date", { ascending: false })
     .limit(1000);
   if (filters.status) query = query.eq("exit_status", filters.status);

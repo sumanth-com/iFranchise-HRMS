@@ -14,7 +14,11 @@ import { Button } from "@/components/common/button";
 import { Label } from "@/components/ui/label";
 import {
   buildStatusItems,
+  currentMonthValue,
+  currentYearValue,
+  matchesAssignedPeriod,
   matchesTextQuery,
+  MonthYearFilterFields,
   paginateItems,
   PerformanceFilters,
   PerformancePagination,
@@ -124,18 +128,21 @@ export function FeedbackTable({
   const [search, setSearch] = useState("");
   const [employeeId, setEmployeeId] = useState<string | undefined>();
   const [feedbackType, setFeedbackType] = useState<string | undefined>();
+  const [month, setMonth] = useState(currentMonthValue);
+  const [year, setYear] = useState(currentYearValue);
   const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => {
     return (records ?? []).filter((row) => {
       if (employeeId && row.toEmployeeId !== employeeId) return false;
       if (feedbackType && row.feedbackType !== feedbackType) return false;
+      if (!matchesAssignedPeriod(row.createdAt, month, year)) return false;
       return matchesTextQuery(
         [row.fromEmployeeName, row.toEmployeeName, row.message],
         search,
       );
     });
-  }, [records, search, employeeId, feedbackType]);
+  }, [records, search, employeeId, feedbackType, month, year]);
 
   const paged = useMemo(
     () => paginateItems(filtered, page, pageSize),
@@ -144,7 +151,7 @@ export function FeedbackTable({
 
   useEffect(() => {
     setPage(1);
-  }, [search, employeeId, feedbackType]);
+  }, [search, employeeId, feedbackType, month, year]);
 
   useEffect(() => {
     if (page !== paged.page) setPage(paged.page);
@@ -172,57 +179,85 @@ export function FeedbackTable({
   }
 
   return (
-    <section className="space-y-4">
-      <div className="rounded-xl border bg-card p-4 shadow-sm">
-        <PerformanceFilters
-          employees={employees}
-          statusItems={filterTypeItems}
-          statusKey="feedbackType"
-          statusValue={feedbackType}
-          employeeId={employeeId}
-          search={search}
-          searchPlaceholder="Search feedback..."
-          showDepartment={false}
-          showCycle={false}
-          onFiltersChange={handleFiltersChange}
-        />
+    <section className="space-y-3">
+      <div>
+        <h2 className="text-sm font-semibold">Feedback history</h2>
+        <p className="text-xs text-muted-foreground">
+          Latest notes for this month appear first. View and delete stay separate.
+        </p>
       </div>
+      <PerformanceFilters
+        employees={employees}
+        statusItems={filterTypeItems}
+        statusKey="feedbackType"
+        statusValue={feedbackType}
+        employeeId={employeeId}
+        search={search}
+        searchPlaceholder="Search feedback…"
+        variant="bar"
+        showDepartment={false}
+        showCycle={false}
+        className="rounded-lg border bg-muted/10 p-3 xl:grid-cols-[minmax(14rem,1.2fr)_repeat(4,minmax(8.5rem,1fr))]"
+        onFiltersChange={handleFiltersChange}
+        extraFilters={
+          <MonthYearFilterFields
+            month={month}
+            year={year}
+            onMonthChange={(value) => {
+              setMonth(value);
+              setPage(1);
+            }}
+            onYearChange={(value) => {
+              setYear(value);
+              setPage(1);
+            }}
+          />
+        }
+      />
       <PerformanceTableShell
         empty={
           <EmptyState
-            title="No feedback yet"
-            description="Start giving appreciation, coaching, or suggestions."
-            className="border-0"
+            title={records.length === 0 ? "No feedback yet" : "No feedback for this period"}
+            description={
+              records.length === 0
+                ? "Start giving appreciation, coaching, or suggestions."
+                : "Try another month or year to see more feedback."
+            }
+            className="border-0 py-8"
           />
         }
       >
         {paged.rows.length > 0 ? (
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[52rem] text-sm">
             <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
               <tr className="text-left text-muted-foreground">
-                <th className="px-4 py-3 font-medium">From</th>
-                <th className="px-4 py-3 font-medium">To</th>
-                <th className="px-4 py-3 font-medium">Type</th>
-                <th className="px-4 py-3 font-medium">Message</th>
-                <th className="px-4 py-3 font-medium">Date</th>
-                <th className="px-4 py-3" />
+                <th className="min-w-[14rem] px-4 py-3 font-medium">From</th>
+                <th className="min-w-[14rem] px-4 py-3 font-medium">To</th>
+                <th className="w-[9rem] px-4 py-3 font-medium">Type</th>
+                <th className="w-[40%] max-w-md px-4 py-3 font-medium">Message</th>
+                <th className="w-[7.5rem] px-4 py-3 font-medium">Date</th>
+                <th className="w-[5.5rem] px-4 py-3" />
               </tr>
             </thead>
             <tbody>
               {paged.rows.map((row) => (
                 <tr key={row.id} className="border-t align-middle">
-                  <td className="px-4 py-3">{row.fromEmployeeName}</td>
-                  <td className="px-4 py-3">{row.toEmployeeName}</td>
-                  <td className="px-4 py-3">
+                  <td className="min-w-[14rem] px-4 py-3 align-middle leading-snug">
+                    {row.fromEmployeeName}
+                  </td>
+                  <td className="min-w-[14rem] px-4 py-3 align-middle leading-snug">
+                    {row.toEmployeeName}
+                  </td>
+                  <td className="w-[9rem] px-4 py-3 align-middle">
                     <FeedbackTypeBadge type={row.feedbackType} />
                   </td>
-                  <td className="max-w-xs px-4 py-3">
-                    <span className="line-clamp-2">{row.message}</span>
+                  <td className="w-[40%] max-w-md px-4 py-3 align-middle">
+                    <span className="line-clamp-2 text-muted-foreground">{row.message}</span>
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td className="w-[7.5rem] px-4 py-3 align-middle whitespace-nowrap text-xs">
                     {format(new Date(row.createdAt), "MMM d, yyyy")}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="w-[5.5rem] px-4 py-3 align-middle">
                     <TableActions>
                       <ViewIconButton onClick={() => setViewRecord(row)} />
                       {canDelete ? (

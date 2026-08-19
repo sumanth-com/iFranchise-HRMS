@@ -18,10 +18,10 @@ export default async function ManagerAssetsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Assets</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            View assets assigned to you and their status.
+            View assets assigned to you and send status updates anytime.
           </p>
         </div>
-        <EmployeeAssetsView data={data} readOnly />
+        <EmployeeAssetsView data={data} />
       </div>
     </div>
   );

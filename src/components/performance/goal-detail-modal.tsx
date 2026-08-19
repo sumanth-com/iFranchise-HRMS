@@ -10,6 +10,7 @@ import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/common/modal";
+import { SuccessCelebrationOverlay } from "@/components/common/success-celebration-overlay";
 import { PerformanceConfirmModal } from "@/components/performance/performance-confirm-modal";
 import { buildStatusItems } from "@/components/performance/performance-filters";
 import {
@@ -25,7 +26,6 @@ import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { toSelectItems } from "@/components/payroll/select-utils";
 import {
   addGoalCommentAction,
-  deleteGoalAction,
   fetchGoalDetailAction,
   toggleGoalMilestoneAction,
   updateGoalAction,
@@ -51,10 +51,28 @@ type Props = {
   /** HR assigner history: read-only summary. Employee: own goals with key-result updates. */
   variant?: "default" | "assigner" | "employee";
   fetchDetail?: (goalId: string) => Promise<GoalDetail | null>;
-  toggleMilestone?: (input: MilestoneToggleInput) => Promise<{ success: boolean; message?: string }>;
+  toggleMilestone?: (input: MilestoneToggleInput) => Promise<{
+    success: boolean;
+    message?: string;
+    data?: {
+      goalStatus: GoalStatus;
+      currentProgress: number;
+      completedMilestones: number;
+      milestoneCount: number;
+      completedNow: boolean;
+    };
+  }>;
   canManage?: boolean;
   categories?: string[];
-  onChanged?: () => void;
+  onChanged?: (patch?: {
+    goalId: string;
+    goalStatus: GoalStatus;
+    currentProgress: number;
+    completedMilestones: number;
+    milestoneCount: number;
+  }) => void;
+  /** Assigner edit opens the form. View stays read-only. */
+  mode?: "view" | "edit";
 };
 
 export function GoalDetailModal({
@@ -68,13 +86,13 @@ export function GoalDetailModal({
   canManage = false,
   categories = [],
   onChanged,
+  mode = "view",
 }: Props) {
   const router = useRouter();
   const [detail, setDetail] = useState<GoalDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [confirmComplete, setConfirmComplete] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [editForm, setEditForm] = useState({
     title: "",
     description: "",
@@ -85,6 +103,9 @@ export function GoalDetailModal({
     goalStatus: "not_started" as GoalStatus,
   });
   const [isPending, startTransition] = useTransition();
+  const [congrats, setCongrats] = useState<{ title: string; description: string } | null>(
+    null,
+  );
 
   const isAssigner = variant === "assigner";
   const isEmployee = variant === "employee";
@@ -115,14 +136,14 @@ export function GoalDetailModal({
           goalStatus: data.goalStatus,
         });
       }
-      setEditing(false);
+      setEditing(mode === "edit" && variant === "assigner");
       setLoading(false);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [open, goalId, fetchDetail]);
+  }, [open, goalId, fetchDetail, mode, variant]);
 
   function refreshDetail() {
     if (!goalId) return;
@@ -157,7 +178,46 @@ export function GoalDetailModal({
         toast.error(result.message ?? "Failed to update key result");
         return;
       }
-      refreshDetail();
+      const snapshot = result.data;
+      setDetail((prev) => {
+        if (!prev) return prev;
+        const milestones = prev.milestones.map((item) =>
+          item.id === milestoneId
+            ? {
+                ...item,
+                isCompleted,
+                completedAt: isCompleted ? new Date().toISOString() : null,
+              }
+            : item,
+        );
+        return {
+          ...prev,
+          milestones,
+          goalStatus: snapshot?.goalStatus ?? prev.goalStatus,
+          currentProgress: snapshot?.currentProgress ?? prev.currentProgress,
+          completedMilestones:
+            snapshot?.completedMilestones ??
+            milestones.filter((item) => item.isCompleted).length,
+          milestoneCount: snapshot?.milestoneCount ?? milestones.length,
+        };
+      });
+      if (snapshot) {
+        onChanged?.({
+          goalId: detail.id,
+          goalStatus: snapshot.goalStatus,
+          currentProgress: snapshot.currentProgress,
+          completedMilestones: snapshot.completedMilestones,
+          milestoneCount: snapshot.milestoneCount,
+        });
+      } else {
+        onChanged?.();
+      }
+      if (snapshot?.completedNow) {
+        setCongrats({
+          title: "Congratulations!",
+          description: `You finished every key result on ${detail.title}.`,
+        });
+      }
     });
   }
 
@@ -183,20 +243,6 @@ export function GoalDetailModal({
       }
       toast.success("Goal updated");
       setEditing(false);
-      refreshDetail();
-    });
-  }
-
-  function handleDelete() {
-    if (!detail) return;
-    startTransition(async () => {
-      const result = await deleteGoalAction({ goalId: detail.id });
-      if (!result.success) {
-        toast.error(result.message);
-        return;
-      }
-      toast.success("Goal deleted");
-      setConfirmDelete(false);
       onOpenChange(false);
       onChanged?.();
       router.refresh();
@@ -245,44 +291,25 @@ export function GoalDetailModal({
         contentClassName="sm:max-w-2xl"
         showCancel={false}
         footer={
-          isAssigner && canManage && detail ? (
-            <div className="flex w-full flex-wrap items-center justify-between gap-2">
+          isAssigner && canManage && mode === "edit" && detail ? (
+            <div className="flex w-full flex-wrap items-center justify-end gap-2">
               <Button
-                variant="destructive"
+                variant="outline"
                 size="sm"
-                disabled={isPending || editing}
-                onClick={() => setConfirmDelete(true)}
+                disabled={isPending}
+                onClick={() => onOpenChange(false)}
               >
-                Delete
+                Cancel
               </Button>
-              <div className="flex flex-wrap gap-2">
-                {editing ? (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={isPending}
-                      onClick={() => setEditing(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button size="sm" disabled={isPending} onClick={saveEdit}>
-                      {isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-                      Save changes
-                    </Button>
-                  </>
-                ) : (
-                  <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-                    Edit
-                  </Button>
-                )}
-                <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-                  Close
-                </Button>
-              </div>
+              <Button size="sm" disabled={isPending} onClick={saveEdit}>
+                {isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                Save changes
+              </Button>
             </div>
           ) : (
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
           )
         }
       >
@@ -515,14 +542,12 @@ export function GoalDetailModal({
         onConfirm={markComplete}
       />
 
-      <PerformanceConfirmModal
-        open={confirmDelete}
-        onOpenChange={setConfirmDelete}
-        title="Delete this goal?"
-        description="The employee will no longer see this assigned goal."
-        confirmLabel="Delete goal"
-        isPending={isPending}
-        onConfirm={handleDelete}
+      <SuccessCelebrationOverlay
+        open={Boolean(congrats)}
+        title={congrats?.title ?? "Congratulations!"}
+        description={congrats?.description}
+        durationMs={3200}
+        onClose={() => setCongrats(null)}
       />
     </>
   );

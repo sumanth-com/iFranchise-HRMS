@@ -208,3 +208,25 @@ export function EditIconButton({
     </Button>
   );
 }
+
+export function UpdatePositionIconButton({
+  onClick,
+  disabled,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Button
+      type="button"
+      size="icon"
+      variant="outline"
+      className={ROW_ICON_BTN}
+      onClick={onClick}
+      disabled={disabled}
+      aria-label="Update position"
+    >
+      <Pencil className="size-3.5" />
+    </Button>
+  );
+}

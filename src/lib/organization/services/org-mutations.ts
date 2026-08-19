@@ -1,4 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { UserProfile } from "@/types/auth";
 import type { z } from "zod";
 import {
@@ -265,11 +266,13 @@ export async function deleteBranch(supabase: AuthSupabaseClient, profile: UserPr
     throw new Error("Cannot delete branch with assigned employees");
   }
 
-  const { error } = await supabase
+  const admin = createAdminClient();
+  const { error } = await admin
     .schema("hrms")
     .from("branches")
     .update({ deleted_at: new Date().toISOString(), status: "archived", ...auditFields(profile) })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("organization_id", orgId);
 
   if (error) throw new Error(error.message);
 }
@@ -490,11 +493,13 @@ export async function deleteEmploymentType(
     throw new Error("Cannot delete employment type assigned to employees");
   }
 
-  const { error } = await supabase
+  const admin = createAdminClient();
+  const { error } = await admin
     .schema("hrms")
     .from("employment_types")
     .update({ deleted_at: new Date().toISOString(), status: "archived", ...auditFields(profile) })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("organization_id", orgId);
 
   if (error) throw new Error(error.message);
 }
@@ -541,11 +546,14 @@ export async function deleteWorkLocation(
   profile: UserProfile,
   id: string,
 ) {
-  const { error } = await supabase
+  const orgId = profile.employee.organizationId;
+  const admin = createAdminClient();
+  const { error } = await admin
     .schema("hrms")
     .from("work_locations")
     .update({ deleted_at: new Date().toISOString(), status: "archived", ...auditFields(profile) })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("organization_id", orgId);
 
   if (error) throw new Error(error.message);
 }
@@ -645,7 +653,8 @@ export async function deleteShiftTemplate(
   profile: UserProfile,
   id: string,
 ) {
-  const { error } = await supabase
+  const admin = createAdminClient();
+  const { error } = await admin
     .schema("hrms")
     .from("shift_templates")
     .update({ deleted_at: new Date().toISOString(), status: "archived", ...auditFields(profile) })

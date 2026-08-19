@@ -271,22 +271,31 @@ export async function deleteGoalAction(
 
 export async function toggleGoalMilestoneAction(
   input: unknown,
-): Promise<PerformanceActionResult<void>> {
+): Promise<PerformanceActionResult<{
+  goalStatus: string;
+  currentProgress: number;
+  completedMilestones: number;
+  milestoneCount: number;
+  completedNow: boolean;
+}>> {
   try {
     const profile = await requireServerAnyPermission(
       managerOrPermissions("performance.edit", "performance.create"),
     );
     const supabase = await getAuthenticatedSupabase();
     const parsed = goalMilestoneToggleSchema.parse(input);
-    await toggleGoalMilestone(
+    const data = await toggleGoalMilestone(
       supabase,
       profile,
       parsed.goalId,
       parsed.milestoneId,
       parsed.isCompleted,
     );
-    revalidatePath(PERFORMANCE_ROUTES.goals);
-    return { success: true, data: undefined };
+    revalidatePerformancePaths();
+    revalidatePath("/dashboard/my-goals");
+    revalidatePath("/employee/goals");
+    revalidatePath("/manager/performance/goals");
+    return { success: true, data };
   } catch (error) {
     return {
       success: false,

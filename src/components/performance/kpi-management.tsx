@@ -15,12 +15,17 @@ import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/common/modal";
 import { KpiDetailModal } from "@/components/performance/kpi-detail-modal";
+import { KpiProgressFields } from "@/components/performance/kpi-progress-fields";
 import { KpiQuickAssign } from "@/components/performance/kpi-quick-assign";
 import { PerformanceConfirmModal } from "@/components/performance/performance-confirm-modal";
-import { KpiStatusBadge } from "@/components/performance/performance-status-badge";
+import { KpiRowStatusBadge } from "@/components/performance/performance-status-badge";
 import {
   buildStatusItems,
+  currentMonthValue,
+  currentYearValue,
+  matchesAssignedPeriod,
   matchesTextQuery,
+  MonthYearFilterFields,
   paginateItems,
   PerformanceFilters,
   PerformancePagination,
@@ -33,8 +38,6 @@ import {
   TableActions,
   ViewIconButton,
 } from "@/components/performance/performance-ui-primitives";
-import { LabeledSelect } from "@/components/payroll/payroll-select";
-import { toSelectItems } from "@/components/payroll/select-utils";
 import {
   deleteKpiAction,
   fetchKpisListAction,
@@ -42,21 +45,23 @@ import {
 } from "@/lib/performance/actions";
 import {
   KPI_MEASUREMENT_LABELS,
-  KPI_PERIOD_LABELS,
   KPI_STATUS_LABELS,
   PERFORMANCE_CLIENT_FETCH_SIZE,
   PERFORMANCE_ROUTES,
 } from "@/lib/performance/constants";
-import { formatKpiTarget } from "@/lib/performance/services/performance-utils";
+import { applyKpiProgressToListItem } from "@/lib/performance/kpi-update-options";
+import {
+  calculateKpiCompletion,
+  deriveKpiStatus,
+  formatKpiProgress,
+  formatKpiTarget,
+} from "@/lib/performance/services/performance-utils";
 import { kpiProgressSchema } from "@/lib/validations/performance";
 import { cn } from "@/lib/utils";
 import type { KpiListItem, KpiTemplateItem } from "@/types/performance";
 import type { LookupOption } from "@/types/employee";
 
-const periodItems = toSelectItems(KPI_PERIOD_LABELS);
 const statusItems = buildStatusItems(KPI_STATUS_LABELS);
-const FILTER_TRIGGER = "h-9 w-full min-w-0";
-const FILTER_CONTENT = "min-w-[var(--radix-select-trigger-width)]";
 
 
 type KpiWorkflowProps = {
@@ -92,6 +97,7 @@ type KpiTableProps = {
   total?: number;
   page?: number;
   pageSize: number;
+  employees?: LookupOption[];
   departments?: LookupOption[];
   designations?: LookupOption[];
   search?: string;
@@ -102,14 +108,17 @@ type KpiTableProps = {
   canManageKpis: boolean;
   currentEmployeeId: string;
   onKpisChanged?: () => void;
+  onKpiRecordUpdated?: (record: KpiListItem) => void;
 };
 
 export function KpiTable({
   records,
   pageSize,
+  employees = [],
   canManageKpis,
   currentEmployeeId,
   onKpisChanged,
+  onKpiRecordUpdated,
 }: KpiTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -117,20 +126,23 @@ export function KpiTable({
   const [viewing, setViewing] = useState<KpiListItem | null>(null);
   const [deleting, setDeleting] = useState<KpiListItem | null>(null);
   const [search, setSearch] = useState("");
+  const [employeeId, setEmployeeId] = useState<string | undefined>();
   const [kpiStatus, setKpiStatus] = useState<string | undefined>();
-  const [kpiPeriod, setKpiPeriod] = useState<string | undefined>();
+  const [month, setMonth] = useState(currentMonthValue);
+  const [year, setYear] = useState(currentYearValue);
   const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => {
     return records.filter((row) => {
+      if (employeeId && row.employeeId !== employeeId) return false;
       if (kpiStatus && row.kpiStatus !== kpiStatus) return false;
-      if (kpiPeriod && row.kpiPeriod !== kpiPeriod) return false;
+      if (!matchesAssignedPeriod(row.createdAt ?? row.startDate, month, year)) return false;
       return matchesTextQuery(
         [row.title, row.employeeName, row.employeeCode, row.departmentName],
         search,
       );
     });
-  }, [records, search, kpiStatus, kpiPeriod]);
+  }, [records, search, employeeId, kpiStatus, month, year]);
 
   const paged = useMemo(
     () => paginateItems(filtered, page, pageSize),
@@ -139,7 +151,7 @@ export function KpiTable({
 
   useEffect(() => {
     setPage(1);
-  }, [search, kpiStatus, kpiPeriod]);
+  }, [search, employeeId, kpiStatus, month, year]);
 
   useEffect(() => {
     if (page !== paged.page) setPage(paged.page);
@@ -147,6 +159,7 @@ export function KpiTable({
 
   function handleFiltersChange(updates: PerformanceFilterUpdates) {
     if ("search" in updates) setSearch(updates.search ?? "");
+    if ("employeeId" in updates) setEmployeeId(updates.employeeId);
     if ("kpiStatus" in updates) setKpiStatus(updates.kpiStatus);
     setPage(1);
   }
@@ -171,34 +184,35 @@ export function KpiTable({
       <div>
         <h2 className="text-sm font-semibold">Assigned KPIs</h2>
         <p className="text-xs text-muted-foreground">
-          Your assignment history appears here. Click View to open details in a popup.
+          Latest assignments for this month appear first. View, edit, and delete stay separate.
         </p>
       </div>
 
       <PerformanceFilters
-        employees={[]}
+        employees={employees}
         statusItems={statusItems}
         statusKey="kpiStatus"
         statusValue={kpiStatus}
+        employeeId={employeeId}
         search={search}
         searchPlaceholder="Search employee or KPI…"
         variant="bar"
-        showEmployee={false}
         showDepartment={false}
         showCycle={false}
-        className="rounded-lg border bg-muted/10 p-3"
+        className="rounded-lg border bg-muted/10 p-3 xl:grid-cols-[minmax(14rem,1.2fr)_repeat(4,minmax(8.5rem,1fr))]"
         onFiltersChange={handleFiltersChange}
         extraFilters={
-          <LabeledSelect
-            items={[{ value: "all", label: "All periods" }, ...periodItems]}
-            value={kpiPeriod ?? "all"}
-            onValueChange={(v) => {
-              setKpiPeriod(v === "all" ? undefined : v);
+          <MonthYearFilterFields
+            month={month}
+            year={year}
+            onMonthChange={(value) => {
+              setMonth(value);
               setPage(1);
             }}
-            placeholder="Review period"
-            triggerClassName={FILTER_TRIGGER}
-            contentClassName={FILTER_CONTENT}
+            onYearChange={(value) => {
+              setYear(value);
+              setPage(1);
+            }}
           />
         }
       />
@@ -207,8 +221,12 @@ export function KpiTable({
         className="max-h-[min(36vh,320px)]"
         empty={
           <EmptyState
-            title="No KPI assignments yet"
-            description="Pick a template above and assign it to an employee to start tracking."
+            title={records.length === 0 ? "No KPI assignments yet" : "No KPIs for this period"}
+            description={
+              records.length === 0
+                ? "Pick a template above and assign it to an employee to start tracking."
+                : "Try another month or year to see more assignments."
+            }
             className="border-0 py-8"
           />
         }
@@ -221,6 +239,7 @@ export function KpiTable({
                 <th className="px-3 py-2.5 font-medium">Employee ID</th>
                 <th className="px-3 py-2.5 font-medium">KPI</th>
                 <th className="px-3 py-2.5 font-medium">Target</th>
+                <th className="px-3 py-2.5 font-medium">Current</th>
                 <th className="px-3 py-2.5 font-medium">Status</th>
                 <th className="px-3 py-2.5 font-medium">Due</th>
                 <th className="px-3 py-2.5" />
@@ -237,8 +256,14 @@ export function KpiTable({
                   <td className="px-3 py-2.5 whitespace-nowrap">
                     {formatKpiTarget(row.targetValue, row.measurementType)}
                   </td>
+                  <td className="px-3 py-2.5 whitespace-nowrap">
+                    {formatKpiProgress(row.currentValue, row.measurementType)}
+                  </td>
                   <td className="px-3 py-2.5">
-                    <KpiStatusBadge status={row.kpiStatus} />
+                    <KpiRowStatusBadge
+                      kpiStatus={row.kpiStatus}
+                      progressComments={row.progressComments}
+                    />
                   </td>
                   <td className="px-3 py-2.5 whitespace-nowrap text-xs">
                     {row.endDate ? format(new Date(row.endDate), "MMM d, yyyy") : "—"}
@@ -274,6 +299,9 @@ export function KpiTable({
           record={editing}
           open={!!editing}
           onOpenChange={(open) => !open && setEditing(null)}
+          onSaved={(updated) => {
+            onKpiRecordUpdated?.(updated);
+          }}
         />
       ) : null}
 
@@ -281,17 +309,6 @@ export function KpiTable({
         record={viewing}
         open={!!viewing}
         onOpenChange={(open) => !open && setViewing(null)}
-        canManage={canManageKpis}
-        canUpdate={
-          viewing
-            ? viewing.kpiStatus !== "completed" &&
-              (canManageKpis || viewing.managerEmployeeId === currentEmployeeId)
-            : false
-        }
-        onUpdateProgress={() => {
-          if (viewing) setEditing(viewing);
-        }}
-        onChanged={onKpisChanged}
       />
 
       <PerformanceConfirmModal
@@ -333,6 +350,11 @@ export function KpiWorkspace({
     setRecords(tableProps.records);
   }, [tableProps.records]);
 
+  const handleKpiRecordUpdated = useCallback((updated: KpiListItem) => {
+    skipServerSyncRef.current = true;
+    setRecords((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+  }, []);
+
   const refreshAssignedKpis = useCallback(async () => {
     const result = await fetchKpisListAction({
       page: 1,
@@ -365,6 +387,8 @@ export function KpiWorkspace({
         <KpiTable
           {...tableProps}
           records={records}
+          employees={formProps.employees}
+          onKpiRecordUpdated={handleKpiRecordUpdated}
           onKpisChanged={refreshAssignedKpis}
         />
       </div>
@@ -376,12 +400,13 @@ function KpiProgressModal({
   record,
   open,
   onOpenChange,
+  onSaved,
 }: {
   record: KpiListItem;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSaved?: (record: KpiListItem) => void;
 }) {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const form = useForm<z.input<typeof kpiProgressSchema>>({
     resolver: zodResolver(kpiProgressSchema),
@@ -393,30 +418,68 @@ function KpiProgressModal({
     },
   });
 
+  useEffect(() => {
+    form.reset({
+      kpiId: record.id,
+      currentValue: record.currentValue,
+      progressComments: record.progressComments ?? "",
+      evidenceNotes: record.evidenceNotes ?? "",
+    });
+  }, [record, form]);
+
   return (
     <Modal
       open={open}
       onOpenChange={onOpenChange}
       title="Update KPI Progress"
       description={`${record.employeeName} — ${record.title}`}
+      contentClassName="sm:max-w-lg"
+      showCancel={false}
       footer={
-        <Button
-          disabled={isPending}
-          onClick={form.handleSubmit((values) => {
-            startTransition(async () => {
-              const result = await updateKpiProgressAction(values);
-              if (!result.success) toast.error(result.message);
-              else {
+        <>
+          <Button type="button" variant="outline" disabled={isPending} onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            disabled={isPending}
+            onClick={form.handleSubmit((values) => {
+              startTransition(async () => {
+                const result = await updateKpiProgressAction(values);
+                if (!result.success) {
+                  toast.error(result.message);
+                  return;
+                }
+
+                const currentValue = Number(values.currentValue);
+                const completion = calculateKpiCompletion(
+                  currentValue,
+                  record.targetValue,
+                  record.measurementType,
+                );
+                const nextStatus = deriveKpiStatus(
+                  completion,
+                  record.endDate,
+                  currentValue,
+                  record.startDate,
+                );
+                const updated = applyKpiProgressToListItem(record, {
+                  currentValue,
+                  completionPercentage: completion,
+                  progressComments: values.progressComments,
+                  evidenceNotes: values.evidenceNotes,
+                  kpiStatus: nextStatus,
+                });
+
                 toast.success("KPI progress updated");
                 onOpenChange(false);
-                router.refresh();
-              }
-            });
-          })}
-        >
-          {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          Save Progress
-        </Button>
+                onSaved?.(updated);
+              });
+            })}
+          >
+            {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Save Progress
+          </Button>
+        </>
       }
     >
       <div className="space-y-4">
@@ -426,24 +489,12 @@ function KpiProgressModal({
             {record.weightage}%
           </p>
         </div>
-        <Field label={`Current Progress (${KPI_MEASUREMENT_LABELS[record.measurementType]})`}>
-          <Input
-            type="number"
-            min={0}
-            step="0.01"
-            disabled={isPending}
-            {...form.register("currentValue")}
-          />
-        </Field>
-        <Field label="Comments">
-          <Input disabled={isPending} placeholder="Manager comments" {...form.register("progressComments")} />
-        </Field>
-        <Field label="Evidence / Notes">
-          <Input disabled={isPending} placeholder="Supporting notes or evidence" {...form.register("evidenceNotes")} />
-        </Field>
-        <p className="text-xs text-muted-foreground">
-          Completion percentage is calculated automatically from the current progress and target.
-        </p>
+        <KpiProgressFields
+          form={form}
+          measurementType={record.measurementType}
+          disabled={isPending}
+          mode="hr"
+        />
       </div>
     </Modal>
   );

@@ -40,7 +40,7 @@ export function HrAssetsHubView({
         <p className="text-sm text-muted-foreground">
           {isTeamView
             ? "Manage company asset inventory, assignments, and maintenance."
-            : "View assets assigned to you and their status."}
+            : "View assets assigned to you and send status updates anytime."}
         </p>
       </div>
 
@@ -54,7 +54,7 @@ export function HrAssetsHubView({
           embedded
         />
       ) : (
-        <EmployeeAssetsView data={selfAssets} readOnly />
+        <EmployeeAssetsView data={selfAssets} />
       )}
     </div>
   );

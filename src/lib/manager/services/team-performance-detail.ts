@@ -3,6 +3,8 @@ import {
   extractMeetingLinkFromAgenda,
 } from "@/lib/performance/services/performance-meeting-link";
 import {
+  calculateCompletionRate,
+  deriveGoalProgressStatus,
   formatEmployeeName,
   fromHrms,
   unwrapRelation,
@@ -192,6 +194,8 @@ export async function getTeamEmployeePerformanceProfile(
     const dept = unwrap(emp?.departments ?? null);
     const cycle = unwrap(row.performance_review_cycles);
     const milestones = (row.performance_goal_milestones ?? []) as Array<{ is_completed: boolean }>;
+    const milestoneCount = milestones.length;
+    const completedMilestones = milestones.filter((item) => item.is_completed).length;
     return {
       id: row.id,
       employeeId: row.employee_id,
@@ -205,12 +209,19 @@ export async function getTeamEmployeePerformanceProfile(
       category: row.category,
       goalPriority: row.goal_priority,
       weightage: Number(row.weightage),
-      currentProgress: Number(row.current_progress),
+      currentProgress:
+        milestoneCount > 0
+          ? calculateCompletionRate(completedMilestones, milestoneCount)
+          : Number(row.current_progress),
       dueDate: row.due_date,
-      goalStatus: row.goal_status,
+      goalStatus: deriveGoalProgressStatus({
+        goalStatus: row.goal_status,
+        completedMilestones,
+        milestoneCount,
+      }),
       attachmentPath: row.attachment_path,
-      milestoneCount: milestones.length,
-      completedMilestones: milestones.filter((item) => item.is_completed).length,
+      milestoneCount,
+      completedMilestones,
       createdAt: row.created_at,
     };
   });

@@ -21,9 +21,9 @@ export function parseEmployeeFullName(fullName: string): {
 
 export function cleanDisplayText(value: string) {
   return value
+    .replace(/[İıĪī]/g, "i")
     .normalize("NFKD")
     .replace(/\p{M}+/gu, "")
-    .replace(/[ıİ]/g, "i")
     .replace(/\s+/g, " ")
     .trim();
 }

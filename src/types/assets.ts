@@ -126,6 +126,7 @@ export type AssetMaintenanceItem = {
   completedAt: string | null;
   notes: string | null;
   createdAt: string;
+  createdByUserId?: string | null;
 };
 
 export type AssetMaintenanceListResult = {
@@ -174,7 +175,17 @@ export type AssetActivityKind =
   | "damaged"
   | "maintenance_opened"
   | "maintenance_completed"
+  | "issue_reported"
+  | "replacement_requested"
+  | "status_reported"
   | "asset_created";
+
+export type AssetActivityFeedParams = {
+  limit?: number;
+  activityType?: "all" | "report" | "replace" | "status";
+  month?: number;
+  year?: number;
+};
 
 export type AssetActivityItem = {
   id: string;
@@ -188,6 +199,7 @@ export type AssetActivityItem = {
   performedByName: string | null;
   actionLabel: string;
   remarks: string | null;
+  detailNotes: string | null;
   assignmentId: string | null;
   maintenanceId: string | null;
 };

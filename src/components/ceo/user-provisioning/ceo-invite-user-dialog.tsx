@@ -1,12 +1,12 @@
 "use client";
 
 import { Loader2, Send } from "lucide-react";
-import { useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
+import { SuccessCelebrationOverlay } from "@/components/common/success-celebration-overlay";
 import { Input } from "@/components/common/input";
 import {
   Select,
@@ -25,13 +25,18 @@ import {
 import { Label } from "@/components/ui/label";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { toLookupSelectItems } from "@/components/payroll/select-utils";
-import { inviteExecutiveUserAction } from "@/lib/ceo/actions/ceo-user-provisioning-actions";
+import {
+  fetchUserProvisioningInviteRolesAction,
+  inviteExecutiveUserAction,
+} from "@/lib/ceo/actions/ceo-user-provisioning-actions";
 import {
   inviteExecutiveUserSchema,
   type InviteExecutiveUserInput,
 } from "@/lib/validations/ceo-user-provisioning";
-import { cn } from "@/lib/utils";
-import type { CeoProvisioningLookups } from "@/types/ceo-user-provisioning";
+import type {
+  CeoProvisioningLookups,
+  ProvisionableRoleOption,
+} from "@/types/ceo-user-provisioning";
 
 type CeoInviteUserDialogProps = {
   open: boolean;
@@ -49,6 +54,14 @@ export function CeoInviteUserDialog({
   onInvited,
 }: CeoInviteUserDialogProps) {
   const [isPending, startTransition] = useTransition();
+  const [inviteRoles, setInviteRoles] = useState<ProvisionableRoleOption[]>(
+    lookups.roles,
+  );
+  const [inviteSuccess, setInviteSuccess] = useState<{
+    title: string;
+    description: string;
+  } | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const {
     register,
@@ -66,54 +79,92 @@ export function CeoInviteUserDialog({
       departmentId: "",
       designation: "",
       employmentTypeId: "",
-      branchId: "",
-      notes: "",
     },
   });
 
   const roleCode = watch("roleCode");
   const departmentId = watch("departmentId");
   const employmentTypeId = watch("employmentTypeId");
-  const branchId = watch("branchId");
+
+  useEffect(() => {
+    setInviteRoles(lookups.roles);
+  }, [lookups.roles]);
+
+  useEffect(() => {
+    if (!open) return;
+    setSubmitError(null);
+
+    void fetchUserProvisioningInviteRolesAction().then((result) => {
+      if (result.success) {
+        setInviteRoles(result.roles);
+      }
+    });
+  }, [open]);
 
   function handleOpenChange(next: boolean) {
-    if (!next) reset();
+    if (!next) {
+      reset();
+      setSubmitError(null);
+    }
     onOpenChange(next);
   }
 
   const onSubmit = handleSubmit((data) => {
     if (!inviteServiceReady) {
-      toast.error("Invitations are not configured on this environment.");
+      setSubmitError("Invitations are not configured on this environment.");
       return;
     }
+
+    setSubmitError(null);
 
     startTransition(async () => {
       const result = await inviteExecutiveUserAction(data);
       if (!result.success) {
-        toast.error(result.message);
+        setSubmitError(result.message);
         return;
       }
-      toast.success(result.message);
+      setInviteSuccess({
+        title: "Invitation sent",
+        description: `${data.email} will receive an email to activate their account.`,
+      });
       reset();
       onOpenChange(false);
       onInvited();
     });
   });
 
-  const selectedRole = lookups.roles.find((role) => role.code === roleCode);
+  const selectedRole = inviteRoles.find((role) => role.code === roleCode);
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <>
+      <SuccessCelebrationOverlay
+        open={Boolean(inviteSuccess)}
+        title={inviteSuccess?.title ?? "Invitation sent"}
+        description={inviteSuccess?.description}
+        durationMs={3200}
+        onClose={() => setInviteSuccess(null)}
+      />
+
+      <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
         <DialogHeader className="shrink-0 border-b px-5 py-4">
           <DialogTitle>Invite User</DialogTitle>
           <DialogDescription>
-            Invite a high-privilege user. Employees are provisioned by HR.
+            Invite a user as CEO, Cofounder, HR Admin, Manager, or Employee.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+            {submitError ? (
+              <div
+                role="alert"
+                className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
+              >
+                {submitError}
+              </div>
+            ) : null}
+
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="fullName">Full Name *</Label>
@@ -159,20 +210,15 @@ export function CeoInviteUserDialog({
                   </SelectTrigger>
                   <SelectContent
                     alignItemWithTrigger={false}
-                    className="w-(--anchor-width) max-w-[min(100vw-2rem,28rem)]"
+                    className="max-h-[min(26rem,calc(100dvh-6rem))] w-(--anchor-width) max-w-[min(100vw-2rem,28rem)]"
                   >
-                    {lookups.roles.map((role) => (
-                      <SelectItem key={role.code} value={role.code} className="items-start py-2.5">
+                    {inviteRoles.map((role) => (
+                      <SelectItem key={role.code} value={role.code} className="items-start py-2">
                         <div className="flex min-w-0 flex-col gap-0.5 text-left">
                           <span className="font-medium">{role.name}</span>
                           <span className="text-[11px] text-muted-foreground">
                             {role.departmentLabel} · {role.portalLabel}
                           </span>
-                          {role.description ? (
-                            <span className="line-clamp-2 text-[11px] text-muted-foreground">
-                              {role.description}
-                            </span>
-                          ) : null}
                         </div>
                       </SelectItem>
                     ))}
@@ -205,7 +251,7 @@ export function CeoInviteUserDialog({
                 <Label htmlFor="designation">Designation *</Label>
                 <Input
                   id="designation"
-                  placeholder="Chief Technology Officer"
+                  placeholder="Software Engineer"
                   disabled={isPending}
                   {...register("designation")}
                 />
@@ -229,38 +275,6 @@ export function CeoInviteUserDialog({
                   <p className="text-xs text-destructive">{errors.employmentTypeId.message}</p>
                 ) : null}
               </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Branch *</Label>
-                <LabeledSelect
-                  value={branchId}
-                  placeholder="Select branch"
-                  items={toLookupSelectItems(lookups.branches)}
-                  onValueChange={(value) => setValue("branchId", value, { shouldValidate: true })}
-                  disabled={isPending}
-                />
-                {errors.branchId ? (
-                  <p className="text-xs text-destructive">{errors.branchId.message}</p>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="notes">Optional Notes</Label>
-              <textarea
-                id="notes"
-                placeholder="Add context for this invitation…"
-                rows={3}
-                disabled={isPending}
-                className={cn(
-                  "flex w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors",
-                  "placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
-                  "disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30",
-                )}
-                {...register("notes")}
-              />
             </div>
 
             {!inviteServiceReady ? (
@@ -296,6 +310,7 @@ export function CeoInviteUserDialog({
           </div>
         </form>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+    </>
   );
 }

@@ -38,7 +38,7 @@ async function AssetsHubContent({
     canViewTeam
       ? listAssets(supabase, profile, { page: 1, pageSize: 100 })
       : Promise.resolve(null),
-    canViewTeam ? getAssetActivityFeed(supabase, profile, 40) : Promise.resolve([]),
+    canViewTeam ? getAssetActivityFeed(supabase, profile, { limit: 100, activityType: "all" }) : Promise.resolve([]),
   ]);
 
   return (

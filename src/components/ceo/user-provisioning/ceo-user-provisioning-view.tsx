@@ -1,7 +1,7 @@
 "use client";
 
 import { UserRoundPlus } from "lucide-react";
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -9,6 +9,10 @@ import {
   CeoModulePageHeader,
 } from "@/components/ceo/ceo-module-primitives";
 import { CeoInviteUserDialog } from "@/components/ceo/user-provisioning/ceo-invite-user-dialog";
+import {
+  CeoProvisioningConfirmDialog,
+  type ProvisioningConfirmAction,
+} from "@/components/ceo/user-provisioning/ceo-provisioning-confirm-dialog";
 import { CeoProvisioningDrawer } from "@/components/ceo/user-provisioning/ceo-provisioning-drawer";
 import { CeoProvisioningFilters } from "@/components/ceo/user-provisioning/ceo-provisioning-filters";
 import { CeoProvisioningPeople } from "@/components/ceo/user-provisioning/ceo-provisioning-people";
@@ -17,6 +21,7 @@ import { Button } from "@/components/common/button";
 import {
   cancelProvisioningInvitationAction,
   deactivateProvisioningUserAction,
+  deleteProvisioningUserAction,
   fetchCeoProvisioningUsersAction,
   getCeoUserProvisioningModuleData,
   reactivateProvisioningUserAction,
@@ -40,25 +45,22 @@ const MUTATION_ACTIONS: Record<
 > = {
   resend: resendProvisioningInvitationAction,
   cancel: cancelProvisioningInvitationAction,
+  delete: deleteProvisioningUserAction,
   deactivate: deactivateProvisioningUserAction,
   reactivate: reactivateProvisioningUserAction,
-};
-
-const CONFIRM_MESSAGES: Partial<Record<ProvisioningRowAction, string>> = {
-  cancel: "Cancel this invitation? The pending account will be removed.",
-  deactivate: "Deactivate this user? They will lose portal access until reactivated.",
 };
 
 export function CeoUserProvisioningView({
   summary: initialSummary,
   users: initialUsers,
-  lookups,
+  lookups: initialLookups,
   inviteServiceReady,
   initialFilters,
   variant = "ceo",
 }: CeoUserProvisioningViewProps) {
   const [summary, setSummary] = useState(initialSummary);
   const [users, setUsers] = useState(initialUsers);
+  const [lookups, setLookups] = useState(initialLookups);
   const [pageParams, setPageParams] = useState<CeoProvisioningListParams>({
     page: initialFilters.page ?? 1,
     pageSize: initialFilters.pageSize ?? 8,
@@ -74,61 +76,106 @@ export function CeoUserProvisioningView({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [busyEmployeeId, setBusyEmployeeId] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{
+    action: ProvisioningConfirmAction;
+    user: CeoProvisioningUser;
+  } | null>(null);
+  const [isConfirmPending, setIsConfirmPending] = useState(false);
 
-  const refreshList = useCallback((next: CeoProvisioningListParams) => {
-    startTransition(async () => {
-      const result = await fetchCeoProvisioningUsersAction(next);
-      setUsers(result);
-    });
-  }, []);
+  const refreshModuleData = useCallback(
+    async (next: CeoProvisioningListParams, options?: { showRefreshing?: boolean }) => {
+      if (options?.showRefreshing) setIsRefreshing(true);
+      try {
+        const data = await getCeoUserProvisioningModuleData(next);
+        setSummary(data.summary);
+        setUsers(data.users);
+        setLookups(data.lookups);
+      } finally {
+        if (options?.showRefreshing) setIsRefreshing(false);
+      }
+    },
+    [],
+  );
 
-  const refreshAll = useCallback((next: CeoProvisioningListParams) => {
-    startTransition(async () => {
-      const data = await getCeoUserProvisioningModuleData(next);
-      setSummary(data.summary);
-      setUsers(data.users);
-    });
-  }, []);
+  const refreshList = useCallback(
+    async (next: CeoProvisioningListParams, options?: { showRefreshing?: boolean }) => {
+      if (options?.showRefreshing) setIsRefreshing(true);
+      try {
+        const result = await fetchCeoProvisioningUsersAction(next);
+        setUsers(result);
+      } finally {
+        if (options?.showRefreshing) setIsRefreshing(false);
+      }
+    },
+    [],
+  );
 
   function applyFilters(next: CeoProvisioningListParams) {
     setPageParams(next);
-    refreshList(next);
+    void refreshList(next, { showRefreshing: true });
   }
 
   function changePage(page: number) {
     const next = { ...pageParams, page };
     setPageParams(next);
-    refreshList(next);
+    void refreshList(next, { showRefreshing: true });
   }
 
-  function handleAction(action: ProvisioningRowAction, user: CeoProvisioningUser) {
+  function requestAction(action: ProvisioningRowAction, user: CeoProvisioningUser) {
     if (action === "view") {
       setSelectedEmployeeId(user.employeeId);
       setDrawerOpen(true);
       return;
     }
 
-    const confirmMessage = CONFIRM_MESSAGES[action];
-    if (confirmMessage && !window.confirm(confirmMessage)) return;
+    if (action === "resend" || action === "reactivate") {
+      void runAction(action, user);
+      return;
+    }
 
+    if (action === "cancel" || action === "delete" || action === "deactivate") {
+      setConfirmAction({ action, user });
+    }
+  }
+
+  async function runAction(
+    action: Exclude<ProvisioningRowAction, "view">,
+    user: CeoProvisioningUser,
+  ) {
     const runner = MUTATION_ACTIONS[action];
     setBusyEmployeeId(user.employeeId);
-    startTransition(async () => {
+    try {
       const result = await runner(user.employeeId);
-      setBusyEmployeeId(null);
       if (!result.success) {
         toast.error(result.message);
         return;
       }
-      toast.success(result.message);
-      if (action === "cancel" || action === "deactivate") {
+
+      if (action !== "resend") {
+        toast.success(result.message);
+      }
+
+      if (action === "cancel" || action === "delete" || action === "deactivate") {
         setDrawerOpen(false);
       }
-      const data = await getCeoUserProvisioningModuleData(pageParams);
-      setSummary(data.summary);
-      setUsers(data.users);
-    });
+
+      await refreshModuleData(pageParams);
+    } finally {
+      setBusyEmployeeId(null);
+    }
+  }
+
+  async function confirmPendingAction() {
+    if (!confirmAction) return;
+    const { action, user } = confirmAction;
+    setIsConfirmPending(true);
+    try {
+      await runAction(action, user);
+      setConfirmAction(null);
+    } finally {
+      setIsConfirmPending(false);
+    }
   }
 
   const headerDescription =
@@ -155,7 +202,10 @@ export function CeoUserProvisioningView({
         <Button
           type="button"
           className="gap-1.5"
-          onClick={() => setInviteOpen(true)}
+          onClick={() => {
+            setInviteOpen(true);
+            void refreshModuleData(pageParams);
+          }}
           disabled={!inviteServiceReady}
         >
           <UserRoundPlus className="size-4" />
@@ -169,20 +219,20 @@ export function CeoUserProvisioningView({
         <CeoProvisioningFilters
           filters={pageParams}
           lookups={lookups}
-          disabled={isPending}
+          disabled={isRefreshing}
           onChange={applyFilters}
         />
       ) : null}
 
       <CeoProvisioningPeople
-        users={users.data}
-        total={users.total}
-        page={users.page}
-        pageSize={users.pageSize}
-        isLoading={isPending}
+        users={users?.data ?? []}
+        total={users?.total ?? 0}
+        page={users?.page ?? 1}
+        pageSize={users?.pageSize ?? pageParams.pageSize ?? 8}
+        isRefreshing={isRefreshing}
         busyEmployeeId={busyEmployeeId}
         onPageChange={changePage}
-        onAction={handleAction}
+        onAction={requestAction}
       />
 
       <CeoInviteUserDialog
@@ -190,14 +240,25 @@ export function CeoUserProvisioningView({
         onOpenChange={setInviteOpen}
         lookups={lookups}
         inviteServiceReady={inviteServiceReady}
-        onInvited={() => refreshAll(pageParams)}
+        onInvited={() => void refreshModuleData(pageParams)}
+      />
+
+      <CeoProvisioningConfirmDialog
+        action={confirmAction?.action ?? null}
+        userName={confirmAction?.user.fullName ?? null}
+        userEmail={confirmAction?.user.email ?? null}
+        isPending={isConfirmPending}
+        onOpenChange={(open) => {
+          if (!open && !isConfirmPending) setConfirmAction(null);
+        }}
+        onConfirm={() => void confirmPendingAction()}
       />
 
       <CeoProvisioningDrawer
         employeeId={selectedEmployeeId}
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
-        onAction={(action, detail) => handleAction(action, detail.user)}
+        onAction={(action, detail) => requestAction(action, detail.user)}
       />
     </div>
   );

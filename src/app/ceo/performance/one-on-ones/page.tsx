@@ -27,7 +27,7 @@ export default async function CeoOneOnOnesPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">One-on-One Meetings</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          View meeting agendas, links, action items, and follow-ups.
+          View meeting agendas, links, and action items.
         </p>
       </div>
       <OneOnOneTable

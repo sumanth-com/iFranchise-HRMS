@@ -1,5 +1,6 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { allocateNextEmployeeCode } from "@/lib/employees/services/employee-code";
+import { cleanDisplayText } from "@/lib/employees/parse-employee-name";
 import type { UserProfile } from "@/types/auth";
 import type {
   EmployeeAccountProvisioningItem,
@@ -179,9 +180,9 @@ export async function listEmployees(
       return {
         id: row.id,
         employeeCode: row.employee_code,
-        firstName: row.first_name,
-        lastName: row.last_name,
-        fullName: `${row.first_name} ${row.last_name}`,
+        firstName: cleanDisplayText(row.first_name),
+        lastName: cleanDisplayText(row.last_name),
+        fullName: `${cleanDisplayText(row.first_name)} ${cleanDisplayText(row.last_name)}`.trim(),
         email: row.email,
         phone: row.phone,
         employmentStatus: row.employment_status as EmployeeListResult["data"][number]["employmentStatus"],

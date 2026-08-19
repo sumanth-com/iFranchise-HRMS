@@ -2,6 +2,7 @@ import { differenceInCalendarDays, startOfDay } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { createSignedAssetImageUrl } from "@/lib/assets/services/asset-mutations";
+import { getEmployeeAssetRequests } from "@/lib/assets/services/asset-queries";
 import { AssetRow, fromHrms, unwrapRelation } from "@/lib/assets/services/assets-utils";
 import type { UserProfile } from "@/types/auth";
 import type {
@@ -43,8 +44,8 @@ function computeWarranty(expiry: string | null): EmployeeAssetWarranty {
 /**
  * Everything the Employee Self-Service "My Assets" module needs, scoped strictly to the
  * signed-in employee: their asset assignments (current + past), each asset's full detail,
- * warranty status, and the maintenance history for those assets. Read-only — employees
- * only hold `asset.view`.
+ * warranty status, and the maintenance history for those assets. Employees can send
+ * status updates for assets currently assigned to them.
  */
 export async function getEmployeeAssetsData(
   supabase: AuthSupabaseClient,
@@ -54,6 +55,8 @@ export async function getEmployeeAssetsData(
     supabase,
     profile.employee.organizationId,
     profile.employee.id,
+    profile,
+    profile.userId,
   );
 }
 
@@ -61,14 +64,34 @@ export async function getEmployeeAssetsDataForEmployee(
   supabase: AuthSupabaseClient,
   organizationId: string,
   employeeId: string,
+  profile?: UserProfile,
 ): Promise<EmployeeAssetsData> {
-  return buildEmployeeAssetsData(supabase, organizationId, employeeId);
+  let requestsUserId: string | null = null;
+  if (profile) {
+    const { data: employeeRow, error: employeeError } = await fromHrms(supabase, "employees")
+      .select("user_id")
+      .eq("id", employeeId)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+    if (employeeError) throw new Error(employeeError.message);
+    requestsUserId = employeeRow?.user_id ?? null;
+  }
+
+  return buildEmployeeAssetsData(
+    supabase,
+    organizationId,
+    employeeId,
+    profile,
+    requestsUserId,
+  );
 }
 
 async function buildEmployeeAssetsData(
   supabase: AuthSupabaseClient,
   organizationId: string,
   employeeId: string,
+  profile?: UserProfile,
+  requestsUserId?: string | null,
 ): Promise<EmployeeAssetsData> {
   const { data, error } = await fromHrms(supabase, "asset_assignments")
     .select(ASSIGNMENT_SELECT)
@@ -189,9 +212,18 @@ async function buildEmployeeAssetsData(
     new Set(items.map((item) => item.categoryName).filter((name): name is string => Boolean(name))),
   ).sort((a, b) => a.localeCompare(b));
 
+  const requests =
+    profile && requestsUserId
+      ? await getEmployeeAssetRequests(supabase, profile, {
+          userId: requestsUserId,
+          employeeId,
+        })
+      : [];
+
   return {
     assigned,
     history,
+    requests,
     summary: {
       currentlyAssigned: assigned.length,
       previouslyReturned: history.filter(
@@ -200,7 +232,11 @@ async function buildEmployeeAssetsData(
       underRepair,
       warrantyExpiringSoon,
       lostOrDamaged: items.filter(
-        (item) => item.assignmentStatus === "lost" || item.assignmentStatus === "damaged",
+        (item) =>
+          item.assignmentStatus === "lost" ||
+          item.assignmentStatus === "damaged" ||
+          item.assetStatus === "lost" ||
+          item.conditionAfter === "damaged",
       ).length,
     },
     categories,

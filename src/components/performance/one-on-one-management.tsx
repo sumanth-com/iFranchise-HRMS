@@ -23,20 +23,20 @@ import {
 } from "@/components/performance/performance-filters";
 import { OneOnOneDetailModal } from "@/components/performance/one-on-one-detail-modal";
 import { PerformanceConfirmModal } from "@/components/performance/performance-confirm-modal";
-import { MeetingStatusBadge } from "@/components/performance/performance-status-badge";
 import {
   DeleteIconButton,
   PerformanceTableShell,
   TableActions,
   ViewIconButton,
 } from "@/components/performance/performance-ui-primitives";
-import { EmployeeSelect } from "@/components/payroll/payroll-select";
+import {
+  EmployeeSelect,
+  FORM_SELECT_CONTENT,
+  FORM_SELECT_TRIGGER,
+} from "@/components/payroll/payroll-select";
 import { createOneOnOneAction, deleteOneOnOneAction } from "@/lib/performance/actions";
 import { MEETING_STATUS_LABELS } from "@/lib/performance/constants";
-import {
-  getMinDateTimeLocalValue,
-  getMinFollowUpDateLocal,
-} from "@/lib/performance/services/performance-utils";
+import { getMinDateTimeLocalValue } from "@/lib/performance/services/performance-utils";
 import { oneOnOneFormSchema } from "@/lib/validations/performance";
 import type { OneOnOneListItem } from "@/types/performance";
 import type { LookupOption } from "@/types/employee";
@@ -56,9 +56,6 @@ export function OneOnOneForm({ employees }: { employees: LookupOption[] }) {
       actionItems: [],
     },
   });
-
-  const scheduledAt = form.watch("scheduledAt");
-  const minFollowUpDate = getMinFollowUpDateLocal(scheduledAt);
 
   return (
     <section className="rounded-xl border bg-card p-5 shadow-sm">
@@ -90,14 +87,18 @@ export function OneOnOneForm({ employees }: { employees: LookupOption[] }) {
             value={form.watch("employeeId")}
             onValueChange={(v) => form.setValue("employeeId", v, { shouldValidate: true })}
             disabled={isPending}
+            triggerClassName={FORM_SELECT_TRIGGER}
+            contentClassName={FORM_SELECT_CONTENT}
           />
         </Field>
-        <Field label="Manager">
+        <Field label="Meeting with">
           <EmployeeSelect
             employees={employees}
             value={form.watch("managerEmployeeId")}
             onValueChange={(v) => form.setValue("managerEmployeeId", v, { shouldValidate: true })}
             disabled={isPending}
+            triggerClassName={FORM_SELECT_TRIGGER}
+            contentClassName={FORM_SELECT_CONTENT}
           />
         </Field>
         <Field label="Scheduled at">
@@ -105,27 +106,7 @@ export function OneOnOneForm({ employees }: { employees: LookupOption[] }) {
             type="datetime-local"
             min={getMinDateTimeLocalValue()}
             disabled={isPending}
-            {...form.register("scheduledAt", {
-              onChange: (event) => {
-                const nextScheduledAt = event.target.value;
-                const followUpDate = form.getValues("followUpDate");
-                if (
-                  followUpDate &&
-                  nextScheduledAt &&
-                  followUpDate < getMinFollowUpDateLocal(nextScheduledAt)
-                ) {
-                  form.setValue("followUpDate", "");
-                }
-              },
-            })}
-          />
-        </Field>
-        <Field label="Follow-up date">
-          <Input
-            type="date"
-            min={minFollowUpDate}
-            disabled={isPending || !scheduledAt}
-            {...form.register("followUpDate")}
+            {...form.register("scheduledAt")}
           />
         </Field>
         <Field label="Agenda">
@@ -174,8 +155,16 @@ export function OneOnOneTable({
     return records.filter((row) => {
       if (employeeId && row.employeeId !== employeeId) return false;
       if (meetingStatus && row.meetingStatus !== meetingStatus) return false;
+      const scheduledLabel = format(new Date(row.scheduledAt), "MMM d, yyyy h:mm a");
       return matchesTextQuery(
-        [row.employeeName, row.managerName, row.agenda, row.notes],
+        [
+          row.employeeName,
+          row.managerName,
+          row.agenda,
+          row.notes,
+          row.meetingLink,
+          scheduledLabel,
+        ],
         search,
       );
     });
@@ -226,8 +215,10 @@ export function OneOnOneTable({
           employeeId={employeeId}
           search={search}
           searchPlaceholder="Search meetings..."
+          variant="bar"
           showDepartment={false}
           showCycle={false}
+          className="xl:grid-cols-[minmax(14rem,1.4fr)_repeat(2,minmax(10rem,1fr))]"
           onFiltersChange={handleFiltersChange}
         />
       </div>
@@ -245,12 +236,9 @@ export function OneOnOneTable({
             <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
               <tr className="text-left text-muted-foreground">
                 <th className="px-4 py-3 font-medium">Employee</th>
-                <th className="px-4 py-3 font-medium">Manager</th>
+                <th className="px-4 py-3 font-medium">Meeting with</th>
                 <th className="px-4 py-3 font-medium">Scheduled</th>
                 <th className="px-4 py-3 font-medium">Agenda</th>
-                <th className="px-4 py-3 font-medium">Actions</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Follow-up</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -264,15 +252,6 @@ export function OneOnOneTable({
                   </td>
                   <td className="max-w-xs px-4 py-3">
                     <span className="line-clamp-2">{row.agenda ?? "—"}</span>
-                  </td>
-                  <td className="px-4 py-3 tabular-nums">
-                    {row.completedActions}/{row.actionItemCount}
-                  </td>
-                  <td className="px-4 py-3">
-                    <MeetingStatusBadge status={row.meetingStatus} />
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    {row.followUpDate ? format(new Date(row.followUpDate), "MMM d, yyyy") : "—"}
                   </td>
                   <td className="px-4 py-3">
                     <TableActions>

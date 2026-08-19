@@ -47,7 +47,7 @@ export const GOAL_STATUS_LABELS: Record<GoalStatus, string> = {
   in_progress: "In Progress",
   on_track: "On Track",
   at_risk: "At Risk",
-  completed: "Completed",
+  completed: "Done",
   cancelled: "Cancelled",
 };
 
@@ -108,9 +108,9 @@ export const KPI_MEASUREMENT_LABELS: Record<KpiMeasurementType, string> = {
 };
 
 export const KPI_STATUS_LABELS: Record<KpiAssignmentStatus, string> = {
-  not_started: "Not Started",
-  in_progress: "In Progress",
-  completed: "Completed",
+  not_started: "Assigned",
+  in_progress: "Active",
+  completed: "Done",
   overdue: "Overdue",
 };
 

@@ -149,31 +149,15 @@ export async function updateAsset(
 
 export async function deleteAsset(
   supabase: AuthSupabaseClient,
-  profile: UserProfile,
+  _profile: UserProfile,
   assetId: string,
 ): Promise<void> {
-  const { data: asset, error: findError } = await fromHrms(supabase, "assets")
-    .select("id, asset_status, current_assignment_id")
-    .eq("id", assetId)
-    .eq("organization_id", profile.employee.organizationId)
-    .is("deleted_at", null)
-    .maybeSingle();
-
-  if (findError) throw new Error(findError.message);
-  if (!asset) throw new Error("Asset not found");
-  if (asset.current_assignment_id || asset.asset_status === "assigned") {
-    throw new Error("Return the asset before deleting it");
-  }
-
-  const { error } = await fromHrms(supabase, "assets")
-    .update({
-      deleted_at: new Date().toISOString(),
-      asset_status: "disposed",
-      updated_by: profile.userId,
-    })
-    .eq("id", assetId);
+  const { data, error } = await supabase.schema("hrms").rpc("soft_delete_asset", {
+    p_asset_id: assetId,
+  });
 
   if (error) throw new Error(error.message);
+  if (data !== true) throw new Error("Asset not found or already deleted.");
 }
 
 function hasAssignConfig(input: AssignAssetValues) {
@@ -562,6 +546,32 @@ export async function updateMaintenanceStatus(
       })
       .eq("id", row.asset_id);
   }
+}
+
+export async function deleteMaintenance(
+  supabase: AuthSupabaseClient,
+  _profile: UserProfile,
+  maintenanceId: string,
+): Promise<void> {
+  const { data, error } = await supabase.schema("hrms").rpc("soft_delete_asset_maintenance", {
+    p_maintenance_id: maintenanceId,
+  });
+
+  if (error) throw new Error(error.message);
+  if (data !== true) throw new Error("Record not found");
+}
+
+export async function deleteAssignedAsset(
+  supabase: AuthSupabaseClient,
+  _profile: UserProfile,
+  assignmentId: string,
+): Promise<void> {
+  const { data, error } = await supabase.schema("hrms").rpc("soft_delete_assigned_asset", {
+    p_assignment_id: assignmentId,
+  });
+
+  if (error) throw new Error(error.message);
+  if (data !== true) throw new Error("Assignment not found");
 }
 
 export async function createVendor(

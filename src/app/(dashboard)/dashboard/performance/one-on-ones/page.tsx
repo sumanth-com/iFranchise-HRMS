@@ -29,7 +29,7 @@ export default async function OneOnOnesPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">One-on-One Meetings</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Schedule meetings with agenda, meeting link, action items, and follow-ups.
+          Schedule meetings with agenda, meeting link, and action items.
         </p>
       </div>
       {canCreatePerformance(profile.permissionCodes) ? (

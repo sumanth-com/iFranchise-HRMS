@@ -1,6 +1,6 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
-import type { GoalDetail, OneOnOneDetail, ReviewDetail } from "@/types/performance";
+import type { GoalDetail, GoalStatus, OneOnOneDetail, ReviewDetail } from "@/types/performance";
 import {
   goalFormSchema,
   reviewFormSchema,
@@ -11,7 +11,9 @@ import {
   isMissingMeetingLinkColumnError,
 } from "@/lib/performance/services/performance-meeting-link";
 import {
+  calculateCompletionRate,
   calculateKpiCompletion,
+  deriveGoalProgressStatus,
   deriveKpiStatus,
   formatEmployeeName,
   fromHrms,
@@ -127,15 +129,23 @@ export async function updateGoalProgress(
   if (error) throw new Error(error.message);
 }
 
+export type GoalMilestoneToggleResult = {
+  goalStatus: GoalStatus;
+  currentProgress: number;
+  completedMilestones: number;
+  milestoneCount: number;
+  completedNow: boolean;
+};
+
 export async function toggleGoalMilestone(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   goalId: string,
   milestoneId: string,
   isCompleted: boolean,
-): Promise<void> {
+): Promise<GoalMilestoneToggleResult> {
   const { data: goal, error: goalError } = await fromHrms(supabase, "performance_goals")
-    .select("id")
+    .select("id, goal_status")
     .eq("id", goalId)
     .eq("organization_id", profile.employee.organizationId)
     .is("deleted_at", null)
@@ -153,6 +163,45 @@ export async function toggleGoalMilestone(
     .eq("goal_id", goalId);
 
   if (error) throw new Error(error.message);
+
+  const { data: milestoneRows, error: countError } = await fromHrms(
+    supabase,
+    "performance_goal_milestones",
+  )
+    .select("id, is_completed")
+    .eq("goal_id", goalId);
+
+  if (countError) throw new Error(countError.message);
+
+  const milestoneCount = milestoneRows?.length ?? 0;
+  const completedMilestones =
+    milestoneRows?.filter((row: { is_completed: boolean }) => row.is_completed).length ?? 0;
+  const previousStatus = goal.goal_status as GoalStatus;
+  const goalStatus = deriveGoalProgressStatus({
+    goalStatus: previousStatus,
+    completedMilestones,
+    milestoneCount,
+  });
+  const currentProgress = calculateCompletionRate(completedMilestones, milestoneCount);
+
+  const { error: progressError } = await fromHrms(supabase, "performance_goals")
+    .update({
+      goal_status: goalStatus,
+      current_progress: currentProgress,
+      updated_by: profile.userId,
+    })
+    .eq("id", goalId)
+    .eq("organization_id", profile.employee.organizationId);
+
+  if (progressError) throw new Error(progressError.message);
+
+  return {
+    goalStatus,
+    currentProgress,
+    completedMilestones,
+    milestoneCount,
+    completedNow: isCompleted && previousStatus !== "completed" && goalStatus === "completed",
+  };
 }
 
 export async function updateGoal(
@@ -375,7 +424,7 @@ export async function updateKpiProgress(
 ): Promise<void> {
   const { data: kpi, error: fetchError } = await fromHrms(supabase, "performance_kpis")
     .select(
-      "id, employee_id, target_value, measurement_type, end_date, manager_employee_id, employees:employee_id(reporting_manager_id)",
+      "id, employee_id, target_value, measurement_type, start_date, end_date, kpi_status, manager_employee_id, employees:employee_id(reporting_manager_id)",
     )
     .eq("id", input.kpiId)
     .eq("organization_id", profile.employee.organizationId)
@@ -397,8 +446,8 @@ export async function updateKpiProgress(
   if (!canManage && !isManager && !isSelf) {
     throw new Error("You do not have permission to update this KPI");
   }
-  if (isSelf && !canManage && !isManager) {
-    throw new Error("Employees can view KPIs but cannot update progress");
+  if (isSelf && !canManage && !isManager && kpi.kpi_status === "completed") {
+    throw new Error("This KPI is already marked done.");
   }
 
   const completion = calculateKpiCompletion(
@@ -410,6 +459,7 @@ export async function updateKpiProgress(
     completion,
     kpi.end_date,
     input.currentValue,
+    kpi.start_date,
   );
 
   const { error } = await fromHrms(supabase, "performance_kpis")
@@ -1017,6 +1067,8 @@ export async function getGoalById(
     created_at: string;
     author: { first_name: string; last_name: string } | { first_name: string; last_name: string }[] | null;
   }>;
+  const milestoneCount = milestones.length;
+  const completedMilestones = milestones.filter((m) => m.is_completed).length;
 
   return {
     id: data.id,
@@ -1031,12 +1083,19 @@ export async function getGoalById(
     category: data.category,
     goalPriority: data.goal_priority,
     weightage: Number(data.weightage),
-    currentProgress: Number(data.current_progress),
+    currentProgress:
+      milestoneCount > 0
+        ? calculateCompletionRate(completedMilestones, milestoneCount)
+        : Number(data.current_progress),
     dueDate: data.due_date,
-    goalStatus: data.goal_status,
+    goalStatus: deriveGoalProgressStatus({
+      goalStatus: data.goal_status,
+      completedMilestones,
+      milestoneCount,
+    }),
     attachmentPath: data.attachment_path,
-    milestoneCount: milestones.length,
-    completedMilestones: milestones.filter((m) => m.is_completed).length,
+    milestoneCount,
+    completedMilestones,
     createdAt: data.created_at,
     milestones: milestones.map((m) => ({
       id: m.id,

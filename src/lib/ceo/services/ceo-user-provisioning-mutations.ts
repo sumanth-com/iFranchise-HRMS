@@ -8,6 +8,7 @@ import {
   inviteEmployeeByEmail,
   resendEmployeeInvitation,
 } from "@/lib/employees/services/employee-account";
+import { permanentlyDeleteEmployee } from "@/lib/employees/services/employee-permanent-delete";
 import { resolveOrCreateDesignation } from "@/lib/employees/services/employee-mutations";
 import { fromHrms, unwrapRelation } from "@/lib/reports/services/reports-utils";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -42,6 +43,7 @@ async function resolveEmployeeRoleCode(
     hr_admin: 3,
     hr_executive: 4,
     manager: 5,
+    employee: 6,
   };
 
   for (const row of (data ?? []) as LooseRow[]) {
@@ -92,36 +94,19 @@ async function assertEmailAvailable(organizationId: string, email: string) {
   if (error) throw new Error(error.message);
   if (!data) return;
 
-  if (data.account_status === "invitation_pending" || data.account_status === "draft") {
+  if (data.account_status === "invitation_pending") {
     throw new Error(
       "This email already has a pending invitation. Resend or cancel it from the list.",
     );
   }
 
-  throw new Error("This email is already registered in your organization.");
-}
-
-async function storeInvitationNotes(
-  employeeId: string,
-  notes: string | undefined,
-  actorUserId: string,
-) {
-  if (!notes?.trim()) return;
-
-  const admin = createAdminClient();
-  const { error } = await admin
-    .schema("hrms")
-    .from("employees")
-    .update({
-      invitation_notes: notes.trim(),
-      updated_by: actorUserId,
-    })
-    .eq("id", employeeId)
-    .is("deleted_at", null);
-
-  if (error && !error.message.includes("invitation_notes")) {
-    throw new Error(error.message);
+  if (data.account_status === "draft") {
+    throw new Error(
+      "This email already has an invite record in the list. Delete it there, then invite again.",
+    );
   }
+
+  throw new Error("This email is already registered in your organization.");
 }
 
 export async function inviteExecutiveUser(
@@ -145,11 +130,9 @@ export async function inviteExecutiveUser(
     roleCode: role.code,
     departmentId: input.departmentId,
     designationId,
-    branchId: input.branchId,
+    branchId: profile.employee.branchId ?? undefined,
     employmentTypeId: input.employmentTypeId,
   });
-
-  await storeInvitationNotes(employeeId, input.notes, profile.userId);
 
   const roleLabel = ROLE_LABELS[role.code] ?? role.name;
 
@@ -166,9 +149,7 @@ export async function inviteExecutiveUser(
       portalKey: role.portalKey,
       departmentId: input.departmentId,
       designation: input.designation,
-      branchId: input.branchId,
       employmentTypeId: input.employmentTypeId,
-      notes: input.notes ?? null,
     },
     "high",
   );
@@ -181,18 +162,21 @@ export async function resendExecutiveInvitation(
   profile: UserProfile,
   employeeId: string,
 ): Promise<void> {
-  const roleCode =
-    (await resolveEmployeeRoleCode(
-      supabase,
-      profile.employee.organizationId,
-      employeeId,
-    )) ?? "manager";
-  const inviteRole = await getInviteableRoleByCode(
-    createAdminClient(),
+  const roleCode = await resolveEmployeeRoleCode(
+    supabase,
     profile.employee.organizationId,
-    roleCode,
+    employeeId,
   );
-  await resendEmployeeInvitation(supabase, profile, employeeId, inviteRole.id);
+  let roleId: string | undefined;
+  if (roleCode) {
+    const inviteRole = await getInviteableRoleByCode(
+      createAdminClient(),
+      profile.employee.organizationId,
+      roleCode,
+    );
+    roleId = inviteRole.id;
+  }
+  await resendEmployeeInvitation(supabase, profile, employeeId, roleId);
   await audit(
     supabase,
     profile,
@@ -238,6 +222,43 @@ export async function cancelExecutiveInvitation(
     `Cancelled invitation for executive user`,
     employeeId,
     { employeeId },
+    "high",
+  );
+}
+
+export async function deleteProvisioningUser(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  employeeId: string,
+): Promise<void> {
+  const admin = createAdminClient();
+  const { data: employee } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select("first_name, last_name, email, account_status")
+    .eq("id", employeeId)
+    .eq("organization_id", profile.employee.organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (!employee) {
+    throw new Error("User not found.");
+  }
+
+  if (employee.account_status === "active") {
+    throw new Error("Deactivate active users before deleting their record.");
+  }
+
+  const deleted = await permanentlyDeleteEmployee(profile, employeeId);
+  const fullName = deleted.fullName;
+
+  await audit(
+    supabase,
+    profile,
+    "user_deleted",
+    `Deleted provisioning user ${fullName}`,
+    employeeId,
+    { employeeId, email: employee.email },
     "high",
   );
 }

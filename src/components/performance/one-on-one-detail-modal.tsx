@@ -10,25 +10,16 @@ import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/common/modal";
-import { MeetingStatusBadge } from "@/components/performance/performance-status-badge";
 import {
   DetailField,
   DetailGrid,
   PerformanceSection,
 } from "@/components/performance/performance-ui-primitives";
-import { LabeledSelect } from "@/components/payroll/payroll-select";
-import { toSelectItems } from "@/components/payroll/select-utils";
 import {
   fetchOneOnOneDetailAction,
   updateOneOnOneAction,
 } from "@/lib/performance/actions";
-import { MEETING_STATUS_LABELS } from "@/lib/performance/constants";
-import {
-  getMinFollowUpDateLocal,
-} from "@/lib/performance/services/performance-utils";
 import type { OneOnOneDetail } from "@/types/performance";
-
-const statusItems = toSelectItems(MEETING_STATUS_LABELS);
 
 type Props = {
   meetingId: string | null;
@@ -48,8 +39,6 @@ export function OneOnOneDetailModal({
   const [loading, setLoading] = useState(false);
   const [agenda, setAgenda] = useState("");
   const [meetingLink, setMeetingLink] = useState("");
-  const [followUpDate, setFollowUpDate] = useState("");
-  const [meetingStatus, setMeetingStatus] = useState<string>("scheduled");
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -66,8 +55,6 @@ export function OneOnOneDetailModal({
       if (data) {
         setAgenda(data.agenda ?? "");
         setMeetingLink(data.meetingLink ?? "");
-        setFollowUpDate(data.followUpDate ?? "");
-        setMeetingStatus(data.meetingStatus);
       }
       setLoading(false);
     });
@@ -84,8 +71,7 @@ export function OneOnOneDetailModal({
         meetingId: detail.id,
         agenda,
         meetingLink: meetingLink || null,
-        followUpDate: followUpDate || null,
-        meetingStatus: meetingStatus as OneOnOneDetail["meetingStatus"],
+        meetingStatus: detail.meetingStatus,
         scheduledAt: detail.scheduledAt,
       });
       if (!result.success) toast.error(result.message);
@@ -126,60 +112,29 @@ export function OneOnOneDetailModal({
         <p className="py-8 text-center text-sm text-muted-foreground">Meeting not found.</p>
       ) : (
         <div className="space-y-4">
-          <MeetingStatusBadge status={detail.meetingStatus} />
-
           <DetailGrid>
+            <DetailField label="Employee" value={detail.employeeName} />
+            <DetailField label="Meeting with" value={detail.managerName} />
             <DetailField
               label="Scheduled"
               value={format(new Date(detail.scheduledAt), "MMM d, yyyy h:mm a")}
             />
-            <DetailField
-              label="Follow-up"
-              value={
-                detail.followUpDate
-                  ? format(new Date(detail.followUpDate), "MMM d, yyyy")
-                  : "—"
-              }
-            />
           </DetailGrid>
 
           {canEdit ? (
-            <div className="space-y-3">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Agenda</Label>
-                  <Input value={agenda} disabled={isPending} onChange={(e) => setAgenda(e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Meeting link</Label>
-                  <Input
-                    value={meetingLink}
-                    disabled={isPending}
-                    placeholder="https://..."
-                    onChange={(e) => setMeetingLink(e.target.value)}
-                  />
-                </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Agenda</Label>
+                <Input value={agenda} disabled={isPending} onChange={(e) => setAgenda(e.target.value)} />
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Follow-up date</Label>
-                  <Input
-                    type="date"
-                    min={getMinFollowUpDateLocal(detail.scheduledAt)}
-                    value={followUpDate}
-                    disabled={isPending}
-                    onChange={(e) => setFollowUpDate(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Status</Label>
-                  <LabeledSelect
-                    items={statusItems}
-                    value={meetingStatus}
-                    onValueChange={setMeetingStatus}
-                    disabled={isPending}
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Meeting link</Label>
+                <Input
+                  value={meetingLink}
+                  disabled={isPending}
+                  placeholder="https://..."
+                  onChange={(e) => setMeetingLink(e.target.value)}
+                />
               </div>
             </div>
           ) : (

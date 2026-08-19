@@ -1,12 +1,13 @@
 "use client";
 
-import { RefreshCw, Wrench } from "lucide-react";
+import { RefreshCw, Send, Wrench } from "lucide-react";
 
 import { AssetDevicePreview } from "@/components/assets/asset-device-preview";
 import { AssetSpecGrid } from "@/components/assets/asset-spec-display";
 import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
 import {
+  AssetStatusBadge,
   AssignmentStatusBadge,
   ConditionBadge,
 } from "@/components/employee/assets/employee-asset-badges";
@@ -36,6 +37,7 @@ type Props = {
   asset: EmployeeAsset | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSendStatus: (asset: EmployeeAsset) => void;
   onReportIssue: (asset: EmployeeAsset) => void;
   onRequestReplacement: (asset: EmployeeAsset) => void;
   readOnly?: boolean;
@@ -45,6 +47,7 @@ export function EmployeeAssetDetailsDialog({
   asset,
   open,
   onOpenChange,
+  onSendStatus,
   onReportIssue,
   onRequestReplacement,
   readOnly = false,
@@ -74,9 +77,17 @@ export function EmployeeAssetDetailsDialog({
               <Wrench className="size-4" />
               Report Issue
             </Button>
-            <Button className="gap-1.5" onClick={() => onRequestReplacement(asset)}>
+            <Button
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => onRequestReplacement(asset)}
+            >
               <RefreshCw className="size-4" />
               Request Replacement
+            </Button>
+            <Button className="gap-1.5" onClick={() => onSendStatus(asset)}>
+              <Send className="size-4" />
+              Send status
             </Button>
           </>
         )
@@ -113,7 +124,10 @@ export function EmployeeAssetDetailsDialog({
                 >
                   {asset.assetCode}
                 </span>
-                <AssignmentStatusBadge status={asset.assignmentStatus} />
+                <AssetStatusBadge status={asset.assetStatus} />
+                {!isActive ? (
+                  <AssignmentStatusBadge status={asset.assignmentStatus} />
+                ) : null}
                 <ConditionBadge condition={asset.conditionAfter ?? asset.conditionBefore} />
               </div>
 

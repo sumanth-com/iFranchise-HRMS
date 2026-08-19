@@ -3,13 +3,16 @@
 import { revalidatePath } from "next/cache";
 
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import { HR_HUB_ROUTES } from "@/lib/dashboard/hr-hub-routes";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
+import { PERFORMANCE_ROUTES } from "@/lib/performance/constants";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import {
   getGoalById,
   getOneOnOneById,
   toggleGoalMilestone,
+  updateKpiProgress,
 } from "@/lib/performance/services/performance-mutations";
 import {
   listFeedback,
@@ -18,7 +21,7 @@ import {
   listOneOnOnes,
   listPromotions,
 } from "@/lib/performance/services/performance-queries";
-import { goalMilestoneToggleSchema } from "@/lib/validations/performance";
+import { goalMilestoneToggleSchema, kpiProgressSchema } from "@/lib/validations/performance";
 import { createClient } from "@/lib/supabase/server";
 import type {
   FeedbackListItem,
@@ -72,7 +75,7 @@ export async function toggleMyGoalMilestoneAction(input: unknown) {
     if (!detail || detail.employeeId !== profile.employee.id) {
       return { success: false as const, message: "Goal not found" };
     }
-    await toggleGoalMilestone(
+    const progress = await toggleGoalMilestone(
       supabase,
       profile,
       parsed.goalId,
@@ -80,8 +83,10 @@ export async function toggleMyGoalMilestoneAction(input: unknown) {
       parsed.isCompleted,
     );
     revalidatePath(EMPLOYEE_ROUTES.goals);
-    revalidatePath(MANAGER_ROUTES.goals);
-    return { success: true as const };
+    revalidatePath(HR_HUB_ROUTES.myGoals);
+    revalidatePath(PERFORMANCE_ROUTES.goals);
+    revalidatePath(MANAGER_ROUTES.performanceGoals);
+    return { success: true as const, data: progress };
   } catch (error) {
     return {
       success: false as const,
@@ -99,6 +104,44 @@ export async function fetchMyKpisAction(): Promise<KpiListItem[]> {
     employeeId: profile.employee.id,
   });
   return result.data;
+}
+
+function revalidateMyKpiPaths() {
+  revalidatePath(PERFORMANCE_ROUTES.kpis);
+  revalidatePath(`${HR_HUB_ROUTES.myGoals}/kpis`);
+  revalidatePath(`${EMPLOYEE_ROUTES.goals}/kpis`);
+  revalidatePath(MANAGER_ROUTES.performanceKpis);
+  revalidatePath(`${MANAGER_ROUTES.goals}/kpis`);
+}
+
+export async function updateMyKpiProgressAction(input: unknown) {
+  try {
+    const profile = await requireEmployeeProfile();
+    const supabase = await createClient();
+    const parsed = kpiProgressSchema.parse(input);
+
+    const { data: kpi } = await supabase
+      .schema("hrms")
+      .from("performance_kpis")
+      .select("id, employee_id, kpi_status")
+      .eq("id", parsed.kpiId)
+      .eq("organization_id", profile.employee.organizationId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (!kpi || kpi.employee_id !== profile.employee.id) {
+      return { success: false as const, message: "KPI not found" };
+    }
+
+    await updateKpiProgress(supabase, profile, parsed);
+    revalidateMyKpiPaths();
+    return { success: true as const, message: "KPI update saved" };
+  } catch (error) {
+    return {
+      success: false as const,
+      message: error instanceof Error ? error.message : "Failed to update KPI",
+    };
+  }
 }
 
 export async function fetchMyFeedbackAction(): Promise<FeedbackListItem[]> {

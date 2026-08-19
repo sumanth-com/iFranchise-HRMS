@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { CheckCircle2, Loader2, Users } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -14,6 +14,7 @@ import { Button, buttonVariants } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/common/modal";
+import { FilterSelect } from "@/components/common/filter-select";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { toSelectItems } from "@/components/payroll/select-utils";
 import { RecruitmentPagination } from "@/components/recruitment/recruitment-pagination";
@@ -31,6 +32,30 @@ import {
 import { interviewCompleteSchema } from "@/lib/validations/recruitment";
 import type { InterviewListItem, RecruitmentLookups } from "@/types/recruitment";
 import { cn } from "@/lib/utils";
+
+const MONTHS = [
+  { value: "01", label: "January" },
+  { value: "02", label: "February" },
+  { value: "03", label: "March" },
+  { value: "04", label: "April" },
+  { value: "05", label: "May" },
+  { value: "06", label: "June" },
+  { value: "07", label: "July" },
+  { value: "08", label: "August" },
+  { value: "09", label: "September" },
+  { value: "10", label: "October" },
+  { value: "11", label: "November" },
+  { value: "12", label: "December" },
+];
+
+function getYearItems() {
+  const current = new Date().getFullYear();
+  const items = [];
+  for (let y = current; y >= current - 3; y--) {
+    items.push({ value: String(y), label: String(y) });
+  }
+  return items;
+}
 
 function Field({
   label,
@@ -78,15 +103,28 @@ export function InterviewsManagement({
   const [isPending, startTransition] = useTransition();
   const [completing, setCompleting] = useState<InterviewListItem | null>(null);
 
-  function updateParams(updates: Record<string, string | undefined>) {
-    const params = new URLSearchParams(searchParams.toString());
-    for (const [key, value] of Object.entries(updates)) {
-      if (!value || value === "all") params.delete(key);
-      else params.set(key, value);
+  const now = new Date();
+  const currentMonth = String(now.getMonth() + 1).padStart(2, "0");
+  const currentYear = String(now.getFullYear());
+
+  const [monthFilter, setMonthFilter] = useState(currentMonth);
+  const [yearFilter, setYearFilter] = useState(currentYear);
+  const [typeFilter, setTypeFilter] = useState("all");
+
+  const filteredRecords = useMemo(() => {
+    let items = [...records];
+    const prefix = `${yearFilter}-${monthFilter}`;
+    items = items.filter((r) => r.interviewDate.startsWith(prefix));
+    if (typeFilter !== "all") {
+      items = items.filter((r) => r.interviewType === typeFilter);
     }
-    params.set("page", "1");
-    startTransition(() => router.push(`?${params.toString()}`));
-  }
+    items.sort((a, b) => {
+      const dateA = `${a.interviewDate} ${a.interviewTime}`;
+      const dateB = `${b.interviewDate} ${b.interviewTime}`;
+      return dateB.localeCompare(dateA);
+    });
+    return items;
+  }, [records, monthFilter, yearFilter, typeFilter]);
 
   return (
     <div className="space-y-4">
@@ -108,50 +146,35 @@ export function InterviewsManagement({
         ) : null}
       </div>
 
-      <div className="rounded-xl border bg-card p-4 shadow-sm">
-        <div className="grid gap-3 lg:grid-cols-5">
-          <Input
-            placeholder="Search candidate..."
-            defaultValue={filters.search}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                updateParams({ search: (e.target as HTMLInputElement).value || undefined });
-              }
-            }}
-          />
-          <LabeledSelect
-            items={[
-              { value: "all", label: "All positions" },
-              ...lookups.jobs.map((j) => ({ value: j.id, label: j.label })),
-            ]}
-            value={filters.jobOpeningId ?? "all"}
-            onValueChange={(v) => updateParams({ jobOpeningId: v === "all" ? undefined : v })}
-          />
-          <LabeledSelect
-            items={[
-              { value: "all", label: "All statuses" },
-              ...toSelectItems(INTERVIEW_STATUS_LABELS),
-            ]}
-            value={filters.interviewStatus ?? "all"}
-            onValueChange={(v) =>
-              updateParams({ interviewStatus: v === "all" ? undefined : v })
-            }
-          />
-          <Input
-            type="date"
-            defaultValue={filters.dateFrom}
-            onChange={(e) => updateParams({ dateFrom: e.target.value || undefined })}
-          />
-          <Input
-            type="date"
-            defaultValue={filters.dateTo}
-            onChange={(e) => updateParams({ dateTo: e.target.value || undefined })}
-          />
-        </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <FilterSelect
+          className="w-[140px]"
+          items={MONTHS}
+          value={monthFilter}
+          placeholder="Month"
+          onValueChange={setMonthFilter}
+        />
+        <FilterSelect
+          className="w-[100px]"
+          items={getYearItems()}
+          value={yearFilter}
+          placeholder="Year"
+          onValueChange={setYearFilter}
+        />
+        <FilterSelect
+          className="w-[150px]"
+          items={[
+            { value: "all", label: "All types" },
+            ...toSelectItems(INTERVIEW_TYPE_LABELS),
+          ]}
+          value={typeFilter}
+          placeholder="All types"
+          onValueChange={setTypeFilter}
+        />
       </div>
 
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-        {records.length === 0 ? (
+        {filteredRecords.length === 0 ? (
           <EmptyState
             title="No interviews"
             description="Schedule interviews from the Candidates page or using the button above."
@@ -173,7 +196,7 @@ export function InterviewsManagement({
                 </tr>
               </thead>
               <tbody>
-                {records.map((row) => (
+                {filteredRecords.map((row) => (
                   <tr key={row.id} className="border-b">
                     <td className="px-4 py-3 font-medium">{row.candidateName}</td>
                     <td className="px-4 py-3">{row.jobTitle}</td>
@@ -230,7 +253,7 @@ export function InterviewsManagement({
         )}
       </div>
 
-      <RecruitmentPagination page={page} pageSize={pageSize} total={total} />
+      <RecruitmentPagination page={page} pageSize={pageSize} total={filteredRecords.length} />
 
       {completing ? (
         <CompleteInterviewModal

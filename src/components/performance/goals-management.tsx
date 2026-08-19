@@ -1,6 +1,6 @@
 "use client";
 
-import { format } from "date-fns";
+import { format, isValid, parseISO } from "date-fns";
 import { Loader2 } from "lucide-react";
 import { useMemo, useState, useTransition, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -14,6 +14,7 @@ import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { GoalDetailModal } from "@/components/performance/goal-detail-modal";
+import { PerformanceConfirmModal } from "@/components/performance/performance-confirm-modal";
 import {
   buildStatusItems,
   matchesTextQuery,
@@ -26,13 +27,16 @@ import {
   GoalStatusBadge,
 } from "@/components/performance/performance-status-badge";
 import {
+  DeleteIconButton,
+  EditIconButton,
   PerformanceTableShell,
+  ProgressBar,
   TableActions,
   ViewIconButton,
 } from "@/components/performance/performance-ui-primitives";
 import { EmployeeSelect, LabeledSelect } from "@/components/payroll/payroll-select";
 import { toSelectItems } from "@/components/payroll/select-utils";
-import { createGoalAction, fetchGoalsListAction } from "@/lib/performance/actions";
+import { createGoalAction, deleteGoalAction, fetchGoalsListAction } from "@/lib/performance/actions";
 import { PERFORMANCE_CLIENT_FETCH_SIZE, PERFORMANCE_ROUTES } from "@/lib/performance/constants";
 import { GOAL_PRIORITY_LABELS, GOAL_STATUS_LABELS } from "@/lib/performance/constants";
 import {
@@ -48,6 +52,35 @@ const statusItems = buildStatusItems(GOAL_STATUS_LABELS);
 const priorityItems = toSelectItems(GOAL_PRIORITY_LABELS);
 const FIELD_CLASS = "h-9";
 const EMPLOYEE_SELECT_TRIGGER = "h-9 w-full min-w-[14rem]";
+const FILTER_TRIGGER = "h-9 w-full min-w-0";
+const FILTER_CONTENT = "min-w-[var(--radix-select-trigger-width)]";
+
+const MONTH_ITEMS = [
+  { value: "all", label: "All months" },
+  ...Array.from({ length: 12 }, (_, index) => ({
+    value: String(index + 1),
+    label: format(new Date(2026, index, 1), "MMMM"),
+  })),
+];
+
+function currentMonthValue() {
+  return String(new Date().getMonth() + 1);
+}
+
+function currentYearValue() {
+  return String(new Date().getFullYear());
+}
+
+function buildYearItems() {
+  const currentYear = new Date().getFullYear();
+  return [
+    { value: "all", label: "All years" },
+    ...Array.from({ length: 5 }, (_, index) => ({
+      value: String(currentYear - index),
+      label: String(currentYear - index),
+    })),
+  ];
+}
 
 export function GoalForm({
   employees,
@@ -296,10 +329,16 @@ export function GoalsTable({
   onGoalsChanged?: () => void;
 }) {
   const [viewId, setViewId] = useState<string | null>(initialGoalId ?? null);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<GoalListItem | null>(null);
   const [search, setSearch] = useState("");
   const [employeeId, setEmployeeId] = useState<string | undefined>();
   const [goalStatus, setGoalStatus] = useState<string | undefined>();
+  const [month, setMonth] = useState(currentMonthValue);
+  const [year, setYear] = useState(currentYearValue);
   const [page, setPage] = useState(1);
+  const [isPending, startTransition] = useTransition();
+  const yearItems = useMemo(() => buildYearItems(), []);
 
   useEffect(() => {
     if (initialGoalId) setViewId(initialGoalId);
@@ -309,12 +348,17 @@ export function GoalsTable({
     return records.filter((row) => {
       if (employeeId && row.employeeId !== employeeId) return false;
       if (goalStatus && row.goalStatus !== goalStatus) return false;
+      const assigned = parseISO(row.createdAt);
+      if (isValid(assigned)) {
+        if (month !== "all" && assigned.getMonth() + 1 !== Number(month)) return false;
+        if (year !== "all" && assigned.getFullYear() !== Number(year)) return false;
+      }
       return matchesTextQuery(
         [row.title, row.employeeName, row.employeeCode, row.category, row.description],
         search,
       );
     });
-  }, [records, search, employeeId, goalStatus]);
+  }, [records, search, employeeId, goalStatus, month, year]);
 
   const paged = useMemo(
     () => paginateItems(filtered, page, pageSize),
@@ -323,7 +367,7 @@ export function GoalsTable({
 
   useEffect(() => {
     setPage(1);
-  }, [search, employeeId, goalStatus]);
+  }, [search, employeeId, goalStatus, month, year]);
 
   useEffect(() => {
     if (page !== paged.page) setPage(paged.page);
@@ -336,12 +380,26 @@ export function GoalsTable({
     setPage(1);
   }
 
+  function handleDelete() {
+    if (!deleting) return;
+    startTransition(async () => {
+      const result = await deleteGoalAction({ goalId: deleting.id });
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+      toast.success("Goal deleted");
+      setDeleting(null);
+      onGoalsChanged?.();
+    });
+  }
+
   return (
     <div className="space-y-3">
       <div>
         <h2 className="text-sm font-semibold">Assigned goals</h2>
         <p className="text-xs text-muted-foreground">
-          Your assignment history appears here. Click View to open details in a popup.
+          Latest assignments for this month appear first. View, edit, and delete stay separate.
         </p>
       </div>
 
@@ -356,16 +414,44 @@ export function GoalsTable({
         variant="bar"
         showDepartment={false}
         showCycle={false}
-        className="rounded-lg border bg-muted/10 p-3"
+        className="rounded-lg border bg-muted/10 p-3 xl:grid-cols-[minmax(14rem,1.2fr)_repeat(4,minmax(8.5rem,1fr))]"
         onFiltersChange={handleFiltersChange}
+        extraFilters={
+          <div className="contents">
+            <LabeledSelect
+              items={MONTH_ITEMS}
+              value={month}
+              onValueChange={(value) => {
+                setMonth(value);
+                setPage(1);
+              }}
+              triggerClassName={FILTER_TRIGGER}
+              contentClassName={FILTER_CONTENT}
+            />
+            <LabeledSelect
+              items={yearItems}
+              value={year}
+              onValueChange={(value) => {
+                setYear(value);
+                setPage(1);
+              }}
+              triggerClassName={FILTER_TRIGGER}
+              contentClassName={FILTER_CONTENT}
+            />
+          </div>
+        }
       />
 
       <PerformanceTableShell
         className="max-h-[min(36vh,320px)]"
         empty={
           <EmptyState
-            title="No goals assigned yet"
-            description="Assign a goal using the form above."
+            title={records.length === 0 ? "No goals assigned yet" : "No goals for this period"}
+            description={
+              records.length === 0
+                ? "Assign a goal using the form above."
+                : "Try another month or year to see more assignments."
+            }
             className="border-0 py-8"
           />
         }
@@ -395,8 +481,13 @@ export function GoalsTable({
                       <div className="text-xs text-muted-foreground">{row.category}</div>
                     ) : null}
                   </td>
-                  <td className="px-3 py-2.5 tabular-nums">
-                    {row.completedMilestones}/{row.milestoneCount}
+                  <td className="px-3 py-2.5">
+                    <div className="space-y-1.5">
+                      <p className="tabular-nums">
+                        {row.completedMilestones}/{row.milestoneCount}
+                      </p>
+                      <ProgressBar value={row.currentProgress} className="max-w-[7.5rem]" />
+                    </div>
                   </td>
                   <td className="px-3 py-2.5">
                     <GoalStatusBadge status={row.goalStatus} />
@@ -407,6 +498,12 @@ export function GoalsTable({
                   <td className="px-3 py-2.5">
                     <TableActions>
                       <ViewIconButton onClick={() => setViewId(row.id)} />
+                      {canManage ? (
+                        <EditIconButton onClick={() => setEditId(row.id)} />
+                      ) : null}
+                      {canManage ? (
+                        <DeleteIconButton onClick={() => setDeleting(row)} />
+                      ) : null}
                     </TableActions>
                   </td>
                 </tr>
@@ -428,9 +525,35 @@ export function GoalsTable({
         open={!!viewId}
         onOpenChange={(open) => !open && setViewId(null)}
         variant="assigner"
+        mode="view"
         canManage={canManage}
         categories={categories}
         onChanged={onGoalsChanged}
+      />
+
+      <GoalDetailModal
+        goalId={editId}
+        open={!!editId}
+        onOpenChange={(open) => !open && setEditId(null)}
+        variant="assigner"
+        mode="edit"
+        canManage={canManage}
+        categories={categories}
+        onChanged={onGoalsChanged}
+      />
+
+      <PerformanceConfirmModal
+        open={!!deleting}
+        onOpenChange={(open) => !open && setDeleting(null)}
+        title="Delete this goal?"
+        description={
+          deleting
+            ? `${deleting.title} assigned to ${deleting.employeeName} will be removed.`
+            : "The employee will no longer see this assigned goal."
+        }
+        confirmLabel="Delete goal"
+        isPending={isPending}
+        onConfirm={handleDelete}
       />
     </div>
   );

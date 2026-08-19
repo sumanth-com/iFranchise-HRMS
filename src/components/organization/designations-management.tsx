@@ -2,8 +2,8 @@
 
 import { format } from "date-fns";
 import { Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -64,14 +64,13 @@ export function DesignationsManagement({
   status,
 }: Props) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<DesignationListItem | null>(null);
   const [deleting, setDeleting] = useState<DesignationListItem | null>(null);
   const [isDeletePending, startDeleteTransition] = useTransition();
   const [searchInput, setSearchInput] = useState(search);
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>(status ?? "all");
 
   const canCreate = canCreateOrganization(permissionCodes);
   const canEdit = canEditOrganization(permissionCodes);
@@ -91,35 +90,27 @@ export function DesignationsManagement({
     [statusItems],
   );
 
+  const filteredData = useMemo(() => {
+    let items = result.data;
+    const q = searchInput.trim().toLowerCase();
+    if (q) {
+      items = items.filter(
+        (d) =>
+          d.title.toLowerCase().includes(q) ||
+          d.code.toLowerCase().includes(q) ||
+          (d.departmentName && d.departmentName.toLowerCase().includes(q)),
+      );
+    }
+    if (statusFilter && statusFilter !== "all") {
+      items = items.filter((d) => d.status === statusFilter);
+    }
+    return items;
+  }, [result.data, searchInput, statusFilter]);
+
   const form = useForm<DesignationFormInput>({
     resolver: zodResolver(designationFormSchema) as never,
     defaultValues: emptyForm,
   });
-
-  useEffect(() => {
-    setSearchInput(search);
-  }, [search]);
-
-  function updateParams(patch: Record<string, string | undefined>) {
-    const params = new URLSearchParams(searchParams.toString());
-    Object.entries(patch).forEach(([key, value]) => {
-      if (!value || value === "all") params.delete(key);
-      else params.set(key, value);
-    });
-    if (!patch.page) params.delete("page");
-    startTransition(() => {
-      router.push(`?${params.toString()}`);
-    });
-  }
-
-  function handleSearchChange(value: string) {
-    setSearchInput(value);
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    searchDebounceRef.current = setTimeout(() => {
-      const trimmed = value.trim();
-      updateParams({ search: trimmed || undefined });
-    }, 300);
-  }
 
   const openCreate = useCallback(() => {
     setEditing(null);
@@ -259,16 +250,16 @@ export function DesignationsManagement({
             placeholder="Search designations…"
             className="h-9 pl-9"
             value={searchInput}
-            onChange={(e) => handleSearchChange(e.target.value)}
+            onChange={(e) => setSearchInput(e.target.value)}
           />
         </div>
         <FilterSelect
           items={statusFilterItems}
-          value={status ?? "all"}
+          value={statusFilter}
           placeholder="All statuses"
           className="sm:w-44"
           triggerClassName="h-9"
-          onValueChange={(v) => updateParams({ status: v === "all" ? undefined : v })}
+          onValueChange={(v) => setStatusFilter(v)}
         />
         {canCreate ? (
           <Button onClick={openCreate} className="h-9 shrink-0 sm:ml-auto">
@@ -285,30 +276,30 @@ export function DesignationsManagement({
         </div>
       ) : null}
 
-      {result.data.length === 0 ? (
+      {filteredData.length === 0 ? (
         <EmptyState
-          title={search.trim() ? "No matching designations" : "No designations found"}
+          title={searchInput.trim() ? "No matching designations" : "No designations found"}
           description={
-            search.trim()
-              ? `Nothing matches "${search.trim()}". Try another spelling or clear the search.`
+            searchInput.trim()
+              ? `Nothing matches "${searchInput.trim()}". Try another spelling or clear the search.`
               : "Add a designation or adjust your filters."
           }
         />
       ) : (
         <DataTable
           columns={columns}
-          data={result.data}
+          data={filteredData}
           align="center"
           scrollable
           maxHeightClass={DATA_TABLE_SCROLL_MAX_HEIGHT}
         />
       )}
 
-      {result.total > result.pageSize ? (
+      {filteredData.length > result.pageSize ? (
         <OrgPagination
           page={result.page}
           pageSize={result.pageSize}
-          total={result.total}
+          total={filteredData.length}
         />
       ) : null}
 

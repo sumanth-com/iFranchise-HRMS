@@ -23,6 +23,7 @@ export const RECRUITMENT_SUB_NAV = [
   { title: "Dashboard", href: RECRUITMENT_ROUTES.dashboard },
   { title: "Job Openings", href: RECRUITMENT_ROUTES.jobs },
   { title: "Candidates", href: RECRUITMENT_ROUTES.candidates },
+  { title: "Interviews", href: RECRUITMENT_ROUTES.interviews },
   { title: "Offers", href: RECRUITMENT_ROUTES.offers },
 ] as const;
 

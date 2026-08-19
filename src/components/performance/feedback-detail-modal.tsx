@@ -21,7 +21,7 @@ export function FeedbackDetailModal({ record, open, onOpenChange }: Props) {
       onOpenChange={onOpenChange}
       title="Feedback"
       description={record ? `From ${record.fromEmployeeName} to ${record.toEmployeeName}` : undefined}
-      contentClassName="sm:max-w-lg"
+      contentClassName="sm:max-w-xl"
       showCancel={false}
       footer={
         <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>

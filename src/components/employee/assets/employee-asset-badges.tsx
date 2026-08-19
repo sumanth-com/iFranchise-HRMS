@@ -1,10 +1,11 @@
 import { ShieldAlert, ShieldCheck, ShieldX } from "lucide-react";
 
 import {
+  ASSET_STATUS_LABELS,
   ASSIGNMENT_STATUS_LABELS,
   CONDITION_LABELS,
 } from "@/lib/assets/constants";
-import type { AssetAssignmentStatus, AssetCondition } from "@/types/assets";
+import type { AssetAssignmentStatus, AssetCondition, AssetStatus } from "@/types/assets";
 import type { EmployeeAssetWarranty } from "@/types/employee-assets";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,15 @@ const STATUS_STYLES: Record<AssetAssignmentStatus, string> = {
   damaged: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
 };
 
+const ASSET_STATUS_STYLES: Record<AssetStatus, string> = {
+  available: "bg-muted text-muted-foreground",
+  assigned: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  maintenance: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  lost: "bg-red-500/10 text-red-600 dark:text-red-400",
+  retired: "bg-muted text-muted-foreground",
+  disposed: "bg-muted text-muted-foreground",
+};
+
 export function ConditionBadge({ condition }: { condition: AssetCondition }) {
   return (
     <span
@@ -33,6 +43,19 @@ export function ConditionBadge({ condition }: { condition: AssetCondition }) {
       )}
     >
       {CONDITION_LABELS[condition]}
+    </span>
+  );
+}
+
+export function AssetStatusBadge({ status }: { status: AssetStatus }) {
+  return (
+    <span
+      className={cn(
+        "rounded-full px-2 py-0.5 text-[11px] font-medium",
+        ASSET_STATUS_STYLES[status],
+      )}
+    >
+      {ASSET_STATUS_LABELS[status]}
     </span>
   );
 }

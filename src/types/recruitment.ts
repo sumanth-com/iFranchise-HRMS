@@ -22,6 +22,8 @@ export type RecruitmentSummary = {
   offersAccepted: number;
   hiresThisMonth: number;
   averageHiringTimeDays: number;
+  /** Candidates at offer stage who haven't had their offer sent yet. */
+  pendingOfferCount: number;
   candidatesByStage: { stage: CandidateStage; count: number }[];
   candidateSources: { source: string; count: number }[];
   hiringByDepartment: { departmentId: string; departmentName: string; count: number }[];

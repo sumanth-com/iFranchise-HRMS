@@ -20,22 +20,25 @@ import {
   REVIEW_STATUS_LABELS,
 } from "@/lib/performance/constants";
 import type { KpiAssignmentStatus } from "@/types/performance";
+import { getKpiRowStatusDisplay } from "@/lib/performance/kpi-update-options";
 import { cn } from "@/lib/utils";
 
 const STATUS_STYLES: Record<string, string> = {
-  draft: "bg-muted text-muted-foreground",
-  pending: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
-  in_progress: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
-  on_track: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-  at_risk: "bg-orange-500/10 text-orange-700 dark:text-orange-400",
-  submitted: "bg-violet-500/10 text-violet-700 dark:text-violet-400",
-  approved: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-  rejected: "bg-destructive/10 text-destructive",
-  completed: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-  cancelled: "bg-muted text-muted-foreground",
-  scheduled: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
-  recommended: "bg-violet-500/10 text-violet-700 dark:text-violet-400",
-  applied: "bg-primary/10 text-primary",
+  draft: "bg-slate-100 text-slate-600 ring-slate-200/80 dark:bg-slate-500/15 dark:text-slate-300 dark:ring-slate-500/25",
+  not_started: "bg-violet-50 text-violet-700 ring-violet-200/80 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-500/25",
+  pending: "bg-amber-50 text-amber-700 ring-amber-200/80 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/25",
+  in_progress: "bg-sky-50 text-sky-700 ring-sky-200/80 dark:bg-sky-500/15 dark:text-sky-300 dark:ring-sky-500/25",
+  on_track: "bg-emerald-50 text-emerald-700 ring-emerald-200/80 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/25",
+  at_risk: "bg-orange-50 text-orange-700 ring-orange-200/80 dark:bg-orange-500/15 dark:text-orange-300 dark:ring-orange-500/25",
+  submitted: "bg-violet-50 text-violet-700 ring-violet-200/80 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-500/25",
+  approved: "bg-emerald-50 text-emerald-700 ring-emerald-200/80 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/25",
+  rejected: "bg-rose-50 text-rose-700 ring-rose-200/80 dark:bg-rose-500/15 dark:text-rose-300 dark:ring-rose-500/25",
+  completed: "bg-emerald-50 text-emerald-700 ring-emerald-200/80 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/25",
+  cancelled: "bg-slate-100 text-slate-600 ring-slate-200/80 dark:bg-slate-500/15 dark:text-slate-300 dark:ring-slate-500/25",
+  scheduled: "bg-sky-50 text-sky-700 ring-sky-200/80 dark:bg-sky-500/15 dark:text-sky-300 dark:ring-sky-500/25",
+  recommended: "bg-violet-50 text-violet-700 ring-violet-200/80 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-500/25",
+  overdue: "bg-rose-50 text-rose-700 ring-rose-200/80 dark:bg-rose-500/15 dark:text-rose-300 dark:ring-rose-500/25",
+  applied: "bg-indigo-50 text-indigo-700 ring-indigo-200/80 dark:bg-indigo-500/15 dark:text-indigo-300 dark:ring-indigo-500/25",
 };
 
 export function PerformanceStatusBadge({
@@ -48,8 +51,9 @@ export function PerformanceStatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium",
-        STATUS_STYLES[status] ?? "bg-muted text-muted-foreground",
+        "inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium leading-5 ring-1 ring-inset",
+        STATUS_STYLES[status] ??
+          "bg-slate-100 text-slate-600 ring-slate-200/80 dark:bg-slate-500/15 dark:text-slate-300 dark:ring-slate-500/25",
       )}
     >
       {label}
@@ -92,13 +96,16 @@ export function PromotionStatusBadge({ status }: { status: PromotionStatus }) {
 }
 
 export function KpiStatusBadge({ status }: { status: KpiAssignmentStatus }) {
-  const style =
-    status === "completed"
-      ? "approved"
-      : status === "overdue"
-        ? "rejected"
-        : status === "in_progress"
-          ? "in_progress"
-          : "draft";
-  return <PerformanceStatusBadge label={KPI_STATUS_LABELS[status]} status={style} />;
+  return <PerformanceStatusBadge label={KPI_STATUS_LABELS[status]} status={status} />;
+}
+
+export function KpiRowStatusBadge({
+  kpiStatus,
+  progressComments,
+}: {
+  kpiStatus: KpiAssignmentStatus;
+  progressComments: string | null;
+}) {
+  const display = getKpiRowStatusDisplay({ kpiStatus, progressComments });
+  return <PerformanceStatusBadge label={display.label} status={display.statusKey} />;
 }

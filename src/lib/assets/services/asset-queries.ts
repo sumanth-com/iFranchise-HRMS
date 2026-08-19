@@ -1,6 +1,14 @@
-import { addDays, format, startOfDay } from "date-fns";
+import { addDays, endOfMonth, format, startOfDay, startOfMonth } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import {
+  classifyMaintenanceIssue,
+  classifyEmployeeRequestKind,
+  employeeRequestLabel,
+  maintenanceActivityLabel,
+  maintenanceIssueFilter,
+  parsePerformerFromMaintenanceNotes,
+} from "@/lib/assets/activity-utils";
 import type { UserProfile } from "@/types/auth";
 import { getAssetSettings } from "@/lib/assets/services/asset-settings";
 import {
@@ -13,6 +21,7 @@ import {
 import type {
   AssetListParams,
   AssignmentListParams,
+  AssetActivityFeedParamsInput,
   MaintenanceListParams,
 } from "@/lib/validations/assets";
 import type {
@@ -97,6 +106,48 @@ function mapAssignment(row: AssetRow): AssetAssignmentItem {
   };
 }
 
+function applyMaintenanceDateFilters<T extends { gte: (col: string, val: string) => T; lte: (col: string, val: string) => T }>(
+  query: T,
+  month?: number,
+  year?: number,
+): T {
+  if (!month && !year) return query;
+  const resolvedYear = year ?? new Date().getFullYear();
+  if (month) {
+    const start = format(startOfMonth(new Date(resolvedYear, month - 1, 1)), "yyyy-MM-dd");
+    const end = format(endOfMonth(new Date(resolvedYear, month - 1, 1)), "yyyy-MM-dd");
+    return query.gte("maintenance_date", start).lte("maintenance_date", end);
+  }
+  return query.gte("maintenance_date", `${resolvedYear}-01-01`).lte("maintenance_date", `${resolvedYear}-12-31`);
+}
+
+async function loadActiveAssignmentsByAsset(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  assetIds: string[],
+): Promise<Map<string, { employeeId: string; employeeName: string }>> {
+  const map = new Map<string, { employeeId: string; employeeName: string }>();
+  if (assetIds.length === 0) return map;
+
+  const { data, error } = await fromHrms(supabase, "asset_assignments")
+    .select("asset_id, employee_id, employees:employee_id(first_name, last_name)")
+    .eq("organization_id", organizationId)
+    .eq("assignment_status", "active")
+    .in("asset_id", assetIds)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+
+  for (const row of data ?? []) {
+    const employee = unwrapRelation(row.employees);
+    map.set(row.asset_id, {
+      employeeId: row.employee_id,
+      employeeName: formatEmployeeName(employee?.first_name, employee?.last_name),
+    });
+  }
+  return map;
+}
+
 function mapMaintenance(row: AssetRow): AssetMaintenanceItem {
   const asset = unwrapRelation(row.assets);
   const vendor = unwrapRelation(row.asset_vendors);
@@ -116,6 +167,7 @@ function mapMaintenance(row: AssetRow): AssetMaintenanceItem {
     completedAt: row.completed_at,
     notes: row.notes,
     createdAt: row.created_at,
+    createdByUserId: row.created_by ?? null,
   };
 }
 
@@ -245,7 +297,7 @@ export async function listMaintenance(
     .select(
       `
       id, asset_id, vendor_id, maintenance_date, issue, cost, next_service_date,
-      maintenance_status, completed_at, notes, created_at,
+      maintenance_status, completed_at, notes, created_at, created_by,
       assets:asset_id(asset_code, name),
       asset_vendors:vendor_id(name)
     `,
@@ -254,12 +306,23 @@ export async function listMaintenance(
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
     .order("maintenance_date", { ascending: false })
+    .order("created_at", { ascending: false })
     .range(from, to);
 
   if (params.assetId) query = query.eq("asset_id", params.assetId);
   if (params.maintenanceStatus) {
     query = query.eq("maintenance_status", params.maintenanceStatus);
   }
+  if (params.createdByUserId) {
+    query = query.eq("created_by", params.createdByUserId);
+  }
+  const issueFilter = params.activityType
+    ? maintenanceIssueFilter(params.activityType)
+    : null;
+  if (issueFilter) {
+    query = query.ilike("issue", issueFilter);
+  }
+  query = applyMaintenanceDateFilters(query, params.month, params.year);
   if (params.search?.trim()) {
     query = query.ilike("issue", `%${params.search.trim()}%`);
   }
@@ -541,6 +604,15 @@ export async function listEmployeeAssets(
   return (data ?? []).map(mapAssignment);
 }
 
+function matchesActivityDate(value: string, month?: number, year?: number) {
+  if (!month && !year) return true;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return true;
+  if (year && parsed.getFullYear() !== year) return false;
+  if (month && parsed.getMonth() + 1 !== month) return false;
+  return true;
+}
+
 const ASSIGNMENT_ACTION_LABELS: Record<string, string> = {
   active: "Asset assigned",
   returned: "Asset returned",
@@ -560,57 +632,165 @@ function assignmentActivityKind(status: string): AssetActivityKind {
 export async function getAssetActivityFeed(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
-  limit = 40,
+  params: AssetActivityFeedParamsInput = { limit: 40, activityType: "all" },
 ): Promise<AssetActivityItem[]> {
-  const assignments = await listAssignments(supabase, profile, {
-    page: 1,
-    pageSize: limit,
-  });
+  const limit = params.limit ?? 40;
+  const activityType = params.activityType ?? "all";
+  const organizationId = profile.employee.organizationId;
+  const employeeOnlyFilter = activityType !== "all";
 
   const maintenance = await listMaintenance(supabase, profile, {
     page: 1,
-    pageSize: Math.min(limit, 20),
+    pageSize: employeeOnlyFilter ? limit : Math.max(limit, 60),
+    activityType: employeeOnlyFilter ? activityType : undefined,
+    month: params.month,
+    year: params.year,
   });
 
-  const assignmentItems: AssetActivityItem[] = assignments.data.map((row) => ({
-    id: `assignment-${row.id}`,
-    kind: assignmentActivityKind(row.assignmentStatus),
-    assetId: row.assetId,
-    assetCode: row.assetCode,
-    assetName: row.assetName,
-    employeeId: row.employeeId,
-    employeeName: row.employeeName,
-    performedAt: row.returnedDate ?? row.assignedDate,
-    performedByName: "HR",
-    actionLabel: ASSIGNMENT_ACTION_LABELS[row.assignmentStatus] ?? "Assignment updated",
-    remarks: row.returnRemarks ?? row.remarks,
-    assignmentId: row.id,
-    maintenanceId: null,
-  }));
+  const assignmentItems: AssetActivityItem[] = [];
+  if (!employeeOnlyFilter) {
+    const assignments = await listAssignments(supabase, profile, {
+      page: 1,
+      pageSize: limit,
+    });
 
-  const maintenanceItems: AssetActivityItem[] = maintenance.data.map((row) => ({
-    id: `maintenance-${row.id}`,
-    kind:
-      row.maintenanceStatus === "completed" ? "maintenance_completed" : "maintenance_opened",
-    assetId: row.assetId,
-    assetCode: row.assetCode,
-    assetName: row.assetName,
-    employeeId: null,
-    employeeName: null,
-    performedAt: row.completedAt ?? row.maintenanceDate,
-    performedByName: "HR",
-    actionLabel:
-      row.maintenanceStatus === "completed"
-        ? "Maintenance completed"
-        : "Marked under maintenance",
-    remarks: row.issue,
-    assignmentId: null,
-    maintenanceId: row.id,
-  }));
+    assignmentItems.push(
+      ...assignments.data
+        .filter((row) =>
+          matchesActivityDate(
+            row.returnedDate ?? row.assignedDate,
+            params.month,
+            params.year,
+          ),
+        )
+        .map((row) => ({
+        id: `assignment-${row.id}`,
+        kind: assignmentActivityKind(row.assignmentStatus),
+        assetId: row.assetId,
+        assetCode: row.assetCode,
+        assetName: row.assetName,
+        employeeId: row.employeeId,
+        employeeName: row.employeeName,
+        performedAt: row.returnedDate ?? row.assignedDate,
+        performedByName: "HR",
+        actionLabel: ASSIGNMENT_ACTION_LABELS[row.assignmentStatus] ?? "Assignment updated",
+        remarks: row.returnRemarks ?? row.remarks,
+        detailNotes: null,
+        assignmentId: row.id,
+        maintenanceId: null,
+      })),
+    );
+  }
+
+  const assetIds = Array.from(new Set(maintenance.data.map((row) => row.assetId)));
+  const assignmentsByAsset = await loadActiveAssignmentsByAsset(
+    supabase,
+    organizationId,
+    assetIds,
+  );
+
+  const maintenanceItems: AssetActivityItem[] = maintenance.data
+    .map((row) => {
+      const kind = classifyMaintenanceIssue(row.issue);
+      const isEmployeeRequest =
+        kind === "issue_reported" ||
+        kind === "replacement_requested" ||
+        kind === "status_reported";
+      const assignment = assignmentsByAsset.get(row.assetId);
+      const resolvedKind =
+        row.maintenanceStatus === "completed" && !isEmployeeRequest
+          ? "maintenance_completed"
+          : kind;
+
+      return {
+        id: `maintenance-${row.id}`,
+        kind: resolvedKind,
+        assetId: row.assetId,
+        assetCode: row.assetCode,
+        assetName: row.assetName,
+        employeeId: assignment?.employeeId ?? null,
+        employeeName: assignment?.employeeName ?? null,
+        performedAt: row.createdAt ?? row.maintenanceDate,
+        performedByName:
+          parsePerformerFromMaintenanceNotes(row.notes) ??
+          (isEmployeeRequest ? assignment?.employeeName ?? "Employee" : "HR"),
+        actionLabel: maintenanceActivityLabel(resolvedKind, row.issue),
+        remarks: row.issue,
+        detailNotes: row.notes,
+        assignmentId: null,
+        maintenanceId: row.id,
+      };
+    })
+    .filter((row) => {
+      if (activityType === "all") return true;
+      if (activityType === "report") return row.kind === "issue_reported";
+      if (activityType === "replace") return row.kind === "replacement_requested";
+      return row.kind === "status_reported";
+    });
 
   return [...assignmentItems, ...maintenanceItems]
     .sort((a, b) => (a.performedAt < b.performedAt ? 1 : -1))
     .slice(0, limit);
+}
+
+export async function getEmployeeAssetRequests(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  params?: {
+    month?: number;
+    year?: number;
+    activityType?: "all" | "report" | "replace" | "status";
+    userId?: string;
+    employeeId?: string;
+  },
+) {
+  const userId = params?.userId ?? profile.userId;
+  const employeeId = params?.employeeId ?? profile.employee.id;
+
+  const maintenance = await listMaintenance(supabase, profile, {
+    page: 1,
+    pageSize: 100,
+    createdByUserId: userId,
+    month: params?.month,
+    year: params?.year,
+    activityType: params?.activityType && params.activityType !== "all" ? params.activityType : undefined,
+  });
+
+  const assetIds = Array.from(new Set(maintenance.data.map((row) => row.assetId)));
+  const assignmentByAsset = new Map<string, string>();
+  if (assetIds.length > 0) {
+    const { data: assignmentRows, error } = await fromHrms(supabase, "asset_assignments")
+      .select("id, asset_id")
+      .eq("organization_id", profile.employee.organizationId)
+      .eq("employee_id", employeeId)
+      .in("asset_id", assetIds)
+      .is("deleted_at", null);
+
+    if (error) throw new Error(error.message);
+    for (const row of assignmentRows ?? []) {
+      assignmentByAsset.set(row.asset_id as string, row.id as string);
+    }
+  }
+
+  return maintenance.data
+    .map((row) => {
+      const requestKind = classifyEmployeeRequestKind(row.issue);
+      if (!requestKind) return null;
+      return {
+        id: row.id,
+        assetId: row.assetId,
+        assetCode: row.assetCode,
+        assetName: row.assetName,
+        assignmentId: assignmentByAsset.get(row.assetId) ?? null,
+        requestKind,
+        requestLabel: employeeRequestLabel(requestKind),
+        issue: row.issue,
+        notes: row.notes,
+        maintenanceStatus: row.maintenanceStatus,
+        submittedAt: row.createdAt ?? row.maintenanceDate,
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => Boolean(row));
 }
 
 export async function getAssetDetail(

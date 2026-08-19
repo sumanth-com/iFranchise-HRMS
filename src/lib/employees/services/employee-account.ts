@@ -41,7 +41,9 @@ type EmployeeAccountRow = {
 function toNamePart(value: string) {
   const cleaned = value.replace(/[^a-zA-Z]+/g, " ").trim();
   if (!cleaned) return "Employee";
-  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase();
+  const first = cleaned.charAt(0);
+  const upper = /[iıİīĪ]/.test(first) ? "I" : first.toLocaleUpperCase("en-US");
+  return upper + cleaned.slice(1).toLocaleLowerCase("en-US");
 }
 
 function deriveNameFromEmail(email: string) {

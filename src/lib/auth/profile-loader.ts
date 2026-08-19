@@ -9,6 +9,7 @@ import type {
 } from "@/types/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getOrganizationLogoSignedUrl } from "@/lib/organization/services/org-logo";
+import { cleanDisplayText } from "@/lib/employees/parse-employee-name";
 
 export type AuthSupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -69,8 +70,8 @@ function mapEmployee(row: EmployeeRow): Employee {
     organizationId: row.organization_id,
     branchId: row.branch_id,
     employeeCode: row.employee_code,
-    firstName: row.first_name,
-    lastName: row.last_name,
+    firstName: cleanDisplayText(row.first_name),
+    lastName: cleanDisplayText(row.last_name),
     email: row.email,
     employmentStatus: row.employment_status,
     accountStatus: row.account_status,

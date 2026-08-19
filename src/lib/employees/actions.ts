@@ -631,6 +631,7 @@ export async function getEmployeeDetailBundleAction(
       supabase,
       profile.employee.organizationId,
       resolved.id,
+      profile,
     ),
     getEmployeePayrollData(supabase, profile, { targetEmployeeId: resolved.id }),
   ]);
@@ -677,6 +678,7 @@ export async function getEmployeeDetailBundleAction(
       : {
           assigned: [],
           history: [],
+          requests: [],
           summary: {
             currentlyAssigned: 0,
             previouslyReturned: 0,

@@ -1,10 +1,11 @@
 "use client";
 
-import { Eye, MapPin, RefreshCw, Wrench } from "lucide-react";
+import { Eye, MapPin, RefreshCw, Send, Wrench } from "lucide-react";
 
 import { AssetDevicePreview } from "@/components/assets/asset-device-preview";
 import { Button } from "@/components/common/button";
 import {
+  AssetStatusBadge,
   AssignmentStatusBadge,
   ConditionBadge,
 } from "@/components/employee/assets/employee-asset-badges";
@@ -18,6 +19,7 @@ import type { EmployeeAsset } from "@/types/employee-assets";
 type Props = {
   asset: EmployeeAsset;
   onViewDetails: (asset: EmployeeAsset) => void;
+  onSendStatus: (asset: EmployeeAsset) => void;
   onReportIssue: (asset: EmployeeAsset) => void;
   onRequestReplacement: (asset: EmployeeAsset) => void;
   readOnly?: boolean;
@@ -26,6 +28,7 @@ type Props = {
 export function EmployeeAssetCard({
   asset,
   onViewDetails,
+  onSendStatus,
   onReportIssue,
   onRequestReplacement,
   readOnly = false,
@@ -55,7 +58,11 @@ export function EmployeeAssetCard({
               <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{subtitle}</p>
             ) : null}
           </div>
-          <AssignmentStatusBadge status={asset.assignmentStatus} />
+          {isActive ? (
+            <AssetStatusBadge status={asset.assetStatus} />
+          ) : (
+            <AssignmentStatusBadge status={asset.assignmentStatus} />
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -97,6 +104,15 @@ export function EmployeeAssetCard({
           </Button>
           {isActive && !readOnly ? (
             <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => onSendStatus(asset)}
+              >
+                <Send className="size-3.5" />
+                Send status
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"

@@ -56,6 +56,13 @@ export const ASSET_STATUS_LABELS: Record<AssetStatus, string> = {
   disposed: "Disposed",
 };
 
+/** Statuses an employee can report from self-service Assets. */
+export const EMPLOYEE_ASSET_STATUS_OPTIONS = [
+  { value: "assigned", label: "Assigned" },
+  { value: "maintenance", label: "Maintenance" },
+  { value: "lost", label: "Lost" },
+] as const;
+
 export const ASSIGNMENT_STATUS_LABELS: Record<AssetAssignmentStatus, string> = {
   active: "Active",
   returned: "Returned",

@@ -12,7 +12,7 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -77,7 +77,6 @@ export function RolesManagement({
   roleType,
 }: Props) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<RoleListItem | null>(null);
@@ -85,6 +84,9 @@ export function RolesManagement({
   const [deleteTarget, setDeleteTarget] = useState<RoleListItem | null>(null);
   const [cloneTarget, setCloneTarget] = useState<RoleListItem | null>(null);
   const [statusTarget, setStatusTarget] = useState<RoleListItem | null>(null);
+  const [searchInput, setSearchInput] = useState(search);
+  const [statusFilter, setStatusFilter] = useState<string>(status ?? "all");
+  const [typeFilter, setTypeFilter] = useState<string>(roleType ?? "all");
 
   const canCreate = canCreateRole(permissionCodes);
   const canEdit = canEditRole(permissionCodes);
@@ -124,22 +126,32 @@ export function RolesManagement({
     [],
   );
 
+  const filteredData = useMemo(() => {
+    let items = result.data;
+    const q = searchInput.trim().toLowerCase();
+    if (q) {
+      items = items.filter(
+        (r) =>
+          r.name.toLowerCase().includes(q) ||
+          r.code.toLowerCase().includes(q) ||
+          (r.description && r.description.toLowerCase().includes(q)),
+      );
+    }
+    if (statusFilter && statusFilter !== "all") {
+      items = items.filter((r) => r.status === statusFilter);
+    }
+    if (typeFilter && typeFilter !== "all") {
+      items = items.filter((r) =>
+        typeFilter === "system" ? r.isSystemRole : !r.isSystemRole,
+      );
+    }
+    return items;
+  }, [result.data, searchInput, statusFilter, typeFilter]);
+
   const form = useForm<RoleFormInput>({
     resolver: zodResolver(roleFormSchema) as never,
     defaultValues: emptyForm,
   });
-
-  function updateParams(patch: Record<string, string | undefined>) {
-    const params = new URLSearchParams(searchParams.toString());
-    Object.entries(patch).forEach(([key, value]) => {
-      if (!value || value === "all") params.delete(key);
-      else params.set(key, value);
-    });
-    if (!patch.page) params.delete("page");
-    startTransition(() => {
-      router.push(`?${params.toString()}`);
-    });
-  }
 
   const openCreate = useCallback(() => {
     setEditing(null);
@@ -388,27 +400,23 @@ export function RolesManagement({
           <Input
             placeholder="Search roles…"
             className="h-9 pl-9"
-            defaultValue={search}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                updateParams({ search: (e.target as HTMLInputElement).value || undefined });
-              }
-            }}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
           />
         </div>
         <FilterSelect
           className="w-[140px] shrink-0"
           items={typeFilterItems}
-          value={roleType ?? "all"}
+          value={typeFilter}
           placeholder="All types"
-          onValueChange={(v) => updateParams({ roleType: v === "all" ? undefined : v })}
+          onValueChange={(v) => setTypeFilter(v)}
         />
         <FilterSelect
           className="w-[150px] shrink-0"
           items={statusFilterItems}
-          value={status ?? "all"}
+          value={statusFilter}
           placeholder="All statuses"
-          onValueChange={(v) => updateParams({ status: v === "all" ? undefined : v })}
+          onValueChange={(v) => setStatusFilter(v)}
         />
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <RolesExportButtons entity="roles" />
@@ -428,16 +436,16 @@ export function RolesManagement({
         </div>
       ) : null}
 
-      {result.data.length === 0 ? (
+      {filteredData.length === 0 ? (
         <EmptyState
           title="No roles found"
           description="Create a custom role or adjust your filters."
         />
       ) : (
-        <DataTable columns={columns} data={result.data} />
+        <DataTable columns={columns} data={filteredData} />
       )}
 
-      <RolesPagination page={result.page} pageSize={result.pageSize} total={result.total} />
+      <RolesPagination page={result.page} pageSize={result.pageSize} total={filteredData.length} />
 
       <RoleDetailDrawer
         roleId={viewingId}
@@ -459,6 +467,7 @@ export function RolesManagement({
               : "Create a custom role. Inheritance is optional."
         }
         contentClassName="sm:max-w-lg"
+        bodyClassName="overflow-visible"
         footer={
           <Button onClick={form.handleSubmit(onSave)} disabled={isPending}>
             {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

@@ -41,6 +41,7 @@ import {
 import {
   calculateCompletionRate,
   calculateKpiCompletion,
+  deriveGoalProgressStatus,
   deriveKpiStatus,
   formatEmployeeName,
   fromHrms,
@@ -271,7 +272,12 @@ export async function getPerformanceSummary(
     const status =
       kpi.kpi_status === "completed"
         ? "completed"
-        : deriveKpiStatus(completion, kpi.end_date, Number(kpi.current_value ?? 0));
+        : deriveKpiStatus(
+            completion,
+            kpi.end_date,
+            Number(kpi.current_value ?? 0),
+            kpi.start_date,
+          );
     return { ...kpi, derivedStatus: status };
   });
 
@@ -439,6 +445,8 @@ export async function listGoals(
     const dept = unwrapRelation(emp?.departments ?? null);
     const cycle = unwrapRelation(row.performance_review_cycles);
     const milestones = (row.performance_goal_milestones as Array<{ is_completed: boolean }>) ?? [];
+    const milestoneCount = milestones.length;
+    const completedMilestones = milestones.filter((m) => m.is_completed).length;
     return {
       id: row.id,
       employeeId: row.employee_id,
@@ -452,12 +460,19 @@ export async function listGoals(
       category: row.category,
       goalPriority: row.goal_priority,
       weightage: Number(row.weightage),
-      currentProgress: Number(row.current_progress),
+      currentProgress:
+        milestoneCount > 0
+          ? calculateCompletionRate(completedMilestones, milestoneCount)
+          : Number(row.current_progress),
       dueDate: row.due_date,
-      goalStatus: row.goal_status,
+      goalStatus: deriveGoalProgressStatus({
+        goalStatus: row.goal_status,
+        completedMilestones,
+        milestoneCount,
+      }),
       attachmentPath: row.attachment_path,
-      milestoneCount: milestones.length,
-      completedMilestones: milestones.filter((m) => m.is_completed).length,
+      milestoneCount,
+      completedMilestones,
       createdAt: row.created_at,
     };
   });
@@ -620,6 +635,7 @@ export async function listKpis(
       completion,
       row.end_date,
       Number(row.current_value ?? 0),
+      row.start_date,
     );
     return {
       id: row.id,

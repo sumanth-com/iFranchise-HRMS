@@ -8,32 +8,22 @@ export function CeoProvisioningSummaryCards({
 }) {
   return (
     <section
-      aria-label="Executive user summary"
-      className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8"
+      aria-label="User provisioning summary"
+      className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5"
     >
+      <CeoStatCard label="Executive Users" value={String(summary.executiveUsers)} />
+      <CeoStatCard label="HR Users" value={String(summary.hrUsers)} />
+      <CeoStatCard label="Managers" value={String(summary.managers)} />
+      <CeoStatCard label="Employees" value={String(summary.employees)} />
       <CeoStatCard
-        label="Executive Users"
-        value={String(summary.totalExecutiveUsers)}
+        label="Deactivated"
+        value={String(summary.deactivatedUsers)}
+        accent={
+          summary.deactivatedUsers > 0
+            ? "text-orange-600 dark:text-orange-400"
+            : undefined
+        }
       />
-      <CeoStatCard
-        label="Pending"
-        value={String(summary.pendingInvitations)}
-        accent={summary.pendingInvitations > 0 ? "text-amber-600 dark:text-amber-400" : undefined}
-      />
-      <CeoStatCard
-        label="Accepted"
-        value={String(summary.acceptedInvitations)}
-        accent={summary.acceptedInvitations > 0 ? "text-emerald-600 dark:text-emerald-400" : undefined}
-      />
-      <CeoStatCard
-        label="Expired"
-        value={String(summary.expiredInvitations)}
-        accent={summary.expiredInvitations > 0 ? "text-orange-600 dark:text-orange-400" : undefined}
-      />
-      <CeoStatCard label="Active Managers" value={String(summary.activeManagers)} />
-      <CeoStatCard label="Active HR Users" value={String(summary.activeHrUsers)} />
-      <CeoStatCard label="Co-Founders" value={String(summary.coFounders)} />
-      <CeoStatCard label="Founders" value={String(summary.founders)} />
     </section>
   );
 }

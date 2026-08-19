@@ -9,6 +9,7 @@ export const EXECUTIVE_ROLE_CODES = [
   "hr_admin",
   "hr_executive",
   "manager",
+  "employee",
 ] as const;
 
 export type ExecutiveRoleCode = (typeof EXECUTIVE_ROLE_CODES)[number];
@@ -20,6 +21,7 @@ export const ROLE_LABELS: Record<string, string> = {
   hr_admin: "HR Admin",
   hr_executive: "HR Executive",
   manager: "Manager",
+  employee: "Employee",
 };
 
 export type ProvisionableRoleOption = {
@@ -36,6 +38,7 @@ export type ProvisioningRowAction =
   | "view"
   | "resend"
   | "cancel"
+  | "delete"
   | "deactivate"
   | "reactivate";
 
@@ -72,14 +75,11 @@ export type CeoProvisioningUser = {
 };
 
 export type CeoProvisioningSummary = {
-  totalExecutiveUsers: number;
-  pendingInvitations: number;
-  acceptedInvitations: number;
-  expiredInvitations: number;
-  activeManagers: number;
-  activeHrUsers: number;
-  coFounders: number;
-  founders: number;
+  executiveUsers: number;
+  hrUsers: number;
+  managers: number;
+  employees: number;
+  deactivatedUsers: number;
 };
 
 export type CeoProvisioningListParams = {

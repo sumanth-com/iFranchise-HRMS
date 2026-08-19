@@ -58,9 +58,24 @@ export type EmployeeAssetsSummary = {
   lostOrDamaged: number;
 };
 
+export type EmployeeAssetRequest = {
+  id: string;
+  assetId: string;
+  assetCode: string;
+  assetName: string;
+  assignmentId: string | null;
+  requestKind: "report" | "replace" | "status";
+  requestLabel: string;
+  issue: string;
+  notes: string | null;
+  maintenanceStatus: AssetMaintenanceStatus;
+  submittedAt: string;
+};
+
 export type EmployeeAssetsData = {
   assigned: EmployeeAsset[];
   history: EmployeeAsset[];
+  requests: EmployeeAssetRequest[];
   summary: EmployeeAssetsSummary;
   categories: string[];
 };

@@ -5,7 +5,7 @@ import { isManagerAllowedReportKey } from "@/lib/manager/reports/manager-report-
 import { isManagerOnlyProfile } from "@/lib/manager/portal-scope";
 import { REPORT_DEFINITIONS } from "@/lib/reports/constants";
 import { getReportsLookups } from "@/lib/reports/services/reports-queries";
-import { defaultDateRange } from "@/lib/reports/services/reports-utils";
+import { defaultDateRangeForCurrentMonth } from "@/lib/reports/services/reports-utils";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 import type { ReportFilters, ReportKey, ReportModuleKey } from "@/types/reports";
@@ -21,17 +21,17 @@ function parseFilters(
 ): ReportFilters {
   const monthRaw = firstString(raw.month);
   const yearRaw = firstString(raw.year);
-  const fallback = defaultDateRange(30);
+  const periodDefault = defaultDateRangeForCurrentMonth();
 
   return {
-    dateFrom: firstString(raw.dateFrom) ?? fallback.dateFrom,
-    dateTo: firstString(raw.dateTo) ?? fallback.dateTo,
+    dateFrom: firstString(raw.dateFrom) ?? periodDefault.dateFrom,
+    dateTo: firstString(raw.dateTo) ?? periodDefault.dateTo,
     departmentId: firstString(raw.departmentId),
     designationId: firstString(raw.designationId),
     employeeId: firstString(raw.employeeId),
     status: firstString(raw.status),
-    month: monthRaw ? Number(monthRaw) : undefined,
-    year: yearRaw ? Number(yearRaw) : undefined,
+    month: monthRaw ? Number(monthRaw) : periodDefault.month,
+    year: yearRaw ? Number(yearRaw) : periodDefault.year,
   };
 }
 
