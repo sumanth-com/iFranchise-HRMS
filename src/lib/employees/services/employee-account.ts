@@ -396,10 +396,28 @@ async function adminLookupInvitedRoleId(employeeId: string) {
 
 async function findAuthUserIdByEmail(email: string) {
   const admin = createAdminClient();
-  const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  if (error) throw new Error(error.message);
-  const match = data.users.find((user) => user.email?.toLowerCase() === email.toLowerCase());
-  return match?.id ?? null;
+  let page = 1;
+  while (page <= 20) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 500 });
+    if (error) break;
+    const match = data.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    if (match) return match.id;
+    if (data.users.length < 500) break;
+    page++;
+  }
+  return null;
+}
+
+/**
+ * Proactively find and delete any stale Supabase Auth user for a given email.
+ * Used before inviting to ensure no "already registered" error.
+ */
+export async function findAndDeleteStaleAuthUser(email: string) {
+  const authId = await findAuthUserIdByEmail(email);
+  if (authId) {
+    const admin = createAdminClient();
+    await admin.auth.admin.deleteUser(authId).catch(() => {});
+  }
 }
 
 async function sendSupabaseInvite(employee: EmployeeAccountRow, roleId?: string | null) {

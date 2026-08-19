@@ -92,7 +92,16 @@ async function assertEmailAvailable(organizationId: string, email: string) {
     .maybeSingle();
 
   if (error) throw new Error(error.message);
-  if (!data) return;
+
+  if (!data) {
+    // No employee record — but there might be a stale auth user from a previous deletion.
+    // Proactively clean it up so the invite won't fail later.
+    const { findAndDeleteStaleAuthUser } = await import(
+      "@/lib/employees/services/employee-account"
+    );
+    await findAndDeleteStaleAuthUser(email);
+    return;
+  }
 
   if (data.account_status === "invitation_pending") {
     throw new Error(

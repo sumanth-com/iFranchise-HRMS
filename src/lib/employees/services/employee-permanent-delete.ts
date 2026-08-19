@@ -75,6 +75,17 @@ export async function permanentlyDeleteEmployee(
     }
   }
 
+  // Also clean up any auth user by email (covers pending invites where user_id wasn't linked)
+  if (result.email) {
+    const { data: authList } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const matchedAuth = authList?.users?.find(
+      (u) => u.email?.toLowerCase() === result.email.toLowerCase(),
+    );
+    if (matchedAuth && matchedAuth.id !== result.user_id) {
+      await admin.auth.admin.deleteUser(matchedAuth.id).catch(() => {});
+    }
+  }
+
   return {
     fullName: result.full_name,
     employeeCode: result.employee_code,
