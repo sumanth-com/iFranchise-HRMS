@@ -1120,7 +1120,8 @@ export async function deleteOnboardingCase(
   }
 
   const now = new Date().toISOString();
-  const { error } = await supabase
+  const admin = createAdminClient();
+  const { error } = await admin
     .schema("hrms")
     .from("onboarding_cases")
     .update({
@@ -1130,6 +1131,7 @@ export async function deleteOnboardingCase(
       updated_at: now,
     })
     .eq("id", caseId)
+    .eq("organization_id", organizationId)
     .is("deleted_at", null);
 
   if (error) throw new Error(error.message);
