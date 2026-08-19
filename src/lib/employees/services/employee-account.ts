@@ -437,7 +437,22 @@ async function sendSupabaseInvite(employee: EmployeeAccountRow, roleId?: string 
 
   if (alreadyExists) {
     const existingUserId = await findAuthUserIdByEmail(employee.email);
-    if (existingUserId) return existingUserId;
+    if (existingUserId) {
+      await admin.auth.admin.deleteUser(existingUserId);
+      const retry = await admin.auth.admin.inviteUserByEmail(employee.email, {
+        redirectTo: INVITE_REDIRECT_TO,
+        data: {
+          employee_id: employee.id,
+          employee_code: employee.employee_code,
+          full_name: inviteContext.fullName,
+          employee_name: inviteContext.greetingName,
+          company_email: employee.email,
+          organization_id: employee.organization_id,
+        },
+      });
+      if (retry.data.user?.id) return retry.data.user.id;
+      if (retry.error) throw new Error(retry.error.message);
+    }
   }
 
   throw new Error(error?.message ?? "Failed to send invitation email");
