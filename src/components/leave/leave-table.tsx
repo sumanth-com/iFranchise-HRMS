@@ -16,7 +16,6 @@ import {
   CheckCircle2,
   Eye,
   Layers,
-  MoreHorizontal,
   Trash2,
   User,
   UserCheck,
@@ -39,12 +38,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/common/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   TableBody,
   TableCell,
@@ -487,62 +480,61 @@ export function LeaveTable({
           );
 
           return (
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button variant="ghost" size="icon-sm" aria-label="Actions">
-                    <MoreHorizontal className="size-4" />
-                  </Button>
-                }
-              />
-              <DropdownMenuContent align="end" className="min-w-[11.5rem]">
-                <DropdownMenuItem
-                  className="whitespace-nowrap"
-                  onClick={() => openLeavePopup(row.original)}
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="View leave"
+                title="View"
+                onClick={() => openLeavePopup(row.original)}
+              >
+                <Eye className="size-4" />
+              </Button>
+              {!embedded && canApprove && isPendingStatus ? (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Approve"
+                  title="Approve"
+                  onClick={() => setApproveTarget(row.original)}
                 >
-                  <Eye className="size-4 shrink-0" />
-                  View Leave
-                </DropdownMenuItem>
-                {!embedded && canApprove && isPendingStatus && row.original.canActOnApproval ? (
-                  <DropdownMenuItem
-                    className="whitespace-nowrap"
-                    onClick={() => setApproveTarget(row.original)}
-                  >
-                    <CheckCircle2 className="size-4 shrink-0" />
-                    Approve
-                  </DropdownMenuItem>
-                ) : null}
-                {!embedded && canReject && isPendingStatus && row.original.canActOnRejection ? (
-                  <DropdownMenuItem
-                    className="whitespace-nowrap"
-                    onClick={() => setRejectTarget(row.original)}
-                  >
-                    <XCircle className="size-4 shrink-0" />
-                    Reject
-                  </DropdownMenuItem>
-                ) : null}
-                {!embedded && canCancel && isCancellable ? (
-                  <DropdownMenuItem
-                    variant="destructive"
-                    className="whitespace-nowrap"
-                    onClick={() => setCancelTarget(row.original)}
-                  >
-                    <Ban className="size-4 shrink-0" />
-                    Cancel Leave
-                  </DropdownMenuItem>
-                ) : null}
-                {!embedded && canDelete ? (
-                  <DropdownMenuItem
-                    variant="destructive"
-                    className="whitespace-nowrap"
-                    onClick={() => setDeleteTarget(row.original)}
-                  >
-                    <Trash2 className="size-4 shrink-0" />
-                    Delete
-                  </DropdownMenuItem>
-                ) : null}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <CheckCircle2 className="size-4 text-emerald-600" />
+                </Button>
+              ) : null}
+              {!embedded && canReject && isPendingStatus ? (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Reject"
+                  title="Reject"
+                  onClick={() => setRejectTarget(row.original)}
+                >
+                  <XCircle className="size-4 text-red-500" />
+                </Button>
+              ) : null}
+              {!embedded && canCancel && isCancellable ? (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Cancel leave"
+                  title="Cancel"
+                  onClick={() => setCancelTarget(row.original)}
+                >
+                  <Ban className="size-4 text-orange-500" />
+                </Button>
+              ) : null}
+              {!embedded && canDelete ? (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Delete"
+                  title="Delete"
+                  onClick={() => setDeleteTarget(row.original)}
+                >
+                  <Trash2 className="size-4 text-red-500" />
+                </Button>
+              ) : null}
+            </div>
           );
         },
       },

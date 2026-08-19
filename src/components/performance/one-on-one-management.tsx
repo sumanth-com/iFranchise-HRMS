@@ -51,7 +51,11 @@ export function OneOnOneForm({ employees }: { employees: LookupOption[] }) {
     defaultValues: {
       employeeId: "",
       managerEmployeeId: "",
-      scheduledAt: "",
+      scheduledAt: (() => {
+        const d = new Date();
+        d.setHours(d.getHours() + 1, 0, 0, 0);
+        return d.toISOString().slice(0, 16);
+      })(),
       meetingStatus: "scheduled",
       actionItems: [],
     },
@@ -209,9 +213,9 @@ export function OneOnOneTable({
       <div className="rounded-xl border bg-card p-4 shadow-sm">
         <PerformanceFilters
           employees={employees}
-          statusItems={statusItems}
+          statusItems={undefined}
           statusKey="meetingStatus"
-          statusValue={meetingStatus}
+          statusValue={undefined}
           employeeId={employeeId}
           search={search}
           searchPlaceholder="Search meetings..."

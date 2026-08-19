@@ -165,7 +165,7 @@ export function SearchableSelect({
                     onClick={() => selectValue(option.value)}
                   >
                     <Check className={cn("size-3.5", isSelected ? "opacity-100" : "opacity-0")} />
-                    <span className="truncate">{option.label}</span>
+                    <span className="whitespace-normal break-words">{option.label}</span>
                   </button>
                 </li>
               );

@@ -294,7 +294,7 @@ export function PayslipHistoryView({
   );
 
   const yearDefault =
-    searchParams.get("yearFilter") ?? searchParams.get("year") ?? "all";
+    searchParams.get("yearFilter") ?? searchParams.get("year") ?? String(currentYear);
   const monthDefault = searchParams.get("month") || "all";
   const hasActiveFilters =
     Boolean(searchParams.get("search")) ||
@@ -364,11 +364,8 @@ export function PayslipHistoryView({
             <Select
               value={yearDefault}
               onValueChange={(value) => {
-                if (!value || value === "all" || value === "current" || value === "last") {
-                  updateParams({
-                    yearFilter: value === "current" || value === "last" ? value : undefined,
-                    year: undefined,
-                  });
+                if (!value || value === "all") {
+                  updateParams({ year: undefined, yearFilter: undefined });
                 } else {
                   updateParams({ year: value, yearFilter: undefined });
                 }
@@ -389,8 +386,6 @@ export function PayslipHistoryView({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All years</SelectItem>
-                <SelectItem value="current">Current year</SelectItem>
-                <SelectItem value="last">Last year</SelectItem>
                 {yearOptions.map((year) => (
                   <SelectItem key={year} value={String(year)}>
                     {year}
@@ -427,25 +422,6 @@ export function PayslipHistoryView({
                 ))}
               </SelectContent>
             </Select>
-            {hasActiveFilters ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground"
-                onClick={() => {
-                  setSearchInput("");
-                  updateParams({
-                    search: undefined,
-                    year: undefined,
-                    yearFilter: undefined,
-                    month: undefined,
-                  });
-                }}
-              >
-                Clear filters
-              </Button>
-            ) : null}
           </div>
         </div>
       </div>

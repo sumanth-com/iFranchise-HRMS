@@ -110,9 +110,9 @@ export function PhoneInput({
         />
       </div>
       {error ? (
-        <p className="text-[11px] text-destructive">{error}</p>
+        <p className="text-[11px] text-destructive text-left">{error}</p>
       ) : showHint ? (
-        <p className="text-[11px] leading-tight text-muted-foreground">
+        <p className="text-[11px] leading-tight text-muted-foreground text-left">
           {phoneDigitHint(countryCode)}
         </p>
       ) : null}

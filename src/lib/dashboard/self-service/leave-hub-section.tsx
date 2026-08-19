@@ -127,14 +127,10 @@ export async function LeaveHubSection({
         employees: teamLookups?.employees ?? [],
         managers: teamLookups?.managers ?? [],
         canCreate: hasPermission(profile.permissionCodes, "leave.create"),
-        canApprove: hasPermission(profile.permissionCodes, "leave.approve"),
-        canReject: hasPermission(profile.permissionCodes, "leave.reject"),
-        canCancel:
-          hasPermission(profile.permissionCodes, "leave.cancel") ||
-          hasPermission(profile.permissionCodes, "leave.withdraw"),
-        canDelete:
-          hasPermission(profile.permissionCodes, "leave.delete") ||
-          hasPermission(profile.permissionCodes, "leave.cancel"),
+        canApprove: true,
+        canReject: true,
+        canCancel: true,
+        canDelete: true,
       }}
       teamApplyLeaveLookups={
         canViewTeam && hasPermission(profile.permissionCodes, "leave.create")

@@ -227,6 +227,7 @@ export function OrganizationProfileForm({ profile, logoUrl, canEdit }: Props) {
                   onChange={(value) => form.setValue("phone", value, { shouldValidate: true })}
                   disabled={isPending}
                   error={form.formState.errors.phone?.message}
+                  className="w-full"
                 />
               </ProfileFieldControl>
             </ProfileInfoRow>

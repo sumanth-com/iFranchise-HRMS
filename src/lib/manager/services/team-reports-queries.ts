@@ -66,15 +66,28 @@ export async function getManagerReportsLookups(
   organizationId: string,
   teamIds: string[],
 ): Promise<ReportsLookups> {
-  const [teamLookups, employees] = await Promise.all([
+  const [teamLookups, employees, leaveTypes] = await Promise.all([
     getTeamFilterLookups(supabase, organizationId, teamIds),
     getTeamMemberOptions(supabase, organizationId, teamIds),
+    supabase
+      .schema("hrms")
+      .from("leave_types")
+      .select("id, name")
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .order("name"),
   ]);
+
+  if (leaveTypes.error) throw new Error(leaveTypes.error.message);
 
   return {
     departments: teamLookups.departments,
     designations: teamLookups.designations,
     employees,
+    leaveTypes: (leaveTypes.data ?? []).map((row) => ({
+      id: String(row.id),
+      label: String(row.name),
+    })),
   };
 }
 

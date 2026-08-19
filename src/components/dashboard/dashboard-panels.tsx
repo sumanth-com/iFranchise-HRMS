@@ -1,12 +1,14 @@
 "use client";
 
 import {
+  ArrowRight,
   BriefcaseBusiness,
   Cake,
   ClipboardList,
-  FileText,
+  FileWarning,
   Medal,
-  UserCheck,
+  Sparkles,
+  UserPlus,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
@@ -24,10 +26,17 @@ import type {
 import { cn } from "@/lib/utils";
 
 const TASK_ICONS: Record<string, LucideIcon> = {
-  "interviews-today": BriefcaseBusiness,
-  "probation-ending": UserCheck,
+  "onboarding-review": UserPlus,
+  "documents-expiring": FileWarning,
+  "active-candidates": BriefcaseBusiness,
   "payroll-due": Wallet,
-  "offers-pending": FileText,
+};
+
+const TASK_HINTS: Record<string, string> = {
+  "onboarding-review": "Review and approve submitted onboarding cases",
+  "documents-expiring": "Renew or verify employee documents before they lapse",
+  "payroll-due": "Process this month's payroll run for your team",
+  "active-candidates": "Follow up on candidates still in the hiring pipeline",
 };
 
 function seriesMax(items: DashboardChartItem[]) {
@@ -131,54 +140,72 @@ function AttendanceSparkline({ items }: { items: DashboardChartItem[] }) {
   );
 }
 
-function PriorityTasks({ items }: { items: DashboardTaskItem[] }) {
+function HrPriorityFocus({ item }: { item: DashboardTaskItem | undefined }) {
+  if (!item) return null;
+
+  const Icon = TASK_ICONS[item.id] ?? ClipboardList;
+  const hasWork = (item.count ?? 0) > 0;
+  const isUrgent = item.urgency === "high" && hasWork;
+  const hint = TASK_HINTS[item.id] ?? "Open the linked workflow to continue";
+
   return (
     <section className="flex h-full min-h-0 flex-col rounded-xl border bg-card p-3 shadow-sm md:p-4">
       <div className="mb-3 flex shrink-0 items-center gap-2">
-        <span className="flex size-7 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
-          <ClipboardList className="size-3.5" />
+        <span className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Sparkles className="size-3.5" />
         </span>
         <div>
           <h2 className="text-[11px] font-semibold tracking-wide text-foreground uppercase">
-            Priority Tasks
+            Focus Today
           </h2>
-          <p className="text-[11px] text-muted-foreground">Items needing your attention</p>
+          <p className="text-[11px] text-muted-foreground">Your most important HR task right now</p>
         </div>
       </div>
-      <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-2 gap-2.5">
-        {items.map((item) => {
-          const Icon = TASK_ICONS[item.id] ?? ClipboardList;
-          const hasWork = (item.count ?? 0) > 0;
 
-          return (
-            <Link
-              key={item.id}
-              href={item.href}
+      <Link
+        href={item.href}
+        className={cn(
+          "flex min-h-0 flex-1 flex-col justify-center rounded-xl border bg-muted/15 p-4 outline-none transition-colors",
+          "hover:border-primary/40 hover:bg-accent/30",
+          "focus-visible:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/40",
+          isUrgent && "border-amber-500/35 bg-gradient-to-br from-amber-500/10 via-background to-background",
+        )}
+      >
+        <div className="flex items-center gap-4">
+          <span
+            className={cn(
+              "flex size-12 shrink-0 items-center justify-center rounded-xl border bg-background shadow-sm",
+              isUrgent && "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+            )}
+          >
+            <Icon className="size-5" />
+          </span>
+
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold leading-snug">{item.label}</p>
+            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{hint}</p>
+          </div>
+
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            <span
               className={cn(
-                "flex min-h-[4.25rem] flex-col justify-between rounded-lg border bg-muted/15 px-3 py-2.5 outline-none transition-colors",
-                "hover:border-primary/40 hover:bg-accent/30",
-                "focus-visible:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/40",
-                !hasWork && "opacity-80",
+                "rounded-full px-3 py-1 text-lg font-semibold tabular-nums leading-none",
+                hasWork
+                  ? isUrgent
+                    ? "bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                    : "bg-primary/10 text-primary"
+                  : "bg-muted text-muted-foreground",
               )}
             >
-              <div className="flex items-start justify-between gap-2">
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-md border bg-muted/40">
-                  <Icon className="size-3.5" />
-                </span>
-                <span
-                  className={cn(
-                    "rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums",
-                    hasWork ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
-                  )}
-                >
-                  {item.count ?? 0}
-                </span>
-              </div>
-              <p className="mt-1.5 line-clamp-2 text-xs font-medium leading-snug">{item.label}</p>
-            </Link>
-          );
-        })}
-      </div>
+              {item.count ?? 0}
+            </span>
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-primary">
+              Open
+              <ArrowRight className="size-3.5" />
+            </span>
+          </div>
+        </div>
+      </Link>
     </section>
   );
 }
@@ -328,7 +355,7 @@ export function DashboardOperationsRow({
   return (
     <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-3 overflow-hidden">
       <div className="grid min-h-0 gap-3 overflow-hidden xl:grid-cols-2 xl:items-stretch">
-        <PriorityTasks items={tasks} />
+        <HrPriorityFocus item={tasks[0]} />
         <HrUpcomingHolidaysPanel holidays={upcomingHolidays} />
       </div>
 

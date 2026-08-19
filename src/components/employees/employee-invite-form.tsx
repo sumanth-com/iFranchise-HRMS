@@ -204,7 +204,7 @@ export function EmployeeInviteForm({
           <Label htmlFor="employmentTypeId">Employment Type *</Label>
           <LabeledSelect
             id="employmentTypeId"
-            items={toLookupSelectItems(lookups.employmentTypes)}
+            items={toLookupSelectItems(lookups.employmentTypes, { showCode: false })}
             value={employmentTypeId}
             onValueChange={(value) =>
               setValue("employmentTypeId", value, { shouldValidate: true })
