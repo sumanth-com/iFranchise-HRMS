@@ -24,6 +24,14 @@ function payrollMonthParts(payrollMonth: string): { year: number; month: number 
   return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1 };
 }
 
+function addCalendarMonth(
+  parts: { year: number; month: number },
+  extraMonths: number,
+): { year: number; month: number } {
+  const date = new Date(Date.UTC(parts.year, parts.month - 1 + extraMonths, 1));
+  return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1 };
+}
+
 function formatPublishDate(publishedAt: string): string {
   return new Date(publishedAt).toLocaleDateString("en-IN", {
     day: "2-digit",
@@ -33,22 +41,22 @@ function formatPublishDate(publishedAt: string): string {
   });
 }
 
-/** Salary is credited on the configured day of the payroll month (default 2nd). */
+/** Salary is credited on the configured day of the month after the payroll period (default 2nd). */
 export function computeSalaryCreditDate(
   payrollMonth: string,
   salaryCreditDay = SALARY_CREDIT_DAY,
 ): string {
-  const { year, month } = payrollMonthParts(payrollMonth);
+  const { year, month } = addCalendarMonth(payrollMonthParts(payrollMonth), 1);
   const day = clampDayOfMonth(salaryCreditDay, SALARY_CREDIT_DAY);
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-/** Employees may access payslips from the 5th of the payroll month at 00:00 IST. */
+/** Employees may access payslips from the 5th of the month after attendance and leave close. */
 export function computePublishedAt(
   payrollMonth: string,
   publishDay = PAYSLIP_PUBLISH_DAY,
 ): string {
-  const { year, month } = payrollMonthParts(payrollMonth);
+  const { year, month } = addCalendarMonth(payrollMonthParts(payrollMonth), 1);
   const day = clampDayOfMonth(publishDay, PAYSLIP_PUBLISH_DAY);
   const istMidnight = Date.UTC(year, month - 1, day, 0, 0, 0) - IST_OFFSET_MS;
   return new Date(istMidnight).toISOString();

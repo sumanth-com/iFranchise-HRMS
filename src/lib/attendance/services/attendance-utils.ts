@@ -2,6 +2,8 @@ import { differenceInMinutes, parseISO } from "date-fns";
 
 export const OFFICE_TIMEZONE = "Asia/Kolkata";
 export const OFFICE_CHECK_IN_TIME = "10:00";
+/** Grace period ends at this time — check-in after this is marked late. */
+export const OFFICE_LATE_AFTER_TIME = "10:10";
 /** Check-in closes automatically at this office time (legacy; self-service punch no longer locks). */
 export const OFFICE_CHECK_IN_LOCK_TIME = "10:07";
 export const OFFICE_CHECK_OUT_TIME = "19:00";
@@ -17,7 +19,7 @@ export type AttendanceRules = {
 };
 
 export const DEFAULT_ATTENDANCE_RULES: AttendanceRules = {
-  lateAfter: "10:05",
+  lateAfter: OFFICE_LATE_AFTER_TIME,
   fullDayMinimumHours: 8,
   halfDayMinimumHours: 4,
 };

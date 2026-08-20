@@ -1,10 +1,10 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { revalidateSelfAttendancePaths } from "@/lib/attendance/actions/self-attendance-punch-actions";
 import {
   computeLateMinutes,
   computeWorkHours,
   getTodayDateString,
   OFFICE_CHECK_OUT_TIME,
-  parseAttendanceRules,
 } from "@/lib/attendance/services/attendance-utils";
 import { getOrganizationAttendanceRules } from "@/lib/attendance/services/attendance-detail";
 import {
@@ -145,6 +145,26 @@ export async function reviewTeamAttendanceCorrection(
     const checkInAt = correction.requested_check_in_at;
     const checkOutAt = correction.requested_check_out_at;
     const workHours = computeWorkHours(checkInAt, checkOutAt);
+    const rules = await getOrganizationAttendanceRules(
+      supabase,
+      profile.employee.organizationId,
+    );
+    const lateMinutes = computeLateMinutes(checkInAt, attendanceDate, rules.lateAfter);
+    const overtimeHours = Math.max(
+      0,
+      Math.round((workHours - rules.fullDayMinimumHours) * 100) / 100,
+    );
+
+    let attendanceStatus: AttendanceStatus = "present";
+    if (
+      checkOutAt &&
+      workHours > 0 &&
+      workHours < rules.fullDayMinimumHours
+    ) {
+      attendanceStatus = workHours < 0.25 ? "absent" : "half_day";
+    } else if (lateMinutes > 0) {
+      attendanceStatus = "late";
+    }
 
     const { error: attendanceError } = await supabase
       .schema("hrms")
@@ -153,7 +173,8 @@ export async function reviewTeamAttendanceCorrection(
         check_in_at: checkInAt,
         check_out_at: checkOutAt,
         work_hours: workHours,
-        attendance_status: workHours > 0 ? "present" : undefined,
+        overtime_hours: overtimeHours,
+        attendance_status: attendanceStatus,
         updated_by: profile.userId,
       })
       .eq("id", correction.attendance_id);
@@ -176,6 +197,8 @@ export async function reviewTeamAttendanceCorrection(
       attendanceDate,
     );
   }
+
+  revalidateSelfAttendancePaths();
 
   return { success: true as const, message: `Regularization ${decision}.` };
 }

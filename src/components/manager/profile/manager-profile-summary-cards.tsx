@@ -85,6 +85,7 @@ export function ManagerProfileSummaryCards({
               className={cn(
                 "font-semibold tracking-tight tabular-nums",
                 isSidebar ? "mt-0.5 text-lg leading-none" : "mt-2 text-2xl",
+                card.key === "absent" && Number(raw) > 0 && "text-red-600 dark:text-red-400",
               )}
             >
               {display}

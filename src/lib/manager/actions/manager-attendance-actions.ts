@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { revalidateSelfAttendancePaths } from "@/lib/attendance/actions/self-attendance-punch-actions";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { reviewTeamAttendanceCorrection, getTeamAttendanceDetailBundle } from "@/lib/manager/services/attendance-correction-service";
 import { getManagerTeamScope } from "@/lib/manager/services/team-queries";
@@ -44,7 +45,7 @@ async function getAuthenticatedContext() {
 }
 
 function revalidateAttendancePaths() {
-  revalidatePath(MANAGER_ROUTES.attendance);
+  revalidateSelfAttendancePaths();
   revalidatePath(MANAGER_ROUTES.attendanceTeam);
   revalidatePath(MANAGER_ROUTES.overview);
   revalidatePath(MANAGER_ROUTES.team);

@@ -30,7 +30,7 @@ export type ManagerAttendanceCalendarDay = {
   inMonth: boolean;
   isToday: boolean;
   isFuture: boolean;
-  status: AttendanceStatus | null;
+  status: AttendanceDisplayStatus | null;
   attendanceId: string | null;
   checkInAt: string | null;
   checkOutAt: string | null;

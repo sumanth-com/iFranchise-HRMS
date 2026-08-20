@@ -165,7 +165,7 @@ const SECTION_HELP: Record<
       {
         label: "Payslip available day",
         detail:
-          "Employees in every portal can open their payslip from this day of the payroll month. Default is the 5th.",
+          "Employees in every portal can open their payslip from the 5th of the month after that payroll period, once attendance and leave are finalized.",
       },
       {
         label: "Who should change this",
@@ -203,7 +203,7 @@ export function HrPayrollHubView({
   const sectionHelp = isTeamView ? SECTION_HELP[teamPayrollSection] : undefined;
 
   function openLatestPayslip() {
-    const latestId = selfPayroll.payslips[0]?.id;
+    const latestId = selfPayroll.payslips.find((row) => row.canEmployeeAccess)?.id;
     if (!latestId) return;
     setActivePayslipId(latestId);
     setDrawerOpen(true);
@@ -243,7 +243,7 @@ export function HrPayrollHubView({
                 variant="outline"
                 size="sm"
                 className="gap-1.5"
-                disabled={selfPayroll.payslips.length === 0}
+                disabled={!selfPayroll.payslips.some((row) => row.canEmployeeAccess)}
                 onClick={openLatestPayslip}
               >
                 <Download className="size-4" />

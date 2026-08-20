@@ -26,7 +26,7 @@ export function EmployeeStatCard({
   const content = (
     <>
       <div className="flex items-start justify-between gap-2">
-        <p className="truncate whitespace-nowrap text-[11px] font-medium leading-snug text-muted-foreground">
+        <p className="truncate whitespace-nowrap text-[11px] font-medium leading-none text-muted-foreground">
           {label}
         </p>
         <span
@@ -38,19 +38,19 @@ export function EmployeeStatCard({
           <Icon className={cn("size-4", accent)} />
         </span>
       </div>
-      <div className="min-w-0">
-        <p className={cn("truncate text-xl font-semibold tracking-tight tabular-nums", accent)}>
+      <div className="mt-3 min-w-0">
+        <p className={cn("truncate text-xl font-semibold leading-7 tracking-tight tabular-nums", accent)}>
           {value}
         </p>
-        {hint ? (
-          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{hint}</p>
-        ) : null}
+        <p className="mt-1 truncate text-[11px] leading-4 text-muted-foreground">
+          {hint || "\u00a0"}
+        </p>
       </div>
     </>
   );
 
   const className =
-    "flex h-full min-w-0 flex-col justify-between gap-2 rounded-xl border bg-card p-3.5 shadow-sm";
+    "flex h-full min-h-[6.75rem] min-w-0 flex-col rounded-xl border bg-card p-3.5 shadow-sm";
 
   if (href) {
     return (

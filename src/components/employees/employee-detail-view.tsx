@@ -423,7 +423,7 @@ export function EmployeeDetailView({
               designation={employee.designationTitle}
               departmentName={employee.departmentName}
               employmentTypeName={formatDisplayLabel(employee.employmentTypeName)}
-              accountStatus={employee.accountStatus}
+              employmentStatus={employee.employmentStatus}
               imageUrl={profileImageUrl}
               profilePath={`/e/${buildEmployeeRouteRef(employee)}`}
               canEdit={canEditProfile}

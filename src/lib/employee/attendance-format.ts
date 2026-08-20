@@ -16,17 +16,15 @@ export function formatWorkingDuration(seconds: number) {
   return `${hours}h ${minutes}m`;
 }
 
-/** Minutes late -> "1h 1m", "45m", etc. */
+/** Minutes late -> "45m", "1 Hour", "1 hr 1m", "3 hr 7m", etc. */
 export function formatLateByLabel(totalMinutes: number) {
   const safe = Math.max(0, Math.floor(totalMinutes));
   const hours = Math.floor(safe / 60);
   const minutes = safe % 60;
-  if (hours > 0 && minutes > 0) {
-    return `${hours}h ${minutes}m`;
-  }
-  if (hours > 0) {
-    return `${hours}h`;
-  }
+
+  if (hours === 1 && minutes === 0) return "1 Hour";
+  if (hours > 1 && minutes === 0) return `${hours} hr`;
+  if (hours > 0 && minutes > 0) return `${hours} hr ${minutes}m`;
   return `${minutes}m`;
 }
 
