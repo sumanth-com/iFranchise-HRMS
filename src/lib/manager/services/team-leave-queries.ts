@@ -398,7 +398,11 @@ export async function listTeamLeaveRequests(
       .gte("end_date", today);
   } else if (summaryFilter === "upcomingPlannedLeaves") {
     query = query.eq("leave_status", "approved").gt("start_date", today);
-  } else if (parsed.dateFrom && parsed.dateTo) {
+  } else if (
+    parsed.dateFrom &&
+    parsed.dateTo &&
+    parsed.leaveStatus !== "pending"
+  ) {
     query = query.lte("start_date", parsed.dateTo).gte("end_date", parsed.dateFrom);
   }
 

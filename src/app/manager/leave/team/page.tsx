@@ -32,6 +32,10 @@ export default async function ManagerTeamLeavePage({
     Number.isInteger(rawYear) && rawYear >= 2000 && rawYear <= 2100
       ? rawYear
       : now.getFullYear();
+  const leaveStatus = firstString(rawParams.leaveStatus);
+  const summaryFilter = firstString(rawParams.summaryFilter);
+  const isPendingQueue =
+    leaveStatus === "pending" || summaryFilter === "pendingRequests";
   const monthRange = getMonthDateRange(month, year);
 
   const parsed = teamLeaveListParamsSchema.parse({
@@ -40,12 +44,13 @@ export default async function ManagerTeamLeavePage({
     search: firstString(rawParams.search),
     sortBy: firstString(rawParams.sortBy),
     sortOrder: firstString(rawParams.sortOrder),
-    leaveStatus: firstString(rawParams.leaveStatus),
+    leaveStatus,
     leaveTypeId: firstString(rawParams.leaveTypeId),
     departmentId: firstString(rawParams.departmentId),
     employeeId: firstString(rawParams.employeeId),
-    dateFrom: firstString(rawParams.dateFrom) ?? monthRange.start,
-    dateTo: firstString(rawParams.dateTo) ?? monthRange.end,
+    dateFrom: firstString(rawParams.dateFrom) ?? (isPendingQueue ? undefined : monthRange.start),
+    dateTo: firstString(rawParams.dateTo) ?? (isPendingQueue ? undefined : monthRange.end),
+    summaryFilter,
   });
 
   const teamData = await safeServerCall(
@@ -94,6 +99,7 @@ export default async function ManagerTeamLeavePage({
           leaveTypeId={parsed.leaveTypeId}
           departmentId={parsed.departmentId}
           employeeId={parsed.employeeId}
+          summaryFilter={parsed.summaryFilter}
           leaveTypes={teamData.lookups.leaveTypes}
           departments={teamData.lookups.departments}
           employees={teamData.lookups.employees}

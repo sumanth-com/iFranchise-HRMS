@@ -84,7 +84,7 @@ export const MANAGER_DASHBOARD_KPI_LINKS = {
   presentToday: `${MANAGER_ROUTES.attendanceTeam}?attendanceStatus=present`,
   onLeaveToday: `${MANAGER_ROUTES.attendanceTeam}?attendanceStatus=absent`,
   lateToday: `${MANAGER_ROUTES.attendanceTeam}?attendanceStatus=late`,
-  pendingLeaveApprovals: `${MANAGER_ROUTES.leaveTeam}?leaveStatus=pending`,
+  pendingLeaveApprovals: `${MANAGER_ROUTES.leaveTeam}?summaryFilter=pendingRequests`,
   pendingPerformanceReviews: MANAGER_ROUTES.performanceGoals,
   openRecruitmentRequests: MANAGER_ROUTES.recruitmentJobs,
   probationEndingSoon: MANAGER_ROUTES.reportsTeam,
@@ -95,7 +95,7 @@ export const MANAGER_QUICK_ACTIONS = [
     id: "approve-leave",
     label: "Team Leave",
     href: (employeeId?: string) => {
-      const params = new URLSearchParams({ leaveStatus: "pending" });
+      const params = new URLSearchParams({ summaryFilter: "pendingRequests" });
       if (employeeId) params.set("employeeId", employeeId);
       return `${MANAGER_ROUTES.leaveTeam}?${params.toString()}`;
     },

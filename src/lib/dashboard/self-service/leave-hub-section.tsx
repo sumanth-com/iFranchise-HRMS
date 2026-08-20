@@ -39,6 +39,10 @@ export async function LeaveHubSection({
   const employeeId = profile.employee.id;
   const calendarMonth = now.getMonth() + 1;
   const calendarYear = now.getFullYear();
+  const leaveStatus = firstString(raw.leaveStatus);
+  const summaryFilter = firstString(raw.summaryFilter);
+  const isPendingQueue =
+    leaveStatus === "pending" || summaryFilter === "pendingRequests";
 
   const teamParams = leaveListParamsSchema.parse({
     page: section === "team" ? raw.page : undefined,
@@ -46,15 +50,16 @@ export async function LeaveHubSection({
     search: firstString(raw.search),
     sortBy: raw.sortBy,
     sortOrder: raw.sortOrder,
-    month: raw.month ?? calendarMonth,
-    year: raw.year ?? calendarYear,
-    leaveStatus: raw.leaveStatus,
+    // Pending queues must match the dashboard count (all open requests, not this month only).
+    month: isPendingQueue ? firstString(raw.month) : (raw.month ?? calendarMonth),
+    year: isPendingQueue ? firstString(raw.year) : (raw.year ?? calendarYear),
+    leaveStatus,
     leaveTypeId: raw.leaveTypeId,
     departmentId: raw.departmentId,
     branchId: raw.branchId,
     reportingManagerId: raw.reportingManagerId,
     employeeId: raw.employeeId,
-    summaryFilter: raw.summaryFilter,
+    summaryFilter,
     excludeHrApplicants: true,
   });
 
@@ -84,6 +89,9 @@ export async function LeaveHubSection({
     calendar: DEFAULT_LEAVE_CALENDAR,
   };
 
+  const loadMySection = section === "my";
+  const loadTeamSection = section === "team" && canViewTeam;
+
   const [
     balancesResult,
     requestsResult,
@@ -93,38 +101,44 @@ export async function LeaveHubSection({
     summarySettled,
     applyLookupsSettled,
   ] = await Promise.all([
-    getEmployeeLeaveBalanceSnapshot(supabase, employeeId, undefined, {
-      month: calendarMonth,
-      year: calendarYear,
-    }).catch((error) => {
-      console.error("[leave] balance snapshot failed", error);
-      return [] as Awaited<ReturnType<typeof getEmployeeLeaveBalanceSnapshot>>;
-    }),
-    listLeaveRequests(supabase, profile, { employeeId, page: 1, pageSize: 25 }).catch(
-      (error) => {
-        console.error("[leave] own requests failed", error);
-        return { data: [], total: 0, page: 1, pageSize: 25 };
-      },
-    ),
-    getEmployeeLeaveCalendarData(supabase, profile, calendarMonth, calendarYear).catch(
-      (error) => {
-        console.error("[leave] calendar failed", error);
-        return emptyCalendar;
-      },
-    ),
-    canViewTeam
+    loadMySection
+      ? getEmployeeLeaveBalanceSnapshot(supabase, employeeId, undefined, {
+          month: calendarMonth,
+          year: calendarYear,
+        }).catch((error) => {
+          console.error("[leave] balance snapshot failed", error);
+          return [] as Awaited<ReturnType<typeof getEmployeeLeaveBalanceSnapshot>>;
+        })
+      : Promise.resolve([] as Awaited<ReturnType<typeof getEmployeeLeaveBalanceSnapshot>>),
+    loadMySection
+      ? listLeaveRequests(supabase, profile, { employeeId, page: 1, pageSize: 25 }).catch(
+          (error) => {
+            console.error("[leave] own requests failed", error);
+            return { data: [], total: 0, page: 1, pageSize: 25 };
+          },
+        )
+      : Promise.resolve({ data: [], total: 0, page: 1, pageSize: 25 }),
+    loadMySection
+      ? getEmployeeLeaveCalendarData(supabase, profile, calendarMonth, calendarYear).catch(
+          (error) => {
+            console.error("[leave] calendar failed", error);
+            return emptyCalendar;
+          },
+        )
+      : Promise.resolve(emptyCalendar),
+    loadTeamSection
       ? listLeaveRequests(supabase, profile, teamParams).catch((error) => {
           console.error("[leave] team requests failed", error);
           return null;
         })
       : Promise.resolve(null),
-    canViewTeam
+    loadTeamSection
       ? getLeaveLookups(supabase, profile.employee.organizationId).catch((error) => {
           console.error("[leave] team lookups failed", error);
           return null;
         })
       : Promise.resolve(null),
-    canViewTeam
+    loadTeamSection
       ? getLeaveSummary(supabase, profile, teamParams.month, teamParams.year, {
           excludeHrApplicants: true,
         }).catch((error) => {
@@ -132,7 +146,7 @@ export async function LeaveHubSection({
           return null;
         })
       : Promise.resolve(null),
-    canApply || canEdit
+    loadMySection && (canApply || canEdit)
       ? getLeaveLookups(supabase, profile.employee.organizationId).catch((error) => {
           console.error("[leave] apply lookups failed", error);
           return null;

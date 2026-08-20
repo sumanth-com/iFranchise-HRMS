@@ -31,6 +31,12 @@ type ManagerTeamLeaveViewProps = {
   leaveTypeId?: string;
   departmentId?: string;
   employeeId?: string;
+  summaryFilter?:
+    | "pendingRequests"
+    | "approvedThisMonth"
+    | "rejectedThisMonth"
+    | "employeesOnLeaveToday"
+    | "upcomingPlannedLeaves";
   leaveTypes: LookupOption[];
   departments: LookupOption[];
   employees: LookupOption[];
@@ -49,6 +55,7 @@ export function ManagerTeamLeaveView({
   leaveTypeId,
   departmentId,
   employeeId,
+  summaryFilter,
   leaveTypes,
   departments,
   employees,
@@ -67,6 +74,7 @@ export function ManagerTeamLeaveView({
       leaveTypeId={leaveTypeId}
       departmentId={departmentId}
       employeeId={employeeId}
+      summaryFilter={summaryFilter}
       leaveTypes={leaveTypes}
       departments={departments}
       branches={[]}

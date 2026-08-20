@@ -2,7 +2,7 @@ import { Suspense } from "react";
 
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
 import { HrDashboard } from "@/components/dashboard/hr-dashboard";
-import { getHrDashboardData } from "@/lib/dashboard/services/dashboard-queries";
+import { getHrDashboardData } from "@/lib/dashboard/services/hr-overview-queries";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 import type { HrDashboardData } from "@/types/dashboard";

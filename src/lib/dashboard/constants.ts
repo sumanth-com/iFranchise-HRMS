@@ -27,7 +27,7 @@ export const DASHBOARD_KPI_LINKS = {
   presentToday: attendanceTeamListUrl({ attendanceStatus: "present" }),
   absentToday: attendanceTeamListUrl({ attendanceStatus: "absent" }),
   lateToday: attendanceTeamListUrl({ attendanceStatus: "late" }),
-  pendingLeaveApprovals: leaveTeamListUrl({ leaveStatus: "pending" }),
+  pendingLeaveApprovals: leaveTeamListUrl({ summaryFilter: "pendingRequests" }),
   exitRequests: EXIT_ROUTES.clearance,
 } as const;
 
