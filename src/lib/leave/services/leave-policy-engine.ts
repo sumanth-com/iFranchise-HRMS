@@ -48,15 +48,20 @@ function officeCalendarDate(now: Date): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(now);
 }
 
-/** Next calendar day for types that need advance notice; today for PL/LOP. */
+/** Next calendar day for types that need advance notice; today for PL/LOP or half-day leave. */
 export function earliestAllowedLeaveStart(
   leaveTypeCode: string,
   _notice: LeavePolicyNoticeHours = DEFAULT_LEAVE_NOTICE,
   now = new Date(),
+  options?: { isHalfDay?: boolean },
 ): string {
   const today = officeCalendarDate(now);
   const code = leaveTypeCode.toUpperCase();
-  if (code === PERIOD_LEAVE_CODE || code === LOSS_OF_PAY_CODE) {
+  if (
+    options?.isHalfDay ||
+    code === PERIOD_LEAVE_CODE ||
+    code === LOSS_OF_PAY_CODE
+  ) {
     return today;
   }
   return format(addDays(parseISO(today), 1), "yyyy-MM-dd");
@@ -164,7 +169,8 @@ export function validateLeavePolicy(input: {
   if (input.overlapping) {
     issues.push({
       code: "overlap",
-      message: "This request overlaps another pending or approved leave.",
+      message:
+        "You already have a pending or approved leave on one or more of these dates. Choose different dates, or cancel the existing request first.",
     });
   }
 
@@ -193,14 +199,14 @@ export function validateLeavePolicy(input: {
       if (probationRules.periodLeaveFemaleOnly && !isFemale) {
         issues.push({
           code: "pl_gender",
-          message: "Period Leave is available to female employees only.",
+          message: "Menstruation Leave is available to female employees only.",
         });
       }
       const used = input.employee.usedAndPendingByType[PERIOD_LEAVE_CODE] ?? 0;
       if (used + input.duration.totalLeaveDays > probationRules.periodLeaveCap) {
         issues.push({
           code: "pl_cap",
-          message: `You can take ${probationRules.periodLeaveCap} Period Leave day during probation.`,
+          message: `You can take ${probationRules.periodLeaveCap} Menstruation Leave day during probation.`,
         });
       }
     } else if (isCl) {
@@ -214,13 +220,13 @@ export function validateLeavePolicy(input: {
     } else if (code !== LOSS_OF_PAY_CODE) {
       issues.push({
         code: "probation_type",
-        message: "During probation you can apply Casual Leave or Period Leave only.",
+        message: "During probation you can apply Casual Leave or Menstruation Leave only.",
       });
     }
   } else if (isPl && probationRules.periodLeaveFemaleOnly && !isFemale) {
     issues.push({
       code: "pl_gender",
-      message: "Period Leave is available to female employees only.",
+      message: "Menstruation Leave is available to female employees only.",
     });
   }
 
@@ -230,23 +236,28 @@ export function validateLeavePolicy(input: {
       if (input.startDate < today) {
         issues.push({
           code: "pl_past",
-          message: "Period Leave must be communicated to HR on the same day.",
+          message: "Menstruation Leave must be communicated to HR on the same day.",
         });
       } else if (input.startDate === today) {
         const endMs = zonedDateMs(input.startDate, notice.officeEnd);
         if (now.getTime() > endMs) {
           issues.push({
             code: "pl_same_day",
-            message: "Period Leave must be communicated to HR before the end of the working day.",
+            message: "Menstruation Leave must be communicated to HR before the end of the working day.",
           });
         }
       }
     } else if (code !== LOSS_OF_PAY_CODE) {
-      const earliest = earliestAllowedLeaveStart(code, notice, now);
+      // Half-day leave can be applied for the present day; full-day still needs advance notice.
+      const earliest = earliestAllowedLeaveStart(code, notice, now, {
+        isHalfDay: input.isHalfDay,
+      });
       if (input.startDate < earliest) {
         issues.push({
           code: "notice",
-          message: `This leave type needs at least one day’s notice. You can start from tomorrow (${format(parseISO(earliest), "d MMMM yyyy")}).`,
+          message: input.isHalfDay
+            ? `Half-day leave can start from today (${format(parseISO(earliest), "d MMMM yyyy")}).`
+            : `This leave type needs at least one day’s notice. You can start from tomorrow (${format(parseISO(earliest), "d MMMM yyyy")}).`,
         });
       }
     }

@@ -46,7 +46,13 @@ export function isRecoverableRouteError(error: unknown): boolean {
     /Load failed/i.test(haystack) ||
     /NetworkError/i.test(haystack) ||
     /The operation was aborted/i.test(haystack) ||
-    /AbortError/i.test(haystack)
+    /AbortError/i.test(haystack) ||
+    // Post-deploy client/server skew — hard reload picks up the new build.
+    /Failed to find Server Action/i.test(haystack) ||
+    /older or newer deployment/i.test(haystack) ||
+    /React Client Manifest/i.test(haystack) ||
+    /Could not find the module/i.test(haystack) ||
+    /NEXT_HTTP_ERROR/i.test(haystack)
   );
 }
 

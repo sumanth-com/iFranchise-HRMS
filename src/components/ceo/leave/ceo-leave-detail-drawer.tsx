@@ -21,7 +21,7 @@ import {
   fetchCeoLeaveDetailAction,
   rejectCeoLeaveAction,
 } from "@/lib/ceo/actions/ceo-leave-actions";
-import { APPROVAL_LEVEL_LABELS } from "@/lib/leave/constants";
+import { leaveApprovalStageLabel } from "@/lib/leave/constants";
 import {
   formatHalfDayPeriod,
   formatLeaveDate,
@@ -77,7 +77,6 @@ export function CeoLeaveDetailDrawer({
   const [approveOpen, setApproveOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [forwardOpen, setForwardOpen] = useState(false);
-  const [approveComments, setApproveComments] = useState("");
   const [rejectComments, setRejectComments] = useState("");
 
   const loadDetail = () => {
@@ -98,7 +97,6 @@ export function CeoLeaveDetailDrawer({
     if (!open || !leaveRequestId) {
       setDetail(null);
       setError(null);
-      setApproveComments("");
       setRejectComments("");
       return;
     }
@@ -111,7 +109,6 @@ export function CeoLeaveDetailDrawer({
     startActing(async () => {
       const result = await approveCeoLeaveAction({
         leaveRequestId: detail.id,
-        comments: approveComments || undefined,
       });
       if (!result.success) {
         toast.error(result.message);
@@ -119,7 +116,6 @@ export function CeoLeaveDetailDrawer({
       }
       toast.success("Leave request approved");
       setApproveOpen(false);
-      setApproveComments("");
       loadDetail();
       onActed?.();
     });
@@ -310,8 +306,9 @@ export function CeoLeaveDetailDrawer({
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                             <div className="space-y-1">
                               <p className="text-sm font-medium">
-                                {APPROVAL_LEVEL_LABELS[step.approvalLevel] ??
-                                  `Level ${step.approvalLevel}`}
+                                {leaveApprovalStageLabel(step.approvalLevel, {
+                                  hrDirectToCeo: detail.hrDirectToCeo,
+                                })}
                               </p>
                               <p className="text-sm text-muted-foreground">
                                 {step.approverName}
@@ -362,25 +359,34 @@ export function CeoLeaveDetailDrawer({
       <Modal
         open={approveOpen}
         onOpenChange={setApproveOpen}
-        title="Approve leave request"
-        description={detail ? `Approve leave for ${detail.employeeName}?` : undefined}
+        title="Confirm approval"
+        description={
+          detail
+            ? `Approve ${detail.leaveTypeName} for ${detail.employeeName}? This will mark the request as approved.`
+            : undefined
+        }
         footer={
           <Button disabled={isActing} onClick={handleApprove}>
-            Approve
+            Confirm & Approve
           </Button>
         }
       >
-        <div className="space-y-2">
-          <Label htmlFor="ceoApproveComments">Comments (optional)</Label>
-          <textarea
-            id="ceoApproveComments"
-            rows={3}
-            value={approveComments}
-            disabled={isActing}
-            className="flex min-h-16 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-            onChange={(event) => setApproveComments(event.currentTarget.value)}
-          />
-        </div>
+        {detail ? (
+          <div className="rounded-lg border bg-muted/20 px-3 py-2.5 text-sm">
+            <p>
+              <span className="text-muted-foreground">Employee: </span>
+              {detail.employeeName}
+            </p>
+            <p className="mt-1">
+              <span className="text-muted-foreground">Leave: </span>
+              {detail.leaveTypeName} · {durationLabel}
+            </p>
+            <p className="mt-1">
+              <span className="text-muted-foreground">Dates: </span>
+              {dateRangeLabel}
+            </p>
+          </div>
+        ) : null}
       </Modal>
 
       <Modal

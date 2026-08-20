@@ -47,14 +47,24 @@ function resolveKpiLinks(pathname: string) {
   return HR_SELF_SERVICE_DASHBOARD_KPI_LINKS;
 }
 
-export function EmployeeDashboardKpiCards({ kpis }: { kpis: EmployeeDashboardKpis }) {
+export function EmployeeDashboardKpiCards({
+  kpis,
+  hideLeaveBalance = false,
+}: {
+  kpis: EmployeeDashboardKpis;
+  hideLeaveBalance?: boolean;
+}) {
   const pathname = usePathname();
   const links = resolveKpiLinks(pathname);
 
   return (
     <section
       aria-label="Your day at a glance"
-      className="grid grid-cols-2 gap-3 lg:grid-cols-4"
+      className={
+        hideLeaveBalance
+          ? "grid grid-cols-2 gap-3 lg:grid-cols-3"
+          : "grid grid-cols-2 gap-3 lg:grid-cols-4"
+      }
     >
       <EmployeeStatCard
         label="Today's Attendance"
@@ -72,14 +82,16 @@ export function EmployeeDashboardKpiCards({ kpis }: { kpis: EmployeeDashboardKpi
         iconBg="bg-sky-500/10"
         href={links.workingHours}
       />
-      <EmployeeStatCard
-        label="Leave Balance"
-        value={`${kpis.leaveBalanceDays} days`}
-        icon={CalendarDays}
-        accent="text-indigo-600 dark:text-indigo-400"
-        iconBg="bg-indigo-500/10"
-        href={links.leaveBalance}
-      />
+      {hideLeaveBalance ? null : (
+        <EmployeeStatCard
+          label="Leave Balance"
+          value={`${kpis.leaveBalanceDays} days`}
+          icon={CalendarDays}
+          accent="text-indigo-600 dark:text-indigo-400"
+          iconBg="bg-indigo-500/10"
+          href={links.leaveBalance}
+        />
+      )}
       <EmployeeStatCard
         label="Pending Leave Requests"
         value={String(kpis.pendingLeaveRequests)}

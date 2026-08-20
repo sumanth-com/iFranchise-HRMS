@@ -239,7 +239,7 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
     recentJobsRes,
     recentPayrollRes,
     auditRes,
-    salaryMetaRes,
+    _salaryMetaRes,
     onboardingStats,
     expiringDocs,
   ] = await Promise.all([
@@ -360,13 +360,6 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
     profileByEmployee.set(p.employee_id, p);
   }
 
-  const probationEndByEmployee = new Map<string, string>();
-  for (const s of (salaryMetaRes.data ?? []) as LooseRow[]) {
-    const meta = s.components as Record<string, unknown> | null;
-    const end = typeof meta?.probation_end_date === "string" ? meta.probation_end_date : null;
-    if (end && s.employee_id) probationEndByEmployee.set(s.employee_id, end);
-  }
-
   // Department headcount
   const deptMap = new Map<string, number>();
   for (const e of activeEmployees) {
@@ -448,22 +441,9 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
       }
     }
 
-    const probationEnd = probationEndByEmployee.get(e.id);
-    if (
-      e.employment_status === "probation" ||
-      (probationEnd &&
-        probationEnd >= today &&
-        probationEnd <= format(eventHorizon, "yyyy-MM-dd"))
-    ) {
-      if (
-        probationEnd &&
-        probationEnd >= today &&
-        probationEnd <= format(eventHorizon, "yyyy-MM-dd")
-      ) {
-        probationEndingSoon += 1;
-      } else if (e.employment_status === "probation" && !probationEnd) {
-        probationEndingSoon += 1;
-      }
+    // Match the HR Overview card link (`?employmentStatus=probation`).
+    if (e.employment_status === "probation") {
+      probationEndingSoon += 1;
     }
   }
 

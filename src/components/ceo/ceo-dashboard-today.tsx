@@ -33,7 +33,11 @@ function Stat({
 }
 
 export function CeoDashboardToday({ attendance }: { attendance: CeoAttendanceOverview }) {
-  const onSite = attendance.presentToday + attendance.lateToday;
+  const presentToday = Number(attendance?.presentToday) || 0;
+  const lateToday = Number(attendance?.lateToday) || 0;
+  const absentToday = Number(attendance?.absentToday) || 0;
+  const onLeaveToday = Number(attendance?.onLeaveToday) || 0;
+  const onSite = presentToday + lateToday;
 
   return (
     <EmployeeSectionCard
@@ -52,9 +56,9 @@ export function CeoDashboardToday({ attendance }: { attendance: CeoAttendanceOve
     >
       <div className="grid grid-cols-4 divide-x rounded-xl border bg-gradient-to-br from-primary/5 via-card to-card">
         <Stat label="Present" value={String(onSite)} highlight />
-        <Stat label="Absent" value={String(attendance.absentToday)} />
-        <Stat label="Late" value={String(attendance.lateToday)} />
-        <Stat label="On leave" value={String(attendance.onLeaveToday)} />
+        <Stat label="Absent" value={String(absentToday)} />
+        <Stat label="Late" value={String(lateToday)} />
+        <Stat label="On leave" value={String(onLeaveToday)} />
       </div>
     </EmployeeSectionCard>
   );

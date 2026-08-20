@@ -1,8 +1,5 @@
 import { DesignationsManagement } from "@/components/organization/designations-management";
-import {
-  requireCeoPortal,
-  toViewOnlyPermissionCodes,
-} from "@/lib/ceo/read-only-permissions";
+import { requireCeoPortal } from "@/lib/ceo/read-only-permissions";
 import { getDepartments, getEmploymentTypes } from "@/lib/organization/services/org-lookups";
 import { listDesignations } from "@/lib/organization/services/org-queries";
 import { createClient } from "@/lib/supabase/server";
@@ -37,7 +34,7 @@ export default async function CeoDesignationsPage({ searchParams }: PageProps) {
       result={result}
       departments={departments}
       employmentTypes={employmentTypes}
-      permissionCodes={toViewOnlyPermissionCodes(profile.permissionCodes)}
+      permissionCodes={profile.permissionCodes}
       search={params.search ?? ""}
       status={params.status as RecordStatus | undefined}
     />

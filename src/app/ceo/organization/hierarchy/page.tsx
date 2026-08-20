@@ -1,8 +1,5 @@
 import { HierarchyManagement } from "@/components/organization/hierarchy-management";
-import {
-  requireCeoPortal,
-  toViewOnlyPermissionCodes,
-} from "@/lib/ceo/read-only-permissions";
+import { requireCeoPortal } from "@/lib/ceo/read-only-permissions";
 import {
   buildHierarchyTree,
   listHierarchyEmployees,
@@ -19,7 +16,7 @@ export default async function CeoHierarchyPage() {
     <HierarchyManagement
       tree={tree}
       employees={employees}
-      permissionCodes={toViewOnlyPermissionCodes(profile.permissionCodes)}
+      permissionCodes={profile.permissionCodes}
     />
   );
 }

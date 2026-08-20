@@ -1,8 +1,5 @@
 import { HolidaysManagement } from "@/components/organization/holidays-management";
-import {
-  requireCeoPortal,
-  toViewOnlyPermissionCodes,
-} from "@/lib/ceo/read-only-permissions";
+import { requireCeoPortal } from "@/lib/ceo/read-only-permissions";
 import { getBranches, getDepartments } from "@/lib/organization/services/org-lookups";
 import { listHolidays } from "@/lib/organization/services/org-queries";
 import { createClient } from "@/lib/supabase/server";
@@ -32,7 +29,7 @@ export default async function CeoHolidaysPage({ searchParams }: PageProps) {
       result={result}
       branches={branches}
       departments={departments}
-      permissionCodes={toViewOnlyPermissionCodes(profile.permissionCodes)}
+      permissionCodes={profile.permissionCodes}
       viewMode={viewMode}
       search={search ?? ""}
     />

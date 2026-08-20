@@ -17,6 +17,7 @@ import {
 import { DEFAULT_LEAVE_POLICY_DOCUMENT } from "@/lib/leave/leave-policy-defaults";
 import { previewLeaveApplication } from "@/lib/leave/services/leave-apply-preview";
 import { formatLeaveDate } from "@/lib/leave/services/leave-utils";
+import { formatLeaveDayCount } from "@/lib/leave/services/leave-usage";
 import type { LeaveDurationBreakdown } from "@/lib/leave/services/leave-calendar-engine";
 import type { LeaveApplyContext } from "@/types/leave";
 import { cn } from "@/lib/utils";
@@ -151,20 +152,14 @@ export function LeaveDurationPreview({
       ? formatLeaveDate(startDate)
       : `${formatLeaveDate(startDate)} – ${formatLeaveDate(endDate)}`;
   const charged = preview.duration.totalLeaveDays;
-  const extraRows = [
-    preview.duration.sandwichDays > 0
-      ? { label: "Sandwich days", value: preview.duration.sandwichDays }
-      : null,
-    preview.duration.weeklyHolidays > 0
-      ? { label: "Weekly holidays", value: preview.duration.weeklyHolidays }
-      : null,
-    preview.duration.publicHolidays > 0
-      ? { label: "Public holidays", value: preview.duration.publicHolidays }
-      : null,
-    preview.duration.halfDays > 0
-      ? { label: "Half day", value: preview.duration.halfDays }
-      : null,
-  ].filter((row): row is { label: string; value: number } => Boolean(row));
+  const selectedDays =
+    preview.duration.workingDays + preview.duration.halfDays * 0.5;
+  const sandwichDays = preview.duration.sandwichDays;
+  const hasSandwich = sandwichDays > 0;
+  const balanceAfter =
+    preview.available != null
+      ? Number((preview.available - charged).toFixed(2))
+      : null;
 
   const noticeIssue = preview.issues.find((issue) =>
     ["notice", "pl_same_day", "pl_past"].includes(issue.code),
@@ -174,50 +169,83 @@ export function LeaveDurationPreview({
   );
 
   return (
-    <div className="space-y-1.5 rounded-xl border bg-muted/20 px-3 py-2">
-      <div className="flex items-center justify-between gap-3">
+    <div className="space-y-2 rounded-xl border bg-muted/20 px-3 py-2.5">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-semibold">Leave period</p>
+          <p className="text-sm font-semibold">Leave deduction</p>
           <p className="text-xs text-muted-foreground">{periodLabel}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-4 text-right">
-          {preview.available != null ? (
-            <div>
-              <p className="text-[10px] text-muted-foreground">Available</p>
-              <p className="text-sm font-semibold tabular-nums">{preview.available}</p>
-            </div>
-          ) : null}
-          {preview.remaining != null ? (
-            <div>
-              <p className="text-[10px] text-muted-foreground">Remaining</p>
-              <p
-                className={cn(
-                  "text-sm font-semibold tabular-nums",
-                  preview.remaining < 0 && "text-destructive",
-                )}
-              >
-                {preview.remaining}
-              </p>
-            </div>
-          ) : null}
-          <div>
-            <p className="text-[10px] text-muted-foreground">Charged</p>
-            <p className="text-sm font-semibold tabular-nums">{charged}</p>
-          </div>
+        <div className="shrink-0 text-right">
+          <p className="text-[10px] text-muted-foreground">Total charged</p>
+          <p className="text-lg font-semibold tabular-nums leading-tight">
+            {formatLeaveDayCount(charged)}
+            <span className="ml-1 text-xs font-normal text-muted-foreground">
+              {charged === 1 ? "day" : "days"}
+            </span>
+          </p>
         </div>
       </div>
 
-      {extraRows.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
-          {extraRows.map((row) => (
-            <span
-              key={row.label}
-              className="rounded-md bg-background px-2 py-1 text-[11px] text-muted-foreground"
-            >
-              {row.label}: <span className="font-medium text-foreground">{row.value}</span>
-            </span>
-          ))}
+      <div className="space-y-1 rounded-lg border bg-background/70 px-2.5 py-2 text-xs">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-muted-foreground">
+            {isHalfDay ? "Selected half day" : "Selected leave days"}
+          </span>
+          <span className="font-medium tabular-nums text-foreground">
+            {formatLeaveDayCount(selectedDays)}
+          </span>
         </div>
+        {hasSandwich ? (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-muted-foreground">
+              Sandwich days (policy)
+            </span>
+            <span className="font-medium tabular-nums text-foreground">
+              +{formatLeaveDayCount(sandwichDays)}
+            </span>
+          </div>
+        ) : null}
+        {preview.duration.publicHolidays > 0 ? (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-muted-foreground">Public holidays in range</span>
+            <span className="font-medium tabular-nums text-foreground">
+              {formatLeaveDayCount(preview.duration.publicHolidays)} (not charged)
+            </span>
+          </div>
+        ) : null}
+        {preview.duration.weeklyHolidays > 0 ? (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-muted-foreground">Weekly holidays in range</span>
+            <span className="font-medium tabular-nums text-foreground">
+              {formatLeaveDayCount(preview.duration.weeklyHolidays)} (not charged)
+            </span>
+          </div>
+        ) : null}
+        <div className="flex items-center justify-between gap-3 border-t pt-1.5">
+          <span className="font-medium text-foreground">Total leave charged</span>
+          <span className="font-semibold tabular-nums text-foreground">
+            {formatLeaveDayCount(charged)}
+          </span>
+        </div>
+      </div>
+
+      {preview.available != null && balanceAfter != null ? (
+        <p className="text-xs text-muted-foreground">
+          Balance:{" "}
+          <span className="font-medium text-foreground tabular-nums">
+            {formatLeaveDayCount(preview.available)}
+          </span>
+          {" → "}
+          <span
+            className={cn(
+              "font-medium tabular-nums",
+              balanceAfter < 0 ? "text-destructive" : "text-foreground",
+            )}
+          >
+            {formatLeaveDayCount(balanceAfter)}
+          </span>{" "}
+          after this request
+        </p>
       ) : null}
 
       {preview.duration.sandwichExplanations.map((message) => (
@@ -237,15 +265,43 @@ export function LeaveDurationPreview({
         </div>
       ) : null}
 
-      {blockingIssues.map((issue) => (
-        <div
-          key={issue.code}
-          className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5"
-        >
-          <p className="text-sm font-medium text-destructive">Cannot submit this request</p>
-          <p className="mt-0.5 text-xs leading-relaxed text-destructive/90">{issue.message}</p>
-        </div>
-      ))}
+      {blockingIssues.map((issue) => {
+        const isOverlap = issue.code === "overlap";
+        return (
+          <div
+            key={issue.code}
+            className={cn(
+              "rounded-lg border px-3 py-2.5",
+              isOverlap
+                ? "border-amber-500/35 bg-amber-500/10"
+                : "border-destructive/30 bg-destructive/10",
+            )}
+          >
+            <p
+              className={cn(
+                "text-sm font-medium",
+                isOverlap
+                  ? "text-amber-950 dark:text-amber-100"
+                  : "text-destructive",
+              )}
+            >
+              {isOverlap ? "These dates already have leave" : "Cannot submit this request"}
+            </p>
+            <p
+              className={cn(
+                "mt-0.5 text-xs leading-relaxed",
+                isOverlap
+                  ? "text-amber-900/90 dark:text-amber-100/80"
+                  : "text-destructive/90",
+              )}
+            >
+              {isOverlap
+                ? "You already have a pending or approved leave on one or more of these dates. Choose different dates, or cancel the existing request first."
+                : issue.message}
+            </p>
+          </div>
+        );
+      })}
     </div>
   );
 }

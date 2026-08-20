@@ -3,26 +3,19 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { format } from "date-fns";
-import { CalendarDays, CalendarPlus, Eye, FileText, type LucideIcon } from "lucide-react";
+import { CalendarPlus, Eye, FileText, Trash2 } from "lucide-react";
 
 import { Button, buttonVariants } from "@/components/common/button";
 import {
   DataTable,
-  DATA_TABLE_SPLIT_SCROLL_MAX_HEIGHT,
+  DATA_TABLE_LEAVE_REQUESTS_MAX_HEIGHT,
   type DataTableColumn,
 } from "@/components/common/data-table";
-import { EmployeeStatCard } from "@/components/employee/dashboard/employee-module-primitives";
 import { EmployeeLeaveCalendar } from "@/components/employee/leave/employee-leave-calendar";
 import { ApplyLeaveDialog } from "@/components/leave/apply-leave-dialog";
+import { LeaveBalanceSummaryCards } from "@/components/leave/leave-balance-summary-cards";
 import { LeaveStatusBadge } from "@/components/leave/leave-status-badge";
 import { MyLeaveDetailPopup } from "@/components/leave/my-leave-detail-popup";
-import {
-  LEAVE_BALANCE_CARD_TONES,
-  LEAVE_BALANCE_DISPLAY_CODES,
-  LEAVE_BALANCE_DISPLAY_LABELS,
-} from "@/lib/leave/constants";
-import { formatLeaveDayCount } from "@/lib/leave/services/leave-usage";
 import { formatLeaveDate } from "@/lib/leave/services/leave-utils";
 import { cn } from "@/lib/utils";
 import type {
@@ -33,33 +26,6 @@ import type {
   LeaveLookups,
 } from "@/types/leave";
 import type { LeaveCalendarContext } from "@/lib/leave/services/leave-calendar-engine";
-
-type LeaveSummaryCard = {
-  key: string;
-  label: string;
-  value: string;
-  icon: LucideIcon;
-  tone: (typeof LEAVE_BALANCE_CARD_TONES)[(typeof LEAVE_BALANCE_DISPLAY_CODES)[number]];
-};
-
-function buildLeaveSummaryCards(balances: LeaveEmployeeBalanceSnapshot[]): LeaveSummaryCard[] {
-  const remainingByCode = new Map(
-    balances.map((row) => [row.leaveTypeCode, row] as const),
-  );
-
-  return LEAVE_BALANCE_DISPLAY_CODES.map((code) => {
-    const row = remainingByCode.get(code);
-    const used = row?.monthUsedDays ?? 0;
-    const total = row?.monthTotalDays ?? 0;
-    return {
-      key: code,
-      label: row?.leaveTypeName || LEAVE_BALANCE_DISPLAY_LABELS[code],
-      value: `${formatLeaveDayCount(used)} / ${formatLeaveDayCount(total)}`,
-      icon: CalendarDays,
-      tone: LEAVE_BALANCE_CARD_TONES[code],
-    };
-  });
-}
 
 type Props = {
   title?: string;
@@ -102,13 +68,17 @@ export function MyLeaveSelfServiceView({
   const [applyOpen, setApplyOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [viewPreview, setViewPreview] = useState<LeaveListItem | null>(null);
+  const [viewMode, setViewMode] = useState<"view" | "edit" | "delete">("view");
   const canOpenApplyDialog = canApply && employeeId && applyLeaveLookups;
 
-  const remainingCards = buildLeaveSummaryCards(balances);
-
-  function openLeavePopup(row: LeaveListItem) {
+  function openLeavePopup(row: LeaveListItem, mode: "view" | "delete" = "view") {
     setViewPreview(row);
+    setViewMode(mode);
     setViewOpen(true);
+  }
+
+  function canDeleteRow(row: LeaveListItem) {
+    return canDelete && row.leaveStatus === "pending";
   }
 
   const columns: DataTableColumn<LeaveListItem>[] = [
@@ -140,16 +110,28 @@ export function MyLeaveSelfServiceView({
       header: "",
       className: "w-[1%] whitespace-nowrap text-right",
       render: (row) => (
-        <div className="flex justify-end">
+        <div className="flex items-center justify-end gap-0.5">
           <Button
             type="button"
             variant="ghost"
             size="icon-sm"
             aria-label="View leave"
-            onClick={() => openLeavePopup(row)}
+            onClick={() => openLeavePopup(row, "view")}
           >
             <Eye className="size-4" />
           </Button>
+          {canDeleteRow(row) ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Delete leave request"
+              className="text-muted-foreground hover:text-destructive"
+              onClick={() => openLeavePopup(row, "delete")}
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          ) : null}
         </div>
       ),
     },
@@ -190,24 +172,8 @@ export function MyLeaveSelfServiceView({
         </div>
       ) : null}
 
-      {remainingCards.length > 0 ? (
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">
-            {format(new Date(calendarYear, calendarMonth - 1, 1), "MMMM yyyy")} · used this month / total
-          </p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {remainingCards.map((card) => (
-              <EmployeeStatCard
-                key={card.key}
-                label={card.label}
-                value={card.value}
-                icon={card.icon}
-                accent={card.tone.accent}
-                iconBg={card.tone.iconBg}
-              />
-            ))}
-          </div>
-        </div>
+      {balances.length > 0 ? (
+        <LeaveBalanceSummaryCards balances={balances} />
       ) : null}
 
       <EmployeeLeaveCalendar
@@ -219,13 +185,18 @@ export function MyLeaveSelfServiceView({
       />
 
       <section className="rounded-xl border bg-card p-4 shadow-sm">
-        <h2 className="mb-3 text-sm font-semibold tracking-tight">My Requests</h2>
+        <div className="mb-3">
+          <h2 className="text-sm font-semibold tracking-tight">My Requests</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Pending requests can be deleted if applied by mistake.
+          </p>
+        </div>
         <DataTable
           columns={columns}
           data={requests}
           emptyMessage="You haven't submitted any leave requests yet."
           scrollable
-          maxHeightClass={DATA_TABLE_SPLIT_SCROLL_MAX_HEIGHT}
+          maxHeightClass={DATA_TABLE_LEAVE_REQUESTS_MAX_HEIGHT}
         />
       </section>
 
@@ -233,9 +204,13 @@ export function MyLeaveSelfServiceView({
         leaveRequestId={viewPreview?.id ?? null}
         preview={viewPreview}
         open={viewOpen}
+        initialMode={viewMode}
         onOpenChange={(open) => {
           setViewOpen(open);
-          if (!open) setViewPreview(null);
+          if (!open) {
+            setViewPreview(null);
+            setViewMode("view");
+          }
         }}
         lookups={applyLeaveLookups}
         canEdit={canEdit}
@@ -247,9 +222,8 @@ export function MyLeaveSelfServiceView({
         <ApplyLeaveDialog
           open={applyOpen}
           onOpenChange={setApplyOpen}
-          lookups={applyLeaveLookups}
           employeeId={employeeId}
-          onSubmitted={() => router.refresh()}
+          lookups={applyLeaveLookups}
           balances={balances}
         />
       ) : null}

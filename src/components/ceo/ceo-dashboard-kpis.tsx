@@ -14,12 +14,22 @@ import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { formatCurrencyInr } from "@/lib/reports/services/reports-utils";
 import type { CeoKpis } from "@/types/ceo-dashboard";
 
-function formatPercent(value: number) {
-  return `${value.toFixed(value % 1 === 0 ? 0 : 1)}%`;
+function asNumber(value: number | null | undefined) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function formatPercent(value: number | null | undefined) {
+  const safe = asNumber(value);
+  return `${safe.toFixed(safe % 1 === 0 ? 0 : 1)}%`;
 }
 
 export function CeoDashboardKpis({ kpis }: { kpis: CeoKpis }) {
-  const totalPendingApprovals = kpis.pendingApprovals + kpis.pendingLeaveApprovals;
+  const attendancePercent = asNumber(kpis.attendancePercent);
+  const attritionRate = asNumber(kpis.attritionRate);
+  const pendingApprovals = asNumber(kpis.pendingApprovals);
+  const pendingLeaveApprovals = asNumber(kpis.pendingLeaveApprovals);
+  const totalPendingApprovals = pendingApprovals + pendingLeaveApprovals;
 
   return (
     <section
@@ -28,7 +38,7 @@ export function CeoDashboardKpis({ kpis }: { kpis: CeoKpis }) {
     >
       <EmployeeStatCard
         label="Employees"
-        value={String(kpis.totalEmployees)}
+        value={String(asNumber(kpis.totalEmployees))}
         icon={Users}
         accent="text-sky-600 dark:text-sky-400"
         iconBg="bg-sky-500/10"
@@ -36,27 +46,27 @@ export function CeoDashboardKpis({ kpis }: { kpis: CeoKpis }) {
       />
       <EmployeeStatCard
         label="Attendance"
-        value={formatPercent(kpis.attendancePercent)}
+        value={formatPercent(attendancePercent)}
         icon={CalendarCheck}
         accent={
-          kpis.attendancePercent < 85
+          attendancePercent < 85
             ? "text-destructive"
             : "text-emerald-600 dark:text-emerald-400"
         }
-        iconBg={kpis.attendancePercent < 85 ? "bg-destructive/10" : "bg-emerald-500/10"}
+        iconBg={attendancePercent < 85 ? "bg-destructive/10" : "bg-emerald-500/10"}
         href={CEO_ROUTES.attendance}
       />
       <EmployeeStatCard
         label="Attrition"
-        value={formatPercent(kpis.attritionRate)}
+        value={formatPercent(attritionRate)}
         icon={TrendingDown}
-        accent={kpis.attritionRate >= 5 ? "text-destructive" : "text-foreground"}
-        iconBg={kpis.attritionRate >= 5 ? "bg-destructive/10" : "bg-muted"}
+        accent={attritionRate >= 5 ? "text-destructive" : "text-foreground"}
+        iconBg={attritionRate >= 5 ? "bg-destructive/10" : "bg-muted"}
         href={CEO_ROUTES.organization}
       />
       <EmployeeStatCard
         label="Open Roles"
-        value={String(kpis.openPositions)}
+        value={String(asNumber(kpis.openPositions))}
         icon={BriefcaseBusiness}
         accent="text-indigo-600 dark:text-indigo-400"
         iconBg="bg-indigo-500/10"
@@ -73,12 +83,12 @@ export function CeoDashboardKpis({ kpis }: { kpis: CeoKpis }) {
         }
         iconBg={totalPendingApprovals > 0 ? "bg-violet-500/10" : "bg-muted"}
         href={
-          kpis.pendingLeaveApprovals > 0 ? CEO_ROUTES.approvalsLeave : CEO_ROUTES.approvals
+          pendingLeaveApprovals > 0 ? CEO_ROUTES.approvalsLeave : CEO_ROUTES.approvals
         }
       />
       <EmployeeStatCard
         label="Payroll Cost"
-        value={formatCurrencyInr(kpis.payrollCost)}
+        value={formatCurrencyInr(asNumber(kpis.payrollCost))}
         icon={Wallet}
         accent="text-amber-700 dark:text-amber-400"
         iconBg="bg-amber-500/10"

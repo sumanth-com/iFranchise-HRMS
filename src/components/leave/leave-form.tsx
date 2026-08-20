@@ -40,6 +40,38 @@ import {
 } from "@/lib/validations/leave";
 import type { LeaveApplyContext, LeaveListItem, LeaveLookups } from "@/types/leave";
 
+function explainLeaveSubmitError(message: string): {
+  title: string;
+  body: string;
+  hint?: string;
+} {
+  const normalized = message.toLowerCase();
+  if (normalized.includes("overlap")) {
+    return {
+      title: "These dates already have leave",
+      body: "You already have a pending or approved leave on one or more of these dates.",
+      hint: "Choose different dates, or cancel the existing request first, then try again.",
+    };
+  }
+  if (normalized.includes("balance") || normalized.includes("exceed")) {
+    return {
+      title: "Not enough leave balance",
+      body: message,
+      hint: "Shorten the leave period or pick another leave type with available days.",
+    };
+  }
+  if (normalized.includes("notice") || normalized.includes("tomorrow")) {
+    return {
+      title: "Advance notice required",
+      body: message,
+    };
+  }
+  return {
+    title: "Please check your leave details",
+    body: message,
+  };
+}
+
 type LeaveFormProps = {
   lookups: LeaveLookups;
   defaultEmployeeId?: string;
@@ -83,6 +115,7 @@ export function LeaveForm({
 
   const [applyContext, setApplyContext] = useState<LeaveApplyContext | null>(initialApplyContext);
   const [balancesLoading, setBalancesLoading] = useState(!initialApplyContext && initialBalances.length === 0);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const employeeItems = lookups.employees.map((employee) => ({
     value: employee.id,
@@ -143,6 +176,8 @@ export function LeaveForm({
   const earliestStart = earliestAllowedLeaveStart(
     selectedLeaveTypeCode,
     applyContext?.notice,
+    undefined,
+    { isHalfDay },
   );
   const startMin =
     isEdit && initialRequest?.startDate && initialRequest.startDate < today
@@ -151,6 +186,7 @@ export function LeaveForm({
 
   useEffect(() => {
     if (!startDate) return;
+    // When half-day is enabled, today is allowed — do not push the user forward.
     const nextStart = startDate < startMin ? startMin : startDate;
     if (nextStart !== startDate) {
       form.setValue("startDate", nextStart, { shouldValidate: true });
@@ -160,6 +196,34 @@ export function LeaveForm({
       form.setValue("endDate", nextEnd, { shouldValidate: true });
     }
   }, [endDate, form, startDate, startMin]);
+
+  function applyHalfDayToggle(checked: boolean) {
+    form.setValue("isHalfDay", checked, { shouldValidate: true });
+    if (checked) {
+      // Half-day leave may start today (no advance-notice lock).
+      const sameDayStart = earliestAllowedLeaveStart(
+        selectedLeaveTypeCode || CASUAL_LEAVE_CODE,
+        applyContext?.notice,
+        undefined,
+        { isHalfDay: true },
+      );
+      form.setValue("startDate", sameDayStart, { shouldValidate: true });
+      form.setValue("endDate", sameDayStart, { shouldValidate: true });
+      return;
+    }
+    form.setValue("halfDayPeriod", "", { shouldValidate: true });
+    const nextStart = earliestAllowedLeaveStart(
+      selectedLeaveTypeCode || CASUAL_LEAVE_CODE,
+      applyContext?.notice,
+      undefined,
+      { isHalfDay: false },
+    );
+    const currentStart = form.getValues("startDate");
+    if (!currentStart || currentStart < nextStart) {
+      form.setValue("startDate", nextStart, { shouldValidate: true });
+      form.setValue("endDate", nextStart, { shouldValidate: true });
+    }
+  }
 
   useEffect(() => {
     if (!selectedEmployeeId) {
@@ -192,14 +256,27 @@ export function LeaveForm({
     };
   }, [selectedEmployeeId, initialApplyContext, initialBalances.length]);
 
+  const isSelfService = variant === "self";
+  const showErrorsInForm = isSelfService || Boolean(onCancel);
+
+  useEffect(() => {
+    setSubmitError(null);
+  }, [selectedLeaveTypeId, startDate, endDate, isHalfDay]);
+
   const onSubmit = form.handleSubmit((values) => {
+    setSubmitError(null);
     startTransition(async () => {
       const result = isEdit
         ? await updateLeaveRequestAction(initialRequest!.id, values)
         : await createLeaveRequestAction(values);
 
       if (!result.success) {
-        toast.error(result.message);
+        // Dialog / self-service modal: keep the error inside the popup (no toast).
+        if (showErrorsInForm) {
+          setSubmitError(result.message);
+        } else {
+          toast.error(result.message);
+        }
         return;
       }
 
@@ -228,7 +305,6 @@ export function LeaveForm({
     });
   });
 
-  const isSelfService = variant === "self";
   const applyPreview =
     applyContext && selectedLeaveTypeId && startDate && endDate
       ? previewLeaveApplication({
@@ -240,6 +316,7 @@ export function LeaveForm({
         })
       : null;
   const policyBlocksSubmit = Boolean(applyPreview?.issues.length);
+  const submitErrorCopy = submitError ? explainLeaveSubmitError(submitError) : null;
 
   return (
     <form onSubmit={onSubmit} className={cn("space-y-3", isSelfService && "space-y-2.5")}>
@@ -392,9 +469,28 @@ export function LeaveForm({
           )
         ) : null}
 
+        <div className={cn("flex flex-col justify-end gap-1", isSelfService ? "lg:col-span-1" : "md:col-span-2")}>
+          <label className="flex h-9 items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="size-4 rounded border"
+              disabled={isPending}
+              checked={isHalfDay}
+              onChange={(event) => applyHalfDayToggle(event.currentTarget.checked)}
+            />
+            Half day leave
+          </label>
+          {isHalfDay ? (
+            <p className="text-[11px] leading-snug text-muted-foreground">
+              Half day can be applied for today.
+            </p>
+          ) : null}
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="startDate">Start Date</Label>
           <Input
+            key={`start-${startMin}-${isHalfDay ? "half" : "full"}`}
             id="startDate"
             type="date"
             disabled={isPending}
@@ -411,6 +507,7 @@ export function LeaveForm({
         <div className="space-y-2">
           <Label htmlFor="endDate">End Date</Label>
           <Input
+            key={`end-${startMin}-${isHalfDay ? "half" : "full"}`}
             id="endDate"
             type="date"
             disabled={isPending || isHalfDay}
@@ -422,28 +519,6 @@ export function LeaveForm({
               {form.formState.errors.endDate.message}
             </p>
           ) : null}
-        </div>
-
-        <div className={cn("flex items-end pb-2", isSelfService ? "lg:col-span-1" : "md:col-span-2")}>
-          <label className="flex h-9 items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="size-4 rounded border"
-              disabled={isPending}
-              checked={isHalfDay}
-              onChange={(event) => {
-                const checked = event.currentTarget.checked;
-                form.setValue("isHalfDay", checked, { shouldValidate: true });
-                if (checked) {
-                  const startDate = form.getValues("startDate");
-                  form.setValue("endDate", startDate, { shouldValidate: true });
-                } else {
-                  form.setValue("halfDayPeriod", "", { shouldValidate: true });
-                }
-              }}
-            />
-            Half day leave
-          </label>
         </div>
 
         {applyContext && selectedLeaveTypeId && startDate && endDate ? (
@@ -539,28 +614,51 @@ export function LeaveForm({
         ) : null}
       </div>
 
-      <div className={cn("flex items-center justify-end gap-2 border-t", isSelfService ? "pt-2.5" : "pt-3")}>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={isPending}
-          onClick={() => {
-            if (onCancel) {
-              onCancel();
-              return;
-            }
-            router.push(redirectPath ?? LEAVE_ROUTES.list);
-          }}
-        >
-          Cancel
-        </Button>
-        <Button type="submit" disabled={isPending || policyBlocksSubmit}>
-          {isEdit
-            ? "Save changes"
-            : isSelfService
-              ? "Submit request"
-              : "Submit leave request"}
-        </Button>
+      <div className={cn("space-y-2 border-t", isSelfService ? "pt-2.5" : "pt-3")}>
+        {submitErrorCopy ? (
+          <div
+            role="status"
+            className="flex gap-2.5 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2.5"
+          >
+            <Info className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-300" />
+            <div className="min-w-0 space-y-1">
+              <p className="text-sm font-medium text-amber-950 dark:text-amber-100">
+                {submitErrorCopy.title}
+              </p>
+              <p className="text-xs leading-relaxed text-amber-900/90 dark:text-amber-100/80">
+                {submitErrorCopy.body}
+              </p>
+              {submitErrorCopy.hint ? (
+                <p className="text-xs leading-relaxed text-amber-900/75 dark:text-amber-100/65">
+                  {submitErrorCopy.hint}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isPending}
+            onClick={() => {
+              if (onCancel) {
+                onCancel();
+                return;
+              }
+              router.push(redirectPath ?? LEAVE_ROUTES.list);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button type="submit" disabled={isPending || policyBlocksSubmit}>
+            {isEdit
+              ? "Save changes"
+              : isSelfService
+                ? "Submit request"
+                : "Submit leave request"}
+          </Button>
+        </div>
       </div>
     </form>
   );

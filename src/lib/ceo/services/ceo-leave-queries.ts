@@ -32,7 +32,9 @@ import {
   getLeaveCalendarData,
   getLeaveLookups,
   ensurePendingHrLeaveAssignedToCeo,
+  getEmployeeRoleCodes,
   isCeoLeaveApprover,
+  isHrLeaveApplicant,
 } from "@/lib/leave/services/leave-queries";
 import { getLeaveRequestById } from "@/lib/leave/services/leave-detail";
 
@@ -803,6 +805,8 @@ export async function getCeoLeaveDetail(
   if (!detail) return null;
 
   const balances = await getEmployeeLeaveBalanceSnapshot(supabase, detail.employeeId);
+  const applicantRoles = await getEmployeeRoleCodes(supabase, detail.employeeId);
+  const hrDirectToCeo = isHrLeaveApplicant(applicantRoles);
 
   const activeLevel = detail.approvals
     .filter((a) => a.approvalStatus === "pending")
@@ -836,6 +840,7 @@ export async function getCeoLeaveDetail(
     approvals: detail.approvals,
     balances,
     canAct,
+    hrDirectToCeo,
   };
 }
 

@@ -44,9 +44,9 @@ export function HrDashboard({ data, error }: Props) {
             },
             {
               id: "probation-ending",
-              label: "Probation ending",
+              label: "On probation",
               value: data.secondary.probationEndingSoon,
-              hint: "Confirm soon",
+              hint: "Review status",
               href: `${EMPLOYEE_ROUTES.list}?employmentStatus=probation`,
             },
           ]}

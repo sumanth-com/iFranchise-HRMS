@@ -211,9 +211,16 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
   const monthStart = format(startOfMonth(now), "yyyy-MM-dd");
   const yesterday = format(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1), "yyyy-MM-dd");
 
-  await syncExecutiveApprovalsFromDomain(supabase, profile);
+  await syncExecutiveApprovalsFromDomain(supabase, profile).catch((error) => {
+    console.error("[ceo-dashboard] executive approval sync failed", error);
+  });
 
-  const leaveApprovalQueue = await listCeoApprovalQueue(supabase, profile);
+  const leaveApprovalQueue = await listCeoApprovalQueue(supabase, profile).catch(
+    (error) => {
+      console.error("[ceo-dashboard] leave approval queue failed", error);
+      return [] as Awaited<ReturnType<typeof listCeoApprovalQueue>>;
+    },
+  );
 
   const [
     yesterdayAttendance,
@@ -231,12 +238,113 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
     auditRes,
     kpiCompletionRes,
   ] = await Promise.all([
-    getAttendanceSummary(supabase, profile, yesterday, yesterday),
-    getLeaveSummary(supabase, profile),
-    getPayrollSummary(supabase, profile),
-    getPerformanceSummary(supabase, profile),
-    getRecruitmentSummary(supabase, profile),
-    getExitSummary(supabase, profile),
+    getAttendanceSummary(supabase, profile, yesterday, yesterday).catch((error) => {
+      console.error("[ceo-dashboard] yesterday attendance failed", error);
+      return {
+        date: yesterday,
+        presentToday: 0,
+        absentToday: 0,
+        lateToday: 0,
+        halfDayToday: 0,
+        onLeaveToday: 0,
+        totalEmployees: 0,
+      };
+    }),
+    getLeaveSummary(supabase, profile).catch((error) => {
+      console.error("[ceo-dashboard] leave summary failed", error);
+      return {
+        pendingRequests: 0,
+        approvedThisMonth: 0,
+        rejectedThisMonth: 0,
+        employeesOnLeaveToday: 0,
+        balanceUtilizationPercent: 0,
+        upcomingPlannedLeaves: 0,
+      };
+    }),
+    getPayrollSummary(supabase, profile).catch((error) => {
+      console.error("[ceo-dashboard] payroll summary failed", error);
+      return {
+        totalPayroll: 0,
+        employeesProcessed: 0,
+        pendingPayroll: 0,
+        grossPayroll: 0,
+        totalDeductions: 0,
+        netPayroll: 0,
+        monthlyOverview: [],
+      };
+    }),
+    getPerformanceSummary(supabase, profile).catch((error) => {
+      console.error("[ceo-dashboard] performance summary failed", error);
+      return {
+        activeGoals: 0,
+        completedGoals: 0,
+        goalCompletionRate: 0,
+        pendingReviews: 0,
+        completedReviews: 0,
+        averageRating: 0,
+        promotionReady: 0,
+        feedbackCount: 0,
+        upcomingMeetings: 0,
+        departmentPerformance: [],
+        reviewStatusBreakdown: [],
+        goalProgressByMonth: [],
+        activeKpis: 0,
+        completedKpis: 0,
+        overdueKpis: 0,
+        averageKpiCompletion: 0,
+        topPerformingDepartment: null,
+        employeesNeedingKpiReview: 0,
+        kpiDepartmentPerformance: [],
+      };
+    }),
+    getRecruitmentSummary(supabase, profile).catch((error) => {
+      console.error("[ceo-dashboard] recruitment summary failed", error);
+      return {
+        openPositions: 0,
+        activeCandidates: 0,
+        interviewsToday: 0,
+        offersPending: 0,
+        offersAccepted: 0,
+        hiresThisMonth: 0,
+        averageHiringTimeDays: 0,
+        pendingOfferCount: 0,
+        candidatesByStage: [],
+        candidateSources: [],
+        hiringByDepartment: [],
+        upcomingInterviews: [],
+        recentActivity: [],
+        openJobSnapshots: [],
+        interviewTracks: [],
+        overview: {
+          hours: [],
+          week: [],
+          month: [],
+          thisMonth: 0,
+          lastMonth: 0,
+          thisWeek: 0,
+          lastWeek: 0,
+          thisHours: 0,
+          lastHours: 0,
+          maxThisMonth: 0,
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    }),
+    getExitSummary(supabase, profile).catch((error) => {
+      console.error("[ceo-dashboard] exit summary failed", error);
+      return {
+        pendingResignations: 0,
+        noticePeriod: 0,
+        pendingClearance: 0,
+        assetsPendingReturn: 0,
+        settlementsPending: 0,
+        leavingThisMonth: 0,
+        exitByDepartment: [],
+        monthlyAttrition: [],
+        exitReasons: [],
+        recentActivities: [],
+      };
+    }),
     fromHrms(supabase, "employees")
       .select(
         "id, employment_status, date_of_joining, date_of_leaving, department_id, reporting_manager_id, departments:department_id(id, name)",
@@ -290,6 +398,34 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
 
   if (employeesRes.error) throw new Error(employeesRes.error.message);
   if (departmentsRes.error) throw new Error(departmentsRes.error.message);
+  // Non-critical panels degrade instead of blanking the executive home.
+  if (managersRes.error) {
+    console.error("[ceo-dashboard] managers query failed", managersRes.error.message);
+  }
+  if (attendanceTodayRes.error) {
+    console.error(
+      "[ceo-dashboard] attendance today query failed",
+      attendanceTodayRes.error.message,
+    );
+  }
+  if (attendanceTrendRes.error) {
+    console.error(
+      "[ceo-dashboard] attendance trend query failed",
+      attendanceTrendRes.error.message,
+    );
+  }
+  if (executiveApprovalsRes.error) {
+    console.error(
+      "[ceo-dashboard] executive approvals query failed",
+      executiveApprovalsRes.error.message,
+    );
+  }
+  if (auditRes.error) {
+    console.error("[ceo-dashboard] audit query failed", auditRes.error.message);
+  }
+  if (kpiCompletionRes.error) {
+    console.error("[ceo-dashboard] kpi query failed", kpiCompletionRes.error.message);
+  }
 
   const empRows = (employeesRes.data ?? []) as LooseRow[];
   const deptRows = (departmentsRes.data ?? []) as LooseRow[];
@@ -428,11 +564,11 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
   const benefitsCost = Math.round((payroll.totalDeductions || 0) * 100) / 100;
 
   if (executiveApprovalsRes.error) {
-    throw new Error(executiveApprovalsRes.error.message);
+    // Already logged above — continue with an empty approvals strip.
   }
 
   const approvals: CeoApprovalItem[] = (
-    (executiveApprovalsRes.data ?? []) as LooseRow[]
+    (executiveApprovalsRes.error ? [] : executiveApprovalsRes.data ?? []) as LooseRow[]
   ).map((row) => {
     const approvalType = row.approval_type as ExecutiveApprovalType;
     const priority =

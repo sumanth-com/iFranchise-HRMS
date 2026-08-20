@@ -39,6 +39,11 @@ export function ManagerRegularizationDialog({
   function submit() {
     if (!row) return;
 
+    if (reason.trim().length < 5) {
+      toast.error("Reason is required (at least 5 characters).");
+      return;
+    }
+
     startTransition(async () => {
       const result = await requestManagerAttendanceRegularizationAction({
         attendanceId: row.id ?? undefined,
@@ -95,8 +100,11 @@ export function ManagerRegularizationDialog({
           </label>
         </div>
         <label className="block space-y-1.5 text-sm">
-          <span className="font-medium">Reason</span>
+          <span className="font-medium">
+            Reason <span className="text-destructive">*</span>
+          </span>
           <textarea
+            required
             className="min-h-24 w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             value={reason}
             onChange={(event) => setReason(event.target.value)}

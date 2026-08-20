@@ -122,6 +122,8 @@ export type CeoLeaveDetail = {
   balances: LeaveEmployeeBalanceSnapshot[];
   /** True only when this leave is a pending approval assigned to the CEO. */
   canAct: boolean;
+  /** HR / Super Admin leave goes straight to CEO (no manager stage). */
+  hrDirectToCeo: boolean;
 };
 
 export type CeoLeaveModuleData = {

@@ -21,7 +21,7 @@ import {
   approveCeoLeaveAction,
   rejectCeoLeaveAction,
 } from "@/lib/ceo/actions/ceo-leave-actions";
-import { APPROVAL_LEVEL_LABELS } from "@/lib/leave/constants";
+import { leaveApprovalStageLabel } from "@/lib/leave/constants";
 import { formatHalfDayPeriod } from "@/lib/leave/services/leave-utils";
 import type { CeoApprovalQueueItem, CeoForwardTarget } from "@/types/ceo-leave";
 
@@ -44,6 +44,13 @@ function durationLabel(item: CeoApprovalQueueItem) {
   return `${item.totalDays} day${item.totalDays === 1 ? "" : "s"}`;
 }
 
+function dateRangeLabel(item: CeoApprovalQueueItem) {
+  if (item.startDate === item.endDate) {
+    return format(parseISO(item.startDate), "dd MMM yyyy");
+  }
+  return `${format(parseISO(item.startDate), "dd MMM yyyy")} – ${format(parseISO(item.endDate), "dd MMM yyyy")}`;
+}
+
 export function CeoLeaveApprovalQueue({
   items,
   forwardTargets,
@@ -56,13 +63,11 @@ export function CeoLeaveApprovalQueue({
     type: "approve" | "reject";
   } | null>(null);
   const [forwardItem, setForwardItem] = useState<CeoApprovalQueueItem | null>(null);
-  const [approveComments, setApproveComments] = useState("");
   const [rejectComments, setRejectComments] = useState("");
   const [isActing, startActing] = useTransition();
 
   const closeModal = () => {
     setTarget(null);
-    setApproveComments("");
     setRejectComments("");
   };
 
@@ -71,7 +76,6 @@ export function CeoLeaveApprovalQueue({
     startActing(async () => {
       const result = await approveCeoLeaveAction({
         leaveRequestId: target.item.id,
-        comments: approveComments || undefined,
       });
       if (!result.success) {
         toast.error(result.message);
@@ -142,12 +146,9 @@ export function CeoLeaveApprovalQueue({
     {
       key: "stage",
       header: "Current Stage",
-      render: (row) => (
-        <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
-          {row.currentApprovalLevel
-            ? (APPROVAL_LEVEL_LABELS[row.currentApprovalLevel] ??
-              `Level ${row.currentApprovalLevel}`)
-            : "Pending"}
+      render: () => (
+        <span className="inline-flex items-center rounded-full bg-violet-500/10 px-2.5 py-0.5 text-xs font-medium text-violet-700 dark:text-violet-300">
+          {leaveApprovalStageLabel(null, { awaitingCeo: true })}
         </span>
       ),
     },
@@ -208,7 +209,7 @@ export function CeoLeaveApprovalQueue({
   return (
     <LeavePanel
       title="CEO Approval Queue"
-      description="Leave requests routed to you for executive approval."
+      description="Leave requests routed to you for executive approval. HR leave comes here directly — managers cannot approve it."
       count={items.length}
     >
       <DataTable
@@ -222,27 +223,34 @@ export function CeoLeaveApprovalQueue({
       <Modal
         open={target?.type === "approve"}
         onOpenChange={(open) => (open ? undefined : closeModal())}
-        title="Approve leave request"
+        title="Confirm approval"
         description={
-          target ? `Approve leave for ${target.item.employeeName}?` : undefined
+          target
+            ? `Approve ${target.item.leaveTypeName || "leave"} for ${target.item.employeeName}? This will mark the request as approved.`
+            : undefined
         }
         footer={
           <Button disabled={isActing} onClick={handleApprove}>
-            Approve
+            Confirm & Approve
           </Button>
         }
       >
-        <div className="space-y-2">
-          <Label htmlFor="queueApproveComments">Comments (optional)</Label>
-          <textarea
-            id="queueApproveComments"
-            rows={3}
-            value={approveComments}
-            disabled={isActing}
-            className="flex min-h-16 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-            onChange={(event) => setApproveComments(event.currentTarget.value)}
-          />
-        </div>
+        {target ? (
+          <div className="rounded-lg border bg-muted/20 px-3 py-2.5 text-sm">
+            <p>
+              <span className="text-muted-foreground">Employee: </span>
+              {target.item.employeeName}
+            </p>
+            <p className="mt-1">
+              <span className="text-muted-foreground">Leave: </span>
+              {target.item.leaveTypeName || "—"} · {durationLabel(target.item)}
+            </p>
+            <p className="mt-1">
+              <span className="text-muted-foreground">Dates: </span>
+              {dateRangeLabel(target.item)}
+            </p>
+          </div>
+        ) : null}
       </Modal>
 
       <Modal
