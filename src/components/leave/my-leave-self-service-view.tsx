@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { format } from "date-fns";
-import { CalendarDays, CalendarPlus, Eye, FileText, type LucideIcon } from "lucide-react";
+import { CalendarPlus, Eye, FileText } from "lucide-react";
 
 import { Button, buttonVariants } from "@/components/common/button";
 import {
@@ -12,17 +11,11 @@ import {
   DATA_TABLE_SPLIT_SCROLL_MAX_HEIGHT,
   type DataTableColumn,
 } from "@/components/common/data-table";
-import { EmployeeStatCard } from "@/components/employee/dashboard/employee-module-primitives";
 import { EmployeeLeaveCalendar } from "@/components/employee/leave/employee-leave-calendar";
 import { ApplyLeaveDialog } from "@/components/leave/apply-leave-dialog";
+import { LeaveBalanceSummaryCards } from "@/components/leave/leave-balance-summary-cards";
 import { LeaveStatusBadge } from "@/components/leave/leave-status-badge";
 import { MyLeaveDetailPopup } from "@/components/leave/my-leave-detail-popup";
-import {
-  LEAVE_BALANCE_CARD_TONES,
-  LEAVE_BALANCE_DISPLAY_CODES,
-  LEAVE_BALANCE_DISPLAY_LABELS,
-} from "@/lib/leave/constants";
-import { formatLeaveDayCount } from "@/lib/leave/services/leave-usage";
 import { formatLeaveDate } from "@/lib/leave/services/leave-utils";
 import { cn } from "@/lib/utils";
 import type {
@@ -33,33 +26,6 @@ import type {
   LeaveLookups,
 } from "@/types/leave";
 import type { LeaveCalendarContext } from "@/lib/leave/services/leave-calendar-engine";
-
-type LeaveSummaryCard = {
-  key: string;
-  label: string;
-  value: string;
-  icon: LucideIcon;
-  tone: (typeof LEAVE_BALANCE_CARD_TONES)[(typeof LEAVE_BALANCE_DISPLAY_CODES)[number]];
-};
-
-function buildLeaveSummaryCards(balances: LeaveEmployeeBalanceSnapshot[]): LeaveSummaryCard[] {
-  const remainingByCode = new Map(
-    balances.map((row) => [row.leaveTypeCode, row] as const),
-  );
-
-  return LEAVE_BALANCE_DISPLAY_CODES.map((code) => {
-    const row = remainingByCode.get(code);
-    const used = row?.monthUsedDays ?? 0;
-    const total = row?.monthTotalDays ?? 0;
-    return {
-      key: code,
-      label: row?.leaveTypeName || LEAVE_BALANCE_DISPLAY_LABELS[code],
-      value: `${formatLeaveDayCount(used)} / ${formatLeaveDayCount(total)}`,
-      icon: CalendarDays,
-      tone: LEAVE_BALANCE_CARD_TONES[code],
-    };
-  });
-}
 
 type Props = {
   title?: string;
@@ -103,8 +69,6 @@ export function MyLeaveSelfServiceView({
   const [viewOpen, setViewOpen] = useState(false);
   const [viewPreview, setViewPreview] = useState<LeaveListItem | null>(null);
   const canOpenApplyDialog = canApply && employeeId && applyLeaveLookups;
-
-  const remainingCards = buildLeaveSummaryCards(balances);
 
   function openLeavePopup(row: LeaveListItem) {
     setViewPreview(row);
@@ -190,24 +154,8 @@ export function MyLeaveSelfServiceView({
         </div>
       ) : null}
 
-      {remainingCards.length > 0 ? (
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">
-            {format(new Date(calendarYear, calendarMonth - 1, 1), "MMMM yyyy")} · used this month / total
-          </p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {remainingCards.map((card) => (
-              <EmployeeStatCard
-                key={card.key}
-                label={card.label}
-                value={card.value}
-                icon={card.icon}
-                accent={card.tone.accent}
-                iconBg={card.tone.iconBg}
-              />
-            ))}
-          </div>
-        </div>
+      {balances.length > 0 ? (
+        <LeaveBalanceSummaryCards balances={balances} />
       ) : null}
 
       <EmployeeLeaveCalendar
@@ -247,9 +195,8 @@ export function MyLeaveSelfServiceView({
         <ApplyLeaveDialog
           open={applyOpen}
           onOpenChange={setApplyOpen}
-          lookups={applyLeaveLookups}
           employeeId={employeeId}
-          onSubmitted={() => router.refresh()}
+          lookups={applyLeaveLookups}
           balances={balances}
         />
       ) : null}

@@ -196,7 +196,20 @@ export function AttendanceTodayPunchCard({
         return;
       }
       setDialog(null);
+
+      // Good-night farewell only after official end of day (7:00 PM).
+      if (isBeforeOfficeEnd()) {
+        toast.success("Checked out successfully");
+        refreshAfterSuccess();
+        return;
+      }
+
       const farewell = buildCheckOutFarewell(firstName);
+      if (!farewell) {
+        toast.success("Checked out successfully");
+        refreshAfterSuccess();
+        return;
+      }
       setDialog({
         kind: "check_out",
         title: farewell.title,

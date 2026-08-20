@@ -83,8 +83,6 @@ export function ManagerProfileHistoryTable({
     return Array.from({ length: 6 }, (_, index) => current - 2 + index);
   }, []);
 
-  const totalPages = Math.max(1, Math.ceil(history.total / history.pageSize));
-
   function updateCheckout(row: ManagerAttendanceHistoryRow) {
     startTransition(async () => {
       const result = await updateManagerCheckoutAction({
@@ -302,48 +300,11 @@ export function ManagerProfileHistoryTable({
         </table>
       </div>
 
-      <div className="flex items-center justify-between border-t px-5 py-3 text-sm text-muted-foreground">
+      <div className="border-t px-5 py-3 text-sm text-muted-foreground">
         <p>
-          Showing {history.data.length} of {history.total} day(s) for{" "}
+          Showing {history.data.length} day(s) for{" "}
           {format(new Date(year, month - 1, 1), "MMMM yyyy")}
         </p>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={history.page <= 1}
-            onClick={() =>
-              onFilterChange({
-                month,
-                year,
-                status,
-                searchDate,
-                page: history.page - 1,
-              })
-            }
-          >
-            Previous
-          </Button>
-          <span>
-            Page {history.page} / {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={history.page >= totalPages}
-            onClick={() =>
-              onFilterChange({
-                month,
-                year,
-                status,
-                searchDate,
-                page: history.page + 1,
-              })
-            }
-          >
-            Next
-          </Button>
-        </div>
       </div>
 
       <Modal

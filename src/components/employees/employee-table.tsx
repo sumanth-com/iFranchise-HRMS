@@ -155,10 +155,12 @@ export function EmployeeTable({
   const employmentStatusItems = useMemo(
     () => [
       { value: "", label: "All statuses" },
-      ...Object.entries(EMPLOYMENT_STATUS_LABELS).map(([value, label]) => ({
-        value,
-        label,
-      })),
+      ...Object.entries(EMPLOYMENT_STATUS_LABELS)
+        .filter(([value]) => value !== "on_leave")
+        .map(([value, label]) => ({
+          value,
+          label,
+        })),
     ],
     [],
   );

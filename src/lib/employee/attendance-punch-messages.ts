@@ -63,15 +63,12 @@ export function buildEarlyCheckOutConfirm(firstName: string) {
 
 export function buildCheckOutFarewell(firstName: string, now = new Date()) {
   const name = firstName.trim() || "there";
-  const afterHours = !isBeforeOfficeEnd(now);
-  if (afterHours) {
-    return {
-      title: `Thank you, ${name}!`,
-      body: "Thanks for your dedication today. Good night — rest well and see you tomorrow.",
-    };
+  // Only used after office end — callers should skip the dialog before 7:00 PM.
+  if (isBeforeOfficeEnd(now)) {
+    return null;
   }
   return {
-    title: `Take care, ${name}`,
-    body: "Your check-out is recorded. We hope the rest of your day goes well. See you tomorrow.",
+    title: `Thank you, ${name}!`,
+    body: "Thanks for your dedication today. Good night — rest well and see you tomorrow.",
   };
 }

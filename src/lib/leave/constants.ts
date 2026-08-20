@@ -94,7 +94,7 @@ export const LEAVE_BALANCE_DISPLAY_LABELS: Record<
   CL: "Casual Leave",
   SL: "Sick Leave",
   EL: "Earned Leave",
-  PL: "Period Leave",
+  PL: "Menstruation Leave",
 };
 
 export const LEAVE_BALANCE_CARD_TONES: Record<

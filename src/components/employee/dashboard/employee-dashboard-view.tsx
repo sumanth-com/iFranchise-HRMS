@@ -5,12 +5,14 @@ import { DailyBoostCard } from "@/components/dashboard/daily-boost-card";
 import { EmployeeDashboardHeader } from "@/components/employee/dashboard/employee-dashboard-header";
 import { EmployeeDashboardKpiCards } from "@/components/employee/dashboard/employee-dashboard-kpis";
 import { EmployeeUpcomingEvents } from "@/components/employee/dashboard/employee-upcoming-events";
+import { LeaveBalanceSummaryCards } from "@/components/leave/leave-balance-summary-cards";
 import type { EmployeeDashboardData } from "@/types/employee-dashboard";
 
 export function EmployeeDashboardView({
   greeting,
   today,
   kpis,
+  leaveBalances,
   referenceDate,
   upcomingHolidays,
   subtitle,
@@ -22,8 +24,11 @@ export function EmployeeDashboardView({
           <EmployeeDashboardHeader greeting={greeting} subtitle={subtitle} />
         </div>
 
-        <div className="shrink-0">
-          <EmployeeDashboardKpiCards kpis={kpis} />
+        <div className="shrink-0 space-y-3">
+          <EmployeeDashboardKpiCards kpis={kpis} hideLeaveBalance />
+          {leaveBalances.length > 0 ? (
+            <LeaveBalanceSummaryCards balances={leaveBalances} />
+          ) : null}
         </div>
 
         <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[3fr_2fr] lg:items-stretch lg:overflow-hidden">

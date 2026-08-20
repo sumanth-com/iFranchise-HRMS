@@ -193,14 +193,14 @@ export function validateLeavePolicy(input: {
       if (probationRules.periodLeaveFemaleOnly && !isFemale) {
         issues.push({
           code: "pl_gender",
-          message: "Period Leave is available to female employees only.",
+          message: "Menstruation Leave is available to female employees only.",
         });
       }
       const used = input.employee.usedAndPendingByType[PERIOD_LEAVE_CODE] ?? 0;
       if (used + input.duration.totalLeaveDays > probationRules.periodLeaveCap) {
         issues.push({
           code: "pl_cap",
-          message: `You can take ${probationRules.periodLeaveCap} Period Leave day during probation.`,
+          message: `You can take ${probationRules.periodLeaveCap} Menstruation Leave day during probation.`,
         });
       }
     } else if (isCl) {
@@ -214,13 +214,13 @@ export function validateLeavePolicy(input: {
     } else if (code !== LOSS_OF_PAY_CODE) {
       issues.push({
         code: "probation_type",
-        message: "During probation you can apply Casual Leave or Period Leave only.",
+        message: "During probation you can apply Casual Leave or Menstruation Leave only.",
       });
     }
   } else if (isPl && probationRules.periodLeaveFemaleOnly && !isFemale) {
     issues.push({
       code: "pl_gender",
-      message: "Period Leave is available to female employees only.",
+      message: "Menstruation Leave is available to female employees only.",
     });
   }
 
@@ -230,14 +230,14 @@ export function validateLeavePolicy(input: {
       if (input.startDate < today) {
         issues.push({
           code: "pl_past",
-          message: "Period Leave must be communicated to HR on the same day.",
+          message: "Menstruation Leave must be communicated to HR on the same day.",
         });
       } else if (input.startDate === today) {
         const endMs = zonedDateMs(input.startDate, notice.officeEnd);
         if (now.getTime() > endMs) {
           issues.push({
             code: "pl_same_day",
-            message: "Period Leave must be communicated to HR before the end of the working day.",
+            message: "Menstruation Leave must be communicated to HR before the end of the working day.",
           });
         }
       }

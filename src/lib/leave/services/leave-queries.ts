@@ -704,7 +704,7 @@ export async function getEmployeeLeaveBalanceSnapshot(
     const balance = balanceByCode.get(code);
     const type = typeByCode.get(code);
     const daysPerYear = balance?.daysPerYear || type?.daysPerYear || 0;
-    const allocatedDays = balance?.allocatedDays || daysPerYear;
+    const allocatedDays = Math.max(balance?.allocatedDays || 0, daysPerYear);
     const usedFromRequests = yearUsedByCode[code] ?? 0;
     const usedDays = Math.max(balance?.usedDays ?? 0, usedFromRequests);
     const pendingDays = balance?.pendingDays ?? 0;

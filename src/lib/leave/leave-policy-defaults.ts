@@ -7,12 +7,12 @@ export const DEFAULT_LEAVE_POLICY_DOCUMENT: LeavePolicyDocument = {
   sections: [
     {
       id: "probation-entitlement",
-      title: "Probation Period Leave Entitlement",
+      title: "Probation Menstruation Leave Entitlement",
       content: `First Month of Probation: No leave is permitted during the first month of the probation period.
 
 Second and Third Month of Probation: A total of two (2) Casual Leaves (CL) may be availed during the remaining two months of the probation period.
 
-Additional Leave for Female Employees: Female employees are entitled to one (1) additional Period Leave (PL) during the probation period.`,
+Additional Leave for Female Employees: Female employees are entitled to one (1) additional Menstruation Leave (PL) during the probation period.`,
     },
     {
       id: "communication-guidelines",
@@ -22,9 +22,9 @@ Additional Leave for Female Employees: Female employees are entitled to one (1) 
 - The email must clearly mention the reason for the leave and the date(s) for which leave is requested.
 - All leave requests are subject to approval by the reporting manager and the HR department.
 
-Period Leave (PL)
-- Female employees availing Period Leave must inform the HR department via email on the same day, at any time before the end of the working day.
-- Prior-day intimation is not mandatory for Period Leave; however, same-day communication is compulsory.
+Menstruation Leave (PL)
+- Female employees availing Menstruation Leave must inform the HR department via email on the same day, at any time before the end of the working day.
+- Prior-day intimation is not mandatory for Menstruation Leave; however, same-day communication is compulsory.
 
 Pre-Planned or Prior Commitments
 - Any previously planned or anticipated leave must be communicated to HR and the reporting manager well in advance, preferably at the time of joining or as soon as the information becomes available.
@@ -44,7 +44,7 @@ Sandwich days are calculated automatically and shown before you submit.`,
       id: "carry-forward",
       title: "Leave Carry Forward Policy",
       content: `- No leave balance will be carried forward until the successful completion of the probation period.
-- Period Leave (PL) is strictly non-carry-forwardable under all circumstances.`,
+- Menstruation Leave (PL) is strictly non-carry-forwardable under all circumstances.`,
     },
     {
       id: "post-probation-carry-forward",

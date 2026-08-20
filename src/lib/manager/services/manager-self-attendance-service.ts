@@ -737,10 +737,8 @@ function buildHistoryRows(input: {
   }
 
   const total = filtered.length;
-  const startIndex = (input.page - 1) * input.pageSize;
-  const data = filtered.slice(startIndex, startIndex + input.pageSize);
-
-  return { data, total, page: input.page, pageSize: input.pageSize };
+  // Self-attendance history shows the full month — no client pagination.
+  return { data: filtered, total, page: 1, pageSize: total || input.pageSize };
 }
 
 async function buildProfileCard(

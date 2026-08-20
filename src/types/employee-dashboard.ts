@@ -1,4 +1,5 @@
 import type { AttendanceStatus } from "@/types/attendance";
+import type { LeaveEmployeeBalanceSnapshot } from "@/types/leave";
 import type { ManagerTodayAttendance } from "@/types/manager-self-attendance";
 
 export type EmployeeGreeting = {
@@ -34,6 +35,7 @@ export type EmployeeDashboardData = {
   greeting: EmployeeGreeting;
   today: ManagerTodayAttendance;
   kpis: EmployeeDashboardKpis;
+  leaveBalances: LeaveEmployeeBalanceSnapshot[];
   referenceDate: string;
   upcomingHolidays: EmployeeUpcomingEvent[];
 };

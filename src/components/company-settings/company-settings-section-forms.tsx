@@ -367,13 +367,13 @@ export function LeavePoliciesForm({
           <SettingsField label="Casual leave cap">
             <Input type="number" {...form.register("probation.casualLeaveCap")} disabled={!canEdit || isPending} />
           </SettingsField>
-          <SettingsField label="Period leave cap">
+          <SettingsField label="Menstruation leave cap">
             <Input type="number" {...form.register("probation.periodLeaveCap")} disabled={!canEdit || isPending} />
           </SettingsField>
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <SettingsToggle label="Allow leave in first month" disabled={!canEdit || isPending} {...form.register("probation.firstMonthLeaveAllowed")} />
-          <SettingsToggle label="Period leave for female employees only" disabled={!canEdit || isPending} {...form.register("probation.periodLeaveFemaleOnly")} />
+          <SettingsToggle label="Menstruation leave for female employees only" disabled={!canEdit || isPending} {...form.register("probation.periodLeaveFemaleOnly")} />
           <SettingsToggle label="Allow carry forward during probation" disabled={!canEdit || isPending} {...form.register("probation.carryForwardAllowed")} />
         </div>
       </SettingsSectionCard>
