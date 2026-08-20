@@ -1,5 +1,8 @@
 import { MyProfileView } from "@/components/employee/profile/my-profile-view";
-import { canEditSelfProfileContactDetails } from "@/lib/employee/profile-contact";
+import {
+  canEditSelfProfileContactDetails,
+  canEditSelfReportingManager,
+} from "@/lib/employee/profile-contact";
 import { getMyProfileBundle } from "@/lib/employee/services/my-profile";
 import { getEmployeeLookups } from "@/lib/employees/services/employee-queries";
 import { SYSTEM_ADMIN_ROUTES } from "@/lib/system-admin/constants";
@@ -20,7 +23,8 @@ export default async function SuperAdminProfilePage() {
   }
 
   const canEditContactDetails = canEditSelfProfileContactDetails(profile.permissionCodes);
-  const lookups = canEditContactDetails
+  const canEditReportingManager = canEditSelfReportingManager(profile.permissionCodes);
+  const lookups = canEditReportingManager
     ? await getEmployeeLookups(
         supabase,
         profile.employee.organizationId,
@@ -38,6 +42,7 @@ export default async function SuperAdminProfilePage() {
       <MyProfileView
         data={data}
         canEditContactDetails={canEditContactDetails}
+        canEditReportingManager={canEditReportingManager}
         managerOptions={managerOptions}
       />
     </div>

@@ -329,6 +329,7 @@ export async function updateEmployeeSelfProfileWithContact(
   profile: UserProfile,
   input: EmployeeSelfProfileInput,
   existing: Pick<EmployeeSelfProfileSettings, "employeeId" | "address" | "emergencyContact">,
+  options?: { allowReportingManagerUpdate?: boolean },
 ) {
   if (profile.employee?.id !== existing.employeeId) {
     throw new Error("You can only update your own profile");
@@ -357,7 +358,7 @@ export async function updateEmployeeSelfProfileWithContact(
     existing.emergencyContact.id,
   );
 
-  if (input.reportingManagerId !== undefined) {
+  if (options?.allowReportingManagerUpdate && input.reportingManagerId !== undefined) {
     await updateReportingManager(
       supabase,
       profile,

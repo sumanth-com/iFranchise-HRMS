@@ -8,7 +8,7 @@ import {
   Loader2,
   XCircle,
 } from "lucide-react";
-import { useState, useTransition, type ReactNode } from "react";
+import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -33,7 +33,7 @@ import {
   OFFER_STATUS_LABELS,
   RECOMMENDATION_LABELS,
 } from "@/lib/recruitment/constants";
-import { formatCurrency } from "@/lib/recruitment/services/recruitment-utils";
+import { formatCurrency, sortInterviewsForDisplay } from "@/lib/recruitment/services/recruitment-utils";
 import { cn } from "@/lib/utils";
 import { interviewCompleteSchema } from "@/lib/validations/recruitment";
 import type {
@@ -144,10 +144,14 @@ function InterviewHub({
   onRefresh: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
+  const orderedInterviews = useMemo(
+    () => sortInterviewsForDisplay(interviews),
+    [interviews],
+  );
 
   return (
     <>
-      {interviews.length === 0 ? (
+      {orderedInterviews.length === 0 ? (
         <div className="flex min-h-[6.5rem] flex-col items-center justify-center rounded-md border border-dashed bg-background/60 px-3 py-3 text-center">
           <p className="text-sm text-muted-foreground">No interviews scheduled yet.</p>
           {canInterview ? (
@@ -158,7 +162,7 @@ function InterviewHub({
         </div>
       ) : (
         <ul className="max-h-[11rem] space-y-2 overflow-y-auto pr-0.5">
-          {interviews.map((interview) => {
+          {orderedInterviews.map((interview) => {
             const isDone = interview.interviewStatus === "completed";
             const isScheduled = interview.interviewStatus === "scheduled";
 

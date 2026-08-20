@@ -32,6 +32,7 @@ import {
   formatEmployeeName,
   fromHrms,
   type PerfRow,
+  sortInterviewsForDisplay,
   unwrapRelation,
 } from "@/lib/recruitment/services/recruitment-utils";
 import { getRecruitmentSettings, archiveRejectedCandidates } from "@/lib/recruitment/services/recruitment-settings";
@@ -1071,7 +1072,9 @@ export async function getCandidateById(
       toStage: row.to_stage ?? null,
       createdAt: row.created_at,
     })),
-    interviews: ((interviewsRes.data ?? []) as PerfRow[]).map(mapInterviewRow),
+    interviews: sortInterviewsForDisplay(
+      ((interviewsRes.data ?? []) as PerfRow[]).map(mapInterviewRow),
+    ),
     offers,
   };
 }

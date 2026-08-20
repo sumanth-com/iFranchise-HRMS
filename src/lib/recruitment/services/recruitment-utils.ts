@@ -1,6 +1,6 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { formatCleanEmployeeName } from "@/lib/employees/parse-employee-name";
-import type { CandidateStage } from "@/types/recruitment";
+import type { CandidateStage, InterviewStatus } from "@/types/recruitment";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type PerfRow = Record<string, any>;
@@ -29,6 +29,43 @@ export function parseSkills(value?: string | null): string[] {
 
 export function emptyToNull(value?: string | null) {
   return value && value.trim().length > 0 ? value.trim() : null;
+}
+
+/** Incomplete interviews first; within each group, latest date/time first. */
+export function sortInterviewsForDisplay<
+  T extends {
+    interviewStatus: InterviewStatus;
+    interviewDate: string;
+    interviewTime?: string | null;
+    createdAt?: string | null;
+  },
+>(interviews: T[]): T[] {
+  const statusRank = (status: InterviewStatus) => {
+    switch (status) {
+      case "scheduled":
+        return 0;
+      case "no_show":
+        return 1;
+      case "cancelled":
+        return 2;
+      case "completed":
+        return 3;
+      default:
+        return 1;
+    }
+  };
+
+  return [...interviews].sort((left, right) => {
+    const byStatus = statusRank(left.interviewStatus) - statusRank(right.interviewStatus);
+    if (byStatus !== 0) return byStatus;
+
+    const leftWhen = `${left.interviewDate}T${left.interviewTime || "00:00"}`;
+    const rightWhen = `${right.interviewDate}T${right.interviewTime || "00:00"}`;
+    const byWhen = rightWhen.localeCompare(leftWhen);
+    if (byWhen !== 0) return byWhen;
+
+    return String(right.createdAt ?? "").localeCompare(String(left.createdAt ?? ""));
+  });
 }
 
 export function nextStageAfterRecommendation(

@@ -139,11 +139,19 @@ export function normalizeRelationshipValue(
   return match?.value ?? "other";
 }
 
+/** Self-service may update own contact/address/emergency fields. */
 export function canEditSelfProfileContactDetails(permissionCodes: string[]): boolean {
   return (
     hasPermission(permissionCodes, "employee.edit") ||
     hasPermission(permissionCodes, "employee_profile.edit") ||
+    hasPermission(permissionCodes, PORTAL_PERMISSIONS.employee) ||
     hasPermission(permissionCodes, PORTAL_PERMISSIONS.manager) ||
-    hasPermission(permissionCodes, PORTAL_PERMISSIONS.ceo)
+    hasPermission(permissionCodes, PORTAL_PERMISSIONS.ceo) ||
+    hasPermission(permissionCodes, PORTAL_PERMISSIONS.hr)
   );
+}
+
+/** Reporting manager is employment data — not editable in pure self-service. */
+export function canEditSelfReportingManager(permissionCodes: string[]): boolean {
+  return hasPermission(permissionCodes, "employee.edit");
 }

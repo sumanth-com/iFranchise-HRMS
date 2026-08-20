@@ -105,12 +105,14 @@ type ManagerOption = {
 type MyProfileViewProps = {
   data: MyProfileBundle;
   canEditContactDetails?: boolean;
+  canEditReportingManager?: boolean;
   managerOptions?: ManagerOption[];
 };
 
 export function MyProfileView({
   data,
   canEditContactDetails = false,
+  canEditReportingManager = false,
   managerOptions = [],
 }: MyProfileViewProps) {
   const router = useRouter();
@@ -199,6 +201,9 @@ export function MyProfileView({
             ...formData,
             emergencyContactRelationship:
               formData.emergencyContactRelationship?.trim() || "",
+            reportingManagerId: canEditReportingManager
+              ? formData.reportingManagerId
+              : data.reportingManagerId ?? "",
           }
         : formData;
 
@@ -215,7 +220,9 @@ export function MyProfileView({
 
   const helperText = isEditing
     ? canEditContactDetails
-      ? "Save your personal and contact details. Employment fields are managed separately."
+      ? canEditReportingManager
+        ? "Save your personal and contact details. Employment fields are managed separately."
+        : "Save your phone, address, and emergency contact. Employment fields stay read-only."
       : "Save your language preference. Contact, address, and emergency details are managed by HR."
     : canEditContactDetails
       ? "View and update your personal contact details below. Employment information is managed separately."
@@ -294,7 +301,7 @@ export function MyProfileView({
           <ProfileInfoRow
             label="Manager"
             value={data.reportingManagerName ?? "—"}
-            editing={isEditing && canEditContactDetails}
+            editing={isEditing && canEditReportingManager}
           >
             <ProfileFieldControl>
               <Select
