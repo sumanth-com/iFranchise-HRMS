@@ -48,7 +48,7 @@ export function focusModuleHref(
 ): string | null {
   switch (focus) {
     case "leave": {
-      const params = new URLSearchParams({ leaveStatus: "pending" });
+      const params = new URLSearchParams({ summaryFilter: "pendingRequests" });
       if (employeeId) params.set("employeeId", employeeId);
       return `${MANAGER_ROUTES.leaveTeam}?${params.toString()}`;
     }

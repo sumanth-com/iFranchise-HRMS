@@ -99,7 +99,8 @@ export async function fetchTeamLeaveRequestsForHrTableAction(
     const skipMonthRange =
       parsed.summaryFilter === "pendingRequests" ||
       parsed.summaryFilter === "employeesOnLeaveToday" ||
-      parsed.summaryFilter === "upcomingPlannedLeaves";
+      parsed.summaryFilter === "upcomingPlannedLeaves" ||
+      parsed.leaveStatus === "pending";
 
     if (!skipMonthRange && !dateFrom && !dateTo && parsed.month && parsed.year) {
       const range = getMonthDateRange(parsed.month, parsed.year);

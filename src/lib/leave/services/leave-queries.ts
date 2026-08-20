@@ -237,6 +237,8 @@ export async function listLeaveRequests(
   }
 
   const today = getTodayDateString();
+  const isPendingQueue =
+    summaryFilter === "pendingRequests" || leaveStatus === "pending";
 
   if (summaryFilter === "pendingRequests") {
     query = query.eq("leave_status", "pending");
@@ -261,12 +263,13 @@ export async function listLeaveRequests(
     query = query.eq("leave_status", "approved").gt("start_date", today);
   } else if (dateFrom && dateTo) {
     query = query.lte("start_date", dateTo).gte("end_date", dateFrom);
-  } else if (month && year) {
+  } else if (!isPendingQueue && month && year) {
+    // Pending approval queues are org-wide — do not clip them to the calendar month.
     const range = getMonthDateRange(month, year);
     query = query
       .gte("start_date", range.start)
       .lte("end_date", range.end);
-  } else if (year) {
+  } else if (!isPendingQueue && year) {
     query = query
       .gte("start_date", `${year}-01-01`)
       .lte("end_date", `${year}-12-31`);
