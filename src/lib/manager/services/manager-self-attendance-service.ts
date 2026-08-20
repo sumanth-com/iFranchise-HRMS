@@ -890,6 +890,23 @@ export async function getManagerProfilePageData(
   };
 }
 
+type SelfPunchRpcResult = {
+  id: string;
+  employee_id: string;
+  attendance_date: string;
+  check_in_at: string | null;
+  check_out_at: string | null;
+  attendance_status: AttendanceStatus;
+  work_hours: number | string;
+  overtime_hours: number | string;
+  action: string;
+};
+
+/**
+ * Self check-in / check-out for the signed-in employee only.
+ * Uses a SECURITY DEFINER RPC so every portal (manager, employee, HR, system)
+ * punches the same personal attendance row — never another employee's.
+ */
 export async function punchManagerAttendance(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -909,119 +926,142 @@ export async function punchManagerAttendance(
       ? `geo:${input.latitude},${input.longitude}`
       : null;
 
+  let status: AttendanceStatus;
+  let workHours = 0;
+  let overtimeHours = 0;
+
   if (input.type === "in") {
     if (existing?.check_in_at) {
       throw new Error("You have already checked in today.");
     }
+    status = resolvePunchStatus(nowIso, null, today, rules);
+  } else if (existing?.check_in_at) {
+    if (parseISO(nowIso).getTime() < parseISO(existing.check_in_at).getTime()) {
+      throw new Error("Checkout cannot be before check-in.");
+    }
+    workHours = computeWorkHours(existing.check_in_at, nowIso);
+    overtimeHours = computeOvertimeHours(workHours, rules);
+    status = resolvePunchStatus(
+      existing.check_in_at,
+      nowIso,
+      today,
+      rules,
+    );
+  } else {
+    // Active row may be missing when only a soft-deleted row exists.
+    // The RPC revives that employee's own row and validates check-in.
+    status = "present";
+  }
 
-    const status = resolvePunchStatus(nowIso, null, today, rules);
-    const branchId = await getEmployeeBranchId(supabase, employeeId);
+  const { data, error } = await supabase.schema("hrms").rpc(
+    "self_service_attendance_punch",
+    {
+      p_type: input.type,
+      p_attendance_status: status,
+      p_work_hours: workHours,
+      p_overtime_hours: overtimeHours,
+      p_notes: geoNote,
+    },
+  );
 
-    if (existing) {
-      const { error } = await supabase
-        .schema("hrms")
-        .from("attendance")
-        .update({
-          check_in_at: nowIso,
-          attendance_status: status,
-          notes: geoNote ?? existing.notes,
-          updated_by: profile.userId,
-        })
-        .eq("id", existing.id);
+  if (error) {
+    throw new Error(error.message);
+  }
 
-      if (error) throw new Error(error.message);
-    } else {
-      const { error } = await supabase
-        .schema("hrms")
-        .from("attendance")
-        .insert({
-          organization_id: profile.employee.organizationId,
-          branch_id: branchId,
-          employee_id: employeeId,
-          attendance_date: today,
-          check_in_at: nowIso,
-          check_out_at: null,
-          attendance_status: status,
-          work_hours: 0,
-          overtime_hours: 0,
-          notes: geoNote,
-          status: "active",
-          created_by: profile.userId,
-          updated_by: profile.userId,
-        });
+  const result = data as SelfPunchRpcResult | null;
+  if (!result?.id) {
+    throw new Error("Failed to update attendance");
+  }
 
-      if (error) {
-        if (error.code === "23505") {
-          throw new Error("Attendance already exists for today.");
-        }
-        throw new Error(error.message);
-      }
+  // RPC always resolves the employee from auth.uid() — reject mismatches.
+  if (result.employee_id && result.employee_id !== employeeId) {
+    throw new Error("Attendance could not be saved for your employee profile.");
+  }
+
+  if (input.type === "in") {
+    if (result.action === "already_checked_in") {
+      // Concurrent / double-submit on the same personal row — treat as success.
+      return;
     }
 
     await writeApplicationAudit(supabase, {
       organizationId: profile.employee.organizationId,
       module: "attendance",
       action: "check_in",
-      description: `Manager checked in on ${today}`,
+      description: `Checked in on ${today}`,
       recordId: employeeId,
-      metadata: { attendanceDate: today, type: "in" },
+      metadata: { attendanceDate: today, type: "in", attendanceId: result.id },
     });
 
     await notifyAttendanceCheckedIn(supabase, profile, today);
     return;
   }
 
-  if (!existing?.check_in_at) {
-    throw new Error("Check in before checking out.");
+  const punchedWorkHours = Number(result.work_hours ?? workHours);
+
+  // If checkout revived a hidden row, recompute hours/status with org rules.
+  if (
+    input.type === "out" &&
+    result.check_in_at &&
+    result.check_out_at &&
+    workHours === 0
+  ) {
+    const repairedHours = computeWorkHours(result.check_in_at, result.check_out_at);
+    const repairedOvertime = computeOvertimeHours(repairedHours, rules);
+    const repairedStatus = resolvePunchStatus(
+      result.check_in_at,
+      result.check_out_at,
+      today,
+      rules,
+    );
+    if (
+      repairedHours !== punchedWorkHours ||
+      repairedStatus !== result.attendance_status
+    ) {
+      await supabase
+        .schema("hrms")
+        .from("attendance")
+        .update({
+          work_hours: repairedHours,
+          overtime_hours: repairedOvertime,
+          attendance_status: repairedStatus,
+          updated_by: profile.userId,
+        })
+        .eq("id", result.id)
+        .eq("employee_id", employeeId)
+        .is("deleted_at", null);
+    }
   }
-
-  if (parseISO(nowIso).getTime() < parseISO(existing.check_in_at).getTime()) {
-    throw new Error("Checkout cannot be before check-in.");
-  }
-
-  const workHours = computeWorkHours(existing.check_in_at, nowIso);
-  const overtimeHours = computeOvertimeHours(workHours, rules);
-  const status = resolvePunchStatus(
-    existing.check_in_at,
-    nowIso,
-    today,
-    rules,
-  );
-
-  const { error } = await supabase
-    .schema("hrms")
-    .from("attendance")
-    .update({
-      check_out_at: nowIso,
-      work_hours: workHours,
-      overtime_hours: overtimeHours,
-      attendance_status: status,
-      notes: geoNote ?? existing.notes,
-      updated_by: profile.userId,
-    })
-    .eq("id", existing.id);
-
-  if (error) throw new Error(error.message);
 
   await writeApplicationAudit(supabase, {
     organizationId: profile.employee.organizationId,
     module: "attendance",
-    action: existing.check_out_at ? "update_checkout" : "check_out",
-    description: existing.check_out_at
-      ? `Manager updated checkout on ${today}`
-      : `Manager checked out on ${today}`,
-    recordId: existing.id,
+    action: existing?.check_out_at ? "update_checkout" : "check_out",
+    description: existing?.check_out_at
+      ? `Updated checkout on ${today}`
+      : `Checked out on ${today}`,
+    recordId: result.id,
     metadata: {
       attendanceDate: today,
-      workHours,
+      workHours: punchedWorkHours || workHours,
       overtimeHours,
     },
   });
 
-  if (existing.check_out_at) {
-    await notifyAttendanceCheckoutUpdated(supabase, profile, today, workHours);
+  if (existing?.check_out_at) {
+    await notifyAttendanceCheckoutUpdated(
+      supabase,
+      profile,
+      today,
+      punchedWorkHours || workHours,
+    );
   } else {
-    await notifyAttendanceCheckedOut(supabase, profile, today, workHours);
+    await notifyAttendanceCheckedOut(
+      supabase,
+      profile,
+      today,
+      punchedWorkHours || workHours,
+    );
   }
 }
 
@@ -1097,7 +1137,9 @@ export async function updateManagerCheckout(
       attendance_status: status,
       updated_by: profile.userId,
     })
-    .eq("id", existing.id);
+    .eq("id", existing.id)
+    .eq("employee_id", employeeId)
+    .is("deleted_at", null);
 
   if (error) throw new Error(error.message);
 
