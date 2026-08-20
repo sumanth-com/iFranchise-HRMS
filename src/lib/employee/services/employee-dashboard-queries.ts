@@ -1,7 +1,6 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
-import { getEmployeeLeaveBalanceSnapshot } from "@/lib/leave/services/leave-queries";
 import { getSelfTodayAttendance } from "@/lib/manager/services/manager-self-attendance-service";
 import type { UserProfile } from "@/types/auth";
 import type {
@@ -9,7 +8,6 @@ import type {
   EmployeeGreeting,
   EmployeeUpcomingEvent,
 } from "@/types/employee-dashboard";
-import type { LeaveEmployeeBalanceSnapshot } from "@/types/leave";
 import type { ManagerTodayAttendance } from "@/types/manager-self-attendance";
 
 /** Runs a widget query but never lets one failing panel break the whole dashboard. */
@@ -127,16 +125,12 @@ export async function getEmployeeDashboardData(
   const organizationId = profile.employee.organizationId;
   const greeting = greetingFromProfile(profile);
 
-  const [todayPanel, leave, leaveBalances, upcomingHolidays] = await Promise.all([
+  const [todayPanel, leave, upcomingHolidays] = await Promise.all([
     safe(() => getSelfTodayAttendance(supabase, profile), buildFallbackToday(today)),
     safe(() => loadLeaveKpis(supabase, employeeId), {
       totalBalanceDays: 0,
       pendingCount: 0,
     }),
-    safe(
-      () => getEmployeeLeaveBalanceSnapshot(supabase, employeeId, getCurrentBalanceYear()),
-      [] as LeaveEmployeeBalanceSnapshot[],
-    ),
     safe(() => loadUpcomingHolidays(supabase, organizationId, today), []),
   ]);
 
@@ -150,7 +144,6 @@ export async function getEmployeeDashboardData(
       leaveBalanceDays: leave.totalBalanceDays,
       pendingLeaveRequests: leave.pendingCount,
     },
-    leaveBalances,
     referenceDate: today,
     upcomingHolidays,
   };
