@@ -261,7 +261,7 @@ export function calculateLeaveDuration(input: {
         class: dayClass,
         counted: 1,
         inRequestedRange,
-        note: `${formatDayLabel(date)} is included because this request is connected to a leave day under the company's Sandwich Leave Policy.`,
+        note: `${formatDayLabel(date)} is added under Sandwich Leave Policy because it sits between your leave and a working day.`,
       });
       continue;
     }
@@ -279,11 +279,14 @@ export function calculateLeaveDuration(input: {
 
   const workingDays = days.filter((day) => day.kind === "working").length;
   const halfDays = days.filter((day) => day.kind === "half_day").length;
-  const weeklyHolidays = days.filter(
-    (day) => day.class === "weekly_off",
-  ).length;
-  const publicHolidays = days.filter((day) => day.class === "holiday").length;
   const sandwichDayRows = days.filter((day) => day.kind === "sandwich");
+  // Weekly/public holiday chips should not double-count sandwich days.
+  const weeklyHolidays = days.filter(
+    (day) => day.class === "weekly_off" && day.kind !== "sandwich",
+  ).length;
+  const publicHolidays = days.filter(
+    (day) => day.class === "holiday" && day.kind !== "sandwich",
+  ).length;
   const totalLeaveDays = days.reduce((sum, day) => sum + day.counted, 0);
 
   return {

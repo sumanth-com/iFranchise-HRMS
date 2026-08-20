@@ -34,6 +34,10 @@ export const DATA_TABLE_SCROLL_MAX_HEIGHT =
 export const DATA_TABLE_SPLIT_SCROLL_MAX_HEIGHT =
   "max-h-[min(32vh,calc(50dvh-14rem))]";
 
+/** Taller scroll area for self-service leave request lists. */
+export const DATA_TABLE_LEAVE_REQUESTS_MAX_HEIGHT =
+  "max-h-[min(52vh,calc(100dvh-22rem))]";
+
 export function DataTable<T extends Record<string, unknown>>({
   columns,
   data,

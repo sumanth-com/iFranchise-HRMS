@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { CalendarPlus, Eye, FileText } from "lucide-react";
+import { CalendarPlus, Eye, FileText, Trash2 } from "lucide-react";
 
 import { Button, buttonVariants } from "@/components/common/button";
 import {
   DataTable,
-  DATA_TABLE_SPLIT_SCROLL_MAX_HEIGHT,
+  DATA_TABLE_LEAVE_REQUESTS_MAX_HEIGHT,
   type DataTableColumn,
 } from "@/components/common/data-table";
 import { EmployeeLeaveCalendar } from "@/components/employee/leave/employee-leave-calendar";
@@ -68,11 +68,17 @@ export function MyLeaveSelfServiceView({
   const [applyOpen, setApplyOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [viewPreview, setViewPreview] = useState<LeaveListItem | null>(null);
+  const [viewMode, setViewMode] = useState<"view" | "edit" | "delete">("view");
   const canOpenApplyDialog = canApply && employeeId && applyLeaveLookups;
 
-  function openLeavePopup(row: LeaveListItem) {
+  function openLeavePopup(row: LeaveListItem, mode: "view" | "delete" = "view") {
     setViewPreview(row);
+    setViewMode(mode);
     setViewOpen(true);
+  }
+
+  function canDeleteRow(row: LeaveListItem) {
+    return canDelete && row.leaveStatus === "pending";
   }
 
   const columns: DataTableColumn<LeaveListItem>[] = [
@@ -104,16 +110,28 @@ export function MyLeaveSelfServiceView({
       header: "",
       className: "w-[1%] whitespace-nowrap text-right",
       render: (row) => (
-        <div className="flex justify-end">
+        <div className="flex items-center justify-end gap-0.5">
           <Button
             type="button"
             variant="ghost"
             size="icon-sm"
             aria-label="View leave"
-            onClick={() => openLeavePopup(row)}
+            onClick={() => openLeavePopup(row, "view")}
           >
             <Eye className="size-4" />
           </Button>
+          {canDeleteRow(row) ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Delete leave request"
+              className="text-muted-foreground hover:text-destructive"
+              onClick={() => openLeavePopup(row, "delete")}
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          ) : null}
         </div>
       ),
     },
@@ -167,13 +185,18 @@ export function MyLeaveSelfServiceView({
       />
 
       <section className="rounded-xl border bg-card p-4 shadow-sm">
-        <h2 className="mb-3 text-sm font-semibold tracking-tight">My Requests</h2>
+        <div className="mb-3">
+          <h2 className="text-sm font-semibold tracking-tight">My Requests</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Pending requests can be deleted if applied by mistake.
+          </p>
+        </div>
         <DataTable
           columns={columns}
           data={requests}
           emptyMessage="You haven't submitted any leave requests yet."
           scrollable
-          maxHeightClass={DATA_TABLE_SPLIT_SCROLL_MAX_HEIGHT}
+          maxHeightClass={DATA_TABLE_LEAVE_REQUESTS_MAX_HEIGHT}
         />
       </section>
 
@@ -181,9 +204,13 @@ export function MyLeaveSelfServiceView({
         leaveRequestId={viewPreview?.id ?? null}
         preview={viewPreview}
         open={viewOpen}
+        initialMode={viewMode}
         onOpenChange={(open) => {
           setViewOpen(open);
-          if (!open) setViewPreview(null);
+          if (!open) {
+            setViewPreview(null);
+            setViewMode("view");
+          }
         }}
         lookups={applyLeaveLookups}
         canEdit={canEdit}

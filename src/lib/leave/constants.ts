@@ -63,6 +63,20 @@ export const APPROVAL_LEVEL_LABELS: Record<number, string> = {
   2: "HR Approval",
 };
 
+/** Shown when leave is awaiting the CEO (e.g. HR applicants go straight to CEO). */
+export const CEO_APPROVAL_STAGE_LABEL = "CEO Approval";
+
+export function leaveApprovalStageLabel(
+  level: number | null | undefined,
+  options?: { awaitingCeo?: boolean; hrDirectToCeo?: boolean },
+): string {
+  if (options?.awaitingCeo || options?.hrDirectToCeo) {
+    return CEO_APPROVAL_STAGE_LABEL;
+  }
+  if (level == null) return "Pending";
+  return APPROVAL_LEVEL_LABELS[level] ?? `Level ${level}`;
+}
+
 /** iFranchise leave policy — active leave types (including LOP for payroll tracking). */
 export const ALLOWED_LEAVE_TYPE_CODES = ["CL", "SL", "EL", "OH", "PL", "LOP"] as const;
 

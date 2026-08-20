@@ -253,28 +253,12 @@ export async function saveBranch(
 }
 
 export async function deleteBranch(supabase: AuthSupabaseClient, profile: UserProfile, id: string) {
-  const orgId = profile.employee.organizationId;
-  const { count } = await supabase
-    .schema("hrms")
-    .from("employees")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", orgId)
-    .eq("branch_id", id)
-    .is("deleted_at", null);
-
-  if ((count ?? 0) > 0) {
-    throw new Error("Cannot delete branch with assigned employees");
-  }
-
-  const admin = createAdminClient();
-  const { error } = await admin
-    .schema("hrms")
-    .from("branches")
-    .update({ deleted_at: new Date().toISOString(), status: "archived", ...auditFields(profile) })
-    .eq("id", id)
-    .eq("organization_id", orgId);
+  const { data, error } = await supabase.schema("hrms").rpc("soft_delete_branch", {
+    p_branch_id: id,
+  });
 
   if (error) throw new Error(error.message);
+  if (!data) throw new Error("Branch not found or already deleted.");
 }
 
 function deriveDepartmentCode(name: string) {

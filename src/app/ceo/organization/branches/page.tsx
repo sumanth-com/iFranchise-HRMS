@@ -1,8 +1,5 @@
 import { BranchesPageContent } from "@/components/organization/branches-page-content";
-import {
-  requireCeoPortal,
-  toViewOnlyPermissionCodes,
-} from "@/lib/ceo/read-only-permissions";
+import { requireCeoPortal } from "@/lib/ceo/read-only-permissions";
 import { getBranches, getEmployeeLookups } from "@/lib/organization/services/org-lookups";
 import { listBranches, listWorkLocations } from "@/lib/organization/services/org-queries";
 import { createClient } from "@/lib/supabase/server";
@@ -50,7 +47,7 @@ export default async function CeoBranchesPage({ searchParams }: PageProps) {
       workLocationsResult={workLocationsResult}
       employees={employees}
       branchLookups={branchLookups}
-      permissionCodes={toViewOnlyPermissionCodes(profile.permissionCodes)}
+      permissionCodes={profile.permissionCodes}
       branchSearch={branchParams.search ?? ""}
       branchStatus={branchParams.status as RecordStatus | undefined}
       workLocationSearch={workLocationParams.search ?? ""}

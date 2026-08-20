@@ -1,8 +1,5 @@
 import { DepartmentsManagement } from "@/components/organization/departments-management";
-import {
-  requireCeoPortal,
-  toViewOnlyPermissionCodes,
-} from "@/lib/ceo/read-only-permissions";
+import { requireCeoPortal } from "@/lib/ceo/read-only-permissions";
 import { getBranches, getEmployeeLookups } from "@/lib/organization/services/org-lookups";
 import { listDepartments } from "@/lib/organization/services/org-queries";
 import { createClient } from "@/lib/supabase/server";
@@ -37,7 +34,7 @@ export default async function CeoDepartmentsPage({ searchParams }: PageProps) {
       result={result}
       employees={employees}
       branches={branches}
-      permissionCodes={toViewOnlyPermissionCodes(profile.permissionCodes)}
+      permissionCodes={profile.permissionCodes}
       search={params.search ?? ""}
       status={params.status as RecordStatus | undefined}
     />
