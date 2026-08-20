@@ -1,4 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { getPortalRouteForRoleCodes } from "@/lib/auth/portals";
 
 type RoleParentRow = {
   id: string;
@@ -86,10 +87,36 @@ export async function resolveUserPermissionCodes(
   return permissions.map((permission) => permission.code as string);
 }
 
+export async function resolveUserRoleCodes(
+  supabase: AuthSupabaseClient,
+  userId: string,
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("user_roles")
+    .select("roles:role_id ( code )")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+
+  return (data ?? [])
+    .map((row) => {
+      const role = Array.isArray(row.roles) ? row.roles[0] : row.roles;
+      return role?.code as string | undefined;
+    })
+    .filter((code): code is string => Boolean(code));
+}
+
 export async function resolveUserPortalRoute(
   supabase: AuthSupabaseClient,
   userId: string,
 ): Promise<string | null> {
+  const roleCodes = await resolveUserRoleCodes(supabase, userId);
+  const fromRoles = getPortalRouteForRoleCodes(roleCodes);
+  if (fromRoles) return fromRoles;
+
   const { data: portalRoute, error } = await supabase
     .schema("hrms")
     .rpc("get_user_portal_route", { p_user_id: userId });

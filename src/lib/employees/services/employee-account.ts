@@ -1,5 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
-import { getInviteableRoleByCode, getInviteableRoleById } from "@/lib/auth/iam-roles";
+import { getInviteableRoleByCode, getInviteableRoleById, ensureRolePortalMetadata } from "@/lib/auth/iam-roles";
 import { getPasswordResetRedirectTo } from "@/lib/auth/reset-redirect";
 import { siteConfig } from "@/config/site";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
@@ -89,6 +89,7 @@ async function setUserPrimaryRole(
 ) {
   const admin = createAdminClient();
   const inviteRole = await getInviteableRoleById(admin, employee.organization_id, roleId);
+  await ensureRolePortalMetadata(admin, employee.organization_id, inviteRole.code);
 
   const { data: role, error: roleError } = await admin
     .schema("hrms")
@@ -1224,6 +1225,15 @@ export async function recordEmployeeSuccessfulLogin(
   }
 
   await updateEmployeeAccountWithClient(supabase, employeeRow.id, updates);
+
+  const invitedRoleId = await adminLookupInvitedRoleId(employeeRow.id);
+  if (invitedRoleId) {
+    try {
+      await setUserPrimaryRole(userId, employeeRow, userId, invitedRoleId);
+    } catch (syncError) {
+      console.error("[login] failed to sync invited role assignment", syncError);
+    }
+  }
 
   if (shouldActivate) {
     await notifyEmployeeAccount(

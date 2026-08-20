@@ -1,5 +1,7 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { PortalKey } from "@/lib/auth/portals";
+import { derivePortalFromRoleCode } from "@/lib/user-provisioning/provisionable-roles";
+import { PORTAL_ROUTES } from "@/lib/auth/portals";
 
 export type InviteableRole = {
   id: string;
@@ -83,4 +85,26 @@ export async function getInviteableRoleByCode(
     throw new Error(`Role "${roleCode}" is not available for invitation.`);
   }
   return match;
+}
+
+export async function ensureRolePortalMetadata(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  roleCode: string,
+): Promise<void> {
+  const portalKey = derivePortalFromRoleCode(roleCode);
+  if (!portalKey) return;
+
+  const portalRoute = PORTAL_ROUTES[portalKey];
+  await supabase
+    .schema("hrms")
+    .from("roles")
+    .update({
+      portal_key: portalKey,
+      portal_route: portalRoute,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("organization_id", organizationId)
+    .eq("code", roleCode)
+    .is("deleted_at", null);
 }

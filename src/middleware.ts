@@ -8,11 +8,13 @@ import {
 import {
   resolveUserPermissionCodes,
   resolveUserPortalRoute,
+  resolveUserRoleCodes,
   userAccountAllowsPortalAccess,
 } from "@/lib/auth/permission-resolver";
 import {
   canAccessPortalPath,
   getPortalRedirectPath,
+  getPrimaryPortalRedirectForPath,
   normalizePortalRoute,
 } from "@/lib/auth/portals";
 import { HR_PORTAL_HOME } from "@/lib/auth/portal-paths";
@@ -56,12 +58,17 @@ export async function middleware(request: NextRequest) {
 
   if (isPublicRoute(pathname)) {
     if (user && isAuthRoute(pathname) && request.method === "GET") {
-      const [permissionCodes, portalRoute] = await Promise.all([
+      const [permissionCodes, portalRoute, roleCodes] = await Promise.all([
         resolveUserPermissionCodes(supabase, user.id),
         resolveUserPortalRoute(supabase, user.id),
+        resolveUserRoleCodes(supabase, user.id),
       ]);
       const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = getPortalRedirectPath(permissionCodes, [], portalRoute);
+      redirectUrl.pathname = getPortalRedirectPath(
+        permissionCodes,
+        roleCodes.map((code) => ({ id: "", name: code, code, isSystemRole: true, status: "active" })),
+        portalRoute,
+      );
       redirectUrl.search = "";
       return NextResponse.redirect(redirectUrl);
     }
@@ -122,11 +129,25 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(redirectUrl);
     }
 
-    if (!canAccessPortalPath(pathname, cachedPermissionCodes)) {
+    const roleCodes = await resolveUserRoleCodes(supabase, user.id);
+    const primaryRedirect = getPrimaryPortalRedirectForPath(
+      pathname,
+      cachedPermissionCodes,
+      roleCodes,
+    );
+    if (primaryRedirect) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = primaryRedirect;
+      redirectUrl.search = "";
+      return NextResponse.redirect(redirectUrl);
+    }
+
+    if (!canAccessPortalPath(pathname, cachedPermissionCodes, roleCodes)) {
       const portalRoute = await resolveUserPortalRoute(supabase, user.id);
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname =
-        normalizePortalRoute(portalRoute) ?? getPortalRedirectPath(cachedPermissionCodes);
+        normalizePortalRoute(portalRoute) ??
+        getPortalRedirectPath(cachedPermissionCodes, [], portalRoute);
       redirectUrl.search = "";
       return NextResponse.redirect(redirectUrl);
     }
@@ -134,9 +155,10 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
-  const [accountAllowed, permissionCodes] = await Promise.all([
+  const [accountAllowed, permissionCodes, roleCodes] = await Promise.all([
     userAccountAllowsPortalAccess(supabase, user.id),
     resolveUserPermissionCodes(supabase, user.id),
+    resolveUserRoleCodes(supabase, user.id),
   ]);
   if (!accountAllowed) {
     const redirectUrl = request.nextUrl.clone();
@@ -159,10 +181,24 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (!canAccessPortalPath(pathname, permissionCodes)) {
+  const primaryRedirect = getPrimaryPortalRedirectForPath(
+    pathname,
+    permissionCodes,
+    roleCodes,
+  );
+  if (primaryRedirect) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = primaryRedirect;
+    redirectUrl.search = "";
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  if (!canAccessPortalPath(pathname, permissionCodes, roleCodes)) {
     const portalRoute = await resolveUserPortalRoute(supabase, user.id);
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = normalizePortalRoute(portalRoute) ?? getPortalRedirectPath(permissionCodes);
+    redirectUrl.pathname =
+      normalizePortalRoute(portalRoute) ??
+      getPortalRedirectPath(permissionCodes, [], portalRoute);
     redirectUrl.search = "";
     return NextResponse.redirect(redirectUrl);
   }

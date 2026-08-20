@@ -24,6 +24,18 @@ export const PORTAL_PERMISSIONS: Record<PortalKey, string> = {
 
 const PORTAL_PRIORITY: PortalKey[] = ["hr", "ceo", "manager", "employee"];
 
+/** Highest-privilege role code wins for portal home routing. */
+export const ROLE_CODE_PORTAL_PRIORITY = [
+  "super_admin",
+  "hr_admin",
+  "hr_executive",
+  "founder",
+  "co_founder",
+  "ceo",
+  "manager",
+  "employee",
+] as const;
+
 const FALLBACK_ROLE_PORTALS: Record<string, PortalKey> = {
   super_admin: "hr",
   hr_admin: "hr",
@@ -57,20 +69,22 @@ export function portalKeyFromRoute(route: string): PortalKey | null {
   return null;
 }
 
-export function getPortalForRoles(roles: Role[]): PortalKey | null {
-  const roleCodes = new Set(roles.map((role) => role.code));
-
-  for (const portal of PORTAL_PRIORITY) {
-    if (
-      Object.entries(FALLBACK_ROLE_PORTALS).some(
-        ([roleCode, rolePortal]) => rolePortal === portal && roleCodes.has(roleCode),
-      )
-    ) {
-      return portal;
-    }
+export function getPortalForRoleCodes(roleCodes: Iterable<string>): PortalKey | null {
+  const codes = new Set(roleCodes);
+  for (const code of ROLE_CODE_PORTAL_PRIORITY) {
+    const portal = FALLBACK_ROLE_PORTALS[code];
+    if (portal && codes.has(code)) return portal;
   }
-
   return null;
+}
+
+export function getPortalRouteForRoleCodes(roleCodes: Iterable<string>): string | null {
+  const portal = getPortalForRoleCodes(roleCodes);
+  return portal ? PORTAL_ROUTES[portal] : null;
+}
+
+export function getPortalForRoles(roles: Role[]): PortalKey | null {
+  return getPortalForRoleCodes(roles.map((role) => role.code));
 }
 
 export function getPortalForPermissions(permissionCodes: Iterable<string>): PortalKey | null {
@@ -81,16 +95,28 @@ export function getPortalForPermissions(permissionCodes: Iterable<string>): Port
   return null;
 }
 
+export function resolvePrimaryPortal(
+  permissionCodes: Iterable<string>,
+  roleCodes: Iterable<string> = [],
+): PortalKey | null {
+  return getPortalForRoleCodes(roleCodes) ?? getPortalForPermissions(permissionCodes);
+}
+
+/**
+ * Post-login route: assigned role wins over inherited permissions and DB fallbacks.
+ */
 export function getPortalRedirectPath(
   permissionCodes: Iterable<string>,
   roles: Role[] = [],
   portalRouteFromDb?: string | null,
 ) {
-  const normalizedDbRoute = normalizePortalRoute(portalRouteFromDb);
-  if (normalizedDbRoute) return normalizedDbRoute;
+  const roleCodes = roles.map((role) => role.code);
+  const fromRoles = getPortalRouteForRoleCodes(roleCodes);
+  const primaryPortal = resolvePrimaryPortal(permissionCodes, roleCodes);
+  const fromPermissions = primaryPortal ? PORTAL_ROUTES[primaryPortal] : null;
+  const fromDb = normalizePortalRoute(portalRouteFromDb);
 
-  const portal = getPortalForPermissions(permissionCodes) ?? getPortalForRoles(roles);
-  return portal ? PORTAL_ROUTES[portal] : "/403";
+  return fromRoles ?? fromPermissions ?? fromDb ?? "/403";
 }
 
 export function getRequiredPortalForPath(pathname: string): PortalKey | null {
@@ -111,7 +137,38 @@ export function getRequiredPortalForPath(pathname: string): PortalKey | null {
   return null;
 }
 
-export function canAccessPortalPath(pathname: string, permissionCodes: Iterable<string>) {
+/** Keep users on their provisioned portal; block downgrades (e.g. manager → employee). */
+export function getPrimaryPortalRedirectForPath(
+  pathname: string,
+  permissionCodes: Iterable<string>,
+  roleCodes: Iterable<string> = [],
+): string | null {
+  const codes = Array.from(roleCodes);
+  if (codes.includes("super_admin")) return null;
+
+  const pathPortal = getRequiredPortalForPath(pathname);
+  if (!pathPortal) return null;
+
+  const primaryPortal = resolvePrimaryPortal(permissionCodes, roleCodes);
+  if (!primaryPortal || primaryPortal === pathPortal) return null;
+
+  const primaryRank = PORTAL_PRIORITY.indexOf(primaryPortal);
+  const pathRank = PORTAL_PRIORITY.indexOf(pathPortal);
+  if (pathRank > primaryRank) {
+    return PORTAL_ROUTES[primaryPortal];
+  }
+
+  return null;
+}
+
+export function canAccessPortalPath(
+  pathname: string,
+  permissionCodes: Iterable<string>,
+  roleCodes: Iterable<string> = [],
+) {
+  const enforced = getPrimaryPortalRedirectForPath(pathname, permissionCodes, roleCodes);
+  if (enforced) return false;
+
   const requiredPortal = getRequiredPortalForPath(pathname);
   if (!requiredPortal) return true;
   return hasPortalPermission(permissionCodes, requiredPortal);
