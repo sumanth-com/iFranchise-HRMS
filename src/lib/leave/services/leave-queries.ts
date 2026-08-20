@@ -1246,9 +1246,10 @@ export async function ensurePendingHrLeaveAssignedToCeo(
   const { data: existingApprovals, error: approvalsError } = await admin
     .schema("hrms")
     .from("leave_approvals")
-    .select("id, leave_request_id, approval_status, approval_level, approver_employee_id")
-    .in("leave_request_id", leaveIds)
-    .is("deleted_at", null);
+    .select(
+      "id, leave_request_id, approval_status, approval_level, approver_employee_id, deleted_at",
+    )
+    .in("leave_request_id", leaveIds);
 
   if (approvalsError) throw new Error(approvalsError.message);
 
@@ -1256,7 +1257,28 @@ export async function ensurePendingHrLeaveAssignedToCeo(
     string,
     { id: string; approverId: string; level: number }[]
   >();
+  const activeLevel1ByLeave = new Map<
+    string,
+    { id: string; status: string; approverId: string }
+  >();
+  const softDeletedLevel1ByLeave = new Map<string, string>();
+
   for (const row of existingApprovals ?? []) {
+    if (row.deleted_at) {
+      if (row.approval_level === 1) {
+        softDeletedLevel1ByLeave.set(row.leave_request_id, row.id);
+      }
+      continue;
+    }
+
+    if (row.approval_level === 1) {
+      activeLevel1ByLeave.set(row.leave_request_id, {
+        id: row.id,
+        status: row.approval_status,
+        approverId: row.approver_employee_id,
+      });
+    }
+
     if (row.approval_status !== "pending") continue;
     const list = pendingByLeave.get(row.leave_request_id) ?? [];
     list.push({
@@ -1269,6 +1291,7 @@ export async function ensurePendingHrLeaveAssignedToCeo(
 
   const approvalIdsToReassign: string[] = [];
   const approvalIdsToCancel: string[] = [];
+  const approvalIdsToRevive: string[] = [];
 
   for (const pendingSteps of pendingByLeave.values()) {
     const sorted = [...pendingSteps].sort((a, b) => a.level - b.level);
@@ -1309,9 +1332,36 @@ export async function ensurePendingHrLeaveAssignedToCeo(
     if (cancelError) throw new Error(cancelError.message);
   }
 
-  const missingApprovalLeaves = leaveRows.filter(
-    (row) => !pendingByLeave.has(row.id),
-  );
+  const missingApprovalLeaves = leaveRows.filter((row) => {
+    const activeLevel1 = activeLevel1ByLeave.get(row.id);
+    if (activeLevel1) {
+      // Already has an active level-1 step (pending or otherwise).
+      return false;
+    }
+    const softDeletedId = softDeletedLevel1ByLeave.get(row.id);
+    if (softDeletedId) {
+      approvalIdsToRevive.push(softDeletedId);
+      return false;
+    }
+    return true;
+  });
+
+  if (approvalIdsToRevive.length > 0) {
+    const { error: reviveError } = await admin
+      .schema("hrms")
+      .from("leave_approvals")
+      .update({
+        approver_employee_id: ceoId,
+        approval_status: "pending",
+        approval_level: 1,
+        status: "active",
+        deleted_at: null,
+        updated_at: now,
+      })
+      .in("id", approvalIdsToRevive);
+
+    if (reviveError) throw new Error(reviveError.message);
+  }
 
   if (missingApprovalLeaves.length > 0) {
     const { error: insertError } = await admin
@@ -1329,6 +1379,8 @@ export async function ensurePendingHrLeaveAssignedToCeo(
         })),
       );
 
-    if (insertError) throw new Error(insertError.message);
+    if (insertError && insertError.code !== "23505") {
+      throw new Error(insertError.message);
+    }
   }
 }
