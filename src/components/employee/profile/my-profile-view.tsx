@@ -18,15 +18,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/common/select";
+import { SearchableSelect } from "@/components/common/searchable-select";
 import { EmployeeIdCard } from "@/components/employees/employee-id-card";
 import { EmploymentStatusBadge } from "@/components/employees/employment-status-badge";
 import {
   EMERGENCY_RELATIONSHIP_OPTIONS,
-  formatFullAddress,
   formatRelationshipLabel,
+  normalizeCountryForSelect,
   normalizeRelationshipValue,
-  parseFullAddress,
 } from "@/lib/employee/profile-contact";
+import { COUNTRIES, INDIAN_STATES, STATE_DISTRICTS } from "@/lib/geo/india";
 import { updateEmployeeSelfProfileAction } from "@/lib/employees/actions";
 import type { MyProfileBundle } from "@/types/my-profile";
 import { TIMEZONE_OPTIONS } from "@/lib/validations/organization";
@@ -116,8 +117,6 @@ export function MyProfileView({
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const initialAddressLine = formatFullAddress(data.profileSettings.address);
-  const [addressLine, setAddressLine] = useState(initialAddressLine);
 
   const {
     register,
@@ -138,7 +137,7 @@ export function MyProfileView({
       city: data.profileSettings.address.city,
       state: data.profileSettings.address.state,
       postalCode: data.profileSettings.address.postalCode,
-      country: data.profileSettings.address.country,
+      country: normalizeCountryForSelect(data.profileSettings.address.country),
       emergencyContactName: data.profileSettings.emergencyContact.name,
       emergencyContactRelationship: normalizeRelationshipValue(
         data.profileSettings.emergencyContact.relationship,
@@ -155,8 +154,10 @@ export function MyProfileView({
   const reportingManagerId = watch("reportingManagerId");
   const personalPhone = watch("personalPhone") ?? "";
   const emergencyContactPhone = watch("emergencyContactPhone") ?? "";
+  const addressState = watch("state") ?? "";
+  const addressCity = watch("city") ?? "";
+  const addressCountry = watch("country") ?? "";
   const fullName = `${data.firstName} ${data.lastName}`.trim();
-  const fullAddress = formatFullAddress(data.profileSettings.address);
   const relationshipDisplay = formatRelationshipLabel(
     data.profileSettings.emergencyContact.relationship,
   );
@@ -172,7 +173,7 @@ export function MyProfileView({
       city: data.profileSettings.address.city,
       state: data.profileSettings.address.state,
       postalCode: data.profileSettings.address.postalCode,
-      country: data.profileSettings.address.country,
+      country: normalizeCountryForSelect(data.profileSettings.address.country),
       emergencyContactName: data.profileSettings.emergencyContact.name,
       emergencyContactRelationship: normalizeRelationshipValue(
         data.profileSettings.emergencyContact.relationship,
@@ -181,7 +182,6 @@ export function MyProfileView({
       emergencyContactEmail: data.profileSettings.emergencyContact.email,
       reportingManagerId: data.reportingManagerId ?? "",
     });
-    setAddressLine(formatFullAddress(data.profileSettings.address));
   }
 
   function handleCancelEdit() {
@@ -199,7 +199,6 @@ export function MyProfileView({
       const payload: EmployeeSelfProfileInput = canEditContactDetails
         ? {
             ...formData,
-            ...parseFullAddress(addressLine, data.profileSettings.address),
             emergencyContactRelationship:
               formData.emergencyContactRelationship?.trim() || "",
           }
@@ -342,18 +341,112 @@ export function MyProfileView({
           </ProfileInfoRow>
 
           <ProfileInfoRow
-            label="Address"
-            value={fullAddress}
+            label="Address line 1"
+            value={data.profileSettings.address.addressLine1 || "—"}
             valueClassName="leading-snug whitespace-normal"
             editing={isEditing && canEditContactDetails}
           >
             <ProfileFieldControl wide>
               <Input
-                placeholder="Full address"
+                placeholder="Street, building, area"
                 disabled={isPending}
-                value={addressLine}
-                onChange={(event) => setAddressLine(event.target.value)}
                 className="h-8 w-full text-right"
+                {...register("addressLine1")}
+              />
+            </ProfileFieldControl>
+          </ProfileInfoRow>
+
+          <ProfileInfoRow
+            label="Address line 2"
+            value={data.profileSettings.address.addressLine2 || "—"}
+            valueClassName="leading-snug whitespace-normal"
+            editing={isEditing && canEditContactDetails}
+          >
+            <ProfileFieldControl wide>
+              <Input
+                placeholder="Apartment, suite, landmark (optional)"
+                disabled={isPending}
+                className="h-8 w-full text-right"
+                {...register("addressLine2")}
+              />
+            </ProfileFieldControl>
+          </ProfileInfoRow>
+
+          <ProfileInfoRow
+            label="State"
+            value={data.profileSettings.address.state || "—"}
+            editing={isEditing && canEditContactDetails}
+          >
+            <ProfileFieldControl wide>
+              <SearchableSelect
+                options={INDIAN_STATES.map((state) => ({ value: state, label: state }))}
+                value={addressState || null}
+                onValueChange={(value) => {
+                  setValue("state", value ?? "", { shouldValidate: true });
+                  setValue("city", "", { shouldValidate: true });
+                }}
+                placeholder="Search state…"
+                allowNone={false}
+                disabled={isPending}
+              />
+            </ProfileFieldControl>
+          </ProfileInfoRow>
+
+          <ProfileInfoRow
+            label="City"
+            value={data.profileSettings.address.city || "—"}
+            editing={isEditing && canEditContactDetails}
+          >
+            <ProfileFieldControl wide>
+              <SearchableSelect
+                options={(STATE_DISTRICTS[addressState] ?? []).map((district) => ({
+                  value: district,
+                  label: district,
+                }))}
+                value={addressCity || null}
+                onValueChange={(value) =>
+                  setValue("city", value ?? "", { shouldValidate: true })
+                }
+                placeholder="Search city…"
+                allowNone={false}
+                disabled={isPending}
+                emptyMessage={
+                  addressState ? "No matches — type to search" : "Select a state first"
+                }
+              />
+            </ProfileFieldControl>
+          </ProfileInfoRow>
+
+          <ProfileInfoRow
+            label="Postal code"
+            value={data.profileSettings.address.postalCode || "—"}
+            editing={isEditing && canEditContactDetails}
+          >
+            <ProfileFieldControl>
+              <Input
+                placeholder="Postal code"
+                disabled={isPending}
+                className="h-8 w-full text-right"
+                {...register("postalCode")}
+              />
+            </ProfileFieldControl>
+          </ProfileInfoRow>
+
+          <ProfileInfoRow
+            label="Country"
+            value={normalizeCountryForSelect(data.profileSettings.address.country) || "—"}
+            editing={isEditing && canEditContactDetails}
+          >
+            <ProfileFieldControl wide>
+              <SearchableSelect
+                options={COUNTRIES.map((country) => ({ value: country, label: country }))}
+                value={addressCountry || null}
+                onValueChange={(value) =>
+                  setValue("country", value ?? "", { shouldValidate: true })
+                }
+                placeholder="Search country…"
+                allowNone={false}
+                disabled={isPending}
               />
             </ProfileFieldControl>
           </ProfileInfoRow>
@@ -525,7 +618,7 @@ export function MyProfileView({
             designation={data.designationTitle}
             departmentName={data.departmentName}
             employmentTypeName={formatDisplayLabel(data.employmentTypeName)}
-            accountStatus={data.accountStatus}
+            employmentStatus={data.employmentStatus}
             imageUrl={data.profileImageUrl}
             profilePath={data.profilePath}
             canEdit={true}

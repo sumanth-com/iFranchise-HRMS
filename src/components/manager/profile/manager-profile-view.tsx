@@ -38,7 +38,7 @@ export function ManagerProfileView({ data, status, searchDate }: Props) {
     if (next.status) params.set("status", next.status);
     if (next.searchDate) params.set("searchDate", next.searchDate);
     if (next.page && next.page > 1) params.set("page", String(next.page));
-    router.push(`/manager/profile?${params.toString()}`);
+    router.push(`/manager/profile?${params.toString()}`, { scroll: false });
   }
 
   return (
@@ -51,7 +51,10 @@ export function ManagerProfileView({ data, status, searchDate }: Props) {
           </p>
         </div>
 
-        <ManagerProfileTodayCard today={data.today} />
+        <ManagerProfileTodayCard
+          firstName={data.profileCard.firstName}
+          today={data.today}
+        />
 
         <div className="grid gap-4 xl:min-h-[min(32rem,calc(100dvh-16rem))] xl:grid-cols-[minmax(0,1.4fr)_minmax(16rem,18.5rem)] xl:items-stretch">
           <ManagerAttendanceCalendar

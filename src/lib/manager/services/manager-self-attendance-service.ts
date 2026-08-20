@@ -179,6 +179,43 @@ function resolvePunchStatus(
   return "present";
 }
 
+function resolveSelfAttendanceDayStatus(input: {
+  date: string;
+  today: string;
+  attendance: AttendanceRow | null;
+  holidayName: string | null;
+  leaveTypeName: string | null;
+  weekendStatus: AttendanceStatus | null;
+  rules: AttendanceRules;
+  correctionStatus: CorrectionStatus | null;
+}): AttendanceDisplayStatus {
+  if (input.correctionStatus === "pending") {
+    return "on_request";
+  }
+
+  if (input.holidayName) return "holiday";
+  if (input.leaveTypeName) return "on_leave";
+  if (input.weekendStatus) return input.weekendStatus;
+  if (input.date > input.today) return "upcoming";
+
+  const checkInAt = input.attendance?.check_in_at ?? null;
+  const checkOutAt = input.attendance?.check_out_at ?? null;
+
+  if (!checkInAt) {
+    if (input.date === input.today) return "upcoming";
+    return "absent";
+  }
+
+  return resolvePunchStatus(checkInAt, checkOutAt, input.date, input.rules);
+}
+
+function calendarStatusFromDisplay(
+  status: AttendanceDisplayStatus,
+): AttendanceDisplayStatus | null {
+  if (status === "upcoming") return null;
+  return status;
+}
+
 /** Regularization allowed for today, yesterday, and the day before only. */
 function isWithinRegularizationWindow(
   attendanceDate: string,
@@ -216,7 +253,9 @@ function buildTodayPanel(
   // Live punch status so checkout hours map to half day / present without waiting on stored row.
   const attendanceStatus = checkInAt
     ? resolvePunchStatus(checkInAt, checkOutAt, attendanceDate, rules)
-    : row?.attendance_status ?? null;
+    : attendanceDate === getTodayDateString()
+      ? null
+      : row?.attendance_status ?? null;
 
   return {
     attendanceId: row?.id ?? null,
@@ -406,14 +445,14 @@ function averageTimeLabel(timestamps: string[]): string | null {
 }
 
 function computeStreaks(
-  days: { date: string; status: AttendanceStatus | null; isWorkingDay: boolean }[],
+  days: { date: string; status: AttendanceDisplayStatus | null; isWorkingDay: boolean }[],
   today: string,
 ) {
   const sorted = [...days]
     .filter((day) => day.date <= today && day.isWorkingDay)
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  const isPresentLike = (status: AttendanceStatus | null) =>
+  const isPresentLike = (status: AttendanceDisplayStatus | null) =>
     status === "present" || status === "late" || status === "half_day";
 
   let best = 0;
@@ -441,6 +480,7 @@ function buildCalendarDays(input: {
   year: number;
   today: string;
   attendanceByDate: Map<string, AttendanceRow>;
+  correctionsByAttendanceId: Map<string, CorrectionRow>;
   holidayByDate: Map<string, string>;
   leaveByDate: Map<string, string>;
   weekendRules: { saturday: WeekendDayRule; sunday: WeekendDayRule };
@@ -460,24 +500,21 @@ function buildCalendarDays(input: {
     const holidayName = input.holidayByDate.get(date) ?? null;
     const leaveTypeName = input.leaveByDate.get(date) ?? null;
     const weekendStatus = weekendStatusForDate(date, input.weekendRules);
+    const correction = attendance
+      ? input.correctionsByAttendanceId.get(attendance.id) ?? null
+      : null;
 
-    let status: AttendanceStatus | null = null;
-    if (attendance) {
-      status = resolvePunchStatus(
-        attendance.check_in_at,
-        attendance.check_out_at,
-        date,
-        input.rules,
-      );
-    } else if (holidayName) {
-      status = "holiday";
-    } else if (leaveTypeName) {
-      status = "on_leave";
-    } else if (weekendStatus) {
-      status = weekendStatus;
-    } else if (inMonth && !isFuture) {
-      status = "absent";
-    }
+    const displayStatus = resolveSelfAttendanceDayStatus({
+      date,
+      today: input.today,
+      attendance,
+      holidayName,
+      leaveTypeName,
+      weekendStatus,
+      rules: input.rules,
+      correctionStatus: correction?.correction_status ?? null,
+    });
+    const status = calendarStatusFromDisplay(displayStatus);
 
     return {
       date,
@@ -624,23 +661,21 @@ function buildHistoryRows(input: {
     const holidayName = input.holidayByDate.get(date) ?? null;
     const leaveTypeName = input.leaveByDate.get(date) ?? null;
     const weekendStatus = weekendStatusForDate(date, input.weekendRules);
-
-    let status: AttendanceDisplayStatus = "absent";
-    if (attendance) {
-      status = resolvePunchStatus(
-        attendance.check_in_at,
-        attendance.check_out_at,
-        date,
-        input.rules,
-      );
-    } else if (holidayName) status = "holiday";
-    else if (leaveTypeName) status = "on_leave";
-    else if (weekendStatus) status = weekendStatus;
-    else if (date > input.today) status = "upcoming";
-
     const correction = attendance
       ? input.correctionsByAttendanceId.get(attendance.id) ?? null
       : null;
+
+    const status = resolveSelfAttendanceDayStatus({
+      date,
+      today: input.today,
+      attendance,
+      holidayName,
+      leaveTypeName,
+      weekendStatus,
+      rules: input.rules,
+      correctionStatus: correction?.correction_status ?? null,
+    });
+
     const lateMinutes = computeLateMinutes(
       attendance?.check_in_at,
       date,
@@ -658,6 +693,9 @@ function buildHistoryRows(input: {
     if (!remarks && leaveTypeName) remarks = leaveTypeName;
     if (!remarks && weekendStatus === "week_off") {
       remarks = getDay(day) === 0 ? "Sunday" : "Saturday";
+    }
+    if (!remarks && correction?.correction_status === "pending") {
+      remarks = "Regularization pending review";
     }
 
     return {
@@ -797,6 +835,7 @@ export async function getManagerProfilePageData(
     year,
     today,
     attendanceByDate,
+    correctionsByAttendanceId,
     holidayByDate,
     leaveByDate,
     weekendRules,

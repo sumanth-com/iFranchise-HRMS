@@ -1,6 +1,6 @@
 "use client";
 
-import { EmployeeAttendanceWidget } from "@/components/employee/dashboard/employee-attendance-widget";
+import { SelfAttendanceTodayCard } from "@/components/attendance/self-attendance-today-card";
 import { DailyBoostCard } from "@/components/dashboard/daily-boost-card";
 import { EmployeeDashboardHeader } from "@/components/employee/dashboard/employee-dashboard-header";
 import { EmployeeDashboardKpiCards } from "@/components/employee/dashboard/employee-dashboard-kpis";
@@ -28,7 +28,10 @@ export function EmployeeDashboardView({
 
         <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[3fr_2fr] lg:items-stretch lg:overflow-hidden">
           <div className="flex min-h-0 flex-col gap-3 lg:h-full lg:gap-4">
-            <EmployeeAttendanceWidget today={today} />
+            <SelfAttendanceTodayCard
+              firstName={greeting.firstName}
+              today={today}
+            />
             <DailyBoostCard
               firstName={greeting.firstName}
               lastName={greeting.lastName}

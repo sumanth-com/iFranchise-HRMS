@@ -20,7 +20,7 @@ export function ManagerProfileIdCard({ profile, className }: Props) {
       designation={profile.designation}
       departmentName={profile.departmentName}
       employmentTypeName={profile.employmentTypeName}
-      accountStatus={profile.accountStatus}
+      employmentStatus={profile.employmentStatus}
       imageUrl={profile.imageUrl}
       profilePath={profile.profilePath}
       canEdit={true}

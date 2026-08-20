@@ -11,7 +11,7 @@ import {
   subMonths,
 } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useMemo } from "react";
+import { Fragment, useMemo } from "react";
 
 import { Button } from "@/components/common/button";
 import {
@@ -21,6 +21,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/common/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { ATTENDANCE_DISPLAY_STATUS_LABELS } from "@/lib/attendance/constants";
+import type { AttendanceDisplayStatus } from "@/types/attendance";
 import type { ManagerAttendanceCalendarDay } from "@/types/manager-self-attendance";
 import { cn } from "@/lib/utils";
 
@@ -30,18 +37,31 @@ const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const PILL_STYLES: Record<string, string> = {
   present: "bg-emerald-500 text-white",
   late: "bg-orange-400 text-white",
-  absent: "bg-muted-foreground/25 text-muted-foreground",
+  absent: "bg-red-500 text-white",
   half_day: "bg-emerald-200 text-emerald-800",
   on_leave: "bg-violet-400 text-white",
   holiday: "bg-sky-400 text-white",
   week_off: "",
+  on_request: "bg-amber-400 text-white",
+};
+
+const TOOLTIP_STYLES: Record<string, string> = {
+  present: "border-emerald-600/30 bg-emerald-600 text-white",
+  late: "border-orange-500/30 bg-orange-500 text-white",
+  absent: "border-red-600/30 bg-red-600 text-white",
+  half_day: "border-emerald-500/30 bg-emerald-500 text-white",
+  on_leave: "border-violet-500/30 bg-violet-500 text-white",
+  holiday: "border-sky-500/30 bg-sky-500 text-white",
+  week_off: "border-border bg-muted-foreground text-white",
+  on_request: "border-amber-500/30 bg-amber-500 text-white",
+  today: "border-emerald-700/30 bg-emerald-600 text-white",
 };
 
 const LEGEND = [
   { key: "present", label: "Present", className: "bg-emerald-500" },
   { key: "late", label: "Late", className: "bg-orange-400" },
-  { key: "absent", label: "Absent", className: "bg-muted-foreground/35" },
-  { key: "half_day", label: "Half day (Sat)", className: "bg-emerald-200" },
+  { key: "absent", label: "Absent", className: "bg-red-500" },
+  { key: "half_day", label: "Half Day", className: "bg-emerald-200" },
   { key: "on_leave", label: "Leave", className: "bg-violet-400" },
   { key: "holiday", label: "Holiday", className: "bg-sky-400" },
   { key: "week_off", label: "Weekend off", className: "bg-muted-foreground/25" },
@@ -57,6 +77,31 @@ type Props = {
   className?: string;
   disableFuture?: boolean;
 };
+
+function getCalendarDayTooltip(day: ManagerAttendanceCalendarDay): {
+  label: string;
+  tone: keyof typeof TOOLTIP_STYLES;
+} | null {
+  if (day.holidayName) {
+    return { label: day.holidayName, tone: "holiday" };
+  }
+  if (day.leaveTypeName) {
+    return { label: day.leaveTypeName, tone: "on_leave" };
+  }
+  if (day.isToday) {
+    return { label: "Today", tone: "today" };
+  }
+  if (day.status) {
+    const label = ATTENDANCE_DISPLAY_STATUS_LABELS[day.status as AttendanceDisplayStatus];
+    if (label && label !== "—") {
+      return { label, tone: day.status };
+    }
+  }
+  if (day.inMonth && getDay(parseISO(day.date)) === 0) {
+    return { label: "Weekend", tone: "week_off" };
+  }
+  return null;
+}
 
 export function ManagerAttendanceCalendar({
   days,
@@ -265,15 +310,15 @@ export function ManagerAttendanceCalendar({
               !live.isToday && live.inMonth && live.status
                 ? PILL_STYLES[live.status]
                 : null;
+            const tooltip = live.inMonth ? getCalendarDayTooltip(live) : null;
 
-            return (
+            const dayButton = (
               <button
-                key={live.date}
                 type="button"
                 disabled={!live.inMonth}
                 onClick={() => onSelectDate(live.date)}
                 className={cn(
-                  "flex min-h-0 items-center justify-center rounded-xl text-sm font-medium transition",
+                  "flex min-h-0 w-full items-center justify-center rounded-xl text-sm font-medium transition",
                   !live.inMonth && "pointer-events-none opacity-25",
                   live.isToday &&
                     "bg-emerald-500 text-white shadow-sm ring-2 ring-emerald-700 ring-offset-2",
@@ -285,12 +330,6 @@ export function ManagerAttendanceCalendar({
                     !live.isToday &&
                     "ring-2 ring-primary/70 ring-offset-1",
                 )}
-                title={
-                  live.holidayName ||
-                  live.leaveTypeName ||
-                  live.status ||
-                  live.date
-                }
               >
                 <span
                   className={cn(
@@ -302,6 +341,27 @@ export function ManagerAttendanceCalendar({
                   {live.dayOfMonth}
                 </span>
               </button>
+            );
+
+            if (!tooltip) {
+              return <Fragment key={live.date}>{dayButton}</Fragment>;
+            }
+
+            return (
+              <Tooltip key={live.date}>
+                <TooltipTrigger render={dayButton} />
+                <TooltipContent
+                  side="top"
+                  sideOffset={6}
+                  hideArrow
+                  className={cn(
+                    "rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-md",
+                    TOOLTIP_STYLES[tooltip.tone] ?? TOOLTIP_STYLES.present,
+                  )}
+                >
+                  {tooltip.label}
+                </TooltipContent>
+              </Tooltip>
             );
           })}
         </div>

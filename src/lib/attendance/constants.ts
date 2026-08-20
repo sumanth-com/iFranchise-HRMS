@@ -38,6 +38,7 @@ export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatus, string> = {
 export const ATTENDANCE_DISPLAY_STATUS_LABELS: Record<AttendanceDisplayStatus, string> = {
   ...ATTENDANCE_STATUS_LABELS,
   upcoming: "—",
+  on_request: "On Request",
 };
 
 export const ATTENDANCE_SOURCE_LABELS: Record<string, string> = {

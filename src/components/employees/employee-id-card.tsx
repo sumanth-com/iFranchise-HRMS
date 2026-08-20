@@ -5,14 +5,14 @@ import { useRouter } from "next/navigation";
 import { Camera, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
+import { EmploymentStatusBadge } from "@/components/employees/employment-status-badge";
 import { PROFILE_IMAGE_MAX_BYTES } from "@/lib/employees/constants";
 import {
   removeProfileImageAction,
   uploadProfileImageAction,
 } from "@/lib/employees/actions";
 import { cn } from "@/lib/utils";
-import { EmployeeAccountStatusBadge } from "@/components/employees/employee-account-status-badge";
-import type { EmployeeAccountStatus } from "@/types/employee";
+import type { EmploymentStatus } from "@/types/auth";
 
 type EmployeeIdCardProps = {
   employeeId: string;
@@ -22,7 +22,7 @@ type EmployeeIdCardProps = {
   designation: string | null;
   departmentName: string | null;
   employmentTypeName: string;
-  accountStatus: EmployeeAccountStatus;
+  employmentStatus: EmploymentStatus;
   imageUrl: string | null;
   profilePath: string;
   canEdit: boolean;
@@ -37,7 +37,7 @@ export function EmployeeIdCard({
   designation,
   departmentName: _departmentName,
   employmentTypeName,
-  accountStatus,
+  employmentStatus,
   imageUrl: initialUrl,
   profilePath: _profilePath,
   canEdit,
@@ -258,7 +258,10 @@ export function EmployeeIdCard({
               <p className="inline-flex w-fit rounded-full bg-white/70 px-2.5 py-1 text-[0.68rem] font-semibold tracking-wide text-neutral-600 shadow-sm ring-1 ring-black/5">
                 {employmentTypeName}
               </p>
-              <EmployeeAccountStatusBadge status={accountStatus} />
+              <EmploymentStatusBadge
+                status={employmentStatus === "draft" ? "active" : employmentStatus}
+                className="bg-white/70 shadow-sm ring-1 ring-black/5"
+              />
             </div>
           </div>
         </div>

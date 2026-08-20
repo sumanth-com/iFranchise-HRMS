@@ -25,6 +25,32 @@ export type ProfileAddressParts = {
   country: string;
 };
 
+export function normalizeCountryForSelect(country: string | null | undefined): string {
+  const trimmed = country?.trim() ?? "";
+  if (!trimmed) return "India";
+  const codeMap: Record<string, string> = {
+    IN: "India",
+    US: "United States",
+    GB: "United Kingdom",
+    UK: "United Kingdom",
+    CA: "Canada",
+    AU: "Australia",
+    SG: "Singapore",
+    AE: "United Arab Emirates",
+    DE: "Germany",
+    FR: "France",
+    JP: "Japan",
+    CN: "China",
+    KR: "South Korea",
+    NL: "Netherlands",
+    CH: "Switzerland",
+    SE: "Sweden",
+  };
+  const mapped = codeMap[trimmed.toUpperCase()];
+  if (mapped) return mapped;
+  return trimmed;
+}
+
 export function formatFullAddress(address: ProfileAddressParts): string {
   const parts = [
     address.addressLine1,

@@ -103,6 +103,7 @@ export function EmployeePayrollView({
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const money = (value: number) => formatCurrency(value, data.currencyCode);
+  const latestPayslip = data.payslips.find((row) => row.canEmployeeAccess) ?? null;
 
   function openPayslip(id: string) {
     setActivePayslipId(id);
@@ -127,8 +128,8 @@ export function EmployeePayrollView({
           <Button
             variant="outline"
             className="gap-1.5"
-            disabled={data.payslips.length === 0}
-            onClick={() => data.payslips[0] && openPayslip(data.payslips[0].id)}
+            disabled={!latestPayslip}
+            onClick={() => latestPayslip && openPayslip(latestPayslip.id)}
           >
             <Download className="size-4" />
             Latest Payslip
@@ -152,8 +153,8 @@ export function EmployeePayrollView({
       <Button
         variant="outline"
         className="gap-1.5"
-        disabled={data.payslips.length === 0}
-        onClick={() => data.payslips[0] && openPayslip(data.payslips[0].id)}
+        disabled={!latestPayslip}
+        onClick={() => latestPayslip && openPayslip(latestPayslip.id)}
       >
         <Download className="size-4" />
         Latest Payslip
@@ -201,7 +202,6 @@ export function EmployeePayrollView({
   const net = breakdown.netSalary;
   const usingStructure = breakdown.usingStructure;
   const extrasIncluded = breakdown.extrasIncluded;
-
   const maxTrend = Math.max(1, ...data.trend.map((point) => point.gross));
 
   return (
@@ -235,6 +235,7 @@ export function EmployeePayrollView({
         <EmployeeStatCard
           label="Current Net Salary"
           value={data.kpis.currentNetSalary != null ? money(data.kpis.currentNetSalary) : "—"}
+          hint="Take-home pay"
           icon={Wallet}
           accent="text-emerald-600 dark:text-emerald-400"
           iconBg="bg-emerald-500/10"
@@ -244,6 +245,7 @@ export function EmployeePayrollView({
           value={
             data.kpis.currentGrossSalary != null ? money(data.kpis.currentGrossSalary) : "—"
           }
+          hint="Before deductions"
           icon={Banknote}
           accent="text-sky-600 dark:text-sky-400"
           iconBg="bg-sky-500/10"
@@ -251,6 +253,7 @@ export function EmployeePayrollView({
         <EmployeeStatCard
           label="Last Payment"
           value={fmtDate(data.kpis.lastPaymentDate)}
+          hint="Salary credited"
           icon={CalendarDays}
           accent="text-violet-600 dark:text-violet-400"
           iconBg="bg-violet-500/10"

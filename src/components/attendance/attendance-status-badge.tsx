@@ -3,14 +3,15 @@ import { ATTENDANCE_DISPLAY_STATUS_LABELS } from "@/lib/attendance/constants";
 import type { AttendanceDisplayStatus } from "@/types/attendance";
 
 const STATUS_STYLES: Record<AttendanceDisplayStatus, string> = {
-  present: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  absent: "bg-destructive/10 text-destructive",
-  late: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  half_day: "bg-orange-500/10 text-orange-700 dark:text-orange-300",
-  on_leave: "bg-blue-500/10 text-blue-700 dark:text-blue-300",
-  holiday: "bg-violet-500/10 text-violet-700 dark:text-violet-300",
+  present: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  absent: "bg-red-500/15 text-red-700 dark:text-red-400",
+  late: "bg-orange-400/15 text-orange-700 dark:text-orange-300",
+  half_day: "bg-emerald-200/80 text-emerald-800 dark:text-emerald-300",
+  on_leave: "bg-violet-400/15 text-violet-700 dark:text-violet-300",
+  holiday: "bg-sky-400/15 text-sky-700 dark:text-sky-300",
   week_off: "bg-muted text-muted-foreground",
   upcoming: "bg-muted text-muted-foreground",
+  on_request: "bg-amber-400/15 text-amber-800 dark:text-amber-300",
 };
 
 type AttendanceStatusBadgeProps = {

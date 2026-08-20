@@ -22,8 +22,8 @@ import {
   formatAttendanceTime,
 } from "@/lib/attendance/services/attendance-utils";
 import { ATTENDANCE_STATUS_LABELS } from "@/lib/attendance/constants";
-import { employeeUpdateCheckoutAction } from "@/lib/employee/actions/employee-dashboard-actions";
-import { formatHoursLabel } from "@/lib/employee/attendance-format";
+import { selfAttendanceUpdateCheckoutAction } from "@/lib/attendance/actions/self-attendance-punch-actions";
+import { formatHoursLabel, formatLateByLabel } from "@/lib/employee/attendance-format";
 import type { AttendanceStatus } from "@/types/attendance";
 import type {
   ManagerAttendanceHistoryResult,
@@ -80,7 +80,7 @@ export function EmployeeAttendanceHistoryTable({
 
   function updateCheckout(row: ManagerAttendanceHistoryRow) {
     startTransition(async () => {
-      const result = await employeeUpdateCheckoutAction({
+      const result = await selfAttendanceUpdateCheckoutAction({
         attendanceId: row.id ?? undefined,
       });
       if (!result.success) {
@@ -225,7 +225,7 @@ export function EmployeeAttendanceHistoryTable({
                   {row.workHours > 0 ? formatHoursLabel(row.workHours) : "—"}
                 </td>
                 <td className="px-4 py-3">
-                  {row.lateMinutes > 0 ? `${row.lateMinutes}m` : "—"}
+                  {row.lateMinutes > 0 ? formatLateByLabel(row.lateMinutes) : "—"}
                 </td>
                 <td className="px-4 py-3">
                   {row.overtimeHours > 0
@@ -430,7 +430,7 @@ function DayReportCard({ row }: { row: ManagerAttendanceHistoryRow }) {
             <p className="text-muted-foreground">
               Late:{" "}
               <span className="font-medium text-foreground">
-                {row.lateMinutes} min
+                {formatLateByLabel(row.lateMinutes)}
               </span>
             </p>
           ) : null}

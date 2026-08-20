@@ -532,7 +532,7 @@ function TeamMemberProfileLayout({ detail }: { detail: TeamMemberDetailBundle })
             designation={employee.designationTitle}
             departmentName={employee.departmentName}
             employmentTypeName={employee.employmentTypeName ?? "—"}
-            accountStatus={employee.accountStatus}
+            employmentStatus={employee.employmentStatus}
             imageUrl={detail.profileImageUrl}
             profilePath={MANAGER_ROUTES.teamMember(employee)}
             canEdit={false}

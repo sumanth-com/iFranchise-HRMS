@@ -7,7 +7,7 @@ import { useState } from "react";
 
 import { buttonVariants } from "@/components/common/button";
 import { EmployeeAttendanceHistoryTable } from "@/components/employee/attendance/employee-attendance-history-table";
-import { EmployeeAttendanceTodayCard } from "@/components/employee/attendance/employee-attendance-today-card";
+import { SelfAttendanceTodayCard } from "@/components/attendance/self-attendance-today-card";
 import { ManagerAttendanceCalendar } from "@/components/manager/profile/manager-attendance-calendar";
 import { ManagerProfileSummaryCards } from "@/components/manager/profile/manager-profile-summary-cards";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
@@ -65,7 +65,7 @@ export function EmployeeAttendanceView({
     if (next.status) params.set("status", next.status);
     if (next.searchDate) params.set("searchDate", next.searchDate);
     if (next.page && next.page > 1) params.set("page", String(next.page));
-    router.push(`${basePath}?${params.toString()}`);
+    router.push(`${basePath}?${params.toString()}`, { scroll: false });
   }
 
   const content = (
@@ -98,7 +98,10 @@ export function EmployeeAttendanceView({
         </div>
       ) : null}
 
-      <EmployeeAttendanceTodayCard today={data.today} />
+      <SelfAttendanceTodayCard
+        firstName={data.profileCard.firstName}
+        today={data.today}
+      />
 
       <div className="grid gap-3 xl:min-h-[min(32rem,calc(100dvh-16rem))] xl:grid-cols-[minmax(0,1fr)_9.75rem] xl:items-stretch">
         <ManagerAttendanceCalendar
@@ -126,23 +129,25 @@ export function EmployeeAttendanceView({
         </div>
       </div>
 
-      <EmployeeAttendanceHistoryTable
-        history={data.history}
-        month={data.month}
-        year={data.year}
-        status={status}
-        searchDate={searchDate}
-        onFilterChange={(filters) =>
-          pushParams({
-            month: filters.month,
-            year: filters.year,
-            date: selectedDate,
-            status: filters.status,
-            searchDate: filters.searchDate,
-            page: filters.page,
-          })
-        }
-      />
+      <div id="attendance-history">
+        <EmployeeAttendanceHistoryTable
+          history={data.history}
+          month={data.month}
+          year={data.year}
+          status={status}
+          searchDate={searchDate}
+          onFilterChange={(filters) =>
+            pushParams({
+              month: filters.month,
+              year: filters.year,
+              date: selectedDate,
+              status: filters.status,
+              searchDate: filters.searchDate,
+              page: filters.page,
+            })
+          }
+        />
+      </div>
     </div>
   );
 
