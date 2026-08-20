@@ -150,6 +150,7 @@ export type CeoRecruitmentCandidateDetail = {
     rating: number | null;
     comments: string | null;
     recommendation: string | null;
+    createdAt?: string | null;
   }[];
   offerStatus: OfferStatus | null;
   expectedJoiningDate: string | null;

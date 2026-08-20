@@ -94,7 +94,7 @@ export const employeeInviteSchema = z.object({
 
 export type EmployeeInviteInput = z.infer<typeof employeeInviteSchema>;
 
-/** Employee self-service: language and timezone only. Contact/address/emergency are HR-managed. */
+/** Preferences-only fallback when contact self-edit is not allowed. */
 export const employeeSelfPreferencesSchema = z.object({
   language: z.string().min(2).max(20),
   timezone: z.string().min(1).max(80),

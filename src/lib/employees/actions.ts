@@ -8,7 +8,7 @@ import {
   requireServerPermission,
 } from "@/lib/permissions/server";
 import { hasPermission } from "@/lib/permissions/utils";
-import { canEditSelfProfileContactDetails } from "@/lib/employee/profile-contact";
+import { canEditSelfProfileContactDetails, canEditSelfReportingManager } from "@/lib/employee/profile-contact";
 import { EMPLOYEE_ROUTES, PROFILE_IMAGE_MAX_BYTES } from "@/lib/employees/constants";
 import {
   getEmployeeById,
@@ -884,6 +884,7 @@ export async function updateEmployeeSelfProfileAction(
     }
 
     const canEditContact = canEditSelfProfileContactDetails(profile.permissionCodes);
+    const canEditReportingManager = canEditSelfReportingManager(profile.permissionCodes);
 
     const supabase = await getAuthenticatedSupabase();
 
@@ -895,7 +896,9 @@ export async function updateEmployeeSelfProfileAction(
         return { success: false, message: "Employee profile not found" };
       }
 
-      await updateEmployeeSelfProfileWithContact(supabase, profile, parsed, existing);
+      await updateEmployeeSelfProfileWithContact(supabase, profile, parsed, existing, {
+        allowReportingManagerUpdate: canEditReportingManager,
+      });
     } else {
       const parsed = employeeSelfPreferencesSchema.parse(input);
       await updateEmployeeSelfPreferences(supabase, profile, parsed);

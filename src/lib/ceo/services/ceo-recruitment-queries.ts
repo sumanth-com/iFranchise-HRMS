@@ -10,6 +10,7 @@ import {
   fromHrms,
   unwrapRelation,
 } from "@/lib/reports/services/reports-utils";
+import { sortInterviewsForDisplay } from "@/lib/recruitment/services/recruitment-utils";
 import { createSignedStorageUrl } from "@/lib/storage/signed-url";
 import { ceoRecruitmentListParamsSchema } from "@/lib/validations/ceo-recruitment";
 import type { UserProfile } from "@/types/auth";
@@ -789,22 +790,25 @@ export async function getCeoRecruitmentCandidateDetail(
       description: item.description,
       createdAt: item.created_at,
     })),
-    interviews: ((interviewsRes.data ?? []) as LooseRow[]).map((item) => {
-      const interviewer = unwrap(item.interviewer);
-      return {
-        id: item.id,
-        roundName: item.round_name,
-        interviewDate: item.interview_date,
-        interviewTime: String(item.interview_time).slice(0, 5),
-        interviewerName: interviewer
-          ? formatEmployeeName(interviewer.first_name, interviewer.last_name)
-          : "—",
-        interviewStatus: item.interview_status,
-        rating: item.rating,
-        comments: item.comments,
-        recommendation: item.recommendation,
-      };
-    }),
+    interviews: sortInterviewsForDisplay(
+      ((interviewsRes.data ?? []) as LooseRow[]).map((item) => {
+        const interviewer = unwrap(item.interviewer);
+        return {
+          id: item.id,
+          roundName: item.round_name,
+          interviewDate: item.interview_date,
+          interviewTime: String(item.interview_time).slice(0, 5),
+          interviewerName: interviewer
+            ? formatEmployeeName(interviewer.first_name, interviewer.last_name)
+            : "—",
+          interviewStatus: item.interview_status,
+          rating: item.rating,
+          comments: item.comments,
+          recommendation: item.recommendation,
+          createdAt: item.created_at ?? null,
+        };
+      }),
+    ),
     offerStatus: latestOffer?.offer_status ?? null,
     expectedJoiningDate: latestOffer?.joining_date ?? null,
   };
