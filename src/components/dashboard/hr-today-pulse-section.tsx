@@ -208,7 +208,7 @@ export function HrTodayPulseSection({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         <PulseMetric
           label="Present Today"
           value={pulse.presentToday}
@@ -232,12 +232,6 @@ export function HrTodayPulseSection({
           value={pulse.pendingApprovals}
           href={links.pendingLeaveApprovals}
           accent="text-violet-600 dark:text-violet-400"
-        />
-        <PulseMetric
-          label="Exit Requests"
-          value={pulse.exitRequests}
-          href={links.exitRequests}
-          accent="text-rose-600 dark:text-rose-400"
         />
       </div>
     </section>

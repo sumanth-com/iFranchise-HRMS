@@ -65,13 +65,21 @@ export const candidateListParamsSchema = recruitmentListParamsSchema.extend({
     .optional(),
   source: z.string().trim().optional(),
   offerQueue: z.enum(["all", "pending", "sent", "accepted"]).optional(),
+  month: z.coerce.number().int().min(1).max(12).optional(),
+  year: z.coerce.number().int().min(2000).max(2100).optional(),
 });
 
 export const candidateFormSchema = z.object({
   jobOpeningId: z.string().uuid("Select a job position"),
   firstName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
-  email: z.string().email(),
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(1, "Email is required")
+    .email("Enter a valid email address")
+    .max(255),
   phone: optionalNullablePhoneSchema,
   experienceYears: z.coerce.number().min(0).optional().nullable(),
   skills: z.string().max(2000).optional().nullable(),

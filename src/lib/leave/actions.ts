@@ -206,7 +206,11 @@ export async function fetchLeaveRequestsAction(
   try {
     const profile = await requireServerPermission("leave.view");
     const supabase = await getAuthenticatedSupabase();
-    const parsed = leaveListParamsSchema.parse(params);
+    const parsed = leaveListParamsSchema.parse({
+      ...params,
+      // HR Team Leave must never list HR applicants (CEO-only queue).
+      excludeHrApplicants: params.excludeHrApplicants ?? true,
+    });
     const data = await listLeaveRequests(supabase, profile, parsed);
     return { success: true, data };
   } catch (error) {
@@ -298,7 +302,9 @@ export async function getLeaveSummaryAction(): Promise<LeaveActionResult<LeaveSu
   try {
     const profile = await requireServerPermission("leave.view");
     const supabase = await getAuthenticatedSupabase();
-    const data = await getLeaveSummary(supabase, profile);
+    const data = await getLeaveSummary(supabase, profile, undefined, undefined, {
+      excludeHrApplicants: true,
+    });
     return { success: true, data };
   } catch (error) {
     return {

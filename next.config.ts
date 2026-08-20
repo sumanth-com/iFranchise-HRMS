@@ -52,8 +52,8 @@ const nextConfig: NextConfig = {
       "recharts",
     ],
     staleTimes: {
-      dynamic: 180,
-      static: 300,
+      dynamic: 300,
+      static: 600,
     },
     // Profile images up to 10 MB; documents up to 30 MB via Server Actions.
     serverActions: {

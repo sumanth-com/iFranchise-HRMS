@@ -4,9 +4,11 @@ import {
   ArrowRight,
   BriefcaseBusiness,
   Cake,
+  CalendarClock,
   ClipboardList,
   FileWarning,
   Medal,
+  Palmtree,
   Sparkles,
   UserPlus,
   Wallet,
@@ -17,11 +19,10 @@ import { format, parseISO } from "date-fns";
 
 import { HrUpcomingHolidaysPanel } from "@/components/dashboard/hr-today-pulse-section";
 import type {
-  DashboardChartItem,
-  DashboardCharts,
   DashboardListItem,
   DashboardPersonEvent,
   DashboardTaskItem,
+  DashboardWatchItem,
 } from "@/types/dashboard";
 import { cn } from "@/lib/utils";
 
@@ -30,123 +31,122 @@ const TASK_ICONS: Record<string, LucideIcon> = {
   "documents-expiring": FileWarning,
   "active-candidates": BriefcaseBusiness,
   "payroll-due": Wallet,
+  "interviews-today": CalendarClock,
+  "on-leave": Palmtree,
+  "probation-ending": UserPlus,
+  "leave-approvals": Palmtree,
+  "offers-pending": BriefcaseBusiness,
 };
 
 const TASK_HINTS: Record<string, string> = {
-  "onboarding-review": "Review and approve submitted onboarding cases",
+  "onboarding-review": "Review candidates still in onboarding",
   "documents-expiring": "Renew or verify employee documents before they lapse",
   "payroll-due": "Process this month's payroll run for your team",
   "active-candidates": "Follow up on candidates still in the hiring pipeline",
+  "interviews-today": "Interviews scheduled for today",
+  "on-leave": "Employees on approved leave today",
 };
 
-function seriesMax(items: DashboardChartItem[]) {
-  return Math.max(1, ...items.map((item) => item.value));
-}
-
-function AttendanceSparkline({ items }: { items: DashboardChartItem[] }) {
-  const rows = items.slice(-7);
-  const max = seriesMax(rows);
-  const total = rows.reduce((sum, item) => sum + item.value, 0);
-  const width = 280;
-  const height = 52;
-  const padX = 8;
-  const padY = 6;
-  const innerW = width - padX * 2;
-  const innerH = height - padY * 2;
-
-  const points =
-    rows.length === 0
-      ? []
-      : rows.map((item, index) => {
-          const x = padX + (rows.length === 1 ? innerW / 2 : (index / (rows.length - 1)) * innerW);
-          const y = padY + innerH - (item.value / max) * innerH;
-          return { x, y, item };
-        });
-
-  const linePath =
-    points.length > 0
-      ? points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ")
-      : "";
-  const areaPath =
-    points.length > 0
-      ? `${linePath} L ${points[points.length - 1].x} ${height - padY} L ${points[0].x} ${height - padY} Z`
-      : "";
-
+function PeopleWatchlistCard({ items }: { items: DashboardWatchItem[] }) {
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-gradient-to-br from-emerald-500/10 via-background to-teal-500/5 p-3">
-      <div className="pointer-events-none absolute -right-8 -top-8 size-24 rounded-full bg-emerald-400/20 blur-2xl" />
-      <div className="flex shrink-0 items-center justify-between gap-2">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
-            Attendance pulse
-          </p>
-          <p className="mt-0.5 text-lg font-semibold tabular-nums tracking-tight">
-            {total}
-            <span className="ml-1 text-xs font-normal text-muted-foreground">present (7d)</span>
-          </p>
-        </div>
-        <span className="rounded-full border bg-background/80 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-          7 days
-        </span>
-      </div>
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-gradient-to-br from-sky-500/10 via-background to-indigo-500/5 p-3">
+      <div className="pointer-events-none absolute -right-8 -top-8 size-24 rounded-full bg-sky-400/20 blur-2xl" />
+      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-400">
+        People watchlist
+      </p>
 
-      {rows.length === 0 ? (
-        <p className="mt-2 text-xs text-muted-foreground">No attendance data yet.</p>
-      ) : (
-        <div className="mt-1.5 min-h-0 shrink-0">
-          <svg
-            viewBox={`0 0 ${width} ${height}`}
-            className="h-12 w-full"
-            preserveAspectRatio="none"
-            aria-hidden
-          >
-            <defs>
-              <linearGradient id="attendanceArea" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="rgb(16 185 129)" stopOpacity="0.35" />
-                <stop offset="100%" stopColor="rgb(16 185 129)" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            {areaPath ? <path d={areaPath} fill="url(#attendanceArea)" /> : null}
-            {linePath ? (
-              <path
-                d={linePath}
-                fill="none"
-                stroke="rgb(16 185 129)"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            ) : null}
-            {points.map((point) => (
-              <circle
-                key={point.item.label}
-                cx={point.x}
-                cy={point.y}
-                r={point.item.value > 0 ? 4 : 2.5}
-                className={point.item.value > 0 ? "fill-emerald-500" : "fill-muted-foreground/40"}
-              />
-            ))}
-          </svg>
-          <div className="mt-1 flex justify-between gap-1 text-[9px] text-muted-foreground">
-            {rows.map((item) => (
-              <span key={item.label} className="flex-1 truncate text-center tabular-nums">
-                {item.label.slice(0, 3)}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+      <div className="grid min-h-0 flex-1 grid-cols-2 gap-1.5">
+        {items.slice(0, 2).map((item) => {
+          const hasWork = item.value > 0;
+          return (
+            <Link
+              key={item.id}
+              href={item.href}
+              className="flex min-h-0 flex-col justify-between rounded-lg border bg-background/80 px-2.5 py-2 outline-none transition-colors hover:border-primary/40 hover:bg-background"
+            >
+              <p className="text-[10px] font-medium leading-tight text-muted-foreground">
+                {item.label}
+              </p>
+              <div className="mt-1 flex items-end justify-between gap-1">
+                <p
+                  className={cn(
+                    "text-xl font-semibold tabular-nums leading-none",
+                    hasWork ? "text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  {item.value}
+                </p>
+                <span className="truncate text-[9px] text-muted-foreground">{item.hint}</span>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-function HrPriorityFocus({ item }: { item: DashboardTaskItem | undefined }) {
-  if (!item) return null;
-
+function FocusTaskCard({ item }: { item: DashboardTaskItem }) {
   const Icon = TASK_ICONS[item.id] ?? ClipboardList;
   const hasWork = (item.count ?? 0) > 0;
   const isUrgent = item.urgency === "high" && hasWork;
   const hint = TASK_HINTS[item.id] ?? "Open the linked workflow to continue";
+
+  return (
+    <Link
+      href={item.href}
+      className={cn(
+        "flex min-h-0 flex-col justify-between rounded-xl border bg-muted/15 p-3 outline-none transition-colors",
+        "hover:border-primary/40 hover:bg-accent/30",
+        "focus-visible:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/40",
+        isUrgent && "border-amber-500/35 bg-gradient-to-br from-amber-500/10 via-background to-background",
+      )}
+    >
+      <div className="flex items-start gap-2.5">
+        <span
+          className={cn(
+            "flex size-9 shrink-0 items-center justify-center rounded-lg border bg-background shadow-sm",
+            isUrgent && "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+          )}
+        >
+          <Icon className="size-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold leading-snug">{item.label}</p>
+          <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">{hint}</p>
+        </div>
+      </div>
+      <div className="mt-2 flex items-end justify-between gap-2">
+        <span
+          className={cn(
+            "rounded-full px-2.5 py-0.5 text-base font-semibold tabular-nums leading-none",
+            hasWork
+              ? isUrgent
+                ? "bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                : "bg-primary/10 text-primary"
+              : "bg-muted text-muted-foreground",
+          )}
+        >
+          {item.count ?? 0}
+        </span>
+        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-primary">
+          Open
+          <ArrowRight className="size-3.5" />
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+function HrPriorityFocus({
+  items,
+  description = "Payroll, interviews, leave, and onboarding",
+}: {
+  items: DashboardTaskItem[];
+  description?: string;
+}) {
+  const cards = items.slice(0, 4);
+  if (cards.length === 0) return null;
 
   return (
     <section className="flex h-full min-h-0 flex-col rounded-xl border bg-card p-3 shadow-sm md:p-4">
@@ -158,54 +158,15 @@ function HrPriorityFocus({ item }: { item: DashboardTaskItem | undefined }) {
           <h2 className="text-[11px] font-semibold tracking-wide text-foreground uppercase">
             Focus Today
           </h2>
-          <p className="text-[11px] text-muted-foreground">Your most important HR task right now</p>
+          <p className="text-[11px] text-muted-foreground">{description}</p>
         </div>
       </div>
 
-      <Link
-        href={item.href}
-        className={cn(
-          "flex min-h-0 flex-1 flex-col justify-center rounded-xl border bg-muted/15 p-4 outline-none transition-colors",
-          "hover:border-primary/40 hover:bg-accent/30",
-          "focus-visible:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/40",
-          isUrgent && "border-amber-500/35 bg-gradient-to-br from-amber-500/10 via-background to-background",
-        )}
-      >
-        <div className="flex items-center gap-4">
-          <span
-            className={cn(
-              "flex size-12 shrink-0 items-center justify-center rounded-xl border bg-background shadow-sm",
-              isUrgent && "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
-            )}
-          >
-            <Icon className="size-5" />
-          </span>
-
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold leading-snug">{item.label}</p>
-            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{hint}</p>
-          </div>
-
-          <div className="flex shrink-0 flex-col items-end gap-2">
-            <span
-              className={cn(
-                "rounded-full px-3 py-1 text-lg font-semibold tabular-nums leading-none",
-                hasWork
-                  ? isUrgent
-                    ? "bg-amber-500/15 text-amber-700 dark:text-amber-400"
-                    : "bg-primary/10 text-primary"
-                  : "bg-muted text-muted-foreground",
-              )}
-            >
-              {item.count ?? 0}
-            </span>
-            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-primary">
-              Open
-              <ArrowRight className="size-3.5" />
-            </span>
-          </div>
-        </div>
-      </Link>
+      <div className="grid min-h-0 flex-1 grid-cols-2 gap-2.5">
+        {cards.map((item) => (
+          <FocusTaskCard key={item.id} item={item} />
+        ))}
+      </div>
     </section>
   );
 }
@@ -303,13 +264,13 @@ function TeamCelebrationsPanel({
 }
 
 function HrInsightsPanel({
-  charts,
+  watchItems,
   birthdays,
   anniversaries,
   title = "HR Insights",
-  description = "Attendance pulse and upcoming celebrations",
+  description = "People to watch and upcoming celebrations",
 }: {
-  charts: DashboardCharts;
+  watchItems: DashboardWatchItem[];
   birthdays: DashboardPersonEvent[];
   anniversaries: DashboardPersonEvent[];
   title?: string;
@@ -325,7 +286,7 @@ function HrInsightsPanel({
       </div>
 
       <div className="grid min-h-0 flex-1 gap-2.5 lg:grid-cols-2 lg:items-stretch">
-        <AttendanceSparkline items={charts.attendanceTrend7Days} />
+        <PeopleWatchlistCard items={watchItems} />
         <TeamCelebrationsPanel
           birthdays={birthdays}
           anniversaries={anniversaries}
@@ -337,31 +298,33 @@ function HrInsightsPanel({
 
 export function DashboardOperationsRow({
   tasks,
-  charts,
+  watchItems,
   upcomingHolidays,
   upcomingBirthdays,
   upcomingAnniversaries,
   insightsTitle,
   insightsDescription,
+  focusDescription,
 }: {
   tasks: DashboardTaskItem[];
-  charts: DashboardCharts;
+  watchItems: DashboardWatchItem[];
   upcomingHolidays: DashboardListItem[];
   upcomingBirthdays: DashboardPersonEvent[];
   upcomingAnniversaries: DashboardPersonEvent[];
   insightsTitle?: string;
   insightsDescription?: string;
+  focusDescription?: string;
 }) {
   return (
     <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-3 overflow-hidden">
       <div className="grid min-h-0 gap-3 overflow-hidden xl:grid-cols-2 xl:items-stretch">
-        <HrPriorityFocus item={tasks[0]} />
+        <HrPriorityFocus items={tasks} description={focusDescription} />
         <HrUpcomingHolidaysPanel holidays={upcomingHolidays} />
       </div>
 
       <div className="min-h-0 overflow-hidden">
         <HrInsightsPanel
-          charts={charts}
+          watchItems={watchItems}
           birthdays={upcomingBirthdays}
           anniversaries={upcomingAnniversaries}
           title={insightsTitle}

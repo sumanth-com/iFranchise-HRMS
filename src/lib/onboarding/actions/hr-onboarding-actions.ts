@@ -55,7 +55,13 @@ export async function fetchOnboardingLookupsAction() {
 }
 
 export async function fetchOnboardingModuleAction(
-  params: { page?: number; pageSize?: number; search?: string; status?: string },
+  params: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    status?: string;
+    roleId?: string;
+  },
 ): Promise<OnboardingModuleData> {
   return loadOnboardingModuleData(params);
 }

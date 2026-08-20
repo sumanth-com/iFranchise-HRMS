@@ -30,6 +30,8 @@ function toAttendanceListItem(row: TeamAttendanceListItem): AttendanceListItem {
     workHours: row.workHours,
     overtimeHours: row.overtimeHours,
     attendanceStatus: row.attendanceStatus,
+    correctionId: row.correctionId,
+    correctionStatus: row.correctionStatus,
   };
 }
 

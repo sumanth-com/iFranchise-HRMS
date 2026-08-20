@@ -110,6 +110,30 @@ export function InterviewsManagement({
   const [monthFilter, setMonthFilter] = useState(currentMonth);
   const [yearFilter, setYearFilter] = useState(currentYear);
   const [typeFilter, setTypeFilter] = useState("all");
+  const [roundFilter, setRoundFilter] = useState("all");
+  const [positionFilter, setPositionFilter] = useState("all");
+
+  const roundOptions = useMemo(() => {
+    const values = Array.from(
+      new Set(records.map((r) => r.roundName).filter((v): v is string => Boolean(v))),
+    ).sort((a, b) => a.localeCompare(b));
+
+    return [{ value: "all", label: "All rounds" }, ...values.map((value) => ({ value, label: value }))];
+  }, [records]);
+
+  const positionOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of records) {
+      if (!r.jobOpeningId) continue;
+      map.set(r.jobOpeningId, r.jobTitle);
+    }
+
+    const values = Array.from(map.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+    return [{ value: "all", label: "All positions" }, ...values];
+  }, [records]);
 
   const filteredRecords = useMemo(() => {
     let items = [...records];
@@ -118,13 +142,19 @@ export function InterviewsManagement({
     if (typeFilter !== "all") {
       items = items.filter((r) => r.interviewType === typeFilter);
     }
+    if (roundFilter !== "all") {
+      items = items.filter((r) => r.roundName === roundFilter);
+    }
+    if (positionFilter !== "all") {
+      items = items.filter((r) => r.jobOpeningId === positionFilter);
+    }
     items.sort((a, b) => {
       const dateA = `${a.interviewDate} ${a.interviewTime}`;
       const dateB = `${b.interviewDate} ${b.interviewTime}`;
       return dateB.localeCompare(dateA);
     });
     return items;
-  }, [records, monthFilter, yearFilter, typeFilter]);
+  }, [records, monthFilter, yearFilter, typeFilter, roundFilter, positionFilter]);
 
   return (
     <div className="space-y-4">
@@ -170,6 +200,20 @@ export function InterviewsManagement({
           value={typeFilter}
           placeholder="All types"
           onValueChange={setTypeFilter}
+        />
+        <FilterSelect
+          className="w-[160px]"
+          items={roundOptions}
+          value={roundFilter}
+          placeholder="All rounds"
+          onValueChange={setRoundFilter}
+        />
+        <FilterSelect
+          className="w-[190px]"
+          items={positionOptions}
+          value={positionFilter}
+          placeholder="All positions"
+          onValueChange={setPositionFilter}
         />
       </div>
 

@@ -76,7 +76,7 @@ function inviteActionLabel(row: OnboardingCaseListItem) {
 
 export function OnboardingDashboardView({
   cases: initialCases,
-  lookups: _lookups,
+  lookups,
   initialFilters,
   readOnly = false,
   basePath = ONBOARDING_ROUTES.hrList,
@@ -168,7 +168,7 @@ export function OnboardingDashboardView({
         </p>
       </div>
 
-      <div className="flex w-full items-center gap-3">
+      <div className="flex w-full flex-wrap items-center gap-3">
         <div className="relative w-72 max-w-full shrink-0">
           <Search
             className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
@@ -182,7 +182,24 @@ export function OnboardingDashboardView({
             className="h-9 w-full bg-background pl-9"
           />
         </div>
-        <div className="w-52 shrink-0 sm:w-56">
+        <div className="w-[22rem] shrink-0">
+          <FilterSelect
+            value={filters.roleId ?? "all"}
+            onValueChange={(v) =>
+              applyFilter({ roleId: v === "all" ? undefined : v })
+            }
+            items={[
+              { value: "all", label: "All roles" },
+              ...lookups.roles.map((role) => ({
+                value: role.id,
+                label: role.name,
+              })),
+            ]}
+            triggerClassName="w-full"
+            contentClassName="min-w-[22rem]"
+          />
+        </div>
+        <div className="w-44 shrink-0 sm:w-48">
           <FilterSelect
             value={filters.status ?? "all"}
             onValueChange={(v) => applyFilter({ status: v === "all" ? undefined : v })}

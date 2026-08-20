@@ -48,6 +48,7 @@ export const onboardingListParamsSchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
   search: z.string().trim().max(200).optional(),
   status: z.string().optional(),
+  roleId: z.string().uuid().optional(),
 });
 
 export const onboardingSectionSchema = z.object({

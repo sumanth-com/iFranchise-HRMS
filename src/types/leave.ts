@@ -18,6 +18,8 @@ export type LeaveListItem = {
   employeeName: string;
   departmentId: string | null;
   departmentName: string | null;
+  designationId?: string | null;
+  designationName?: string | null;
   branchId: string | null;
   branchName: string | null;
   leaveTypeId: string;
@@ -74,6 +76,8 @@ export type LeaveListParams = {
   dateFrom?: string;
   dateTo?: string;
   createdByEmployeeId?: string;
+  /** When true, omit leave from HR applicants (CEO-only approval queue). */
+  excludeHrApplicants?: boolean;
   summaryFilter?:
     | "pendingRequests"
     | "approvedThisMonth"

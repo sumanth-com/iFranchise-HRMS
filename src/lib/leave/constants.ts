@@ -63,8 +63,14 @@ export const APPROVAL_LEVEL_LABELS: Record<number, string> = {
   2: "HR Approval",
 };
 
-/** iFranchise leave policy — active leave types (including LOP for requests/payroll). */
+/** iFranchise leave policy — active leave types (including LOP for payroll tracking). */
 export const ALLOWED_LEAVE_TYPE_CODES = ["CL", "SL", "EL", "OH", "PL", "LOP"] as const;
+
+/** Types available in Apply Leave — LOP is unpaid leave; OH uses optional holiday workflow. */
+export const LEAVE_APPLY_TYPE_CODES = ["CL", "SL", "EL", "PL", "LOP"] as const;
+
+/** Types that cannot be applied through the normal leave form. */
+export const NON_APPLY_LEAVE_TYPE_CODES = ["OH"] as const;
 
 const LEAVE_TYPE_CODE_RANK = new Map(
   ALLOWED_LEAVE_TYPE_CODES.map((code, index) => [code, index]),
@@ -78,8 +84,8 @@ export function sortByLeaveTypeCode<T extends { code?: string | null }>(items: T
   });
 }
 
-/** Leave balance UI — actual balances only; LOP appears in payroll, not leave balance. */
-export const LEAVE_BALANCE_DISPLAY_CODES = ["CL", "SL", "EL", "OH", "PL"] as const;
+/** Leave balance UI cards — OH is not shown here; LOP is unpaid and shown via Apply Leave / payroll. */
+export const LEAVE_BALANCE_DISPLAY_CODES = ["CL", "SL", "EL", "PL"] as const;
 
 export const LEAVE_BALANCE_DISPLAY_LABELS: Record<
   (typeof LEAVE_BALANCE_DISPLAY_CODES)[number],
@@ -88,7 +94,6 @@ export const LEAVE_BALANCE_DISPLAY_LABELS: Record<
   CL: "Casual Leave",
   SL: "Sick Leave",
   EL: "Earned Leave",
-  OH: "Optional Holiday",
   PL: "Period Leave",
 };
 
@@ -99,6 +104,5 @@ export const LEAVE_BALANCE_CARD_TONES: Record<
   CL: { accent: "text-indigo-600 dark:text-indigo-400", iconBg: "bg-indigo-500/10" },
   SL: { accent: "text-sky-600 dark:text-sky-400", iconBg: "bg-sky-500/10" },
   EL: { accent: "text-emerald-600 dark:text-emerald-400", iconBg: "bg-emerald-500/10" },
-  OH: { accent: "text-violet-600 dark:text-violet-400", iconBg: "bg-violet-500/10" },
   PL: { accent: "text-rose-600 dark:text-rose-400", iconBg: "bg-rose-500/10" },
 };

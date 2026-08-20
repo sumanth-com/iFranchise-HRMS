@@ -1,6 +1,7 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
-import type { AttendanceDetail, AttendanceStatus } from "@/types/attendance";
+import type { AttendanceDetail, AttendanceStatus, AttendanceCorrectionDetail } from "@/types/attendance";
+import type { CorrectionStatus } from "@/types/manager-attendance";
 import {
   computeLateMinutes,
   parseAttendanceRules,
@@ -199,3 +200,48 @@ export async function getAttendanceById(
 }
 
 export { getOrganizationAttendanceRules };
+
+export async function getAttendanceCorrectionByAttendanceId(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  attendanceId: string,
+): Promise<AttendanceCorrectionDetail | null> {
+  const organizationId = profile.employee.organizationId;
+
+  const { data: attendance, error: attendanceError } = await supabase
+    .schema("hrms")
+    .from("attendance")
+    .select("id, organization_id")
+    .eq("id", attendanceId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (attendanceError) throw new Error(attendanceError.message);
+  if (!attendance) return null;
+
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("attendance_corrections")
+    .select(
+      "id, attendance_id, requested_check_in_at, requested_check_out_at, reason, correction_status, review_notes",
+    )
+    .eq("attendance_id", attendanceId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+
+  return {
+    id: data.id,
+    attendanceId: data.attendance_id,
+    requestedCheckInAt: data.requested_check_in_at,
+    requestedCheckOutAt: data.requested_check_out_at,
+    reason: data.reason,
+    correctionStatus: data.correction_status as CorrectionStatus,
+    reviewNotes: data.review_notes,
+  };
+}

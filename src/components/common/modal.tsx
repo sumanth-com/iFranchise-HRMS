@@ -47,7 +47,7 @@ export function Modal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className={cn(
-          "flex max-h-[min(90vh,880px)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-lg",
+          "flex max-h-[min(94vh,880px)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-lg",
           contentClassName,
         )}
       >

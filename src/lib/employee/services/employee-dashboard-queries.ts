@@ -1,10 +1,7 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
-import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
-import { createSignedStorageUrl } from "@/lib/storage/signed-url";
-import { getEmployeeLeaveBalanceSnapshot } from "@/lib/leave/services/leave-queries";
-import { getManagerProfilePageData } from "@/lib/manager/services/manager-self-attendance-service";
-import { listHolidays } from "@/lib/organization/services/org-queries";
+import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
+import { getSelfTodayAttendance } from "@/lib/manager/services/manager-self-attendance-service";
 import type { UserProfile } from "@/types/auth";
 import type {
   EmployeeDashboardData,
@@ -40,93 +37,83 @@ function buildFallbackToday(today: string): ManagerTodayAttendance {
   };
 }
 
-async function loadGreeting(
-  supabase: AuthSupabaseClient,
-  profile: UserProfile,
-): Promise<EmployeeGreeting> {
-  const employeeId = profile.employee.id;
-
-  const [employeeResult, profileResult] = await Promise.all([
-    supabase
-      .schema("hrms")
-      .from("employees")
-      .select(
-        `
-          employee_code,
-          first_name,
-          last_name,
-          departments:department_id (name),
-          designations:designation_id (title)
-        `,
-      )
-      .eq("id", employeeId)
-      .is("deleted_at", null)
-      .maybeSingle(),
-    supabase
-      .schema("hrms")
-      .from("employee_profiles")
-      .select("profile_image_storage_path")
-      .eq("employee_id", employeeId)
-      .is("deleted_at", null)
-      .maybeSingle(),
-  ]);
-
-  const employee = employeeResult.data;
-  const firstName = employee?.first_name ?? "there";
-  const lastName = employee?.last_name ?? "";
+function greetingFromProfile(profile: UserProfile): EmployeeGreeting {
+  const firstName = profile.employee.firstName || "there";
+  const lastName = profile.employee.lastName ?? "";
   const fullName = `${firstName} ${lastName}`.trim();
 
-  const department = employee?.departments as { name: string } | { name: string }[] | null;
-  const designation = employee?.designations as { title: string } | { title: string }[] | null;
-  const departmentName = Array.isArray(department)
-    ? department[0]?.name ?? null
-    : department?.name ?? null;
-  const designationTitle = Array.isArray(designation)
-    ? designation[0]?.title ?? null
-    : designation?.title ?? null;
-
-  let avatarUrl: string | null = null;
-  const imagePath = profileResult.data?.profile_image_storage_path ?? null;
-  if (imagePath) {
-    avatarUrl = await createSignedStorageUrl(
-      supabase,
-      EMPLOYEE_STORAGE_BUCKETS.profileImages,
-      imagePath,
-    );
-  }
-
   return {
-    employeeId,
+    employeeId: profile.employee.id,
     firstName,
     lastName,
     fullName: fullName || firstName,
-    employeeCode: employee?.employee_code ?? profile.employee.employeeCode,
-    designation: designationTitle,
-    departmentName,
-    avatarUrl,
+    employeeCode: profile.employee.employeeCode,
+    designation: null,
+    departmentName: null,
+    avatarUrl: null,
   };
 }
 
-async function loadLeaveSnapshot(
+async function loadLeaveKpis(
   supabase: AuthSupabaseClient,
   employeeId: string,
 ): Promise<{ totalBalanceDays: number; pendingCount: number }> {
-  const balances = await getEmployeeLeaveBalanceSnapshot(supabase, employeeId);
-  const totalBalanceDays = balances.reduce((sum, row) => sum + row.balanceDays, 0);
+  const balanceYear = getCurrentBalanceYear();
 
-  const { count, error } = await supabase
-    .schema("hrms")
-    .from("leave_requests")
-    .select("id", { count: "exact", head: true })
-    .eq("employee_id", employeeId)
-    .eq("leave_status", "pending")
-    .is("deleted_at", null);
-  if (error) throw new Error(error.message);
+  const [balancesResult, pendingResult] = await Promise.all([
+    supabase
+      .schema("hrms")
+      .from("leave_balances")
+      .select("balance_days")
+      .eq("employee_id", employeeId)
+      .eq("balance_year", balanceYear)
+      .is("deleted_at", null),
+    supabase
+      .schema("hrms")
+      .from("leave_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("employee_id", employeeId)
+      .eq("leave_status", "pending")
+      .is("deleted_at", null),
+  ]);
+
+  if (balancesResult.error) throw new Error(balancesResult.error.message);
+  if (pendingResult.error) throw new Error(pendingResult.error.message);
+
+  const totalBalanceDays = (balancesResult.data ?? []).reduce((sum, row) => {
+    return sum + Number(row.balance_days ?? 0);
+  }, 0);
 
   return {
     totalBalanceDays: Math.round(totalBalanceDays * 100) / 100,
-    pendingCount: count ?? 0,
+    pendingCount: pendingResult.count ?? 0,
   };
+}
+
+async function loadUpcomingHolidays(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  today: string,
+): Promise<EmployeeUpcomingEvent[]> {
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("holidays")
+    .select("id, name, holiday_date, is_optional")
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .gte("holiday_date", today)
+    .order("holiday_date")
+    .limit(8);
+
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((holiday) => ({
+    id: `holiday-${holiday.id}`,
+    type: "holiday" as const,
+    title: holiday.name,
+    subtitle: holiday.is_optional ? "Optional holiday" : "Company holiday",
+    date: holiday.holiday_date,
+  }));
 }
 
 export async function getEmployeeDashboardData(
@@ -136,47 +123,16 @@ export async function getEmployeeDashboardData(
   const today = getTodayDateString();
   const employeeId = profile.employee.id;
   const organizationId = profile.employee.organizationId;
-  const currentYear = new Date().getFullYear();
+  const greeting = greetingFromProfile(profile);
 
-  const [greeting, attendance, leave, holidays] = await Promise.all([
-    safe(() => loadGreeting(supabase, profile), {
-      employeeId,
-      firstName: "there",
-      lastName: "",
-      fullName: "there",
-      employeeCode: profile.employee.employeeCode,
-      designation: null,
-      departmentName: null,
-      avatarUrl: null,
-    }),
-    safe(
-      () => getManagerProfilePageData(supabase, profile, { page: 1, pageSize: 31 }),
-      null,
-    ),
-    safe(() => loadLeaveSnapshot(supabase, employeeId), {
+  const [todayPanel, leave, upcomingHolidays] = await Promise.all([
+    safe(() => getSelfTodayAttendance(supabase, profile), buildFallbackToday(today)),
+    safe(() => loadLeaveKpis(supabase, employeeId), {
       totalBalanceDays: 0,
       pendingCount: 0,
     }),
-    safe(() => listHolidays(supabase, organizationId, { year: currentYear }), {
-      data: [],
-      total: 0,
-      page: 1,
-      year: currentYear,
-    }),
+    safe(() => loadUpcomingHolidays(supabase, organizationId, today), []),
   ]);
-
-  const todayPanel = attendance?.today ?? buildFallbackToday(today);
-
-  const upcomingHolidays: EmployeeUpcomingEvent[] = holidays.data
-    .filter((holiday) => holiday.holidayDate >= today)
-    .sort((a, b) => a.holidayDate.localeCompare(b.holidayDate))
-    .map((holiday) => ({
-      id: `holiday-${holiday.id}`,
-      type: "holiday" as const,
-      title: holiday.name,
-      subtitle: holiday.isOptional ? "Optional holiday" : "Company holiday",
-      date: holiday.holidayDate,
-    }));
 
   return {
     greeting,

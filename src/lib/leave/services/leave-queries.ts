@@ -1,6 +1,7 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { hasPermission } from "@/lib/permissions/utils";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { UserProfile } from "@/types/auth";
 import type {
   LeaveBalanceItem,
@@ -60,16 +61,20 @@ type LeaveRequestRow = {
     first_name: string;
     last_name: string;
     department_id: string | null;
+    designation_id: string | null;
     branch_id: string;
     departments: { name: string } | { name: string }[] | null;
+    designations: { title: string } | { title: string }[] | null;
     branches: { name: string } | { name: string }[] | null;
   } | {
     employee_code: string;
     first_name: string;
     last_name: string;
     department_id: string | null;
+    designation_id: string | null;
     branch_id: string;
     departments: { name: string } | { name: string }[] | null;
+    designations: { title: string } | { title: string }[] | null;
     branches: { name: string } | { name: string }[] | null;
   }[] | null;
   leave_types: { name: string; code: string } | { name: string; code: string }[] | null;
@@ -84,6 +89,63 @@ type LeaveRequestRow = {
 function unwrapRelation<T>(value: T | T[] | null): T | null {
   if (!value) return null;
   return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+function approvalPersonName(
+  approval: {
+    approver_employee_id: string;
+    employees: { first_name: string; last_name: string } | { first_name: string; last_name: string }[] | null;
+  },
+  nameById: Map<string, string>,
+): string | null {
+  const fromJoin = unwrapRelation(approval.employees);
+  if (fromJoin) {
+    const name = `${fromJoin.first_name} ${fromJoin.last_name}`.trim();
+    if (name) return name;
+  }
+  return nameById.get(approval.approver_employee_id) ?? null;
+}
+
+function resolveApproverDisplayName(
+  approvals: NonNullable<LeaveRequestRow["leave_approvals"]>,
+  nameById: Map<string, string>,
+): string | null {
+  const pending = [...approvals]
+    .filter((a) => a.approval_status === "pending")
+    .sort((a, b) => a.approval_level - b.approval_level)[0];
+  if (pending) return approvalPersonName(pending, nameById);
+
+  const acted = [...approvals]
+    .filter((a) => a.approval_status === "approved" || a.approval_status === "rejected")
+    .sort((a, b) => b.approval_level - a.approval_level)[0];
+  if (acted) return approvalPersonName(acted, nameById);
+
+  const first = [...approvals].sort((a, b) => a.approval_level - b.approval_level)[0];
+  return first ? approvalPersonName(first, nameById) : null;
+}
+
+async function loadApproverNameMap(
+  supabase: AuthSupabaseClient,
+  approverIds: string[],
+): Promise<Map<string, string>> {
+  const uniqueIds = Array.from(new Set(approverIds.filter(Boolean)));
+  const nameById = new Map<string, string>();
+  if (uniqueIds.length === 0) return nameById;
+
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("employees")
+    .select("id, first_name, last_name")
+    .in("id", uniqueIds)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+
+  for (const row of data ?? []) {
+    const name = `${row.first_name} ${row.last_name}`.trim();
+    if (name) nameById.set(row.id, name);
+  }
+  return nameById;
 }
 
 function parseListParams(params: LeaveListParams) {
@@ -116,6 +178,7 @@ export async function listLeaveRequests(
     dateFrom,
     dateTo,
     createdByEmployeeId,
+    excludeHrApplicants,
     summaryFilter,
   } = parseListParams(params);
 
@@ -145,10 +208,12 @@ export async function listLeaveRequests(
           last_name,
           email,
           department_id,
+          designation_id,
           branch_id,
           employment_type_id,
           reporting_manager_id,
           departments:department_id (name),
+          designations:designation_id (title),
           branches:branch_id (name)
         ),
         leave_types:leave_type_id (name, code),
@@ -163,6 +228,13 @@ export async function listLeaveRequests(
     )
     .eq("employees.organization_id", organizationId)
     .is("deleted_at", null);
+
+  if (excludeHrApplicants) {
+    const hrApplicantIds = await listHrLeaveApplicantEmployeeIds(organizationId);
+    if (hrApplicantIds.length > 0) {
+      query = query.not("employee_id", "in", `(${hrApplicantIds.join(",")})`);
+    }
+  }
 
   const today = getTodayDateString();
 
@@ -246,20 +318,22 @@ export async function listLeaveRequests(
   if (error) throw new Error(error.message);
 
   const rows = (data ?? []) as LeaveRequestRow[];
+  const nameById = await loadApproverNameMap(
+    supabase,
+    rows.flatMap((row) => (row.leave_approvals ?? []).map((a) => a.approver_employee_id)),
+  );
 
   return {
     data: rows.map((row) => {
       const employee = unwrapRelation(row.employees);
       const leaveType = unwrapRelation(row.leave_types);
       const department = unwrapRelation(employee?.departments ?? null);
+      const designation = unwrapRelation(employee?.designations ?? null);
       const branch = unwrapRelation(employee?.branches ?? null);
       const approvals = row.leave_approvals ?? [];
       const pendingApproval = approvals
         .filter((a) => a.approval_status === "pending")
         .sort((a, b) => a.approval_level - b.approval_level)[0];
-      const currentApprover = pendingApproval
-        ? unwrapRelation(pendingApproval.employees)
-        : null;
 
       const pendingApproverEmployeeId = pendingApproval?.approver_employee_id ?? null;
       const isAssignedApprover =
@@ -275,6 +349,8 @@ export async function listLeaveRequests(
           : "",
         departmentId: employee?.department_id ?? null,
         departmentName: department?.name ?? null,
+        designationId: employee?.designation_id ?? null,
+        designationName: designation?.title ?? null,
         branchId: employee?.branch_id ?? null,
         branchName: branch?.name ?? null,
         leaveTypeId: row.leave_type_id,
@@ -291,9 +367,7 @@ export async function listLeaveRequests(
         reason: row.reason,
         leaveStatus: row.leave_status as LeaveListResult["data"][number]["leaveStatus"],
         appliedAt: row.created_at,
-        approverName: currentApprover
-          ? `${currentApprover.first_name} ${currentApprover.last_name}`
-          : null,
+        approverName: resolveApproverDisplayName(approvals, nameById),
         currentApprovalLevel: pendingApproval?.approval_level ?? null,
         pendingApproverEmployeeId,
         canActOnApproval: isAssignedApprover,
@@ -381,49 +455,68 @@ export async function getLeaveSummary(
   profile: UserProfile,
   month?: number,
   year?: number,
+  options?: { excludeHrApplicants?: boolean },
 ): Promise<LeaveSummary> {
   const organizationId = profile.employee.organizationId;
   const today = getTodayDateString();
   const summaryYear = year ?? Number.parseInt(today.slice(0, 4), 10);
   const summaryMonth = month ?? Number.parseInt(today.slice(5, 7), 10);
   const monthRange = getMonthDateRange(summaryMonth, summaryYear);
+  const hrApplicantIds = options?.excludeHrApplicants
+    ? await listHrLeaveApplicantEmployeeIds(organizationId)
+    : [];
+
+  const applyHrExclusion = <T extends { not: (column: string, operator: string, value: string) => T }>(
+    query: T,
+  ): T => {
+    if (hrApplicantIds.length === 0) return query;
+    return query.not("employee_id", "in", `(${hrApplicantIds.join(",")})`);
+  };
 
   const [pendingResult, approvedResult, rejectedResult, onLeaveResult, balancesResult, upcomingResult] =
     await Promise.all([
-    supabase
-      .schema("hrms")
-      .from("leave_requests")
-      .select("id, employees!inner(organization_id)", { count: "exact", head: true })
-      .eq("leave_status", "pending")
-      .eq("employees.organization_id", organizationId)
-      .is("deleted_at", null),
-    supabase
-      .schema("hrms")
-      .from("leave_requests")
-      .select("id, employees!inner(organization_id)", { count: "exact", head: true })
-      .eq("leave_status", "approved")
-      .gte("start_date", monthRange.start)
-      .lte("start_date", monthRange.end)
-      .eq("employees.organization_id", organizationId)
-      .is("deleted_at", null),
-    supabase
-      .schema("hrms")
-      .from("leave_requests")
-      .select("id, employees!inner(organization_id)", { count: "exact", head: true })
-      .eq("leave_status", "rejected")
-      .gte("created_at", `${monthRange.start}T00:00:00`)
-      .lte("created_at", `${monthRange.end}T23:59:59`)
-      .eq("employees.organization_id", organizationId)
-      .is("deleted_at", null),
-    supabase
-      .schema("hrms")
-      .from("leave_requests")
-      .select("employee_id, employees!inner(organization_id)", { count: "exact", head: true })
-      .eq("leave_status", "approved")
-      .lte("start_date", today)
-      .gte("end_date", today)
-      .eq("employees.organization_id", organizationId)
-      .is("deleted_at", null),
+    applyHrExclusion(
+      supabase
+        .schema("hrms")
+        .from("leave_requests")
+        .select("id, employees!inner(organization_id)", { count: "exact", head: true })
+        .eq("leave_status", "pending")
+        .eq("employees.organization_id", organizationId)
+        .is("deleted_at", null),
+    ),
+    applyHrExclusion(
+      supabase
+        .schema("hrms")
+        .from("leave_requests")
+        .select("id, employees!inner(organization_id)", { count: "exact", head: true })
+        .eq("leave_status", "approved")
+        .gte("start_date", monthRange.start)
+        .lte("start_date", monthRange.end)
+        .eq("employees.organization_id", organizationId)
+        .is("deleted_at", null),
+    ),
+    applyHrExclusion(
+      supabase
+        .schema("hrms")
+        .from("leave_requests")
+        .select("id, employees!inner(organization_id)", { count: "exact", head: true })
+        .eq("leave_status", "rejected")
+        .gte("created_at", `${monthRange.start}T00:00:00`)
+        .lte("created_at", `${monthRange.end}T23:59:59`)
+        .eq("employees.organization_id", organizationId)
+        .is("deleted_at", null),
+    ),
+    applyHrExclusion(
+      supabase
+        .schema("hrms")
+        .from("leave_requests")
+        .select("employee_id, employees!inner(organization_id)", { count: "exact", head: true })
+        .eq("leave_status", "approved")
+        .lte("start_date", today)
+        .gte("end_date", today)
+        .eq("employees.organization_id", organizationId)
+        .is("deleted_at", null),
+    ),
     supabase
       .schema("hrms")
       .from("leave_balances")
@@ -431,14 +524,16 @@ export async function getLeaveSummary(
       .eq("balance_year", getCurrentBalanceYear(today))
       .eq("employees.organization_id", organizationId)
       .is("deleted_at", null),
-    supabase
-      .schema("hrms")
-      .from("leave_requests")
-      .select("id, employees!inner(organization_id)", { count: "exact", head: true })
-      .eq("leave_status", "approved")
-      .gt("start_date", today)
-      .eq("employees.organization_id", organizationId)
-      .is("deleted_at", null),
+    applyHrExclusion(
+      supabase
+        .schema("hrms")
+        .from("leave_requests")
+        .select("id, employees!inner(organization_id)", { count: "exact", head: true })
+        .eq("leave_status", "approved")
+        .gt("start_date", today)
+        .eq("employees.organization_id", organizationId)
+        .is("deleted_at", null),
+    ),
   ]);
 
   let balanceUtilizationPercent = 0;
@@ -941,6 +1036,33 @@ export function isHrLeaveApplicant(roleCodes: string[]): boolean {
   );
 }
 
+export async function listHrLeaveApplicantEmployeeIds(
+  organizationId: string,
+): Promise<string[]> {
+  // Admin client: auth RLS can hide other users' role rows and miss Super Admin / HR.
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .schema("hrms")
+    .from("user_roles")
+    .select(
+      `
+        employee_id,
+        roles!inner (code),
+        employees!inner (organization_id, deleted_at)
+      `,
+    )
+    .eq("employees.organization_id", organizationId)
+    .in("roles.code", [...HR_LEAVE_APPLICANT_ROLE_CODES])
+    .is("deleted_at", null)
+    .is("employees.deleted_at", null);
+
+  if (error) throw new Error(error.message);
+
+  return Array.from(
+    new Set((data ?? []).map((row) => row.employee_id).filter(Boolean)),
+  );
+}
+
 export function isCeoLeaveApprover(profile: UserProfile): boolean {
   return (
     profile.roles.some((role) =>
@@ -973,35 +1095,101 @@ export async function getHrApproverEmployeeId(
   return row?.employee_id ?? null;
 }
 
-export async function getCeoApproverEmployeeId(
-  supabase: AuthSupabaseClient,
+export async function listCeoLeaveApproverEmployeeIds(
   organizationId: string,
-): Promise<string | null> {
-  const { data, error } = await supabase
-    .schema("hrms")
-    .from("user_roles")
-    .select(
-      `
-        employee_id,
-        roles!inner (code),
-        employees!inner (organization_id, employment_status, deleted_at)
-      `,
-    )
-    .eq("employees.organization_id", organizationId)
-    .in("roles.code", ["ceo", "founder", "co_founder"])
-    .is("employees.deleted_at", null)
-    .limit(1);
+): Promise<string[]> {
+  const admin = createAdminClient();
 
-  if (error) throw new Error(error.message);
-  const row = data?.[0];
-  return row?.employee_id ?? null;
+  const [byRoleResult, byPermissionResult] = await Promise.all([
+    admin
+      .schema("hrms")
+      .from("user_roles")
+      .select(
+        `
+          employee_id,
+          roles!inner (code),
+          employees!inner (organization_id, deleted_at)
+        `,
+      )
+      .eq("employees.organization_id", organizationId)
+      .in("roles.code", [...CEO_LEAVE_APPROVER_ROLE_CODES])
+      .is("deleted_at", null)
+      .is("employees.deleted_at", null),
+    admin
+      .schema("hrms")
+      .from("role_permissions")
+      .select(
+        `
+          role_id,
+          permissions!inner (code),
+          roles!inner (id, organization_id, deleted_at)
+        `,
+      )
+      .eq("permissions.code", PORTAL_PERMISSIONS.ceo)
+      .eq("roles.organization_id", organizationId)
+      .is("deleted_at", null)
+      .is("roles.deleted_at", null)
+      .is("permissions.deleted_at", null),
+  ]);
+
+  if (byRoleResult.error) throw new Error(byRoleResult.error.message);
+  if (byPermissionResult.error) throw new Error(byPermissionResult.error.message);
+
+  const ids = new Set<string>(
+    (byRoleResult.data ?? []).map((row) => row.employee_id).filter(Boolean),
+  );
+
+  const roleIds = Array.from(
+    new Set(
+      (byPermissionResult.data ?? [])
+        .map((row) => row.role_id)
+        .filter(Boolean),
+    ),
+  );
+
+  if (roleIds.length > 0) {
+    const { data: userRoles, error: userRolesError } = await admin
+      .schema("hrms")
+      .from("user_roles")
+      .select(
+        `
+          employee_id,
+          employees!inner (organization_id, deleted_at)
+        `,
+      )
+      .in("role_id", roleIds)
+      .eq("employees.organization_id", organizationId)
+      .is("deleted_at", null)
+      .is("employees.deleted_at", null);
+
+    if (userRolesError) throw new Error(userRolesError.message);
+    for (const row of userRoles ?? []) {
+      if (row.employee_id) ids.add(row.employee_id);
+    }
+  }
+
+  return Array.from(ids);
+}
+
+export async function getCeoApproverEmployeeId(
+  _supabase: AuthSupabaseClient,
+  organizationId: string,
+  preferredCeoEmployeeId?: string | null,
+): Promise<string | null> {
+  const ceoIds = await listCeoLeaveApproverEmployeeIds(organizationId);
+  if (ceoIds.length === 0) return null;
+  if (preferredCeoEmployeeId && ceoIds.includes(preferredCeoEmployeeId)) {
+    return preferredCeoEmployeeId;
+  }
+  return ceoIds[0] ?? null;
 }
 
 export async function getEmployeeRoleCodes(
-  supabase: AuthSupabaseClient,
+  _supabase: AuthSupabaseClient,
   employeeId: string,
 ): Promise<string[]> {
-  const { data, error } = await supabase
+  const admin = createAdminClient();
+  const { data, error } = await admin
     .schema("hrms")
     .from("user_roles")
     .select("roles!inner (code)")
@@ -1014,4 +1202,133 @@ export async function getEmployeeRoleCodes(
     const role = Array.isArray(row.roles) ? row.roles[0] : row.roles;
     return role?.code as string;
   }).filter(Boolean);
+}
+
+/**
+ * Ensures pending leave from HR / Super Admin applicants is assigned to the CEO
+ * so it appears in Executive Approvals (and not only on a wrong Team Leave path).
+ *
+ * When `preferredCeoEmployeeId` is a valid executive approver (role or
+ * portal.ceo.access), pending HR leave is routed to that person so the
+ * logged-in executive sees the queue.
+ */
+export async function ensurePendingHrLeaveAssignedToCeo(
+  organizationId: string,
+  preferredCeoEmployeeId?: string | null,
+): Promise<void> {
+  const hrApplicantIds = await listHrLeaveApplicantEmployeeIds(organizationId);
+  if (hrApplicantIds.length === 0) return;
+
+  const admin = createAdminClient();
+  const ceoId =
+    preferredCeoEmployeeId ||
+    (await getCeoApproverEmployeeId(
+      admin as unknown as AuthSupabaseClient,
+      organizationId,
+    ));
+  if (!ceoId) return;
+
+  const { data: pendingLeaves, error: leaveError } = await admin
+    .schema("hrms")
+    .from("leave_requests")
+    .select("id, created_by")
+    .in("employee_id", hrApplicantIds)
+    .eq("leave_status", "pending")
+    .is("deleted_at", null);
+
+  if (leaveError) throw new Error(leaveError.message);
+  const leaveRows = pendingLeaves ?? [];
+  if (leaveRows.length === 0) return;
+
+  const leaveIds = leaveRows.map((row) => row.id);
+  const now = new Date().toISOString();
+
+  const { data: existingApprovals, error: approvalsError } = await admin
+    .schema("hrms")
+    .from("leave_approvals")
+    .select("id, leave_request_id, approval_status, approval_level, approver_employee_id")
+    .in("leave_request_id", leaveIds)
+    .is("deleted_at", null);
+
+  if (approvalsError) throw new Error(approvalsError.message);
+
+  const pendingByLeave = new Map<
+    string,
+    { id: string; approverId: string; level: number }[]
+  >();
+  for (const row of existingApprovals ?? []) {
+    if (row.approval_status !== "pending") continue;
+    const list = pendingByLeave.get(row.leave_request_id) ?? [];
+    list.push({
+      id: row.id,
+      approverId: row.approver_employee_id,
+      level: row.approval_level,
+    });
+    pendingByLeave.set(row.leave_request_id, list);
+  }
+
+  const approvalIdsToReassign: string[] = [];
+  const approvalIdsToCancel: string[] = [];
+
+  for (const pendingSteps of pendingByLeave.values()) {
+    const sorted = [...pendingSteps].sort((a, b) => a.level - b.level);
+    const active = sorted[0];
+    if (!active) continue;
+    if (active.approverId !== ceoId) {
+      approvalIdsToReassign.push(active.id);
+    }
+    for (const extra of sorted.slice(1)) {
+      approvalIdsToCancel.push(extra.id);
+    }
+  }
+
+  if (approvalIdsToReassign.length > 0) {
+    const { error: updateError } = await admin
+      .schema("hrms")
+      .from("leave_approvals")
+      .update({
+        approver_employee_id: ceoId,
+        updated_at: now,
+      })
+      .in("id", approvalIdsToReassign);
+
+    if (updateError) throw new Error(updateError.message);
+  }
+
+  if (approvalIdsToCancel.length > 0) {
+    const { error: cancelError } = await admin
+      .schema("hrms")
+      .from("leave_approvals")
+      .update({
+        approval_status: "cancelled",
+        deleted_at: now,
+        updated_at: now,
+      })
+      .in("id", approvalIdsToCancel);
+
+    if (cancelError) throw new Error(cancelError.message);
+  }
+
+  const missingApprovalLeaves = leaveRows.filter(
+    (row) => !pendingByLeave.has(row.id),
+  );
+
+  if (missingApprovalLeaves.length > 0) {
+    const { error: insertError } = await admin
+      .schema("hrms")
+      .from("leave_approvals")
+      .insert(
+        missingApprovalLeaves.map((row) => ({
+          leave_request_id: row.id,
+          approver_employee_id: ceoId,
+          approval_level: 1,
+          approval_status: "pending" as const,
+          status: "active" as const,
+          created_by: row.created_by,
+          updated_by: row.created_by,
+        })),
+      );
+
+    if (insertError) throw new Error(insertError.message);
+  }
 }

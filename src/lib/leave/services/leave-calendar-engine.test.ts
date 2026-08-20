@@ -199,6 +199,23 @@ describe("probation and notice", () => {
     assert.ok(issues.some((issue) => issue.code === "notice"));
   });
 
+  it("allows CL starting tomorrow", () => {
+    const issues = validateLeavePolicy({
+      asOf: new Date("2026-08-10T18:00:00+05:30"),
+      startDate: "2026-08-11",
+      endDate: "2026-08-11",
+      isHalfDay: false,
+      leaveTypeCode: "CL",
+      isPaid: true,
+      duration: duration("2026-08-11", "2026-08-11"),
+      availableBalance: 6,
+      employee: { ...employee, joiningDate: "2026-01-01", employmentStatus: "active" },
+      notice: DEFAULT_LEAVE_NOTICE,
+      overlapping: false,
+    });
+    assert.equal(issues.filter((issue) => issue.code === "notice").length, 0);
+  });
+
   it("allows same-day PL before end of working day", () => {
     const issues = validateLeavePolicy({
       asOf: new Date("2026-08-10T16:00:00+05:30"),

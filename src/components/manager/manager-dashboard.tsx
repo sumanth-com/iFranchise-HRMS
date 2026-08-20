@@ -44,12 +44,28 @@ export function ManagerDashboard({ data, error }: ManagerDashboardProps) {
       >
         <DashboardOperationsRow
           tasks={data.tasks}
-          charts={data.charts}
+          watchItems={[
+            {
+              id: "team-size",
+              label: "Team size",
+              value: data.kpis.teamSize,
+              hint: "People",
+              href: MANAGER_DASHBOARD_KPI_LINKS.teamSize,
+            },
+            {
+              id: "probation-ending",
+              label: "Probation ending",
+              value: data.kpis.probationEndingSoon,
+              hint: "Confirm soon",
+              href: MANAGER_DASHBOARD_KPI_LINKS.probationEndingSoon,
+            },
+          ]}
           upcomingHolidays={data.todayPulse.upcomingHolidays}
           upcomingBirthdays={data.upcomingBirthdays}
           upcomingAnniversaries={data.upcomingAnniversaries}
           insightsTitle="Team Insights"
-          insightsDescription="Attendance pulse and upcoming celebrations"
+          insightsDescription="People to watch and upcoming celebrations"
+          focusDescription="Interviews, probation, leave, and hiring"
         />
       </section>
     </div>

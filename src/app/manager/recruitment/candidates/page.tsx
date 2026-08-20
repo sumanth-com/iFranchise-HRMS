@@ -16,6 +16,9 @@ type PageProps = {
 async function ManagerCandidatesPageContent({ searchParams }: PageProps) {
   const { profile, supabase, lookups } = await loadManagerRecruitmentPage();
   const raw = await searchParams;
+  const now = new Date();
+  const monthRaw = typeof raw.month === "string" ? raw.month : undefined;
+  const yearRaw = typeof raw.year === "string" ? raw.year : undefined;
 
   const params = candidateListParamsSchema.parse({
     page: raw.page,
@@ -24,6 +27,10 @@ async function ManagerCandidatesPageContent({ searchParams }: PageProps) {
     departmentId: raw.departmentId,
     jobOpeningId: raw.jobOpeningId,
     stage: raw.stage,
+    month:
+      monthRaw && monthRaw !== "all" ? monthRaw : monthRaw === undefined ? now.getMonth() + 1 : undefined,
+    year:
+      yearRaw && yearRaw !== "all" ? yearRaw : yearRaw === undefined ? now.getFullYear() : undefined,
   });
 
   const candidateId = typeof raw.candidateId === "string" ? raw.candidateId : undefined;
@@ -56,6 +63,18 @@ async function ManagerCandidatesPageContent({ searchParams }: PageProps) {
         departmentId: params.departmentId,
         jobOpeningId: params.jobOpeningId,
         stage: params.stage,
+        month:
+          monthRaw === "all"
+            ? "all"
+            : params.month
+              ? String(params.month)
+              : String(now.getMonth() + 1),
+        year:
+          yearRaw === "all"
+            ? "all"
+            : params.year
+              ? String(params.year)
+              : String(now.getFullYear()),
       }}
     />
   );

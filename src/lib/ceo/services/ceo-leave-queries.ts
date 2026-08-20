@@ -31,6 +31,8 @@ import {
   getEmployeeLeaveBalanceSnapshot,
   getLeaveCalendarData,
   getLeaveLookups,
+  ensurePendingHrLeaveAssignedToCeo,
+  isCeoLeaveApprover,
 } from "@/lib/leave/services/leave-queries";
 import { getLeaveRequestById } from "@/lib/leave/services/leave-detail";
 
@@ -275,6 +277,17 @@ export async function listCeoApprovalQueue(
   const organizationId = profile.employee.organizationId;
   const ceoEmployeeId = profile.employee.id;
 
+  if (isCeoLeaveApprover(profile)) {
+    await ensurePendingHrLeaveAssignedToCeo(organizationId, ceoEmployeeId).catch(
+      (error) => {
+        console.error(
+          "[ceo-leave] failed to assign pending HR leave to CEO",
+          error instanceof Error ? error.message : error,
+        );
+      },
+    );
+  }
+
   const { data: pendingRows, error: pendingError } = await supabase
     .schema("hrms")
     .from("leave_approvals")
@@ -290,7 +303,13 @@ export async function listCeoApprovalQueue(
   const requestIds = Array.from(new Set(pending.map((r) => r.leave_request_id)));
   const levelByRequest = new Map<string, { id: string; level: number }>();
   pending.forEach((r) => {
-    levelByRequest.set(r.leave_request_id, { id: r.id, level: r.approval_level });
+    const existing = levelByRequest.get(r.leave_request_id);
+    if (!existing || r.approval_level < existing.level) {
+      levelByRequest.set(r.leave_request_id, {
+        id: r.id,
+        level: r.approval_level,
+      });
+    }
   });
 
   const { data, error } = await supabase

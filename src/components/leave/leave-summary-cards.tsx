@@ -13,7 +13,8 @@ export type LeaveSummaryFilterKey =
   | "pendingRequests"
   | "approvedThisMonth"
   | "rejectedThisMonth"
-  | "upcomingPlannedLeaves";
+  | "upcomingPlannedLeaves"
+  | "employeesOnLeaveToday";
 
 type LeaveSummaryCardsProps = {
   summary: LeaveSummary;

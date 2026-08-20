@@ -3,7 +3,7 @@
 import { format, formatDistanceToNow } from "date-fns";
 import { Check, Bell, Loader2, MoreHorizontal, Search, Trash2, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
@@ -22,8 +22,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  deleteAllNotificationsAction,
   deleteNotificationAction,
+  deleteSelectedNotificationsAction,
   markAllNotificationsReadAction,
   markNotificationReadAction,
 } from "@/lib/notifications/actions";
@@ -70,12 +70,31 @@ export function NotificationCenterSplitView({
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [deleteTarget, setDeleteTarget] = useState<NotificationListItem | null>(null);
-  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkSelectMode, setBulkSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
 
   const selected =
     result.items.find((item) => item.id === selectedId) ??
     result.items.find((item) => item.id === searchParams.get("id")) ??
     null;
+
+  const visibleIds = useMemo(
+    () => result.items.map((item) => item.id),
+    [result.items],
+  );
+  const allVisibleSelected =
+    visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+  const selectedCount = selectedIds.size;
+
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      if (prev.size === 0) return prev;
+      const visible = new Set(visibleIds);
+      const next = new Set(Array.from(prev).filter((id) => visible.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [visibleIds]);
 
   const setParams = useCallback(
     (updates: Record<string, string | undefined>) => {
@@ -93,6 +112,33 @@ export function NotificationCenterSplitView({
     },
     [centerPath, preserveQuery, router, searchParams],
   );
+
+  function exitBulkSelectMode() {
+    setBulkSelectMode(false);
+    setSelectedIds(new Set());
+    setBulkDeleteConfirmOpen(false);
+  }
+
+  function toggleSelect(id: string, checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllVisible(checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        visibleIds.forEach((id) => next.add(id));
+      } else {
+        visibleIds.forEach((id) => next.delete(id));
+      }
+      return next;
+    });
+  }
 
   function markAsRead(item: NotificationListItem) {
     if (item.status === "read" || item.status === "archived") return;
@@ -117,18 +163,23 @@ export function NotificationCenterSplitView({
     });
   }
 
-  function confirmBulkDelete() {
+  function confirmSelectedDelete() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
     startTransition(async () => {
-      const res = await deleteAllNotificationsAction();
+      const res = await deleteSelectedNotificationsAction(ids);
       if (res.success) {
         const count = res.data?.deletedCount ?? 0;
         toast.success(
           count > 0
             ? `${count} notification${count === 1 ? "" : "s"} deleted`
-            : "No notifications to delete",
+            : "No notifications deleted",
         );
-        setBulkDeleteOpen(false);
-        setParams({ id: undefined, page: "1" });
+        if (selected && ids.includes(selected.id)) {
+          setParams({ id: undefined });
+        }
+        exitBulkSelectMode();
         router.refresh();
       } else {
         toast.error(res.message);
@@ -137,6 +188,10 @@ export function NotificationCenterSplitView({
   }
 
   function selectNotification(item: NotificationListItem) {
+    if (bulkSelectMode) {
+      toggleSelect(item.id, !selectedIds.has(item.id));
+      return;
+    }
     setParams({ id: item.id });
     if (item.status === "unread") markAsRead(item);
   }
@@ -158,13 +213,14 @@ export function NotificationCenterSplitView({
                 <button
                   key={item.value}
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
+                    exitBulkSelectMode();
                     setParams({
                       [filterParamKey]: item.value,
                       page: "1",
                       id: undefined,
-                    })
-                  }
+                    });
+                  }}
                   className={cn(
                     "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                     tab === item.value
@@ -175,17 +231,56 @@ export function NotificationCenterSplitView({
                   {item.label}
                 </button>
               ))}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-8 gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                disabled={isPending || result.total === 0}
-                onClick={() => setBulkDeleteOpen(true)}
-              >
-                <Trash2 className="size-3.5" />
-                Bulk delete
-              </Button>
+              {bulkSelectMode ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8"
+                    disabled={isPending || visibleIds.length === 0}
+                    onClick={() => toggleSelectAllVisible(!allVisibleSelected)}
+                  >
+                    {allVisibleSelected ? "Clear page" : "Select page"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    disabled={isPending || selectedCount === 0}
+                    onClick={() => setBulkDeleteConfirmOpen(true)}
+                  >
+                    <Trash2 className="size-3.5" />
+                    Delete{selectedCount > 0 ? ` (${selectedCount})` : ""}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    disabled={isPending}
+                    onClick={exitBulkSelectMode}
+                  >
+                    Cancel
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  disabled={isPending || result.total === 0}
+                  onClick={() => {
+                    setBulkSelectMode(true);
+                    setSelectedIds(new Set());
+                  }}
+                >
+                  <Trash2 className="size-3.5" />
+                  Bulk delete
+                </Button>
+              )}
             </div>
           ) : (
             <div />
@@ -251,6 +346,9 @@ export function NotificationCenterSplitView({
                   item={item}
                   isActive={selected?.id === item.id}
                   isPending={isPending}
+                  bulkSelectMode={bulkSelectMode}
+                  isChecked={selectedIds.has(item.id)}
+                  onToggleSelect={(checked) => toggleSelect(item.id, checked)}
                   onSelect={() => selectNotification(item)}
                   onMarkRead={() => markAsRead(item)}
                   onDelete={() => setDeleteTarget(item)}
@@ -340,31 +438,34 @@ export function NotificationCenterSplitView({
       </Modal>
 
       <Modal
-        open={bulkDeleteOpen}
+        open={bulkDeleteConfirmOpen}
         onOpenChange={(open) => {
-          if (!open) setBulkDeleteOpen(false);
+          if (!open) setBulkDeleteConfirmOpen(false);
         }}
-        title="Delete all notifications?"
-        description="This permanently removes every notification in your inbox."
+        title="Delete selected notifications?"
+        description="Only the notifications you selected will be permanently removed."
         contentClassName="sm:max-w-md"
         showCancel={false}
         footer={
           <>
-            <Button variant="outline" onClick={() => setBulkDeleteOpen(false)}>
+            <Button variant="outline" onClick={() => setBulkDeleteConfirmOpen(false)}>
               Cancel
             </Button>
             <Button
               variant="destructive"
-              disabled={isPending}
-              onClick={confirmBulkDelete}
+              disabled={isPending || selectedCount === 0}
+              onClick={confirmSelectedDelete}
             >
-              {isPending ? "Deleting…" : "Delete all"}
+              {isPending
+                ? "Deleting…"
+                : `Delete ${selectedCount} notification${selectedCount === 1 ? "" : "s"}`}
             </Button>
           </>
         }
       >
         <p className="text-sm text-muted-foreground">
-          All of your notifications will be deleted. This cannot be undone.
+          {selectedCount} selected notification{selectedCount === 1 ? "" : "s"} will be
+          deleted. This cannot be undone.
         </p>
       </Modal>
     </div>
@@ -375,6 +476,9 @@ function NotificationListRow({
   item,
   isActive,
   isPending,
+  bulkSelectMode,
+  isChecked,
+  onToggleSelect,
   onSelect,
   onMarkRead,
   onDelete,
@@ -382,6 +486,9 @@ function NotificationListRow({
   item: NotificationListItem;
   isActive: boolean;
   isPending: boolean;
+  bulkSelectMode: boolean;
+  isChecked: boolean;
+  onToggleSelect: (checked: boolean) => void;
   onSelect: () => void;
   onMarkRead: () => void;
   onDelete: () => void;
@@ -390,9 +497,23 @@ function NotificationListRow({
     <div
       className={cn(
         "flex items-start gap-1 border-b transition-colors",
-        isActive ? "bg-accent" : "hover:bg-muted/60",
+        isActive || isChecked ? "bg-accent" : "hover:bg-muted/60",
       )}
     >
+      {bulkSelectMode ? (
+        <div className="flex shrink-0 items-start pt-3.5 pl-3">
+          <input
+            type="checkbox"
+            className="size-4 rounded border-input"
+            checked={isChecked}
+            disabled={isPending}
+            onChange={(event) => onToggleSelect(event.target.checked)}
+            onClick={(event) => event.stopPropagation()}
+            aria-label={`Select ${item.title}`}
+          />
+        </div>
+      ) : null}
+
       <button
         type="button"
         onClick={onSelect}
@@ -417,46 +538,48 @@ function NotificationListRow({
         </p>
       </button>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button
-              variant="ghost"
-              size="icon"
-              className="mr-1 mt-2 size-8 shrink-0"
-              aria-label="Notification actions"
-              disabled={isPending}
-              onClick={(event) => event.stopPropagation()}
-            >
-              <MoreHorizontal className="size-4" />
-            </Button>
-          }
-        />
-        <DropdownMenuContent align="end" className="min-w-[10rem]">
-          {item.status === "unread" ? (
+      {!bulkSelectMode ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon"
+                className="mr-1 mt-2 size-8 shrink-0"
+                aria-label="Notification actions"
+                disabled={isPending}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <MoreHorizontal className="size-4" />
+              </Button>
+            }
+          />
+          <DropdownMenuContent align="end" className="min-w-[10rem]">
+            {item.status === "unread" ? (
+              <DropdownMenuItem
+                className="whitespace-nowrap"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onMarkRead();
+                }}
+              >
+                <Check className="mr-2 size-4" />
+                Mark as read
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuItem
-              className="whitespace-nowrap"
+              className="whitespace-nowrap text-destructive focus:text-destructive"
               onClick={(event) => {
                 event.stopPropagation();
-                onMarkRead();
+                onDelete();
               }}
             >
-              <Check className="mr-2 size-4" />
-              Mark as read
+              <Trash2 className="mr-2 size-4" />
+              Delete
             </DropdownMenuItem>
-          ) : null}
-          <DropdownMenuItem
-            className="whitespace-nowrap text-destructive focus:text-destructive"
-            onClick={(event) => {
-              event.stopPropagation();
-              onDelete();
-            }}
-          >
-            <Trash2 className="mr-2 size-4" />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
     </div>
   );
 }

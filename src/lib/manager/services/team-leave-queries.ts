@@ -499,6 +499,8 @@ export async function listTeamLeaveRequests(
           : "",
         departmentId: employee?.department_id ?? null,
         departmentName: department?.name ?? null,
+        designationId: employee?.designation_id ?? null,
+        designationName: designation?.title ?? null,
         branchId: employee?.branch_id ?? null,
         branchName: branch?.name ?? null,
         leaveTypeId: row.leave_type_id,

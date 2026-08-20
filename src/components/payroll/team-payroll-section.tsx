@@ -57,9 +57,21 @@ export async function TeamPayrollSection({
   const now = new Date();
 
   if (section === TEAM_PAYROLL_SECTIONS.run) {
+    const requestedMonth = Number(firstString(rawSearchParams.month));
+    const requestedYear = Number(firstString(rawSearchParams.year));
     return (
       <PayrollRunForm
-        defaultYear={now.getFullYear()}
+        defaultMonth={
+          Number.isInteger(requestedMonth) && requestedMonth >= 1 && requestedMonth <= 12
+            ? requestedMonth
+            : now.getMonth() + 1
+        }
+        defaultYear={
+          Number.isInteger(requestedYear) && requestedYear >= 2000
+            ? requestedYear
+            : now.getFullYear()
+        }
+        autoLoad={firstString(rawSearchParams.autoload) === "1"}
         canRun={canRunPayrollOverride ?? canRunPayroll(profile.permissionCodes)}
       />
     );

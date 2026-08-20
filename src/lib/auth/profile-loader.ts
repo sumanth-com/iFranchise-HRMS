@@ -231,37 +231,9 @@ export const loadUserProfile = cache(async function loadUserProfile(
       (code): code is string => typeof code === "string",
     );
 
-    if (permissionCodes.length > 0) {
-      const { data: permissionRows, error: permissionRowsError } = await supabase
-        .schema("hrms")
-        .from("permissions")
-        .select("id, code, module, action, resource")
-        .in("code", permissionCodes)
-        .is("deleted_at", null)
-        .eq("status", "active");
-
-      if (permissionRowsError) {
-        return { success: false, error: "NO_ROLES" };
-      }
-
-      const byCode = new Map(
-        (permissionRows ?? []).map((permission) => [permission.code, permission]),
-      );
-      // Preserve RPC order while keeping only active permission rows.
-      permissions = permissionCodes
-        .map((code) => byCode.get(code))
-        .filter((permission): permission is NonNullable<typeof permission> =>
-          Boolean(permission),
-        )
-        .map((permission) => ({
-          id: permission.id,
-          code: permission.code,
-          module: permission.module,
-          action: permission.action,
-          resource: permission.resource,
-        }));
-      permissionCodes = permissions.map((permission) => permission.code);
-    }
+    // Nav and server guards use permissionCodes. Skip hydrating the full
+    // permissions catalog on the layout critical path (extra round-trip).
+    permissions = [];
   } else {
     const { data: orgRoles } = await supabase
       .schema("hrms")

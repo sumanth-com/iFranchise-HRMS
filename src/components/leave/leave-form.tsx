@@ -21,7 +21,7 @@ import {
 } from "@/components/common/select";
 import { createLeaveRequestAction, getLeaveApplyContextAction, updateLeaveRequestAction } from "@/lib/leave/actions";
 import {
-  ALLOWED_LEAVE_TYPE_CODES,
+  LEAVE_APPLY_TYPE_CODES,
   HALF_DAY_PERIOD_LABELS,
   LEAVE_ROUTES,
   sortByLeaveTypeCode,
@@ -29,6 +29,10 @@ import {
 import { LeaveDurationPreview, LeavePolicyInfo } from "@/components/leave/leave-apply-policy-panel";
 import { formatLeaveDayCount } from "@/lib/leave/services/leave-usage";
 import { previewLeaveApplication } from "@/lib/leave/services/leave-apply-preview";
+import {
+  CASUAL_LEAVE_CODE,
+  earliestAllowedLeaveStart,
+} from "@/lib/leave/services/leave-policy-engine";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import {
   leaveFormSchema,
@@ -87,13 +91,17 @@ export function LeaveForm({
       : employee.label,
   }));
 
+  const isEdit = mode === "edit" && Boolean(initialRequest?.id);
+
   const leaveTypeItems = sortByLeaveTypeCode(
     lookups.leaveTypes.filter((leaveType) => Boolean(leaveType.id)),
   )
-    .filter((leaveType) =>
-      !leaveType.code ||
-      ALLOWED_LEAVE_TYPE_CODES.includes(leaveType.code as (typeof ALLOWED_LEAVE_TYPE_CODES)[number]),
-    )
+    .filter((leaveType) => {
+      if (!leaveType.code) return true;
+      const code = leaveType.code.toUpperCase();
+      if (isEdit && initialRequest?.leaveTypeId === leaveType.id) return true;
+      return (LEAVE_APPLY_TYPE_CODES as readonly string[]).includes(code);
+    })
     .map((leaveType) => ({
       value: leaveType.id,
       label: leaveType.code ? `${leaveType.label} (${leaveType.code})` : leaveType.label,
@@ -104,15 +112,15 @@ export function LeaveForm({
   );
 
   const today = getTodayDateString();
-  const isEdit = mode === "edit" && Boolean(initialRequest?.id);
+  const defaultStart = earliestAllowedLeaveStart(CASUAL_LEAVE_CODE);
 
   const form = useForm<LeaveFormInput>({
     resolver: zodResolver(leaveFormSchema) as Resolver<LeaveFormInput>,
     defaultValues: {
       employeeId: initialRequest?.employeeId ?? defaultEmployeeId ?? "",
       leaveTypeId: initialRequest?.leaveTypeId ?? "",
-      startDate: initialRequest?.startDate ?? today,
-      endDate: initialRequest?.endDate ?? today,
+      startDate: initialRequest?.startDate ?? defaultStart,
+      endDate: initialRequest?.endDate ?? defaultStart,
       isHalfDay: initialRequest?.isHalfDay ?? false,
       halfDayPeriod: initialRequest?.halfDayPeriod ?? "",
       reason: initialRequest?.reason ?? "",
@@ -128,13 +136,30 @@ export function LeaveForm({
   const startDate = form.watch("startDate");
   const endDate = form.watch("endDate");
   const balances = applyContext?.balances ?? initialBalances;
+  const selectedLeaveTypeCode =
+    applyContext?.leaveTypes.find((item) => item.id === selectedLeaveTypeId)?.code ??
+    lookups.leaveTypes.find((item) => item.id === selectedLeaveTypeId)?.code ??
+    "";
+  const earliestStart = earliestAllowedLeaveStart(
+    selectedLeaveTypeCode,
+    applyContext?.notice,
+  );
+  const startMin =
+    isEdit && initialRequest?.startDate && initialRequest.startDate < today
+      ? initialRequest.startDate
+      : earliestStart;
 
   useEffect(() => {
     if (!startDate) return;
-    if (!endDate || endDate < startDate) {
-      form.setValue("endDate", startDate, { shouldValidate: true });
+    const nextStart = startDate < startMin ? startMin : startDate;
+    if (nextStart !== startDate) {
+      form.setValue("startDate", nextStart, { shouldValidate: true });
     }
-  }, [endDate, form, startDate]);
+    const nextEnd = !endDate || endDate < nextStart ? nextStart : endDate;
+    if (nextEnd !== endDate) {
+      form.setValue("endDate", nextEnd, { shouldValidate: true });
+    }
+  }, [endDate, form, startDate, startMin]);
 
   useEffect(() => {
     if (!selectedEmployeeId) {
@@ -217,15 +242,16 @@ export function LeaveForm({
   const policyBlocksSubmit = Boolean(applyPreview?.issues.length);
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form onSubmit={onSubmit} className={cn("space-y-3", isSelfService && "space-y-2.5")}>
       <LeavePolicyInfo
+        compact={isSelfService}
         context={applyContext}
         employeeName={
           lookups.employees.find((employee) => employee.id === selectedEmployeeId)?.label ??
           "Employee"
         }
       />
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className={cn("grid gap-3", isSelfService ? "md:grid-cols-2 lg:grid-cols-3" : "md:grid-cols-2")}>
         {!isSelfService ? (
           <div className="space-y-2">
             <Label htmlFor="employeeId">Employee</Label>
@@ -257,7 +283,7 @@ export function LeaveForm({
           </div>
         ) : null}
 
-        <div className={cn("space-y-2", isSelfService && "md:col-span-2")}>
+        <div className={cn("space-y-2", isSelfService && "md:col-span-2 lg:col-span-3")}>
           <Label htmlFor="leaveTypeId">Leave Type</Label>
           <Select
             items={leaveTypeItems}
@@ -289,8 +315,8 @@ export function LeaveForm({
         {selectedEmployeeId ? (
           isSelfService ? (
             balancesLoading || balances.length > 0 ? (
-              <div className="flex flex-wrap items-center gap-2 md:col-span-2">
-                <span className="text-xs font-medium text-muted-foreground">Your balance:</span>
+              <div className="flex flex-wrap items-center gap-1.5 md:col-span-2 lg:col-span-3">
+                <span className="text-xs font-medium text-muted-foreground">Balance</span>
                 {balancesLoading && balances.length === 0 ? (
                   <span className="text-xs text-muted-foreground">Loading…</span>
                 ) : (
@@ -372,6 +398,7 @@ export function LeaveForm({
             id="startDate"
             type="date"
             disabled={isPending}
+            min={startMin}
             {...form.register("startDate")}
           />
           {form.formState.errors.startDate ? (
@@ -386,8 +413,8 @@ export function LeaveForm({
           <Input
             id="endDate"
             type="date"
-            min={startDate || undefined}
             disabled={isPending || isHalfDay}
+            min={startDate || startMin}
             {...form.register("endDate")}
           />
           {form.formState.errors.endDate ? (
@@ -397,20 +424,8 @@ export function LeaveForm({
           ) : null}
         </div>
 
-        {applyContext && selectedLeaveTypeId && startDate && endDate ? (
-          <div className="md:col-span-2">
-            <LeaveDurationPreview
-              context={applyContext}
-              leaveTypeId={selectedLeaveTypeId}
-              startDate={startDate}
-              endDate={endDate}
-              isHalfDay={isHalfDay}
-            />
-          </div>
-        ) : null}
-
-        <div className="space-y-2 md:col-span-2">
-          <label className="flex items-center gap-2 text-sm">
+        <div className={cn("flex items-end pb-2", isSelfService ? "lg:col-span-1" : "md:col-span-2")}>
+          <label className="flex h-9 items-center gap-2 text-sm">
             <input
               type="checkbox"
               className="size-4 rounded border"
@@ -431,8 +446,20 @@ export function LeaveForm({
           </label>
         </div>
 
+        {applyContext && selectedLeaveTypeId && startDate && endDate ? (
+          <div className={cn("md:col-span-2", isSelfService && "lg:col-span-3")}>
+            <LeaveDurationPreview
+              context={applyContext}
+              leaveTypeId={selectedLeaveTypeId}
+              startDate={startDate}
+              endDate={endDate}
+              isHalfDay={isHalfDay}
+            />
+          </div>
+        ) : null}
+
         {isHalfDay ? (
-          <div className="space-y-2 md:col-span-2">
+          <div className={cn("space-y-2 md:col-span-2", isSelfService && "lg:col-span-3")}>
             <Label htmlFor="halfDayPeriod">Half Day Period</Label>
             <Select
               items={halfDayPeriodItems}
@@ -466,13 +493,16 @@ export function LeaveForm({
           </div>
         ) : null}
 
-        <div className="space-y-2 md:col-span-2">
+        <div className={cn("space-y-2 md:col-span-2", isSelfService && "lg:col-span-3")}>
           <Label htmlFor="reason">Reason</Label>
           <textarea
             id="reason"
-            rows={isSelfService ? 3 : 4}
+            rows={isSelfService ? 2 : 4}
             disabled={isPending}
-            className="flex min-h-20 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            className={cn(
+              "flex w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+              isSelfService ? "min-h-16" : "min-h-20",
+            )}
             {...form.register("reason")}
           />
           {form.formState.errors.reason ? (
@@ -509,7 +539,7 @@ export function LeaveForm({
         ) : null}
       </div>
 
-      <div className="flex items-center justify-end gap-2 border-t pt-3">
+      <div className={cn("flex items-center justify-end gap-2 border-t", isSelfService ? "pt-2.5" : "pt-3")}>
         <Button
           type="button"
           variant="outline"

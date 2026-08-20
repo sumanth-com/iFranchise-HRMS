@@ -295,6 +295,19 @@ async function getAttendanceForDate(
   return data;
 }
 
+/** Today’s punch panel only — used by home dashboards instead of a full month profile load. */
+export async function getSelfTodayAttendance(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+): Promise<ManagerTodayAttendance> {
+  const today = getTodayDateString();
+  const [rules, todayRow] = await Promise.all([
+    getOrganizationAttendanceRules(supabase, profile.employee.organizationId),
+    getAttendanceForDate(supabase, profile.employee.id, today),
+  ]);
+  return buildTodayPanel(todayRow, today, rules);
+}
+
 async function loadMonthAttendance(
   supabase: AuthSupabaseClient,
   employeeId: string,
@@ -1195,6 +1208,10 @@ export async function requestManagerAttendanceRegularization(
       parseISO(requestedCheckInAt).getTime()
   ) {
     throw new Error("Requested checkout cannot be before check-in.");
+  }
+
+  if (requestedCheckOutAt && parseISO(requestedCheckOutAt).getTime() > Date.now()) {
+    throw new Error("Requested checkout cannot be in the future.");
   }
 
   const { data: correction, error } = await supabase

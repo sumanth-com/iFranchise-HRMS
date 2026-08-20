@@ -89,7 +89,8 @@ export function ApplyLeaveDialog({
           ? "Create a leave request for an employee. It will follow the normal approval workflow."
           : "Submit a leave request for manager and HR approval."
       }
-      contentClassName={isTeam ? "sm:max-w-2xl" : "sm:max-w-xl"}
+      contentClassName="w-[min(96vw,48rem)] sm:max-w-3xl"
+      bodyClassName="overflow-y-auto py-3"
       showCancel={false}
     >
       {open ? (
