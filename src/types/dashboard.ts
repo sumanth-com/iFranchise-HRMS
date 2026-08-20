@@ -59,6 +59,14 @@ export type DashboardSecondaryMetrics = {
   exitClearancePending: number;
 };
 
+export type DashboardWatchItem = {
+  id: string;
+  label: string;
+  value: number;
+  hint: string;
+  href: string;
+};
+
 export type DashboardCharts = {
   headcountByDepartment: DashboardChartItem[];
   attendanceTrend7Days: DashboardChartItem[];

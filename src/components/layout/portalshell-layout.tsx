@@ -1,7 +1,8 @@
-import { type ReactNode } from "react";
+import { type ReactNode, Suspense } from "react";
 import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { DashboardShellFallback } from "@/components/layout/dashboard-shell-fallback";
 import { AUTH_ROUTES } from "@/lib/auth/constants";
 import { getLayoutUserProfile } from "@/lib/auth/layout-profile";
 import { AuthProvider, type PortalVariant } from "@/providers/auth-provider";
@@ -13,7 +14,24 @@ type PortalShellLayoutProps = {
   portalLabel?: string;
 };
 
-export async function PortalShellLayout({
+export function PortalShellLayout({
+  children,
+  portalVariant = "hr",
+  portalLabel,
+}: PortalShellLayoutProps) {
+  return (
+    <Suspense fallback={<DashboardShellFallback />}>
+      <ResolvedPortalShell
+        portalVariant={portalVariant}
+        portalLabel={portalLabel}
+      >
+        {children}
+      </ResolvedPortalShell>
+    </Suspense>
+  );
+}
+
+async function ResolvedPortalShell({
   children,
   portalVariant = "hr",
   portalLabel,

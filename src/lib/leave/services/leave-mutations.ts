@@ -12,6 +12,7 @@ import {
   isHrLeaveApplicant,
 } from "@/lib/leave/services/leave-queries";
 import { evaluateLeaveApplication } from "@/lib/leave/services/leave-policy-runtime";
+import { NON_APPLY_LEAVE_TYPE_CODES } from "@/lib/leave/constants";
 import {
   notifyLeaveApproved,
   notifyLeaveCancelled,
@@ -190,7 +191,10 @@ async function createApprovalSteps(
 ) {
   const organizationId = profile.employee.organizationId;
   const applicantRoles = await getEmployeeRoleCodes(supabase, employeeId);
-  const hrApplicant = isHrLeaveApplicant(applicantRoles);
+  const submitterRoles = profile.roles.map((role) => role.code);
+  const hrApplicant =
+    isHrLeaveApplicant(applicantRoles) ||
+    (employeeId === profile.employee.id && isHrLeaveApplicant(submitterRoles));
 
   const steps: Array<{ approverId: string; level: number }> = [];
 
@@ -262,6 +266,16 @@ export async function createLeaveRequest(
       isHalfDay: input.isHalfDay,
     },
   );
+  const applyCode = evaluated.leaveType.code.toUpperCase();
+  if (
+    NON_APPLY_LEAVE_TYPE_CODES.includes(
+      applyCode as (typeof NON_APPLY_LEAVE_TYPE_CODES)[number],
+    )
+  ) {
+    throw new Error(
+      "Optional Holiday cannot be applied here. Use the Optional Holiday workflow instead.",
+    );
+  }
   const totalDays = evaluated.duration.totalLeaveDays;
   const balanceYear = getCurrentBalanceYear(input.startDate);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   Banknote,
   CalendarClock,
@@ -35,7 +35,7 @@ import {
   formatCurrency,
   formatPayrollMonth,
 } from "@/lib/payroll/services/payroll-utils";
-import type { PayrollBreakdown, PayrollDetail } from "@/types/payroll";
+import type { PayrollBreakdown, PayrollDetail, PayrollPreviewResult } from "@/types/payroll";
 
 type EmployeeTableRow = {
   id: string;
@@ -64,13 +64,16 @@ const PIPELINE_STEPS = [
 ] as const;
 
 type PayrollRunFormProps = {
+  defaultMonth?: number;
   defaultYear: number;
+  autoLoad?: boolean;
   canRun: boolean;
 };
 
 type PanelState =
   | { kind: "idle" }
   | { kind: "info"; title: string; text: string; tone?: "default" | "warning" }
+  | { kind: "preview"; data: PayrollPreviewResult }
   | { kind: "run"; data: PayrollDetail; mode: "existing" | "created" };
 
 function formatPayrollRunError(error: unknown): string {
@@ -94,10 +97,12 @@ function isFuturePayrollPeriod(month: number, year: number) {
 }
 
 export function PayrollRunForm({
+  defaultMonth,
   defaultYear,
+  autoLoad = false,
   canRun,
 }: PayrollRunFormProps) {
-  const [month, setMonth] = useState(String(new Date().getMonth() + 1));
+  const [month, setMonth] = useState(String(defaultMonth ?? new Date().getMonth() + 1));
   const [year, setYear] = useState(String(defaultYear));
   const [panel, setPanel] = useState<PanelState>({ kind: "idle" });
   const [breakdownEmployee, setBreakdownEmployee] =
@@ -105,6 +110,7 @@ export function PayrollRunForm({
   const [breakdownOpen, setBreakdownOpen] = useState(false);
   const [breakdownLoading, setBreakdownLoading] = useState(false);
   const breakdownRequestId = useRef(0);
+  const autoLoadStarted = useRef(false);
   const [isPending, startTransition] = useTransition();
 
   const hasPeriod = month.length > 0 && year.length > 0;
@@ -148,7 +154,7 @@ export function PayrollRunForm({
     }
   }
 
-  function handleRunPayroll() {
+  async function loadPeriodSnapshot() {
     if (!hasPeriod) {
       setPanel({
         kind: "info",
@@ -168,7 +174,120 @@ export function PayrollRunForm({
       return;
     }
 
+    try {
+      const runs = await fetchPayrollRunsAction({
+        month: monthNumber,
+        year: yearNumber,
+        page: 1,
+        pageSize: 1,
+      });
+
+      if (runs.data[0]) {
+        await fetchRunDetail(runs.data[0].id, "existing");
+        return;
+      }
+
+      const previewResult = await previewPayrollRunAction(runInput());
+      if (!previewResult.success) {
+        setPanel({
+          kind: "info",
+          title: "Unable to load payroll",
+          text: previewResult.message,
+        });
+        return;
+      }
+
+      const data = previewResult.data;
+
+      if (data.employeeCount === 0) {
+        setPanel({
+          kind: "info",
+          title: `No employees for ${periodLabel}`,
+          text: "Add active employees before running payroll for this period.",
+        });
+        return;
+      }
+
+      if (data.totalGross === 0 && data.totalNet === 0) {
+        const missingStructures = data.items.filter((item) => !item.hasSalaryStructure).length;
+        setPanel({
+          kind: "info",
+          title: `No payable amounts for ${periodLabel}`,
+          text:
+            missingStructures === data.employeeCount
+              ? "Configure salary structures for employees, then run payroll again."
+              : "Review attendance, leave, bonuses, and reimbursements, then try again.",
+        });
+        return;
+      }
+
+      setPanel({ kind: "preview", data });
+    } catch (error) {
+      setPanel({
+        kind: "info",
+        title: "Unable to load payroll",
+        text: formatPayrollRunError(error),
+      });
+    }
+  }
+
+  useEffect(() => {
+    if (!autoLoad || !canRun || autoLoadStarted.current) return;
+    autoLoadStarted.current = true;
+    startTransition(() => {
+      void loadPeriodSnapshot();
+    });
+    // Load the due period once when arriving from HR Overview.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoLoad, canRun]);
+
+  function handleRunPayroll() {
+    if (panel.kind === "preview") {
+      startTransition(async () => {
+        try {
+          const result = await generatePayrollRunAction(runInput());
+          if (!result.success) {
+            setPanel({
+              kind: "info",
+              title: "Unable to run payroll",
+              text: result.message,
+            });
+            return;
+          }
+
+          toast.success(`Payroll run created for ${periodLabel}`);
+          await fetchRunDetail(result.data, "created");
+        } catch (error) {
+          setPanel({
+            kind: "info",
+            title: "Unable to run payroll",
+            text: formatPayrollRunError(error),
+          });
+        }
+      });
+      return;
+    }
+
     startTransition(async () => {
+      if (!hasPeriod) {
+        setPanel({
+          kind: "info",
+          title: "Select a payroll period",
+          text: "Choose a month and year before running payroll.",
+        });
+        return;
+      }
+
+      if (isFuturePeriod) {
+        setPanel({
+          kind: "info",
+          title: `${periodLabel} is an upcoming period`,
+          text: "Payroll can only be run for the current month and completed past months.",
+          tone: "warning",
+        });
+        return;
+      }
+
       try {
         const runs = await fetchPayrollRunsAction({
           month: monthNumber,
@@ -287,6 +406,23 @@ export function PayrollRunForm({
     setBreakdownEmployee(result.data);
   }
 
+  function mapPreviewItemToRow(item: PayrollPreviewResult["items"][number]): EmployeeTableRow {
+    return {
+      id: item.employeeId,
+      name: item.employeeName,
+      code: item.employeeCode,
+      department: item.departmentName,
+      gross: item.grossSalary,
+      deductions: item.totalDeductions,
+      net: item.netSalary,
+      lopDays: item.breakdown.attendance.lopDays,
+      breakdown: item.breakdown,
+      basicSalary: item.basicSalary,
+      totalAllowances: item.totalAllowances,
+      hasSalaryStructure: item.hasSalaryStructure,
+    };
+  }
+
   function mapRunItemToRow(item: PayrollDetail["items"][number]): EmployeeTableRow {
     return {
       id: item.employeeId,
@@ -380,14 +516,22 @@ export function PayrollRunForm({
 
       {panel.kind === "idle" ? (
         <PayrollRunStatusMessage
-          icon={isFuturePeriod ? CalendarClock : CircleDollarSign}
-          title={isFuturePeriod ? `${periodLabel} is an upcoming period` : "Run monthly payroll"}
-          text={
-            isFuturePeriod
-              ? "Payroll can only be run for the current month and completed past months. Choose a completed month above."
-              : "Select a month and year above, then click Run payroll to review an existing run or generate salaries for that period."
+          icon={isPending ? ClipboardList : isFuturePeriod ? CalendarClock : CircleDollarSign}
+          title={
+            isPending
+              ? `Loading payroll for ${periodLabel}`
+              : isFuturePeriod
+                ? `${periodLabel} is an upcoming period`
+                : "Run monthly payroll"
           }
-          tone={isFuturePeriod ? "warning" : "default"}
+          text={
+            isPending
+              ? "Fetching the due payroll run or calculated amounts for this period."
+              : isFuturePeriod
+                ? "Payroll can only be run for the current month and completed past months. Choose a completed month above."
+                : "Select a month and year above, then click Run payroll to review an existing run or generate salaries for that period."
+          }
+          tone={isFuturePeriod && !isPending ? "warning" : "default"}
         />
       ) : null}
 
@@ -398,6 +542,30 @@ export function PayrollRunForm({
           text={panel.text}
           tone={panel.tone ?? "default"}
         />
+      ) : null}
+
+      {panel.kind === "preview" ? (
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold">Payroll due for {periodLabel}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              This period has not been processed yet. Review the calculated amounts below, then
+              click Run payroll to save the run.
+            </p>
+          </div>
+
+          <PayrollTotals
+            employeeCount={panel.data.items.length}
+            totalGross={panel.data.totalGross}
+            totalDeductions={panel.data.totalDeductions}
+            totalNet={panel.data.totalNet}
+          />
+
+          <EmployeePayrollTable
+            rows={panel.data.items.map(mapPreviewItemToRow)}
+            onView={openBreakdown}
+          />
+        </div>
       ) : null}
 
       {panel.kind === "run" ? (

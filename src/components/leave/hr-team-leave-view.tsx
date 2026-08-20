@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
+import { FileText } from "lucide-react";
 
+import { buttonVariants } from "@/components/common/button";
 import {
   LeaveSummaryCards,
   type LeaveSummaryFilterKey,
@@ -9,6 +12,7 @@ import {
 import { LeaveTable } from "@/components/leave/leave-table";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { getLeaveSummaryAction } from "@/lib/leave/actions";
+import { cn } from "@/lib/utils";
 import type {
   LeaveActionResult,
   LeaveListItem,
@@ -33,6 +37,7 @@ type HrTeamLeaveViewProps = {
   branchId?: string;
   reportingManagerId?: string;
   employeeId?: string;
+  summaryFilter?: LeaveSummaryFilterKey;
   leaveTypes: LookupOption[];
   departments: LookupOption[];
   branches: LookupOption[];
@@ -46,6 +51,7 @@ type HrTeamLeaveViewProps = {
   embedded?: boolean;
   title?: string;
   description?: string;
+  policyHref?: string;
   listBasePath?: string;
   fetchRecords?: (
     params: LeaveListParams,
@@ -67,6 +73,7 @@ export function HrTeamLeaveView({
   branchId,
   reportingManagerId,
   employeeId,
+  summaryFilter: initialSummaryFilter,
   leaveTypes,
   departments,
   branches,
@@ -80,11 +87,14 @@ export function HrTeamLeaveView({
   embedded = false,
   title = "Leave & Approvals",
   description = "Track leave requests, approvals, balances, and workforce availability across the organization.",
+  policyHref,
   listBasePath,
   fetchRecords,
 }: HrTeamLeaveViewProps) {
   const [summaryState, setSummaryState] = useState(summary);
-  const [summaryFilter, setSummaryFilter] = useState<LeaveSummaryFilterKey>();
+  const [summaryFilter, setSummaryFilter] = useState<LeaveSummaryFilterKey | undefined>(
+    initialSummaryFilter,
+  );
 
   useEffect(() => {
     setSummaryState(summary);
@@ -103,11 +113,20 @@ export function HrTeamLeaveView({
   return (
     <div className="space-y-6">
       {!embedded ? (
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {description}
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          </div>
+          {policyHref ? (
+            <Link
+              href={policyHref}
+              className={cn(buttonVariants({ variant: "outline" }), "shrink-0 gap-1.5")}
+            >
+              <FileText className="size-4" />
+              Leave Policy
+            </Link>
+          ) : null}
         </div>
       ) : null}
 

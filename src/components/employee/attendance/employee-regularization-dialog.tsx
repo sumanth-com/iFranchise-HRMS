@@ -2,14 +2,19 @@
 
 import { format, parseISO } from "date-fns";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Modal } from "@/components/common/modal";
 import { employeeRequestRegularizationAction } from "@/lib/employee/actions/employee-dashboard-actions";
-import { extractTimeFromTimestamp } from "@/lib/attendance/services/attendance-utils";
+import {
+  combineDateAndTime,
+  extractTimeFromTimestamp,
+  getTodayDateString,
+  isTimestampInFuture,
+} from "@/lib/attendance/services/attendance-utils";
 import type { ManagerAttendanceHistoryRow } from "@/types/manager-self-attendance";
 
 type Props = {
@@ -32,8 +37,19 @@ export function EmployeeRegularizationDialog({ row, open, onOpenChange }: Props)
     setReason("");
   }, [open, row]);
 
+  const checkoutInFuture = useMemo(() => {
+    if (!row || !checkOut) return false;
+    const timestamp = combineDateAndTime(row.attendanceDate, checkOut);
+    return timestamp ? isTimestampInFuture(timestamp) : false;
+  }, [checkOut, row]);
+
   function submit() {
     if (!row) return;
+
+    if (checkoutInFuture) {
+      toast.error("Requested checkout cannot be in the future.");
+      return;
+    }
 
     startTransition(async () => {
       const result = await employeeRequestRegularizationAction({
@@ -66,7 +82,10 @@ export function EmployeeRegularizationDialog({ row, open, onOpenChange }: Props)
           : undefined
       }
       footer={
-        <Button disabled={isPending || reason.trim().length < 5} onClick={submit}>
+        <Button
+          disabled={isPending || reason.trim().length < 5 || checkoutInFuture}
+          onClick={submit}
+        >
           Submit request
         </Button>
       }
@@ -86,8 +105,18 @@ export function EmployeeRegularizationDialog({ row, open, onOpenChange }: Props)
             <Input
               type="time"
               value={checkOut}
+              max={
+                row?.attendanceDate === getTodayDateString()
+                  ? extractTimeFromTimestamp(new Date().toISOString())
+                  : undefined
+              }
               onChange={(event) => setCheckOut(event.target.value)}
             />
+            {checkoutInFuture ? (
+              <p className="text-xs text-destructive">
+                Checkout time cannot be later than the current time.
+              </p>
+            ) : null}
           </label>
         </div>
         <label className="block space-y-1.5 text-sm">

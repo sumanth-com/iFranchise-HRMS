@@ -195,7 +195,7 @@ export function MyLeaveSelfServiceView({
           <p className="text-xs text-muted-foreground">
             {format(new Date(calendarYear, calendarMonth - 1, 1), "MMMM yyyy")} · used this month / total
           </p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {remainingCards.map((card) => (
               <EmployeeStatCard
                 key={card.key}

@@ -5,6 +5,7 @@ import {
   downloadOfferLetterFile,
   resolveOfferLetterExtension,
 } from "@/lib/recruitment/services/offer-letter-storage";
+import { resolveOfferLetterFileName } from "@/lib/recruitment/services/offer-letter-display";
 import { fromHrms, unwrapRelation, type PerfRow } from "@/lib/recruitment/services/recruitment-utils";
 
 export async function getOfferLetterFileForOffer(
@@ -16,7 +17,7 @@ export async function getOfferLetterFileForOffer(
 
   const { data: offer, error } = await fromHrms(supabase, "recruitment_offers")
     .select(
-      `id, offer_letter_path,
+      `id, offer_letter_path, offer_letter_filename,
       candidate:candidate_id(first_name, last_name),
       job:job_opening_id(title)`,
     )
@@ -35,8 +36,12 @@ export async function getOfferLetterFileForOffer(
     : "Candidate";
   const position = job?.title ?? "Role";
   const ext = resolveOfferLetterExtension(offer.offer_letter_path);
-  const safeName = candidateName.replace(/[^\w.-]+/g, "_");
-  const filename = `Offer-${safeName}-${position.replace(/[^\w.-]+/g, "_")}.${ext}`;
+  const filename = resolveOfferLetterFileName({
+    storedFileName: offer.offer_letter_filename,
+    offerLetterPath: offer.offer_letter_path,
+    candidateName,
+    jobTitle: position,
+  });
 
   const fileBytes = await downloadOfferLetterFile(supabase, offer.offer_letter_path);
 

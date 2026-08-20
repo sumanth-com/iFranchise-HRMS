@@ -232,22 +232,89 @@ export async function createOnboardingCase(
   return data.id;
 }
 
+async function findOnboardingCaseByEmail(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  personalEmail: string,
+) {
+  const email = personalEmail.trim().toLowerCase();
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("onboarding_cases")
+    .select("id, status, deleted_at")
+    .eq("organization_id", organizationId)
+    .eq("personal_email", email)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+/** RLS hides soft-deleted rows from the auth client; use admin for dismiss checks. */
+async function hasHrDismissedOnboardingByEmail(
+  organizationId: string,
+  personalEmail: string,
+): Promise<boolean> {
+  const email = personalEmail.trim().toLowerCase();
+  if (!email) return false;
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .schema("hrms")
+    .from("onboarding_cases")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("personal_email", email)
+    .not("deleted_at", "is", null)
+    .limit(1);
+
+  if (error) throw new Error(error.message);
+  return (data?.length ?? 0) > 0;
+}
+
+/**
+ * When HR deleted onboarding for an email, block offer-sync from recreating it.
+ * Also soft-deletes any active duplicate rows that may have been created before this guard.
+ */
+async function applyOnboardingDismissalGuard(
+  organizationId: string,
+  personalEmail: string,
+  actorUserId: string,
+): Promise<boolean> {
+  const dismissed = await hasHrDismissedOnboardingByEmail(organizationId, personalEmail);
+  if (!dismissed) return false;
+
+  const email = personalEmail.trim().toLowerCase();
+  const now = new Date().toISOString();
+  const admin = createAdminClient();
+  const { error } = await admin
+    .schema("hrms")
+    .from("onboarding_cases")
+    .update({
+      deleted_at: now,
+      onboarding_account_active: false,
+      updated_by: actorUserId,
+      updated_at: now,
+    })
+    .eq("organization_id", organizationId)
+    .eq("personal_email", email)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+  return true;
+}
+
 async function findActiveOnboardingCaseByEmail(
   supabase: AuthSupabaseClient,
   organizationId: string,
   personalEmail: string,
 ) {
-  const { data, error } = await supabase
-    .schema("hrms")
-    .from("onboarding_cases")
-    .select("id, status")
-    .eq("organization_id", organizationId)
-    .eq("personal_email", personalEmail.trim().toLowerCase())
-    .is("deleted_at", null)
-    .not("status", "in", '("cancelled","archived","rejected","completed")')
-    .maybeSingle();
-
-  if (error) throw new Error(error.message);
+  const data = await findOnboardingCaseByEmail(supabase, organizationId, personalEmail);
+  if (!data) return null;
+  if (["cancelled", "archived", "rejected", "completed"].includes(data.status as string)) {
+    return null;
+  }
   return data;
 }
 
@@ -341,11 +408,13 @@ export async function ensureOnboardingCaseFromOffer(
     offerReferenceNumber?: string | null;
   },
 ): Promise<string | null> {
+  const organizationId = profile.employee.organizationId;
   const email = input.personalEmail?.trim().toLowerCase() ?? "";
   const fullName = input.fullName.trim();
   if (!email || !fullName) return null;
 
-  const organizationId = profile.employee.organizationId;
+  if (await applyOnboardingDismissalGuard(organizationId, email, profile.userId)) return null;
+
   const existing = await findActiveOnboardingCaseByEmail(supabase, organizationId, email);
   if (existing) return existing.id;
 

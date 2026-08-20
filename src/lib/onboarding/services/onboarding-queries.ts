@@ -161,7 +161,13 @@ export async function getOnboardingDashboardStats(
 export async function listOnboardingCases(
   supabase: AuthSupabaseClient,
   organizationId: string,
-  params: { page: number; pageSize: number; search?: string; status?: string },
+  params: {
+    page: number;
+    pageSize: number;
+    search?: string;
+    status?: string;
+    roleId?: string;
+  },
 ): Promise<{ data: OnboardingCaseListItem[]; total: number }> {
   const from = (params.page - 1) * params.pageSize;
   const to = from + params.pageSize - 1;
@@ -185,6 +191,7 @@ export async function listOnboardingCases(
     .range(from, to);
 
   if (params.status) query = query.eq("status", params.status);
+  if (params.roleId) query = query.eq("intended_role_id", params.roleId);
   if (params.search) {
     const term = `%${params.search}%`;
     query = query.or(`full_name.ilike.${term},personal_email.ilike.${term}`);

@@ -34,7 +34,13 @@ const VIEW_PERMISSIONS = [
 ];
 
 export async function loadOnboardingModuleData(
-  params: { page?: number; pageSize?: number; search?: string; status?: string },
+  params: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    status?: string;
+    roleId?: string;
+  },
 ): Promise<OnboardingModuleData> {
   const profile = await requireServerAnyPermission(VIEW_PERMISSIONS);
   const supabase = await createClient();

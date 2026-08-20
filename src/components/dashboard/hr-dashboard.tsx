@@ -3,6 +3,7 @@
 import { ErrorState } from "@/components/common";
 import { DashboardOperationsRow } from "@/components/dashboard/dashboard-panels";
 import { HrTodayPulseSection } from "@/components/dashboard/hr-today-pulse-section";
+import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
 import type { HrDashboardData } from "@/types/dashboard";
 
 type Props = {
@@ -33,10 +34,26 @@ export function HrDashboard({ data, error }: Props) {
       >
         <DashboardOperationsRow
           tasks={data.tasks}
-          charts={data.charts}
+          watchItems={[
+            {
+              id: "headcount",
+              label: "Active employees",
+              value: data.kpis.totalEmployees,
+              hint: "Workforce",
+              href: EMPLOYEE_ROUTES.list,
+            },
+            {
+              id: "probation-ending",
+              label: "Probation ending",
+              value: data.secondary.probationEndingSoon,
+              hint: "Confirm soon",
+              href: `${EMPLOYEE_ROUTES.list}?employmentStatus=probation`,
+            },
+          ]}
           upcomingHolidays={data.todayPulse.upcomingHolidays}
           upcomingBirthdays={data.upcomingBirthdays}
           upcomingAnniversaries={data.upcomingAnniversaries}
+          insightsDescription="People to watch and upcoming celebrations"
         />
       </section>
     </div>

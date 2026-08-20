@@ -7,6 +7,7 @@ import { NavigationProgress } from "@/components/layout/navigation-progress";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopNav } from "@/components/layout/top-nav";
 import { DashboardUrlCleaner } from "@/components/layout/dashboard-url-cleaner";
+import { InstantNavPrefetch } from "@/components/layout/instant-nav-prefetch";
 import { ActivePortalProvider } from "@/providers/active-portal-provider";
 import { BreadcrumbLabelProvider } from "@/providers/breadcrumb-label-provider";
 import { SidebarProvider } from "@/hooks/use-sidebar";
@@ -21,6 +22,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
       <BreadcrumbLabelProvider>
         <SidebarProvider>
         <DashboardUrlCleaner />
+        <InstantNavPrefetch />
         <div className="flex h-screen overflow-hidden bg-background">
           <Sidebar />
           <MobileSidebar />

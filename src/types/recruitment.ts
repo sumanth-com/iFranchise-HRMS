@@ -236,6 +236,7 @@ export type OfferListItem = {
   salary: number;
   joiningDate: string;
   offerLetterPath: string | null;
+  offerLetterFileName: string | null;
   offerStatus: OfferStatus;
   expiresAt: string | null;
   employeeId: string | null;

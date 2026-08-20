@@ -6,7 +6,9 @@ import {
   getEmployeeLeaveBalanceSnapshot,
   getEmployeeLeaveCalendarData,
   listLeaveRequests,
+  ensurePendingHrLeaveAssignedToCeo,
 } from "@/lib/leave/services/leave-queries";
+import { DEFAULT_LEAVE_CALENDAR } from "@/lib/leave/services/leave-calendar-engine";
 import { requireServerPermission } from "@/lib/permissions/server";
 import { hasAnyPermission, hasPermission } from "@/lib/permissions/utils";
 import { createClient } from "@/lib/supabase/server";
@@ -52,6 +54,8 @@ export async function LeaveHubSection({
     branchId: raw.branchId,
     reportingManagerId: raw.reportingManagerId,
     employeeId: raw.employeeId,
+    summaryFilter: raw.summaryFilter,
+    excludeHrApplicants: true,
   });
 
   const canApply = hasPermission(profile.permissionCodes, "leave.create");
@@ -63,25 +67,86 @@ export async function LeaveHubSection({
     hasPermission(profile.permissionCodes, "leave.cancel") ||
     hasPermission(profile.permissionCodes, "leave.withdraw");
 
-  const [balances, requests, calendar, teamResult, teamLookups, summary, applyLookups] =
-    await Promise.all([
-      getEmployeeLeaveBalanceSnapshot(supabase, employeeId, undefined, {
-        month: calendarMonth,
-        year: calendarYear,
-      }),
-      listLeaveRequests(supabase, profile, { employeeId, page: 1, pageSize: 25 }),
-      getEmployeeLeaveCalendarData(supabase, profile, calendarMonth, calendarYear),
-      canViewTeam ? listLeaveRequests(supabase, profile, teamParams) : Promise.resolve(null),
-      canViewTeam
-        ? getLeaveLookups(supabase, profile.employee.organizationId)
-        : Promise.resolve(null),
-      canViewTeam
-        ? getLeaveSummary(supabase, profile, teamParams.month, teamParams.year)
-        : Promise.resolve(null),
-      canApply || canEdit
-        ? getLeaveLookups(supabase, profile.employee.organizationId)
-        : Promise.resolve(null),
-    ]);
+  if (canViewTeam) {
+    await ensurePendingHrLeaveAssignedToCeo(profile.employee.organizationId).catch(
+      (error) => {
+        console.error(
+          "[leave] failed to assign pending HR leave to CEO",
+          error instanceof Error ? error.message : error,
+        );
+      },
+    );
+  }
+
+  const emptyCalendar = {
+    leaves: [] as Awaited<ReturnType<typeof getEmployeeLeaveCalendarData>>["leaves"],
+    holidays: [] as Awaited<ReturnType<typeof getEmployeeLeaveCalendarData>>["holidays"],
+    calendar: DEFAULT_LEAVE_CALENDAR,
+  };
+
+  const [
+    balancesResult,
+    requestsResult,
+    calendarResult,
+    teamResultSettled,
+    teamLookupsSettled,
+    summarySettled,
+    applyLookupsSettled,
+  ] = await Promise.all([
+    getEmployeeLeaveBalanceSnapshot(supabase, employeeId, undefined, {
+      month: calendarMonth,
+      year: calendarYear,
+    }).catch((error) => {
+      console.error("[leave] balance snapshot failed", error);
+      return [] as Awaited<ReturnType<typeof getEmployeeLeaveBalanceSnapshot>>;
+    }),
+    listLeaveRequests(supabase, profile, { employeeId, page: 1, pageSize: 25 }).catch(
+      (error) => {
+        console.error("[leave] own requests failed", error);
+        return { data: [], total: 0, page: 1, pageSize: 25 };
+      },
+    ),
+    getEmployeeLeaveCalendarData(supabase, profile, calendarMonth, calendarYear).catch(
+      (error) => {
+        console.error("[leave] calendar failed", error);
+        return emptyCalendar;
+      },
+    ),
+    canViewTeam
+      ? listLeaveRequests(supabase, profile, teamParams).catch((error) => {
+          console.error("[leave] team requests failed", error);
+          return null;
+        })
+      : Promise.resolve(null),
+    canViewTeam
+      ? getLeaveLookups(supabase, profile.employee.organizationId).catch((error) => {
+          console.error("[leave] team lookups failed", error);
+          return null;
+        })
+      : Promise.resolve(null),
+    canViewTeam
+      ? getLeaveSummary(supabase, profile, teamParams.month, teamParams.year, {
+          excludeHrApplicants: true,
+        }).catch((error) => {
+          console.error("[leave] summary failed", error);
+          return null;
+        })
+      : Promise.resolve(null),
+    canApply || canEdit
+      ? getLeaveLookups(supabase, profile.employee.organizationId).catch((error) => {
+          console.error("[leave] apply lookups failed", error);
+          return null;
+        })
+      : Promise.resolve(null),
+  ]);
+
+  const balances = balancesResult;
+  const requests = requestsResult;
+  const calendar = calendarResult;
+  const teamResult = teamResultSettled;
+  const teamLookups = teamLookupsSettled;
+  const summary = summarySettled;
+  const applyLookups = applyLookupsSettled;
 
   return (
     <HrLeaveHubView
@@ -121,6 +186,7 @@ export async function LeaveHubSection({
         branchId: teamParams.branchId,
         reportingManagerId: teamParams.reportingManagerId,
         employeeId: teamParams.employeeId,
+        summaryFilter: teamParams.summaryFilter,
         leaveTypes: teamLookups?.leaveTypes ?? [],
         departments: teamLookups?.departments ?? [],
         branches: teamLookups?.branches ?? [],

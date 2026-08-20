@@ -7,6 +7,7 @@ import {
   archiveNotification,
   deleteAllOwnNotifications,
   deleteNotification,
+  deleteNotificationsByIds,
   markAllNotificationsRead,
   markNotificationRead,
   previewNotificationTemplate,
@@ -103,6 +104,28 @@ export async function deleteNotificationAction(
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to delete notification",
+    };
+  }
+}
+
+export async function deleteSelectedNotificationsAction(
+  notificationIds: string[],
+): Promise<NotificationActionResult<{ deletedCount: number }>> {
+  try {
+    const profile = await requireAuthenticatedProfile();
+    const supabase = await createClient();
+    const deletedCount = await deleteNotificationsByIds(
+      supabase,
+      profile,
+      notificationIds,
+    );
+    revalidateNotifications();
+    return { success: true, data: { deletedCount } };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "Failed to delete notifications",
     };
   }
 }

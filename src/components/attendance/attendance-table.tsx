@@ -11,16 +11,18 @@ import {
 import { format, parseISO } from "date-fns";
 import {
   Eye,
+  CheckCircle2,
   Loader2,
-  MoreHorizontal,
   Pencil,
   Trash2,
   CalendarDays,
+  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
   AttendanceEditDialog,
+  AttendanceRegularizationViewDialog,
   AttendanceViewDialog,
 } from "@/components/attendance/attendance-record-dialogs";
 import { AttendanceStatusBadge } from "@/components/attendance/attendance-status-badge";
@@ -35,19 +37,17 @@ import {
   SelectValue,
 } from "@/components/common/select";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { deleteAttendanceAction } from "@/lib/attendance/actions";
+import {
+  approveAttendanceCorrectionAction,
+  deleteAttendanceAction,
+  rejectAttendanceCorrectionAction,
+} from "@/lib/attendance/actions";
 import {
   ATTENDANCE_ROUTES,
   ATTENDANCE_STATUS_LABELS,
@@ -80,6 +80,8 @@ type AttendanceTableProps = {
   attendanceLookups?: AttendanceLookups;
   onViewRecord?: (record: AttendanceListItem) => void;
   summaryDate?: string;
+  teamRegularizationMode?: boolean;
+  canApproveCorrections?: boolean;
 };
 
 function formatDateTime(value?: string | null) {
@@ -118,7 +120,7 @@ const TABLE_HEAD_ROW_CLASS =
 const TABLE_HEAD_CELL_BASE =
   "h-11 whitespace-nowrap bg-black px-4 py-3 align-middle font-medium text-white";
 const TABLE_DATA_CELL_BASE = "whitespace-nowrap px-4 py-3 align-middle";
-const TABLE_ACTIONS_CELL_CLASS = "w-16 min-w-16 px-3 py-3 text-center align-middle";
+const TABLE_ACTIONS_CELL_CLASS = "min-w-36 px-2 py-3 text-center align-middle";
 
 const FILTER_CONTROL_CLASS =
   "h-10 w-full min-w-0 gap-2 rounded-lg [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-muted-foreground/70";
@@ -150,6 +152,8 @@ export function AttendanceTable({
   attendanceLookups,
   onViewRecord,
   summaryDate,
+  teamRegularizationMode = false,
+  canApproveCorrections = false,
 }: AttendanceTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -160,6 +164,8 @@ export function AttendanceTable({
   const [deleteTarget, setDeleteTarget] = useState<AttendanceListItem | null>(null);
   const [viewId, setViewId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
+
+  const [isReviewing, setIsReviewing] = useState(false);
 
   useEffect(() => {
     setRows(records);
@@ -277,6 +283,29 @@ export function AttendanceTable({
     updateParams(updates);
   };
 
+  const showEditAction = canEdit && attendanceLookups && !teamRegularizationMode;
+
+  const handleCorrectionReview = useCallback(
+    async (correctionId: string, approve: boolean) => {
+      if (isReviewing) return;
+      setIsReviewing(true);
+      const action = approve
+        ? approveAttendanceCorrectionAction
+        : rejectAttendanceCorrectionAction;
+      const result = await action({ correctionId });
+      setIsReviewing(false);
+
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+
+      toast.success(result.message);
+      router.refresh();
+    },
+    [isReviewing, router],
+  );
+
   const columns = useMemo<ColumnDef<AttendanceListItem, unknown>[]>(
     () => [
       {
@@ -349,18 +378,17 @@ export function AttendanceTable({
         id: "actions",
         header: "Actions",
         meta: { align: "center" } satisfies AttendanceColumnMeta,
-        cell: ({ row }) => (
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button variant="ghost" size="icon-sm" aria-label="Actions">
-                  <MoreHorizontal className="size-4" />
-                </Button>
-              }
-            />
-            <DropdownMenuContent align="end" className="min-w-[11.5rem]">
-              <DropdownMenuItem
-                className="whitespace-nowrap"
+        cell: ({ row }) => {
+          const pending =
+            row.original.correctionStatus === "pending" && row.original.correctionId;
+
+          return (
+            <div className="flex items-center justify-center gap-0.5">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="View attendance"
+                title="View"
                 onClick={() => {
                   if (onViewRecord) {
                     onViewRecord(row.original);
@@ -369,34 +397,73 @@ export function AttendanceTable({
                   setViewId(row.original.id);
                 }}
               >
-                <Eye className="size-4 shrink-0" />
-                View Attendance
-              </DropdownMenuItem>
-              {canEdit ? (
-                <DropdownMenuItem
-                  className="whitespace-nowrap"
+                <Eye className="size-4" />
+              </Button>
+              {teamRegularizationMode && canApproveCorrections && pending ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Accept regularization"
+                    title="Accept"
+                    disabled={isReviewing}
+                    onClick={() =>
+                      void handleCorrectionReview(row.original.correctionId!, true)
+                    }
+                  >
+                    <CheckCircle2 className="size-4 text-emerald-600" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Reject regularization"
+                    title="Reject"
+                    disabled={isReviewing}
+                    onClick={() =>
+                      void handleCorrectionReview(row.original.correctionId!, false)
+                    }
+                  >
+                    <XCircle className="size-4 text-red-500" />
+                  </Button>
+                </>
+              ) : null}
+              {showEditAction ? (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Edit attendance"
+                  title="Edit"
                   onClick={() => setEditId(row.original.id)}
                 >
-                  <Pencil className="size-4 shrink-0" />
-                  Edit Attendance
-                </DropdownMenuItem>
+                  <Pencil className="size-4" />
+                </Button>
               ) : null}
               {canDelete ? (
-                <DropdownMenuItem
-                  variant="destructive"
-                  className="whitespace-nowrap"
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Delete attendance"
+                  title="Delete"
                   onClick={() => setDeleteTarget(row.original)}
                 >
-                  <Trash2 className="size-4 shrink-0" />
-                  Delete Attendance
-                </DropdownMenuItem>
+                  <Trash2 className="size-4 text-red-500" />
+                </Button>
               ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ),
+            </div>
+          );
+        },
       },
     ],
-    [canDelete, canEdit, onViewRecord],
+    [
+      attendanceLookups,
+      canApproveCorrections,
+      canDelete,
+      isReviewing,
+      onViewRecord,
+      showEditAction,
+      teamRegularizationMode,
+      handleCorrectionReview,
+    ],
   );
 
   const table = useReactTable({
@@ -689,22 +756,23 @@ export function AttendanceTable({
         </p>
       )}
 
-      <AttendanceViewDialog
-        attendanceId={viewId}
-        open={Boolean(viewId)}
-        onOpenChange={(open) => {
-          if (!open) setViewId(null);
-        }}
-        canEdit={canEdit && Boolean(attendanceLookups)}
-        onEdit={
-          canEdit && attendanceLookups
-            ? (detail) => {
-                setViewId(null);
-                setEditId(detail.id);
-              }
-            : undefined
-        }
-      />
+      {teamRegularizationMode ? (
+        <AttendanceRegularizationViewDialog
+          attendanceId={viewId}
+          open={Boolean(viewId)}
+          onOpenChange={(open) => {
+            if (!open) setViewId(null);
+          }}
+        />
+      ) : (
+        <AttendanceViewDialog
+          attendanceId={viewId}
+          open={Boolean(viewId)}
+          onOpenChange={(open) => {
+            if (!open) setViewId(null);
+          }}
+        />
+      )}
 
       {attendanceLookups ? (
         <AttendanceEditDialog

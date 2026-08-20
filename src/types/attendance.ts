@@ -1,4 +1,5 @@
 import type { LookupOption } from "@/types/employee";
+import type { CorrectionStatus } from "@/types/manager-attendance";
 
 export type AttendanceStatus =
   | "present"
@@ -29,6 +30,8 @@ export type AttendanceListItem = {
   workHours: number;
   overtimeHours: number;
   attendanceStatus: AttendanceStatus;
+  correctionId: string | null;
+  correctionStatus: CorrectionStatus | null;
 };
 
 export type AttendanceListResult = {
@@ -73,6 +76,16 @@ export type AttendanceSummary = {
 export type AttendanceAuditActor = {
   userId: string;
   employeeName: string | null;
+};
+
+export type AttendanceCorrectionDetail = {
+  id: string;
+  attendanceId: string;
+  requestedCheckInAt: string | null;
+  requestedCheckOutAt: string | null;
+  reason: string;
+  correctionStatus: CorrectionStatus;
+  reviewNotes: string | null;
 };
 
 export type AttendanceDetail = {

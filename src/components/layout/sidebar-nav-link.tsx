@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentProps, ReactNode } from "react";
 
+import { AppNavLink } from "@/components/layout/app-nav-link";
 import { SidebarNavIcon } from "@/components/layout/sidebar-nav-icon";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { cn } from "@/lib/utils";
@@ -36,7 +36,7 @@ export function SidebarNavLink({
   const isPending = pendingHref === href && pathname !== href;
 
   return (
-    <Link
+    <AppNavLink
       href={disabled ? "#" : href}
       prefetch
       aria-disabled={disabled}
@@ -60,6 +60,6 @@ export function SidebarNavLink({
     >
       <SidebarNavIcon icon={icon} active={active || isPending} />
       {!collapsed ? <span className="truncate">{children ?? title}</span> : null}
-    </Link>
+    </AppNavLink>
   );
 }

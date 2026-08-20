@@ -920,7 +920,7 @@ export async function listCandidates(
   params: unknown,
 ): Promise<CandidateListResult> {
   const parsed = candidateListParamsSchema.parse(params);
-  const { page, pageSize, search, departmentId, jobOpeningId, stage, source } = parsed;
+  const { page, pageSize, search, departmentId, jobOpeningId, stage, source, month, year } = parsed;
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
   const organizationId = profile.employee.organizationId;
@@ -957,6 +957,13 @@ export async function listCandidates(
     query = query.or(
       `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`,
     );
+  }
+  if (month && year) {
+    const monthKey = String(month).padStart(2, "0");
+    const lastDay = new Date(year, month, 0).getDate();
+    query = query
+      .gte("created_at", `${year}-${monthKey}-01T00:00:00+05:30`)
+      .lte("created_at", `${year}-${monthKey}-${String(lastDay).padStart(2, "0")}T23:59:59.999+05:30`);
   }
 
   const { data, error, count } = await query;
@@ -1036,7 +1043,7 @@ export async function getCandidateById(
       .select(
         `id, candidate_id, job_opening_id, department_id, designation_id, branch_id,
         employment_type_id, reporting_manager_id, salary, joining_date, offer_letter_path,
-        email_subject, offer_letter_body, offer_status, expires_at, employee_id, notes, created_at,
+        offer_letter_filename, email_subject, offer_letter_body, offer_status, expires_at, employee_id, notes, created_at,
         candidate:candidate_id(first_name, last_name, email),
         job:job_opening_id(title),
         departments:department_id(name),
@@ -1192,6 +1199,7 @@ function mapOfferRow(row: PerfRow): OfferListItem {
     salary: Number(row.salary),
     joiningDate: row.joining_date,
     offerLetterPath: row.offer_letter_path,
+    offerLetterFileName: row.offer_letter_filename ?? null,
     offerStatus: row.offer_status,
     expiresAt: row.expires_at,
     employeeId: row.employee_id,
@@ -1217,7 +1225,7 @@ export async function listOffers(
     .select(
       `id, candidate_id, job_opening_id, department_id, designation_id, branch_id,
         employment_type_id, reporting_manager_id, salary, joining_date, offer_letter_path,
-        email_subject, offer_letter_body, offer_status, expires_at, employee_id, notes, created_at,
+        offer_letter_filename, email_subject, offer_letter_body, offer_status, expires_at, employee_id, notes, created_at,
       candidate:candidate_id!inner(first_name, last_name, email),
       job:job_opening_id(title),
       departments:department_id(name),

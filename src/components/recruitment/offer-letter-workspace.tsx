@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
+import { buttonVariants } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -26,6 +27,7 @@ import {
   assertOfferLetterFile,
   OFFER_LETTER_MAX_BYTES,
 } from "@/lib/validations/recruitment";
+import { resolveOfferLetterFileName } from "@/lib/recruitment/services/offer-letter-display";
 import { cn } from "@/lib/utils";
 import type { CandidateDetail, OfferEmailDefaults } from "@/types/recruitment";
 
@@ -58,19 +60,27 @@ export function OfferLetterWorkspace({
   const [emailSubject, setEmailSubject] = useState("");
   const [emailMessage, setEmailMessage] = useState("");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [sentCelebration, setSentCelebration] = useState(false);
   const [missingFilePrompt, setMissingFilePrompt] = useState<"save" | "send" | null>(null);
 
   const latestOffer = detail?.offers[0];
   const hasStoredLetter = Boolean(latestOffer?.offerLetterPath);
-  const storedFileName = latestOffer?.offerLetterPath?.split("/").pop() ?? "Saved offer letter";
   const activeFile = uploadedFile;
-  const activeFileLabel = activeFile?.name ?? (hasStoredLetter ? storedFileName : null);
-  const canPreviewPdf =
-    activeFile?.type === "application/pdf" ||
-    (hasStoredLetter && !activeFile && latestOffer?.offerLetterPath?.toLowerCase().endsWith(".pdf"));
+  const displayFileName =
+    activeFile?.name ??
+    (hasStoredLetter
+      ? resolveOfferLetterFileName({
+          storedFileName: latestOffer?.offerLetterFileName,
+          offerLetterPath: latestOffer?.offerLetterPath,
+          candidateName: detail?.fullName,
+          jobTitle: detail?.jobTitle,
+        })
+      : null);
+  const storedPdfHref =
+    latestOffer?.id && hasStoredLetter && !activeFile
+      ? `/api/recruitment/offers/${latestOffer.id}/pdf`
+      : null;
 
   const defaultSubject = useMemo(() => {
     if (!detail) return "";
@@ -93,27 +103,8 @@ export function OfferLetterWorkspace({
     setEmailSubject(existing?.emailSubject ?? defaultSubject);
     setEmailMessage(existing?.emailMessage ?? defaultMessage);
     setUploadedFile(null);
-    setPreviewUrl(null);
     setDragging(false);
   }, [detail?.id, detail, defaultSubject, defaultMessage]);
-
-  useEffect(() => {
-    if (!activeFile) {
-      setPreviewUrl(null);
-      return;
-    }
-
-    if (activeFile.type === "application/pdf") {
-      const url = URL.createObjectURL(activeFile);
-      setPreviewUrl(url);
-      return () => URL.revokeObjectURL(url);
-    }
-
-    setPreviewUrl(null);
-  }, [activeFile]);
-
-  // Only show preview for locally uploaded files (blob URLs work reliably)
-  // Server-stored PDFs are not previewed to avoid CSP/iframe blocking issues
 
   function handleFileChange(file: File | null) {
     if (!file) {
@@ -260,7 +251,7 @@ export function OfferLetterWorkspace({
             onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
           />
 
-          {activeFileLabel ? (
+          {displayFileName ? (
             <div className="space-y-3">
               <div
                 className={cn(
@@ -293,7 +284,7 @@ export function OfferLetterWorkspace({
                         Offer letter ready
                       </p>
                       <p className="mt-1 truncate text-base font-semibold tracking-tight">
-                        {activeFileLabel}
+                        {displayFileName}
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {activeFile
@@ -302,51 +293,46 @@ export function OfferLetterWorkspace({
                       </p>
                     </div>
 
-                    {canOffer ? (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={isPending}
-                          onClick={openFilePicker}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {storedPdfHref ? (
+                        <a
+                          href={storedPdfHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={buttonVariants({ size: "sm", variant: "secondary" })}
                         >
-                          <UploadCloud className="mr-1.5 size-4" />
-                          Replace file
-                        </Button>
-                        {activeFile ? (
+                          Open PDF
+                        </a>
+                      ) : null}
+                      {canOffer ? (
+                        <>
                           <Button
                             type="button"
                             size="sm"
-                            variant="ghost"
+                            variant="outline"
                             disabled={isPending}
-                            onClick={() => setUploadedFile(null)}
+                            onClick={openFilePicker}
                           >
-                            Remove
+                            <UploadCloud className="mr-1.5 size-4" />
+                            Replace file
                           </Button>
-                        ) : null}
-                      </div>
-                    ) : null}
+                          {activeFile ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              disabled={isPending}
+                              onClick={() => setUploadedFile(null)}
+                            >
+                              Remove
+                            </Button>
+                          ) : null}
+                        </>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               </div>
-
-              {previewUrl && canPreviewPdf ? (
-                <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
-                  <iframe
-                    title="Offer letter preview"
-                    src={previewUrl}
-                    className="h-[min(360px,45vh)] w-full"
-                  />
-                </div>
-              ) : activeFileLabel ? (
-                <p className="text-xs text-muted-foreground">
-                  {activeFile?.type === "application/pdf" ||
-                  activeFileLabel.toLowerCase().endsWith(".pdf")
-                    ? "PDF preview is shown above when available."
-                    : "Preview is available for PDF files. Any file type up to 10 MB can still be emailed."}
-                </p>
-              ) : null}
             </div>
           ) : (
             <button

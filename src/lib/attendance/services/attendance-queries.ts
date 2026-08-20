@@ -166,6 +166,10 @@ export async function listAttendance(
   }
 
   query = query.order("attendance_date", { ascending: false });
+  if (!isEmployeeHistoryView) {
+    query = query.order("check_in_at", { ascending: false, nullsFirst: false });
+    query = query.order("created_at", { ascending: false });
+  }
   query = query.range(from, to);
 
   const { data, error, count } = await query;
@@ -175,6 +179,31 @@ export async function listAttendance(
   }
 
   const rows = (data ?? []) as AttendanceRow[];
+  const attendanceIds = rows.map((row) => row.id);
+
+  const correctionsResult = attendanceIds.length
+    ? await supabase
+        .schema("hrms")
+        .from("attendance_corrections")
+        .select("id, attendance_id, correction_status")
+        .in("attendance_id", attendanceIds)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+    : { data: [], error: null };
+
+  if (correctionsResult.error) {
+    throw new Error(correctionsResult.error.message);
+  }
+
+  const correctionByAttendance = new Map<string, { id: string; status: string }>();
+  for (const row of correctionsResult.data ?? []) {
+    if (!correctionByAttendance.has(row.attendance_id)) {
+      correctionByAttendance.set(row.attendance_id, {
+        id: row.id,
+        status: row.correction_status,
+      });
+    }
+  }
 
   return {
     data: rows.map((row) => {
@@ -182,6 +211,7 @@ export async function listAttendance(
       const branch = unwrapRelation(row.branches);
       const department = unwrapRelation(employee?.departments ?? null);
       const designation = unwrapRelation(employee?.designations ?? null);
+      const correction = correctionByAttendance.get(row.id);
 
       return {
         id: row.id,
@@ -202,6 +232,10 @@ export async function listAttendance(
         workHours: Number(row.work_hours ?? 0),
         overtimeHours: Number(row.overtime_hours ?? 0),
         attendanceStatus: row.attendance_status,
+        correctionId: correction?.id ?? null,
+        correctionStatus:
+          (correction?.status as AttendanceListResult["data"][number]["correctionStatus"]) ??
+          null,
       };
     }),
     total: count ?? 0,

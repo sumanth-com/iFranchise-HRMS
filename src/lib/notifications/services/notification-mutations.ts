@@ -85,6 +85,26 @@ export async function deleteNotification(
   }
 }
 
+export async function deleteNotificationsByIds(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  notificationIds: string[],
+): Promise<number> {
+  const uniqueIds = Array.from(new Set(notificationIds.filter(Boolean)));
+  let deletedCount = 0;
+
+  for (const notificationId of uniqueIds) {
+    try {
+      await deleteNotification(supabase, profile, notificationId);
+      deletedCount += 1;
+    } catch {
+      // Skip IDs that were already deleted or not owned by this user.
+    }
+  }
+
+  return deletedCount;
+}
+
 export async function deleteAllOwnNotifications(
   supabase: AuthSupabaseClient,
   _profile: UserProfile,

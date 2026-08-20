@@ -34,6 +34,7 @@ type TeamAttendanceData = {
   canCreate: boolean;
   canEdit: boolean;
   canDelete: boolean;
+  canApproveCorrections: boolean;
 };
 
 type Props = {
@@ -79,7 +80,12 @@ export function HrAttendanceHubView({
       </div>
 
       {isTeamView ? (
-        <HrTeamAttendanceView {...teamAttendance} embedded />
+        <HrTeamAttendanceView
+          {...teamAttendance}
+          teamRegularizationMode
+          canApproveCorrections={teamAttendance.canApproveCorrections}
+          embedded
+        />
       ) : (
         <EmployeeAttendanceView
           data={selfAttendance.data}

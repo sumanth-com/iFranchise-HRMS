@@ -56,6 +56,10 @@ export function combineDateAndTime(date: string, time?: string | null): string |
   return `${date}T${time}:00+05:30`;
 }
 
+export function isTimestampInFuture(value: string): boolean {
+  return parseISO(value).getTime() > Date.now();
+}
+
 export function formatAttendanceTime(value?: string | null): string {
   if (!value) return "—";
 

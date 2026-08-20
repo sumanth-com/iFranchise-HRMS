@@ -1,4 +1,4 @@
-import { addMonths, differenceInCalendarDays, format, parseISO } from "date-fns";
+import { addDays, addMonths, differenceInCalendarDays, format, parseISO } from "date-fns";
 
 import type { LeaveDurationBreakdown } from "@/lib/leave/services/leave-calendar-engine";
 
@@ -43,6 +43,24 @@ export const DEFAULT_LEAVE_NOTICE: LeavePolicyNoticeHours = {
   officeStart: "10:00",
   officeEnd: "19:00",
 };
+
+function officeCalendarDate(now: Date): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(now);
+}
+
+/** Next calendar day for types that need advance notice; today for PL/LOP. */
+export function earliestAllowedLeaveStart(
+  leaveTypeCode: string,
+  _notice: LeavePolicyNoticeHours = DEFAULT_LEAVE_NOTICE,
+  now = new Date(),
+): string {
+  const today = officeCalendarDate(now);
+  const code = leaveTypeCode.toUpperCase();
+  if (code === PERIOD_LEAVE_CODE || code === LOSS_OF_PAY_CODE) {
+    return today;
+  }
+  return format(addDays(parseISO(today), 1), "yyyy-MM-dd");
+}
 
 export type LeaveProbationSnapshot = {
   onProbation: boolean;
@@ -208,7 +226,7 @@ export function validateLeavePolicy(input: {
 
   if (!input.skipNotice) {
     if (isPl) {
-      const today = format(now, "yyyy-MM-dd");
+      const today = officeCalendarDate(now);
       if (input.startDate < today) {
         issues.push({
           code: "pl_past",
@@ -224,12 +242,11 @@ export function validateLeavePolicy(input: {
         }
       }
     } else if (code !== LOSS_OF_PAY_CODE) {
-      const startMs = zonedDateMs(input.startDate, notice.officeStart);
-      const hoursAhead = (startMs - now.getTime()) / (1000 * 60 * 60);
-      if (hoursAhead < notice.advanceNoticeHours) {
+      const earliest = earliestAllowedLeaveStart(code, notice, now);
+      if (input.startDate < earliest) {
         issues.push({
           code: "notice",
-          message: `This leave type needs at least ${notice.advanceNoticeHours} hours' notice.`,
+          message: `This leave type needs at least one day’s notice. You can start from tomorrow (${format(parseISO(earliest), "d MMMM yyyy")}).`,
         });
       }
     }

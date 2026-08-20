@@ -52,8 +52,10 @@ export async function AttendanceHubSection({
     page: section === "team" ? raw.page : undefined,
     pageSize: raw.pageSize,
     search: firstString(raw.search),
-    sortBy: raw.sortBy,
-    sortOrder: raw.sortOrder,
+    sortBy:
+      section === "team" && !raw.sortBy ? "check_in_at" : raw.sortBy,
+    sortOrder:
+      section === "team" && !raw.sortOrder ? "desc" : raw.sortOrder,
     dateFrom:
       typeof raw.dateFrom === "string" && raw.dateFrom.length > 0
         ? raw.dateFrom
@@ -113,6 +115,7 @@ export async function AttendanceHubSection({
         canCreate: hasPermission(profile.permissionCodes, "attendance.create"),
         canEdit: hasPermission(profile.permissionCodes, "attendance.edit"),
         canDelete: hasPermission(profile.permissionCodes, "attendance.delete"),
+        canApproveCorrections: hasPermission(profile.permissionCodes, "attendance.approve"),
       }}
     />
   );

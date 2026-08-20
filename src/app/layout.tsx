@@ -8,9 +8,10 @@ import "./globals.css";
 
 const lato = Lato({
   subsets: ["latin"],
-  weight: ["300", "400", "700", "900"],
+  weight: ["400", "700"],
   variable: "--font-sans",
   display: "swap",
+  preload: true,
 });
 
 export const metadata: Metadata = {

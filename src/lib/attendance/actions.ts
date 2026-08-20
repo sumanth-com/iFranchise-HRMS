@@ -2,12 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 
+import { revalidateSelfAttendancePaths } from "@/lib/attendance/actions/self-attendance-punch-actions";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { createClient } from "@/lib/supabase/server";
 import { toUserFriendlyError } from "@/lib/errors/user-messages";
+import { reviewOrganizationAttendanceCorrection } from "@/lib/manager/services/attendance-correction-service";
 import { requireServerAnyPermission, requireServerPermission } from "@/lib/permissions/server";
 import { ATTENDANCE_ROUTES, SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
-import { getAttendanceById } from "@/lib/attendance/services/attendance-detail";
+import {
+  getAttendanceById,
+  getAttendanceCorrectionByAttendanceId,
+} from "@/lib/attendance/services/attendance-detail";
 import { getManagerTeamScope } from "@/lib/manager/services/team-queries";
 import { hasPermission } from "@/lib/permissions/utils";
 import {
@@ -25,8 +30,10 @@ import {
   attendanceFormSchema,
   attendanceListParamsSchema,
 } from "@/lib/validations/attendance";
+import { teamCorrectionReviewSchema } from "@/lib/validations/manager-team";
 import type {
   AttendanceActionResult,
+  AttendanceCorrectionDetail,
   AttendanceDetail,
   AttendanceListParams,
   AttendanceListResult,
@@ -205,6 +212,89 @@ export async function fetchEmployeeDepartmentLabelAction(
     return {
       success: false,
       message: toUserFriendlyError(error, "Failed to load employee department"),
+    };
+  }
+}
+
+export async function getAttendanceCorrectionDetailAction(
+  attendanceId: string,
+): Promise<AttendanceActionResult<AttendanceCorrectionDetail>> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "attendance.view",
+      PORTAL_PERMISSIONS.manager,
+      PORTAL_PERMISSIONS.ceo,
+    ]);
+    const supabase = await getAuthenticatedSupabase();
+    const data = await getAttendanceCorrectionByAttendanceId(
+      supabase,
+      profile,
+      attendanceId,
+    );
+
+    if (!data) {
+      return { success: false, message: "No regularization request found for this record." };
+    }
+
+    return { success: true, data };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to load regularization request",
+    };
+  }
+}
+
+function revalidateTeamAttendancePaths() {
+  revalidateSelfAttendancePaths();
+  revalidatePath(SELF_ATTENDANCE_ROUTES.team);
+  revalidatePath(SELF_ATTENDANCE_ROUTES.list);
+  revalidatePath(ATTENDANCE_ROUTES.list);
+}
+
+export async function approveAttendanceCorrectionAction(input: unknown) {
+  try {
+    teamCorrectionReviewSchema.parse(input);
+    const profile = await requireServerPermission("attendance.approve");
+    const supabase = await getAuthenticatedSupabase();
+    const result = await reviewOrganizationAttendanceCorrection(
+      supabase,
+      profile,
+      input,
+      "approved",
+    );
+    revalidateTeamAttendancePaths();
+    return result;
+  } catch (error) {
+    return {
+      success: false as const,
+      message:
+        error instanceof Error ? error.message : "Failed to approve regularization.",
+    };
+  }
+}
+
+export async function rejectAttendanceCorrectionAction(input: unknown) {
+  try {
+    teamCorrectionReviewSchema.parse(input);
+    const profile = await requireServerPermission("attendance.approve");
+    const supabase = await getAuthenticatedSupabase();
+    const result = await reviewOrganizationAttendanceCorrection(
+      supabase,
+      profile,
+      input,
+      "rejected",
+    );
+    revalidateTeamAttendancePaths();
+    return result;
+  } catch (error) {
+    return {
+      success: false as const,
+      message:
+        error instanceof Error ? error.message : "Failed to reject regularization.",
     };
   }
 }

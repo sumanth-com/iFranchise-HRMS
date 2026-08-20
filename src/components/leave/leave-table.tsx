@@ -11,7 +11,7 @@ import { format, parseISO } from "date-fns";
 import {
   BadgeCheck,
   Ban,
-  Building2,
+  Briefcase,
   CalendarDays,
   CheckCircle2,
   Eye,
@@ -188,6 +188,7 @@ function leaveStatusForSummaryFilter(
   if (key === "pendingRequests") return "pending";
   if (key === "approvedThisMonth") return "approved";
   if (key === "rejectedThisMonth") return "rejected";
+  if (key === "employeesOnLeaveToday") return "approved";
   return undefined;
 }
 
@@ -421,9 +422,9 @@ export function LeaveTable({
         ),
       },
       {
-        id: "departmentName",
-        header: "Department",
-        cell: ({ row }) => row.original.departmentName ?? "—",
+        id: "designationName",
+        header: "Designation",
+        cell: ({ row }) => row.original.designationName ?? "—",
       },
       {
         id: "leaveTypeName",
@@ -808,7 +809,7 @@ export function LeaveTable({
                   TABLE_HEAD_CELL_CLASS,
                 )}
               >
-                <HeadLabel label="Department" icon={Building2} />
+                <HeadLabel label="Designation" icon={Briefcase} />
               </TableHead>
               <TableHead
                 className={cn(

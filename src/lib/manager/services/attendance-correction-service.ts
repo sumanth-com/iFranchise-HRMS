@@ -94,6 +94,31 @@ export async function reviewTeamAttendanceCorrection(
   input: unknown,
   decision: "approved" | "rejected",
 ) {
+  return reviewAttendanceCorrection(supabase, profile, input, decision, {
+    allowedEmployeeIds: teamIds,
+  });
+}
+
+export async function reviewOrganizationAttendanceCorrection(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: unknown,
+  decision: "approved" | "rejected",
+) {
+  return reviewAttendanceCorrection(supabase, profile, input, decision, {
+    organizationId: profile.employee.organizationId,
+  });
+}
+
+async function reviewAttendanceCorrection(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: unknown,
+  decision: "approved" | "rejected",
+  scope:
+    | { allowedEmployeeIds: string[] }
+    | { organizationId: string },
+) {
   const parsed = teamCorrectionReviewSchema.parse(input);
 
   const { data: correction, error: fetchError } = await supabase
@@ -116,8 +141,25 @@ export async function reviewTeamAttendanceCorrection(
 
   if (fetchError) throw new Error(fetchError.message);
   if (!correction) throw new Error("Correction request not found.");
-  if (!teamIds.includes(correction.employee_id)) {
+  if (
+    "allowedEmployeeIds" in scope &&
+    !scope.allowedEmployeeIds.includes(correction.employee_id)
+  ) {
     throw new Error("You can only review corrections for your team.");
+  }
+  if ("organizationId" in scope) {
+    const { data: employeeRow, error: employeeError } = await supabase
+      .schema("hrms")
+      .from("employees")
+      .select("organization_id")
+      .eq("id", correction.employee_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (employeeError) throw new Error(employeeError.message);
+    if (!employeeRow || employeeRow.organization_id !== scope.organizationId) {
+      throw new Error("Correction request not found.");
+    }
   }
   if (correction.correction_status !== "pending") {
     throw new Error("This correction has already been reviewed.");
@@ -149,22 +191,10 @@ export async function reviewTeamAttendanceCorrection(
       supabase,
       profile.employee.organizationId,
     );
-    const lateMinutes = computeLateMinutes(checkInAt, attendanceDate, rules.lateAfter);
     const overtimeHours = Math.max(
       0,
       Math.round((workHours - rules.fullDayMinimumHours) * 100) / 100,
     );
-
-    let attendanceStatus: AttendanceStatus = "present";
-    if (
-      checkOutAt &&
-      workHours > 0 &&
-      workHours < rules.fullDayMinimumHours
-    ) {
-      attendanceStatus = workHours < 0.25 ? "absent" : "half_day";
-    } else if (lateMinutes > 0) {
-      attendanceStatus = "late";
-    }
 
     const { error: attendanceError } = await supabase
       .schema("hrms")
@@ -174,7 +204,7 @@ export async function reviewTeamAttendanceCorrection(
         check_out_at: checkOutAt,
         work_hours: workHours,
         overtime_hours: overtimeHours,
-        attendance_status: attendanceStatus,
+        attendance_status: "present",
         updated_by: profile.userId,
       })
       .eq("id", correction.attendance_id);
@@ -189,6 +219,17 @@ export async function reviewTeamAttendanceCorrection(
       attendanceDate,
     );
   } else {
+    const { error: attendanceError } = await supabase
+      .schema("hrms")
+      .from("attendance")
+      .update({
+        attendance_status: "late",
+        updated_by: profile.userId,
+      })
+      .eq("id", correction.attendance_id);
+
+    if (attendanceError) throw new Error(attendanceError.message);
+
     await notifyAttendanceCorrectionRejected(
       supabase,
       profile,

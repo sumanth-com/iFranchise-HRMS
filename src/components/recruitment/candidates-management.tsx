@@ -55,6 +55,27 @@ import type {
   RecruitmentLookups,
 } from "@/types/recruitment";
 
+const MONTH_OPTIONS = Array.from({ length: 12 }, (_, index) => ({
+  value: String(index + 1),
+  label: new Date(2000, index, 1).toLocaleString("en-IN", { month: "long" }),
+}));
+
+function getYearOptions() {
+  const current = new Date().getFullYear();
+  return Array.from({ length: 4 }, (_, index) => {
+    const year = current - index;
+    return { value: String(year), label: String(year) };
+  });
+}
+
+function candidateMatchesPeriod(createdAt: string, month?: string, year?: string) {
+  const datePrefix = createdAt.slice(0, 10);
+  const [recordYear, recordMonth] = datePrefix.split("-");
+  if (month && month !== "all" && Number(recordMonth) !== Number(month)) return false;
+  if (year && year !== "all" && recordYear !== year) return false;
+  return true;
+}
+
 type CandidateFormInput = z.input<typeof candidateFormSchema>;
 
 function Field({
@@ -102,11 +123,16 @@ export function CandidatesManagement({
     departmentId?: string;
     jobOpeningId?: string;
     stage?: string;
+    month?: string;
+    year?: string;
   };
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
+  const now = new Date();
+  const defaultMonth = String(now.getMonth() + 1);
+  const defaultYear = String(now.getFullYear());
   const [creating, setCreating] = useState(false);
   const [interviewOpen, setInterviewOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(Boolean(initialSelected));
@@ -116,7 +142,11 @@ export function CandidatesManagement({
   const [rejecting, setRejecting] = useState(false);
   const [visibleCandidates, setVisibleCandidates] = useState(records);
   const [listTotal, setListTotal] = useState(total);
-  const [localFilters, setLocalFilters] = useState(filters);
+  const [localFilters, setLocalFilters] = useState({
+    month: defaultMonth,
+    year: defaultYear,
+    ...filters,
+  });
   const [searchFocused, setSearchFocused] = useState(false);
 
   useEffect(() => {
@@ -138,8 +168,12 @@ export function CandidatesManagement({
   useEffect(() => {
     setVisibleCandidates(records);
     setListTotal(total);
-    setLocalFilters(filters);
-  }, [records, total, filters]);
+    setLocalFilters({
+      month: defaultMonth,
+      year: defaultYear,
+      ...filters,
+    });
+  }, [defaultMonth, defaultYear, filters, records, total]);
 
   useEffect(() => {
     let filtered = records;
@@ -173,6 +207,14 @@ export function CandidatesManagement({
 
     if (localFilters.stage) {
       filtered = filtered.filter((row) => row.stage === localFilters.stage);
+    }
+
+    const hasMonthFilter = Boolean(localFilters.month && localFilters.month !== "all");
+    const hasYearFilter = Boolean(localFilters.year && localFilters.year !== "all");
+    if (hasMonthFilter || hasYearFilter) {
+      filtered = filtered.filter((row) =>
+        candidateMatchesPeriod(row.createdAt, localFilters.month, localFilters.year),
+      );
     }
 
     setVisibleCandidates(filtered);
@@ -233,7 +275,10 @@ export function CandidatesManagement({
     setLocalFilters((prev) => {
       const next = { ...prev };
       for (const [key, value] of Object.entries(updates)) {
-        if (!value || value === "all") {
+        if (key === "month" || key === "year") {
+          (next as Record<string, string | undefined>)[key] =
+            !value || value === "all" ? "all" : value;
+        } else if (!value || value === "all") {
           delete (next as Record<string, string | undefined>)[key];
         } else {
           (next as Record<string, string | undefined>)[key] = value;
@@ -292,11 +337,12 @@ export function CandidatesManagement({
         ) : null}
       </div>
 
-      <div className="shrink-0 rounded-xl border bg-card p-4 shadow-sm">
-        <div className="grid gap-3 lg:grid-cols-4">
-          <div className="relative">
+      <div className="shrink-0 overflow-x-auto rounded-xl border bg-card p-3 shadow-sm">
+        <div className="flex min-w-max items-center gap-2">
+          <div className="relative w-44 shrink-0">
             <Input
               placeholder="Search candidate..."
+              className="h-8"
               value={localFilters.search ?? ""}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => {
@@ -323,22 +369,44 @@ export function CandidatesManagement({
               </div>
             ) : null}
           </div>
-          <LabeledSelect
-            items={[
-              { value: "all", label: "All positions" },
-              ...lookups.jobs.map((j) => ({ value: j.id, label: j.label })),
-            ]}
-            value={localFilters.jobOpeningId ?? "all"}
-            onValueChange={(v) => updateParams({ jobOpeningId: v === "all" ? undefined : v })}
-          />
-          <LabeledSelect
-            items={[
-              { value: "all", label: "All stages" },
-              ...toSelectItems(CANDIDATE_STAGE_LABELS),
-            ]}
-            value={localFilters.stage ?? "all"}
-            onValueChange={(v) => updateParams({ stage: v === "all" ? undefined : v })}
-          />
+          <div className="shrink-0">
+            <LabeledSelect
+              items={[{ value: "all", label: "All months" }, ...MONTH_OPTIONS]}
+              value={localFilters.month ?? defaultMonth}
+              onValueChange={(value) => updateParams({ month: value })}
+              triggerClassName="h-8 w-[7.25rem] shrink-0"
+            />
+          </div>
+          <div className="shrink-0">
+            <LabeledSelect
+              items={[{ value: "all", label: "All years" }, ...getYearOptions()]}
+              value={localFilters.year ?? defaultYear}
+              onValueChange={(value) => updateParams({ year: value })}
+              triggerClassName="h-8 w-[5.25rem] shrink-0"
+            />
+          </div>
+          <div className="shrink-0">
+            <LabeledSelect
+              items={[
+                { value: "all", label: "All positions" },
+                ...lookups.jobs.map((j) => ({ value: j.id, label: j.label })),
+              ]}
+              value={localFilters.jobOpeningId ?? "all"}
+              onValueChange={(v) => updateParams({ jobOpeningId: v === "all" ? undefined : v })}
+              triggerClassName="h-8 w-[9.5rem] shrink-0"
+            />
+          </div>
+          <div className="shrink-0">
+            <LabeledSelect
+              items={[
+                { value: "all", label: "All stages" },
+                ...toSelectItems(CANDIDATE_STAGE_LABELS),
+              ]}
+              value={localFilters.stage ?? "all"}
+              onValueChange={(v) => updateParams({ stage: v === "all" ? undefined : v })}
+              triggerClassName="h-8 w-[8.5rem] shrink-0"
+            />
+          </div>
         </div>
       </div>
 
@@ -497,6 +565,8 @@ function CandidateFormModal({
   );
   const form = useForm<CandidateFormInput>({
     resolver: zodResolver(candidateFormSchema),
+    mode: "onBlur",
+    reValidateMode: "onChange",
     defaultValues: {
       jobOpeningId: defaultJobOpeningId ?? "",
       firstName: "",
@@ -550,7 +620,19 @@ function CandidateFormModal({
           <Input disabled={isPending} {...form.register("lastName")} />
         </Field>
         <Field label="Email">
-          <Input type="email" disabled={isPending} {...form.register("email")} />
+          <Input
+            type="email"
+            autoComplete="email"
+            inputMode="email"
+            placeholder="name@example.com"
+            disabled={isPending}
+            aria-invalid={Boolean(form.formState.errors.email)}
+            className={cn(form.formState.errors.email && "border-destructive")}
+            {...form.register("email")}
+          />
+          {form.formState.errors.email ? (
+            <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
+          ) : null}
         </Field>
         <Field label="Phone">
           <PhoneInput

@@ -31,10 +31,18 @@ export const DASHBOARD_KPI_LINKS = {
   exitRequests: EXIT_ROUTES.clearance,
 } as const;
 
-/** Priority focus card on HR Overview — single most useful actionable task. */
+/** Focus Today cards on HR Overview. */
 export const DASHBOARD_ACTION_LINKS = {
   onboardingReview: RECRUITMENT_ROUTES.onboarding,
   documentsExpiring: `${HR_HUB_ROUTES.teamDocuments}/expiring`,
   activeCandidates: RECRUITMENT_ROUTES.candidates,
   payrollDue: payrollTeamListUrl(),
+  payrollDuePeriod: (month: number, year: number) =>
+    payrollTeamListUrl({
+      month: String(month),
+      year: String(year),
+      autoload: "1",
+    }),
+  interviewsToday: RECRUITMENT_ROUTES.interviews,
+  onLeaveToday: leaveTeamListUrl({ summaryFilter: "employeesOnLeaveToday" }),
 } as const;

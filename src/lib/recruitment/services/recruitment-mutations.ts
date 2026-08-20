@@ -33,9 +33,9 @@ import {
 } from "@/lib/recruitment/services/recruitment-offer-email";
 import {
   downloadOfferLetterFile,
-  resolveOfferLetterExtension,
   storeOfferLetterFile,
 } from "@/lib/recruitment/services/offer-letter-storage";
+import { resolveOfferLetterFileName } from "@/lib/recruitment/services/offer-letter-display";
 import { assertOfferLetterFile } from "@/lib/validations/recruitment";
 import {
   getRecruitmentSettings,
@@ -749,7 +749,7 @@ export async function createOffer(
   const resolvedJoiningDate = new Date().toISOString().slice(0, 10);
 
   const { data: existingDraft } = await fromHrms(supabase, "recruitment_offers")
-    .select("id, offer_code, offer_letter_path, salary, joining_date, offer_status")
+    .select("id, offer_code, offer_letter_path, offer_letter_filename, salary, joining_date, offer_status")
     .eq("candidate_id", input.candidateId)
     .eq("organization_id", organizationId)
     .in("offer_status", ["draft", "sent"])
@@ -837,7 +837,8 @@ export async function createOffer(
   }
 
   let offerLetterPath = existingDraft?.offer_letter_path ?? null;
-  let attachmentFilename = offerFile?.filename ?? null;
+  let attachmentFilename =
+    offerFile?.filename ?? existingDraft?.offer_letter_filename ?? null;
 
   if (offerFile) {
     offerLetterPath = await storeOfferLetterFile(
@@ -853,6 +854,7 @@ export async function createOffer(
     const { error: pathError } = await fromHrms(supabase, "recruitment_offers")
       .update({
         offer_letter_path: offerLetterPath,
+        offer_letter_filename: offerFile.filename,
         updated_by: profile.userId,
       })
       .eq("id", offerId)
@@ -876,12 +878,12 @@ export async function createOffer(
 
     const fileBytes =
       offerFile?.bytes ?? await downloadOfferLetterFile(supabase, offerLetterPath);
-    const storedExt = resolveOfferLetterExtension(
-      attachmentFilename ?? offerLetterPath,
-    );
-    const emailFilename =
-      attachmentFilename ??
-      `Offer-${emailContext.candidateName.replace(/[^\w.-]+/g, "_")}-${emailContext.jobTitle.replace(/[^\w.-]+/g, "_")}.${storedExt}`;
+    const emailFilename = resolveOfferLetterFileName({
+      storedFileName: attachmentFilename,
+      offerLetterPath,
+      candidateName: emailContext.candidateName,
+      jobTitle: emailContext.jobTitle,
+    });
 
     await deliverOfferEmailToCandidate({
       to: emailContext.candidateEmail,

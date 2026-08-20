@@ -35,6 +35,8 @@ type HrTeamAttendanceViewProps = {
   canEdit: boolean;
   canDelete: boolean;
   embedded?: boolean;
+  teamRegularizationMode?: boolean;
+  canApproveCorrections?: boolean;
   title?: string;
   description?: string;
   listBasePath?: string;
@@ -60,6 +62,8 @@ export function HrTeamAttendanceView({
   canCreate,
   canEdit,
   canDelete,
+  teamRegularizationMode = false,
+  canApproveCorrections = false,
   embedded = false,
   title = "Team Attendance",
   description = "Track daily attendance records, manual entries, and workforce presence across the organization.",
@@ -134,6 +138,8 @@ export function HrTeamAttendanceView({
           canCreate={canCreate}
           canEdit={canEdit}
           canDelete={canDelete}
+          teamRegularizationMode={teamRegularizationMode}
+          canApproveCorrections={canApproveCorrections}
           listBasePath={listBasePath}
           onViewRecord={onViewRecord}
           summaryDate={summary.date}

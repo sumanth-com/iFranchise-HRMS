@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import { AppNavLink as Link } from "@/components/layout/app-nav-link";
 
 import { DEFAULT_BRAND_LOGO_PATH } from "@/lib/brand/constants";
 import { useAuth } from "@/providers/auth-provider";

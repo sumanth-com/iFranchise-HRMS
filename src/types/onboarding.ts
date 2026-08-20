@@ -17,7 +17,7 @@ export const ONBOARDING_STATUSES = [
 export type OnboardingStatus = (typeof ONBOARDING_STATUSES)[number];
 
 export const ONBOARDING_STATUS_LABELS: Record<OnboardingStatus, string> = {
-  draft: "Draft",
+  draft: "Ready for Invitation",
   invitation_sent: "Invitation Sent",
   invitation_viewed: "Invitation Viewed",
   in_progress: "In Progress",
@@ -221,6 +221,7 @@ export type OnboardingListParams = {
   pageSize: number;
   search?: string;
   status?: string;
+  roleId?: string;
 };
 
 export type OnboardingDashboardStats = {

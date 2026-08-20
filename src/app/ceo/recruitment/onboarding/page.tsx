@@ -24,6 +24,7 @@ export default async function CeoOnboardingListPage({ searchParams }: PageProps)
     pageSize: firstString(raw.pageSize) ?? "20",
     search: firstString(raw.search),
     status: firstString(raw.status),
+    roleId: firstString(raw.roleId),
   });
 
   const data = await loadOnboardingModuleData(parsed);

@@ -25,6 +25,7 @@ import { getLeaveSummary } from "@/lib/leave/services/leave-queries";
 import { ORGANIZATION_ROUTES } from "@/lib/organization/constants";
 import { listHolidays } from "@/lib/organization/services/org-queries";
 import { PAYROLL_ROUTES, PAYROLL_STATUS_LABELS } from "@/lib/payroll/constants";
+import { getPayrollMonthDate } from "@/lib/payroll/services/payroll-utils";
 import { getPayrollSummary } from "@/lib/payroll/services/payroll-queries";
 import { getOnboardingDashboardStats } from "@/lib/onboarding/services/onboarding-queries";
 import { RECRUITMENT_ROUTES } from "@/lib/recruitment/constants";
@@ -474,8 +475,10 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
   const attendancePercent =
     totalEmployees > 0 ? Math.round((presentCount / totalEmployees) * 1000) / 10 : 0;
 
+  const payrollMonth = todayDate.getMonth() + 1;
+  const payrollYear = todayDate.getFullYear();
   const currentPayroll = payroll.monthlyOverview.find(
-    (m) => m.month === format(todayDate, "yyyy-MM"),
+    (m) => m.month === getPayrollMonthDate(payrollMonth, payrollYear),
   );
   const payrollStatus = currentPayroll?.status
     ? PAYROLL_STATUS_LABELS[currentPayroll.status as PayrollStatus] ?? currentPayroll.status
@@ -493,46 +496,38 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
   const onboardingAwaitingReview = onboardingStats.pendingReview;
   const documentsExpiring =
     expiringDocs.next30Days + expiringDocs.expired + expiringDocs.expiringToday;
-  const activeCandidates = recruitment.activeCandidates ?? 0;
+  const onLeaveToday = leave.employeesOnLeaveToday;
 
-  // Single priority card — first actionable item by HR urgency order.
-  const actionCandidates: DashboardTaskItem[] = [
-    {
-      id: "onboarding-review",
-      label: "Onboarding Awaiting Review",
-      count: onboardingAwaitingReview,
-      href: DASHBOARD_ACTION_LINKS.onboardingReview,
-      urgency: onboardingAwaitingReview > 0 ? "high" : "low",
-    },
-    {
-      id: "documents-expiring",
-      label: "Documents Expiring Soon",
-      count: documentsExpiring,
-      href: DASHBOARD_ACTION_LINKS.documentsExpiring,
-      urgency: documentsExpiring > 0 ? "high" : "low",
-    },
+  const tasks: DashboardTaskItem[] = [
     {
       id: "payroll-due",
       label: "Payroll Due This Month",
       count: payrollDue,
-      href: DASHBOARD_ACTION_LINKS.payrollDue,
+      href: DASHBOARD_ACTION_LINKS.payrollDuePeriod(payrollMonth, payrollYear),
       urgency: payrollDue > 0 ? "high" : "low",
     },
     {
-      id: "active-candidates",
-      label: "Candidates in Pipeline",
-      count: activeCandidates,
-      href: DASHBOARD_ACTION_LINKS.activeCandidates,
-      urgency: activeCandidates > 0 ? "medium" : "low",
+      id: "interviews-today",
+      label: "Interviews Today",
+      count: interviewsToday,
+      href: `${DASHBOARD_ACTION_LINKS.interviewsToday}?dateFrom=${today}&dateTo=${today}`,
+      urgency: interviewsToday > 0 ? "high" : "low",
+    },
+    {
+      id: "on-leave",
+      label: "On Leave",
+      count: onLeaveToday,
+      href: DASHBOARD_ACTION_LINKS.onLeaveToday,
+      urgency: onLeaveToday > 0 ? "medium" : "low",
+    },
+    {
+      id: "onboarding-review",
+      label: "Onboarding",
+      count: onboardingAwaitingReview,
+      href: DASHBOARD_ACTION_LINKS.onboardingReview,
+      urgency: onboardingAwaitingReview > 0 ? "high" : "low",
     },
   ];
-
-  const priorityTask =
-    actionCandidates.find((item) => (item.count ?? 0) > 0) ??
-    actionCandidates.find((item) => item.id === "payroll-due") ??
-    actionCandidates[0];
-
-  const tasks: DashboardTaskItem[] = [priorityTask];
 
   const auditRows = ((auditRes.data ?? []) as LooseRow[]).filter(isMeaningfulActivity);
   const activityUserIds = [

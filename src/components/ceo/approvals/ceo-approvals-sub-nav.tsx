@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { AppNavLink as Link } from "@/components/layout/app-nav-link";
 import { usePathname } from "next/navigation";
 
 import { CEO_APPROVALS_SUB_NAV, CEO_ROUTES } from "@/lib/ceo/constants";

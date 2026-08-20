@@ -30,7 +30,6 @@ import {
 import { COUNTRIES, INDIAN_STATES, STATE_DISTRICTS } from "@/lib/geo/india";
 import { updateEmployeeSelfProfileAction } from "@/lib/employees/actions";
 import type { MyProfileBundle } from "@/types/my-profile";
-import { TIMEZONE_OPTIONS } from "@/lib/validations/organization";
 import {
   employeeSelfProfileSchema,
   type EmployeeSelfProfileInput,
@@ -149,7 +148,6 @@ export function MyProfileView({
   });
 
   const language = watch("language");
-  const timezone = watch("timezone");
   const emergencyRelationship = watch("emergencyContactRelationship");
   const reportingManagerId = watch("reportingManagerId");
   const personalPhone = watch("personalPhone") ?? "";
@@ -218,10 +216,19 @@ export function MyProfileView({
   const helperText = isEditing
     ? canEditContactDetails
       ? "Save your personal and contact details. Employment fields are managed separately."
-      : "Save your language and timezone preferences. Contact, address, and emergency details are managed by HR."
+      : "Save your language preference. Contact, address, and emergency details are managed by HR."
     : canEditContactDetails
       ? "View and update your personal contact details below. Employment information is managed separately."
-      : "View your employment and contact details below. You can update language, timezone, and profile photo. Other fields are managed by HR.";
+      : "View your employment and contact details below. You can update language and profile photo. Other fields are managed by HR.";
+
+  const selectedManagerLabel =
+    !reportingManagerId || reportingManagerId === "none"
+      ? "None"
+      : managerOptions.find((option) => option.value === reportingManagerId)?.label ??
+        (reportingManagerId === data.reportingManagerId
+          ? data.reportingManagerName
+          : null) ??
+        "Select manager";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
@@ -282,6 +289,7 @@ export function MyProfileView({
 
         <dl className="rounded-xl border bg-card lg:col-start-1 lg:row-start-2">
           <input type="hidden" {...register("personalEmail")} />
+          <input type="hidden" {...register("timezone")} />
 
           <ProfileInfoRow
             label="Manager"
@@ -300,7 +308,9 @@ export function MyProfileView({
                 disabled={isPending}
               >
                 <SelectTrigger className="h-8 w-full">
-                  <SelectValue placeholder="Select manager" />
+                  <SelectValue placeholder="Select manager">
+                    {() => selectedManagerLabel}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent
                   align="end"
@@ -373,26 +383,6 @@ export function MyProfileView({
           </ProfileInfoRow>
 
           <ProfileInfoRow
-            label="State"
-            value={data.profileSettings.address.state || "—"}
-            editing={isEditing && canEditContactDetails}
-          >
-            <ProfileFieldControl wide>
-              <SearchableSelect
-                options={INDIAN_STATES.map((state) => ({ value: state, label: state }))}
-                value={addressState || null}
-                onValueChange={(value) => {
-                  setValue("state", value ?? "", { shouldValidate: true });
-                  setValue("city", "", { shouldValidate: true });
-                }}
-                placeholder="Search state…"
-                allowNone={false}
-                disabled={isPending}
-              />
-            </ProfileFieldControl>
-          </ProfileInfoRow>
-
-          <ProfileInfoRow
             label="City"
             value={data.profileSettings.address.city || "—"}
             editing={isEditing && canEditContactDetails}
@@ -411,8 +401,28 @@ export function MyProfileView({
                 allowNone={false}
                 disabled={isPending}
                 emptyMessage={
-                  addressState ? "No matches — type to search" : "Select a state first"
+                  addressState ? "No matches — type to search" : "Select a state below first"
                 }
+              />
+            </ProfileFieldControl>
+          </ProfileInfoRow>
+
+          <ProfileInfoRow
+            label="State"
+            value={data.profileSettings.address.state || "—"}
+            editing={isEditing && canEditContactDetails}
+          >
+            <ProfileFieldControl wide>
+              <SearchableSelect
+                options={INDIAN_STATES.map((state) => ({ value: state, label: state }))}
+                value={addressState || null}
+                onValueChange={(value) => {
+                  setValue("state", value ?? "", { shouldValidate: true });
+                  setValue("city", "", { shouldValidate: true });
+                }}
+                placeholder="Search state…"
+                allowNone={false}
+                disabled={isPending}
               />
             </ProfileFieldControl>
           </ProfileInfoRow>
@@ -581,32 +591,6 @@ export function MyProfileView({
             </ProfileFieldControl>
           </ProfileInfoRow>
 
-          <ProfileInfoRow label="Timezone" value={data.profileSettings.timezone} editing={isEditing}>
-            <ProfileFieldControl>
-              <Select
-                value={timezone}
-                onValueChange={(value) => {
-                  if (value) setValue("timezone", value, { shouldValidate: true });
-                }}
-                disabled={isPending}
-              >
-                <SelectTrigger className="h-8 w-full">
-                  <SelectValue placeholder="Timezone" />
-                </SelectTrigger>
-                <SelectContent
-                  align="end"
-                  alignItemWithTrigger={false}
-                  className={PROFILE_SELECT_CONTENT_CLASS}
-                >
-                  {TIMEZONE_OPTIONS.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </ProfileFieldControl>
-          </ProfileInfoRow>
         </dl>
 
         <aside className="flex flex-col items-center overflow-visible lg:col-start-2 lg:row-start-2 lg:sticky lg:top-4">

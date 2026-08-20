@@ -9,6 +9,7 @@ import { Button, buttonVariants } from "@/components/common/button";
 import { ApplyLeaveDialog } from "@/components/leave/apply-leave-dialog";
 import { HrTeamLeaveView } from "@/components/leave/hr-team-leave-view";
 import { MyLeaveSelfServiceView } from "@/components/leave/my-leave-self-service-view";
+import type { LeaveSummaryFilterKey } from "@/components/leave/leave-summary-cards";
 import { LEAVE_ROUTES, SELF_LEAVE_ROUTES } from "@/lib/leave/constants";
 import { cn } from "@/lib/utils";
 import type {
@@ -38,6 +39,7 @@ type TeamLeaveData = {
   branchId?: string;
   reportingManagerId?: string;
   employeeId?: string;
+  summaryFilter?: LeaveSummaryFilterKey;
   leaveTypes: LookupOption[];
   departments: LookupOption[];
   branches: LookupOption[];
@@ -93,36 +95,34 @@ export function HrLeaveHubView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5">
-      <div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {isTeamView ? "Team Leave" : "Leave"}
-          </h1>
-          <div className="flex shrink-0 items-center gap-2">
-            <Link
-              href={isTeamView ? LEAVE_ROUTES.policy : SELF_LEAVE_ROUTES.policy}
-              className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}
-            >
-              <FileText className="size-4" />
-              Leave Policy
-            </Link>
-            {!isTeamView && canApply && applyLeaveLookups ? (
-              <Button type="button" className="gap-1.5" onClick={() => setApplyOpen(true)}>
-                <CalendarPlus className="size-4" />
-                Apply Leave
-              </Button>
-            ) : null}
+      {!isTeamView ? (
+        <div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h1 className="text-2xl font-semibold tracking-tight">Leave</h1>
+            <div className="flex shrink-0 items-center gap-2">
+              <Link
+                href={SELF_LEAVE_ROUTES.policy}
+                className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}
+              >
+                <FileText className="size-4" />
+                Leave Policy
+              </Link>
+              {canApply && applyLeaveLookups ? (
+                <Button type="button" className="gap-1.5" onClick={() => setApplyOpen(true)}>
+                  <CalendarPlus className="size-4" />
+                  Apply Leave
+                </Button>
+              ) : null}
+            </div>
           </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Apply for leave, track balances, and view your leave calendar.
+          </p>
         </div>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {isTeamView
-            ? "Review and manage leave requests across the organization."
-            : "Apply for leave, track balances, and view your leave calendar."}
-        </p>
-      </div>
+      ) : null}
 
       {isTeamView ? (
-        <HrTeamLeaveView {...teamLeave} />
+        <HrTeamLeaveView {...teamLeave} policyHref={LEAVE_ROUTES.policy} />
       ) : (
         <MyLeaveSelfServiceView
           canApply={canApply}
