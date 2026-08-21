@@ -614,7 +614,7 @@ export function MyProfileView({
             profilePath={data.profilePath}
             canEdit={true}
           />
-          <p className="mt-3 max-w-[19rem] text-center text-xs text-muted-foreground">
+          <p className="mt-3 max-w-[19rem] text-center text-xs leading-relaxed text-slate-500 dark:text-slate-400">
             Tap the photo on your digital ID to update your profile picture anytime.
           </p>
         </aside>

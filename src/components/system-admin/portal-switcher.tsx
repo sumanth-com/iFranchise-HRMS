@@ -2,7 +2,6 @@
 
 import { ChevronDown, LayoutGrid } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 
 import { Button } from "@/components/common/button";
 import {
@@ -29,16 +28,12 @@ const PORTAL_PERMISSION_MAP: Record<string, string> = {
   employee: "portal.employee.access",
 };
 
+/** Client-only portal switcher — loaded without SSR to avoid hydration mismatches. */
 export function PortalSwitcher() {
   const router = useRouter();
   const { permissionCodes, roles } = useAuth();
   const { activePortal, setActivePortal } = useActivePortal();
   const pathname = usePathname();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const isSuperAdmin = roles.some((role) => role.code === "super_admin");
   if (!isSuperAdmin) return null;
@@ -47,31 +42,12 @@ export function PortalSwitcher() {
     hasPermission(permissionCodes, PORTAL_PERMISSION_MAP[portal.portal]),
   );
 
-  // Pathname-only on first paint so SSR and client match (activePortal can
-  // come from sessionStorage after mount).
   const activePortalLink = resolveActivePortalSwitchLink(
     pathname,
     availablePortals,
-    mounted ? activePortal : null,
+    activePortal,
   );
   const label = activePortalLink?.label ?? "Portals";
-
-  if (!mounted) {
-    return (
-      <Button
-        variant="outline"
-        size="sm"
-        className="gap-2"
-        aria-haspopup="menu"
-        aria-expanded={false}
-        type="button"
-      >
-        <LayoutGrid className="size-4" />
-        <span className="hidden sm:inline">{label}</span>
-        <ChevronDown className="size-4 opacity-70" />
-      </Button>
-    );
-  }
 
   return (
     <DropdownMenu>
@@ -116,4 +92,8 @@ export function PortalSwitcher() {
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+export function PortalSwitcherSkeleton() {
+  return <div className="h-8 w-[7.25rem] shrink-0" aria-hidden />;
 }

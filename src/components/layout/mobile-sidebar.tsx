@@ -58,7 +58,11 @@ export function MobileSidebar() {
             const Icon = item.icon;
             const prevSection = index > 0 ? navigation[index - 1]?.section : undefined;
             const showSection = item.section && item.section !== prevSection;
-            const sectionOpen = item.section ? isSectionOpen(item.section) : true;
+            const sectionOpen = !sectionsReady
+              ? true
+              : item.section
+                ? isSectionOpen(item.section)
+                : true;
 
             return (
               <div key={`${item.section ?? ""}-${item.href}`} className="shrink-0">
@@ -66,7 +70,10 @@ export function MobileSidebar() {
                   <button
                     type="button"
                     onClick={() => toggleSection(item.section!)}
-                    className="mb-2 mt-4 flex w-full items-center justify-between border-t px-3 pt-4 text-left text-[15px] font-semibold text-foreground first:mt-0 first:border-t-0 first:pt-0 dark:border-white/15 dark:text-white"
+                    className={cn(
+                      "mb-2 mt-4 flex w-full items-center justify-between border-t border-border/60 px-3 pt-4 text-left text-[15px] font-semibold text-foreground dark:border-white/15 dark:text-white",
+                      index === 0 && "mt-0 border-t-0 pt-0",
+                    )}
                     aria-expanded={sectionOpen}
                   >
                     <span>{item.section}</span>
