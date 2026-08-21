@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { format, parseISO } from "date-fns";
 import {
+  Award,
   Banknote,
   CalendarDays,
   CircleDollarSign,
@@ -209,24 +210,35 @@ export function EmployeePayrollView({
       {header}
 
       {data.pendingPromotion ? (
-        <section className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm">
-          <p className="font-medium text-amber-900 dark:text-amber-200">
-            Promotion pending approval
-          </p>
-          <p className="mt-1 text-muted-foreground">
-            {data.pendingPromotion.recommendedDesignation
-              ? `Proposed role: ${data.pendingPromotion.recommendedDesignation}. `
-              : null}
-            {data.pendingPromotion.currentSalary != null &&
-            data.pendingPromotion.recommendedSalary != null
-              ? `Proposed salary: ${money(data.pendingPromotion.currentSalary)} → ${money(
-                  data.pendingPromotion.recommendedSalary,
-                )}. `
-              : data.pendingPromotion.recommendedSalary != null
-                ? `Proposed salary: ${money(data.pendingPromotion.recommendedSalary)}. `
-                : null}
-            Payroll uses your current approved salary until the CEO approves this promotion.
-          </p>
+        <section className="relative overflow-hidden rounded-xl border border-amber-500/40 bg-gradient-to-br from-amber-500/15 via-card to-card px-4 py-4 shadow-sm dark:border-amber-400/45 dark:from-amber-500/20 dark:via-[#0a0f1c] dark:to-[#060914] dark:shadow-[0_0_24px_-8px_rgba(251,191,36,0.35)]">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-amber-400 via-amber-500 to-orange-500"
+          />
+          <div className="relative flex items-start gap-3 pl-2">
+            <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-700 ring-1 ring-amber-500/30 dark:bg-amber-400/15 dark:text-amber-300 dark:ring-amber-400/40">
+              <Award className="size-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold tracking-tight text-amber-950 dark:text-amber-200">
+                Promotion pending approval
+              </p>
+              <p className="mt-1.5 text-sm leading-relaxed text-foreground/85 dark:text-white/90">
+                {data.pendingPromotion.recommendedDesignation
+                  ? `Proposed role: ${data.pendingPromotion.recommendedDesignation}. `
+                  : null}
+                {data.pendingPromotion.currentSalary != null &&
+                data.pendingPromotion.recommendedSalary != null
+                  ? `Proposed salary: ${money(data.pendingPromotion.currentSalary)} → ${money(
+                      data.pendingPromotion.recommendedSalary,
+                    )}. `
+                  : data.pendingPromotion.recommendedSalary != null
+                    ? `Proposed salary: ${money(data.pendingPromotion.recommendedSalary)}. `
+                    : null}
+                Payroll uses your current approved salary until the CEO approves this promotion.
+              </p>
+            </div>
+          </div>
         </section>
       ) : null}
 

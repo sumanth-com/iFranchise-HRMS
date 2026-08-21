@@ -129,7 +129,7 @@ export function ManagerLeaveCalendar({
           showYearPicker
         />
       ) : (
-        <section className="overflow-hidden rounded-xl border bg-card">
+        <section className="card-surface-static overflow-hidden rounded-xl border bg-card">
           <div className="flex items-center justify-between border-b px-4 py-3">
             <Button variant="outline" size="icon-sm" onClick={() => shiftWeek(-1)}>
               <ChevronLeft className="size-4" />

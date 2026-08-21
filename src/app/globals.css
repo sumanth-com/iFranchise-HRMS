@@ -84,37 +84,40 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* Near-black canvas — stylish dark HRMS */
+  --background: oklch(0.12 0.022 265);
+  --foreground: oklch(0.97 0.01 265);
+  --card: oklch(0.15 0.025 265);
+  --card-foreground: oklch(0.97 0.01 265);
+  --popover: oklch(0.14 0.025 265);
+  --popover-foreground: oklch(0.97 0.01 265);
+  /* Vibrant blue actions / active nav (dark mode) */
+  --primary: oklch(0.55 0.22 262);
+  --primary-foreground: oklch(0.99 0.01 265);
+  --secondary: oklch(0.2 0.03 265);
+  --secondary-foreground: oklch(0.95 0.01 265);
+  --muted: oklch(0.2 0.025 265);
+  --muted-foreground: oklch(0.92 0.01 265);
+  --accent: oklch(0.22 0.04 265);
+  --accent-foreground: oklch(0.97 0.01 265);
+  --destructive: oklch(0.65 0.2 25);
+  --border: oklch(0.55 0.06 250 / 32%);
+  --input: oklch(0.5 0.05 250 / 38%);
+  --ring: oklch(0.72 0.14 210);
+  --chart-1: oklch(0.65 0.18 262);
+  --chart-2: oklch(0.7 0.15 165);
+  --chart-3: oklch(0.72 0.16 300);
+  --chart-4: oklch(0.75 0.15 85);
+  --chart-5: oklch(0.65 0.2 25);
+  --sidebar: oklch(0.11 0.04 275);
+  --sidebar-foreground: oklch(0.98 0.01 265);
+  /* Deep indigo/violet active pill — not bright sky blue */
+  --sidebar-primary: oklch(0.42 0.18 275);
+  --sidebar-primary-foreground: oklch(0.99 0.01 265);
+  --sidebar-accent: oklch(0.28 0.08 275);
+  --sidebar-accent-foreground: oklch(0.98 0.01 265);
+  --sidebar-border: oklch(0.55 0.08 275 / 28%);
+  --sidebar-ring: oklch(0.55 0.16 275);
 }
 
 @layer base {
@@ -126,6 +129,243 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* Dark mode shell: ambient blue/purple glow behind content (desktop HRMS) */
+.dark .app-shell-canvas {
+  background-color: var(--background);
+}
+
+/* Sidebar: left near-black → right luminous royal/indigo (dark only) */
+.dark .app-shell-sidebar {
+  background-color: #060918;
+  background-image: linear-gradient(
+    105deg,
+    #050714 0%,
+    #0a1548 42%,
+    #1a2f9e 78%,
+    #2438b8 100%
+  );
+  border-right-color: rgba(120, 140, 220, 0.22);
+  color: #f8fafc;
+}
+
+.dark .app-shell-sidebar .border-b,
+.dark .app-shell-sidebar .border-t {
+  border-color: rgba(148, 163, 255, 0.16);
+}
+
+/* Active nav pill: translucent deep indigo/violet glass (not bright blue) */
+.dark .sidebar-nav-active {
+  background: linear-gradient(
+    90deg,
+    rgba(48, 52, 150, 0.78) 0%,
+    rgba(58, 62, 170, 0.62) 100%
+  ) !important;
+  color: #ffffff !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 6px 16px -8px rgba(20, 24, 80, 0.55) !important;
+}
+
+.dark .sidebar-nav-item:not(.sidebar-nav-active) {
+  color: rgba(248, 250, 252, 0.86);
+}
+
+.dark .sidebar-nav-item:not(.sidebar-nav-active):hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.dark .app-shell-main {
+  background-color: transparent;
+  background-image:
+    radial-gradient(ellipse 85% 65% at 75% 5%, rgba(37, 99, 235, 0.18), transparent 58%),
+    radial-gradient(ellipse 60% 50% at 95% 60%, rgba(109, 40, 217, 0.12), transparent 52%),
+    radial-gradient(ellipse 50% 40% at 12% 90%, rgba(6, 182, 212, 0.08), transparent 48%);
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+
+.dark .app-shell-topnav {
+  background-color: color-mix(in oklch, var(--background) 78%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+/*
+  Dark cards: near-black panels.
+  Hover = clean sidebar-style pill: soft fill edge + thin outline (no wash / glow).
+*/
+.dark .rounded-xl.bg-card,
+.dark .rounded-2xl.bg-card {
+  background-color: #060914;
+  background-image: linear-gradient(
+    165deg,
+    rgba(36, 64, 120, 0.28) 0%,
+    rgba(8, 12, 28, 0.92) 42%,
+    #04060f 100%
+  );
+  border-color: rgba(100, 140, 200, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(186, 210, 255, 0.06),
+    0 12px 28px -18px rgba(0, 0, 0, 0.75);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
+/* Match sidebar nav hover / active edge: subtle indigo glass + thin ring */
+.dark .rounded-xl.bg-card:not(.card-surface-static):hover,
+.dark .rounded-2xl.bg-card:not(.card-surface-static):hover {
+  border-color: rgba(129, 140, 248, 0.55);
+  box-shadow:
+    inset 0 0 0 1px rgba(165, 180, 252, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 12px 28px -18px rgba(0, 0, 0, 0.75);
+}
+
+.dark .card-surface-static:hover,
+.dark .card-surface-static:focus-within {
+  border-color: rgba(129, 140, 248, 0.55) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(165, 180, 252, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 12px 28px -18px rgba(0, 0, 0, 0.75) !important;
+}
+
+/*
+  Attendance panels: blue/violet “wave” glow (top-right + soft bottom-left).
+  Hover stays clean — outline only, wave unchanged.
+*/
+.dark .attendance-wave-surface {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background-color: #060914 !important;
+  background-image:
+    radial-gradient(
+      ellipse 95% 85% at 94% 0%,
+      rgba(109, 40, 217, 0.38),
+      transparent 52%
+    ),
+    radial-gradient(
+      ellipse 80% 70% at 88% 12%,
+      rgba(37, 99, 235, 0.4),
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 60% 55% at 6% 100%,
+      rgba(56, 189, 248, 0.14),
+      transparent 50%
+    ),
+    linear-gradient(
+      165deg,
+      rgba(36, 64, 120, 0.26) 0%,
+      rgba(8, 12, 28, 0.94) 44%,
+      #04060f 100%
+    ) !important;
+  border-color: rgba(120, 150, 210, 0.32) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(186, 210, 255, 0.08),
+    0 14px 32px -18px rgba(0, 0, 0, 0.78) !important;
+}
+
+.dark .attendance-wave-surface:hover,
+.dark .attendance-wave-surface:focus-within {
+  border-color: rgba(129, 140, 248, 0.55) !important;
+  background-image:
+    radial-gradient(
+      ellipse 95% 85% at 94% 0%,
+      rgba(109, 40, 217, 0.38),
+      transparent 52%
+    ),
+    radial-gradient(
+      ellipse 80% 70% at 88% 12%,
+      rgba(37, 99, 235, 0.4),
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 60% 55% at 6% 100%,
+      rgba(56, 189, 248, 0.14),
+      transparent 50%
+    ),
+    linear-gradient(
+      165deg,
+      rgba(36, 64, 120, 0.26) 0%,
+      rgba(8, 12, 28, 0.94) 44%,
+      #04060f 100%
+    ) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(165, 180, 252, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 14px 32px -18px rgba(0, 0, 0, 0.78) !important;
+}
+
+/* Soft day-cell hover — thin outline, light fill */
+.dark .attendance-day-cell:not(:disabled):not(.attendance-day-today):hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(165, 180, 252, 0.35);
+}
+
+.dark .attendance-day-cell:not(:disabled):not(.attendance-day-today):focus-visible {
+  outline: none;
+  background-color: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(165, 180, 252, 0.45);
+}
+
+.dark a.rounded-xl.bg-card:hover,
+.dark a.rounded-2xl.bg-card:hover {
+  border-color: rgba(129, 140, 248, 0.55);
+  box-shadow:
+    inset 0 0 0 1px rgba(165, 180, 252, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 12px 28px -18px rgba(0, 0, 0, 0.75);
+}
+
+.dark .group\/nav:hover .sidebar-nav-icon {
+  filter: drop-shadow(0 0 8px rgba(96, 165, 250, 0.45));
+}
+
+/* Popup / modal form controls — darker inset fields like Apply Leave reference.
+   Exclude #payslip-print so the document stays light (print-style) in dark mode. */
+.dark [data-slot="dialog-content"] label:not(#payslip-print *),
+.dark [data-slot="dialog-content"] .text-sm.font-medium:not(#payslip-print *) {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.dark [data-slot="dialog-content"] input:not([type="checkbox"]):not([type="radio"]):not(#payslip-print *),
+.dark [data-slot="dialog-content"] textarea:not(#payslip-print *),
+.dark [data-slot="dialog-content"] [data-slot="select-trigger"]:not(#payslip-print *),
+.dark [data-slot="dialog-content"] [data-slot="combobox-trigger"]:not(#payslip-print *) {
+  background-color: rgba(6, 10, 24, 0.92);
+  border-color: rgba(120, 150, 210, 0.28);
+  color: rgba(248, 250, 252, 0.95);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.dark [data-slot="dialog-content"] input:not(#payslip-print *)::placeholder,
+.dark [data-slot="dialog-content"] textarea:not(#payslip-print *)::placeholder {
+  color: rgba(186, 200, 230, 0.55);
+}
+
+.dark [data-slot="dialog-content"] .rounded-xl.border:not(#payslip-print *),
+.dark [data-slot="dialog-content"] .rounded-lg.border:not(#payslip-print *) {
+  border-color: rgba(120, 150, 210, 0.28);
+  background-color: rgba(8, 12, 28, 0.55);
+}
+
+/* Payslip document: always light paper inside dark chrome */
+.dark #payslip-print {
+  color-scheme: light;
+  color: #171717;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dark .rounded-xl.bg-card,
+  .dark .rounded-2xl.bg-card {
+    transition: none;
   }
 }
 

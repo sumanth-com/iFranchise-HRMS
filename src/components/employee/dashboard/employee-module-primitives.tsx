@@ -26,7 +26,7 @@ export function EmployeeStatCard({
   const content = (
     <>
       <div className="flex items-start justify-between gap-2">
-        <p className="truncate whitespace-nowrap text-[11px] font-medium leading-none text-muted-foreground">
+        <p className="truncate whitespace-nowrap text-[11px] font-medium leading-none text-foreground/90 dark:text-white">
           {label}
         </p>
         <span
@@ -42,7 +42,7 @@ export function EmployeeStatCard({
         <p className={cn("truncate text-xl font-semibold leading-7 tracking-tight tabular-nums", accent)}>
           {value}
         </p>
-        <p className="mt-1 truncate text-[11px] leading-4 text-muted-foreground">
+        <p className="mt-1 truncate text-[11px] leading-4 text-foreground/80 dark:text-white/90">
           {hint || "\u00a0"}
         </p>
       </div>
@@ -56,7 +56,10 @@ export function EmployeeStatCard({
     return (
       <Link
         href={href}
-        className={cn(className, "transition-colors hover:border-primary/40 hover:bg-accent/30")}
+        className={cn(
+          className,
+          "transition-[border-color,box-shadow,background-color] duration-150 hover:border-primary/40 hover:bg-accent/30 dark:hover:border-indigo-300/50 dark:hover:bg-transparent",
+        )}
       >
         {content}
       </Link>

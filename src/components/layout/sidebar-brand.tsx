@@ -30,11 +30,11 @@ export function SidebarBrand({
       href={href}
       prefetch
       onClick={onNavigate}
-      className={cn("group/brand flex items-center gap-2 font-semibold", className)}
+      className={cn("group/brand flex items-center gap-2 font-semibold dark:text-white", className)}
     >
       <span
         className={cn(
-          "relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary/5 ring-1 ring-border",
+          "relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary/5 ring-1 ring-border dark:bg-white/10 dark:ring-white/20",
           collapsed ? "size-8" : "size-8",
         )}
       >

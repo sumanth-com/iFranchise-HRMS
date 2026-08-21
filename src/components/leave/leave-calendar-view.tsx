@@ -404,7 +404,7 @@ export function LeaveCalendarView({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border bg-card">
+      <div className="card-surface-static overflow-hidden rounded-xl border bg-card">
         <div className="overflow-x-auto">
           <div className={gridMinWidth}>
             <div className="grid grid-cols-7 border-b bg-muted/40">
