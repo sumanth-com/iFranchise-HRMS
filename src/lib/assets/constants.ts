@@ -124,7 +124,7 @@ export function canAssignAssets(codes: string[]) {
   return hasAnyPermission(codes, ["asset.assign", "asset.edit"]);
 }
 
-/** All `src/assets` device images — keys match {@link ASSET_DEVICE_IMAGE_CATALOG}. */
+/** All device catalog keys — match {@link ASSET_DEVICE_IMAGE_CATALOG}. */
 export const HR_ASSIGN_ASSET_TYPE_KEYS = ASSET_DEVICE_CATALOG_KEYS;
 
 export type HrAssignAssetTypeKey = AssetDeviceCatalogKey;

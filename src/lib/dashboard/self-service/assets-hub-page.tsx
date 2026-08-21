@@ -31,14 +31,34 @@ async function AssetsHubContent({
   void (await searchParams);
   const canViewTeam = hasAnyPermission(profile.permissionCodes, [...TEAM_ASSETS_PERMISSIONS]);
   const canAssign = canAssignAssets(profile.permissionCodes);
+  const loadMySection = section === "my";
+  const loadTeamSection = section === "team" && canViewTeam;
+
+  const emptySelfAssets = {
+    assigned: [],
+    history: [],
+    requests: [],
+    summary: {
+      currentlyAssigned: 0,
+      previouslyReturned: 0,
+      underRepair: 0,
+      warrantyExpiringSoon: 0,
+      lostOrDamaged: 0,
+    },
+    categories: [] as string[],
+  };
 
   const [selfAssets, lookups, inventory, activity] = await Promise.all([
-    getEmployeeAssetsData(supabase, profile),
-    canViewTeam ? getAssetsLookups(supabase, profile) : Promise.resolve(null),
-    canViewTeam
+    loadMySection
+      ? getEmployeeAssetsData(supabase, profile)
+      : Promise.resolve(emptySelfAssets),
+    loadTeamSection ? getAssetsLookups(supabase, profile) : Promise.resolve(null),
+    loadTeamSection
       ? listAssets(supabase, profile, { page: 1, pageSize: 100 })
       : Promise.resolve(null),
-    canViewTeam ? getAssetActivityFeed(supabase, profile, { limit: 100, activityType: "all" }) : Promise.resolve([]),
+    loadTeamSection
+      ? getAssetActivityFeed(supabase, profile, { limit: 100, activityType: "all" })
+      : Promise.resolve([]),
   ]);
 
   return (

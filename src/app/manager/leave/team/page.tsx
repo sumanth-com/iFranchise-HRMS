@@ -16,7 +16,7 @@ function firstString(value: string | string[] | undefined) {
   return typeof value === "string" ? value : undefined;
 }
 
-export default async function ManagerTeamLeavePage({
+async function ManagerTeamLeaveContent({
   searchParams,
 }: ManagerTeamLeavePageProps) {
   await requireServerAnyPermission(["portal.manager.access", "leave.view"]);
@@ -78,6 +78,31 @@ export default async function ManagerTeamLeavePage({
   );
 
   return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-5">
+      <ManagerTeamLeaveView
+        summary={teamData.summary}
+        records={teamData.records.data}
+        total={teamData.records.total}
+        page={teamData.records.page}
+        pageSize={teamData.records.pageSize}
+        search={parsed.search ?? ""}
+        month={month}
+        year={year}
+        leaveStatus={parsed.leaveStatus}
+        leaveTypeId={parsed.leaveTypeId}
+        departmentId={parsed.departmentId}
+        employeeId={parsed.employeeId}
+        summaryFilter={parsed.summaryFilter}
+        leaveTypes={teamData.lookups.leaveTypes}
+        departments={teamData.lookups.departments}
+        employees={teamData.lookups.employees}
+      />
+    </div>
+  );
+}
+
+export default function ManagerTeamLeavePage(props: ManagerTeamLeavePageProps) {
+  return (
     <Suspense
       fallback={
         <div className="flex flex-1 items-center justify-center">
@@ -85,26 +110,7 @@ export default async function ManagerTeamLeavePage({
         </div>
       }
     >
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-5">
-        <ManagerTeamLeaveView
-          summary={teamData.summary}
-          records={teamData.records.data}
-          total={teamData.records.total}
-          page={teamData.records.page}
-          pageSize={teamData.records.pageSize}
-          search={parsed.search ?? ""}
-          month={month}
-          year={year}
-          leaveStatus={parsed.leaveStatus}
-          leaveTypeId={parsed.leaveTypeId}
-          departmentId={parsed.departmentId}
-          employeeId={parsed.employeeId}
-          summaryFilter={parsed.summaryFilter}
-          leaveTypes={teamData.lookups.leaveTypes}
-          departments={teamData.lookups.departments}
-          employees={teamData.lookups.employees}
-        />
-      </div>
+      <ManagerTeamLeaveContent {...props} />
     </Suspense>
   );
 }

@@ -28,6 +28,7 @@ export const DEFAULT_LEAVE_POLICIES: LeavePoliciesConfiguration = {
   allowHalfDay: true,
   allowCarryForward: true,
   approvalLevels: 2,
+  defaultHrApproverEmployeeId: null,
   halfDayRules: {
     enabled: true,
     morningEnd: "13:00",
@@ -208,6 +209,11 @@ export function parseLeavePolicies(
         ? leaveRules.allow_carry_forward
         : DEFAULT_LEAVE_POLICIES.allowCarryForward,
     approvalLevels: Number(leaveRules.approval_levels) || DEFAULT_LEAVE_POLICIES.approvalLevels,
+    defaultHrApproverEmployeeId:
+      typeof leaveRules.default_hr_approver_employee_id === "string" &&
+      leaveRules.default_hr_approver_employee_id.length > 0
+        ? leaveRules.default_hr_approver_employee_id
+        : null,
     halfDayRules: {
       enabled:
         typeof halfDay.enabled === "boolean" ? halfDay.enabled : DEFAULT_LEAVE_POLICIES.halfDayRules.enabled,
@@ -432,6 +438,7 @@ export function toStoredLeavePolicies(leave: LeavePoliciesConfiguration) {
       allow_half_day: leave.allowHalfDay,
       allow_carry_forward: leave.allowCarryForward,
       approval_levels: leave.approvalLevels,
+      default_hr_approver_employee_id: leave.defaultHrApproverEmployeeId,
     },
     leave_policies: {
       leave_year_start_month: leave.leaveYearStartMonth,

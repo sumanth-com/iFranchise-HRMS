@@ -7,7 +7,7 @@ import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { inviteEmployeeByEmail } from "@/lib/employees/services/employee-account";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import {
-  requireServerAnyPermission,
+  requireServerAllPermissions,
 } from "@/lib/permissions/server";
 import { hasSupabaseServiceRoleEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -29,7 +29,7 @@ export async function inviteTeamMemberAction(input: unknown): Promise<
       };
     }
 
-    const profile = await requireServerAnyPermission([
+    const profile = await requireServerAllPermissions([
       PORTAL_PERMISSIONS.manager,
       "manager.team.invite",
     ]);

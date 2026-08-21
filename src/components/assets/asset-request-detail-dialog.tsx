@@ -99,6 +99,9 @@ export function AssetRequestDetailDialog({ request, open, onOpenChange }: Props)
             <Detail label="Type" value={parsed?.typeLabel ?? request.title} />
             <Detail label="Sent" value={formatWhen(request.submittedAt)} />
             {parsed?.severity ? <Detail label="Severity" value={parsed.severity} /> : null}
+            {parsed?.kind === "return" && parsed.returnDate ? (
+              <Detail label="Requested return date" value={parsed.returnDate} />
+            ) : null}
           </div>
 
           <div className="rounded-lg border bg-muted/10 px-3 py-3">
@@ -106,7 +109,10 @@ export function AssetRequestDetailDialog({ request, open, onOpenChange }: Props)
               What was written
             </p>
             <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">
-              {parsed?.message || request.issue}
+              {parsed?.kind === "return"
+                ? parsed.message ||
+                  (parsed.returnDate ? `Return requested for ${parsed.returnDate}` : request.issue)
+                : parsed?.message || request.issue}
             </p>
           </div>
         </div>

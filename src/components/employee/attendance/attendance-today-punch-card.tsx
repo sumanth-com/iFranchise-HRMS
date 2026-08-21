@@ -37,7 +37,7 @@ type DialogState =
 const PUNCH_MESSAGE_DISMISS_MS = 3500;
 
 const PUNCH_BUTTON_CLASS =
-  "h-11 min-w-[11.5rem] gap-2.5 rounded-lg px-6 text-sm font-semibold shadow-sm transition-all hover:shadow-md active:scale-[0.98]";
+  "h-11 min-w-[11.5rem] gap-2.5 rounded-lg px-6 text-sm font-semibold transition-all active:scale-[0.98]";
 
 type Props = {
   firstName: string;
@@ -79,7 +79,6 @@ function PunchActionButton({
       onClick={onClick}
       className={cn(
         PUNCH_BUTTON_CLASS,
-        variant === "default" && "shadow-primary/20",
         className,
       )}
     >

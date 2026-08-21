@@ -695,7 +695,8 @@ export async function getAssetActivityFeed(
       const isEmployeeRequest =
         kind === "issue_reported" ||
         kind === "replacement_requested" ||
-        kind === "status_reported";
+        kind === "status_reported" ||
+        kind === "return_requested";
       const assignment = assignmentsByAsset.get(row.assetId);
       const resolvedKind =
         row.maintenanceStatus === "completed" && !isEmployeeRequest
@@ -725,6 +726,7 @@ export async function getAssetActivityFeed(
       if (activityType === "all") return true;
       if (activityType === "report") return row.kind === "issue_reported";
       if (activityType === "replace") return row.kind === "replacement_requested";
+      if (activityType === "return") return row.kind === "return_requested";
       return row.kind === "status_reported";
     });
 
@@ -739,7 +741,7 @@ export async function getEmployeeAssetRequests(
   params?: {
     month?: number;
     year?: number;
-    activityType?: "all" | "report" | "replace" | "status";
+    activityType?: "all" | "report" | "replace" | "status" | "return";
     userId?: string;
     employeeId?: string;
   },

@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -8,8 +9,6 @@ import { CircleHelp, FileText, Download } from "lucide-react";
 
 import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
-import { EmployeePayslipDrawer } from "@/components/employee/payroll/employee-payslip-drawer";
-import { EmployeePayrollView } from "@/components/employee/payroll/employee-payroll-view";
 import { PayrollSubNav } from "@/components/payroll/payroll-sub-nav";
 import {
   TeamPayrollHeaderActionsOutlet,
@@ -25,6 +24,23 @@ import {
   type TeamPayrollSection,
 } from "@/lib/payroll/constants";
 import type { EmployeePayrollData } from "@/types/employee-payroll";
+
+/** Lazy: Team Payroll must not evaluate employee payslip/server-action modules. */
+const EmployeePayrollView = dynamic(
+  () =>
+    import("@/components/employee/payroll/employee-payroll-view").then(
+      (mod) => mod.EmployeePayrollView,
+    ),
+  { ssr: false },
+);
+
+const EmployeePayslipDrawer = dynamic(
+  () =>
+    import("@/components/employee/payroll/employee-payslip-drawer").then(
+      (mod) => mod.EmployeePayslipDrawer,
+    ),
+  { ssr: false },
+);
 
 type PayrollSection = "my" | "team";
 
@@ -51,6 +67,16 @@ const SECTION_HELP: Record<
         label: "What this page is for",
         detail:
           "Generate and process the monthly payroll for active employees — review attendance impact, finalize amounts, and move the run through draft → processed → approved → paid.",
+      },
+      {
+        label: "Status pills",
+        detail:
+          "Draft (pending) = run exists but is not finished yet. Processing = calculation is running. Processed = amounts are ready for HR review. Approved = cleared for payment. Paid = salaries released. Cancelled = stopped and will not be paid.",
+      },
+      {
+        label: "Employee filter",
+        detail:
+          "Use Search employee next to month and year to find someone by name or employee code in the payroll list after you run or open a period.",
       },
       {
         label: "Before you run",
@@ -87,6 +113,11 @@ const SECTION_HELP: Record<
         detail:
           "When you add a newer structure for an employee, the previous Current one becomes Historical automatically.",
       },
+      {
+        label: "Filters",
+        detail:
+          "Use month, year, employee, and status (Current / Historical) filters to find the right structure quickly.",
+      },
     ],
   },
   bonuses: {
@@ -103,9 +134,14 @@ const SECTION_HELP: Record<
           "Bonuses typically need HR and Finance approval. Only approved bonuses for the selected month are picked up when you run payroll.",
       },
       {
-        label: "Status tips",
+        label: "Status pills",
         detail:
           "Pending = waiting on approval. Approved = ready for payroll. Paid = already settled in a completed run. Rejected or cancelled = not paid.",
+      },
+      {
+        label: "Filters",
+        detail:
+          "Use month, year, employee, and status filters to find a bonus quickly before approving or reviewing.",
       },
     ],
   },
@@ -123,9 +159,14 @@ const SECTION_HELP: Record<
           "Approve only valid claims with clear descriptions. Approved claims can be included in the next payroll cycle for payout.",
       },
       {
-        label: "Status tips",
+        label: "Status pills",
         detail:
-          "Pending needs review. Approved is ready to pay. Paid means settled. Rejected or cancelled will not be paid.",
+          "Pending = waiting on approval. Approved = ready to pay in payroll. Paid = settled. Rejected or cancelled = not paid.",
+      },
+      {
+        label: "Filters",
+        detail:
+          "Use month, year, employee, and status filters to locate claims before you approve them.",
       },
     ],
   },

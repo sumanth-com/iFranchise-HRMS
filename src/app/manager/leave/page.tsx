@@ -40,9 +40,7 @@ function teamRedirect(
   return hubListUrl(MANAGER_ROUTES.leaveTeam, filters);
 }
 
-export default async function ManagerLeavePage({
-  searchParams,
-}: ManagerLeavePageProps) {
+async function ManagerLeaveContent({ searchParams }: ManagerLeavePageProps) {
   const profile = await requireServerAnyPermission([
     "portal.manager.access",
     "leave.view",
@@ -103,6 +101,27 @@ export default async function ManagerLeavePage({
   ]);
 
   return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-4 md:p-5">
+      <MyLeaveSelfServiceView
+        canApply={canApply}
+        canEdit={canEdit}
+        canDelete={canDelete}
+        employeeId={employeeId}
+        applyLeaveLookups={applyLookups}
+        balances={balances}
+        requests={requests}
+        calendarMonth={calendarMonth}
+        calendarYear={calendarYear}
+        calendarLeaves={calendar.leaves}
+        calendarHolidays={calendar.holidays}
+        calendarContext={calendar.calendar}
+      />
+    </div>
+  );
+}
+
+export default function ManagerLeavePage(props: ManagerLeavePageProps) {
+  return (
     <Suspense
       fallback={
         <div className="flex flex-1 items-center justify-center">
@@ -110,22 +129,7 @@ export default async function ManagerLeavePage({
         </div>
       }
     >
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-4 md:p-5">
-        <MyLeaveSelfServiceView
-          canApply={canApply}
-          canEdit={canEdit}
-          canDelete={canDelete}
-          employeeId={employeeId}
-          applyLeaveLookups={applyLookups}
-          balances={balances}
-          requests={requests}
-          calendarMonth={calendarMonth}
-          calendarYear={calendarYear}
-          calendarLeaves={calendar.leaves}
-          calendarHolidays={calendar.holidays}
-          calendarContext={calendar.calendar}
-        />
-      </div>
+      <ManagerLeaveContent {...props} />
     </Suspense>
   );
 }

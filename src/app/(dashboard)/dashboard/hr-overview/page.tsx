@@ -19,6 +19,7 @@ const EMPTY_DASHBOARD: HrDashboardData = {
     presentToday: 0,
     absentToday: 0,
     lateToday: 0,
+    halfDayToday: 0,
     pendingApprovals: 0,
     exitRequests: 0,
     upcomingHolidays: [],

@@ -1,11 +1,16 @@
 "use client";
 
 import { ChevronDown, LayoutGrid } from "lucide-react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/common/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   PORTAL_SWITCH_LINKS,
   resolveActivePortalSwitchLink,
@@ -25,10 +30,15 @@ const PORTAL_PERMISSION_MAP: Record<string, string> = {
 };
 
 export function PortalSwitcher() {
+  const router = useRouter();
   const { permissionCodes, roles } = useAuth();
   const { activePortal, setActivePortal } = useActivePortal();
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const isSuperAdmin = roles.some((role) => role.code === "super_admin");
   if (!isSuperAdmin) return null;
@@ -37,57 +47,73 @@ export function PortalSwitcher() {
     hasPermission(permissionCodes, PORTAL_PERMISSION_MAP[portal.portal]),
   );
 
+  // Pathname-only on first paint so SSR and client match (activePortal can
+  // come from sessionStorage after mount).
   const activePortalLink = resolveActivePortalSwitchLink(
     pathname,
     availablePortals,
-    activePortal,
+    mounted ? activePortal : null,
   );
+  const label = activePortalLink?.label ?? "Portals";
 
-  return (
-    <div className="relative">
+  if (!mounted) {
+    return (
       <Button
         variant="outline"
         size="sm"
         className="gap-2"
-        onClick={() => setOpen((current) => !current)}
-        aria-expanded={open}
-        aria-haspopup="listbox"
+        aria-haspopup="menu"
+        aria-expanded={false}
+        type="button"
       >
         <LayoutGrid className="size-4" />
-        <span className="hidden sm:inline">{activePortalLink?.label ?? "Portals"}</span>
-        <ChevronDown className={cn("size-4 transition-transform", open && "rotate-180")} />
+        <span className="hidden sm:inline">{label}</span>
+        <ChevronDown className="size-4 opacity-70" />
       </Button>
-      {open ? (
-        <>
-          <button
-            type="button"
-            className="fixed inset-0 z-40 cursor-default"
-            aria-label="Close portal menu"
-            onClick={() => setOpen(false)}
-          />
-          <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border bg-popover p-1 shadow-lg">
-            {availablePortals.map((portal) => (
-              <Link
-                key={portal.portal}
-                href={portal.href}
-                prefetch
-                onClick={() => {
-                  setActivePortal(portal.portal);
-                  setOpen(false);
-                }}
-                className={cn(
-                  "block rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent",
-                  activePortalLink?.portal === portal.portal
-                    ? "bg-accent font-medium"
-                    : "",
-                )}
-              >
-                {portal.label}
-              </Link>
-            ))}
-          </div>
-        </>
-      ) : null}
-    </div>
+    );
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            aria-haspopup="menu"
+          >
+            <LayoutGrid className="size-4" />
+            <span className="hidden sm:inline">{label}</span>
+            <ChevronDown className="size-4 opacity-70" />
+          </Button>
+        }
+      />
+      <DropdownMenuContent
+        align="end"
+        side="bottom"
+        sideOffset={8}
+        className="z-[100] w-56 rounded-xl p-1"
+      >
+        {availablePortals.map((portal) => {
+          const isActive = activePortalLink?.portal === portal.portal;
+          return (
+            <DropdownMenuItem
+              key={portal.portal}
+              className={cn(
+                "cursor-pointer rounded-lg px-3 py-2",
+                isActive && "bg-accent font-medium",
+              )}
+              onClick={() => {
+                setActivePortal(portal.portal);
+                router.push(portal.href);
+              }}
+            >
+              {portal.label}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

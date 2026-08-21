@@ -5,7 +5,8 @@ import type { PayrollStatus } from "@/types/payroll";
 const STATUS_STYLES: Record<PayrollStatus, string> = {
   draft: "bg-muted text-muted-foreground",
   processing: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
-  processed: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  // Not amber — amber reads as "Pending" next to other payroll badges.
+  processed: "bg-sky-500/15 text-sky-800 dark:text-sky-200",
   approved: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   paid: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
   cancelled: "bg-destructive/15 text-destructive",

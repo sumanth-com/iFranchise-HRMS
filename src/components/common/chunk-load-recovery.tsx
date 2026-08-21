@@ -4,6 +4,7 @@ import { useEffect } from "react";
 
 import {
   isChunkLoadError,
+  isStaleHmrModuleError,
   recoverFromChunkLoadError,
 } from "@/lib/next/chunk-load-recovery";
 
@@ -13,15 +14,19 @@ import {
  */
 export function ChunkLoadRecovery() {
   useEffect(() => {
+    function isRecoverableClientError(candidate: unknown) {
+      return isChunkLoadError(candidate) || isStaleHmrModuleError(candidate);
+    }
+
     function handleError(event: ErrorEvent) {
       const candidate = event.error ?? event.message;
-      if (!isChunkLoadError(candidate)) return;
+      if (!isRecoverableClientError(candidate)) return;
       event.preventDefault();
       recoverFromChunkLoadError();
     }
 
     function handleRejection(event: PromiseRejectionEvent) {
-      if (!isChunkLoadError(event.reason)) return;
+      if (!isRecoverableClientError(event.reason)) return;
       event.preventDefault();
       recoverFromChunkLoadError();
     }

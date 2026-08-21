@@ -48,12 +48,14 @@ export function SidebarNavLink({
         onNavigate?.();
       }}
       className={cn(
-        "group/nav sidebar-nav-item flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-[color,background-color,box-shadow,opacity] duration-150",
+        "group/nav sidebar-nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium leading-snug transition-[color,background-color,opacity] duration-150",
         indented && !collapsed && "ml-2",
         active
-          ? "sidebar-nav-active bg-sidebar-primary text-sidebar-primary-foreground"
-          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-        isPending && !active && "bg-sidebar-accent/80 text-sidebar-accent-foreground",
+          ? "sidebar-nav-active bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-[0_10px_28px_-12px_rgba(79,70,229,0.65)] dark:from-blue-600 dark:to-violet-600"
+          : "text-sidebar-foreground/80 hover:bg-muted hover:text-foreground dark:hover:bg-white/[0.06] dark:hover:text-white/90",
+        isPending &&
+          !active &&
+          "bg-muted text-foreground dark:bg-white/[0.06] dark:text-white/90",
         disabled && "pointer-events-none opacity-50",
         collapsed && "justify-center px-2",
       )}

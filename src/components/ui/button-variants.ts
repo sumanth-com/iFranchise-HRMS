@@ -10,7 +10,7 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground hover:bg-primary/80 dark:border-transparent dark:bg-gradient-to-r dark:from-blue-600 dark:to-violet-600 dark:text-white dark:shadow-[0_10px_28px_-12px_rgba(79,70,229,0.65)] dark:hover:from-blue-500 dark:hover:to-violet-500",
+          "border-transparent bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-[0_10px_28px_-12px_rgba(79,70,229,0.65)] hover:from-blue-500 hover:to-violet-500 focus-visible:ring-violet-500/40",
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-sky-400/35 dark:bg-transparent dark:text-white dark:hover:border-sky-300/55 dark:hover:bg-white/5",
         secondary:

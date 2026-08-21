@@ -40,7 +40,13 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
             <ErrorState
               title="Something went wrong"
               description="We couldn't load this page. Please refresh or try again in a moment."
-              onRetry={reset}
+              onRetry={() => {
+                if (isRecoverable) {
+                  recoverFromChunkLoadError({ force: true });
+                  return;
+                }
+                reset();
+              }}
               retryLabel="Try again"
             />
           )}

@@ -178,11 +178,12 @@ export type AssetActivityKind =
   | "issue_reported"
   | "replacement_requested"
   | "status_reported"
+  | "return_requested"
   | "asset_created";
 
 export type AssetActivityFeedParams = {
   limit?: number;
-  activityType?: "all" | "report" | "replace" | "status";
+  activityType?: "all" | "report" | "replace" | "status" | "return";
   month?: number;
   year?: number;
 };

@@ -2,12 +2,14 @@
 
 import Image from "next/image";
 
-import dashboardImage from "@/assets/dashboard.png";
 import {
   resolveDailyBoostLine,
   type DailyBoostTone,
 } from "@/lib/dashboard/daily-boost-messages";
 import { cn } from "@/lib/utils";
+
+/** Compressed public asset (replaces ~1.5MB PNG import on every dashboard). */
+const DASHBOARD_BOOST_IMAGE = "/images/dashboard-boost.jpg";
 
 type DailyBoostCardProps = {
   firstName?: string;
@@ -50,10 +52,11 @@ export function DailyBoostCard({
       )}
     >
       <Image
-        src={dashboardImage}
+        src={DASHBOARD_BOOST_IMAGE}
         alt=""
         fill
         priority={false}
+        quality={72}
         sizes="(max-width: 1024px) 100vw, 55vw"
         className="object-cover object-[70%_center]"
       />

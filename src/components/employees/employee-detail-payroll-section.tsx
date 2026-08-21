@@ -9,7 +9,7 @@ import { EmployeeDetailPayslipDrawer } from "@/components/employees/employee-det
 import { EmployeeStatCard } from "@/components/employee/dashboard/employee-module-primitives";
 import { Button } from "@/components/common/button";
 import { FilterSelect } from "@/components/common/filter-select";
-import { getYearSelectItems } from "@/components/payroll/select-utils";
+import { getMonthSelectItems, getYearSelectItems } from "@/components/payroll/select-utils";
 import { PAYROLL_STATUS_LABELS } from "@/lib/payroll/constants";
 import { formatCurrency } from "@/lib/payroll/services/payroll-utils";
 import type { EmployeePayrollData } from "@/types/employee-payroll";
@@ -68,6 +68,14 @@ function yearFromPayrollMonth(payrollMonth: string): number | null {
   return date.getUTCFullYear();
 }
 
+function monthFromPayrollMonth(payrollMonth: string): number | null {
+  if (!payrollMonth) return null;
+  const value = payrollMonth.length === 7 ? `${payrollMonth}-01` : payrollMonth;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.getUTCMonth() + 1;
+}
+
 function payrollYearItems(selectedYear: number | null) {
   const current = new Date().getFullYear();
   const years = new Set([
@@ -83,6 +91,11 @@ function payrollYearItems(selectedYear: number | null) {
   return getYearSelectItems([...years].sort((a, b) => a - b));
 }
 
+const PAYROLL_MONTH_ITEMS = [
+  { value: "all", label: "All months" },
+  ...getMonthSelectItems(),
+];
+
 type EmployeeDetailPayrollSectionProps = {
   data: EmployeePayrollData | null;
 };
@@ -93,15 +106,32 @@ export function EmployeeDetailPayrollSection({ data }: EmployeeDetailPayrollSect
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const yearRaw = Number.parseInt(searchParams.get("year") ?? "", 10);
+  const monthRaw = Number.parseInt(searchParams.get("month") ?? "", 10);
   const initialYear = yearRaw >= 2000 && yearRaw <= 2100 ? yearRaw : new Date().getFullYear();
+  const initialMonth =
+    monthRaw >= 1 && monthRaw <= 12 ? monthRaw : new Date().getMonth() + 1;
   const [selectedYear, setSelectedYear] = useState<number>(initialYear);
+  const [selectedMonth, setSelectedMonth] = useState<number | "all">(
+    searchParams.has("month") ? initialMonth : "all",
+  );
+
+  function syncPeriodUrl(next: { month: number | "all"; year: number }) {
+    const params = new URLSearchParams(window.location.search);
+    params.set("tab", "payroll");
+    params.set("year", String(next.year));
+    if (next.month === "all") params.delete("month");
+    else params.set("month", String(next.month));
+    window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+  }
 
   function handleYearChange(year: number) {
     setSelectedYear(year);
-    const params = new URLSearchParams(window.location.search);
-    params.set("tab", "payroll");
-    params.set("year", String(year));
-    window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+    syncPeriodUrl({ month: selectedMonth, year });
+  }
+
+  function handleMonthChange(month: number | "all") {
+    setSelectedMonth(month);
+    syncPeriodUrl({ month, year: selectedYear });
   }
 
   function openPayslip(id: string) {
@@ -128,12 +158,24 @@ export function EmployeeDetailPayrollSection({ data }: EmployeeDetailPayrollSect
 
   const currency = data?.currencyCode ?? "INR";
   const payslips = data?.payslips ?? [];
-  const yearPayslips = payslips.filter((row) => yearFromPayrollMonth(row.payrollMonth) === selectedYear);
+  const yearPayslips = payslips.filter(
+    (row) => yearFromPayrollMonth(row.payrollMonth) === selectedYear,
+  );
+  const filteredPayslips =
+    selectedMonth === "all"
+      ? yearPayslips
+      : yearPayslips.filter(
+          (row) => monthFromPayrollMonth(row.payrollMonth) === selectedMonth,
+        );
   const yearNetPay = yearPayslips.reduce((total, row) => total + row.netSalary, 0);
+  const periodLabel =
+    selectedMonth === "all"
+      ? String(selectedYear)
+      : format(new Date(selectedYear, selectedMonth - 1, 1), "MMMM yyyy");
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <EmployeeStatCard
           label="Current net salary"
           value={
@@ -165,30 +207,47 @@ export function EmployeeDetailPayrollSection({ data }: EmployeeDetailPayrollSect
         />
         <EmployeeStatCard
           label="Payslips issued"
-          value={String(yearPayslips.length)}
+          value={String(filteredPayslips.length)}
           icon={FileStack}
-          accent="text-amber-600 dark:text-amber-400"
-          iconBg="bg-amber-500/10"
+          accent="text-violet-600 dark:text-violet-400"
+          iconBg="bg-violet-500/10"
         />
-      </div>
-
-      <section className="overflow-hidden rounded-xl border bg-card">
-        <div className="flex items-center justify-between gap-3 bg-black px-5 py-1.5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-white">
-            Salary structure
-          </p>
-          <div className="flex h-8 items-center gap-1.5 rounded-md border border-white/15 bg-white pl-2 pr-1">
-            <span className="shrink-0 text-xs text-muted-foreground">Year</span>
-            <FilterSelect
-              items={payrollYearItems(selectedYear)}
-              value={String(selectedYear)}
-              onValueChange={(value) => handleYearChange(Number.parseInt(value, 10))}
-              placeholder="Select year"
-              className="w-auto"
-              triggerClassName="h-7 min-w-[6.5rem] border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
-            />
+        <div className="flex items-center justify-center rounded-xl border-0 bg-card p-3">
+          <div className="flex w-full flex-col gap-2">
+            <div className="grid h-9 grid-cols-[3rem_1fr] items-center rounded-lg border bg-muted/30 px-3">
+              <span className="text-xs font-medium text-muted-foreground">Month</span>
+              <FilterSelect
+                items={PAYROLL_MONTH_ITEMS}
+                value={selectedMonth === "all" ? "all" : String(selectedMonth)}
+                onValueChange={(value) =>
+                  handleMonthChange(
+                    value === "all" ? "all" : Number.parseInt(value, 10),
+                  )
+                }
+                placeholder="Select"
+                className="w-full"
+                triggerClassName="h-7 w-full border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
+              />
+            </div>
+            <div className="grid h-9 grid-cols-[3rem_1fr] items-center rounded-lg border bg-muted/30 px-3">
+              <span className="text-xs font-medium text-muted-foreground">Year</span>
+              <FilterSelect
+                items={payrollYearItems(selectedYear)}
+                value={String(selectedYear)}
+                onValueChange={(value) => handleYearChange(Number.parseInt(value, 10))}
+                placeholder="Select"
+                className="w-full"
+                triggerClassName="h-7 w-full border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
+              />
+            </div>
           </div>
         </div>
+      </div>
+
+      <section className="overflow-hidden rounded-xl border-0 bg-card">
+        <p className="bg-black px-5 py-2.5 text-xs font-semibold uppercase tracking-wide text-white">
+          Salary structure
+        </p>
         {data?.salaryStructure ? (
           <div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
             <InfoTile
@@ -224,7 +283,7 @@ export function EmployeeDetailPayrollSection({ data }: EmployeeDetailPayrollSect
       </section>
 
       {data?.bank ? (
-        <section className="overflow-hidden rounded-xl border bg-card">
+        <section className="overflow-hidden rounded-xl border-0 bg-card">
           <p className="bg-black px-5 py-2.5 text-xs font-semibold uppercase tracking-wide text-white">
             Bank account
           </p>
@@ -237,11 +296,11 @@ export function EmployeeDetailPayrollSection({ data }: EmployeeDetailPayrollSect
         </section>
       ) : null}
 
-      <section className="overflow-hidden rounded-xl border bg-card">
+      <section className="overflow-hidden rounded-xl border-0 bg-card">
         <p className="bg-black px-5 py-2.5 text-xs font-semibold uppercase tracking-wide text-white">
           Payslip history
         </p>
-        {yearPayslips.length > 0 ? (
+        {filteredPayslips.length > 0 ? (
           <div className="max-h-[min(28rem,calc(100dvh-22rem))] overflow-auto p-4">
             <table className="w-full min-w-[44rem] text-sm">
               <thead className="sticky top-0 z-10 bg-card">
@@ -256,7 +315,7 @@ export function EmployeeDetailPayrollSection({ data }: EmployeeDetailPayrollSect
                 </tr>
               </thead>
               <tbody>
-                {yearPayslips.map((row) => (
+                {filteredPayslips.map((row) => (
                   <tr key={row.id} className="border-b last:border-0">
                     <td className="py-3 pr-3 font-medium">{fmtMonth(row.payrollMonth)}</td>
                     <td className="py-3 pr-3 text-muted-foreground">{row.payslipNumber}</td>
@@ -269,7 +328,7 @@ export function EmployeeDetailPayrollSection({ data }: EmployeeDetailPayrollSect
                     </td>
                     <td className="py-3 pr-3">
                       {row.availability === "under_review" ? (
-                        <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                        <span className="inline-flex items-center rounded-full bg-violet-500/10 px-2.5 py-0.5 text-xs font-medium text-violet-700 dark:text-violet-400">
                           HR Review
                         </span>
                       ) : (
@@ -307,7 +366,8 @@ export function EmployeeDetailPayrollSection({ data }: EmployeeDetailPayrollSect
           </div>
         ) : (
           <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-            No payslips issued for {selectedYear}. Payslips will appear here once payroll is processed.
+            No payslips issued for {periodLabel}. Payslips will appear here once payroll is
+            processed.
           </div>
         )}
       </section>

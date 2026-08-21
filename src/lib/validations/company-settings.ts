@@ -56,6 +56,10 @@ export const leavePoliciesSchema = z.object({
   allowHalfDay: z.boolean(),
   allowCarryForward: z.boolean(),
   approvalLevels: z.coerce.number().int().min(1).max(5),
+  defaultHrApproverEmployeeId: z
+    .union([z.string().uuid(), z.literal(""), z.null()])
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : null)),
   halfDayRules: z.object({
     enabled: z.boolean(),
     morningEnd: timeSchema,

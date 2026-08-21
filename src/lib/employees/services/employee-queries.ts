@@ -1,6 +1,11 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { allocateNextEmployeeCode } from "@/lib/employees/services/employee-code";
 import { cleanDisplayText } from "@/lib/employees/parse-employee-name";
+import {
+  resolveOrgDataEmployeeScope,
+  scopedEmployeeIds,
+} from "@/lib/manager/portal-scope";
+import { listEligibleHrLeaveApproverOptions } from "@/lib/leave/services/leave-queries";
 import type { UserProfile } from "@/types/auth";
 import type {
   EmployeeAccountProvisioningItem,
@@ -75,6 +80,12 @@ export async function listEmployees(
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
+  const employeeScope = await resolveOrgDataEmployeeScope(supabase, profile);
+  const scopedIds = scopedEmployeeIds(employeeScope);
+  if (scopedIds && scopedIds.length === 0) {
+    return { data: [], total: 0, page, pageSize };
+  }
+
   let departmentId: string | undefined;
   if (department) {
     const { data: departmentRow, error: departmentError } = await supabase
@@ -130,6 +141,10 @@ export async function listEmployees(
     )
     .eq("organization_id", profile.employee.organizationId)
     .is("deleted_at", null);
+
+  if (scopedIds) {
+    query = query.in("id", scopedIds);
+  }
 
   if (search) {
     const escaped = search.replace(/[%_,.()\"\\]/g, " ").trim();
@@ -396,10 +411,11 @@ export async function getEmployeeLookups(
   excludeEmployeeId?: string,
 ) {
   const { getOrganizationLookups } = await import("@/lib/organization/services/org-lookups");
-  const [orgLookups, managers, documentTypes] = await Promise.all([
+  const [orgLookups, managers, documentTypes, hrApprovers] = await Promise.all([
     getOrganizationLookups(supabase, organizationId, excludeEmployeeId),
     getManagers(supabase, organizationId, excludeEmployeeId),
     getDocumentTypes(supabase, organizationId),
+    listEligibleHrLeaveApproverOptions(organizationId, excludeEmployeeId),
   ]);
 
   return {
@@ -408,6 +424,7 @@ export async function getEmployeeLookups(
     designations: orgLookups.designations,
     employmentTypes: orgLookups.employmentTypes,
     managers,
+    hrApprovers,
     documentTypes,
   };
 }

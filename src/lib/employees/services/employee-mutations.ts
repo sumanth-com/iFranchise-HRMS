@@ -7,6 +7,7 @@ import {
   DOCUMENT_MAX_BYTES,
   PROFILE_IMAGE_MAX_BYTES,
 } from "@/lib/employees/constants";
+import { assertEligibleHrLeaveApprover } from "@/lib/leave/services/leave-queries";
 import { emitHrmsWebhook } from "@/lib/public-api/emit";
 
 export { createSignedStorageUrl } from "@/lib/storage/signed-url";
@@ -86,6 +87,13 @@ export async function createEmployeeFromWizard(
   const organizationId = profile.employee.organizationId;
   const { basic, employment, address, emergencyContact, documents } = input;
 
+  const assignedHrId = emptyToNull(employment.assignedHrEmployeeId);
+  if (assignedHrId) {
+    await assertEligibleHrLeaveApprover(organizationId, assignedHrId, {
+      fieldLabel: "Assigned HR",
+    });
+  }
+
   const { data: employee, error: employeeError } = await supabase
     .schema("hrms")
     .from("employees")
@@ -96,6 +104,7 @@ export async function createEmployeeFromWizard(
       designation_id: emptyToNull(employment.designationId),
       employment_type_id: emptyToNull(employment.employmentTypeId),
       reporting_manager_id: emptyToNull(employment.reportingManagerId),
+      assigned_hr_employee_id: assignedHrId,
       employee_code: basic.employeeCode.trim(),
       first_name: basic.firstName.trim(),
       last_name: basic.lastName.trim(),
@@ -246,6 +255,18 @@ export async function updateEmployee(
     );
   }
 
+  const assignedHrId = emptyToNull(input.assignedHrEmployeeId);
+  if (assignedHrId) {
+    if (assignedHrId === employeeId) {
+      throw new Error("An employee cannot be assigned as their own HR approver");
+    }
+    await assertEligibleHrLeaveApprover(
+      profile.employee.organizationId,
+      assignedHrId,
+      { fieldLabel: "Assigned HR" },
+    );
+  }
+
   const { error } = await supabase
     .schema("hrms")
     .from("employees")
@@ -255,6 +276,7 @@ export async function updateEmployee(
       designation_id: designationId,
       employment_type_id: emptyToNull(input.employmentTypeId),
       reporting_manager_id: emptyToNull(input.reportingManagerId),
+      assigned_hr_employee_id: assignedHrId,
       employee_code: input.employeeCode.trim(),
       first_name: input.firstName.trim(),
       last_name: input.lastName.trim(),

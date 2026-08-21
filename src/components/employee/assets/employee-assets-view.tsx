@@ -1,6 +1,6 @@
 "use client";
 
-import { Boxes, PackageCheck, RotateCcw, Search, ShieldAlert, Wrench } from "lucide-react";
+import { Boxes, PackageCheck, RotateCcw, Search, Wrench } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Input } from "@/components/common/input";
@@ -9,6 +9,7 @@ import { EmployeeAssetCard } from "@/components/employee/assets/employee-asset-c
 import { EmployeeAssetDetailsDialog } from "@/components/employee/assets/employee-asset-details-dialog";
 import { EmployeeAssetIssueDialog } from "@/components/employee/assets/employee-asset-issue-dialog";
 import { EmployeeAssetReplacementDialog } from "@/components/employee/assets/employee-asset-replacement-dialog";
+import { EmployeeAssetReturnDialog } from "@/components/employee/assets/employee-asset-return-dialog";
 import { EmployeeAssetStatusDialog } from "@/components/employee/assets/employee-asset-status-dialog";
 import { EmployeeAssetRequestsSection } from "@/components/employee/assets/employee-asset-requests-section";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
@@ -35,6 +36,9 @@ export function EmployeeAssetsView({
 
   const [statusAsset, setStatusAsset] = useState<EmployeeAsset | null>(null);
   const [statusOpen, setStatusOpen] = useState(false);
+
+  const [returnAsset, setReturnAsset] = useState<EmployeeAsset | null>(null);
+  const [returnOpen, setReturnOpen] = useState(false);
 
   const query = search.trim().toLowerCase();
 
@@ -78,16 +82,21 @@ export function EmployeeAssetsView({
     setStatusAsset(asset);
     setStatusOpen(true);
   };
+  const openReturn = (asset: EmployeeAsset) => {
+    setReturnAsset(asset);
+    setReturnOpen(true);
+  };
 
   const hasAnyAssets = data.assigned.length > 0 || data.history.length > 0;
 
   return (
     <div className="flex flex-col gap-4">
       {/* Summary */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+      <div className="grid grid-cols-4 gap-3">
         <EmployeeStatCard
           label="Currently Assigned"
           value={String(data.summary.currentlyAssigned)}
+          hint="Active with you"
           icon={Boxes}
           accent="text-indigo-600 dark:text-indigo-400"
           iconBg="bg-indigo-500/10"
@@ -95,6 +104,7 @@ export function EmployeeAssetsView({
         <EmployeeStatCard
           label="Previously Returned"
           value={String(data.summary.previouslyReturned)}
+          hint="Handed back"
           icon={PackageCheck}
           accent="text-emerald-600 dark:text-emerald-400"
           iconBg="bg-emerald-500/10"
@@ -102,20 +112,15 @@ export function EmployeeAssetsView({
         <EmployeeStatCard
           label="Under Repair"
           value={String(data.summary.underRepair)}
+          hint="Service in progress"
           icon={Wrench}
           accent="text-amber-600 dark:text-amber-400"
           iconBg="bg-amber-500/10"
         />
         <EmployeeStatCard
-          label="Warranty Expiring"
-          value={String(data.summary.warrantyExpiringSoon)}
-          icon={ShieldAlert}
-          accent="text-orange-600 dark:text-orange-400"
-          iconBg="bg-orange-500/10"
-        />
-        <EmployeeStatCard
           label="Lost / Damaged"
           value={String(data.summary.lostOrDamaged)}
+          hint="Needs attention"
           icon={RotateCcw}
           accent="text-rose-600 dark:text-rose-400"
           iconBg="bg-rose-500/10"
@@ -169,6 +174,7 @@ export function EmployeeAssetsView({
                     onSendStatus={openStatus}
                     onReportIssue={openIssue}
                     onRequestReplacement={openReplace}
+                    onReturnAsset={openReturn}
                   />
                 ))}
               </div>
@@ -196,6 +202,7 @@ export function EmployeeAssetsView({
                     onSendStatus={openStatus}
                     onReportIssue={openIssue}
                     onRequestReplacement={openReplace}
+                    onReturnAsset={openReturn}
                   />
                 ))}
               </div>
@@ -210,24 +217,37 @@ export function EmployeeAssetsView({
         readOnly={readOnly}
       />
 
-      <EmployeeAssetDetailsDialog
-        asset={detailsAsset}
-        open={detailsOpen}
-        onOpenChange={setDetailsOpen}
-        readOnly={readOnly}
-        onSendStatus={(asset) => {
-          setDetailsOpen(false);
-          openStatus(asset);
-        }}
-        onReportIssue={(asset) => {
-          setDetailsOpen(false);
-          openIssue(asset);
-        }}
-        onRequestReplacement={(asset) => {
-          setDetailsOpen(false);
-          openReplace(asset);
-        }}
-      />
+      {detailsOpen && detailsAsset ? (
+        <EmployeeAssetDetailsDialog
+          asset={detailsAsset}
+          open={detailsOpen}
+          onOpenChange={(open) => {
+            setDetailsOpen(open);
+            if (!open) setDetailsAsset(null);
+          }}
+          readOnly={readOnly}
+          onSendStatus={(asset) => {
+            setDetailsOpen(false);
+            setDetailsAsset(null);
+            openStatus(asset);
+          }}
+          onReportIssue={(asset) => {
+            setDetailsOpen(false);
+            setDetailsAsset(null);
+            openIssue(asset);
+          }}
+          onRequestReplacement={(asset) => {
+            setDetailsOpen(false);
+            setDetailsAsset(null);
+            openReplace(asset);
+          }}
+          onReturnAsset={(asset) => {
+            setDetailsOpen(false);
+            setDetailsAsset(null);
+            openReturn(asset);
+          }}
+        />
+      ) : null}
       {!readOnly ? (
         <>
           <EmployeeAssetStatusDialog
@@ -240,6 +260,11 @@ export function EmployeeAssetsView({
             asset={replaceAsset}
             open={replaceOpen}
             onOpenChange={setReplaceOpen}
+          />
+          <EmployeeAssetReturnDialog
+            asset={returnAsset}
+            open={returnOpen}
+            onOpenChange={setReturnOpen}
           />
         </>
       ) : null}

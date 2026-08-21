@@ -29,14 +29,65 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
   const supabase = await createClient();
   const rawParams = await searchParams;
 
+  const legacyDepartmentId = firstString(rawParams.departmentId);
+  const legacyBranchId = firstString(rawParams.branchId);
+  const rawDepartment = firstString(rawParams.department);
+  const needsLegacyCleanup =
+    Boolean(legacyDepartmentId) || Boolean(legacyBranchId) || Boolean(rawDepartment);
+
+  // Fast path: no legacy URL rewrite — load list + departments together.
+  if (!needsLegacyCleanup) {
+    const params = employeeListParamsSchema.parse({
+      page: rawParams.page,
+      pageSize: rawParams.pageSize,
+      search: firstString(rawParams.search),
+      sortBy: rawParams.sortBy,
+      sortOrder: rawParams.sortOrder,
+      department: rawDepartment,
+      employmentStatus: firstString(rawParams.employmentStatus),
+      accountStatus: firstString(rawParams.accountStatus),
+    });
+
+    const [departments, result] = await Promise.all([
+      getDepartments(supabase, profile.employee.organizationId),
+      listEmployees(supabase, profile, params),
+    ]);
+
+    return (
+      <PageScroll>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Employees</h1>
+            <p className="text-sm text-muted-foreground">
+              Manage employee records, employment details, and related information.
+            </p>
+          </div>
+          <Suspense fallback={<PageSkeleton />}>
+            <EmployeeTable
+              employees={result.data}
+              total={result.total}
+              page={result.page}
+              pageSize={result.pageSize}
+              search={params.search ?? ""}
+              sortBy={params.sortBy}
+              sortOrder={params.sortOrder}
+              department={params.department}
+              employmentStatus={params.employmentStatus}
+              accountStatus={params.accountStatus}
+              departments={departments}
+              canEdit={hasPermission(profile.permissionCodes, "employee.edit")}
+              canDelete={hasPermission(profile.permissionCodes, "employee.delete")}
+            />
+          </Suspense>
+        </div>
+      </PageScroll>
+    );
+  }
+
   const departments = await getDepartments(
     supabase,
     profile.employee.organizationId,
   );
-
-  const legacyDepartmentId = firstString(rawParams.departmentId);
-  const legacyBranchId = firstString(rawParams.branchId);
-  const rawDepartment = firstString(rawParams.department);
 
   let departmentCode =
     rawDepartment &&

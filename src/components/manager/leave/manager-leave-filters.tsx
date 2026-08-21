@@ -66,13 +66,14 @@ export function ManagerLeaveFilters({
           </label>
           <Select
             value={employeeValue}
-            onValueChange={(value) =>
+            onValueChange={(value) => {
+              if (value == null) return;
               onChange({
-                employeeId: !value || value === FILTER_ANY_VALUE ? undefined : value,
+                employeeId: value === FILTER_ANY_VALUE ? undefined : value,
                 search: undefined,
                 page: 1,
-              })
-            }
+              });
+            }}
             disabled={disabled}
           >
             <SelectTrigger id="leave-team-member" className="w-full">
@@ -104,12 +105,13 @@ export function ManagerLeaveFilters({
           </label>
           <Select
             value={leaveTypeValue}
-            onValueChange={(value) =>
+            onValueChange={(value) => {
+              if (value == null) return;
               onChange({
-                leaveTypeId: !value || value === FILTER_ANY_VALUE ? undefined : value,
+                leaveTypeId: value === FILTER_ANY_VALUE ? undefined : value,
                 page: 1,
-              })
-            }
+              });
+            }}
             disabled={disabled}
           >
             <SelectTrigger id="leave-type-filter" className="w-full">
@@ -140,15 +142,16 @@ export function ManagerLeaveFilters({
           </label>
           <Select
             value={leaveStatusValue}
-            onValueChange={(value) =>
+            onValueChange={(value) => {
+              if (value == null) return;
               onChange({
                 leaveStatus:
                   value === FILTER_ANY_VALUE
                     ? undefined
                     : (value as TeamLeaveListParams["leaveStatus"]),
                 page: 1,
-              })
-            }
+              });
+            }}
             disabled={disabled}
           >
             <SelectTrigger id="leave-status-filter" className="w-full">

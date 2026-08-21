@@ -19,13 +19,16 @@ import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { parseEmployeeRequestDetails } from "@/lib/assets/activity-utils";
 import { MAINTENANCE_STATUS_LABELS } from "@/lib/assets/constants";
 import { employeeDeleteAssetRequestAction } from "@/lib/employee/actions/employee-asset-actions";
+import { isOpenRepairMaintenance } from "@/lib/employee/assets/asset-display";
 import type { EmployeeAsset, EmployeeAssetRequest } from "@/types/employee-assets";
+import { cn } from "@/lib/utils";
 
 const TYPE_ITEMS = [
   { value: "all", label: "All types" },
   { value: "report", label: "Reports" },
   { value: "replace", label: "Replace" },
   { value: "status", label: "Status" },
+  { value: "return", label: "Return" },
 ];
 
 const MONTH_ITEMS = [
@@ -137,21 +140,47 @@ export function EmployeeAssetRequestsSection({
     {
       key: "type",
       header: "Type",
-      render: (row) => row.requestLabel,
+      render: (row) => {
+        const underRepair = isOpenRepairMaintenance(row.issue, row.maintenanceStatus);
+        return (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span>{row.requestLabel}</span>
+            {underRepair ? (
+              <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                Under repair
+              </span>
+            ) : null}
+          </div>
+        );
+      },
     },
     {
       key: "details",
       header: "Details",
       render: (row) => (
         <span className="line-clamp-2 text-sm">
-          {parseEmployeeRequestDetails(row.issue, row.notes).message}
+          {parseEmployeeRequestDetails(row.issue, row.notes).message || row.issue}
         </span>
       ),
     },
     {
       key: "status",
       header: "Status",
-      render: (row) => MAINTENANCE_STATUS_LABELS[row.maintenanceStatus],
+      render: (row) => {
+        const underRepair = isOpenRepairMaintenance(row.issue, row.maintenanceStatus);
+        return (
+          <span
+            className={cn(
+              "inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium",
+              underRepair
+                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                : "bg-muted text-muted-foreground",
+            )}
+          >
+            {underRepair ? "Under repair" : MAINTENANCE_STATUS_LABELS[row.maintenanceStatus]}
+          </span>
+        );
+      },
     },
     {
       key: "when",
@@ -217,7 +246,7 @@ export function EmployeeAssetRequestsSection({
       <div className="border-b px-5 py-4">
         <h2 className="text-base font-semibold tracking-tight">Sent reports & requests</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Track issue reports, replacement requests, and status updates you have submitted.
+          Track issue reports, replacement requests, return requests, and status updates you have submitted.
         </p>
       </div>
 
@@ -237,7 +266,7 @@ export function EmployeeAssetRequestsSection({
         {filtered.length === 0 ? (
           <EmptyState
             title="No matching requests"
-            description="Reports, replacement requests, and status updates you send will appear here."
+            description="Reports, replacement, return, and status updates you send will appear here."
           />
         ) : (
           <DataTable

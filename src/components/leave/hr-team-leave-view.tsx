@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { FileText } from "lucide-react";
 
 import { buttonVariants } from "@/components/common/button";
@@ -10,7 +10,6 @@ import {
   type LeaveSummaryFilterKey,
 } from "@/components/leave/leave-summary-cards";
 import { LeaveTable } from "@/components/leave/leave-table";
-import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { getLeaveSummaryAction } from "@/lib/leave/actions";
 import { cn } from "@/lib/utils";
 import type {
@@ -136,47 +135,39 @@ export function HrTeamLeaveView({
         onSelect={applySummaryFilter}
       />
 
-      <Suspense
-        fallback={
-          <div className="flex justify-center py-12">
-            <LoadingSpinner />
-          </div>
-        }
-      >
-        <LeaveTable
-          records={records}
-          total={total}
-          page={page}
-          pageSize={pageSize}
-          search={search}
-          month={month}
-          year={year}
-          leaveStatus={leaveStatus}
-          leaveTypeId={leaveTypeId}
-          departmentId={departmentId}
-          branchId={branchId}
-          reportingManagerId={reportingManagerId}
-          employeeId={employeeId}
-          summaryFilter={summaryFilter}
-          onSummaryFilterChange={setSummaryFilter}
-          leaveTypes={leaveTypes}
-          departments={departments}
-          branches={branches}
-          employees={employees}
-          managers={managers}
-          canCreate={canCreate}
-          canApprove={canApprove}
-          canReject={canReject}
-          canCancel={canCancel}
-          canDelete={canDelete}
-          embedded={embedded}
-          listBasePath={listBasePath}
-          fetchRecords={fetchRecords}
-          onMutated={() => {
-            void refreshSummary();
-          }}
-        />
-      </Suspense>
+      <LeaveTable
+        records={records}
+        total={total}
+        page={page}
+        pageSize={pageSize}
+        search={search}
+        month={month}
+        year={year}
+        leaveStatus={leaveStatus}
+        leaveTypeId={leaveTypeId}
+        departmentId={departmentId}
+        branchId={branchId}
+        reportingManagerId={reportingManagerId}
+        employeeId={employeeId}
+        summaryFilter={summaryFilter}
+        onSummaryFilterChange={setSummaryFilter}
+        leaveTypes={leaveTypes}
+        departments={departments}
+        branches={branches}
+        employees={employees}
+        managers={managers}
+        canCreate={canCreate}
+        canApprove={canApprove}
+        canReject={canReject}
+        canCancel={canCancel}
+        canDelete={canDelete}
+        embedded={embedded}
+        listBasePath={listBasePath}
+        fetchRecords={fetchRecords}
+        onMutated={() => {
+          void refreshSummary();
+        }}
+      />
     </div>
   );
 }

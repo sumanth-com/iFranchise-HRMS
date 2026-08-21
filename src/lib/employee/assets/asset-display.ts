@@ -1,6 +1,8 @@
 import { format, isValid, parseISO } from "date-fns";
 
+import { classifyMaintenanceIssue } from "@/lib/assets/activity-utils";
 import { parseAssetRemarks, parseAssetSpecs } from "@/lib/assets/asset-spec-utils";
+import type { AssetMaintenanceStatus } from "@/types/assets";
 import type { EmployeeAsset } from "@/types/employee-assets";
 
 export function formatAssetDate(value: string | null | undefined, fallback = "—"): string {
@@ -40,4 +42,26 @@ export function getAssetConfigurationText(asset: EmployeeAsset): string | null {
 
   const remarks = parseAssetRemarks(asset.notes);
   return remarks ?? null;
+}
+
+/** Open maintenance that means the asset is actually under repair (not return/status noise). */
+export function isOpenRepairMaintenance(
+  issue: string,
+  maintenanceStatus: AssetMaintenanceStatus,
+): boolean {
+  if (maintenanceStatus !== "pending" && maintenanceStatus !== "in_progress") return false;
+  const kind = classifyMaintenanceIssue(issue);
+  if (kind === "issue_reported" || kind === "maintenance_opened") return true;
+  if (kind === "status_reported" && /:\s*Maintenance\b/i.test(issue)) return true;
+  if (kind === "replacement_requested" && /^Repair\s+requested:/i.test(issue.trim())) return true;
+  return false;
+}
+
+export function isEmployeeAssetUnderRepair(
+  asset: Pick<EmployeeAsset, "assetStatus" | "maintenance">,
+): boolean {
+  if (asset.assetStatus === "maintenance") return true;
+  return asset.maintenance.some((row) =>
+    isOpenRepairMaintenance(row.issue, row.maintenanceStatus),
+  );
 }

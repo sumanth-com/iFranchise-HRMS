@@ -11,6 +11,7 @@ import {
   EMPLOYEE_ROUTES,
   HR_SELF_SERVICE_DASHBOARD_KPI_LINKS,
 } from "@/lib/employee/constants";
+import { formatLeaveDayCount } from "@/lib/leave/services/leave-usage";
 import { MANAGER_ROUTES, MANAGER_SELF_SERVICE_DASHBOARD_KPI_LINKS } from "@/lib/manager/constants";
 import {
   SUPER_ADMIN_SELF_SERVICE_DASHBOARD_KPI_LINKS,
@@ -85,7 +86,7 @@ export function EmployeeDashboardKpiCards({
       {hideLeaveBalance ? null : (
         <EmployeeStatCard
           label="Leave Balance"
-          value={`${kpis.leaveBalanceDays} days`}
+          value={`${formatLeaveDayCount(kpis.leaveBalanceDays)} days`}
           icon={CalendarDays}
           accent="text-indigo-600 dark:text-indigo-400"
           iconBg="bg-indigo-500/10"

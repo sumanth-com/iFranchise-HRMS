@@ -48,7 +48,7 @@ export function MobileSidebar() {
 
   return (
     <Sheet open={isMobileOpen} onOpenChange={setMobileOpen}>
-      <SheetContent side="left" className="app-shell-sidebar flex w-64 flex-col bg-sidebar p-0 text-sidebar-foreground">
+      <SheetContent side="left" className="app-shell-sidebar flex w-64 flex-col bg-background p-0 text-sidebar-foreground">
         <SheetHeader className="shrink-0 border-b px-4 py-4 dark:border-white/15">
           <SheetTitle className="dark:text-white"><OrganizationBrandTitle /></SheetTitle>
         </SheetHeader>
@@ -66,7 +66,7 @@ export function MobileSidebar() {
                   <button
                     type="button"
                     onClick={() => toggleSection(item.section!)}
-                    className="mb-2 mt-4 flex w-full items-center justify-between border-t px-3 pt-4 text-left text-sm font-semibold text-foreground first:mt-0 first:border-t-0 first:pt-0 dark:border-white/15 dark:text-white"
+                    className="mb-2 mt-4 flex w-full items-center justify-between border-t px-3 pt-4 text-left text-[15px] font-semibold text-foreground first:mt-0 first:border-t-0 first:pt-0 dark:border-white/15 dark:text-white"
                     aria-expanded={sectionOpen}
                   >
                     <span>{item.section}</span>

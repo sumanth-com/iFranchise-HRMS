@@ -27,6 +27,7 @@ const EMPTY_OVERVIEW: ManagerDashboardData = {
     presentToday: 0,
     absentToday: 0,
     lateToday: 0,
+    halfDayToday: 0,
     pendingApprovals: 0,
     exitRequests: 0,
     upcomingHolidays: [],
@@ -45,26 +46,27 @@ const EMPTY_OVERVIEW: ManagerDashboardData = {
   upcomingAnniversaries: [],
 };
 
-export default async function ManagerOverviewPage() {
+async function ManagerOverviewContent() {
   const profile = await requireServerPermission(PORTAL_PERMISSIONS.manager);
   const supabase = await createClient();
 
-  let data: ManagerDashboardData = EMPTY_OVERVIEW;
-  let error: string | null = null;
-
   try {
-    data = await getManagerDashboardData(supabase, profile);
+    const data = await getManagerDashboardData(supabase, profile);
+    return <ManagerDashboard data={data} error={null} />;
   } catch (loadError) {
-    error =
+    const error =
       loadError instanceof Error
         ? loadError.message
         : "Failed to load manager overview.";
+    return <ManagerDashboard data={EMPTY_OVERVIEW} error={error} />;
   }
+}
 
+export default function ManagerOverviewPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <Suspense fallback={<DashboardSkeleton />}>
-        <ManagerDashboard data={data} error={error} />
+        <ManagerOverviewContent />
       </Suspense>
     </div>
   );

@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Loader2, Pencil, Trash2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
 import { LeaveForm } from "@/components/leave/leave-form";
 import { LeaveStatusBadge } from "@/components/leave/leave-status-badge";
-import { LeaveDurationBreakdownCard } from "@/components/leave/leave-apply-policy-panel";
 import {
   deleteLeaveRequestAction,
   getLeaveDetailAction,
@@ -83,7 +82,9 @@ export function MyLeaveDetailPopup({
   initialMode = "view",
   onActionComplete,
 }: Props) {
-  const [detail, setDetail] = useState<LeaveDetail | null>(null);
+  const [detail, setDetail] = useState<LeaveDetail | null>(() =>
+    preview ? toPartialDetail(preview) : null,
+  );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isFetching, setIsFetching] = useState(false);
   const [mode, setMode] = useState<"view" | "edit" | "delete">(initialMode);
@@ -98,10 +99,24 @@ export function MyLeaveDetailPopup({
       return;
     }
 
-    let cancelled = false;
+    const seed = preview ? toPartialDetail(preview) : null;
     setLoadError(null);
     setMode(initialMode);
-    setDetail(preview ? toPartialDetail(preview) : null);
+    setDetail(seed);
+
+    // View/delete with row preview: one instant popup, no second fetch/rebuild.
+    if (seed && (initialMode === "view" || initialMode === "delete")) {
+      setIsFetching(false);
+      return;
+    }
+
+    // Edit (or view without preview): load once if needed for form completeness.
+    if (seed && initialMode === "edit") {
+      setIsFetching(false);
+      return;
+    }
+
+    let cancelled = false;
     setIsFetching(true);
 
     void (async () => {
@@ -110,7 +125,7 @@ export function MyLeaveDetailPopup({
         if (cancelled) return;
         if (!result.success) {
           setLoadError(result.message);
-          if (!preview) setDetail(null);
+          setDetail(null);
           toast.error(result.message);
           return;
         }
@@ -121,7 +136,7 @@ export function MyLeaveDetailPopup({
         const message =
           error instanceof Error ? error.message : "Failed to load leave request";
         setLoadError(message);
-        if (!preview) setDetail(null);
+        setDetail(null);
         toast.error(message);
       } finally {
         if (!cancelled) setIsFetching(false);
@@ -131,14 +146,13 @@ export function MyLeaveDetailPopup({
     return () => {
       cancelled = true;
     };
-    // Intentionally omit preview/onOpenChange to avoid re-fetch loops.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch when dialog opens, id, or mode entry changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- open once per dialog session
   }, [open, leaveRequestId, initialMode]);
 
-  const showEdit =
+  const canUseEditMode =
     Boolean(detail?.canEdit ?? (canEdit && detail?.leaveStatus === "pending")) &&
     Boolean(lookups);
-  const showDelete = Boolean(
+  const canUseDeleteMode = Boolean(
     detail?.canDelete ?? (canDelete && detail?.leaveStatus === "pending"),
   );
 
@@ -164,6 +178,13 @@ export function MyLeaveDetailPopup({
     });
   }
 
+  const activeMode =
+    mode === "edit" && !canUseEditMode
+      ? "view"
+      : mode === "delete" && !canUseDeleteMode
+        ? "view"
+        : mode;
+
   return (
     <Modal
       open={open}
@@ -172,40 +193,42 @@ export function MyLeaveDetailPopup({
         onOpenChange(next);
       }}
       title={
-        mode === "edit"
+        activeMode === "edit"
           ? "Edit leave request"
-          : mode === "delete"
+          : activeMode === "delete"
             ? "Delete leave request"
             : detail
               ? detail.leaveTypeName
               : "Leave details"
       }
       description={
-        mode === "edit"
+        activeMode === "edit"
           ? "Update your pending leave request."
-          : mode === "delete"
+          : activeMode === "delete"
             ? "This removes the request and restores your leave balance."
             : detail
               ? `${dateRange} · ${detail.totalDays} day${detail.totalDays === 1 ? "" : "s"}`
-              : "Loading leave request…"
+              : isFetching
+                ? "Loading leave request…"
+                : undefined
       }
       contentClassName="sm:max-w-lg"
       showCancel={false}
       headerAddon={
-        detail && mode === "view" ? (
+        detail && activeMode === "view" ? (
           <LeaveStatusBadge status={detail.leaveStatus} />
         ) : null
       }
       footer={
-        mode === "edit" ? null : mode === "delete" ? (
+        activeMode === "edit" ? null : activeMode === "delete" ? (
           <div className="flex w-full flex-wrap items-center justify-end gap-2">
             <Button
               type="button"
               variant="outline"
               disabled={isPending}
-              onClick={() => setMode("view")}
+              onClick={() => onOpenChange(false)}
             >
-              Back
+              Cancel
             </Button>
             <Button
               type="button"
@@ -215,29 +238,6 @@ export function MyLeaveDetailPopup({
             >
               Confirm delete
             </Button>
-          </div>
-        ) : detail ? (
-          <div className="flex w-full flex-wrap items-center justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Close
-            </Button>
-            {showDelete ? (
-              <Button
-                type="button"
-                variant="destructive"
-                disabled={isPending}
-                onClick={() => setMode("delete")}
-              >
-                <Trash2 className="size-4" />
-                Delete
-              </Button>
-            ) : null}
-            {showEdit ? (
-              <Button type="button" disabled={isPending} onClick={() => setMode("edit")}>
-                <Pencil className="size-4" />
-                Edit
-              </Button>
-            ) : null}
           </div>
         ) : (
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
@@ -257,7 +257,7 @@ export function MyLeaveDetailPopup({
         <p className="py-10 text-center text-sm text-muted-foreground">
           Leave request not found.
         </p>
-      ) : mode === "edit" && lookups ? (
+      ) : activeMode === "edit" && lookups ? (
         <LeaveForm
           lookups={lookups}
           defaultEmployeeId={detail.employeeId}
@@ -278,9 +278,9 @@ export function MyLeaveDetailPopup({
             onOpenChange(false);
             onActionComplete?.();
           }}
-          onCancel={() => setMode("view")}
+          onCancel={() => onOpenChange(false)}
         />
-      ) : mode === "delete" ? (
+      ) : activeMode === "delete" ? (
         <p className="text-sm text-muted-foreground">
           Delete {detail.leaveTypeName} for {dateRange}? This cannot be undone.
         </p>
@@ -296,14 +296,6 @@ export function MyLeaveDetailPopup({
                   : `${detail.totalDays} day${detail.totalDays === 1 ? "" : "s"}`
               }
             />
-            {detail.durationBreakdown ? (
-              <div className="sm:col-span-2 rounded-lg border bg-muted/20 px-3 py-2.5">
-                <p className="text-xs text-muted-foreground">How this was calculated</p>
-                <div className="mt-2">
-                  <LeaveDurationBreakdownCard breakdown={detail.durationBreakdown} />
-                </div>
-              </div>
-            ) : null}
             <DetailField label="Start date" value={formatLeaveDate(detail.startDate)} />
             <DetailField label="End date" value={formatLeaveDate(detail.endDate)} />
             <DetailField
@@ -338,4 +330,3 @@ export function MyLeaveDetailPopup({
     </Modal>
   );
 }
-

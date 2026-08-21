@@ -81,6 +81,7 @@ export type HrTodayPulse = {
   presentToday: number;
   absentToday: number;
   lateToday: number;
+  halfDayToday: number;
   pendingApprovals: number;
   exitRequests: number;
   upcomingHolidays: DashboardListItem[];

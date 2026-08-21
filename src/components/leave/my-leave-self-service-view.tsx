@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { CalendarPlus, Eye, FileText, Trash2 } from "lucide-react";
+import { CalendarPlus, Eye, FileText, Pencil, Trash2 } from "lucide-react";
 
 import { Button, buttonVariants } from "@/components/common/button";
 import {
@@ -71,10 +71,14 @@ export function MyLeaveSelfServiceView({
   const [viewMode, setViewMode] = useState<"view" | "edit" | "delete">("view");
   const canOpenApplyDialog = canApply && employeeId && applyLeaveLookups;
 
-  function openLeavePopup(row: LeaveListItem, mode: "view" | "delete" = "view") {
+  function openLeavePopup(row: LeaveListItem, mode: "view" | "edit" | "delete" = "view") {
     setViewPreview(row);
     setViewMode(mode);
     setViewOpen(true);
+  }
+
+  function canEditRow(row: LeaveListItem) {
+    return canEdit && row.leaveStatus === "pending" && Boolean(applyLeaveLookups);
   }
 
   function canDeleteRow(row: LeaveListItem) {
@@ -116,16 +120,30 @@ export function MyLeaveSelfServiceView({
             variant="ghost"
             size="icon-sm"
             aria-label="View leave"
+            title="View"
             onClick={() => openLeavePopup(row, "view")}
           >
             <Eye className="size-4" />
           </Button>
+          {canEditRow(row) ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Edit leave request"
+              title="Edit"
+              onClick={() => openLeavePopup(row, "edit")}
+            >
+              <Pencil className="size-4" />
+            </Button>
+          ) : null}
           {canDeleteRow(row) ? (
             <Button
               type="button"
               variant="ghost"
               size="icon-sm"
               aria-label="Delete leave request"
+              title="Delete"
               className="text-muted-foreground hover:text-destructive"
               onClick={() => openLeavePopup(row, "delete")}
             >
@@ -188,7 +206,7 @@ export function MyLeaveSelfServiceView({
         <div className="mb-3">
           <h2 className="text-sm font-semibold tracking-tight">My Requests</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Pending requests can be deleted if applied by mistake.
+            Use View, Edit, or Delete on each row. Pending requests can be edited or deleted.
           </p>
         </div>
         <DataTable
@@ -200,23 +218,26 @@ export function MyLeaveSelfServiceView({
         />
       </section>
 
-      <MyLeaveDetailPopup
-        leaveRequestId={viewPreview?.id ?? null}
-        preview={viewPreview}
-        open={viewOpen}
-        initialMode={viewMode}
-        onOpenChange={(open) => {
-          setViewOpen(open);
-          if (!open) {
-            setViewPreview(null);
-            setViewMode("view");
-          }
-        }}
-        lookups={applyLeaveLookups}
-        canEdit={canEdit}
-        canDelete={canDelete}
-        onActionComplete={() => router.refresh()}
-      />
+      {viewOpen && viewPreview ? (
+        <MyLeaveDetailPopup
+          key={`${viewPreview.id}-${viewMode}`}
+          leaveRequestId={viewPreview.id}
+          preview={viewPreview}
+          open={viewOpen}
+          initialMode={viewMode}
+          onOpenChange={(nextOpen) => {
+            setViewOpen(nextOpen);
+            if (!nextOpen) {
+              setViewPreview(null);
+              setViewMode("view");
+            }
+          }}
+          lookups={applyLeaveLookups}
+          canEdit={canEdit}
+          canDelete={canDelete}
+          onActionComplete={() => router.refresh()}
+        />
+      ) : null}
 
       {showPageHeading && applyLeaveLookups && employeeId ? (
         <ApplyLeaveDialog

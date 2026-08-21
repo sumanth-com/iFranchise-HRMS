@@ -665,9 +665,10 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
       pendingLeaveApprovals: leave.pendingRequests,
     },
     todayPulse: {
-      presentToday: presentCount,
+      presentToday: attendance.presentToday,
       absentToday: absentTodayIncludingLeave(attendance),
       lateToday: attendance.lateToday,
+      halfDayToday: attendance.halfDayToday,
       pendingApprovals: leave.pendingRequests,
       exitRequests: exitSummary.pendingClearance || 0,
       upcomingHolidays,

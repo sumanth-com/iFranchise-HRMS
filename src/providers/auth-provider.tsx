@@ -148,7 +148,7 @@ export function AuthProvider({
   useEffect(() => {
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       const pathname = window.location.pathname;
       const isPublicAuthRoute = PUBLIC_ROUTES.some(
         (route) => pathname === route || pathname.startsWith(`${route}/`),
@@ -161,6 +161,22 @@ export function AuthProvider({
       ) {
         router.push(`${AUTH_ROUTES.login}?expired=1`);
         router.refresh();
+        return;
+      }
+
+      // Same-origin cookies are shared across tabs. If another tab signs in as a
+      // different user, hard-reload so header/profile/data never mix identities.
+      if (event === "SIGNED_IN" || event === "USER_UPDATED") {
+        const nextUserId = session?.user?.id;
+        if (nextUserId && nextUserId !== profile.userId) {
+          toast.message("Session updated", {
+            description: "Another sign-in replaced this browser session. Reloading…",
+          });
+          window.location.assign(resolvedPortalHome);
+          return;
+        }
+        router.refresh();
+        return;
       }
 
       if (event === "TOKEN_REFRESHED") {
@@ -169,7 +185,7 @@ export function AuthProvider({
     });
 
     return () => subscription.unsubscribe();
-  }, [router, supabase.auth]);
+  }, [profile.userId, resolvedPortalHome, router, supabase.auth]);
 
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {

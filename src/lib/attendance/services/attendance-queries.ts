@@ -16,6 +16,10 @@ import {
   getManagers,
 } from "@/lib/employees/services/employee-queries";
 import { cleanDisplayText, formatCleanEmployeeName } from "@/lib/employees/parse-employee-name";
+import {
+  resolveOrgDataEmployeeScope,
+  scopedEmployeeIds,
+} from "@/lib/manager/portal-scope";
 
 type AttendanceRow = {
   id: string;
@@ -87,6 +91,12 @@ export async function listAttendance(
   const to = from + effectivePageSize - 1;
   const organizationId = profile.employee.organizationId;
 
+  const employeeScope = await resolveOrgDataEmployeeScope(supabase, profile);
+  const scopedIds = scopedEmployeeIds(employeeScope, employeeId);
+  if (scopedIds && scopedIds.length === 0) {
+    return { data: [], total: 0, page: effectivePage, pageSize: effectivePageSize };
+  }
+
   let query = supabase
     .schema("hrms")
     .from("attendance")
@@ -117,6 +127,12 @@ export async function listAttendance(
     .eq("organization_id", organizationId)
     .is("deleted_at", null);
 
+  if (scopedIds) {
+    query = query.in("employee_id", scopedIds);
+  } else if (employeeId) {
+    query = query.eq("employee_id", employeeId);
+  }
+
   if (dateFrom) {
     query = query.gte("attendance_date", dateFrom);
   }
@@ -139,10 +155,6 @@ export async function listAttendance(
     } else {
       query = query.eq("attendance_status", attendanceStatus);
     }
-  }
-
-  if (employeeId) {
-    query = query.eq("employee_id", employeeId);
   }
 
   if (search) {

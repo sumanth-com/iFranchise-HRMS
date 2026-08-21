@@ -49,9 +49,8 @@ const TASK_HINTS: Record<string, string> = {
 
 function PeopleWatchlistCard({ items }: { items: DashboardWatchItem[] }) {
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-gradient-to-br from-sky-500/10 via-background to-indigo-500/5 p-3">
-      <div className="pointer-events-none absolute -right-8 -top-8 size-24 rounded-full bg-sky-400/20 blur-2xl" />
-      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-400">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border-0 bg-muted/20 p-3 dark:bg-white/[0.03]">
+      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         People watchlist
       </p>
 
@@ -62,7 +61,7 @@ function PeopleWatchlistCard({ items }: { items: DashboardWatchItem[] }) {
             <Link
               key={item.id}
               href={item.href}
-              className="flex min-h-0 flex-col justify-between rounded-lg border bg-background/80 px-2.5 py-2 outline-none transition-colors hover:border-primary/40 hover:bg-background"
+              className="flex min-h-0 flex-col justify-between rounded-lg border-0 bg-background/60 px-2.5 py-2 outline-none transition-colors hover:bg-background dark:bg-white/[0.04] dark:hover:bg-white/[0.07]"
             >
               <p className="text-[10px] font-medium leading-tight text-muted-foreground">
                 {item.label}
@@ -89,42 +88,31 @@ function PeopleWatchlistCard({ items }: { items: DashboardWatchItem[] }) {
 function FocusTaskCard({ item }: { item: DashboardTaskItem }) {
   const Icon = TASK_ICONS[item.id] ?? ClipboardList;
   const hasWork = (item.count ?? 0) > 0;
-  const isUrgent = item.urgency === "high" && hasWork;
   const hint = TASK_HINTS[item.id] ?? "Open the linked workflow to continue";
 
   return (
     <Link
       href={item.href}
       className={cn(
-        "flex min-h-0 flex-col justify-between rounded-xl border bg-muted/15 p-3 outline-none transition-colors",
-        "hover:border-primary/40 hover:bg-accent/30",
-        "focus-visible:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring/40",
-        isUrgent && "border-amber-500/35 bg-gradient-to-br from-amber-500/10 via-background to-background",
+        "flex min-h-0 flex-col justify-between rounded-xl border-0 bg-muted/25 p-3 outline-none transition-colors",
+        "hover:bg-muted/40 dark:bg-white/[0.04] dark:hover:bg-white/[0.07]",
+        "focus-visible:ring-2 focus-visible:ring-ring/40",
       )}
     >
       <div className="flex items-start gap-2.5">
-        <span
-          className={cn(
-            "flex size-9 shrink-0 items-center justify-center rounded-lg border bg-background shadow-sm",
-            isUrgent && "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
-          )}
-        >
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Icon className="size-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold leading-snug">{item.label}</p>
+          <p className="text-sm font-semibold leading-snug text-foreground">{item.label}</p>
           <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">{hint}</p>
         </div>
       </div>
       <div className="mt-2 flex items-end justify-between gap-2">
         <span
           className={cn(
-            "rounded-full px-2.5 py-0.5 text-base font-semibold tabular-nums leading-none",
-            hasWork
-              ? isUrgent
-                ? "bg-amber-500/15 text-amber-700 dark:text-amber-400"
-                : "bg-primary/10 text-primary"
-              : "bg-muted text-muted-foreground",
+            "rounded-md px-2.5 py-0.5 text-base font-semibold tabular-nums leading-none",
+            hasWork ? "bg-primary/10 text-primary" : "bg-muted/70 text-muted-foreground",
           )}
         >
           {item.count ?? 0}
@@ -149,7 +137,7 @@ function HrPriorityFocus({
   if (cards.length === 0) return null;
 
   return (
-    <section className="flex h-full min-h-0 flex-col rounded-xl border bg-card p-3 shadow-sm md:p-4">
+    <section className="flex h-full min-h-0 flex-col rounded-xl border-0 bg-card p-3 shadow-sm md:p-4">
       <div className="mb-3 flex shrink-0 items-center gap-2">
         <span className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Sparkles className="size-3.5" />
@@ -186,8 +174,7 @@ function TeamCelebrationsPanel({
     .slice(0, 4);
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-gradient-to-br from-rose-500/10 via-background to-amber-500/5 p-3">
-      <div className="pointer-events-none absolute -right-6 top-0 size-20 rounded-full bg-rose-400/15 blur-2xl" />
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border-0 bg-muted/20 p-3 dark:bg-white/[0.03]">
       <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="flex size-6 items-center justify-center rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400">
@@ -200,7 +187,7 @@ function TeamCelebrationsPanel({
       </div>
 
       {events.length === 0 ? (
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center rounded-lg border border-dashed bg-background/50 px-3 py-4 text-center">
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center rounded-lg border-0 bg-background/40 px-3 py-4 text-center dark:bg-white/[0.02]">
           <Medal className="size-4 text-muted-foreground/60" />
           <p className="mt-2 text-xs font-medium text-foreground">No celebrations soon</p>
           <p className="mt-0.5 text-[10px] text-muted-foreground">
@@ -214,13 +201,13 @@ function TeamCelebrationsPanel({
             const accent =
               event.kind === "birthday"
                 ? "text-rose-600 dark:text-rose-400"
-                : "text-amber-600 dark:text-amber-400";
+                : "text-indigo-600 dark:text-indigo-400";
             const iconBg =
-              event.kind === "birthday" ? "bg-rose-500/10" : "bg-amber-500/10";
+              event.kind === "birthday" ? "bg-rose-500/10" : "bg-indigo-500/10";
             const kindLabel = event.kind === "birthday" ? "Birthday" : "Work anniversary";
 
             const row = (
-              <div className="flex items-center gap-2.5 rounded-lg border bg-background/75 px-2.5 py-2 transition-colors hover:bg-background">
+              <div className="flex items-center gap-2.5 rounded-lg border-0 bg-background/60 px-2.5 py-2 transition-colors hover:bg-background dark:bg-white/[0.04] dark:hover:bg-white/[0.07]">
                 <span
                   className={cn(
                     "flex size-7 shrink-0 items-center justify-center rounded-md",
@@ -277,7 +264,7 @@ function HrInsightsPanel({
   description?: string;
 }) {
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border bg-card p-3 shadow-sm md:p-4">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border-0 bg-card p-3 shadow-sm md:p-4">
       <div className="mb-2 shrink-0">
         <h2 className="text-[11px] font-semibold tracking-wide text-foreground uppercase">
           {title}

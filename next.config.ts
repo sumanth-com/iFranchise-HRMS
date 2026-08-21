@@ -49,7 +49,6 @@ const nextConfig: NextConfig = {
       "@radix-ui/react-label",
       "@radix-ui/react-separator",
       "@tanstack/react-table",
-      "recharts",
     ],
     staleTimes: {
       dynamic: 300,
@@ -62,6 +61,24 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
+      {
+        source: "/images/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        source: "/_next/static/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
       {
         source: "/(.*)",
         headers: securityHeaders,

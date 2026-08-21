@@ -36,9 +36,23 @@ export function isChunkLoadError(error: unknown): boolean {
   );
 }
 
+/** Turbopack/Webpack HMR left a stale client module graph — hard reload recovers. */
+export function isStaleHmrModuleError(error: unknown): boolean {
+  if (!error) return false;
+  const haystack = errorHaystack(error);
+  return (
+    /module factory is not available/i.test(haystack) ||
+    /deleted in an HMR update/i.test(haystack) ||
+    /was instantiated because it was required/i.test(haystack) ||
+    /module factory is undefined/i.test(haystack) ||
+    /Cannot find module/i.test(haystack) ||
+    /Module \[project\]/i.test(haystack)
+  );
+}
+
 /** Stale client bundles and interrupted RSC navigations should never strand the user. */
 export function isRecoverableRouteError(error: unknown): boolean {
-  if (isChunkLoadError(error)) return true;
+  if (isChunkLoadError(error) || isStaleHmrModuleError(error)) return true;
 
   const haystack = errorHaystack(error);
   return (
@@ -57,13 +71,15 @@ export function isRecoverableRouteError(error: unknown): boolean {
 }
 
 /** Reloads once to pick up new chunks; returns false if already retried recently. */
-export function recoverFromChunkLoadError(): boolean {
+export function recoverFromChunkLoadError(options?: { force?: boolean }): boolean {
   if (typeof window === "undefined") return false;
+
+  const force = options?.force === true;
 
   try {
     const last = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) ?? "0");
     const now = Date.now();
-    if (last && now - last < CHUNK_RELOAD_COOLDOWN_MS) {
+    if (!force && last && now - last < CHUNK_RELOAD_COOLDOWN_MS) {
       return false;
     }
     sessionStorage.setItem(CHUNK_RELOAD_KEY, String(now));
@@ -71,7 +87,9 @@ export function recoverFromChunkLoadError(): boolean {
     // Private mode / blocked storage — still attempt a single reload.
   }
 
-  const { pathname, search, hash } = window.location;
-  window.location.replace(`${pathname}${search}${hash}`);
+  const url = new URL(window.location.href);
+  // Bust any sticky client/HMR graph so the reload cannot reuse a dead module factory.
+  url.searchParams.set("_r", String(Date.now()));
+  window.location.replace(`${url.pathname}${url.search}${url.hash}`);
   return true;
 }

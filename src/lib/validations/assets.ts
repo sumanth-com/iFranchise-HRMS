@@ -59,13 +59,13 @@ export const maintenanceListParamsSchema = z.object({
     .optional(),
   month: z.coerce.number().int().min(1).max(12).optional(),
   year: z.coerce.number().int().min(2000).max(2100).optional(),
-  activityType: z.enum(["all", "report", "replace", "status"]).optional(),
+  activityType: z.enum(["all", "report", "replace", "status", "return"]).optional(),
   createdByUserId: z.string().uuid().optional(),
 });
 
 export const assetActivityFeedParamsSchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(40),
-  activityType: z.enum(["all", "report", "replace", "status"]).default("all"),
+  activityType: z.enum(["all", "report", "replace", "status", "return"]).default("all"),
   month: z.coerce.number().int().min(1).max(12).optional(),
   year: z.coerce.number().int().min(2000).max(2100).optional(),
 });

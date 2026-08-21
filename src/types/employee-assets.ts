@@ -64,7 +64,7 @@ export type EmployeeAssetRequest = {
   assetCode: string;
   assetName: string;
   assignmentId: string | null;
-  requestKind: "report" | "replace" | "status";
+  requestKind: "report" | "replace" | "status" | "return";
   requestLabel: string;
   issue: string;
   notes: string | null;

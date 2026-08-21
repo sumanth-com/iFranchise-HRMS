@@ -18,6 +18,7 @@ import {
   toStoredSecurityConfiguration,
   toStoredWorkingConfiguration,
 } from "@/lib/company-settings/services/company-settings-parsers";
+import { assertEligibleHrLeaveApprover } from "@/lib/leave/services/leave-queries";
 import { updateOrganizationProfile } from "@/lib/organization/services/org-mutations";
 import type { z } from "zod";
 import type { organizationProfileSchema } from "@/lib/validations/organization";
@@ -96,6 +97,13 @@ export async function saveLeavePolicies(
   profile: UserProfile,
   leave: LeavePoliciesConfiguration,
 ) {
+  if (leave.defaultHrApproverEmployeeId) {
+    await assertEligibleHrLeaveApprover(
+      profile.employee.organizationId,
+      leave.defaultHrApproverEmployeeId,
+      { fieldLabel: "Default HR leave approver" },
+    );
+  }
   const stored = toStoredLeavePolicies(leave);
   await mergeOrganizationSettings(supabase, profile, (current) => ({
     ...current,

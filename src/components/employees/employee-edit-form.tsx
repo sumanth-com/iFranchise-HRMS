@@ -41,6 +41,7 @@ type EmployeeEditFormProps = {
     designations: LookupOption[];
     employmentTypes: LookupOption[];
     managers: LookupOption[];
+    hrApprovers?: LookupOption[];
   };
   variant?: "page" | "inline";
   onCancel?: () => void;
@@ -100,6 +101,11 @@ export function EmployeeEditForm({
     ...toEmployeeSelectItems(lookups.managers),
   ];
 
+  const hrApproverItems = [
+    { value: "none", label: "None (use organization default)" },
+    ...toEmployeeSelectItems(lookups.hrApprovers ?? []),
+  ];
+
   const primaryAddress =
     employee.addresses.find((item) => item.isPrimary) ?? employee.addresses[0];
   const primaryEmergency =
@@ -120,6 +126,7 @@ export function EmployeeEditForm({
       customDesignationTitle: "",
       employmentTypeId: employee.employmentTypeId ?? "",
       reportingManagerId: employee.reportingManagerId ?? "",
+      assignedHrEmployeeId: employee.assignedHrEmployeeId ?? "",
       employmentStatus: employee.employmentStatus,
       dateOfJoining: employee.dateOfJoining ?? "",
       dateOfLeaving: employee.dateOfLeaving ?? "",
@@ -336,6 +343,30 @@ export function EmployeeEditForm({
               ))}
             </SelectContent>
           </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Assigned HR</Label>
+          <Select
+            items={hrApproverItems}
+            value={form.watch("assignedHrEmployeeId") || "none"}
+            onValueChange={(value) =>
+              form.setValue("assignedHrEmployeeId", value === "none" ? "" : value ?? "")
+            }
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select assigned HR" />
+            </SelectTrigger>
+            <SelectContent align="start" alignItemWithTrigger={false}>
+              {hrApproverItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Primary HR leave approver. Falls back to organization default when empty.
+          </p>
         </div>
         <div className="space-y-2">
           <Label>Employment status</Label>

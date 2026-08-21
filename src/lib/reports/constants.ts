@@ -75,7 +75,7 @@ const BASE_REPORT_DEFINITIONS: {
   { key: "performance_goals", module: "performance", title: "Goal Progress", description: "Goal tracking status and progress." },
   { key: "performance_reviews", module: "performance", title: "Review Ratings", description: "Performance review ratings." },
   { key: "performance_promotions", module: "performance", title: "Promotion Readiness", description: "Promotion recommendations and status." },
-  { key: "recruitment_jobs", module: "recruitment", title: "Open Jobs", description: "Job openings and openings status." },
+  { key: "recruitment_jobs", module: "recruitment", title: "Job Openings", description: "All job openings by status, department, and openings count." },
   { key: "recruitment_pipeline", module: "recruitment", title: "Candidate Pipeline", description: "Candidates by stage." },
   { key: "recruitment_funnel", module: "recruitment", title: "Hiring Funnel", description: "Aggregated funnel counts." },
   { key: "recruitment_offers", module: "recruitment", title: "Offer Acceptance", description: "Offers and acceptance outcomes." },

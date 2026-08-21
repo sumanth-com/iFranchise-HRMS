@@ -42,7 +42,7 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "app-shell-sidebar hidden h-full shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground transition-[width] duration-200 md:flex",
+        "app-shell-sidebar hidden h-full shrink-0 flex-col border-r bg-transparent text-sidebar-foreground transition-[width] duration-200 md:flex",
         isCollapsed ? "w-16" : "w-64",
       )}
     >
@@ -76,7 +76,7 @@ export function Sidebar() {
                 <button
                   type="button"
                   onClick={() => toggleSection(item.section!)}
-                  className="mb-2 mt-4 flex w-full items-center justify-between border-t px-3 pt-4 text-left text-sm font-semibold text-sidebar-foreground first:mt-0 first:border-t-0 first:pt-0 dark:text-white"
+                  className="mb-2 mt-4 flex w-full items-center justify-between border-t px-3 pt-4 text-left text-[15px] font-semibold text-sidebar-foreground first:mt-0 first:border-t-0 first:pt-0 dark:text-white"
                   aria-expanded={sectionOpen}
                 >
                   <span>{item.section}</span>

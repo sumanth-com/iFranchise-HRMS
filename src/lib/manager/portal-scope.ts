@@ -12,13 +12,39 @@ export function hasHrPortalAccess(profile: UserProfile) {
   return hasPermission(profile.permissionCodes, PORTAL_PERMISSIONS.hr);
 }
 
+export function hasCeoPortalAccess(profile: UserProfile) {
+  return hasPermission(profile.permissionCodes, PORTAL_PERMISSIONS.ceo);
+}
+
 export function hasManagerPortalAccess(profile: UserProfile) {
   return hasPermission(profile.permissionCodes, PORTAL_PERMISSIONS.manager);
+}
+
+/** Org-wide HR/executive visibility (not team- or self-scoped). */
+export function hasOrgWidePeopleAccess(profile: UserProfile) {
+  return hasHrPortalAccess(profile) || hasCeoPortalAccess(profile);
 }
 
 /** Manager portal without HR — data must stay in the reporting hierarchy. */
 export function isManagerOnlyProfile(profile: UserProfile) {
   return hasManagerPortalAccess(profile) && !hasHrPortalAccess(profile);
+}
+
+/**
+ * Server-side employee ID scope for shared list/query APIs.
+ * - HR / CEO / Super Admin with org portals: null (organization-wide)
+ * - Manager-only: reporting-tree team IDs
+ * - Everyone else (e.g. employee self-service): own employee id only
+ */
+export async function resolveOrgDataEmployeeScope(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+): Promise<string[] | null> {
+  if (hasOrgWidePeopleAccess(profile)) return null;
+  if (isManagerOnlyProfile(profile)) {
+    return resolveTeamEmployeeIds(supabase, profile);
+  }
+  return [profile.employee.id];
 }
 
 export function managerOrPermissions(...codes: string[]) {
