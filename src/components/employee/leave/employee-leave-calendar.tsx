@@ -46,7 +46,7 @@ export function EmployeeLeaveCalendar({
   }
 
   return (
-    <section className="rounded-xl border bg-card p-4 shadow-sm">
+    <section className="card-surface-static rounded-xl border bg-card p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold tracking-tight">Leave Calendar</h2>
         {isPending ? (

@@ -184,7 +184,7 @@ export function MyLeaveSelfServiceView({
         initialCalendar={calendarContext}
       />
 
-      <section className="rounded-xl border bg-card p-4 shadow-sm">
+      <section className="card-surface-static rounded-xl border bg-card p-4 shadow-sm">
         <div className="mb-3">
           <h2 className="text-sm font-semibold tracking-tight">My Requests</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">

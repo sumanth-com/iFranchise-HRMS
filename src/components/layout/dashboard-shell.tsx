@@ -23,7 +23,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
         <SidebarProvider>
         <DashboardUrlCleaner />
         <InstantNavPrefetch />
-        <div className="flex h-screen overflow-hidden bg-background">
+        <div className="app-shell-canvas flex h-screen overflow-hidden bg-background">
           <Sidebar />
           <MobileSidebar />
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -32,7 +32,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
             Overflow is owned by ModuleShell / PageScroll children so
             sticky module headers never fight page content.
           */}
-            <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
+            <main className="app-shell-main relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
               <NavigationProgress />
               {children}
             </main>

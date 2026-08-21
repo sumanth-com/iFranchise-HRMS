@@ -243,7 +243,7 @@ export function AttendanceTodayPunchCard({
 
   return (
     <>
-      <section className="rounded-2xl border bg-card p-5 shadow-sm">
+      <section className="attendance-wave-surface card-surface-static rounded-2xl border bg-card p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0 space-y-3">
             <div>

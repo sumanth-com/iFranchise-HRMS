@@ -188,7 +188,7 @@ export function ManagerAttendanceCalendar({
   return (
     <section
       className={cn(
-        "flex h-full min-h-[28rem] flex-col rounded-2xl border bg-card p-4 shadow-sm",
+        "attendance-wave-surface card-surface-static flex h-full min-h-[28rem] flex-col rounded-2xl border bg-card p-4 shadow-sm",
         className,
       )}
     >
@@ -318,17 +318,20 @@ export function ManagerAttendanceCalendar({
                 disabled={!live.inMonth}
                 onClick={() => onSelectDate(live.date)}
                 className={cn(
-                  "flex min-h-0 w-full items-center justify-center rounded-xl text-sm font-medium transition",
+                  "attendance-day-cell flex min-h-0 w-full items-center justify-center rounded-xl text-sm font-medium transition-[background-color,box-shadow,color] duration-150",
                   !live.inMonth && "pointer-events-none opacity-25",
                   live.isToday &&
-                    "bg-emerald-500 text-white shadow-sm ring-2 ring-emerald-700 ring-offset-2",
+                    "attendance-day-today bg-emerald-500 text-white shadow-sm ring-2 ring-emerald-700 ring-offset-2 ring-offset-background dark:ring-offset-[#060914]",
                   !live.isToday &&
                     live.inMonth &&
                     isSunday &&
-                    "bg-muted/80 text-muted-foreground",
+                    "bg-muted/80 text-muted-foreground dark:bg-white/[0.06] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]",
                   isSelected &&
                     !live.isToday &&
-                    "ring-2 ring-primary/70 ring-offset-1",
+                    "ring-2 ring-primary/70 ring-offset-1 dark:ring-white/25 dark:ring-offset-[#060914]",
+                  live.inMonth &&
+                    !live.isToday &&
+                    "hover:bg-white/10",
                 )}
               >
                 <span

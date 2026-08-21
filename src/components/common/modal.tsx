@@ -51,7 +51,7 @@ export function Modal({
           contentClassName,
         )}
       >
-        <DialogHeader className="shrink-0 border-b px-5 py-4 pr-12">
+        <DialogHeader className="shrink-0 border-b border-border px-5 py-4 pr-12 dark:border-white/10">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <DialogTitle>{title}</DialogTitle>
@@ -64,9 +64,9 @@ export function Modal({
         <div className={cn("min-h-0 flex-1 overflow-y-auto px-5 py-4", bodyClassName)}>{children}</div>
 
         {(footer || showCancel) && (
-          <DialogFooter className="m-0 shrink-0 rounded-none border-t px-5 py-3 sm:justify-end">
+          <DialogFooter className="m-0 shrink-0 gap-2 rounded-none border-t px-5 py-3 sm:justify-end dark:border-white/10">
             {showCancel ? (
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+              <Button variant="secondary" onClick={() => onOpenChange(false)}>
                 {cancelLabel}
               </Button>
             ) : null}
