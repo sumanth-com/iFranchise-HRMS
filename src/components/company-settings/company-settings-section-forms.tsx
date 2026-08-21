@@ -286,9 +286,11 @@ export function WorkingConfigurationForm({
 export function LeavePoliciesForm({
   leave,
   canEdit,
+  hrApproverOptions = [],
 }: {
   leave: LeavePoliciesConfiguration;
   canEdit: boolean;
+  hrApproverOptions?: { id: string; label: string; code?: string }[];
 }) {
   const form = useForm<LeavePoliciesInput, unknown, LeavePoliciesValues>({
     resolver: zodResolver(leavePoliciesSchema),
@@ -298,6 +300,18 @@ export function LeavePoliciesForm({
     saveLeavePoliciesAction,
     form,
     "Leave policies saved",
+  );
+
+  const hrItems = useMemo(
+    () =>
+      withSelectOption(
+        hrApproverOptions.map((item) => ({
+          value: item.id,
+          label: item.code ? `${item.label} (${item.code})` : item.label,
+        })),
+        { value: "none", label: "None (fail closed until configured)" },
+      ),
+    [hrApproverOptions],
   );
 
   return (
@@ -328,6 +342,34 @@ export function LeavePoliciesForm({
           </SettingsField>
           <SettingsField label="Approval levels">
             <Input type="number" min={1} max={5} {...form.register("approvalLevels")} disabled={!canEdit || isPending} />
+          </SettingsField>
+          <SettingsField label="Default HR leave approver">
+            <Select
+              items={hrItems}
+              value={form.watch("defaultHrApproverEmployeeId") || "none"}
+              onValueChange={(value) =>
+                form.setValue(
+                  "defaultHrApproverEmployeeId",
+                  value === "none" || !value ? null : value,
+                  { shouldDirty: true },
+                )
+              }
+              disabled={!canEdit || isPending}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select default HR" />
+              </SelectTrigger>
+              <SelectContent>
+                {hrItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Used when an employee has no assigned HR. Leave approval fails closed if neither is set.
+            </p>
           </SettingsField>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">

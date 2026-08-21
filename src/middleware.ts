@@ -35,10 +35,6 @@ function isAuthRoute(pathname: string): boolean {
   );
 }
 
-function isNavigationPrefetch(request: NextRequest) {
-  return request.headers.get("next-router-prefetch") === "1";
-}
-
 export async function middleware(request: NextRequest) {
   const { supabase, supabaseResponse, user } = await updateSession(request);
   const { pathname, searchParams } = request.nextUrl;
@@ -95,10 +91,6 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
-  if (isNavigationPrefetch(request)) {
-    return supabaseResponse;
-  }
-
   let cachedPermissionPayload: Awaited<ReturnType<typeof getCachedPermissionPayload>> = null;
   try {
     cachedPermissionPayload = await getCachedPermissionPayload(request, user.id);
@@ -129,7 +121,21 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(redirectUrl);
     }
 
-    const roleCodes = await resolveUserRoleCodes(supabase, user.id);
+    let roleCodes = cachedPermissionPayload.roleCodes;
+    if (!Array.isArray(roleCodes) || roleCodes.length === 0) {
+      roleCodes = await resolveUserRoleCodes(supabase, user.id);
+      try {
+        await attachPermissionCache(
+          supabaseResponse,
+          user.id,
+          cachedPermissionCodes,
+          accountAllowed,
+          roleCodes,
+        );
+      } catch (error) {
+        console.error("[middleware] permission cache upgrade failed", error);
+      }
+    }
     const primaryRedirect = getPrimaryPortalRedirectForPath(
       pathname,
       cachedPermissionCodes,
@@ -169,7 +175,13 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    await attachPermissionCache(supabaseResponse, user.id, permissionCodes, accountAllowed);
+    await attachPermissionCache(
+      supabaseResponse,
+      user.id,
+      permissionCodes,
+      accountAllowed,
+      roleCodes,
+    );
   } catch (error) {
     console.error("[middleware] permission cache attach failed", error);
   }

@@ -4,6 +4,7 @@ import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { createSignedAssetImageUrl } from "@/lib/assets/services/asset-mutations";
 import { getEmployeeAssetRequests } from "@/lib/assets/services/asset-queries";
 import { AssetRow, fromHrms, unwrapRelation } from "@/lib/assets/services/assets-utils";
+import { isEmployeeAssetUnderRepair } from "@/lib/employee/assets/asset-display";
 import type { UserProfile } from "@/types/auth";
 import type {
   AssetAssignmentStatus,
@@ -193,13 +194,7 @@ async function buildEmployeeAssetsData(
   const assigned = items.filter((item) => item.assignmentStatus === "active");
   const history = items.filter((item) => item.assignmentStatus !== "active");
 
-  const underRepair = assigned.filter(
-    (item) =>
-      item.assetStatus === "maintenance" ||
-      item.maintenance.some(
-        (m) => m.maintenanceStatus === "pending" || m.maintenanceStatus === "in_progress",
-      ),
-  ).length;
+  const underRepair = assigned.filter((item) => isEmployeeAssetUnderRepair(item)).length;
 
   const warrantyExpiringSoon = assigned.filter(
     (item) =>

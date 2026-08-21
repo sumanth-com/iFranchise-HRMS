@@ -498,7 +498,7 @@ export function GoalsTable({
                   <td className="px-3 py-2.5">
                     <TableActions>
                       <ViewIconButton onClick={() => setViewId(row.id)} />
-                      {canManage ? (
+                      {canManage && row.goalStatus !== "completed" ? (
                         <EditIconButton onClick={() => setEditId(row.id)} />
                       ) : null}
                       {canManage ? (

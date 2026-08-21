@@ -1,7 +1,10 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
+import { LEAVE_BALANCE_DISPLAY_CODES } from "@/lib/leave/constants";
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
+import { roundLeaveDays } from "@/lib/leave/services/leave-usage";
 import { getSelfTodayAttendance } from "@/lib/manager/services/manager-self-attendance-service";
+import { unwrapRelation } from "@/lib/reports/services/reports-utils";
 import type { UserProfile } from "@/types/auth";
 import type {
   EmployeeDashboardData,
@@ -9,6 +12,8 @@ import type {
   EmployeeUpcomingEvent,
 } from "@/types/employee-dashboard";
 import type { ManagerTodayAttendance } from "@/types/manager-self-attendance";
+
+const DISPLAY_LEAVE_CODES = new Set<string>(LEAVE_BALANCE_DISPLAY_CODES);
 
 /** Runs a widget query but never lets one failing panel break the whole dashboard. */
 async function safe<T>(operation: () => Promise<T>, fallback: T): Promise<T> {
@@ -64,7 +69,7 @@ async function loadLeaveKpis(
     supabase
       .schema("hrms")
       .from("leave_balances")
-      .select("balance_days")
+      .select("balance_days, leave_types:leave_type_id (code)")
       .eq("employee_id", employeeId)
       .eq("balance_year", balanceYear)
       .is("deleted_at", null),
@@ -80,12 +85,18 @@ async function loadLeaveKpis(
   if (balancesResult.error) throw new Error(balancesResult.error.message);
   if (pendingResult.error) throw new Error(pendingResult.error.message);
 
+  // Match Leave page cards: CL + SL + EL + PL remaining only (exclude LOP/OH/etc.).
   const totalBalanceDays = (balancesResult.data ?? []).reduce((sum, row) => {
-    return sum + Number(row.balance_days ?? 0);
+    const leaveType = unwrapRelation(
+      row.leave_types as { code: string } | { code: string }[] | null,
+    );
+    const code = leaveType?.code;
+    if (!code || !DISPLAY_LEAVE_CODES.has(code)) return sum;
+    return sum + Math.max(0, Number(row.balance_days ?? 0));
   }, 0);
 
   return {
-    totalBalanceDays: Math.round(totalBalanceDays * 100) / 100,
+    totalBalanceDays: roundLeaveDays(totalBalanceDays),
     pendingCount: pendingResult.count ?? 0,
   };
 }

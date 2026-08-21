@@ -1,137 +1,129 @@
-import type { StaticImageData } from "next/image";
-
-import airPodsImg from "@/assets/AirPods.png";
-import androidPhoneImg from "@/assets/Android Phone.png";
-import appleWatchImg from "@/assets/Applewatch.png";
-import desktopPcImg from "@/assets/Desktop PC.png";
-import dualMonitorImg from "@/assets/Dual Monitor.png";
-import hardDriveImg from "@/assets/Hard Drive.png";
-import headphonesImg from "@/assets/Headphones.png";
-import keyboardImg from "@/assets/Keyboard.png";
-import laptopImg from "@/assets/Laptop.png";
-import macbookImg from "@/assets/Macbook .png";
-import microphoneImg from "@/assets/Microphone.png";
-import monitorImg from "@/assets/Monitor.png";
-import mouseImg from "@/assets/Mouse.png";
-import smartwatchImg from "@/assets/Smartwatch.png";
-import tabletImg from "@/assets/Tablet.png";
-import trackpadImg from "@/assets/Trackpad.png";
-import usbDriveImg from "@/assets/USB Drive.png";
-import imacImg from "@/assets/iMac.png";
-import ipadImg from "@/assets/iPad.png";
-import iphoneImg from "@/assets/iPhone.png";
+export type AssetDeviceImageSrc = {
+  src: string;
+  width: number;
+  height: number;
+};
 
 export type AssetDeviceImageConfig = {
-  src: StaticImageData;
+  src: AssetDeviceImageSrc;
   label: string;
   categoryNames: string[];
   defaultBrand?: string;
 };
 
-/** Every device product image in `src/assets/` (excluding brand/auth artwork). */
+/** Compressed device previews under `public/images/devices/` (max 800px JPEG). */
+function deviceImage(file: string, width = 800, height = 533): AssetDeviceImageSrc {
+  return {
+    src: `/images/devices/${file}`,
+    width,
+    height,
+  };
+}
+
+/** Every device product image (excluding brand/auth artwork). */
 export const ASSET_DEVICE_IMAGE_CATALOG = {
   airPods: {
-    src: airPodsImg,
+    src: deviceImage("airpods.jpg"),
     label: "AirPods",
     categoryNames: ["Headphone", "Headset"],
     defaultBrand: "Apple",
   },
   androidPhone: {
-    src: androidPhoneImg,
+    src: deviceImage("android-phone.jpg"),
     label: "Android Phone",
     categoryNames: ["Mobile", "SIM"],
   },
   appleWatch: {
-    src: appleWatchImg,
+    src: deviceImage("applewatch.jpg"),
     label: "Apple Watch",
     categoryNames: ["Mobile", "Wearable"],
     defaultBrand: "Apple",
   },
   desktopPc: {
-    src: desktopPcImg,
+    src: deviceImage("desktop-pc.jpg"),
     label: "Desktop PC",
     categoryNames: ["Desktop"],
   },
   dualMonitor: {
-    src: dualMonitorImg,
+    src: deviceImage("dual-monitor.jpg"),
     label: "Dual Monitor",
     categoryNames: ["Monitor"],
   },
   hardDrive: {
-    src: hardDriveImg,
+    src: deviceImage("hard-drive.jpg"),
     label: "Hard Drive",
     categoryNames: ["Other", "Storage"],
   },
   headphones: {
-    src: headphonesImg,
+    src: deviceImage("headphones.jpg"),
     label: "Headphones",
     categoryNames: ["Headphone", "Headset"],
   },
   keyboard: {
-    src: keyboardImg,
+    src: deviceImage("keyboard.jpg"),
     label: "Keyboard",
     categoryNames: ["Keyboard"],
   },
   laptop: {
-    src: laptopImg,
+    src: deviceImage("laptop.jpg"),
     label: "Laptop",
     categoryNames: ["Laptop"],
   },
   macbook: {
-    src: macbookImg,
+    src: deviceImage("macbook.jpg", 800, 450),
     label: "MacBook",
     categoryNames: ["Laptop"],
     defaultBrand: "Apple",
   },
   microphone: {
-    src: microphoneImg,
+    src: deviceImage("microphone.jpg"),
     label: "Microphone",
     categoryNames: ["Other", "Microphone"],
   },
   monitor: {
-    src: monitorImg,
+    src: deviceImage("monitor.jpg", 800, 565),
     label: "Monitor",
     categoryNames: ["Monitor"],
   },
   mouse: {
-    src: mouseImg,
+    src: deviceImage("mouse.jpg"),
     label: "Mouse",
     categoryNames: ["Mouse"],
   },
   smartwatch: {
-    src: smartwatchImg,
+    src: deviceImage("smartwatch.jpg"),
     label: "Smartwatch",
     categoryNames: ["Mobile", "Wearable"],
   },
   tablet: {
-    src: tabletImg,
+    src: deviceImage("tablet.jpg", 800, 800),
     label: "Tablet",
     categoryNames: ["Mobile", "Tablet"],
   },
   trackpad: {
-    src: trackpadImg,
+    src: deviceImage("trackpad.jpg"),
     label: "Trackpad",
     categoryNames: ["Mouse", "Trackpad"],
   },
   usbDrive: {
-    src: usbDriveImg,
+    src: deviceImage("usb-drive.jpg"),
     label: "USB Drive",
     categoryNames: ["Other", "USB"],
   },
   imac: {
-    src: imacImg,
+    src: deviceImage("imac.jpg"),
     label: "iMac",
     categoryNames: ["Desktop"],
     defaultBrand: "Apple",
   },
   ipad: {
-    src: ipadImg,
+    src: deviceImage("ipad.jpg"),
     label: "iPad",
     categoryNames: ["Mobile", "Tablet"],
     defaultBrand: "Apple",
   },
   iphone: {
-    src: iphoneImg,
+    src: deviceImage("iphone.jpg"),
     label: "iPhone",
     categoryNames: ["Mobile", "SIM"],
     defaultBrand: "Apple",

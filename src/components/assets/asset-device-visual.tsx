@@ -41,11 +41,11 @@ export function AssetDeviceVisual({ type, selected, size = "sm", className }: Pr
           )}
         >
           <Image
-            src={src}
+            src={src.src}
             alt={label}
             width={src.width}
             height={src.height}
-            quality={95}
+            quality={75}
             className={cn(
               "absolute inset-0 h-full w-full object-contain object-center",
               framed ? "p-2 scale-[1.18]" : "p-1.5 scale-[1.2]",
@@ -71,11 +71,11 @@ export function AssetDeviceVisual({ type, selected, size = "sm", className }: Pr
       )}
     >
       <Image
-        src={src}
+        src={src.src}
         alt={label}
         width={src.width}
         height={src.height}
-        quality={95}
+        quality={75}
         className={cn(
           "object-contain drop-shadow-md transition-transform duration-200",
           IMAGE_CLASS[visualSize],

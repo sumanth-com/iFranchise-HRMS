@@ -18,7 +18,7 @@ export function SidebarNavIcon({ icon: Icon, active, className }: SidebarNavIcon
       )}
       aria-hidden
     >
-      <Icon className="size-4" strokeWidth={active ? 2.25 : 2} />
+      <Icon className="size-[1.125rem]" strokeWidth={active ? 2.25 : 2} />
     </span>
   );
 }

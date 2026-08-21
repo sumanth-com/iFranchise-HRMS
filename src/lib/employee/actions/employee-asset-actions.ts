@@ -10,6 +10,7 @@ import {
   employeeDeleteAssetRequest,
   employeeReportAssetIssue,
   employeeRequestAssetReplacement,
+  employeeRequestAssetReturn,
   employeeUpdateAssetRequest,
   employeeUpdateAssetStatus,
 } from "@/lib/employee/services/employee-asset-mutations";
@@ -33,6 +34,12 @@ const updateStatusSchema = z.object({
   assignmentId: z.string().uuid(),
   assetStatus: z.enum(["assigned", "maintenance", "lost"]),
   condition: z.enum(["excellent", "good", "fair", "poor", "damaged"]),
+  notes: z.string().trim().max(1000).optional(),
+});
+
+const returnRequestSchema = z.object({
+  assignmentId: z.string().uuid(),
+  returnDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Select a valid return date"),
   notes: z.string().trim().max(1000).optional(),
 });
 
@@ -103,6 +110,26 @@ export async function employeeUpdateAssetStatusAction(input: unknown) {
   }
 }
 
+export async function employeeRequestAssetReturnAction(input: unknown) {
+  try {
+    const profile = await requireServerAnyPermission([
+      PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.manager,
+      "asset.view",
+    ]);
+    const supabase = await createClient();
+    const parsed = returnRequestSchema.parse(input);
+    await employeeRequestAssetReturn(supabase, profile, parsed);
+    revalidateEmployeeAssets();
+    return { success: true as const };
+  } catch (error) {
+    return {
+      success: false as const,
+      message: error instanceof Error ? error.message : "Failed to send the return request",
+    };
+  }
+}
+
 export async function employeeUpdateAssetRequestAction(input: unknown) {
   try {
     const profile = await requireServerAnyPermission([
@@ -131,6 +158,12 @@ export async function employeeUpdateAssetRequestAction(input: unknown) {
           maintenanceId: z.string().uuid(),
           assetStatus: z.enum(["assigned", "maintenance", "lost"]),
           condition: z.enum(["excellent", "good", "fair", "poor", "damaged"]),
+          notes: z.string().trim().max(1000).optional(),
+        }),
+        z.object({
+          kind: z.literal("return"),
+          maintenanceId: z.string().uuid(),
+          returnDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Select a valid return date"),
           notes: z.string().trim().max(1000).optional(),
         }),
       ])

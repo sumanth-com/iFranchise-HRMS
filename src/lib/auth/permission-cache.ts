@@ -8,6 +8,7 @@ const TTL_SECONDS = 5 * 60;
 type PermissionCachePayload = {
   userId: string;
   codes: string[];
+  roleCodes: string[];
   accountAllowed: boolean;
   expiresAt: number;
 };
@@ -64,11 +65,13 @@ export async function attachPermissionCache(
   userId: string,
   codes: string[],
   accountAllowed = true,
+  roleCodes: string[] = [],
 ): Promise<void> {
   try {
     const payload: PermissionCachePayload = {
       userId,
       codes,
+      roleCodes,
       accountAllowed,
       expiresAt: Date.now() + TTL_SECONDS * 1000,
     };

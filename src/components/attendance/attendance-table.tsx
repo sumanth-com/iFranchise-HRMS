@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -57,6 +57,20 @@ import { FILTER_ANY_VALUE } from "@/lib/manager/filter-select";
 import type { AttendanceListItem, AttendanceLookups } from "@/types/attendance";
 import type { LookupOption } from "@/types/employee";
 import { cn } from "@/lib/utils";
+
+function normalizeSearchParams(params: URLSearchParams | { toString(): string }) {
+  const source =
+    params instanceof URLSearchParams
+      ? params
+      : new URLSearchParams(params.toString());
+  const entries = Array.from(source.entries()).filter(([, value]) => value !== "");
+  entries.sort(([a], [b]) => a.localeCompare(b));
+  return new URLSearchParams(entries).toString();
+}
+
+function sameFilterValue(current: string | undefined, next: string | undefined) {
+  return (current ?? undefined) === (next ?? undefined);
+}
 
 type AttendanceTableProps = {
   records: AttendanceListItem[];
@@ -164,13 +178,19 @@ export function AttendanceTable({
   const [deleteTarget, setDeleteTarget] = useState<AttendanceListItem | null>(null);
   const [viewId, setViewId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
-
   const [isReviewing, setIsReviewing] = useState(false);
+  const lastNavigatedQueryRef = useRef<string | null>(null);
+  const navigationLockRef = useRef(false);
 
   useEffect(() => {
     setRows(records);
     setRowTotal(total);
   }, [records, total]);
+
+  // Unlock after the server props catch up to the requested filters.
+  useEffect(() => {
+    navigationLockRef.current = false;
+  }, [attendanceStatus, employeeId, departmentId, dateFrom, dateTo, page, search]);
 
   const resolvedListPath = listBasePath ?? ATTENDANCE_ROUTES.list;
 
@@ -182,7 +202,7 @@ export function AttendanceTable({
           params.set(key, value);
         });
       }
-      const nextQuery = params.toString();
+      const nextQuery = normalizeSearchParams(params);
       return nextQuery ? `${resolvedListPath}?${nextQuery}` : resolvedListPath;
     },
     [fixedQuery, resolvedListPath],
@@ -203,12 +223,26 @@ export function AttendanceTable({
       if (dateFrom && !params.get("dateFrom")) params.set("dateFrom", dateFrom);
       if (dateTo && !params.get("dateTo")) params.set("dateTo", dateTo);
 
+      const nextQuery = normalizeSearchParams(params);
+      const currentQuery = normalizeSearchParams(searchParams);
+      if (nextQuery === currentQuery) return;
+      if (lastNavigatedQueryRef.current === nextQuery) return;
+
+      lastNavigatedQueryRef.current = nextQuery;
+      navigationLockRef.current = true;
+
       startTransition(() => {
-        router.push(buildListUrl(params.toString()), { scroll: false });
+        // replace avoids stacking history + accidental refetch from push remounts
+        router.replace(buildListUrl(nextQuery), { scroll: false });
       });
     },
     [buildListUrl, dateFrom, dateTo, router, searchParams],
   );
+
+  function selectFilterValue(raw: string | null | undefined) {
+    if (raw == null || navigationLockRef.current) return null;
+    return raw;
+  }
 
   const totalPages = Math.max(1, Math.ceil(rowTotal / pageSize));
 
@@ -257,6 +291,9 @@ export function AttendanceTable({
 
   const updateDateFrom = (value: string) => {
     const nextFrom = value || undefined;
+    if (sameFilterValue(dateFrom, nextFrom) && !(nextFrom && dateTo && nextFrom > dateTo)) {
+      return;
+    }
     const updates: Record<string, string | undefined> = {
       dateFrom: nextFrom,
       page: "1",
@@ -271,6 +308,9 @@ export function AttendanceTable({
 
   const updateDateTo = (value: string) => {
     const nextTo = value || undefined;
+    if (sameFilterValue(dateTo, nextTo) && !(nextTo && dateFrom && dateFrom > nextTo)) {
+      return;
+    }
     const updates: Record<string, string | undefined> = {
       dateTo: nextTo,
       page: "1",
@@ -508,16 +548,20 @@ export function AttendanceTable({
           <Select
             items={employeeItems}
             value={employeeId ?? FILTER_ANY_VALUE}
-            onValueChange={(value) =>
+            onValueChange={(value) => {
+              const selected = selectFilterValue(value);
+              if (selected == null) return;
+              const next =
+                selected === FILTER_ANY_VALUE ? undefined : selected;
+              if (sameFilterValue(employeeId, next)) return;
               updateParams({
-                employeeId:
-                  !value || value === FILTER_ANY_VALUE ? undefined : value,
+                employeeId: next,
                 search: undefined,
                 departmentId: undefined,
                 branchId: undefined,
                 page: "1",
-              })
-            }
+              });
+            }}
           >
             <SelectTrigger className={FILTER_CONTROL_CLASS}>
               <SelectValue placeholder="All employees" />
@@ -540,13 +584,18 @@ export function AttendanceTable({
           <Select
             items={statusItems}
             value={attendanceStatus ?? FILTER_ANY_VALUE}
-            onValueChange={(value) =>
+            onValueChange={(value) => {
+              const selected = selectFilterValue(value);
+              if (selected == null) return;
+              const next =
+                selected === FILTER_ANY_VALUE ? undefined : selected;
+              // Same status already applied — do not refetch.
+              if (sameFilterValue(attendanceStatus, next)) return;
               updateParams({
-                attendanceStatus:
-                  !value || value === FILTER_ANY_VALUE ? undefined : value,
+                attendanceStatus: next,
                 page: "1",
-              })
-            }
+              });
+            }}
           >
             <SelectTrigger className={STATUS_FILTER_CLASS}>
               <SelectValue placeholder="All statuses" />
@@ -599,14 +648,18 @@ export function AttendanceTable({
           <Select
             items={departmentItems}
             value={departmentId ?? FILTER_ANY_VALUE}
-            onValueChange={(value) =>
+            onValueChange={(value) => {
+              const selected = selectFilterValue(value);
+              if (selected == null) return;
+              const next =
+                selected === FILTER_ANY_VALUE ? undefined : selected;
+              if (sameFilterValue(departmentId, next)) return;
               updateParams({
-                departmentId:
-                  !value || value === FILTER_ANY_VALUE ? undefined : value,
+                departmentId: next,
                 employeeId: undefined,
                 page: "1",
-              })
-            }
+              });
+            }}
           >
             <SelectTrigger className={FILTER_CONTROL_CLASS}>
               <SelectValue placeholder="All departments" />

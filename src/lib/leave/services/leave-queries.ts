@@ -38,10 +38,15 @@ import {
   getEmploymentTypes,
   getManagers,
 } from "@/lib/employees/services/employee-queries";
+import {
+  resolveOrgDataEmployeeScope,
+  scopedEmployeeIds,
+} from "@/lib/manager/portal-scope";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import {
   getCurrentBalanceYear,
   getMonthDateRange,
+  sortLeaveListItemsForDisplay,
 } from "@/lib/leave/services/leave-utils";
 
 type LeaveRequestRow = {
@@ -186,6 +191,15 @@ export async function listLeaveRequests(
   const to = from + pageSize - 1;
   const organizationId = profile.employee.organizationId;
 
+  const employeeScope = await resolveOrgDataEmployeeScope(supabase, profile);
+  const scopedIds = scopedEmployeeIds(
+    employeeScope,
+    employeeId ?? createdByEmployeeId,
+  );
+  if (scopedIds && scopedIds.length === 0) {
+    return { data: [], total: 0, page, pageSize };
+  }
+
   let query = supabase
     .schema("hrms")
     .from("leave_requests")
@@ -229,6 +243,10 @@ export async function listLeaveRequests(
     .eq("employees.organization_id", organizationId)
     .is("deleted_at", null);
 
+  if (scopedIds) {
+    query = query.in("employee_id", scopedIds);
+  }
+
   if (excludeHrApplicants) {
     const hrApplicantIds = await listHrLeaveApplicantEmployeeIds(organizationId);
     if (hrApplicantIds.length > 0) {
@@ -260,7 +278,8 @@ export async function listLeaveRequests(
       .lte("start_date", today)
       .gte("end_date", today);
   } else if (summaryFilter === "upcomingPlannedLeaves") {
-    query = query.eq("leave_status", "approved").gt("start_date", today);
+    // Applied upcoming leave: pending or approved requests that start after today.
+    query = query.in("leave_status", ["pending", "approved"]).gt("start_date", today);
   } else if (dateFrom && dateTo) {
     query = query.lte("start_date", dateTo).gte("end_date", dateFrom);
   } else if (!isPendingQueue && month && year) {
@@ -277,8 +296,8 @@ export async function listLeaveRequests(
 
   if (!summaryFilter && leaveStatus) query = query.eq("leave_status", leaveStatus);
   if (leaveTypeId) query = query.eq("leave_type_id", leaveTypeId);
-  if (employeeId) query = query.eq("employee_id", employeeId);
-  if (createdByEmployeeId) query = query.eq("employee_id", createdByEmployeeId);
+  if (!scopedIds && employeeId) query = query.eq("employee_id", employeeId);
+  if (!scopedIds && createdByEmployeeId) query = query.eq("employee_id", createdByEmployeeId);
   if (departmentId) query = query.eq("employees.department_id", departmentId);
   if (branchId) query = query.eq("employees.branch_id", branchId);
   if (employmentStatus) {
@@ -326,8 +345,7 @@ export async function listLeaveRequests(
     rows.flatMap((row) => (row.leave_approvals ?? []).map((a) => a.approver_employee_id)),
   );
 
-  return {
-    data: rows.map((row) => {
+  const mapped = rows.map((row) => {
       const employee = unwrapRelation(row.employees);
       const leaveType = unwrapRelation(row.leave_types);
       const department = unwrapRelation(employee?.departments ?? null);
@@ -363,10 +381,12 @@ export async function listLeaveRequests(
         endDate: row.end_date,
         totalDays: Number(row.total_days),
         isHalfDay: row.is_half_day,
-        halfDayPeriod:
-          row.half_day_period === "morning" || row.half_day_period === "afternoon"
-            ? row.half_day_period
-            : null,
+        halfDayPeriod: ((): LeaveListResult["data"][number]["halfDayPeriod"] => {
+          if (row.half_day_period === "morning" || row.half_day_period === "afternoon") {
+            return row.half_day_period;
+          }
+          return null;
+        })(),
         reason: row.reason,
         leaveStatus: row.leave_status as LeaveListResult["data"][number]["leaveStatus"],
         appliedAt: row.created_at,
@@ -376,7 +396,16 @@ export async function listLeaveRequests(
         canActOnApproval: isAssignedApprover,
         canActOnRejection: isAssignedApprover,
       };
-    }),
+    });
+
+  const prioritizePendingAndLatest =
+    summaryFilter === "upcomingPlannedLeaves" ||
+    (sortBy === "created_at" && sortOrder === "desc");
+
+  return {
+    data: prioritizePendingAndLatest
+      ? sortLeaveListItemsForDisplay(mapped)
+      : mapped,
     total: count ?? 0,
     page,
     pageSize,
@@ -532,7 +561,7 @@ export async function getLeaveSummary(
         .schema("hrms")
         .from("leave_requests")
         .select("id, employees!inner(organization_id)", { count: "exact", head: true })
-        .eq("leave_status", "approved")
+        .in("leave_status", ["pending", "approved"])
         .gt("start_date", today)
         .eq("employees.organization_id", organizationId)
         .is("deleted_at", null),
@@ -1074,28 +1103,202 @@ export function isCeoLeaveApprover(profile: UserProfile): boolean {
   );
 }
 
-export async function getHrApproverEmployeeId(
-  supabase: AuthSupabaseClient,
+export const HR_LEAVE_APPROVER_ROLE_CODES = [
+  "hr_admin",
+  "hr_executive",
+] as const;
+
+export const NO_HR_APPROVER_CONFIGURED_MESSAGE =
+  "No HR approver is configured for this employee. Please contact HR/Admin to configure the appropriate HR approver.";
+
+export type ResolveHrApproverOptions = {
+  /** Employee whose leave is being routed (uses assigned_hr_employee_id first). */
+  employeeId?: string;
+  /** Exclude these employee IDs (e.g. applicant or reporting manager). */
+  excludeEmployeeIds?: string[];
+};
+
+/**
+ * Eligible HR leave approvers: hr_admin / hr_executive only.
+ * Super Admin is not automatically eligible.
+ */
+export async function employeeIsEligibleHrLeaveApprover(
   organizationId: string,
-): Promise<string | null> {
-  const { data, error } = await supabase
+  candidateEmployeeId: string,
+): Promise<boolean> {
+  const admin = createAdminClient();
+  const { data: employee, error: employeeError } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select("id, organization_id, employment_status, status, deleted_at")
+    .eq("id", candidateEmployeeId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (employeeError) throw new Error(employeeError.message);
+  if (!employee) return false;
+  if (employee.status !== "active") return false;
+  if (!["active", "probation"].includes(employee.employment_status)) return false;
+
+  const { data: roleRows, error: roleError } = await admin
+    .schema("hrms")
+    .from("user_roles")
+    .select("roles!inner (code)")
+    .eq("employee_id", candidateEmployeeId)
+    .is("deleted_at", null)
+    .in("roles.code", [...HR_LEAVE_APPROVER_ROLE_CODES]);
+
+  if (roleError) throw new Error(roleError.message);
+  return (roleRows ?? []).length > 0;
+}
+
+export async function assertEligibleHrLeaveApprover(
+  organizationId: string,
+  candidateEmployeeId: string,
+  options?: { fieldLabel?: string },
+): Promise<void> {
+  const ok = await employeeIsEligibleHrLeaveApprover(
+    organizationId,
+    candidateEmployeeId,
+  );
+  if (!ok) {
+    throw new Error(
+      options?.fieldLabel
+        ? `${options.fieldLabel} must be an active HR Admin or HR Executive in this organization`
+        : "Selected HR approver must be an active HR Admin or HR Executive in this organization",
+    );
+  }
+}
+
+export async function listEligibleHrLeaveApproverOptions(
+  organizationId: string,
+  excludeEmployeeId?: string,
+): Promise<{ id: string; label: string; code: string }[]> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
     .schema("hrms")
     .from("user_roles")
     .select(
       `
         employee_id,
         roles!inner (code),
-        employees!inner (organization_id, employment_status, deleted_at)
+        employees!inner (
+          id,
+          first_name,
+          last_name,
+          employee_code,
+          organization_id,
+          employment_status,
+          status,
+          deleted_at
+        )
       `,
     )
     .eq("employees.organization_id", organizationId)
-    .in("roles.code", ["hr_admin", "super_admin"])
+    .in("roles.code", [...HR_LEAVE_APPROVER_ROLE_CODES])
+    .is("deleted_at", null)
     .is("employees.deleted_at", null)
-    .limit(1);
+    .eq("employees.status", "active")
+    .in("employees.employment_status", ["active", "probation"]);
 
   if (error) throw new Error(error.message);
-  const row = data?.[0];
-  return row?.employee_id ?? null;
+
+  const byId = new Map<string, { id: string; label: string; code: string }>();
+  for (const row of data ?? []) {
+    const employee = Array.isArray(row.employees)
+      ? row.employees[0]
+      : row.employees;
+    if (!employee?.id) continue;
+    if (excludeEmployeeId && employee.id === excludeEmployeeId) continue;
+    if (byId.has(employee.id)) continue;
+    byId.set(employee.id, {
+      id: employee.id,
+      label: `${employee.first_name} ${employee.last_name}`.trim(),
+      code: employee.employee_code,
+    });
+  }
+
+  return Array.from(byId.values()).sort((a, b) =>
+    a.label.localeCompare(b.label),
+  );
+}
+
+async function getOrganizationDefaultHrApproverEmployeeId(
+  organizationId: string,
+): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .schema("hrms")
+    .from("organization_settings")
+    .select("settings")
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  const settings = (data?.settings as Record<string, unknown> | null) ?? {};
+  const leaveRules =
+    (settings.leave_rules as Record<string, unknown> | undefined) ?? {};
+  const raw = leaveRules.default_hr_approver_employee_id;
+  return typeof raw === "string" && raw.length > 0 ? raw : null;
+}
+
+async function getEmployeeAssignedHrEmployeeId(
+  organizationId: string,
+  employeeId: string,
+): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select("assigned_hr_employee_id, organization_id")
+    .eq("id", employeeId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data?.assigned_hr_employee_id ?? null;
+}
+
+/**
+ * Deterministic HR leave approver routing (no arbitrary LIMIT 1):
+ * 1. Employee.assigned_hr_employee_id (if valid eligible HR)
+ * 2. Organization leave_rules.default_hr_approver_employee_id (if valid)
+ * 3. null → caller must fail closed
+ */
+export async function getHrApproverEmployeeId(
+  _supabase: AuthSupabaseClient,
+  organizationId: string,
+  options?: ResolveHrApproverOptions,
+): Promise<string | null> {
+  const exclude = new Set(
+    (options?.excludeEmployeeIds ?? []).filter(Boolean),
+  );
+
+  const tryCandidate = async (candidateId: string | null | undefined) => {
+    if (!candidateId || exclude.has(candidateId)) return null;
+    const eligible = await employeeIsEligibleHrLeaveApprover(
+      organizationId,
+      candidateId,
+    );
+    return eligible ? candidateId : null;
+  };
+
+  if (options?.employeeId) {
+    const assigned = await getEmployeeAssignedHrEmployeeId(
+      organizationId,
+      options.employeeId,
+    );
+    const fromAssigned = await tryCandidate(assigned);
+    if (fromAssigned) return fromAssigned;
+  }
+
+  const orgDefault = await getOrganizationDefaultHrApproverEmployeeId(
+    organizationId,
+  );
+  return tryCandidate(orgDefault);
 }
 
 export async function listCeoLeaveApproverEmployeeIds(

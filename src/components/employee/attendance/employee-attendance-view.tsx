@@ -109,7 +109,6 @@ export function EmployeeAttendanceView({
           month={data.month}
           year={data.year}
           selectedDate={selectedDate}
-          disableFuture
           onMonthChange={(month, year) =>
             pushParams({ month, year, date: selectedDate, status, searchDate })
           }

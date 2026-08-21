@@ -13,6 +13,7 @@ import {
   expandDateRange,
   getCurrentBalanceYear,
   getMonthDateRange,
+  sortLeaveListItemsForDisplay,
 } from "@/lib/leave/services/leave-utils";
 import { getTeamFilterLookups } from "@/lib/manager/services/team-queries";
 import { teamLeaveListParamsSchema } from "@/lib/validations/manager-leave";
@@ -397,7 +398,7 @@ export async function listTeamLeaveRequests(
       .lte("start_date", today)
       .gte("end_date", today);
   } else if (summaryFilter === "upcomingPlannedLeaves") {
-    query = query.eq("leave_status", "approved").gt("start_date", today);
+    query = query.in("leave_status", ["pending", "approved"]).gt("start_date", today);
   } else if (
     parsed.dateFrom &&
     parsed.dateTo &&
@@ -538,8 +539,14 @@ export async function listTeamLeaveRequests(
     }),
   );
 
+  const prioritizePendingAndLatest =
+    summaryFilter === "upcomingPlannedLeaves" ||
+    (parsed.sortBy === "created_at" && parsed.sortOrder === "desc");
+
   return {
-    data: mapped,
+    data: prioritizePendingAndLatest
+      ? sortLeaveListItemsForDisplay(mapped)
+      : mapped,
     total: count ?? 0,
     page: parsed.page,
     pageSize: parsed.pageSize,
@@ -617,7 +624,7 @@ export async function getTeamLeaveSummary(
       .from("leave_requests")
       .select("id", { count: "exact", head: true })
       .in("employee_id", teamIds)
-      .eq("leave_status", "approved")
+      .in("leave_status", ["pending", "approved"])
       .gt("start_date", today)
       .is("deleted_at", null),
     supabase

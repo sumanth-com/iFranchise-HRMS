@@ -19,18 +19,24 @@ function PulseMetric({
   accent?: string;
 }) {
   const content = (
-    <div className="flex min-h-[4.5rem] flex-col justify-between rounded-lg border bg-background px-3 py-2.5 shadow-sm transition-colors hover:border-primary/40 hover:bg-accent/30">
-      <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+    <div className="flex h-full min-h-[4.25rem] flex-col justify-between rounded-lg bg-muted/30 px-2.5 py-2.5 transition-colors hover:bg-muted/45 dark:bg-white/[0.045] dark:hover:bg-white/[0.08]">
+      <p className="text-[10px] font-medium leading-tight tracking-wide text-muted-foreground uppercase">
         {label}
       </p>
-      <p className={cn("text-2xl font-semibold tracking-tight tabular-nums", accent)}>{value}</p>
+      <p className={cn("text-2xl font-semibold tracking-tight tabular-nums", accent)}>
+        {value}
+      </p>
     </div>
   );
 
   if (href) {
-    return <Link href={href}>{content}</Link>;
+    return (
+      <Link href={href} className="min-w-0 flex-1">
+        {content}
+      </Link>
+    );
   }
-  return content;
+  return <div className="min-w-0 flex-1">{content}</div>;
 }
 
 function parseHolidayDate(meta: string | undefined) {
@@ -59,11 +65,8 @@ function HolidayFeaturedCard({
     <Link
       href={holiday.href}
       className={cn(
-        "group relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-gradient-to-br p-3 shadow-sm transition-all hover:shadow-md",
+        "group relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border-0 bg-gradient-to-br p-3 shadow-none transition-all hover:bg-muted/20",
         HOLIDAY_CARD_THEMES[themeIndex % HOLIDAY_CARD_THEMES.length],
-        themeIndex === 0
-          ? "hover:border-violet-400/40"
-          : "hover:border-sky-400/40",
       )}
     >
       <div
@@ -75,10 +78,8 @@ function HolidayFeaturedCard({
       <div className="flex items-start gap-3">
         <span
           className={cn(
-            "flex size-11 shrink-0 items-center justify-center rounded-xl border shadow-sm",
-            themeIndex === 0
-              ? "border-violet-200/70 bg-white/95 dark:border-violet-500/30 dark:bg-background/90"
-              : "border-sky-200/70 bg-white/95 dark:border-sky-500/30 dark:bg-background/90",
+            "flex size-11 shrink-0 items-center justify-center rounded-xl bg-background/90 shadow-sm dark:bg-background/80",
+            themeIndex === 0 ? "ring-1 ring-violet-500/15" : "ring-1 ring-sky-500/15",
           )}
         >
           <HolidayGlyph name={holiday.primary} className="size-8 text-3xl leading-none" />
@@ -101,7 +102,7 @@ function HolidayFeaturedCard({
             {format(parseISO(dateStr), "EEEE, d MMMM yyyy")}
           </p>
         </div>
-        <div className="shrink-0 rounded-lg border bg-background/90 px-2.5 py-1.5 text-center shadow-sm">
+        <div className="shrink-0 rounded-lg bg-background/90 px-2.5 py-1.5 text-center shadow-sm dark:bg-background/80">
           <p
             className={cn(
               "text-xl font-bold tabular-nums leading-none",
@@ -132,7 +133,7 @@ export function HrUpcomingHolidaysPanel({
 
   if (items.length === 0) {
     return (
-      <section className="flex h-full min-h-0 flex-col rounded-xl border bg-card p-3 shadow-sm md:p-4">
+      <section className="flex h-full min-h-0 flex-col rounded-xl border-0 bg-card p-3 shadow-sm md:p-4">
         <div className="flex items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400">
             <CalendarDays className="size-4" />
@@ -153,7 +154,7 @@ export function HrUpcomingHolidaysPanel({
   }
 
   return (
-    <section className="flex h-full min-h-0 flex-col rounded-xl border bg-card p-3 shadow-sm md:p-4">
+    <section className="flex h-full min-h-0 flex-col rounded-xl border-0 bg-card p-3 shadow-sm md:p-4">
       <div className="mb-3 flex shrink-0 items-center gap-2">
         <span className="flex size-7 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400">
           <CalendarDays className="size-3.5" />
@@ -191,13 +192,14 @@ export function HrTodayPulseSection({
     presentToday: string;
     absentToday: string;
     lateToday: string;
+    halfDayToday: string;
     pendingLeaveApprovals: string;
     exitRequests: string;
   };
 }) {
   return (
     <section
-      className="rounded-xl border bg-card p-3 shadow-sm md:p-4"
+      className="rounded-xl border-0 bg-card p-3 shadow-sm md:p-4"
       aria-label="Today's Pulse"
     >
       <div className="mb-3 flex items-center gap-2">
@@ -208,7 +210,7 @@ export function HrTodayPulseSection({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+      <div className="flex flex-nowrap gap-2">
         <PulseMetric
           label="Present Today"
           value={pulse.presentToday}
@@ -225,7 +227,13 @@ export function HrTodayPulseSection({
           label="Late Employees"
           value={pulse.lateToday}
           href={links.lateToday}
-          accent="text-orange-600 dark:text-orange-400"
+          accent="text-rose-600 dark:text-rose-400"
+        />
+        <PulseMetric
+          label="Half Day"
+          value={pulse.halfDayToday ?? 0}
+          href={links.halfDayToday}
+          accent="text-sky-600 dark:text-sky-400"
         />
         <PulseMetric
           label="Pending Approvals"

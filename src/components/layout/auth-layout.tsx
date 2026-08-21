@@ -1,11 +1,12 @@
 import Image from "next/image";
 import { type ReactNode } from "react";
 
-import authHero from "@/assets/Auth.png";
-
 type AuthLayoutProps = {
   children: ReactNode;
 };
+
+/** Compressed public hero (replaces ~1.4MB PNG static import). */
+const AUTH_HERO_IMAGE = "/images/auth-hero.jpg";
 
 export function AuthLayout({ children }: AuthLayoutProps) {
   return (
@@ -13,10 +14,11 @@ export function AuthLayout({ children }: AuthLayoutProps) {
       {/* Globe fills left half */}
       <div className="absolute inset-0 lg:right-1/2">
         <Image
-          src={authHero}
+          src={AUTH_HERO_IMAGE}
           alt=""
           fill
           priority
+          quality={75}
           sizes="(max-width: 1024px) 100vw, 50vw"
           className="object-cover object-left"
         />

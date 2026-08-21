@@ -1,11 +1,13 @@
-import { format, lastDayOfMonth } from "date-fns";
+import { eachDayOfInterval, format, lastDayOfMonth, startOfMonth } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { LEAVE_BALANCE_DISPLAY_CODES } from "@/lib/leave/constants";
 import { cleanDisplayText } from "@/lib/employees/parse-employee-name";
 import type {
   EmployeeAddressDetail,
   EmployeeAttendancePeriod,
+  EmployeeAttendanceSummary,
   EmployeeDetail,
   EmployeeDocumentDetail,
   EmployeeProfileDetail,
@@ -49,6 +51,135 @@ function attendanceMonthRange(period: { month: number; year: number }) {
   };
 }
 
+type EmployeeAttendanceRow = {
+  id: string;
+  attendance_date: string;
+  check_in_at: string | null;
+  check_out_at: string | null;
+  attendance_status: string;
+  work_hours: number | null;
+};
+
+function isWeekendDate(dateStr: string) {
+  const day = new Date(`${dateStr}T12:00:00`).getDay();
+  return day === 0 || day === 6;
+}
+
+function emptyAttendanceSummary(): EmployeeAttendanceSummary {
+  return {
+    totalRecords: 0,
+    presentDays: 0,
+    absentDays: 0,
+    lateDays: 0,
+    halfDayDays: 0,
+    totalWorkHours: 0,
+  };
+}
+
+function summarizeAttendanceRows(
+  rows: Array<{ attendance_status: string; work_hours?: number | null }>,
+): EmployeeAttendanceSummary {
+  let presentDays = 0;
+  let absentDays = 0;
+  let lateDays = 0;
+  let halfDayDays = 0;
+  let totalWorkHours = 0;
+
+  for (const row of rows) {
+    const status = row.attendance_status;
+    if (status === "upcoming" || status === "week_off" || status === "holiday") {
+      continue;
+    }
+
+    totalWorkHours += Number(row.work_hours ?? 0);
+
+    switch (status) {
+      case "present":
+        presentDays += 1;
+        break;
+      case "late":
+        lateDays += 1;
+        presentDays += 1;
+        break;
+      case "half_day":
+        halfDayDays += 1;
+        presentDays += 1;
+        break;
+      case "absent":
+      case "on_leave":
+        absentDays += 1;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return {
+    totalRecords: rows.filter((row) => row.attendance_status !== "upcoming").length,
+    presentDays,
+    absentDays,
+    lateDays,
+    halfDayDays,
+    totalWorkHours: Math.round(totalWorkHours * 100) / 100,
+  };
+}
+
+/** Expand stored attendance into one row per calendar day for the selected month. */
+function fillMonthAttendanceRows(
+  period: { month: number; year: number },
+  records: EmployeeAttendanceRow[],
+  today: string,
+): EmployeeAttendanceRow[] {
+  const byDate = new Map(records.map((row) => [row.attendance_date, row]));
+  const start = startOfMonth(new Date(period.year, period.month - 1, 1));
+  const end = lastDayOfMonth(start);
+
+  return eachDayOfInterval({ start, end })
+    .map((day) => {
+      const date = format(day, "yyyy-MM-dd");
+      const existing = byDate.get(date);
+      if (existing) {
+        return {
+          ...existing,
+          work_hours:
+            existing.work_hours == null ? null : Number(existing.work_hours),
+        };
+      }
+
+      if (date > today) {
+        return {
+          id: `upcoming-${date}`,
+          attendance_date: date,
+          check_in_at: null,
+          check_out_at: null,
+          attendance_status: "upcoming",
+          work_hours: 0,
+        };
+      }
+
+      if (isWeekendDate(date)) {
+        return {
+          id: `week-off-${date}`,
+          attendance_date: date,
+          check_in_at: null,
+          check_out_at: null,
+          attendance_status: "week_off",
+          work_hours: 0,
+        };
+      }
+
+      return {
+        id: `absent-${date}`,
+        attendance_date: date,
+        check_in_at: null,
+        check_out_at: null,
+        attendance_status: "absent",
+        work_hours: 0,
+      };
+    })
+    .sort((a, b) => b.attendance_date.localeCompare(a.attendance_date));
+}
+
 export async function getEmployeeById(
   supabase: AuthSupabaseClient,
   employeeId: string,
@@ -65,6 +196,7 @@ export async function getEmployeeById(
         designation_id,
         employment_type_id,
         reporting_manager_id,
+        assigned_hr_employee_id,
         user_id,
         employee_code,
         first_name,
@@ -90,7 +222,8 @@ export async function getEmployeeById(
         departments:department_id (name),
         designations:designation_id (title),
         employment_types:employment_type_id (name),
-        manager:reporting_manager_id (first_name, last_name)
+        manager:reporting_manager_id (first_name, last_name),
+        assigned_hr:assigned_hr_employee_id (first_name, last_name)
       `,
     )
     .eq("id", employeeId)
@@ -174,6 +307,12 @@ export async function getEmployeeById(
       | { first_name: string; last_name: string }[]
       | null,
   );
+  const assignedHr = unwrapRelation(
+    employee.assigned_hr as
+      | { first_name: string; last_name: string }
+      | { first_name: string; last_name: string }[]
+      | null,
+  );
 
   const profile: EmployeeProfileDetail | null = profileResult.data
     ? {
@@ -247,6 +386,7 @@ export async function getEmployeeById(
     designationId: employee.designation_id,
     employmentTypeId: employee.employment_type_id,
     reportingManagerId: employee.reporting_manager_id,
+    assignedHrEmployeeId: employee.assigned_hr_employee_id,
     userId: employee.user_id,
     employeeCode: employee.employee_code,
     firstName: cleanDisplayText(employee.first_name),
@@ -274,6 +414,9 @@ export async function getEmployeeById(
     employmentTypeName: employmentType?.name ?? null,
     reportingManagerName: manager
       ? `${manager.first_name} ${manager.last_name}`
+      : null,
+    assignedHrName: assignedHr
+      ? `${assignedHr.first_name} ${assignedHr.last_name}`
       : null,
     profile,
     addresses,
@@ -311,7 +454,57 @@ export async function getEmployeeAttendance(
   const { data, error } = await query;
 
   if (error) throw new Error(error.message);
-  return data ?? [];
+
+  const records = (data ?? []) as EmployeeAttendanceRow[];
+
+  if (period && isCompleteAttendancePeriod(period)) {
+    return fillMonthAttendanceRows(period, records, getTodayDateString());
+  }
+
+  return records;
+}
+
+export async function getEmployeeAttendanceSummary(
+  supabase: AuthSupabaseClient,
+  employeeId: string,
+  period?: EmployeeAttendancePeriod,
+): Promise<EmployeeAttendanceSummary> {
+  if (period && !isCompleteAttendancePeriod(period)) {
+    return emptyAttendanceSummary();
+  }
+
+  let query = supabase
+    .schema("hrms")
+    .from("attendance")
+    .select("attendance_date, attendance_status, work_hours")
+    .eq("employee_id", employeeId)
+    .is("deleted_at", null);
+
+  if (period && isCompleteAttendancePeriod(period)) {
+    const { startDate, endDate } = attendanceMonthRange(period);
+    query = query.gte("attendance_date", startDate).lte("attendance_date", endDate);
+  }
+
+  const { data, error } = await query;
+
+  if (error) throw new Error(error.message);
+
+  const records = (data ?? []).map((row) => ({
+    id: row.attendance_date,
+    attendance_date: row.attendance_date as string,
+    check_in_at: null,
+    check_out_at: null,
+    attendance_status: row.attendance_status as string,
+    work_hours: row.work_hours as number | null,
+  }));
+
+  if (period && isCompleteAttendancePeriod(period)) {
+    return summarizeAttendanceRows(
+      fillMonthAttendanceRows(period, records, getTodayDateString()),
+    );
+  }
+
+  return summarizeAttendanceRows(records);
 }
 
 export async function getEmployeeLeaveRequests(
@@ -622,44 +815,6 @@ export async function getEmployeeSalaryStructure(
     grossSalary: Number(data.gross_salary),
     netSalary: Number(data.net_salary),
     components: (data.components as Record<string, unknown>) ?? {},
-  };
-}
-
-export async function getEmployeeAttendanceSummary(
-  supabase: AuthSupabaseClient,
-  employeeId: string,
-  period?: EmployeeAttendancePeriod,
-) {
-  if (period && !isCompleteAttendancePeriod(period)) {
-    return { totalRecords: 0, presentDays: 0, totalWorkHours: 0 };
-  }
-
-  let query = supabase
-    .schema("hrms")
-    .from("attendance")
-    .select("attendance_status, work_hours")
-    .eq("employee_id", employeeId)
-    .is("deleted_at", null);
-
-  if (period && isCompleteAttendancePeriod(period)) {
-    const { startDate, endDate } = attendanceMonthRange(period);
-    query = query.gte("attendance_date", startDate).lte("attendance_date", endDate);
-  }
-
-  const { data, error } = await query;
-
-  if (error) throw new Error(error.message);
-
-  const records = data ?? [];
-
-  return {
-    totalRecords: records.length,
-    presentDays: records.filter((row) => row.attendance_status === "present")
-      .length,
-    totalWorkHours: records.reduce(
-      (total, row) => total + Number(row.work_hours ?? 0),
-      0,
-    ),
   };
 }
 

@@ -73,7 +73,8 @@ export async function LeaveHubSection({
     hasPermission(profile.permissionCodes, "leave.withdraw");
 
   if (canViewTeam) {
-    await ensurePendingHrLeaveAssignedToCeo(profile.employee.organizationId).catch(
+    // Fire-and-forget alongside data loads — do not block the hub on this side-effect.
+    void ensurePendingHrLeaveAssignedToCeo(profile.employee.organizationId).catch(
       (error) => {
         console.error(
           "[leave] failed to assign pending HR leave to CEO",

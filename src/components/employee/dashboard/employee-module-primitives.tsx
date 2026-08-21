@@ -14,6 +14,8 @@ export function EmployeeStatCard({
   iconBg = "bg-muted",
   hint,
   href,
+  onClick,
+  active = false,
 }: {
   label: string;
   value: string;
@@ -22,6 +24,8 @@ export function EmployeeStatCard({
   iconBg?: string;
   hint?: string;
   href?: string;
+  onClick?: () => void;
+  active?: boolean;
 }) {
   const content = (
     <>
@@ -49,20 +53,26 @@ export function EmployeeStatCard({
     </>
   );
 
-  const className =
-    "flex h-full min-h-[6.75rem] min-w-0 flex-col rounded-xl border bg-card p-3.5 shadow-sm";
+  const className = cn(
+    "flex h-full min-h-[6.75rem] min-w-0 flex-col rounded-xl border bg-card p-3.5 text-left shadow-sm",
+    (href || onClick) &&
+      "cursor-pointer transition-[border-color,box-shadow,background-color] duration-150 hover:border-primary/40 hover:bg-accent/30 dark:hover:border-indigo-300/50 dark:hover:bg-transparent",
+    active && "border-primary/50 bg-accent/25 ring-1 ring-primary/30 dark:border-indigo-300/45",
+  );
 
   if (href) {
     return (
-      <Link
-        href={href}
-        className={cn(
-          className,
-          "transition-[border-color,box-shadow,background-color] duration-150 hover:border-primary/40 hover:bg-accent/30 dark:hover:border-indigo-300/50 dark:hover:bg-transparent",
-        )}
-      >
+      <Link href={href} className={className}>
         {content}
       </Link>
+    );
+  }
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={className}>
+        {content}
+      </button>
     );
   }
 

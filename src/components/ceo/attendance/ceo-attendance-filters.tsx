@@ -77,13 +77,14 @@ export function CeoAttendanceFilters({
       <div className="flex w-full flex-wrap items-center gap-2 lg:flex-nowrap lg:gap-3">
         <Select
           value={employeeValue}
-          onValueChange={(value) =>
+          onValueChange={(value) => {
+            if (value == null) return;
             onChange({
-              employeeId: !value || value === FILTER_ANY_VALUE ? undefined : value,
+              employeeId: value === FILTER_ANY_VALUE ? undefined : value,
               search: undefined,
               page: 1,
-            })
-          }
+            });
+          }}
           disabled={disabled}
         >
           <SelectTrigger className="h-10 min-w-0 flex-1 basis-[11rem]">
@@ -107,12 +108,13 @@ export function CeoAttendanceFilters({
 
         <Select
           value={departmentValue}
-          onValueChange={(value) =>
+          onValueChange={(value) => {
+            if (value == null) return;
             onChange({
-              departmentId: !value || value === FILTER_ANY_VALUE ? undefined : value,
+              departmentId: value === FILTER_ANY_VALUE ? undefined : value,
               page: 1,
-            })
-          }
+            });
+          }}
           disabled={disabled}
         >
           <SelectTrigger className="h-10 min-w-0 flex-1 basis-[10rem]">
@@ -135,15 +137,16 @@ export function CeoAttendanceFilters({
 
         <Select
           value={statusValue}
-          onValueChange={(value) =>
+          onValueChange={(value) => {
+            if (value == null) return;
             onChange({
               attendanceStatus:
                 value === FILTER_ANY_VALUE
                   ? undefined
                   : (value as CeoAttendanceListParams["attendanceStatus"]),
               page: 1,
-            })
-          }
+            });
+          }}
           disabled={disabled}
         >
           <SelectTrigger className="h-10 min-w-0 flex-1 basis-[9rem]">
@@ -170,9 +173,10 @@ export function CeoAttendanceFilters({
 
         <Select
           value={monthValue}
-          onValueChange={(value) =>
-            onChange({ month: value ? Number(value) : undefined, page: 1 })
-          }
+          onValueChange={(value) => {
+            if (value == null) return;
+            onChange({ month: Number(value), page: 1 });
+          }}
           disabled={disabled}
         >
           <SelectTrigger className="h-10 min-w-0 flex-1 basis-[8rem]">

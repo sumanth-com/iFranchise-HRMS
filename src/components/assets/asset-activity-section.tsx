@@ -50,6 +50,7 @@ const TYPE_ITEMS = [
   { value: "all", label: "All activity" },
   { value: "report", label: "Reports" },
   { value: "replace", label: "Replace" },
+  { value: "return", label: "Return" },
   { value: "assigned", label: "Assigned" },
 ];
 
@@ -79,7 +80,12 @@ function formatActivityWhen(value: string) {
 }
 
 function isRequestKind(kind: AssetActivityItem["kind"]) {
-  return kind === "issue_reported" || kind === "replacement_requested" || kind === "status_reported";
+  return (
+    kind === "issue_reported" ||
+    kind === "replacement_requested" ||
+    kind === "status_reported" ||
+    kind === "return_requested"
+  );
 }
 
 export function AssetActivitySection({
@@ -126,6 +132,7 @@ export function AssetActivitySection({
     return activity.filter((row) => {
       if (activityType === "report" && row.kind !== "issue_reported") return false;
       if (activityType === "replace" && row.kind !== "replacement_requested") return false;
+      if (activityType === "return" && row.kind !== "return_requested") return false;
       if (activityType === "assigned" && row.kind !== "assigned") return false;
       const parsed = parseISO(row.performedAt);
       if (isValid(parsed)) {
@@ -318,7 +325,7 @@ export function AssetActivitySection({
         <div>
           <h2 className="text-base font-semibold tracking-tight">Asset history</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Employee reports, replacement requests, status updates, and assignment activity.
+            Employee reports, replacement requests, return requests, status updates, and assignment activity.
           </p>
         </div>
         {showAddButton && canCreate && lookups ? (

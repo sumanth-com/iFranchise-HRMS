@@ -23,7 +23,7 @@ function isAuthorizedPath(path: string, allowedPrefixes: string[]) {
 
 /**
  * Warm the App Router cache for routes the current user can already see in nav.
- * Bulk prefetch waits until after first paint so it does not contend with page data.
+ * Priority routes prefetch immediately; the rest warm on idle.
  */
 export function InstantNavPrefetch() {
   const router = useRouter();
@@ -51,17 +51,26 @@ export function InstantNavPrefetch() {
       }
     };
 
-    const warmAuthorizedNav = () => {
-      prefetch(portalHome);
-      for (const item of navigation) {
-        if (typeof item.href === "string") prefetch(item.href);
+    const navHrefs = navigation
+      .map((item) => (typeof item.href === "string" ? item.href : null))
+      .filter((href): href is string => Boolean(href));
+
+    // Immediate: home + first sidebar items for snappy module switches.
+    prefetch(portalHome);
+    for (const href of navHrefs.slice(0, 8)) {
+      prefetch(href);
+    }
+
+    const warmRemainingNav = () => {
+      for (const href of navHrefs.slice(8)) {
+        prefetch(href);
       }
     };
 
     const idleId =
       typeof window.requestIdleCallback === "function"
-        ? window.requestIdleCallback(warmAuthorizedNav, { timeout: 2000 })
-        : window.setTimeout(warmAuthorizedNav, 1200);
+        ? window.requestIdleCallback(warmRemainingNav, { timeout: 1500 })
+        : window.setTimeout(warmRemainingNav, 600);
 
     const onPointerOver = (event: Event) => {
       const target = event.target;
@@ -70,7 +79,18 @@ export function InstantNavPrefetch() {
       if (anchor) prefetch(anchor.getAttribute("href"));
     };
 
+    const onPointerDown = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const anchor = target.closest("a[href]");
+      if (anchor) prefetch(anchor.getAttribute("href"));
+    };
+
     document.addEventListener("pointerover", onPointerOver, {
+      capture: true,
+      passive: true,
+    });
+    document.addEventListener("pointerdown", onPointerDown, {
       capture: true,
       passive: true,
     });
@@ -83,6 +103,7 @@ export function InstantNavPrefetch() {
         window.clearTimeout(idleId as number);
       }
       document.removeEventListener("pointerover", onPointerOver, true);
+      document.removeEventListener("pointerdown", onPointerDown, true);
       document.removeEventListener("focusin", onPointerOver, true);
     };
   }, [navigation, pathname, portalHome, router]);

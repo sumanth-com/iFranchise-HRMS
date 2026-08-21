@@ -16,7 +16,7 @@ function firstString(value: string | string[] | undefined) {
   return typeof value === "string" ? value : undefined;
 }
 
-export default async function ManagerTeamAttendancePage({
+async function ManagerTeamAttendanceContent({
   searchParams,
 }: ManagerTeamAttendancePageProps) {
   await requireServerPermission(PORTAL_PERMISSIONS.manager);
@@ -40,6 +40,31 @@ export default async function ManagerTeamAttendancePage({
   const teamData = await getManagerTeamAttendancePageData(teamParams);
 
   return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-5">
+      <ManagerTeamAttendanceView
+        summary={teamData.summary}
+        records={teamData.records.data}
+        total={teamData.records.total}
+        page={teamData.records.page}
+        pageSize={teamData.records.pageSize}
+        search={teamParams.search ?? ""}
+        dateFrom={teamParams.dateFrom}
+        dateTo={teamParams.dateTo}
+        today={today}
+        departmentId={teamParams.departmentId}
+        attendanceStatus={teamParams.attendanceStatus}
+        employeeId={teamParams.employeeId}
+        departments={teamData.lookups.departments}
+        employees={teamData.lookups.teamMembers}
+      />
+    </div>
+  );
+}
+
+export default function ManagerTeamAttendancePage(
+  props: ManagerTeamAttendancePageProps,
+) {
+  return (
     <Suspense
       fallback={
         <div className="flex flex-1 items-center justify-center">
@@ -47,24 +72,7 @@ export default async function ManagerTeamAttendancePage({
         </div>
       }
     >
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-5">
-        <ManagerTeamAttendanceView
-          summary={teamData.summary}
-          records={teamData.records.data}
-          total={teamData.records.total}
-          page={teamData.records.page}
-          pageSize={teamData.records.pageSize}
-          search={teamParams.search ?? ""}
-          dateFrom={teamParams.dateFrom}
-          dateTo={teamParams.dateTo}
-          today={today}
-          departmentId={teamParams.departmentId}
-          attendanceStatus={teamParams.attendanceStatus}
-          employeeId={teamParams.employeeId}
-          departments={teamData.lookups.departments}
-          employees={teamData.lookups.teamMembers}
-        />
-      </div>
+      <ManagerTeamAttendanceContent {...props} />
     </Suspense>
   );
 }

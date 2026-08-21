@@ -89,7 +89,10 @@ export function NotificationBell() {
 
   useEffect(() => {
     attachNotificationSoundUnlock();
-    void refresh();
+    const timer = window.setTimeout(() => {
+      void refresh();
+    }, 1500);
+    return () => window.clearTimeout(timer);
   }, [refresh]);
 
   usePollWhenVisible(() => void refresh(), POLL_INTERVAL_MS, { skipInitial: true });

@@ -48,6 +48,8 @@ export type LeavePoliciesConfiguration = {
   allowHalfDay: boolean;
   allowCarryForward: boolean;
   approvalLevels: number;
+  /** Organization default HR leave approver (fallback when employee has no assigned HR). */
+  defaultHrApproverEmployeeId: string | null;
   halfDayRules: {
     enabled: boolean;
     morningEnd: string;

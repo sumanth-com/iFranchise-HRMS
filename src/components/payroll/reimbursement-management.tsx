@@ -21,7 +21,7 @@ import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { ReimbursementDialog } from "@/components/payroll/reimbursement-dialog";
 import { EmployeeSelect, LabeledSelect } from "@/components/payroll/payroll-select";
-import { toSelectItems } from "@/components/payroll/select-utils";
+import { toEmployeeSelectItems, toSelectItems } from "@/components/payroll/select-utils";
 import { useTeamPayrollHeaderActions } from "@/components/payroll/team-payroll-header-actions";
 import {
   TableBody,
@@ -195,15 +195,34 @@ export function ReimbursementTable({
   const now = new Date();
   const [monthFilter, setMonthFilter] = useState(String(now.getMonth() + 1));
   const [yearFilter, setYearFilter] = useState(String(now.getFullYear()));
+  const [employeeFilter, setEmployeeFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  const employeeItems = useMemo(
+    () => [{ value: "all", label: "All employees" }, ...toEmployeeSelectItems(employees)],
+    [employees],
+  );
+  const statusItems = useMemo(
+    () => [
+      { value: "all", label: "All statuses" },
+      ...Object.entries(REIMBURSEMENT_STATUS_LABELS).map(([value, label]) => ({
+        value,
+        label,
+      })),
+    ],
+    [],
+  );
 
   const filteredRecords = useMemo(() => {
     return records.filter((r) => {
       const d = new Date(r.expenseDate);
       if (monthFilter && monthFilter !== "all" && d.getMonth() + 1 !== Number(monthFilter)) return false;
       if (yearFilter && yearFilter !== "all" && d.getFullYear() !== Number(yearFilter)) return false;
+      if (employeeFilter !== "all" && r.employeeId !== employeeFilter) return false;
+      if (statusFilter !== "all" && r.reimbursementStatus !== statusFilter) return false;
       return true;
     });
-  }, [records, monthFilter, yearFilter]);
+  }, [records, monthFilter, yearFilter, employeeFilter, statusFilter]);
 
   const updateParams = useCallback(
     (updates: Record<string, string | undefined>) => {
@@ -339,6 +358,20 @@ export function ReimbursementTable({
           value={yearFilter}
           onValueChange={setYearFilter}
           triggerClassName="w-[100px]"
+        />
+        <LabeledSelect
+          items={employeeItems}
+          value={employeeFilter}
+          onValueChange={(value) => setEmployeeFilter(value || "all")}
+          placeholder="Employee"
+          triggerClassName="w-[220px]"
+        />
+        <LabeledSelect
+          items={statusItems}
+          value={statusFilter}
+          onValueChange={(value) => setStatusFilter(value || "all")}
+          placeholder="Status"
+          triggerClassName="w-[150px]"
         />
       </div>
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">

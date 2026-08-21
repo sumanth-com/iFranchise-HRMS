@@ -192,6 +192,17 @@ function leaveStatusForSummaryFilter(
   return undefined;
 }
 
+/** Status-dropdown value used when the Upcoming Planned Leaves card is active. */
+const UPCOMING_FILTER_VALUE = "upcoming_planned";
+
+function statusSelectValue(
+  summaryFilter: LeaveSummaryFilterKey | undefined,
+  leaveStatus: LeaveListParams["leaveStatus"] | undefined,
+) {
+  if (summaryFilter === "upcomingPlannedLeaves") return UPCOMING_FILTER_VALUE;
+  return leaveStatus ?? FILTER_ANY_VALUE;
+}
+
 export function LeaveTable({
   records: initialRecords,
   total: initialTotal,
@@ -276,8 +287,8 @@ export function LeaveTable({
   const today = getTodayDateString();
 
   const reloadTable = useCallback(
-    async (nextFilters: LeaveListParams = filters) => {
-      const result = await fetchRecords(nextFilters);
+    async (nextFilters?: LeaveListParams) => {
+      const result = await fetchRecords(nextFilters ?? filtersRef.current);
       if (!result.success) {
         toast.error(result.message);
         return false;
@@ -290,7 +301,7 @@ export function LeaveTable({
       });
       return true;
     },
-    [fetchRecords, filters],
+    [fetchRecords],
   );
 
   const patchRecordStatus = useCallback(
@@ -327,11 +338,12 @@ export function LeaveTable({
 
   const updateParams = useCallback(
     (updates: Record<string, string | undefined>) => {
+      const previous = filtersRef.current;
       const nextFilters: LeaveListParams = {
-        ...filters,
-        page: updates.page ? Number(updates.page) : filters.page,
-        month: updates.month ? Number(updates.month) : filters.month,
-        year: updates.year ? Number(updates.year) : filters.year,
+        ...previous,
+        page: updates.page ? Number(updates.page) : previous.page,
+        month: updates.month ? Number(updates.month) : previous.month,
+        year: updates.year ? Number(updates.year) : previous.year,
       };
 
       Object.entries(updates).forEach(([key, value]) => {
@@ -340,13 +352,30 @@ export function LeaveTable({
           !value || value === FILTER_ANY_VALUE ? undefined : value;
       });
 
+      const changed =
+        nextFilters.page !== previous.page ||
+        nextFilters.month !== previous.month ||
+        nextFilters.year !== previous.year ||
+        (nextFilters.search ?? undefined) !== (previous.search ?? undefined) ||
+        (nextFilters.leaveStatus ?? undefined) !== (previous.leaveStatus ?? undefined) ||
+        (nextFilters.leaveTypeId ?? undefined) !== (previous.leaveTypeId ?? undefined) ||
+        (nextFilters.departmentId ?? undefined) !== (previous.departmentId ?? undefined) ||
+        (nextFilters.branchId ?? undefined) !== (previous.branchId ?? undefined) ||
+        (nextFilters.reportingManagerId ?? undefined) !==
+          (previous.reportingManagerId ?? undefined) ||
+        (nextFilters.employeeId ?? undefined) !== (previous.employeeId ?? undefined) ||
+        (nextFilters.summaryFilter ?? undefined) !== (previous.summaryFilter ?? undefined);
+
+      if (!changed) return;
+
       setFilters(nextFilters);
+      filtersRef.current = nextFilters;
 
       startTransition(async () => {
         await reloadTable(nextFilters);
       });
     },
-    [filters, reloadTable],
+    [reloadTable],
   );
 
   useEffect(() => {
@@ -365,6 +394,7 @@ export function LeaveTable({
     };
 
     setFilters(nextFilters);
+    filtersRef.current = nextFilters;
     startTransition(async () => {
       await reloadTable(nextFilters);
     });
@@ -378,6 +408,7 @@ export function LeaveTable({
   const statusItems = useMemo(
     () => [
       { value: FILTER_ANY_VALUE, label: "All statuses" },
+      { value: UPCOMING_FILTER_VALUE, label: "Upcoming planned" },
       ...Object.entries(LEAVE_STATUS_LABELS).map(([value, label]) => ({
         value,
         label,
@@ -646,17 +677,19 @@ export function LeaveTable({
           <Select
             items={employeeItems}
             value={filters.employeeId ?? FILTER_ANY_VALUE}
-            onValueChange={(value) =>
+            onValueChange={(value) => {
+              if (value == null) return;
+              const next = value === FILTER_ANY_VALUE ? undefined : value;
+              if ((filters.employeeId ?? undefined) === next) return;
               updateParams({
-                employeeId:
-                  !value || value === FILTER_ANY_VALUE ? undefined : value,
+                employeeId: next,
                 search: undefined,
                 departmentId: undefined,
                 branchId: undefined,
                 reportingManagerId: undefined,
                 page: "1",
-              })
-            }
+              });
+            }}
           >
             <SelectTrigger className={cn(FILTER_CONTROL_CLASS, "min-w-[10.75rem] max-w-[16rem]")}>
               <SelectValue
@@ -682,9 +715,11 @@ export function LeaveTable({
           <Select
             items={MONTH_ITEMS}
             value={String(currentMonth)}
-            onValueChange={(value) =>
-              updateParams({ month: value ?? undefined, page: "1" })
-            }
+            onValueChange={(value) => {
+              if (value == null) return;
+              if (String(currentMonth) === value) return;
+              updateParams({ month: value, page: "1" });
+            }}
           >
             <SelectTrigger className={cn(FILTER_CONTROL_CLASS, "min-w-[9rem]")}>
               <SelectValue placeholder="Month" className="overflow-visible whitespace-nowrap" />
@@ -703,9 +738,11 @@ export function LeaveTable({
           <Select
             items={yearItems}
             value={String(currentYear)}
-            onValueChange={(value) =>
-              updateParams({ year: value ?? undefined, page: "1" })
-            }
+            onValueChange={(value) => {
+              if (value == null) return;
+              if (String(currentYear) === value) return;
+              updateParams({ year: value, page: "1" });
+            }}
           >
             <SelectTrigger className={cn(FILTER_CONTROL_CLASS, "min-w-[6.25rem]")}>
               <SelectValue placeholder="Year" className="overflow-visible whitespace-nowrap" />
@@ -723,14 +760,32 @@ export function LeaveTable({
         <div className="shrink-0">
           <Select
             items={statusItems}
-            value={filters.leaveStatus ?? FILTER_ANY_VALUE}
+            value={statusSelectValue(summaryFilter, filters.leaveStatus)}
             onValueChange={(value) => {
+              if (value == null) return;
+
+              const displayed = statusSelectValue(
+                summaryFilter,
+                filters.leaveStatus,
+              );
+              // Ignore remount echoes for the already-selected filter.
+              if (value === displayed) return;
+
+              if (value === UPCOMING_FILTER_VALUE) {
+                onSummaryFilterChange?.("upcomingPlannedLeaves");
+                return;
+              }
+
+              const next =
+                value === FILTER_ANY_VALUE
+                  ? undefined
+                  : (value as LeaveListParams["leaveStatus"]);
+
               if (summaryFilter) {
                 onSummaryFilterChange?.(undefined);
               }
               updateParams({
-                leaveStatus:
-                  !value || value === FILTER_ANY_VALUE ? undefined : value,
+                leaveStatus: next,
                 summaryFilter: undefined,
                 page: "1",
               });
@@ -753,13 +808,15 @@ export function LeaveTable({
           <Select
             items={leaveTypeItems}
             value={filters.leaveTypeId ?? FILTER_ANY_VALUE}
-            onValueChange={(value) =>
+            onValueChange={(value) => {
+              if (value == null) return;
+              const next = value === FILTER_ANY_VALUE ? undefined : value;
+              if ((filters.leaveTypeId ?? undefined) === next) return;
               updateParams({
-                leaveTypeId:
-                  !value || value === FILTER_ANY_VALUE ? undefined : value,
+                leaveTypeId: next,
                 page: "1",
-              })
-            }
+              });
+            }}
           >
             <SelectTrigger className={cn(FILTER_CONTROL_CLASS, "min-w-[10rem]")}>
               <SelectValue

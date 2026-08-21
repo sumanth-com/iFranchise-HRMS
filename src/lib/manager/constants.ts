@@ -84,6 +84,7 @@ export const MANAGER_DASHBOARD_KPI_LINKS = {
   presentToday: `${MANAGER_ROUTES.attendanceTeam}?attendanceStatus=present`,
   onLeaveToday: `${MANAGER_ROUTES.attendanceTeam}?attendanceStatus=absent`,
   lateToday: `${MANAGER_ROUTES.attendanceTeam}?attendanceStatus=late`,
+  halfDayToday: `${MANAGER_ROUTES.attendanceTeam}?attendanceStatus=half_day`,
   pendingLeaveApprovals: `${MANAGER_ROUTES.leaveTeam}?summaryFilter=pendingRequests`,
   pendingPerformanceReviews: MANAGER_ROUTES.performanceGoals,
   openRecruitmentRequests: MANAGER_ROUTES.recruitmentJobs,

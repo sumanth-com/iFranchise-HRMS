@@ -402,11 +402,6 @@ export function OrganizationProfileForm({ profile, logoUrl, canEdit }: Props) {
             hasCustomLogo={Boolean(profile.logoStoragePath)}
             canEdit={canEdit}
           />
-          {canEdit ? (
-            <p className="mt-3 max-w-[24rem] text-center text-xs text-muted-foreground">
-              Tap the logo to update the company image anytime.
-            </p>
-          ) : null}
         </aside>
       </form>
     </div>

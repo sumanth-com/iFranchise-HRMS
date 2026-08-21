@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 const OPEN_SECTIONS_STORAGE_KEY = "hrms.sidebar.openSections";
 
@@ -53,6 +53,7 @@ function readStoredOpenSections(): Record<string, boolean> {
 
 export function SidebarProvider({ children }: SidebarProviderProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
@@ -114,9 +115,20 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
     [openSections],
   );
 
-  const startNavigation = useCallback((href: string) => {
-    setPendingHref(href);
-  }, []);
+  const startNavigation = useCallback(
+    (href: string) => {
+      setPendingHref(href);
+      try {
+        const path = href.split("#")[0];
+        if (path?.startsWith("/") && !path.startsWith("//")) {
+          router.prefetch(path);
+        }
+      } catch {
+        // Prefetch is best-effort.
+      }
+    },
+    [router],
+  );
 
   const clearNavigation = useCallback(() => {
     setPendingHref(null);

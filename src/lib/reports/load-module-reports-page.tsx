@@ -76,7 +76,7 @@ export async function loadModuleReportsPage(
 
   return (
     <ModuleReportsView
-      key={module}
+      key={`${module}-reports-v4`}
       module={module}
       definitions={definitions}
       lookups={lookups}

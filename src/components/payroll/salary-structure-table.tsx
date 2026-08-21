@@ -17,6 +17,7 @@ import { Modal } from "@/components/common/modal";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { SalaryStructureDialog } from "@/components/payroll/salary-structure-dialog";
 import { useTeamPayrollHeaderActions } from "@/components/payroll/team-payroll-header-actions";
+import { toEmployeeSelectItems } from "@/components/payroll/select-utils";
 import {
   TableBody,
   TableCell,
@@ -30,6 +31,12 @@ import type { LookupOption } from "@/types/employee";
 import type { SalaryStructureItem } from "@/types/payroll";
 
 type DialogMode = "create" | "edit";
+
+const STATUS_FILTER_ITEMS = [
+  { value: "all", label: "All statuses" },
+  { value: "current", label: "Current" },
+  { value: "historical", label: "Historical" },
+] as const;
 
 export function SalaryStructureTable({
   records,
@@ -51,15 +58,25 @@ export function SalaryStructureTable({
   const now = new Date();
   const [monthFilter, setMonthFilter] = useState(String(now.getMonth() + 1));
   const [yearFilter, setYearFilter] = useState(String(now.getFullYear()));
+  const [employeeFilter, setEmployeeFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  const employeeItems = useMemo(
+    () => [{ value: "all", label: "All employees" }, ...toEmployeeSelectItems(employees)],
+    [employees],
+  );
 
   const filteredRecords = useMemo(() => {
     return records.filter((r) => {
       const d = new Date(r.effectiveFrom);
       if (monthFilter && monthFilter !== "all" && d.getMonth() + 1 !== Number(monthFilter)) return false;
       if (yearFilter && yearFilter !== "all" && d.getFullYear() !== Number(yearFilter)) return false;
+      if (employeeFilter !== "all" && r.employeeId !== employeeFilter) return false;
+      if (statusFilter === "current" && !r.isCurrent) return false;
+      if (statusFilter === "historical" && r.isCurrent) return false;
       return true;
     });
-  }, [records, monthFilter, yearFilter]);
+  }, [records, monthFilter, yearFilter, employeeFilter, statusFilter]);
 
   const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => ({
     value: String(i + 1),
@@ -209,6 +226,20 @@ export function SalaryStructureTable({
           value={yearFilter}
           onValueChange={setYearFilter}
           triggerClassName="w-[100px]"
+        />
+        <LabeledSelect
+          items={employeeItems}
+          value={employeeFilter}
+          onValueChange={(value) => setEmployeeFilter(value || "all")}
+          placeholder="Employee"
+          triggerClassName="w-[220px]"
+        />
+        <LabeledSelect
+          items={[...STATUS_FILTER_ITEMS]}
+          value={statusFilter}
+          onValueChange={(value) => setStatusFilter(value || "all")}
+          placeholder="Status"
+          triggerClassName="w-[150px]"
         />
       </div>
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">

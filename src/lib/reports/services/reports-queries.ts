@@ -1292,7 +1292,7 @@ async function runRecruitmentReport(
       .order("created_at", { ascending: false })
       .limit(500);
     if (filters.status) query = query.eq("job_status", filters.status);
-    else query = query.in("job_status", ["open", "on_hold", "draft"]);
+    // All statuses → return every job (open, draft, on hold, filled, closed, etc.).
     if (filters.departmentId) query = query.eq("department_id", filters.departmentId);
     if (filters.recruitmentDepartmentIds?.length) {
       query = query.in("department_id", filters.recruitmentDepartmentIds);

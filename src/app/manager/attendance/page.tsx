@@ -34,7 +34,7 @@ function teamRedirect(
   return hubListUrl(MANAGER_ROUTES.attendanceTeam, filters);
 }
 
-export default async function ManagerAttendancePage({
+async function ManagerAttendanceContent({
   searchParams,
 }: ManagerAttendancePageProps) {
   const profile = await requireServerPermission(PORTAL_PERMISSIONS.manager);
@@ -55,6 +55,17 @@ export default async function ManagerAttendancePage({
   const selfData = await getManagerProfilePageData(supabase, profile, selfParams);
 
   return (
+    <EmployeeAttendanceView
+      data={selfData}
+      status={selfParams.status}
+      searchDate={selfParams.searchDate}
+      basePath={MANAGER_ROUTES.attendance}
+    />
+  );
+}
+
+export default function ManagerAttendancePage(props: ManagerAttendancePageProps) {
+  return (
     <Suspense
       fallback={
         <div className="flex flex-1 items-center justify-center">
@@ -62,12 +73,7 @@ export default async function ManagerAttendancePage({
         </div>
       }
     >
-      <EmployeeAttendanceView
-        data={selfData}
-        status={selfParams.status}
-        searchDate={selfParams.searchDate}
-        basePath={MANAGER_ROUTES.attendance}
-      />
+      <ManagerAttendanceContent {...props} />
     </Suspense>
   );
 }

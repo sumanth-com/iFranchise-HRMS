@@ -126,6 +126,7 @@ export type EmployeeDetail = {
   designationId: string | null;
   employmentTypeId: string | null;
   reportingManagerId: string | null;
+  assignedHrEmployeeId: string | null;
   userId: string | null;
   employeeCode: string;
   firstName: string;
@@ -152,6 +153,7 @@ export type EmployeeDetail = {
   designationTitle: string | null;
   employmentTypeName: string | null;
   reportingManagerName: string | null;
+  assignedHrName: string | null;
   profile: EmployeeProfileDetail | null;
   addresses: EmployeeAddressDetail[];
   emergencyContacts: EmergencyContactDetail[];
@@ -276,6 +278,9 @@ export type EmployeeAttendancePeriod = {
 export type EmployeeAttendanceSummary = {
   totalRecords: number;
   presentDays: number;
+  absentDays: number;
+  lateDays: number;
+  halfDayDays: number;
   totalWorkHours: number;
 };
 
@@ -308,6 +313,7 @@ export type EmployeeWizardInput = {
     designationId?: string;
     employmentTypeId?: string;
     reportingManagerId?: string;
+    assignedHrEmployeeId?: string;
     employmentStatus: EmploymentStatus;
     dateOfJoining?: string;
     dateOfLeaving?: string;

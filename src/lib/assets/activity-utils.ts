@@ -1,11 +1,12 @@
 import type { AssetActivityKind } from "@/types/assets";
 
-export type EmployeeRequestKind = "report" | "replace" | "status";
+export type EmployeeRequestKind = "report" | "replace" | "status" | "return";
 
 export type ActivityFilterType = "all" | EmployeeRequestKind;
 
 const REPORT_PREFIX = "Issue reported (";
 const STATUS_PREFIX = "Status reported:";
+const RETURN_PREFIX = "Return request:";
 const REPLACE_SUFFIX = " requested:";
 
 function plainLatinI(value: string) {
@@ -16,6 +17,8 @@ export function classifyMaintenanceIssue(issue: string): AssetActivityKind {
   const trimmed = issue.trim();
   if (trimmed.startsWith(REPORT_PREFIX)) return "issue_reported";
   if (trimmed.startsWith(STATUS_PREFIX)) return "status_reported";
+  // Must run before REPLACE_SUFFIX — "Return request:" must not match replacement.
+  if (trimmed.startsWith(RETURN_PREFIX)) return "return_requested";
   if (trimmed.includes(REPLACE_SUFFIX)) return "replacement_requested";
   return "maintenance_opened";
 }
@@ -25,6 +28,7 @@ export function classifyEmployeeRequestKind(issue: string): EmployeeRequestKind 
   if (kind === "issue_reported") return "report";
   if (kind === "replacement_requested") return "replace";
   if (kind === "status_reported") return "status";
+  if (kind === "return_requested") return "return";
   return null;
 }
 
@@ -38,6 +42,8 @@ export function maintenanceActivityLabel(kind: AssetActivityKind, issue: string)
     }
     case "status_reported":
       return "Status reported";
+    case "return_requested":
+      return "Return requested";
     case "maintenance_completed":
       return "Maintenance completed";
     default:
@@ -53,6 +59,8 @@ export function maintenanceIssueFilter(type: ActivityFilterType): string | null 
       return `%${REPLACE_SUFFIX}%`;
     case "status":
       return `${STATUS_PREFIX}%`;
+    case "return":
+      return `${RETURN_PREFIX}%`;
     default:
       return null;
   }
@@ -66,6 +74,8 @@ export function parsePerformerFromMaintenanceNotes(notes: string | null): string
   if (reported?.[1]) return plainLatinI(reported[1].trim());
   const request = notes.match(/Employee request \(.+?\) by (.+?)$/);
   if (request?.[1]) return plainLatinI(request[1].trim());
+  const returnBy = notes.match(/Return request by (.+)$/);
+  if (returnBy?.[1]) return plainLatinI(returnBy[1].trim());
   return null;
 }
 
@@ -89,6 +99,19 @@ export function parseEmployeeRequestDetails(issue: string, notes?: string | null
       typeLabel: "Status",
       message: extra || status[1].trim(),
       severity: null,
+    };
+  }
+
+  const returnReq = trimmed.match(/^Return request:\s*([\s\S]+)$/);
+  if (returnReq) {
+    const body = returnReq[1].trim();
+    const [datePart, ...noteParts] = body.split(" — ");
+    return {
+      kind: "return" as const,
+      typeLabel: "Return",
+      message: noteParts.length > 0 ? noteParts.join(" — ").trim() : "",
+      severity: null,
+      returnDate: datePart?.trim() || null,
     };
   }
 
@@ -118,5 +141,12 @@ export function employeeRequestLabel(kind: EmployeeRequestKind): string {
       return "Replacement request";
     case "status":
       return "Status update";
+    case "return":
+      return "Return request";
   }
+}
+
+export function formatReturnRequestIssue(returnDate: string, notes?: string | null) {
+  const note = notes?.trim();
+  return note ? `${RETURN_PREFIX} ${returnDate} — ${note}` : `${RETURN_PREFIX} ${returnDate}`;
 }

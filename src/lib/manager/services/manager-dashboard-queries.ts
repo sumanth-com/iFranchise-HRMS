@@ -86,6 +86,7 @@ function emptyOverviewFields(upcomingHolidays: DashboardListItem[] = []): Pick<
       presentToday: 0,
       absentToday: 0,
       lateToday: 0,
+      halfDayToday: 0,
       pendingApprovals: 0,
       exitRequests: 0,
       upcomingHolidays,
@@ -697,16 +698,19 @@ export async function getManagerDashboardData(
     presentToday: 0,
     onLeaveToday: 0,
     lateToday: 0,
+    halfDayToday: 0,
   };
 
   for (const row of attendanceResult.data ?? []) {
     switch (row.attendance_status) {
       case "present":
-      case "half_day":
         attendanceCounts.presentToday += 1;
         break;
       case "late":
         attendanceCounts.lateToday += 1;
+        break;
+      case "half_day":
+        attendanceCounts.halfDayToday += 1;
         break;
       case "absent":
       case "on_leave":
@@ -946,9 +950,10 @@ export async function getManagerDashboardData(
   const exitRequests = exitRequestsResult.count ?? 0;
 
   const todayPulse: HrTodayPulse = {
-    presentToday: kpis.presentToday,
-    absentToday: kpis.onLeaveToday,
-    lateToday: kpis.lateToday,
+    presentToday: attendanceCounts.presentToday,
+    absentToday: attendanceCounts.onLeaveToday,
+    lateToday: attendanceCounts.lateToday,
+    halfDayToday: attendanceCounts.halfDayToday,
     pendingApprovals: pendingLeaveApprovals,
     exitRequests,
     upcomingHolidays,
@@ -960,28 +965,28 @@ export async function getManagerDashboardData(
       label: "Interviews Today",
       count: interviewsToday,
       href: MANAGER_ROUTES.recruitment,
-      urgency: interviewsToday > 0 ? "medium" : "low",
+      urgency: "low",
     },
     {
       id: "probation-ending",
       label: "Employees Completing Probation",
       count: probationEndingSoon,
       href: MANAGER_DASHBOARD_KPI_LINKS.probationEndingSoon,
-      urgency: probationEndingSoon > 0 ? "medium" : "low",
+      urgency: "low",
     },
     {
       id: "leave-approvals",
       label: "Pending Leave Approvals",
       count: pendingLeaveApprovals,
       href: MANAGER_DASHBOARD_KPI_LINKS.pendingLeaveApprovals,
-      urgency: pendingLeaveApprovals > 0 ? "high" : "low",
+      urgency: "low",
     },
     {
       id: "offers-pending",
       label: "Open Recruitment Requests",
       count: openRecruitmentRequests,
       href: MANAGER_DASHBOARD_KPI_LINKS.openRecruitmentRequests,
-      urgency: openRecruitmentRequests > 0 ? "medium" : "low",
+      urgency: "low",
     },
   ];
 

@@ -10,6 +10,7 @@ import {
   getHrApproverEmployeeId,
   isCeoLeaveApprover,
   isHrLeaveApplicant,
+  NO_HR_APPROVER_CONFIGURED_MESSAGE,
 } from "@/lib/leave/services/leave-queries";
 import { evaluateLeaveApplication } from "@/lib/leave/services/leave-policy-runtime";
 import { NON_APPLY_LEAVE_TYPE_CODES } from "@/lib/leave/constants";
@@ -206,27 +207,43 @@ async function createApprovalSteps(
     steps.push({ approverId: ceoId, level: 1 });
   } else {
     const managerId = await getEmployeeReportingManagerId(supabase, employeeId);
-    const hrId = await getHrApproverEmployeeId(supabase, organizationId);
-    const twoLevel =
-      approvalLevels >= 2 &&
-      Boolean(managerId) &&
-      managerId !== employeeId &&
-      Boolean(hrId) &&
-      hrId !== managerId;
+    const excludeFromHr = [employeeId, managerId].filter(
+      (id): id is string => Boolean(id),
+    );
+    const hrId = await getHrApproverEmployeeId(supabase, organizationId, {
+      employeeId,
+      excludeEmployeeIds: excludeFromHr,
+    });
+    const wantsTwoLevel = approvalLevels >= 2;
+    const hasDistinctManager =
+      Boolean(managerId) && managerId !== employeeId;
 
-    if (twoLevel && managerId && hrId) {
-      steps.push({ approverId: managerId, level: 1 });
-      if (hrId !== employeeId) {
-        steps.push({ approverId: hrId, level: 2 });
+    if (wantsTwoLevel && hasDistinctManager) {
+      if (!hrId) {
+        console.error("[leave] HR approver routing failed (fail-closed)", {
+          organizationId,
+          employeeId,
+          managerId,
+          leaveRequestId,
+          reason: "missing_or_invalid_assigned_and_default_hr",
+        });
+        throw new Error(NO_HR_APPROVER_CONFIGURED_MESSAGE);
       }
-    } else if (managerId && managerId !== employeeId) {
-      steps.push({ approverId: managerId, level: 1 });
-    } else if (hrId && hrId !== employeeId) {
-      steps.push({ approverId: hrId, level: 1 });
+      steps.push({ approverId: managerId!, level: 1 });
+      steps.push({ approverId: hrId, level: 2 });
+    } else if (hasDistinctManager) {
+      steps.push({ approverId: managerId!, level: 1 });
     } else if (hrId) {
       steps.push({ approverId: hrId, level: 1 });
     } else {
-      throw new Error("No manager or HR approver is configured for this leave request");
+      console.error("[leave] HR approver routing failed (fail-closed)", {
+        organizationId,
+        employeeId,
+        managerId,
+        leaveRequestId,
+        reason: "no_manager_and_no_valid_hr",
+      });
+      throw new Error(NO_HR_APPROVER_CONFIGURED_MESSAGE);
     }
   }
 

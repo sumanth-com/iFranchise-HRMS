@@ -15,5 +15,13 @@ export function formatEnterpriseNotificationMessage(text: string): string {
     },
   );
 
-  return result.replace(/\s{2,}/g, " ").trim();
+  // Common display cleanup: missing spaces after dates / punctuation.
+  result = result
+    .replace(/([a-z])(\d)/gi, "$1 $2")
+    .replace(/(\d)([A-Za-z])/g, "$1 $2")
+    .replace(/([.,:;!?])([A-Za-z])/g, "$1 $2")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  return result;
 }

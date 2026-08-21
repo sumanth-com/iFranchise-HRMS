@@ -6,6 +6,7 @@ import {
   type ComponentProps,
   type MouseEvent,
   type FocusEvent,
+  type PointerEvent,
 } from "react";
 
 type AppNavLinkProps = ComponentProps<typeof Link>;
@@ -27,6 +28,7 @@ export function AppNavLink({
   prefetch = true,
   onMouseEnter,
   onFocus,
+  onPointerDown,
   href,
   ...props
 }: AppNavLinkProps) {
@@ -47,6 +49,10 @@ export function AppNavLink({
       href={href}
       prefetch={prefetch}
       {...props}
+      onPointerDown={(event: PointerEvent<HTMLAnchorElement>) => {
+        prefetchRoute();
+        onPointerDown?.(event);
+      }}
       onMouseEnter={(event: MouseEvent<HTMLAnchorElement>) => {
         prefetchRoute();
         onMouseEnter?.(event);

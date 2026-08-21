@@ -47,6 +47,7 @@ type EmployeeWizardProps = {
     designations: LookupOption[];
     employmentTypes: LookupOption[];
     managers: LookupOption[];
+    hrApprovers?: LookupOption[];
     documentTypes: LookupOption[];
   };
 };
@@ -86,6 +87,7 @@ export function EmployeeWizard({ lookups }: EmployeeWizardProps) {
       designationId: "",
       employmentTypeId: "",
       reportingManagerId: "",
+      assignedHrEmployeeId: "",
       employmentStatus: "draft" as const,
       dateOfJoining: "",
       dateOfLeaving: "",
@@ -145,6 +147,14 @@ export function EmployeeWizard({ lookups }: EmployeeWizardProps) {
   const managerItems = useMemo(
     () => withSelectOption(toEmployeeSelectItems(lookups.managers), { value: "none", label: "None" }),
     [lookups.managers],
+  );
+  const hrApproverItems = useMemo(
+    () =>
+      withSelectOption(toEmployeeSelectItems(lookups.hrApprovers ?? []), {
+        value: "none",
+        label: "None (use organization default)",
+      }),
+    [lookups.hrApprovers],
   );
   const employmentStatusItems = useMemo(() => toSelectItems(EMPLOYMENT_STATUS_LABELS), []);
 
@@ -356,6 +366,17 @@ export function EmployeeWizard({ lookups }: EmployeeWizardProps) {
             />
           </div>
           <div className="space-y-2">
+            <Label>Assigned HR</Label>
+            <LabeledSelect
+              items={hrApproverItems}
+              value={employmentForm.watch("assignedHrEmployeeId") || "none"}
+              onValueChange={(value) =>
+                employmentForm.setValue("assignedHrEmployeeId", value === "none" ? "" : value)
+              }
+              placeholder="Select assigned HR"
+            />
+          </div>
+          <div className="space-y-2">
             <Label>Employment status</Label>
             <LabeledSelect
               items={employmentStatusItems}
@@ -511,6 +532,11 @@ export function EmployeeWizard({ lookups }: EmployeeWizardProps) {
           <ReviewCard title="Employment" items={[
             ["Branch", lookups.branches.find((b) => b.id === review.employment.branchId)?.label ?? "—"],
             ["Department", lookups.departments.find((d) => d.id === review.employment.departmentId)?.label ?? "—"],
+            [
+              "Assigned HR",
+              lookups.hrApprovers?.find((h) => h.id === review.employment.assignedHrEmployeeId)?.label ??
+                "Organization default",
+            ],
             ["Status", EMPLOYMENT_STATUS_LABELS[review.employment.employmentStatus]],
           ]} />
           <ReviewCard title="Address" items={[

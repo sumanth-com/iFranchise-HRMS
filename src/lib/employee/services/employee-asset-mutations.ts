@@ -1,6 +1,9 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { ASSET_STATUS_LABELS, CONDITION_LABELS } from "@/lib/assets/constants";
-import { classifyEmployeeRequestKind } from "@/lib/assets/activity-utils";
+import {
+  classifyEmployeeRequestKind,
+  formatReturnRequestIssue,
+} from "@/lib/assets/activity-utils";
 import { fromHrms, unwrapRelation } from "@/lib/assets/services/assets-utils";
 import type { UserProfile } from "@/types/auth";
 import type { AssetCondition, AssetStatus } from "@/types/assets";
@@ -166,6 +169,38 @@ export async function employeeUpdateAssetStatus(
   if (maintenanceError) throw new Error(maintenanceError.message);
 }
 
+type ReturnRequestInput = {
+  assignmentId: string;
+  returnDate: string;
+  notes?: string;
+};
+
+/**
+ * Lets an employee request to return an assigned asset on a chosen date.
+ * Creates a pending maintenance/request record for HR — does not complete the return.
+ */
+export async function employeeRequestAssetReturn(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: ReturnRequestInput,
+): Promise<void> {
+  const { assetId } = await assertOwnedAssignment(supabase, profile, input.assignmentId);
+
+  const { error } = await fromHrms(supabase, "asset_maintenance").insert({
+    organization_id: profile.employee.organizationId,
+    asset_id: assetId,
+    maintenance_date: input.returnDate,
+    issue: formatReturnRequestIssue(input.returnDate, input.notes),
+    maintenance_status: "pending",
+    notes: `Return request by ${profile.employee.firstName} ${profile.employee.lastName}`.trim(),
+    status: "active",
+    created_by: profile.userId,
+    updated_by: profile.userId,
+  });
+
+  if (error) throw new Error(error.message);
+}
+
 export async function employeeDeleteAssetRequest(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -217,6 +252,12 @@ type UpdateRequestInput =
       assetStatus: Extract<AssetStatus, "assigned" | "maintenance" | "lost">;
       condition: AssetCondition;
       notes?: string;
+    }
+  | {
+      maintenanceId: string;
+      kind: "return";
+      returnDate: string;
+      notes?: string;
     };
 
 export async function employeeUpdateAssetRequest(
@@ -250,6 +291,9 @@ export async function employeeUpdateAssetRequest(
   } else if (input.kind === "replace") {
     issue = `${input.requestType} requested: ${input.reason}`;
     notes = `Employee request (${input.requestType}) by ${reporter}`.trim();
+  } else if (input.kind === "return") {
+    issue = formatReturnRequestIssue(input.returnDate, input.notes);
+    notes = `Return request by ${reporter}`.trim();
   } else {
     const statusLabel = ASSET_STATUS_LABELS[input.assetStatus];
     const conditionLabel = CONDITION_LABELS[input.condition];
@@ -262,6 +306,7 @@ export async function employeeUpdateAssetRequest(
     .update({
       issue,
       notes,
+      ...(input.kind === "return" ? { maintenance_date: input.returnDate } : {}),
       updated_by: profile.userId,
     })
     .eq("id", input.maintenanceId);

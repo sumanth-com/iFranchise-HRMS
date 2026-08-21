@@ -23,7 +23,7 @@ export function EmployeeDashboardView({
         </div>
 
         <div className="shrink-0">
-          <EmployeeDashboardKpiCards kpis={kpis} hideLeaveBalance />
+          <EmployeeDashboardKpiCards kpis={kpis} />
         </div>
 
         <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[3fr_2fr] lg:items-stretch lg:overflow-hidden">

@@ -19,11 +19,11 @@ import {
 } from "@/components/common/select";
 import { Label } from "@/components/ui/label";
 import { PROFILE_IMAGE_MAX_BYTES } from "@/lib/employees/constants";
+import { updateEmployeeSelfProfileAction } from "@/lib/employees/actions";
 import {
   removeProfileImageAction,
-  updateEmployeeSelfProfileAction,
   uploadProfileImageAction,
-} from "@/lib/employees/actions";
+} from "@/lib/employees/profile-image-actions";
 import type { EmployeeSelfProfileSettings } from "@/lib/employee/services/employee-self-profile";
 import { TIMEZONE_OPTIONS } from "@/lib/validations/organization";
 import {

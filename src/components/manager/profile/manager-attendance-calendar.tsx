@@ -273,21 +273,24 @@ export function ManagerAttendanceCalendar({
           <Button
             variant="outline"
             size="icon"
-            className="size-8 shrink-0"
+            className="size-9 shrink-0 border-border/80 bg-background text-foreground shadow-sm hover:bg-muted hover:text-foreground disabled:opacity-40"
             onClick={() => shiftMonth(-1)}
+            type="button"
             aria-label="Previous month"
           >
-            <ChevronLeft className="size-4" />
+            <ChevronLeft className="size-4" strokeWidth={2.25} />
           </Button>
           <Button
             variant="outline"
             size="icon"
-            className="size-8 shrink-0"
+            className="size-9 shrink-0 border-border/80 bg-background text-foreground shadow-sm hover:bg-muted hover:text-foreground disabled:opacity-40"
             onClick={() => shiftMonth(1)}
+            type="button"
             disabled={!canGoForward}
             aria-label="Next month"
+            title={!canGoForward ? "You are on the latest month" : "Next month"}
           >
-            <ChevronRight className="size-4" />
+            <ChevronRight className="size-4" strokeWidth={2.25} />
           </Button>
         </div>
       </div>

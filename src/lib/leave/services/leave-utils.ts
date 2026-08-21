@@ -37,6 +37,32 @@ export function formatHalfDayPeriod(period: HalfDayPeriod | null | undefined) {
   return period === "morning" ? "First Half" : "Second Half";
 }
 
+const LEAVE_LIST_STATUS_RANK: Record<string, number> = {
+  pending: 0,
+  approved: 1,
+  rejected: 2,
+  cancelled: 3,
+  withdrawn: 4,
+};
+
+/** Pending / not-yet-approved first, then latest applied requests at the top. */
+export function sortLeaveListItemsForDisplay<
+  T extends { leaveStatus: string; appliedAt: string; startDate: string },
+>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const rankA = LEAVE_LIST_STATUS_RANK[a.leaveStatus] ?? 50;
+    const rankB = LEAVE_LIST_STATUS_RANK[b.leaveStatus] ?? 50;
+    if (rankA !== rankB) return rankA - rankB;
+    if (a.appliedAt !== b.appliedAt) {
+      return a.appliedAt < b.appliedAt ? 1 : -1;
+    }
+    if (a.startDate !== b.startDate) {
+      return a.startDate < b.startDate ? -1 : 1;
+    }
+    return 0;
+  });
+}
+
 export function getMonthDateRange(month: number, year: number) {
   const start = `${year}-${String(month).padStart(2, "0")}-01`;
   const lastDay = new Date(year, month, 0).getDate();

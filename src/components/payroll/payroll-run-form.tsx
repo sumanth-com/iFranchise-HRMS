@@ -1,22 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
-  Banknote,
   CalendarClock,
   CheckCircle2,
-  ClipboardList,
   CircleDollarSign,
+  ClipboardList,
   Eye,
   Info,
   Play,
-  Sparkles,
-  Users,
-  Wallet,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
+import { Input } from "@/components/common/input";
 import {
   PayrollEmployeeBreakdownDialog,
   type PayrollEmployeeBreakdownData,
@@ -55,13 +53,6 @@ type EmployeeTableRow = {
 
 const monthItems = getMonthSelectItems();
 const yearItems = getYearSelectItems();
-
-const PIPELINE_STEPS = [
-  { icon: Users, label: "Active employees" },
-  { icon: Wallet, label: "Salary structures" },
-  { icon: ClipboardList, label: "Attendance & leave" },
-  { icon: Banknote, label: "Bonuses & reimbursements" },
-] as const;
 
 type PayrollRunFormProps = {
   defaultMonth?: number;
@@ -109,6 +100,7 @@ export function PayrollRunForm({
     useState<PayrollEmployeeBreakdownData | null>(null);
   const [breakdownOpen, setBreakdownOpen] = useState(false);
   const [breakdownLoading, setBreakdownLoading] = useState(false);
+  const [employeeSearch, setEmployeeSearch] = useState("");
   const breakdownRequestId = useRef(0);
   const autoLoadStarted = useRef(false);
   const [isPending, startTransition] = useTransition();
@@ -131,6 +123,7 @@ export function PayrollRunForm({
 
   function resetToIdle() {
     setPanel({ kind: "idle" });
+    setEmployeeSearch("");
   }
 
   async function fetchRunDetail(payrollId: string, mode: "existing" | "created") {
@@ -420,10 +413,12 @@ export function PayrollRunForm({
       basicSalary: item.basicSalary,
       totalAllowances: item.totalAllowances,
       hasSalaryStructure: item.hasSalaryStructure,
+      note: item.hasSalaryStructure ? undefined : "No salary structure",
     };
   }
 
   function mapRunItemToRow(item: PayrollDetail["items"][number]): EmployeeTableRow {
+    const missingPay = item.grossSalary === 0 && item.netSalary === 0;
     return {
       id: item.employeeId,
       name: item.employeeName,
@@ -436,83 +431,63 @@ export function PayrollRunForm({
       breakdown: item.breakdown,
       basicSalary: item.basicSalary,
       totalAllowances: item.totalAllowances,
+      note: missingPay ? "No salary structure" : undefined,
     };
   }
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-xl border bg-gradient-to-br from-primary/5 via-card to-card p-5 shadow-sm">
-        <div className="flex items-start gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Sparkles className="size-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-base font-semibold tracking-tight">Run payroll</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Calculate monthly payroll from salary structures, attendance, leave, bonuses, and
-              reimbursements.
-            </p>
-          </div>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <LabeledSelect
+          items={monthItems}
+          value={month}
+          placeholder="Select month"
+          triggerClassName={filterControlClass}
+          onValueChange={(value) => {
+            if (!value) return;
+            setMonth(value);
+            resetToIdle();
+          }}
+          disabled={isPending}
+        />
+        <LabeledSelect
+          items={yearItems}
+          value={year}
+          placeholder="Select year"
+          triggerClassName={filterControlClass}
+          onValueChange={(value) => {
+            if (!value) return;
+            setYear(value);
+            resetToIdle();
+          }}
+          disabled={isPending}
+        />
+        <div className="relative w-full min-w-[12rem] flex-1 sm:max-w-xs">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={employeeSearch}
+            onChange={(event) => setEmployeeSearch(event.target.value)}
+            placeholder="Search employee..."
+            className="h-9 pl-9"
+            disabled={isPending}
+            aria-label="Search employee"
+          />
         </div>
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {PIPELINE_STEPS.map((step) => {
-            const Icon = step.icon;
-            return (
-              <div
-                key={step.label}
-                className="flex items-center gap-2 rounded-lg border bg-background/80 px-3 py-2 text-xs"
-              >
-                <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-                <span className="font-medium text-foreground">{step.label}</span>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="mt-4 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <LabeledSelect
-              items={monthItems}
-              value={month}
-              placeholder="Select month"
-              triggerClassName={filterControlClass}
-              onValueChange={(value) => {
-                if (!value) return;
-                setMonth(value);
-                resetToIdle();
-              }}
-              disabled={isPending}
-            />
-            <LabeledSelect
-              items={yearItems}
-              value={year}
-              placeholder="Select year"
-              triggerClassName={filterControlClass}
-              onValueChange={(value) => {
-                if (!value) return;
-                setYear(value);
-                resetToIdle();
-              }}
-              disabled={isPending}
-            />
-          </div>
-          <Button
-            onClick={handleRunPayroll}
-            disabled={isPending || !canRun}
-            className={`${filterControlClass} shrink-0 gap-1.5`}
-          >
-            <Play className="size-4" />
-            Run payroll
-          </Button>
-        </div>
-
-        {!canRun ? (
-          <p className="mt-4 text-sm text-muted-foreground">
-            You do not have permission to run payroll for this organization.
-          </p>
-        ) : null}
+        <Button
+          onClick={handleRunPayroll}
+          disabled={isPending || !canRun}
+          className={`${filterControlClass} shrink-0 gap-1.5 sm:ml-auto`}
+        >
+          <Play className="size-4" />
+          Run payroll
+        </Button>
       </div>
+
+      {!canRun ? (
+        <p className="text-sm text-muted-foreground">
+          You do not have permission to run payroll for this organization.
+        </p>
+      ) : null}
 
       {panel.kind === "idle" ? (
         <PayrollRunStatusMessage
@@ -563,6 +538,7 @@ export function PayrollRunForm({
 
           <EmployeePayrollTable
             rows={panel.data.items.map(mapPreviewItemToRow)}
+            employeeSearch={employeeSearch}
             onView={openBreakdown}
           />
         </div>
@@ -599,6 +575,7 @@ export function PayrollRunForm({
 
           <EmployeePayrollTable
             rows={panel.data.items.map(mapRunItemToRow)}
+            employeeSearch={employeeSearch}
             onView={openBreakdown}
           />
         </div>
@@ -692,11 +669,32 @@ function PayrollTotals({
 
 function EmployeePayrollTable({
   rows,
+  employeeSearch = "",
   onView,
 }: {
   rows: EmployeeTableRow[];
+  employeeSearch?: string;
   onView: (row: EmployeeTableRow) => void;
 }) {
+  const filteredRows = useMemo(() => {
+    const term = employeeSearch.trim().toLowerCase();
+    if (!term) return rows;
+    return rows.filter((row) => {
+      const haystack = `${row.name} ${row.code} ${row.department ?? ""}`.toLowerCase();
+      return haystack.includes(term);
+    });
+  }, [employeeSearch, rows]);
+
+  if (filteredRows.length === 0) {
+    return (
+      <div className="rounded-lg border px-4 py-10 text-center text-sm text-muted-foreground">
+        {rows.length === 0
+          ? "No employees in this payroll run."
+          : "No employees match your filter."}
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-auto max-h-[min(32rem,calc(100dvh-18rem))] rounded-lg border">
       <table className="w-full text-sm">
@@ -712,7 +710,7 @@ function EmployeePayrollTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {filteredRows.map((row) => (
             <tr key={row.id} className="border-b last:border-b-0 hover:bg-muted/30">
               <td className="px-3 py-2.5">
                 <div className="font-medium">{row.name}</div>

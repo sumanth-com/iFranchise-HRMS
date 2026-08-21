@@ -52,7 +52,13 @@ export function AppRouteError({ error, reset }: AppRouteErrorProps) {
       <ErrorState
         title="Something went wrong"
         description="We couldn't load this page. Please try again, or contact your HR administrator if the problem continues."
-        onRetry={reset}
+        onRetry={() => {
+          if (isRecoverable) {
+            recoverFromChunkLoadError({ force: true });
+            return;
+          }
+          reset();
+        }}
         retryLabel="Try again"
       />
     </div>

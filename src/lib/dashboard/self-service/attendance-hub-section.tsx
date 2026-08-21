@@ -49,42 +49,113 @@ export async function AttendanceHubSection({
   });
 
   const teamParams = attendanceListParamsSchema.parse({
-    page: section === "team" ? raw.page : undefined,
-    pageSize: raw.pageSize,
+    page: section === "team" ? firstString(raw.page) : undefined,
+    pageSize: firstString(raw.pageSize),
     search: firstString(raw.search),
     sortBy:
-      section === "team" && !raw.sortBy ? "check_in_at" : raw.sortBy,
+      section === "team" && !raw.sortBy ? "check_in_at" : firstString(raw.sortBy),
     sortOrder:
-      section === "team" && !raw.sortOrder ? "desc" : raw.sortOrder,
+      section === "team" && !raw.sortOrder ? "desc" : firstString(raw.sortOrder),
     dateFrom:
       typeof raw.dateFrom === "string" && raw.dateFrom.length > 0
         ? raw.dateFrom
         : undefined,
     dateTo:
       typeof raw.dateTo === "string" && raw.dateTo.length > 0 ? raw.dateTo : undefined,
-    branchId: raw.branchId,
-    departmentId: raw.departmentId,
-    attendanceStatus: raw.attendanceStatus,
-    employeeId: raw.employeeId,
+    branchId: firstString(raw.branchId) || undefined,
+    departmentId: firstString(raw.departmentId) || undefined,
+    attendanceStatus: firstString(raw.attendanceStatus) || undefined,
+    employeeId: firstString(raw.employeeId) || undefined,
   });
 
+  const loadMySection = section === "my";
+  const loadTeamSection = section === "team" && canViewTeam;
+
   const [selfData, teamResult, lookups, summary] = await Promise.all([
-    getManagerProfilePageData(supabase, profile, selfParams),
-    canViewTeam ? listAttendance(supabase, profile, teamParams) : Promise.resolve(null),
-    canViewTeam
+    loadMySection
+      ? getManagerProfilePageData(supabase, profile, selfParams)
+      : Promise.resolve(null),
+    loadTeamSection
+      ? listAttendance(supabase, profile, teamParams)
+      : Promise.resolve(null),
+    loadTeamSection
       ? getAttendanceLookups(supabase, profile.employee.organizationId)
       : Promise.resolve(null),
-    canViewTeam
+    loadTeamSection
       ? getAttendanceSummary(supabase, profile, teamParams.dateFrom, teamParams.dateTo)
       : Promise.resolve(null),
   ]);
+
+  const emptySelfData = {
+    today: {
+      attendanceId: null,
+      attendanceDate: today,
+      punchState: "not_checked_in" as const,
+      attendanceStatus: null,
+      checkInAt: null,
+      checkOutAt: null,
+      workHours: 0,
+      overtimeHours: 0,
+      lateMinutes: 0,
+      isLocked: false,
+      lockMessage: null,
+      workingDurationLabel: "0h 00m",
+    },
+    calendarDays: [],
+    profileCard: {
+      employeeId: profile.employee.id,
+      firstName: profile.employee.firstName,
+      lastName: profile.employee.lastName,
+      employeeCode: profile.employee.employeeCode,
+      designation: null,
+      departmentName: null,
+      employmentTypeName: "",
+      employmentStatus: profile.employee.employmentStatus,
+      accountStatus: (profile.employee.accountStatus ?? "active") as
+        | "draft"
+        | "invited"
+        | "invitation_pending"
+        | "invitation_accepted"
+        | "active"
+        | "inactive"
+        | "suspended"
+        | "archived",
+      reportingTo: null,
+      joiningDate: null,
+      email: profile.employee.email,
+      phone: null,
+      imageUrl: null,
+      profilePath: "",
+    },
+    summary: {
+      workingDays: 0,
+      present: 0,
+      absent: 0,
+      late: 0,
+      leave: 0,
+      halfDay: 0,
+      weekend: 0,
+      holiday: 0,
+      averageWorkingHours: 0,
+      averageCheckIn: null,
+      averageCheckOut: null,
+      overtimeHours: 0,
+      currentStreak: 0,
+      bestStreak: 0,
+    },
+    history: { data: [], total: 0, page: 1, pageSize: 25 },
+    month: selfParams.month ?? new Date().getMonth() + 1,
+    year: selfParams.year ?? new Date().getFullYear(),
+    selectedDate: null,
+    selectedDay: null,
+  };
 
   return (
     <HrAttendanceHubView
       initialSection={section}
       canViewTeam={canViewTeam}
       selfAttendance={{
-        data: selfData,
+        data: selfData ?? emptySelfData,
         status: selfParams.status,
         searchDate: selfParams.searchDate,
       }}

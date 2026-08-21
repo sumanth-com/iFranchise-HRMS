@@ -1,11 +1,10 @@
 "use client";
 
-import { Suspense, useCallback, useTransition } from "react";
+import { useCallback, useEffect, useRef, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { AttendanceSummaryCards } from "@/components/attendance/attendance-summary-cards";
 import { AttendanceTable } from "@/components/attendance/attendance-table";
-import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
 import type {
   AttendanceListItem,
@@ -14,6 +13,12 @@ import type {
   AttendanceSummary,
 } from "@/types/attendance";
 import type { LookupOption } from "@/types/employee";
+
+function normalizeQuery(params: URLSearchParams) {
+  const entries = Array.from(params.entries()).filter(([, value]) => value !== "");
+  entries.sort(([a], [b]) => a.localeCompare(b));
+  return new URLSearchParams(entries).toString();
+}
 
 type HrTeamAttendanceViewProps = {
   summary: AttendanceSummary;
@@ -73,6 +78,11 @@ export function HrTeamAttendanceView({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isCardPending, startCardTransition] = useTransition();
+  const lastCardQueryRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    lastCardQueryRef.current = null;
+  }, [attendanceStatus]);
 
   const applyStatusFilter = useCallback(
     (status: AttendanceStatus | undefined) => {
@@ -89,9 +99,16 @@ export function HrTeamAttendanceView({
       if (dateFrom && !params.get("dateFrom")) params.set("dateFrom", dateFrom);
       if (dateTo && !params.get("dateTo")) params.set("dateTo", dateTo);
 
-      const query = params.toString();
+      const query = normalizeQuery(params);
+      const current = normalizeQuery(searchParams);
+      if (query === current) return;
+      if (lastCardQueryRef.current === query) return;
+      lastCardQueryRef.current = query;
+
       startCardTransition(() => {
-        router.push(query ? `${listBasePath}?${query}` : listBasePath, { scroll: false });
+        router.replace(query ? `${listBasePath}?${query}` : listBasePath, {
+          scroll: false,
+        });
       });
     },
     [attendanceStatus, dateFrom, dateTo, listBasePath, router, searchParams],
@@ -113,38 +130,30 @@ export function HrTeamAttendanceView({
         onSelect={applyStatusFilter}
       />
 
-      <Suspense
-        fallback={
-          <div className="flex justify-center py-12">
-            <LoadingSpinner />
-          </div>
-        }
-      >
-        <AttendanceTable
-          records={records}
-          total={total}
-          page={page}
-          pageSize={pageSize}
-          search={search}
-          dateFrom={dateFrom}
-          dateTo={dateTo}
-          today={today}
-          departmentId={departmentId}
-          attendanceStatus={attendanceStatus}
-          employeeId={employeeId}
-          departments={departments}
-          employees={employees}
-          attendanceLookups={attendanceLookups}
-          canCreate={canCreate}
-          canEdit={canEdit}
-          canDelete={canDelete}
-          teamRegularizationMode={teamRegularizationMode}
-          canApproveCorrections={canApproveCorrections}
-          listBasePath={listBasePath}
-          onViewRecord={onViewRecord}
-          summaryDate={summary.date}
-        />
-      </Suspense>
+      <AttendanceTable
+        records={records}
+        total={total}
+        page={page}
+        pageSize={pageSize}
+        search={search}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        today={today}
+        departmentId={departmentId}
+        attendanceStatus={attendanceStatus}
+        employeeId={employeeId}
+        departments={departments}
+        employees={employees}
+        attendanceLookups={attendanceLookups}
+        canCreate={canCreate}
+        canEdit={canEdit}
+        canDelete={canDelete}
+        teamRegularizationMode={teamRegularizationMode}
+        canApproveCorrections={canApproveCorrections}
+        listBasePath={listBasePath}
+        onViewRecord={onViewRecord}
+        summaryDate={summary.date}
+      />
     </div>
   );
 }

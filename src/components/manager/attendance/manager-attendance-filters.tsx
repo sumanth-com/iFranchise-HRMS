@@ -65,13 +65,14 @@ export function ManagerAttendanceFilters({
           </label>
           <Select
             value={employeeValue}
-            onValueChange={(value) =>
+            onValueChange={(value) => {
+              if (value == null) return;
               onChange({
-                employeeId: !value || value === FILTER_ANY_VALUE ? undefined : value,
+                employeeId: value === FILTER_ANY_VALUE ? undefined : value,
                 search: undefined,
                 page: 1,
-              })
-            }
+              });
+            }}
             disabled={disabled}
           >
             <SelectTrigger id="team-member-filter" className="w-full">
@@ -126,15 +127,16 @@ export function ManagerAttendanceFilters({
           </label>
           <Select
             value={statusValue}
-            onValueChange={(value) =>
+            onValueChange={(value) => {
+              if (value == null) return;
               onChange({
                 attendanceStatus:
                   value === FILTER_ANY_VALUE
                     ? undefined
                     : (value as TeamAttendanceListParams["attendanceStatus"]),
                 page: 1,
-              })
-            }
+              });
+            }}
             disabled={disabled}
           >
             <SelectTrigger id="attendance-status" className="w-full">

@@ -14,7 +14,7 @@ function firstString(value: string | string[] | undefined) {
   return typeof value === "string" ? value : undefined;
 }
 
-export default async function ManagerTeamPage({ searchParams }: ManagerTeamPageProps) {
+async function ManagerTeamContent({ searchParams }: ManagerTeamPageProps) {
   const profile = await requireServerPermission("portal.manager.access");
   const rawParams = await searchParams;
 
@@ -25,6 +25,10 @@ export default async function ManagerTeamPage({ searchParams }: ManagerTeamPageP
     }),
   );
 
+  return <ManagerTeamView {...data} managerEmployeeId={profile.employee.id} />;
+}
+
+export default function ManagerTeamPage(props: ManagerTeamPageProps) {
   return (
     <Suspense
       fallback={
@@ -33,7 +37,7 @@ export default async function ManagerTeamPage({ searchParams }: ManagerTeamPageP
         </div>
       }
     >
-      <ManagerTeamView {...data} managerEmployeeId={profile.employee.id} />
+      <ManagerTeamContent {...props} />
     </Suspense>
   );
 }

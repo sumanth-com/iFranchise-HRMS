@@ -24,7 +24,6 @@ import { getMonthSelectItems, getYearSelectItems } from "@/components/payroll/se
 import { canExportReports } from "@/lib/reports/constants";
 import { exportGeneratedReportAction, runReportAction } from "@/lib/reports/actions";
 import { defaultDateRangeForCurrentMonth } from "@/lib/reports/services/reports-utils";
-import { cn } from "@/lib/utils";
 import type {
   ReportExportFormat,
   ReportFilters,
@@ -87,18 +86,6 @@ const MODULE_STATUS_OPTIONS: Partial<
     { value: "holiday", label: "Holiday" },
     { value: "week_off", label: "Week Off" },
   ],
-  leave: [
-    { value: "pending", label: "Pending" },
-    { value: "approved", label: "Approved" },
-    { value: "rejected", label: "Rejected" },
-    { value: "cancelled", label: "Cancelled" },
-  ],
-  payroll: [
-    { value: "draft", label: "Draft" },
-    { value: "processing", label: "Processing" },
-    { value: "completed", label: "Completed" },
-    { value: "paid", label: "Paid" },
-  ],
   performance: [
     { value: "draft", label: "Draft" },
     { value: "not_started", label: "Not Started" },
@@ -108,9 +95,10 @@ const MODULE_STATUS_OPTIONS: Partial<
   ],
   recruitment: [
     { value: "open", label: "Open" },
-    { value: "closed", label: "Closed" },
+    { value: "draft", label: "Draft" },
     { value: "on_hold", label: "On Hold" },
     { value: "filled", label: "Filled" },
+    { value: "closed", label: "Closed" },
   ],
   assets: [
     { value: "available", label: "Available" },
@@ -141,7 +129,7 @@ const MODULE_TITLES: Record<ReportModuleKey, string> = {
 const MODULE_SUBTITLES: Record<ReportModuleKey, string> = {
   hr: "Review workforce, joining, and probation data for the selected period.",
   attendance: "Track daily presence, late marks, and working hours across the selected period.",
-  leave: "Monitor leave balances, utilization, and request status for the selected period.",
+  leave: "Monitor leave balances and utilization for the selected period.",
   payroll: "Review salary, deductions, bonuses, and net pay for the selected month.",
   performance: "Track KPIs, goals, reviews, and promotion readiness for the selected month.",
   recruitment: "Review open roles, pipeline, offers, and hiring progress for the selected period.",
@@ -161,12 +149,12 @@ const MODULE_EMPTY_STATE: Record<
   attendance: {
     title: "Attendance records will appear here",
     description:
-      "Set the From and To dates, optionally choose a status or employee, then generate the report to view and export attendance.",
+      "Set the From and To dates, optionally choose status, department, or employee, then generate the report to view and export attendance.",
   },
   leave: {
     title: "Leave records will appear here",
     description:
-      "Optionally filter by status or employee, then generate the report to view and export leave data.",
+      "Optionally filter by employee or leave type, then generate the report to view and export leave data.",
   },
   payroll: {
     title: "Payroll records will appear here",
@@ -202,15 +190,16 @@ const MODULE_NO_DATA: Record<ReportModuleKey, { title: string; description: stri
   },
   attendance: {
     title: "No attendance records found",
-    description: "Try a different date range, status, or employee, then click Generate again.",
+    description:
+      "Try a different date range, status, department, or employee, then click Generate again.",
   },
   leave: {
     title: "No leave records found",
-    description: "Try a different status or employee, then click Generate again.",
+    description: "Try a different employee or leave type, then click Generate again.",
   },
   payroll: {
     title: "No payroll records found",
-    description: "Try a different report type, month, or year, then click Generate again.",
+    description: "Try a different report type, month, year, or employee, then click Generate again.",
   },
   performance: {
     title: "No performance records found",
@@ -269,6 +258,8 @@ function showFiltersFor(module: ReportModuleKey) {
     reportType: module !== "attendance" && module !== "leave",
     dates: module !== "payroll" && module !== "performance",
     monthYear: module === "payroll" || module === "performance",
+    status: module !== "leave" && module !== "payroll",
+    department: module === "attendance",
     designation: module === "hr",
     employee: module !== "hr" && module !== "recruitment",
     leaveType: module === "leave",
@@ -295,6 +286,7 @@ function monthToDateRange(month: number, year: number) {
 function buildFilters(
   dateFrom: string,
   dateTo: string,
+  departmentId: string,
   designationId: string,
   employeeId: string,
   leaveTypeId: string,
@@ -308,6 +300,8 @@ function buildFilters(
   return {
     dateFrom: period.dateFrom || undefined,
     dateTo: period.dateTo || undefined,
+    departmentId:
+      departmentId && departmentId !== ALL_OPTION.value ? departmentId : undefined,
     designationId:
       designationId && designationId !== ALL_OPTION.value ? designationId : undefined,
     employeeId: employeeId && employeeId !== ALL_OPTION.value ? employeeId : undefined,
@@ -349,6 +343,9 @@ export function ModuleReportsView({
     defaultFilters?.dateFrom ?? periodDefault.dateFrom,
   );
   const [dateTo, setDateTo] = useState(defaultFilters?.dateTo ?? periodDefault.dateTo);
+  const [departmentId, setDepartmentId] = useState(
+    defaultFilters?.departmentId ?? ALL_OPTION.value,
+  );
   const [designationId, setDesignationId] = useState(
     defaultFilters?.designationId ?? ALL_OPTION.value,
   );
@@ -367,8 +364,17 @@ export function ModuleReportsView({
   );
 
   const filterVisibility = showFiltersFor(module);
-  const statusOptions = MODULE_STATUS_OPTIONS[module] ?? [];
+  const showStatusFilter = module !== "leave" && module !== "payroll";
+  const statusOptions = showStatusFilter ? (MODULE_STATUS_OPTIONS[module] ?? []) : [];
 
+  const departmentItems = useMemo(
+    () =>
+      dedupeByValue([
+        { value: ALL_OPTION.value, label: "All departments" },
+        ...lookups.departments.map((d) => ({ value: d.id, label: d.label })),
+      ]),
+    [lookups.departments],
+  );
   const designationItems = useMemo(
     () =>
       dedupeByValue([
@@ -417,10 +423,11 @@ export function ModuleReportsView({
     return buildFilters(
       dateFrom,
       dateTo,
+      departmentId,
       designationId,
       employeeId,
       leaveTypeId,
-      status,
+      filterVisibility.status && showStatusFilter ? status : ALL_OPTION.value,
       filterVisibility.monthYear ? selectedMonth : undefined,
       filterVisibility.monthYear ? selectedYear : undefined,
     );
@@ -484,13 +491,6 @@ export function ModuleReportsView({
     description: "Choose filters and click Generate to view and export data.",
   };
   const EmptyIcon = MODULE_EMPTY_ICONS[module] ?? CalendarDays;
-  const growingFilter = filterVisibility.employee
-    ? "employee"
-    : filterVisibility.leaveType
-      ? "leaveType"
-    : filterVisibility.designation
-      ? "designation"
-      : "status";
   const canDownload = Boolean(result && result.total > 0 && result.key === reportKey);
   const showTable = Boolean(result && result.total > 0 && result.key === reportKey);
   const panelCopy =
@@ -580,22 +580,32 @@ export function ModuleReportsView({
           </>
         ) : null}
 
-        <div className={cn(growingFilter === "status" ? "min-w-[132px] flex-1" : "w-[132px] shrink-0")}>
-          <LabeledSelect
-            items={statusItems}
-            value={status}
-            onValueChange={(value) => changeFilter(value, status, setStatus)}
-            placeholder="All statuses"
-            triggerClassName="h-8 w-full"
-            contentClassName="w-max min-w-[var(--anchor-width)] max-w-[16rem] max-h-[min(18rem,calc(100dvh-8rem))]"
-          />
-        </div>
+        {showStatusFilter && filterVisibility.status ? (
+          <div className="w-[130px] shrink-0">
+            <LabeledSelect
+              items={statusItems}
+              value={status}
+              onValueChange={(value) => changeFilter(value, status, setStatus)}
+              placeholder="All statuses"
+              triggerClassName="h-8 w-full"
+              contentClassName="w-max min-w-[var(--anchor-width)] max-w-[16rem] max-h-[min(18rem,calc(100dvh-8rem))]"
+            />
+          </div>
+        ) : null}
+        {filterVisibility.department ? (
+          <div className="w-[150px] shrink-0">
+            <LabeledSelect
+              items={departmentItems}
+              value={departmentId}
+              onValueChange={(value) => changeFilter(value, departmentId, setDepartmentId)}
+              placeholder="All departments"
+              triggerClassName="h-8 w-full"
+              contentClassName="w-max min-w-[16rem] max-w-[min(22rem,calc(100vw-2rem))] max-h-[min(18rem,calc(100dvh-8rem))]"
+            />
+          </div>
+        ) : null}
         {filterVisibility.designation ? (
-          <div
-            className={cn(
-              growingFilter === "designation" ? "min-w-[150px] flex-1" : "w-[150px] shrink-0",
-            )}
-          >
+          <div className="w-[150px] shrink-0">
             <LabeledSelect
               items={designationItems}
               value={designationId}
@@ -608,11 +618,7 @@ export function ModuleReportsView({
           </div>
         ) : null}
         {filterVisibility.employee ? (
-          <div
-            className={cn(
-              growingFilter === "employee" ? "min-w-[170px] flex-1" : "w-[170px] shrink-0",
-            )}
-          >
+          <div className="w-[180px] shrink-0">
             <LabeledSelect
               items={employeeItems}
               value={employeeId}
@@ -624,11 +630,7 @@ export function ModuleReportsView({
           </div>
         ) : null}
         {filterVisibility.leaveType ? (
-          <div
-            className={cn(
-              growingFilter === "leaveType" ? "min-w-[170px] flex-1" : "w-[170px] shrink-0",
-            )}
-          >
+          <div className="w-[160px] shrink-0">
             <LabeledSelect
               items={leaveTypeItems}
               value={leaveTypeId}
@@ -640,7 +642,7 @@ export function ModuleReportsView({
           </div>
         ) : null}
 
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
           <Button onClick={onRun} disabled={isPending} size="sm">
             {isPending ? (
               <Loader2 className="mr-1.5 size-3.5 animate-spin" />
