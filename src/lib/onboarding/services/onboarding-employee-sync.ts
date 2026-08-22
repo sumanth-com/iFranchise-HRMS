@@ -4,6 +4,10 @@ import { DOCUMENTS_STORAGE_BUCKET } from "@/lib/documents/constants";
 import { getDocumentSettings, nextDocumentNumber } from "@/lib/documents/services/document-settings";
 import { getDocumentTypeIdByCode } from "@/lib/documents/services/document-queries";
 import { ONBOARDING_STORAGE_BUCKET } from "@/lib/onboarding/constants";
+import {
+  educationDocumentLabel,
+  parseEducationForm,
+} from "@/lib/onboarding/education-utils";
 import type { OnboardingCaseDetail } from "@/types/onboarding";
 import {
   ONBOARDING_EMPLOYMENT_DOCUMENTS,
@@ -43,7 +47,7 @@ function onboardingDocTitle(code: string): string {
   const match = catalog.find((item) => item.code === code);
   if (match) return match.label;
   if (code === "cancelled_cheque") return "Cancelled Cheque";
-  if (code.startsWith("edu_")) return "Education Certificate";
+  if (code.startsWith("edu_")) return educationDocumentLabel(code);
   return code.replace(/_/g, " ");
 }
 
@@ -68,36 +72,23 @@ async function resolveDocumentTypeId(
 }
 
 function buildEducationBio(education: Record<string, unknown>): string | null {
-  const entries = education.entries;
-  if (Array.isArray(entries)) {
-    const lines: string[] = [];
-    for (const item of entries) {
-      if (!item || typeof item !== "object") continue;
-      const record = item as Record<string, unknown>;
-      const level = typeof record.level === "string" ? record.level : "";
-      const institution =
-        typeof record.institutionName === "string" ? record.institutionName.trim() : "";
-      if (!level || !institution) continue;
-      const label = level.replace(/_/g, " ");
-      lines.push(`${label}: ${institution}`);
-    }
-    if (lines.length) return `Education (from onboarding)\n${lines.join("\n")}`;
-  }
-
+  const form = parseEducationForm(education);
   const lines: string[] = [];
-  const fields: Array<[string, string]> = [
-    ["ssc", "SSC"],
-    ["intermediate", "Intermediate"],
-    ["graduation", "Graduation"],
-    ["postGraduation", "Post graduation"],
-    ["certifications", "Certifications"],
-  ];
 
-  for (const [key, label] of fields) {
-    const value = education[key];
-    if (typeof value === "string" && value.trim()) {
-      lines.push(`${label}: ${value.trim()}`);
-    }
+  if (form.ssc.schoolName.trim()) {
+    lines.push(
+      `10th (SSC): ${form.ssc.schoolName.trim()} — ${form.ssc.board || "Board N/A"}, ${form.ssc.yearOfPassing || "Year N/A"}`,
+    );
+  }
+  if (form.intermediate.schoolName.trim()) {
+    lines.push(
+      `12th: ${form.intermediate.schoolName.trim()} — ${form.intermediate.qualification || "Qualification N/A"}, ${form.intermediate.stream || "Stream N/A"}`,
+    );
+  }
+  if (form.graduation.collegeName.trim()) {
+    lines.push(
+      `Graduation: ${form.graduation.degree || "Degree N/A"} (${form.graduation.specialization || "Branch N/A"}) — ${form.graduation.collegeName.trim()}, ${form.graduation.university || "University N/A"}`,
+    );
   }
 
   if (!lines.length) return null;
@@ -174,8 +165,19 @@ async function syncProfileSections(
     { onConflict: "employee_id" },
   );
 
-  const address = typeof personal.address === "string" ? personal.address.trim() : "";
-  if (address) {
+  const addressLine =
+    typeof personal.addressLine === "string"
+      ? personal.addressLine.trim()
+      : typeof personal.address === "string"
+        ? personal.address.trim()
+        : "";
+  const state =
+    typeof personal.state === "string" ? personal.state.trim() : "";
+  const city = typeof personal.city === "string" ? personal.city.trim() : "";
+  const pincode =
+    typeof personal.pincode === "string" ? personal.pincode.trim() : "";
+
+  if (state || city || pincode || addressLine) {
     const { data: existingAddress } = await admin
       .schema("hrms")
       .from("employee_addresses")
@@ -186,11 +188,11 @@ async function syncProfileSections(
       .maybeSingle();
 
     const addressPayload = {
-      address_line1: address,
+      address_line1: addressLine || null,
       address_line2: null,
-      city: "Not specified",
-      state: null,
-      postal_code: null,
+      city: city || "Not specified",
+      state: state || null,
+      postal_code: pincode || null,
       country: "India",
       is_primary: true,
       status: "active",

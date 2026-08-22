@@ -1,9 +1,12 @@
 import {
-  educationDocumentTypeCode,
-  educationLevelLabel,
-  parseEducationEntries,
+  EDUCATION_DOCUMENT_CODES,
+  parseEducationForm,
+  type OnboardingEducationFormData,
 } from "@/lib/onboarding/education-utils";
+import { isValidPassingYear } from "@/lib/onboarding/education-options";
 import { isValidBankAccountNumber, isValidIfsc } from "@/lib/onboarding/bank-field-utils";
+import { isValidAadhaar, isValidPan } from "@/lib/onboarding/identity-field-utils";
+import { isValidIndianPincode } from "@/lib/onboarding/india-locations";
 import { isValidStoredPhone } from "@/lib/onboarding/personal-field-options";
 import {
   ONBOARDING_AGREEMENT_TYPES,
@@ -12,7 +15,6 @@ import {
   ONBOARDING_POLICY_DOCUMENTS,
   ONBOARDING_WIZARD_SECTIONS,
   type CandidatePortalContext,
-  type OnboardingEducationEntry,
   type OnboardingWizardSection,
 } from "@/types/onboarding";
 
@@ -20,7 +22,9 @@ const PERSONAL_REQUIRED: { key: string; label: string }[] = [
   { key: "fullName", label: "Full name" },
   { key: "dateOfBirth", label: "Date of birth" },
   { key: "gender", label: "Gender" },
-  { key: "address", label: "Address" },
+  { key: "state", label: "State" },
+  { key: "city", label: "City / district" },
+  { key: "pincode", label: "Pincode" },
   { key: "emergencyContact", label: "Emergency contact" },
   { key: "personalMobile", label: "Personal mobile" },
   { key: "personalEmail", label: "Personal email" },
@@ -62,23 +66,118 @@ export type SectionValidationResult = {
 
 export function validateEducationSection(
   context: CandidatePortalContext,
-  entries: OnboardingEducationEntry[],
+  form: OnboardingEducationFormData,
 ): SectionValidationResult {
   const missing: string[] = [];
 
-  if (entries.length === 0) {
-    missing.push("At least one education qualification");
-    return { valid: false, missing };
+  const sscFields: { key: keyof OnboardingEducationFormData["ssc"]; label: string }[] = [
+    { key: "schoolName", label: "10th — school name" },
+    { key: "board", label: "10th — board" },
+    { key: "yearOfPassing", label: "10th — year of passing" },
+    { key: "percentageOrCgpa", label: "10th — percentage / CGPA" },
+    { key: "rollNumber", label: "10th — roll / registration number" },
+    { key: "placeOrState", label: "10th — place / state" },
+  ];
+  for (const field of sscFields) {
+    if (!hasText(form.ssc[field.key])) missing.push(field.label);
+  }
+  if (hasText(form.ssc.yearOfPassing) && !isValidPassingYear(form.ssc.yearOfPassing)) {
+    missing.push("10th — valid year of passing");
+  }
+  if (
+    !hasUploadedDocument(context, "education", EDUCATION_DOCUMENT_CODES.ssc_marksheet)
+  ) {
+    missing.push("10th — marks memo / marksheet");
+  }
+  if (
+    !hasUploadedDocument(context, "education", EDUCATION_DOCUMENT_CODES.ssc_certificate)
+  ) {
+    missing.push("10th — certificate");
   }
 
-  for (const entry of entries) {
-    const label = educationLevelLabel(entry.level);
-    if (!hasText(entry.institutionName)) {
-      missing.push(`${label} — school / college name`);
-    }
-    if (!hasUploadedDocument(context, "education", educationDocumentTypeCode(entry.id))) {
-      missing.push(`${label} — certificate upload`);
-    }
+  const intermediateFields: {
+    key: keyof OnboardingEducationFormData["intermediate"];
+    label: string;
+  }[] = [
+    { key: "qualification", label: "12th — qualification" },
+    { key: "schoolName", label: "12th — school / college name" },
+    { key: "board", label: "12th — board" },
+    { key: "stream", label: "12th — stream" },
+    { key: "yearOfPassing", label: "12th — year of passing" },
+    { key: "percentageOrCgpa", label: "12th — percentage / CGPA" },
+    { key: "rollNumber", label: "12th — roll / registration number" },
+    { key: "collegeStateOrLocation", label: "12th — college state / location" },
+  ];
+  for (const field of intermediateFields) {
+    if (!hasText(form.intermediate[field.key])) missing.push(field.label);
+  }
+  if (
+    hasText(form.intermediate.yearOfPassing) &&
+    !isValidPassingYear(form.intermediate.yearOfPassing)
+  ) {
+    missing.push("12th — valid year of passing");
+  }
+  if (
+    !hasUploadedDocument(context, "education", EDUCATION_DOCUMENT_CODES.intermediate_marksheet)
+  ) {
+    missing.push("12th — marksheet");
+  }
+  if (
+    !hasUploadedDocument(
+      context,
+      "education",
+      EDUCATION_DOCUMENT_CODES.intermediate_certificate,
+    )
+  ) {
+    missing.push("12th — passing certificate");
+  }
+
+  const graduationFields: {
+    key: keyof OnboardingEducationFormData["graduation"];
+    label: string;
+  }[] = [
+    { key: "degree", label: "Graduation — degree" },
+    { key: "specialization", label: "Graduation — specialization / branch" },
+    { key: "collegeName", label: "Graduation — college / institution" },
+    { key: "university", label: "Graduation — university" },
+    { key: "yearOfAdmission", label: "Graduation — year of admission" },
+    { key: "yearOfPassing", label: "Graduation — year of passing" },
+    { key: "percentageOrCgpa", label: "Graduation — percentage / CGPA" },
+    { key: "rollNumber", label: "Graduation — roll / registration number" },
+    { key: "stateOrLocation", label: "Graduation — state / location" },
+  ];
+  for (const field of graduationFields) {
+    if (!hasText(form.graduation[field.key])) missing.push(field.label);
+  }
+  if (
+    hasText(form.graduation.yearOfAdmission) &&
+    !isValidPassingYear(form.graduation.yearOfAdmission)
+  ) {
+    missing.push("Graduation — valid year of admission");
+  }
+  if (
+    hasText(form.graduation.yearOfPassing) &&
+    !isValidPassingYear(form.graduation.yearOfPassing)
+  ) {
+    missing.push("Graduation — valid year of passing");
+  }
+  if (
+    !hasUploadedDocument(
+      context,
+      "education",
+      EDUCATION_DOCUMENT_CODES.graduation_semester_marksheets,
+    )
+  ) {
+    missing.push("Graduation — semester-wise mark sheets");
+  }
+  if (
+    !hasUploadedDocument(
+      context,
+      "education",
+      EDUCATION_DOCUMENT_CODES.graduation_degree_certificate,
+    )
+  ) {
+    missing.push("Graduation — degree certificate");
   }
 
   return { valid: missing.length === 0, missing };
@@ -101,6 +200,9 @@ export function validateOnboardingSection(
           missing.push(field.label);
         }
       }
+      if (hasText(data.pincode) && !isValidIndianPincode(String(data.pincode))) {
+        missing.push("Valid 6-digit pincode");
+      }
       break;
 
     case "identity":
@@ -109,13 +211,16 @@ export function validateOnboardingSection(
           missing.push(doc.label);
         }
       }
-      if (!hasText(data.aadhaar)) missing.push("Aadhaar number");
-      if (!hasText(data.pan)) missing.push("PAN number");
+      if (!hasText(data.aadhaar) || !isValidAadhaar(data.aadhaar)) {
+        missing.push("Valid 12-digit Aadhaar number");
+      }
+      if (!hasText(data.pan) || !isValidPan(data.pan)) {
+        missing.push("Valid PAN (e.g. ABCDE1234F)");
+      }
       break;
 
     case "education":
-      const entries = parseEducationEntries(data);
-      return validateEducationSection(context, entries);
+      return validateEducationSection(context, parseEducationForm(data));
 
     case "employment_history":
       for (const doc of ONBOARDING_EMPLOYMENT_DOCUMENTS) {

@@ -1,30 +1,39 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { useMemo, type ReactNode } from "react";
 
-import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { OnboardingDocumentUpload } from "@/components/onboarding/candidate/onboarding-document-upload";
+import { OnboardingTypeaheadField } from "@/components/onboarding/candidate/onboarding-typeahead-field";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import {
-  createEducationEntry,
-  educationLevelLabel,
-} from "@/lib/onboarding/education-utils";
+  ACADEMIC_STREAMS,
+  filterEducationOptions,
+  GRADUATION_DEGREES,
+  GRADUATION_SPECIALIZATIONS,
+  INDIAN_COLLEGES,
+  INDIAN_SCHOOL_BOARDS,
+  INDIAN_UNIVERSITIES,
+  INTERMEDIATE_QUALIFICATIONS,
+  sanitizeYear,
+  toSelectItems,
+} from "@/lib/onboarding/education-options";
 import {
-  ONBOARDING_EDUCATION_LEVELS,
-  type OnboardingEducationEntry,
-  type OnboardingEducationLevelCode,
-} from "@/types/onboarding";
+  EDUCATION_DOCUMENT_CODES,
+  educationDocumentMaxMb,
+  type OnboardingEducationFormData,
+} from "@/lib/onboarding/education-utils";
 import { cn } from "@/lib/utils";
-
-const LEVEL_ITEMS = ONBOARDING_EDUCATION_LEVELS.map((level) => ({
-  value: level.code,
-  label: level.label,
-}));
 
 const educationInputClassName =
   "h-9 bg-background text-sm text-foreground caret-foreground placeholder:text-muted-foreground dark:bg-background dark:text-foreground";
+
+const BOARD_ITEMS = toSelectItems(INDIAN_SCHOOL_BOARDS);
+const QUALIFICATION_ITEMS = toSelectItems(INTERMEDIATE_QUALIFICATIONS);
+const STREAM_ITEMS = toSelectItems(ACADEMIC_STREAMS);
+const DEGREE_ITEMS = toSelectItems(GRADUATION_DEGREES);
+const SPECIALIZATION_ITEMS = toSelectItems(GRADUATION_SPECIALIZATIONS);
 
 type UploadMeta = {
   fileName: string | null;
@@ -33,10 +42,10 @@ type UploadMeta = {
 };
 
 type OnboardingEducationSectionProps = {
-  entries: OnboardingEducationEntry[];
-  onEntriesChange: (entries: OnboardingEducationEntry[]) => void;
-  onUpload: (entryId: string, file: File) => void;
-  getUploadMeta: (entryId: string) => UploadMeta;
+  form: OnboardingEducationFormData;
+  onFormChange: (form: OnboardingEducationFormData) => void;
+  onUpload: (documentCode: string, file: File) => void;
+  getUploadMeta: (documentCode: string) => UploadMeta;
 };
 
 function FieldLabel({ label, required }: { label: string; required?: boolean }) {
@@ -48,135 +57,366 @@ function FieldLabel({ label, required }: { label: string; required?: boolean }) 
   );
 }
 
+function SectionHeading({ title }: { title: string }) {
+  return (
+    <h3 className="border-b border-border/60 pb-2 text-base font-semibold tracking-tight text-foreground">
+      {title}
+    </h3>
+  );
+}
+
+function UploadPair({
+  left,
+  right,
+}: {
+  left: ReactNode;
+  right: ReactNode;
+}) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {left}
+      {right}
+    </div>
+  );
+}
+
 export function OnboardingEducationSection({
-  entries,
-  onEntriesChange,
+  form,
+  onFormChange,
   onUpload,
   getUploadMeta,
 }: OnboardingEducationSectionProps) {
-  function updateEntry(id: string, patch: Partial<OnboardingEducationEntry>) {
-    onEntriesChange(entries.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry)));
+  const collegeSuggestions = useMemo(
+    () => filterEducationOptions(INDIAN_COLLEGES, form.graduation.collegeName),
+    [form.graduation.collegeName],
+  );
+  const universitySuggestions = useMemo(
+    () => filterEducationOptions(INDIAN_UNIVERSITIES, form.graduation.university),
+    [form.graduation.university],
+  );
+
+  function updateSsc(patch: Partial<OnboardingEducationFormData["ssc"]>) {
+    onFormChange({ ...form, ssc: { ...form.ssc, ...patch } });
   }
 
-  function removeEntry(id: string) {
-    onEntriesChange(entries.filter((entry) => entry.id !== id));
+  function updateIntermediate(patch: Partial<OnboardingEducationFormData["intermediate"]>) {
+    onFormChange({ ...form, intermediate: { ...form.intermediate, ...patch } });
   }
 
-  function addEntry(level: OnboardingEducationLevelCode) {
-    onEntriesChange([...entries, createEducationEntry(level)]);
+  function updateGraduation(patch: Partial<OnboardingEducationFormData["graduation"]>) {
+    onFormChange({ ...form, graduation: { ...form.graduation, ...patch } });
   }
 
-  if (entries.length === 0) {
+  function renderUpload(code: string, label: string, required = true) {
+    const meta = getUploadMeta(code);
     return (
-      <div className="space-y-4">
-        <p className="text-center text-sm text-muted-foreground">
-          Add your qualifications — select the level, enter the school or college name, and upload
-          the certificate for each.
-        </p>
-        <div className="flex flex-wrap justify-center gap-2">
-          {ONBOARDING_EDUCATION_LEVELS.slice(0, 4).map((level) => (
-            <Button
-              key={level.code}
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => addEntry(level.code)}
-            >
-              <Plus className="mr-1 h-3.5 w-3.5" />
-              {level.label}
-            </Button>
-          ))}
-        </div>
-      </div>
+      <OnboardingDocumentUpload
+        variant="card"
+        label={label}
+        required={required}
+        maxUploadMb={educationDocumentMaxMb(code)}
+        fileName={meta.fileName}
+        uploading={meta.uploading}
+        pendingFileName={meta.pendingFileName}
+        onSelectFile={(file) => onUpload(code, file)}
+      />
     );
   }
 
   return (
-    <div className="space-y-4">
-      {entries.map((entry, index) => {
-        const meta = getUploadMeta(entry.id);
-        return (
-          <div
-            key={entry.id}
-            className="space-y-3 rounded-xl border border-border bg-muted/30 p-4 dark:bg-muted/20"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Qualification {index + 1}
-              </p>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-8 text-muted-foreground hover:text-destructive"
-                onClick={() => removeEntry(entry.id)}
-              >
-                <Trash2 className="mr-1 h-3.5 w-3.5" />
-                Remove
-              </Button>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1">
-                <FieldLabel label="Education level" required />
-                <LabeledSelect
-                  items={LEVEL_ITEMS}
-                  value={entry.level}
-                  placeholder="Select level"
-                  onValueChange={(value) =>
-                    updateEntry(entry.id, { level: value as OnboardingEducationLevelCode })
-                  }
-                  triggerClassName={cn(educationInputClassName, "w-full")}
-                />
-              </div>
-              <div className="space-y-1">
-                <FieldLabel
-                  label={
-                    entry.level === "ssc" || entry.level === "intermediate"
-                      ? "School name"
-                      : "College / institution name"
-                  }
-                  required
-                />
-                <Input
-                  className={educationInputClassName}
-                  value={entry.institutionName}
-                  onChange={(e) => updateEntry(entry.id, { institutionName: e.target.value })}
-                  placeholder={
-                    entry.level === "ssc" || entry.level === "intermediate"
-                      ? "Enter school name"
-                      : "Enter college or institution name"
-                  }
-                />
-              </div>
-            </div>
-
-            <OnboardingDocumentUpload
-              label={`${educationLevelLabel(entry.level)} certificate`}
-              required
-              fileName={meta.fileName}
-              uploading={meta.uploading}
-              pendingFileName={meta.pendingFileName}
-              onSelectFile={(file) => onUpload(entry.id, file)}
+    <div className="space-y-8">
+      <section className="space-y-4">
+        <SectionHeading title="10th Class (SSC)" />
+        <div className="space-y-1">
+          <FieldLabel label="School name" required />
+          <Input
+            className={educationInputClassName}
+            value={form.ssc.schoolName}
+            placeholder="Enter school name"
+            onChange={(e) => updateSsc({ schoolName: e.target.value })}
+          />
+        </div>
+        <div className="space-y-1">
+          <FieldLabel label="Board" required />
+          <LabeledSelect
+            items={BOARD_ITEMS}
+            value={form.ssc.board}
+            placeholder="Select board (CBSE / ICSE / State Board)"
+            onValueChange={(value) => updateSsc({ board: value })}
+            triggerClassName={cn(educationInputClassName, "w-full")}
+          />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <FieldLabel label="Year of passing" required />
+            <Input
+              className={educationInputClassName}
+              inputMode="numeric"
+              maxLength={4}
+              placeholder="YYYY"
+              value={form.ssc.yearOfPassing}
+              onChange={(e) => updateSsc({ yearOfPassing: sanitizeYear(e.target.value) })}
             />
           </div>
-        );
-      })}
+          <div className="space-y-1">
+            <FieldLabel label="Percentage / CGPA" required />
+            <Input
+              className={educationInputClassName}
+              value={form.ssc.percentageOrCgpa}
+              placeholder="e.g. 85% or 9.2 CGPA"
+              onChange={(e) => updateSsc({ percentageOrCgpa: e.target.value })}
+            />
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <FieldLabel label="Roll number / Registration number" required />
+            <Input
+              className={educationInputClassName}
+              value={form.ssc.rollNumber}
+              onChange={(e) => updateSsc({ rollNumber: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1">
+            <FieldLabel label="Place / State" required />
+            <Input
+              className={educationInputClassName}
+              value={form.ssc.placeOrState}
+              onChange={(e) => updateSsc({ placeOrState: e.target.value })}
+            />
+          </div>
+        </div>
+        <UploadPair
+          left={renderUpload(
+            EDUCATION_DOCUMENT_CODES.ssc_marksheet,
+            "10th Marks Memo / Marksheet",
+          )}
+          right={renderUpload(
+            EDUCATION_DOCUMENT_CODES.ssc_certificate,
+            "10th Certificate / SSC Certificate",
+          )}
+        />
+      </section>
 
-      <div className="flex flex-wrap justify-center gap-2 pt-1">
-        {ONBOARDING_EDUCATION_LEVELS.map((level) => (
-          <Button
-            key={level.code}
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => addEntry(level.code)}
-          >
-            <Plus className="mr-1 h-3.5 w-3.5" />
-            Add {level.label}
-          </Button>
-        ))}
-      </div>
+      <section className="space-y-4">
+        <SectionHeading title="12th Class — Application Details" />
+        <div className="space-y-1">
+          <FieldLabel label="Qualification" required />
+          <LabeledSelect
+            items={QUALIFICATION_ITEMS}
+            value={form.intermediate.qualification}
+            placeholder="12th / Intermediate / PUC"
+            onValueChange={(value) => updateIntermediate({ qualification: value })}
+            triggerClassName={cn(educationInputClassName, "w-full")}
+          />
+        </div>
+        <div className="space-y-1">
+          <FieldLabel label="School / College name" required />
+          <Input
+            className={educationInputClassName}
+            value={form.intermediate.schoolName}
+            placeholder="Enter school or college name"
+            onChange={(e) => updateIntermediate({ schoolName: e.target.value })}
+          />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <FieldLabel label="Board" required />
+            <LabeledSelect
+              items={BOARD_ITEMS}
+              value={form.intermediate.board}
+              placeholder="CBSE / ISC / State Board"
+              onValueChange={(value) => updateIntermediate({ board: value })}
+              triggerClassName={cn(educationInputClassName, "w-full")}
+            />
+          </div>
+          <div className="space-y-1">
+            <FieldLabel label="Stream" required />
+            <LabeledSelect
+              items={STREAM_ITEMS}
+              value={form.intermediate.stream}
+              placeholder="MPC / BiPC / Commerce / Arts"
+              onValueChange={(value) => updateIntermediate({ stream: value })}
+              triggerClassName={cn(educationInputClassName, "w-full")}
+            />
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <FieldLabel label="Year of passing" required />
+            <Input
+              className={educationInputClassName}
+              inputMode="numeric"
+              maxLength={4}
+              placeholder="YYYY"
+              value={form.intermediate.yearOfPassing}
+              onChange={(e) =>
+                updateIntermediate({ yearOfPassing: sanitizeYear(e.target.value) })
+              }
+            />
+          </div>
+          <div className="space-y-1">
+            <FieldLabel label="Percentage / CGPA" required />
+            <Input
+              className={educationInputClassName}
+              value={form.intermediate.percentageOrCgpa}
+              placeholder="e.g. 85% or 9.2 CGPA"
+              onChange={(e) => updateIntermediate({ percentageOrCgpa: e.target.value })}
+            />
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <FieldLabel label="Roll number / Registration number" required />
+            <Input
+              className={educationInputClassName}
+              value={form.intermediate.rollNumber}
+              onChange={(e) => updateIntermediate({ rollNumber: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1">
+            <FieldLabel label="College state / Location" required />
+            <Input
+              className={educationInputClassName}
+              value={form.intermediate.collegeStateOrLocation}
+              onChange={(e) => updateIntermediate({ collegeStateOrLocation: e.target.value })}
+            />
+          </div>
+        </div>
+        <UploadPair
+          left={renderUpload(
+            EDUCATION_DOCUMENT_CODES.intermediate_marksheet,
+            "12th Marksheet",
+          )}
+          right={renderUpload(
+            EDUCATION_DOCUMENT_CODES.intermediate_certificate,
+            "12th Passing Certificate / Intermediate Certificate",
+          )}
+        />
+      </section>
+
+      <section className="space-y-4">
+        <SectionHeading title="Graduation — Application Details" />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <FieldLabel label="Degree" required />
+            <LabeledSelect
+              items={DEGREE_ITEMS}
+              value={form.graduation.degree}
+              placeholder="B.Tech, B.E., B.Sc, etc."
+              onValueChange={(value) => updateGraduation({ degree: value })}
+              triggerClassName={cn(educationInputClassName, "w-full")}
+            />
+          </div>
+          <div className="space-y-1">
+            <FieldLabel label="Specialization / Branch" required />
+            <LabeledSelect
+              items={SPECIALIZATION_ITEMS}
+              value={form.graduation.specialization}
+              placeholder="CSE, ECE, Mechanical, etc."
+              onValueChange={(value) => updateGraduation({ specialization: value })}
+              triggerClassName={cn(educationInputClassName, "w-full")}
+            />
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <OnboardingTypeaheadField
+            label="College / Institution name"
+            required
+            value={form.graduation.collegeName}
+            placeholder="Type or select college"
+            suggestions={collegeSuggestions}
+            onValueChange={(value) => updateGraduation({ collegeName: value })}
+            inputClassName={educationInputClassName}
+          />
+          <OnboardingTypeaheadField
+            label="University"
+            required
+            value={form.graduation.university}
+            placeholder="Type or select university"
+            suggestions={universitySuggestions}
+            onValueChange={(value) => updateGraduation({ university: value })}
+            inputClassName={educationInputClassName}
+          />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <FieldLabel label="Year of admission" required />
+            <Input
+              className={educationInputClassName}
+              inputMode="numeric"
+              maxLength={4}
+              placeholder="YYYY"
+              value={form.graduation.yearOfAdmission}
+              onChange={(e) =>
+                updateGraduation({ yearOfAdmission: sanitizeYear(e.target.value) })
+              }
+            />
+          </div>
+          <div className="space-y-1">
+            <FieldLabel label="Year of passing" required />
+            <Input
+              className={educationInputClassName}
+              inputMode="numeric"
+              maxLength={4}
+              placeholder="YYYY"
+              value={form.graduation.yearOfPassing}
+              onChange={(e) =>
+                updateGraduation({ yearOfPassing: sanitizeYear(e.target.value) })
+              }
+            />
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="space-y-1">
+            <FieldLabel label="Percentage / CGPA" required />
+            <Input
+              className={educationInputClassName}
+              value={form.graduation.percentageOrCgpa}
+              placeholder="e.g. 75% or 8.5 CGPA"
+              onChange={(e) => updateGraduation({ percentageOrCgpa: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1">
+            <FieldLabel label="Roll number / Registration number" required />
+            <Input
+              className={educationInputClassName}
+              value={form.graduation.rollNumber}
+              onChange={(e) => updateGraduation({ rollNumber: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1">
+            <FieldLabel label="State / Location" required />
+            <Input
+              className={educationInputClassName}
+              value={form.graduation.stateOrLocation}
+              onChange={(e) => updateGraduation({ stateOrLocation: e.target.value })}
+            />
+          </div>
+        </div>
+        <UploadPair
+          left={renderUpload(
+            EDUCATION_DOCUMENT_CODES.graduation_semester_marksheets,
+            "Semester-wise Mark Sheets",
+          )}
+          right={renderUpload(
+            EDUCATION_DOCUMENT_CODES.graduation_degree_certificate,
+            "Degree Certificate",
+          )}
+        />
+        <UploadPair
+          left={renderUpload(
+            EDUCATION_DOCUMENT_CODES.graduation_tc,
+            "Transfer Certificate (TC)",
+            false,
+          )}
+          right={renderUpload(
+            EDUCATION_DOCUMENT_CODES.graduation_migration,
+            "Migration Certificate",
+            false,
+          )}
+        />
+      </section>
     </div>
   );
 }

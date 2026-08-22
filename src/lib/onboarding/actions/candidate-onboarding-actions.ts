@@ -32,7 +32,11 @@ import { getCandidatePortalContext } from "@/lib/onboarding/services/onboarding-
 import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
 import { assertRateLimit } from "@/lib/security/rate-limit";
 import { hashEmailVerificationToken } from "@/lib/security/signed-flow-tokens";
-import { ONBOARDING_UPLOAD_MAX_BYTES } from "@/lib/onboarding/constants";
+import {
+  ONBOARDING_EDUCATION_LARGE_UPLOAD_CODES,
+  ONBOARDING_EDUCATION_LARGE_UPLOAD_MAX_BYTES,
+  ONBOARDING_UPLOAD_MAX_BYTES,
+} from "@/lib/onboarding/constants";
 import {
   ONBOARDING_ALLOWED_EXTENSIONS,
   ONBOARDING_ALLOWED_MIME_TYPES,
@@ -251,7 +255,9 @@ export async function uploadCandidateDocumentAction(formData: FormData): Promise
       fileName: file.name,
       fileSize: file.size,
       mimeType: file.type,
-      maxBytes: ONBOARDING_UPLOAD_MAX_BYTES,
+      maxBytes: ONBOARDING_EDUCATION_LARGE_UPLOAD_CODES.has(documentTypeCode)
+        ? ONBOARDING_EDUCATION_LARGE_UPLOAD_MAX_BYTES
+        : ONBOARDING_UPLOAD_MAX_BYTES,
       allowedExtensions: ONBOARDING_ALLOWED_EXTENSIONS,
       allowedMimeTypes: ONBOARDING_ALLOWED_MIME_TYPES,
     });

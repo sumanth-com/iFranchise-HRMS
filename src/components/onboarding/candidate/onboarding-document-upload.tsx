@@ -17,6 +17,8 @@ type OnboardingDocumentUploadProps = {
   uploading?: boolean;
   pendingFileName?: string | null;
   disabled?: boolean;
+  variant?: "default" | "card";
+  maxUploadMb?: number;
   onSelectFile: (file: File) => void;
 };
 
@@ -27,10 +29,88 @@ export function OnboardingDocumentUpload({
   uploading = false,
   pendingFileName,
   disabled = false,
+  variant = "default",
+  maxUploadMb = ONBOARDING_UPLOAD_MAX_MB,
   onSelectFile,
 }: OnboardingDocumentUploadProps) {
   const displayName = fileName ?? pendingFileName;
   const isUploaded = Boolean(fileName) && !uploading;
+  const uploadHint = `PDF, Word, Excel, images, or ZIP · max ${maxUploadMb} MB`;
+
+  if (variant === "card") {
+    return (
+      <div className="flex h-full min-h-[168px] flex-col rounded-xl border border-border bg-muted/25 p-4 dark:bg-muted/15">
+        <div className="mb-3 text-center">
+          <Label className="text-sm font-medium text-foreground">
+            {label}
+            {required ? <span className="text-foreground"> *</span> : null}
+          </Label>
+        </div>
+
+        <div className="flex flex-1 flex-col justify-center gap-2">
+          {displayName ? (
+            <div
+              className={cn(
+                "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm transition-colors",
+                isUploaded
+                  ? "border-emerald-500/45 bg-emerald-500/10 text-emerald-950 dark:text-emerald-100"
+                  : "border-border bg-background/80 text-foreground",
+              )}
+            >
+              {uploading ? (
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              )}
+              <p className="min-w-0 flex-1 truncate text-xs font-medium">{displayName}</p>
+            </div>
+          ) : (
+            <label
+              className={cn(
+                "flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-background/60 px-3 py-4 text-center transition-colors hover:bg-muted/40",
+                (disabled || uploading) && "pointer-events-none opacity-60",
+              )}
+            >
+              <FileUp className="h-4 w-4 text-muted-foreground" />
+              <span className="text-xs font-medium text-foreground">Choose file</span>
+              <Input
+                type="file"
+                accept={UPLOAD_ACCEPT}
+                disabled={disabled || uploading}
+                className="sr-only"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) onSelectFile(file);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          )}
+
+          {displayName && !uploading ? (
+            <label className="cursor-pointer text-center">
+              <span className="text-xs font-medium text-primary hover:underline">Replace file</span>
+              <Input
+                type="file"
+                accept={UPLOAD_ACCEPT}
+                disabled={disabled || uploading}
+                className="sr-only"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) onSelectFile(file);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          ) : null}
+        </div>
+
+        <p className="mt-3 text-center text-[11px] leading-relaxed text-muted-foreground">
+          {uploadHint}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2 rounded-xl border border-border bg-muted/30 p-4 dark:bg-muted/20">
@@ -62,32 +142,22 @@ export function OnboardingDocumentUpload({
         </div>
       ) : null}
 
-      <div className="relative">
-        <Input
-          type="file"
-          accept={UPLOAD_ACCEPT}
-          disabled={disabled || uploading}
-          className={cn(
-            "h-10 cursor-pointer bg-background text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-foreground dark:bg-background",
-            uploading && "opacity-70",
-          )}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) onSelectFile(file);
-            e.target.value = "";
-          }}
-        />
-        {!displayName ? (
-          <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center gap-2 text-xs text-muted-foreground">
-            <FileUp className="h-3.5 w-3.5" />
-            <span>Choose file to upload</span>
-          </div>
-        ) : null}
-      </div>
+      <Input
+        type="file"
+        accept={UPLOAD_ACCEPT}
+        disabled={disabled || uploading}
+        className={cn(
+          "h-10 cursor-pointer bg-background text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-foreground dark:bg-background",
+          uploading && "opacity-70",
+        )}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onSelectFile(file);
+          e.target.value = "";
+        }}
+      />
 
-      <p className="text-[11px] text-muted-foreground">
-        PDF, Word, Excel, images, or ZIP · max {ONBOARDING_UPLOAD_MAX_MB} MB
-      </p>
+      <p className="text-[11px] text-muted-foreground">{uploadHint}</p>
     </div>
   );
 }
