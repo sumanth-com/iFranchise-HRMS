@@ -34,6 +34,8 @@ import {
   toIsoDate,
 } from "@/lib/onboarding/personal-field-options";
 import {
+  getBankAccountValidationMessage,
+  getIfscValidationMessage,
   sanitizeAccountNumber,
   sanitizeIfsc,
   ONBOARDING_BANK_ACCOUNT_TYPE_OPTIONS,
@@ -177,6 +179,11 @@ function FieldLabel({ label, required }: { label: string; required?: boolean }) 
   );
 }
 
+function FieldHint({ error }: { error?: string | null }) {
+  if (!error) return null;
+  return <p className="text-[11px] font-medium text-destructive">{error}</p>;
+}
+
 type OnboardingWizardProps = {
   context: CandidatePortalContext;
   onRefresh: () => void | Promise<void>;
@@ -277,7 +284,13 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
   function sectionHintText(): string {
     if (!currentValidation.valid) {
-      return "Complete required fields (*) to unlock the next section";
+      const items = currentValidation.missing;
+      if (items.length === 0) {
+        return "Complete required fields (*) to continue";
+      }
+      if (items.length === 1) return items[0];
+      if (items.length === 2) return items.join(" · ");
+      return `${items.slice(0, 2).join(" · ")} (+${items.length - 2} more)`;
     }
     if (step < firstIncompleteStep) {
       return "Section completed";
@@ -339,11 +352,17 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   }
 
   function showValidationError(result: { missing: string[] }) {
-    if (result.missing.length <= 3) {
-      toast.error(`Please complete: ${result.missing.join(", ")}`);
-    } else {
-      toast.error(`Please complete ${result.missing.length} required items in this section`);
+    if (result.missing.length === 0) {
+      toast.error("Please complete all required fields in this section");
+      return;
     }
+    if (result.missing.length <= 3) {
+      toast.error(result.missing.join(" · "));
+      return;
+    }
+    toast.error(
+      `Please fix ${result.missing.length} items: ${result.missing.slice(0, 3).join(" · ")} (+${result.missing.length - 3} more)`,
+    );
   }
 
   function saveSection(markComplete = true) {
@@ -554,7 +573,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                   "text-xs",
                   currentValidation.valid
                     ? "font-medium text-emerald-700 dark:text-emerald-400"
-                    : "text-muted-foreground",
+                    : "font-medium text-amber-800 dark:text-amber-400",
                 )}
               >
                 {sectionHintText()}
@@ -770,6 +789,14 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
           {sectionKey === "bank" && (
             <div className="space-y-6">
+              {(() => {
+                const bankIfsc = liveSectionPatch.ifsc ?? "";
+                const bankAccountNumber = liveSectionPatch.accountNumber ?? "";
+                const ifscError = getIfscValidationMessage(bankIfsc);
+                const accountNumberError = getBankAccountValidationMessage(bankAccountNumber);
+
+                return (
+                  <>
               <div className="grid min-w-0 gap-4 lg:grid-cols-3">
                 <div className="space-y-1.5">
                   <FieldLabel label="Account holder name" required />
@@ -795,7 +822,10 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                 <div className="space-y-1.5">
                   <FieldLabel label="Account number" required />
                   <Input
-                    className={wizardInputClassName}
+                    className={cn(
+                      wizardInputClassName,
+                      accountNumberError && "border-destructive focus-visible:ring-destructive/30",
+                    )}
                     inputMode="numeric"
                     maxLength={18}
                     value={form.accountNumber ?? readSectionField(sectionData.accountNumber)}
@@ -804,6 +834,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                     }
                     placeholder="Account number"
                   />
+                  <FieldHint error={accountNumberError} />
                 </div>
               </div>
 
@@ -811,12 +842,22 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                 <div className="space-y-1.5">
                   <FieldLabel label="IFSC code" required />
                   <Input
-                    className={cn(wizardInputClassName, "uppercase")}
+                    className={cn(
+                      wizardInputClassName,
+                      "uppercase",
+                      ifscError && "border-destructive focus-visible:ring-destructive/30",
+                    )}
                     maxLength={11}
                     value={form.ifsc ?? readSectionField(sectionData.ifsc)}
                     onChange={(e) => updateField("ifsc", sanitizeIfsc(e.target.value))}
-                    placeholder="ABCD0123456"
+                    placeholder="SBIN0001234"
                   />
+                  <FieldHint error={ifscError} />
+                  {!ifscError ? (
+                    <p className="text-[11px] text-muted-foreground">
+                      11 characters — 4 bank letters, then 0, then 6 branch characters
+                    </p>
+                  ) : null}
                 </div>
                 <div className="space-y-1.5">
                   <FieldLabel label="Branch name" required />
@@ -841,6 +882,9 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                   />
                 </div>
               </div>
+                  </>
+                );
+              })()}
 
               <div className="mx-auto w-full max-w-sm">
                 <OnboardingDocumentUpload
@@ -927,8 +971,11 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
             ) : (
               <Button
                 onClick={goNext}
-                disabled={isPending || !currentValidation.valid}
-                className="w-full sm:w-auto"
+                disabled={isPending}
+                className={cn(
+                  "w-full sm:w-auto",
+                  !currentValidation.valid && "opacity-90",
+                )}
               >
                 Next
               </Button>

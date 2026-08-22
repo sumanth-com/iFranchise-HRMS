@@ -11,7 +11,10 @@ import {
   type OnboardingEducationFormData,
 } from "@/lib/onboarding/education-utils";
 import { isValidEducationDateRange } from "@/lib/onboarding/education-options";
-import { isValidBankAccountNumber, isValidIfsc } from "@/lib/onboarding/bank-field-utils";
+import {
+  getBankAccountValidationMessage,
+  getIfscValidationMessage,
+} from "@/lib/onboarding/bank-field-utils";
 import { isValidAadhaar, isValidPan } from "@/lib/onboarding/identity-field-utils";
 import { isValidIndianPincode } from "@/lib/onboarding/india-locations";
 import { isValidStoredPhone } from "@/lib/onboarding/personal-field-options";
@@ -294,12 +297,10 @@ export function validateOnboardingSection(
       for (const field of BANK_REQUIRED) {
         if (!hasText(data[field.key])) missing.push(field.label);
       }
-      if (hasText(data.accountNumber) && !isValidBankAccountNumber(data.accountNumber)) {
-        missing.push("Valid account number (9–18 digits)");
-      }
-      if (hasText(data.ifsc) && !isValidIfsc(data.ifsc)) {
-        missing.push("Valid IFSC code");
-      }
+      const accountNumberMessage = getBankAccountValidationMessage(data.accountNumber);
+      if (accountNumberMessage) missing.push(accountNumberMessage);
+      const ifscMessage = getIfscValidationMessage(data.ifsc);
+      if (ifscMessage) missing.push(ifscMessage);
       break;
 
     case "terms": {
