@@ -248,10 +248,94 @@ async function findOnboardingCaseByEmail(
     .eq("organization_id", organizationId)
     .eq("personal_email", email)
     .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (error) throw new Error(error.message);
   return data;
+}
+
+const ONBOARDING_TERMINAL_STATUSES = ["cancelled", "archived", "rejected", "completed"] as const;
+
+function isDuplicateOnboardingEmailError(error: { message?: string; code?: string }): boolean {
+  if (error.code === "23505") return true;
+  const message = error.message ?? "";
+  return (
+    message.includes("onboarding_cases_org_personal_email_active_idx") ||
+    message.includes("duplicate key")
+  );
+}
+
+async function findActiveOnboardingCaseByEmailAdmin(
+  organizationId: string,
+  personalEmail: string,
+) {
+  const admin = createAdminClient();
+  const email = personalEmail.trim().toLowerCase();
+  const { data, error } = await admin
+    .schema("hrms")
+    .from("onboarding_cases")
+    .select("id, status, deleted_at")
+    .eq("organization_id", organizationId)
+    .eq("personal_email", email)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  if (
+    ONBOARDING_TERMINAL_STATUSES.includes(
+      data.status as (typeof ONBOARDING_TERMINAL_STATUSES)[number],
+    )
+  ) {
+    return null;
+  }
+  return data;
+}
+
+type OfferOnboardingSyncInput = {
+  fullName: string;
+  personalEmail: string;
+  mobileNumber?: string | null;
+  designationId?: string | null;
+  departmentId?: string | null;
+  reportingManagerId?: string | null;
+  employmentTypeId?: string | null;
+  joiningDate?: string | null;
+  offerReferenceNumber?: string | null;
+};
+
+async function updateOnboardingCaseFromOfferAdmin(
+  organizationId: string,
+  caseId: string,
+  profile: UserProfile,
+  input: OfferOnboardingSyncInput,
+) {
+  const admin = createAdminClient();
+  const now = new Date().toISOString();
+  const { error } = await admin
+    .schema("hrms")
+    .from("onboarding_cases")
+    .update({
+      full_name: input.fullName.trim(),
+      personal_email: input.personalEmail.trim().toLowerCase(),
+      mobile_number: input.mobileNumber?.trim() || null,
+      designation_id: input.designationId || null,
+      department_id: input.departmentId || null,
+      reporting_manager_id: input.reportingManagerId || null,
+      employment_type_id: input.employmentTypeId || null,
+      joining_date: input.joiningDate || null,
+      offer_reference_number: input.offerReferenceNumber?.trim() || null,
+      updated_by: profile.userId,
+      updated_at: now,
+    })
+    .eq("id", caseId)
+    .eq("organization_id", organizationId);
+
+  if (error) throw new Error(error.message);
 }
 
 /** RLS hides soft-deleted rows from the auth client; use admin for dismiss checks. */
@@ -399,46 +483,37 @@ export async function createOrUpdateOnboardingCaseForInvite(
 export async function ensureOnboardingCaseFromOffer(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
-  input: {
-    fullName: string;
-    personalEmail: string;
-    mobileNumber?: string | null;
-    designationId?: string | null;
-    departmentId?: string | null;
-    reportingManagerId?: string | null;
-    employmentTypeId?: string | null;
-    joiningDate?: string | null;
-    offerReferenceNumber?: string | null;
-  },
-): Promise<string | null> {
+  input: OfferOnboardingSyncInput,
+): Promise<string> {
   const organizationId = profile.employee.organizationId;
   const email = input.personalEmail?.trim().toLowerCase() ?? "";
   const fullName = input.fullName.trim();
-  if (!email || !fullName) return null;
+  if (!email) {
+    throw new Error("Candidate email is required to add them to onboarding.");
+  }
+  if (!fullName) {
+    throw new Error("Candidate name is required to add them to onboarding.");
+  }
 
-  if (await applyOnboardingDismissalGuard(organizationId, email, profile.userId)) return null;
+  if (await applyOnboardingDismissalGuard(organizationId, email, profile.userId)) {
+    throw new Error(
+      `Onboarding was previously removed for ${email}. Restore the case or contact support before uploading an offer letter.`,
+    );
+  }
 
-  const existing = await findActiveOnboardingCaseByEmail(supabase, organizationId, email);
+  const syncInput: OfferOnboardingSyncInput = { ...input, fullName, personalEmail: email };
+
+  const existing = await findActiveOnboardingCaseByEmailAdmin(organizationId, email);
   if (existing) {
-    if (input.offerReferenceNumber?.trim()) {
-      await supabase
-        .schema("hrms")
-        .from("onboarding_cases")
-        .update({
-          offer_reference_number: input.offerReferenceNumber.trim(),
-          updated_by: profile.userId,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", existing.id)
-        .eq("organization_id", organizationId);
-    }
+    await updateOnboardingCaseFromOfferAdmin(organizationId, existing.id, profile, syncInput);
     return existing.id;
   }
 
   const branchId = await resolveOnboardingBranchId(supabase, profile);
   const intendedRoleId = await resolveDefaultEmployeeRoleId(organizationId);
+  const admin = createAdminClient();
 
-  const { data, error } = await supabase
+  const { data, error } = await admin
     .schema("hrms")
     .from("onboarding_cases")
     .insert({
@@ -462,9 +537,17 @@ export async function ensureOnboardingCaseFromOffer(
     .single();
 
   if (error) {
-    if (error.message.includes("onboarding_cases_org_personal_email_active_idx")) {
-      const duplicate = await findActiveOnboardingCaseByEmail(supabase, organizationId, email);
-      return duplicate?.id ?? null;
+    if (isDuplicateOnboardingEmailError(error)) {
+      const duplicate = await findActiveOnboardingCaseByEmailAdmin(organizationId, email);
+      if (duplicate?.id) {
+        await updateOnboardingCaseFromOfferAdmin(
+          organizationId,
+          duplicate.id,
+          profile,
+          syncInput,
+        );
+        return duplicate.id;
+      }
     }
     throw new Error(error.message);
   }

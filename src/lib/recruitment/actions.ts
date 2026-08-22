@@ -55,6 +55,7 @@ function revalidateRecruitment() {
   revalidatePath(RECRUITMENT_ROUTES.candidates);
   revalidatePath(RECRUITMENT_ROUTES.interviews);
   revalidatePath(RECRUITMENT_ROUTES.offers);
+  revalidatePath(RECRUITMENT_ROUTES.onboarding);
   revalidatePath("/dashboard/employees");
 }
 

@@ -809,6 +809,23 @@ export async function createOffer(
     offerId = data.id;
   }
 
+  const candidateName =
+    [candidate.first_name, candidate.last_name].filter(Boolean).join(" ").trim() ||
+    candidate.email.split("@")[0] ||
+    "New hire";
+
+  await ensureOnboardingCaseFromOffer(supabase, profile, {
+    fullName: candidateName,
+    personalEmail: candidate.email,
+    mobileNumber: candidate.phone ?? null,
+    designationId,
+    departmentId,
+    reportingManagerId,
+    employmentTypeId,
+    joiningDate: offerJoiningDate,
+    offerReferenceNumber: offerCodeValue,
+  });
+
   let offerLetterPath = existingDraft?.offer_letter_path ?? null;
   let attachmentFilename = offerFile.filename;
 
@@ -834,7 +851,6 @@ export async function createOffer(
 
   if (pathError) throw new Error(pathError.message);
 
-  const candidateName = [candidate.first_name, candidate.last_name].filter(Boolean).join(" ");
   const hadLetter = Boolean(existingDraft?.offer_letter_path);
 
   await moveCandidateStage(supabase, profile, {
@@ -847,20 +863,6 @@ export async function createOffer(
     eventType: "offer",
     title: hadLetter ? "Offer letter updated" : "Offer letter uploaded",
     description: `${attachmentFilename} is available in the candidate onboarding portal`,
-  });
-
-  await ensureOnboardingCaseFromOffer(supabase, profile, {
-    fullName: candidateName,
-    personalEmail: candidate.email,
-    mobileNumber: candidate.phone ?? null,
-    designationId,
-    departmentId,
-    reportingManagerId,
-    employmentTypeId,
-    joiningDate: offerJoiningDate,
-    offerReferenceNumber: offerCodeValue,
-  }).catch((error) => {
-    console.error("[recruitment] failed to sync offer letter to onboarding", error);
   });
 
   return offerId;
