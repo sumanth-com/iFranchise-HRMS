@@ -30,7 +30,7 @@ import {
   ONBOARDING_OFFER_ACCEPTANCE_CATEGORY,
   ONBOARDING_SIGNED_OFFER_DOCUMENT_CODE,
 } from "@/lib/onboarding/offer-acceptance-constants";
-import { readOnboardingAddressLine } from "@/lib/onboarding/onboarding-personal-field-utils";
+import { readOnboardingAddressLine, normalizeOnboardingSectionData } from "@/lib/onboarding/onboarding-personal-field-utils";
 import {
   normalizeSelectValue,
   toIsoDate,
@@ -115,7 +115,7 @@ function buildLiveSectionPatch(
   draft: Record<string, string>,
   fullName: string,
 ): Record<string, string> {
-  const safeFullName = (fullName ?? "").trim();
+  const safeFullName = typeof fullName === "string" ? fullName.trim() : "";
   const patch: Record<string, string> = {};
   for (const [key, value] of Object.entries(saved)) {
     const text = readSectionField(value);
@@ -207,7 +207,9 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   const initializedRef = useRef(false);
   const prevSectionKeyRef = useRef<string | null>(null);
   const sectionKey = ONBOARDING_WIZARD_SECTIONS[step];
-  const sectionData = context.sections.find((s) => s.sectionKey === sectionKey)?.data ?? {};
+  const sectionData = normalizeOnboardingSectionData(
+    context.sections.find((s) => s.sectionKey === sectionKey)?.data,
+  );
   const [form, setForm] = useState<Record<string, string>>({});
   const [educationForm, setEducationForm] = useState<OnboardingEducationFormData>(() =>
     createEmptyEducationForm(),

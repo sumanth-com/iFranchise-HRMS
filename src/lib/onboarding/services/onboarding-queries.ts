@@ -2,6 +2,7 @@ import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { loadInviteableRoles } from "@/lib/auth/iam-roles";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadCandidateOfferLetter } from "@/lib/onboarding/services/candidate-offer-letter";
+import { normalizeOnboardingSectionData } from "@/lib/onboarding/onboarding-personal-field-utils";
 import { ONBOARDING_WIZARD_SECTIONS } from "@/lib/onboarding/constants";
 import {
   assignOnboardingRouteRefs,
@@ -414,7 +415,7 @@ export async function getOnboardingCaseDetail(
     correctionNotes: row.correction_notes ?? null,
     sections: (sections.data ?? []).map((s) => ({
       sectionKey: s.section_key,
-      data: (s.data as Record<string, unknown>) ?? {},
+      data: normalizeOnboardingSectionData(s.data),
       completedAt: s.completed_at ?? null,
     })),
     documents,
@@ -497,7 +498,7 @@ export async function getCandidatePortalContext(caseId: string): Promise<Candida
     locked,
     sections: (sections.data ?? []).map((s) => ({
       sectionKey: s.section_key,
-      data: (s.data as Record<string, unknown>) ?? {},
+      data: normalizeOnboardingSectionData(s.data),
       completedAt: s.completed_at ?? null,
     })),
     documents,

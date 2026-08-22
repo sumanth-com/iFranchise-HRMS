@@ -17,6 +17,7 @@ import {
 } from "@/lib/onboarding/bank-field-utils";
 import { isValidAadhaar, isValidPan } from "@/lib/onboarding/identity-field-utils";
 import { isValidIndianPincode } from "@/lib/onboarding/india-locations";
+import { normalizeOnboardingSectionData } from "@/lib/onboarding/onboarding-personal-field-utils";
 import {
   ONBOARDING_OFFER_ACCEPTANCE_CATEGORY,
   ONBOARDING_SIGNED_OFFER_DOCUMENT_CODE,
@@ -61,7 +62,9 @@ function sectionData(
   sectionKey: OnboardingWizardSection,
   patch?: Record<string, string>,
 ): Record<string, unknown> {
-  const saved = context.sections.find((s) => s.sectionKey === sectionKey)?.data ?? {};
+  const saved = normalizeOnboardingSectionData(
+    context.sections.find((s) => s.sectionKey === sectionKey)?.data,
+  );
   return { ...saved, ...patch };
 }
 

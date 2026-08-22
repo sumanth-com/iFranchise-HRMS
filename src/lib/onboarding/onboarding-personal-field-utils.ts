@@ -3,6 +3,12 @@ import {
   toDateInputValue,
 } from "@/lib/onboarding/personal-field-options";
 
+/** Ensure section JSON from Supabase is a plain object for form initialization. */
+export function normalizeOnboardingSectionData(data: unknown): Record<string, unknown> {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return {};
+  return data as Record<string, unknown>;
+}
+
 /** Coerce onboarding section JSON values to plain strings for controlled inputs. */
 export function readOnboardingTextField(value: unknown): string {
   if (typeof value === "string") return value;
@@ -55,15 +61,18 @@ export type PersonalSectionFieldValues = {
 type PersonalFieldOptions = readonly { value: string; label: string }[];
 
 export function buildPersonalSectionFieldValues(input: {
-  sectionData: Record<string, unknown>;
-  form: Record<string, string>;
-  fullNameFallback: string;
-  personalEmailFallback: string;
+  sectionData: unknown;
+  form: Record<string, string> | null | undefined;
+  fullNameFallback?: unknown;
+  personalEmailFallback?: unknown;
   genderOptions: PersonalFieldOptions;
   maritalOptions: PersonalFieldOptions;
   bloodGroupOptions: PersonalFieldOptions;
 }): PersonalSectionFieldValues {
-  const { sectionData, form } = input;
+  const sectionData = normalizeOnboardingSectionData(input.sectionData);
+  const form = input.form ?? {};
+  const fullNameFallback = readOnboardingTextField(input.fullNameFallback).trim();
+  const personalEmailFallback = readOnboardingTextField(input.personalEmailFallback).trim();
 
   function textField(key: string, fallback = ""): string {
     if (key in form) return readOnboardingTextField(form[key]);
@@ -81,8 +90,8 @@ export function buildPersonalSectionFieldValues(input: {
     return normalizeSelectValue(sectionData[key], options);
   }
 
-  const fullName = textField("fullName", input.fullNameFallback.trim());
-  const personalEmail = textField("personalEmail", input.personalEmailFallback.trim());
+  const fullName = textField("fullName", fullNameFallback);
+  const personalEmail = textField("personalEmail", personalEmailFallback);
 
   return {
     fullName,
