@@ -1,11 +1,9 @@
 "use client";
 
 import { Input } from "@/components/common/input";
-import { ClientSectionBoundary } from "@/components/common/client-section-boundary";
 import { OnboardingAddressFields } from "@/components/onboarding/candidate/onboarding-address-fields";
 import { OnboardingPhoneField } from "@/components/onboarding/candidate/onboarding-phone-field";
 import { OnboardingWizardSelect } from "@/components/onboarding/candidate/onboarding-wizard-select";
-import { useClientMounted } from "@/hooks/use-client-mounted";
 import { buildPersonalSectionFieldValues } from "@/lib/onboarding/onboarding-personal-field-utils";
 import {
   ONBOARDING_BLOOD_GROUP_OPTIONS,
@@ -38,15 +36,6 @@ function FieldLabel({ label, required }: { label: string; required?: boolean }) 
   );
 }
 
-function selectPlaceholder(
-  value: string,
-  items: SelectItemOption[],
-  fallback: string,
-): string {
-  if (!value) return fallback;
-  return items.find((item) => item.value === value)?.label ?? fallback;
-}
-
 type OnboardingPersonalSectionProps = {
   sectionData: unknown;
   form: Record<string, string>;
@@ -56,7 +45,7 @@ type OnboardingPersonalSectionProps = {
   onFieldChange: (key: string, value: string) => void;
 };
 
-function OnboardingPersonalSectionContent({
+export function OnboardingPersonalSection({
   sectionData,
   form,
   fullNameFallback,
@@ -64,7 +53,6 @@ function OnboardingPersonalSectionContent({
   inputClassName,
   onFieldChange,
 }: OnboardingPersonalSectionProps) {
-  const mounted = useClientMounted();
   const fields = buildPersonalSectionFieldValues({
     sectionData,
     form,
@@ -97,63 +85,33 @@ function OnboardingPersonalSectionContent({
       </div>
       <div className="space-y-1">
         <FieldLabel label="Gender" required />
-        {mounted ? (
-          <OnboardingWizardSelect
-            items={GENDER_ITEMS}
-            value={fields.gender}
-            placeholder="Select gender"
-            onValueChange={(value) => onFieldChange("gender", value)}
-            triggerClassName={inputClassName}
-          />
-        ) : (
-          <Input
-            readOnly
-            tabIndex={-1}
-            className={inputClassName}
-            value={selectPlaceholder(fields.gender, GENDER_ITEMS, "Select gender")}
-            aria-hidden
-          />
-        )}
+        <OnboardingWizardSelect
+          items={GENDER_ITEMS}
+          value={fields.gender}
+          placeholder="Select gender"
+          onValueChange={(value) => onFieldChange("gender", value)}
+          triggerClassName={inputClassName}
+        />
       </div>
       <div className="space-y-1">
         <FieldLabel label="Marital status" />
-        {mounted ? (
-          <OnboardingWizardSelect
-            items={MARITAL_ITEMS}
-            value={fields.maritalStatus}
-            placeholder="Select marital status"
-            onValueChange={(value) => onFieldChange("maritalStatus", value)}
-            triggerClassName={inputClassName}
-          />
-        ) : (
-          <Input
-            readOnly
-            tabIndex={-1}
-            className={inputClassName}
-            value={selectPlaceholder(fields.maritalStatus, MARITAL_ITEMS, "Select marital status")}
-            aria-hidden
-          />
-        )}
+        <OnboardingWizardSelect
+          items={MARITAL_ITEMS}
+          value={fields.maritalStatus}
+          placeholder="Select marital status"
+          onValueChange={(value) => onFieldChange("maritalStatus", value)}
+          triggerClassName={inputClassName}
+        />
       </div>
       <div className="space-y-1">
         <FieldLabel label="Blood group" />
-        {mounted ? (
-          <OnboardingWizardSelect
-            items={BLOOD_GROUP_ITEMS}
-            value={fields.bloodGroup}
-            placeholder="Select blood group"
-            onValueChange={(value) => onFieldChange("bloodGroup", value)}
-            triggerClassName={inputClassName}
-          />
-        ) : (
-          <Input
-            readOnly
-            tabIndex={-1}
-            className={inputClassName}
-            value={selectPlaceholder(fields.bloodGroup, BLOOD_GROUP_ITEMS, "Select blood group")}
-            aria-hidden
-          />
-        )}
+        <OnboardingWizardSelect
+          items={BLOOD_GROUP_ITEMS}
+          value={fields.bloodGroup}
+          placeholder="Select blood group"
+          onValueChange={(value) => onFieldChange("bloodGroup", value)}
+          triggerClassName={inputClassName}
+        />
       </div>
       <div className="space-y-1">
         <FieldLabel label="Nationality" />
@@ -175,49 +133,22 @@ function OnboardingPersonalSectionContent({
         onAddressLineChange={(value) => onFieldChange("addressLine", value)}
         inputClassName={inputClassName}
       />
-      {mounted ? (
-        <>
-          <OnboardingPhoneField
-            label="Personal mobile"
-            required
-            className="w-full max-w-none"
-            value={fields.personalMobile}
-            onChange={(value) => onFieldChange("personalMobile", value)}
-            placeholder="Mobile number"
-          />
-          <OnboardingPhoneField
-            label="Emergency contact"
-            required
-            className="w-full max-w-none"
-            value={fields.emergencyContact}
-            onChange={(value) => onFieldChange("emergencyContact", value)}
-            placeholder="Emergency number"
-          />
-        </>
-      ) : (
-        <>
-          <div className="space-y-1">
-            <FieldLabel label="Personal mobile" required />
-            <Input
-              readOnly
-              tabIndex={-1}
-              className={inputClassName}
-              value={fields.personalMobile}
-              aria-hidden
-            />
-          </div>
-          <div className="space-y-1">
-            <FieldLabel label="Emergency contact" required />
-            <Input
-              readOnly
-              tabIndex={-1}
-              className={inputClassName}
-              value={fields.emergencyContact}
-              aria-hidden
-            />
-          </div>
-        </>
-      )}
+      <OnboardingPhoneField
+        label="Personal mobile"
+        required
+        className="w-full max-w-none"
+        value={fields.personalMobile}
+        onChange={(value) => onFieldChange("personalMobile", value)}
+        placeholder="Mobile number"
+      />
+      <OnboardingPhoneField
+        label="Emergency contact"
+        required
+        className="w-full max-w-none"
+        value={fields.emergencyContact}
+        onChange={(value) => onFieldChange("emergencyContact", value)}
+        placeholder="Emergency number"
+      />
       <div className="space-y-1 sm:col-span-2">
         <FieldLabel label="Personal email" required />
         <Input
@@ -228,16 +159,5 @@ function OnboardingPersonalSectionContent({
         />
       </div>
     </div>
-  );
-}
-
-export function OnboardingPersonalSection(props: OnboardingPersonalSectionProps) {
-  return (
-    <ClientSectionBoundary
-      title="Couldn't load Personal Details"
-      description="Something went wrong while opening this section. Your other onboarding steps are still available — try again or refresh the page."
-    >
-      <OnboardingPersonalSectionContent {...props} />
-    </ClientSectionBoundary>
   );
 }
