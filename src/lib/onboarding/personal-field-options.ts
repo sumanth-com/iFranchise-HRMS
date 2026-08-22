@@ -40,12 +40,14 @@ export function normalizeSelectValue(
 ): string {
   const raw = typeof value === "string" ? value.trim().toLowerCase() : "";
   if (!raw) return "";
-  const match = options.find(
-    (option) =>
-      option.value === raw ||
-      option.value.replace(/_/g, " ") === raw ||
-      option.value === raw.replace(/\s+/g, "_"),
-  );
+  const match = options.find((option) => {
+    const normalized = option.value.toLowerCase();
+    return (
+      normalized === raw ||
+      normalized.replace(/_/g, " ") === raw ||
+      normalized === raw.replace(/\s+/g, "_")
+    );
+  });
   return match?.value ?? "";
 }
 
@@ -66,4 +68,10 @@ export function toIsoDate(value: unknown): string {
   }
 
   return trimmed;
+}
+
+/** Safe value for `<input type="date" />` — empty when not a valid ISO date. */
+export function toDateInputValue(value: unknown): string {
+  const iso = toIsoDate(value);
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : "";
 }

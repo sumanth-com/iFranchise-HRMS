@@ -40,7 +40,8 @@ export function PhoneInput({
   className,
   size = "default",
 }: PhoneInputProps) {
-  const parsed = parseStoredPhone(value);
+  const safeValue = typeof value === "string" ? value : "";
+  const parsed = parseStoredPhone(safeValue);
   const countryCode = parsed.countryCode;
   const maxDigits = phoneCountryMeta(countryCode).maxDigits;
   const heightClass = size === "sm" ? "h-8" : "h-9";
@@ -83,6 +84,9 @@ export function PhoneInput({
             items={countryItems}
             value={countryCode}
             onValueChange={updateCountry}
+            align="start"
+            side="bottom"
+            alignItemWithTrigger={false}
             triggerClassName={cn(
               "w-full min-w-0 border-0 bg-transparent shadow-none rounded-none rounded-l-lg px-2 focus-visible:border-transparent focus-visible:ring-0",
               heightClass,

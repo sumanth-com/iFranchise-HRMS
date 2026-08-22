@@ -31,6 +31,7 @@ import {
   ONBOARDING_MARITAL_STATUS_OPTIONS,
   normalizeSelectValue,
   todayIsoDate,
+  toDateInputValue,
   toIsoDate,
 } from "@/lib/onboarding/personal-field-options";
 import {
@@ -61,6 +62,7 @@ import {
   canSubmitOnboarding,
   getCompletedStepIndices,
   getFirstIncompleteStepIndex,
+  isOnboardingSectionComplete,
   validateEducationSection,
   validateEmploymentSection,
   validateOnboardingSection,
@@ -127,6 +129,7 @@ function buildLiveSectionPatch(
   draft: Record<string, string>,
   fullName: string,
 ): Record<string, string> {
+  const safeFullName = (fullName ?? "").trim();
   const patch: Record<string, string> = {};
   for (const [key, value] of Object.entries(saved)) {
     const text = readSectionField(value);
@@ -142,8 +145,8 @@ function buildLiveSectionPatch(
   }
 
   if (sectionKey === "bank") {
-    if (!patch.accountHolderName?.trim() && fullName.trim()) {
-      patch.accountHolderName = fullName.trim();
+    if (!patch.accountHolderName?.trim() && safeFullName) {
+      patch.accountHolderName = safeFullName;
     }
     const accountType = patch.accountType?.toLowerCase();
     if (accountType === "salary") patch.accountType = "savings";
@@ -293,7 +296,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
       return `${items.slice(0, 2).join(" · ")} (+${items.length - 2} more)`;
     }
     if (step < firstIncompleteStep) {
-      return "Section completed";
+      return "Section completed — edit if needed, then click Next to continue";
     }
     return "Ready — continue to the next section";
   }
@@ -339,8 +342,40 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   }
 
   function personalField(key: string): string {
-    if (form[key]) return form[key];
-    return readSectionField(sectionData[key]);
+    if (key in form) return form[key] ?? "";
+    const fromPatch = liveSectionPatch[key];
+    if (fromPatch) return fromPatch;
+    const saved = readSectionField(sectionData[key]);
+    if (saved) return saved;
+    if (key === "fullName") return (context.fullName ?? "").trim();
+    return "";
+  }
+
+  function sectionHasDraftChanges(): boolean {
+    if (sectionKey === "education") {
+      try {
+        return (
+          JSON.stringify(educationForm) !== JSON.stringify(parseEducationForm(sectionData))
+        );
+      } catch {
+        return true;
+      }
+    }
+    if (sectionKey === "employment_history") {
+      try {
+        return (
+          JSON.stringify(employmentForm) !== JSON.stringify(parseEmploymentForm(sectionData))
+        );
+      } catch {
+        return true;
+      }
+    }
+    if (Object.keys(form).length === 0) return false;
+    for (const [key, value] of Object.entries(form)) {
+      const saved = readSectionField(sectionData[key]);
+      if (value.trim() !== saved.trim()) return true;
+    }
+    return false;
   }
 
   function personalSelectValue(
@@ -430,7 +465,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   function goToStep(index: number) {
     if (index < 0 || index >= ONBOARDING_WIZARD_SECTIONS.length) return;
     if (!canNavigateToStep(index, context)) {
-      toast.error("Complete the current section before opening the next step");
+      toast.error("Complete earlier sections before opening this step");
       return;
     }
     setForm({});
@@ -469,8 +504,22 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
   function goNext() {
     const validation = validateCurrentSection();
+    const sectionComplete = isOnboardingSectionComplete(sectionKey, context);
+    const hasChanges = sectionHasDraftChanges();
+
     if (!validation.valid) {
+      if (sectionComplete && !hasChanges) {
+        setForm({});
+        advanceStep();
+        return;
+      }
       showValidationError(validation);
+      return;
+    }
+
+    if (sectionComplete && !hasChanges) {
+      setForm({});
+      advanceStep();
       return;
     }
 
@@ -606,7 +655,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                   type="date"
                   className={wizardInputClassName}
                   max={todayIsoDate()}
-                  value={form.dateOfBirth ?? toIsoDate(sectionData.dateOfBirth)}
+                  value={form.dateOfBirth ?? toDateInputValue(sectionData.dateOfBirth)}
                   onChange={(e) => updateField("dateOfBirth", e.target.value)}
                 />
               </div>
@@ -804,7 +853,8 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                     className={wizardInputClassName}
                     value={
                       form.accountHolderName ??
-                      (readSectionField(sectionData.accountHolderName) || context.fullName)
+                      (readSectionField(sectionData.accountHolderName) ||
+                        (context.fullName ?? ""))
                     }
                     onChange={(e) => updateField("accountHolderName", e.target.value)}
                     placeholder="Name as per bank records"

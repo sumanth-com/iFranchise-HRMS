@@ -352,8 +352,11 @@ export function getFirstIncompleteStepIndex(context: CandidatePortalContext): nu
   return ONBOARDING_WIZARD_SECTIONS.length - 1;
 }
 
-/** Candidate may only open completed steps and the next incomplete step. */
+/** Candidate may open any completed section and the current incomplete step. */
 export function canNavigateToStep(stepIndex: number, context: CandidatePortalContext): boolean {
+  if (stepIndex < 0 || stepIndex >= ONBOARDING_WIZARD_SECTIONS.length) return false;
+  const sectionKey = ONBOARDING_WIZARD_SECTIONS[stepIndex];
+  if (isOnboardingSectionComplete(sectionKey, context)) return true;
   return stepIndex <= getFirstIncompleteStepIndex(context);
 }
 
