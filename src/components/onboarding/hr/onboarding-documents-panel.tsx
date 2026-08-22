@@ -9,6 +9,7 @@ import {
   educationLevelLabel,
   parseEducationEntries,
 } from "@/lib/onboarding/education-utils";
+import { employmentDocumentLabel } from "@/lib/onboarding/employment-utils";
 import {
   ONBOARDING_DOCUMENT_CATEGORY_LABELS,
   ONBOARDING_EMPLOYMENT_DOCUMENTS,
@@ -36,6 +37,7 @@ function catalogLabel(category: string, typeCode: string): string {
     if (match) return match.label;
   }
   if (category === "employment") {
+    if (typeCode.startsWith("emp_")) return employmentDocumentLabel(typeCode);
     const match = ONBOARDING_EMPLOYMENT_DOCUMENTS.find((d) => d.code === typeCode);
     if (match) return match.label;
   }

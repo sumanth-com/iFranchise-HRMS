@@ -8,6 +8,7 @@ import {
   educationDocumentLabel,
   parseEducationForm,
 } from "@/lib/onboarding/education-utils";
+import { employmentDocumentLabel } from "@/lib/onboarding/employment-utils";
 import type { OnboardingCaseDetail } from "@/types/onboarding";
 import {
   ONBOARDING_EMPLOYMENT_DOCUMENTS,
@@ -48,6 +49,7 @@ function onboardingDocTitle(code: string): string {
   if (match) return match.label;
   if (code === "cancelled_cheque") return "Cancelled Cheque";
   if (code.startsWith("edu_")) return educationDocumentLabel(code);
+  if (code.startsWith("emp_")) return employmentDocumentLabel(code);
   return code.replace(/_/g, " ");
 }
 

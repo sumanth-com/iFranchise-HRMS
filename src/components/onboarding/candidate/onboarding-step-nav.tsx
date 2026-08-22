@@ -98,7 +98,7 @@ export function OnboardingStepNav({
   }, [activeStep]);
 
   return (
-    <div className="sticky top-[3.25rem] z-20 w-full max-w-full overflow-hidden border-b border-border bg-card/95 backdrop-blur-sm dark:bg-card/90">
+    <div className="sticky top-[3.25rem] z-20 w-full max-w-full border-b border-border bg-card/95 backdrop-blur-sm dark:bg-card/90">
       <div
         ref={scrollRef}
         className="w-full max-w-full overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"

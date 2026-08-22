@@ -1,4 +1,11 @@
 import {
+  EMPLOYMENT_ENTRY_DOCUMENTS,
+  employmentDocumentTypeCode,
+  isValidEmploymentDates,
+  parseEmploymentForm,
+  type OnboardingEmploymentFormData,
+} from "@/lib/onboarding/employment-utils";
+import {
   EDUCATION_DOCUMENT_CODES,
   parseEducationForm,
   type OnboardingEducationFormData,
@@ -10,7 +17,6 @@ import { isValidIndianPincode } from "@/lib/onboarding/india-locations";
 import { isValidStoredPhone } from "@/lib/onboarding/personal-field-options";
 import {
   ONBOARDING_AGREEMENT_TYPES,
-  ONBOARDING_EMPLOYMENT_DOCUMENTS,
   ONBOARDING_IDENTITY_DOCUMENTS,
   ONBOARDING_POLICY_DOCUMENTS,
   ONBOARDING_WIZARD_SECTIONS,
@@ -182,6 +188,53 @@ export function validateEducationSection(
   return { valid: missing.length === 0, missing };
 }
 
+export function validateEmploymentSection(
+  context: CandidatePortalContext,
+  form: OnboardingEmploymentFormData,
+): SectionValidationResult {
+  const missing: string[] = [];
+
+  if (form.noPriorExperience) {
+    return { valid: true, missing };
+  }
+
+  if (form.entries.length === 0) {
+    missing.push("At least one previous company");
+    return { valid: false, missing };
+  }
+
+  for (const [index, entry] of form.entries.entries()) {
+    const label = `Company ${index + 1}`;
+    if (!hasText(entry.companyName)) missing.push(`${label} — company name`);
+    if (!hasText(entry.companyLocation)) missing.push(`${label} — company location`);
+    if (!hasText(entry.jobTitle)) missing.push(`${label} — job title`);
+    if (!hasText(entry.department)) missing.push(`${label} — department`);
+    if (!hasText(entry.employmentType)) missing.push(`${label} — employment type`);
+    if (!hasText(entry.dateOfJoining)) missing.push(`${label} — date of joining`);
+    if (!hasText(entry.dateOfLeaving)) missing.push(`${label} — date of leaving`);
+    if (
+      hasText(entry.dateOfJoining) &&
+      hasText(entry.dateOfLeaving) &&
+      !isValidEmploymentDates(entry.dateOfJoining, entry.dateOfLeaving)
+    ) {
+      missing.push(`${label} — valid joining and leaving dates`);
+    }
+    if (!hasText(entry.totalExperience)) missing.push(`${label} — total experience`);
+    if (!hasText(entry.lastDrawnCtc)) missing.push(`${label} — last drawn CTC`);
+    if (!hasText(entry.reasonForLeaving)) missing.push(`${label} — reason for leaving`);
+
+    for (const doc of EMPLOYMENT_ENTRY_DOCUMENTS) {
+      if (!doc.required) continue;
+      const typeCode = employmentDocumentTypeCode(entry.id, doc.code);
+      if (!hasUploadedDocument(context, "employment", typeCode)) {
+        missing.push(`${label} — ${doc.label}`);
+      }
+    }
+  }
+
+  return { valid: missing.length === 0, missing };
+}
+
 export function validateOnboardingSection(
   sectionKey: OnboardingWizardSection,
   context: CandidatePortalContext,
@@ -222,12 +275,7 @@ export function validateOnboardingSection(
       return validateEducationSection(context, parseEducationForm(data));
 
     case "employment_history":
-      for (const doc of ONBOARDING_EMPLOYMENT_DOCUMENTS) {
-        if (doc.required && !hasUploadedDocument(context, "employment", doc.code)) {
-          missing.push(doc.label);
-        }
-      }
-      break;
+      return validateEmploymentSection(context, parseEmploymentForm(data));
 
     case "bank":
       for (const field of BANK_REQUIRED) {

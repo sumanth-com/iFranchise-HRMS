@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { OnboardingAddressFields } from "@/components/onboarding/candidate/onboarding-address-fields";
 import { OnboardingDocumentUpload } from "@/components/onboarding/candidate/onboarding-document-upload";
 import { OnboardingEducationSection } from "@/components/onboarding/candidate/onboarding-education-section";
+import { OnboardingEmploymentSection } from "@/components/onboarding/candidate/onboarding-employment-section";
 import { OnboardingPhoneField } from "@/components/onboarding/candidate/onboarding-phone-field";
 import { OnboardingSignature } from "@/components/onboarding/candidate/onboarding-signature";
 import { OnboardingStepNav } from "@/components/onboarding/candidate/onboarding-step-nav";
@@ -45,16 +46,22 @@ import {
   type OnboardingEducationFormData,
 } from "@/lib/onboarding/education-utils";
 import {
+  createEmptyEmploymentForm,
+  employmentFormToPayload,
+  parseEmploymentForm,
+  type OnboardingEmploymentFormData,
+} from "@/lib/onboarding/employment-utils";
+import {
   canNavigateToStep,
   canSubmitOnboarding,
   getCompletedStepIndices,
   getFirstIncompleteStepIndex,
   validateEducationSection,
+  validateEmploymentSection,
   validateOnboardingSection,
 } from "@/lib/onboarding/onboarding-section-validation";
 import {
   ONBOARDING_AGREEMENT_TYPES,
-  ONBOARDING_EMPLOYMENT_DOCUMENTS,
   ONBOARDING_IDENTITY_DOCUMENTS,
   ONBOARDING_POLICY_DOCUMENTS,
   ONBOARDING_WIZARD_SECTIONS,
@@ -130,6 +137,9 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   const [educationForm, setEducationForm] = useState<OnboardingEducationFormData>(() =>
     createEmptyEducationForm(),
   );
+  const [employmentForm, setEmploymentForm] = useState<OnboardingEmploymentFormData>(() =>
+    createEmptyEmploymentForm(),
+  );
   const [stepAnimKey, setStepAnimKey] = useState(0);
   const [uploadSlots, setUploadSlots] = useState<
     Record<string, { uploading: boolean; pendingFileName?: string }>
@@ -141,8 +151,11 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
     if (sectionKey === "education") {
       return validateEducationSection(context, educationForm);
     }
+    if (sectionKey === "employment_history") {
+      return validateEmploymentSection(context, employmentForm);
+    }
     return validateOnboardingSection(sectionKey, context, form);
-  }, [sectionKey, context, form, educationForm]);
+  }, [sectionKey, context, form, educationForm, employmentForm]);
   const submitValidation = useMemo(() => canSubmitOnboarding(context), [context]);
 
   useEffect(() => {
@@ -158,6 +171,9 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
     if (sectionKey === "education" && enteredSection) {
       setEducationForm(parseEducationForm(sectionData));
+    }
+    if (sectionKey === "employment_history" && enteredSection) {
+      setEmploymentForm(parseEmploymentForm(sectionData));
     }
   }, [sectionKey, sectionData]);
 
@@ -178,6 +194,9 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   function sectionPayload(): Record<string, unknown> {
     if (sectionKey === "education") {
       return { ...sectionData, ...educationFormToPayload(educationForm) };
+    }
+    if (sectionKey === "employment_history") {
+      return { ...sectionData, ...employmentFormToPayload(employmentForm) };
     }
     return { ...sectionData, ...form };
   }
@@ -217,7 +236,9 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
     const validation =
       sectionKey === "education"
         ? validateEducationSection(context, educationForm)
-        : validateOnboardingSection(sectionKey, context, form);
+        : sectionKey === "employment_history"
+          ? validateEmploymentSection(context, employmentForm)
+          : validateOnboardingSection(sectionKey, context, form);
     if (markComplete && !validation.valid) {
       showValidationError(validation);
       return;
@@ -312,7 +333,9 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
     const validation =
       sectionKey === "education"
         ? validateEducationSection(context, educationForm)
-        : validateOnboardingSection(sectionKey, context, form);
+        : sectionKey === "employment_history"
+          ? validateEmploymentSection(context, employmentForm)
+          : validateOnboardingSection(sectionKey, context, form);
     if (!validation.valid) {
       showValidationError(validation);
       return;
@@ -394,7 +417,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-1 flex-col">
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-lg shadow-black/5 ring-1 ring-border/50 dark:shadow-black/25">
+      <div className="flex min-w-0 flex-1 flex-col rounded-2xl border border-border bg-card shadow-lg shadow-black/5 ring-1 ring-border/50 dark:shadow-black/25">
         <OnboardingStepNav
           activeStep={step}
           completedSteps={completedSteps}
@@ -589,22 +612,16 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           )}
 
           {sectionKey === "employment_history" && (
-            <div className="space-y-4">
-              {ONBOARDING_EMPLOYMENT_DOCUMENTS.map((doc) => {
-                const meta = uploadMeta("employment", doc.code);
-                return (
-                  <OnboardingDocumentUpload
-                    key={doc.code}
-                    label={doc.label}
-                    required={doc.required}
-                    fileName={meta.fileName}
-                    uploading={meta.uploading}
-                    pendingFileName={meta.pendingFileName}
-                    onSelectFile={(file) => uploadDoc("employment", doc.code, file)}
-                  />
-                );
-              })}
-            </div>
+            <OnboardingEmploymentSection
+              form={employmentForm}
+              onFormChange={(updater) =>
+                setEmploymentForm((prev) =>
+                  typeof updater === "function" ? updater(prev) : updater,
+                )
+              }
+              onUpload={(documentCode, file) => uploadDoc("employment", documentCode, file)}
+              getUploadMeta={(documentCode) => uploadMeta("employment", documentCode)}
+            />
           )}
 
           {sectionKey === "bank" && (
