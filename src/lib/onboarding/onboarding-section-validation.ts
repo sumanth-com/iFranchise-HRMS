@@ -3,7 +3,7 @@ import {
   parseEducationForm,
   type OnboardingEducationFormData,
 } from "@/lib/onboarding/education-utils";
-import { isValidPassingYear } from "@/lib/onboarding/education-options";
+import { isValidEducationDateRange } from "@/lib/onboarding/education-options";
 import { isValidBankAccountNumber, isValidIfsc } from "@/lib/onboarding/bank-field-utils";
 import { isValidAadhaar, isValidPan } from "@/lib/onboarding/identity-field-utils";
 import { isValidIndianPincode } from "@/lib/onboarding/india-locations";
@@ -73,7 +73,8 @@ export function validateEducationSection(
   const sscFields: { key: keyof OnboardingEducationFormData["ssc"]; label: string }[] = [
     { key: "schoolName", label: "10th — school name" },
     { key: "board", label: "10th — board" },
-    { key: "yearOfPassing", label: "10th — year of passing" },
+    { key: "periodFrom", label: "10th — from date" },
+    { key: "periodTo", label: "10th — to date" },
     { key: "percentageOrCgpa", label: "10th — percentage / CGPA" },
     { key: "rollNumber", label: "10th — roll / registration number" },
     { key: "placeOrState", label: "10th — place / state" },
@@ -81,8 +82,11 @@ export function validateEducationSection(
   for (const field of sscFields) {
     if (!hasText(form.ssc[field.key])) missing.push(field.label);
   }
-  if (hasText(form.ssc.yearOfPassing) && !isValidPassingYear(form.ssc.yearOfPassing)) {
-    missing.push("10th — valid year of passing");
+  if (
+    (hasText(form.ssc.periodFrom) || hasText(form.ssc.periodTo)) &&
+    !isValidEducationDateRange(form.ssc.periodFrom, form.ssc.periodTo)
+  ) {
+    missing.push("10th — valid from and to dates");
   }
   if (
     !hasUploadedDocument(context, "education", EDUCATION_DOCUMENT_CODES.ssc_marksheet)
@@ -103,7 +107,8 @@ export function validateEducationSection(
     { key: "schoolName", label: "12th — school / college name" },
     { key: "board", label: "12th — board" },
     { key: "stream", label: "12th — stream" },
-    { key: "yearOfPassing", label: "12th — year of passing" },
+    { key: "periodFrom", label: "12th — from date" },
+    { key: "periodTo", label: "12th — to date" },
     { key: "percentageOrCgpa", label: "12th — percentage / CGPA" },
     { key: "rollNumber", label: "12th — roll / registration number" },
     { key: "collegeStateOrLocation", label: "12th — college state / location" },
@@ -112,10 +117,10 @@ export function validateEducationSection(
     if (!hasText(form.intermediate[field.key])) missing.push(field.label);
   }
   if (
-    hasText(form.intermediate.yearOfPassing) &&
-    !isValidPassingYear(form.intermediate.yearOfPassing)
+    (hasText(form.intermediate.periodFrom) || hasText(form.intermediate.periodTo)) &&
+    !isValidEducationDateRange(form.intermediate.periodFrom, form.intermediate.periodTo)
   ) {
-    missing.push("12th — valid year of passing");
+    missing.push("12th — valid from and to dates");
   }
   if (
     !hasUploadedDocument(context, "education", EDUCATION_DOCUMENT_CODES.intermediate_marksheet)
@@ -140,8 +145,8 @@ export function validateEducationSection(
     { key: "specialization", label: "Graduation — specialization / branch" },
     { key: "collegeName", label: "Graduation — college / institution" },
     { key: "university", label: "Graduation — university" },
-    { key: "yearOfAdmission", label: "Graduation — year of admission" },
-    { key: "yearOfPassing", label: "Graduation — year of passing" },
+    { key: "periodFrom", label: "Graduation — from date" },
+    { key: "periodTo", label: "Graduation — to date" },
     { key: "percentageOrCgpa", label: "Graduation — percentage / CGPA" },
     { key: "rollNumber", label: "Graduation — roll / registration number" },
     { key: "stateOrLocation", label: "Graduation — state / location" },
@@ -150,16 +155,10 @@ export function validateEducationSection(
     if (!hasText(form.graduation[field.key])) missing.push(field.label);
   }
   if (
-    hasText(form.graduation.yearOfAdmission) &&
-    !isValidPassingYear(form.graduation.yearOfAdmission)
+    (hasText(form.graduation.periodFrom) || hasText(form.graduation.periodTo)) &&
+    !isValidEducationDateRange(form.graduation.periodFrom, form.graduation.periodTo)
   ) {
-    missing.push("Graduation — valid year of admission");
-  }
-  if (
-    hasText(form.graduation.yearOfPassing) &&
-    !isValidPassingYear(form.graduation.yearOfPassing)
-  ) {
-    missing.push("Graduation — valid year of passing");
+    missing.push("Graduation — valid from and to dates");
   }
   if (
     !hasUploadedDocument(

@@ -1,3 +1,4 @@
+import { normalizeIntermediateQualification } from "@/lib/onboarding/education-options";
 import {
   ONBOARDING_EDUCATION_LARGE_UPLOAD_MAX_MB,
   ONBOARDING_UPLOAD_MAX_MB,
@@ -37,7 +38,8 @@ export const EDUCATION_DOCUMENT_LABELS: Record<EducationDocumentCode, string> = 
 export type OnboardingSscDetails = {
   schoolName: string;
   board: string;
-  yearOfPassing: string;
+  periodFrom: string;
+  periodTo: string;
   percentageOrCgpa: string;
   rollNumber: string;
   placeOrState: string;
@@ -48,7 +50,8 @@ export type OnboardingIntermediateDetails = {
   schoolName: string;
   board: string;
   stream: string;
-  yearOfPassing: string;
+  periodFrom: string;
+  periodTo: string;
   percentageOrCgpa: string;
   rollNumber: string;
   collegeStateOrLocation: string;
@@ -59,8 +62,8 @@ export type OnboardingGraduationDetails = {
   specialization: string;
   collegeName: string;
   university: string;
-  yearOfAdmission: string;
-  yearOfPassing: string;
+  periodFrom: string;
+  periodTo: string;
   percentageOrCgpa: string;
   rollNumber: string;
   stateOrLocation: string;
@@ -87,7 +90,8 @@ export function createEmptyEducationForm(): OnboardingEducationFormData {
     ssc: {
       schoolName: "",
       board: "",
-      yearOfPassing: "",
+      periodFrom: "",
+      periodTo: "",
       percentageOrCgpa: "",
       rollNumber: "",
       placeOrState: "",
@@ -97,7 +101,8 @@ export function createEmptyEducationForm(): OnboardingEducationFormData {
       schoolName: "",
       board: "",
       stream: "",
-      yearOfPassing: "",
+      periodFrom: "",
+      periodTo: "",
       percentageOrCgpa: "",
       rollNumber: "",
       collegeStateOrLocation: "",
@@ -107,13 +112,46 @@ export function createEmptyEducationForm(): OnboardingEducationFormData {
       specialization: "",
       collegeName: "",
       university: "",
-      yearOfAdmission: "",
-      yearOfPassing: "",
+      periodFrom: "",
+      periodTo: "",
       percentageOrCgpa: "",
       rollNumber: "",
       stateOrLocation: "",
     },
   };
+}
+
+function readPeriodFields(
+  record: Record<string, unknown>,
+  legacyFromKey?: string,
+  legacyToKey?: string,
+  legacySingleYearKey?: string,
+): { periodFrom: string; periodTo: string } {
+  const periodFrom = readString(record.periodFrom);
+  const periodTo = readString(record.periodTo);
+  if (periodFrom && periodTo) return { periodFrom, periodTo };
+
+  const legacyFrom = legacyFromKey ? readString(record[legacyFromKey]) : "";
+  const legacyTo = legacyToKey ? readString(record[legacyToKey]) : "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(legacyFrom) && /^\d{4}-\d{2}-\d{2}$/.test(legacyTo)) {
+    return { periodFrom: legacyFrom, periodTo: legacyTo };
+  }
+  if (/^\d{4}$/.test(legacyFrom) && /^\d{4}$/.test(legacyTo)) {
+    return {
+      periodFrom: `${legacyFrom}-06-01`,
+      periodTo: `${legacyTo}-04-30`,
+    };
+  }
+
+  const legacyYear = legacySingleYearKey ? readString(record[legacySingleYearKey]) : "";
+  if (/^\d{4}$/.test(legacyYear)) {
+    return {
+      periodFrom: `${legacyYear}-06-01`,
+      periodTo: `${legacyYear}-04-30`,
+    };
+  }
+
+  return { periodFrom: "", periodTo: "" };
 }
 
 function parseSscDetails(raw: unknown, legacyData: Record<string, unknown>): OnboardingSscDetails {
@@ -123,10 +161,11 @@ function parseSscDetails(raw: unknown, legacyData: Record<string, unknown>): Onb
     return legacySchool ? { ...empty, schoolName: legacySchool } : empty;
   }
   const record = raw as Record<string, unknown>;
+  const period = readPeriodFields(record, undefined, undefined, "yearOfPassing");
   return {
     schoolName: readString(record.schoolName),
     board: readString(record.board),
-    yearOfPassing: readString(record.yearOfPassing),
+    ...period,
     percentageOrCgpa: readString(record.percentageOrCgpa),
     rollNumber: readString(record.rollNumber),
     placeOrState: readString(record.placeOrState),
@@ -143,12 +182,13 @@ function parseIntermediateDetails(
     return legacySchool ? { ...empty, schoolName: legacySchool } : empty;
   }
   const record = raw as Record<string, unknown>;
+  const period = readPeriodFields(record, undefined, undefined, "yearOfPassing");
   return {
-    qualification: readString(record.qualification),
+    qualification: normalizeIntermediateQualification(readString(record.qualification)),
     schoolName: readString(record.schoolName),
     board: readString(record.board),
     stream: readString(record.stream),
-    yearOfPassing: readString(record.yearOfPassing),
+    ...period,
     percentageOrCgpa: readString(record.percentageOrCgpa),
     rollNumber: readString(record.rollNumber),
     collegeStateOrLocation: readString(record.collegeStateOrLocation),
@@ -165,13 +205,13 @@ function parseGraduationDetails(
     return legacySchool ? { ...empty, collegeName: legacySchool } : empty;
   }
   const record = raw as Record<string, unknown>;
+  const period = readPeriodFields(record, "yearOfAdmission", "yearOfPassing");
   return {
     degree: readString(record.degree),
     specialization: readString(record.specialization),
     collegeName: readString(record.collegeName),
     university: readString(record.university),
-    yearOfAdmission: readString(record.yearOfAdmission),
-    yearOfPassing: readString(record.yearOfPassing),
+    ...period,
     percentageOrCgpa: readString(record.percentageOrCgpa),
     rollNumber: readString(record.rollNumber),
     stateOrLocation: readString(record.stateOrLocation),

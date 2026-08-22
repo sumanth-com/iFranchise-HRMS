@@ -77,17 +77,17 @@ function buildEducationBio(education: Record<string, unknown>): string | null {
 
   if (form.ssc.schoolName.trim()) {
     lines.push(
-      `10th (SSC): ${form.ssc.schoolName.trim()} — ${form.ssc.board || "Board N/A"}, ${form.ssc.yearOfPassing || "Year N/A"}`,
+      `10th (SSC): ${form.ssc.schoolName.trim()} — ${form.ssc.board || "Board N/A"} (${form.ssc.periodFrom || "?"} to ${form.ssc.periodTo || "?"})`,
     );
   }
   if (form.intermediate.schoolName.trim()) {
     lines.push(
-      `12th: ${form.intermediate.schoolName.trim()} — ${form.intermediate.qualification || "Qualification N/A"}, ${form.intermediate.stream || "Stream N/A"}`,
+      `12th: ${form.intermediate.schoolName.trim()} — ${form.intermediate.qualification || "Qualification N/A"}, ${form.intermediate.stream || "Stream N/A"} (${form.intermediate.periodFrom || "?"} to ${form.intermediate.periodTo || "?"})`,
     );
   }
   if (form.graduation.collegeName.trim()) {
     lines.push(
-      `Graduation: ${form.graduation.degree || "Degree N/A"} (${form.graduation.specialization || "Branch N/A"}) — ${form.graduation.collegeName.trim()}, ${form.graduation.university || "University N/A"}`,
+      `Graduation: ${form.graduation.degree || "Degree N/A"} (${form.graduation.specialization || "Branch N/A"}) — ${form.graduation.collegeName.trim()}, ${form.graduation.university || "University N/A"} (${form.graduation.periodFrom || "?"} to ${form.graduation.periodTo || "?"})`,
     );
   }
 

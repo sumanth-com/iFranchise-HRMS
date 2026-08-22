@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { OnboardingWizard } from "@/components/onboarding/candidate/onboarding-wizard";
+import { OnboardingPortalProgressSync } from "@/components/onboarding/candidate/onboarding-portal-progress-sync";
 import { getCandidatePortalContextAction } from "@/lib/onboarding/actions/candidate-onboarding-actions";
 import type { CandidatePortalContext } from "@/types/onboarding";
 
@@ -40,7 +41,8 @@ export default function OnboardingPortalPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden py-1">
+    <div className="flex min-w-0 max-w-full flex-1 flex-col gap-2 py-1">
+      <OnboardingPortalProgressSync completionPercent={context.completionPercent} />
       {context.correctionNotes ? (
         <div className="shrink-0 rounded-lg border border-orange-500/30 bg-orange-500/10 px-3 py-2 text-xs text-orange-950 dark:text-orange-100">
           <strong>HR corrections:</strong> {context.correctionNotes}

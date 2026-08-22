@@ -1,42 +1,74 @@
 /** Education dropdown / typeahead options for Indian qualifications. */
 
-export const INDIAN_SCHOOL_BOARDS = [
-  "CBSE (Central Board of Secondary Education)",
-  "ICSE (Indian Certificate of Secondary Education)",
-  "ISC (Indian School Certificate)",
-  "NIOS (National Institute of Open Schooling)",
-  "Andhra Pradesh Board of Secondary Education",
+/** Class X / SSC / Secondary boards (India). */
+export const INDIAN_SSC_BOARDS = [
+  "CBSE — Class X (Secondary)",
+  "ICSE — Class X (Secondary)",
+  "NIOS — Secondary Course",
+  "Andhra Pradesh Board of Secondary Education (BSEAP)",
   "Assam Board of Secondary Education (SEBA)",
-  "Bihar School Examination Board (BSEB)",
+  "Bihar School Examination Board (BSEB) — Matric",
   "Chhattisgarh Board of Secondary Education (CGBSE)",
-  "Goa Board of Secondary and Higher Secondary Education",
-  "Gujarat Secondary and Higher Secondary Education Board (GSEB)",
-  "Board of School Education Haryana (BSEH)",
-  "Himachal Pradesh Board of School Education (HPBOSE)",
-  "Jammu and Kashmir Board of School Education (JKBOSE)",
-  "Jharkhand Academic Council (JAC)",
-  "Karnataka Secondary Education Examination Board (KSEEB)",
-  "Kerala Board of Public Examinations (KBPE)",
-  "Maharashtra State Board of Secondary and Higher Secondary Education (MSBSHSE)",
-  "Board of Secondary Education, Madhya Pradesh (MPBSE)",
-  "Board of Secondary Education, Odisha (BSE Odisha)",
-  "Punjab School Education Board (PSEB)",
-  "Rajasthan Board of Secondary Education (RBSE)",
-  "Tamil Nadu State Board",
-  "Telangana Board of Secondary Education (BSE Telangana)",
-  "Tripura Board of Secondary Education (TBSE)",
-  "Uttar Pradesh Board of Secondary Education (UP Board)",
-  "Uttarakhand Board of School Education (UBSE)",
-  "West Bengal Board of Secondary Education (WBBSE)",
-  "Council for the Indian School Certificate Examinations (CISCE)",
+  "Goa Board — Secondary School Certificate (SSC)",
+  "Gujarat Secondary Education Board (GSEB) — SSC",
+  "Board of School Education Haryana (BSEH) — Secondary",
+  "HP Board of School Education (HPBOSE) — Class X",
+  "JKBOSE — Class X",
+  "Jharkhand Academic Council (JAC) — Class X",
+  "Karnataka Secondary Education Examination Board (KSEEB) — SSLC",
+  "Kerala Board of Public Examinations (KBPE) — SSLC",
+  "Maharashtra State Board — SSC",
+  "MP Board of Secondary Education (MPBSE) — Class X",
+  "Board of Secondary Education, Odisha (BSE) — Class X",
+  "Punjab School Education Board (PSEB) — Matric",
+  "Rajasthan Board of Secondary Education (RBSE) — Class X",
+  "Tamil Nadu State Board — SSLC",
+  "Telangana Board of Secondary Education — SSC",
+  "Tripura Board of Secondary Education (TBSE) — Madhyamik",
+  "UP Board — High School (Class X)",
+  "Uttarakhand Board of School Education (UBSE) — Class X",
+  "West Bengal Board of Secondary Education (WBBSE) — Madhyamik",
+  "CISCE — ICSE (Class X)",
 ] as const;
 
+/** Class XII / Intermediate / HSC boards (India). */
+export const INDIAN_INTERMEDIATE_BOARDS = [
+  "CBSE — Class XII (Senior Secondary)",
+  "ISC — Class XII (Indian School Certificate)",
+  "NIOS — Senior Secondary Course",
+  "Andhra Pradesh Board of Intermediate Education (BIEAP)",
+  "Telangana State Board of Intermediate Education (TSBIE)",
+  "Assam Higher Secondary Education Council (AHSEC)",
+  "Bihar School Examination Board (BSEB) — Intermediate",
+  "Chhattisgarh Board of Secondary Education — Higher Secondary",
+  "Goa Board — Higher Secondary (HSSC)",
+  "Gujarat Secondary and Higher Secondary Education Board (GSEB) — HSC",
+  "Board of School Education Haryana (BSEH) — Senior Secondary",
+  "HP Board of School Education (HPBOSE) — Class XII",
+  "JKBOSE — Class XII",
+  "Jharkhand Academic Council (JAC) — Intermediate",
+  "Karnataka Pre-University Board (PUC)",
+  "Kerala Higher Secondary Examination Board (DHSE) — Plus Two",
+  "Maharashtra State Board — HSC",
+  "MP Board — Higher Secondary (Class XII)",
+  "Council of Higher Secondary Education, Odisha (CHSE)",
+  "Punjab School Education Board (PSEB) — Senior Secondary",
+  "Rajasthan Board of Secondary Education (RBSE) — Class XII",
+  "Tamil Nadu State Board — HSC (+2)",
+  "Tripura Board of Joint Entrance Examination (TBJEE) / Higher Secondary",
+  "UP Board — Intermediate (Class XII)",
+  "Uttarakhand Board of School Education (UBSE) — Class XII",
+  "West Bengal Council of Higher Secondary Education (WBCHSE)",
+  "CISCE — ISC (Class XII)",
+] as const;
+
+/** @deprecated Use INDIAN_SSC_BOARDS or INDIAN_INTERMEDIATE_BOARDS */
+export const INDIAN_SCHOOL_BOARDS = INDIAN_SSC_BOARDS;
+
 export const INTERMEDIATE_QUALIFICATIONS = [
-  "12th",
-  "Intermediate",
+  "12th / Intermediate / Senior Secondary",
   "PUC (Pre-University Course)",
   "HSC (Higher Secondary Certificate)",
-  "Senior Secondary",
 ] as const;
 
 export const ACADEMIC_STREAMS = [
@@ -93,63 +125,6 @@ export const GRADUATION_SPECIALIZATIONS = [
   "Other",
 ] as const;
 
-export const INDIAN_UNIVERSITIES = [
-  "University of Delhi",
-  "Jawaharlal Nehru University (JNU)",
-  "Banaras Hindu University (BHU)",
-  "Aligarh Muslim University (AMU)",
-  "University of Mumbai",
-  "University of Pune (SPPU)",
-  "Savitribai Phule Pune University",
-  "University of Calcutta",
-  "Jadavpur University",
-  "University of Hyderabad",
-  "Osmania University",
-  "Kakatiya University",
-  "Andhra University",
-  "Sri Venkateswara University",
-  "Anna University",
-  "Bharathiar University",
-  "Madras University",
-  "Visvesvaraya Technological University (VTU)",
-  "Bangalore University",
-  "Mysore University",
-  "Gujarat University",
-  "Maharaja Sayajirao University of Baroda",
-  "Panjab University",
-  "Guru Nanak Dev University",
-  "Rajasthan University",
-  "University of Rajasthan",
-  "Lucknow University",
-  "Allahabad University (University of Allahabad)",
-  "Dr. A.P.J. Abdul Kalam Technical University (AKTU)",
-  "Gautam Buddha University",
-  "Jamia Millia Islamia",
-  "Indira Gandhi National Open University (IGNOU)",
-  "BITS Pilani",
-  "Manipal Academy of Higher Education",
-  "Amity University",
-  "VIT University (Vellore Institute of Technology)",
-  "SRM Institute of Science and Technology",
-  "Lovely Professional University (LPU)",
-  "Chandigarh University",
-  "Symbiosis International University",
-  "Other",
-] as const;
-
-export const INDIAN_COLLEGES = [
-  "Indian Institute of Technology (IIT)",
-  "National Institute of Technology (NIT)",
-  "Indian Institute of Information Technology (IIIT)",
-  "Government Degree College",
-  "Government Polytechnic",
-  "Private Engineering College",
-  "Private Degree College",
-  "Autonomous College",
-  "Affiliated College",
-  "Other",
-] as const;
-
 export function filterEducationOptions(
   options: readonly string[],
   query: string,
@@ -164,22 +139,26 @@ export function toSelectItems(options: readonly string[]) {
   return options.map((item) => ({ value: item, label: item }));
 }
 
-export function passingYearSelectItems() {
-  const current = new Date().getFullYear();
-  const items: { value: string; label: string }[] = [];
-  for (let year = current + 1; year >= 1970; year -= 1) {
-    items.push({ value: String(year), label: String(year) });
-  }
-  return items;
+export function isValidEducationDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = Date.parse(value);
+  return !Number.isNaN(parsed);
 }
 
-export function sanitizeYear(value: string): string {
-  return value.replace(/\D/g, "").slice(0, 4);
+export function isValidEducationDateRange(from: string, to: string): boolean {
+  if (!isValidEducationDate(from) || !isValidEducationDate(to)) return false;
+  return from <= to;
 }
 
-export function isValidPassingYear(value: string): boolean {
-  if (!/^\d{4}$/.test(value)) return false;
-  const year = Number(value);
-  const current = new Date().getFullYear();
-  return year >= 1970 && year <= current + 1;
+export function normalizeIntermediateQualification(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const legacyMap: Record<string, string> = {
+    "12th": "12th / Intermediate / Senior Secondary",
+    Intermediate: "12th / Intermediate / Senior Secondary",
+    "Senior Secondary": "12th / Intermediate / Senior Secondary",
+    "PUC (Pre-University Course)": "PUC (Pre-University Course)",
+    "HSC (Higher Secondary Certificate)": "HSC (Higher Secondary Certificate)",
+  };
+  return legacyMap[trimmed] ?? trimmed;
 }

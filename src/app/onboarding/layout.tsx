@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { OnboardingPortalHeader } from "@/components/onboarding/candidate/onboarding-portal-header";
+import { OnboardingPortalProgressProvider } from "@/components/onboarding/candidate/onboarding-portal-progress-context";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function OnboardingLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative flex min-h-screen flex-col bg-background text-foreground">
+    <div className="relative flex min-h-screen flex-col overflow-x-hidden overscroll-x-none bg-background text-foreground">
       <div
         className="pointer-events-none fixed inset-0 bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] bg-[size:24px_24px] opacity-[0.35] dark:opacity-[0.18]"
         aria-hidden
@@ -20,11 +21,13 @@ export default function OnboardingLayout({ children }: { children: React.ReactNo
         aria-hidden
       />
 
-      <OnboardingPortalHeader />
+      <OnboardingPortalProgressProvider>
+        <OnboardingPortalHeader />
 
-      <main className="relative mx-auto flex min-h-[calc(100dvh-3.25rem)] w-full max-w-6xl flex-1 flex-col px-4 py-2">
-        {children}
-      </main>
+        <main className="relative mx-auto flex min-h-[calc(100dvh-3.25rem)] w-full min-w-0 max-w-6xl flex-1 flex-col overflow-x-hidden px-4 py-2">
+          {children}
+        </main>
+      </OnboardingPortalProgressProvider>
     </div>
   );
 }

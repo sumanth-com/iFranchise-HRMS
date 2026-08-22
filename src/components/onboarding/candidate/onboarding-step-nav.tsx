@@ -98,12 +98,12 @@ export function OnboardingStepNav({
   }, [activeStep]);
 
   return (
-    <div className="relative border-b border-border bg-muted/40 dark:bg-muted/20">
+    <div className="sticky top-[3.25rem] z-20 w-full max-w-full overflow-hidden border-b border-border bg-card/95 backdrop-blur-sm dark:bg-card/90">
       <div
         ref={scrollRef}
-        className="overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="w-full max-w-full overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        <div className="relative flex min-w-max items-center justify-center gap-0 px-2 sm:min-w-full sm:justify-between sm:px-5">
+        <div className="relative inline-flex min-w-full w-max max-w-none items-center justify-start gap-0 px-2 sm:w-full sm:justify-between sm:px-5">
           {ONBOARDING_WIZARD_SECTIONS.map((key, index) => {
             const isActive = index === activeStep;
             const isComplete = completedSteps.includes(index);
