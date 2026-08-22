@@ -457,26 +457,34 @@ export async function getCandidatePortalContext(caseId: string): Promise<Candida
 
   const locked = ["pending_hr_review", "approved", "employee_created", "completed", "rejected", "cancelled", "archived"].includes(row.status);
 
-  const [sections, documents, policies, agreements, signature, offerLetterRecord] = await Promise.all([
+  const [sections, documents, policies, agreements, signature] = await Promise.all([
     admin.schema("hrms").from("onboarding_sections").select("section_key, data, completed_at").eq("case_id", caseId),
     loadCaseDocuments(caseId),
     admin.schema("hrms").from("onboarding_policy_acknowledgements").select("policy_code").eq("case_id", caseId),
     admin.schema("hrms").from("onboarding_agreements").select("agreement_type, signed_at, locked_at").eq("case_id", caseId),
     admin.schema("hrms").from("onboarding_signatures").select("id, signature_type, signature_style, finalized_at").eq("case_id", caseId).order("finalized_at", { ascending: false }).limit(1).maybeSingle(),
-    loadCandidateOfferLetter(
+  ]);
+
+  let offerLetter: CandidatePortalContext["offerLetter"] = null;
+  try {
+    const offerLetterRecord = await loadCandidateOfferLetter(
       row.organization_id as string,
       (row.offer_reference_number as string | null) ?? null,
       row.personal_email as string,
-    ),
-  ]);
-
-  const offerLetter = offerLetterRecord
-    ? {
-        fileName: offerLetterRecord.fileName,
-        uploadedAt: offerLetterRecord.uploadedAt,
-        contentType: offerLetterRecord.contentType,
-      }
-    : null;
+    );
+    offerLetter = offerLetterRecord
+      ? {
+          fileName: offerLetterRecord.fileName,
+          uploadedAt: offerLetterRecord.uploadedAt,
+          contentType: offerLetterRecord.contentType,
+        }
+      : null;
+  } catch (error) {
+    console.error("[onboarding] offer letter lookup failed", {
+      caseId,
+      error: error instanceof Error ? error.message : error,
+    });
+  }
 
   return {
     caseId: row.id,

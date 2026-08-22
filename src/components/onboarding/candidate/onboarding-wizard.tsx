@@ -6,13 +6,12 @@ import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
-import { OnboardingAddressFields } from "@/components/onboarding/candidate/onboarding-address-fields";
 import { OnboardingDocumentUpload } from "@/components/onboarding/candidate/onboarding-document-upload";
 import { OnboardingEducationSection } from "@/components/onboarding/candidate/onboarding-education-section";
 import { OnboardingEmploymentSection } from "@/components/onboarding/candidate/onboarding-employment-section";
+import { OnboardingPersonalSection } from "@/components/onboarding/candidate/onboarding-personal-section";
 import { OnboardingTermsSection } from "@/components/onboarding/candidate/onboarding-terms-section";
 import { OnboardingOfferAcceptanceSection } from "@/components/onboarding/candidate/onboarding-offer-acceptance-section";
-import { OnboardingPhoneField } from "@/components/onboarding/candidate/onboarding-phone-field";
 import { useOnboardingPortalProgress } from "@/components/onboarding/candidate/onboarding-portal-progress-context";
 import { OnboardingStepNav } from "@/components/onboarding/candidate/onboarding-step-nav";
 import { OnboardingSubmittedCelebration } from "@/components/onboarding/candidate/onboarding-submitted-celebration";
@@ -31,13 +30,9 @@ import {
   ONBOARDING_OFFER_ACCEPTANCE_CATEGORY,
   ONBOARDING_SIGNED_OFFER_DOCUMENT_CODE,
 } from "@/lib/onboarding/offer-acceptance-constants";
+import { readOnboardingAddressLine } from "@/lib/onboarding/onboarding-personal-field-utils";
 import {
-  ONBOARDING_BLOOD_GROUP_OPTIONS,
-  ONBOARDING_GENDER_OPTIONS,
-  ONBOARDING_MARITAL_STATUS_OPTIONS,
   normalizeSelectValue,
-  todayIsoDate,
-  toDateInputValue,
   toIsoDate,
 } from "@/lib/onboarding/personal-field-options";
 import {
@@ -96,18 +91,6 @@ const SECTION_TITLES: Record<string, string> = {
   bank: "Bank Details",
 };
 
-const GENDER_ITEMS = ONBOARDING_GENDER_OPTIONS.map((item) => ({
-  value: item.value,
-  label: item.label,
-}));
-const MARITAL_ITEMS = ONBOARDING_MARITAL_STATUS_OPTIONS.map((item) => ({
-  value: item.value,
-  label: item.label,
-}));
-const BLOOD_GROUP_ITEMS = ONBOARDING_BLOOD_GROUP_OPTIONS.map((item) => ({
-  value: item.value,
-  label: item.label,
-}));
 const BANK_ACCOUNT_TYPE_ITEMS = ONBOARDING_BANK_ACCOUNT_TYPE_OPTIONS.map((item) => ({
   value: item.value,
   label: item.label,
@@ -143,8 +126,13 @@ function buildLiveSectionPatch(
   }
 
   if (sectionKey === "personal") {
-    const dob = draft.dateOfBirth ?? toIsoDate(saved.dateOfBirth);
-    if (dob) patch.dateOfBirth = dob;
+    const dob = toIsoDate(draft.dateOfBirth ?? saved.dateOfBirth);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dob)) patch.dateOfBirth = dob;
+
+    if (!patch.addressLine?.trim()) {
+      const addressLine = readOnboardingAddressLine(saved);
+      if (addressLine.trim()) patch.addressLine = addressLine.trim();
+    }
   }
 
   if (sectionKey === "bank") {
@@ -360,16 +348,6 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function personalField(key: string): string {
-    if (key in form) return form[key] ?? "";
-    const fromPatch = liveSectionPatch[key];
-    if (fromPatch) return fromPatch;
-    const saved = readSectionField(sectionData[key]);
-    if (saved) return saved;
-    if (key === "fullName") return (context.fullName ?? "").trim();
-    return "";
-  }
-
   function sectionHasDraftChanges(): boolean {
     if (sectionKey === "education") {
       try {
@@ -443,11 +421,11 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
     URL.revokeObjectURL(url);
   }
 
-  function personalSelectValue(
+  function wizardSelectValue(
     key: string,
     options: readonly { value: string }[],
   ): string {
-    if (form[key]) return form[key];
+    if (form[key]) return normalizeSelectValue(form[key], options);
     return normalizeSelectValue(sectionData[key], options);
   }
 
@@ -709,106 +687,16 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           ref={contentScrollRef}
           className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain scroll-smooth px-4 py-4 sm:px-6 sm:py-5"
         >
-          <div key={`${sectionKey}-${stepAnimKey}`} className="onboarding-section-enter min-w-0">
+          <div key={sectionKey} className="onboarding-section-enter min-w-0">
           {sectionKey === "personal" && (
-            <div className="grid gap-2.5 sm:grid-cols-2">
-              <div className="space-y-1">
-                <FieldLabel label="Full name" required />
-                <Input
-                  className={wizardInputClassName}
-                  value={personalField("fullName")}
-                  onChange={(e) => updateField("fullName", e.target.value)}
-                />
-              </div>
-              <div className="space-y-1">
-                <FieldLabel label="Date of birth" required />
-                <Input
-                  type="date"
-                  className={wizardInputClassName}
-                  max={todayIsoDate()}
-                  value={form.dateOfBirth ?? toDateInputValue(sectionData.dateOfBirth)}
-                  onChange={(e) => updateField("dateOfBirth", e.target.value)}
-                />
-              </div>
-              <div className="space-y-1">
-                <FieldLabel label="Gender" required />
-                <OnboardingWizardSelect
-                  items={GENDER_ITEMS}
-                  value={personalSelectValue("gender", ONBOARDING_GENDER_OPTIONS)}
-                  placeholder="Select gender"
-                  onValueChange={(value) => updateField("gender", value)}
-                  triggerClassName={wizardInputClassName}
-                />
-              </div>
-              <div className="space-y-1">
-                <FieldLabel label="Marital status" />
-                <OnboardingWizardSelect
-                  items={MARITAL_ITEMS}
-                  value={personalSelectValue("maritalStatus", ONBOARDING_MARITAL_STATUS_OPTIONS)}
-                  placeholder="Select marital status"
-                  onValueChange={(value) => updateField("maritalStatus", value)}
-                  triggerClassName={wizardInputClassName}
-                />
-              </div>
-              <div className="space-y-1">
-                <FieldLabel label="Blood group" />
-                <OnboardingWizardSelect
-                  items={BLOOD_GROUP_ITEMS}
-                  value={personalSelectValue("bloodGroup", ONBOARDING_BLOOD_GROUP_OPTIONS)}
-                  placeholder="Select blood group"
-                  onValueChange={(value) => updateField("bloodGroup", value)}
-                  triggerClassName={wizardInputClassName}
-                />
-              </div>
-              <div className="space-y-1">
-                <FieldLabel label="Nationality" />
-                <Input
-                  className={wizardInputClassName}
-                  value={personalField("nationality")}
-                  onChange={(e) => updateField("nationality", e.target.value)}
-                  placeholder="Nationality"
-                />
-              </div>
-              <OnboardingAddressFields
-                stateValue={personalField("state")}
-                cityValue={personalField("city")}
-                pincodeValue={personalField("pincode")}
-                addressLineValue={
-                  form.addressLine ??
-                  readSectionField(sectionData.addressLine ?? sectionData.address)
-                }
-                onStateChange={(value) => updateField("state", value)}
-                onCityChange={(value) => updateField("city", value)}
-                onPincodeChange={(value) => updateField("pincode", value)}
-                onAddressLineChange={(value) => updateField("addressLine", value)}
-                inputClassName={wizardInputClassName}
-              />
-              <OnboardingPhoneField
-                label="Personal mobile"
-                required
-                className="w-full max-w-none"
-                value={personalField("personalMobile")}
-                onChange={(value) => updateField("personalMobile", value)}
-                placeholder="Mobile number"
-              />
-              <OnboardingPhoneField
-                label="Emergency contact"
-                required
-                className="w-full max-w-none"
-                value={personalField("emergencyContact")}
-                onChange={(value) => updateField("emergencyContact", value)}
-                placeholder="Emergency number"
-              />
-              <div className="space-y-1 sm:col-span-2">
-                <FieldLabel label="Personal email" required />
-                <Input
-                  type="email"
-                  className={wizardInputClassName}
-                  value={personalField("personalEmail")}
-                  onChange={(e) => updateField("personalEmail", e.target.value)}
-                />
-              </div>
-            </div>
+            <OnboardingPersonalSection
+              sectionData={sectionData}
+              form={form}
+              fullNameFallback={context.fullName ?? ""}
+              personalEmailFallback={context.personalEmail ?? ""}
+              inputClassName={wizardInputClassName}
+              onFieldChange={updateField}
+            />
           )}
 
           {sectionKey === "identity" && (
@@ -993,7 +881,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                   <FieldLabel label="Account type" required />
                   <OnboardingWizardSelect
                     items={BANK_ACCOUNT_TYPE_ITEMS}
-                    value={personalSelectValue(
+                    value={wizardSelectValue(
                       "accountType",
                       ONBOARDING_BANK_ACCOUNT_TYPE_OPTIONS,
                     )}

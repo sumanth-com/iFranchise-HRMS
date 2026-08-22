@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import { OnboardingWizard } from "@/components/onboarding/candidate/onboarding-wizard";
 import { OnboardingPortalProgressSync } from "@/components/onboarding/candidate/onboarding-portal-progress-sync";
@@ -13,8 +14,13 @@ export default function OnboardingPortalPage() {
   const [context, setContext] = useState<CandidatePortalContext | null | undefined>(undefined);
 
   const refresh = useCallback(async () => {
-    const data = await getCandidatePortalContextAction();
-    setContext(data);
+    try {
+      const data = await getCandidatePortalContextAction();
+      setContext(data);
+    } catch (error) {
+      console.error("[onboarding-portal] context refresh failed", error);
+      toast.error("Could not load your onboarding data. Please try again.");
+    }
   }, []);
 
   useEffect(() => {
