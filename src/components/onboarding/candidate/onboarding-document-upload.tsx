@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { ONBOARDING_UPLOAD_MAX_MB } from "@/lib/onboarding/constants";
 import { cn } from "@/lib/utils";
 
-const UPLOAD_ACCEPT =
+const DEFAULT_UPLOAD_ACCEPT =
   ".pdf,.doc,.docx,.xls,.xlsx,.zip,image/jpeg,image/png,image/webp";
 
 type OnboardingDocumentUploadProps = {
@@ -19,6 +19,8 @@ type OnboardingDocumentUploadProps = {
   disabled?: boolean;
   variant?: "default" | "card";
   maxUploadMb?: number;
+  accept?: string;
+  uploadHint?: string;
   onSelectFile: (file: File) => void;
 };
 
@@ -31,17 +33,21 @@ export function OnboardingDocumentUpload({
   disabled = false,
   variant = "default",
   maxUploadMb = ONBOARDING_UPLOAD_MAX_MB,
+  accept,
+  uploadHint: uploadHintProp,
   onSelectFile,
 }: OnboardingDocumentUploadProps) {
   const displayName = fileName ?? pendingFileName;
   const isUploaded = Boolean(fileName) && !uploading;
-  const uploadHint = `PDF, Word, Excel, images, or ZIP · max ${maxUploadMb} MB`;
+  const uploadAccept = accept ?? DEFAULT_UPLOAD_ACCEPT;
+  const uploadHint =
+    uploadHintProp ?? `PDF, Word, Excel, images, or ZIP · max ${maxUploadMb} MB`;
 
   if (variant === "card") {
     return (
       <div className="flex h-full min-h-[168px] flex-col rounded-xl border border-border bg-muted/25 p-4 dark:bg-muted/15">
-        <div className="mb-3 text-center">
-          <Label className="text-sm font-medium text-foreground">
+        <div className="mb-3 flex min-h-[2.75rem] items-center justify-center px-1 text-center">
+          <Label className="text-balance text-sm font-medium leading-snug text-foreground">
             {label}
             {required ? <span className="text-foreground"> *</span> : null}
           </Label>
@@ -75,7 +81,7 @@ export function OnboardingDocumentUpload({
               <span className="text-xs font-medium text-foreground">Choose file</span>
               <Input
                 type="file"
-                accept={UPLOAD_ACCEPT}
+                accept={uploadAccept}
                 disabled={disabled || uploading}
                 className="sr-only"
                 onChange={(e) => {
@@ -92,7 +98,7 @@ export function OnboardingDocumentUpload({
               <span className="text-xs font-medium text-primary hover:underline">Replace file</span>
               <Input
                 type="file"
-                accept={UPLOAD_ACCEPT}
+                accept={uploadAccept}
                 disabled={disabled || uploading}
                 className="sr-only"
                 onChange={(e) => {
@@ -144,7 +150,7 @@ export function OnboardingDocumentUpload({
 
       <Input
         type="file"
-        accept={UPLOAD_ACCEPT}
+        accept={uploadAccept}
         disabled={disabled || uploading}
         className={cn(
           "h-10 cursor-pointer bg-background text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-foreground dark:bg-background",

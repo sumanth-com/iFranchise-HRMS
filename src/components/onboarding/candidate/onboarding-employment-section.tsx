@@ -131,6 +131,8 @@ export function OnboardingEmploymentSection({
           variant="card"
           label={doc.label}
           required={doc.required}
+          accept=".pdf,image/jpeg,image/png,image/webp"
+          uploadHint="PDF or image only"
           fileName={meta.fileName}
           uploading={meta.uploading}
           pendingFileName={meta.pendingFileName}

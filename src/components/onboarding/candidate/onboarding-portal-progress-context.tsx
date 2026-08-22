@@ -2,9 +2,16 @@
 
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 
+export type OnboardingPortalWizardStep = {
+  current: number;
+  total: number;
+};
+
 type OnboardingPortalProgressContextValue = {
   completionPercent: number | null;
   setCompletionPercent: (percent: number | null) => void;
+  wizardStep: OnboardingPortalWizardStep | null;
+  setWizardStep: (step: OnboardingPortalWizardStep | null) => void;
 };
 
 const OnboardingPortalProgressContext =
@@ -12,9 +19,10 @@ const OnboardingPortalProgressContext =
 
 export function OnboardingPortalProgressProvider({ children }: { children: ReactNode }) {
   const [completionPercent, setCompletionPercent] = useState<number | null>(null);
+  const [wizardStep, setWizardStep] = useState<OnboardingPortalWizardStep | null>(null);
   const value = useMemo(
-    () => ({ completionPercent, setCompletionPercent }),
-    [completionPercent],
+    () => ({ completionPercent, setCompletionPercent, wizardStep, setWizardStep }),
+    [completionPercent, wizardStep],
   );
 
   return (

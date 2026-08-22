@@ -24,7 +24,7 @@ export default function OnboardingLayout({ children }: { children: React.ReactNo
       <OnboardingPortalProgressProvider>
         <OnboardingPortalHeader />
 
-        <main className="relative mx-auto flex min-h-[calc(100dvh-3.25rem)] w-full min-w-0 max-w-6xl flex-1 flex-col px-4 py-2">
+        <main className="relative mx-auto flex min-h-[calc(100dvh-3.5rem)] w-full min-w-0 max-w-6xl flex-1 flex-col px-4 pb-2 pt-0">
           {children}
         </main>
       </OnboardingPortalProgressProvider>

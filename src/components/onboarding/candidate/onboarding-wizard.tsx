@@ -13,6 +13,7 @@ import { OnboardingEmploymentSection } from "@/components/onboarding/candidate/o
 import { OnboardingTermsSection } from "@/components/onboarding/candidate/onboarding-terms-section";
 import { OnboardingPhoneField } from "@/components/onboarding/candidate/onboarding-phone-field";
 import { OnboardingSignature } from "@/components/onboarding/candidate/onboarding-signature";
+import { useOnboardingPortalProgress } from "@/components/onboarding/candidate/onboarding-portal-progress-context";
 import { OnboardingStepNav } from "@/components/onboarding/candidate/onboarding-step-nav";
 import { OnboardingSubmittedCelebration } from "@/components/onboarding/candidate/onboarding-submitted-celebration";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
@@ -125,6 +126,7 @@ type OnboardingWizardProps = {
 };
 
 export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) {
+  const progressCtx = useOnboardingPortalProgress();
   const [step, setStep] = useState(0);
   const [isPending, startTransition] = useTransition();
   const [showCelebration, setShowCelebration] = useState(false);
@@ -179,6 +181,15 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [step, stepAnimKey]);
+
+  useEffect(() => {
+    if (!progressCtx) return;
+    progressCtx.setWizardStep({
+      current: step + 1,
+      total: ONBOARDING_WIZARD_SECTIONS.length,
+    });
+    return () => progressCtx.setWizardStep(null);
+  }, [step, progressCtx]);
 
   function sectionHintText(): string {
     if (!currentValidation.valid) {
@@ -440,9 +451,9 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   const isLastStep = step === ONBOARDING_WIZARD_SECTIONS.length - 1;
 
   return (
-    <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-1 flex-col pb-2">
-      <div className="flex min-w-0 flex-1 flex-col rounded-2xl border border-border bg-card shadow-lg shadow-black/5 ring-1 ring-border/50 dark:shadow-black/25">
-        <div className="sticky top-[3.25rem] z-20 shrink-0 rounded-t-2xl bg-card/95 backdrop-blur-sm dark:bg-card/90">
+    <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-1 flex-col">
+      <div className="sticky top-14 z-20 shrink-0 pt-2">
+        <div className="overflow-hidden rounded-t-2xl border border-border bg-card/95 shadow-sm ring-1 ring-border/50 backdrop-blur-sm dark:bg-card/90 dark:shadow-black/25">
           <OnboardingStepNav
             activeStep={step}
             completedSteps={completedSteps}
@@ -450,10 +461,12 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
             onStepChange={goToStep}
           />
         </div>
+      </div>
 
+      <div className="-mt-px flex min-w-0 flex-1 flex-col rounded-b-2xl border border-t-0 border-border bg-card shadow-lg shadow-black/5 ring-1 ring-border/50 dark:shadow-black/25">
         <div
           key={`${sectionKey}-${stepAnimKey}`}
-          className="onboarding-section-enter min-w-0 overflow-x-hidden px-4 py-4 pb-24 sm:px-6 sm:py-5 sm:pb-24"
+          className="onboarding-section-enter min-w-0 overflow-x-hidden px-4 py-4 pb-28 sm:px-6 sm:py-5 sm:pb-28"
         >
           <div className="mb-4 flex items-center justify-between gap-3 border-b border-border/60 pb-3">
             <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-0.5">
@@ -471,7 +484,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                 {sectionHintText()}
               </p>
             </div>
-            <p className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            <p className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground sm:hidden">
               Step {step + 1} of {ONBOARDING_WIZARD_SECTIONS.length}
             </p>
           </div>
@@ -719,21 +732,9 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
             </div>
           )}
 
-          {sectionKey !== "signature" && (
-              <div className="mt-4 flex justify-center">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => saveSection(false)}
-                  disabled={isPending}
-                >
-                  Save progress
-                </Button>
-              </div>
-            )}
         </div>
 
-        <div className="sticky bottom-0 z-10 flex min-w-0 shrink-0 flex-col gap-2 rounded-b-2xl border-t border-border bg-card/95 px-4 py-3 shadow-[0_-4px_24px_-12px_rgba(0,0,0,0.12)] backdrop-blur-sm dark:bg-card/90 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="sticky bottom-2 z-10 mx-2 mb-2 flex min-w-0 shrink-0 flex-col gap-2 rounded-2xl border border-border bg-card/95 px-4 py-3 shadow-[0_-4px_24px_-12px_rgba(0,0,0,0.12)] backdrop-blur-sm dark:bg-card/90 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <Button
             variant="outline"
             disabled={step === 0 || isPending}
@@ -747,27 +748,37 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
             Previous
           </Button>
 
-          <div className="text-center text-[11px] text-muted-foreground sm:order-none">
-            Step {step + 1}/{ONBOARDING_WIZARD_SECTIONS.length}
-          </div>
+          <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+            {sectionKey !== "signature" ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => saveSection(false)}
+                disabled={isPending}
+                className="w-full sm:w-auto"
+              >
+                Save progress
+              </Button>
+            ) : null}
 
-          {isLastStep ? (
-            <Button
-              onClick={submitAll}
-              disabled={isPending || !submitValidation.valid}
-              className="w-full sm:w-auto"
-            >
-              Submit for HR review
-            </Button>
-          ) : (
-            <Button
-              onClick={goNext}
-              disabled={isPending || !currentValidation.valid}
-              className="w-full sm:w-auto"
-            >
-              Next
-            </Button>
-          )}
+            {isLastStep ? (
+              <Button
+                onClick={submitAll}
+                disabled={isPending || !submitValidation.valid}
+                className="w-full sm:w-auto"
+              >
+                Submit for HR review
+              </Button>
+            ) : (
+              <Button
+                onClick={goNext}
+                disabled={isPending || !currentValidation.valid}
+                className="w-full sm:w-auto"
+              >
+                Next
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>

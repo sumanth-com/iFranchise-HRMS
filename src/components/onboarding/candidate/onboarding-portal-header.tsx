@@ -15,6 +15,7 @@ export function OnboardingPortalHeader() {
   const [themeReady, setThemeReady] = useState(false);
   const progressCtx = useOnboardingPortalProgress();
   const completionPercent = progressCtx?.completionPercent ?? null;
+  const wizardStep = progressCtx?.wizardStep ?? null;
 
   useEffect(() => {
     setThemeReady(true);
@@ -23,8 +24,8 @@ export function OnboardingPortalHeader() {
   const isDark = themeReady && resolvedTheme === "dark";
 
   return (
-    <header className="sticky top-0 z-30 w-full max-w-[100vw] overflow-x-hidden border-b border-border/60 bg-background/95 backdrop-blur-xl">
-      <div className="mx-auto grid w-full min-w-0 max-w-6xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-4 py-2.5">
+    <header className="sticky top-0 z-30 h-14 w-full max-w-[100vw] border-b border-border/60 bg-background/95 backdrop-blur-xl">
+      <div className="mx-auto grid h-full w-full min-w-0 max-w-6xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-4">
         <div className="flex min-w-0 items-center gap-3 justify-self-start">
           <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-xl bg-card shadow-sm ring-1 ring-border/60">
             <Image
@@ -73,9 +74,11 @@ export function OnboardingPortalHeader() {
         )}
 
         <div className="flex shrink-0 items-center justify-end gap-2 justify-self-end">
-          <span className="hidden rounded-full border border-border bg-muted/40 px-3 py-1 text-[11px] font-medium text-muted-foreground lg:inline">
-            Secure candidate portal
-          </span>
+          {wizardStep ? (
+            <span className="rounded-full border border-border bg-muted/40 px-3 py-1 text-[11px] font-semibold tabular-nums text-foreground">
+              Step {wizardStep.current}/{wizardStep.total}
+            </span>
+          ) : null}
           <Button
             type="button"
             variant="outline"
