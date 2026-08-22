@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
+import { OnboardingForgotPasswordPanel } from "@/components/onboarding/candidate/onboarding-forgot-password-panel";
 import { setupCandidatePasswordByEmailAction } from "@/lib/onboarding/actions/candidate-onboarding-actions";
 import { ONBOARDING_ROUTES } from "@/types/onboarding";
 import { cn } from "@/lib/utils";
@@ -80,6 +81,7 @@ export function OnboardingSignUpRedirect() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const lengthMet = password.length >= MIN_PASSWORD_LENGTH;
@@ -111,6 +113,9 @@ export function OnboardingSignUpRedirect() {
       });
       if (!result.success) {
         toast.error(result.message);
+        if (result.message.toLowerCase().includes("already set")) {
+          setShowForgotPassword(true);
+        }
         return;
       }
       clearOnboardingInviteToken();
@@ -232,6 +237,20 @@ export function OnboardingSignUpRedirect() {
         >
           {isPending ? "Saving password…" : "Save password & continue"}
         </Button>
+
+        <div className="flex justify-center">
+          <button
+            type="button"
+            className="text-[11px] font-semibold text-primary hover:underline"
+            onClick={() => setShowForgotPassword((v) => !v)}
+          >
+            {showForgotPassword ? "Hide forgot password" : "Forgot password?"}
+          </button>
+        </div>
+
+        {showForgotPassword ? (
+          <OnboardingForgotPasswordPanel email={email} onEmailChange={setEmail} />
+        ) : null}
 
         <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
           Already set a password?{" "}

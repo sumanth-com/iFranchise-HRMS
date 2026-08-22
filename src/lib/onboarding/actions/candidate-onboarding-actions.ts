@@ -3,7 +3,7 @@
 import { sendEmail } from "@/lib/email/mailer";
 import { onboardingActionErrorMessage } from "@/lib/onboarding/action-error-message";
 import { onboardingPortalErrorMessage } from "@/lib/onboarding/onboarding-errors";
-import { renderOnboardingOtpEmail } from "@/lib/onboarding/email-templates";
+import { renderOnboardingOtpEmail, renderOnboardingPasswordResetEmail } from "@/lib/onboarding/email-templates";
 import {
   getCandidateCaseIdFromSession,
   setCandidateSession,
@@ -47,6 +47,7 @@ import {
   candidateOtpVerifySchema,
   candidatePasswordSchema,
   candidatePasswordSetupSchema,
+  candidatePasswordResetSchema,
   onboardingSectionSchema,
   onboardingSignatureSchema,
   policyAcknowledgementSchema,
@@ -151,7 +152,8 @@ export async function setupCandidatePasswordByEmailAction(
     if (typeof account.password_hash === "string" && account.password_hash.length > 0) {
       return {
         success: false,
-        message: "A password is already set for this email. Sign in with that password.",
+        message:
+          "A password is already set for this email. Sign in with that password, or use Forgot password to reset it.",
       };
     }
 
@@ -282,6 +284,103 @@ export async function verifyCandidateOtpAction(input: unknown): Promise<ActionRe
     return { success: true, message: "Verified" };
   } catch (error) {
     return { success: false, message: error instanceof Error ? error.message : "Verification failed" };
+  }
+}
+
+/** Send a password-reset code to an invited candidate's personal email. */
+export async function requestCandidatePasswordResetAction(
+  input: unknown,
+): Promise<ActionResult> {
+  try {
+    const parsed = candidateOtpRequestSchema.parse(input);
+    const email = parsed.personalEmail.trim().toLowerCase();
+    try {
+      await assertOnboardingRateLimit("password-reset-request", email, 3, 60 * 60 * 1000);
+    } catch {
+      return { success: false, message: "Too many reset requests. Please try again later." };
+    }
+
+    const admin = createAdminClient();
+    const { data: account } = await admin
+      .schema("hrms")
+      .from("onboarding_portal_accounts")
+      .select("case_id, is_active")
+      .eq("personal_email", email)
+      .maybeSingle();
+
+    if (!account?.is_active) {
+      return { success: false, message: "No active onboarding account found for this email" };
+    }
+
+    const otp = generateOtpCode();
+    await storePortalOtp(account.case_id, email, otp);
+
+    const resetEmail = renderOnboardingPasswordResetEmail({
+      otp,
+      personalEmail: email,
+    });
+
+    const emailResult = await sendEmail({
+      to: email,
+      subject: resetEmail.subject,
+      html: resetEmail.html,
+      text: resetEmail.text,
+    });
+
+    if (!emailResult.delivered) {
+      if (emailResult.skipped) {
+        return {
+          success: false,
+          message:
+            emailResult.error ??
+            "Reset email could not be sent — SMTP is not configured. Contact HR for assistance.",
+        };
+      }
+      return {
+        success: false,
+        message: emailResult.error ?? "Failed to send reset code. Please try again.",
+      };
+    }
+
+    return { success: true, message: "Password reset code sent to your email" };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Could not send reset code",
+    };
+  }
+}
+
+/** Verify reset code and save a new permanent portal password. */
+export async function resetCandidatePasswordWithOtpAction(
+  input: unknown,
+): Promise<ActionResult> {
+  try {
+    const parsed = candidatePasswordResetSchema.parse(input);
+    const email = parsed.personalEmail.trim().toLowerCase();
+    try {
+      await assertOnboardingRateLimit("password-reset", email, 5, 15 * 60 * 1000);
+    } catch {
+      return { success: false, message: "Too many reset attempts. Please try again later." };
+    }
+
+    const caseId = await verifyPortalOtp(email, parsed.otp);
+    if (!caseId) return { success: false, message: "Invalid or expired code" };
+
+    await storePortalPassword(caseId, email, parsed.password);
+
+    const session = await createPortalSession(caseId);
+    await setCandidateSession(session);
+
+    return {
+      success: true,
+      message: "Password updated. You can sign in with this password anytime.",
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: onboardingPortalErrorMessage(error, "Could not reset password. Please try again."),
+    };
   }
 }
 

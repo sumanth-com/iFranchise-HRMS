@@ -244,6 +244,41 @@ export function renderOnboardingOtpEmail(params: OnboardingOtpEmailParams): {
   };
 }
 
+export function renderOnboardingPasswordResetEmail(params: OnboardingOtpEmailParams): {
+  subject: string;
+  html: string;
+  text: string;
+} {
+  const content = `
+    ${renderParagraph("Use this one-time code to reset your pre-joining portal password:")}
+    <div style="margin:20px 0;text-align:center;">
+      <div style="display:inline-block;border-radius:16px;border:1px solid #e5e7eb;background:#f8fafc;padding:18px 28px;">
+        <span style="font-size:32px;font-weight:800;letter-spacing:0.35em;color:#111827;font-family:ui-monospace,Menlo,monospace;">
+          ${params.otp}
+        </span>
+      </div>
+    </div>
+    ${renderNote(
+      `This code expires in ${ONBOARDING_OTP_TTL_MINUTES} minutes and is valid only for <strong>${params.personalEmail}</strong>. If you did not request a reset, you can ignore this email.`,
+    )}
+  `;
+
+  const html = renderBrandedEmail({
+    title: "Password reset code",
+    preheader: `Your password reset code: ${params.otp}`,
+    heading: "Reset your password",
+    subheading: "Pre-joining onboarding portal",
+    contentHtml: content,
+    footerNote: `${siteConfig.name} · Automated security message`,
+  });
+
+  return {
+    subject: `${siteConfig.name} — Password reset code`,
+    html,
+    text: `Your onboarding password reset code is ${params.otp}. It expires in ${ONBOARDING_OTP_TTL_MINUTES} minutes.`,
+  };
+}
+
 export type OnboardingCorrectionsEmailParams = {
   candidateName: string;
   personalEmail: string;

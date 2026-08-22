@@ -133,6 +133,25 @@ export const candidateOtpVerifySchema = z.object({
   otp: z.string().trim().length(6),
 });
 
+/** Forgot-password reset: email code + new password. */
+export const candidatePasswordResetSchema = z
+  .object({
+    personalEmail: z.string().trim().email(),
+    otp: z.string().trim().length(6),
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .max(128, "Password must be at most 128 characters"),
+    confirmPassword: z
+      .string()
+      .min(8, "Confirm password must be at least 8 characters")
+      .max(128),
+  })
+  .refine((v) => v.password === v.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
+
 export const onboardingSignatureSchema = z.object({
   caseId: z.string().uuid(),
   signatureType: z.enum(["typed", "drawn", "uploaded"]),

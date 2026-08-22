@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
+import { OnboardingForgotPasswordPanel } from "@/components/onboarding/candidate/onboarding-forgot-password-panel";
 import {
   candidateLoginAction,
   requestCandidateOtpAction,
@@ -46,6 +47,7 @@ export function OnboardingLoginForm() {
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const canRequestOtp = email.trim().length > 0 && !isPending;
@@ -131,6 +133,20 @@ export function OnboardingLoginForm() {
             </button>
           </div>
         </Field>
+
+        <div className="flex justify-end">
+          <button
+            type="button"
+            className="text-[11px] font-semibold text-primary hover:underline"
+            onClick={() => setShowForgotPassword((v) => !v)}
+          >
+            {showForgotPassword ? "Hide forgot password" : "Forgot password?"}
+          </button>
+        </div>
+
+        {showForgotPassword ? (
+          <OnboardingForgotPasswordPanel email={email} onEmailChange={setEmail} />
+        ) : null}
 
         <Button
           className="h-10 w-full text-sm font-semibold"
