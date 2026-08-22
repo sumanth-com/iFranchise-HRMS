@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { ClientSectionBoundary } from "@/components/common/client-section-boundary";
 import { OnboardingWizard } from "@/components/onboarding/candidate/onboarding-wizard";
 import { OnboardingPortalProgressSync } from "@/components/onboarding/candidate/onboarding-portal-progress-sync";
 import { getCandidatePortalContextAction } from "@/lib/onboarding/actions/candidate-onboarding-actions";
@@ -49,7 +50,12 @@ export default function OnboardingPortalPage() {
         </div>
       ) : null}
 
-      <OnboardingWizard context={context} onRefresh={refresh} />
+      <ClientSectionBoundary
+        title="Something went wrong"
+        description="We couldn't load this section. Please try again."
+      >
+        <OnboardingWizard context={context} onRefresh={refresh} />
+      </ClientSectionBoundary>
     </div>
   );
 }

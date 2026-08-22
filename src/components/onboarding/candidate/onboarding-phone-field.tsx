@@ -10,9 +10,10 @@ type OnboardingPhoneFieldProps = {
   placeholder?: string;
   disabled?: boolean;
   showHint?: boolean;
+  className?: string;
 };
 
 /** Onboarding wrapper around the shared PhoneInput. */
-export function OnboardingPhoneField(props: OnboardingPhoneFieldProps) {
-  return <PhoneInput {...props} />;
+export function OnboardingPhoneField({ className, ...props }: OnboardingPhoneFieldProps) {
+  return <PhoneInput {...props} className={className} />;
 }

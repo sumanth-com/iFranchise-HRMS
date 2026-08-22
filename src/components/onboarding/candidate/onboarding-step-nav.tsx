@@ -20,7 +20,7 @@ import { ONBOARDING_WIZARD_SECTIONS } from "@/types/onboarding";
 import type { CandidatePortalContext } from "@/types/onboarding";
 
 const STEP_LABELS: Record<string, string> = {
-  personal: "Personal",
+  personal: "Personal Details",
   identity: "Identity",
   education: "Education",
   employment_history: "Employment",

@@ -4,11 +4,11 @@ import { CheckCircle2, FileUp, Loader2 } from "lucide-react";
 
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
-import { ONBOARDING_UPLOAD_MAX_MB } from "@/lib/onboarding/constants";
+import {
+  ONBOARDING_DOCUMENT_ACCEPT,
+  ONBOARDING_UPLOAD_MAX_MB,
+} from "@/lib/onboarding/constants";
 import { cn } from "@/lib/utils";
-
-const DEFAULT_UPLOAD_ACCEPT =
-  ".pdf,.doc,.docx,.xls,.xlsx,.zip,image/jpeg,image/png,image/webp";
 
 type OnboardingDocumentUploadProps = {
   label: string;
@@ -33,15 +33,13 @@ export function OnboardingDocumentUpload({
   disabled = false,
   variant = "default",
   maxUploadMb = ONBOARDING_UPLOAD_MAX_MB,
-  accept,
+  accept = ONBOARDING_DOCUMENT_ACCEPT,
   uploadHint: uploadHintProp,
   onSelectFile,
 }: OnboardingDocumentUploadProps) {
   const displayName = fileName ?? pendingFileName;
   const isUploaded = Boolean(fileName) && !uploading;
-  const uploadAccept = accept ?? DEFAULT_UPLOAD_ACCEPT;
-  const uploadHint =
-    uploadHintProp ?? `PDF, Word, Excel, images, or ZIP · max ${maxUploadMb} MB`;
+  const uploadHint = uploadHintProp ?? `PDF or image only · max ${maxUploadMb} MB`;
 
   if (variant === "card") {
     return (
@@ -81,7 +79,7 @@ export function OnboardingDocumentUpload({
               <span className="text-xs font-medium text-foreground">Choose file</span>
               <Input
                 type="file"
-                accept={uploadAccept}
+                accept={accept}
                 disabled={disabled || uploading}
                 className="sr-only"
                 onChange={(e) => {
@@ -98,7 +96,7 @@ export function OnboardingDocumentUpload({
               <span className="text-xs font-medium text-primary hover:underline">Replace file</span>
               <Input
                 type="file"
-                accept={uploadAccept}
+                accept={accept}
                 disabled={disabled || uploading}
                 className="sr-only"
                 onChange={(e) => {
@@ -150,7 +148,7 @@ export function OnboardingDocumentUpload({
 
       <Input
         type="file"
-        accept={uploadAccept}
+        accept={accept}
         disabled={disabled || uploading}
         className={cn(
           "h-10 cursor-pointer bg-background text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-foreground dark:bg-background",

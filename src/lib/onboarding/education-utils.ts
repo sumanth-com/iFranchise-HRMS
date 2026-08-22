@@ -1,8 +1,5 @@
 import { normalizeIntermediateQualification } from "@/lib/onboarding/education-options";
-import {
-  ONBOARDING_EDUCATION_LARGE_UPLOAD_MAX_MB,
-  ONBOARDING_UPLOAD_MAX_MB,
-} from "@/lib/onboarding/constants";
+import { ONBOARDING_UPLOAD_MAX_MB } from "@/lib/onboarding/constants";
 import {
   ONBOARDING_EDUCATION_LEVELS,
   type OnboardingEducationEntry,
@@ -284,10 +281,7 @@ export function educationDocumentLabel(typeCode: string): string {
   return typeCode.replace(/_/g, " ");
 }
 
-export function educationDocumentMaxMb(typeCode: string): number {
-  if (typeCode === EDUCATION_DOCUMENT_CODES.graduation_semester_marksheets) {
-    return ONBOARDING_EDUCATION_LARGE_UPLOAD_MAX_MB;
-  }
+export function educationDocumentMaxMb(_typeCode: string): number {
   return ONBOARDING_UPLOAD_MAX_MB;
 }
 

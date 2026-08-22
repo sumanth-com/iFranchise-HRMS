@@ -36,6 +36,7 @@ import {
 import {
   sanitizeAccountNumber,
   sanitizeIfsc,
+  ONBOARDING_BANK_ACCOUNT_TYPE_OPTIONS,
 } from "@/lib/onboarding/bank-field-utils";
 import {
   sanitizeAadhaar,
@@ -79,7 +80,7 @@ function uploadSlotKey(documentCategory: string, documentTypeCode: string) {
 }
 
 const SECTION_TITLES: Record<string, string> = {
-  personal: "Personal Information",
+  personal: "Personal Details",
   identity: "Identity Documents",
   education: "Education",
   employment_history: "Previous Employment",
@@ -100,6 +101,17 @@ const BLOOD_GROUP_ITEMS = ONBOARDING_BLOOD_GROUP_OPTIONS.map((item) => ({
   value: item.value,
   label: item.label,
 }));
+const BANK_ACCOUNT_TYPE_ITEMS = ONBOARDING_BANK_ACCOUNT_TYPE_OPTIONS.map((item) => ({
+  value: item.value,
+  label: item.label,
+}));
+
+const IDENTITY_REQUIRED_CODES = new Set(["aadhaar", "pan"]);
+const IDENTITY_OPTIONAL_CODES = new Set(["passport", "voter_id", "driving_license"]);
+
+function identityDocumentCardLabel(label: string, required: boolean): string {
+  return required ? label : `${label} — optional`;
+}
 
 function documentRecord(
   context: CandidatePortalContext,
@@ -488,9 +500,9 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
         <div
           ref={contentScrollRef}
-          key={`${sectionKey}-${stepAnimKey}`}
           className="onboarding-section-enter min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-4 sm:px-6 sm:py-5"
         >
+          <div key={`${sectionKey}-${stepAnimKey}`} className="min-w-0">
           {sectionKey === "personal" && (
             <div className="grid gap-2.5 sm:grid-cols-2">
               <div className="space-y-1">
@@ -567,6 +579,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
               <OnboardingPhoneField
                 label="Personal mobile"
                 required
+                className="w-full max-w-none"
                 value={personalField("personalMobile")}
                 onChange={(value) => updateField("personalMobile", value)}
                 placeholder="Mobile number"
@@ -574,6 +587,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
               <OnboardingPhoneField
                 label="Emergency contact"
                 required
+                className="w-full max-w-none"
                 value={personalField("emergencyContact")}
                 onChange={(value) => updateField("emergencyContact", value)}
                 placeholder="Emergency number"
@@ -591,15 +605,36 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           )}
 
           {sectionKey === "identity" && (
-            <div className="space-y-4">
-              <div className="grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-4">
-                {ONBOARDING_IDENTITY_DOCUMENTS.map((doc) => {
+            <div className="space-y-6">
+              <div className="mx-auto grid w-full max-w-3xl grid-cols-1 items-stretch gap-4 sm:grid-cols-2">
+                {ONBOARDING_IDENTITY_DOCUMENTS.filter((doc) =>
+                  IDENTITY_REQUIRED_CODES.has(doc.code),
+                ).map((doc) => {
                   const meta = uploadMeta("identity", doc.code);
                   return (
                     <OnboardingDocumentUpload
                       key={doc.code}
                       variant="card"
-                      label={doc.label}
+                      label={identityDocumentCardLabel(doc.label, doc.required)}
+                      required={doc.required}
+                      fileName={meta.fileName}
+                      uploading={meta.uploading}
+                      pendingFileName={meta.pendingFileName}
+                      onSelectFile={(file) => uploadDoc("identity", doc.code, file)}
+                    />
+                  );
+                })}
+              </div>
+              <div className="mx-auto grid w-full max-w-4xl grid-cols-1 items-stretch gap-4 sm:grid-cols-3">
+                {ONBOARDING_IDENTITY_DOCUMENTS.filter((doc) =>
+                  IDENTITY_OPTIONAL_CODES.has(doc.code),
+                ).map((doc) => {
+                  const meta = uploadMeta("identity", doc.code);
+                  return (
+                    <OnboardingDocumentUpload
+                      key={doc.code}
+                      variant="card"
+                      label={identityDocumentCardLabel(doc.label, doc.required)}
                       required={doc.required}
                       fileName={meta.fileName}
                       uploading={meta.uploading}
@@ -666,34 +701,80 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           )}
 
           {sectionKey === "bank" && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              {[
-                { key: "bankName", label: "Bank name", required: true },
-                { key: "accountNumber", label: "Account number", required: true },
-                { key: "ifsc", label: "IFSC", required: true },
-              ].map(({ key, label, required }) => (
-                <div key={key} className="space-y-1.5">
-                  <FieldLabel label={label} required={required} />
+            <div className="space-y-6">
+              <div className="grid min-w-0 gap-4 lg:grid-cols-3">
+                <div className="space-y-1.5">
+                  <FieldLabel label="Account holder name" required />
                   <Input
                     className={wizardInputClassName}
-                    value={form[key] ?? String(sectionData[key] ?? "")}
-                    onChange={(e) => {
-                      if (key === "accountNumber") {
-                        updateField(key, sanitizeAccountNumber(e.target.value));
-                      } else if (key === "ifsc") {
-                        updateField(key, sanitizeIfsc(e.target.value));
-                      } else {
-                        updateField(key, e.target.value);
-                      }
-                    }}
-                    inputMode={key === "accountNumber" ? "numeric" : undefined}
-                    maxLength={key === "accountNumber" ? 18 : key === "ifsc" ? 11 : undefined}
+                    value={form.accountHolderName ?? String(sectionData.accountHolderName ?? "")}
+                    onChange={(e) => updateField("accountHolderName", e.target.value)}
+                    placeholder="Name as per bank records"
                   />
                 </div>
-              ))}
-              <div className="sm:col-span-2">
+                <div className="space-y-1.5">
+                  <FieldLabel label="Bank name" required />
+                  <Input
+                    className={wizardInputClassName}
+                    value={form.bankName ?? String(sectionData.bankName ?? "")}
+                    onChange={(e) => updateField("bankName", e.target.value)}
+                    placeholder="Bank name"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <FieldLabel label="Account number" required />
+                  <Input
+                    className={wizardInputClassName}
+                    inputMode="numeric"
+                    maxLength={18}
+                    value={form.accountNumber ?? String(sectionData.accountNumber ?? "")}
+                    onChange={(e) =>
+                      updateField("accountNumber", sanitizeAccountNumber(e.target.value))
+                    }
+                    placeholder="Account number"
+                  />
+                </div>
+              </div>
+
+              <div className="grid min-w-0 gap-4 lg:grid-cols-3">
+                <div className="space-y-1.5">
+                  <FieldLabel label="IFSC code" required />
+                  <Input
+                    className={cn(wizardInputClassName, "uppercase")}
+                    maxLength={11}
+                    value={form.ifsc ?? String(sectionData.ifsc ?? "")}
+                    onChange={(e) => updateField("ifsc", sanitizeIfsc(e.target.value))}
+                    placeholder="ABCD0123456"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <FieldLabel label="Branch name" required />
+                  <Input
+                    className={wizardInputClassName}
+                    value={form.branchName ?? String(sectionData.branchName ?? "")}
+                    onChange={(e) => updateField("branchName", e.target.value)}
+                    placeholder="Branch name"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <FieldLabel label="Account type" required />
+                  <LabeledSelect
+                    items={BANK_ACCOUNT_TYPE_ITEMS}
+                    value={personalSelectValue(
+                      "accountType",
+                      ONBOARDING_BANK_ACCOUNT_TYPE_OPTIONS,
+                    )}
+                    placeholder="Savings / Current"
+                    onValueChange={(value) => updateField("accountType", value)}
+                    triggerClassName={cn(wizardInputClassName, "w-full")}
+                  />
+                </div>
+              </div>
+
+              <div className="mx-auto w-full max-w-sm">
                 <OnboardingDocumentUpload
-                  label="Cancelled cheque"
+                  variant="card"
+                  label="Cancelled Cheque — optional"
                   fileName={uploadMeta("bank", "cancelled_cheque").fileName}
                   uploading={uploadMeta("bank", "cancelled_cheque").uploading}
                   pendingFileName={uploadMeta("bank", "cancelled_cheque").pendingFileName}
@@ -734,6 +815,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
             </div>
           )}
 
+          </div>
         </div>
 
         <div className="flex shrink-0 flex-col gap-2 border-t border-border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">

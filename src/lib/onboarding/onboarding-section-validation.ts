@@ -37,9 +37,12 @@ const PERSONAL_REQUIRED: { key: string; label: string }[] = [
 ];
 
 const BANK_REQUIRED: { key: string; label: string }[] = [
+  { key: "accountHolderName", label: "Account holder name" },
   { key: "bankName", label: "Bank name" },
   { key: "accountNumber", label: "Account number" },
-  { key: "ifsc", label: "IFSC" },
+  { key: "ifsc", label: "IFSC code" },
+  { key: "branchName", label: "Branch name" },
+  { key: "accountType", label: "Account type" },
 ];
 
 function hasText(value: unknown): boolean {

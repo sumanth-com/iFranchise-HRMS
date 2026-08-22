@@ -20,6 +20,7 @@ const ONBOARDING_DOC_TYPE_MAP: Record<string, string> = {
   aadhaar: "AADHAAR",
   pan: "PAN",
   passport: "PASSPORT",
+  voter_id: "OTHER",
   driving_license: "DRIVING_LICENSE",
   resume: "RESUME",
   experience_letter: "EXPERIENCE_LETTER",
@@ -257,8 +258,22 @@ async function syncProfileSections(
   }
 
   const bankName = typeof bank.bankName === "string" ? bank.bankName.trim() : "";
+  const accountHolderName =
+    typeof bank.accountHolderName === "string" && bank.accountHolderName.trim()
+      ? bank.accountHolderName.trim()
+      : detail.fullName;
   const accountNumber = typeof bank.accountNumber === "string" ? bank.accountNumber.trim() : "";
   const ifsc = typeof bank.ifsc === "string" ? bank.ifsc.trim() : "";
+  const branchName =
+    typeof bank.branchName === "string" && bank.branchName.trim() ? bank.branchName.trim() : null;
+  const accountTypeRaw =
+    typeof bank.accountType === "string" ? bank.accountType.trim().toLowerCase() : "";
+  const accountType =
+    accountTypeRaw === "current"
+      ? "current"
+      : accountTypeRaw === "savings"
+        ? "savings"
+        : "salary";
 
   if (bankName && accountNumber) {
     const { data: existingBank } = await admin
@@ -272,10 +287,11 @@ async function syncProfileSections(
 
     const bankPayload = {
       bank_name: bankName,
-      account_holder_name: detail.fullName,
+      account_holder_name: accountHolderName,
       account_number: accountNumber,
       ifsc_code: ifsc || null,
-      account_type: "salary",
+      branch_name: branchName,
+      account_type: accountType,
       is_primary: true,
       status: "active",
       updated_by: profile.userId,

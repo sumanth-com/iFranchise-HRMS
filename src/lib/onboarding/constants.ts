@@ -46,12 +46,28 @@ export const ONBOARDING_PERMISSIONS = {
 export const ONBOARDING_UPLOAD_MAX_MB = 10;
 export const ONBOARDING_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 
-/** Graduation semester mark sheets may be a combined PDF up to 30 MB. */
-export const ONBOARDING_EDUCATION_LARGE_UPLOAD_MAX_MB = 30;
-export const ONBOARDING_EDUCATION_LARGE_UPLOAD_MAX_BYTES = 30 * 1024 * 1024;
-export const ONBOARDING_EDUCATION_LARGE_UPLOAD_CODES = new Set([
-  "edu_graduation_semester_marksheets",
-]);
+/** PDF and common image formats only (all onboarding document cards). */
+export const ONBOARDING_DOCUMENT_ACCEPT =
+  ".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp";
+
+export const ONBOARDING_DOCUMENT_UPLOAD_HINT = `PDF or image only · max ${ONBOARDING_UPLOAD_MAX_MB} MB`;
+
+export const ONBOARDING_DOCUMENT_ALLOWED_EXTENSIONS = [
+  "pdf",
+  "jpg",
+  "jpeg",
+  "png",
+  "webp",
+] as const;
+
+export const ONBOARDING_DOCUMENT_ALLOWED_MIME_TYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+] as const;
+
+/** @deprecated Use ONBOARDING_DOCUMENT_ALLOWED_EXTENSIONS for onboarding uploads. */
 export const ONBOARDING_ALLOWED_FILE_TYPES = DEFAULT_DOCUMENT_SETTINGS.allowedFileTypes;
 
 export function onboardingInviteUrl(token: string): string {

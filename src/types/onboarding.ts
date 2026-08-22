@@ -83,10 +83,11 @@ export const ONBOARDING_AGREEMENT_TYPES = [
 ] as const;
 
 export const ONBOARDING_IDENTITY_DOCUMENTS = [
-  { code: "aadhaar", label: "Aadhaar", required: true },
-  { code: "pan", label: "PAN", required: true },
-  { code: "driving_license", label: "Driving License", required: false },
+  { code: "aadhaar", label: "Aadhaar Card", required: true },
+  { code: "pan", label: "PAN Card", required: true },
   { code: "passport", label: "Passport", required: false },
+  { code: "voter_id", label: "Voter ID", required: false },
+  { code: "driving_license", label: "Driving Licence", required: false },
 ] as const;
 
 export const ONBOARDING_EMPLOYMENT_DOCUMENTS = [

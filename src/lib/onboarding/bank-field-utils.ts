@@ -18,3 +18,8 @@ export function isValidIfsc(value: unknown): boolean {
   const code = typeof value === "string" ? value.trim().toUpperCase() : "";
   return /^[A-Z]{4}0[A-Z0-9]{6}$/.test(code);
 }
+
+export const ONBOARDING_BANK_ACCOUNT_TYPE_OPTIONS = [
+  { value: "savings", label: "Savings" },
+  { value: "current", label: "Current" },
+] as const;

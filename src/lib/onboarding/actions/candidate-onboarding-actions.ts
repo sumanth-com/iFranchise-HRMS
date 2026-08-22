@@ -33,15 +33,11 @@ import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
 import { assertRateLimit } from "@/lib/security/rate-limit";
 import { hashEmailVerificationToken } from "@/lib/security/signed-flow-tokens";
 import {
-  ONBOARDING_EDUCATION_LARGE_UPLOAD_CODES,
-  ONBOARDING_EDUCATION_LARGE_UPLOAD_MAX_BYTES,
+  ONBOARDING_DOCUMENT_ALLOWED_EXTENSIONS,
+  ONBOARDING_DOCUMENT_ALLOWED_MIME_TYPES,
   ONBOARDING_UPLOAD_MAX_BYTES,
 } from "@/lib/onboarding/constants";
-import {
-  ONBOARDING_ALLOWED_EXTENSIONS,
-  ONBOARDING_ALLOWED_MIME_TYPES,
-  validateUploadFile,
-} from "@/lib/security/upload-validation";
+import { validateUploadFile } from "@/lib/security/upload-validation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   agreementAcceptanceSchema,
@@ -255,11 +251,9 @@ export async function uploadCandidateDocumentAction(formData: FormData): Promise
       fileName: file.name,
       fileSize: file.size,
       mimeType: file.type,
-      maxBytes: ONBOARDING_EDUCATION_LARGE_UPLOAD_CODES.has(documentTypeCode)
-        ? ONBOARDING_EDUCATION_LARGE_UPLOAD_MAX_BYTES
-        : ONBOARDING_UPLOAD_MAX_BYTES,
-      allowedExtensions: ONBOARDING_ALLOWED_EXTENSIONS,
-      allowedMimeTypes: ONBOARDING_ALLOWED_MIME_TYPES,
+      maxBytes: ONBOARDING_UPLOAD_MAX_BYTES,
+      allowedExtensions: ONBOARDING_DOCUMENT_ALLOWED_EXTENSIONS,
+      allowedMimeTypes: ONBOARDING_DOCUMENT_ALLOWED_MIME_TYPES,
     });
 
     const bytes = new Uint8Array(await file.arrayBuffer());
