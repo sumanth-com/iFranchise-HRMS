@@ -1,13 +1,11 @@
 "use client";
 
-import { FileText, Loader2, Mail, Save, UploadCloud, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { FileText, Loader2, Trash2, UploadCloud, X } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { buttonVariants } from "@/components/common/button";
-import { Input } from "@/components/common/input";
-import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -16,20 +14,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { OfferStageCelebration } from "@/components/recruitment/offer-stage-celebration";
-import { createOfferAction } from "@/lib/recruitment/actions";
-import { OFFER_STATUS_LABELS } from "@/lib/recruitment/constants";
 import {
-  applyOfferEmailTemplate,
-  buildDefaultOfferEmailSubject,
-} from "@/lib/recruitment/offer-email-content";
+  createOfferAction,
+  deleteOfferLetterAction,
+} from "@/lib/recruitment/actions";
+import { OFFER_STATUS_LABELS } from "@/lib/recruitment/constants";
 import {
   assertOfferLetterFile,
   OFFER_LETTER_MAX_BYTES,
 } from "@/lib/validations/recruitment";
 import { resolveOfferLetterFileName } from "@/lib/recruitment/services/offer-letter-display";
 import { cn } from "@/lib/utils";
-import type { CandidateDetail, OfferEmailDefaults } from "@/types/recruitment";
+import type { CandidateDetail } from "@/types/recruitment";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -41,7 +37,6 @@ type OfferLetterWorkspaceProps = {
   detail: CandidateDetail | null;
   loading: boolean;
   canOffer: boolean;
-  offerEmailDefaults: OfferEmailDefaults;
   onClose: () => void;
   onRefresh: () => void;
 };
@@ -50,19 +45,15 @@ export function OfferLetterWorkspace({
   detail,
   loading,
   canOffer,
-  offerEmailDefaults,
   onClose,
   onRefresh,
 }: OfferLetterWorkspaceProps) {
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [emailSubject, setEmailSubject] = useState("");
-  const [emailMessage, setEmailMessage] = useState("");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [sentCelebration, setSentCelebration] = useState(false);
-  const [missingFilePrompt, setMissingFilePrompt] = useState<"save" | "send" | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const latestOffer = detail?.offers[0];
   const hasStoredLetter = Boolean(latestOffer?.offerLetterPath);
@@ -82,29 +73,11 @@ export function OfferLetterWorkspace({
       ? `/api/recruitment/offers/${latestOffer.id}/pdf`
       : null;
 
-  const defaultSubject = useMemo(() => {
-    if (!detail) return "";
-    return buildDefaultOfferEmailSubject(detail.jobTitle, offerEmailDefaults.subjectTemplate);
-  }, [detail, offerEmailDefaults.subjectTemplate]);
-
-  const defaultMessage = useMemo(() => {
-    if (!detail) return "";
-    return applyOfferEmailTemplate(offerEmailDefaults.messageTemplate, {
-      candidateName: detail.fullName,
-      position: detail.jobTitle,
-      hrEmail: offerEmailDefaults.hrEmail,
-      hrPhone: offerEmailDefaults.hrPhone,
-    });
-  }, [detail, offerEmailDefaults]);
-
   useEffect(() => {
     if (!detail) return;
-    const existing = detail.offers[0];
-    setEmailSubject(existing?.emailSubject ?? defaultSubject);
-    setEmailMessage(existing?.emailMessage ?? defaultMessage);
     setUploadedFile(null);
     setDragging(false);
-  }, [detail?.id, detail, defaultSubject, defaultMessage]);
+  }, [detail?.id]);
 
   function handleFileChange(file: File | null) {
     if (!file) {
@@ -128,29 +101,15 @@ export function OfferLetterWorkspace({
     fileInputRef.current?.click();
   }
 
-  function submit(sendNow: boolean) {
-    if (!detail || !canOffer) return;
-    if (!emailSubject.trim()) {
-      toast.error("Email subject is required");
-      return;
-    }
-    if (!emailMessage.trim()) {
-      toast.error("Email message is required");
-      return;
-    }
-    if (!uploadedFile && !hasStoredLetter) {
-      setMissingFilePrompt(sendNow ? "send" : "save");
+  function uploadLetter() {
+    if (!detail || !canOffer || !uploadedFile) {
+      toast.error("Choose an offer letter file to upload");
       return;
     }
 
     const formData = new FormData();
     formData.set("candidateId", detail.id);
-    formData.set("emailSubject", emailSubject.trim());
-    formData.set("emailMessage", emailMessage.trim());
-    formData.set("sendNow", sendNow ? "true" : "false");
-    if (uploadedFile) {
-      formData.set("offerFile", uploadedFile);
-    }
+    formData.set("offerFile", uploadedFile);
 
     startTransition(async () => {
       const result = await createOfferAction(formData);
@@ -160,24 +119,39 @@ export function OfferLetterWorkspace({
         return;
       }
 
-      if (sendNow) {
-        setSentCelebration(true);
-      } else {
-        toast.success("Offer letter saved");
-      }
+      toast.success(
+        hasStoredLetter
+          ? "Offer letter updated — available in candidate onboarding"
+          : "Offer letter uploaded — available in candidate onboarding",
+      );
+      setUploadedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       onRefresh();
     });
   }
 
-  const canSend =
-    canOffer &&
-    detail &&
-    (!detail.offers.length ||
-      detail.offers[0].offerStatus === "draft" ||
-      detail.offers[0].offerStatus === "sent");
-  const sendLabel =
-    latestOffer?.offerStatus === "sent" ? "Resend offer" : "Send offer";
+  function confirmDelete() {
+    if (!latestOffer?.id || !canOffer) return;
+
+    startTransition(async () => {
+      const result = await deleteOfferLetterAction(latestOffer.id);
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+
+      toast.success("Offer letter removed");
+      setUploadedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setDeleteConfirmOpen(false);
+      onRefresh();
+    });
+  }
+
   const maxSizeLabel = formatBytes(OFFER_LETTER_MAX_BYTES);
+  const statusLabel = latestOffer
+    ? OFFER_STATUS_LABELS[latestOffer.offerStatus]
+    : "No letter yet";
 
   if (loading && !detail) {
     return (
@@ -193,7 +167,7 @@ export function OfferLetterWorkspace({
       <div className="flex h-full flex-col items-center justify-center rounded-xl border bg-card p-8 text-center">
         <p className="text-sm font-medium">Select a candidate</p>
         <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-          Choose someone from the list to upload their offer letter and send it by email.
+          Choose someone from the list to upload their offer letter for onboarding.
         </p>
       </div>
     );
@@ -208,8 +182,7 @@ export function OfferLetterWorkspace({
           </p>
           <h2 className="truncate text-lg font-semibold">{detail.fullName}</h2>
           <p className="text-xs text-muted-foreground">
-            {detail.jobTitle} · {detail.email}
-            {latestOffer ? ` · ${OFFER_STATUS_LABELS[latestOffer.offerStatus]}` : ""}
+            {detail.jobTitle} · {detail.email} · {statusLabel}
           </p>
         </div>
         <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Close">
@@ -218,29 +191,10 @@ export function OfferLetterWorkspace({
       </div>
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-        <div className="space-y-2">
-          <Label>Email subject</Label>
-          <Input
-            value={emailSubject}
-            onChange={(e) => setEmailSubject(e.target.value)}
-            disabled={isPending || !canOffer}
-            placeholder={defaultSubject}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label>Email message</Label>
-          <textarea
-            className="min-h-[200px] w-full rounded-md border bg-background px-3 py-2 text-sm leading-relaxed"
-            value={emailMessage}
-            onChange={(e) => setEmailMessage(e.target.value)}
-            disabled={isPending || !canOffer}
-            placeholder={defaultMessage}
-          />
-          <p className="text-xs text-muted-foreground">
-            Sent to {detail.email} with the offer letter attached.
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Upload the offer letter here. It will appear in this candidate&apos;s onboarding portal
+          under Offer Acceptance — no email is sent.
+        </p>
 
         <div className="space-y-3">
           <input
@@ -259,37 +213,29 @@ export function OfferLetterWorkspace({
                   canOffer && "transition-shadow hover:shadow-md",
                 )}
               >
-                <div
-                  className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,rgba(99,102,241,0.1),transparent_42%),radial-gradient(circle_at_100%_100%,rgba(16,185,129,0.08),transparent_38%)]"
-                />
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,rgba(99,102,241,0.1),transparent_42%),radial-gradient(circle_at_100%_100%,rgba(16,185,129,0.08),transparent_38%)]" />
 
                 <div className="relative flex min-h-[10rem]">
                   <div className="flex w-[34%] min-w-[7.5rem] shrink-0 items-center justify-center border-r border-border/60 bg-gradient-to-br from-muted/40 via-background to-primary/[0.06]">
-                    <div className="relative flex items-center justify-center">
-                      <span
-                        className="absolute size-[4.5rem] rounded-full bg-emerald-500/15 blur-2xl"
-                        aria-hidden
-                      />
-                      <span
-                        className="relative flex size-[3.75rem] items-center justify-center rounded-[1.2rem] bg-gradient-to-br from-primary via-primary to-violet-600 text-primary-foreground shadow-[0_12px_30px_-12px_rgba(79,70,229,0.65)] ring-1 ring-white/25"
-                      >
-                        <FileText className="size-8" strokeWidth={1.6} />
-                      </span>
-                    </div>
+                    <span className="relative flex size-[3.75rem] items-center justify-center rounded-[1.2rem] bg-gradient-to-br from-primary via-primary to-violet-600 text-primary-foreground shadow-[0_12px_30px_-12px_rgba(79,70,229,0.65)] ring-1 ring-white/25">
+                      <FileText className="size-8" strokeWidth={1.6} />
+                    </span>
                   </div>
 
                   <div className="relative flex min-w-0 flex-1 flex-col justify-between px-4 py-4 sm:px-5">
                     <div className="min-w-0">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary/80">
-                        Offer letter ready
+                        {hasStoredLetter && !activeFile ? "Current offer letter" : "Ready to upload"}
                       </p>
                       <p className="mt-1 truncate text-base font-semibold tracking-tight">
                         {displayFileName}
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {activeFile
-                          ? `${formatBytes(activeFile.size)} · attached when you send`
-                          : "Saved offer letter · attached when you send"}
+                          ? `${formatBytes(activeFile.size)} · click Upload to save`
+                          : hasStoredLetter
+                            ? "Available in candidate onboarding · Offer Acceptance"
+                            : ""}
                       </p>
                     </div>
 
@@ -301,7 +247,7 @@ export function OfferLetterWorkspace({
                           rel="noopener noreferrer"
                           className={buttonVariants({ size: "sm", variant: "secondary" })}
                         >
-                          Open PDF
+                          Open file
                         </a>
                       ) : null}
                       {canOffer ? (
@@ -314,7 +260,7 @@ export function OfferLetterWorkspace({
                             onClick={openFilePicker}
                           >
                             <UploadCloud className="mr-1.5 size-4" />
-                            Replace file
+                            {hasStoredLetter ? "Replace file" : "Choose file"}
                           </Button>
                           {activeFile ? (
                             <Button
@@ -324,7 +270,20 @@ export function OfferLetterWorkspace({
                               disabled={isPending}
                               onClick={() => setUploadedFile(null)}
                             >
-                              Remove
+                              Clear selection
+                            </Button>
+                          ) : null}
+                          {hasStoredLetter && !activeFile ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              disabled={isPending}
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => setDeleteConfirmOpen(true)}
+                            >
+                              <Trash2 className="mr-1.5 size-4" />
+                              Delete
                             </Button>
                           ) : null}
                         </>
@@ -357,25 +316,17 @@ export function OfferLetterWorkspace({
                 dragging && "border-primary ring-2 ring-primary/20",
               )}
             >
-              <div
-                className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,rgba(99,102,241,0.12),transparent_42%),radial-gradient(circle_at_100%_100%,rgba(16,185,129,0.08),transparent_38%)]"
-              />
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,rgba(99,102,241,0.12),transparent_42%),radial-gradient(circle_at_100%_100%,rgba(16,185,129,0.08),transparent_38%)]" />
 
               <div className="relative flex w-[38%] min-w-[8.5rem] shrink-0 items-center justify-center border-r border-border/60 bg-gradient-to-br from-muted/40 via-background to-primary/[0.06]">
-                <div className="relative flex items-center justify-center">
-                  <span
-                    className="absolute size-[5.5rem] rounded-full bg-primary/15 blur-2xl"
-                    aria-hidden
-                  />
-                  <span
-                    className={cn(
-                      "relative flex size-[4.75rem] items-center justify-center rounded-[1.35rem] bg-gradient-to-br from-primary via-primary to-violet-600 text-primary-foreground shadow-[0_12px_30px_-12px_rgba(79,70,229,0.65)] ring-1 ring-white/25",
-                      canOffer && !isPending && "transition-transform duration-300 group-hover:scale-[1.02]",
-                    )}
-                  >
-                    <UploadCloud className="size-[2.1rem]" strokeWidth={1.6} />
-                  </span>
-                </div>
+                <span
+                  className={cn(
+                    "relative flex size-[4.75rem] items-center justify-center rounded-[1.35rem] bg-gradient-to-br from-primary via-primary to-violet-600 text-primary-foreground shadow-[0_12px_30px_-12px_rgba(79,70,229,0.65)] ring-1 ring-white/25",
+                    canOffer && !isPending && "transition-transform duration-300 group-hover:scale-[1.02]",
+                  )}
+                >
+                  <UploadCloud className="size-[2.1rem]" strokeWidth={1.6} />
+                </span>
               </div>
 
               <div className="relative flex min-w-0 flex-1 flex-col justify-between px-4 py-4 sm:px-5">
@@ -388,7 +339,7 @@ export function OfferLetterWorkspace({
                   </h3>
                   <p className="mt-1.5 max-w-md text-sm leading-relaxed text-muted-foreground">
                     Drag & drop or browse to attach the candidate&apos;s offer letter. Any file type
-                    up to {maxSizeLabel} — it will be emailed when you send the offer.
+                    up to {maxSizeLabel}. The file is shared in onboarding only — not emailed.
                   </p>
                 </div>
 
@@ -409,62 +360,41 @@ export function OfferLetterWorkspace({
         </div>
       </div>
 
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t bg-muted/10 px-4 py-3">
-        {canOffer ? (
-          <Button size="sm" variant="outline" disabled={isPending} onClick={() => submit(false)}>
+      {canOffer ? (
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t bg-muted/10 px-4 py-3">
+          <Button
+            size="sm"
+            disabled={isPending || !uploadedFile}
+            onClick={uploadLetter}
+          >
             {isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
-            <Save className="mr-1 h-3.5 w-3.5" />
-            Save
+            <UploadCloud className="mr-1 h-3.5 w-3.5" />
+            {hasStoredLetter ? "Upload replacement" : "Upload offer letter"}
           </Button>
-        ) : null}
-        {canSend ? (
-          <Button size="sm" disabled={isPending} onClick={() => submit(true)}>
-            {isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
-            <Mail className="mr-1 h-3.5 w-3.5" />
-            {sendLabel}
-          </Button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
-      <OfferStageCelebration
-        open={sentCelebration}
-        candidateName={detail.fullName}
-        title="Offer sent"
-        description={`The offer letter was emailed to ${detail.email} with the subject, message, and attached file.`}
-        onClose={() => setSentCelebration(false)}
-      />
-
-      <Dialog
-        open={missingFilePrompt !== null}
-        onOpenChange={(open) => {
-          if (!open) setMissingFilePrompt(null);
-        }}
-      >
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Upload the offer letter</DialogTitle>
+            <DialogTitle>Delete offer letter?</DialogTitle>
             <DialogDescription>
-              {missingFilePrompt === "send"
-                ? "Attach the offer letter first, then send it to the candidate with the email subject and message."
-                : "Attach the offer letter first, then save the draft."}
+              This removes the uploaded file for {detail.fullName}. The candidate will no longer
+              see it in onboarding until you upload a new letter.
             </DialogDescription>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            PDF, Word, or any other file up to 10 MB is supported.
-          </p>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setMissingFilePrompt(null)}>
-              Cancel
-            </Button>
             <Button
               type="button"
-              onClick={() => {
-                setMissingFilePrompt(null);
-                openFilePicker();
-              }}
+              variant="outline"
+              disabled={isPending}
+              onClick={() => setDeleteConfirmOpen(false)}
             >
-              <UploadCloud className="mr-1.5 h-4 w-4" />
-              Choose file
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" disabled={isPending} onClick={confirmDelete}>
+              {isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+              Delete letter
             </Button>
           </DialogFooter>
         </DialogContent>

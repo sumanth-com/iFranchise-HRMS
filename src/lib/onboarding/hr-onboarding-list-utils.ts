@@ -81,10 +81,40 @@ export function buildJoiningMonthOptions() {
   ];
 }
 
-export function buildJoiningYearOptions() {
-  const currentYear = new Date().getFullYear();
+const JOINING_DATE_MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+/** Timezone-safe joining date for SSR/client hydration (date portion only). */
+export function formatOnboardingJoiningDate(value: string | null | undefined): string {
+  if (!value?.trim()) return "—";
+
+  const dateOnly = value.trim().slice(0, 10);
+  const match = dateOnly.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return "—";
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return "—";
+
+  return `${day} ${JOINING_DATE_MONTHS[month - 1]} ${year}`;
+}
+
+export function buildJoiningYearOptions(anchorYear: number) {
   const years = [{ value: "all", label: "All years" }];
-  for (let year = currentYear + 1; year >= currentYear - 3; year -= 1) {
+  for (let year = anchorYear + 1; year >= anchorYear - 3; year -= 1) {
     years.push({ value: String(year), label: String(year) });
   }
   return years;

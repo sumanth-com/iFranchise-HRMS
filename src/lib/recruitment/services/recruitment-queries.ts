@@ -815,6 +815,95 @@ function mapCandidateRow(row: PerfRow): CandidateListItem {
   };
 }
 
+function offerQueueCandidateSelect() {
+  return `id, first_name, last_name, email, phone, experience_years, skills, current_company,
+      current_ctc, expected_ctc, notice_period_days, source, stage, job_opening_id, resume_path,
+      photo_path, notes, employee_id, created_at,
+      job:job_opening_id!inner(title, department_id, departments:department_id(name))`;
+}
+
+function applyOfferQueueCandidateFilters(
+  query: ReturnType<typeof fromHrms>,
+  options: {
+    jobOpeningId?: string;
+    departmentId?: string;
+    departmentIds?: string[] | null;
+    search?: string;
+  },
+) {
+  let next = query;
+  if (options.jobOpeningId) next = next.eq("job_opening_id", options.jobOpeningId);
+  if (options.departmentId) next = next.eq("job.department_id", options.departmentId);
+  else if (options.departmentIds?.length) next = next.in("job.department_id", options.departmentIds);
+  if (options.search) {
+    next = next.or(
+      `first_name.ilike.%${options.search}%,last_name.ilike.%${options.search}%,email.ilike.%${options.search}%`,
+    );
+  }
+  return next;
+}
+
+async function loadActiveOnboardingEmails(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("onboarding_cases")
+    .select("personal_email")
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+
+  return [
+    ...new Set(
+      (data ?? [])
+        .map((row) => String(row.personal_email ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];
+}
+
+async function loadOfferQueueCandidateRows(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  options: {
+    stage?: string;
+    emails?: string[];
+    jobOpeningId?: string;
+    departmentId?: string;
+    departmentIds?: string[] | null;
+    search?: string;
+  },
+): Promise<PerfRow[]> {
+  let query = fromHrms(supabase, "recruitment_candidates")
+    .select(offerQueueCandidateSelect())
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .is("archived_at", null)
+    .neq("stage", "rejected");
+
+  if (options.stage) query = query.eq("stage", options.stage);
+  if (options.emails?.length) query = query.in("email", options.emails);
+
+  query = applyOfferQueueCandidateFilters(query, options);
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return (data ?? []) as PerfRow[];
+}
+
+function mergeCandidateRowsById(rows: PerfRow[]): PerfRow[] {
+  const byId = new Map<string, PerfRow>();
+  for (const row of rows) {
+    byId.set(String(row.id), row);
+  }
+  return [...byId.values()].sort(
+    (a, b) => new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime(),
+  );
+}
+
 function matchesOfferQueue(
   latestOfferStatus: OfferStatus | null | undefined,
   offerQueue: string | undefined,
@@ -846,32 +935,29 @@ export async function listOfferQueueCandidates(
     return emptyPagedResult(page, pageSize);
   }
 
-  let query = fromHrms(supabase, "recruitment_candidates")
-    .select(
-      `id, first_name, last_name, email, phone, experience_years, skills, current_company,
-      current_ctc, expected_ctc, notice_period_days, source, stage, job_opening_id, resume_path,
-      photo_path, notes, employee_id, created_at,
-      job:job_opening_id!inner(title, department_id, departments:department_id(name))`,
-    )
-    .eq("organization_id", organizationId)
-    .eq("stage", "offer")
-    .is("deleted_at", null)
-    .is("archived_at", null)
-    .order("created_at", { ascending: false });
+  const filterOptions = {
+    jobOpeningId,
+    departmentId,
+    departmentIds,
+    search,
+  };
 
-  if (jobOpeningId) query = query.eq("job_opening_id", jobOpeningId);
-  if (departmentId) query = query.eq("job.department_id", departmentId);
-  else if (departmentIds) query = query.in("job.department_id", departmentIds);
-  if (search) {
-    query = query.or(
-      `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`,
-    );
-  }
+  const onboardingEmails = await loadActiveOnboardingEmails(supabase, organizationId);
 
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  const [offerStageRows, onboardingLinkedRows] = await Promise.all([
+    loadOfferQueueCandidateRows(supabase, organizationId, {
+      ...filterOptions,
+      stage: "offer",
+    }),
+    onboardingEmails.length > 0
+      ? loadOfferQueueCandidateRows(supabase, organizationId, {
+          ...filterOptions,
+          emails: onboardingEmails,
+        })
+      : Promise.resolve([]),
+  ]);
 
-  const candidateRows = (data ?? []) as PerfRow[];
+  const candidateRows = mergeCandidateRowsById([...offerStageRows, ...onboardingLinkedRows]);
   const candidateIds = candidateRows.map((row) => row.id);
 
   const offerStatusByCandidate = new Map<string, OfferStatus>();
@@ -898,10 +984,7 @@ export async function listOfferQueueCandidates(
       const latestOfferStatus = offerStatusByCandidate.get(row.id) ?? null;
       return { ...mapped, latestOfferStatus };
     })
-    .filter((row) => {
-      if (row.latestOfferStatus === "accepted") return false;
-      return matchesOfferQueue(row.latestOfferStatus, offerQueue);
-    });
+    .filter((row) => matchesOfferQueue(row.latestOfferStatus, offerQueue));
 
   const total = enriched.length;
   const from = (page - 1) * pageSize;

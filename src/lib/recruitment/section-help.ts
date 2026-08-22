@@ -77,17 +77,17 @@ export const HIRING_SECTION_HELP = {
       {
         label: "What this page is for",
         detail:
-          "Prepare and send offer letters to candidates who have cleared CEO stage — upload the letter and email it securely.",
+          "Upload offer letters for candidates who have cleared CEO stage. Letters appear in the candidate onboarding portal — no email is sent from here.",
       },
       {
         label: "When candidates appear",
         detail:
-          "Only candidates ready for offer show here. Earlier stages stay under Candidates until CEO is done.",
+          "Candidates stay in this list at the offer stage. You can upload, replace, or delete their letter at any time.",
       },
       {
-        label: "Send flow",
+        label: "Upload flow",
         detail:
-          "Select the candidate, attach the offer letter, review the email, then send. Track sent vs accepted status afterward.",
+          "Select the candidate, attach the offer letter, and upload. The same letter is available under Offer Acceptance in their onboarding portal.",
       },
       {
         label: "After acceptance",

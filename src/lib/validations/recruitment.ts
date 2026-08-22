@@ -151,9 +151,13 @@ export const offerFormSchema = z.object({
   reportingManagerId: uuidOptional,
   expiresAt: z.string().optional().nullable(),
   notes: z.string().max(5000).optional().nullable(),
-  emailSubject: z.string().min(1, "Email subject is required").max(500),
-  emailMessage: z.string().min(1, "Email message is required").max(10000),
-  sendNow: z.boolean().optional().default(true),
+  emailSubject: z.string().max(500).optional().default(""),
+  emailMessage: z.string().max(10000).optional().default(""),
+  sendNow: z.boolean().optional().default(false),
+});
+
+export const deleteOfferLetterSchema = z.object({
+  offerId: z.string().uuid(),
 });
 
 export const OFFER_LETTER_MAX_BYTES = 10 * 1024 * 1024; // 10 MB

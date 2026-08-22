@@ -419,7 +419,21 @@ export async function ensureOnboardingCaseFromOffer(
   if (await applyOnboardingDismissalGuard(organizationId, email, profile.userId)) return null;
 
   const existing = await findActiveOnboardingCaseByEmail(supabase, organizationId, email);
-  if (existing) return existing.id;
+  if (existing) {
+    if (input.offerReferenceNumber?.trim()) {
+      await supabase
+        .schema("hrms")
+        .from("onboarding_cases")
+        .update({
+          offer_reference_number: input.offerReferenceNumber.trim(),
+          updated_by: profile.userId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existing.id)
+        .eq("organization_id", organizationId);
+    }
+    return existing.id;
+  }
 
   const branchId = await resolveOnboardingBranchId(supabase, profile);
   const intendedRoleId = await resolveDefaultEmployeeRoleId(organizationId);
@@ -458,7 +472,7 @@ export async function ensureOnboardingCaseFromOffer(
   await addTimelineEvent(supabase, data.id, {
     eventType: "case_created",
     title: "Ready for onboarding",
-    description: `${fullName} added after offer letter was sent`,
+    description: `${fullName} added after offer letter was uploaded`,
     actorUserId: profile.userId,
   });
 
@@ -479,7 +493,8 @@ export async function syncOnboardingCasesFromSentOffers(
       job:job_opening_id(title, department_id, designation_id, employment_type_id, hiring_manager_id)`,
     )
     .eq("organization_id", organizationId)
-    .in("offer_status", ["sent", "accepted"])
+    .not("offer_letter_path", "is", null)
+    .in("offer_status", ["draft", "sent", "accepted"])
     .is("deleted_at", null);
 
   if (error) throw new Error(error.message);

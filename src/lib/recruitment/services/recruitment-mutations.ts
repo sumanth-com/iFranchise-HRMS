@@ -28,15 +28,12 @@ import {
 } from "@/lib/recruitment/services/recruitment-notifications";
 import {
   deliverInterviewInviteEmail,
-  deliverOfferEmailToCandidate,
-  loadOfferEmailContext,
 } from "@/lib/recruitment/services/recruitment-offer-email";
 import {
-  downloadOfferLetterFile,
+  removeOfferLetterFile,
   storeOfferLetterFile,
 } from "@/lib/recruitment/services/offer-letter-storage";
-import { resolveOfferLetterFileName } from "@/lib/recruitment/services/offer-letter-display";
-import { assertOfferLetterFile } from "@/lib/validations/recruitment";
+import { assertOfferLetterFile, deleteOfferLetterSchema } from "@/lib/validations/recruitment";
 import {
   getRecruitmentSettings,
   nextRecruitmentCode,
@@ -732,19 +729,6 @@ export async function createOffer(
 
   const settings = await getRecruitmentSettings(supabase, organizationId);
 
-  const emailContext = await loadOfferEmailContext(
-    supabase,
-    organizationId,
-    input.candidateId,
-    candidate.job_opening_id,
-    reportingManagerId,
-    branchId,
-    departmentId,
-    designationId,
-  );
-
-  const resolvedEmailSubject = input.emailSubject.trim();
-  const resolvedEmailMessage = input.emailMessage.trim();
   const resolvedSalary = Number(candidate.expected_ctc ?? 0);
   const resolvedJoiningDate = new Date().toISOString().slice(0, 10);
 
@@ -752,23 +736,16 @@ export async function createOffer(
     .select("id, offer_code, offer_letter_path, offer_letter_filename, salary, joining_date, offer_status")
     .eq("candidate_id", input.candidateId)
     .eq("organization_id", organizationId)
-    .in("offer_status", ["draft", "sent"])
+    .in("offer_status", ["draft", "sent", "accepted"])
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (offerFile) {
-    assertOfferLetterFile({ name: offerFile.filename, size: offerFile.bytes.byteLength });
+  if (!offerFile) {
+    throw new Error("Choose an offer letter file to upload");
   }
-
-  const hasStoredLetter = Boolean(existingDraft?.offer_letter_path);
-  if (input.sendNow && !offerFile && !hasStoredLetter) {
-    throw new Error("Upload an offer letter before sending");
-  }
-  if (!input.sendNow && !offerFile && !hasStoredLetter) {
-    throw new Error("Upload an offer letter to save the draft");
-  }
+  assertOfferLetterFile({ name: offerFile.filename, size: offerFile.bytes.byteLength });
 
   let offerId: string;
   let offerCodeValue = existingDraft?.offer_code ?? null;
@@ -787,8 +764,6 @@ export async function createOffer(
         joining_date: offerJoiningDate,
         expires_at: emptyToNull(input.expiresAt),
         notes: emptyToNull(input.notes),
-        email_subject: resolvedEmailSubject,
-        offer_letter_body: resolvedEmailMessage,
         updated_by: profile.userId,
       })
       .eq("id", existingDraft.id)
@@ -823,8 +798,6 @@ export async function createOffer(
         joining_date: offerJoiningDate,
         expires_at: emptyToNull(input.expiresAt),
         notes: emptyToNull(input.notes),
-        email_subject: resolvedEmailSubject,
-        offer_letter_body: resolvedEmailMessage,
         offer_status: "draft",
         created_by: profile.userId,
         updated_by: profile.userId,
@@ -837,113 +810,105 @@ export async function createOffer(
   }
 
   let offerLetterPath = existingDraft?.offer_letter_path ?? null;
-  let attachmentFilename =
-    offerFile?.filename ?? existingDraft?.offer_letter_filename ?? null;
+  let attachmentFilename = offerFile.filename;
 
-  if (offerFile) {
-    offerLetterPath = await storeOfferLetterFile(
-      supabase,
-      organizationId,
-      offerId,
-      input.candidateId,
-      offerFile.bytes,
-      offerFile.filename,
-    );
-    attachmentFilename = offerFile.filename;
+  offerLetterPath = await storeOfferLetterFile(
+    supabase,
+    organizationId,
+    offerId,
+    input.candidateId,
+    offerFile.bytes,
+    offerFile.filename,
+  );
 
-    const { error: pathError } = await fromHrms(supabase, "recruitment_offers")
-      .update({
-        offer_letter_path: offerLetterPath,
-        offer_letter_filename: offerFile.filename,
-        updated_by: profile.userId,
-      })
-      .eq("id", offerId)
-      .eq("organization_id", organizationId);
+  const { error: pathError } = await fromHrms(supabase, "recruitment_offers")
+    .update({
+      offer_letter_path: offerLetterPath,
+      offer_letter_filename: offerFile.filename,
+      offer_status: "sent",
+      sent_at: new Date().toISOString(),
+      updated_by: profile.userId,
+    })
+    .eq("id", offerId)
+    .eq("organization_id", organizationId);
 
-    if (pathError) throw new Error(pathError.message);
-  }
+  if (pathError) throw new Error(pathError.message);
 
   const candidateName = [candidate.first_name, candidate.last_name].filter(Boolean).join(" ");
+  const hadLetter = Boolean(existingDraft?.offer_letter_path);
 
   await moveCandidateStage(supabase, profile, {
     candidateId: input.candidateId,
     stage: "offer",
-    reason: input.sendNow ? "Offer sent" : "Offer created",
+    reason: hadLetter ? "Offer letter replaced" : "Offer letter uploaded",
   });
 
-  if (input.sendNow) {
-    if (!offerLetterPath) {
-      throw new Error("Offer letter file is missing");
-    }
+  await addTimeline(supabase, organizationId, input.candidateId, profile.userId, {
+    eventType: "offer",
+    title: hadLetter ? "Offer letter updated" : "Offer letter uploaded",
+    description: `${attachmentFilename} is available in the candidate onboarding portal`,
+  });
 
-    const fileBytes =
-      offerFile?.bytes ?? await downloadOfferLetterFile(supabase, offerLetterPath);
-    const emailFilename = resolveOfferLetterFileName({
-      storedFileName: attachmentFilename,
-      offerLetterPath,
-      candidateName: emailContext.candidateName,
-      jobTitle: emailContext.jobTitle,
-    });
+  await ensureOnboardingCaseFromOffer(supabase, profile, {
+    fullName: candidateName,
+    personalEmail: candidate.email,
+    mobileNumber: candidate.phone ?? null,
+    designationId,
+    departmentId,
+    reportingManagerId,
+    employmentTypeId,
+    joiningDate: offerJoiningDate,
+    offerReferenceNumber: offerCodeValue,
+  }).catch((error) => {
+    console.error("[recruitment] failed to sync offer letter to onboarding", error);
+  });
 
-    await deliverOfferEmailToCandidate({
-      to: emailContext.candidateEmail,
-      subject: resolvedEmailSubject,
-      messageText: resolvedEmailMessage,
-      fileBytes,
-      attachmentFilename: emailFilename,
-    });
+  return offerId;
+}
 
-    const sentAt = new Date().toISOString();
-    const { error: sentError } = await fromHrms(supabase, "recruitment_offers")
-      .update({
-        offer_status: "sent",
-        sent_at: sentAt,
-        updated_by: profile.userId,
-      })
-      .eq("id", offerId)
-      .eq("organization_id", organizationId);
+export async function deleteOfferLetter(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: z.infer<typeof deleteOfferLetterSchema>,
+): Promise<void> {
+  const organizationId = profile.employee.organizationId;
 
-    if (sentError) throw new Error(sentError.message);
+  const { data: offer, error: fetchError } = await fromHrms(supabase, "recruitment_offers")
+    .select("id, candidate_id, offer_letter_path")
+    .eq("id", input.offerId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
 
-    await addTimeline(supabase, organizationId, input.candidateId, profile.userId, {
-      eventType: "offer",
-      title: existingDraft?.offer_status === "sent" ? "Offer resent" : "Offer sent",
-      description: `Offer emailed to ${emailContext.candidateEmail}`,
-    });
+  if (fetchError) throw new Error(fetchError.message);
+  if (!offer) throw new Error("Offer not found");
 
-    await notifyOfferStatus(
-      supabase,
-      profile,
-      reportingManagerId,
-      "offerSent",
-      existingDraft?.offer_status === "sent" ? "Offer resent" : "Offer sent",
-      `Offer sent to ${candidateName}.`,
-      offerId,
-      candidateName,
-    );
+  await assertManagerCandidateAccess(supabase, profile, offer.candidate_id);
 
-    await ensureOnboardingCaseFromOffer(supabase, profile, {
-      fullName: candidateName,
-      personalEmail: candidate.email,
-      mobileNumber: candidate.phone ?? null,
-      designationId,
-      departmentId,
-      reportingManagerId,
-      employmentTypeId,
-      joiningDate: offerJoiningDate,
-      offerReferenceNumber: offerCodeValue,
-    }).catch((error) => {
-      console.error("[recruitment] failed to add candidate to onboarding", error);
-    });
-  } else {
-    await addTimeline(supabase, organizationId, input.candidateId, profile.userId, {
-      eventType: "offer",
-      title: "Offer drafted",
-      description: "Offer letter draft saved",
+  if (offer.offer_letter_path) {
+    await removeOfferLetterFile(offer.offer_letter_path).catch((error) => {
+      console.error("[recruitment] failed to remove offer letter from storage", error);
     });
   }
 
-  return offerId;
+  const { error: updateError } = await fromHrms(supabase, "recruitment_offers")
+    .update({
+      offer_letter_path: null,
+      offer_letter_filename: null,
+      offer_status: "draft",
+      sent_at: null,
+      updated_by: profile.userId,
+    })
+    .eq("id", input.offerId)
+    .eq("organization_id", organizationId);
+
+  if (updateError) throw new Error(updateError.message);
+
+  await addTimeline(supabase, organizationId, offer.candidate_id, profile.userId, {
+    eventType: "offer",
+    title: "Offer letter removed",
+    description: "The uploaded offer letter was deleted from the candidate record",
+  });
 }
 
 export async function updateOfferStatus(

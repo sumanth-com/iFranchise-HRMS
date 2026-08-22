@@ -30,6 +30,7 @@ export default async function CeoOnboardingListPage({ searchParams }: PageProps)
   });
 
   const data = await loadOnboardingModuleData(parsed);
+  const joiningYearAnchor = new Date().getFullYear();
 
   return (
     <Suspense
@@ -42,6 +43,7 @@ export default async function CeoOnboardingListPage({ searchParams }: PageProps)
       <OnboardingDashboardView
         {...data}
         initialFilters={parsed}
+        joiningYearAnchor={joiningYearAnchor}
         readOnly
         basePath={`${CEO_ROUTES.recruitment}/onboarding`}
       />

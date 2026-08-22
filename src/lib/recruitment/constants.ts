@@ -28,8 +28,8 @@ export const RECRUITMENT_SUB_NAV = [
 
 export const OFFER_QUEUE_FILTER_LABELS = {
   all: "All offer candidates",
-  pending: "Pending send",
-  sent: "Sent",
+  pending: "Pending upload",
+  sent: "Letter uploaded",
   accepted: "Accepted",
 } as const;
 
@@ -109,7 +109,7 @@ export const RECOMMENDATION_LABELS: Record<InterviewRecommendation, string> = {
 
 export const OFFER_STATUS_LABELS: Record<OfferStatus, string> = {
   draft: "Draft",
-  sent: "Offer sent",
+  sent: "Letter uploaded",
   accepted: "Accepted",
   rejected: "Rejected",
   expired: "Expired",
@@ -123,7 +123,7 @@ export function getCandidateStageBadge(
     return { label: "Offer accepted", status: "accepted" };
   }
   if (stage === "offer" && latestOfferStatus === "sent") {
-    return { label: "Offer sent", status: "offer_sent" };
+    return { label: "Letter uploaded", status: "offer_sent" };
   }
   return { label: CANDIDATE_STAGE_LABELS[stage], status: stage };
 }

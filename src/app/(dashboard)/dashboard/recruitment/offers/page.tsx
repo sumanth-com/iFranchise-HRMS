@@ -50,7 +50,7 @@ async function OffersPageContent({ searchParams }: PageProps) {
       pageSize={result.pageSize}
       lookups={lookups}
       initialSelected={
-        selected && ["ceo", "offer"].includes(selected.stage) ? selected : null
+        selected && ["ceo", "offer", "joined"].includes(selected.stage) ? selected : null
       }
       canOffer={canManageOffers(profile.permissionCodes)}
       filters={{

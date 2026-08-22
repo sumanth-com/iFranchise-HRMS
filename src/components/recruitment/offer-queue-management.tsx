@@ -35,7 +35,7 @@ function offerQueueBadge(row: CandidateListItem) {
   if (row.stage === "ceo") {
     return { label: OFFER_QUEUE_STAGE_LABELS.ceo, status: "ceo" as CandidateStage };
   }
-  return { label: "Pending send", status: "draft" as OfferStatus };
+  return { label: "Pending upload", status: "draft" as OfferStatus };
 }
 
 export function OfferQueueManagement({
@@ -118,8 +118,8 @@ export function OfferQueueManagement({
         toast.error(result.message);
         return;
       }
-      if (!["ceo", "offer"].includes(result.data.stage)) {
-        toast.error("This candidate is not ready for offer");
+      if (!["ceo", "offer", "joined"].includes(result.data.stage)) {
+        toast.error("This candidate is not in the offer queue");
         return;
       }
       setSelectedDetail(result.data);
@@ -153,9 +153,8 @@ export function OfferQueueManagement({
           <h1 className="text-2xl font-semibold tracking-tight">Offers</h1>
         </SectionHelpButton>
         <p className="mt-1 text-sm text-muted-foreground">
-          {listOnly
-            ? "Candidates who have reached offer — view who is in the offer queue."
-            : "Unlocks after CEO stage — select a candidate, upload their offer letter, and send by email."}
+          Upload offer letters for candidates at offer stage and anyone in onboarding — letters
+          appear in their onboarding portal (no email is sent).
         </p>
       </div>
 
@@ -270,7 +269,6 @@ export function OfferQueueManagement({
               detail={selectedDetail}
               loading={detailLoading}
               canOffer={canOffer}
-              offerEmailDefaults={lookups.offerEmailDefaults}
               onClose={closePanel}
               onRefresh={() => {
                 if (selectedId) void refreshDetail(selectedId);

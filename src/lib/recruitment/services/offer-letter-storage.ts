@@ -56,6 +56,12 @@ export async function storeOfferLetterFile(
   return storagePath;
 }
 
+export async function removeOfferLetterFile(storagePath: string): Promise<void> {
+  const admin = createAdminClient();
+  const { error } = await admin.storage.from(BUCKET).remove([storagePath]);
+  if (error) throw new Error(error.message);
+}
+
 export async function downloadOfferLetterFile(
   _supabase: AuthSupabaseClient,
   storagePath: string,

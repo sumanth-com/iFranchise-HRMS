@@ -18,6 +18,7 @@ import {
   createJobOpening,
   createOffer,
   deleteJobOpening,
+  deleteOfferLetter,
   duplicateJobOpening,
   moveCandidateStage,
   scheduleInterview,
@@ -35,6 +36,7 @@ import {
   moveStageSchema,
   offerFormSchema,
   offerStatusSchema,
+  deleteOfferLetterSchema,
   assertOfferLetterFile,
   recruitmentSettingsSchema,
 } from "@/lib/validations/recruitment";
@@ -263,33 +265,32 @@ export async function createOfferAction(formData: FormData): Promise<ActionResul
 
     const parsed = offerFormSchema.parse({
       candidateId: formData.get("candidateId"),
-      emailSubject: formData.get("emailSubject"),
-      emailMessage: formData.get("emailMessage"),
-      sendNow: formData.get("sendNow") === "true",
+      emailSubject: formData.get("emailSubject") ?? "",
+      emailMessage: formData.get("emailMessage") ?? "",
+      sendNow: false,
     });
 
     const file = formData.get("offerFile");
-    let offerFile: { bytes: Uint8Array; filename: string } | undefined;
-
-    if (file instanceof File && file.size > 0) {
-      try {
-        assertOfferLetterFile(file);
-      } catch (error) {
-        return {
-          success: false,
-          message: error instanceof Error ? error.message : "Invalid offer letter file",
-        };
-      }
-      offerFile = {
-        bytes: new Uint8Array(await file.arrayBuffer()),
-        filename: file.name,
-      };
-    } else if (file instanceof File && file.size === 0) {
+    if (!(file instanceof File) || file.size <= 0) {
       return {
         success: false,
-        message: "The selected file is empty. Choose another file.",
+        message: "Choose an offer letter file to upload",
       };
     }
+
+    let offerFile: { bytes: Uint8Array; filename: string };
+    try {
+      assertOfferLetterFile(file);
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : "Invalid offer letter file",
+      };
+    }
+    offerFile = {
+      bytes: new Uint8Array(await file.arrayBuffer()),
+      filename: file.name,
+    };
 
     const id = await createOffer(supabase, profile, parsed, offerFile);
     revalidateRecruitment();
@@ -297,7 +298,25 @@ export async function createOfferAction(formData: FormData): Promise<ActionResul
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to send offer",
+      message: error instanceof Error ? error.message : "Failed to upload offer letter",
+    };
+  }
+}
+
+export async function deleteOfferLetterAction(offerId: string): Promise<ActionResult<void>> {
+  try {
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("recruitment.offer"),
+    );
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = deleteOfferLetterSchema.parse({ offerId });
+    await deleteOfferLetter(supabase, profile, parsed);
+    revalidateRecruitment();
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to delete offer letter",
     };
   }
 }

@@ -77,7 +77,7 @@ export async function loadCandidateOfferLetter(
     .eq("candidate_id", candidate.id)
     .not("offer_letter_path", "is", null)
     .is("deleted_at", null)
-    .in("offer_status", ["sent", "accepted"])
+    .in("offer_status", ["draft", "sent", "accepted"])
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();

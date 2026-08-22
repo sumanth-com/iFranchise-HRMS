@@ -27,6 +27,7 @@ import {
 import {
   buildJoiningMonthOptions,
   buildJoiningYearOptions,
+  formatOnboardingJoiningDate,
   getHrOnboardingListStatus,
   ONBOARDING_HR_STATUS_FILTER_OPTIONS,
 } from "@/lib/onboarding/hr-onboarding-list-utils";
@@ -39,6 +40,8 @@ import type { OnboardingListParams } from "@/types/onboarding";
 
 type OnboardingDashboardViewProps = OnboardingModuleData & {
   initialFilters: OnboardingListParams;
+  /** Server-provided year anchor so filter options match SSR markup during hydration. */
+  joiningYearAnchor: number;
   readOnly?: boolean;
   basePath?: string;
 };
@@ -65,15 +68,6 @@ function isResendInvite(row: OnboardingCaseListItem) {
   return Boolean(row.invitationSentAt) || row.status !== "draft";
 }
 
-function formatJoiningDate(value: string | null | undefined) {
-  if (!value) return "—";
-  return new Date(value).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
 function ProgressCell({ percent }: { percent: number }) {
   const clamped = Math.max(0, Math.min(100, percent));
   return (
@@ -93,6 +87,7 @@ export function OnboardingDashboardView({
   cases: initialCases,
   designationFilters,
   initialFilters,
+  joiningYearAnchor,
   readOnly = false,
   basePath = ONBOARDING_ROUTES.hrList,
 }: OnboardingDashboardViewProps) {
@@ -162,7 +157,10 @@ export function OnboardingDashboardView({
 
   const inviteableCases = cases.data.filter((row) => canSendOnboardingInvite(row.status));
   const monthOptions = useMemo(() => buildJoiningMonthOptions(), []);
-  const yearOptions = useMemo(() => buildJoiningYearOptions(), []);
+  const yearOptions = useMemo(
+    () => buildJoiningYearOptions(joiningYearAnchor),
+    [joiningYearAnchor],
+  );
 
   function openInviteDialog(row?: OnboardingCaseListItem) {
     setInviteTarget(row ?? inviteableCases[0] ?? null);
@@ -253,7 +251,7 @@ export function OnboardingDashboardView({
         </p>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <div className="relative z-10 flex min-w-0 flex-1 flex-nowrap items-center gap-3 overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:thin]">
           <div className="relative w-56 shrink-0 sm:w-64">
             <Search
@@ -368,7 +366,7 @@ export function OnboardingDashboardView({
                         <div className="text-xs text-muted-foreground">{row.personalEmail}</div>
                       </td>
                       <td className="p-3">{row.designationName ?? row.intendedRoleName ?? "—"}</td>
-                      <td className="p-3">{formatJoiningDate(row.joiningDate)}</td>
+                      <td className="p-3">{formatOnboardingJoiningDate(row.joiningDate)}</td>
                       <td className="p-3">
                         <ProgressCell percent={row.completionPercent} />
                       </td>

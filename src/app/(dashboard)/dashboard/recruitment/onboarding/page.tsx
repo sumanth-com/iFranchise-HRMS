@@ -35,6 +35,7 @@ export default async function OnboardingListPage({ searchParams }: PageProps) {
   });
 
   const data = await loadOnboardingModuleData(parsed);
+  const joiningYearAnchor = new Date().getFullYear();
 
   return (
     <Suspense
@@ -44,7 +45,11 @@ export default async function OnboardingListPage({ searchParams }: PageProps) {
         </div>
       }
     >
-      <OnboardingDashboardView {...data} initialFilters={parsed} />
+      <OnboardingDashboardView
+        {...data}
+        initialFilters={parsed}
+        joiningYearAnchor={joiningYearAnchor}
+      />
     </Suspense>
   );
 }
