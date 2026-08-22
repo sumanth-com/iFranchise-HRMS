@@ -134,9 +134,13 @@ export function OnboardingSignUpRedirect() {
           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50">
             New candidate
           </p>
-          <h1 className="text-xl font-semibold tracking-tight">Set up your password</h1>
+          <h1 className="text-xl font-semibold tracking-tight">
+            {showForgotPassword ? "Reset password" : "Set up your password"}
+          </h1>
           <p className="text-xs leading-snug text-white/65">
-            Create your permanent password, then use it to sign in to the pre-joining portal.
+            {showForgotPassword
+              ? "Verify your email with a code, then set a new permanent password."
+              : "Create your permanent password, then use it to sign in to the pre-joining portal."}
           </p>
         </div>
       </div>
@@ -156,112 +160,114 @@ export function OnboardingSignUpRedirect() {
           </div>
         </Field>
 
-        <Field label="Password">
-          <div className="relative">
-            <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type={showPassword ? "text" : "password"}
-              minLength={MIN_PASSWORD_LENGTH}
-              maxLength={128}
-              placeholder="Min. 8 characters"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className={cn(inputClassName, "pl-9 pr-9")}
-              autoComplete="new-password"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              aria-label={showPassword ? "Hide password" : "Show password"}
-            >
-              {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-            </button>
-          </div>
-        </Field>
-
-        <div className="rounded-lg border border-border bg-muted/50 px-3 py-2.5 dark:bg-muted/30">
-          <div className="flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            <span className="text-foreground/80">Strength</span>
-            <span
-              className={cn(
-                lengthMet ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground",
-              )}
-            >
-              {strengthLabel}
-            </span>
-          </div>
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-            <CheckItem met={lengthMet} label={`${MIN_PASSWORD_LENGTH}+ characters`} />
-            <CheckItem met={passwordsMatch} label="Passwords match" />
-          </div>
-        </div>
-
-        <Field label="Confirm password">
-          <div className="relative">
-            <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type={showConfirm ? "text" : "password"}
-              minLength={MIN_PASSWORD_LENGTH}
-              maxLength={128}
-              placeholder="Re-enter password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className={cn(
-                inputClassName,
-                "pl-9 pr-9 transition-colors",
-                confirmPassword && !passwordsMatch && "border-red-400 dark:border-red-500",
-                passwordsMatch && "border-emerald-500 dark:border-emerald-400",
-              )}
-              autoComplete="new-password"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && canSubmit) submit();
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => setShowConfirm((v) => !v)}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              aria-label={showConfirm ? "Hide password" : "Show password"}
-            >
-              {showConfirm ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-            </button>
-          </div>
-        </Field>
-
-        <Button
-          type="button"
-          className="h-10 w-full text-sm font-semibold"
-          disabled={!canSubmit}
-          onClick={submit}
-        >
-          {isPending ? "Saving password…" : "Save password & continue"}
-        </Button>
-
-        <div className="flex justify-center">
-          <button
-            type="button"
-            className="text-[11px] font-semibold text-primary hover:underline"
-            onClick={() => setShowForgotPassword((v) => !v)}
-          >
-            {showForgotPassword ? "Hide forgot password" : "Forgot password?"}
-          </button>
-        </div>
-
         {showForgotPassword ? (
-          <OnboardingForgotPasswordPanel email={email} onEmailChange={setEmail} />
-        ) : null}
+          <OnboardingForgotPasswordPanel
+            email={email}
+            onBack={() => setShowForgotPassword(false)}
+          />
+        ) : (
+          <>
+            <Field label="Password">
+              <div className="relative">
+                <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  minLength={MIN_PASSWORD_LENGTH}
+                  maxLength={128}
+                  placeholder="Min. 8 characters"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={cn(inputClassName, "pl-9 pr-9")}
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                </button>
+              </div>
+            </Field>
 
-        <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
-          Already set a password?{" "}
-          <Link
-            href={ONBOARDING_ROUTES.login}
-            className="inline-flex items-center gap-1 font-semibold text-primary hover:underline"
-          >
-            <LogIn className="h-3 w-3" />
-            Sign in
-          </Link>
-        </p>
+            <div className="rounded-lg border border-border bg-muted/50 px-3 py-2.5 dark:bg-muted/30">
+              <div className="flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <span className="text-foreground/80">Strength</span>
+                <span
+                  className={cn(
+                    lengthMet ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground",
+                  )}
+                >
+                  {strengthLabel}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                <CheckItem met={lengthMet} label={`${MIN_PASSWORD_LENGTH}+ characters`} />
+                <CheckItem met={passwordsMatch} label="Passwords match" />
+              </div>
+            </div>
+
+            <Field label="Confirm password">
+              <div className="relative">
+                <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type={showConfirm ? "text" : "password"}
+                  minLength={MIN_PASSWORD_LENGTH}
+                  maxLength={128}
+                  placeholder="Re-enter password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className={cn(
+                    inputClassName,
+                    "pl-9 pr-9 transition-colors",
+                    confirmPassword && !passwordsMatch && "border-red-400 dark:border-red-500",
+                    passwordsMatch && "border-emerald-500 dark:border-emerald-400",
+                  )}
+                  autoComplete="new-password"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && canSubmit) submit();
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm((v) => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showConfirm ? "Hide password" : "Show password"}
+                >
+                  {showConfirm ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                </button>
+              </div>
+            </Field>
+
+            <Button
+              type="button"
+              className="h-10 w-full text-sm font-semibold"
+              disabled={!canSubmit}
+              onClick={submit}
+            >
+              {isPending ? "Saving password…" : "Save password & continue"}
+            </Button>
+
+            <div className="flex justify-center gap-3 text-[11px]">
+              <button
+                type="button"
+                className="font-semibold text-primary hover:underline"
+                onClick={() => setShowForgotPassword(true)}
+              >
+                Forgot password?
+              </button>
+              <span className="text-muted-foreground">·</span>
+              <Link
+                href={ONBOARDING_ROUTES.login}
+                className="inline-flex items-center gap-1 font-semibold text-primary hover:underline"
+              >
+                <LogIn className="h-3 w-3" />
+                Sign in
+              </Link>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -63,12 +63,12 @@ const TIMELINE = [
   {
     icon: Clock,
     title: "HR review in progress",
-    description: "Our team will verify your information within 2–3 business days.",
+    description: "Our HR team will verify your information and update you soon.",
   },
   {
     icon: Mail,
-    title: "Company account activation",
-    description: "You'll receive your official email and login after approval.",
+    title: "Next steps by email",
+    description: "You'll hear from HR about account activation and joining moves.",
   },
 ];
 
@@ -94,16 +94,10 @@ export function OnboardingSubmittedCelebration({
 
   return (
     <div className="relative mx-auto w-full max-w-2xl">
-      <div
-        className="relative overflow-hidden rounded-3xl border border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/50 to-slate-50 p-8 shadow-2xl shadow-emerald-900/[0.06] ring-1 ring-emerald-100 sm:p-10"
-      >
+      <div className="relative overflow-hidden rounded-3xl border border-emerald-500/25 bg-card p-8 shadow-2xl shadow-black/20 ring-1 ring-border sm:p-10 dark:border-emerald-400/20">
         <ConfettiBurst />
-        <div
-          className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-emerald-200/30 blur-3xl"
-        />
-        <div
-          className="pointer-events-none absolute -bottom-12 -left-12 h-40 w-40 rounded-full bg-blue-200/25 blur-3xl"
-        />
+        <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-emerald-500/15 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-12 -left-12 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
 
         <div className="relative space-y-8">
           <div
@@ -111,22 +105,22 @@ export function OnboardingSubmittedCelebration({
               stage >= 1 ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"
             }`}
           >
-            <div className="mx-auto mb-5 flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-emerald-100 ring-8 ring-emerald-50 onboarding-check-pop">
-              <CheckCircle2 className="h-9 w-9 text-emerald-600" strokeWidth={2.25} />
+            <div className="mx-auto mb-5 flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-emerald-500/15 ring-8 ring-emerald-500/10 onboarding-check-pop">
+              <CheckCircle2 className="h-9 w-9 text-emerald-600 dark:text-emerald-400" strokeWidth={2.25} />
             </div>
-            <div className="mb-3 flex items-center justify-center gap-2 text-emerald-700">
+            <div className="mb-3 flex items-center justify-center gap-2 text-emerald-700 dark:text-emerald-400">
               <Sparkles className="h-4 w-4" />
               <span className="text-xs font-semibold uppercase tracking-[0.2em]">
                 Onboarding complete
               </span>
               <Sparkles className="h-4 w-4" />
             </div>
-            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
               Congratulations, {firstName}!
             </h2>
             <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
               You&apos;ve successfully submitted your pre-joining onboarding. Our HR team will
-              review everything and guide you through the next steps.
+              review your details and update you on the next steps.
             </p>
           </div>
 
@@ -135,23 +129,27 @@ export function OnboardingSubmittedCelebration({
               stage >= 2 ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
             }`}
           >
-            <div className="rounded-2xl border bg-white/80 p-4 text-center backdrop-blur-sm">
+            <div className="rounded-2xl border border-border bg-card/90 p-4 text-center backdrop-blur-sm">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Status
               </p>
-              <p className="mt-1 text-sm font-semibold">{statusLabel}</p>
+              <p className="mt-1 text-sm font-semibold text-foreground">{statusLabel}</p>
             </div>
-            <div className="rounded-2xl border bg-white/80 p-4 text-center backdrop-blur-sm">
+            <div className="rounded-2xl border border-border bg-card/90 p-4 text-center backdrop-blur-sm">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Joining date
               </p>
-              <p className="mt-1 text-sm font-semibold">{formatJoiningDate(joiningDate)}</p>
+              <p className="mt-1 text-sm font-semibold text-foreground">
+                {formatJoiningDate(joiningDate)}
+              </p>
             </div>
-            <div className="rounded-2xl border bg-white/80 p-4 text-center backdrop-blur-sm">
+            <div className="rounded-2xl border border-border bg-card/90 p-4 text-center backdrop-blur-sm">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Progress
               </p>
-              <p className="mt-1 text-sm font-semibold text-emerald-600">100% submitted</p>
+              <p className="mt-1 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                100% submitted
+              </p>
             </div>
           </div>
 
@@ -166,17 +164,17 @@ export function OnboardingSubmittedCelebration({
             {TIMELINE.map((item, index) => (
               <div
                 key={item.title}
-                className={`flex gap-4 rounded-2xl border bg-white/70 p-4 backdrop-blur-sm transition-all duration-500 ${
+                className={`flex gap-4 rounded-2xl border border-border bg-card/80 p-4 backdrop-blur-sm transition-all duration-500 ${
                   stage >= 3 ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
                 }`}
                 style={{ transitionDelay: `${index * 120 + 200}ms` }}
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100">
-                  <item.icon className="h-5 w-5 text-slate-600" strokeWidth={2} />
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
+                  <item.icon className="h-5 w-5 text-foreground/70" strokeWidth={2} />
                 </div>
                 <div>
-                  <p className="font-medium text-sm">{item.title}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
+                  <p className="text-sm font-medium text-foreground">{item.title}</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
                     {item.description}
                   </p>
                 </div>
@@ -189,7 +187,7 @@ export function OnboardingSubmittedCelebration({
               stage >= 4 ? "opacity-100" : "opacity-0"
             }`}
           >
-            You can close this window. We&apos;ll email you when there&apos;s an update.
+            Our HR team will update you by email. You can close this window for now.
           </p>
         </div>
       </div>

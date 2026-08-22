@@ -87,9 +87,13 @@ export function OnboardingLoginForm() {
           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50">
             Candidate portal
           </p>
-          <h1 className="text-xl font-semibold tracking-tight">Onboarding sign in</h1>
+          <h1 className="text-xl font-semibold tracking-tight">
+            {showForgotPassword ? "Reset password" : "Onboarding sign in"}
+          </h1>
           <p className="text-xs leading-snug text-white/65">
-            Use your personal email and password to continue pre-joining onboarding.
+            {showForgotPassword
+              ? "Verify your email with a code, then set a new permanent password."
+              : "Use your personal email and password to continue pre-joining onboarding."}
           </p>
         </div>
       </div>
@@ -109,107 +113,118 @@ export function OnboardingLoginForm() {
           </div>
         </Field>
 
-        <Field label="Password" required>
-          <div className="relative">
-            <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type={showPassword ? "text" : "password"}
-              autoComplete="current-password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className={cn(inputClassName, "pl-9 pr-9")}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && canSignIn) loginWithPassword();
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              aria-label={showPassword ? "Hide password" : "Show password"}
-            >
-              {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-            </button>
-          </div>
-        </Field>
-
-        <div className="flex justify-end">
-          <button
-            type="button"
-            className="text-[11px] font-semibold text-primary hover:underline"
-            onClick={() => setShowForgotPassword((v) => !v)}
-          >
-            {showForgotPassword ? "Hide forgot password" : "Forgot password?"}
-          </button>
-        </div>
-
         {showForgotPassword ? (
-          <OnboardingForgotPasswordPanel email={email} onEmailChange={setEmail} />
-        ) : null}
+          <OnboardingForgotPasswordPanel
+            email={email}
+            onBack={() => setShowForgotPassword(false)}
+          />
+        ) : (
+          <>
+            <Field label="Password" required>
+              <div className="relative">
+                <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={cn(inputClassName, "pl-9 pr-9")}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && canSignIn) loginWithPassword();
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-3.5 w-3.5" />
+                  ) : (
+                    <Eye className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              </div>
+            </Field>
 
-        <Button
-          className="h-10 w-full text-sm font-semibold"
-          onClick={loginWithPassword}
-          disabled={!canSignIn}
-        >
-          {isPending ? "Signing in…" : "Sign in with password"}
-        </Button>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                className="text-[11px] font-semibold text-primary hover:underline"
+                onClick={() => setShowForgotPassword(true)}
+              >
+                Forgot password?
+              </button>
+            </div>
 
-        <div className="rounded-lg border border-border bg-muted/50 px-3 py-3 dark:bg-muted/30">
-          <p className="text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Or use a one-time code
-          </p>
-          <div className="mt-3 space-y-2">
             <Button
-              type="button"
-              variant="outline"
-              className="h-10 w-full text-sm"
-              onClick={requestOtp}
-              disabled={!canRequestOtp}
+              className="h-10 w-full text-sm font-semibold"
+              onClick={loginWithPassword}
+              disabled={!canSignIn}
             >
-              Send verification code
+              {isPending ? "Signing in…" : "Sign in with password"}
             </Button>
-            {otpSent ? (
-              <>
-                <Field label="Verification code" required>
-                  <Input
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    placeholder="6-digit code"
-                    maxLength={6}
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    className={inputClassName}
-                  />
-                </Field>
+
+            <div className="rounded-lg border border-border bg-muted/50 px-3 py-3 dark:bg-muted/30">
+              <p className="text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Or use a one-time code
+              </p>
+              <div className="mt-3 space-y-2">
                 <Button
                   type="button"
-                  className="h-10 w-full text-sm font-semibold"
-                  onClick={verifyOtp}
-                  disabled={isPending || otp.length !== 6}
+                  variant="outline"
+                  className="h-10 w-full text-sm"
+                  onClick={requestOtp}
+                  disabled={!canRequestOtp}
                 >
-                  Verify code
+                  Send verification code
                 </Button>
-              </>
-            ) : null}
-          </div>
-        </div>
+                {otpSent ? (
+                  <>
+                    <Field label="Verification code" required>
+                      <Input
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        placeholder="6-digit code"
+                        maxLength={6}
+                        value={otp}
+                        onChange={(e) =>
+                          setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                        }
+                        className={inputClassName}
+                      />
+                    </Field>
+                    <Button
+                      type="button"
+                      className="h-10 w-full text-sm font-semibold"
+                      onClick={verifyOtp}
+                      disabled={isPending || otp.length !== 6}
+                    >
+                      Verify code
+                    </Button>
+                  </>
+                ) : null}
+              </div>
+            </div>
 
-        <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
-          No account?{" "}
-          <Link
-            href={
-              email.trim()
-                ? `${ONBOARDING_ROUTES.signUp}?email=${encodeURIComponent(email.trim())}`
-                : ONBOARDING_ROUTES.signUp
-            }
-            className="inline-flex items-center gap-1 font-semibold text-primary hover:underline"
-          >
-            <UserPlus className="h-3 w-3" />
-            Set up password
-          </Link>
-        </p>
+            <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
+              No account?{" "}
+              <Link
+                href={
+                  email.trim()
+                    ? `${ONBOARDING_ROUTES.signUp}?email=${encodeURIComponent(email.trim())}`
+                    : ONBOARDING_ROUTES.signUp
+                }
+                className="inline-flex items-center gap-1 font-semibold text-primary hover:underline"
+              >
+                <UserPlus className="h-3 w-3" />
+                Set up password
+              </Link>
+            </p>
+          </>
+        )}
       </div>
     </div>
   );

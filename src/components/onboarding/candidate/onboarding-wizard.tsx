@@ -640,11 +640,19 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
   if (context.locked || showCelebration) {
     return (
-      <OnboardingSubmittedCelebration
-        fullName={context.fullName}
-        status={context.status}
-        joiningDate={context.joiningDate}
-      />
+      <div className="mx-auto flex min-h-0 w-full min-w-0 max-w-6xl flex-1 flex-col items-center justify-center px-4 py-8">
+        <div
+          className="fixed inset-0 z-40 bg-background/70 backdrop-blur-sm"
+          aria-hidden
+        />
+        <div className="relative z-50 w-full">
+          <OnboardingSubmittedCelebration
+            fullName={context.fullName}
+            status={context.status}
+            joiningDate={context.joiningDate}
+          />
+        </div>
+      </div>
     );
   }
 
