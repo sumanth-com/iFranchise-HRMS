@@ -4,7 +4,7 @@ import { PageSkeleton } from "@/components/common/page-skeleton";
 import { OfferQueueManagement } from "@/components/recruitment/offer-queue-management";
 import { loadManagerRecruitmentPage } from "@/lib/manager/load-admin-context";
 import {
-  getCandidateById,
+  getOfferWorkspaceCandidateById,
   listOfferQueueCandidates,
 } from "@/lib/recruitment/services/recruitment-queries";
 import { candidateListParamsSchema } from "@/lib/validations/recruitment";
@@ -31,7 +31,7 @@ async function ManagerOffersPageContent({ searchParams }: PageProps) {
   const [result, selected] = await Promise.all([
     listOfferQueueCandidates(supabase, profile, params),
     candidateId
-      ? getCandidateById(supabase, profile.employee.organizationId, candidateId)
+      ? getOfferWorkspaceCandidateById(supabase, profile.employee.organizationId, candidateId)
       : Promise.resolve(null),
   ]);
 

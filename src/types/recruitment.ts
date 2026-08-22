@@ -162,6 +162,9 @@ export type CandidateListItem = {
   employeeId: string | null;
   createdAt: string;
   latestOfferStatus?: OfferStatus | null;
+  latestOfferId?: string | null;
+  latestOfferLetterPath?: string | null;
+  latestOfferLetterFileName?: string | null;
   inOnboardingList?: boolean;
 };
 

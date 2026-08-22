@@ -851,17 +851,16 @@ async function loadActiveOnboardingEmails(
   const { data, error } = await supabase
     .schema("hrms")
     .from("onboarding_cases")
-    .select("personal_email, status")
+    .select("personal_email")
     .eq("organization_id", organizationId)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .not("status", "in", "(cancelled,archived,rejected,completed)");
 
   if (error) throw new Error(error.message);
 
-  const terminal = new Set(["cancelled", "archived", "rejected", "completed"]);
   return [
     ...new Set(
       (data ?? [])
-        .filter((row) => !terminal.has(String(row.status ?? "")))
         .map((row) => String(row.personal_email ?? "").trim())
         .filter(Boolean),
     ),
@@ -907,6 +906,7 @@ async function loadOfferQueueCandidateRows(
   options: {
     stage?: string;
     emails?: string[];
+    onboardingEmails?: string[];
     jobOpeningId?: string;
     departmentId?: string;
     departmentIds?: string[] | null;
@@ -920,8 +920,14 @@ async function loadOfferQueueCandidateRows(
     .is("archived_at", null)
     .neq("stage", "rejected");
 
-  if (options.stage) query = query.eq("stage", options.stage);
-  if (options.emails?.length) query = query.in("email", options.emails);
+  if (options.onboardingEmails?.length) {
+    const emailList = options.onboardingEmails.join(",");
+    query = query.or(`stage.eq.offer,email.in.(${emailList})`);
+  } else if (options.stage) {
+    query = query.eq("stage", options.stage);
+  } else if (options.emails?.length) {
+    query = query.in("email", options.emails);
+  }
 
   query = applyOfferQueueCandidateFilters(query, options);
 
@@ -930,15 +936,6 @@ async function loadOfferQueueCandidateRows(
   return (data ?? []) as PerfRow[];
 }
 
-function mergeCandidateRowsById(rows: PerfRow[]): PerfRow[] {
-  const byId = new Map<string, PerfRow>();
-  for (const row of rows) {
-    byId.set(String(row.id), row);
-  }
-  return [...byId.values()].sort(
-    (a, b) => new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime(),
-  );
-}
 
 function matchesOfferQueue(
   latestOfferStatus: OfferStatus | null | undefined,
@@ -961,7 +958,7 @@ export async function listOfferQueueCandidates(
   const parsed = candidateListParamsSchema.parse(params);
   const { page, pageSize, search, departmentId, jobOpeningId, offerQueue } = parsed;
   const organizationId = profile.employee.organizationId;
-  await archiveRejectedCandidates(supabase, organizationId).catch(() => 0);
+  void archiveRejectedCandidates(supabase, organizationId).catch(() => 0);
   const departmentIds = await resolveManagerDepartmentIds(supabase, profile);
 
   if (departmentIds && departmentIds.length === 0) {
@@ -981,26 +978,27 @@ export async function listOfferQueueCandidates(
   const onboardingEmails = await loadActiveOnboardingEmails(supabase, organizationId);
   const onboardingEmailSet = new Set(onboardingEmails.map((email) => email.toLowerCase()));
 
-  const [offerStageRows, onboardingLinkedRows] = await Promise.all([
-    loadOfferQueueCandidateRows(supabase, organizationId, {
-      ...filterOptions,
-      stage: "offer",
-    }),
-    onboardingEmails.length > 0
-      ? loadOfferQueueCandidateRows(supabase, organizationId, {
-          ...filterOptions,
-          emails: onboardingEmails,
-        })
-      : Promise.resolve([]),
-  ]);
+  const candidateRows = await loadOfferQueueCandidateRows(supabase, organizationId, {
+    ...filterOptions,
+    onboardingEmails,
+  });
 
-  const candidateRows = mergeCandidateRowsById([...offerStageRows, ...onboardingLinkedRows]);
   const candidateIds = candidateRows.map((row) => row.id);
 
-  const offerStatusByCandidate = new Map<string, OfferStatus>();
+  const offerMetaByCandidate = new Map<
+    string,
+    {
+      id: string;
+      status: OfferStatus;
+      path: string | null;
+      fileName: string | null;
+    }
+  >();
   if (candidateIds.length > 0) {
     const { data: offers, error: offersError } = await fromHrms(supabase, "recruitment_offers")
-      .select("candidate_id, offer_status, created_at")
+      .select(
+        "id, candidate_id, offer_status, offer_letter_path, offer_letter_filename, created_at",
+      )
       .in("candidate_id", candidateIds)
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
@@ -1009,8 +1007,13 @@ export async function listOfferQueueCandidates(
 
     for (const offer of offers ?? []) {
       const candidateId = String(offer.candidate_id);
-      if (!offerStatusByCandidate.has(candidateId)) {
-        offerStatusByCandidate.set(candidateId, offer.offer_status as OfferStatus);
+      if (!offerMetaByCandidate.has(candidateId)) {
+        offerMetaByCandidate.set(candidateId, {
+          id: String(offer.id),
+          status: offer.offer_status as OfferStatus,
+          path: (offer.offer_letter_path as string | null) ?? null,
+          fileName: (offer.offer_letter_filename as string | null) ?? null,
+        });
       }
     }
   }
@@ -1018,11 +1021,14 @@ export async function listOfferQueueCandidates(
   const enriched = candidateRows
     .map((row) => {
       const mapped = mapCandidateRow(row);
-      const latestOfferStatus = offerStatusByCandidate.get(row.id) ?? null;
+      const offerMeta = offerMetaByCandidate.get(row.id);
       const emailKey = mapped.email.trim().toLowerCase();
       return {
         ...mapped,
-        latestOfferStatus,
+        latestOfferStatus: offerMeta?.status ?? null,
+        latestOfferId: offerMeta?.id ?? null,
+        latestOfferLetterPath: offerMeta?.path ?? null,
+        latestOfferLetterFileName: offerMeta?.fileName ?? null,
         inOnboardingList: onboardingEmailSet.has(emailKey),
       };
     })
@@ -1050,7 +1056,7 @@ export async function listCandidates(
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
   const organizationId = profile.employee.organizationId;
-  await archiveRejectedCandidates(supabase, organizationId).catch(() => 0);
+  void archiveRejectedCandidates(supabase, organizationId).catch(() => 0);
   const departmentIds = await resolveManagerDepartmentIds(supabase, profile);
 
   if (departmentIds && departmentIds.length === 0) {
@@ -1189,6 +1195,9 @@ export async function getCandidateById(
   return {
     ...base,
     latestOfferStatus: offers[0]?.offerStatus ?? base.latestOfferStatus,
+    latestOfferId: offers[0]?.id ?? null,
+    latestOfferLetterPath: offers[0]?.offerLetterPath ?? null,
+    latestOfferLetterFileName: offers[0]?.offerLetterFileName ?? null,
     inOnboardingList: Boolean(onboardingCaseId),
     onboardingCaseId,
     timeline: ((timelineRes.data ?? []) as PerfRow[]).map((row) => ({
@@ -1203,6 +1212,103 @@ export async function getCandidateById(
     interviews: sortInterviewsForDisplay(
       ((interviewsRes.data ?? []) as PerfRow[]).map(mapInterviewRow),
     ),
+    offers,
+  };
+}
+
+const OFFER_WORKSPACE_OFFER_SELECT = `
+  id, candidate_id, job_opening_id, offer_letter_path, offer_letter_filename,
+  offer_status, salary, joining_date, expires_at, employee_id, notes,
+  email_subject, offer_letter_body, created_at,
+  job:job_opening_id(title)
+`;
+
+function mapOfferWorkspaceRow(row: PerfRow): OfferListItem {
+  const job = unwrapRelation(row.job);
+  return {
+    id: String(row.id),
+    candidateId: String(row.candidate_id ?? ""),
+    candidateName: "—",
+    candidateEmail: "",
+    jobOpeningId: String(row.job_opening_id ?? ""),
+    jobTitle: job?.title ?? "—",
+    departmentId: null,
+    departmentName: null,
+    designationId: null,
+    designationTitle: null,
+    branchId: null,
+    branchName: null,
+    employmentTypeId: null,
+    employmentTypeName: null,
+    reportingManagerId: null,
+    reportingManagerName: null,
+    salary: Number(row.salary ?? 0),
+    joiningDate: String(row.joining_date ?? ""),
+    offerLetterPath: (row.offer_letter_path as string | null) ?? null,
+    offerLetterFileName: (row.offer_letter_filename as string | null) ?? null,
+    offerStatus: row.offer_status as OfferStatus,
+    expiresAt: (row.expires_at as string | null) ?? null,
+    employeeId: (row.employee_id as string | null) ?? null,
+    notes: (row.notes as string | null) ?? null,
+    emailSubject: (row.email_subject as string | null) ?? null,
+    emailMessage: (row.offer_letter_body as string | null) ?? null,
+    createdAt: String(row.created_at ?? ""),
+  };
+}
+
+/** Lightweight candidate load for the Offers workspace (no timeline/interviews). */
+export async function getOfferWorkspaceCandidateById(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  id: string,
+): Promise<CandidateDetail | null> {
+  const { data, error } = await fromHrms(supabase, "recruitment_candidates")
+    .select(
+      `id, first_name, last_name, email, phone, experience_years, skills, current_company,
+      current_ctc, expected_ctc, notice_period_days, source, stage, job_opening_id, resume_path,
+      photo_path, notes, employee_id, created_at,
+      job:job_opening_id(title, department_id, departments:department_id(name))`,
+    )
+    .eq("id", id)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+
+  const [offersRes, onboardingCaseId] = await Promise.all([
+    fromHrms(supabase, "recruitment_offers")
+      .select(OFFER_WORKSPACE_OFFER_SELECT)
+      .eq("candidate_id", id)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false }),
+    resolveActiveOnboardingCaseIdForEmail(
+      organizationId,
+      String((data as PerfRow).email ?? ""),
+    ),
+  ]);
+
+  const base = mapCandidateRow(data as PerfRow);
+  const offers = ((offersRes.data ?? []) as PerfRow[]).map((row) => {
+    const mapped = mapOfferWorkspaceRow(row);
+    return {
+      ...mapped,
+      candidateName: base.fullName,
+      candidateEmail: base.email,
+    };
+  });
+
+  return {
+    ...base,
+    latestOfferStatus: offers[0]?.offerStatus ?? base.latestOfferStatus,
+    latestOfferId: offers[0]?.id ?? null,
+    latestOfferLetterPath: offers[0]?.offerLetterPath ?? null,
+    latestOfferLetterFileName: offers[0]?.offerLetterFileName ?? null,
+    inOnboardingList: Boolean(onboardingCaseId),
+    onboardingCaseId,
+    timeline: [],
+    interviews: [],
     offers,
   };
 }

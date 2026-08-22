@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/common/empty-state";
@@ -11,13 +11,17 @@ import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { OfferLetterWorkspace } from "@/components/recruitment/offer-letter-workspace";
 import { RecruitmentPagination } from "@/components/recruitment/recruitment-pagination";
 import { RecruitmentStatusBadge } from "@/components/recruitment/recruitment-status-badge";
-import { getCandidateDetailAction } from "@/lib/recruitment/actions";
+import { getOfferWorkspaceCandidateAction } from "@/lib/recruitment/actions";
 import {
   CANDIDATE_STAGE_LABELS,
   OFFER_QUEUE_FILTER_LABELS,
   OFFER_QUEUE_STAGE_LABELS,
   OFFER_STATUS_LABELS,
 } from "@/lib/recruitment/constants";
+import {
+  buildOfferWorkspaceDetailFromListItem,
+  syncOfferCandidateQueryParam,
+} from "@/lib/recruitment/offer-workspace-utils";
 import { HIRING_SECTION_HELP } from "@/lib/recruitment/section-help";
 import { cn } from "@/lib/utils";
 import type {
@@ -70,67 +74,83 @@ export function OfferQueueManagement({
   const [selectedId, setSelectedId] = useState<string | null>(initialSelected?.id ?? null);
   const [selectedDetail, setSelectedDetail] = useState<CandidateDetail | null>(initialSelected);
   const [detailLoading, setDetailLoading] = useState(false);
+  const loadRequestRef = useRef(0);
 
   useEffect(() => {
     if (!initialSelected || !selectedId || initialSelected.id !== selectedId) return;
     setSelectedDetail((prev) => {
       if (!prev || prev.id !== initialSelected.id) return initialSelected;
-      const richness =
-        (d: CandidateDetail) => d.interviews.length + d.offers.length + d.timeline.length;
-      return richness(initialSelected) >= richness(prev) ? initialSelected : prev;
+      return initialSelected.offers.length >= prev.offers.length ? initialSelected : prev;
     });
   }, [initialSelected, selectedId]);
 
-  const syncCandidateUrl = useCallback(
-    (candidateId: string | null) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (candidateId) params.set("candidateId", candidateId);
-      else params.delete("candidateId");
-      const query = params.toString();
-      startTransition(() => {
-        router.replace(query ? `?${query}` : "?", { scroll: false });
-      });
-    },
-    [router, searchParams, startTransition],
-  );
-
   const refreshDetail = useCallback(async (candidateId: string) => {
-    const result = await getCandidateDetailAction(candidateId);
+    const result = await getOfferWorkspaceCandidateAction(candidateId);
     if (result.success) {
       setSelectedDetail(result.data);
     } else {
       toast.error(result.message);
     }
-    startTransition(() => {
-      router.refresh();
-    });
-  }, [router, startTransition]);
+  }, []);
 
   const loadCandidate = useCallback(
-    async (id: string) => {
-      setSelectedId(id);
-      setDetailLoading(true);
-      syncCandidateUrl(id);
+    async (id: string, listRow?: CandidateListItem) => {
+      const row = listRow ?? records.find((record) => record.id === id);
+      const requestId = ++loadRequestRef.current;
 
-      const result = await getCandidateDetailAction(id);
-      setDetailLoading(false);
-      if (!result.success) {
-        toast.error(result.message);
-        return;
+      setSelectedId(id);
+      syncOfferCandidateQueryParam(id);
+
+      if (row) {
+        setSelectedDetail(buildOfferWorkspaceDetailFromListItem(row));
       }
-      if (!["ceo", "offer", "joined"].includes(result.data.stage)) {
-        toast.error("This candidate is not in the offer queue");
-        return;
+      setDetailLoading(true);
+
+      try {
+        const result = await getOfferWorkspaceCandidateAction(id);
+        if (requestId !== loadRequestRef.current) return;
+
+        if (!result.success) {
+          toast.error(result.message);
+          if (!row) {
+            setSelectedId(null);
+            setSelectedDetail(null);
+            syncOfferCandidateQueryParam(null);
+          }
+          return;
+        }
+        if (!["ceo", "offer", "joined"].includes(result.data.stage)) {
+          toast.error("This candidate is not in the offer queue");
+          return;
+        }
+        setSelectedDetail(result.data);
+      } finally {
+        if (requestId === loadRequestRef.current) {
+          setDetailLoading(false);
+        }
       }
-      setSelectedDetail(result.data);
     },
-    [syncCandidateUrl],
+    [records],
   );
 
+  useEffect(() => {
+    if (listOnly || selectedId || initialSelected) return;
+
+    const urlCandidateId = searchParams.get("candidateId");
+    if (urlCandidateId) {
+      const row = records.find((record) => record.id === urlCandidateId);
+      if (row) {
+        void loadCandidate(urlCandidateId, row);
+      }
+    }
+  }, [initialSelected, listOnly, loadCandidate, records, searchParams, selectedId]);
+
   function closePanel() {
+    loadRequestRef.current += 1;
     setSelectedId(null);
     setSelectedDetail(null);
-    syncCandidateUrl(null);
+    setDetailLoading(false);
+    syncOfferCandidateQueryParam(null);
   }
 
   function updateParams(updates: Record<string, string | undefined>) {
@@ -252,7 +272,7 @@ export function OfferQueueManagement({
                       ) : (
                         <button
                           type="button"
-                          onClick={() => loadCandidate(row.id)}
+                          onClick={() => loadCandidate(row.id, row)}
                           className={cardClass}
                         >
                           {body}

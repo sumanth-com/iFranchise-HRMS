@@ -7,7 +7,7 @@ import {
   canManageOffers,
 } from "@/lib/recruitment/constants";
 import {
-  getCandidateById,
+  getOfferWorkspaceCandidateById,
   getRecruitmentLookups,
   listOfferQueueCandidates,
 } from "@/lib/recruitment/services/recruitment-queries";
@@ -38,7 +38,7 @@ async function OffersPageContent({ searchParams }: PageProps) {
     listOfferQueueCandidates(supabase, profile, params),
     getRecruitmentLookups(supabase, profile.employee.organizationId),
     candidateId
-      ? getCandidateById(supabase, profile.employee.organizationId, candidateId)
+      ? getOfferWorkspaceCandidateById(supabase, profile.employee.organizationId, candidateId)
       : Promise.resolve(null),
   ]);
 
