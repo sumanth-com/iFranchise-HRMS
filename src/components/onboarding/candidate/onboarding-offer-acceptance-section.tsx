@@ -7,6 +7,7 @@ import {
   Download,
   Eye,
   FileText,
+  Loader2,
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
@@ -95,7 +96,10 @@ export function OnboardingOfferAcceptanceSection({
   const [offerActionPending, setOfferActionPending] = useState<"view" | "download" | null>(null);
 
   const offerLetter: CandidatePortalOfferLetter | null = context.offerLetter;
-  const signedUploaded = Boolean(signedOfferMeta.fileName) && !signedOfferMeta.uploading;
+  const displayFileName =
+    signedOfferMeta.fileName ?? signedOfferMeta.pendingFileName ?? null;
+  const hasSignedFile = Boolean(displayFileName);
+  const isUploading = signedOfferMeta.uploading;
 
   function validatePdf(file: File): boolean {
     const isPdf =
@@ -222,7 +226,7 @@ export function OnboardingOfferAcceptanceSection({
                   dragOver
                     ? "border-primary bg-primary/5"
                     : "border-primary/30 bg-primary/[0.02]",
-                  signedOfferMeta.uploading && "pointer-events-none opacity-70",
+                  isUploading && "pointer-events-none opacity-80",
                 )}
                 onDragOver={(event) => {
                   event.preventDefault();
@@ -235,21 +239,35 @@ export function OnboardingOfferAcceptanceSection({
                   handleFile(event.dataTransfer.files?.[0]);
                 }}
               >
-                {signedUploaded ? (
+                {hasSignedFile ? (
                   <div className="space-y-3">
-                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600">
-                      <Check className="h-6 w-6" />
-                    </div>
-                    <p className="text-sm font-medium text-foreground">
-                      {signedOfferMeta.fileName}
-                    </p>
-                    <button
-                      type="button"
-                      className="text-xs font-medium text-primary underline-offset-2 hover:underline"
-                      onClick={() => fileInputRef.current?.click()}
+                    <div
+                      className={cn(
+                        "mx-auto flex h-12 w-12 items-center justify-center rounded-full",
+                        isUploading
+                          ? "bg-primary/10 text-primary"
+                          : "bg-emerald-500/10 text-emerald-600",
+                      )}
                     >
-                      Replace file
-                    </button>
+                      {isUploading ? (
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                      ) : (
+                        <Check className="h-6 w-6" />
+                      )}
+                    </div>
+                    <p className="text-sm font-medium text-foreground">{displayFileName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {isUploading ? "Uploading…" : "Signed offer letter uploaded"}
+                    </p>
+                    {!isUploading ? (
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        Replace file
+                      </button>
+                    ) : null}
                   </div>
                 ) : (
                   <>

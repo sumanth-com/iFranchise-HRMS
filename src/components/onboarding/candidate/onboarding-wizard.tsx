@@ -60,7 +60,6 @@ import {
 } from "@/lib/onboarding/employment-utils";
 import {
   canNavigateToStep,
-  canSubmitOnboarding,
   getCompletedStepIndices,
   getFirstIncompleteStepIndex,
   isOnboardingSectionComplete,
@@ -223,8 +222,52 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   >({});
   const contentScrollRef = useRef<HTMLDivElement>(null);
 
-  const completedSteps = useMemo(() => getCompletedStepIndices(context), [context]);
-  const firstIncompleteStep = useMemo(() => getFirstIncompleteStepIndex(context), [context]);
+  const contextWithOptimisticDocs = useMemo(() => {
+    const extras = Object.entries(uploadSlots)
+      .filter(([, slot]) => Boolean(slot.pendingFileName) && !slot.uploading)
+      .flatMap(([key, slot]) => {
+        const separator = key.indexOf(":");
+        if (separator <= 0) return [];
+        const documentCategory = key.slice(0, separator);
+        const documentTypeCode = key.slice(separator + 1);
+        if (
+          context.documents.some(
+            (doc) =>
+              doc.documentCategory === documentCategory &&
+              doc.documentTypeCode === documentTypeCode,
+          )
+        ) {
+          return [];
+        }
+        return [
+          {
+            id: `optimistic:${key}`,
+            documentCategory,
+            documentTypeCode,
+            fileName: slot.pendingFileName ?? "Uploaded",
+            fileSize: null,
+            reviewStatus: "pending" as const,
+            hrComment: null,
+            reviewedAt: null,
+          },
+        ];
+      });
+
+    if (extras.length === 0) return context;
+    return {
+      ...context,
+      documents: [...context.documents, ...extras],
+    };
+  }, [context, uploadSlots]);
+
+  const completedSteps = useMemo(
+    () => getCompletedStepIndices(contextWithOptimisticDocs),
+    [contextWithOptimisticDocs],
+  );
+  const firstIncompleteStep = useMemo(
+    () => getFirstIncompleteStepIndex(contextWithOptimisticDocs),
+    [contextWithOptimisticDocs],
+  );
   const liveSectionPatch = useMemo(
     () => buildLiveSectionPatch(sectionKey, sectionData, form, context.fullName),
     [sectionKey, sectionData, form, context.fullName],
@@ -232,20 +275,33 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
   function validateCurrentSection() {
     if (sectionKey === "education") {
-      return validateEducationSection(context, educationForm);
+      return validateEducationSection(contextWithOptimisticDocs, educationForm);
     }
     if (sectionKey === "employment_history") {
-      return validateEmploymentSection(context, employmentForm);
+      return validateEmploymentSection(contextWithOptimisticDocs, employmentForm);
     }
-    return validateOnboardingSection(sectionKey, context, liveSectionPatch);
+    return validateOnboardingSection(
+      sectionKey,
+      contextWithOptimisticDocs,
+      liveSectionPatch,
+    );
   }
 
   const currentValidation = useMemo(
     () => validateCurrentSection(),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- liveSectionPatch captures form + saved fields
-    [sectionKey, context, liveSectionPatch, educationForm, employmentForm],
+    [sectionKey, contextWithOptimisticDocs, liveSectionPatch, educationForm, employmentForm],
   );
-  const submitValidation = useMemo(() => canSubmitOnboarding(context), [context]);
+  const submitValidation = useMemo(() => {
+    const missing: string[] = [];
+    for (const key of ONBOARDING_WIZARD_SECTIONS) {
+      const patch = key === sectionKey ? liveSectionPatch : undefined;
+      missing.push(
+        ...validateOnboardingSection(key, contextWithOptimisticDocs, patch).missing,
+      );
+    }
+    return { valid: missing.length === 0, missing };
+  }, [contextWithOptimisticDocs, sectionKey, liveSectionPatch]);
 
   useEffect(() => {
     if (!initializedRef.current) {
@@ -470,7 +526,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
     const slot = uploadSlots[key];
     const saved = documentRecord(context, documentCategory, documentTypeCode);
     return {
-      fileName: saved?.fileName ?? null,
+      fileName: saved?.fileName ?? slot?.pendingFileName ?? null,
       uploading: Boolean(slot?.uploading),
       pendingFileName: slot?.pendingFileName ?? null,
     };
@@ -493,11 +549,30 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
         const result = await uploadCandidateDocumentAction(fd);
         if (!result.success) {
           toast.error(result.message);
+          setUploadSlots((prev) => {
+            const next = { ...prev };
+            delete next[key];
+            return next;
+          });
           return;
         }
         toast.success(`${file.name} uploaded`);
-        await onRefresh();
-      } finally {
+        // Keep the filename visible immediately; clear once server context refreshes.
+        setUploadSlots((prev) => ({
+          ...prev,
+          [key]: { uploading: false, pendingFileName: file.name },
+        }));
+        try {
+          await onRefresh();
+        } finally {
+          setUploadSlots((prev) => {
+            const next = { ...prev };
+            delete next[key];
+            return next;
+          });
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Upload failed");
         setUploadSlots((prev) => {
           const next = { ...prev };
           delete next[key];
@@ -607,7 +682,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   }
 
   function submitAll() {
-    const validation = canSubmitOnboarding(context);
+    const validation = submitValidation;
     if (!validation.valid) {
       showValidationError(validation);
       return;
