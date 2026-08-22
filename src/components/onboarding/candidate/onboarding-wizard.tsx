@@ -89,7 +89,7 @@ const SECTION_TITLES: Record<string, string> = {
   education: "Education",
   employment_history: "Previous Employment",
   bank: "Bank Details",
-  terms: "Policies & Terms",
+  terms: "Terms & conditions",
   signature: "Electronic Signature",
 };
 
@@ -153,11 +153,15 @@ function buildLiveSectionPatch(
   }
 
   if (sectionKey === "terms") {
-    const accepted =
-      draft.termsAccepted === "true" ||
-      saved.termsAccepted === true ||
-      saved.termsAccepted === "true";
-    if (accepted) patch.termsAccepted = "true";
+    if ("termsAccepted" in draft) {
+      if (draft.termsAccepted === "true") {
+        patch.termsAccepted = "true";
+      } else {
+        delete patch.termsAccepted;
+      }
+    } else if (saved.termsAccepted === true || saved.termsAccepted === "true") {
+      patch.termsAccepted = "true";
+    }
   }
 
   return patch;
@@ -370,12 +374,24 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
         return true;
       }
     }
+    if (sectionKey === "terms") {
+      const savedAccepted =
+        sectionData.termsAccepted === true || sectionData.termsAccepted === "true";
+      return termsAcceptedLive() !== savedAccepted;
+    }
     if (Object.keys(form).length === 0) return false;
     for (const [key, value] of Object.entries(form)) {
       const saved = readSectionField(sectionData[key]);
       if (value.trim() !== saved.trim()) return true;
     }
     return false;
+  }
+
+  function termsAcceptedLive(): boolean {
+    if ("termsAccepted" in form) return form.termsAccepted === "true";
+    return (
+      sectionData.termsAccepted === true || sectionData.termsAccepted === "true"
+    );
   }
 
   function personalSelectValue(
@@ -951,9 +967,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
           {sectionKey === "terms" && (
             <OnboardingTermsSection
-              accepted={
-                form.termsAccepted === "true" || sectionData.termsAccepted === true
-              }
+              accepted={termsAcceptedLive()}
               onAcceptedChange={(checked) =>
                 updateField("termsAccepted", checked ? "true" : "")
               }

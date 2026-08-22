@@ -25,7 +25,7 @@ const STEP_LABELS: Record<string, string> = {
   education: "Education",
   employment_history: "Employment",
   bank: "Bank",
-  terms: "Terms",
+  terms: "Terms & conditions",
   signature: "Signature",
 };
 
