@@ -162,6 +162,7 @@ export type CandidateListItem = {
   employeeId: string | null;
   createdAt: string;
   latestOfferStatus?: OfferStatus | null;
+  inOnboardingList?: boolean;
 };
 
 export type CandidateListResult = {
@@ -184,6 +185,7 @@ export type TimelineItem = {
 };
 
 export type CandidateDetail = CandidateListItem & {
+  onboardingCaseId?: string | null;
   timeline: TimelineItem[];
   interviews: InterviewListItem[];
   offers: OfferListItem[];

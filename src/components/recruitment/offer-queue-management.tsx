@@ -153,8 +153,8 @@ export function OfferQueueManagement({
           <h1 className="text-2xl font-semibold tracking-tight">Offers</h1>
         </SectionHelpButton>
         <p className="mt-1 text-sm text-muted-foreground">
-          Upload offer letters for candidates at offer stage and anyone in onboarding — letters
-          appear in their onboarding portal (no email is sent).
+          Upload offer letters, view stored files anytime, and add candidates to Employee Onboarding
+          when ready — no email is sent.
         </p>
       </div>
 
@@ -234,6 +234,12 @@ export function OfferQueueManagement({
                           <>
                             <span>·</span>
                             <span>{row.experienceYears} yrs</span>
+                          </>
+                        ) : null}
+                        {row.inOnboardingList ? (
+                          <>
+                            <span>·</span>
+                            <span className="font-medium text-primary">In onboarding</span>
                           </>
                         ) : null}
                       </div>

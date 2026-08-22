@@ -1,4 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { UserProfile } from "@/types/auth";
 import type {
   AnalyticsSummary,
@@ -850,19 +851,54 @@ async function loadActiveOnboardingEmails(
   const { data, error } = await supabase
     .schema("hrms")
     .from("onboarding_cases")
-    .select("personal_email")
+    .select("personal_email, status")
     .eq("organization_id", organizationId)
     .is("deleted_at", null);
 
   if (error) throw new Error(error.message);
 
+  const terminal = new Set(["cancelled", "archived", "rejected", "completed"]);
   return [
     ...new Set(
       (data ?? [])
+        .filter((row) => !terminal.has(String(row.status ?? "")))
         .map((row) => String(row.personal_email ?? "").trim())
         .filter(Boolean),
     ),
   ];
+}
+
+const ONBOARDING_TERMINAL_STATUSES = ["cancelled", "archived", "rejected", "completed"] as const;
+
+async function resolveActiveOnboardingCaseIdForEmail(
+  organizationId: string,
+  personalEmail: string,
+): Promise<string | null> {
+  const email = personalEmail.trim().toLowerCase();
+  if (!email) return null;
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .schema("hrms")
+    .from("onboarding_cases")
+    .select("id, status")
+    .eq("organization_id", organizationId)
+    .eq("personal_email", email)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  if (
+    ONBOARDING_TERMINAL_STATUSES.includes(
+      data.status as (typeof ONBOARDING_TERMINAL_STATUSES)[number],
+    )
+  ) {
+    return null;
+  }
+  return data.id;
 }
 
 async function loadOfferQueueCandidateRows(
@@ -943,6 +979,7 @@ export async function listOfferQueueCandidates(
   };
 
   const onboardingEmails = await loadActiveOnboardingEmails(supabase, organizationId);
+  const onboardingEmailSet = new Set(onboardingEmails.map((email) => email.toLowerCase()));
 
   const [offerStageRows, onboardingLinkedRows] = await Promise.all([
     loadOfferQueueCandidateRows(supabase, organizationId, {
@@ -982,7 +1019,12 @@ export async function listOfferQueueCandidates(
     .map((row) => {
       const mapped = mapCandidateRow(row);
       const latestOfferStatus = offerStatusByCandidate.get(row.id) ?? null;
-      return { ...mapped, latestOfferStatus };
+      const emailKey = mapped.email.trim().toLowerCase();
+      return {
+        ...mapped,
+        latestOfferStatus,
+        inOnboardingList: onboardingEmailSet.has(emailKey),
+      };
     })
     .filter((row) => matchesOfferQueue(row.latestOfferStatus, offerQueue));
 
@@ -1143,9 +1185,12 @@ export async function getCandidateById(
 
   const base = mapCandidateRow(data as PerfRow);
   const offers = ((offersRes.data ?? []) as PerfRow[]).map(mapOfferRow);
+  const onboardingCaseId = await resolveActiveOnboardingCaseIdForEmail(organizationId, base.email);
   return {
     ...base,
     latestOfferStatus: offers[0]?.offerStatus ?? base.latestOfferStatus,
+    inOnboardingList: Boolean(onboardingCaseId),
+    onboardingCaseId,
     timeline: ((timelineRes.data ?? []) as PerfRow[]).map((row) => ({
       id: row.id,
       eventType: row.event_type,

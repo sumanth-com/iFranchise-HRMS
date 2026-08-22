@@ -809,34 +809,8 @@ export async function createOffer(
     offerId = data.id;
   }
 
-  const candidateName =
-    [candidate.first_name, candidate.last_name].filter(Boolean).join(" ").trim() ||
-    candidate.email.split("@")[0] ||
-    "New hire";
-
-  const onboardingCaseId = await ensureOnboardingCaseFromOffer(
-    supabase,
-    profile,
-    {
-      fullName: candidateName,
-      personalEmail: candidate.email,
-      mobileNumber: candidate.phone ?? null,
-      designationId,
-      departmentId,
-      reportingManagerId,
-      employmentTypeId,
-      joiningDate: offerJoiningDate,
-      offerReferenceNumber: offerCodeValue,
-    },
-    { source: "upload" },
-  );
-
-  if (!onboardingCaseId) {
-    throw new Error("Could not add this candidate to onboarding after uploading the offer letter.");
-  }
-
   let offerLetterPath = existingDraft?.offer_letter_path ?? null;
-  let attachmentFilename = offerFile.filename;
+  const attachmentFilename = offerFile.filename;
 
   offerLetterPath = await storeOfferLetterFile(
     supabase,
@@ -871,10 +845,93 @@ export async function createOffer(
   await addTimeline(supabase, organizationId, input.candidateId, profile.userId, {
     eventType: "offer",
     title: hadLetter ? "Offer letter updated" : "Offer letter uploaded",
-    description: `${attachmentFilename} is available in the candidate onboarding portal`,
+    description: `${attachmentFilename} saved — use Add to onboarding list when ready`,
   });
 
   return offerId;
+}
+
+export async function pushCandidateToOnboarding(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  candidateId: string,
+): Promise<string> {
+  const organizationId = profile.employee.organizationId;
+  await assertManagerCandidateAccess(supabase, profile, candidateId);
+
+  const { data: candidate, error: candError } = await fromHrms(supabase, "recruitment_candidates")
+    .select(
+      `id, first_name, last_name, email, phone, stage,
+      job:job_opening_id(title, department_id, designation_id, employment_type_id, hiring_manager_id)`,
+    )
+    .eq("id", candidateId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (candError) throw new Error(candError.message);
+  if (!candidate) throw new Error("Candidate not found");
+
+  const { data: offer, error: offerError } = await fromHrms(supabase, "recruitment_offers")
+    .select(
+      `offer_code, joining_date, offer_letter_path, reporting_manager_id,
+      department_id, designation_id, employment_type_id`,
+    )
+    .eq("candidate_id", candidateId)
+    .eq("organization_id", organizationId)
+    .not("offer_letter_path", "is", null)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (offerError) throw new Error(offerError.message);
+  if (!offer?.offer_letter_path) {
+    throw new Error("Upload an offer letter before adding this candidate to onboarding.");
+  }
+
+  const job = unwrapRelation(candidate.job as PerfRow | null);
+  const candidateName =
+    [candidate.first_name, candidate.last_name].filter(Boolean).join(" ").trim() ||
+    candidate.email.split("@")[0] ||
+    "New hire";
+
+  const caseId = await ensureOnboardingCaseFromOffer(
+    supabase,
+    profile,
+    {
+      fullName: candidateName,
+      personalEmail: candidate.email,
+      mobileNumber: candidate.phone ?? null,
+      designationId: offer.designation_id ?? job?.designation_id ?? null,
+      departmentId: offer.department_id ?? job?.department_id ?? null,
+      reportingManagerId: offer.reporting_manager_id ?? job?.hiring_manager_id ?? null,
+      employmentTypeId: offer.employment_type_id ?? job?.employment_type_id ?? null,
+      joiningDate: offer.joining_date ?? null,
+      offerReferenceNumber: offer.offer_code ?? null,
+    },
+    { source: "upload" },
+  );
+
+  if (!caseId) {
+    throw new Error("Could not add this candidate to the onboarding list.");
+  }
+
+  if (candidate.stage !== "offer") {
+    await moveCandidateStage(supabase, profile, {
+      candidateId,
+      stage: "offer",
+      reason: "Added to onboarding from offer letter",
+    });
+  }
+
+  await addTimeline(supabase, organizationId, candidateId, profile.userId, {
+    eventType: "offer",
+    title: "Added to onboarding",
+    description: `${candidateName} is listed in Employee Onboarding`,
+  });
+
+  return caseId;
 }
 
 export async function deleteOfferLetter(

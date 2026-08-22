@@ -1,6 +1,7 @@
 "use client";
 
-import { FileText, Loader2, Trash2, UploadCloud, X } from "lucide-react";
+import { FileText, ListPlus, Loader2, Trash2, UploadCloud, X } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -17,8 +18,9 @@ import {
 import {
   createOfferAction,
   deleteOfferLetterAction,
+  pushCandidateToOnboardingAction,
 } from "@/lib/recruitment/actions";
-import { OFFER_STATUS_LABELS } from "@/lib/recruitment/constants";
+import { OFFER_STATUS_LABELS, RECRUITMENT_ROUTES } from "@/lib/recruitment/constants";
 import {
   assertOfferLetterFile,
   OFFER_LETTER_MAX_BYTES,
@@ -68,10 +70,15 @@ export function OfferLetterWorkspace({
           jobTitle: detail?.jobTitle,
         })
       : null);
-  const storedPdfHref =
+  const storedViewHref =
+    latestOffer?.id && hasStoredLetter && !activeFile
+      ? `/api/recruitment/offers/${latestOffer.id}/pdf?inline=1`
+      : null;
+  const storedDownloadHref =
     latestOffer?.id && hasStoredLetter && !activeFile
       ? `/api/recruitment/offers/${latestOffer.id}/pdf`
       : null;
+  const inOnboardingList = Boolean(detail?.inOnboardingList);
 
   useEffect(() => {
     if (!detail) return;
@@ -121,11 +128,29 @@ export function OfferLetterWorkspace({
 
       toast.success(
         hasStoredLetter
-          ? "Offer letter updated — available in candidate onboarding"
-          : "Offer letter uploaded — available in candidate onboarding",
+          ? "Offer letter updated and saved"
+          : "Offer letter saved — add to onboarding when ready",
       );
       setUploadedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
+      onRefresh();
+    });
+  }
+
+  function pushToOnboarding() {
+    if (!detail || !canOffer || !hasStoredLetter) {
+      toast.error("Upload an offer letter before adding to onboarding");
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await pushCandidateToOnboardingAction(detail.id);
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+
+      toast.success(`${detail.fullName} is now on the onboarding list`);
       onRefresh();
     });
   }
@@ -152,6 +177,7 @@ export function OfferLetterWorkspace({
   const statusLabel = latestOffer
     ? OFFER_STATUS_LABELS[latestOffer.offerStatus]
     : "No letter yet";
+  const onboardingStatusLabel = inOnboardingList ? "In onboarding list" : "Not in onboarding yet";
 
   if (loading && !detail) {
     return (
@@ -182,7 +208,7 @@ export function OfferLetterWorkspace({
           </p>
           <h2 className="truncate text-lg font-semibold">{detail.fullName}</h2>
           <p className="text-xs text-muted-foreground">
-            {detail.jobTitle} · {detail.email} · {statusLabel}
+            {detail.jobTitle} · {detail.email} · {statusLabel} · {onboardingStatusLabel}
           </p>
         </div>
         <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Close">
@@ -192,8 +218,8 @@ export function OfferLetterWorkspace({
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
         <p className="text-sm text-muted-foreground">
-          Upload the offer letter here. It will appear in this candidate&apos;s onboarding portal
-          under Offer Acceptance — no email is sent.
+          Upload and store the offer letter here. Use Add to onboarding list when you want this
+          person to appear under Employee Onboarding. Stored letters can be viewed anytime below.
         </p>
 
         <div className="space-y-3">
@@ -234,20 +260,28 @@ export function OfferLetterWorkspace({
                         {activeFile
                           ? `${formatBytes(activeFile.size)} · click Upload to save`
                           : hasStoredLetter
-                            ? "Available in candidate onboarding · Offer Acceptance"
+                            ? "Saved · view or download anytime"
                             : ""}
                       </p>
                     </div>
 
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {storedPdfHref ? (
+                      {storedViewHref ? (
                         <a
-                          href={storedPdfHref}
+                          href={storedViewHref}
                           target="_blank"
                           rel="noopener noreferrer"
                           className={buttonVariants({ size: "sm", variant: "secondary" })}
                         >
-                          Open file
+                          View letter
+                        </a>
+                      ) : null}
+                      {storedDownloadHref ? (
+                        <a
+                          href={storedDownloadHref}
+                          className={buttonVariants({ size: "sm", variant: "outline" })}
+                        >
+                          Download
                         </a>
                       ) : null}
                       {canOffer ? (
@@ -361,16 +395,45 @@ export function OfferLetterWorkspace({
       </div>
 
       {canOffer ? (
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t bg-muted/10 px-4 py-3">
-          <Button
-            size="sm"
-            disabled={isPending || !uploadedFile}
-            onClick={uploadLetter}
-          >
-            {isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
-            <UploadCloud className="mr-1 h-3.5 w-3.5" />
-            {hasStoredLetter ? "Upload replacement" : "Upload offer letter"}
-          </Button>
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t bg-muted/10 px-4 py-3">
+          <div className="text-xs text-muted-foreground">
+            {inOnboardingList ? (
+              <span>
+                Listed in{" "}
+                <Link href={RECRUITMENT_ROUTES.onboarding} className="font-medium text-primary hover:underline">
+                  Employee Onboarding
+                </Link>
+              </span>
+            ) : hasStoredLetter ? (
+              "Letter saved — add to onboarding when ready"
+            ) : (
+              "Upload a letter to enable onboarding"
+            )}
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {hasStoredLetter ? (
+              <Button
+                size="sm"
+                variant={inOnboardingList ? "outline" : "default"}
+                disabled={isPending}
+                onClick={pushToOnboarding}
+              >
+                {isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+                <ListPlus className="mr-1 h-3.5 w-3.5" />
+                {inOnboardingList ? "Update onboarding list" : "Add to onboarding list"}
+              </Button>
+            ) : null}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isPending || !uploadedFile}
+              onClick={uploadLetter}
+            >
+              {isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+              <UploadCloud className="mr-1 h-3.5 w-3.5" />
+              {hasStoredLetter ? "Save replacement" : "Upload offer letter"}
+            </Button>
+          </div>
         </div>
       ) : null}
 

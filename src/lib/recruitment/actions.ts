@@ -21,6 +21,7 @@ import {
   deleteOfferLetter,
   duplicateJobOpening,
   moveCandidateStage,
+  pushCandidateToOnboarding,
   scheduleInterview,
   updateJobOpening,
   updateOfferStatus,
@@ -318,6 +319,25 @@ export async function deleteOfferLetterAction(offerId: string): Promise<ActionRe
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to delete offer letter",
+    };
+  }
+}
+
+export async function pushCandidateToOnboardingAction(
+  candidateId: string,
+): Promise<ActionResult<string>> {
+  try {
+    const profile = await requireServerAnyPermission(
+      managerOrPermissions("recruitment.offer"),
+    );
+    const supabase = await getAuthenticatedSupabase();
+    const caseId = await pushCandidateToOnboarding(supabase, profile, candidateId);
+    revalidateRecruitment();
+    return { success: true, data: caseId };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to add candidate to onboarding",
     };
   }
 }
