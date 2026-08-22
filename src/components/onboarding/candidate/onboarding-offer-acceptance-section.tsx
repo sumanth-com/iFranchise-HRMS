@@ -2,13 +2,11 @@
 
 import { format, parseISO } from "date-fns";
 import {
-  ArrowUpRight,
   Check,
   CloudUpload,
   Download,
   Eye,
   FileText,
-  Headphones,
   Lock,
   Shield,
 } from "lucide-react";
@@ -132,34 +130,32 @@ export function OnboardingOfferAcceptanceSection({
   }
 
   return (
-    <div className="mx-auto grid min-w-0 max-w-6xl gap-6 lg:grid-cols-[minmax(0,1fr)_17.5rem]">
-      <div className="min-w-0 space-y-5">
-        <div className="rounded-2xl border border-border/80 bg-gradient-to-br from-primary/5 via-background to-background p-5 sm:p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex min-w-0 items-start gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <FileText className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 space-y-1">
-                <h3 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
-                  Offer Letter & Signature
-                </h3>
-                <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                  Please download the offer letter provided by HR, sign it, and upload the signed
-                  copy below.
-                </p>
-              </div>
+    <div className="grid min-w-0 w-full gap-5 lg:grid-cols-[minmax(0,1fr)_16.5rem] lg:items-stretch">
+      <div className="flex min-w-0 flex-col gap-5">
+        <div className="w-full rounded-2xl border border-border/80 bg-gradient-to-br from-primary/5 via-background to-background p-5 sm:p-6">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <FileText className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1 space-y-1">
+              <h3 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+                Offer Letter & Signature
+              </h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Please download the offer letter provided by HR, sign it, and upload the signed
+                copy below.
+              </p>
             </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+        <div className="w-full rounded-2xl border border-border bg-card p-4 sm:p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-start gap-3">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <FileText className="h-4 w-4" />
               </div>
-              <div className="min-w-0 space-y-1">
+              <div className="min-w-0 flex-1 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-semibold text-foreground">Offer Letter Provided by HR</p>
                   {offerLetter ? (
@@ -184,7 +180,7 @@ export function OnboardingOfferAcceptanceSection({
               </div>
             </div>
 
-            <div className="flex shrink-0 flex-wrap gap-2">
+            <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
               <Button
                 type="button"
                 variant="outline"
@@ -210,7 +206,7 @@ export function OnboardingOfferAcceptanceSection({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+        <div className="w-full rounded-2xl border border-border bg-card p-4 sm:p-5">
           <div className="space-y-1">
             <h3 className="text-base font-semibold text-foreground">Upload Signed Offer Letter</h3>
             <p className="text-sm text-muted-foreground">
@@ -218,10 +214,10 @@ export function OnboardingOfferAcceptanceSection({
             </p>
           </div>
 
-          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_14rem]">
+          <div className="mt-4 space-y-4">
             <div
               className={cn(
-                "flex min-h-[220px] flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors",
+                "flex w-full min-h-[220px] flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors",
                 dragOver
                   ? "border-primary bg-primary/5"
                   : "border-primary/30 bg-primary/[0.02]",
@@ -287,11 +283,11 @@ export function OnboardingOfferAcceptanceSection({
               />
             </div>
 
-            <div className="space-y-3">
-              <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
-                <div className="flex items-start gap-2">
+            <div className="flex w-full flex-col gap-3">
+              <div className="w-full rounded-xl border border-primary/20 bg-primary/5 p-3.5">
+                <div className="flex items-start gap-2.5">
                   <Shield className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-xs font-semibold text-foreground">Important</p>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                       Please ensure the document is clear and all pages are included.
@@ -299,16 +295,18 @@ export function OnboardingOfferAcceptanceSection({
                   </div>
                 </div>
               </div>
-              <div className="flex items-start gap-2 rounded-xl border border-border bg-muted/20 p-3">
-                <Lock className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  Your document is secure and only visible to HR.
-                </p>
+              <div className="w-full rounded-xl border border-border bg-muted/20 p-3.5">
+                <div className="flex items-start gap-2.5">
+                  <Lock className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <p className="min-w-0 text-xs leading-relaxed text-muted-foreground">
+                    Your document is secure and only visible to HR.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
 
-          <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/15 p-4">
+          <label className="mt-4 flex w-full cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/15 p-4">
             <input
               type="checkbox"
               className="mt-0.5 size-4 shrink-0 accent-primary"
@@ -326,13 +324,13 @@ export function OnboardingOfferAcceptanceSection({
         </div>
       </div>
 
-      <aside className="space-y-4">
-        <div className="rounded-2xl border border-border bg-card p-4">
+      <aside className="flex min-h-0 min-w-0 flex-col">
+        <div className="flex h-full min-h-0 flex-1 flex-col rounded-2xl border border-border bg-card p-4">
           <p className="text-center text-sm font-semibold text-foreground">Onboarding Progress</p>
-          <div className="mt-4">
+          <div className="mt-4 shrink-0">
             <ProgressRing percent={context.completionPercent} />
           </div>
-          <ul className="mt-4 space-y-2">
+          <ul className="mt-4 min-h-0 flex-1 space-y-2">
             {ONBOARDING_WIZARD_SECTIONS.map((key, index) => {
               const isComplete = completedSteps.includes(index);
               const isCurrent = index === activeStep;
@@ -366,27 +364,6 @@ export function OnboardingOfferAcceptanceSection({
               );
             })}
           </ul>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Headphones className="h-4 w-4" />
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-foreground">Need Help?</p>
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Contact our HR team if you have any questions.
-              </p>
-              <a
-                href="mailto:hr@ifranchise.com"
-                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-input bg-background px-3 text-xs font-medium hover:bg-muted/40"
-              >
-                Contact HR
-                <ArrowUpRight className="h-3.5 w-3.5" />
-              </a>
-            </div>
-          </div>
         </div>
       </aside>
     </div>
