@@ -3,13 +3,11 @@
 import {
   Briefcase,
   Check,
-  FileText,
   GraduationCap,
   IdCard,
   Landmark,
   Lock,
   PenLine,
-  Receipt,
   ScrollText,
   User,
   type LucideIcon,
@@ -27,9 +25,7 @@ const STEP_LABELS: Record<string, string> = {
   education: "Education",
   employment_history: "Employment",
   bank: "Bank",
-  tax: "Tax",
-  policies: "Policies",
-  agreements: "Agreements",
+  terms: "Terms",
   signature: "Signature",
 };
 
@@ -39,9 +35,7 @@ const STEP_ICONS: Record<string, LucideIcon> = {
   education: GraduationCap,
   employment_history: Briefcase,
   bank: Landmark,
-  tax: Receipt,
-  policies: ScrollText,
-  agreements: FileText,
+  terms: ScrollText,
   signature: PenLine,
 };
 
@@ -98,7 +92,7 @@ export function OnboardingStepNav({
   }, [activeStep]);
 
   return (
-    <div className="sticky top-[3.25rem] z-20 w-full max-w-full border-b border-border bg-card/95 backdrop-blur-sm dark:bg-card/90">
+    <div className="w-full max-w-full border-b border-border">
       <div
         ref={scrollRef}
         className="w-full max-w-full overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"

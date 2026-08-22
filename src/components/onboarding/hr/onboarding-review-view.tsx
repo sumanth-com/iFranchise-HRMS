@@ -61,9 +61,7 @@ const SECTION_LABELS: Record<string, string> = {
   education: "Education",
   employment_history: "Previous employment",
   bank: "Bank details",
-  tax: "Tax information",
-  policies: "Company policies",
-  agreements: "Employment agreements",
+  terms: "Policies & terms",
   signature: "Electronic signature",
 };
 

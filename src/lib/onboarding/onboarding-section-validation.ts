@@ -65,6 +65,16 @@ function hasUploadedDocument(
   );
 }
 
+function hasLegacyTermsAcknowledgement(context: CandidatePortalContext): boolean {
+  const policiesComplete = ONBOARDING_POLICY_DOCUMENTS.every((policy) =>
+    context.policyAcknowledgements.includes(policy.code),
+  );
+  const agreementsComplete = ONBOARDING_AGREEMENT_TYPES.every((agreement) =>
+    context.agreements.some((item) => item.agreementType === agreement.code),
+  );
+  return policiesComplete && agreementsComplete;
+}
+
 export type SectionValidationResult = {
   valid: boolean;
   missing: string[];
@@ -289,24 +299,16 @@ export function validateOnboardingSection(
       }
       break;
 
-    case "tax":
-      break;
-
-    case "policies":
-      for (const policy of ONBOARDING_POLICY_DOCUMENTS) {
-        if (!context.policyAcknowledgements.includes(policy.code)) {
-          missing.push(policy.label);
-        }
+    case "terms": {
+      const accepted =
+        data.termsAccepted === true ||
+        data.termsAccepted === "true" ||
+        hasLegacyTermsAcknowledgement(context);
+      if (!accepted) {
+        missing.push("Terms and conditions acknowledgement");
       }
       break;
-
-    case "agreements":
-      for (const agreement of ONBOARDING_AGREEMENT_TYPES) {
-        if (!context.agreements.some((a) => a.agreementType === agreement.code)) {
-          missing.push(agreement.label);
-        }
-      }
-      break;
+    }
 
     case "signature":
       if (!context.signature) missing.push("Electronic signature");
@@ -321,7 +323,16 @@ export function isOnboardingSectionComplete(
   context: CandidatePortalContext,
 ): boolean {
   const saved = context.sections.find((s) => s.sectionKey === sectionKey);
-  return Boolean(saved?.completedAt);
+  if (saved?.completedAt) return true;
+  if (sectionKey === "terms") {
+    const data = saved?.data ?? {};
+    return (
+      data.termsAccepted === true ||
+      data.termsAccepted === "true" ||
+      hasLegacyTermsAcknowledgement(context)
+    );
+  }
+  return false;
 }
 
 export function getCompletedStepIndices(context: CandidatePortalContext): number[] {

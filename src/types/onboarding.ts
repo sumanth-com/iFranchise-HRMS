@@ -57,9 +57,7 @@ export const ONBOARDING_WIZARD_SECTIONS = [
   "education",
   "employment_history",
   "bank",
-  "tax",
-  "policies",
-  "agreements",
+  "terms",
   "signature",
 ] as const;
 

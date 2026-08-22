@@ -7,7 +7,7 @@ export const EMPLOYMENT_TYPE_OPTIONS = [
   "Internship",
 ] as const;
 
-export const EMPLOYMENT_ENTRY_DOCUMENTS = [
+export const EMPLOYMENT_MANDATORY_DOCUMENTS = [
   {
     code: "experience_relieving",
     label: "Experience / Relieving Letter",
@@ -18,24 +18,29 @@ export const EMPLOYMENT_ENTRY_DOCUMENTS = [
     label: "Offer / Appointment Letter",
     required: true,
   },
+] as const;
+
+export const EMPLOYMENT_OPTIONAL_DOCUMENTS = [
   {
     code: "payslips_3months",
     label: "Last 3 Months' Payslips",
-    hint: "if your company requires them",
-    required: true,
+    required: false,
   },
   {
     code: "fnf_settlement",
     label: "Full & Final Settlement Letter",
-    hint: "if applicable",
-    required: true,
+    required: false,
   },
   {
     code: "employment_verification",
     label: "Employment Verification Letter",
-    hint: "if applicable",
-    required: true,
+    required: false,
   },
+] as const;
+
+export const EMPLOYMENT_ENTRY_DOCUMENTS = [
+  ...EMPLOYMENT_MANDATORY_DOCUMENTS,
+  ...EMPLOYMENT_OPTIONAL_DOCUMENTS,
 ] as const;
 
 export type EmploymentEntryDocumentCode =

@@ -10,6 +10,7 @@ import { OnboardingAddressFields } from "@/components/onboarding/candidate/onboa
 import { OnboardingDocumentUpload } from "@/components/onboarding/candidate/onboarding-document-upload";
 import { OnboardingEducationSection } from "@/components/onboarding/candidate/onboarding-education-section";
 import { OnboardingEmploymentSection } from "@/components/onboarding/candidate/onboarding-employment-section";
+import { OnboardingTermsSection } from "@/components/onboarding/candidate/onboarding-terms-section";
 import { OnboardingPhoneField } from "@/components/onboarding/candidate/onboarding-phone-field";
 import { OnboardingSignature } from "@/components/onboarding/candidate/onboarding-signature";
 import { OnboardingStepNav } from "@/components/onboarding/candidate/onboarding-step-nav";
@@ -82,9 +83,7 @@ const SECTION_TITLES: Record<string, string> = {
   education: "Education",
   employment_history: "Previous Employment",
   bank: "Bank Details",
-  tax: "Tax Information",
-  policies: "Company Policies",
-  agreements: "Employment Agreements",
+  terms: "Policies & Terms",
   signature: "Electronic Signature",
 };
 
@@ -197,6 +196,16 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
     }
     if (sectionKey === "employment_history") {
       return { ...sectionData, ...employmentFormToPayload(employmentForm) };
+    }
+    if (sectionKey === "terms") {
+      return {
+        ...sectionData,
+        termsAccepted: form.termsAccepted === "true",
+        acceptedAt:
+          form.termsAccepted === "true"
+            ? new Date().toISOString()
+            : sectionData.acceptedAt ?? null,
+      };
     }
     return { ...sectionData, ...form };
   }
@@ -314,11 +323,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   }
 
   async function markSectionCompleteIfNeeded() {
-    if (
-      sectionKey === "policies" ||
-      sectionKey === "agreements" ||
-      sectionKey === "signature"
-    ) {
+    if (sectionKey === "signature") {
       const result = await saveCandidateSectionAction({
         caseId: context.caseId,
         sectionKey,
@@ -327,6 +332,23 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
       });
       if (!result.success) throw new Error(result.message);
     }
+  }
+
+  async function persistTermsAcknowledgements() {
+    const policyCodes = ONBOARDING_POLICY_DOCUMENTS.map((policy) => policy.code);
+    const agreementTypes = ONBOARDING_AGREEMENT_TYPES.map((agreement) => agreement.code);
+
+    const policyResult = await saveCandidatePoliciesAction({
+      caseId: context.caseId,
+      policyCodes,
+    });
+    if (!policyResult.success) throw new Error(policyResult.message);
+
+    const agreementResult = await saveCandidateAgreementsAction({
+      caseId: context.caseId,
+      agreementTypes,
+    });
+    if (!agreementResult.success) throw new Error(agreementResult.message);
   }
 
   function goNext() {
@@ -341,8 +363,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
       return;
     }
 
-    const isFormSection =
-      sectionKey !== "policies" && sectionKey !== "agreements" && sectionKey !== "signature";
+    const isFormSection = sectionKey !== "signature";
 
     startTransition(async () => {
       try {
@@ -357,6 +378,9 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           if (!result.success) {
             toast.error(result.message);
             return;
+          }
+          if (sectionKey === "terms") {
+            await persistTermsAcknowledgements();
           }
         } else {
           await markSectionCompleteIfNeeded();
@@ -416,18 +440,20 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   const isLastStep = step === ONBOARDING_WIZARD_SECTIONS.length - 1;
 
   return (
-    <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-1 flex-col">
+    <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-1 flex-col pb-2">
       <div className="flex min-w-0 flex-1 flex-col rounded-2xl border border-border bg-card shadow-lg shadow-black/5 ring-1 ring-border/50 dark:shadow-black/25">
-        <OnboardingStepNav
-          activeStep={step}
-          completedSteps={completedSteps}
-          context={context}
-          onStepChange={goToStep}
-        />
+        <div className="sticky top-[3.25rem] z-20 shrink-0 rounded-t-2xl bg-card/95 backdrop-blur-sm dark:bg-card/90">
+          <OnboardingStepNav
+            activeStep={step}
+            completedSteps={completedSteps}
+            context={context}
+            onStepChange={goToStep}
+          />
+        </div>
 
         <div
           key={`${sectionKey}-${stepAnimKey}`}
-          className="onboarding-section-enter min-w-0 overflow-x-hidden px-4 py-4 sm:px-6 sm:py-5"
+          className="onboarding-section-enter min-w-0 overflow-x-hidden px-4 py-4 pb-24 sm:px-6 sm:py-5 sm:pb-24"
         >
           <div className="mb-4 flex items-center justify-between gap-3 border-b border-border/60 pb-3">
             <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-0.5">
@@ -662,106 +688,15 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
             </div>
           )}
 
-          {sectionKey === "tax" && (
-            <div className="mx-auto max-w-lg space-y-4">
-              <p className="text-center text-sm text-muted-foreground">
-                Optional — add tax details if you have them. You can skip this section.
-              </p>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {[
-                  { key: "taxPan", label: "PAN" },
-                  { key: "taxAadhaar", label: "Aadhaar" },
-                  { key: "taxDeclaration", label: "Tax declaration" },
-                ].map(({ key, label }) => (
-                  <div key={key} className="space-y-1.5 sm:col-span-2 last:sm:col-span-1">
-                    <FieldLabel label={label} />
-                    <Input
-                      className={wizardInputClassName}
-                      value={form[key] ?? String(sectionData[key] ?? "")}
-                      onChange={(e) => updateField(key, e.target.value)}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {sectionKey === "policies" && (
-            <div className="mx-auto max-w-2xl space-y-3">
-              <p className="text-center text-sm text-muted-foreground">
-                Please read and acknowledge each company policy to continue.
-              </p>
-              {ONBOARDING_POLICY_DOCUMENTS.map((policy) => {
-                const checked = context.policyAcknowledgements.includes(policy.code);
-                return (
-                  <label
-                    key={policy.code}
-                    className="flex items-start gap-3 rounded-xl border bg-muted/20 p-4 text-sm transition-colors hover:bg-muted/30"
-                  >
-                    <input
-                      type="checkbox"
-                      className="mt-0.5"
-                      checked={checked}
-                      onChange={(e) => {
-                        const codes = e.target.checked
-                          ? [...context.policyAcknowledgements, policy.code]
-                          : context.policyAcknowledgements.filter((c) => c !== policy.code);
-                        startTransition(async () => {
-                          const result = await saveCandidatePoliciesAction({
-                            caseId: context.caseId,
-                            policyCodes: codes,
-                          });
-                          if (!result.success) toast.error(result.message);
-                          else onRefresh();
-                        });
-                      }}
-                    />
-                    <span>I have read and acknowledge the {policy.label}</span>
-                  </label>
-                );
-              })}
-            </div>
-          )}
-
-          {sectionKey === "agreements" && (
-            <div className="mx-auto max-w-2xl space-y-3">
-              <p className="text-center text-sm text-muted-foreground">
-                Please accept each agreement to continue.
-              </p>
-              {ONBOARDING_AGREEMENT_TYPES.map((agreement) => {
-                const accepted = context.agreements.some(
-                  (a) => a.agreementType === agreement.code,
-                );
-                return (
-                  <label
-                    key={agreement.code}
-                    className="flex items-start gap-3 rounded-xl border bg-muted/20 p-4 text-sm transition-colors hover:bg-muted/30"
-                  >
-                    <input
-                      type="checkbox"
-                      className="mt-0.5"
-                      checked={accepted}
-                      onChange={(e) => {
-                        const types = e.target.checked
-                          ? [...context.agreements.map((a) => a.agreementType), agreement.code]
-                          : context.agreements
-                              .map((a) => a.agreementType)
-                              .filter((c) => c !== agreement.code);
-                        startTransition(async () => {
-                          const result = await saveCandidateAgreementsAction({
-                            caseId: context.caseId,
-                            agreementTypes: types,
-                          });
-                          if (!result.success) toast.error(result.message);
-                          else onRefresh();
-                        });
-                      }}
-                    />
-                    <span>I accept the {agreement.label}</span>
-                  </label>
-                );
-              })}
-            </div>
+          {sectionKey === "terms" && (
+            <OnboardingTermsSection
+              accepted={
+                form.termsAccepted === "true" || sectionData.termsAccepted === true
+              }
+              onAcceptedChange={(checked) =>
+                updateField("termsAccepted", checked ? "true" : "")
+              }
+            />
           )}
 
           {sectionKey === "signature" && (
@@ -784,9 +719,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
             </div>
           )}
 
-          {sectionKey !== "policies" &&
-            sectionKey !== "agreements" &&
-            sectionKey !== "signature" && (
+          {sectionKey !== "signature" && (
               <div className="mt-4 flex justify-center">
                 <Button
                   variant="outline"
@@ -800,7 +733,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
             )}
         </div>
 
-        <div className="sticky bottom-0 z-10 flex min-w-0 shrink-0 flex-col gap-2 overflow-x-hidden border-t border-border bg-card/95 px-4 py-3 backdrop-blur-sm dark:bg-card/90 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="sticky bottom-0 z-10 flex min-w-0 shrink-0 flex-col gap-2 rounded-b-2xl border-t border-border bg-card/95 px-4 py-3 shadow-[0_-4px_24px_-12px_rgba(0,0,0,0.12)] backdrop-blur-sm dark:bg-card/90 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <Button
             variant="outline"
             disabled={step === 0 || isPending}

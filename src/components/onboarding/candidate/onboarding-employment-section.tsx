@@ -10,7 +10,8 @@ import { OnboardingEducationSelect } from "@/components/onboarding/candidate/onb
 import {
   computeEmploymentDuration,
   createEmptyEmploymentEntry,
-  EMPLOYMENT_ENTRY_DOCUMENTS,
+  EMPLOYMENT_MANDATORY_DOCUMENTS,
+  EMPLOYMENT_OPTIONAL_DOCUMENTS,
   EMPLOYMENT_TYPE_OPTIONS,
   employmentDocumentTypeCode,
   type OnboardingEmploymentEntry,
@@ -115,22 +116,27 @@ export function OnboardingEmploymentSection({
     }));
   }
 
-  function renderUpload(entryId: string, doc: (typeof EMPLOYMENT_ENTRY_DOCUMENTS)[number]) {
+  function renderUpload(
+    entryId: string,
+    doc:
+      | (typeof EMPLOYMENT_MANDATORY_DOCUMENTS)[number]
+      | (typeof EMPLOYMENT_OPTIONAL_DOCUMENTS)[number],
+    className?: string,
+  ) {
     const code = employmentDocumentTypeCode(entryId, doc.code);
     const meta = getUploadMeta(code);
-    const label =
-      "hint" in doc && doc.hint ? `${doc.label} — ${doc.hint}` : doc.label;
     return (
-      <OnboardingDocumentUpload
-        key={code}
-        variant="card"
-        label={label}
-        required={doc.required}
-        fileName={meta.fileName}
-        uploading={meta.uploading}
-        pendingFileName={meta.pendingFileName}
-        onSelectFile={(file) => onUpload(code, file)}
-      />
+      <div key={code} className={cn("min-w-0", className)}>
+        <OnboardingDocumentUpload
+          variant="card"
+          label={doc.label}
+          required={doc.required}
+          fileName={meta.fileName}
+          uploading={meta.uploading}
+          pendingFileName={meta.pendingFileName}
+          onSelectFile={(file) => onUpload(code, file)}
+        />
+      </div>
     );
   }
 
@@ -290,14 +296,18 @@ export function OnboardingEmploymentSection({
               </div>
 
               <SectionHeading title="Previous Employment Documents" />
-              <div className="grid min-w-0 gap-3 lg:grid-cols-3">
-                {EMPLOYMENT_ENTRY_DOCUMENTS.slice(0, 3).map((doc) =>
-                  renderUpload(entry.id, doc),
+              <div className="mx-auto flex w-full max-w-2xl flex-wrap justify-center gap-3">
+                {EMPLOYMENT_MANDATORY_DOCUMENTS.map((doc) =>
+                  renderUpload(entry.id, doc, "w-full max-w-[320px] sm:w-[calc(50%-0.375rem)]"),
                 )}
               </div>
-              <div className="grid min-w-0 gap-3 lg:grid-cols-3">
-                {EMPLOYMENT_ENTRY_DOCUMENTS.slice(3).map((doc) =>
-                  renderUpload(entry.id, doc),
+              <div className="mx-auto flex w-full max-w-4xl flex-wrap justify-center gap-3">
+                {EMPLOYMENT_OPTIONAL_DOCUMENTS.map((doc) =>
+                  renderUpload(
+                    entry.id,
+                    doc,
+                    "w-full max-w-[280px] sm:w-[calc(33.333%-0.5rem)]",
+                  ),
                 )}
               </div>
             </div>
