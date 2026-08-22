@@ -14,6 +14,8 @@ export type OnboardingInvitationEmailParams = {
   inviteUrl: string;
   expiryLabel: string;
   joiningDate?: string | null;
+  /** When false, joining date is omitted (e.g. invitation resend). Defaults to true. */
+  includeJoiningDate?: boolean;
   designationName?: string | null;
   departmentName?: string | null;
   workLocationName?: string | null;
@@ -31,10 +33,11 @@ function formatJoiningDate(value: string | null | undefined) {
 }
 
 function buildDetailRows(params: OnboardingInvitationEmailParams) {
-  const rows = [
-    { label: "Candidate email", value: params.personalEmail },
-    { label: "Joining date", value: formatJoiningDate(params.joiningDate) },
-  ];
+  const rows = [{ label: "Candidate email", value: params.personalEmail }];
+
+  if (params.includeJoiningDate !== false) {
+    rows.push({ label: "Joining date", value: formatJoiningDate(params.joiningDate) });
+  }
 
   if (params.designationName) rows.push({ label: "Designation", value: params.designationName });
   if (params.departmentName) rows.push({ label: "Department", value: params.departmentName });
@@ -72,12 +75,14 @@ export function renderOnboardingInvitationEmail(params: OnboardingInvitationEmai
   text: string;
 } {
   const firstName = params.candidateName.trim().split(/\s+/)[0] ?? "there";
+  const includeJoiningDate = params.includeJoiningDate !== false;
+  const introParagraph = includeJoiningDate
+    ? `Congratulations on your upcoming journey with <strong>${siteConfig.name}</strong>. To help us prepare for your joining, please complete your secure pre-joining onboarding before your start date.`
+    : `Please complete your secure pre-joining onboarding with <strong>${siteConfig.name}</strong>. Use the link below to continue where you left off or start fresh with a new secure session.`;
 
   const content = `
     ${renderParagraph(`Dear ${firstName},`)}
-    ${renderParagraph(
-      `Congratulations on your upcoming journey with <strong>${siteConfig.name}</strong>. To help us prepare for your joining, please complete your secure pre-joining onboarding before your start date.`,
-    )}
+    ${renderParagraph(introParagraph)}
     ${renderDetailTable(buildDetailRows(params))}
   <div style="margin:28px 0 4px;text-align:center;">
     <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:#111827;text-transform:uppercase;letter-spacing:0.06em;">
@@ -105,9 +110,13 @@ export function renderOnboardingInvitationEmail(params: OnboardingInvitationEmai
 
   const html = renderBrandedEmail({
     title: "Complete your pre-joining onboarding",
-    preheader: `Action required — complete onboarding before ${formatJoiningDate(params.joiningDate)}`,
+    preheader: includeJoiningDate
+      ? `Action required — complete onboarding before ${formatJoiningDate(params.joiningDate)}`
+      : "Action required — complete your secure pre-joining onboarding",
     heading: "Welcome to the team",
-    subheading: "Secure pre-joining onboarding invitation",
+    subheading: includeJoiningDate
+      ? "Secure pre-joining onboarding invitation"
+      : "Secure onboarding invitation",
     contentHtml: content,
     footerNote: `${siteConfig.name} · Confidential onboarding communication`,
   });
@@ -116,7 +125,7 @@ export function renderOnboardingInvitationEmail(params: OnboardingInvitationEmai
     `Dear ${firstName},`,
     "",
     `You have been invited to complete pre-joining onboarding with ${siteConfig.name}.`,
-    `Joining date: ${formatJoiningDate(params.joiningDate)}`,
+    includeJoiningDate ? `Joining date: ${formatJoiningDate(params.joiningDate)}` : "",
     params.designationName ? `Designation: ${params.designationName}` : "",
     params.departmentName ? `Department: ${params.departmentName}` : "",
     params.workLocationName ? `Work location: ${params.workLocationName}` : "",

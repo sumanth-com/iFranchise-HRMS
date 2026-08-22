@@ -544,6 +544,7 @@ export async function sendOnboardingInvitation(
     inviteUrl,
     expiryLabel,
     joiningDate: detail.joiningDate,
+    includeJoiningDate: !detail.invitationSentAt && detail.status === "draft",
     designationName: detail.designationName,
     departmentName: detail.departmentName,
     workLocationName: detail.workLocationName,

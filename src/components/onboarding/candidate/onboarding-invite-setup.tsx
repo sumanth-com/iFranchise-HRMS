@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { Check, Eye, EyeOff, LogIn, Lock, Mail } from "lucide-react";
+import { Check, Eye, EyeOff, LogIn, Lock, Mail, UserPlus } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -70,14 +70,16 @@ function CheckItem({ met, label }: { met: boolean; label: string }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 text-[11px]",
-        met ? "text-emerald-700" : "text-muted-foreground",
+        "inline-flex items-center gap-1.5 text-[11px] font-medium",
+        met ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground",
       )}
     >
       <span
         className={cn(
           "flex h-3.5 w-3.5 items-center justify-center rounded-full border",
-          met ? "border-emerald-500 bg-emerald-500 text-white" : "border-border",
+          met
+            ? "border-emerald-500 bg-emerald-500 text-white dark:border-emerald-400 dark:bg-emerald-400"
+            : "border-border bg-background",
         )}
       >
         {met ? <Check className="h-2 w-2" strokeWidth={3} /> : null}
@@ -103,6 +105,9 @@ function Field({
     </div>
   );
 }
+
+const inputClassName =
+  "h-10 bg-background pr-9 text-sm text-foreground caret-foreground placeholder:text-muted-foreground dark:bg-background dark:text-foreground";
 
 export function OnboardingInviteSetup({
   token,
@@ -147,7 +152,7 @@ export function OnboardingInviteSetup({
   const firstName = fullName.trim().split(/\s+/)[0] ?? fullName;
 
   return (
-    <div className="flex w-full max-w-md flex-col overflow-hidden rounded-2xl border border-border/70 bg-card shadow-lg shadow-slate-900/[0.05] ring-1 ring-black/[0.03]">
+    <div className="flex w-full max-w-md flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-lg shadow-black/5 ring-1 ring-border/50 dark:shadow-black/25">
       <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-5 py-5 text-center text-white sm:px-6">
         <div className="mx-auto flex max-w-sm flex-col items-center gap-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15">
@@ -167,7 +172,7 @@ export function OnboardingInviteSetup({
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 px-5 py-5 sm:px-6">
+      <div className="flex flex-col gap-4 bg-card px-5 py-5 sm:px-6">
         <Field label="Password">
           <div className="relative">
             <Input
@@ -177,7 +182,7 @@ export function OnboardingInviteSetup({
               placeholder="Min. 8 characters"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="h-10 pr-9 text-sm"
+              className={inputClassName}
               autoComplete="new-password"
             />
             <button
@@ -191,10 +196,16 @@ export function OnboardingInviteSetup({
           </div>
         </Field>
 
-        <div className="rounded-lg border bg-slate-50/80 px-3 py-2.5">
-          <div className="flex items-center justify-between gap-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            <span>Strength</span>
-            <span className={cn(lengthMet ? "text-emerald-600" : "text-muted-foreground")}>
+        <div className="rounded-lg border border-border bg-muted/50 px-3 py-2.5 dark:bg-muted/30">
+          <div className="flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <span className="text-foreground/80">Strength</span>
+            <span
+              className={cn(
+                lengthMet
+                  ? "text-emerald-700 dark:text-emerald-400"
+                  : "text-muted-foreground",
+              )}
+            >
               {strength.label}
             </span>
           </div>
@@ -224,9 +235,10 @@ export function OnboardingInviteSetup({
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className={cn(
-                "h-10 pr-9 text-sm transition-colors",
-                confirmPassword && !passwordsMatch && "border-red-300",
-                passwordsMatch && "border-emerald-400",
+                inputClassName,
+                "transition-colors",
+                confirmPassword && !passwordsMatch && "border-red-400 dark:border-red-500",
+                passwordsMatch && "border-emerald-500 dark:border-emerald-400",
               )}
               autoComplete="new-password"
             />
@@ -257,6 +269,16 @@ export function OnboardingInviteSetup({
           >
             <LogIn className="h-3 w-3" />
             Sign in
+          </Link>
+        </p>
+        <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
+          No account?{" "}
+          <Link
+            href={ONBOARDING_ROUTES.signUp}
+            className="inline-flex items-center gap-1 font-semibold text-primary hover:underline"
+          >
+            <UserPlus className="h-3 w-3" />
+            Sign up
           </Link>
         </p>
       </div>

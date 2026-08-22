@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/common/button";
@@ -38,6 +38,11 @@ export function MobileSidebar() {
     navigation,
   );
 
+  const firstSectionName = useMemo(
+    () => navigation.find((item) => Boolean(item.section))?.section,
+    [navigation],
+  );
+
   useEffect(() => {
     if (!sectionsReady || !activeHref) return;
     const activeItem = navigation.find((item) => item.href === activeHref);
@@ -58,11 +63,10 @@ export function MobileSidebar() {
             const Icon = item.icon;
             const prevSection = index > 0 ? navigation[index - 1]?.section : undefined;
             const showSection = item.section && item.section !== prevSection;
-            const sectionOpen = !sectionsReady
-              ? true
-              : item.section
-                ? isSectionOpen(item.section)
-                : true;
+            const sectionOpen =
+              !sectionsReady || !item.section ? true : isSectionOpen(item.section);
+            const isFirstSection =
+              Boolean(showSection) && item.section === firstSectionName;
 
             return (
               <div key={`${item.section ?? ""}-${item.href}`} className="shrink-0">
@@ -71,8 +75,10 @@ export function MobileSidebar() {
                     type="button"
                     onClick={() => toggleSection(item.section!)}
                     className={cn(
-                      "mb-2 mt-4 flex w-full items-center justify-between border-t border-border/60 px-3 pt-4 text-left text-[15px] font-semibold text-foreground dark:border-white/15 dark:text-white",
-                      index === 0 && "mt-0 border-t-0 pt-0",
+                      "mb-2 flex w-full items-center justify-between px-3 text-left text-[15px] font-semibold text-foreground dark:text-white",
+                      isFirstSection
+                        ? "mt-0 border-t-0 pt-0"
+                        : "mt-4 border-t border-border/60 pt-4 dark:border-white/15",
                     )}
                     aria-expanded={sectionOpen}
                   >

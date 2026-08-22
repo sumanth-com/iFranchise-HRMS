@@ -37,6 +37,7 @@ export const ONBOARDING_ROUTES = {
   hrDetail: (id: string) => `/dashboard/recruitment/onboarding/${id}`,
   invite: (token: string) => `/onboarding/invite/${token}`,
   login: "/onboarding/login",
+  signUp: "/onboarding/sign-up",
   portal: "/onboarding/portal",
 } as const;
 

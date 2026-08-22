@@ -1,3 +1,5 @@
+import type { AssetActivityFilterValue } from "@/lib/assets/constants";
+
 export type ReportExportFormat = "csv" | "excel" | "pdf";
 export type ReportScheduleFrequency =
   | "daily"
@@ -74,6 +76,8 @@ export type ReportFilters = {
   employeeId?: string;
   leaveTypeId?: string;
   status?: string;
+  /** Company Assets activity action (reports module). */
+  assetAction?: AssetActivityFilterValue | string;
   month?: number;
   year?: number;
   reportKey?: ReportKey;

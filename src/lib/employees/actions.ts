@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { toUserFriendlyError } from "@/lib/errors/user-messages";
 import { createClient } from "@/lib/supabase/server";
 import {
   requireAuthenticatedProfile,
@@ -192,8 +193,7 @@ export async function createEmployeeAction(
   } catch (error) {
     return {
       success: false,
-      message:
-        error instanceof Error ? error.message : "Failed to create employee",
+      message: toUserFriendlyError(error, "Failed to create employee"),
     };
   }
 }
@@ -221,8 +221,7 @@ export async function updateEmployeeAction(
   } catch (error) {
     return {
       success: false,
-      message:
-        error instanceof Error ? error.message : "Failed to update employee",
+      message: toUserFriendlyError(error, "Failed to update employee"),
     };
   }
 }
@@ -804,8 +803,7 @@ export async function updateEmployeeSelfProfileAction(
   } catch (error) {
     return {
       success: false,
-      message:
-        error instanceof Error ? error.message : "Failed to update profile",
+      message: toUserFriendlyError(error, "Failed to update profile"),
     };
   }
 }

@@ -74,7 +74,7 @@ export function OnboardingInviteUnavailable({ reason }: OnboardingInviteUnavaila
               <LogIn className="mr-2 h-4 w-4" />
               Sign in to onboarding portal
             </Link>
-            <div className="rounded-xl border bg-slate-50/90 p-4 text-left">
+            <div className="rounded-xl border border-border bg-muted/40 p-4 text-left dark:bg-muted/25">
               <div className="flex items-start gap-3">
                 <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                 <div className="space-y-1 text-xs text-muted-foreground">
@@ -85,7 +85,7 @@ export function OnboardingInviteUnavailable({ reason }: OnboardingInviteUnavaila
             </div>
           </div>
         ) : (
-          <div className="rounded-xl border bg-slate-50/90 p-4">
+          <div className="rounded-xl border border-border bg-muted/40 p-4 dark:bg-muted/25">
             <div className="flex items-start gap-3 text-left">
               <Mail className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <p className="text-xs leading-relaxed text-muted-foreground">

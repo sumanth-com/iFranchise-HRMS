@@ -21,6 +21,7 @@ import {
   markAllNotificationsReadAction,
   markNotificationReadAction,
 } from "@/lib/notifications/actions";
+import { runServerActionSafely } from "@/lib/errors/stale-server-action";
 import {
   NOTIFICATION_CENTER_TABS,
   NOTIFICATIONS_ROUTES,
@@ -131,7 +132,10 @@ export function NotificationCenterTable({
                 disabled={isPending}
                 onClick={() => {
                   startTransition(async () => {
-                    const res = await markNotificationReadAction(row.id);
+                    const res = await runServerActionSafely(() =>
+                      markNotificationReadAction(row.id),
+                    );
+                    if (res === null) return;
                     if (res.success) toast.success("Marked as read");
                     else toast.error(res.message);
                   });
@@ -148,7 +152,10 @@ export function NotificationCenterTable({
                 disabled={isPending}
                 onClick={() => {
                   startTransition(async () => {
-                    const res = await archiveNotificationAction(row.id);
+                    const res = await runServerActionSafely(() =>
+                      archiveNotificationAction(row.id),
+                    );
+                    if (res === null) return;
                     if (res.success) toast.success("Archived");
                     else toast.error(res.message);
                   });
@@ -164,7 +171,10 @@ export function NotificationCenterTable({
               disabled={isPending}
               onClick={() => {
                 startTransition(async () => {
-                  const res = await deleteNotificationAction(row.id);
+                  const res = await runServerActionSafely(() =>
+                    deleteNotificationAction(row.id),
+                  );
+                  if (res === null) return;
                   if (res.success) toast.success("Deleted");
                   else toast.error(res.message);
                 });
@@ -217,7 +227,10 @@ export function NotificationCenterTable({
             disabled={isPending}
             onClick={() => {
               startTransition(async () => {
-                const res = await markAllNotificationsReadAction();
+                const res = await runServerActionSafely(() =>
+                  markAllNotificationsReadAction(),
+                );
+                if (res === null) return;
                 if (res.success) toast.success("All notifications marked as read");
                 else toast.error(res.message);
               });

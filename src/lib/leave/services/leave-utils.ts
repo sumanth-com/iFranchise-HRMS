@@ -70,6 +70,27 @@ export function getMonthDateRange(month: number, year: number) {
   return { start, end };
 }
 
+const MONTH_LABELS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
+/** Locale-stable label so SSR and the client hydrate the same month string. */
+export function formatLeaveMonthYear(month: number, year: number) {
+  const name = MONTH_LABELS[month - 1];
+  return name ? `${name} ${year}` : String(year);
+}
+
 export function isWeekendDate(
   date: string,
   calendar: LeaveCalendarContext = DEFAULT_LEAVE_CALENDAR,

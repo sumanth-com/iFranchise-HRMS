@@ -29,6 +29,7 @@ import {
   WIZARD_STEPS,
 } from "@/lib/employees/constants";
 import { COUNTRIES, INDIAN_STATES, STATE_DISTRICTS } from "@/lib/geo/india";
+import { todayIsoDateLocal } from "@/lib/validations/date";
 import {
   employeeAddressStepSchema,
   employeeBasicStepSchema,
@@ -297,7 +298,17 @@ export function EmployeeWizard({ lookups }: EmployeeWizardProps) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="dateOfBirth">Date of birth</Label>
-            <Input id="dateOfBirth" type="date" {...basicForm.register("dateOfBirth")} />
+            <Input
+              id="dateOfBirth"
+              type="date"
+              max={todayIsoDateLocal()}
+              {...basicForm.register("dateOfBirth")}
+            />
+            {basicForm.formState.errors.dateOfBirth?.message ? (
+              <p className="text-xs text-destructive">
+                {basicForm.formState.errors.dateOfBirth.message}
+              </p>
+            ) : null}
           </div>
           <div className="space-y-2">
             <Label htmlFor="personalEmail">Personal email</Label>

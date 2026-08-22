@@ -18,6 +18,7 @@ import {
   deleteNotificationAction,
   markNotificationReadAction,
 } from "@/lib/notifications/actions";
+import { runServerActionSafely } from "@/lib/errors/stale-server-action";
 import {
   formatNotificationDisplayText,
   formatNotificationModule,
@@ -87,15 +88,16 @@ export function NotificationHistoryTimeline({
 
     if (nextId && item.status === "unread") {
       startTransition(async () => {
-        const res = await markNotificationReadAction(item.id);
-        if (res.success) router.refresh();
+        const res = await runServerActionSafely(() => markNotificationReadAction(item.id));
+        if (res?.success) router.refresh();
       });
     }
   }
 
   function confirmDelete(item: NotificationListItem) {
     startTransition(async () => {
-      const res = await deleteNotificationAction(item.id);
+      const res = await runServerActionSafely(() => deleteNotificationAction(item.id));
+      if (res === null) return;
       if (res.success) {
         toast.success("Removed from history");
         if (expandedId === item.id) {

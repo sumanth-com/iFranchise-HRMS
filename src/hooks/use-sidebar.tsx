@@ -92,13 +92,14 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
   const toggleSection = useCallback((section: string) => {
     setOpenSections((current) => ({
       ...current,
-      [section]: !(current[section] ?? false),
+      // Unset sections default open (matches SSR / pre-hydrate paint).
+      [section]: !(current[section] ?? true),
     }));
   }, []);
 
   const setSectionOpen = useCallback((section: string, open: boolean) => {
     setOpenSections((current) => {
-      if ((current[section] ?? false) === open) return current;
+      if ((current[section] ?? true) === open) return current;
       return { ...current, [section]: open };
     });
   }, []);
@@ -111,7 +112,9 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
   }, []);
 
   const isSectionOpen = useCallback(
-    (section: string) => openSections[section] ?? false,
+    // Default open so server HTML and the first client paint match before
+    // localStorage is applied in useEffect.
+    (section: string) => openSections[section] ?? true,
     [openSections],
   );
 

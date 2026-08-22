@@ -28,7 +28,7 @@ export default function OnboardingPortalPage() {
 
   if (context === undefined) {
     return (
-      <div className="flex min-h-[calc(100dvh-3.25rem)] flex-col items-center justify-center gap-3">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 py-8">
         <div className="h-7 w-7 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         <p className="text-sm text-muted-foreground">Loading your onboarding portal…</p>
       </div>
@@ -40,9 +40,9 @@ export default function OnboardingPortalPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 py-1">
+    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden py-1">
       {context.correctionNotes ? (
-        <div className="shrink-0 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-950">
+        <div className="shrink-0 rounded-lg border border-orange-500/30 bg-orange-500/10 px-3 py-2 text-xs text-orange-950 dark:text-orange-100">
           <strong>HR corrections:</strong> {context.correctionNotes}
         </div>
       ) : null}

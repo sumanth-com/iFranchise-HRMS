@@ -21,6 +21,11 @@ import {
 } from "@/components/common/select";
 import { createLeaveRequestAction, getLeaveApplyContextAction, updateLeaveRequestAction } from "@/lib/leave/actions";
 import {
+  clearStaleServerActionReloadFlag,
+  isStaleServerActionError,
+  reloadForStaleServerAction,
+} from "@/lib/errors/stale-server-action";
+import {
   LEAVE_APPLY_TYPE_CODES,
   HALF_DAY_PERIOD_LABELS,
   LEAVE_ROUTES,
@@ -243,13 +248,22 @@ export function LeaveForm({
     let cancelled = false;
     if (initialBalances.length === 0) setBalancesLoading(true);
 
-    void getLeaveApplyContextAction(selectedEmployeeId).then((result) => {
-      if (cancelled) return;
-      setBalancesLoading(false);
-      if (result.success) {
-        setApplyContext(result.data);
-      }
-    });
+    void getLeaveApplyContextAction(selectedEmployeeId)
+      .then((result) => {
+        if (cancelled) return;
+        setBalancesLoading(false);
+        if (result.success) {
+          setApplyContext(result.data);
+          clearStaleServerActionReloadFlag();
+        }
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setBalancesLoading(false);
+        if (isStaleServerActionError(error)) {
+          reloadForStaleServerAction();
+        }
+      });
 
     return () => {
       cancelled = true;

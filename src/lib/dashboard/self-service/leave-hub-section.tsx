@@ -5,6 +5,7 @@ import {
   getLeaveSummary,
   getEmployeeLeaveBalanceSnapshot,
   getEmployeeLeaveCalendarData,
+  listEmployeeOwnLeaveRequests,
   listLeaveRequests,
   ensurePendingHrLeaveAssignedToCeo,
 } from "@/lib/leave/services/leave-queries";
@@ -103,22 +104,20 @@ export async function LeaveHubSection({
     applyLookupsSettled,
   ] = await Promise.all([
     loadMySection
-      ? getEmployeeLeaveBalanceSnapshot(supabase, employeeId, undefined, {
-          month: calendarMonth,
-          year: calendarYear,
-        }).catch((error) => {
+      ? getEmployeeLeaveBalanceSnapshot(supabase, employeeId, calendarYear).catch((error) => {
           console.error("[leave] balance snapshot failed", error);
           return [] as Awaited<ReturnType<typeof getEmployeeLeaveBalanceSnapshot>>;
         })
       : Promise.resolve([] as Awaited<ReturnType<typeof getEmployeeLeaveBalanceSnapshot>>),
     loadMySection
-      ? listLeaveRequests(supabase, profile, { employeeId, page: 1, pageSize: 25 }).catch(
-          (error) => {
-            console.error("[leave] own requests failed", error);
-            return { data: [], total: 0, page: 1, pageSize: 25 };
-          },
-        )
-      : Promise.resolve({ data: [], total: 0, page: 1, pageSize: 25 }),
+      ? listEmployeeOwnLeaveRequests(supabase, employeeId, 1, 50, {
+          month: calendarMonth,
+          year: calendarYear,
+        }).catch((error) => {
+          console.error("[leave] own requests failed", error);
+          return [] as Awaited<ReturnType<typeof listEmployeeOwnLeaveRequests>>;
+        })
+      : Promise.resolve([] as Awaited<ReturnType<typeof listEmployeeOwnLeaveRequests>>),
     loadMySection
       ? getEmployeeLeaveCalendarData(supabase, profile, calendarMonth, calendarYear).catch(
           (error) => {
@@ -173,7 +172,7 @@ export async function LeaveHubSection({
       employeeId={employeeId}
       applyLeaveLookups={applyLookups}
       balances={balances}
-      requests={requests.data}
+      requests={requests}
       calendarMonth={calendarMonth}
       calendarYear={calendarYear}
       calendarLeaves={calendar.leaves}

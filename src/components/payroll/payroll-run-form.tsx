@@ -8,6 +8,7 @@ import {
   ClipboardList,
   Eye,
   Info,
+  Loader2,
   Play,
   Search,
 } from "lucide-react";
@@ -15,6 +16,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   PayrollEmployeeBreakdownDialog,
   type PayrollEmployeeBreakdownData,
@@ -23,7 +25,6 @@ import { PayrollStatusBadge } from "@/components/payroll/payroll-status-badge";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { getMonthSelectItems, getYearSelectItems } from "@/components/payroll/select-utils";
 import {
-  fetchEmployeePayrollBreakdownAction,
   fetchPayrollDetailAction,
   fetchPayrollRunsAction,
   generatePayrollRunAction,
@@ -32,6 +33,7 @@ import {
 import {
   formatCurrency,
   formatPayrollMonth,
+  roundCurrency,
 } from "@/lib/payroll/services/payroll-utils";
 import type { PayrollBreakdown, PayrollDetail, PayrollPreviewResult } from "@/types/payroll";
 
@@ -63,6 +65,7 @@ type PayrollRunFormProps = {
 
 type PanelState =
   | { kind: "idle" }
+  | { kind: "loading" }
   | { kind: "info"; title: string; text: string; tone?: "default" | "warning" }
   | { kind: "preview"; data: PayrollPreviewResult }
   | { kind: "run"; data: PayrollDetail; mode: "existing" | "created" };
@@ -87,6 +90,66 @@ function isFuturePayrollPeriod(month: number, year: number) {
   return false;
 }
 
+function deriveBreakdownTotals(breakdown: PayrollBreakdown, grossSalary: number) {
+  let bonusTotal = 0;
+  let claimsTotal = 0;
+  let salaryTotal = 0;
+
+  for (const line of breakdown.earnings ?? []) {
+    const code = line.code.toLowerCase();
+    const label = line.label.toLowerCase();
+    const amount = Number(line.amount) || 0;
+    if (code.startsWith("bonus") || label.includes("bonus")) {
+      bonusTotal += amount;
+      continue;
+    }
+    if (
+      code.startsWith("reimb") ||
+      code === "claims" ||
+      label.includes("reimbursement") ||
+      label.includes("claim")
+    ) {
+      claimsTotal += amount;
+      continue;
+    }
+    salaryTotal += amount;
+  }
+
+  return {
+    bonusTotal: roundCurrency(bonusTotal),
+    claimsTotal: roundCurrency(claimsTotal),
+    salaryTotal:
+      salaryTotal > 0
+        ? roundCurrency(salaryTotal)
+        : roundCurrency(grossSalary - bonusTotal - claimsTotal),
+  };
+}
+
+function tableRowToBreakdown(
+  row: EmployeeTableRow,
+  periodLabel: string,
+): PayrollEmployeeBreakdownData {
+  const totals = deriveBreakdownTotals(row.breakdown, row.gross);
+
+  return {
+    employeeId: row.id,
+    employeeCode: row.code,
+    employeeName: row.name,
+    departmentName: row.department,
+    basicSalary: row.basicSalary,
+    totalAllowances: row.totalAllowances,
+    totalDeductions: row.deductions,
+    grossSalary: row.gross,
+    netSalary: row.net,
+    bonusTotal: totals.bonusTotal,
+    claimsTotal: totals.claimsTotal,
+    salaryTotal: totals.salaryTotal,
+    breakdown: row.breakdown,
+    hasSalaryStructure: row.hasSalaryStructure ?? (row.gross > 0 || row.net > 0),
+    periodLabel,
+  };
+}
+
 export function PayrollRunForm({
   defaultMonth,
   defaultYear,
@@ -99,11 +162,10 @@ export function PayrollRunForm({
   const [breakdownEmployee, setBreakdownEmployee] =
     useState<PayrollEmployeeBreakdownData | null>(null);
   const [breakdownOpen, setBreakdownOpen] = useState(false);
-  const [breakdownLoading, setBreakdownLoading] = useState(false);
   const [employeeSearch, setEmployeeSearch] = useState("");
-  const breakdownRequestId = useRef(0);
-  const autoLoadStarted = useRef(false);
   const [isPending, startTransition] = useTransition();
+
+  const autoLoadStarted = useRef(false);
 
   const hasPeriod = month.length > 0 && year.length > 0;
   const monthNumber = hasPeriod ? Number(month) : 0;
@@ -166,6 +228,8 @@ export function PayrollRunForm({
       });
       return;
     }
+
+    setPanel({ kind: "loading" });
 
     try {
       const runs = await fetchPayrollRunsAction({
@@ -350,53 +414,10 @@ export function PayrollRunForm({
     });
   }
 
-  async function openBreakdown(row: EmployeeTableRow) {
+  function openBreakdown(row: EmployeeTableRow) {
     if (!hasPeriod) return;
-    const requestId = ++breakdownRequestId.current;
+    setBreakdownEmployee(tableRowToBreakdown(row, periodLabel));
     setBreakdownOpen(true);
-    setBreakdownLoading(true);
-    setBreakdownEmployee({
-      employeeId: row.id,
-      employeeCode: row.code,
-      employeeName: row.name,
-      departmentName: row.department,
-      basicSalary: 0,
-      totalAllowances: 0,
-      totalDeductions: 0,
-      grossSalary: 0,
-      netSalary: 0,
-      bonusTotal: 0,
-      claimsTotal: 0,
-      salaryTotal: 0,
-      breakdown: {
-        earnings: [],
-        deductions: [],
-        attendance: {
-          workingDays: 0,
-          presentDays: 0,
-          absentDays: 0,
-          lopDays: 0,
-          leaveLopDays: 0,
-          overtimeHours: 0,
-        },
-      },
-      hasSalaryStructure: true,
-      periodLabel,
-    });
-
-    const result = await fetchEmployeePayrollBreakdownAction({
-      employeeId: row.id,
-      month: monthNumber,
-      year: yearNumber,
-    });
-    if (requestId !== breakdownRequestId.current) return;
-    setBreakdownLoading(false);
-    if (!result.success) {
-      toast.error(result.message);
-      setBreakdownEmployee(null);
-      return;
-    }
-    setBreakdownEmployee(result.data);
   }
 
   function mapPreviewItemToRow(item: PayrollPreviewResult["items"][number]): EmployeeTableRow {
@@ -431,6 +452,7 @@ export function PayrollRunForm({
       breakdown: item.breakdown,
       basicSalary: item.basicSalary,
       totalAllowances: item.totalAllowances,
+      hasSalaryStructure: !missingPay,
       note: missingPay ? "No salary structure" : undefined,
     };
   }
@@ -487,6 +509,17 @@ export function PayrollRunForm({
         <p className="text-sm text-muted-foreground">
           You do not have permission to run payroll for this organization.
         </p>
+      ) : null}
+
+      {panel.kind === "loading" ? (
+        <div className="animate-in fade-in duration-150 space-y-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            Loading payroll for {periodLabel}…
+          </div>
+          <Skeleton className="h-24 rounded-xl bg-muted/80 dark:bg-muted/40" />
+          <Skeleton className="h-[min(20rem,45vh)] rounded-xl bg-muted/80 dark:bg-muted/40" />
+        </div>
       ) : null}
 
       {panel.kind === "idle" ? (
@@ -585,7 +618,6 @@ export function PayrollRunForm({
         employee={breakdownEmployee}
         open={breakdownOpen}
         onOpenChange={setBreakdownOpen}
-        loading={breakdownLoading}
       />
     </div>
   );

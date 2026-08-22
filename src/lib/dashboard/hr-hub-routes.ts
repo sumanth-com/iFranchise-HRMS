@@ -5,7 +5,7 @@ export const HR_HUB_ROUTES = {
   myLeave: "/dashboard/leave",
   teamLeave: "/dashboard/leave/team",
   myPayroll: "/dashboard/payroll",
-  teamPayroll: "/dashboard/payroll/team",
+  teamPayroll: "/dashboard/payroll/team/run",
   myDocuments: "/dashboard/documents",
   teamDocuments: "/dashboard/documents/team",
   myAssets: "/dashboard/assets",

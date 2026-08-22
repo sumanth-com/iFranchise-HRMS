@@ -1,13 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
+import { NoticeDialog } from "@/components/common/notice-dialog";
 import { PhoneInput } from "@/components/common/phone-input";
 import { SearchableSelect } from "@/components/common/searchable-select";
 import { Label } from "@/components/ui/label";
@@ -31,7 +32,15 @@ import {
   employeeUpdateSchema,
   type EmployeeUpdateInput,
 } from "@/lib/validations/employee";
+import { todayIsoDateLocal } from "@/lib/validations/date";
 import type { EmployeeDetail, LookupOption } from "@/types/employee";
+
+function firstFormErrorMessage(errors: Record<string, { message?: string }>): string | null {
+  for (const value of Object.values(errors)) {
+    if (value?.message) return value.message;
+  }
+  return null;
+}
 
 type EmployeeEditFormProps = {
   employee: EmployeeDetail;
@@ -64,6 +73,8 @@ export function EmployeeEditForm({
   const routes = routesProp ?? resolveEmployeeModuleRoutes(routesBasePath);
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
+  const maxDateToday = todayIsoDateLocal();
 
   const branchItems = lookups.branches.map((item) => ({
     value: item.id,
@@ -167,34 +178,48 @@ export function EmployeeEditForm({
     { value: "other", label: "Other" },
   ];
 
-  const onSubmit = form.handleSubmit((values) => {
-    startTransition(async () => {
-      const result = await updateEmployeeAction(employee.id, values);
-      if (!result.success) {
-        toast.error(result.message);
-        return;
-      }
+  const onSubmit = form.handleSubmit(
+    (values) => {
+      startTransition(async () => {
+        const result = await updateEmployeeAction(employee.id, values);
+        if (!result.success) {
+          setNotice({
+            title: "Could not save employee",
+            message: result.message,
+          });
+          return;
+        }
 
-      toast.success("Employee updated successfully");
-      if (variant === "inline") {
-        onSaved?.();
+        toast.success("Employee updated successfully");
+        if (variant === "inline") {
+          onSaved?.();
+          router.refresh();
+          return;
+        }
+
+        router.push(
+          routes.detail({
+            employeeCode: values.employeeCode,
+            firstName: values.firstName,
+            lastName: values.lastName,
+          }),
+        );
         router.refresh();
-        return;
-      }
-
-      router.push(
-        routes.detail({
-          employeeCode: values.employeeCode,
-          firstName: values.firstName,
-          lastName: values.lastName,
-        }),
-      );
-      router.refresh();
-    });
-  });
+      });
+    },
+    (fieldErrors) => {
+      setNotice({
+        title: "Please review the form",
+        message:
+          firstFormErrorMessage(fieldErrors) ??
+          "Some fields need your attention before saving.",
+      });
+    },
+  );
 
   return (
-    <form onSubmit={onSubmit} className="space-y-6">
+    <>
+      <form onSubmit={onSubmit} className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="employeeCode">Employee code</Label>
@@ -510,7 +535,17 @@ export function EmployeeEditForm({
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="dateOfBirth">Date of birth</Label>
-            <Input id="dateOfBirth" type="date" {...form.register("dateOfBirth")} />
+            <Input
+              id="dateOfBirth"
+              type="date"
+              max={maxDateToday}
+              {...form.register("dateOfBirth")}
+            />
+            {form.formState.errors.dateOfBirth?.message ? (
+              <p className="text-xs text-destructive">
+                {form.formState.errors.dateOfBirth.message}
+              </p>
+            ) : null}
           </div>
           <div className="space-y-2">
             <Label>Gender</Label>
@@ -615,5 +650,15 @@ export function EmployeeEditForm({
         </Button>
       </div>
     </form>
+
+      <NoticeDialog
+        open={notice != null}
+        onOpenChange={(open) => {
+          if (!open) setNotice(null);
+        }}
+        title={notice?.title ?? "Notice"}
+        message={notice?.message ?? ""}
+      />
+    </>
   );
 }

@@ -14,7 +14,6 @@ import {
   parseTeamPayrollSection,
   TEAM_PAYROLL_SECTIONS,
 } from "@/lib/payroll/constants";
-import { createClient } from "@/lib/supabase/server";
 
 type PageProps = {
   params: Promise<{ section: string }>;
@@ -26,7 +25,6 @@ export default async function CeoPayrollSectionPage({
   searchParams,
 }: PageProps) {
   const profile = await requireCeoPortal();
-  const supabase = await createClient();
   const { section } = await params;
   const raw = await searchParams;
 
@@ -50,7 +48,6 @@ export default async function CeoPayrollSectionPage({
           section={teamSection}
           rawSearchParams={raw}
           profile={viewProfile}
-          supabase={supabase}
           teamBasePath={CEO_ROUTES.payroll}
           canRunPayrollOverride
         />

@@ -11,6 +11,7 @@ import {
   removeProfileImageAction,
   uploadProfileImageAction,
 } from "@/lib/employees/profile-image-actions";
+import { optimizeProfileImageFile } from "@/lib/media/client-image-optimize";
 import { cn } from "@/lib/utils";
 import type { EmploymentStatus } from "@/types/auth";
 
@@ -78,17 +79,25 @@ export function EmployeeIdCard({
       return;
     }
 
-    const preview = URL.createObjectURL(file);
-    setImageUrl(preview);
-
-    const formData = new FormData();
-    formData.append("file", file);
-
     startTransition(async () => {
+      const optimized = await optimizeProfileImageFile(file);
+      if (optimized.size > PROFILE_IMAGE_MAX_BYTES) {
+        toast.error("Profile image must be 10 MB or smaller");
+        event.target.value = "";
+        return;
+      }
+
+      const preview = URL.createObjectURL(optimized);
+      setImageUrl(preview);
+
+      const formData = new FormData();
+      formData.append("file", optimized);
+
       const result = await uploadProfileImageAction(employeeId, formData);
       if (!result.success) {
         toast.error(result.message);
         setImageUrl(initialUrl);
+        URL.revokeObjectURL(preview);
         return;
       }
 
@@ -125,12 +134,12 @@ export function EmployeeIdCard({
         className={cn(
           "card-surface-static relative flex h-full flex-col overflow-hidden rounded-[1.65rem] border bg-card",
           "border-border/80 shadow-[0_2px_6px_rgba(15,23,42,0.06),0_18px_42px_-18px_rgba(15,23,42,0.28)]",
-          "dark:border-white/18 dark:bg-[#0a1020] dark:shadow-[0_2px_10px_rgba(0,0,0,0.45),0_22px_48px_-18px_rgba(0,0,0,0.7)]",
+          "dark:border-white/20 dark:bg-[#070d1a] dark:shadow-[0_2px_10px_rgba(0,0,0,0.45),0_22px_48px_-18px_rgba(0,0,0,0.7)]",
         )}
       >
-        <div className="pointer-events-none absolute inset-0 z-20 rounded-[1.65rem] ring-1 ring-inset ring-black/[0.04] dark:ring-white/12" />
+        <div className="pointer-events-none absolute inset-0 z-20 rounded-[1.65rem] ring-1 ring-inset ring-black/[0.04] dark:ring-white/14" />
 
-        <div className="absolute left-4 top-4 z-10 rounded-full bg-white/90 px-3 py-1 text-[0.65rem] font-semibold tracking-[0.16em] text-neutral-600 shadow-sm backdrop-blur dark:bg-black/60 dark:text-white dark:ring-1 dark:ring-white/20">
+        <div className="absolute left-4 top-4 z-10 rounded-full bg-white/90 px-3 py-1 text-[0.65rem] font-semibold tracking-[0.16em] text-neutral-600 shadow-sm backdrop-blur dark:bg-black/70 dark:text-white dark:ring-1 dark:ring-white/25">
           DIGITAL ID
         </div>
 
@@ -160,6 +169,7 @@ export function EmployeeIdCard({
             <img
               src={imageUrl}
               alt={fullName}
+              decoding="async"
               className="size-full object-cover object-[center_20%]"
             />
           ) : (
@@ -220,76 +230,98 @@ export function EmployeeIdCard({
         </div>
 
         <div className="relative z-10 -mt-[3.1rem] shrink-0">
-          {/* Light wave */}
-          <svg
-            className="absolute inset-x-0 top-0 h-[3.1rem] w-full dark:hidden"
-            viewBox="0 0 360 68"
-            preserveAspectRatio="none"
-            aria-hidden
-          >
-            <defs>
-              <linearGradient
-                id={`${waveGradientId}-light`}
-                x1="0%"
-                y1="0%"
-                x2="100%"
-                y2="100%"
-              >
-                <stop offset="0%" stopColor="#ffffff" />
-                <stop offset="50%" stopColor="#f4eefc" />
-                <stop offset="100%" stopColor="#d9c8f0" />
-              </linearGradient>
-            </defs>
-            <path
-              fill={`url(#${waveGradientId}-light)`}
-              d="M0 68V28C44 10 86 4 128 10C178 18 210 38 260 46C300 52 330 46 360 36V68H0Z"
-            />
-          </svg>
-
-          {/* Dark wave — separate markup so stop colors are not overridden */}
-          <svg
-            className="absolute inset-x-0 top-0 hidden h-[3.1rem] w-full dark:block"
-            viewBox="0 0 360 68"
-            preserveAspectRatio="none"
-            aria-hidden
-          >
-            <defs>
-              <linearGradient
-                id={`${waveGradientId}-dark`}
-                x1="0%"
-                y1="0%"
-                x2="100%"
-                y2="100%"
-              >
-                <stop offset="0%" stopColor="#0f172a" />
-                <stop offset="50%" stopColor="#0f172a" />
-                <stop offset="100%" stopColor="#0f172a" />
-              </linearGradient>
-            </defs>
-            <path
-              fill={`url(#${waveGradientId}-dark)`}
-              d="M0 68V28C44 10 86 4 128 10C178 18 210 38 260 46C300 52 330 46 360 36V68H0Z"
-            />
-          </svg>
-
-          <div className="relative bg-gradient-to-br from-white via-[#f4eefc] to-[#d9c8f0] px-5 pb-5 pt-9 dark:bg-none dark:bg-[#0f172a] dark:from-transparent dark:via-transparent dark:to-transparent">
-            <p className="break-words text-[1.15rem] font-bold leading-snug tracking-tight text-neutral-950 dark:text-white">
-              {fullName}
-            </p>
-            <p className="mt-2 break-words text-[0.92rem] leading-relaxed text-neutral-500 dark:text-slate-300">
-              {roleTitle}
-            </p>
-            <p className="mt-2.5 font-mono text-[0.7rem] font-semibold tracking-[0.08em] text-neutral-600 dark:text-slate-400">
-              ID · {employeeCode}
-            </p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <p className="inline-flex w-fit rounded-full bg-white/70 px-2.5 py-1 text-[0.68rem] font-semibold tracking-wide text-neutral-700 shadow-sm ring-1 ring-black/5 dark:bg-slate-700/80 dark:text-slate-100 dark:ring-white/20 dark:shadow-none">
-                {employmentTypeName}
-              </p>
-              <EmploymentStatusBadge
-                status={employmentStatus === "draft" ? "active" : employmentStatus}
-                className="dark:shadow-none"
+          {/* Light wave + panel */}
+          <div className="dark:hidden">
+            <svg
+              className="absolute inset-x-0 top-0 h-[3.1rem] w-full"
+              viewBox="0 0 360 68"
+              preserveAspectRatio="none"
+              aria-hidden
+            >
+              <defs>
+                <linearGradient
+                  id={`${waveGradientId}-light`}
+                  x1="0%"
+                  y1="0%"
+                  x2="100%"
+                  y2="100%"
+                >
+                  <stop offset="0%" stopColor="#ffffff" />
+                  <stop offset="50%" stopColor="#f4eefc" />
+                  <stop offset="100%" stopColor="#d9c8f0" />
+                </linearGradient>
+              </defs>
+              <path
+                fill={`url(#${waveGradientId}-light)`}
+                d="M0 68V28C44 10 86 4 128 10C178 18 210 38 260 46C300 52 330 46 360 36V68H0Z"
               />
+            </svg>
+            <div className="relative bg-gradient-to-br from-white via-[#f4eefc] to-[#d9c8f0] px-5 pb-5 pt-9">
+              <p className="break-words text-[1.15rem] font-bold leading-snug tracking-tight text-neutral-950">
+                {fullName}
+              </p>
+              <p className="mt-2 break-words text-[0.92rem] leading-relaxed text-neutral-500">
+                {roleTitle}
+              </p>
+              <p className="mt-2.5 font-mono text-[0.7rem] font-semibold tracking-[0.08em] text-neutral-600">
+                ID · {employeeCode}
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <p className="inline-flex w-fit rounded-full bg-white/70 px-2.5 py-1 text-[0.68rem] font-semibold tracking-wide text-neutral-700 shadow-sm ring-1 ring-black/5">
+                  {employmentTypeName}
+                </p>
+                <EmploymentStatusBadge
+                  status={employmentStatus === "draft" ? "active" : employmentStatus}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Dark wave + panel — separate tree so light gradient never paints in dark mode */}
+          <div className="hidden dark:block">
+            <svg
+              className="absolute inset-x-0 top-0 h-[3.1rem] w-full"
+              viewBox="0 0 360 68"
+              preserveAspectRatio="none"
+              aria-hidden
+            >
+              <defs>
+                <linearGradient
+                  id={`${waveGradientId}-dark`}
+                  x1="0%"
+                  y1="0%"
+                  x2="100%"
+                  y2="100%"
+                >
+                  <stop offset="0%" stopColor="#0b1224" />
+                  <stop offset="55%" stopColor="#0b1224" />
+                  <stop offset="100%" stopColor="#111b33" />
+                </linearGradient>
+              </defs>
+              <path
+                fill={`url(#${waveGradientId}-dark)`}
+                d="M0 68V28C44 10 86 4 128 10C178 18 210 38 260 46C300 52 330 46 360 36V68H0Z"
+              />
+            </svg>
+            <div className="relative bg-[#0b1224] px-5 pb-5 pt-9">
+              <p className="break-words text-[1.15rem] font-bold leading-snug tracking-tight text-white">
+                {fullName}
+              </p>
+              <p className="mt-2 break-words text-[0.92rem] leading-relaxed text-slate-200">
+                {roleTitle}
+              </p>
+              <p className="mt-2.5 font-mono text-[0.7rem] font-semibold tracking-[0.08em] text-slate-100">
+                ID · {employeeCode}
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <p className="inline-flex w-fit rounded-full bg-white/10 px-2.5 py-1 text-[0.68rem] font-semibold tracking-wide text-slate-100 ring-1 ring-white/20">
+                  {employmentTypeName}
+                </p>
+                <EmploymentStatusBadge
+                  status={employmentStatus === "draft" ? "active" : employmentStatus}
+                  className="shadow-none"
+                />
+              </div>
             </div>
           </div>
         </div>

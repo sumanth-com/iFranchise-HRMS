@@ -22,6 +22,18 @@ export function toUserFriendlyError(
 
   const pg = error as Error & PostgresErrorShape;
 
+  if (/employee_profiles_dob_valid/i.test(raw)) {
+    return "Date of birth cannot be in the future. Please choose a valid date.";
+  }
+
+  if (/employee_addresses_type_primary_per_employee/i.test(raw)) {
+    return "We could not save the employee address. Refresh the page and try again.";
+  }
+
+  if (/violates check constraint/i.test(raw)) {
+    return "Some of the entered values are not allowed. Please review the form and try again.";
+  }
+
   if (pg.code === "23505" || DUPLICATE_PAYROLL_ITEM.test(raw)) {
     if (DUPLICATE_PAYROLL_ITEM.test(raw)) {
       return "Payroll for the selected period has already been generated. Open Run Payroll to review the existing run.";

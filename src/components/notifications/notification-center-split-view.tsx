@@ -27,6 +27,7 @@ import {
   markAllNotificationsReadAction,
   markNotificationReadAction,
 } from "@/lib/notifications/actions";
+import { runServerActionSafely } from "@/lib/errors/stale-server-action";
 import {
   NOTIFICATION_CENTER_TABS,
   NOTIFICATIONS_ROUTES,
@@ -164,7 +165,8 @@ export function NotificationCenterSplitView({
         : prev,
     );
     startTransition(async () => {
-      const res = await markNotificationReadAction(item.id);
+      const res = await runServerActionSafely(() => markNotificationReadAction(item.id));
+      if (res === null) return;
       if (res.success) router.refresh();
       else toast.error(res.message);
     });
@@ -172,7 +174,8 @@ export function NotificationCenterSplitView({
 
   function confirmDelete(item: NotificationListItem) {
     startTransition(async () => {
-      const res = await deleteNotificationAction(item.id);
+      const res = await runServerActionSafely(() => deleteNotificationAction(item.id));
+      if (res === null) return;
       if (res.success) {
         toast.success("Notification deleted");
         if (activeNotification?.id === item.id) {
@@ -192,7 +195,10 @@ export function NotificationCenterSplitView({
     if (ids.length === 0) return;
 
     startTransition(async () => {
-      const res = await deleteSelectedNotificationsAction(ids);
+      const res = await runServerActionSafely(() =>
+        deleteSelectedNotificationsAction(ids),
+      );
+      if (res === null) return;
       if (res.success) {
         const count = res.data?.deletedCount ?? 0;
         toast.success(
@@ -349,7 +355,10 @@ export function NotificationCenterSplitView({
                   disabled={isPending}
                   onClick={() => {
                     startTransition(async () => {
-                      const res = await markAllNotificationsReadAction();
+                      const res = await runServerActionSafely(() =>
+                        markAllNotificationsReadAction(),
+                      );
+                      if (res === null) return;
                       if (res.success) {
                         toast.success("All notifications marked as read");
                         router.refresh();

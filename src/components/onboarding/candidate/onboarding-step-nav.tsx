@@ -98,7 +98,7 @@ export function OnboardingStepNav({
   }, [activeStep]);
 
   return (
-    <div className="relative border-b border-border/60 bg-gradient-to-b from-slate-50/90 to-white">
+    <div className="relative border-b border-border bg-muted/40 dark:bg-muted/20">
       <div
         ref={scrollRef}
         className="overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -139,12 +139,12 @@ export function OnboardingStepNav({
                     className={cn(
                       "flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-all duration-300",
                       isComplete
-                        ? "bg-emerald-100 text-emerald-700"
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
                         : isActive
                           ? "bg-primary text-primary-foreground shadow-sm"
                           : isLocked
                             ? "bg-muted text-muted-foreground"
-                            : "bg-slate-100 text-slate-600 group-hover:bg-slate-200",
+                            : "bg-muted text-muted-foreground group-hover:bg-muted/80 dark:group-hover:bg-muted/60",
                     )}
                   >
                     {isComplete ? (
