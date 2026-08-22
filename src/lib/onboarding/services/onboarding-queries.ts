@@ -158,6 +158,67 @@ export async function getOnboardingDashboardStats(
   };
 }
 
+export async function listOnboardingDesignationFilters(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+): Promise<{ id: string; title: string }[]> {
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("onboarding_cases")
+    .select("designation_id, designations:designation_id (id, title)")
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .not("designation_id", "is", null);
+
+  if (error) throw new Error(error.message);
+
+  const map = new Map<string, string>();
+  for (const row of data ?? []) {
+    const designationId = row.designation_id as string | null;
+    const title = unwrapName(row as LooseRow, "designations");
+    if (designationId && title) {
+      map.set(designationId, title);
+    }
+  }
+
+  return [...map.entries()]
+    .map(([id, title]) => ({ id, title }))
+    .sort((a, b) => a.title.localeCompare(b.title));
+}
+
+function applyOnboardingListStatusFilter(query: LooseRow, status: string) {
+  switch (status) {
+    case "ready":
+      return query.eq("status", "draft");
+    case "in_progress":
+      return query.or(
+        "and(completion_percent.gt.0,completion_percent.lt.100),status.in.(in_progress,documents_uploaded,corrections_requested,invitation_viewed,pending_hr_review)",
+      );
+    case "done":
+      return query.or(
+        "completion_percent.gte.100,status.in.(completed,employee_created,approved)",
+      );
+    default:
+      return query.eq("status", status);
+  }
+}
+
+function applyJoiningDateFilter(query: LooseRow, joiningYear?: number, joiningMonth?: number) {
+  if (!joiningYear) return query;
+
+  if (joiningMonth) {
+    const month = String(joiningMonth).padStart(2, "0");
+    const lastDay = new Date(joiningYear, joiningMonth, 0).getDate();
+    return query
+      .gte("joining_date", `${joiningYear}-${month}-01`)
+      .lte("joining_date", `${joiningYear}-${month}-${String(lastDay).padStart(2, "0")}`);
+  }
+
+  return query
+    .gte("joining_date", `${joiningYear}-01-01`)
+    .lte("joining_date", `${joiningYear}-12-31`);
+}
+
 export async function listOnboardingCases(
   supabase: AuthSupabaseClient,
   organizationId: string,
@@ -166,7 +227,9 @@ export async function listOnboardingCases(
     pageSize: number;
     search?: string;
     status?: string;
-    roleId?: string;
+    designationId?: string;
+    joiningMonth?: number;
+    joiningYear?: number;
   },
 ): Promise<{ data: OnboardingCaseListItem[]; total: number }> {
   const from = (params.page - 1) * params.pageSize;
@@ -190,12 +253,13 @@ export async function listOnboardingCases(
     .order("created_at", { ascending: false })
     .range(from, to);
 
-  if (params.status) query = query.eq("status", params.status);
-  if (params.roleId) query = query.eq("intended_role_id", params.roleId);
+  if (params.status) query = applyOnboardingListStatusFilter(query, params.status);
+  if (params.designationId) query = query.eq("designation_id", params.designationId);
   if (params.search) {
     const term = `%${params.search}%`;
     query = query.or(`full_name.ilike.${term},personal_email.ilike.${term}`);
   }
+  query = applyJoiningDateFilter(query, params.joiningYear, params.joiningMonth);
 
   const { data, error, count } = await query;
   if (error) throw new Error(error.message);

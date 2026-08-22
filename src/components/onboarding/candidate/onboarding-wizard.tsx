@@ -145,6 +145,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   const [uploadSlots, setUploadSlots] = useState<
     Record<string, { uploading: boolean; pendingFileName?: string }>
   >({});
+  const contentScrollRef = useRef<HTMLDivElement>(null);
 
   const completedSteps = useMemo(() => getCompletedStepIndices(context), [context]);
   const firstIncompleteStep = useMemo(() => getFirstIncompleteStepIndex(context), [context]);
@@ -179,7 +180,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   }, [sectionKey, sectionData]);
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    contentScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
   }, [step, stepAnimKey]);
 
   useEffect(() => {
@@ -451,9 +452,9 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   const isLastStep = step === ONBOARDING_WIZARD_SECTIONS.length - 1;
 
   return (
-    <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-1 flex-col">
-      <div className="sticky top-14 z-20 shrink-0 pt-2">
-        <div className="overflow-hidden rounded-t-2xl border border-border bg-card/95 shadow-sm ring-1 ring-border/50 backdrop-blur-sm dark:bg-card/90 dark:shadow-black/25">
+    <div className="mx-auto flex min-h-0 w-full min-w-0 max-w-6xl flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-lg shadow-black/5 ring-1 ring-border/50 dark:shadow-black/25">
+        <div className="shrink-0">
           <OnboardingStepNav
             activeStep={step}
             completedSteps={completedSteps}
@@ -461,14 +462,9 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
             onStepChange={goToStep}
           />
         </div>
-      </div>
 
-      <div className="-mt-px flex min-w-0 flex-1 flex-col rounded-b-2xl border border-t-0 border-border bg-card shadow-lg shadow-black/5 ring-1 ring-border/50 dark:shadow-black/25">
-        <div
-          key={`${sectionKey}-${stepAnimKey}`}
-          className="onboarding-section-enter min-w-0 overflow-x-hidden px-4 py-4 pb-28 sm:px-6 sm:py-5 sm:pb-28"
-        >
-          <div className="mb-4 flex items-center justify-between gap-3 border-b border-border/60 pb-3">
+        <div className="shrink-0 border-b border-border/60 px-4 py-3 sm:px-6">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-0.5">
               <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
                 {SECTION_TITLES[sectionKey]}
@@ -488,7 +484,13 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
               Step {step + 1} of {ONBOARDING_WIZARD_SECTIONS.length}
             </p>
           </div>
+        </div>
 
+        <div
+          ref={contentScrollRef}
+          key={`${sectionKey}-${stepAnimKey}`}
+          className="onboarding-section-enter min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-4 sm:px-6 sm:py-5"
+        >
           {sectionKey === "personal" && (
             <div className="grid gap-2.5 sm:grid-cols-2">
               <div className="space-y-1">
@@ -734,7 +736,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
         </div>
 
-        <div className="sticky bottom-2 z-10 mx-2 mb-2 flex min-w-0 shrink-0 flex-col gap-2 rounded-2xl border border-border bg-card/95 px-4 py-3 shadow-[0_-4px_24px_-12px_rgba(0,0,0,0.12)] backdrop-blur-sm dark:bg-card/90 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="flex shrink-0 flex-col gap-2 border-t border-border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <Button
             variant="outline"
             disabled={step === 0 || isPending}

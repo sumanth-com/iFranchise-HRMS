@@ -34,20 +34,28 @@ export function FilterSelect({
   contentClassName,
   itemClassName,
 }: FilterSelectProps) {
+  const safeValue = items.some((item) => item.value === value) ? value : null;
+
   return (
-    <div className={cn("w-full", className)}>
+    <div className={cn("w-full min-w-0", className)}>
       <Select
         items={items}
-        value={value || null}
+        value={safeValue}
         onValueChange={(next) => {
           if (next) onValueChange(next);
         }}
         disabled={disabled}
       >
-        <SelectTrigger className={cn("h-9 w-full", triggerClassName)}>
+        <SelectTrigger className={cn("h-9 w-full min-w-0", triggerClassName)}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
-        <SelectContent align="start" sideOffset={4} className={cn("min-w-[10rem] p-1", contentClassName)}>
+        <SelectContent
+          align="start"
+          side="bottom"
+          sideOffset={4}
+          alignItemWithTrigger={false}
+          className={cn("z-[100] min-w-[10rem] p-1", contentClassName)}
+        >
           {items.map((item) => (
             <SelectItem key={item.value} value={item.value} className={cn("py-2", itemClassName)}>
               {item.label}

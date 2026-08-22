@@ -6,6 +6,7 @@ import {
   getOnboardingDashboardStats,
   getOnboardingLookups,
   listOnboardingCases,
+  listOnboardingDesignationFilters,
   resolveOnboardingCaseId,
 } from "@/lib/onboarding/services/onboarding-queries";
 import { syncOnboardingCasesFromSentOffers } from "@/lib/onboarding/services/onboarding-mutations";
@@ -23,6 +24,7 @@ export type OnboardingModuleData = {
   stats: OnboardingDashboardStats;
   cases: { data: OnboardingCaseListItem[]; total: number };
   lookups: OnboardingLookups;
+  designationFilters: { id: string; title: string }[];
 };
 
 const VIEW_PERMISSIONS = [
@@ -39,7 +41,9 @@ export async function loadOnboardingModuleData(
     pageSize?: number;
     search?: string;
     status?: string;
-    roleId?: string;
+    designationId?: string;
+    joiningMonth?: number;
+    joiningYear?: number;
   },
 ): Promise<OnboardingModuleData> {
   const profile = await requireServerAnyPermission(VIEW_PERMISSIONS);
@@ -54,13 +58,14 @@ export async function loadOnboardingModuleData(
     );
   });
 
-  const [stats, cases, lookups] = await Promise.all([
+  const [stats, cases, lookups, designationFilters] = await Promise.all([
     getOnboardingDashboardStats(supabase, organizationId),
     listOnboardingCases(supabase, organizationId, parsed),
     getOnboardingLookups(supabase, organizationId),
+    listOnboardingDesignationFilters(supabase, organizationId),
   ]);
 
-  return { stats, cases, lookups };
+  return { stats, cases, lookups, designationFilters };
 }
 
 export async function loadOnboardingCaseDetail(routeRef: string): Promise<OnboardingCaseDetail> {

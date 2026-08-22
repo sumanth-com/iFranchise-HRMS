@@ -1,11 +1,17 @@
+import {
+  payrollTeamSectionPath,
+  SELF_PAYROLL_ROUTES,
+  TEAM_PAYROLL_SECTIONS,
+} from "@/lib/payroll/constants";
+
 /** HR portal hub routes — personal vs team administration paths. */
 export const HR_HUB_ROUTES = {
   myAttendance: "/dashboard/attendance",
   teamAttendance: "/dashboard/attendance/team",
   myLeave: "/dashboard/leave",
   teamLeave: "/dashboard/leave/team",
-  myPayroll: "/dashboard/payroll",
-  teamPayroll: "/dashboard/payroll/team/run",
+  myPayroll: SELF_PAYROLL_ROUTES.list,
+  teamPayroll: payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS.run),
   myDocuments: "/dashboard/documents",
   teamDocuments: "/dashboard/documents/team",
   myAssets: "/dashboard/assets",

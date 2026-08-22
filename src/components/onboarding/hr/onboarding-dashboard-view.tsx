@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ClipboardList, Loader2, Mail, Search, Trash2, UserPlus } from "lucide-react";
-import { useCallback, useState } from "react";
+import { Eye, Loader2, Mail, RefreshCw, Search, Send, Trash2, UserPlus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
@@ -24,15 +24,17 @@ import {
   fetchOnboardingModuleAction,
   sendOnboardingInvitationAction,
 } from "@/lib/onboarding/actions/hr-onboarding-actions";
+import {
+  buildJoiningMonthOptions,
+  buildJoiningYearOptions,
+  getHrOnboardingListStatus,
+  ONBOARDING_HR_STATUS_FILTER_OPTIONS,
+} from "@/lib/onboarding/hr-onboarding-list-utils";
 import type { OnboardingModuleData } from "@/lib/onboarding/loaders/hr-onboarding-loaders";
 import { assignOnboardingRouteRefs } from "@/lib/onboarding/routing";
+import { debounce } from "@/lib/performance/debounce";
 import { HIRING_SECTION_HELP } from "@/lib/recruitment/section-help";
-import {
-  ONBOARDING_ROUTES,
-  ONBOARDING_STATUS_LABELS,
-  ONBOARDING_STATUSES,
-  type OnboardingCaseListItem,
-} from "@/types/onboarding";
+import { ONBOARDING_ROUTES, type OnboardingCaseListItem } from "@/types/onboarding";
 import type { OnboardingListParams } from "@/types/onboarding";
 
 type OnboardingDashboardViewProps = OnboardingModuleData & {
@@ -41,18 +43,7 @@ type OnboardingDashboardViewProps = OnboardingModuleData & {
   basePath?: string;
 };
 
-function statusBadgeClass(status: string) {
-  if (status === "pending_hr_review") return "bg-amber-100 text-amber-800";
-  if (status === "employee_created" || status === "completed") return "bg-emerald-100 text-emerald-800";
-  if (status === "rejected" || status === "cancelled") return "bg-red-100 text-red-800";
-  if (status === "corrections_requested") return "bg-orange-100 text-orange-800";
-  if (status === "draft") return "bg-sky-100 text-sky-800";
-  if (status === "invitation_sent") return "bg-blue-100 text-blue-800";
-  if (status === "invitation_viewed") return "bg-violet-100 text-violet-800";
-  if (status === "in_progress" || status === "documents_uploaded") return "bg-indigo-100 text-indigo-800";
-  if (status === "approved") return "bg-emerald-100 text-emerald-800";
-  return "bg-slate-100 text-slate-700";
-}
+const LIST_REFRESH_MS = 15_000;
 
 function canDeleteOnboardingCase(status: string) {
   return status !== "employee_created" && status !== "completed";
@@ -70,10 +61,6 @@ function canSendOnboardingInvite(status: string) {
   ].includes(status);
 }
 
-function inviteActionLabel(row: OnboardingCaseListItem) {
-  return row.invitationSentAt || row.status !== "draft" ? "Resend invitation" : "Send invitation";
-}
-
 function isResendInvite(row: OnboardingCaseListItem) {
   return Boolean(row.invitationSentAt) || row.status !== "draft";
 }
@@ -87,15 +74,32 @@ function formatJoiningDate(value: string | null | undefined) {
   });
 }
 
+function ProgressCell({ percent }: { percent: number }) {
+  const clamped = Math.max(0, Math.min(100, percent));
+  return (
+    <div className="flex min-w-[7rem] items-center gap-2">
+      <div className="h-1.5 min-w-[4.5rem] flex-1 overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
+          style={{ width: `${clamped}%` }}
+        />
+      </div>
+      <span className="shrink-0 text-xs font-medium tabular-nums text-foreground">{clamped}%</span>
+    </div>
+  );
+}
+
 export function OnboardingDashboardView({
   cases: initialCases,
-  lookups,
+  designationFilters,
   initialFilters,
   readOnly = false,
   basePath = ONBOARDING_ROUTES.hrList,
 }: OnboardingDashboardViewProps) {
   const [cases, setCases] = useState(initialCases);
   const [filters, setFilters] = useState(initialFilters);
+  const [searchInput, setSearchInput] = useState(initialFilters.search ?? "");
+  const filtersRef = useRef(filters);
   const [deleteTarget, setDeleteTarget] = useState<OnboardingCaseListItem | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteTarget, setInviteTarget] = useState<OnboardingCaseListItem | null>(null);
@@ -103,24 +107,62 @@ export function OnboardingDashboardView({
   const [invitingCaseId, setInvitingCaseId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const refresh = useCallback((next: OnboardingListParams) => {
-    setRefreshing(true);
+  useEffect(() => {
+    filtersRef.current = filters;
+  }, [filters]);
+
+  const refresh = useCallback((next: OnboardingListParams, options?: { silent?: boolean }) => {
+    if (!options?.silent) setRefreshing(true);
     void fetchOnboardingModuleAction(next)
       .then((data) => {
         setCases(data.cases);
       })
+      .catch((error) => {
+        if (!options?.silent) {
+          toast.error(error instanceof Error ? error.message : "Could not refresh onboarding list");
+        }
+      })
       .finally(() => {
-        setRefreshing(false);
+        if (!options?.silent) setRefreshing(false);
       });
   }, []);
 
-  function applyFilter(patch: Partial<OnboardingListParams>) {
-    const next = { ...filters, ...patch, page: patch.page ?? 1 };
-    setFilters(next);
-    refresh(next);
-  }
+  const applyFilter = useCallback(
+    (patch: Partial<OnboardingListParams>) => {
+      const next = { ...filtersRef.current, ...patch, page: patch.page ?? 1 };
+      setFilters(next);
+      filtersRef.current = next;
+      refresh(next);
+    },
+    [refresh],
+  );
+
+  const debouncedSearch = useMemo(
+    () =>
+      debounce((value: string) => {
+        applyFilter({ search: value.trim() || undefined });
+      }, 280),
+    [applyFilter],
+  );
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      refresh(filtersRef.current, { silent: true });
+    }, LIST_REFRESH_MS);
+
+    const onFocus = () => refresh(filtersRef.current, { silent: true });
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [refresh]);
 
   const inviteableCases = cases.data.filter((row) => canSendOnboardingInvite(row.status));
+  const monthOptions = useMemo(() => buildJoiningMonthOptions(), []);
+  const yearOptions = useMemo(() => buildJoiningYearOptions(), []);
 
   function openInviteDialog(row?: OnboardingCaseListItem) {
     setInviteTarget(row ?? inviteableCases[0] ?? null);
@@ -142,7 +184,7 @@ export function OnboardingDashboardView({
       }
       toast.success(result.message);
       closeInviteDialog();
-      refresh(filters);
+      refresh(filtersRef.current);
     } finally {
       setInvitingCaseId(null);
     }
@@ -178,7 +220,7 @@ export function OnboardingDashboardView({
         total: prev.total - 1,
       }));
       setDeleteTarget(null);
-      refresh(filters);
+      refresh(filtersRef.current);
     } finally {
       setDeleting(false);
     }
@@ -187,6 +229,14 @@ export function OnboardingDashboardView({
   const routeRefs = assignOnboardingRouteRefs(
     cases.data.map((row) => ({ id: row.id, fullName: row.fullName })),
   );
+
+  const roleFilterItems = [
+    { value: "all", label: "All roles" },
+    ...designationFilters.map((role) => ({
+      value: role.id,
+      label: role.title,
+    })),
+  ];
 
   return (
     <div className="flex flex-col gap-3">
@@ -203,54 +253,75 @@ export function OnboardingDashboardView({
         </p>
       </div>
 
-      <div className="flex w-full flex-wrap items-center gap-3">
-        <div className="relative w-72 max-w-full shrink-0">
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-            aria-hidden
-          />
-          <Input
-            type="search"
-            placeholder="Search name or email"
-            value={filters.search ?? ""}
-            onChange={(e) => applyFilter({ search: e.target.value || undefined })}
-            className="h-9 w-full bg-background pl-9"
-          />
+      <div className="flex items-center gap-4">
+        <div className="relative z-10 flex min-w-0 flex-1 flex-nowrap items-center gap-3 overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:thin]">
+          <div className="relative w-56 shrink-0 sm:w-64">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              type="search"
+              placeholder="Search name or email"
+              value={searchInput}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSearchInput(value);
+                debouncedSearch(value);
+              }}
+              className="h-9 w-full bg-background pl-9"
+            />
+          </div>
+
+          <div className="w-36 shrink-0 sm:w-40">
+            <FilterSelect
+              value={filters.designationId ?? "all"}
+              onValueChange={(v) =>
+                applyFilter({ designationId: v === "all" ? undefined : v })
+              }
+              items={roleFilterItems}
+              triggerClassName="w-full"
+              contentClassName="min-w-[12rem]"
+            />
+          </div>
+
+          <div className="w-32 shrink-0">
+            <FilterSelect
+              value={filters.joiningMonth ? String(filters.joiningMonth) : "all"}
+              onValueChange={(v) =>
+                applyFilter({ joiningMonth: v === "all" ? undefined : Number(v) })
+              }
+              items={monthOptions}
+              triggerClassName="w-full"
+            />
+          </div>
+
+          <div className="w-28 shrink-0">
+            <FilterSelect
+              value={filters.joiningYear ? String(filters.joiningYear) : "all"}
+              onValueChange={(v) =>
+                applyFilter({ joiningYear: v === "all" ? undefined : Number(v) })
+              }
+              items={yearOptions}
+              triggerClassName="w-full"
+            />
+          </div>
+
+          <div className="w-36 shrink-0 sm:w-40">
+            <FilterSelect
+              value={filters.status ?? "all"}
+              onValueChange={(v) => applyFilter({ status: v === "all" ? undefined : v })}
+              items={[...ONBOARDING_HR_STATUS_FILTER_OPTIONS]}
+              triggerClassName="w-full"
+              contentClassName="min-w-[12rem]"
+            />
+          </div>
         </div>
-        <div className="w-[22rem] shrink-0">
-          <FilterSelect
-            value={filters.roleId ?? "all"}
-            onValueChange={(v) =>
-              applyFilter({ roleId: v === "all" ? undefined : v })
-            }
-            items={[
-              { value: "all", label: "All roles" },
-              ...lookups.roles.map((role) => ({
-                value: role.id,
-                label: role.name,
-              })),
-            ]}
-            triggerClassName="w-full"
-            contentClassName="min-w-[22rem]"
-          />
-        </div>
-        <div className="w-44 shrink-0 sm:w-48">
-          <FilterSelect
-            value={filters.status ?? "all"}
-            onValueChange={(v) => applyFilter({ status: v === "all" ? undefined : v })}
-            items={[
-              { value: "all", label: "All statuses" },
-              ...ONBOARDING_STATUSES.map((s) => ({
-                value: s,
-                label: ONBOARDING_STATUS_LABELS[s],
-              })),
-            ]}
-          />
-        </div>
+
         {readOnly ? null : (
           <Button
             type="button"
-            className="h-9 shrink-0 sm:ml-auto"
+            className="h-9 shrink-0 whitespace-nowrap"
             disabled={invitingCaseId !== null}
             onClick={() => openInviteDialog()}
           >
@@ -280,71 +351,86 @@ export function OnboardingDashboardView({
                 <th className="p-3 font-medium">Joining</th>
                 <th className="p-3 font-medium">Progress</th>
                 <th className="p-3 font-medium">Status</th>
-                <th className="w-[220px] p-3 font-medium" />
+                <th className="w-[120px] p-3 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {cases.data.filter((row) => !["cancelled", "archived"].includes(row.status)).map((row) => (
-                <tr key={row.id} className="border-t hover:bg-muted/30">
-                  <td className="p-3">
-                    <div className="font-medium">{row.fullName}</div>
-                    <div className="text-muted-foreground text-xs">{row.personalEmail}</div>
-                  </td>
-                  <td className="p-3">{row.designationName ?? row.intendedRoleName ?? "—"}</td>
-                  <td className="p-3">{formatJoiningDate(row.joiningDate)}</td>
-                  <td className="p-3">{row.completionPercent}%</td>
-                  <td className="p-3">
-                    <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${statusBadgeClass(row.status)}`}>
-                      {ONBOARDING_STATUS_LABELS[row.status]}
-                    </span>
-                  </td>
-                  <td className="p-3 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Link
-                        href={`${basePath}/${routeRefs.get(row.id) ?? row.id}`}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-primary hover:bg-muted hover:text-primary"
-                      >
-                        <ClipboardList className="h-4 w-4" />
-                        {readOnly ? "View" : "Review"}
-                      </Link>
-                      {!readOnly && canSendOnboardingInvite(row.status) ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8"
-                          disabled={invitingCaseId === row.id}
-                          onClick={() => handleInviteClick(row)}
+              {cases.data
+                .filter((row) => !["cancelled", "archived"].includes(row.status))
+                .map((row) => {
+                  const displayStatus = getHrOnboardingListStatus(row);
+                  const resend = isResendInvite(row);
+
+                  return (
+                    <tr key={row.id} className="border-t hover:bg-muted/30">
+                      <td className="p-3">
+                        <div className="font-medium">{row.fullName}</div>
+                        <div className="text-xs text-muted-foreground">{row.personalEmail}</div>
+                      </td>
+                      <td className="p-3">{row.designationName ?? row.intendedRoleName ?? "—"}</td>
+                      <td className="p-3">{formatJoiningDate(row.joiningDate)}</td>
+                      <td className="p-3">
+                        <ProgressCell percent={row.completionPercent} />
+                      </td>
+                      <td className="p-3">
+                        <span
+                          className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${displayStatus.badgeClass}`}
                         >
-                          {invitingCaseId === row.id ? (
-                            <>
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              Sending…
-                            </>
-                          ) : (
-                            <>
-                              <Mail className="h-3.5 w-3.5" />
-                              {inviteActionLabel(row)}
-                            </>
-                          )}
-                        </Button>
-                      ) : null}
-                      {!readOnly && canDeleteOnboardingCase(row.status) ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={`Delete ${row.fullName}`}
-                          disabled={deleting}
-                          onClick={() => setDeleteTarget(row)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                          {displayStatus.label}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <div className="flex items-center justify-end gap-0.5">
+                          <Link
+                            href={`${basePath}/${routeRefs.get(row.id) ?? row.id}`}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-primary hover:bg-muted hover:text-primary"
+                            aria-label={readOnly ? `View ${row.fullName}` : `Review ${row.fullName}`}
+                            title={readOnly ? "View" : "Review"}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Link>
+                          {!readOnly && canSendOnboardingInvite(row.status) ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              className="h-8 w-8"
+                              disabled={invitingCaseId === row.id}
+                              aria-label={
+                                resend
+                                  ? `Resend invitation to ${row.fullName}`
+                                  : `Send invitation to ${row.fullName}`
+                              }
+                              title={resend ? "Resend invitation" : "Send invitation"}
+                              onClick={() => handleInviteClick(row)}
+                            >
+                              {invitingCaseId === row.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : resend ? (
+                                <RefreshCw className="h-4 w-4" />
+                              ) : (
+                                <Send className="h-4 w-4" />
+                              )}
+                            </Button>
+                          ) : null}
+                          {!readOnly && canDeleteOnboardingCase(row.status) ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              className="h-8 w-8"
+                              aria-label={`Delete ${row.fullName}`}
+                              disabled={deleting}
+                              onClick={() => setDeleteTarget(row)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
         </div>
@@ -360,7 +446,7 @@ export function OnboardingDashboardView({
           >
             Previous
           </Button>
-          <span className="text-sm text-muted-foreground self-center">
+          <span className="self-center text-sm text-muted-foreground">
             Page {filters.page} · {cases.total} total
           </span>
           <Button
@@ -434,8 +520,16 @@ export function OnboardingDashboardView({
                 </>
               ) : (
                 <>
-                  <Mail className="mr-2 h-4 w-4" />
-                  {inviteTarget ? inviteActionLabel(inviteTarget) : "Send invitation"}
+                  {inviteTarget && isResendInvite(inviteTarget) ? (
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                  ) : (
+                    <Send className="mr-2 h-4 w-4" />
+                  )}
+                  {inviteTarget
+                    ? isResendInvite(inviteTarget)
+                      ? "Resend invitation"
+                      : "Send invitation"
+                    : "Send invitation"}
                 </>
               )}
             </Button>

@@ -220,7 +220,9 @@ export type OnboardingListParams = {
   pageSize: number;
   search?: string;
   status?: string;
-  roleId?: string;
+  designationId?: string;
+  joiningMonth?: number;
+  joiningYear?: number;
 };
 
 export type OnboardingDashboardStats = {

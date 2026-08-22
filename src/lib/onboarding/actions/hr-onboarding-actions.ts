@@ -60,7 +60,9 @@ export async function fetchOnboardingModuleAction(
     pageSize?: number;
     search?: string;
     status?: string;
-    roleId?: string;
+    designationId?: string;
+    joiningMonth?: number;
+    joiningYear?: number;
   },
 ): Promise<OnboardingModuleData> {
   return loadOnboardingModuleData(params);
