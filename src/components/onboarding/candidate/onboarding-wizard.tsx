@@ -524,7 +524,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
     const hasChanges = sectionHasDraftChanges();
 
     if (!validation.valid) {
-      if (sectionComplete && !hasChanges) {
+      if (sectionComplete && !hasChanges && sectionKey !== "terms") {
         setForm({});
         advanceStep();
         return;
@@ -533,9 +533,14 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
       return;
     }
 
-    if (sectionComplete && !hasChanges) {
+    if (sectionComplete && !hasChanges && sectionKey !== "terms") {
       setForm({});
       advanceStep();
+      return;
+    }
+
+    if (sectionKey === "terms" && !termsAcceptedLive()) {
+      showValidationError(validation);
       return;
     }
 
@@ -1035,11 +1040,8 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
             ) : (
               <Button
                 onClick={goNext}
-                disabled={isPending}
-                className={cn(
-                  "w-full sm:w-auto",
-                  !currentValidation.valid && "opacity-90",
-                )}
+                disabled={isPending || !currentValidation.valid}
+                className="w-full sm:w-auto"
               >
                 Next
               </Button>

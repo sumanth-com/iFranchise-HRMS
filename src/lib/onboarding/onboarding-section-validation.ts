@@ -304,10 +304,7 @@ export function validateOnboardingSection(
       break;
 
     case "terms": {
-      const accepted =
-        data.termsAccepted === true ||
-        data.termsAccepted === "true" ||
-        hasLegacyTermsAcknowledgement(context);
+      const accepted = data.termsAccepted === true || data.termsAccepted === "true";
       if (!accepted) {
         missing.push("Terms and conditions acknowledgement");
       }
