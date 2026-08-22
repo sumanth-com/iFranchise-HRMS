@@ -187,7 +187,7 @@ export function OnboardingLoginForm() {
             className="inline-flex items-center gap-1 font-semibold text-primary hover:underline"
           >
             <UserPlus className="h-3 w-3" />
-            Sign up
+            Set up password
           </Link>
         </p>
       </div>

@@ -2,14 +2,15 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { Check, Eye, EyeOff, LogIn, Lock, Mail, UserPlus } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import { Check, Eye, EyeOff, LogIn, Lock, Mail } from "lucide-react";
+import { useMemo, useState, useTransition, useEffect } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { setupCandidateAccountAction } from "@/lib/onboarding/actions/candidate-onboarding-actions";
+import { rememberOnboardingInviteToken } from "@/components/onboarding/candidate/onboarding-sign-up-redirect";
 import { ONBOARDING_ROUTES } from "@/types/onboarding";
 import { cn } from "@/lib/utils";
 
@@ -124,6 +125,10 @@ export function OnboardingInviteSetup({
   const lengthMet = password.length >= MIN_PASSWORD_LENGTH;
   const passwordsMatch = confirmPassword.length > 0 && password === confirmPassword;
   const canSubmit = lengthMet && passwordsMatch && !isPending;
+
+  useEffect(() => {
+    rememberOnboardingInviteToken(token);
+  }, [token]);
 
   const barWidth =
     password.length === 0
@@ -269,16 +274,6 @@ export function OnboardingInviteSetup({
           >
             <LogIn className="h-3 w-3" />
             Sign in
-          </Link>
-        </p>
-        <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
-          No account?{" "}
-          <Link
-            href={ONBOARDING_ROUTES.signUp}
-            className="inline-flex items-center gap-1 font-semibold text-primary hover:underline"
-          >
-            <UserPlus className="h-3 w-3" />
-            Sign up
           </Link>
         </p>
       </div>
