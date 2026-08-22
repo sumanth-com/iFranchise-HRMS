@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
+import { validateInviteTokenAction } from "@/lib/onboarding/actions/candidate-onboarding-actions";
 import { ONBOARDING_ROUTES } from "@/types/onboarding";
 
 const INVITE_TOKEN_STORAGE_KEY = "ifranchise_onboarding_invite_token";
@@ -16,6 +17,11 @@ const INVITE_TOKEN_STORAGE_KEY = "ifranchise_onboarding_invite_token";
 export function rememberOnboardingInviteToken(token: string) {
   if (typeof window === "undefined" || !token.trim()) return;
   sessionStorage.setItem(INVITE_TOKEN_STORAGE_KEY, token.trim());
+}
+
+export function clearOnboardingInviteToken() {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(INVITE_TOKEN_STORAGE_KEY);
 }
 
 function readStoredInviteToken(): string | null {
@@ -50,11 +56,32 @@ export function OnboardingSignUpRedirect() {
 
   useEffect(() => {
     const stored = readStoredInviteToken();
-    if (stored) {
-      router.replace(ONBOARDING_ROUTES.invite(stored));
+    if (!stored) {
+      setCheckingStored(false);
       return;
     }
-    setCheckingStored(false);
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const validation = await validateInviteTokenAction(stored);
+        if (cancelled) return;
+        if (validation.ok) {
+          router.replace(ONBOARDING_ROUTES.invite(stored));
+          return;
+        }
+        // Stale / already-used invite — stay on password-setup entry, not the "already used" page.
+        clearOnboardingInviteToken();
+      } catch {
+        if (!cancelled) clearOnboardingInviteToken();
+      } finally {
+        if (!cancelled) setCheckingStored(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   function continueToPasswordSetup() {
@@ -64,8 +91,22 @@ export function OnboardingSignUpRedirect() {
       return;
     }
 
-    rememberOnboardingInviteToken(token);
-    startTransition(() => {
+    startTransition(async () => {
+      const validation = await validateInviteTokenAction(token);
+      if (!validation.ok) {
+        if (
+          validation.reason.toLowerCase().includes("already been used") ||
+          validation.reason.toLowerCase().includes("no longer active")
+        ) {
+          toast.error("This invitation was already used. Sign in with your email and password.");
+          router.push(ONBOARDING_ROUTES.login);
+          return;
+        }
+        toast.error(validation.reason);
+        return;
+      }
+
+      rememberOnboardingInviteToken(token);
       router.push(ONBOARDING_ROUTES.invite(token));
     });
   }

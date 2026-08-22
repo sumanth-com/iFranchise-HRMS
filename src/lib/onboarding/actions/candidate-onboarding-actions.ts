@@ -91,8 +91,13 @@ export async function setupCandidateAccountAction(
     }
 
     await markInvitationViewed(validation.data.caseId);
+    // Persist password first so sign-in works even if token consume/session steps fail after.
     await storePortalPassword(validation.data.caseId, validation.data.personalEmail, parsed.password);
-    await consumeOnboardingInvitationToken(rawToken);
+    try {
+      await consumeOnboardingInvitationToken(rawToken);
+    } catch (consumeError) {
+      console.error("[onboarding] invite token consume after password save:", consumeError);
+    }
 
     const session = await createPortalSession(validation.data.caseId);
     await setCandidateSession(session);

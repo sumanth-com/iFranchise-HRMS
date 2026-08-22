@@ -10,7 +10,10 @@ import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { setupCandidateAccountAction } from "@/lib/onboarding/actions/candidate-onboarding-actions";
-import { rememberOnboardingInviteToken } from "@/components/onboarding/candidate/onboarding-sign-up-redirect";
+import {
+  clearOnboardingInviteToken,
+  rememberOnboardingInviteToken,
+} from "@/components/onboarding/candidate/onboarding-sign-up-redirect";
 import { ONBOARDING_ROUTES } from "@/types/onboarding";
 import { cn } from "@/lib/utils";
 
@@ -149,8 +152,13 @@ export function OnboardingInviteSetup({
 
     startTransition(async () => {
       const result = await setupCandidateAccountAction(token, { password, confirmPassword });
-      if (!result.success) toast.error(result.message);
-      else window.location.href = "/onboarding/portal";
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+      clearOnboardingInviteToken();
+      toast.success("Password saved. You can sign in with this password anytime.");
+      window.location.href = "/onboarding/portal";
     });
   }
 
@@ -168,7 +176,7 @@ export function OnboardingInviteSetup({
           </p>
           <h1 className="text-xl font-semibold tracking-tight">Welcome, {firstName}</h1>
           <p className="text-xs leading-snug text-white/65">
-            Set a temporary password for the pre-joining portal.
+            Create your permanent password for the pre-joining portal. You will use it to sign in later.
           </p>
           <div className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] text-white/90">
             <Mail className="h-3 w-3 shrink-0 text-white/55" />

@@ -130,6 +130,19 @@ export type ValidatedInvitation = {
   status: string;
 };
 
+async function portalAccountHasPassword(caseId: string): Promise<boolean> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .schema("hrms")
+    .from("onboarding_portal_accounts")
+    .select("password_hash")
+    .eq("case_id", caseId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return typeof data?.password_hash === "string" && data.password_hash.length > 0;
+}
+
 export async function validateOnboardingInvitationToken(
   rawToken: string,
 ): Promise<{ ok: true; data: ValidatedInvitation } | { ok: false; reason: string }> {
@@ -145,9 +158,19 @@ export async function validateOnboardingInvitationToken(
     .maybeSingle();
 
   if (error || !tokenRow) return { ok: false, reason: "Invalid or expired invitation link." };
-  if (tokenRow.status !== "active") return { ok: false, reason: "This invitation is no longer active." };
-  if (tokenRow.consumed_at) return { ok: false, reason: "This invitation link has already been used." };
-  if (new Date(tokenRow.expires_at) < new Date()) {
+
+  // Revoked by a newer invite (not yet consumed) — candidate must use the latest email link.
+  if (tokenRow.status !== "active" && !tokenRow.consumed_at) {
+    return { ok: false, reason: "This invitation is no longer active." };
+  }
+
+  if (tokenRow.consumed_at) {
+    // Incomplete setup: token was marked used but password never saved — allow password screen again.
+    const hasPassword = await portalAccountHasPassword(tokenRow.case_id);
+    if (hasPassword) {
+      return { ok: false, reason: "This invitation link has already been used." };
+    }
+  } else if (new Date(tokenRow.expires_at) < new Date()) {
     return { ok: false, reason: "This invitation link has expired." };
   }
 
@@ -400,17 +423,39 @@ export async function storePortalOtp(caseId: string, email: string, otp: string)
   const admin = createAdminClient();
   const otpHash = hashOtp(otp);
   const expiresAt = new Date(Date.now() + ONBOARDING_OTP_TTL_MINUTES * 60 * 1000).toISOString();
-  const { error } = await admin.schema("hrms").from("onboarding_portal_accounts").upsert(
-    {
-      case_id: caseId,
-      personal_email: email.toLowerCase(),
-      otp_hash: otpHash,
-      otp_expires_at: expiresAt,
-      is_active: true,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "case_id" },
-  );
+  // Update-only fields so an existing password_hash is never wiped by OTP upsert.
+  const { data: existing, error: existingError } = await admin
+    .schema("hrms")
+    .from("onboarding_portal_accounts")
+    .select("case_id")
+    .eq("case_id", caseId)
+    .maybeSingle();
+  if (existingError) throw new Error(existingError.message);
+
+  if (existing) {
+    const { error } = await admin
+      .schema("hrms")
+      .from("onboarding_portal_accounts")
+      .update({
+        personal_email: email.toLowerCase(),
+        otp_hash: otpHash,
+        otp_expires_at: expiresAt,
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("case_id", caseId);
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  const { error } = await admin.schema("hrms").from("onboarding_portal_accounts").insert({
+    case_id: caseId,
+    personal_email: email.toLowerCase(),
+    otp_hash: otpHash,
+    otp_expires_at: expiresAt,
+    is_active: true,
+    updated_at: new Date().toISOString(),
+  });
   if (error) throw new Error(error.message);
 }
 
