@@ -164,6 +164,15 @@ export function toSelectItems(options: readonly string[]) {
   return options.map((item) => ({ value: item, label: item }));
 }
 
+export function passingYearSelectItems() {
+  const current = new Date().getFullYear();
+  const items: { value: string; label: string }[] = [];
+  for (let year = current + 1; year >= 1970; year -= 1) {
+    items.push({ value: String(year), label: String(year) });
+  }
+  return items;
+}
+
 export function sanitizeYear(value: string): string {
   return value.replace(/\D/g, "").slice(0, 4);
 }

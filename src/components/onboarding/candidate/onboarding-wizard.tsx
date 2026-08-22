@@ -125,6 +125,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   const [showCelebration, setShowCelebration] = useState(false);
   const initializedRef = useRef(false);
   const contentScrollRef = useRef<HTMLDivElement>(null);
+  const prevSectionKeyRef = useRef<string | null>(null);
   const sectionKey = ONBOARDING_WIZARD_SECTIONS[step];
   const sectionData = context.sections.find((s) => s.sectionKey === sectionKey)?.data ?? {};
   const [form, setForm] = useState<Record<string, string>>({});
@@ -154,7 +155,10 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   }, [context]);
 
   useEffect(() => {
-    if (sectionKey === "education") {
+    const enteredSection = prevSectionKeyRef.current !== sectionKey;
+    prevSectionKeyRef.current = sectionKey;
+
+    if (sectionKey === "education" && enteredSection) {
       setEducationForm(parseEducationForm(sectionData));
     }
   }, [sectionKey, sectionData]);
@@ -582,7 +586,11 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           {sectionKey === "education" && (
             <OnboardingEducationSection
               form={educationForm}
-              onFormChange={setEducationForm}
+              onFormChange={(updater) =>
+                setEducationForm((prev) =>
+                  typeof updater === "function" ? updater(prev) : updater,
+                )
+              }
               onUpload={(documentCode, file) => uploadDoc("education", documentCode, file)}
               getUploadMeta={(documentCode) => uploadMeta("education", documentCode)}
             />

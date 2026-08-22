@@ -5,8 +5,8 @@ import { useMemo, type ReactNode } from "react";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { OnboardingDocumentUpload } from "@/components/onboarding/candidate/onboarding-document-upload";
+import { OnboardingEducationSelect } from "@/components/onboarding/candidate/onboarding-education-select";
 import { OnboardingTypeaheadField } from "@/components/onboarding/candidate/onboarding-typeahead-field";
-import { LabeledSelect } from "@/components/payroll/payroll-select";
 import {
   ACADEMIC_STREAMS,
   filterEducationOptions,
@@ -16,7 +16,7 @@ import {
   INDIAN_SCHOOL_BOARDS,
   INDIAN_UNIVERSITIES,
   INTERMEDIATE_QUALIFICATIONS,
-  sanitizeYear,
+  passingYearSelectItems,
   toSelectItems,
 } from "@/lib/onboarding/education-options";
 import {
@@ -24,6 +24,7 @@ import {
   educationDocumentMaxMb,
   type OnboardingEducationFormData,
 } from "@/lib/onboarding/education-utils";
+import { INDIAN_STATES } from "@/lib/onboarding/india-locations";
 import { cn } from "@/lib/utils";
 
 const educationInputClassName =
@@ -34,6 +35,12 @@ const QUALIFICATION_ITEMS = toSelectItems(INTERMEDIATE_QUALIFICATIONS);
 const STREAM_ITEMS = toSelectItems(ACADEMIC_STREAMS);
 const DEGREE_ITEMS = toSelectItems(GRADUATION_DEGREES);
 const SPECIALIZATION_ITEMS = toSelectItems(GRADUATION_SPECIALIZATIONS);
+const STATE_ITEMS = toSelectItems(INDIAN_STATES);
+const YEAR_ITEMS = passingYearSelectItems();
+
+type EducationFormUpdater =
+  | OnboardingEducationFormData
+  | ((prev: OnboardingEducationFormData) => OnboardingEducationFormData);
 
 type UploadMeta = {
   fileName: string | null;
@@ -43,7 +50,7 @@ type UploadMeta = {
 
 type OnboardingEducationSectionProps = {
   form: OnboardingEducationFormData;
-  onFormChange: (form: OnboardingEducationFormData) => void;
+  onFormChange: (updater: EducationFormUpdater) => void;
   onUpload: (documentCode: string, file: File) => void;
   getUploadMeta: (documentCode: string) => UploadMeta;
 };
@@ -96,15 +103,21 @@ export function OnboardingEducationSection({
   );
 
   function updateSsc(patch: Partial<OnboardingEducationFormData["ssc"]>) {
-    onFormChange({ ...form, ssc: { ...form.ssc, ...patch } });
+    onFormChange((prev) => ({ ...prev, ssc: { ...prev.ssc, ...patch } }));
   }
 
   function updateIntermediate(patch: Partial<OnboardingEducationFormData["intermediate"]>) {
-    onFormChange({ ...form, intermediate: { ...form.intermediate, ...patch } });
+    onFormChange((prev) => ({
+      ...prev,
+      intermediate: { ...prev.intermediate, ...patch },
+    }));
   }
 
   function updateGraduation(patch: Partial<OnboardingEducationFormData["graduation"]>) {
-    onFormChange({ ...form, graduation: { ...form.graduation, ...patch } });
+    onFormChange((prev) => ({
+      ...prev,
+      graduation: { ...prev.graduation, ...patch },
+    }));
   }
 
   function renderUpload(code: string, label: string, required = true) {
@@ -123,6 +136,8 @@ export function OnboardingEducationSection({
     );
   }
 
+  const selectTriggerClassName = cn(educationInputClassName, "w-full");
+
   return (
     <div className="space-y-8">
       <section className="space-y-4">
@@ -133,29 +148,29 @@ export function OnboardingEducationSection({
             className={educationInputClassName}
             value={form.ssc.schoolName}
             placeholder="Enter school name"
+            autoComplete="off"
             onChange={(e) => updateSsc({ schoolName: e.target.value })}
           />
         </div>
-        <div className="space-y-1">
+        <div className="relative space-y-1">
           <FieldLabel label="Board" required />
-          <LabeledSelect
+          <OnboardingEducationSelect
             items={BOARD_ITEMS}
             value={form.ssc.board}
             placeholder="Select board (CBSE / ICSE / State Board)"
             onValueChange={(value) => updateSsc({ board: value })}
-            triggerClassName={cn(educationInputClassName, "w-full")}
+            triggerClassName={selectTriggerClassName}
           />
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1">
+          <div className="relative space-y-1">
             <FieldLabel label="Year of passing" required />
-            <Input
-              className={educationInputClassName}
-              inputMode="numeric"
-              maxLength={4}
-              placeholder="YYYY"
+            <OnboardingEducationSelect
+              items={YEAR_ITEMS}
               value={form.ssc.yearOfPassing}
-              onChange={(e) => updateSsc({ yearOfPassing: sanitizeYear(e.target.value) })}
+              placeholder="Select year"
+              onValueChange={(value) => updateSsc({ yearOfPassing: value })}
+              triggerClassName={selectTriggerClassName}
             />
           </div>
           <div className="space-y-1">
@@ -164,6 +179,7 @@ export function OnboardingEducationSection({
               className={educationInputClassName}
               value={form.ssc.percentageOrCgpa}
               placeholder="e.g. 85% or 9.2 CGPA"
+              autoComplete="off"
               onChange={(e) => updateSsc({ percentageOrCgpa: e.target.value })}
             />
           </div>
@@ -174,15 +190,18 @@ export function OnboardingEducationSection({
             <Input
               className={educationInputClassName}
               value={form.ssc.rollNumber}
+              autoComplete="off"
               onChange={(e) => updateSsc({ rollNumber: e.target.value })}
             />
           </div>
-          <div className="space-y-1">
+          <div className="relative space-y-1">
             <FieldLabel label="Place / State" required />
-            <Input
-              className={educationInputClassName}
+            <OnboardingEducationSelect
+              items={STATE_ITEMS}
               value={form.ssc.placeOrState}
-              onChange={(e) => updateSsc({ placeOrState: e.target.value })}
+              placeholder="Select state"
+              onValueChange={(value) => updateSsc({ placeOrState: value })}
+              triggerClassName={selectTriggerClassName}
             />
           </div>
         </div>
@@ -200,14 +219,14 @@ export function OnboardingEducationSection({
 
       <section className="space-y-4">
         <SectionHeading title="12th Class — Application Details" />
-        <div className="space-y-1">
+        <div className="relative space-y-1">
           <FieldLabel label="Qualification" required />
-          <LabeledSelect
+          <OnboardingEducationSelect
             items={QUALIFICATION_ITEMS}
             value={form.intermediate.qualification}
             placeholder="12th / Intermediate / PUC"
             onValueChange={(value) => updateIntermediate({ qualification: value })}
-            triggerClassName={cn(educationInputClassName, "w-full")}
+            triggerClassName={selectTriggerClassName}
           />
         </div>
         <div className="space-y-1">
@@ -216,43 +235,41 @@ export function OnboardingEducationSection({
             className={educationInputClassName}
             value={form.intermediate.schoolName}
             placeholder="Enter school or college name"
+            autoComplete="off"
             onChange={(e) => updateIntermediate({ schoolName: e.target.value })}
           />
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1">
+          <div className="relative space-y-1">
             <FieldLabel label="Board" required />
-            <LabeledSelect
+            <OnboardingEducationSelect
               items={BOARD_ITEMS}
               value={form.intermediate.board}
               placeholder="CBSE / ISC / State Board"
               onValueChange={(value) => updateIntermediate({ board: value })}
-              triggerClassName={cn(educationInputClassName, "w-full")}
+              triggerClassName={selectTriggerClassName}
             />
           </div>
-          <div className="space-y-1">
+          <div className="relative space-y-1">
             <FieldLabel label="Stream" required />
-            <LabeledSelect
+            <OnboardingEducationSelect
               items={STREAM_ITEMS}
               value={form.intermediate.stream}
               placeholder="MPC / BiPC / Commerce / Arts"
               onValueChange={(value) => updateIntermediate({ stream: value })}
-              triggerClassName={cn(educationInputClassName, "w-full")}
+              triggerClassName={selectTriggerClassName}
             />
           </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1">
+          <div className="relative space-y-1">
             <FieldLabel label="Year of passing" required />
-            <Input
-              className={educationInputClassName}
-              inputMode="numeric"
-              maxLength={4}
-              placeholder="YYYY"
+            <OnboardingEducationSelect
+              items={YEAR_ITEMS}
               value={form.intermediate.yearOfPassing}
-              onChange={(e) =>
-                updateIntermediate({ yearOfPassing: sanitizeYear(e.target.value) })
-              }
+              placeholder="Select year"
+              onValueChange={(value) => updateIntermediate({ yearOfPassing: value })}
+              triggerClassName={selectTriggerClassName}
             />
           </div>
           <div className="space-y-1">
@@ -261,6 +278,7 @@ export function OnboardingEducationSection({
               className={educationInputClassName}
               value={form.intermediate.percentageOrCgpa}
               placeholder="e.g. 85% or 9.2 CGPA"
+              autoComplete="off"
               onChange={(e) => updateIntermediate({ percentageOrCgpa: e.target.value })}
             />
           </div>
@@ -271,15 +289,18 @@ export function OnboardingEducationSection({
             <Input
               className={educationInputClassName}
               value={form.intermediate.rollNumber}
+              autoComplete="off"
               onChange={(e) => updateIntermediate({ rollNumber: e.target.value })}
             />
           </div>
-          <div className="space-y-1">
+          <div className="relative space-y-1">
             <FieldLabel label="College state / Location" required />
-            <Input
-              className={educationInputClassName}
+            <OnboardingEducationSelect
+              items={STATE_ITEMS}
               value={form.intermediate.collegeStateOrLocation}
-              onChange={(e) => updateIntermediate({ collegeStateOrLocation: e.target.value })}
+              placeholder="Select state"
+              onValueChange={(value) => updateIntermediate({ collegeStateOrLocation: value })}
+              triggerClassName={selectTriggerClassName}
             />
           </div>
         </div>
@@ -298,24 +319,24 @@ export function OnboardingEducationSection({
       <section className="space-y-4">
         <SectionHeading title="Graduation — Application Details" />
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1">
+          <div className="relative space-y-1">
             <FieldLabel label="Degree" required />
-            <LabeledSelect
+            <OnboardingEducationSelect
               items={DEGREE_ITEMS}
               value={form.graduation.degree}
               placeholder="B.Tech, B.E., B.Sc, etc."
               onValueChange={(value) => updateGraduation({ degree: value })}
-              triggerClassName={cn(educationInputClassName, "w-full")}
+              triggerClassName={selectTriggerClassName}
             />
           </div>
-          <div className="space-y-1">
+          <div className="relative space-y-1">
             <FieldLabel label="Specialization / Branch" required />
-            <LabeledSelect
+            <OnboardingEducationSelect
               items={SPECIALIZATION_ITEMS}
               value={form.graduation.specialization}
               placeholder="CSE, ECE, Mechanical, etc."
               onValueChange={(value) => updateGraduation({ specialization: value })}
-              triggerClassName={cn(educationInputClassName, "w-full")}
+              triggerClassName={selectTriggerClassName}
             />
           </div>
         </div>
@@ -340,30 +361,24 @@ export function OnboardingEducationSection({
           />
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1">
+          <div className="relative space-y-1">
             <FieldLabel label="Year of admission" required />
-            <Input
-              className={educationInputClassName}
-              inputMode="numeric"
-              maxLength={4}
-              placeholder="YYYY"
+            <OnboardingEducationSelect
+              items={YEAR_ITEMS}
               value={form.graduation.yearOfAdmission}
-              onChange={(e) =>
-                updateGraduation({ yearOfAdmission: sanitizeYear(e.target.value) })
-              }
+              placeholder="Select year"
+              onValueChange={(value) => updateGraduation({ yearOfAdmission: value })}
+              triggerClassName={selectTriggerClassName}
             />
           </div>
-          <div className="space-y-1">
+          <div className="relative space-y-1">
             <FieldLabel label="Year of passing" required />
-            <Input
-              className={educationInputClassName}
-              inputMode="numeric"
-              maxLength={4}
-              placeholder="YYYY"
+            <OnboardingEducationSelect
+              items={YEAR_ITEMS}
               value={form.graduation.yearOfPassing}
-              onChange={(e) =>
-                updateGraduation({ yearOfPassing: sanitizeYear(e.target.value) })
-              }
+              placeholder="Select year"
+              onValueChange={(value) => updateGraduation({ yearOfPassing: value })}
+              triggerClassName={selectTriggerClassName}
             />
           </div>
         </div>
@@ -374,6 +389,7 @@ export function OnboardingEducationSection({
               className={educationInputClassName}
               value={form.graduation.percentageOrCgpa}
               placeholder="e.g. 75% or 8.5 CGPA"
+              autoComplete="off"
               onChange={(e) => updateGraduation({ percentageOrCgpa: e.target.value })}
             />
           </div>
@@ -382,15 +398,18 @@ export function OnboardingEducationSection({
             <Input
               className={educationInputClassName}
               value={form.graduation.rollNumber}
+              autoComplete="off"
               onChange={(e) => updateGraduation({ rollNumber: e.target.value })}
             />
           </div>
-          <div className="space-y-1">
+          <div className="relative space-y-1">
             <FieldLabel label="State / Location" required />
-            <Input
-              className={educationInputClassName}
+            <OnboardingEducationSelect
+              items={STATE_ITEMS}
               value={form.graduation.stateOrLocation}
-              onChange={(e) => updateGraduation({ stateOrLocation: e.target.value })}
+              placeholder="Select state"
+              onValueChange={(value) => updateGraduation({ stateOrLocation: value })}
+              triggerClassName={selectTriggerClassName}
             />
           </div>
         </div>
