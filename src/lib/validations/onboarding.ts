@@ -101,6 +101,24 @@ export const candidatePasswordSchema = z
     path: ["confirmPassword"],
   });
 
+/** First-time portal password setup from the login "Set up password" screen. */
+export const candidatePasswordSetupSchema = z
+  .object({
+    personalEmail: z.string().trim().email(),
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .max(128, "Password must be at most 128 characters"),
+    confirmPassword: z
+      .string()
+      .min(8, "Confirm password must be at least 8 characters")
+      .max(128),
+  })
+  .refine((v) => v.password === v.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
+
 export const candidateLoginSchema = z.object({
   personalEmail: z.string().trim().email(),
   password: z.string().min(1),

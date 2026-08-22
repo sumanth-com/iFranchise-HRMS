@@ -46,6 +46,7 @@ import {
   candidateOtpRequestSchema,
   candidateOtpVerifySchema,
   candidatePasswordSchema,
+  candidatePasswordSetupSchema,
   onboardingSectionSchema,
   onboardingSignatureSchema,
   policyAcknowledgementSchema,
@@ -107,6 +108,82 @@ export async function setupCandidateAccountAction(
     return {
       success: false,
       message: onboardingPortalErrorMessage(error, "Account setup failed. Please try again."),
+    };
+  }
+}
+
+/**
+ * First-time password setup from /onboarding/sign-up (no invite token required).
+ * Only works for invited candidates who do not already have a password.
+ * The first password set is permanent for portal sign-in.
+ */
+export async function setupCandidatePasswordByEmailAction(
+  input: unknown,
+): Promise<ActionResult> {
+  try {
+    const parsed = candidatePasswordSetupSchema.parse(input);
+    const email = parsed.personalEmail.trim().toLowerCase();
+
+    try {
+      await assertOnboardingRateLimit("password-setup", email, 5, 60 * 60 * 1000);
+    } catch {
+      return { success: false, message: "Too many setup attempts. Please try again later." };
+    }
+
+    const admin = createAdminClient();
+    const { data: account, error: accountError } = await admin
+      .schema("hrms")
+      .from("onboarding_portal_accounts")
+      .select("case_id, password_hash, is_active, personal_email")
+      .eq("personal_email", email)
+      .maybeSingle();
+
+    if (accountError) throw new Error(accountError.message);
+
+    if (!account?.is_active) {
+      return {
+        success: false,
+        message:
+          "No onboarding invitation found for this email. Use the invitation link from HR, or contact HR.",
+      };
+    }
+
+    if (typeof account.password_hash === "string" && account.password_hash.length > 0) {
+      return {
+        success: false,
+        message: "A password is already set for this email. Sign in with that password.",
+      };
+    }
+
+    const { data: caseRow, error: caseError } = await admin
+      .schema("hrms")
+      .from("onboarding_cases")
+      .select("id, status, deleted_at, cancelled_at, archived_at, onboarding_account_active")
+      .eq("id", account.case_id)
+      .maybeSingle();
+
+    if (caseError) throw new Error(caseError.message);
+    if (!caseRow || caseRow.deleted_at) {
+      return { success: false, message: "Onboarding case not found for this email." };
+    }
+    if (caseRow.cancelled_at || caseRow.archived_at || !caseRow.onboarding_account_active) {
+      return { success: false, message: "This onboarding account is no longer available." };
+    }
+    if (["cancelled", "archived", "completed", "rejected"].includes(caseRow.status)) {
+      return { success: false, message: "This onboarding is closed. Contact HR for assistance." };
+    }
+
+    await markInvitationViewed(account.case_id);
+    await storePortalPassword(account.case_id, email, parsed.password);
+
+    const session = await createPortalSession(account.case_id);
+    await setCandidateSession(session);
+
+    return { success: true, message: "Password saved. You can sign in with this password anytime." };
+  } catch (error) {
+    return {
+      success: false,
+      message: onboardingPortalErrorMessage(error, "Could not set password. Please try again."),
     };
   }
 }

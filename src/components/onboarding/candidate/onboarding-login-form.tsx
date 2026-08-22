@@ -183,7 +183,11 @@ export function OnboardingLoginForm() {
         <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
           No account?{" "}
           <Link
-            href={ONBOARDING_ROUTES.signUp}
+            href={
+              email.trim()
+                ? `${ONBOARDING_ROUTES.signUp}?email=${encodeURIComponent(email.trim())}`
+                : ONBOARDING_ROUTES.signUp
+            }
             className="inline-flex items-center gap-1 font-semibold text-primary hover:underline"
           >
             <UserPlus className="h-3 w-3" />
