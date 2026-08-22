@@ -75,6 +75,7 @@ export async function getTeamAttendanceSummary(
       .select("id", { count: "exact", head: true })
       .in("employee_id", teamIds)
       .eq("correction_status", "pending")
+      .is("approver_employee_id", null)
       .is("deleted_at", null),
   ]);
 

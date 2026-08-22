@@ -58,6 +58,8 @@ export type CeoLeaveRecord = {
 export type CeoApprovalQueueItem = CeoLeaveRecord & {
   approvalRecordId: string;
   submittedAt: string;
+  requestCategory: "hr" | "manager";
+  requestCategoryLabel: string;
 };
 
 export type CeoDepartmentLeaveOverview = {
@@ -122,8 +124,10 @@ export type CeoLeaveDetail = {
   balances: LeaveEmployeeBalanceSnapshot[];
   /** True only when this leave is a pending approval assigned to the CEO. */
   canAct: boolean;
-  /** HR / Super Admin leave goes straight to CEO (no manager stage). */
+  /** HR / Manager leave goes straight to CEO (no manager/HR stage). */
   hrDirectToCeo: boolean;
+  requestCategory: "hr" | "manager" | null;
+  requestCategoryLabel: string | null;
 };
 
 export type CeoLeaveModuleData = {

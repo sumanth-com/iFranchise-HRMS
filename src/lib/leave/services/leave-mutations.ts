@@ -5,13 +5,13 @@ import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
 import {
   getEmployeeReportingManagerId,
-  getCeoApproverEmployeeId,
   getEmployeeRoleCodes,
   getHrApproverEmployeeId,
   isCeoLeaveApprover,
-  isHrLeaveApplicant,
   NO_HR_APPROVER_CONFIGURED_MESSAGE,
+  requireCeoApproverEmployeeId,
 } from "@/lib/leave/services/leave-queries";
+import { requiresCeoLeaveApproval } from "@/lib/approvals/executive-request-routing";
 import { evaluateLeaveApplication } from "@/lib/leave/services/leave-policy-runtime";
 import { NON_APPLY_LEAVE_TYPE_CODES } from "@/lib/leave/constants";
 import {
@@ -193,17 +193,18 @@ async function createApprovalSteps(
   const organizationId = profile.employee.organizationId;
   const applicantRoles = await getEmployeeRoleCodes(supabase, employeeId);
   const submitterRoles = profile.roles.map((role) => role.code);
-  const hrApplicant =
-    isHrLeaveApplicant(applicantRoles) ||
-    (employeeId === profile.employee.id && isHrLeaveApplicant(submitterRoles));
+  const executiveApplicant =
+    requiresCeoLeaveApproval(applicantRoles) ||
+    (employeeId === profile.employee.id &&
+      requiresCeoLeaveApproval(submitterRoles));
 
   const steps: Array<{ approverId: string; level: number }> = [];
 
-  if (hrApplicant) {
-    const ceoId = await getCeoApproverEmployeeId(supabase, organizationId);
-    if (!ceoId) {
-      throw new Error("No CEO is configured to approve HR leave requests");
-    }
+  if (executiveApplicant) {
+    const ceoId = await requireCeoApproverEmployeeId(
+      supabase,
+      organizationId,
+    );
     steps.push({ approverId: ceoId, level: 1 });
   } else {
     const managerId = await getEmployeeReportingManagerId(supabase, employeeId);
@@ -434,11 +435,13 @@ async function assertCanActOnLeaveApproval(
   }
 
   const applicantRoles = await getEmployeeRoleCodes(supabase, employeeId);
-  const hrApplicant = isHrLeaveApplicant(applicantRoles);
+  const executiveApplicant = requiresCeoLeaveApproval(applicantRoles);
 
-  if (hrApplicant) {
+  if (executiveApplicant) {
     if (!isCeoLeaveApprover(profile)) {
-      throw new Error("Only the CEO can approve or reject HR leave requests");
+      throw new Error(
+        "Only the CEO can approve or reject HR and Manager leave requests",
+      );
     }
     return;
   }

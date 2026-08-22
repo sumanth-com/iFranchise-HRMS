@@ -6,7 +6,9 @@ import { formatCleanEmployeeName } from "@/lib/employees/parse-employee-name";
 import { ALLOWED_LEAVE_TYPE_CODES } from "@/lib/leave/constants";
 import {
   getEmployeeLeaveBalanceSnapshot,
+  getEmployeeRoleCodes,
 } from "@/lib/leave/services/leave-queries";
+import { requiresCeoLeaveApproval } from "@/lib/approvals/executive-request-routing";
 import { classifyCalendarDay, DEFAULT_LEAVE_CALENDAR } from "@/lib/leave/services/leave-calendar-engine";
 import { loadLeavePolicyRuntime } from "@/lib/leave/services/leave-policy-runtime";
 import {
@@ -470,6 +472,8 @@ export async function listTeamLeaveRequests(
       const currentApprover = pendingApproval
         ? unwrap(pendingApproval.employees)
         : null;
+      const applicantRoles = await getEmployeeRoleCodes(supabase, row.employee_id);
+      const executiveApplicant = requiresCeoLeaveApproval(applicantRoles);
 
       const conflicts = await detectTeamLeaveConflicts(
         supabase,
@@ -528,9 +532,11 @@ export async function listTeamLeaveRequests(
         currentApprovalLevel: pendingApproval?.approval_level ?? null,
         pendingApproverEmployeeId: pendingApproval?.approver_employee_id ?? null,
         canActOnApproval:
+          !executiveApplicant &&
           pendingApproval?.approver_employee_id === profile.employee.id &&
           row.leave_status === "pending",
         canActOnRejection:
+          !executiveApplicant &&
           pendingApproval?.approver_employee_id === profile.employee.id &&
           row.leave_status === "pending",
         workflowStatus,

@@ -484,6 +484,7 @@ export async function getManagerDashboardData(
       )
       .in("employee_id", teamIds)
       .eq("correction_status", "pending")
+      .is("approver_employee_id", null)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(20),

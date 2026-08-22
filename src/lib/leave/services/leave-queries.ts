@@ -1125,6 +1125,12 @@ export const HR_LEAVE_APPROVER_ROLE_CODES = [
 export const NO_HR_APPROVER_CONFIGURED_MESSAGE =
   "No HR approver is configured for this employee. Please contact HR/Admin to configure the appropriate HR approver.";
 
+export const NO_CEO_APPROVER_CONFIGURED_MESSAGE =
+  "No active CEO is configured to approve this request. Please contact your administrator to assign a CEO approver for your organization.";
+
+export const NO_CEO_APPROVER_AMBIGUOUS_MESSAGE =
+  "Multiple CEOs are configured for this organization. Please contact your administrator to designate a single CEO approver before submitting executive requests.";
+
 export type ResolveHrApproverOptions = {
   /** Employee whose leave is being routed (uses assigned_hr_employee_id first). */
   employeeId?: string;
@@ -1391,17 +1397,139 @@ export async function listCeoLeaveApproverEmployeeIds(
   return Array.from(ids);
 }
 
+async function filterActiveCeoEmployeeIds(
+  organizationId: string,
+  ceoIds: string[],
+): Promise<string[]> {
+  if (ceoIds.length === 0) return [];
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select("id, employment_status, status")
+    .eq("organization_id", organizationId)
+    .in("id", ceoIds)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+
+  return (data ?? [])
+    .filter(
+      (row) =>
+        row.status === "active" &&
+        ["active", "probation"].includes(row.employment_status),
+    )
+    .map((row) => row.id);
+}
+
+/**
+ * Fail-closed CEO resolution for new HR/Manager leave requests.
+ * Requires exactly one active CEO in the organization.
+ */
+export async function requireCeoApproverEmployeeId(
+  _supabase: AuthSupabaseClient,
+  organizationId: string,
+): Promise<string> {
+  const ceoIds = await listCeoLeaveApproverEmployeeIds(organizationId);
+  const activeIds = await filterActiveCeoEmployeeIds(organizationId, ceoIds);
+
+  if (activeIds.length === 0) {
+    console.error("[leave] CEO routing failed (fail-closed)", {
+      organizationId,
+      reason: "no_active_ceo",
+      configuredCeoCount: ceoIds.length,
+    });
+    throw new Error(NO_CEO_APPROVER_CONFIGURED_MESSAGE);
+  }
+
+  if (activeIds.length > 1) {
+    console.error("[leave] CEO routing failed (fail-closed)", {
+      organizationId,
+      reason: "ambiguous_multiple_ceos",
+      activeCeoCount: activeIds.length,
+      activeCeoEmployeeIds: activeIds,
+    });
+    throw new Error(NO_CEO_APPROVER_AMBIGUOUS_MESSAGE);
+  }
+
+  return activeIds[0]!;
+}
+
+/**
+ * Repair/sync helper — when a logged-in CEO opens their queue.
+ * Uses preferred CEO when valid; otherwise requires exactly one active CEO.
+ */
+export async function resolveCeoApproverEmployeeIdForSync(
+  organizationId: string,
+  preferredCeoEmployeeId?: string | null,
+): Promise<string | null> {
+  const ceoIds = await listCeoLeaveApproverEmployeeIds(organizationId);
+  const activeIds = await filterActiveCeoEmployeeIds(organizationId, ceoIds);
+
+  if (preferredCeoEmployeeId && activeIds.includes(preferredCeoEmployeeId)) {
+    return preferredCeoEmployeeId;
+  }
+
+  if (activeIds.length === 1) {
+    return activeIds[0]!;
+  }
+
+  return null;
+}
+
+/** @deprecated Use requireCeoApproverEmployeeId for new requests or resolveCeoApproverEmployeeIdForSync for repair. */
 export async function getCeoApproverEmployeeId(
   _supabase: AuthSupabaseClient,
   organizationId: string,
   preferredCeoEmployeeId?: string | null,
 ): Promise<string | null> {
-  const ceoIds = await listCeoLeaveApproverEmployeeIds(organizationId);
-  if (ceoIds.length === 0) return null;
-  if (preferredCeoEmployeeId && ceoIds.includes(preferredCeoEmployeeId)) {
-    return preferredCeoEmployeeId;
-  }
-  return ceoIds[0] ?? null;
+  return resolveCeoApproverEmployeeIdForSync(
+    organizationId,
+    preferredCeoEmployeeId,
+  );
+}
+
+export async function listManagerLeaveApplicantEmployeeIds(
+  organizationId: string,
+): Promise<string[]> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .schema("hrms")
+    .from("user_roles")
+    .select(
+      `
+        employee_id,
+        roles!inner (code),
+        employees!inner (organization_id, deleted_at)
+      `,
+    )
+    .eq("employees.organization_id", organizationId)
+    .in("roles.code", ["manager"])
+    .is("deleted_at", null)
+    .is("employees.deleted_at", null);
+
+  if (error) throw new Error(error.message);
+
+  const managerIds = Array.from(
+    new Set((data ?? []).map((row) => row.employee_id).filter(Boolean)),
+  );
+  if (managerIds.length === 0) return [];
+
+  const hrApplicantIds = new Set(
+    await listHrLeaveApplicantEmployeeIds(organizationId),
+  );
+  return managerIds.filter((id) => !hrApplicantIds.has(id));
+}
+
+export async function listExecutiveLeaveApplicantEmployeeIds(
+  organizationId: string,
+): Promise<string[]> {
+  const [hrIds, managerIds] = await Promise.all([
+    listHrLeaveApplicantEmployeeIds(organizationId),
+    listManagerLeaveApplicantEmployeeIds(organizationId),
+  ]);
+  return Array.from(new Set([...hrIds, ...managerIds]));
 }
 
 export async function getEmployeeRoleCodes(
@@ -1425,34 +1553,32 @@ export async function getEmployeeRoleCodes(
 }
 
 /**
- * Ensures pending leave from HR / Super Admin applicants is assigned to the CEO
- * so it appears in Executive Approvals (and not only on a wrong Team Leave path).
+ * Ensures pending leave from HR / Manager applicants is assigned to the CEO
+ * so it appears in Executive Approvals (and not on manager/HR team queues).
  *
- * When `preferredCeoEmployeeId` is a valid executive approver (role or
- * portal.ceo.access), pending HR leave is routed to that person so the
- * logged-in executive sees the queue.
+ * When `preferredCeoEmployeeId` is a valid executive approver, pending executive
+ * leave is routed to that person so the logged-in executive sees the queue.
  */
-export async function ensurePendingHrLeaveAssignedToCeo(
+export async function ensurePendingExecutiveLeaveAssignedToCeo(
   organizationId: string,
   preferredCeoEmployeeId?: string | null,
 ): Promise<void> {
-  const hrApplicantIds = await listHrLeaveApplicantEmployeeIds(organizationId);
-  if (hrApplicantIds.length === 0) return;
+  const executiveApplicantIds =
+    await listExecutiveLeaveApplicantEmployeeIds(organizationId);
+  if (executiveApplicantIds.length === 0) return;
 
   const admin = createAdminClient();
-  const ceoId =
-    preferredCeoEmployeeId ||
-    (await getCeoApproverEmployeeId(
-      admin as unknown as AuthSupabaseClient,
-      organizationId,
-    ));
+  const ceoId = await resolveCeoApproverEmployeeIdForSync(
+    organizationId,
+    preferredCeoEmployeeId,
+  );
   if (!ceoId) return;
 
   const { data: pendingLeaves, error: leaveError } = await admin
     .schema("hrms")
     .from("leave_requests")
     .select("id, created_by")
-    .in("employee_id", hrApplicantIds)
+    .in("employee_id", executiveApplicantIds)
     .eq("leave_status", "pending")
     .is("deleted_at", null);
 
@@ -1603,4 +1729,15 @@ export async function ensurePendingHrLeaveAssignedToCeo(
       throw new Error(insertError.message);
     }
   }
+}
+
+/** @deprecated Use ensurePendingExecutiveLeaveAssignedToCeo */
+export async function ensurePendingHrLeaveAssignedToCeo(
+  organizationId: string,
+  preferredCeoEmployeeId?: string | null,
+): Promise<void> {
+  return ensurePendingExecutiveLeaveAssignedToCeo(
+    organizationId,
+    preferredCeoEmployeeId,
+  );
 }

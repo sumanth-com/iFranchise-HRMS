@@ -51,9 +51,9 @@ export function CeoLeaveApprovalsView({
           <h1 className="text-2xl font-semibold tracking-tight">Leave Approvals</h1>
         </SectionHelpButton>
         <p className="mt-1 text-sm text-muted-foreground">
-          Review and approve leave requests assigned to you. HR leave comes to you
-          directly (managers cannot approve it). Other employee requests reach you only
-          when they are routed for executive approval.
+          Review and approve leave requests assigned to you. HR and Manager leave comes
+          to you directly. Employee requests reach you only when routed for executive
+          approval.
         </p>
       </div>
 

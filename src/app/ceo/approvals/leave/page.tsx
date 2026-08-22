@@ -7,7 +7,7 @@ import {
   getCeoForwardTargets,
   listCeoApprovalQueue,
 } from "@/lib/ceo/services/ceo-leave-queries";
-import { ensurePendingHrLeaveAssignedToCeo } from "@/lib/leave/services/leave-queries";
+import { ensurePendingExecutiveLeaveAssignedToCeo } from "@/lib/leave/services/leave-queries";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -18,13 +18,13 @@ async function CeoLeaveApprovalsContent() {
   ]);
   const supabase = await createClient();
 
-  await ensurePendingHrLeaveAssignedToCeo(
+  await ensurePendingExecutiveLeaveAssignedToCeo(
     profile.employee.organizationId,
     profile.employee.id,
   ).catch(
     (error) => {
       console.error(
-        "[ceo-leave] failed to assign pending HR leave to CEO",
+        "[ceo-leave] failed to assign pending executive leave to CEO",
         error instanceof Error ? error.message : error,
       );
     },

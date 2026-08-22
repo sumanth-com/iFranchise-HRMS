@@ -283,16 +283,16 @@ export async function createOfferAction(formData: FormData): Promise<ActionResul
     let offerFile: { bytes: Uint8Array; filename: string };
     try {
       assertOfferLetterFile(file);
+      offerFile = {
+        bytes: new Uint8Array(await file.arrayBuffer()),
+        filename: file.name,
+      };
     } catch (error) {
       return {
         success: false,
         message: error instanceof Error ? error.message : "Invalid offer letter file",
       };
     }
-    offerFile = {
-      bytes: new Uint8Array(await file.arrayBuffer()),
-      filename: file.name,
-    };
 
     const id = await createOffer(supabase, profile, parsed, offerFile);
     revalidateRecruitment();

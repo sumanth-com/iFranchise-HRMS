@@ -30,6 +30,11 @@ import {
 } from "@/lib/attendance/services/attendance-utils";
 import { getEmployeeBranchId } from "@/lib/attendance/services/attendance-queries";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
+import {
+  getEmployeeRoleCodes,
+  requireCeoApproverEmployeeId,
+} from "@/lib/leave/services/leave-queries";
+import { requiresCeoRegularizationApproval } from "@/lib/approvals/executive-request-routing";
 import { parseWorkingConfiguration } from "@/lib/company-settings/services/company-settings-parsers";
 import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
 import { getEmployeeById } from "@/lib/employees/services/employee-detail";
@@ -1254,6 +1259,16 @@ export async function requestManagerAttendanceRegularization(
     throw new Error("Requested checkout cannot be in the future.");
   }
 
+  const applicantRoles = await getEmployeeRoleCodes(supabase, employeeId);
+  const executiveApplicant = requiresCeoRegularizationApproval(applicantRoles);
+  let approverEmployeeId: string | null = null;
+  if (executiveApplicant) {
+    approverEmployeeId = await requireCeoApproverEmployeeId(
+      supabase,
+      profile.employee.organizationId,
+    );
+  }
+
   const { data: correction, error } = await supabase
     .schema("hrms")
     .from("attendance_corrections")
@@ -1264,6 +1279,7 @@ export async function requestManagerAttendanceRegularization(
       requested_check_out_at: requestedCheckOutAt,
       reason: input.reason.trim(),
       correction_status: "pending",
+      approver_employee_id: approverEmployeeId,
       status: "active",
       created_by: profile.userId,
       updated_by: profile.userId,
@@ -1292,6 +1308,7 @@ export async function requestManagerAttendanceRegularization(
     profile,
     correction.id,
     input.attendanceDate,
+    { executiveApplicant, ceoEmployeeId: approverEmployeeId },
   );
 
   return correction.id;

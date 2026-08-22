@@ -31,11 +31,14 @@ import {
   getEmployeeLeaveBalanceSnapshot,
   getLeaveCalendarData,
   getLeaveLookups,
-  ensurePendingHrLeaveAssignedToCeo,
+  ensurePendingExecutiveLeaveAssignedToCeo,
   getEmployeeRoleCodes,
   isCeoLeaveApprover,
-  isHrLeaveApplicant,
 } from "@/lib/leave/services/leave-queries";
+import {
+  executiveRequestCategoryLabel,
+  getExecutiveRequestCategory,
+} from "@/lib/approvals/executive-request-routing";
 import { getLeaveRequestById } from "@/lib/leave/services/leave-detail";
 
 const APPROVER_ROLE_CODES = [
@@ -280,10 +283,10 @@ export async function listCeoApprovalQueue(
   const ceoEmployeeId = profile.employee.id;
 
   if (isCeoLeaveApprover(profile)) {
-    await ensurePendingHrLeaveAssignedToCeo(organizationId, ceoEmployeeId).catch(
+    await ensurePendingExecutiveLeaveAssignedToCeo(organizationId, ceoEmployeeId).catch(
       (error) => {
         console.error(
-          "[ceo-leave] failed to assign pending HR leave to CEO",
+          "[ceo-leave] failed to assign pending executive leave to CEO",
           error instanceof Error ? error.message : error,
         );
       },
@@ -327,6 +330,8 @@ export async function listCeoApprovalQueue(
   if (error) throw new Error(error.message);
 
   const items: CeoApprovalQueueItem[] = [];
+  const roleCodesByEmployee = new Map<string, string[]>();
+
   for (const row of (data as unknown as LeaveRow[]) ?? []) {
     const approvals = row.leave_approvals ?? [];
     const activeLevel = approvals
@@ -336,10 +341,19 @@ export async function listCeoApprovalQueue(
     if (!ceoStep || activeLevel == null || ceoStep.level !== activeLevel) continue;
 
     const record = mapLeaveRow(row);
+    let roleCodes = roleCodesByEmployee.get(row.employee_id);
+    if (!roleCodes) {
+      roleCodes = await getEmployeeRoleCodes(supabase, row.employee_id);
+      roleCodesByEmployee.set(row.employee_id, roleCodes);
+    }
+    const requestCategory = getExecutiveRequestCategory(roleCodes) ?? "hr";
+
     items.push({
       ...record,
       approvalRecordId: ceoStep.id,
       submittedAt: row.created_at,
+      requestCategory,
+      requestCategoryLabel: executiveRequestCategoryLabel(requestCategory),
     });
   }
 
@@ -806,7 +820,8 @@ export async function getCeoLeaveDetail(
 
   const balances = await getEmployeeLeaveBalanceSnapshot(supabase, detail.employeeId);
   const applicantRoles = await getEmployeeRoleCodes(supabase, detail.employeeId);
-  const hrDirectToCeo = isHrLeaveApplicant(applicantRoles);
+  const requestCategory = getExecutiveRequestCategory(applicantRoles);
+  const executiveDirectToCeo = requestCategory != null;
 
   const activeLevel = detail.approvals
     .filter((a) => a.approvalStatus === "pending")
@@ -840,7 +855,11 @@ export async function getCeoLeaveDetail(
     approvals: detail.approvals,
     balances,
     canAct,
-    hrDirectToCeo,
+    hrDirectToCeo: executiveDirectToCeo,
+    requestCategory,
+    requestCategoryLabel: requestCategory
+      ? executiveRequestCategoryLabel(requestCategory)
+      : null,
   };
 }
 

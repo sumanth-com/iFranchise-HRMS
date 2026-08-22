@@ -11,6 +11,7 @@ import {
   notifyAttendanceCorrectionApproved,
   notifyAttendanceCorrectionRejected,
 } from "@/lib/attendance/services/attendance-notifications";
+import { isCeoLeaveApprover } from "@/lib/leave/services/leave-queries";
 import { teamCorrectionReviewSchema } from "@/lib/validations/manager-team";
 import type { UserProfile } from "@/types/auth";
 import type { AttendanceStatus } from "@/types/attendance";
@@ -110,6 +111,22 @@ export async function reviewOrganizationAttendanceCorrection(
   });
 }
 
+export async function reviewCeoAttendanceCorrection(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: unknown,
+  decision: "approved" | "rejected",
+) {
+  if (!isCeoLeaveApprover(profile)) {
+    throw new Error("Only the CEO can approve or reject this regularization request");
+  }
+
+  return reviewAttendanceCorrection(supabase, profile, input, decision, {
+    organizationId: profile.employee.organizationId,
+    requireAssignedCeo: true,
+  });
+}
+
 async function reviewAttendanceCorrection(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -117,7 +134,7 @@ async function reviewAttendanceCorrection(
   decision: "approved" | "rejected",
   scope:
     | { allowedEmployeeIds: string[] }
-    | { organizationId: string },
+    | { organizationId: string; requireAssignedCeo?: boolean },
 ) {
   const parsed = teamCorrectionReviewSchema.parse(input);
 
@@ -130,6 +147,7 @@ async function reviewAttendanceCorrection(
         employee_id,
         attendance_id,
         correction_status,
+        approver_employee_id,
         requested_check_in_at,
         requested_check_out_at,
         attendance:attendance_id (attendance_date)
@@ -141,13 +159,26 @@ async function reviewAttendanceCorrection(
 
   if (fetchError) throw new Error(fetchError.message);
   if (!correction) throw new Error("Correction request not found.");
-  if (
-    "allowedEmployeeIds" in scope &&
-    !scope.allowedEmployeeIds.includes(correction.employee_id)
-  ) {
-    throw new Error("You can only review corrections for your team.");
+  if (correction.correction_status !== "pending") {
+    throw new Error("This correction has already been reviewed.");
   }
-  if ("organizationId" in scope) {
+
+  if (correction.approver_employee_id) {
+    if (
+      !isCeoLeaveApprover(profile) ||
+      correction.approver_employee_id !== profile.employee.id
+    ) {
+      throw new Error(
+        "Only the assigned CEO can approve or reject this regularization request",
+      );
+    }
+  } else if ("requireAssignedCeo" in scope && scope.requireAssignedCeo) {
+    throw new Error("This regularization request is not assigned to you");
+  } else if ("allowedEmployeeIds" in scope) {
+    if (!scope.allowedEmployeeIds.includes(correction.employee_id)) {
+      throw new Error("You can only review corrections for your team.");
+    }
+  } else if ("organizationId" in scope) {
     const { data: employeeRow, error: employeeError } = await supabase
       .schema("hrms")
       .from("employees")
@@ -160,9 +191,6 @@ async function reviewAttendanceCorrection(
     if (!employeeRow || employeeRow.organization_id !== scope.organizationId) {
       throw new Error("Correction request not found.");
     }
-  }
-  if (correction.correction_status !== "pending") {
-    throw new Error("This correction has already been reviewed.");
   }
 
   const reviewedAt = new Date().toISOString();

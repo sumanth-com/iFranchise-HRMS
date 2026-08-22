@@ -5,8 +5,8 @@ import { hasPermission } from "@/lib/permissions/utils";
 import {
   getEmployeeRoleCodes,
   isCeoLeaveApprover,
-  isHrLeaveApplicant,
 } from "@/lib/leave/services/leave-queries";
+import { requiresCeoLeaveApproval } from "@/lib/approvals/executive-request-routing";
 
 function unwrapRelation<T>(value: T | T[] | null): T | null {
   if (!value) return null;
@@ -104,17 +104,17 @@ export async function getLeaveRequestById(
   const isAssignedApprover =
     pendingApproval?.approverEmployeeId === profile.employee.id;
   const applicantRoles = await getEmployeeRoleCodes(supabase, data.employee_id);
-  const hrApplicant = isHrLeaveApplicant(applicantRoles);
+  const executiveApplicant = requiresCeoLeaveApproval(applicantRoles);
 
   const canApprove =
     isPending &&
     isAssignedApprover &&
-    (hrApplicant ? isCeoLeaveApprover(profile) : true);
+    (executiveApplicant ? isCeoLeaveApprover(profile) : true);
 
   const canReject =
     isPending &&
     isAssignedApprover &&
-    (hrApplicant ? isCeoLeaveApprover(profile) : true);
+    (executiveApplicant ? isCeoLeaveApprover(profile) : true);
 
   const canCancel =
     ["pending", "approved"].includes(data.leave_status) &&

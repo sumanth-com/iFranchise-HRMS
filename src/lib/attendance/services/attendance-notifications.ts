@@ -1,6 +1,7 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
+import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { notifyEmployee } from "@/lib/notifications/services/notification-service";
 
 function formatHoursLabel(hours: number) {
@@ -73,12 +74,17 @@ export async function notifyAttendanceRegularizationRequested(
   profile: UserProfile,
   correctionId: string,
   attendanceDate: string,
+  options?: { executiveApplicant?: boolean; ceoEmployeeId?: string | null },
 ) {
+  const executiveApplicant = options?.executiveApplicant ?? false;
+
   await notifyEmployee(supabase, {
     organizationId: profile.employee.organizationId,
     employeeId: profile.employee.id,
     title: "Regularization requested",
-    message: `Your attendance regularization for ${attendanceDate} was submitted for review.`,
+    message: executiveApplicant
+      ? `Your attendance regularization for ${attendanceDate} was submitted and is pending CEO approval.`
+      : `Your attendance regularization for ${attendanceDate} was submitted for review.`,
     notificationType: "attendance_regularization_requested",
     module: "attendance",
     priority: "medium",
@@ -87,6 +93,22 @@ export async function notifyAttendanceRegularizationRequested(
     templateKey: "attendance_correction",
     createdBy: profile.userId,
   });
+
+  if (executiveApplicant && options?.ceoEmployeeId) {
+    await notifyEmployee(supabase, {
+      organizationId: profile.employee.organizationId,
+      employeeId: options.ceoEmployeeId,
+      title: "Regularization pending CEO approval",
+      message: `An HR or Manager attendance regularization for ${attendanceDate} requires your approval.`,
+      notificationType: "attendance_regularization_requested",
+      module: "attendance",
+      priority: "high",
+      actionUrl: CEO_ROUTES.approvalsRegularization,
+      sourceEventKey: `attendance_regularization_ceo:${correctionId}:${options.ceoEmployeeId}`,
+      templateKey: "attendance_correction",
+      createdBy: profile.userId,
+    });
+  }
 }
 
 export async function notifyAttendanceCorrectionApproved(

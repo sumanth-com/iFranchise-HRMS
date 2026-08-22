@@ -110,6 +110,15 @@ export function CeoLeaveApprovalQueue({
 
   const columns: DataTableColumn<CeoApprovalQueueItem>[] = [
     {
+      key: "requestCategoryLabel",
+      header: "Request Type",
+      render: (row) => (
+        <span className="inline-flex items-center rounded-full bg-violet-500/10 px-2.5 py-0.5 text-xs font-medium text-violet-700 dark:text-violet-300">
+          {row.requestCategoryLabel}
+        </span>
+      ),
+    },
+    {
       key: "employeeName",
       header: "Employee",
       render: (row) => (
@@ -209,7 +218,7 @@ export function CeoLeaveApprovalQueue({
   return (
     <LeavePanel
       title="CEO Approval Queue"
-      description="Leave requests routed to you for executive approval. HR leave comes here directly — managers cannot approve it."
+      description="Leave requests from HR and Manager users routed for executive approval. Employee requests only appear here when assigned to you."
       count={items.length}
     >
       <DataTable
