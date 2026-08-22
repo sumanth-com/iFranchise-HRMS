@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { Menu, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { Suspense } from "react";
@@ -7,10 +8,21 @@ import { Suspense } from "react";
 import { Button } from "@/components/common/button";
 import { BreadcrumbNav } from "@/components/layout/breadcrumb-nav";
 import { NotificationBell } from "@/components/notifications/notification-bell";
-import { PortalSwitcher } from "@/components/system-admin/portal-switcher";
 import { UserProfileDropdown } from "@/components/layout/user-profile-dropdown";
+import { PortalSwitcherSkeleton } from "@/components/system-admin/portal-switcher";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/providers/auth-provider";
+
+const PortalSwitcher = dynamic(
+  () =>
+    import("@/components/system-admin/portal-switcher").then(
+      (mod) => mod.PortalSwitcher,
+    ),
+  {
+    ssr: false,
+    loading: () => <PortalSwitcherSkeleton />,
+  },
+);
 
 export function TopNav() {
   const pathname = usePathname();

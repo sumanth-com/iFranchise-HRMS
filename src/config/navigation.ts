@@ -205,11 +205,4 @@ export const mainNavItems: NavigationItem[] = [
     section: "Administration",
     permissions: ["role.view", "permission.view", "user_role.view"],
   },
-  {
-    title: "Company Settings",
-    href: "/dashboard/company-settings",
-    icon: Settings,
-    section: "Administration",
-    permissions: ["settings.view"],
-  },
 ];

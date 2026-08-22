@@ -382,7 +382,7 @@ function buildBreadcrumbItems(
     const items: BreadcrumbItemConfig[] = [
       { label: "Dashboard", href: HR_PORTAL_HOME },
       { label: "Payroll", href: "/dashboard/payroll" },
-      { label: "Team Payroll", href: "/dashboard/payroll/team" },
+      { label: "Team Payroll", href: "/dashboard/payroll/team/run" },
     ];
 
     const sectionLabels: Record<string, string> = {

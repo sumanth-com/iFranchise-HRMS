@@ -27,6 +27,7 @@ import {
   canCreateAssets,
   canDeleteAssets,
   canEditAssets,
+  ASSET_ACTIVITY_FILTER_ITEMS,
 } from "@/lib/assets/constants";
 import type {
   AssetActivityItem,
@@ -46,13 +47,10 @@ type Props = {
   showAddButton?: boolean;
 };
 
-const TYPE_ITEMS = [
-  { value: "all", label: "All activity" },
-  { value: "report", label: "Reports" },
-  { value: "replace", label: "Replace" },
-  { value: "return", label: "Return" },
-  { value: "assigned", label: "Assigned" },
-];
+const TYPE_ITEMS = ASSET_ACTIVITY_FILTER_ITEMS.map((item) => ({
+  value: item.value,
+  label: item.label,
+}));
 
 const MONTH_ITEMS = [
   { value: "all", label: "All months" },

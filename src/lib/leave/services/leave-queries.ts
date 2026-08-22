@@ -418,11 +418,12 @@ export async function listEmployeeOwnLeaveRequests(
   employeeId: string,
   page = 1,
   pageSize = 25,
+  monthYear?: { month: number; year: number },
 ): Promise<LeaveListItem[]> {
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  const { data, error } = await supabase
+  let query = supabase
     .schema("hrms")
     .from("leave_requests")
     .select(
@@ -438,11 +439,19 @@ export async function listEmployeeOwnLeaveRequests(
         reason,
         leave_status,
         created_at,
+        duration_breakdown,
         leave_types:leave_type_id (name, code)
       `,
     )
     .eq("employee_id", employeeId)
-    .is("deleted_at", null)
+    .is("deleted_at", null);
+
+  if (monthYear) {
+    const range = getMonthDateRange(monthYear.month, monthYear.year);
+    query = query.lte("start_date", range.end).gte("end_date", range.start);
+  }
+
+  const { data, error } = await query
     .order("created_at", { ascending: false })
     .range(from, to);
 
@@ -476,6 +485,7 @@ export async function listEmployeeOwnLeaveRequests(
       reason: row.reason,
       leaveStatus: row.leave_status as LeaveListItem["leaveStatus"],
       appliedAt: row.created_at,
+      durationBreakdown: row.duration_breakdown ?? undefined,
       approverName: null,
       currentApprovalLevel: null,
     };
@@ -596,14 +606,15 @@ export async function getLeaveSummary(
 export async function getEmployeeLeaveBalanceSnapshot(
   supabase: AuthSupabaseClient,
   employeeId: string,
-  balanceYear = getCurrentBalanceYear(),
+  balanceYearParam = getCurrentBalanceYear(),
   monthYear?: { month: number; year: number },
 ): Promise<LeaveEmployeeBalanceSnapshot[]> {
   const now = new Date();
+  const calendarYear = monthYear?.year ?? balanceYearParam;
+  const balanceYear = balanceYearParam;
   const month = monthYear?.month ?? now.getMonth() + 1;
-  const year = monthYear?.year ?? now.getFullYear();
-  const monthRange = getMonthDateRange(month, year);
-  const yearRange = { start: `${balanceYear}-01-01`, end: `${balanceYear}-12-31` };
+  const monthRange = getMonthDateRange(month, calendarYear);
+  const yearRange = { start: `${calendarYear}-01-01`, end: `${calendarYear}-12-31` };
 
   const [employeeResult, balancesResult] = await Promise.all([
     supabase
@@ -672,6 +683,7 @@ export async function getEmployeeLeaveBalanceSnapshot(
   }
   const monthUsedByCode: Record<string, number> = {};
   const yearUsedByCode: Record<string, number> = {};
+  const yearTakenByCode: Record<string, number> = {};
 
   for (const row of requestRows) {
     const leaveType = unwrapRelation(
@@ -686,11 +698,12 @@ export async function getEmployeeLeaveBalanceSnapshot(
       isHalfDay: Boolean(row.is_half_day),
       durationBreakdown: row.duration_breakdown,
     };
+    const takenInYear = countLeaveDaysInRange(request, yearRange, calendar);
     monthUsedByCode[code] =
       (monthUsedByCode[code] ?? 0) + countLeaveDaysInRange(request, monthRange, calendar);
+    yearTakenByCode[code] = (yearTakenByCode[code] ?? 0) + takenInYear;
     if (row.leave_status === "approved") {
-      yearUsedByCode[code] =
-        (yearUsedByCode[code] ?? 0) + countLeaveDaysInRange(request, yearRange, calendar);
+      yearUsedByCode[code] = (yearUsedByCode[code] ?? 0) + takenInYear;
     }
   }
 
@@ -753,6 +766,7 @@ export async function getEmployeeLeaveBalanceSnapshot(
       balanceDays: roundLeaveDays(balanceDays),
       monthUsedDays: roundLeaveDays(monthUsedByCode[code] ?? 0),
       monthTotalDays: roundLeaveDays(allocatedDays),
+      yearTakenDays: roundLeaveDays(yearTakenByCode[code] ?? 0),
     };
   });
 }

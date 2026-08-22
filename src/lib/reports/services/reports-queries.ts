@@ -3,7 +3,8 @@ import { format, startOfMonth, subMonths } from "date-fns";
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { absentTodayIncludingLeave } from "@/lib/attendance/attendance-presence";
 import { getAttendanceSummary } from "@/lib/attendance/services/attendance-queries";
-import { getAssetsReports, getAssetsSummary } from "@/lib/assets/services/asset-queries";
+import { getAssetsReports, getAssetActivityFeed, getAssetsSummary } from "@/lib/assets/services/asset-queries";
+import { ASSET_ACTIVITY_FILTER_ITEMS } from "@/lib/assets/constants";
 import { getExitSummary } from "@/lib/exit/services/exit-queries";
 import { getLeaveSummary } from "@/lib/leave/services/leave-queries";
 import { getPayrollSummary } from "@/lib/payroll/services/payroll-queries";
@@ -25,6 +26,7 @@ import {
   unwrapRelation,
 } from "@/lib/reports/services/reports-utils";
 import type { UserProfile } from "@/types/auth";
+import type { AssetActivityItem } from "@/types/assets";
 import type {
   ExecutiveDashboard,
   ReportFilters,
@@ -1393,15 +1395,32 @@ async function runRecruitmentReport(
   );
 }
 
+function matchesAssetActionFilter(row: AssetActivityItem, action: string | undefined): boolean {
+  const filter = action && action !== "all" ? action : "all";
+  if (filter === "all") return true;
+  if (filter === "report") return row.kind === "issue_reported";
+  if (filter === "replace") return row.kind === "replacement_requested";
+  if (filter === "return") return row.kind === "return_requested";
+  if (filter === "assigned") return row.kind === "assigned";
+  return true;
+}
+
+function resolveAssetActivityReportTitle(action: string | undefined): string {
+  if (!action || action === "all") return "Asset Activity";
+  const match = ASSET_ACTIVITY_FILTER_ITEMS.find((item) => item.value === action);
+  return match ? `${match.label} — Asset Activity` : "Asset Activity";
+}
+
 async function runAssetsReport(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   key: ReportKey,
+  filters: ReportFilters = {},
 ): Promise<ReportResult> {
   const title = REPORT_KEY_LABELS[key];
-  const reports = await getAssetsReports(supabase, profile);
 
   if (key === "assets_warranty") {
+    const reports = await getAssetsReports(supabase, profile);
     return buildResult(
       key,
       title,
@@ -1459,48 +1478,52 @@ async function runAssetsReport(
     );
   }
 
-  const organizationId = profile.employee.organizationId;
-  const status = key === "assets_returned" ? "returned" : "active";
-  const { data, error } = await fromHrms(supabase, "asset_assignments")
-    .select(
-      `
-      assigned_date, returned_date, assignment_status,
-      assets:asset_id(asset_code, name),
-      employees:employee_id(employee_code, first_name, last_name)
-    `,
-    )
-    .eq("organization_id", organizationId)
-    .eq("assignment_status", status)
-    .is("deleted_at", null)
-    .order("assigned_date", { ascending: false })
-    .limit(2000);
-  if (error) throw new Error(error.message);
+  const action =
+    filters.assetAction && filters.assetAction !== "all"
+      ? filters.assetAction
+      : key === "assets_returned"
+        ? "return"
+        : "all";
+  const { dateFrom, dateTo } = resolveDates(filters);
+  const activity = await getAssetActivityFeed(supabase, profile, {
+    limit: 3000,
+    activityType: "all",
+  });
+
+  const rows = activity
+    .filter((row) => matchesAssetActionFilter(row, action))
+    .filter((row) => {
+      const day = row.performedAt.slice(0, 10);
+      if (dateFrom && day < dateFrom) return false;
+      if (dateTo && day > dateTo) return false;
+      return true;
+    })
+    .filter((row) => !filters.employeeId || row.employeeId === filters.employeeId)
+    .map((row) => ({
+      action: row.actionLabel,
+      assetCode: row.assetCode,
+      assetName: row.assetName,
+      employeeName: row.employeeName ?? "—",
+      date: row.performedAt.slice(0, 10),
+      performedBy: row.performedByName ?? "—",
+      notes: row.remarks ?? row.detailNotes ?? "",
+    }));
+
+  const reportTitle = resolveAssetActivityReportTitle(action);
 
   return buildResult(
     key,
-    title,
+    reportTitle,
     [
+      { key: "action", header: "Action" },
       { key: "assetCode", header: "Code" },
       { key: "assetName", header: "Asset" },
-      { key: "employeeCode", header: "Emp Code" },
       { key: "employeeName", header: "Employee" },
-      { key: "assignedDate", header: "Assigned" },
-      { key: "returnedDate", header: "Returned" },
-      { key: "status", header: "Status" },
+      { key: "date", header: "Date" },
+      { key: "performedBy", header: "Performed By" },
+      { key: "notes", header: "Notes" },
     ],
-    ((data ?? []) as ReportRowLoose[]).map((row) => {
-      const asset = unwrapRelation(row.assets);
-      const emp = unwrapRelation(row.employees);
-      return {
-        assetCode: asset?.asset_code ?? "—",
-        assetName: asset?.name ?? "—",
-        employeeCode: emp?.employee_code ?? "—",
-        employeeName: formatEmployeeName(emp?.first_name, emp?.last_name),
-        assignedDate: row.assigned_date,
-        returnedDate: row.returned_date ?? "",
-        status: row.assignment_status,
-      };
-    }),
+    rows,
   );
 }
 
@@ -1655,7 +1678,7 @@ export async function runReport(
   if (key.startsWith("recruitment_")) {
     return runRecruitmentReport(supabase, profile, key, filters);
   }
-  if (key.startsWith("assets_")) return runAssetsReport(supabase, profile, key);
+  if (key.startsWith("assets_")) return runAssetsReport(supabase, profile, key, filters);
   if (key.startsWith("exit_")) return runExitReport(supabase, profile, key, filters);
 
   throw new Error(`Unknown report: ${key}`);

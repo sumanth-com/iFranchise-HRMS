@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { DESIGNATION_OTHER_VALUE } from "@/lib/employees/constants";
+import { optionalPastOrTodayDateSchema } from "@/lib/validations/date";
 import {
   optionalPhoneSchema,
   requiredPhoneSchema,
@@ -104,23 +105,48 @@ export type EmployeeSelfPreferencesInput = z.infer<typeof employeeSelfPreference
 
 export const employeeSelfProfileSchema = z.object({
   personalEmail: z.string().email().optional().or(z.literal("")),
-  personalPhone: optionalPhoneSchema,
-  language: z.string().min(2).max(20),
+  personalPhone: requiredPhoneSchema,
+  language: z.string().min(2, "Language is required").max(20),
   timezone: z.string().min(1).max(80),
-  addressLine1: z.string().max(200).optional().or(z.literal("")),
-  addressLine2: z.string().max(200).optional().or(z.literal("")),
-  city: z.string().max(100).optional().or(z.literal("")),
-  state: z.string().max(100).optional().or(z.literal("")),
-  postalCode: z.string().max(20).optional().or(z.literal("")),
-  country: z.string().max(100).optional().or(z.literal("")),
-  emergencyContactName: z.string().max(100).optional().or(z.literal("")),
-  emergencyContactRelationship: z.string().max(100).optional().or(z.literal("")),
-  emergencyContactPhone: optionalPhoneSchema,
-  emergencyContactEmail: z.string().email().optional().or(z.literal("")),
+  addressLine1: z
+    .string()
+    .trim()
+    .min(1, "Address line 1 is required")
+    .max(200),
+  addressLine2: z
+    .string()
+    .trim()
+    .min(1, "Address line 2 is required")
+    .max(200),
+  city: z.string().trim().min(1, "City is required").max(100),
+  state: z.string().trim().min(1, "State is required").max(100),
+  postalCode: z.string().trim().min(1, "Postal code is required").max(20),
+  country: z.string().trim().min(1, "Country is required").max(100),
+  emergencyContactName: z
+    .string()
+    .trim()
+    .min(1, "Emergency contact name is required")
+    .max(100),
+  emergencyContactRelationship: z
+    .string()
+    .trim()
+    .min(1, "Emergency relationship is required")
+    .max(100),
+  emergencyContactPhone: requiredPhoneSchema,
+  emergencyContactEmail: z
+    .string()
+    .trim()
+    .min(1, "Emergency email is required")
+    .email("Enter a valid emergency email"),
   reportingManagerId: z.string().uuid().optional().or(z.literal("")),
 });
 
 export type EmployeeSelfProfileInput = z.infer<typeof employeeSelfProfileSchema>;
+
+/** Validates only language/timezone when contact self-edit is disabled. */
+export const employeeSelfProfilePreferencesOnlySchema = employeeSelfProfileSchema
+  .partial()
+  .required({ language: true, timezone: true });
 
 export const employeeBasicStepSchema = z.object({
   employeeCode: z
@@ -131,7 +157,7 @@ export const employeeBasicStepSchema = z.object({
   lastName: z.string().min(1, "Last name is required").max(100),
   email: z.string().email("Enter a valid email address"),
   phone: optionalPhoneSchema,
-  dateOfBirth: z.string().optional(),
+  dateOfBirth: optionalPastOrTodayDateSchema,
   gender: genderTypeSchema.optional(),
   maritalStatus: maritalStatusSchema.optional(),
   nationality: z.string().max(100).optional(),
@@ -213,7 +239,7 @@ export const employeeUpdateSchema = z
     employmentStatus: employmentStatusSchema,
     dateOfJoining: z.string().optional().or(z.literal("")),
     dateOfLeaving: z.string().optional().or(z.literal("")),
-    dateOfBirth: z.string().optional().or(z.literal("")),
+    dateOfBirth: optionalPastOrTodayDateSchema,
     gender: genderTypeSchema.optional(),
     maritalStatus: maritalStatusSchema.optional(),
     nationality: z.string().max(100).optional().or(z.literal("")),

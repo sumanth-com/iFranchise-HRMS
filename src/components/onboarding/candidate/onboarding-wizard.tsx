@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
+import { OnboardingDocumentUpload } from "@/components/onboarding/candidate/onboarding-document-upload";
 import { OnboardingEducationSection } from "@/components/onboarding/candidate/onboarding-education-section";
 import { OnboardingPhoneField } from "@/components/onboarding/candidate/onboarding-phone-field";
 import { OnboardingPortalHero } from "@/components/onboarding/candidate/onboarding-portal-hero";
@@ -21,7 +22,6 @@ import {
   submitCandidateOnboardingAction,
   uploadCandidateDocumentAction,
 } from "@/lib/onboarding/actions/candidate-onboarding-actions";
-import { ONBOARDING_UPLOAD_MAX_MB } from "@/lib/onboarding/constants";
 import {
   ONBOARDING_BLOOD_GROUP_OPTIONS,
   ONBOARDING_GENDER_OPTIONS,
@@ -52,17 +52,13 @@ import {
   type OnboardingEducationEntry,
 } from "@/types/onboarding";
 import type { CandidatePortalContext } from "@/types/onboarding";
+import { cn } from "@/lib/utils";
 
-const UPLOAD_ACCEPT =
-  ".pdf,.doc,.docx,.xls,.xlsx,.zip,image/jpeg,image/png,image/webp";
+const wizardInputClassName =
+  "h-9 bg-background text-sm text-foreground caret-foreground placeholder:text-muted-foreground dark:bg-background dark:text-foreground";
 
-function formatJoiningDate(value: string | null) {
-  if (!value) return "To be confirmed";
-  return new Date(value).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+function uploadSlotKey(documentCategory: string, documentTypeCode: string) {
+  return `${documentCategory}:${documentTypeCode}`;
 }
 
 const SECTION_TITLES: Record<string, string> = {
@@ -90,30 +86,22 @@ const BLOOD_GROUP_ITEMS = ONBOARDING_BLOOD_GROUP_OPTIONS.map((item) => ({
   label: item.label,
 }));
 
-function UploadHint() {
-  return (
-    <p className="mt-1.5 text-xs text-muted-foreground">
-      PDF, Word, Excel, images, or ZIP · max {ONBOARDING_UPLOAD_MAX_MB} MB
-    </p>
+function documentRecord(
+  context: CandidatePortalContext,
+  category: string,
+  code: string,
+) {
+  return context.documents.find(
+    (doc) => doc.documentCategory === category && doc.documentTypeCode === code,
   );
 }
 
 function FieldLabel({ label, required }: { label: string; required?: boolean }) {
   return (
-    <Label className="text-sm font-medium">
+    <Label className="text-sm font-medium text-foreground">
       {label}
       {required ? <span className="text-foreground"> *</span> : null}
     </Label>
-  );
-}
-
-function documentUploaded(
-  context: CandidatePortalContext,
-  category: string,
-  code: string,
-): boolean {
-  return context.documents.some(
-    (doc) => doc.documentCategory === category && doc.documentTypeCode === code,
   );
 }
 
@@ -132,6 +120,9 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   const [form, setForm] = useState<Record<string, string>>({});
   const [educationEntries, setEducationEntries] = useState<OnboardingEducationEntry[]>([]);
   const [stepAnimKey, setStepAnimKey] = useState(0);
+  const [uploadSlots, setUploadSlots] = useState<
+    Record<string, { uploading: boolean; pendingFileName?: string }>
+  >({});
 
   const completedSteps = useMemo(() => getCompletedStepIndices(context), [context]);
   const firstIncompleteStep = useMemo(() => getFirstIncompleteStepIndex(context), [context]);
@@ -221,16 +212,46 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
     });
   }
 
+  function uploadMeta(documentCategory: string, documentTypeCode: string) {
+    const key = uploadSlotKey(documentCategory, documentTypeCode);
+    const slot = uploadSlots[key];
+    const saved = documentRecord(context, documentCategory, documentTypeCode);
+    return {
+      fileName: saved?.fileName ?? null,
+      uploading: Boolean(slot?.uploading),
+      pendingFileName: slot?.pendingFileName ?? null,
+    };
+  }
+
   function uploadDoc(documentCategory: string, documentTypeCode: string, file: File) {
+    const key = uploadSlotKey(documentCategory, documentTypeCode);
+    setUploadSlots((prev) => ({
+      ...prev,
+      [key]: { uploading: true, pendingFileName: file.name },
+    }));
+
     const fd = new FormData();
     fd.set("file", file);
     fd.set("documentCategory", documentCategory);
     fd.set("documentTypeCode", documentTypeCode);
-    startTransition(async () => {
-      const result = await uploadCandidateDocumentAction(fd);
-      toast[result.success ? "success" : "error"](result.message);
-      if (result.success) onRefresh();
-    });
+
+    void (async () => {
+      try {
+        const result = await uploadCandidateDocumentAction(fd);
+        if (!result.success) {
+          toast.error(result.message);
+          return;
+        }
+        toast.success(`${file.name} uploaded`);
+        await onRefresh();
+      } finally {
+        setUploadSlots((prev) => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+      }
+    })();
   }
 
   function goToStep(index: number) {
@@ -344,11 +365,10 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   const isLastStep = step === ONBOARDING_WIZARD_SECTIONS.length - 1;
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col max-h-[calc(100dvh-3.25rem)] min-h-0">
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-lg shadow-slate-900/[0.04] ring-1 ring-black/[0.03]">
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-lg shadow-black/5 ring-1 ring-border/50 dark:shadow-black/25">
         <OnboardingPortalHero
           fullName={context.fullName}
-          joiningDateLabel={formatJoiningDate(context.joiningDate)}
           completionPercent={context.completionPercent}
         />
 
@@ -376,9 +396,11 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                 <span className="text-foreground">*</span>) to unlock the next section
               </p>
             ) : step < firstIncompleteStep ? (
-              <p className="mt-1 text-xs font-medium text-emerald-600">Section completed</p>
+              <p className="mt-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                Section completed
+              </p>
             ) : (
-              <p className="mt-1 text-xs font-medium text-emerald-600">
+              <p className="mt-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                 Ready — continue to the next section
               </p>
             )}
@@ -389,7 +411,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
               <div className="space-y-1">
                 <FieldLabel label="Full name" required />
                 <Input
-                  className="h-9 text-sm"
+                  className={wizardInputClassName}
                   value={personalField("fullName")}
                   onChange={(e) => updateField("fullName", e.target.value)}
                 />
@@ -398,7 +420,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                 <FieldLabel label="Date of birth" required />
                 <Input
                   type="date"
-                  className="h-9 text-sm"
+                  className={wizardInputClassName}
                   max={todayIsoDate()}
                   value={form.dateOfBirth ?? toIsoDate(sectionData.dateOfBirth)}
                   onChange={(e) => updateField("dateOfBirth", e.target.value)}
@@ -411,7 +433,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                   value={personalSelectValue("gender", ONBOARDING_GENDER_OPTIONS)}
                   placeholder="Select gender"
                   onValueChange={(value) => updateField("gender", value)}
-                  triggerClassName="h-9 w-full text-sm"
+                  triggerClassName={cn(wizardInputClassName, "w-full")}
                 />
               </div>
               <div className="space-y-1">
@@ -421,7 +443,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                   value={personalSelectValue("maritalStatus", ONBOARDING_MARITAL_STATUS_OPTIONS)}
                   placeholder="Select marital status"
                   onValueChange={(value) => updateField("maritalStatus", value)}
-                  triggerClassName="h-9 w-full text-sm"
+                  triggerClassName={cn(wizardInputClassName, "w-full")}
                 />
               </div>
               <div className="space-y-1">
@@ -431,13 +453,13 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                   value={personalSelectValue("bloodGroup", ONBOARDING_BLOOD_GROUP_OPTIONS)}
                   placeholder="Select blood group"
                   onValueChange={(value) => updateField("bloodGroup", value)}
-                  triggerClassName="h-9 w-full text-sm"
+                  triggerClassName={cn(wizardInputClassName, "w-full")}
                 />
               </div>
               <div className="space-y-1">
                 <FieldLabel label="Nationality" />
                 <Input
-                  className="h-9 text-sm"
+                  className={wizardInputClassName}
                   value={personalField("nationality")}
                   onChange={(e) => updateField("nationality", e.target.value)}
                   placeholder="Nationality"
@@ -446,7 +468,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
               <div className="space-y-1 sm:col-span-2">
                 <FieldLabel label="Address" required />
                 <Input
-                  className="h-9 text-sm"
+                  className={wizardInputClassName}
                   value={personalField("address")}
                   onChange={(e) => updateField("address", e.target.value)}
                 />
@@ -469,7 +491,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                 <FieldLabel label="Personal email" required />
                 <Input
                   type="email"
-                  className="h-9 text-sm"
+                  className={wizardInputClassName}
                   value={personalField("personalEmail")}
                   onChange={(e) => updateField("personalEmail", e.target.value)}
                 />
@@ -478,28 +500,19 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           )}
 
           {sectionKey === "identity" && (
-            <div className="space-y-5">
+            <div className="space-y-4">
               {ONBOARDING_IDENTITY_DOCUMENTS.map((doc) => {
-                const uploaded = documentUploaded(context, "identity", doc.code);
+                const meta = uploadMeta("identity", doc.code);
                 return (
-                  <div
+                  <OnboardingDocumentUpload
                     key={doc.code}
-                    className="rounded-xl border bg-muted/20 p-4 space-y-2"
-                  >
-                    <FieldLabel label={doc.label} required={doc.required} />
-                    {uploaded ? (
-                      <p className="text-xs font-medium text-emerald-600">Uploaded</p>
-                    ) : null}
-                    <Input
-                      type="file"
-                      accept={UPLOAD_ACCEPT}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) uploadDoc("identity", doc.code, file);
-                      }}
-                    />
-                    <UploadHint />
-                  </div>
+                    label={doc.label}
+                    required={doc.required}
+                    fileName={meta.fileName}
+                    uploading={meta.uploading}
+                    pendingFileName={meta.pendingFileName}
+                    onSelectFile={(file) => uploadDoc("identity", doc.code, file)}
+                  />
                 );
               })}
               <div className="grid gap-4 sm:grid-cols-2">
@@ -523,11 +536,13 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
           {sectionKey === "education" && (
             <OnboardingEducationSection
-              context={context}
               entries={educationEntries}
               onEntriesChange={setEducationEntries}
               onUpload={(entryId, file) =>
                 uploadDoc("education", educationDocumentTypeCode(entryId), file)
+              }
+              getUploadMeta={(entryId) =>
+                uploadMeta("education", educationDocumentTypeCode(entryId))
               }
             />
           )}
@@ -535,26 +550,17 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           {sectionKey === "employment_history" && (
             <div className="space-y-4">
               {ONBOARDING_EMPLOYMENT_DOCUMENTS.map((doc) => {
-                const uploaded = documentUploaded(context, "employment", doc.code);
+                const meta = uploadMeta("employment", doc.code);
                 return (
-                  <div
+                  <OnboardingDocumentUpload
                     key={doc.code}
-                    className="rounded-xl border bg-muted/20 p-4 space-y-2"
-                  >
-                    <FieldLabel label={doc.label} required={doc.required} />
-                    {uploaded ? (
-                      <p className="text-xs font-medium text-emerald-600">Uploaded</p>
-                    ) : null}
-                    <Input
-                      type="file"
-                      accept={UPLOAD_ACCEPT}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) uploadDoc("employment", doc.code, file);
-                      }}
-                    />
-                    <UploadHint />
-                  </div>
+                    label={doc.label}
+                    required={doc.required}
+                    fileName={meta.fileName}
+                    uploading={meta.uploading}
+                    pendingFileName={meta.pendingFileName}
+                    onSelectFile={(file) => uploadDoc("employment", doc.code, file)}
+                  />
                 );
               })}
             </div>
@@ -570,7 +576,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                 <div key={key} className="space-y-1.5">
                   <FieldLabel label={label} required={required} />
                   <Input
-                    className="h-9 text-sm"
+                    className={wizardInputClassName}
                     value={form[key] ?? String(sectionData[key] ?? "")}
                     onChange={(e) => {
                       if (key === "accountNumber") {
@@ -586,20 +592,14 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                   />
                 </div>
               ))}
-              <div className="space-y-2 sm:col-span-2 rounded-xl border bg-muted/20 p-4">
-                <FieldLabel label="Cancelled cheque" />
-                {documentUploaded(context, "bank", "cancelled_cheque") ? (
-                  <p className="text-xs font-medium text-emerald-600">Uploaded</p>
-                ) : null}
-                <Input
-                  type="file"
-                  accept={UPLOAD_ACCEPT}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) uploadDoc("bank", "cancelled_cheque", file);
-                  }}
+              <div className="sm:col-span-2">
+                <OnboardingDocumentUpload
+                  label="Cancelled cheque"
+                  fileName={uploadMeta("bank", "cancelled_cheque").fileName}
+                  uploading={uploadMeta("bank", "cancelled_cheque").uploading}
+                  pendingFileName={uploadMeta("bank", "cancelled_cheque").pendingFileName}
+                  onSelectFile={(file) => uploadDoc("bank", "cancelled_cheque", file)}
                 />
-                <UploadHint />
               </div>
             </div>
           )}
@@ -618,7 +618,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                   <div key={key} className="space-y-1.5 sm:col-span-2 last:sm:col-span-1">
                     <FieldLabel label={label} />
                     <Input
-                      className="h-9 text-sm"
+                      className={wizardInputClassName}
                       value={form[key] ?? String(sectionData[key] ?? "")}
                       onChange={(e) => updateField(key, e.target.value)}
                     />
@@ -742,7 +742,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
             )}
         </div>
 
-        <div className="flex shrink-0 flex-col gap-2 border-t border-border/60 bg-slate-50/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="flex shrink-0 flex-col gap-2 border-t border-border bg-muted/40 px-4 py-3 dark:bg-muted/20 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <Button
             variant="outline"
             disabled={step === 0 || isPending}

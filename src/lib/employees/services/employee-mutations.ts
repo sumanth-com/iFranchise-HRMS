@@ -315,39 +315,46 @@ export async function updateEmployee(
     throw new Error(profileError.message);
   }
 
-  const primaryAddress =
-    await supabase
-      .schema("hrms")
-      .from("employee_addresses")
-      .select("id")
-      .eq("employee_id", employeeId)
-      .eq("is_primary", true)
-      .is("deleted_at", null)
-      .maybeSingle();
+  const { data: existingAddresses, error: addressLookupError } = await supabase
+    .schema("hrms")
+    .from("employee_addresses")
+    .select("id")
+    .eq("employee_id", employeeId)
+    .eq("address_type", "current")
+    .is("deleted_at", null)
+    .order("is_primary", { ascending: false })
+    .limit(1);
 
-  const primaryContact =
-    await supabase
-      .schema("hrms")
-      .from("emergency_contacts")
-      .select("id")
-      .eq("employee_id", employeeId)
-      .eq("is_primary", true)
-      .is("deleted_at", null)
-      .maybeSingle();
+  if (addressLookupError) {
+    throw new Error(addressLookupError.message);
+  }
+
+  const { data: existingContacts, error: contactLookupError } = await supabase
+    .schema("hrms")
+    .from("emergency_contacts")
+    .select("id")
+    .eq("employee_id", employeeId)
+    .is("deleted_at", null)
+    .order("is_primary", { ascending: false })
+    .limit(1);
+
+  if (contactLookupError) {
+    throw new Error(contactLookupError.message);
+  }
 
   await upsertEmployeeAddressForUpdate(
     supabase,
     employeeId,
     userId,
     input,
-    primaryAddress.data?.id ?? null,
+    existingAddresses?.[0]?.id ?? null,
   );
   await upsertEmergencyContactForUpdate(
     supabase,
     employeeId,
     userId,
     input,
-    primaryContact.data?.id ?? null,
+    existingContacts?.[0]?.id ?? null,
   );
 
   emitHrmsWebhook(organizationId, "employee.updated", {
@@ -538,15 +545,15 @@ export async function uploadProfileImage(
     throw new Error("Profile image must be 10 MB or smaller");
   }
 
-  const extension = file.name.split(".").pop() ?? "jpg";
+  const extension = file.type === "image/webp" ? "webp" : file.name.split(".").pop() ?? "jpg";
   const storagePath = `${organizationId}/${employeeId}/profile.${extension}`;
 
   const { error } = await supabase.storage
     .from(EMPLOYEE_STORAGE_BUCKETS.profileImages)
     .upload(storagePath, file, {
-      cacheControl: "3600",
+      cacheControl: "86400",
       upsert: true,
-      contentType: file.type,
+      contentType: file.type || "image/jpeg",
     });
 
   if (error) {

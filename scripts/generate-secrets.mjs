@@ -17,6 +17,7 @@ const REQUIRED_SECRETS = [
   "EMAIL_VERIFICATION_TOKEN_SECRET",
   "PERMISSION_CACHE_SECRET",
   "CRON_SECRET",
+  "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY",
 ];
 
 console.log("# iFranchise HRMS — generated server secrets");

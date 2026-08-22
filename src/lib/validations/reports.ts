@@ -31,6 +31,10 @@ export const reportFiltersSchema = z.object({
   employeeId: z.string().uuid().optional().or(z.literal("")),
   leaveTypeId: z.string().uuid().optional().or(z.literal("")),
   status: z.string().optional().or(z.literal("")),
+  assetAction: z
+    .enum(["all", "report", "replace", "return", "assigned"])
+    .optional()
+    .or(z.literal("")),
   month: z.coerce.number().int().min(1).max(12).optional(),
   year: z.coerce.number().int().min(2000).max(2100).optional(),
   reportKey: z.enum(reportKeys).optional(),

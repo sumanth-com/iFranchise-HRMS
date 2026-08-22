@@ -18,6 +18,7 @@ import {
 } from "@/lib/payroll/constants";
 import type { requireServerAnyPermission } from "@/lib/permissions/server";
 import { hasAnyPermission } from "@/lib/permissions/utils";
+import { createClient } from "@/lib/supabase/server";
 import {
   getPayrollLookups,
   listBonuses,
@@ -25,7 +26,6 @@ import {
   listSalaryStructures,
 } from "@/lib/payroll/services/payroll-queries";
 import { listPayslipHistory } from "@/lib/payroll/services/payslip-history-queries";
-import type { createClient } from "@/lib/supabase/server";
 import {
   bonusListParamsSchema,
   payslipHistoryParamsSchema,
@@ -41,7 +41,6 @@ type TeamPayrollSectionProps = {
   section: TeamPayrollSection;
   rawSearchParams: Record<string, string | string[] | undefined>;
   profile: Awaited<ReturnType<typeof requireServerAnyPermission>>;
-  supabase: Awaited<ReturnType<typeof createClient>>;
   teamBasePath?: string;
   canRunPayrollOverride?: boolean;
 };
@@ -50,10 +49,10 @@ export async function TeamPayrollSection({
   section,
   rawSearchParams,
   profile,
-  supabase,
   teamBasePath,
   canRunPayrollOverride,
 }: TeamPayrollSectionProps) {
+  const supabase = await createClient();
   const now = new Date();
 
   if (section === TEAM_PAYROLL_SECTIONS.run) {

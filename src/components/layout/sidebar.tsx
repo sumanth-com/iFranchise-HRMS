@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 import { SidebarNavLink } from "@/components/layout/sidebar-nav-link";
@@ -29,6 +29,11 @@ export function Sidebar() {
     searchParams,
     portalHome,
     navigation,
+  );
+
+  const firstSectionName = useMemo(
+    () => navigation.find((item) => Boolean(item.section))?.section,
+    [navigation],
   );
 
   useEffect(() => {
@@ -68,7 +73,12 @@ export function Sidebar() {
           const Icon = item.icon;
           const prevSection = index > 0 ? navigation[index - 1]?.section : undefined;
           const showSection = item.section && item.section !== prevSection && !isCollapsed;
-          const sectionOpen = item.section ? isSectionOpen(item.section) : true;
+          // Until localStorage is applied, keep sections open so SSR and the
+          // first client paint produce identical markup.
+          const sectionOpen =
+            !sectionsReady || !item.section ? true : isSectionOpen(item.section);
+          const isFirstSection =
+            Boolean(showSection) && item.section === firstSectionName;
 
           return (
             <div key={`${item.section ?? ""}-${item.href}`} className="shrink-0">
@@ -76,7 +86,12 @@ export function Sidebar() {
                 <button
                   type="button"
                   onClick={() => toggleSection(item.section!)}
-                  className="mb-2 mt-4 flex w-full items-center justify-between border-t px-3 pt-4 text-left text-[15px] font-semibold text-sidebar-foreground first:mt-0 first:border-t-0 first:pt-0 dark:text-white"
+                  className={cn(
+                    "mb-2 flex w-full items-center justify-between px-3 text-left text-[15px] font-semibold text-sidebar-foreground dark:text-white",
+                    isFirstSection
+                      ? "mt-0 border-t-0 pt-0"
+                      : "mt-4 border-t border-sidebar-border/60 pt-4 dark:border-white/12",
+                  )}
                   aria-expanded={sectionOpen}
                 >
                   <span>{item.section}</span>

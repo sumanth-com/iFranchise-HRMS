@@ -24,6 +24,7 @@ import {
   removeProfileImageAction,
   uploadProfileImageAction,
 } from "@/lib/employees/profile-image-actions";
+import { optimizeProfileImageFile } from "@/lib/media/client-image-optimize";
 import type { EmployeeSelfProfileSettings } from "@/lib/employee/services/employee-self-profile";
 import { TIMEZONE_OPTIONS } from "@/lib/validations/organization";
 import {
@@ -106,10 +107,16 @@ export function EmployeeProfileSettingsSection({
       return;
     }
 
-    const formData = new FormData();
-    formData.set("file", file);
-
     startTransition(async () => {
+      const optimized = await optimizeProfileImageFile(file);
+      if (optimized.size > PROFILE_IMAGE_MAX_BYTES) {
+        toast.error("Profile image must be 10 MB or smaller");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.set("file", optimized);
+
       const result = await uploadProfileImageAction(settings.employeeId, formData);
       if (!result.success) {
         toast.error(result.message);

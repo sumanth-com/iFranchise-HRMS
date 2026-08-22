@@ -8,6 +8,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { TopNav } from "@/components/layout/top-nav";
 import { DashboardUrlCleaner } from "@/components/layout/dashboard-url-cleaner";
 import { InstantNavPrefetch } from "@/components/layout/instant-nav-prefetch";
+import { ServerActionStaleRecovery } from "@/components/providers/server-action-stale-recovery";
 import { ActivePortalProvider } from "@/providers/active-portal-provider";
 import { BreadcrumbLabelProvider } from "@/providers/breadcrumb-label-provider";
 import { SidebarProvider } from "@/hooks/use-sidebar";
@@ -23,6 +24,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
         <SidebarProvider>
         <DashboardUrlCleaner />
         <InstantNavPrefetch />
+        <ServerActionStaleRecovery />
         <div className="app-shell-canvas flex h-screen overflow-hidden bg-background">
           <Sidebar />
           <MobileSidebar />

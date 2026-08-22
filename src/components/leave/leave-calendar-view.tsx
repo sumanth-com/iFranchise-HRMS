@@ -139,8 +139,8 @@ function CalendarLegend() {
 }
 
 export function LeaveCalendarView({
-  leaves,
-  holidays,
+  leaves: leavesProp,
+  holidays: holidaysProp,
   month,
   year,
   onMonthChange,
@@ -149,8 +149,11 @@ export function LeaveCalendarView({
   hideLegend = false,
   enableWeekView = false,
   compact = false,
-  calendar = DEFAULT_LEAVE_CALENDAR,
+  calendar: calendarProp = DEFAULT_LEAVE_CALENDAR,
 }: LeaveCalendarViewProps) {
+  const leaves = leavesProp ?? [];
+  const holidays = holidaysProp ?? [];
+  const calendar = calendarProp ?? DEFAULT_LEAVE_CALENDAR;
   const [view, setView] = useState<CalendarViewMode>("month");
   const [anchor, setAnchor] = useState<string>(() =>
     format(startOfMonth(new Date(year, month - 1, 1)), "yyyy-MM-dd"),
@@ -256,8 +259,10 @@ export function LeaveCalendarView({
       ...calendar,
       holidays: Array.from(
         new Set([
-          ...calendar.holidays,
-          ...holidays.filter((item) => !item.isOptional).map((item) => item.holidayDate),
+          ...(calendar.holidays ?? []),
+          ...(holidays ?? [])
+            .filter((item) => !item.isOptional)
+            .map((item) => item.holidayDate),
         ]),
       ),
     }),
@@ -267,12 +272,13 @@ export function LeaveCalendarView({
   const sandwichDates = useMemo(() => {
     const dates = new Set<string>();
     leaves.forEach((leave) => {
-      calculateLeaveDuration({
+      const days = calculateLeaveDuration({
         startDate: leave.startDate,
         endDate: leave.endDate,
         isHalfDay: leave.isHalfDay,
         calendar: calendarWithHolidays,
-      }).days.forEach((day) => {
+      }).days;
+      (days ?? []).forEach((day) => {
         if (day.kind === "sandwich") dates.add(day.date);
       });
     });
@@ -455,7 +461,7 @@ export function LeaveCalendarView({
                 key={day.date}
                 className={cn(
                   "border-b border-r last:border-r-0",
-                  compact ? "p-1.5" : "p-2",
+                  compact ? "flex flex-col p-1.5" : "p-2",
                   cellMinHeight,
                   !day.isCurrentMonth && "bg-muted/20 text-muted-foreground",
                   isWeeklyHoliday &&
@@ -475,7 +481,12 @@ export function LeaveCalendarView({
                   leaveHighlight,
                 )}
               >
-                <div className={cn("flex items-start justify-between gap-1", compact ? "mb-1" : "mb-2")}>
+                <div
+                  className={cn(
+                    "flex shrink-0 items-start",
+                    compact ? "mb-0.5" : "mb-2 justify-between gap-1",
+                  )}
+                >
                   <span
                     className={cn(
                       "font-medium tabular-nums",
@@ -487,23 +498,29 @@ export function LeaveCalendarView({
                   >
                     {day.dayNumber}
                   </span>
-                  {day.isCurrentMonth && isHalfDayCalendar && !holiday ? (
+                  {!compact && day.isCurrentMonth && isHalfDayCalendar && !holiday ? (
                     <span className="rounded bg-orange-500/15 px-1 py-px text-[9px] font-medium text-orange-700 dark:text-orange-300">
                       Half
                     </span>
-                  ) : sandwichOnDay && day.isCurrentMonth && dayLeaves.length === 0 ? (
+                  ) : !compact && sandwichOnDay && day.isCurrentMonth && dayLeaves.length === 0 ? (
                     <span className="rounded bg-sky-500/15 px-1 py-px text-[9px] font-medium text-sky-800 dark:text-sky-300">
                       Sandwich
                     </span>
                   ) : null}
                 </div>
 
-                <div className={cn("flex flex-col", compact ? "gap-0.5" : "gap-1")}>
+                <div
+                  className={cn(
+                    compact
+                      ? "flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-0.5"
+                      : "flex flex-col gap-1",
+                  )}
+                >
                   {holiday && day.isCurrentMonth ? (
                     <div
                       className={cn(
-                        "flex min-w-0 items-center gap-1 text-violet-700 dark:text-violet-200",
-                        compact ? "text-[10px]" : "text-xs",
+                        "flex min-w-0 max-w-full items-center gap-1 text-violet-700 dark:text-violet-200",
+                        compact ? "justify-center text-[10px]" : "text-xs",
                       )}
                       title={holiday.name}
                     >
@@ -520,13 +537,27 @@ export function LeaveCalendarView({
                     </div>
                   ) : null}
 
+                  {compact &&
+                  day.isCurrentMonth &&
+                  isHalfDayCalendar &&
+                  !holiday &&
+                  dayLeaves.length === 0 ? (
+                    <span className="inline-flex items-center justify-center rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-semibold leading-tight text-white shadow-sm">
+                      Half
+                    </span>
+                  ) : compact && sandwichOnDay && day.isCurrentMonth && dayLeaves.length === 0 ? (
+                    <span className="inline-flex items-center justify-center rounded-full bg-sky-500 px-2 py-0.5 text-[10px] font-semibold leading-tight text-white shadow-sm">
+                      Sandwich
+                    </span>
+                  ) : null}
+
                   {compact ? (
-                    <div className="flex flex-wrap gap-0.5">
+                    <div className="flex w-full flex-wrap items-center justify-center gap-1">
                       {dayLeaves.slice(0, maxVisibleLeaves).map((leave) => (
                         <span
                           key={`${day.date}-${leave.id}`}
                           className={cn(
-                            "inline-flex max-w-full truncate rounded-full px-1.5 py-0.5 text-[9px] font-semibold leading-none text-white",
+                            "inline-flex max-w-full min-w-[2.125rem] items-center justify-center truncate rounded-full px-2 py-0.5 text-center text-[10px] font-semibold leading-tight text-white shadow-sm",
                             leave.isHalfDay
                               ? LEAVE_CALENDAR_LEGEND.halfDay.className
                               : LEAVE_STATUS_COLORS[leave.leaveStatus],
@@ -537,7 +568,7 @@ export function LeaveCalendarView({
                         </span>
                       ))}
                       {dayLeaves.length > maxVisibleLeaves ? (
-                        <span className="inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">
+                        <span className="inline-flex items-center justify-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium leading-tight text-muted-foreground">
                           +{dayLeaves.length - maxVisibleLeaves}
                         </span>
                       ) : null}

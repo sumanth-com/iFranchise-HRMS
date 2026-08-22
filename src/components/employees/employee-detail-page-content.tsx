@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
+import { Button } from "@/components/common/button";
 import { EmployeeDetailTabBar } from "@/components/employees/employee-detail-tab-bar";
 import { EmployeeDetailView } from "@/components/employees/employee-detail-view";
-import { buttonVariants } from "@/components/common/button";
 import {
   resolveEmployeeModuleRoutes,
   resolveEmployeeTab,
@@ -27,7 +28,6 @@ import type { AssetAssignmentItem } from "@/types/assets";
 import type { EmployeeAssetsData } from "@/types/employee-assets";
 import type { EmployeeDocumentsExplorerData } from "@/types/employee-documents-explorer";
 import type { EmployeePayrollData } from "@/types/employee-payroll";
-import { cn } from "@/lib/utils";
 
 type EmployeeDetailPageContentProps = {
   employee: EmployeeDetail;
@@ -101,15 +101,15 @@ export function EmployeeDetailPageContent({
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="shrink-0 border-b bg-background px-4 md:px-6">
         <div className="flex items-center pt-2.5 pb-1.5">
-          <Link
-            href={routes.list}
-            className={cn(
-              buttonVariants({ variant: "ghost", size: "sm" }),
-              "h-7 px-0 text-muted-foreground hover:text-foreground",
-            )}
+          <Button
+            variant="outline"
+            size="sm"
+            nativeButton={false}
+            render={<Link href={routes.list} />}
           >
-            ← Back to employees
-          </Link>
+            <ArrowLeft className="size-4" />
+            Back to employees
+          </Button>
         </div>
         <EmployeeDetailTabBar activeTab={activeTab} onTabChange={handleTabChange} />
       </div>

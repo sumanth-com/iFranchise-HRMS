@@ -81,14 +81,10 @@ export function DataTable<T extends Record<string, unknown>>({
           <tbody>
             {data.length === 0 ? (
               <tr className="border-b">
-                <td
-                  colSpan={columns.length}
-                  className={cn(
-                    "h-24 p-2 align-middle text-sm text-muted-foreground",
-                    cellAlign,
-                  )}
-                >
-                  {emptyMessage}
+                <td colSpan={columns.length} className="p-0 align-middle">
+                  <div className="flex min-h-[7rem] items-center justify-center px-4 py-8 text-center text-sm text-muted-foreground">
+                    {emptyMessage}
+                  </div>
                 </td>
               </tr>
             ) : (
@@ -138,11 +134,10 @@ export function DataTable<T extends Record<string, unknown>>({
         <TableBody>
           {data.length === 0 ? (
             <TableRow>
-              <TableCell
-                colSpan={columns.length}
-                className={cn("h-24 text-muted-foreground", cellAlign)}
-              >
-                {emptyMessage}
+              <TableCell colSpan={columns.length} className="p-0 align-middle">
+                <div className="flex min-h-[7rem] items-center justify-center px-4 py-8 text-center text-sm text-muted-foreground">
+                  {emptyMessage}
+                </div>
               </TableCell>
             </TableRow>
           ) : (

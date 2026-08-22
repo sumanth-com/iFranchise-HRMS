@@ -1,7 +1,5 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
-
 import {
   Dialog,
   DialogContent,
@@ -19,7 +17,6 @@ type PayrollEmployeeBreakdownDialogProps = {
   employee: PayrollEmployeeBreakdownData | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  loading?: boolean;
 };
 
 function StatTile({ label, value }: { label: string; value: string }) {
@@ -70,12 +67,7 @@ export function PayrollEmployeeBreakdownDialog({
   employee,
   open,
   onOpenChange,
-  loading = false,
 }: PayrollEmployeeBreakdownDialogProps) {
-  if (!open) {
-    return null;
-  }
-
   const attendance = employee?.breakdown.attendance;
   const earnings = employee
     ? toEmployeeFacingEarnings(employee.breakdown.earnings ?? [])
@@ -112,21 +104,12 @@ export function PayrollEmployeeBreakdownDialog({
               ? `${employee.employeeCode}${
                   employee.departmentName ? ` · ${employee.departmentName}` : ""
                 }${employee.periodLabel ? ` · ${employee.periodLabel}` : ""}`
-              : "Loading live salary, bonuses, and expense claims."}
+              : "Payroll breakdown"}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
-          {loading ? (
-            <div className="flex min-h-48 items-center justify-center text-sm text-muted-foreground">
-              <Loader2 className="mr-2 size-4 animate-spin" />
-              Fetching salary, bonuses, and expense claims…
-            </div>
-          ) : !employee ? (
-            <p className="rounded-lg border bg-muted/20 px-3 py-2.5 text-sm text-muted-foreground">
-              Could not load this employee&apos;s live payroll details. Close and try again.
-            </p>
-          ) : (
+          {!employee ? null : (
             <>
               {employee.hasSalaryStructure === false ? (
                 <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-950 dark:text-amber-100">

@@ -31,6 +31,9 @@ import {
   markNotificationReadAction,
 } from "@/lib/notifications/actions";
 import {
+  runServerActionSafely,
+} from "@/lib/errors/stale-server-action";
+import {
   formatNotificationDisplayText,
   formatNotificationModule,
   getNotificationsRoutesForPath,
@@ -68,8 +71,8 @@ export function NotificationBell() {
   const initializedRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    const res = await getNotificationBellDataAction();
-    if (!res.success) return;
+    const res = await runServerActionSafely(() => getNotificationBellDataAction());
+    if (!res?.success) return;
 
     const next = res.data;
     if (initializedRef.current && next.soundEnabled) {
@@ -119,8 +122,9 @@ export function NotificationBell() {
     event.stopPropagation();
     removeFromBell(item.id);
     startTransition(async () => {
-      const res = await markNotificationReadAction(item.id);
-      if (!res.success) {
+      const res = await runServerActionSafely(() => markNotificationReadAction(item.id));
+      if (!res?.success) {
+        if (res === null) return;
         toast.error(res.message);
         await refresh();
         return;
@@ -164,10 +168,14 @@ export function NotificationBell() {
                   items: [],
                 }));
                 startTransition(async () => {
-                  const res = await markAllNotificationsReadAction();
-                  if (res.success) {
+                  const res = await runServerActionSafely(() =>
+                    markAllNotificationsReadAction(),
+                  );
+                  if (res?.success) {
                     toast.success("All marked as read");
                     await refresh();
+                  } else if (res === null) {
+                    return;
                   } else {
                     toast.error(res.message);
                     await refresh();

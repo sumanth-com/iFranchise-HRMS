@@ -29,6 +29,26 @@ function parseDurationBreakdown(value: unknown): LeaveDurationBreakdown | null {
   return value as LeaveDurationBreakdown;
 }
 
+export function resolveLeaveDurationBreakdown(
+  request: {
+    startDate: string;
+    endDate: string;
+    isHalfDay: boolean;
+    durationBreakdown?: unknown;
+  },
+  calendar: LeaveCalendarContext,
+): LeaveDurationBreakdown {
+  return (
+    parseDurationBreakdown(request.durationBreakdown) ??
+    calculateLeaveDuration({
+      startDate: request.startDate.slice(0, 10),
+      endDate: request.endDate.slice(0, 10),
+      isHalfDay: request.isHalfDay,
+      calendar,
+    })
+  );
+}
+
 export function countLeaveDaysInRange(
   request: {
     startDate: string;

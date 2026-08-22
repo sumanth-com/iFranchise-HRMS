@@ -71,6 +71,18 @@ export const ASSIGNMENT_STATUS_LABELS: Record<AssetAssignmentStatus, string> = {
   damaged: "Damaged",
 };
 
+/** Matches Company Assets activity filters (reports + activity feed). */
+export const ASSET_ACTIVITY_FILTER_ITEMS = [
+  { value: "all", label: "All activity" },
+  { value: "report", label: "Reports" },
+  { value: "replace", label: "Replace" },
+  { value: "return", label: "Return" },
+  { value: "assigned", label: "Assigned" },
+] as const;
+
+export type AssetActivityFilterValue =
+  (typeof ASSET_ACTIVITY_FILTER_ITEMS)[number]["value"];
+
 export const MAINTENANCE_STATUS_LABELS: Record<AssetMaintenanceStatus, string> = {
   pending: "Pending",
   in_progress: "In Progress",

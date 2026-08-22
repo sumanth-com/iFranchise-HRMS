@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ClipboardList, Loader2, Mail, Search, Trash2, UserPlus } from "lucide-react";
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
@@ -74,6 +74,19 @@ function inviteActionLabel(row: OnboardingCaseListItem) {
   return row.invitationSentAt || row.status !== "draft" ? "Resend invitation" : "Send invitation";
 }
 
+function isResendInvite(row: OnboardingCaseListItem) {
+  return Boolean(row.invitationSentAt) || row.status !== "draft";
+}
+
+function formatJoiningDate(value: string | null | undefined) {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export function OnboardingDashboardView({
   cases: initialCases,
   lookups,
@@ -86,13 +99,19 @@ export function OnboardingDashboardView({
   const [deleteTarget, setDeleteTarget] = useState<OnboardingCaseListItem | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteTarget, setInviteTarget] = useState<OnboardingCaseListItem | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [refreshing, setRefreshing] = useState(false);
+  const [invitingCaseId, setInvitingCaseId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const refresh = useCallback((next: OnboardingListParams) => {
-    startTransition(async () => {
-      const data = await fetchOnboardingModuleAction(next);
-      setCases(data.cases);
-    });
+    setRefreshing(true);
+    void fetchOnboardingModuleAction(next)
+      .then((data) => {
+        setCases(data.cases);
+      })
+      .finally(() => {
+        setRefreshing(false);
+      });
   }, []);
 
   function applyFilter(patch: Partial<OnboardingListParams>) {
@@ -113,11 +132,10 @@ export function OnboardingDashboardView({
     setInviteTarget(null);
   }
 
-  function confirmInvite() {
-    if (!inviteTarget) return;
-
-    startTransition(async () => {
-      const result = await sendOnboardingInvitationAction(inviteTarget.id);
+  async function sendInvite(row: OnboardingCaseListItem) {
+    setInvitingCaseId(row.id);
+    try {
+      const result = await sendOnboardingInvitationAction(row.id);
       if (!result.success) {
         toast.error(result.message);
         return;
@@ -125,20 +143,35 @@ export function OnboardingDashboardView({
       toast.success(result.message);
       closeInviteDialog();
       refresh(filters);
-    });
+    } finally {
+      setInvitingCaseId(null);
+    }
   }
 
-  function confirmDelete() {
+  function handleInviteClick(row: OnboardingCaseListItem) {
+    if (isResendInvite(row)) {
+      void sendInvite(row);
+      return;
+    }
+    openInviteDialog(row);
+  }
+
+  function confirmInvite() {
+    if (!inviteTarget) return;
+    void sendInvite(inviteTarget);
+  }
+
+  async function confirmDelete() {
     if (!deleteTarget) return;
 
-    startTransition(async () => {
+    setDeleting(true);
+    try {
       const result = await deleteOnboardingAction(deleteTarget.id);
       if (!result.success) {
         toast.error(result.message);
         return;
       }
       toast.success(result.message);
-      // Immediately remove from local state
       setCases((prev) => ({
         ...prev,
         data: prev.data.filter((c) => c.id !== deleteTarget.id),
@@ -146,7 +179,9 @@ export function OnboardingDashboardView({
       }));
       setDeleteTarget(null);
       refresh(filters);
-    });
+    } finally {
+      setDeleting(false);
+    }
   }
 
   const routeRefs = assignOnboardingRouteRefs(
@@ -216,7 +251,7 @@ export function OnboardingDashboardView({
           <Button
             type="button"
             className="h-9 shrink-0 sm:ml-auto"
-            disabled={isPending}
+            disabled={invitingCaseId !== null}
             onClick={() => openInviteDialog()}
           >
             <Mail className="h-4 w-4" />
@@ -256,7 +291,7 @@ export function OnboardingDashboardView({
                     <div className="text-muted-foreground text-xs">{row.personalEmail}</div>
                   </td>
                   <td className="p-3">{row.designationName ?? row.intendedRoleName ?? "—"}</td>
-                  <td className="p-3">{row.joiningDate ?? "—"}</td>
+                  <td className="p-3">{formatJoiningDate(row.joiningDate)}</td>
                   <td className="p-3">{row.completionPercent}%</td>
                   <td className="p-3">
                     <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${statusBadgeClass(row.status)}`}>
@@ -278,11 +313,20 @@ export function OnboardingDashboardView({
                           variant="outline"
                           size="sm"
                           className="h-8"
-                          disabled={isPending}
-                          onClick={() => openInviteDialog(row)}
+                          disabled={invitingCaseId === row.id}
+                          onClick={() => handleInviteClick(row)}
                         >
-                          <Mail className="h-3.5 w-3.5" />
-                          {inviteActionLabel(row)}
+                          {invitingCaseId === row.id ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              Sending…
+                            </>
+                          ) : (
+                            <>
+                              <Mail className="h-3.5 w-3.5" />
+                              {inviteActionLabel(row)}
+                            </>
+                          )}
                         </Button>
                       ) : null}
                       {!readOnly && canDeleteOnboardingCase(row.status) ? (
@@ -291,7 +335,7 @@ export function OnboardingDashboardView({
                           variant="ghost"
                           size="icon-sm"
                           aria-label={`Delete ${row.fullName}`}
-                          disabled={isPending}
+                          disabled={deleting}
                           onClick={() => setDeleteTarget(row)}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
@@ -311,7 +355,7 @@ export function OnboardingDashboardView({
           <Button
             variant="outline"
             size="sm"
-            disabled={filters.page <= 1 || isPending}
+            disabled={filters.page <= 1 || refreshing}
             onClick={() => applyFilter({ page: filters.page - 1 })}
           >
             Previous
@@ -322,7 +366,7 @@ export function OnboardingDashboardView({
           <Button
             variant="outline"
             size="sm"
-            disabled={filters.page * filters.pageSize >= cases.total || isPending}
+            disabled={filters.page * filters.pageSize >= cases.total || refreshing}
             onClick={() => applyFilter({ page: filters.page + 1 })}
           >
             Next
@@ -371,17 +415,19 @@ export function OnboardingDashboardView({
             <Button
               type="button"
               variant="outline"
-              disabled={isPending}
+              disabled={invitingCaseId !== null}
               onClick={closeInviteDialog}
             >
               Cancel
             </Button>
             <Button
               type="button"
-              disabled={isPending || !inviteTarget || inviteableCases.length === 0}
+              disabled={
+                invitingCaseId !== null || !inviteTarget || inviteableCases.length === 0
+              }
               onClick={confirmInvite}
             >
-              {isPending ? (
+              {invitingCaseId !== null ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Sending…
@@ -411,7 +457,7 @@ export function OnboardingDashboardView({
             <Button
               type="button"
               variant="outline"
-              disabled={isPending}
+              disabled={deleting}
               onClick={() => setDeleteTarget(null)}
             >
               Cancel
@@ -419,10 +465,10 @@ export function OnboardingDashboardView({
             <Button
               type="button"
               variant="destructive"
-              disabled={isPending || !deleteTarget}
-              onClick={confirmDelete}
+              disabled={deleting || !deleteTarget}
+              onClick={() => void confirmDelete()}
             >
-              {isPending ? (
+              {deleting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Deleting…

@@ -10,6 +10,7 @@ import { CircleHelp, FileText, Download } from "lucide-react";
 import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
 import { PayrollSubNav } from "@/components/payroll/payroll-sub-nav";
+import { TeamPayrollContentSkeleton } from "@/components/payroll/team-payroll-content-skeleton";
 import {
   TeamPayrollHeaderActionsOutlet,
   TeamPayrollHeaderActionsProvider,
@@ -31,7 +32,10 @@ const EmployeePayrollView = dynamic(
     import("@/components/employee/payroll/employee-payroll-view").then(
       (mod) => mod.EmployeePayrollView,
     ),
-  { ssr: false },
+  {
+    ssr: false,
+    loading: () => <TeamPayrollContentSkeleton />,
+  },
 );
 
 const EmployeePayslipDrawer = dynamic(

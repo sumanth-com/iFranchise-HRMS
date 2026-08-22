@@ -80,7 +80,7 @@ const BASE_REPORT_DEFINITIONS: {
   { key: "recruitment_funnel", module: "recruitment", title: "Hiring Funnel", description: "Aggregated funnel counts." },
   { key: "recruitment_offers", module: "recruitment", title: "Offer Acceptance", description: "Offers and acceptance outcomes." },
   { key: "recruitment_time_to_hire", module: "recruitment", title: "Time to Hire", description: "Hiring velocity metrics." },
-  { key: "assets_assigned", module: "assets", title: "Assigned Assets", description: "Active asset assignments." },
+  { key: "assets_assigned", module: "assets", title: "Asset Activity", description: "Company asset actions and requests for the selected period." },
   { key: "assets_returned", module: "assets", title: "Returned Assets", description: "Returned asset history." },
   { key: "assets_maintenance", module: "assets", title: "Maintenance Report", description: "Maintenance tickets and cost." },
   { key: "assets_warranty", module: "assets", title: "Warranty Expiry", description: "Assets approaching warranty end." },
@@ -97,7 +97,7 @@ const MODULE_FILTER_SUMMARIES: Record<ReportModuleKey, string> = {
   payroll: "Date range, employee, payroll month, run status.",
   performance: "Date range, department, designation, employee, review status.",
   recruitment: "Date range, job status, pipeline stage.",
-  assets: "Date range, employee, asset status.",
+  assets: "Date range, employee, action.",
   exit: "Date range, resignation status, settlement stage.",
 };
 

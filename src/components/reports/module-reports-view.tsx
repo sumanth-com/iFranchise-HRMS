@@ -22,6 +22,7 @@ import { Input } from "@/components/common/input";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { getMonthSelectItems, getYearSelectItems } from "@/components/payroll/select-utils";
 import { canExportReports } from "@/lib/reports/constants";
+import { ASSET_ACTIVITY_FILTER_ITEMS } from "@/lib/assets/constants";
 import { exportGeneratedReportAction, runReportAction } from "@/lib/reports/actions";
 import { defaultDateRangeForCurrentMonth } from "@/lib/reports/services/reports-utils";
 import type {
@@ -133,7 +134,7 @@ const MODULE_SUBTITLES: Record<ReportModuleKey, string> = {
   payroll: "Review salary, deductions, bonuses, and net pay for the selected month.",
   performance: "Track KPIs, goals, reviews, and promotion readiness for the selected month.",
   recruitment: "Review open roles, pipeline, offers, and hiring progress for the selected period.",
-  assets: "Track assigned, returned, and maintenance assets for the selected period.",
+  assets: "Track asset actions, requests, and assignments for the selected period.",
   exit: "Review resignations, attrition, and settlement status for the selected period.",
 };
 
@@ -174,7 +175,7 @@ const MODULE_EMPTY_STATE: Record<
   assets: {
     title: "Asset records will appear here",
     description:
-      "Choose a report type and date range, optionally filter by employee, then generate the report to view and export asset data.",
+      "Choose an action and date range, optionally filter by employee, then generate the report to view and export asset activity.",
   },
   exit: {
     title: "Exit records will appear here",
@@ -211,7 +212,7 @@ const MODULE_NO_DATA: Record<ReportModuleKey, { title: string; description: stri
   },
   assets: {
     title: "No asset records found",
-    description: "Try a different report type or date range, then click Generate again.",
+    description: "Try a different action, date range, or employee, then click Generate again.",
   },
   exit: {
     title: "No exit records found",
@@ -255,10 +256,11 @@ function downloadBase64(filename: string, mimeType: string, base64: string) {
 
 function showFiltersFor(module: ReportModuleKey) {
   return {
-    reportType: module !== "attendance" && module !== "leave",
+    reportType: module !== "attendance" && module !== "leave" && module !== "assets",
+    assetAction: module === "assets",
     dates: module !== "payroll" && module !== "performance",
     monthYear: module === "payroll" || module === "performance",
-    status: module !== "leave" && module !== "payroll",
+    status: module !== "leave" && module !== "payroll" && module !== "assets",
     department: module === "attendance",
     designation: module === "hr",
     employee: module !== "hr" && module !== "recruitment",
@@ -291,6 +293,7 @@ function buildFilters(
   employeeId: string,
   leaveTypeId: string,
   status: string,
+  assetAction?: string,
   month?: number,
   year?: number,
 ): ReportFilters {
@@ -307,6 +310,7 @@ function buildFilters(
     employeeId: employeeId && employeeId !== ALL_OPTION.value ? employeeId : undefined,
     leaveTypeId: leaveTypeId && leaveTypeId !== ALL_OPTION.value ? leaveTypeId : undefined,
     status: status && status !== ALL_OPTION.value ? status : undefined,
+    assetAction: assetAction && assetAction !== "all" ? assetAction : undefined,
     month: hasPeriod ? month : undefined,
     year: hasPeriod ? year : undefined,
   };
@@ -331,7 +335,9 @@ export function ModuleReportsView({
       ? "attendance_daily"
       : module === "leave"
         ? "leave_balance"
-        : (initialReportKey ?? definitions[0]?.key ?? "hr_employee_master"),
+        : module === "assets"
+          ? "assets_assigned"
+          : (initialReportKey ?? definitions[0]?.key ?? "hr_employee_master"),
   );
   const [result, setResult] = useState<ReportResult | null>(initialResult);
   const [notice, setNotice] = useState<ReportNotice>("idle");
@@ -356,6 +362,7 @@ export function ModuleReportsView({
     defaultFilters?.leaveTypeId ?? ALL_OPTION.value,
   );
   const [status, setStatus] = useState(defaultFilters?.status ?? ALL_OPTION.value);
+  const [assetAction, setAssetAction] = useState(defaultFilters?.assetAction ?? "all");
   const [month, setMonth] = useState(
     defaultFilters?.month ? String(defaultFilters.month) : String(periodDefault.month),
   );
@@ -411,6 +418,14 @@ export function ModuleReportsView({
       ]),
     [statusOptions],
   );
+  const assetActionItems = useMemo(
+    () =>
+      ASSET_ACTIVITY_FILTER_ITEMS.map((item) => ({
+        value: item.value,
+        label: item.label,
+      })),
+    [],
+  );
   const monthItems = useMemo(() => getMonthSelectItems(), []);
   const yearItems = useMemo(() => {
     const current = new Date().getFullYear();
@@ -428,6 +443,7 @@ export function ModuleReportsView({
       employeeId,
       leaveTypeId,
       filterVisibility.status && showStatusFilter ? status : ALL_OPTION.value,
+      filterVisibility.assetAction ? assetAction : undefined,
       filterVisibility.monthYear ? selectedMonth : undefined,
       filterVisibility.monthYear ? selectedYear : undefined,
     );
@@ -526,6 +542,19 @@ export function ModuleReportsView({
               placeholder="Report type"
               triggerClassName="h-8 w-full"
               contentClassName="w-max min-w-[var(--anchor-width)] max-w-[22rem] max-h-[min(18rem,calc(100dvh-8rem))]"
+            />
+          </div>
+        ) : null}
+
+        {filterVisibility.assetAction ? (
+          <div className="w-[150px] shrink-0">
+            <LabeledSelect
+              items={assetActionItems}
+              value={assetAction}
+              onValueChange={(value) => changeFilter(value, assetAction, setAssetAction)}
+              placeholder="Action"
+              triggerClassName="h-8 w-full"
+              contentClassName="w-max min-w-[var(--anchor-width)] max-w-[16rem] max-h-[min(18rem,calc(100dvh-8rem))]"
             />
           </div>
         ) : null}

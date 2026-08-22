@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   Briefcase,
   Building2,
-  Calendar,
   Check,
   CheckCircle2,
   Clock,
@@ -81,15 +80,6 @@ function statusBadgeClass(status: OnboardingStatus) {
   if (status === "in_progress" || status === "documents_uploaded")
     return "bg-violet-100 text-violet-900 border-violet-200";
   return "bg-slate-100 text-slate-700 border-slate-200";
-}
-
-function formatDate(value: string | null | undefined) {
-  if (!value) return "—";
-  return new Date(value).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
 }
 
 function formatDateTime(value: string) {
@@ -261,7 +251,7 @@ export function OnboardingReviewView({
                   variant="outline"
                   size="sm"
                   onClick={resendInvite}
-                  disabled={isResending || isPending || !canResendInvite}
+                  disabled={isResending || !canResendInvite}
                 >
                   {isResending ? (
                     <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
@@ -333,7 +323,7 @@ export function OnboardingReviewView({
             </div>
           ) : null}
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-xl border bg-card p-4 shadow-sm">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Progress
@@ -347,15 +337,6 @@ export function OnboardingReviewView({
               </div>
               <p className="mt-1.5 text-xs text-muted-foreground">
                 {completedSections} of {ONBOARDING_WIZARD_SECTIONS.length} sections
-              </p>
-            </div>
-            <div className="rounded-xl border bg-card p-4 shadow-sm">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Joining date
-              </p>
-              <p className="mt-1 flex items-center gap-2 text-lg font-medium">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                {formatDate(detail.joiningDate)}
               </p>
             </div>
             <div className="rounded-xl border bg-card p-4 shadow-sm">

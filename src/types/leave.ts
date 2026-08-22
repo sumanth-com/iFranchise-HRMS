@@ -35,6 +35,8 @@ export type LeaveListItem = {
   appliedAt: string;
   approverName: string | null;
   currentApprovalLevel: number | null;
+  /** Stored duration breakdown when available (day-level history). */
+  durationBreakdown?: unknown;
   pendingApproverEmployeeId?: string | null;
   canActOnApproval?: boolean;
   canActOnRejection?: boolean;
@@ -179,8 +181,12 @@ export type LeaveEmployeeBalanceSnapshot = {
   usedDays: number;
   pendingDays: number;
   balanceDays: number;
+  /** Days taken in the selected calendar month (approved + pending). */
   monthUsedDays: number;
+  /** Monthly quota display — kept for apply-leave context. */
   monthTotalDays: number;
+  /** Days taken in the balance year to date (approved + pending). */
+  yearTakenDays: number;
 };
 
 export type LeaveLookups = {

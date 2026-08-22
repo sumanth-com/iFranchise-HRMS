@@ -101,7 +101,6 @@ export async function PayrollTeamPage({
 
   const resolvedSection = teamSection ?? TEAM_PAYROLL_SECTIONS.run;
   const profile = await requireServerAnyPermission(["payroll.view", "payslip.view"]);
-  const supabase = await createClient();
   const canViewTeam = hasAnyPermission(profile.permissionCodes, [...TEAM_PAYROLL_PERMISSIONS]);
 
   return (
@@ -115,7 +114,6 @@ export async function PayrollTeamPage({
           section={resolvedSection}
           rawSearchParams={raw}
           profile={profile}
-          supabase={supabase}
         />
       </Suspense>
     </HrPayrollHubView>

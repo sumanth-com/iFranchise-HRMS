@@ -3,13 +3,14 @@
 import { format } from "date-fns";
 import { Loader2, Pencil, Save, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { useMemo, useState, useTransition } from "react";
+import { type Resolver, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
+import { NoticeDialog } from "@/components/common/notice-dialog";
 import { PhoneInput } from "@/components/common/phone-input";
 import {
   Select,
@@ -31,6 +32,7 @@ import { COUNTRIES, INDIAN_STATES, STATE_DISTRICTS } from "@/lib/geo/india";
 import { updateEmployeeSelfProfileAction } from "@/lib/employees/actions";
 import type { MyProfileBundle } from "@/types/my-profile";
 import {
+  employeeSelfProfilePreferencesOnlySchema,
   employeeSelfProfileSchema,
   type EmployeeSelfProfileInput,
 } from "@/lib/validations/employee";
@@ -54,22 +56,37 @@ function ProfileFieldControl({
   );
 }
 
+function ProfileFieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <p className="text-xs text-destructive text-right">{message}</p>;
+}
+
 function ProfileInfoRow({
   label,
   value,
   editing,
   children,
   valueClassName,
+  required,
 }: {
   label: string;
   value?: string;
   editing?: boolean;
   children?: React.ReactNode;
   valueClassName?: string;
+  required?: boolean;
 }) {
   return (
     <div className="flex items-start gap-4 border-b px-4 py-3 last:border-b-0 sm:gap-6">
-      <dt className="w-32 shrink-0 pt-0.5 text-sm text-muted-foreground sm:w-36">{label}</dt>
+      <dt className="w-32 shrink-0 pt-0.5 text-sm text-muted-foreground sm:w-36">
+        {label}
+        {required ? (
+          <span className="text-destructive dark:text-white" aria-hidden="true">
+            {" "}
+            *
+          </span>
+        ) : null}
+      </dt>
       <dd
         className={`min-w-0 flex-1 text-right text-sm font-medium ${valueClassName ?? ""}`}
       >
@@ -118,6 +135,15 @@ export function MyProfileView({
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
+  const validationSchema = useMemo(
+    () =>
+      canEditContactDetails
+        ? employeeSelfProfileSchema
+        : employeeSelfProfilePreferencesOnlySchema,
+    [canEditContactDetails],
+  );
+  const contactFieldsRequired = canEditContactDetails;
 
   const {
     register,
@@ -127,7 +153,7 @@ export function MyProfileView({
     watch,
     formState: { errors },
   } = useForm<EmployeeSelfProfileInput>({
-    resolver: zodResolver(employeeSelfProfileSchema),
+    resolver: zodResolver(validationSchema) as Resolver<EmployeeSelfProfileInput>,
     defaultValues: {
       personalEmail: data.profileSettings.personalEmail,
       personalPhone: data.profileSettings.personalPhone,
@@ -209,7 +235,10 @@ export function MyProfileView({
 
       const result = await updateEmployeeSelfProfileAction(payload);
       if (!result.success) {
-        toast.error(result.message);
+        setNotice({
+          title: "Could not save profile",
+          message: result.message,
+        });
         return;
       }
       toast.success("Profile saved successfully");
@@ -341,19 +370,23 @@ export function MyProfileView({
             label="Personal phone"
             value={data.profileSettings.personalPhone || "—"}
             editing={isEditing && canEditContactDetails}
+            required={contactFieldsRequired}
           >
             <ProfileFieldControl>
-              <PhoneInput
-                id="personalPhone"
-                value={personalPhone}
-                onChange={(value) =>
-                  setValue("personalPhone", value, { shouldValidate: true })
-                }
-                disabled={isPending}
-                size="sm"
-                showHint
-                error={errors.personalPhone?.message}
-              />
+              <div className="flex w-full flex-col gap-1">
+                <PhoneInput
+                  id="personalPhone"
+                  value={personalPhone}
+                  onChange={(value) =>
+                    setValue("personalPhone", value, { shouldValidate: true })
+                  }
+                  disabled={isPending}
+                  size="sm"
+                  showHint
+                  required={contactFieldsRequired}
+                  error={errors.personalPhone?.message}
+                />
+              </div>
             </ProfileFieldControl>
           </ProfileInfoRow>
 
@@ -362,14 +395,18 @@ export function MyProfileView({
             value={data.profileSettings.address.addressLine1 || "—"}
             valueClassName="leading-snug whitespace-normal"
             editing={isEditing && canEditContactDetails}
+            required={contactFieldsRequired}
           >
             <ProfileFieldControl wide>
-              <Input
-                placeholder="Street, building, area"
-                disabled={isPending}
-                className="h-8 w-full text-right"
-                {...register("addressLine1")}
-              />
+              <div className="flex w-full flex-col gap-1">
+                <Input
+                  placeholder="Street, building, area"
+                  disabled={isPending}
+                  className="h-8 w-full text-right"
+                  {...register("addressLine1")}
+                />
+                <ProfileFieldError message={errors.addressLine1?.message} />
+              </div>
             </ProfileFieldControl>
           </ProfileInfoRow>
 
@@ -378,39 +415,18 @@ export function MyProfileView({
             value={data.profileSettings.address.addressLine2 || "—"}
             valueClassName="leading-snug whitespace-normal"
             editing={isEditing && canEditContactDetails}
+            required={contactFieldsRequired}
           >
             <ProfileFieldControl wide>
-              <Input
-                placeholder="Apartment, suite, landmark (optional)"
-                disabled={isPending}
-                className="h-8 w-full text-right"
-                {...register("addressLine2")}
-              />
-            </ProfileFieldControl>
-          </ProfileInfoRow>
-
-          <ProfileInfoRow
-            label="City"
-            value={data.profileSettings.address.city || "—"}
-            editing={isEditing && canEditContactDetails}
-          >
-            <ProfileFieldControl wide>
-              <SearchableSelect
-                options={(STATE_DISTRICTS[addressState] ?? []).map((district) => ({
-                  value: district,
-                  label: district,
-                }))}
-                value={addressCity || null}
-                onValueChange={(value) =>
-                  setValue("city", value ?? "", { shouldValidate: true })
-                }
-                placeholder="Search city…"
-                allowNone={false}
-                disabled={isPending}
-                emptyMessage={
-                  addressState ? "No matches — type to search" : "Select a state below first"
-                }
-              />
+              <div className="flex w-full flex-col gap-1">
+                <Input
+                  placeholder="Apartment, suite, landmark"
+                  disabled={isPending}
+                  className="h-8 w-full text-right"
+                  {...register("addressLine2")}
+                />
+                <ProfileFieldError message={errors.addressLine2?.message} />
+              </div>
             </ProfileFieldControl>
           </ProfileInfoRow>
 
@@ -418,19 +434,52 @@ export function MyProfileView({
             label="State"
             value={data.profileSettings.address.state || "—"}
             editing={isEditing && canEditContactDetails}
+            required={contactFieldsRequired}
           >
             <ProfileFieldControl wide>
-              <SearchableSelect
-                options={INDIAN_STATES.map((state) => ({ value: state, label: state }))}
-                value={addressState || null}
-                onValueChange={(value) => {
-                  setValue("state", value ?? "", { shouldValidate: true });
-                  setValue("city", "", { shouldValidate: true });
-                }}
-                placeholder="Search state…"
-                allowNone={false}
-                disabled={isPending}
-              />
+              <div className="flex w-full flex-col gap-1">
+                <SearchableSelect
+                  options={INDIAN_STATES.map((state) => ({ value: state, label: state }))}
+                  value={addressState || null}
+                  onValueChange={(value) => {
+                    setValue("state", value ?? "", { shouldValidate: true });
+                    setValue("city", "", { shouldValidate: true });
+                  }}
+                  placeholder="Search state…"
+                  allowNone={false}
+                  disabled={isPending}
+                />
+                <ProfileFieldError message={errors.state?.message} />
+              </div>
+            </ProfileFieldControl>
+          </ProfileInfoRow>
+
+          <ProfileInfoRow
+            label="City"
+            value={data.profileSettings.address.city || "—"}
+            editing={isEditing && canEditContactDetails}
+            required={contactFieldsRequired}
+          >
+            <ProfileFieldControl wide>
+              <div className="flex w-full flex-col gap-1">
+                <SearchableSelect
+                  options={(STATE_DISTRICTS[addressState] ?? []).map((district) => ({
+                    value: district,
+                    label: district,
+                  }))}
+                  value={addressCity || null}
+                  onValueChange={(value) =>
+                    setValue("city", value ?? "", { shouldValidate: true })
+                  }
+                  placeholder="Search city…"
+                  allowNone={false}
+                  disabled={isPending}
+                  emptyMessage={
+                    addressState ? "No matches — type to search" : "Select a state first"
+                  }
+                />
+                <ProfileFieldError message={errors.city?.message} />
+              </div>
             </ProfileFieldControl>
           </ProfileInfoRow>
 
@@ -438,14 +487,18 @@ export function MyProfileView({
             label="Postal code"
             value={data.profileSettings.address.postalCode || "—"}
             editing={isEditing && canEditContactDetails}
+            required={contactFieldsRequired}
           >
             <ProfileFieldControl>
-              <Input
-                placeholder="Postal code"
-                disabled={isPending}
-                className="h-8 w-full text-right"
-                {...register("postalCode")}
-              />
+              <div className="flex w-full flex-col gap-1">
+                <Input
+                  placeholder="Postal code"
+                  disabled={isPending}
+                  className="h-8 w-full text-right"
+                  {...register("postalCode")}
+                />
+                <ProfileFieldError message={errors.postalCode?.message} />
+              </div>
             </ProfileFieldControl>
           </ProfileInfoRow>
 
@@ -453,18 +506,22 @@ export function MyProfileView({
             label="Country"
             value={normalizeCountryForSelect(data.profileSettings.address.country) || "—"}
             editing={isEditing && canEditContactDetails}
+            required={contactFieldsRequired}
           >
             <ProfileFieldControl wide>
-              <SearchableSelect
-                options={COUNTRIES.map((country) => ({ value: country, label: country }))}
-                value={addressCountry || null}
-                onValueChange={(value) =>
-                  setValue("country", value ?? "", { shouldValidate: true })
-                }
-                placeholder="Search country…"
-                allowNone={false}
-                disabled={isPending}
-              />
+              <div className="flex w-full flex-col gap-1">
+                <SearchableSelect
+                  options={COUNTRIES.map((country) => ({ value: country, label: country }))}
+                  value={addressCountry || null}
+                  onValueChange={(value) =>
+                    setValue("country", value ?? "", { shouldValidate: true })
+                  }
+                  placeholder="Search country…"
+                  allowNone={false}
+                  disabled={isPending}
+                />
+                <ProfileFieldError message={errors.country?.message} />
+              </div>
             </ProfileFieldControl>
           </ProfileInfoRow>
 
@@ -472,32 +529,36 @@ export function MyProfileView({
             label="Emergency relation"
             value={relationshipDisplay}
             editing={isEditing && canEditContactDetails}
+            required={contactFieldsRequired}
           >
             <ProfileFieldControl>
-              <Select
-                value={emergencyRelationship || undefined}
-                onValueChange={(value) => {
-                  if (value) {
-                    setValue("emergencyContactRelationship", value, { shouldValidate: true });
-                  }
-                }}
-                disabled={isPending}
-              >
-                <SelectTrigger className="h-8 w-full">
-                  <SelectValue placeholder="Select relationship" />
-                </SelectTrigger>
-                <SelectContent
-                  align="end"
-                  alignItemWithTrigger={false}
-                  className={PROFILE_SELECT_CONTENT_CLASS}
+              <div className="flex w-full flex-col gap-1">
+                <Select
+                  value={emergencyRelationship || undefined}
+                  onValueChange={(value) => {
+                    if (value) {
+                      setValue("emergencyContactRelationship", value, { shouldValidate: true });
+                    }
+                  }}
+                  disabled={isPending}
                 >
-                  {EMERGENCY_RELATIONSHIP_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                  <SelectTrigger className="h-8 w-full">
+                    <SelectValue placeholder="Select relationship" />
+                  </SelectTrigger>
+                  <SelectContent
+                    align="end"
+                    alignItemWithTrigger={false}
+                    className={PROFILE_SELECT_CONTENT_CLASS}
+                  >
+                    {EMERGENCY_RELATIONSHIP_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <ProfileFieldError message={errors.emergencyContactRelationship?.message} />
+              </div>
             </ProfileFieldControl>
           </ProfileInfoRow>
 
@@ -505,14 +566,18 @@ export function MyProfileView({
             label="Emergency name"
             value={data.profileSettings.emergencyContact.name || "—"}
             editing={isEditing && canEditContactDetails}
+            required={contactFieldsRequired}
           >
             <ProfileFieldControl>
-              <Input
-                placeholder="Name"
-                disabled={isPending}
-                className="h-8 w-full text-right"
-                {...register("emergencyContactName")}
-              />
+              <div className="flex w-full flex-col gap-1">
+                <Input
+                  placeholder="Name"
+                  disabled={isPending}
+                  className="h-8 w-full text-right"
+                  {...register("emergencyContactName")}
+                />
+                <ProfileFieldError message={errors.emergencyContactName?.message} />
+              </div>
             </ProfileFieldControl>
           </ProfileInfoRow>
 
@@ -520,19 +585,23 @@ export function MyProfileView({
             label="Emergency contact"
             value={data.profileSettings.emergencyContact.phone || "—"}
             editing={isEditing && canEditContactDetails}
+            required={contactFieldsRequired}
           >
             <ProfileFieldControl>
-              <PhoneInput
-                id="emergencyContactPhone"
-                value={emergencyContactPhone}
-                onChange={(value) =>
-                  setValue("emergencyContactPhone", value, { shouldValidate: true })
-                }
-                disabled={isPending}
-                size="sm"
-                showHint
-                error={errors.emergencyContactPhone?.message}
-              />
+              <div className="flex w-full flex-col gap-1">
+                <PhoneInput
+                  id="emergencyContactPhone"
+                  value={emergencyContactPhone}
+                  onChange={(value) =>
+                    setValue("emergencyContactPhone", value, { shouldValidate: true })
+                  }
+                  disabled={isPending}
+                  size="sm"
+                  showHint
+                  required={contactFieldsRequired}
+                  error={errors.emergencyContactPhone?.message}
+                />
+              </div>
             </ProfileFieldControl>
           </ProfileInfoRow>
 
@@ -540,6 +609,7 @@ export function MyProfileView({
             label="Emergency email"
             value={data.profileSettings.emergencyContact.email || "—"}
             editing={isEditing && canEditContactDetails}
+            required={contactFieldsRequired}
           >
             <ProfileFieldControl>
               <div className="flex flex-col gap-1">
@@ -550,11 +620,7 @@ export function MyProfileView({
                   className="h-8 w-full text-right"
                   {...register("emergencyContactEmail")}
                 />
-                {errors.emergencyContactEmail ? (
-                  <p className="text-xs text-destructive text-right">
-                    {errors.emergencyContactEmail.message}
-                  </p>
-                ) : null}
+                <ProfileFieldError message={errors.emergencyContactEmail?.message} />
               </div>
             </ProfileFieldControl>
           </ProfileInfoRow>
@@ -566,35 +632,39 @@ export function MyProfileView({
               data.profileSettings.language
             }
             editing={isEditing}
+            required
           >
             <ProfileFieldControl>
-              <Select
-                value={language}
-                onValueChange={(value) => {
-                  if (value) setValue("language", value, { shouldValidate: true });
-                }}
-                disabled={isPending}
-              >
-                <SelectTrigger className="h-8 w-full">
-                  <SelectValue placeholder="Language">
-                    {(value) =>
-                      LANGUAGE_OPTIONS.find((option) => option.value === value)?.label ??
-                      "Language"
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent
-                  align="end"
-                  alignItemWithTrigger={false}
-                  className={PROFILE_SELECT_CONTENT_CLASS}
+              <div className="flex w-full flex-col gap-1">
+                <Select
+                  value={language}
+                  onValueChange={(value) => {
+                    if (value) setValue("language", value, { shouldValidate: true });
+                  }}
+                  disabled={isPending}
                 >
-                  {LANGUAGE_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                  <SelectTrigger className="h-8 w-full">
+                    <SelectValue placeholder="Language">
+                      {(value) =>
+                        LANGUAGE_OPTIONS.find((option) => option.value === value)?.label ??
+                        "Language"
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent
+                    align="end"
+                    alignItemWithTrigger={false}
+                    className={PROFILE_SELECT_CONTENT_CLASS}
+                  >
+                    {LANGUAGE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <ProfileFieldError message={errors.language?.message} />
+              </div>
             </ProfileFieldControl>
           </ProfileInfoRow>
 
@@ -614,11 +684,20 @@ export function MyProfileView({
             profilePath={data.profilePath}
             canEdit={true}
           />
-          <p className="mt-3 max-w-[19rem] text-center text-xs text-muted-foreground">
+          <p className="mt-3 max-w-[19rem] text-center text-xs leading-relaxed text-slate-500 dark:text-slate-300">
             Tap the photo on your digital ID to update your profile picture anytime.
           </p>
         </aside>
       </form>
+
+      <NoticeDialog
+        open={notice != null}
+        onOpenChange={(open) => {
+          if (!open) setNotice(null);
+        }}
+        title={notice?.title ?? "Notice"}
+        message={notice?.message ?? ""}
+      />
     </div>
   );
 }

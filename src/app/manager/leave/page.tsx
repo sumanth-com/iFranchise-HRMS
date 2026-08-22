@@ -66,15 +66,16 @@ async function ManagerLeaveContent({ searchParams }: ManagerLeavePageProps) {
   const [balances, requests, calendar, applyLookups] = await Promise.all([
     safeServerCall(
       () =>
-        getEmployeeLeaveBalanceSnapshot(supabase, employeeId, undefined, {
-          month: calendarMonth,
-          year: calendarYear,
-        }),
+        getEmployeeLeaveBalanceSnapshot(supabase, employeeId, calendarYear),
       [],
       "[manager/leave] balances",
     ),
     safeServerCall(
-      () => listEmployeeOwnLeaveRequests(supabase, employeeId, 1, 25),
+      () =>
+        listEmployeeOwnLeaveRequests(supabase, employeeId, 1, 50, {
+          month: calendarMonth,
+          year: calendarYear,
+        }),
       [],
       "[manager/leave] requests",
     ),
