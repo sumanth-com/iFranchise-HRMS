@@ -28,6 +28,7 @@ import {
   getLeaveLookups,
   getLeaveSummary,
   getEmployeeLeaveBalanceSnapshot,
+  getEmployeeRoleCodes,
   listLeaveBalances,
   listLeaveRequests,
 } from "@/lib/leave/services/leave-queries";
@@ -337,7 +338,7 @@ export async function getLeaveApplyContextAction(
   try {
     const profile = await requireServerPermission("leave.create");
     const supabase = await getAuthenticatedSupabase();
-    const [runtime, employee, balances] = await Promise.all([
+    const [runtime, employee, balances, applicantRoleCodes] = await Promise.all([
       loadLeavePolicyRuntime(supabase, profile.employee.organizationId),
       loadLeaveEmployeePolicyState(
         supabase,
@@ -346,6 +347,7 @@ export async function getLeaveApplyContextAction(
         profile.employee.organizationId,
       ),
       getEmployeeLeaveBalanceSnapshot(supabase, employeeId),
+      getEmployeeRoleCodes(supabase, employeeId),
     ]);
 
     return {
@@ -367,6 +369,7 @@ export async function getLeaveApplyContextAction(
         })),
         balances,
         policyDocument: DEFAULT_LEAVE_POLICY_DOCUMENT,
+        applicantRoleCodes,
       },
     };
   } catch (error) {

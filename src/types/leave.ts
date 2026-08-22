@@ -216,6 +216,8 @@ export type LeaveApplyContext = {
   }>;
   balances: LeaveEmployeeBalanceSnapshot[];
   policyDocument: import("@/types/leave-policy").LeavePolicyDocument;
+  /** Role codes for the employee applying leave — drives approval copy. */
+  applicantRoleCodes: string[];
 };
 
 export type LeaveActionResult<T = void> =

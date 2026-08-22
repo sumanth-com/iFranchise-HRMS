@@ -8,8 +8,10 @@ import {
   getEmployeeRoleCodes,
   getHrApproverEmployeeId,
   isCeoLeaveApprover,
+  LEAVE_ALREADY_APPROVED_BY_OTHER_CEO_MESSAGE,
+  LEAVE_ALREADY_PROCESSED_MESSAGE,
   NO_HR_APPROVER_CONFIGURED_MESSAGE,
-  requireCeoApproverEmployeeId,
+  requireActiveCeoApproverEmployeeIds,
 } from "@/lib/leave/services/leave-queries";
 import { requiresCeoLeaveApproval } from "@/lib/approvals/executive-request-routing";
 import { evaluateLeaveApplication } from "@/lib/leave/services/leave-policy-runtime";
@@ -201,11 +203,13 @@ async function createApprovalSteps(
   const steps: Array<{ approverId: string; level: number }> = [];
 
   if (executiveApplicant) {
-    const ceoId = await requireCeoApproverEmployeeId(
+    const ceoIds = await requireActiveCeoApproverEmployeeIds(
       supabase,
       organizationId,
     );
-    steps.push({ approverId: ceoId, level: 1 });
+    for (const ceoId of ceoIds) {
+      steps.push({ approverId: ceoId, level: 1 });
+    }
   } else {
     const managerId = await getEmployeeReportingManagerId(supabase, employeeId);
     const excludeFromHr = [employeeId, managerId].filter(
@@ -399,6 +403,25 @@ function canRejectLeave(profile: UserProfile): boolean {
   return profile.permissionCodes.includes("leave.reject");
 }
 
+async function getPendingLeaveApprovalForActor(
+  supabase: AuthSupabaseClient,
+  leaveRequestId: string,
+  actorEmployeeId: string,
+) {
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("leave_approvals")
+    .select("id, approver_employee_id, approval_level")
+    .eq("leave_request_id", leaveRequestId)
+    .eq("approver_employee_id", actorEmployeeId)
+    .eq("approval_status", "pending")
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 async function getPendingLeaveApproval(
   supabase: AuthSupabaseClient,
   leaveRequestId: string,
@@ -418,6 +441,57 @@ async function getPendingLeaveApproval(
   return data;
 }
 
+async function cancelSiblingPendingApprovals(
+  supabase: AuthSupabaseClient,
+  leaveRequestId: string,
+  actingApproverEmployeeId: string,
+  userId: string,
+) {
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .schema("hrms")
+    .from("leave_approvals")
+    .update({
+      approval_status: "cancelled",
+      deleted_at: now,
+      updated_at: now,
+      updated_by: userId,
+    })
+    .eq("leave_request_id", leaveRequestId)
+    .eq("approval_status", "pending")
+    .neq("approver_employee_id", actingApproverEmployeeId)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+}
+
+async function throwIfLeaveAlreadyProcessed(
+  supabase: AuthSupabaseClient,
+  leaveRequestId: string,
+  executiveApplicant: boolean,
+) {
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("leave_requests")
+    .select("leave_status")
+    .eq("id", leaveRequestId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Leave request not found");
+
+  if (data.leave_status === "approved") {
+    throw new Error(
+      executiveApplicant
+        ? LEAVE_ALREADY_APPROVED_BY_OTHER_CEO_MESSAGE
+        : LEAVE_ALREADY_PROCESSED_MESSAGE,
+    );
+  }
+  if (data.leave_status === "rejected" || data.leave_status === "cancelled") {
+    throw new Error(LEAVE_ALREADY_PROCESSED_MESSAGE);
+  }
+}
+
 async function assertCanActOnLeaveApproval(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -425,12 +499,17 @@ async function assertCanActOnLeaveApproval(
   employeeId: string,
   action: "approve" | "reject",
 ): Promise<void> {
-  const pendingApproval = await getPendingLeaveApproval(supabase, leaveRequestId);
+  const pendingApproval = await getPendingLeaveApprovalForActor(
+    supabase,
+    leaveRequestId,
+    profile.employee.id,
+  );
   if (!pendingApproval) {
-    throw new Error("No pending approval step for this request");
-  }
-
-  if (pendingApproval.approver_employee_id !== profile.employee.id) {
+    await throwIfLeaveAlreadyProcessed(
+      supabase,
+      leaveRequestId,
+      requiresCeoLeaveApproval(await getEmployeeRoleCodes(supabase, employeeId)),
+    );
     throw new Error("You are not the assigned approver for this request");
   }
 
@@ -563,7 +642,7 @@ export async function approveLeaveRequest(
   const { data: request, error } = await supabase
     .schema("hrms")
     .from("leave_requests")
-    .select("id, employee_id, leave_status")
+    .select("id, employee_id, leave_status, leave_type_id, start_date, end_date, total_days, is_half_day")
     .eq("id", leaveRequestId)
     .single();
 
@@ -571,6 +650,9 @@ export async function approveLeaveRequest(
   if (request.leave_status !== "pending") {
     throw new Error("Only pending requests can be approved");
   }
+
+  const applicantRoles = await getEmployeeRoleCodes(supabase, request.employee_id);
+  const executiveApplicant = requiresCeoLeaveApproval(applicantRoles);
 
   await assertCanActOnLeaveApproval(
     supabase,
@@ -581,6 +663,114 @@ export async function approveLeaveRequest(
   );
 
   const actedAt = new Date().toISOString();
+  const pendingStep = await getPendingLeaveApprovalForActor(
+    supabase,
+    leaveRequestId,
+    profile.employee.id,
+  );
+  if (!pendingStep) {
+    await throwIfLeaveAlreadyProcessed(supabase, leaveRequestId, executiveApplicant);
+    throw new Error("This approval step was already processed");
+  }
+
+  if (executiveApplicant) {
+    const evaluated = await evaluateLeaveApplication(
+      supabase,
+      profile.employee.organizationId,
+      {
+        employeeId: request.employee_id,
+        leaveTypeId: request.leave_type_id,
+        startDate: request.start_date,
+        endDate: request.end_date,
+        isHalfDay: Boolean(request.is_half_day),
+        excludeRequestId: leaveRequestId,
+        skipNotice: true,
+      },
+    );
+
+    const balanceYear = getCurrentBalanceYear(request.start_date);
+    const totalDays = Number(request.total_days);
+
+    const { data: finalized, error: finalizeError } = await supabase
+      .schema("hrms")
+      .from("leave_requests")
+      .update({
+        leave_status: "approved",
+        total_days: evaluated.duration.totalLeaveDays,
+        duration_breakdown: evaluated.duration,
+        updated_by: profile.userId,
+        updated_at: actedAt,
+      })
+      .eq("id", leaveRequestId)
+      .eq("leave_status", "pending")
+      .select("id")
+      .maybeSingle();
+
+    if (finalizeError) throw new Error(finalizeError.message);
+    if (!finalized) {
+      await throwIfLeaveAlreadyProcessed(supabase, leaveRequestId, true);
+      throw new Error(LEAVE_ALREADY_PROCESSED_MESSAGE);
+    }
+
+    const { data: updatedStep, error: updateError } = await supabase
+      .schema("hrms")
+      .from("leave_approvals")
+      .update({
+        approval_status: "approved",
+        comments: emptyToNull(comments),
+        acted_at: actedAt,
+        updated_by: profile.userId,
+      })
+      .eq("id", pendingStep.id)
+      .eq("approval_status", "pending")
+      .is("deleted_at", null)
+      .select("id, approval_level")
+      .maybeSingle();
+
+    if (updateError) throw new Error(updateError.message);
+    if (!updatedStep) {
+      throw new Error("This approval step was already processed");
+    }
+
+    await cancelSiblingPendingApprovals(
+      supabase,
+      leaveRequestId,
+      profile.employee.id,
+      profile.userId,
+    );
+
+    if (evaluated.leaveType.isPaid) {
+      await adjustLeaveBalance(
+        supabase,
+        request.employee_id,
+        request.leave_type_id,
+        balanceYear,
+        { pending: -totalDays, used: evaluated.duration.totalLeaveDays },
+      );
+    }
+
+    await notifyLeaveApproved(supabase, profile, leaveRequestId, request.employee_id);
+    await writeApplicationAudit(supabase, {
+      organizationId: profile.employee.organizationId,
+      module: "leave",
+      action: "approve",
+      description: "Leave request approved by CEO",
+      recordId: leaveRequestId,
+      metadata: {
+        approvalLevel: updatedStep.approval_level,
+        approverEmployeeId: profile.employee.id,
+        totalDays: evaluated.duration.totalLeaveDays,
+        sandwichDays: evaluated.duration.sandwichDays,
+        duration: evaluated.duration,
+      },
+    });
+    emitHrmsWebhook(profile.employee.organizationId, "leave.approved", {
+      id: leaveRequestId,
+      employeeId: request.employee_id,
+    });
+    return;
+  }
+
   const { data: updatedStep, error: updateError } = await supabase
     .schema("hrms")
     .from("leave_approvals")
@@ -666,6 +856,11 @@ export async function rejectLeaveRequest(
 
   if (approvalError) throw new Error(approvalError.message);
   if (!approvalRow) {
+    await throwIfLeaveAlreadyProcessed(
+      supabase,
+      leaveRequestId,
+      requiresCeoLeaveApproval(await getEmployeeRoleCodes(supabase, request.employee_id)),
+    );
     throw new Error("This approval step was already processed");
   }
 
@@ -684,8 +879,20 @@ export async function rejectLeaveRequest(
 
   if (updateError) throw new Error(updateError.message);
   if (!rejected) {
+    await throwIfLeaveAlreadyProcessed(
+      supabase,
+      leaveRequestId,
+      requiresCeoLeaveApproval(await getEmployeeRoleCodes(supabase, request.employee_id)),
+    );
     throw new Error("This leave request was already processed");
   }
+
+  await cancelSiblingPendingApprovals(
+    supabase,
+    leaveRequestId,
+    profile.employee.id,
+    profile.userId,
+  );
 
   const { data: leaveType } = await supabase
     .schema("hrms")

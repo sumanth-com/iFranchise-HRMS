@@ -30,6 +30,7 @@ import {
   DEFAULT_LEAVE_CALENDAR,
   type LeaveCalendarContext,
 } from "@/lib/leave/services/leave-calendar-engine";
+import { formatLeaveBalanceUsedTotal } from "@/lib/leave/leave-balance-display";
 import {
   formatLeaveDayCount,
   resolveLeaveDurationBreakdown,
@@ -536,7 +537,7 @@ export function MyLeaveSelfServiceView({
               {selectedLeaveTypeCode && selectedTypeLabel
                 ? `${selectedTypeLabel} in ${monthLabel} · ${formatLeaveDayCount(historyDaysTotal)} day${historyDaysTotal === 1 ? "" : "s"} this month${
                     selectedBalance
-                      ? ` · ${formatLeaveDayCount(selectedBalance.yearTakenDays)} / ${formatLeaveDayCount(selectedBalance.allocatedDays)} on card (year to date)`
+                      ? ` · ${formatLeaveBalanceUsedTotal(selectedBalance)} on card (year to date)`
                       : ""
                   }.`
                 : `Requests in ${monthLabel}. Click a leave card for that type’s history in this month only.`}

@@ -33,6 +33,7 @@ import {
 } from "@/lib/leave/constants";
 import { LeaveDurationPreview, LeavePolicyInfo } from "@/components/leave/leave-apply-policy-panel";
 import { formatLeaveDayCount } from "@/lib/leave/services/leave-usage";
+import { formatLeaveBalanceUsedTotal } from "@/lib/leave/leave-balance-display";
 import { previewLeaveApplication } from "@/lib/leave/services/leave-apply-preview";
 import {
   CASUAL_LEAVE_CODE,
@@ -416,8 +417,7 @@ export function LeaveForm({
                       key={balance.leaveTypeCode}
                       className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium"
                     >
-                      {balance.leaveTypeName}: {formatLeaveDayCount(balance.usedDays)} /{" "}
-                      {formatLeaveDayCount(balance.allocatedDays)}
+                      {balance.leaveTypeName}: {formatLeaveBalanceUsedTotal(balance)}
                     </span>
                   ))
                 )}
@@ -455,7 +455,7 @@ export function LeaveForm({
                         {balance.leaveTypeName}
                       </p>
                       <p className="mt-1 text-2xl font-semibold tabular-nums">
-                        {formatLeaveDayCount(balance.usedDays)} / {formatLeaveDayCount(balance.allocatedDays)}
+                        {formatLeaveBalanceUsedTotal(balance)}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {formatLeaveDayCount(balance.balanceDays)} available

@@ -39,23 +39,25 @@ export async function notifyLeaveSubmitted(
   });
 
   if (executiveApplicant) {
-    const { data: pendingApproval, error } = await supabase
+    const { data: pendingApprovals, error } = await supabase
       .schema("hrms")
       .from("leave_approvals")
       .select("approver_employee_id")
       .eq("leave_request_id", leaveRequestId)
       .eq("approval_status", "pending")
-      .is("deleted_at", null)
-      .order("approval_level", { ascending: true })
-      .limit(1)
-      .maybeSingle();
+      .is("deleted_at", null);
 
     if (error) throw new Error(error.message);
 
-    if (pendingApproval?.approver_employee_id) {
+    const notified = new Set<string>();
+    for (const row of pendingApprovals ?? []) {
+      if (!row.approver_employee_id || notified.has(row.approver_employee_id)) {
+        continue;
+      }
+      notified.add(row.approver_employee_id);
       await notifyEmployee(supabase, {
         organizationId,
-        employeeId: pendingApproval.approver_employee_id,
+        employeeId: row.approver_employee_id,
         title: "Leave request pending CEO approval",
         message:
           "An HR or Manager leave request requires your executive approval.",
@@ -63,7 +65,7 @@ export async function notifyLeaveSubmitted(
         module: "leave",
         priority: "high",
         actionUrl: CEO_ROUTES.approvalsLeave,
-        sourceEventKey: `leave_submitted_ceo:${leaveRequestId}:${pendingApproval.approver_employee_id}`,
+        sourceEventKey: `leave_submitted_ceo:${leaveRequestId}:${row.approver_employee_id}`,
         templateKey: "leave_submitted",
         createdBy: profile.userId,
       });

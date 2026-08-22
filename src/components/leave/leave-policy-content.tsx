@@ -1,5 +1,6 @@
 import { EmployeeStatCard } from "@/components/employee/dashboard/employee-module-primitives";
 import { LEAVE_BALANCE_CARD_TONES } from "@/lib/leave/constants";
+import { formatLeaveBalanceUsedTotal } from "@/lib/leave/leave-balance-display";
 import { formatLeaveDayCount } from "@/lib/leave/services/leave-usage";
 import type { LeaveEmployeeBalanceSnapshot } from "@/types/leave";
 import type { LeavePolicyContact, LeavePolicySection } from "@/types/leave-policy";
@@ -17,7 +18,7 @@ export function LeavePolicyYearUsage({
     <section className="space-y-2">
       <div>
         <h2 className="text-sm font-medium text-foreground/90">{year} leave year</h2>
-        <p className="text-xs text-foreground/55">Used / total for the year, with days still available.</p>
+        <p className="text-xs text-foreground/55">Used this year / annual entitlement, with days still available.</p>
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {balances.map((row) => {
@@ -28,7 +29,7 @@ export function LeavePolicyYearUsage({
             <EmployeeStatCard
               key={row.leaveTypeCode}
               label={row.leaveTypeName}
-              value={`${formatLeaveDayCount(row.usedDays)} / ${formatLeaveDayCount(row.allocatedDays)}`}
+              value={formatLeaveBalanceUsedTotal(row)}
               hint={`${formatLeaveDayCount(row.balanceDays)} available`}
               accent={tone.accent}
               iconBg={tone.iconBg}

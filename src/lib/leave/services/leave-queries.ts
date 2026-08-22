@@ -1128,8 +1128,11 @@ export const NO_HR_APPROVER_CONFIGURED_MESSAGE =
 export const NO_CEO_APPROVER_CONFIGURED_MESSAGE =
   "No active CEO is configured to approve this request. Please contact your administrator to assign a CEO approver for your organization.";
 
-export const NO_CEO_APPROVER_AMBIGUOUS_MESSAGE =
-  "Multiple CEOs are configured for this organization. Please contact your administrator to designate a single CEO approver before submitting executive requests.";
+export const LEAVE_ALREADY_APPROVED_BY_OTHER_CEO_MESSAGE =
+  "This request has already been approved by another CEO.";
+
+export const LEAVE_ALREADY_PROCESSED_MESSAGE =
+  "This request has already been processed.";
 
 export type ResolveHrApproverOptions = {
   /** Employee whose leave is being routed (uses assigned_hr_employee_id first). */
@@ -1424,13 +1427,13 @@ async function filterActiveCeoEmployeeIds(
 }
 
 /**
- * Fail-closed CEO resolution for new HR/Manager leave requests.
- * Requires exactly one active CEO in the organization.
+ * Active CEO approvers for executive leave routing (HR / Manager applicants).
+ * Fail-closed when none are configured.
  */
-export async function requireCeoApproverEmployeeId(
+export async function requireActiveCeoApproverEmployeeIds(
   _supabase: AuthSupabaseClient,
   organizationId: string,
-): Promise<string> {
+): Promise<string[]> {
   const ceoIds = await listCeoLeaveApproverEmployeeIds(organizationId);
   const activeIds = await filterActiveCeoEmployeeIds(organizationId, ceoIds);
 
@@ -1443,16 +1446,18 @@ export async function requireCeoApproverEmployeeId(
     throw new Error(NO_CEO_APPROVER_CONFIGURED_MESSAGE);
   }
 
-  if (activeIds.length > 1) {
-    console.error("[leave] CEO routing failed (fail-closed)", {
-      organizationId,
-      reason: "ambiguous_multiple_ceos",
-      activeCeoCount: activeIds.length,
-      activeCeoEmployeeIds: activeIds,
-    });
-    throw new Error(NO_CEO_APPROVER_AMBIGUOUS_MESSAGE);
-  }
+  return activeIds.sort();
+}
 
+/**
+ * @deprecated Prefer requireActiveCeoApproverEmployeeIds for leave. Returns the first
+ * active CEO for single-assignee workflows (e.g. attendance regularization).
+ */
+export async function requireCeoApproverEmployeeId(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+): Promise<string> {
+  const activeIds = await requireActiveCeoApproverEmployeeIds(supabase, organizationId);
   return activeIds[0]!;
 }
 
@@ -1553,26 +1558,25 @@ export async function getEmployeeRoleCodes(
 }
 
 /**
- * Ensures pending leave from HR / Manager applicants is assigned to the CEO
- * so it appears in Executive Approvals (and not on manager/HR team queues).
- *
- * When `preferredCeoEmployeeId` is a valid executive approver, pending executive
- * leave is routed to that person so the logged-in executive sees the queue.
+ * Ensures pending leave from HR / Manager applicants has a pending level-1 approval
+ * row for every active CEO in the organization (any-of CEO approval queue).
  */
 export async function ensurePendingExecutiveLeaveAssignedToCeo(
   organizationId: string,
-  preferredCeoEmployeeId?: string | null,
+  _preferredCeoEmployeeId?: string | null,
 ): Promise<void> {
+  const ceoIds = await filterActiveCeoEmployeeIds(
+    organizationId,
+    await listCeoLeaveApproverEmployeeIds(organizationId),
+  );
+  if (ceoIds.length === 0) return;
+
   const executiveApplicantIds =
     await listExecutiveLeaveApplicantEmployeeIds(organizationId);
   if (executiveApplicantIds.length === 0) return;
 
   const admin = createAdminClient();
-  const ceoId = await resolveCeoApproverEmployeeIdForSync(
-    organizationId,
-    preferredCeoEmployeeId,
-  );
-  if (!ceoId) return;
+  const ceoIdSet = new Set(ceoIds);
 
   const { data: pendingLeaves, error: leaveError } = await admin
     .schema("hrms")
@@ -1599,69 +1603,29 @@ export async function ensurePendingExecutiveLeaveAssignedToCeo(
 
   if (approvalsError) throw new Error(approvalsError.message);
 
-  const pendingByLeave = new Map<
-    string,
-    { id: string; approverId: string; level: number }[]
-  >();
-  const activeLevel1ByLeave = new Map<
-    string,
-    { id: string; status: string; approverId: string }
-  >();
-  const softDeletedLevel1ByLeave = new Map<string, string>();
+  const pendingByLeaveAndApprover = new Map<string, string>();
+  const approvalIdsToCancel: string[] = [];
 
   for (const row of existingApprovals ?? []) {
-    if (row.deleted_at) {
-      if (row.approval_level === 1) {
-        softDeletedLevel1ByLeave.set(row.leave_request_id, row.id);
-      }
+    if (row.deleted_at) continue;
+
+    const key = `${row.leave_request_id}:${row.approver_employee_id}`;
+    if (
+      row.approval_level === 1 &&
+      row.approval_status === "pending" &&
+      ceoIdSet.has(row.approver_employee_id)
+    ) {
+      pendingByLeaveAndApprover.set(key, row.id);
       continue;
     }
 
-    if (row.approval_level === 1) {
-      activeLevel1ByLeave.set(row.leave_request_id, {
-        id: row.id,
-        status: row.approval_status,
-        approverId: row.approver_employee_id,
-      });
+    if (
+      row.approval_level === 1 &&
+      row.approval_status === "pending" &&
+      !ceoIdSet.has(row.approver_employee_id)
+    ) {
+      approvalIdsToCancel.push(row.id);
     }
-
-    if (row.approval_status !== "pending") continue;
-    const list = pendingByLeave.get(row.leave_request_id) ?? [];
-    list.push({
-      id: row.id,
-      approverId: row.approver_employee_id,
-      level: row.approval_level,
-    });
-    pendingByLeave.set(row.leave_request_id, list);
-  }
-
-  const approvalIdsToReassign: string[] = [];
-  const approvalIdsToCancel: string[] = [];
-  const approvalIdsToRevive: string[] = [];
-
-  for (const pendingSteps of pendingByLeave.values()) {
-    const sorted = [...pendingSteps].sort((a, b) => a.level - b.level);
-    const active = sorted[0];
-    if (!active) continue;
-    if (active.approverId !== ceoId) {
-      approvalIdsToReassign.push(active.id);
-    }
-    for (const extra of sorted.slice(1)) {
-      approvalIdsToCancel.push(extra.id);
-    }
-  }
-
-  if (approvalIdsToReassign.length > 0) {
-    const { error: updateError } = await admin
-      .schema("hrms")
-      .from("leave_approvals")
-      .update({
-        approver_employee_id: ceoId,
-        updated_at: now,
-      })
-      .in("id", approvalIdsToReassign);
-
-    if (updateError) throw new Error(updateError.message);
   }
 
   if (approvalIdsToCancel.length > 0) {
@@ -1678,52 +1642,37 @@ export async function ensurePendingExecutiveLeaveAssignedToCeo(
     if (cancelError) throw new Error(cancelError.message);
   }
 
-  const missingApprovalLeaves = leaveRows.filter((row) => {
-    const activeLevel1 = activeLevel1ByLeave.get(row.id);
-    if (activeLevel1) {
-      // Already has an active level-1 step (pending or otherwise).
-      return false;
-    }
-    const softDeletedId = softDeletedLevel1ByLeave.get(row.id);
-    if (softDeletedId) {
-      approvalIdsToRevive.push(softDeletedId);
-      return false;
-    }
-    return true;
-  });
+  const rowsToInsert: Array<{
+    leave_request_id: string;
+    approver_employee_id: string;
+    approval_level: number;
+    approval_status: "pending";
+    status: "active";
+    created_by: string;
+    updated_by: string;
+  }> = [];
 
-  if (approvalIdsToRevive.length > 0) {
-    const { error: reviveError } = await admin
-      .schema("hrms")
-      .from("leave_approvals")
-      .update({
+  for (const leave of leaveRows) {
+    for (const ceoId of ceoIds) {
+      const key = `${leave.id}:${ceoId}`;
+      if (pendingByLeaveAndApprover.has(key)) continue;
+      rowsToInsert.push({
+        leave_request_id: leave.id,
         approver_employee_id: ceoId,
-        approval_status: "pending",
         approval_level: 1,
+        approval_status: "pending",
         status: "active",
-        deleted_at: null,
-        updated_at: now,
-      })
-      .in("id", approvalIdsToRevive);
-
-    if (reviveError) throw new Error(reviveError.message);
+        created_by: leave.created_by,
+        updated_by: leave.created_by,
+      });
+    }
   }
 
-  if (missingApprovalLeaves.length > 0) {
+  if (rowsToInsert.length > 0) {
     const { error: insertError } = await admin
       .schema("hrms")
       .from("leave_approvals")
-      .insert(
-        missingApprovalLeaves.map((row) => ({
-          leave_request_id: row.id,
-          approver_employee_id: ceoId,
-          approval_level: 1,
-          approval_status: "pending" as const,
-          status: "active" as const,
-          created_by: row.created_by,
-          updated_by: row.created_by,
-        })),
-      );
+      .insert(rowsToInsert);
 
     if (insertError && insertError.code !== "23505") {
       throw new Error(insertError.message);

@@ -15,6 +15,7 @@ import {
   LeavePolicySections,
 } from "@/components/leave/leave-policy-content";
 import { DEFAULT_LEAVE_POLICY_DOCUMENT } from "@/lib/leave/leave-policy-defaults";
+import { getLeaveSubmissionApprovalMessage } from "@/lib/leave/leave-approval-copy";
 import { previewLeaveApplication } from "@/lib/leave/services/leave-apply-preview";
 import { formatLeaveDate } from "@/lib/leave/services/leave-utils";
 import { formatLeaveDayCount } from "@/lib/leave/services/leave-usage";
@@ -34,10 +35,10 @@ export function LeavePolicyInfo({
   const [open, setOpen] = useState(false);
   const approvalLevels = context?.approvalLevels ?? 2;
   const document = context?.policyDocument ?? DEFAULT_LEAVE_POLICY_DOCUMENT;
-  const approvalLine =
-    approvalLevels >= 2
-      ? "Your request is subject to Manager and HR approval."
-      : "Your request is subject to approval.";
+  const approvalLine = getLeaveSubmissionApprovalMessage(
+    context?.applicantRoleCodes ?? [],
+    approvalLevels,
+  );
 
   return (
     <div className={cn("rounded-xl border bg-muted/20", compact ? "px-3 py-2" : "px-4 py-3")}>

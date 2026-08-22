@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/common/modal";
 import { LeaveForm } from "@/components/leave/leave-form";
 import { getLeaveApplyContextAction } from "@/lib/leave/actions";
+import { getLeaveApplyDialogDescription } from "@/lib/leave/leave-approval-copy";
 import {
   clearStaleServerActionReloadFlag,
   isStaleServerActionError,
@@ -108,7 +109,10 @@ export function ApplyLeaveDialog({
       description={
         isTeam
           ? "Create a leave request for an employee. It will follow the normal approval workflow."
-          : "Submit a leave request for manager and HR approval."
+          : getLeaveApplyDialogDescription(
+              applyContext?.applicantRoleCodes ?? [],
+              applyContext?.approvalLevels ?? 2,
+            )
       }
       contentClassName="w-[min(96vw,48rem)] sm:max-w-3xl"
       bodyClassName="overflow-y-auto py-3"

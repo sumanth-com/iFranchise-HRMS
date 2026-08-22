@@ -7,12 +7,18 @@ import {
   LEAVE_BALANCE_DISPLAY_CODES,
   LEAVE_BALANCE_DISPLAY_LABELS,
 } from "@/lib/leave/constants";
-import { formatLeaveDayCount, roundLeaveDays } from "@/lib/leave/services/leave-usage";
+import {
+  formatLeaveBalanceUsedTotal,
+  LEAVE_BALANCE_USAGE_CAPTION,
+  getLeaveBalanceYearUsage,
+  getLeaveBalanceAnnualEntitlement,
+} from "@/lib/leave/leave-balance-display";
+import { formatLeaveDayCount } from "@/lib/leave/services/leave-usage";
 import { cn } from "@/lib/utils";
 import type { LeaveEmployeeBalanceSnapshot } from "@/types/leave";
 
 /** Fixed copy — annual pool; total does not reset when the calendar month changes. */
-const BALANCE_CARDS_CAPTION = "Used this year / annual entitlement";
+const BALANCE_CARDS_CAPTION = LEAVE_BALANCE_USAGE_CAPTION;
 
 type Props = {
   balances: LeaveEmployeeBalanceSnapshot[];
@@ -40,14 +46,14 @@ export function LeaveBalanceSummaryCards({
 
   const cards = LEAVE_BALANCE_DISPLAY_CODES.map((code) => {
     const row = byCode.get(code);
-    const used =
-      row?.yearTakenDays ??
-      roundLeaveDays((row?.usedDays ?? 0) + (row?.pendingDays ?? 0));
-    const total = row?.allocatedDays ?? row?.monthTotalDays ?? 0;
+    const used = row ? getLeaveBalanceYearUsage(row) : 0;
+    const total = row ? getLeaveBalanceAnnualEntitlement(row) : 0;
     return {
       key: code,
       label: row?.leaveTypeName || LEAVE_BALANCE_DISPLAY_LABELS[code],
-      value: `${formatLeaveDayCount(used)} / ${formatLeaveDayCount(total)}`,
+      value: row
+        ? formatLeaveBalanceUsedTotal(row)
+        : `${formatLeaveDayCount(used)} / ${formatLeaveDayCount(total)}`,
       tone: LEAVE_BALANCE_CARD_TONES[code],
     };
   });
