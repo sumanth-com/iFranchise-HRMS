@@ -40,7 +40,7 @@ type OfferLetterWorkspaceProps = {
   loading: boolean;
   canOffer: boolean;
   onClose: () => void;
-  onRefresh: () => void;
+  onRefresh: () => void | Promise<void>;
 };
 
 export function OfferLetterWorkspace({
@@ -60,6 +60,8 @@ export function OfferLetterWorkspace({
   const latestOffer = detail?.offers[0];
   const hasStoredLetter = Boolean(latestOffer?.offerLetterPath);
   const activeFile = uploadedFile;
+  const canSaveLetter = Boolean(canOffer && activeFile && !isPending);
+  const canPushToOnboarding = Boolean(canOffer && hasStoredLetter && !isPending);
   const displayFileName =
     activeFile?.name ??
     (hasStoredLetter
@@ -129,8 +131,39 @@ export function OfferLetterWorkspace({
       toast.success(
         hasStoredLetter
           ? "Offer letter updated and saved"
-          : "Offer letter saved — add to onboarding when ready",
+          : "Offer letter saved — you can add them to onboarding now",
       );
+      setUploadedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      onRefresh();
+    });
+  }
+
+  function saveAndPushToOnboarding() {
+    if (!detail || !canOffer || !activeFile) {
+      toast.error("Choose an offer letter file first");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.set("candidateId", detail.id);
+    formData.set("offerFile", activeFile);
+
+    startTransition(async () => {
+      const uploadResult = await createOfferAction(formData);
+      if (!uploadResult.success) {
+        toast.error(uploadResult.message);
+        return;
+      }
+
+      const pushResult = await pushCandidateToOnboardingAction(detail.id);
+      if (!pushResult.success) {
+        toast.error(pushResult.message);
+        onRefresh();
+        return;
+      }
+
+      toast.success(`${detail.fullName} saved and added to onboarding`);
       setUploadedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       onRefresh();
@@ -258,7 +291,7 @@ export function OfferLetterWorkspace({
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {activeFile
-                          ? `${formatBytes(activeFile.size)} · click Upload to save`
+                          ? `${formatBytes(activeFile.size)} · use the Actions buttons below to save`
                           : hasStoredLetter
                             ? "Saved · view or download anytime"
                             : ""}
@@ -284,8 +317,61 @@ export function OfferLetterWorkspace({
                           Download
                         </a>
                       ) : null}
-                      {canOffer ? (
+                      {canOffer && activeFile ? (
                         <>
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={!canSaveLetter}
+                            onClick={uploadLetter}
+                          >
+                            {isPending ? (
+                              <Loader2 className="mr-1.5 size-4 animate-spin" />
+                            ) : (
+                              <UploadCloud className="mr-1.5 size-4" />
+                            )}
+                            Save offer letter
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            disabled={!canSaveLetter}
+                            onClick={saveAndPushToOnboarding}
+                          >
+                            {isPending ? (
+                              <Loader2 className="mr-1.5 size-4 animate-spin" />
+                            ) : (
+                              <ListPlus className="mr-1.5 size-4" />
+                            )}
+                            Save & add to onboarding
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            disabled={isPending}
+                            onClick={() => setUploadedFile(null)}
+                          >
+                            Clear selection
+                          </Button>
+                        </>
+                      ) : null}
+                      {canOffer && hasStoredLetter && !activeFile ? (
+                        <>
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={!canPushToOnboarding}
+                            onClick={pushToOnboarding}
+                          >
+                            {isPending ? (
+                              <Loader2 className="mr-1.5 size-4 animate-spin" />
+                            ) : (
+                              <ListPlus className="mr-1.5 size-4" />
+                            )}
+                            {inOnboardingList ? "Update onboarding list" : "Add to onboarding list"}
+                          </Button>
                           <Button
                             type="button"
                             size="sm"
@@ -294,33 +380,32 @@ export function OfferLetterWorkspace({
                             onClick={openFilePicker}
                           >
                             <UploadCloud className="mr-1.5 size-4" />
-                            {hasStoredLetter ? "Replace file" : "Choose file"}
+                            Replace file
                           </Button>
-                          {activeFile ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              disabled={isPending}
-                              onClick={() => setUploadedFile(null)}
-                            >
-                              Clear selection
-                            </Button>
-                          ) : null}
-                          {hasStoredLetter && !activeFile ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              disabled={isPending}
-                              className="text-destructive hover:text-destructive"
-                              onClick={() => setDeleteConfirmOpen(true)}
-                            >
-                              <Trash2 className="mr-1.5 size-4" />
-                              Delete
-                            </Button>
-                          ) : null}
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            disabled={isPending}
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setDeleteConfirmOpen(true)}
+                          >
+                            <Trash2 className="mr-1.5 size-4" />
+                            Delete
+                          </Button>
                         </>
+                      ) : null}
+                      {canOffer && !hasStoredLetter && !activeFile ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={isPending}
+                          onClick={openFilePicker}
+                        >
+                          <UploadCloud className="mr-1.5 size-4" />
+                          Choose file
+                        </Button>
                       ) : null}
                     </div>
                   </div>
@@ -394,48 +479,83 @@ export function OfferLetterWorkspace({
         </div>
       </div>
 
-      {canOffer ? (
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t bg-muted/10 px-4 py-3">
-          <div className="text-xs text-muted-foreground">
-            {inOnboardingList ? (
-              <span>
-                Listed in{" "}
-                <Link href={RECRUITMENT_ROUTES.onboarding} className="font-medium text-primary hover:underline">
-                  Employee Onboarding
-                </Link>
-              </span>
-            ) : hasStoredLetter ? (
-              "Letter saved — add to onboarding when ready"
-            ) : (
-              "Upload a letter to enable onboarding"
-            )}
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {hasStoredLetter ? (
-              <Button
-                size="sm"
-                variant={inOnboardingList ? "outline" : "default"}
-                disabled={isPending}
-                onClick={pushToOnboarding}
-              >
-                {isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
-                <ListPlus className="mr-1 h-3.5 w-3.5" />
-                {inOnboardingList ? "Update onboarding list" : "Add to onboarding list"}
-              </Button>
-            ) : null}
+      <div className="shrink-0 border-t bg-card px-4 py-4 shadow-[0_-4px_24px_-12px_rgba(15,23,42,0.12)]">
+        <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          Actions
+        </p>
+        {!canOffer ? (
+          <p className="text-sm text-muted-foreground">
+            You can view saved letters. Ask an HR admin for offer permissions to upload or add
+            candidates to onboarding.
+          </p>
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-2">
             <Button
-              size="sm"
-              variant="outline"
-              disabled={isPending || !uploadedFile}
+              type="button"
+              className="w-full"
+              disabled={!canSaveLetter}
               onClick={uploadLetter}
             >
-              {isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
-              <UploadCloud className="mr-1 h-3.5 w-3.5" />
-              {hasStoredLetter ? "Save replacement" : "Upload offer letter"}
+              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              <UploadCloud className="mr-2 h-4 w-4" />
+              Save offer letter
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full"
+              disabled={activeFile ? !canSaveLetter : !canPushToOnboarding}
+              onClick={activeFile ? saveAndPushToOnboarding : pushToOnboarding}
+            >
+              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              <ListPlus className="mr-2 h-4 w-4" />
+              {activeFile
+                ? "Save & add to onboarding"
+                : inOnboardingList
+                  ? "Update onboarding list"
+                  : "Add to onboarding list"}
             </Button>
           </div>
-        </div>
-      ) : null}
+        )}
+        {(storedViewHref || storedDownloadHref) && (
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {storedViewHref ? (
+              <a
+                href={storedViewHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(buttonVariants({ variant: "outline" }), "w-full justify-center")}
+              >
+                View saved letter
+              </a>
+            ) : null}
+            {storedDownloadHref ? (
+              <a
+                href={storedDownloadHref}
+                className={cn(buttonVariants({ variant: "outline" }), "w-full justify-center")}
+              >
+                Download letter
+              </a>
+            ) : null}
+          </div>
+        )}
+        <p className="mt-3 text-xs text-muted-foreground">
+          {inOnboardingList ? (
+            <>
+              Listed in{" "}
+              <Link href={RECRUITMENT_ROUTES.onboarding} className="font-medium text-primary hover:underline">
+                Employee Onboarding
+              </Link>
+            </>
+          ) : activeFile ? (
+            "File selected — save it, then add to onboarding."
+          ) : hasStoredLetter ? (
+            "Letter saved — add to onboarding when ready."
+          ) : (
+            "Choose a file above to get started."
+          )}
+        </p>
+      </div>
 
       <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <DialogContent className="sm:max-w-md">
