@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
+import { OnboardingAddressFields } from "@/components/onboarding/candidate/onboarding-address-fields";
 import { OnboardingDocumentUpload } from "@/components/onboarding/candidate/onboarding-document-upload";
 import { OnboardingEducationSection } from "@/components/onboarding/candidate/onboarding-education-section";
 import { OnboardingPhoneField } from "@/components/onboarding/candidate/onboarding-phone-field";
@@ -34,7 +35,16 @@ import {
   sanitizeAccountNumber,
   sanitizeIfsc,
 } from "@/lib/onboarding/bank-field-utils";
-import { educationDocumentTypeCode, parseEducationEntries } from "@/lib/onboarding/education-utils";
+import {
+  sanitizeAadhaar,
+  sanitizePan,
+} from "@/lib/onboarding/identity-field-utils";
+import {
+  createEmptyEducationForm,
+  educationFormToPayload,
+  parseEducationForm,
+  type OnboardingEducationFormData,
+} from "@/lib/onboarding/education-utils";
 import {
   canNavigateToStep,
   canSubmitOnboarding,
@@ -49,9 +59,8 @@ import {
   ONBOARDING_IDENTITY_DOCUMENTS,
   ONBOARDING_POLICY_DOCUMENTS,
   ONBOARDING_WIZARD_SECTIONS,
-  type OnboardingEducationEntry,
+  type CandidatePortalContext,
 } from "@/types/onboarding";
-import type { CandidatePortalContext } from "@/types/onboarding";
 import { cn } from "@/lib/utils";
 
 const wizardInputClassName =
@@ -115,10 +124,13 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   const [isPending, startTransition] = useTransition();
   const [showCelebration, setShowCelebration] = useState(false);
   const initializedRef = useRef(false);
+  const contentScrollRef = useRef<HTMLDivElement>(null);
   const sectionKey = ONBOARDING_WIZARD_SECTIONS[step];
   const sectionData = context.sections.find((s) => s.sectionKey === sectionKey)?.data ?? {};
   const [form, setForm] = useState<Record<string, string>>({});
-  const [educationEntries, setEducationEntries] = useState<OnboardingEducationEntry[]>([]);
+  const [educationForm, setEducationForm] = useState<OnboardingEducationFormData>(() =>
+    createEmptyEducationForm(),
+  );
   const [stepAnimKey, setStepAnimKey] = useState(0);
   const [uploadSlots, setUploadSlots] = useState<
     Record<string, { uploading: boolean; pendingFileName?: string }>
@@ -128,10 +140,10 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   const firstIncompleteStep = useMemo(() => getFirstIncompleteStepIndex(context), [context]);
   const currentValidation = useMemo(() => {
     if (sectionKey === "education") {
-      return validateEducationSection(context, educationEntries);
+      return validateEducationSection(context, educationForm);
     }
     return validateOnboardingSection(sectionKey, context, form);
-  }, [sectionKey, context, form, educationEntries]);
+  }, [sectionKey, context, form, educationForm]);
   const submitValidation = useMemo(() => canSubmitOnboarding(context), [context]);
 
   useEffect(() => {
@@ -143,13 +155,27 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
   useEffect(() => {
     if (sectionKey === "education") {
-      setEducationEntries(parseEducationEntries(sectionData));
+      setEducationForm(parseEducationForm(sectionData));
     }
   }, [sectionKey, sectionData]);
 
+  useEffect(() => {
+    contentScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }, [step, stepAnimKey]);
+
+  function sectionHintText(): string {
+    if (!currentValidation.valid) {
+      return "Complete required fields (*) to unlock the next section";
+    }
+    if (step < firstIncompleteStep) {
+      return "Section completed";
+    }
+    return "Ready — continue to the next section";
+  }
+
   function sectionPayload(): Record<string, unknown> {
     if (sectionKey === "education") {
-      return { ...sectionData, entries: educationEntries };
+      return { ...sectionData, ...educationFormToPayload(educationForm) };
     }
     return { ...sectionData, ...form };
   }
@@ -188,7 +214,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   function saveSection(markComplete = true) {
     const validation =
       sectionKey === "education"
-        ? validateEducationSection(context, educationEntries)
+        ? validateEducationSection(context, educationForm)
         : validateOnboardingSection(sectionKey, context, form);
     if (markComplete && !validation.valid) {
       showValidationError(validation);
@@ -283,7 +309,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   function goNext() {
     const validation =
       sectionKey === "education"
-        ? validateEducationSection(context, educationEntries)
+        ? validateEducationSection(context, educationForm)
         : validateOnboardingSection(sectionKey, context, form);
     if (!validation.valid) {
       showValidationError(validation);
@@ -307,13 +333,13 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
             toast.error(result.message);
             return;
           }
-          setForm({});
         } else {
           await markSectionCompleteIfNeeded();
         }
 
-        await onRefresh();
+        setForm({});
         advanceStep();
+        void onRefresh();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Could not save section");
       }
@@ -380,30 +406,29 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
         />
 
         <div
+          ref={contentScrollRef}
           key={`${sectionKey}-${stepAnimKey}`}
           className="onboarding-section-enter min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5"
         >
-          <div className="mb-4 text-center">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          <div className="mb-4 flex items-center justify-between gap-3 border-b border-border/60 pb-3">
+            <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-0.5">
+              <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+                {SECTION_TITLES[sectionKey]}
+              </h2>
+              <p
+                className={cn(
+                  "text-xs",
+                  currentValidation.valid
+                    ? "font-medium text-emerald-700 dark:text-emerald-400"
+                    : "text-muted-foreground",
+                )}
+              >
+                {sectionHintText()}
+              </p>
+            </div>
+            <p className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               Step {step + 1} of {ONBOARDING_WIZARD_SECTIONS.length}
             </p>
-            <h2 className="mt-1 text-lg font-semibold tracking-tight sm:text-xl">
-              {SECTION_TITLES[sectionKey]}
-            </h2>
-            {!currentValidation.valid ? (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Complete required fields (
-                <span className="text-foreground">*</span>) to unlock the next section
-              </p>
-            ) : step < firstIncompleteStep ? (
-              <p className="mt-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                Section completed
-              </p>
-            ) : (
-              <p className="mt-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                Ready — continue to the next section
-              </p>
-            )}
           </div>
 
           {sectionKey === "personal" && (
@@ -465,14 +490,20 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                   placeholder="Nationality"
                 />
               </div>
-              <div className="space-y-1 sm:col-span-2">
-                <FieldLabel label="Address" required />
-                <Input
-                  className={wizardInputClassName}
-                  value={personalField("address")}
-                  onChange={(e) => updateField("address", e.target.value)}
-                />
-              </div>
+              <OnboardingAddressFields
+                stateValue={personalField("state")}
+                cityValue={personalField("city")}
+                pincodeValue={personalField("pincode")}
+                addressLineValue={
+                  form.addressLine ??
+                  String(sectionData.addressLine ?? sectionData.address ?? "")
+                }
+                onStateChange={(value) => updateField("state", value)}
+                onCityChange={(value) => updateField("city", value)}
+                onPincodeChange={(value) => updateField("pincode", value)}
+                onAddressLineChange={(value) => updateField("addressLine", value)}
+                inputClassName={wizardInputClassName}
+              />
               <OnboardingPhoneField
                 label="Personal mobile"
                 required
@@ -501,34 +532,48 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
           {sectionKey === "identity" && (
             <div className="space-y-4">
-              {ONBOARDING_IDENTITY_DOCUMENTS.map((doc) => {
-                const meta = uploadMeta("identity", doc.code);
-                return (
-                  <OnboardingDocumentUpload
-                    key={doc.code}
-                    label={doc.label}
-                    required={doc.required}
-                    fileName={meta.fileName}
-                    uploading={meta.uploading}
-                    pendingFileName={meta.pendingFileName}
-                    onSelectFile={(file) => uploadDoc("identity", doc.code, file)}
-                  />
-                );
-              })}
+              <div className="grid grid-cols-4 gap-3">
+                {ONBOARDING_IDENTITY_DOCUMENTS.map((doc) => {
+                  const meta = uploadMeta("identity", doc.code);
+                  return (
+                    <OnboardingDocumentUpload
+                      key={doc.code}
+                      variant="card"
+                      label={doc.label}
+                      required={doc.required}
+                      fileName={meta.fileName}
+                      uploading={meta.uploading}
+                      pendingFileName={meta.pendingFileName}
+                      onSelectFile={(file) => uploadDoc("identity", doc.code, file)}
+                    />
+                  );
+                })}
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <FieldLabel label="Aadhaar number" required />
                   <Input
+                    className={wizardInputClassName}
+                    inputMode="numeric"
+                    maxLength={12}
+                    placeholder="12-digit Aadhaar number"
                     value={form.aadhaar ?? String(sectionData.aadhaar ?? "")}
-                    onChange={(e) => updateField("aadhaar", e.target.value)}
+                    onChange={(e) => updateField("aadhaar", sanitizeAadhaar(e.target.value))}
                   />
+                  <p className="text-[11px] text-muted-foreground">12 digits only</p>
                 </div>
                 <div className="space-y-1.5">
                   <FieldLabel label="PAN" required />
                   <Input
+                    className={cn(wizardInputClassName, "uppercase")}
+                    maxLength={10}
+                    placeholder="ABCDE1234F"
                     value={form.pan ?? String(sectionData.pan ?? "")}
-                    onChange={(e) => updateField("pan", e.target.value)}
+                    onChange={(e) => updateField("pan", sanitizePan(e.target.value))}
                   />
+                  <p className="text-[11px] text-muted-foreground">
+                    10 characters — 5 letters, 4 digits, 1 letter
+                  </p>
                 </div>
               </div>
             </div>
@@ -536,14 +581,10 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
           {sectionKey === "education" && (
             <OnboardingEducationSection
-              entries={educationEntries}
-              onEntriesChange={setEducationEntries}
-              onUpload={(entryId, file) =>
-                uploadDoc("education", educationDocumentTypeCode(entryId), file)
-              }
-              getUploadMeta={(entryId) =>
-                uploadMeta("education", educationDocumentTypeCode(entryId))
-              }
+              form={educationForm}
+              onFormChange={setEducationForm}
+              onUpload={(documentCode, file) => uploadDoc("education", documentCode, file)}
+              getUploadMeta={(documentCode) => uploadMeta("education", documentCode)}
             />
           )}
 

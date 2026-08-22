@@ -4,6 +4,7 @@ import { ExternalLink, FileText } from "lucide-react";
 
 import { Button } from "@/components/common/button";
 import {
+  educationDocumentLabel,
   educationDocumentTypeCode,
   educationLevelLabel,
   parseEducationEntries,
@@ -40,7 +41,7 @@ function catalogLabel(category: string, typeCode: string): string {
   }
   if (category === "bank" && typeCode === "cancelled_cheque") return "Cancelled cheque";
   if (category === "education" && typeCode.startsWith("edu_")) {
-    return "Education certificate";
+    return educationDocumentLabel(typeCode);
   }
   return typeCode.replace(/_/g, " ");
 }

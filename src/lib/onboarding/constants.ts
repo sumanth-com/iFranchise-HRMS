@@ -1,6 +1,5 @@
 import { siteConfig } from "@/config/site";
 import { DEFAULT_DOCUMENT_SETTINGS } from "@/lib/documents/constants";
-import { DOCUMENT_MAX_BYTES, DOCUMENT_MAX_MB } from "@/lib/employees/constants";
 
 import {
   ONBOARDING_AGREEMENT_TYPES,
@@ -43,9 +42,16 @@ export const ONBOARDING_PERMISSIONS = {
   activate: "onboarding.activate",
 } as const;
 
-/** Matches employee documents module limits (30 MB, same file types). */
-export const ONBOARDING_UPLOAD_MAX_BYTES = DOCUMENT_MAX_BYTES;
-export const ONBOARDING_UPLOAD_MAX_MB = DOCUMENT_MAX_MB;
+/** Onboarding uploads capped at 10 MB per file. */
+export const ONBOARDING_UPLOAD_MAX_MB = 10;
+export const ONBOARDING_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+
+/** Graduation semester mark sheets may be a combined PDF up to 30 MB. */
+export const ONBOARDING_EDUCATION_LARGE_UPLOAD_MAX_MB = 30;
+export const ONBOARDING_EDUCATION_LARGE_UPLOAD_MAX_BYTES = 30 * 1024 * 1024;
+export const ONBOARDING_EDUCATION_LARGE_UPLOAD_CODES = new Set([
+  "edu_graduation_semester_marksheets",
+]);
 export const ONBOARDING_ALLOWED_FILE_TYPES = DEFAULT_DOCUMENT_SETTINGS.allowedFileTypes;
 
 export function onboardingInviteUrl(token: string): string {
