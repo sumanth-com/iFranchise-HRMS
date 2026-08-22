@@ -62,7 +62,7 @@ const SECTION_LABELS: Record<string, string> = {
   employment_history: "Previous employment",
   bank: "Bank details",
   terms: "Terms & conditions",
-  signature: "Electronic signature",
+  signature: "Offer Acceptance",
 };
 
 function statusBadgeClass(status: OnboardingStatus) {

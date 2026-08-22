@@ -244,6 +244,12 @@ export type OnboardingLookups = {
   roles: { id: string; name: string; code: string }[];
 };
 
+export type CandidatePortalOfferLetter = {
+  fileName: string;
+  uploadedAt: string | null;
+  contentType: string;
+};
+
 export type CandidatePortalContext = {
   caseId: string;
   fullName: string;
@@ -257,5 +263,6 @@ export type CandidatePortalContext = {
   policyAcknowledgements: string[];
   agreements: OnboardingAgreementRecord[];
   signature: OnboardingSignatureRecord | null;
+  offerLetter: CandidatePortalOfferLetter | null;
   locked: boolean;
 };

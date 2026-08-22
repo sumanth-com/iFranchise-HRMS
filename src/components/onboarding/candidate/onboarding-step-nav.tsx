@@ -3,11 +3,11 @@
 import {
   Briefcase,
   Check,
+  FileText,
   GraduationCap,
   IdCard,
   Landmark,
   Lock,
-  PenLine,
   ScrollText,
   User,
   type LucideIcon,
@@ -16,18 +16,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 import { canNavigateToStep } from "@/lib/onboarding/onboarding-section-validation";
+import { ONBOARDING_STEP_LABELS } from "@/lib/onboarding/onboarding-step-labels";
 import { ONBOARDING_WIZARD_SECTIONS } from "@/types/onboarding";
 import type { CandidatePortalContext } from "@/types/onboarding";
-
-const STEP_LABELS: Record<string, string> = {
-  personal: "Personal Details",
-  identity: "Identity",
-  education: "Education",
-  employment_history: "Employment",
-  bank: "Bank",
-  terms: "Terms & conditions",
-  signature: "Signature",
-};
 
 const STEP_ICONS: Record<string, LucideIcon> = {
   personal: User,
@@ -36,7 +27,7 @@ const STEP_ICONS: Record<string, LucideIcon> = {
   employment_history: Briefcase,
   bank: Landmark,
   terms: ScrollText,
-  signature: PenLine,
+  signature: FileText,
 };
 
 type OnboardingStepNavProps = {
@@ -149,7 +140,7 @@ export function OnboardingStepNav({
                       <StepIcon className="h-3.5 w-3.5" strokeWidth={2} />
                     )}
                   </span>
-                  {STEP_LABELS[key]}
+                  {ONBOARDING_STEP_LABELS[key]}
                 </span>
               </button>
             );

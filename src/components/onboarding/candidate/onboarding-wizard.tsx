@@ -11,20 +11,26 @@ import { OnboardingDocumentUpload } from "@/components/onboarding/candidate/onbo
 import { OnboardingEducationSection } from "@/components/onboarding/candidate/onboarding-education-section";
 import { OnboardingEmploymentSection } from "@/components/onboarding/candidate/onboarding-employment-section";
 import { OnboardingTermsSection } from "@/components/onboarding/candidate/onboarding-terms-section";
+import { OnboardingOfferAcceptanceSection } from "@/components/onboarding/candidate/onboarding-offer-acceptance-section";
 import { OnboardingPhoneField } from "@/components/onboarding/candidate/onboarding-phone-field";
-import { OnboardingSignature } from "@/components/onboarding/candidate/onboarding-signature";
 import { useOnboardingPortalProgress } from "@/components/onboarding/candidate/onboarding-portal-progress-context";
 import { OnboardingStepNav } from "@/components/onboarding/candidate/onboarding-step-nav";
 import { OnboardingSubmittedCelebration } from "@/components/onboarding/candidate/onboarding-submitted-celebration";
 import { OnboardingWizardSelect } from "@/components/onboarding/candidate/onboarding-wizard-select";
 import {
+  downloadCandidateOfferLetterAction,
+  getCandidateOfferLetterUrlAction,
   saveCandidateAgreementsAction,
   saveCandidatePoliciesAction,
   saveCandidateSectionAction,
-  saveCandidateSignatureAction,
   submitCandidateOnboardingAction,
   uploadCandidateDocumentAction,
 } from "@/lib/onboarding/actions/candidate-onboarding-actions";
+import { ONBOARDING_STEP_LABELS } from "@/lib/onboarding/onboarding-step-labels";
+import {
+  ONBOARDING_OFFER_ACCEPTANCE_CATEGORY,
+  ONBOARDING_SIGNED_OFFER_DOCUMENT_CODE,
+} from "@/lib/onboarding/offer-acceptance-constants";
 import {
   ONBOARDING_BLOOD_GROUP_OPTIONS,
   ONBOARDING_GENDER_OPTIONS,
@@ -84,13 +90,10 @@ function uploadSlotKey(documentCategory: string, documentTypeCode: string) {
 }
 
 const SECTION_TITLES: Record<string, string> = {
-  personal: "Personal Details",
+  ...ONBOARDING_STEP_LABELS,
   identity: "Identity Documents",
-  education: "Education",
   employment_history: "Previous Employment",
   bank: "Bank Details",
-  terms: "Terms & conditions",
-  signature: "Electronic Signature",
 };
 
 const GENDER_ITEMS = ONBOARDING_GENDER_OPTIONS.map((item) => ({
@@ -161,6 +164,18 @@ function buildLiveSectionPatch(
       }
     } else if (saved.termsAccepted === true || saved.termsAccepted === "true") {
       patch.termsAccepted = "true";
+    }
+  }
+
+  if (sectionKey === "signature") {
+    if ("offerAccepted" in draft) {
+      if (draft.offerAccepted === "true") {
+        patch.offerAccepted = "true";
+      } else {
+        delete patch.offerAccepted;
+      }
+    } else if (saved.offerAccepted === true || saved.offerAccepted === "true") {
+      patch.offerAccepted = "true";
     }
   }
 
@@ -379,6 +394,11 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
         sectionData.termsAccepted === true || sectionData.termsAccepted === "true";
       return termsAcceptedLive() !== savedAccepted;
     }
+    if (sectionKey === "signature") {
+      const savedAccepted =
+        sectionData.offerAccepted === true || sectionData.offerAccepted === "true";
+      return offerAcceptedLive() !== savedAccepted;
+    }
     if (Object.keys(form).length === 0) return false;
     for (const [key, value] of Object.entries(form)) {
       const saved = readSectionField(sectionData[key]);
@@ -392,6 +412,35 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
     return (
       sectionData.termsAccepted === true || sectionData.termsAccepted === "true"
     );
+  }
+
+  function offerAcceptedLive(): boolean {
+    if ("offerAccepted" in form) return form.offerAccepted === "true";
+    return sectionData.offerAccepted === true || sectionData.offerAccepted === "true";
+  }
+
+  async function viewOfferLetter() {
+    const result = await getCandidateOfferLetterUrlAction();
+    if (!result.success) {
+      toast.error(result.message);
+      return;
+    }
+    window.open(result.url, "_blank", "noopener,noreferrer");
+  }
+
+  async function downloadOfferLetter() {
+    const result = await downloadCandidateOfferLetterAction();
+    if (!result.success) {
+      toast.error(result.message);
+      return;
+    }
+    const blob = Uint8Array.from(atob(result.base64), (char) => char.charCodeAt(0));
+    const url = URL.createObjectURL(new Blob([blob], { type: result.contentType }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = result.fileName;
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
 
   function personalSelectValue(
@@ -491,10 +540,11 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
   async function markSectionCompleteIfNeeded() {
     if (sectionKey === "signature") {
+      const merged = sectionPayload();
       const result = await saveCandidateSectionAction({
         caseId: context.caseId,
         sectionKey,
-        data: sectionData,
+        data: merged,
         markComplete: true,
       });
       if (!result.success) throw new Error(result.message);
@@ -524,7 +574,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
     const hasChanges = sectionHasDraftChanges();
 
     if (!validation.valid) {
-      if (sectionComplete && !hasChanges && sectionKey !== "terms") {
+      if (sectionComplete && !hasChanges && sectionKey !== "terms" && sectionKey !== "signature") {
         setForm({});
         advanceStep();
         return;
@@ -533,7 +583,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
       return;
     }
 
-    if (sectionComplete && !hasChanges && sectionKey !== "terms") {
+    if (sectionComplete && !hasChanges && sectionKey !== "terms" && sectionKey !== "signature") {
       setForm({});
       advanceStep();
       return;
@@ -589,7 +639,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           await saveCandidateSectionAction({
             caseId: context.caseId,
             sectionKey: "signature",
-            data: sectionData,
+            data: sectionPayload(),
             markComplete: true,
           });
         }
@@ -980,23 +1030,28 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           )}
 
           {sectionKey === "signature" && (
-            <div className="mx-auto max-w-2xl">
-              <OnboardingSignature
-              fullName={context.fullName}
-              disabled={Boolean(context.signature)}
-              onSave={async (payload) => {
-                const result = await saveCandidateSignatureAction({
-                  caseId: context.caseId,
-                  ...payload,
-                });
-                if (!result.success) toast.error(result.message);
-                else {
-                  toast.success("Signature saved");
-                  onRefresh();
-                }
-              }}
+            <OnboardingOfferAcceptanceSection
+              context={context}
+              completedSteps={completedSteps}
+              activeStep={step}
+              offerAccepted={offerAcceptedLive()}
+              onOfferAcceptedChange={(checked) =>
+                updateField("offerAccepted", checked ? "true" : "")
+              }
+              signedOfferMeta={uploadMeta(
+                ONBOARDING_OFFER_ACCEPTANCE_CATEGORY,
+                ONBOARDING_SIGNED_OFFER_DOCUMENT_CODE,
+              )}
+              onUploadSignedOffer={(file) =>
+                uploadDoc(
+                  ONBOARDING_OFFER_ACCEPTANCE_CATEGORY,
+                  ONBOARDING_SIGNED_OFFER_DOCUMENT_CODE,
+                  file,
+                )
+              }
+              onViewOfferLetter={viewOfferLetter}
+              onDownloadOfferLetter={downloadOfferLetter}
             />
-            </div>
           )}
 
           </div>

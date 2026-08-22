@@ -17,6 +17,10 @@ import {
 } from "@/lib/onboarding/bank-field-utils";
 import { isValidAadhaar, isValidPan } from "@/lib/onboarding/identity-field-utils";
 import { isValidIndianPincode } from "@/lib/onboarding/india-locations";
+import {
+  ONBOARDING_OFFER_ACCEPTANCE_CATEGORY,
+  ONBOARDING_SIGNED_OFFER_DOCUMENT_CODE,
+} from "@/lib/onboarding/offer-acceptance-constants";
 import { isValidStoredPhone } from "@/lib/onboarding/personal-field-options";
 import {
   ONBOARDING_AGREEMENT_TYPES,
@@ -311,9 +315,22 @@ export function validateOnboardingSection(
       break;
     }
 
-    case "signature":
-      if (!context.signature) missing.push("Electronic signature");
+    case "signature": {
+      if (
+        !hasUploadedDocument(
+          context,
+          ONBOARDING_OFFER_ACCEPTANCE_CATEGORY,
+          ONBOARDING_SIGNED_OFFER_DOCUMENT_CODE,
+        )
+      ) {
+        missing.push("Signed offer letter upload");
+      }
+      const offerAccepted = data.offerAccepted === true || data.offerAccepted === "true";
+      if (!offerAccepted) {
+        missing.push("Offer acceptance confirmation");
+      }
       break;
+    }
   }
 
   return { valid: missing.length === 0, missing };
@@ -332,6 +349,16 @@ export function isOnboardingSectionComplete(
       data.termsAccepted === "true" ||
       hasLegacyTermsAcknowledgement(context)
     );
+  }
+  if (sectionKey === "signature") {
+    const data = saved?.data ?? {};
+    const offerAccepted = data.offerAccepted === true || data.offerAccepted === "true";
+    const hasSignedOffer = context.documents.some(
+      (doc) =>
+        doc.documentCategory === ONBOARDING_OFFER_ACCEPTANCE_CATEGORY &&
+        doc.documentTypeCode === ONBOARDING_SIGNED_OFFER_DOCUMENT_CODE,
+    );
+    return offerAccepted && hasSignedOffer;
   }
   return false;
 }

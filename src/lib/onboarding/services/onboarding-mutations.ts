@@ -146,20 +146,23 @@ async function resolveDefaultEmployeeRoleId(organizationId: string): Promise<str
 
 async function refreshCompletionPercent(caseId: string) {
   const admin = createAdminClient();
-  const [sections, docs, policies, agreements, signature] = await Promise.all([
+  const [sections, docs, policies, agreements] = await Promise.all([
     admin.schema("hrms").from("onboarding_sections").select("section_key, completed_at").eq("case_id", caseId),
     admin.schema("hrms").from("onboarding_documents").select("id", { count: "exact", head: true }).eq("case_id", caseId).is("deleted_at", null),
     admin.schema("hrms").from("onboarding_policy_acknowledgements").select("policy_code", { count: "exact", head: true }).eq("case_id", caseId),
     admin.schema("hrms").from("onboarding_agreements").select("agreement_type", { count: "exact", head: true }).eq("case_id", caseId),
-    admin.schema("hrms").from("onboarding_signatures").select("id").eq("case_id", caseId).limit(1).maybeSingle(),
   ]);
+
+  const signatureSectionComplete = (sections.data ?? []).some(
+    (section) => section.section_key === "signature" && section.completed_at,
+  );
 
   const completionPercent = calculateCompletionPercent(
     (sections.data ?? []).map((s) => ({ sectionKey: s.section_key, completedAt: s.completed_at })),
     docs.count ?? 0,
     policies.count ?? 0,
     agreements.count ?? 0,
-    Boolean(signature.data),
+    signatureSectionComplete,
   );
 
   await admin

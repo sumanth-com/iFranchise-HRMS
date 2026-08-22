@@ -29,6 +29,7 @@ import {
   uploadOnboardingDocument,
 } from "@/lib/onboarding/services/onboarding-mutations";
 import { getCandidatePortalContext } from "@/lib/onboarding/services/onboarding-queries";
+import { getCandidateOfferLetterFile, loadCandidateOfferLetter } from "@/lib/onboarding/services/candidate-offer-letter";
 import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
 import { assertRateLimit } from "@/lib/security/rate-limit";
 import { hashEmailVerificationToken } from "@/lib/security/signed-flow-tokens";
@@ -343,4 +344,86 @@ export async function submitCandidateOnboardingAction(): Promise<ActionResult> {
 
 export async function candidateLogoutAction(): Promise<void> {
   await clearCandidateSession();
+}
+
+export async function getCandidateOfferLetterUrlAction(): Promise<
+  { success: true; url: string; fileName: string } | { success: false; message: string }
+> {
+  try {
+    const caseId = await getCandidateCaseIdFromSession();
+    if (!caseId) return { success: false, message: "Session expired" };
+
+    const admin = createAdminClient();
+    const { data: caseRow } = await admin
+      .schema("hrms")
+      .from("onboarding_cases")
+      .select("organization_id, offer_reference_number, personal_email")
+      .eq("id", caseId)
+      .maybeSingle();
+
+    if (!caseRow) return { success: false, message: "Case not found" };
+
+    const offer = await loadCandidateOfferLetter(
+      caseRow.organization_id as string,
+      (caseRow.offer_reference_number as string | null) ?? null,
+      caseRow.personal_email as string,
+    );
+
+    if (!offer) return { success: false, message: "Offer letter is not available yet" };
+
+    const { data: signed, error } = await admin.storage
+      .from("employee-documents")
+      .createSignedUrl(offer.storagePath, 3600);
+
+    if (error || !signed?.signedUrl) {
+      return { success: false, message: "Could not open offer letter" };
+    }
+
+    return { success: true, url: signed.signedUrl, fileName: offer.fileName };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Could not open offer letter",
+    };
+  }
+}
+
+export async function downloadCandidateOfferLetterAction(): Promise<
+  { success: true; base64: string; fileName: string; contentType: string } | { success: false; message: string }
+> {
+  try {
+    const caseId = await getCandidateCaseIdFromSession();
+    if (!caseId) return { success: false, message: "Session expired" };
+
+    const admin = createAdminClient();
+    const { data: caseRow } = await admin
+      .schema("hrms")
+      .from("onboarding_cases")
+      .select("organization_id, offer_reference_number, personal_email")
+      .eq("id", caseId)
+      .maybeSingle();
+
+    if (!caseRow) return { success: false, message: "Case not found" };
+
+    const file = await getCandidateOfferLetterFile(
+      caseRow.organization_id as string,
+      (caseRow.offer_reference_number as string | null) ?? null,
+      caseRow.personal_email as string,
+    );
+
+    if (!file) return { success: false, message: "Offer letter is not available yet" };
+
+    const base64 = Buffer.from(file.fileBytes).toString("base64");
+    return {
+      success: true,
+      base64,
+      fileName: file.fileName,
+      contentType: file.contentType,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Could not download offer letter",
+    };
+  }
 }
