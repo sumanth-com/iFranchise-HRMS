@@ -119,6 +119,45 @@ function readSectionField(value: unknown): string {
   return "";
 }
 
+function buildLiveSectionPatch(
+  sectionKey: string,
+  saved: Record<string, unknown>,
+  draft: Record<string, string>,
+  fullName: string,
+): Record<string, string> {
+  const patch: Record<string, string> = {};
+  for (const [key, value] of Object.entries(saved)) {
+    const text = readSectionField(value);
+    if (text) patch[key] = text;
+  }
+  for (const [key, value] of Object.entries(draft)) {
+    if (value.trim()) patch[key] = value.trim();
+  }
+
+  if (sectionKey === "personal") {
+    const dob = draft.dateOfBirth ?? toIsoDate(saved.dateOfBirth);
+    if (dob) patch.dateOfBirth = dob;
+  }
+
+  if (sectionKey === "bank") {
+    if (!patch.accountHolderName?.trim() && fullName.trim()) {
+      patch.accountHolderName = fullName.trim();
+    }
+    const accountType = patch.accountType?.toLowerCase();
+    if (accountType === "salary") patch.accountType = "savings";
+  }
+
+  if (sectionKey === "terms") {
+    const accepted =
+      draft.termsAccepted === "true" ||
+      saved.termsAccepted === true ||
+      saved.termsAccepted === "true";
+    if (accepted) patch.termsAccepted = "true";
+  }
+
+  return patch;
+}
+
 function documentRecord(
   context: CandidatePortalContext,
   category: string,
@@ -167,15 +206,26 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
   const completedSteps = useMemo(() => getCompletedStepIndices(context), [context]);
   const firstIncompleteStep = useMemo(() => getFirstIncompleteStepIndex(context), [context]);
-  const currentValidation = useMemo(() => {
+  const liveSectionPatch = useMemo(
+    () => buildLiveSectionPatch(sectionKey, sectionData, form, context.fullName),
+    [sectionKey, sectionData, form, context.fullName],
+  );
+
+  function validateCurrentSection() {
     if (sectionKey === "education") {
       return validateEducationSection(context, educationForm);
     }
     if (sectionKey === "employment_history") {
       return validateEmploymentSection(context, employmentForm);
     }
-    return validateOnboardingSection(sectionKey, context, form);
-  }, [sectionKey, context, form, educationForm, employmentForm]);
+    return validateOnboardingSection(sectionKey, context, liveSectionPatch);
+  }
+
+  const currentValidation = useMemo(
+    () => validateCurrentSection(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- liveSectionPatch captures form + saved fields
+    [sectionKey, context, liveSectionPatch, educationForm, employmentForm],
+  );
   const submitValidation = useMemo(() => canSubmitOnboarding(context), [context]);
 
   useEffect(() => {
@@ -252,7 +302,16 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
             : sectionData.acceptedAt ?? null,
       };
     }
-    return { ...sectionData, ...form };
+    return { ...sectionData, ...liveSectionPatch };
+  }
+
+  function validateBeforeSave(markComplete: boolean) {
+    const validation = validateCurrentSection();
+    if (markComplete && !validation.valid) {
+      showValidationError(validation);
+      return false;
+    }
+    return true;
   }
 
   function advanceStep() {
@@ -288,16 +347,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   }
 
   function saveSection(markComplete = true) {
-    const validation =
-      sectionKey === "education"
-        ? validateEducationSection(context, educationForm)
-        : sectionKey === "employment_history"
-          ? validateEmploymentSection(context, employmentForm)
-          : validateOnboardingSection(sectionKey, context, form);
-    if (markComplete && !validation.valid) {
-      showValidationError(validation);
-      return;
-    }
+    if (!validateBeforeSave(markComplete)) return;
 
     startTransition(async () => {
       const merged = sectionPayload();
@@ -399,12 +449,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   }
 
   function goNext() {
-    const validation =
-      sectionKey === "education"
-        ? validateEducationSection(context, educationForm)
-        : sectionKey === "employment_history"
-          ? validateEmploymentSection(context, employmentForm)
-          : validateOnboardingSection(sectionKey, context, form);
+    const validation = validateCurrentSection();
     if (!validation.valid) {
       showValidationError(validation);
       return;
@@ -730,7 +775,10 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                   <FieldLabel label="Account holder name" required />
                   <Input
                     className={wizardInputClassName}
-                    value={form.accountHolderName ?? readSectionField(sectionData.accountHolderName)}
+                    value={
+                      form.accountHolderName ??
+                      (readSectionField(sectionData.accountHolderName) || context.fullName)
+                    }
                     onChange={(e) => updateField("accountHolderName", e.target.value)}
                     placeholder="Name as per bank records"
                   />
