@@ -308,6 +308,11 @@ type OfferOnboardingSyncInput = {
   offerReferenceNumber?: string | null;
 };
 
+/** upload = explicit HR offer letter upload; sync = background repair on list load. */
+type EnsureOnboardingFromOfferOptions = {
+  source?: "upload" | "sync";
+};
+
 async function updateOnboardingCaseFromOfferAdmin(
   organizationId: string,
   caseId: string,
@@ -484,7 +489,9 @@ export async function ensureOnboardingCaseFromOffer(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   input: OfferOnboardingSyncInput,
-): Promise<string> {
+  options?: EnsureOnboardingFromOfferOptions,
+): Promise<string | null> {
+  const source = options?.source ?? "upload";
   const organizationId = profile.employee.organizationId;
   const email = input.personalEmail?.trim().toLowerCase() ?? "";
   const fullName = input.fullName.trim();
@@ -495,13 +502,17 @@ export async function ensureOnboardingCaseFromOffer(
     throw new Error("Candidate name is required to add them to onboarding.");
   }
 
-  if (await applyOnboardingDismissalGuard(organizationId, email, profile.userId)) {
-    throw new Error(
-      `Onboarding was previously removed for ${email}. Restore the case or contact support before uploading an offer letter.`,
-    );
-  }
-
   const syncInput: OfferOnboardingSyncInput = { ...input, fullName, personalEmail: email };
+
+  if (source === "sync") {
+    const previouslyDismissed = await hasHrDismissedOnboardingByEmail(organizationId, email);
+    if (previouslyDismissed) {
+      const activeCase = await findActiveOnboardingCaseByEmailAdmin(organizationId, email);
+      if (!activeCase) {
+        return null;
+      }
+    }
+  }
 
   const existing = await findActiveOnboardingCaseByEmailAdmin(organizationId, email);
   if (existing) {
@@ -552,10 +563,15 @@ export async function ensureOnboardingCaseFromOffer(
     throw new Error(error.message);
   }
 
+  const reopenedAfterRemoval =
+    source === "upload" && (await hasHrDismissedOnboardingByEmail(organizationId, email));
+
   await addTimelineEvent(supabase, data.id, {
     eventType: "case_created",
-    title: "Ready for onboarding",
-    description: `${fullName} added after offer letter was uploaded`,
+    title: reopenedAfterRemoval ? "Onboarding reopened" : "Ready for onboarding",
+    description: reopenedAfterRemoval
+      ? `${fullName} added again after a new offer letter was uploaded`
+      : `${fullName} added after offer letter was uploaded`,
     actorUserId: profile.userId,
   });
 
@@ -588,8 +604,10 @@ export async function syncOnboardingCasesFromSentOffers(
     if (!candidate?.email) continue;
 
     const fullName = [candidate.first_name, candidate.last_name].filter(Boolean).join(" ").trim();
-    try {
-      await ensureOnboardingCaseFromOffer(supabase, profile, {
+    await ensureOnboardingCaseFromOffer(
+      supabase,
+      profile,
+      {
         fullName: fullName || candidate.email,
         personalEmail: candidate.email,
         mobileNumber: candidate.phone ?? null,
@@ -599,14 +617,9 @@ export async function syncOnboardingCasesFromSentOffers(
         employmentTypeId: job?.employment_type_id ?? null,
         joiningDate: offer.joining_date ?? null,
         offerReferenceNumber: offer.offer_code ?? null,
-      });
-    } catch (error) {
-      console.error(
-        "[onboarding] failed to add sent offer to onboarding",
-        candidate.email,
-        error instanceof Error ? error.message : error,
-      );
-    }
+      },
+      { source: "sync" },
+    );
   }
 }
 

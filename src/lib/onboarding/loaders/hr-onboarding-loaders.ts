@@ -51,12 +51,7 @@ export async function loadOnboardingModuleData(
   const parsed = onboardingListParamsSchema.parse(params);
   const organizationId = profile.employee.organizationId;
 
-  await syncOnboardingCasesFromSentOffers(supabase, profile).catch((error) => {
-    console.error(
-      "[onboarding] sync from sent offers failed",
-      error instanceof Error ? error.message : error,
-    );
-  });
+  await syncOnboardingCasesFromSentOffers(supabase, profile);
 
   const [stats, cases, lookups, designationFilters] = await Promise.all([
     getOnboardingDashboardStats(supabase, organizationId),

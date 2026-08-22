@@ -814,17 +814,26 @@ export async function createOffer(
     candidate.email.split("@")[0] ||
     "New hire";
 
-  await ensureOnboardingCaseFromOffer(supabase, profile, {
-    fullName: candidateName,
-    personalEmail: candidate.email,
-    mobileNumber: candidate.phone ?? null,
-    designationId,
-    departmentId,
-    reportingManagerId,
-    employmentTypeId,
-    joiningDate: offerJoiningDate,
-    offerReferenceNumber: offerCodeValue,
-  });
+  const onboardingCaseId = await ensureOnboardingCaseFromOffer(
+    supabase,
+    profile,
+    {
+      fullName: candidateName,
+      personalEmail: candidate.email,
+      mobileNumber: candidate.phone ?? null,
+      designationId,
+      departmentId,
+      reportingManagerId,
+      employmentTypeId,
+      joiningDate: offerJoiningDate,
+      offerReferenceNumber: offerCodeValue,
+    },
+    { source: "upload" },
+  );
+
+  if (!onboardingCaseId) {
+    throw new Error("Could not add this candidate to onboarding after uploading the offer letter.");
+  }
 
   let offerLetterPath = existingDraft?.offer_letter_path ?? null;
   let attachmentFilename = offerFile.filename;
