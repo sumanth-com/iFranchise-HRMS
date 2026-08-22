@@ -36,7 +36,11 @@ import {
   sortInterviewsForDisplay,
   unwrapRelation,
 } from "@/lib/recruitment/services/recruitment-utils";
-import { getRecruitmentSettings, archiveRejectedCandidates } from "@/lib/recruitment/services/recruitment-settings";
+import {
+  getRecruitmentSettings,
+  archiveRejectedCandidates,
+  nextRecruitmentCode,
+} from "@/lib/recruitment/services/recruitment-settings";
 import {
   emptyPagedResult,
   resolveManagerDepartmentIds,
@@ -861,10 +865,141 @@ async function loadActiveOnboardingEmails(
   return [
     ...new Set(
       (data ?? [])
-        .map((row) => String(row.personal_email ?? "").trim())
+        .map((row) => String(row.personal_email ?? "").trim().toLowerCase())
         .filter(Boolean),
     ),
   ];
+}
+
+function splitOnboardingFullName(fullName: string, email: string): { firstName: string; lastName: string } {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) {
+    const local = email.split("@")[0]?.trim() || "Candidate";
+    return { firstName: local, lastName: "—" };
+  }
+  if (parts.length === 1) {
+    return { firstName: parts[0], lastName: "—" };
+  }
+  return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
+}
+
+/**
+ * HR can add people to Employee Onboarding without a recruitment candidate.
+ * Offers list is candidate-based, so create offer-stage rows for those emails
+ * so they appear (and offer-letter upload keeps working).
+ */
+async function ensureOfferQueueCandidatesForOnboardingEmails(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  onboardingEmails: string[],
+): Promise<void> {
+  if (onboardingEmails.length === 0) return;
+
+  const organizationId = profile.employee.organizationId;
+  const admin = createAdminClient();
+
+  const { data: existingRows, error: existingError } = await admin
+    .schema("hrms")
+    .from("recruitment_candidates")
+    .select("email")
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .is("archived_at", null)
+    .in("email", onboardingEmails);
+
+  if (existingError) throw new Error(existingError.message);
+
+  const existingEmails = new Set(
+    ((existingRows ?? []) as PerfRow[])
+      .map((row) => String(row.email ?? "").trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const missingEmails = onboardingEmails.filter((email) => !existingEmails.has(email));
+  if (missingEmails.length === 0) return;
+
+  const { data: cases, error: casesError } = await admin
+    .schema("hrms")
+    .from("onboarding_cases")
+    .select("id, full_name, personal_email, department_id, mobile_number, created_at")
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .not("status", "in", "(cancelled,archived,rejected,completed)")
+    .order("created_at", { ascending: false });
+
+  if (casesError) throw new Error(casesError.message);
+  if (!cases?.length) return;
+
+  const missingSet = new Set(missingEmails);
+  const orphanCases = (cases as PerfRow[]).filter((row) => {
+    const email = String(row.personal_email ?? "").trim().toLowerCase();
+    return Boolean(email) && missingSet.has(email);
+  });
+  if (orphanCases.length === 0) return;
+
+  const { data: jobs, error: jobsError } = await admin
+    .schema("hrms")
+    .from("recruitment_job_openings")
+    .select("id, department_id, job_status, created_at")
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false });
+
+  if (jobsError) throw new Error(jobsError.message);
+  if (!jobs?.length) return;
+
+  const openJobs = (jobs as PerfRow[]).filter((job) => job.job_status === "open");
+  const jobPool = openJobs.length > 0 ? openJobs : (jobs as PerfRow[]);
+  const settings = await getRecruitmentSettings(supabase, organizationId);
+
+  const seenMissing = new Set<string>();
+  for (const caseRow of orphanCases) {
+    const email = String(caseRow.personal_email ?? "").trim().toLowerCase();
+    if (!email || seenMissing.has(email) || existingEmails.has(email)) continue;
+    seenMissing.add(email);
+
+    const departmentId = (caseRow.department_id as string | null) ?? null;
+    const matchedJob =
+      (departmentId
+        ? jobPool.find((job) => String(job.department_id ?? "") === departmentId)
+        : null) ?? jobPool[0];
+    if (!matchedJob) continue;
+
+    const { firstName, lastName } = splitOnboardingFullName(
+      String(caseRow.full_name ?? ""),
+      email,
+    );
+    const candidateCode = await nextRecruitmentCode(
+      supabase,
+      organizationId,
+      "recruitment_candidates",
+      "candidate_code",
+      settings.numberFormats.candidatePrefix,
+    );
+
+    const { error: insertError } = await admin.schema("hrms").from("recruitment_candidates").insert({
+      organization_id: organizationId,
+      candidate_code: candidateCode,
+      job_opening_id: matchedJob.id,
+      first_name: firstName,
+      last_name: lastName,
+      email,
+      phone: (caseRow.mobile_number as string | null) ?? null,
+      stage: "offer",
+      source: "onboarding",
+      notes: "Synced from Employee Onboarding for Offers queue",
+      created_by: profile.userId,
+      updated_by: profile.userId,
+    });
+
+    if (insertError) {
+      // Concurrent insert or race — leave existing row; list query will pick it up if present.
+      if (!/duplicate|unique/i.test(insertError.message)) {
+        throw new Error(insertError.message);
+      }
+    } else {
+      existingEmails.add(email);
+    }
+  }
 }
 
 const ONBOARDING_TERMINAL_STATUSES = ["cancelled", "archived", "rejected", "completed"] as const;
@@ -921,7 +1056,10 @@ async function loadOfferQueueCandidateRows(
     .neq("stage", "rejected");
 
   if (options.onboardingEmails?.length) {
-    const emailList = options.onboardingEmails.join(",");
+    // Quote emails so PostgREST parses values that contain @ / .
+    const emailList = options.onboardingEmails
+      .map((email) => `"${email.replace(/"/g, "")}"`)
+      .join(",");
     query = query.or(`stage.eq.offer,email.in.(${emailList})`);
   } else if (options.stage) {
     query = query.eq("stage", options.stage);
@@ -976,7 +1114,8 @@ export async function listOfferQueueCandidates(
   };
 
   const onboardingEmails = await loadActiveOnboardingEmails(supabase, organizationId);
-  const onboardingEmailSet = new Set(onboardingEmails.map((email) => email.toLowerCase()));
+  const onboardingEmailSet = new Set(onboardingEmails);
+  await ensureOfferQueueCandidatesForOnboardingEmails(supabase, profile, onboardingEmails);
 
   const candidateRows = await loadOfferQueueCandidateRows(supabase, organizationId, {
     ...filterOptions,
