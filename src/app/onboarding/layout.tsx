@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function OnboardingLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative flex min-h-dvh flex-col overscroll-x-none bg-background text-foreground">
+    <div className="relative flex h-dvh flex-col overflow-hidden overscroll-x-none bg-background text-foreground">
       <div
         className="pointer-events-none fixed inset-0 bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] bg-[size:24px_24px] opacity-[0.35] dark:opacity-[0.18]"
         aria-hidden
@@ -24,7 +24,7 @@ export default function OnboardingLayout({ children }: { children: React.ReactNo
       <OnboardingPortalProgressProvider>
         <OnboardingPortalHeader />
 
-        <main className="relative mx-auto flex w-full min-w-0 max-w-6xl flex-1 flex-col overflow-hidden px-4 py-2 min-h-0">
+        <main className="relative mx-auto flex h-full min-h-0 w-full max-w-6xl flex-1 flex-col overflow-hidden px-4 py-2">
           {children}
         </main>
       </OnboardingPortalProgressProvider>

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { ClientSectionBoundary } from "@/components/common/client-section-boundary";
 import { OnboardingWizard } from "@/components/onboarding/candidate/onboarding-wizard";
 import { OnboardingPortalProgressSync } from "@/components/onboarding/candidate/onboarding-portal-progress-sync";
 import { getCandidatePortalContextAction } from "@/lib/onboarding/actions/candidate-onboarding-actions";
@@ -42,7 +41,7 @@ export default function OnboardingPortalPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
       <OnboardingPortalProgressSync completionPercent={context.completionPercent} />
       {context.correctionNotes ? (
         <div className="shrink-0 rounded-lg border border-orange-500/30 bg-orange-500/10 px-3 py-2 text-xs text-orange-950 dark:text-orange-100">
@@ -50,12 +49,7 @@ export default function OnboardingPortalPage() {
         </div>
       ) : null}
 
-      <ClientSectionBoundary
-        title="Something went wrong"
-        description="We couldn't load this section. Please try again."
-      >
-        <OnboardingWizard context={context} onRefresh={refresh} />
-      </ClientSectionBoundary>
+      <OnboardingWizard context={context} onRefresh={refresh} />
     </div>
   );
 }

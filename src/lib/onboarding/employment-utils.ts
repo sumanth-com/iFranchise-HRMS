@@ -73,6 +73,13 @@ function readBool(value: unknown): boolean {
   return value === true;
 }
 
+function newEmploymentEntryId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `entry-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
 export function employmentDocumentTypeCode(
   entryId: string,
   docCode: string,
@@ -90,7 +97,7 @@ export function employmentDocumentLabel(typeCode: string): string {
 
 export function createEmptyEmploymentEntry(): OnboardingEmploymentEntry {
   return {
-    id: crypto.randomUUID(),
+    id: newEmploymentEntryId(),
     companyName: "",
     companyLocation: "",
     jobTitle: "",

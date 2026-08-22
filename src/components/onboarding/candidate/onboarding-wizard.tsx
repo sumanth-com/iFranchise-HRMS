@@ -16,7 +16,7 @@ import { OnboardingSignature } from "@/components/onboarding/candidate/onboardin
 import { useOnboardingPortalProgress } from "@/components/onboarding/candidate/onboarding-portal-progress-context";
 import { OnboardingStepNav } from "@/components/onboarding/candidate/onboarding-step-nav";
 import { OnboardingSubmittedCelebration } from "@/components/onboarding/candidate/onboarding-submitted-celebration";
-import { LabeledSelect } from "@/components/payroll/payroll-select";
+import { OnboardingWizardSelect } from "@/components/onboarding/candidate/onboarding-wizard-select";
 import {
   saveCandidateAgreementsAction,
   saveCandidatePoliciesAction,
@@ -113,6 +113,12 @@ function identityDocumentCardLabel(label: string, required: boolean): string {
   return required ? label : `${label} — optional`;
 }
 
+function readSectionField(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return "";
+}
+
 function documentRecord(
   context: CandidatePortalContext,
   category: string,
@@ -184,15 +190,25 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
     prevSectionKeyRef.current = sectionKey;
 
     if (sectionKey === "education" && enteredSection) {
-      setEducationForm(parseEducationForm(sectionData));
+      try {
+        setEducationForm(parseEducationForm(sectionData));
+      } catch {
+        setEducationForm(createEmptyEducationForm());
+      }
     }
     if (sectionKey === "employment_history" && enteredSection) {
-      setEmploymentForm(parseEmploymentForm(sectionData));
+      try {
+        setEmploymentForm(parseEmploymentForm(sectionData));
+      } catch {
+        setEmploymentForm(createEmptyEmploymentForm());
+      }
     }
   }, [sectionKey, sectionData]);
 
   useEffect(() => {
-    contentScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    const el = contentScrollRef.current;
+    if (!el) return;
+    el.scrollTop = 0;
   }, [step, stepAnimKey]);
 
   useEffect(() => {
@@ -201,8 +217,13 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
       current: step + 1,
       total: ONBOARDING_WIZARD_SECTIONS.length,
     });
-    return () => progressCtx.setWizardStep(null);
   }, [step, progressCtx]);
+
+  useEffect(() => {
+    return () => {
+      progressCtx?.setWizardStep(null);
+    };
+  }, [progressCtx]);
 
   function sectionHintText(): string {
     if (!currentValidation.valid) {
@@ -246,7 +267,8 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   }
 
   function personalField(key: string): string {
-    return form[key] ?? String(sectionData[key] ?? "");
+    if (form[key]) return form[key];
+    return readSectionField(sectionData[key]);
   }
 
   function personalSelectValue(
@@ -337,6 +359,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   }
 
   function goToStep(index: number) {
+    if (index < 0 || index >= ONBOARDING_WIZARD_SECTIONS.length) return;
     if (!canNavigateToStep(index, context)) {
       toast.error("Complete the current section before opening the next step");
       return;
@@ -500,9 +523,9 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
         <div
           ref={contentScrollRef}
-          className="onboarding-section-enter min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-4 sm:px-6 sm:py-5"
+          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain scroll-smooth px-4 py-4 sm:px-6 sm:py-5"
         >
-          <div key={`${sectionKey}-${stepAnimKey}`} className="min-w-0">
+          <div key={`${sectionKey}-${stepAnimKey}`} className="onboarding-section-enter min-w-0">
           {sectionKey === "personal" && (
             <div className="grid gap-2.5 sm:grid-cols-2">
               <div className="space-y-1">
@@ -525,32 +548,32 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
               </div>
               <div className="space-y-1">
                 <FieldLabel label="Gender" required />
-                <LabeledSelect
+                <OnboardingWizardSelect
                   items={GENDER_ITEMS}
                   value={personalSelectValue("gender", ONBOARDING_GENDER_OPTIONS)}
                   placeholder="Select gender"
                   onValueChange={(value) => updateField("gender", value)}
-                  triggerClassName={cn(wizardInputClassName, "w-full")}
+                  triggerClassName={wizardInputClassName}
                 />
               </div>
               <div className="space-y-1">
                 <FieldLabel label="Marital status" />
-                <LabeledSelect
+                <OnboardingWizardSelect
                   items={MARITAL_ITEMS}
                   value={personalSelectValue("maritalStatus", ONBOARDING_MARITAL_STATUS_OPTIONS)}
                   placeholder="Select marital status"
                   onValueChange={(value) => updateField("maritalStatus", value)}
-                  triggerClassName={cn(wizardInputClassName, "w-full")}
+                  triggerClassName={wizardInputClassName}
                 />
               </div>
               <div className="space-y-1">
                 <FieldLabel label="Blood group" />
-                <LabeledSelect
+                <OnboardingWizardSelect
                   items={BLOOD_GROUP_ITEMS}
                   value={personalSelectValue("bloodGroup", ONBOARDING_BLOOD_GROUP_OPTIONS)}
                   placeholder="Select blood group"
                   onValueChange={(value) => updateField("bloodGroup", value)}
-                  triggerClassName={cn(wizardInputClassName, "w-full")}
+                  triggerClassName={wizardInputClassName}
                 />
               </div>
               <div className="space-y-1">
@@ -568,7 +591,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                 pincodeValue={personalField("pincode")}
                 addressLineValue={
                   form.addressLine ??
-                  String(sectionData.addressLine ?? sectionData.address ?? "")
+                  readSectionField(sectionData.addressLine ?? sectionData.address)
                 }
                 onStateChange={(value) => updateField("state", value)}
                 onCityChange={(value) => updateField("city", value)}
@@ -652,7 +675,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                     inputMode="numeric"
                     maxLength={12}
                     placeholder="12-digit Aadhaar number"
-                    value={form.aadhaar ?? String(sectionData.aadhaar ?? "")}
+                    value={form.aadhaar ?? readSectionField(sectionData.aadhaar)}
                     onChange={(e) => updateField("aadhaar", sanitizeAadhaar(e.target.value))}
                   />
                   <p className="text-[11px] text-muted-foreground">12 digits only</p>
@@ -663,7 +686,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                     className={cn(wizardInputClassName, "uppercase")}
                     maxLength={10}
                     placeholder="ABCDE1234F"
-                    value={form.pan ?? String(sectionData.pan ?? "")}
+                    value={form.pan ?? readSectionField(sectionData.pan)}
                     onChange={(e) => updateField("pan", sanitizePan(e.target.value))}
                   />
                   <p className="text-[11px] text-muted-foreground">
@@ -707,7 +730,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                   <FieldLabel label="Account holder name" required />
                   <Input
                     className={wizardInputClassName}
-                    value={form.accountHolderName ?? String(sectionData.accountHolderName ?? "")}
+                    value={form.accountHolderName ?? readSectionField(sectionData.accountHolderName)}
                     onChange={(e) => updateField("accountHolderName", e.target.value)}
                     placeholder="Name as per bank records"
                   />
@@ -716,7 +739,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                   <FieldLabel label="Bank name" required />
                   <Input
                     className={wizardInputClassName}
-                    value={form.bankName ?? String(sectionData.bankName ?? "")}
+                    value={form.bankName ?? readSectionField(sectionData.bankName)}
                     onChange={(e) => updateField("bankName", e.target.value)}
                     placeholder="Bank name"
                   />
@@ -727,7 +750,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                     className={wizardInputClassName}
                     inputMode="numeric"
                     maxLength={18}
-                    value={form.accountNumber ?? String(sectionData.accountNumber ?? "")}
+                    value={form.accountNumber ?? readSectionField(sectionData.accountNumber)}
                     onChange={(e) =>
                       updateField("accountNumber", sanitizeAccountNumber(e.target.value))
                     }
@@ -742,7 +765,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                   <Input
                     className={cn(wizardInputClassName, "uppercase")}
                     maxLength={11}
-                    value={form.ifsc ?? String(sectionData.ifsc ?? "")}
+                    value={form.ifsc ?? readSectionField(sectionData.ifsc)}
                     onChange={(e) => updateField("ifsc", sanitizeIfsc(e.target.value))}
                     placeholder="ABCD0123456"
                   />
@@ -751,14 +774,14 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                   <FieldLabel label="Branch name" required />
                   <Input
                     className={wizardInputClassName}
-                    value={form.branchName ?? String(sectionData.branchName ?? "")}
+                    value={form.branchName ?? readSectionField(sectionData.branchName)}
                     onChange={(e) => updateField("branchName", e.target.value)}
                     placeholder="Branch name"
                   />
                 </div>
                 <div className="space-y-1.5">
                   <FieldLabel label="Account type" required />
-                  <LabeledSelect
+                  <OnboardingWizardSelect
                     items={BANK_ACCOUNT_TYPE_ITEMS}
                     value={personalSelectValue(
                       "accountType",
@@ -766,7 +789,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                     )}
                     placeholder="Savings / Current"
                     onValueChange={(value) => updateField("accountType", value)}
-                    triggerClassName={cn(wizardInputClassName, "w-full")}
+                    triggerClassName={wizardInputClassName}
                   />
                 </div>
               </div>
