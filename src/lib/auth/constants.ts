@@ -4,13 +4,19 @@ export const AUTH_ROUTES = {
   resetPassword: "/reset-password",
   callback: "/auth/callback",
   unauthorized: "/403",
-  dashboard: "/",
+  dashboard: "/dashboard",
 } as const;
 
 /** Base path for the Universal Email Approval Engine landing page. */
 export const APPROVAL_PUBLIC_ROUTE = "/approval";
 
+/** Pre-login marketing / welcome experience */
+export const PUBLIC_LANDING_ROUTE = "/";
+export const WHATS_NEW_ROUTE = "/whats-new";
+
 export const PUBLIC_ROUTES = [
+  PUBLIC_LANDING_ROUTE,
+  WHATS_NEW_ROUTE,
   AUTH_ROUTES.login,
   AUTH_ROUTES.forgotPassword,
   AUTH_ROUTES.resetPassword,

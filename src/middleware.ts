@@ -88,7 +88,18 @@ export async function middleware(request: NextRequest) {
   const { supabase, supabaseResponse, user } = await updateSession(request);
   const { pathname, searchParams } = request.nextUrl;
 
-  if (pathname === "/" || pathname === "/settings") {
+  if (pathname === "/") {
+    if (user) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = HR_PORTAL_HOME;
+      redirectUrl.search = "";
+      return NextResponse.redirect(redirectUrl);
+    }
+
+    return supabaseResponse;
+  }
+
+  if (pathname === "/settings") {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = HR_PORTAL_HOME;
     redirectUrl.search = "";

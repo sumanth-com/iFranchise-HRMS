@@ -1,11 +1,15 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
 import { User } from "lucide-react";
 
 import brandLogo from "@/assets/Logo.png";
 import { AuthThemeToggle } from "@/components/auth/auth-theme-toggle";
+import { PUBLIC_LANDING_ROUTE } from "@/lib/auth/constants";
+import { consumeLandingToLoginTransition } from "@/lib/landing/navigate-to-login";
+import { cn } from "@/lib/utils";
 
 type AuthLayoutProps = {
   children: ReactNode;
@@ -31,7 +35,11 @@ function AuthGlassOrb() {
 
   return (
     <div className="auth-glass-stage" suppressHydrationWarning>
-      <div className="auth-glass-brand">
+      <Link
+        href={PUBLIC_LANDING_ROUTE}
+        className="auth-glass-brand rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+        aria-label="Go to HRMS home"
+      >
         <div className="auth-logo-shine auth-glass-brand-mark">
           <Image
             src={brandLogo}
@@ -43,7 +51,7 @@ function AuthGlassOrb() {
           />
         </div>
         <p className="auth-glass-brand-name">iFranchise</p>
-      </div>
+      </Link>
 
       <div className="auth-glass-aurora auth-glass-aurora-a" aria-hidden />
       <div className="auth-glass-aurora auth-glass-aurora-b" aria-hidden />
@@ -109,8 +117,19 @@ function AuthGlassOrb() {
 }
 
 export function AuthLayout({ children }: AuthLayoutProps) {
+  const [fromLanding, setFromLanding] = useState(false);
+
+  useEffect(() => {
+    setFromLanding(consumeLandingToLoginTransition());
+  }, []);
+
   return (
-    <div className="relative flex h-[100dvh] w-screen max-w-[100vw] overflow-hidden bg-background">
+    <div
+      className={cn(
+        "relative flex h-[100dvh] w-screen max-w-[100vw] overflow-hidden bg-background",
+        fromLanding && "auth-enter-from-landing",
+      )}
+    >
       <aside className="relative hidden min-w-0 flex-1 p-3 lg:block xl:p-4">
         <AuthGlassOrb />
       </aside>
