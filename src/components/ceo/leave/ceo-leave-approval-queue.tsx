@@ -1,21 +1,14 @@
 "use client";
 
 import { format, parseISO } from "date-fns";
-import { CheckCircle2, Eye, Forward, MoreVertical, XCircle } from "lucide-react";
+import { CheckCircle2, Eye, XCircle } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { CeoLeaveForwardModal } from "@/components/ceo/leave/ceo-leave-forward-modal";
 import { LeavePanel } from "@/components/ceo/leave/ceo-leave-tables";
 import { Button } from "@/components/common/button";
 import { DataTable, type DataTableColumn } from "@/components/common/data-table";
 import { Modal } from "@/components/common/modal";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import {
   approveCeoLeaveAction,
@@ -23,11 +16,10 @@ import {
 } from "@/lib/ceo/actions/ceo-leave-actions";
 import { leaveApprovalStageLabel } from "@/lib/leave/constants";
 import { formatHalfDayPeriod } from "@/lib/leave/services/leave-utils";
-import type { CeoApprovalQueueItem, CeoForwardTarget } from "@/types/ceo-leave";
+import type { CeoApprovalQueueItem } from "@/types/ceo-leave";
 
 type CeoLeaveApprovalQueueProps = {
   items: CeoApprovalQueueItem[];
-  forwardTargets: CeoForwardTarget[];
   isLoading?: boolean;
   onView: (id: string) => void;
   onActed: () => void;
@@ -53,7 +45,6 @@ function dateRangeLabel(item: CeoApprovalQueueItem) {
 
 export function CeoLeaveApprovalQueue({
   items,
-  forwardTargets,
   isLoading,
   onView,
   onActed,
@@ -62,7 +53,6 @@ export function CeoLeaveApprovalQueue({
     item: CeoApprovalQueueItem;
     type: "approve" | "reject";
   } | null>(null);
-  const [forwardItem, setForwardItem] = useState<CeoApprovalQueueItem | null>(null);
   const [rejectComments, setRejectComments] = useState("");
   const [isActing, startActing] = useTransition();
 
@@ -186,30 +176,15 @@ export function CeoLeaveApprovalQueue({
             <XCircle className="size-3.5" />
             Reject
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  aria-label="More actions"
-                  disabled={isActing}
-                >
-                  <MoreVertical className="size-4" />
-                </Button>
-              }
-            />
-            <DropdownMenuContent align="end" className="min-w-[11rem]">
-              <DropdownMenuItem onClick={() => setForwardItem(row)}>
-                <Forward className="mr-2 size-4" />
-                Forward to Manager / HR
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onView(row.id)}>
-                <Eye className="mr-2 size-4" />
-                View details
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label="View details"
+            disabled={isActing}
+            onClick={() => onView(row.id)}
+          >
+            <Eye className="size-4" />
+          </Button>
         </div>
       ),
     },
@@ -285,18 +260,6 @@ export function CeoLeaveApprovalQueue({
           />
         </div>
       </Modal>
-
-      <CeoLeaveForwardModal
-        open={forwardItem !== null}
-        onOpenChange={(open) => (open ? undefined : setForwardItem(null))}
-        leaveRequestId={forwardItem?.id ?? null}
-        employeeName={forwardItem?.employeeName}
-        targets={forwardTargets}
-        onForwarded={() => {
-          setForwardItem(null);
-          onActed();
-        }}
-      />
     </LeavePanel>
   );
 }

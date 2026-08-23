@@ -85,6 +85,11 @@ const MONTH_LABELS = [
   "December",
 ] as const;
 
+export const LEAVE_MONTH_OPTIONS = MONTH_LABELS.map((label, index) => ({
+  value: index + 1,
+  label,
+}));
+
 /** Locale-stable label so SSR and the client hydrate the same month string. */
 export function formatLeaveMonthYear(month: number, year: number) {
   const name = MONTH_LABELS[month - 1];

@@ -22,6 +22,8 @@ export const ceoLeaveFiltersSchema = z.object({
   search: z.string().trim().max(200).optional(),
   dateFrom: isoDate,
   dateTo: isoDate,
+  month: z.number().int().min(1).max(12).optional(),
+  year: z.number().int().min(2000).max(2100).optional(),
 });
 
 export type CeoLeaveFiltersInput = z.infer<typeof ceoLeaveFiltersSchema>;

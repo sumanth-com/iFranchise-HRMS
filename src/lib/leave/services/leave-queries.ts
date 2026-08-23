@@ -1577,6 +1577,36 @@ export async function ensurePendingExecutiveLeaveAssignedToCeo(
 
   const admin = createAdminClient();
   const ceoIdSet = new Set(ceoIds);
+  const now = new Date().toISOString();
+
+  // Clear leftover pending approval rows on leaves that are already finalized
+  // (e.g. multi-CEO approve finalized leave_status before sibling cancel ran).
+  const { data: finalizedLeaves, error: finalizedError } = await admin
+    .schema("hrms")
+    .from("leave_requests")
+    .select("id")
+    .in("employee_id", executiveApplicantIds)
+    .in("leave_status", ["approved", "rejected", "cancelled", "withdrawn"])
+    .is("deleted_at", null);
+
+  if (finalizedError) throw new Error(finalizedError.message);
+
+  const finalizedIds = (finalizedLeaves ?? []).map((row) => row.id);
+  if (finalizedIds.length > 0) {
+    const { error: orphanError } = await admin
+      .schema("hrms")
+      .from("leave_approvals")
+      .update({
+        approval_status: "skipped",
+        deleted_at: now,
+        updated_at: now,
+      })
+      .in("leave_request_id", finalizedIds)
+      .eq("approval_status", "pending")
+      .is("deleted_at", null);
+
+    if (orphanError) throw new Error(orphanError.message);
+  }
 
   const { data: pendingLeaves, error: leaveError } = await admin
     .schema("hrms")
@@ -1591,7 +1621,6 @@ export async function ensurePendingExecutiveLeaveAssignedToCeo(
   if (leaveRows.length === 0) return;
 
   const leaveIds = leaveRows.map((row) => row.id);
-  const now = new Date().toISOString();
 
   const { data: existingApprovals, error: approvalsError } = await admin
     .schema("hrms")
@@ -1633,7 +1662,7 @@ export async function ensurePendingExecutiveLeaveAssignedToCeo(
       .schema("hrms")
       .from("leave_approvals")
       .update({
-        approval_status: "cancelled",
+        approval_status: "skipped",
         deleted_at: now,
         updated_at: now,
       })

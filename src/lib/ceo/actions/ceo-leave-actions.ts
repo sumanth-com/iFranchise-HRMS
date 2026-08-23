@@ -15,6 +15,7 @@ import {
   getCeoLeaveLookups,
   getCeoLeaveSummary,
   listCeoApprovalQueue,
+  listCeoProcessedLeaveApprovals,
   listCeoTodaysLeave,
   listCeoUpcomingLeave,
 } from "@/lib/ceo/services/ceo-leave-queries";
@@ -130,14 +131,34 @@ export async function fetchCeoLeaveListsAction(
   }
 }
 
-export async function fetchCeoApprovalQueueAction(): Promise<
-  CeoLeaveActionResult<CeoApprovalQueueItem[]>
+export async function fetchCeoApprovalQueueAction(
+  rawFilters: { month?: number; year?: number } = {},
+): Promise<
+  CeoLeaveActionResult<{
+    queue: CeoApprovalQueueItem[];
+    processed: CeoLeaveRecord[];
+    month: number;
+    year: number;
+  }>
 > {
   try {
     const profile = await requireServerAnyPermission(VIEW_PERMISSIONS);
     const supabase = await createClient();
-    const data = await listCeoApprovalQueue(supabase, profile);
-    return { success: true, data };
+    const now = new Date();
+    const month = rawFilters.month ?? now.getMonth() + 1;
+    const year = rawFilters.year ?? now.getFullYear();
+    const parsed = ceoLeaveCalendarSchema.parse({ month, year });
+    const period = { month: parsed.month, year: parsed.year };
+
+    const [queue, processed] = await Promise.all([
+      listCeoApprovalQueue(supabase, profile, period),
+      listCeoProcessedLeaveApprovals(supabase, profile, period).catch((error) => {
+        console.error("[ceo-leave] processed approvals failed", error);
+        return [] as CeoLeaveRecord[];
+      }),
+    ]);
+
+    return { success: true, data: { queue, processed, ...period } };
   } catch (error) {
     return {
       success: false,

@@ -1,9 +1,13 @@
 import { Suspense } from "react";
 
 import { CeoRegularizationApprovalsView } from "@/components/ceo/regularization/ceo-regularization-approvals-view";
+import { EmptyState } from "@/components/common/empty-state";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
-import { listCeoRegularizationApprovalQueue } from "@/lib/ceo/services/ceo-regularization-queries";
+import {
+  listCeoProcessedRegularizations,
+  listCeoRegularizationApprovalQueue,
+} from "@/lib/ceo/services/ceo-regularization-queries";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,9 +17,40 @@ async function CeoRegularizationApprovalsContent() {
     "attendance.view",
   ]);
   const supabase = await createClient();
-  const approvalQueue = await listCeoRegularizationApprovalQueue(supabase, profile);
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const year = now.getFullYear();
+  const period = { month, year };
 
-  return <CeoRegularizationApprovalsView approvalQueue={approvalQueue} />;
+  try {
+    const [approvalQueue, processedItems] = await Promise.all([
+      listCeoRegularizationApprovalQueue(supabase, profile),
+      listCeoProcessedRegularizations(supabase, profile, period).catch(() => []),
+    ]);
+
+    return (
+      <CeoRegularizationApprovalsView
+        approvalQueue={approvalQueue}
+        processedItems={processedItems}
+        initialMonth={month}
+        initialYear={year}
+      />
+    );
+  } catch (error) {
+    console.error("[ceo-regularization] page failed to load", error);
+    return (
+      <div className="flex flex-1 items-center justify-center p-6">
+        <EmptyState
+          title="Couldn’t load regularization approvals"
+          description={
+            error instanceof Error
+              ? error.message
+              : "Please refresh the page or try again in a moment."
+          }
+        />
+      </div>
+    );
+  }
 }
 
 export default function CeoApprovalsRegularizationPage() {

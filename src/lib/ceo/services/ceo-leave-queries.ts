@@ -278,6 +278,7 @@ export async function listCeoUpcomingLeave(
 export async function listCeoApprovalQueue(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
+  _filters: Pick<CeoLeaveFilters, "month" | "year"> = {},
 ): Promise<CeoApprovalQueueItem[]> {
   const organizationId = profile.employee.organizationId;
   const ceoEmployeeId = profile.employee.id;
@@ -358,6 +359,64 @@ export async function listCeoApprovalQueue(
   }
 
   return items;
+}
+
+/** Leave decisions this CEO already acted on (approved / rejected), for the selected month. */
+export async function listCeoProcessedLeaveApprovals(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  filters: Pick<CeoLeaveFilters, "month" | "year"> = {},
+): Promise<CeoLeaveRecord[]> {
+  const organizationId = profile.employee.organizationId;
+  const ceoEmployeeId = profile.employee.id;
+  const now = new Date();
+  const month = filters.month ?? now.getMonth() + 1;
+  const year = filters.year ?? now.getFullYear();
+  const range = getMonthDateRange(month, year);
+
+  const { data: actedRows, error: actedError } = await supabase
+    .schema("hrms")
+    .from("leave_approvals")
+    .select("leave_request_id, approval_status, acted_at")
+    .eq("approver_employee_id", ceoEmployeeId)
+    .in("approval_status", ["approved", "rejected"])
+    .is("deleted_at", null)
+    .gte("acted_at", `${range.start}T00:00:00`)
+    .lte("acted_at", `${range.end}T23:59:59.999`);
+
+  if (actedError) throw new Error(actedError.message);
+  const acted = actedRows ?? [];
+  if (acted.length === 0) return [];
+
+  const requestIds = Array.from(new Set(acted.map((row) => row.leave_request_id)));
+  const statusByRequest = new Map<string, string>();
+  for (const row of acted) {
+    if (!statusByRequest.has(row.leave_request_id)) {
+      statusByRequest.set(row.leave_request_id, row.approval_status);
+    }
+  }
+
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("leave_requests")
+    .select(LEAVE_ROW_SELECT)
+    .in("id", requestIds)
+    .eq("employees.organization_id", organizationId)
+    .in("leave_status", ["approved", "rejected"])
+    .is("deleted_at", null)
+    .order("updated_at", { ascending: false })
+    .limit(100);
+
+  if (error) throw new Error(error.message);
+
+  return ((data as unknown as LeaveRow[]) ?? []).map((row) => {
+    const record = mapLeaveRow(row);
+    const decision = statusByRequest.get(row.id);
+    if (decision === "approved" || decision === "rejected") {
+      return { ...record, leaveStatus: decision };
+    }
+    return record;
+  });
 }
 
 export async function getCeoLeaveSummary(

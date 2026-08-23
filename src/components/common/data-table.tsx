@@ -18,8 +18,8 @@ export type DataTableColumn<T> = {
 };
 
 type DataTableProps<T> = {
-  columns: DataTableColumn<T>[];
-  data: T[];
+  columns?: DataTableColumn<T>[] | null;
+  data?: T[] | null;
   className?: string;
   emptyMessage?: string;
   align?: "left" | "center";
@@ -39,14 +39,16 @@ export const DATA_TABLE_LEAVE_REQUESTS_MAX_HEIGHT =
   "max-h-[min(52vh,calc(100dvh-22rem))]";
 
 export function DataTable<T extends Record<string, unknown>>({
-  columns,
-  data,
+  columns: columnsProp,
+  data: dataProp,
   className,
   emptyMessage = "No records to display.",
   align = "left",
   scrollable = false,
   maxHeightClass = DATA_TABLE_SCROLL_MAX_HEIGHT,
 }: DataTableProps<T>) {
+  const columns = Array.isArray(columnsProp) ? columnsProp : [];
+  const rows = Array.isArray(dataProp) ? dataProp : [];
   const headAlign = align === "center" ? "text-center" : "text-left";
   const cellAlign = align === "center" ? "text-center" : "text-left";
 
@@ -79,7 +81,7 @@ export function DataTable<T extends Record<string, unknown>>({
             </tr>
           </thead>
           <tbody>
-            {data.length === 0 ? (
+            {rows.length === 0 ? (
               <tr className="border-b">
                 <td colSpan={columns.length} className="p-0 align-middle">
                   <div className="flex min-h-[7rem] items-center justify-center px-4 py-8 text-center text-sm text-muted-foreground">
@@ -88,7 +90,7 @@ export function DataTable<T extends Record<string, unknown>>({
                 </td>
               </tr>
             ) : (
-              data.map((row, rowIndex) => (
+              rows.map((row, rowIndex) => (
                 <tr
                   key={rowIndex}
                   className="border-b transition-colors hover:bg-muted/50"
@@ -132,7 +134,7 @@ export function DataTable<T extends Record<string, unknown>>({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.length === 0 ? (
+          {rows.length === 0 ? (
             <TableRow>
               <TableCell colSpan={columns.length} className="p-0 align-middle">
                 <div className="flex min-h-[7rem] items-center justify-center px-4 py-8 text-center text-sm text-muted-foreground">
@@ -141,7 +143,7 @@ export function DataTable<T extends Record<string, unknown>>({
               </TableCell>
             </TableRow>
           ) : (
-            data.map((row, rowIndex) => (
+            rows.map((row, rowIndex) => (
               <TableRow key={rowIndex}>
                 {columns.map((column) => (
                   <TableCell

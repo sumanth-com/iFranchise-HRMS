@@ -18,6 +18,9 @@ export type CeoLeaveFilters = {
   search?: string;
   dateFrom?: string;
   dateTo?: string;
+  /** 1–12 — filters leave start dates to this calendar month */
+  month?: number;
+  year?: number;
 };
 
 export type CeoLeaveSummary = {

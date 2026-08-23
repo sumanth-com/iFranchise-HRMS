@@ -1,5 +1,7 @@
 import type { ExecutiveRequestCategory } from "@/lib/approvals/executive-request-routing";
 
+export type CeoRegularizationStatus = "pending" | "approved" | "rejected";
+
 export type CeoRegularizationQueueItem = {
   id: string;
   employeeId: string;
@@ -13,7 +15,8 @@ export type CeoRegularizationQueueItem = {
   requestedCheckOutAt: string | null;
   reason: string;
   submittedAt: string;
-  correctionStatus: "pending";
+  correctionStatus: CeoRegularizationStatus;
+  reviewedAt?: string | null;
 };
 
 export type CeoRegularizationActionResult<T = void> =

@@ -66,7 +66,7 @@ export function CeoLeaveView(props: CeoLeaveModuleData) {
       } catch {
         // Fall back to a lighter refresh if the full reload fails.
         const queue = await fetchCeoApprovalQueueAction();
-        if (queue.success) setApprovalQueue(queue.data);
+        if (queue.success) setApprovalQueue(queue.data.queue);
       }
     });
   }, [filters]);
@@ -108,7 +108,6 @@ export function CeoLeaveView(props: CeoLeaveModuleData) {
 
       <CeoLeaveApprovalQueue
         items={approvalQueue}
-        forwardTargets={props.forwardTargets}
         isLoading={isPending}
         onView={handleView}
         onActed={refreshAll}

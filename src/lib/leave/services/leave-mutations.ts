@@ -23,6 +23,7 @@ import {
   notifyLeaveSubmitted,
 } from "@/lib/leave/services/leave-notifications";
 import { emitHrmsWebhook } from "@/lib/public-api/emit";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 function emptyToNull(value?: string | null) {
   return value && value.trim().length > 0 ? value.trim() : null;
@@ -442,17 +443,19 @@ async function getPendingLeaveApproval(
 }
 
 async function cancelSiblingPendingApprovals(
-  supabase: AuthSupabaseClient,
+  _supabase: AuthSupabaseClient,
   leaveRequestId: string,
   actingApproverEmployeeId: string,
   userId: string,
 ) {
+  const admin = createAdminClient();
   const now = new Date().toISOString();
-  const { error } = await supabase
+  // Admin client avoids RLS on sibling CEO rows (authenticated UPDATE can fail WITH CHECK).
+  const { error } = await admin
     .schema("hrms")
     .from("leave_approvals")
     .update({
-      approval_status: "cancelled",
+      approval_status: "skipped",
       deleted_at: now,
       updated_at: now,
       updated_by: userId,
@@ -460,6 +463,30 @@ async function cancelSiblingPendingApprovals(
     .eq("leave_request_id", leaveRequestId)
     .eq("approval_status", "pending")
     .neq("approver_employee_id", actingApproverEmployeeId)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+}
+
+/** Clear leftover pending approval rows after a leave is already finalized. */
+async function clearRemainingPendingApprovals(
+  _supabase: AuthSupabaseClient,
+  leaveRequestId: string,
+  userId: string,
+) {
+  const admin = createAdminClient();
+  const now = new Date().toISOString();
+  const { error } = await admin
+    .schema("hrms")
+    .from("leave_approvals")
+    .update({
+      approval_status: "skipped",
+      deleted_at: now,
+      updated_at: now,
+      updated_by: userId,
+    })
+    .eq("leave_request_id", leaveRequestId)
+    .eq("approval_status", "pending")
     .is("deleted_at", null);
 
   if (error) throw new Error(error.message);
@@ -647,6 +674,14 @@ export async function approveLeaveRequest(
     .single();
 
   if (error || !request) throw new Error(error?.message ?? "Leave request not found");
+
+  // Idempotent: earlier multi-CEO approve may have finalized leave_status before
+  // sibling pending rows were cleared. Treat as success and clean leftovers.
+  if (request.leave_status === "approved") {
+    await clearRemainingPendingApprovals(supabase, leaveRequestId, profile.userId);
+    return;
+  }
+
   if (request.leave_status !== "pending") {
     throw new Error("Only pending requests can be approved");
   }
@@ -712,7 +747,7 @@ export async function approveLeaveRequest(
       throw new Error(LEAVE_ALREADY_PROCESSED_MESSAGE);
     }
 
-    const { data: updatedStep, error: updateError } = await supabase
+    const { data: updatedStep, error: updateError } = await createAdminClient()
       .schema("hrms")
       .from("leave_approvals")
       .update({
@@ -720,6 +755,7 @@ export async function approveLeaveRequest(
         comments: emptyToNull(comments),
         acted_at: actedAt,
         updated_by: profile.userId,
+        updated_at: actedAt,
       })
       .eq("id", pendingStep.id)
       .eq("approval_status", "pending")
@@ -826,6 +862,13 @@ export async function rejectLeaveRequest(
     .single();
 
   if (error || !request) throw new Error(error?.message ?? "Leave request not found");
+
+  if (request.leave_status === "rejected" || request.leave_status === "approved") {
+    await clearRemainingPendingApprovals(supabase, leaveRequestId, profile.userId);
+    if (request.leave_status === "rejected") return;
+    throw new Error(LEAVE_ALREADY_PROCESSED_MESSAGE);
+  }
+
   if (request.leave_status !== "pending") {
     throw new Error("Only pending requests can be rejected");
   }
