@@ -4,6 +4,8 @@ export {
   forgotPasswordAction,
   requestPasswordResetEmailAction,
   resetPasswordAction,
+  touchSessionActivityAction,
+  idleSessionLogoutAction,
 } from "./actions";
 export { AUTH_ROUTES, PUBLIC_ROUTES } from "./constants";
 export { getAuthErrorMessage, mapSupabaseAuthError } from "./errors";

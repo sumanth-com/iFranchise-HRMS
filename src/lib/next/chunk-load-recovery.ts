@@ -46,7 +46,10 @@ export function isStaleHmrModuleError(error: unknown): boolean {
     /was instantiated because it was required/i.test(haystack) ||
     /module factory is undefined/i.test(haystack) ||
     /Cannot find module/i.test(haystack) ||
-    /Module \[project\]/i.test(haystack)
+    /Module \[project\]/i.test(haystack) ||
+    // Webpack HMR left a broken require() graph (undefined module factory).
+    /Cannot read properties of undefined \(reading 'call'\)/i.test(haystack) ||
+    /Cannot read property 'call' of undefined/i.test(haystack)
   );
 }
 

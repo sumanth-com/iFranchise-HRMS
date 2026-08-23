@@ -1,21 +1,24 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
-import brandLogo from "@/assets/Logo.png";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { loginAction } from "@/lib/auth/actions";
-import { AUTH_ROUTES } from "@/lib/auth/constants";
+import { AUTH_ROUTES, IDLE_ACTIVITY_STORAGE_KEY } from "@/lib/auth/constants";
 import { getAuthErrorMessage } from "@/lib/auth/errors";
+import {
+  clearRememberedEmail,
+  getRememberedEmail,
+  setRememberedEmail,
+} from "@/lib/auth/remember-email";
 import { getSafeRedirectPath } from "@/lib/security/safe-redirect";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -30,14 +33,15 @@ const PROFILE_ERROR_CODES: AuthErrorCode[] = [
   "ORGANIZATION_NOT_FOUND",
 ];
 
+const SIGNED_OUT_TOAST_ID = "auth-signed-out";
+
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isPending, startTransition] = useTransition();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isInviteLinkPending, setInviteLinkPending] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [showSignedOutMessage, setShowSignedOutMessage] = useState(false);
   const [showPasswordUpdatedMessage, setShowPasswordUpdatedMessage] = useState(false);
 
   const {
@@ -50,32 +54,45 @@ export function LoginForm() {
     defaultValues: {
       email: searchParams.get("email") ?? "",
       password: "",
-      rememberMe: false,
+      rememberMe: Boolean(getRememberedEmail()),
     },
   });
 
   useEffect(() => {
-    const email = searchParams.get("email");
-    if (email) setValue("email", email);
+    const queryEmail = searchParams.get("email")?.trim();
+    if (queryEmail) {
+      setValue("email", queryEmail);
+      return;
+    }
+
+    const rememberedEmail = getRememberedEmail();
+    if (rememberedEmail) {
+      setValue("email", rememberedEmail);
+      setValue("rememberMe", true);
+    }
   }, [searchParams, setValue]);
 
+  const signedOutToastHandledRef = useRef(false);
+
   useEffect(() => {
+    if (signedOutToastHandledRef.current) return;
+
     const params = new URLSearchParams(window.location.search);
     if (params.get("signedOut") !== "1") return;
 
-    setShowSignedOutMessage(true);
+    signedOutToastHandledRef.current = true;
     params.delete("signedOut");
     const query = params.toString();
-    router.replace(query ? `${AUTH_ROUTES.login}?${query}` : AUTH_ROUTES.login, {
-      scroll: false,
+    window.history.replaceState(
+      null,
+      "",
+      query ? `${AUTH_ROUTES.login}?${query}` : AUTH_ROUTES.login,
+    );
+
+    toast.success("You have been signed out successfully.", {
+      id: SIGNED_OUT_TOAST_ID,
     });
-
-    const timeout = window.setTimeout(() => {
-      setShowSignedOutMessage(false);
-    }, 4000);
-
-    return () => window.clearTimeout(timeout);
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -135,14 +152,15 @@ export function LoginForm() {
       })
       .catch(() => {
         setFormError("Invitation link is invalid or expired. Ask HR to resend it.");
-        toast.error("Invitation link is invalid or expired");
         window.history.replaceState(null, "", window.location.pathname);
       })
       .finally(() => setInviteLinkPending(false));
   }, [router, searchParams]);
 
-  const onSubmit = handleSubmit((data) => {
+  const onSubmit = handleSubmit(async (data) => {
     setFormError(null);
+    setIsSubmitting(true);
+
     const formData = new FormData();
     formData.set("email", data.email);
     formData.set("password", data.password);
@@ -150,30 +168,40 @@ export function LoginForm() {
       formData.set("rememberMe", "on");
     }
 
-    startTransition(async () => {
-      try {
-        const result = await loginAction(formData);
+    try {
+      const result = await loginAction(formData);
 
-        if (!result.success) {
-          setFormError(result.message);
-          toast.error(result.message);
-          return;
-        }
-
-        const requestedRedirect = searchParams.get("redirectTo");
-        const redirectTo = requestedRedirect
-          ? getSafeRedirectPath(requestedRedirect, result.redirectTo)
-          : result.redirectTo;
-
-        toast.success("Signed in successfully");
-        router.push(redirectTo);
-        router.refresh();
-      } catch {
-        const message = getAuthErrorMessage("SERVER_ERROR");
-        setFormError(message);
-        toast.error(message);
+      if (!result.success) {
+        setFormError(result.message);
+        return;
       }
-    });
+
+      if (data.rememberMe) {
+        setRememberedEmail(data.email);
+      } else {
+        clearRememberedEmail();
+      }
+
+      try {
+        window.localStorage.setItem(
+          IDLE_ACTIVITY_STORAGE_KEY,
+          Date.now().toString(),
+        );
+      } catch {
+        // Ignore storage failures
+      }
+
+      const requestedRedirect = searchParams.get("redirectTo");
+      const redirectTo = requestedRedirect
+        ? getSafeRedirectPath(requestedRedirect, result.redirectTo)
+        : result.redirectTo;
+
+      router.replace(redirectTo);
+    } catch {
+      setFormError(getAuthErrorMessage("SERVER_ERROR"));
+    } finally {
+      setIsSubmitting(false);
+    }
   });
 
   const expired = searchParams.get("expired") === "1";
@@ -185,144 +213,125 @@ export function LoginForm() {
       : null;
 
   const fieldClass =
-    "h-11 rounded-xl border-slate-200 bg-white pl-10 text-sm shadow-none placeholder:text-slate-400 focus-visible:border-blue-500 focus-visible:ring-blue-500/20";
+    "h-11 rounded-full border-sky-200/80 bg-sky-50/80 pl-10 text-sm font-medium text-foreground shadow-none placeholder:text-muted-foreground/80 focus-visible:border-sky-500 focus-visible:ring-sky-500/25 dark:border-border/80 dark:bg-muted/40";
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="space-y-4 text-center">
-        <div className="flex justify-center">
-          <div className="auth-logo-shine relative size-16 overflow-hidden rounded-[14px] shadow-[0_8px_24px_rgba(88,28,135,0.28)] ring-1 ring-black/5">
-            <Image
-              src={brandLogo}
-              alt="iFranchise HRMS"
-              width={64}
-              height={64}
-              priority
-              className="relative z-0 size-full object-contain"
-            />
-          </div>
-        </div>
-        <div className="space-y-1.5">
-          <h1 className="text-[1.75rem] font-semibold tracking-tight text-slate-900">
-            Welcome back <span aria-hidden>👋</span>
-          </h1>
-          <p className="text-sm text-slate-500">
-            Sign in with the email HR registered for your account
+      <div className="space-y-1.5 text-center">
+        <h1 className="text-[1.75rem] font-semibold tracking-tight text-foreground">
+          Welcome Back
+        </h1>
+        <p className="text-sm font-medium text-muted-foreground">
+          Sign in with the email HR registered for your account
+        </p>
+      </div>
+
+      <div className="flex items-start gap-3 rounded-2xl border border-sky-200/90 bg-sky-50/90 px-4 py-3.5 text-left shadow-sm dark:border-sky-500/25 dark:bg-sky-500/10">
+        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 text-sky-600 dark:bg-sky-400/15 dark:text-sky-300">
+          <ShieldCheck className="size-4" strokeWidth={2.25} />
+        </span>
+        <div className="min-w-0 space-y-0.5">
+          <p className="text-sm font-semibold text-sky-950 dark:text-sky-100">
+            Secure access
+          </p>
+          <p className="text-[13px] leading-snug text-slate-600 dark:text-slate-300">
+            Your workplace data is protected with enterprise-grade security.
           </p>
         </div>
       </div>
 
-      <div className="flex items-center gap-2.5 rounded-2xl border border-[#dbeafe] bg-[#eff6ff] px-4 py-3">
-        <ShieldCheck className="size-[18px] shrink-0 text-[#2563eb]" strokeWidth={2} />
-        <p className="whitespace-nowrap text-[13px] leading-none tracking-[-0.01em]">
-          <span className="font-semibold text-[#1e3a8a]">Secure access.</span>{" "}
-          <span className="font-normal text-[#64748b]">
-            Your data is protected with enterprise-grade security.
-          </span>
-        </p>
-      </div>
-
       {isInviteLinkPending ? (
-        <div className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">
+        <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
           Preparing your account setup...
         </div>
       ) : null}
 
       {expired ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
           {getAuthErrorMessage("SESSION_EXPIRED")}
         </div>
       ) : null}
 
-      {showSignedOutMessage ? (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 transition-opacity duration-300">
-          You have been signed out successfully.
-        </div>
-      ) : null}
-
       {showPasswordUpdatedMessage ? (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 transition-opacity duration-300">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900 transition-opacity duration-300 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
           Password created successfully. Sign in with your email and new password.
         </div>
       ) : null}
 
       {profileError ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
           {profileError}
         </div>
       ) : null}
 
       {formError ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
           {formError}
         </div>
       ) : null}
 
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-4" autoComplete="on">
         <div className="space-y-2">
-          <Label htmlFor="email" className="text-sm font-medium text-slate-700">
-            Email
+          <Label htmlFor="email" className="text-sm font-semibold text-foreground">
+            Work Email
           </Label>
           <div className="relative">
-            <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               id="email"
               type="email"
-              autoComplete="email"
-              placeholder="Enter your email"
-              disabled={isPending}
+              autoComplete="username"
+              placeholder="Enter your work email"
               className={fieldClass}
               {...register("email")}
             />
           </div>
           {errors.email ? (
-            <p className="text-sm text-red-600">{errors.email.message}</p>
+            <p className="text-sm font-medium text-destructive">{errors.email.message}</p>
           ) : null}
         </div>
 
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3">
-            <Label htmlFor="password" className="text-sm font-medium text-slate-700">
+            <Label htmlFor="password" className="text-sm font-semibold text-foreground">
               Password
             </Label>
             <Link
               href="/forgot-password"
-              className="text-xs font-medium text-blue-600 hover:text-blue-700"
+              className="text-xs font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300"
             >
-              Forgot password?
+              Forgot Password?
             </Link>
           </div>
           <div className="relative">
-            <Lock className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <Lock className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               id="password"
               type={showPassword ? "text" : "password"}
               autoComplete="current-password"
               placeholder="Enter your password"
-              disabled={isPending}
               className={cn(fieldClass, "pr-10")}
               {...register("password")}
             />
             <button
               type="button"
               onClick={() => setShowPassword((value) => !value)}
-              className="absolute inset-y-0 right-2 flex items-center px-1 text-slate-400 hover:text-slate-700"
+              className="absolute inset-y-0 right-2 flex items-center px-1 text-muted-foreground transition-colors hover:text-foreground"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
           </div>
           {errors.password ? (
-            <p className="text-sm text-red-600">{errors.password.message}</p>
+            <p className="text-sm font-medium text-destructive">{errors.password.message}</p>
           ) : null}
         </div>
 
-        <label className="flex items-center gap-2.5 text-sm text-slate-600">
+        <label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-foreground/90">
           <input
             type="checkbox"
-            className="size-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500/30"
-            disabled={isPending}
+            className="size-4 rounded border-border bg-background text-sky-500 focus:ring-sky-500/30"
             {...register("rememberMe")}
           />
           Remember me
@@ -330,14 +339,29 @@ export function LoginForm() {
 
         <Button
           type="submit"
-          className="h-11 w-full rounded-xl bg-[#0f2f6d] text-sm font-semibold text-white hover:bg-[#0c275c]"
-          disabled={isPending}
+          className="group inline-flex h-11 w-full items-center justify-center gap-2.5 rounded-full bg-gradient-to-r from-sky-500 to-blue-600 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(37,99,235,0.35)] hover:from-sky-400 hover:to-blue-500 disabled:opacity-100"
+          disabled={isSubmitting}
         >
-          {isPending ? "Signing in..." : "Sign in"}
+          {isSubmitting ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Signing in...
+            </>
+          ) : (
+            <>
+              Sign In
+              <span
+                className="inline-flex size-5 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/30 transition-transform duration-200 group-hover:translate-x-0.5"
+                aria-hidden
+              >
+                <ArrowRight className="size-3.5" strokeWidth={2.75} />
+              </span>
+            </>
+          )}
         </Button>
       </form>
 
-      <p className="pt-2 text-center text-xs text-slate-400">
+      <p className="pt-2 text-center text-xs text-muted-foreground">
         © {new Date().getFullYear()} iFranchise HRMS. All rights reserved.
       </p>
     </div>

@@ -450,234 +450,522 @@
   }
 }
 
-.auth-brand {
-  width: min(52%, 720px);
+/* Left auth panel — CSS glass orb (no raster globe image) */
+.auth-glass-stage {
+  position: relative;
+  display: flex;
+  height: 100%;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 1.75rem;
+  /* Light mode: bright cyan → blue mesh like the design reference */
   background:
-    radial-gradient(circle at 20% 15%, rgba(56, 189, 248, 0.18), transparent 35%),
-    radial-gradient(circle at 80% 70%, rgba(37, 99, 235, 0.35), transparent 40%),
-    linear-gradient(165deg, #071533 0%, #0b2a6b 48%, #0a1f4d 100%);
+    radial-gradient(ellipse 80% 60% at 12% 8%, rgba(125, 211, 252, 0.95), transparent 52%),
+    radial-gradient(ellipse 70% 55% at 88% 88%, rgba(59, 130, 246, 0.75), transparent 55%),
+    radial-gradient(circle at 48% 48%, rgba(147, 197, 253, 0.55), transparent 45%),
+    linear-gradient(160deg, #7dd3fc 0%, #38bdf8 32%, #3b82f6 68%, #2563eb 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 18px 48px rgba(37, 99, 235, 0.22);
 }
 
-.auth-brand-grid {
-  background-image: radial-gradient(rgba(148, 163, 184, 0.22) 1px, transparent 1px);
-  background-size: 22px 22px;
-  mask-image: radial-gradient(circle at center, black 30%, transparent 78%);
+.auth-glass-brand {
+  position: absolute;
+  top: 1.35rem;
+  left: 1.35rem;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.auth-glass-brand-mark {
+  position: relative;
+  z-index: 0;
+  display: flex;
+  width: 3.25rem;
+  height: 3.25rem;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 0.9rem;
+  box-shadow:
+    0 10px 28px rgba(15, 23, 42, 0.22),
+    0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+
+.auth-glass-brand-name {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: #ffffff;
+  text-shadow: 0 1px 10px rgba(15, 23, 42, 0.22);
+}
+
+.auth-glass-stage-center {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
+.auth-glass-tagline {
+  position: relative;
+  z-index: 5;
+  width: min(90%, 24rem);
+  padding: 0 1.25rem 2rem;
+  text-align: center;
+}
+
+.auth-glass-tagline-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: #ffffff;
+  text-shadow: 0 1px 10px rgba(15, 23, 42, 0.22);
+}
+
+.auth-glass-tagline-copy {
+  margin: 0.55rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 8px rgba(15, 23, 42, 0.18);
+}
+
+.dark .auth-glass-tagline-title {
+  color: #f8fafc;
+}
+
+.dark .auth-glass-tagline-copy {
+  color: rgba(226, 232, 240, 0.86);
+}
+
+.dark .auth-glass-stage {
+  background:
+    radial-gradient(ellipse 70% 55% at 18% 12%, rgba(139, 92, 246, 0.38), transparent 55%),
+    radial-gradient(ellipse 55% 45% at 82% 78%, rgba(37, 99, 235, 0.28), transparent 50%),
+    radial-gradient(circle at 48% 42%, rgba(56, 189, 248, 0.14), transparent 42%),
+    linear-gradient(165deg, #0a1024 0%, #101b3a 42%, #070d1c 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 24px 60px rgba(0, 0, 0, 0.35);
+}
+
+.auth-glass-aurora {
+  pointer-events: none;
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(48px);
   opacity: 0.45;
+  animation: auth-glass-drift 14s ease-in-out infinite;
 }
 
-.auth-brand-glow {
+.auth-glass-aurora-a {
+  top: -8%;
+  left: -6%;
+  width: 52%;
+  height: 42%;
+  background: rgba(186, 230, 253, 0.7);
+}
+
+.auth-glass-aurora-b {
+  right: -10%;
+  bottom: 8%;
+  width: 48%;
+  height: 40%;
+  background: rgba(37, 99, 235, 0.45);
+  animation-delay: -4s;
+}
+
+.auth-glass-aurora-c {
+  left: 28%;
+  top: 38%;
+  width: 36%;
+  height: 28%;
+  background: rgba(56, 189, 248, 0.35);
+  animation-delay: -7s;
+}
+
+.dark .auth-glass-aurora-a {
+  background: rgba(124, 58, 237, 0.45);
+}
+
+.dark .auth-glass-aurora-b {
+  background: rgba(37, 99, 235, 0.4);
+}
+
+.dark .auth-glass-aurora-c {
+  background: rgba(56, 189, 248, 0.22);
+}
+
+.auth-glass-grid {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.28) 1px, transparent 1px);
+  background-size: 24px 24px;
+  mask-image: radial-gradient(circle at 48% 45%, black 18%, transparent 72%);
+  opacity: 0.22;
+}
+
+.dark .auth-glass-grid {
+  background-image: radial-gradient(rgba(148, 163, 184, 0.16) 1px, transparent 1px);
+  opacity: 0.35;
+}
+
+.auth-glass-bounce {
+  --orb-size: 9.5rem;
+  --icon-size: 2.35rem;
+  /* Orbit = orb radius + gap + half icon → icons sit outside with a clear gap */
+  --icon-orbit: calc((var(--orb-size) / 2) + 1.15rem + (var(--icon-size) / 2));
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: min(68%, 420px);
+  aspect-ratio: 1;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+
+.auth-glass-orb-cluster {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  animation: auth-glass-bounce 3.2s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
+}
+
+.auth-glass-people {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.auth-glass-person {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 1;
+  display: flex;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  border-radius: 9999px;
+  border: 1.5px solid #ffffff;
+  background: #ffffff;
+  color: #1d4ed8;
+  box-shadow:
+    0 8px 18px rgba(15, 23, 42, 0.28),
+    0 0 0 3px rgba(59, 130, 246, 0.22);
+  opacity: 0;
+  transform-origin: center;
+  /* Same timeline as ball bounce — no delay so reveal matches the peak */
+  animation: auth-glass-person-reveal 3.2s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
+}
+
+.dark .auth-glass-person {
+  border-color: #eff6ff;
+  background: #eff6ff;
+  color: #1e40af;
+  box-shadow:
+    0 10px 22px rgba(2, 6, 23, 0.55),
+    0 0 0 3px rgba(96, 165, 250, 0.35);
+}
+
+.auth-glass-bounce--static .auth-glass-orb-cluster,
+.auth-glass-bounce--static .auth-glass-ground-shadow,
+.auth-glass-bounce--static .auth-glass-person {
+  animation: none !important;
+}
+
+.auth-glass-bounce--static .auth-glass-orb {
+  transform: translateY(10px);
+}
+
+.auth-glass-bounce--static .auth-glass-ground-shadow {
+  opacity: 0.55;
+}
+
+.auth-glass-orb {
+  position: relative;
+  z-index: 2;
+  width: var(--orb-size);
+  height: var(--orb-size);
+  flex-shrink: 0;
+}
+
+.auth-glass-orb-glow {
+  position: absolute;
+  inset: -22%;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(125, 211, 252, 0.35) 35%,
+    transparent 70%
+  );
+  filter: blur(16px);
+  animation: auth-glass-pulse 5.5s ease-in-out infinite;
+}
+
+.dark .auth-glass-orb-glow {
+  background: radial-gradient(
+    circle,
+    rgba(59, 130, 246, 0.45) 0%,
+    rgba(99, 102, 241, 0.18) 42%,
+    transparent 70%
+  );
+}
+
+.auth-glass-orb-body {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 9999px;
   background:
-    radial-gradient(circle at 50% 42%, rgba(56, 189, 248, 0.16), transparent 42%),
-    radial-gradient(circle at 50% 100%, rgba(14, 165, 233, 0.12), transparent 35%);
+    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.72), transparent 30%),
+    radial-gradient(circle at 50% 45%, rgba(186, 230, 253, 0.55) 0%, rgba(59, 130, 246, 0.35) 48%, rgba(30, 64, 175, 0.45) 100%);
+  box-shadow:
+    inset -18px -14px 36px rgba(30, 64, 175, 0.28),
+    inset 12px 10px 28px rgba(255, 255, 255, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.35),
+    0 18px 40px rgba(37, 99, 235, 0.28);
+  backdrop-filter: blur(2px);
 }
 
-.auth-feature-chip {
-  animation: auth-float 5.5s ease-in-out infinite;
+.dark .auth-glass-orb-body {
+  background:
+    radial-gradient(circle at 32% 28%, rgba(147, 197, 253, 0.55), transparent 28%),
+    radial-gradient(circle at 50% 48%, rgba(37, 99, 235, 0.55) 0%, rgba(15, 23, 42, 0.2) 48%, rgba(2, 6, 23, 0.55) 100%);
+  box-shadow:
+    inset -28px -20px 50px rgba(2, 6, 23, 0.55),
+    inset 16px 14px 36px rgba(191, 219, 254, 0.22),
+    0 0 0 1px rgba(191, 219, 254, 0.18),
+    0 30px 80px rgba(37, 99, 235, 0.35);
 }
 
-.auth-feature-chip.feature-tl {
+.auth-glass-orb-core {
+  position: absolute;
+  inset: 18%;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle at 45% 40%,
+    rgba(255, 255, 255, 0.55),
+    rgba(125, 211, 252, 0.35) 55%,
+    transparent 75%
+  );
+  filter: blur(6px);
+  opacity: 0.9;
+}
+
+.dark .auth-glass-orb-core {
+  background: radial-gradient(
+    circle at 45% 40%,
+    rgba(96, 165, 250, 0.7),
+    rgba(29, 78, 216, 0.25) 55%,
+    transparent 75%
+  );
+}
+
+.auth-glass-orb-frost {
+  position: absolute;
   left: 0;
-  top: 12%;
-  animation-delay: 0s;
-}
-
-.auth-feature-chip.feature-tr {
   right: 0;
-  top: 18%;
-  animation-delay: 0.8s;
+  bottom: 0;
+  height: 52%;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.18) 28%,
+    rgba(191, 219, 254, 0.45) 100%
+  );
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  opacity: 0.9;
 }
 
-.auth-feature-chip.feature-bl {
-  left: 2%;
-  bottom: 18%;
-  animation-delay: 1.4s;
+.dark .auth-glass-orb-frost {
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(15, 23, 42, 0.15) 30%,
+    rgba(2, 6, 23, 0.45) 100%
+  );
 }
 
-.auth-feature-chip.feature-br {
-  right: 2%;
+.auth-glass-orb-caustic {
+  position: absolute;
+  left: 12%;
+  right: 12%;
   bottom: 14%;
-  animation-delay: 2s;
+  height: 34%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.35), transparent 70%);
+  filter: blur(4px);
+  opacity: 0.85;
+  animation: auth-glass-caustic 6s ease-in-out infinite;
 }
 
-.auth-globe-stage {
-  transform-style: preserve-3d;
-  perspective: 900px;
+.dark .auth-glass-orb-caustic {
+  background: radial-gradient(ellipse at 50% 0%, rgba(125, 211, 252, 0.28), transparent 70%);
 }
 
-.auth-orbit {
+.auth-glass-orb-specular {
+  position: absolute;
+  top: 12%;
+  left: 18%;
+  width: 34%;
+  height: 22%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at 30% 30%,
+    rgba(255, 255, 255, 0.95),
+    rgba(255, 255, 255, 0.28) 45%,
+    transparent 70%
+  );
+  filter: blur(1px);
+  transform: rotate(-18deg);
+  animation: auth-glass-shine 8s ease-in-out infinite;
+}
+
+.auth-glass-orb-rim {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.35),
+    inset 0 -24px 32px rgba(30, 64, 175, 0.12);
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.35) 0%,
+    transparent 28%,
+    transparent 62%,
+    rgba(30, 64, 175, 0.12) 100%
+  );
+}
+
+/* Ground shadow — stays on the floor and reacts to bounce height */
+.auth-glass-ground-shadow {
   position: absolute;
   left: 50%;
-  top: 50%;
-  border-radius: 9999px;
-  border: 1px solid rgba(125, 211, 252, 0.28);
-  box-shadow: 0 0 18px rgba(56, 189, 248, 0.12);
-  transform: translate(-50%, -50%) rotateX(var(--orbit-tilt, 68deg))
-    rotateZ(var(--orbit-yaw, 0deg));
+  bottom: 16%;
+  z-index: 0;
+  width: calc(var(--orb-size) * 0.92);
+  height: 9%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(30, 64, 175, 0.42) 0%,
+    rgba(30, 64, 175, 0.18) 45%,
+    transparent 72%
+  );
+  filter: blur(7px);
+  transform: translateX(-50%) scale(1);
   transform-origin: center;
-  animation: auth-orbit-spin linear infinite;
+  animation: auth-glass-shadow 3.2s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
+  pointer-events: none;
 }
 
-.auth-orbit-a {
-  width: 78%;
-  height: 78%;
-  --orbit-tilt: 68deg;
-  --orbit-yaw: 0deg;
-  animation-duration: 18s;
+.dark .auth-glass-ground-shadow {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(2, 6, 23, 0.75) 0%,
+    rgba(2, 6, 23, 0.35) 48%,
+    transparent 72%
+  );
 }
 
-.auth-orbit-b {
-  width: 92%;
-  height: 92%;
-  border-color: rgba(96, 165, 250, 0.22);
-  --orbit-tilt: 68deg;
-  --orbit-yaw: 35deg;
-  animation-duration: 26s;
-  animation-direction: reverse;
-}
-
-.auth-orbit-c {
-  width: 104%;
-  height: 104%;
-  border-color: rgba(147, 197, 253, 0.16);
-  --orbit-tilt: 68deg;
-  --orbit-yaw: -20deg;
-  animation-duration: 34s;
-}
-
-.auth-orbit-dot {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 8px;
-  height: 8px;
-  margin: -4px 0 0 -4px;
-  border-radius: 9999px;
-  background: #7dd3fc;
-  box-shadow: 0 0 12px rgba(125, 211, 252, 0.9);
-  animation: auth-orbit-dot linear infinite;
-  transform-origin: center;
-}
-
-.auth-orbit-dot-a {
-  animation-duration: 18s;
-  --orbit-r: 118px;
-}
-
-.auth-orbit-dot-b {
-  animation-duration: 26s;
-  animation-direction: reverse;
-  --orbit-r: 140px;
-  background: #60a5fa;
-}
-
-.auth-orbit-dot-c {
-  animation-duration: 34s;
-  --orbit-r: 158px;
-  background: #38bdf8;
-}
-
-.auth-globe {
-  animation: auth-globe-pulse 6s ease-in-out infinite;
-}
-
-.auth-globe-sphere {
-  background: radial-gradient(circle at 30% 28%, #1e3a8a, #020617 70%);
-  box-shadow:
-    inset -18px -10px 40px rgba(2, 6, 23, 0.65),
-    inset 10px 8px 24px rgba(125, 211, 252, 0.18),
-    0 0 40px rgba(56, 189, 248, 0.25);
-}
-
-.auth-globe-map {
-  background-image: url("/images/earth-night.jpg");
-  background-size: 145% 145%;
-  background-position: 42% 48%;
-  opacity: 0.95;
-  animation: auth-globe-drift 28s ease-in-out infinite alternate;
-  filter: saturate(1.2) contrast(1.1) brightness(1.08);
-}
-
-.auth-globe-shine {
-  background:
-    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.28), transparent 32%),
-    linear-gradient(105deg, transparent 40%, rgba(2, 6, 23, 0.35) 70%);
-  animation: auth-shine-sweep 7s ease-in-out infinite;
-}
-
-.auth-globe-atmosphere {
-  border: 1px solid rgba(125, 211, 252, 0.35);
-  box-shadow:
-    0 0 30px rgba(56, 189, 248, 0.35),
-    inset 0 0 24px rgba(56, 189, 248, 0.12);
-  animation: auth-atmosphere 4.5s ease-in-out infinite;
-}
-
-.auth-globe-halo {
-  background: radial-gradient(circle, rgba(56, 189, 248, 0.22), transparent 68%);
-  animation: auth-halo 5s ease-in-out infinite;
-}
-
-@keyframes auth-globe-drift {
-  from {
-    background-position: 34% 46%;
-    transform: scale(1);
-  }
-  to {
-    background-position: 58% 52%;
-    transform: scale(1.06);
-  }
-}
-
-@keyframes auth-shine-sweep {
+@keyframes auth-glass-bounce {
   0%,
   100% {
-    opacity: 0.85;
+    transform: translateY(22px) scale(1.02, 0.96);
+  }
+  20% {
+    transform: translateY(8px) scale(1.01, 0.98);
+  }
+  50% {
+    transform: translateY(-52px) scale(0.98, 1.03);
+  }
+  72% {
+    transform: translateY(4px) scale(1.01, 0.98);
+  }
+}
+
+@keyframes auth-glass-person-reveal {
+  /* Hidden while ball is down / rising / falling */
+  0%,
+  36%,
+  62%,
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--angle)) translateY(0)
+      rotate(calc(-1 * var(--angle))) scale(0.4);
+  }
+  /* Only visible at the upside peak of the jump */
+  46%,
+  52% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(var(--angle))
+      translateY(calc(-1 * var(--icon-orbit))) rotate(calc(-1 * var(--angle)))
+      scale(1);
+  }
+}
+
+@keyframes auth-glass-shadow {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: translateX(-50%) scale(1.05, 1);
+    filter: blur(5px);
+  }
+  50% {
+    opacity: 0.28;
+    transform: translateX(-50%) scale(1.55, 0.7);
+    filter: blur(12px);
+  }
+}
+
+@keyframes auth-glass-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: scale(1);
   }
   50% {
     opacity: 1;
+    transform: scale(1.04);
   }
 }
 
-@keyframes auth-orbit-spin {
-  from {
-    transform: translate(-50%, -50%) rotateX(var(--orbit-tilt)) rotateZ(var(--orbit-yaw));
-  }
-  to {
-    transform: translate(-50%, -50%) rotateX(var(--orbit-tilt))
-      rotateZ(calc(var(--orbit-yaw) + 360deg));
-  }
-}
-
-@keyframes auth-orbit-dot {
-  from {
-    transform: rotateX(68deg) rotateZ(0deg) translateX(var(--orbit-r));
-  }
-  to {
-    transform: rotateX(68deg) rotateZ(360deg) translateX(var(--orbit-r));
-  }
-}
-
-@keyframes auth-float {
+@keyframes auth-glass-drift {
   0%,
   100% {
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0) scale(1);
   }
   50% {
-    transform: translateY(-8px);
+    transform: translate3d(3%, -2%, 0) scale(1.05);
   }
 }
 
-@keyframes auth-globe-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.02);
-  }
-}
-
-@keyframes auth-atmosphere {
+@keyframes auth-glass-shine {
   0%,
   100% {
     opacity: 0.75;
@@ -687,15 +975,15 @@
   }
 }
 
-@keyframes auth-halo {
+@keyframes auth-glass-caustic {
   0%,
   100% {
-    opacity: 0.55;
-    transform: scale(1);
+    opacity: 0.65;
+    transform: scaleX(1);
   }
   50% {
-    opacity: 0.9;
-    transform: scale(1.04);
+    opacity: 0.95;
+    transform: scaleX(1.04);
   }
 }
 
@@ -768,16 +1056,19 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .auth-globe-map,
-  .auth-globe-shine,
-  .auth-orbit,
-  .auth-orbit-dot,
-  .auth-feature-chip,
-  .auth-globe,
-  .auth-globe-atmosphere,
-  .auth-globe-halo,
+  .auth-glass-aurora,
+  .auth-glass-orb-cluster,
+  .auth-glass-orb-glow,
+  .auth-glass-orb-specular,
+  .auth-glass-orb-caustic,
+  .auth-glass-person,
+  .auth-glass-ground-shadow,
   .auth-logo-shine::after {
     animation: none !important;
+  }
+
+  .auth-glass-person {
+    opacity: 0 !important;
   }
 
   .sidebar-nav-icon,

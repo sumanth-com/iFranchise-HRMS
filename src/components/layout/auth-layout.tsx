@@ -1,35 +1,127 @@
+"use client";
+
 import Image from "next/image";
-import { type ReactNode } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
+import { User } from "lucide-react";
+
+import brandLogo from "@/assets/Logo.png";
+import { AuthThemeToggle } from "@/components/auth/auth-theme-toggle";
 
 type AuthLayoutProps = {
   children: ReactNode;
 };
 
-/** Compressed public hero (replaces ~1.4MB PNG static import). */
-const AUTH_HERO_IMAGE = "/images/auth-hero.jpg";
+/** 7 icons evenly spaced on a circle around the orb (degrees from top). */
+const PEOPLE = [
+  { angle: "0deg" },
+  { angle: "51.428deg" },
+  { angle: "102.857deg" },
+  { angle: "154.286deg" },
+  { angle: "205.714deg" },
+  { angle: "257.143deg" },
+  { angle: "308.571deg" },
+] as const;
+
+function AuthGlassOrb() {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  return (
+    <div className="auth-glass-stage" suppressHydrationWarning>
+      <div className="auth-glass-brand">
+        <div className="auth-logo-shine auth-glass-brand-mark">
+          <Image
+            src={brandLogo}
+            alt=""
+            width={52}
+            height={52}
+            priority
+            className="relative z-0 size-full object-contain"
+          />
+        </div>
+        <p className="auth-glass-brand-name">iFranchise</p>
+      </div>
+
+      <div className="auth-glass-aurora auth-glass-aurora-a" aria-hidden />
+      <div className="auth-glass-aurora auth-glass-aurora-b" aria-hidden />
+      <div className="auth-glass-aurora auth-glass-aurora-c" aria-hidden />
+      <div className="auth-glass-grid" aria-hidden />
+
+      <div className="auth-glass-stage-center" aria-hidden>
+        {mounted ? (
+          <div className="auth-glass-bounce">
+            <div className="auth-glass-orb-cluster">
+              <div className="auth-glass-people">
+                {PEOPLE.map((person, index) => (
+                  <span
+                    key={index}
+                    className="auth-glass-person"
+                    style={{ "--angle": person.angle } as CSSProperties}
+                  >
+                    <User className="size-4" strokeWidth={2.4} />
+                  </span>
+                ))}
+              </div>
+
+              <div className="auth-glass-orb">
+                <div className="auth-glass-orb-glow" />
+                <div className="auth-glass-orb-body">
+                  <div className="auth-glass-orb-core" />
+                  <div className="auth-glass-orb-frost" />
+                  <div className="auth-glass-orb-caustic" />
+                  <div className="auth-glass-orb-specular" />
+                  <div className="auth-glass-orb-rim" />
+                </div>
+              </div>
+            </div>
+
+            <div className="auth-glass-ground-shadow" />
+          </div>
+        ) : (
+          <div className="auth-glass-bounce auth-glass-bounce--static">
+            <div className="auth-glass-orb">
+              <div className="auth-glass-orb-glow" />
+              <div className="auth-glass-orb-body">
+                <div className="auth-glass-orb-core" />
+                <div className="auth-glass-orb-frost" />
+                <div className="auth-glass-orb-caustic" />
+                <div className="auth-glass-orb-specular" />
+                <div className="auth-glass-orb-rim" />
+              </div>
+            </div>
+            <div className="auth-glass-ground-shadow" />
+          </div>
+        )}
+      </div>
+
+      <div className="auth-glass-tagline">
+        <p className="auth-glass-tagline-title">iFranchise HRMS</p>
+        <p className="auth-glass-tagline-copy">
+          Your complete people platform — attendance, leave, payroll, and
+          performance in one secure workplace system.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export function AuthLayout({ children }: AuthLayoutProps) {
   return (
-    <div className="relative flex h-[100dvh] w-screen max-w-[100vw] overflow-hidden bg-[#020b1f]">
-      {/* Globe fills left half */}
-      <div className="absolute inset-0 lg:right-1/2">
-        <Image
-          src={AUTH_HERO_IMAGE}
-          alt=""
-          fill
-          priority
-          quality={75}
-          sizes="(max-width: 1024px) 100vw, 50vw"
-          className="object-cover object-left"
-        />
-      </div>
+    <div className="relative flex h-[100dvh] w-screen max-w-[100vw] overflow-hidden bg-background">
+      <aside className="relative hidden min-w-0 flex-1 p-3 lg:block xl:p-4">
+        <AuthGlassOrb />
+      </aside>
 
-      <div className="relative hidden min-w-0 flex-1 lg:block" aria-hidden />
+      <main className="relative z-10 flex h-full w-full flex-col bg-background lg:w-[48%] lg:shrink-0 lg:border-l lg:border-border/50">
+        <div className="absolute top-4 right-4 z-20 sm:top-5 sm:right-5">
+          <AuthThemeToggle />
+        </div>
 
-      {/* Right side — ~50% like the design, a bit wider content */}
-      <main className="relative z-10 flex h-full w-full flex-col bg-white lg:w-1/2 lg:shrink-0 lg:shadow-[-24px_0_48px_rgba(0,0,0,0.2)]">
-        <div className="flex min-h-0 flex-1 flex-col justify-center overflow-y-auto px-10 py-10 sm:px-14 lg:px-16 xl:px-20">
-          <div className="mx-auto w-full max-w-[480px]">{children}</div>
+        <div className="flex min-h-0 flex-1 flex-col justify-center overflow-y-auto px-8 py-12 sm:px-12 lg:px-14 xl:px-16">
+          <div className="mx-auto w-full max-w-[400px]">{children}</div>
         </div>
       </main>
     </div>

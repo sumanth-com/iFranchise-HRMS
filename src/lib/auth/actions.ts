@@ -5,9 +5,13 @@ import { redirect } from "next/navigation";
 
 import {
   DEFAULT_SESSION_MAX_AGE,
+  IDLE_ACTIVITY_COOKIE,
   REMEMBER_ME_MAX_AGE,
   AUTH_ROUTES,
 } from "@/lib/auth/constants";
+import {
+  resolveActivityCookieMaxAge,
+} from "@/lib/auth/idle-session";
 import {
   getAuthErrorMessage,
   mapSupabaseAuthError,
@@ -44,6 +48,44 @@ async function applyRememberMePreference(rememberMe: boolean) {
     secure: process.env.NODE_ENV === "production",
     maxAge: rememberMe ? REMEMBER_ME_MAX_AGE : DEFAULT_SESSION_MAX_AGE,
   });
+}
+
+async function touchIdleActivityCookie(rememberMe?: boolean) {
+  const cookieStore = await cookies();
+  let resolvedRememberMe = rememberMe;
+
+  if (resolvedRememberMe === undefined) {
+    resolvedRememberMe = cookieStore.get("remember_me")?.value === "1";
+  }
+
+  cookieStore.set(IDLE_ACTIVITY_COOKIE, Date.now().toString(), {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: resolveActivityCookieMaxAge(resolvedRememberMe),
+  });
+}
+
+export async function touchSessionActivityAction(): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return;
+
+  await touchIdleActivityCookie();
+}
+
+export async function idleSessionLogoutAction(): Promise<void> {
+  const supabase = await createClient();
+  const cookieStore = await cookies();
+
+  cookieStore.delete(IDLE_ACTIVITY_COOKIE);
+  await supabase.auth.signOut();
+  await clearPermissionCacheCookie();
+  redirect(`${AUTH_ROUTES.login}?expired=1`);
 }
 
 export async function loginAction(
@@ -131,6 +173,7 @@ export async function loginAction(
     }
 
     await applyRememberMePreference(rememberMe);
+    await touchIdleActivityCookie(rememberMe);
 
     try {
       await recordEmployeeSuccessfulLogin(supabase, authData.user.id, email);
@@ -217,6 +260,8 @@ export async function logoutAction(): Promise<void> {
 
   await supabase.auth.signOut();
   await clearPermissionCacheCookie();
+  const cookieStore = await cookies();
+  cookieStore.delete(IDLE_ACTIVITY_COOKIE);
   redirect(`${AUTH_ROUTES.login}?signedOut=1`);
 }
 

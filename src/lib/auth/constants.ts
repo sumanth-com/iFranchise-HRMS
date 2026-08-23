@@ -25,6 +25,21 @@ export const PUBLIC_ROUTES = [
 
 export const LOGOUT_BROADCAST_KEY = "ifranchise-hrms-logout";
 
+/** Cross-tab idle activity sync (client localStorage) */
+export const IDLE_ACTIVITY_STORAGE_KEY = "ifranchise-hrms-last-activity";
+
+/** Cross-tab idle logout broadcast */
+export const IDLE_LOGOUT_BROADCAST_KEY = "ifranchise-hrms-idle-logout";
+
+/** Remember-me email only — never store passwords here */
+export const REMEMBERED_EMAIL_STORAGE_KEY = "ifranchise-hrms-remembered-email";
+
+/** HttpOnly cookie tracking last meaningful activity (server-enforced idle timeout) */
+export const IDLE_ACTIVITY_COOKIE = "hrms_last_activity";
+
+/** 2 hours of inactivity before silent session expiration */
+export const IDLE_SESSION_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+
 /** 30 days when "Remember me" is checked */
 export const REMEMBER_ME_MAX_AGE = 60 * 60 * 24 * 30;
 

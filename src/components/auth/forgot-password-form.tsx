@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Mail, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button, buttonVariants } from "@/components/common/button";
@@ -18,6 +19,12 @@ import {
   forgotPasswordSchema,
   type ForgotPasswordInput,
 } from "@/lib/validations/auth";
+
+const fieldClass =
+  "h-11 rounded-full border-sky-200/80 bg-sky-50/80 pl-10 text-sm text-foreground shadow-none placeholder:text-muted-foreground focus-visible:border-sky-500 focus-visible:ring-sky-500/25 dark:border-border/80 dark:bg-muted/40";
+
+const submitClass =
+  "h-11 w-full rounded-full bg-gradient-to-r from-sky-500 to-blue-600 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(37,99,235,0.35)] hover:from-sky-400 hover:to-blue-500";
 
 export function ForgotPasswordForm() {
   const [isPending, startTransition] = useTransition();
@@ -65,22 +72,19 @@ export function ForgotPasswordForm() {
 
   if (isSubmitted) {
     return (
-      <div className="space-y-6">
-        <div className="space-y-1.5">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+      <div className="flex flex-col gap-6">
+        <div className="space-y-1.5 text-center">
+          <h1 className="text-[1.75rem] font-semibold tracking-tight text-foreground">
             Check your email
           </h1>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-muted-foreground">
             If an account exists for that email, you will receive password reset
             instructions shortly.
           </p>
         </div>
         <Link
           href={AUTH_ROUTES.login}
-          className={cn(
-            buttonVariants({ variant: "outline" }),
-            "h-11 w-full rounded-xl",
-          )}
+          className={cn(buttonVariants({ variant: "outline" }), "h-11 w-full rounded-full")}
         >
           Back to sign in
         </Link>
@@ -89,46 +93,59 @@ export function ForgotPasswordForm() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-1.5">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+    <div className="flex flex-col gap-6">
+      <div className="space-y-1.5 text-center">
+        <h1 className="text-[1.75rem] font-semibold tracking-tight text-foreground">
           Forgot password
         </h1>
-        <p className="text-sm text-slate-500">
-          Enter the email HR registered for your account and we will send you a reset link.
+        <p className="text-sm text-muted-foreground">
+          Enter the email HR registered for your account and we will send a reset link.
         </p>
       </div>
 
+      <div className="flex items-start gap-3 rounded-2xl border border-sky-200/90 bg-sky-50/90 px-4 py-3.5 text-left shadow-sm dark:border-sky-500/25 dark:bg-sky-500/10">
+        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 text-sky-600 dark:bg-sky-400/15 dark:text-sky-300">
+          <ShieldCheck className="size-4" strokeWidth={2.25} />
+        </span>
+        <div className="min-w-0 space-y-0.5">
+          <p className="text-sm font-semibold text-sky-950 dark:text-sky-100">
+            Secure recovery
+          </p>
+          <p className="text-[13px] leading-snug text-slate-600 dark:text-slate-300">
+            Reset links are sent only to your registered workplace email.
+          </p>
+        </div>
+      </div>
+
       {formError ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {formError}
         </div>
       ) : null}
 
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="email" className="text-sm font-medium text-slate-700">
+          <Label htmlFor="email" className="text-sm font-medium text-foreground/90">
             Email
           </Label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            placeholder="Enter your email"
-            disabled={isPending}
-            className="h-11 rounded-xl border-slate-200"
-            {...register("email")}
-          />
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              placeholder="Enter your email"
+              disabled={isPending}
+              className={fieldClass}
+              {...register("email")}
+            />
+          </div>
           {errors.email ? (
-            <p className="text-sm text-red-600">{errors.email.message}</p>
+            <p className="text-sm text-destructive">{errors.email.message}</p>
           ) : null}
         </div>
 
-        <Button
-          type="submit"
-          className="h-11 w-full rounded-xl bg-[#0f2f6d] text-sm font-semibold text-white hover:bg-[#0c275c]"
-          disabled={isPending}
-        >
+        <Button type="submit" className={submitClass} disabled={isPending}>
           {isPending ? "Sending..." : "Send reset link"}
         </Button>
 

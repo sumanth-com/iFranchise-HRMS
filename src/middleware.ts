@@ -2,6 +2,13 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { AUTH_ROUTES, PUBLIC_ROUTES } from "@/lib/auth/constants";
 import {
+  isIdleSessionExpired,
+  parseActivityTimestamp,
+  resolveActivityCookieMaxAge,
+  shouldRefreshActivityInMiddleware,
+  IDLE_ACTIVITY_COOKIE,
+} from "@/lib/auth/idle-session";
+import {
   attachPermissionCache,
   getCachedPermissionPayload,
 } from "@/lib/auth/permission-cache";
@@ -33,6 +40,48 @@ function isAuthRoute(pathname: string): boolean {
     pathname === AUTH_ROUTES.login ||
     pathname === AUTH_ROUTES.forgotPassword
   );
+}
+
+function touchIdleActivityIfNeeded(
+  request: NextRequest,
+  response: NextResponse,
+): void {
+  if (
+    !shouldRefreshActivityInMiddleware({
+      method: request.method,
+      pathname: request.nextUrl.pathname,
+      headers: request.headers,
+    })
+  ) {
+    return;
+  }
+
+  const rememberMe = request.cookies.get("remember_me")?.value === "1";
+  response.cookies.set(IDLE_ACTIVITY_COOKIE, Date.now().toString(), {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: resolveActivityCookieMaxAge(rememberMe),
+  });
+}
+
+async function signOutExpiredIdleSession(
+  request: NextRequest,
+  supabase: NonNullable<Awaited<ReturnType<typeof updateSession>>["supabase"]>,
+): Promise<NextResponse> {
+  try {
+    await supabase.auth.signOut();
+  } catch (error) {
+    console.error("[middleware] idle session sign-out failed", error);
+  }
+
+  const redirectUrl = request.nextUrl.clone();
+  redirectUrl.pathname = AUTH_ROUTES.login;
+  redirectUrl.search = "expired=1";
+  const redirectResponse = NextResponse.redirect(redirectUrl);
+  redirectResponse.cookies.delete(IDLE_ACTIVITY_COOKIE);
+  return redirectResponse;
 }
 
 export async function middleware(request: NextRequest) {
@@ -86,6 +135,22 @@ export async function middleware(request: NextRequest) {
 
     return NextResponse.redirect(redirectUrl);
   }
+
+  const lastActivity = parseActivityTimestamp(
+    request.cookies.get(IDLE_ACTIVITY_COOKIE)?.value,
+  );
+  if (lastActivity && isIdleSessionExpired(lastActivity)) {
+    if (supabase) {
+      return signOutExpiredIdleSession(request, supabase);
+    }
+
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = AUTH_ROUTES.login;
+    redirectUrl.search = "expired=1";
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  touchIdleActivityIfNeeded(request, supabaseResponse);
 
   if (pathname === AUTH_ROUTES.unauthorized) {
     return supabaseResponse;

@@ -26,6 +26,7 @@ import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { createClient } from "@/lib/supabase/client";
+import { useIdleSession } from "@/hooks/use-idle-session";
 import { UnsavedChangesProvider } from "@/providers/unsaved-changes-provider";
 import {
   hasAllPermissions,
@@ -88,6 +89,11 @@ type AuthProviderProps = {
   portalHome?: string;
   portalLabel?: string;
 };
+
+function IdleSessionManager() {
+  useIdleSession();
+  return null;
+}
 
 export function AuthProvider({
   children,
@@ -236,6 +242,7 @@ export function AuthProvider({
 
   return (
     <AuthContext.Provider value={value}>
+      <IdleSessionManager />
       <UnsavedChangesProvider>{children}</UnsavedChangesProvider>
     </AuthContext.Provider>
   );
