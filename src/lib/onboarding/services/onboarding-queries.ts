@@ -170,14 +170,19 @@ export async function getOnboardingDashboardStats(
 export async function listOnboardingDesignationFilters(
   supabase: AuthSupabaseClient,
   organizationId: string,
+  departmentIds?: string[],
 ): Promise<{ id: string; title: string }[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .schema("hrms")
     .from("onboarding_cases")
     .select("designation_id, designations:designation_id (id, title)")
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
     .not("designation_id", "is", null);
+
+  if (departmentIds?.length) query = query.in("department_id", departmentIds);
+
+  const { data, error } = await query;
 
   if (error) throw new Error(error.message);
 
