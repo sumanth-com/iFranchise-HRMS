@@ -58,6 +58,15 @@ describe("working calendar", () => {
   });
 });
 
+describe("explicit half-day request", () => {
+  it("charges 0.5 days for a half-day checkbox on a working day", () => {
+    const result = duration("2026-08-24", "2026-08-24", [], true);
+    assert.equal(result.workingDays, 0);
+    assert.equal(result.halfDays, 1);
+    assert.equal(result.totalLeaveDays, 0.5);
+  });
+});
+
 describe("sandwich leave", () => {
   it("includes Sunday when Friday leave connects through a 2nd Saturday half day", () => {
     const result = duration("2026-09-11", "2026-09-11");

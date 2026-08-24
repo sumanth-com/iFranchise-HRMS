@@ -108,7 +108,7 @@ export function ApplyLeaveDialog({
       title={isTeam ? "Apply leave" : "Apply for Leave"}
       description={
         isTeam
-          ? "Create a leave request for an employee. It will follow the normal approval workflow."
+          ? "Create a leave request for an employee. It will be sent to HR for approval."
           : getLeaveApplyDialogDescription(
               applyContext?.applicantRoleCodes ?? [],
               applyContext?.approvalLevels ?? 2,

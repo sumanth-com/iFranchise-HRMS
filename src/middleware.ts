@@ -29,10 +29,45 @@ import { SYSTEM_ADMIN_PERMISSION } from "@/lib/system-admin/constants";
 import { isSystemAdminPath } from "@/lib/system-admin/paths";
 import { updateSession } from "@/lib/supabase/middleware";
 
+/** Bound permission RPCs so a slow DB cannot hold Edge middleware open. */
+const MIDDLEWARE_PERMISSION_TIMEOUT_MS = 4_000;
+
 function isPublicRoute(pathname: string): boolean {
   return PUBLIC_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`),
   );
+}
+
+async function withMiddlewareTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string,
+): Promise<T | null> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const result = await Promise.race([
+      promise,
+      new Promise<null>((resolve) => {
+        timeoutId = setTimeout(() => {
+          console.error("[middleware] operation timed out", {
+            label,
+            timeoutMs,
+          });
+          resolve(null);
+        }, timeoutMs);
+      }),
+    ]);
+    return result;
+  } catch (error) {
+    console.error("[middleware] operation failed", {
+      label,
+      name: error instanceof Error ? error.name : "unknown",
+      message: error instanceof Error ? error.message : "unknown",
+    });
+    return null;
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
 }
 
 function isAuthRoute(pathname: string): boolean {
@@ -90,8 +125,27 @@ export async function middleware(request: NextRequest) {
 
   if (pathname === "/") {
     if (user) {
+      let destination: string = HR_PORTAL_HOME;
+      try {
+        const cached = await getCachedPermissionPayload(request, user.id);
+        if (cached) {
+          destination = getPortalRedirectPath(
+            cached.codes,
+            (cached.roleCodes ?? []).map((code) => ({
+              id: "",
+              name: code,
+              code,
+              isSystemRole: true,
+              status: "active" as const,
+            })),
+          );
+        }
+      } catch (error) {
+        console.error("[middleware] home portal cache read failed", error);
+      }
+
       const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = HR_PORTAL_HOME;
+      redirectUrl.pathname = destination;
       redirectUrl.search = "";
       return NextResponse.redirect(redirectUrl);
     }
@@ -113,16 +167,55 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isPublicRoute(pathname)) {
-    if (user && isAuthRoute(pathname) && request.method === "GET") {
-      const [permissionCodes, portalRoute, roleCodes] = await Promise.all([
-        resolveUserPermissionCodes(supabase, user.id),
-        resolveUserPortalRoute(supabase, user.id),
-        resolveUserRoleCodes(supabase, user.id),
-      ]);
+    if (user && supabase && isAuthRoute(pathname) && request.method === "GET") {
+      const cached = await getCachedPermissionPayload(request, user.id).catch(
+        () => null,
+      );
+      if (cached) {
+        const redirectUrl = request.nextUrl.clone();
+        redirectUrl.pathname = getPortalRedirectPath(
+          cached.codes,
+          (cached.roleCodes ?? []).map((code) => ({
+            id: "",
+            name: code,
+            code,
+            isSystemRole: true,
+            status: "active" as const,
+          })),
+        );
+        redirectUrl.search = "";
+        return NextResponse.redirect(redirectUrl);
+      }
+
+      const resolved = await withMiddlewareTimeout(
+        Promise.all([
+          resolveUserPermissionCodes(supabase, user.id),
+          resolveUserPortalRoute(supabase, user.id),
+          resolveUserRoleCodes(supabase, user.id),
+        ]),
+        MIDDLEWARE_PERMISSION_TIMEOUT_MS,
+        "public-auth-portal-redirect",
+      );
+
+      if (!resolved) {
+        // Session is valid; avoid 504. Layouts still enforce auth.
+        const redirectUrl = request.nextUrl.clone();
+        redirectUrl.pathname = HR_PORTAL_HOME;
+        redirectUrl.search = "";
+        return NextResponse.redirect(redirectUrl);
+      }
+
+      const [permissionCodes, portalRoute, roleCodes] = resolved;
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = getPortalRedirectPath(
         permissionCodes,
-        roleCodes.map((code) => ({ id: "", name: code, code, isSystemRole: true, status: "active" })),
+        roleCodes.map((code) => ({
+          id: "",
+          name: code,
+          code,
+          isSystemRole: true,
+          status: "active" as const,
+        })),
         portalRoute,
       );
       redirectUrl.search = "";
@@ -132,7 +225,7 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
-  if (!user) {
+  if (!user || !supabase) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = AUTH_ROUTES.login;
     redirectUrl.searchParams.set(
@@ -176,9 +269,19 @@ export async function middleware(request: NextRequest) {
 
   if (cachedPermissionPayload) {
     const cachedPermissionCodes = cachedPermissionPayload.codes;
-    const accountAllowed =
-      cachedPermissionPayload.accountAllowed ??
-      await userAccountAllowsPortalAccess(supabase, user.id);
+    let accountAllowed = cachedPermissionPayload.accountAllowed;
+    if (typeof accountAllowed !== "boolean") {
+      const allowed = await withMiddlewareTimeout(
+        userAccountAllowsPortalAccess(supabase, user.id),
+        MIDDLEWARE_PERMISSION_TIMEOUT_MS,
+        "cached-account-allowed",
+      );
+      if (allowed == null) {
+        // Session is valid; avoid 504. Portal layouts still require a live profile.
+        return supabaseResponse;
+      }
+      accountAllowed = allowed;
+    }
     if (!accountAllowed) {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = AUTH_ROUTES.login;
@@ -199,7 +302,15 @@ export async function middleware(request: NextRequest) {
 
     let roleCodes = cachedPermissionPayload.roleCodes;
     if (!Array.isArray(roleCodes) || roleCodes.length === 0) {
-      roleCodes = await resolveUserRoleCodes(supabase, user.id);
+      const resolvedRoles = await withMiddlewareTimeout(
+        resolveUserRoleCodes(supabase, user.id),
+        MIDDLEWARE_PERMISSION_TIMEOUT_MS,
+        "cached-role-codes",
+      );
+      if (!resolvedRoles) {
+        return supabaseResponse;
+      }
+      roleCodes = resolvedRoles;
       try {
         await attachPermissionCache(
           supabaseResponse,
@@ -225,7 +336,11 @@ export async function middleware(request: NextRequest) {
     }
 
     if (!canAccessPortalPath(pathname, cachedPermissionCodes, roleCodes)) {
-      const portalRoute = await resolveUserPortalRoute(supabase, user.id);
+      const portalRoute = await withMiddlewareTimeout(
+        resolveUserPortalRoute(supabase, user.id),
+        MIDDLEWARE_PERMISSION_TIMEOUT_MS,
+        "cached-portal-route",
+      );
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname =
         normalizePortalRoute(portalRoute) ??
@@ -237,11 +352,23 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
-  const [accountAllowed, permissionCodes, roleCodes] = await Promise.all([
-    userAccountAllowsPortalAccess(supabase, user.id),
-    resolveUserPermissionCodes(supabase, user.id),
-    resolveUserRoleCodes(supabase, user.id),
-  ]);
+  const bootstrapped = await withMiddlewareTimeout(
+    Promise.all([
+      userAccountAllowsPortalAccess(supabase, user.id),
+      resolveUserPermissionCodes(supabase, user.id),
+      resolveUserRoleCodes(supabase, user.id),
+    ]),
+    MIDDLEWARE_PERMISSION_TIMEOUT_MS,
+    "permission-bootstrap",
+  );
+
+  if (!bootstrapped) {
+    // Authenticated session is present; do not hold Edge open for a slow DB.
+    // PortalShellLayout + RLS still enforce access on the page itself.
+    return supabaseResponse;
+  }
+
+  const [accountAllowed, permissionCodes, roleCodes] = bootstrapped;
   if (!accountAllowed) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = AUTH_ROUTES.login;
@@ -282,7 +409,11 @@ export async function middleware(request: NextRequest) {
   }
 
   if (!canAccessPortalPath(pathname, permissionCodes, roleCodes)) {
-    const portalRoute = await resolveUserPortalRoute(supabase, user.id);
+    const portalRoute = await withMiddlewareTimeout(
+      resolveUserPortalRoute(supabase, user.id),
+      MIDDLEWARE_PERMISSION_TIMEOUT_MS,
+      "portal-route",
+    );
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname =
       normalizePortalRoute(portalRoute) ??

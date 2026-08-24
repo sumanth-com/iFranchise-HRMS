@@ -191,7 +191,7 @@ async function createApprovalSteps(
   profile: UserProfile,
   leaveRequestId: string,
   employeeId: string,
-  approvalLevels: number,
+  _approvalLevels: number,
 ) {
   const organizationId = profile.employee.organizationId;
   const applicantRoles = await getEmployeeRoleCodes(supabase, employeeId);
@@ -212,45 +212,21 @@ async function createApprovalSteps(
       steps.push({ approverId: ceoId, level: 1 });
     }
   } else {
-    const managerId = await getEmployeeReportingManagerId(supabase, employeeId);
-    const excludeFromHr = [employeeId, managerId].filter(
-      (id): id is string => Boolean(id),
-    );
     const hrId = await getHrApproverEmployeeId(supabase, organizationId, {
       employeeId,
-      excludeEmployeeIds: excludeFromHr,
+      excludeEmployeeIds: [employeeId],
     });
-    const wantsTwoLevel = approvalLevels >= 2;
-    const hasDistinctManager =
-      Boolean(managerId) && managerId !== employeeId;
-
-    if (wantsTwoLevel && hasDistinctManager) {
-      if (!hrId) {
-        console.error("[leave] HR approver routing failed (fail-closed)", {
-          organizationId,
-          employeeId,
-          managerId,
-          leaveRequestId,
-          reason: "missing_or_invalid_assigned_and_default_hr",
-        });
-        throw new Error(NO_HR_APPROVER_CONFIGURED_MESSAGE);
-      }
-      steps.push({ approverId: managerId!, level: 1 });
-      steps.push({ approverId: hrId, level: 2 });
-    } else if (hasDistinctManager) {
-      steps.push({ approverId: managerId!, level: 1 });
-    } else if (hrId) {
-      steps.push({ approverId: hrId, level: 1 });
-    } else {
+    if (!hrId) {
       console.error("[leave] HR approver routing failed (fail-closed)", {
         organizationId,
         employeeId,
-        managerId,
         leaveRequestId,
-        reason: "no_manager_and_no_valid_hr",
+        reason: "no_eligible_hr_approver",
       });
       throw new Error(NO_HR_APPROVER_CONFIGURED_MESSAGE);
     }
+    // Level 2 keeps the existing "HR Approval" stage label.
+    steps.push({ approverId: hrId, level: 2 });
   }
 
   const { error } = await supabase.schema("hrms").from("leave_approvals").insert(

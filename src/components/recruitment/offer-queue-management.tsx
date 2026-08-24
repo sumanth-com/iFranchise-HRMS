@@ -11,7 +11,7 @@ import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { OfferLetterWorkspace } from "@/components/recruitment/offer-letter-workspace";
 import { RecruitmentPagination } from "@/components/recruitment/recruitment-pagination";
 import { RecruitmentStatusBadge } from "@/components/recruitment/recruitment-status-badge";
-import { getOfferWorkspaceCandidateAction } from "@/lib/recruitment/actions";
+import { getOfferWorkspaceCandidateAction } from "@/lib/recruitment/offer-workspace-actions";
 import {
   CANDIDATE_STAGE_LABELS,
   OFFER_QUEUE_FILTER_LABELS,

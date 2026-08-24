@@ -293,7 +293,7 @@ export function buildLeavePreviewMessages(input: {
     );
   }
   if (input.requiresManagerAndHr) {
-    messages.push("Approval required from Manager and HR");
+    messages.push("Approval required from HR");
   }
   if (input.leaveTypeCode.toUpperCase() === PERIOD_LEAVE_CODE) {
     messages.push("PL requests must be communicated to HR on the same day");

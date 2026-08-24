@@ -1289,7 +1289,8 @@ async function getEmployeeAssignedHrEmployeeId(
  * Deterministic HR leave approver routing (no arbitrary LIMIT 1):
  * 1. Employee.assigned_hr_employee_id (if valid eligible HR)
  * 2. Organization leave_rules.default_hr_approver_employee_id (if valid)
- * 3. null → caller must fail closed
+ * 3. First eligible HR Admin/Executive in the org (sorted by name)
+ * 4. null → caller must fail closed
  */
 export async function getHrApproverEmployeeId(
   _supabase: AuthSupabaseClient,
@@ -1321,7 +1322,14 @@ export async function getHrApproverEmployeeId(
   const orgDefault = await getOrganizationDefaultHrApproverEmployeeId(
     organizationId,
   );
-  return tryCandidate(orgDefault);
+  const fromOrgDefault = await tryCandidate(orgDefault);
+  if (fromOrgDefault) return fromOrgDefault;
+
+  const eligibleHrs = await listEligibleHrLeaveApproverOptions(
+    organizationId,
+    options?.employeeId,
+  );
+  return eligibleHrs.find((hr) => !exclude.has(hr.id))?.id ?? null;
 }
 
 export async function listCeoLeaveApproverEmployeeIds(
