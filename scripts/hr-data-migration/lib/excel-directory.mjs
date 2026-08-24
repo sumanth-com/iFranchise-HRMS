@@ -23,14 +23,12 @@ function normalizeEmail(value) {
 function excelSerialOrDateToIso(value) {
   if (value == null || value === "") return null;
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    // Prefer calendar Y-M-D in local parts to avoid UTC day-shift for IST sheets
-    const y = value.getFullYear();
-    const m = String(value.getMonth() + 1).padStart(2, "0");
-    const d = String(value.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
+    // SheetJS often materializes Excel day values as previous-local-day ~23:59:50.
+    // Shift to noon before taking the UTC civil date to recover the intended sheet day.
+    const shifted = new Date(value.getTime() + 12 * 60 * 60 * 1000);
+    return shifted.toISOString().slice(0, 10);
   }
   if (typeof value === "number" && Number.isFinite(value)) {
-    // Excel serial → UTC date components (Sheets store civil dates)
     const utcDays = Math.floor(value - 25569);
     const date = new Date(utcDays * 86400 * 1000);
     const y = date.getUTCFullYear();

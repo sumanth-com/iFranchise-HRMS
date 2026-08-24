@@ -1,7 +1,4 @@
--- PROPOSED ONLY — do not apply until migration write phase is approved.
--- hrms.data_import_batches: audit trail for HR Excel imports.
--- Never store Aadhaar, PAN, DOB, full bank account numbers, or raw salary dumps here.
--- Store counts, warnings, and non-sensitive error codes only.
+-- Migration: data_import_batches for HR Excel import audit (no PII/bank payloads).
 
 CREATE TABLE IF NOT EXISTS hrms.data_import_batches (
   id uuid PRIMARY KEY DEFAULT public.new_uuid(),
@@ -31,3 +28,19 @@ CREATE INDEX IF NOT EXISTS data_import_batches_started_at_idx
 
 COMMENT ON TABLE hrms.data_import_batches IS
   'Import audit batches for HR data migrations. No sensitive PII/bank payloads.';
+
+ALTER TABLE hrms.data_import_batches ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS data_import_batches_select ON hrms.data_import_batches;
+CREATE POLICY data_import_batches_select
+  ON hrms.data_import_batches
+  FOR SELECT
+  TO authenticated
+  USING (
+    organization_id = hrms.current_user_organization_id()
+    AND (
+      hrms.user_has_permission('payroll.view')
+      OR hrms.user_has_permission('employee.edit')
+      OR hrms.user_has_permission('portal.ceo.access')
+    )
+  );
