@@ -18,7 +18,10 @@ import { DEFAULT_LEAVE_POLICY_DOCUMENT } from "@/lib/leave/leave-policy-defaults
 import { getLeaveSubmissionApprovalMessage } from "@/lib/leave/leave-approval-copy";
 import { previewLeaveApplication } from "@/lib/leave/services/leave-apply-preview";
 import { formatLeaveDate } from "@/lib/leave/services/leave-utils";
-import { formatLeaveDayCount } from "@/lib/leave/services/leave-usage";
+import {
+  formatLeaveDayCount,
+  formatLeaveDayUnit,
+} from "@/lib/leave/services/leave-usage";
 import type { LeaveDurationBreakdown } from "@/lib/leave/services/leave-calendar-engine";
 import type { LeaveApplyContext } from "@/types/leave";
 import { cn } from "@/lib/utils";
@@ -95,7 +98,7 @@ export function LeaveDurationBreakdownCard({
 }) {
   const rows = [
     { label: "Working days", value: breakdown.workingDays },
-    { label: "Half day", value: breakdown.halfDays },
+    { label: "Half day", value: breakdown.halfDays * 0.5 },
     { label: "Weekly holidays", value: breakdown.weeklyHolidays },
     { label: "Public holidays", value: breakdown.publicHolidays },
     { label: "Sandwich days", value: breakdown.sandwichDays },
@@ -108,7 +111,9 @@ export function LeaveDurationBreakdownCard({
         {rows.map((row) => (
           <div key={row.label} className="flex items-baseline justify-between gap-2">
             <dt className="text-xs text-muted-foreground">{row.label}</dt>
-            <dd className="font-medium tabular-nums">{row.value}</dd>
+            <dd className="font-medium tabular-nums">
+              {formatLeaveDayCount(row.value)}
+            </dd>
           </div>
         ))}
       </dl>
@@ -181,7 +186,7 @@ export function LeaveDurationPreview({
           <p className="text-lg font-semibold tabular-nums leading-tight">
             {formatLeaveDayCount(charged)}
             <span className="ml-1 text-xs font-normal text-muted-foreground">
-              {charged === 1 ? "day" : "days"}
+              {formatLeaveDayUnit(charged)}
             </span>
           </p>
         </div>
@@ -193,7 +198,7 @@ export function LeaveDurationPreview({
             {isHalfDay ? "Selected half day" : "Selected leave days"}
           </span>
           <span className="font-medium tabular-nums text-foreground">
-            {formatLeaveDayCount(selectedDays)}
+            {formatLeaveDayCount(selectedDays)} {formatLeaveDayUnit(selectedDays)}
           </span>
         </div>
         {hasSandwich ? (
@@ -225,7 +230,7 @@ export function LeaveDurationPreview({
         <div className="flex items-center justify-between gap-3 border-t pt-1.5">
           <span className="font-medium text-foreground">Total leave charged</span>
           <span className="font-semibold tabular-nums text-foreground">
-            {formatLeaveDayCount(charged)}
+            {formatLeaveDayCount(charged)} {formatLeaveDayUnit(charged)}
           </span>
         </div>
       </div>

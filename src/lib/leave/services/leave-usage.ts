@@ -9,7 +9,13 @@ export function roundLeaveDays(value: number) {
 }
 
 export function formatLeaveDayCount(value: number) {
-  return String(Math.round(roundLeaveDays(value)));
+  const rounded = roundLeaveDays(value);
+  if (Number.isInteger(rounded)) return String(rounded);
+  return String(rounded);
+}
+
+export function formatLeaveDayUnit(value: number) {
+  return Math.abs(roundLeaveDays(value)) === 1 ? "day" : "days";
 }
 
 /** Monthly quota from a yearly pool. Small yearly pools (OH, PL) stay available in the month. */

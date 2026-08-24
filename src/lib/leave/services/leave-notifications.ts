@@ -28,7 +28,7 @@ export async function notifyLeaveSubmitted(
     title: "Leave request submitted",
     message: executiveApplicant
       ? "Your leave request has been submitted and is pending CEO approval."
-      : "Your leave request has been submitted and is pending approval.",
+      : "Your leave request has been submitted and is pending HR approval.",
     notificationType: "leave_submitted",
     module: "leave",
     priority: "medium",
@@ -73,18 +73,32 @@ export async function notifyLeaveSubmitted(
     return;
   }
 
-  const managerId = await getEmployeeReportingManagerId(supabase, employeeId);
-  if (managerId && managerId !== employeeId) {
+  const { data: pendingApprovals, error } = await supabase
+    .schema("hrms")
+    .from("leave_approvals")
+    .select("approver_employee_id")
+    .eq("leave_request_id", leaveRequestId)
+    .eq("approval_status", "pending")
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+
+  const notified = new Set<string>();
+  for (const row of pendingApprovals ?? []) {
+    if (!row.approver_employee_id || notified.has(row.approver_employee_id)) {
+      continue;
+    }
+    notified.add(row.approver_employee_id);
     await notifyEmployee(supabase, {
       organizationId,
-      employeeId: managerId,
-      title: "Leave request pending approval",
-      message: "A team member has submitted a leave request awaiting your approval.",
+      employeeId: row.approver_employee_id,
+      title: "Leave request pending HR approval",
+      message: "An employee leave request requires your HR approval.",
       notificationType: "leave_submitted",
       module: "leave",
       priority: "high",
-      actionUrl: MANAGER_ROUTES.leaveDetail(leaveRequestId),
-      sourceEventKey: `leave_submitted_manager:${leaveRequestId}:${managerId}`,
+      actionUrl: LEAVE_ROUTES.detail(leaveRequestId),
+      sourceEventKey: `leave_submitted_hr:${leaveRequestId}:${row.approver_employee_id}`,
       templateKey: "leave_submitted",
       createdBy: profile.userId,
     });

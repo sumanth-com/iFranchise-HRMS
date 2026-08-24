@@ -1,6 +1,7 @@
 import { LeaveForm } from "@/components/leave/leave-form";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
+import { getLeaveApplyDialogDescription } from "@/lib/leave/leave-approval-copy";
 import { getLeaveLookups } from "@/lib/leave/services/leave-queries";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -28,7 +29,10 @@ export default async function EmployeeNewLeavePage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Apply for Leave</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Submit a leave request for approval by your manager and HR.
+            {getLeaveApplyDialogDescription(
+              profile.roles.map((role) => role.code),
+              2,
+            )}
           </p>
         </div>
         <LeaveForm

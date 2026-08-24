@@ -2,7 +2,16 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { DEFAULT_LEAVE_CALENDAR } from "./leave-calendar-engine";
-import { countLeaveDaysInRange, monthlyLeaveQuota, roundLeaveDays } from "./leave-usage";
+import { countLeaveDaysInRange, formatLeaveDayCount, formatLeaveDayUnit, monthlyLeaveQuota, roundLeaveDays } from "./leave-usage";
+
+describe("formatLeaveDayCount", () => {
+  it("keeps half days as 0.5 instead of rounding to a full day", () => {
+    assert.equal(formatLeaveDayCount(0.5), "0.5");
+    assert.equal(formatLeaveDayUnit(0.5), "days");
+    assert.equal(formatLeaveDayCount(1), "1");
+    assert.equal(formatLeaveDayUnit(1), "day");
+  });
+});
 
 describe("monthlyLeaveQuota", () => {
   it("splits a yearly CL pool across 12 months", () => {
