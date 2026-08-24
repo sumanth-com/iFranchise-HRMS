@@ -371,6 +371,7 @@ export function PayslipHistoryView({
             <Select
               value={yearValue}
               onValueChange={(value) => {
+                if (!value) return;
                 setYearValue(value);
                 updateParams(monthValue, value);
               }}
@@ -389,6 +390,7 @@ export function PayslipHistoryView({
             <Select
               value={monthValue}
               onValueChange={(value) => {
+                if (!value) return;
                 setMonthValue(value);
                 updateParams(value, yearValue);
               }}
