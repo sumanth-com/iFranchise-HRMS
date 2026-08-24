@@ -65,7 +65,7 @@ export function ManagerDashboard({ data, error }: ManagerDashboardProps) {
           upcomingBirthdays={data.upcomingBirthdays}
           upcomingAnniversaries={data.upcomingAnniversaries}
           insightsTitle="Team Insights"
-          insightsDescription="People to watch and upcoming celebrations"
+          insightsDescription="People to watch and upcoming birthdays"
           focusDescription="Interviews, probation, leave, and hiring"
         />
       </section>

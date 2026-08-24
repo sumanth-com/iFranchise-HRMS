@@ -34,6 +34,7 @@ export function CeoProfileIdCard({ profile, className }: Props) {
       departmentName={profile.departmentName}
       employmentTypeName={profile.employmentTypeName ?? "Full Time"}
       employmentStatus="active"
+      profileImagePath={profile.profileImagePath}
       imageUrl={profile.profileImageUrl}
       profilePath={CEO_ROUTES.profile}
       canEdit={false}

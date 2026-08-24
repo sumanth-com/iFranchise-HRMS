@@ -57,6 +57,7 @@ export async function getMyProfileBundle(
       totalWorkHours: attendanceSummary.totalWorkHours,
     },
     profileImageUrl,
+    profileImagePath: employee.profile?.profileImageStoragePath ?? null,
     profileSettings,
     selfProfileSubmittedAt: submittedResult.data?.self_profile_submitted_at ?? null,
     profilePath,

@@ -53,7 +53,7 @@ export function HrDashboard({ data, error }: Props) {
           upcomingHolidays={data.todayPulse.upcomingHolidays}
           upcomingBirthdays={data.upcomingBirthdays}
           upcomingAnniversaries={data.upcomingAnniversaries}
-          insightsDescription="People to watch and upcoming celebrations"
+          insightsDescription="People to watch and upcoming birthdays"
         />
       </section>
     </div>

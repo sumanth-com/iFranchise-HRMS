@@ -23,6 +23,56 @@ export function getEmployeeLoginStatus(status: EmployeeAccountStatus) {
   return "Not provisioned";
 }
 
+/** Account login disabled via deactivate or suspend. */
+export function isEmployeeAccountDeactivated(status: EmployeeAccountStatus) {
+  return status === "inactive" || status === "suspended";
+}
+
+export function EmployeeDeactivatedBadge({
+  className,
+}: {
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700 dark:border-white/15 dark:bg-white/10 dark:text-zinc-200",
+        className,
+      )}
+    >
+      Inactive
+    </span>
+  );
+}
+
+/** Card/list pill: Active vs Inactive (and other account states). */
+export function EmployeeAccountActivityBadge({
+  status,
+  className,
+}: {
+  status: EmployeeAccountStatus;
+  className?: string;
+}) {
+  if (status === "active") {
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:border-emerald-400/25 dark:bg-emerald-400/12 dark:text-emerald-300",
+          className,
+        )}
+      >
+        Active
+      </span>
+    );
+  }
+
+  if (isEmployeeAccountDeactivated(status)) {
+    return <EmployeeDeactivatedBadge className={className} />;
+  }
+
+  return <EmployeeAccountStatusBadge status={status} className={className} />;
+}
+
 export function EmployeeAccountStatusBadge({
   status,
   className,

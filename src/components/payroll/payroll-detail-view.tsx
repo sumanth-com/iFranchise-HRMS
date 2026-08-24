@@ -5,6 +5,10 @@ import { toast } from "sonner";
 
 import { PayrollStatusBadge } from "@/components/payroll/payroll-status-badge";
 import { Button } from "@/components/common/button";
+import {
+  TABLE_HEADER_CELL_CLASS,
+  TABLE_HEADER_STICKY_CLASS,
+} from "@/components/common/table-header-classes";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -149,13 +153,13 @@ export function PayrollDetailView({
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/30 text-left text-muted-foreground">
-                <th className="px-4 py-3">Employee</th>
-                <th className="px-4 py-3">Department</th>
-                <th className="px-4 py-3">Gross</th>
-                <th className="px-4 py-3">Deductions</th>
-                <th className="px-4 py-3">Net</th>
+            <thead className={TABLE_HEADER_STICKY_CLASS}>
+              <tr className="border-white/10 bg-black hover:bg-black">
+                <th className={TABLE_HEADER_CELL_CLASS}>Employee</th>
+                <th className={TABLE_HEADER_CELL_CLASS}>Department</th>
+                <th className={TABLE_HEADER_CELL_CLASS}>Gross</th>
+                <th className={TABLE_HEADER_CELL_CLASS}>Deductions</th>
+                <th className={TABLE_HEADER_CELL_CLASS}>Net</th>
               </tr>
             </thead>
             <tbody>

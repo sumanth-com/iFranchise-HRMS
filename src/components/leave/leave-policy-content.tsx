@@ -170,12 +170,12 @@ export function LeavePolicyHolidayTable({
       <h2 className={`shrink-0 border-b px-4 py-3 ${policyHeadingClass}`}>{title}</h2>
       <div className={HOLIDAY_TABLE_SCROLL_CLASS}>
         <table className="w-full table-fixed text-sm">
-          <thead className="sticky top-0 z-10 border-b bg-muted/40 backdrop-blur-sm">
+          <thead className="sticky top-0 z-30 bg-black text-left shadow-[0_1px_0_rgba(255,255,255,0.08)]">
             <tr className="text-left text-xs text-foreground/60">
-              <th className="w-14 px-3 py-2 font-medium">Sl. No.</th>
-              <th className="px-3 py-2 font-medium">Occasion / Festival</th>
-              <th className="w-24 px-3 py-2 font-medium">Date</th>
-              <th className="w-24 px-3 py-2 font-medium">Day</th>
+              <th className="h-11 w-14 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Sl. No.</th>
+              <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Occasion / Festival</th>
+              <th className="h-11 w-24 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Date</th>
+              <th className="h-11 w-24 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Day</th>
             </tr>
           </thead>
           <tbody>

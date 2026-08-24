@@ -21,7 +21,6 @@ import {
 } from "@/components/common/select";
 import { SearchableSelect } from "@/components/common/searchable-select";
 import { EmployeeIdCard } from "@/components/employees/employee-id-card";
-import { EmploymentStatusBadge } from "@/components/employees/employment-status-badge";
 import {
   EMERGENCY_RELATIONSHIP_OPTIONS,
   formatRelationshipLabel,
@@ -36,11 +35,6 @@ import {
   employeeSelfProfileSchema,
   type EmployeeSelfProfileInput,
 } from "@/lib/validations/employee";
-
-const LANGUAGE_OPTIONS = [
-  { value: "en", label: "English" },
-  { value: "hi", label: "Hindi" },
-] as const;
 
 const PROFILE_SELECT_CONTENT_CLASS = "min-w-[14rem] max-w-[20rem]";
 
@@ -175,7 +169,6 @@ export function MyProfileView({
     },
   });
 
-  const language = watch("language");
   const emergencyRelationship = watch("emergencyContactRelationship");
   const reportingManagerId = watch("reportingManagerId");
   const personalPhone = watch("personalPhone") ?? "";
@@ -183,7 +176,6 @@ export function MyProfileView({
   const addressState = watch("state") ?? "";
   const addressCity = watch("city") ?? "";
   const addressCountry = watch("country") ?? "";
-  const fullName = `${data.firstName} ${data.lastName}`.trim();
   const relationshipDisplay = formatRelationshipLabel(
     data.profileSettings.emergencyContact.relationship,
   );
@@ -252,10 +244,10 @@ export function MyProfileView({
       ? canEditReportingManager
         ? "Save your personal and contact details. Employment fields are managed separately."
         : "Save your phone, address, and emergency contact. Employment fields stay read-only."
-      : "Save your language preference. Contact, address, and emergency details are managed by HR."
+      : "Profile photo can be updated on your digital ID. Other fields are managed by HR."
     : canEditContactDetails
       ? "View and update your personal contact details below. Employment information is managed separately."
-      : "View your employment and contact details below. You can update language and profile photo. Other fields are managed by HR.";
+      : "View your employment and contact details below. You can update your profile photo. Other fields are managed by HR.";
 
   const selectedManagerLabel =
     !reportingManagerId || reportingManagerId === "none"
@@ -267,14 +259,16 @@ export function MyProfileView({
         "Select manager";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight">{fullName}</h1>
-          <EmploymentStatusBadge status={data.employmentStatus} />
+    <div className="mx-auto w-full max-w-6xl">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
+            Employee Information
+          </h1>
+          <p className="max-w-2xl text-sm text-muted-foreground">{helperText}</p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {isEditing ? (
             <>
               <Button
@@ -315,17 +309,14 @@ export function MyProfileView({
         </div>
       </div>
 
-      <p className="text-sm text-muted-foreground">{helperText}</p>
-
       <form
         onSubmit={handleSubmit(onSubmit)}
-        className="grid gap-x-6 gap-y-3 lg:grid-cols-[minmax(0,1fr)_minmax(300px,22rem)]"
+        className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,22rem)]"
       >
-        <h2 className="text-base font-semibold lg:col-start-1">Employee Information</h2>
-
-        <dl className="rounded-xl border bg-card lg:col-start-1 lg:row-start-2">
+        <dl className="rounded-xl border bg-card">
           <input type="hidden" {...register("personalEmail")} />
           <input type="hidden" {...register("timezone")} />
+          <input type="hidden" {...register("language")} />
 
           <ProfileInfoRow
             label="Manager"
@@ -625,52 +616,9 @@ export function MyProfileView({
             </ProfileFieldControl>
           </ProfileInfoRow>
 
-          <ProfileInfoRow
-            label="Language"
-            value={
-              LANGUAGE_OPTIONS.find((o) => o.value === data.profileSettings.language)?.label ??
-              data.profileSettings.language
-            }
-            editing={isEditing}
-            required
-          >
-            <ProfileFieldControl>
-              <div className="flex w-full flex-col gap-1">
-                <Select
-                  value={language}
-                  onValueChange={(value) => {
-                    if (value) setValue("language", value, { shouldValidate: true });
-                  }}
-                  disabled={isPending}
-                >
-                  <SelectTrigger className="h-8 w-full">
-                    <SelectValue placeholder="Language">
-                      {(value) =>
-                        LANGUAGE_OPTIONS.find((option) => option.value === value)?.label ??
-                        "Language"
-                      }
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent
-                    align="end"
-                    alignItemWithTrigger={false}
-                    className={PROFILE_SELECT_CONTENT_CLASS}
-                  >
-                    {LANGUAGE_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <ProfileFieldError message={errors.language?.message} />
-              </div>
-            </ProfileFieldControl>
-          </ProfileInfoRow>
-
         </dl>
 
-        <aside className="flex flex-col items-center overflow-visible lg:col-start-2 lg:row-start-2 lg:sticky lg:top-4">
+        <aside className="flex flex-col items-center lg:self-start">
           <EmployeeIdCard
             employeeId={data.employeeId}
             firstName={data.firstName}
@@ -680,6 +628,8 @@ export function MyProfileView({
             departmentName={data.departmentName}
             employmentTypeName={formatDisplayLabel(data.employmentTypeName)}
             employmentStatus={data.employmentStatus}
+            accountStatus={data.accountStatus}
+            profileImagePath={data.profileImagePath}
             imageUrl={data.profileImageUrl}
             profilePath={data.profilePath}
             canEdit={true}

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Eye, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/common/button";
-import { EmploymentStatusBadge } from "@/components/employees/employment-status-badge";
+import { EmployeeAccountActivityBadge } from "@/components/employees/employee-account-status-badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -114,7 +114,7 @@ export function EmployeeCardsGrid({
                   <CardPhoto employee={employee} />
                 </div>
                 <div className="absolute left-3 top-3 z-[1]">
-                  <EmploymentStatusBadge status={employee.employmentStatus} />
+                  <EmployeeAccountActivityBadge status={employee.accountStatus} />
                 </div>
               </div>
 

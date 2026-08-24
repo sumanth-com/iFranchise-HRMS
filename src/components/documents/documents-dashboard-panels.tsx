@@ -13,6 +13,10 @@ import {
 
 import { Button } from "@/components/common/button";
 import {
+  TABLE_HEADER_CELL_CLASS,
+  TABLE_HEADER_STICKY_CLASS,
+} from "@/components/common/table-header-classes";
+import {
   DOCUMENTS_ROUTES,
   documentsHubUrl,
   TEAM_DOCUMENTS_SECTIONS,
@@ -217,14 +221,14 @@ export function DocumentsDashboardPanels({
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
-                  <th className="px-4 py-2.5 font-medium">Employee</th>
-                  <th className="px-4 py-2.5 font-medium">Document</th>
-                  <th className="px-4 py-2.5 font-medium">Type</th>
-                  <th className="px-4 py-2.5 font-medium">Uploaded</th>
-                  <th className="px-4 py-2.5 font-medium">Status</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Action</th>
+              <thead className={TABLE_HEADER_STICKY_CLASS}>
+                <tr className="border-white/10 bg-black hover:bg-black">
+                  <th className={TABLE_HEADER_CELL_CLASS}>Employee</th>
+                  <th className={TABLE_HEADER_CELL_CLASS}>Document</th>
+                  <th className={TABLE_HEADER_CELL_CLASS}>Type</th>
+                  <th className={TABLE_HEADER_CELL_CLASS}>Uploaded</th>
+                  <th className={TABLE_HEADER_CELL_CLASS}>Status</th>
+                  <th className={cn(TABLE_HEADER_CELL_CLASS, "text-right")}>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -339,13 +343,13 @@ export function DocumentsDashboardPanels({
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
-                  <th className="px-4 py-2.5 font-medium">Employee</th>
-                  <th className="px-4 py-2.5 font-medium">File</th>
-                  <th className="px-4 py-2.5 font-medium">Type</th>
-                  <th className="px-4 py-2.5 font-medium">Status</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Action</th>
+              <thead className={TABLE_HEADER_STICKY_CLASS}>
+                <tr className="border-white/10 bg-black hover:bg-black">
+                  <th className={TABLE_HEADER_CELL_CLASS}>Employee</th>
+                  <th className={TABLE_HEADER_CELL_CLASS}>File</th>
+                  <th className={TABLE_HEADER_CELL_CLASS}>Type</th>
+                  <th className={TABLE_HEADER_CELL_CLASS}>Status</th>
+                  <th className={cn(TABLE_HEADER_CELL_CLASS, "text-right")}>Action</th>
                 </tr>
               </thead>
               <tbody>

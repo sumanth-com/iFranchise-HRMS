@@ -26,14 +26,14 @@ export default async function EmployeePayrollHistoryPage({ searchParams }: PageP
 
   void processDuePayslipPublications(supabase, profile, siteConfig.url).catch(() => undefined);
 
+  const now = new Date();
   const params = payslipHistoryParamsSchema.parse({
     page: raw.page,
     pageSize: raw.pageSize,
     search: firstString(raw.search),
-    month: raw.month,
-    year: raw.year,
-    yearFilter: firstString(raw.yearFilter),
-    groupByYear: true,
+    month: firstString(raw.month) ?? now.getMonth() + 1,
+    year: firstString(raw.year) ?? now.getFullYear(),
+    groupByYear: false,
   });
 
   const history = await listPayslipHistory(supabase, profile, params);
@@ -43,6 +43,8 @@ export default async function EmployeePayrollHistoryPage({ searchParams }: PageP
       <PayslipHistoryView
         history={history}
         mode="employee"
+        month={params.month ?? now.getMonth() + 1}
+        year={params.year ?? now.getFullYear()}
         basePath={EMPLOYEE_ROUTES.payrollHistory}
       />
     </div>

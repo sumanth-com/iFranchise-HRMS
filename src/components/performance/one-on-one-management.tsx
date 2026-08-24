@@ -237,13 +237,13 @@ export function OneOnOneTable({
       >
         {paged.rows.length > 0 ? (
           <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
+            <thead className="sticky top-0 z-30 bg-black text-left shadow-[0_1px_0_rgba(255,255,255,0.08)]">
               <tr className="text-left text-muted-foreground">
-                <th className="px-4 py-3 font-medium">Employee</th>
-                <th className="px-4 py-3 font-medium">Meeting with</th>
-                <th className="px-4 py-3 font-medium">Scheduled</th>
-                <th className="px-4 py-3 font-medium">Agenda</th>
-                <th className="px-4 py-3" />
+                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Employee</th>
+                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Meeting with</th>
+                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Scheduled</th>
+                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Agenda</th>
+                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle" />
               </tr>
             </thead>
             <tbody>

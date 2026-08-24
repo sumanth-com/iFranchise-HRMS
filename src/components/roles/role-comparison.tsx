@@ -251,13 +251,13 @@ export function RoleComparison({ roles }: Props) {
               </div>
             ) : (
               <table className="w-full min-w-[36rem] text-sm">
-                <thead className="sticky top-0 z-10 bg-muted/95 text-left text-xs tracking-wide text-muted-foreground backdrop-blur supports-[backdrop-filter]:bg-muted/80">
-                  <tr className="border-b">
-                    <th className="px-4 py-3 font-medium">Permission</th>
-                    <th className="w-28 px-3 py-3 text-center font-medium">
+                <thead className="sticky top-0 z-30 bg-black text-left shadow-[0_1px_0_rgba(255,255,255,0.08)]">
+                  <tr className="border-white/10 bg-black hover:bg-black">
+                    <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Permission</th>
+                    <th className="h-11 w-28 whitespace-nowrap bg-black px-3 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wide text-white">
                       {comparison.roleA.name}
                     </th>
-                    <th className="w-28 px-3 py-3 text-center font-medium">
+                    <th className="h-11 w-28 whitespace-nowrap bg-black px-3 py-3 text-center align-middle text-xs font-semibold uppercase tracking-wide text-white">
                       {comparison.roleB.name}
                     </th>
                   </tr>

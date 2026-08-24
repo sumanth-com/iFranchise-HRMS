@@ -26,6 +26,7 @@ import {
   extractTimeFromTimestamp,
   OFFICE_CHECK_IN_TIME,
   OFFICE_CHECK_OUT_TIME,
+  toDisplayAttendanceNotes,
 } from "@/lib/attendance/services/attendance-utils";
 import {
   attendanceFormSchema,
@@ -74,7 +75,7 @@ export function AttendanceForm({
         extractTimeFromTimestamp(attendance?.checkOutAt) || OFFICE_CHECK_OUT_TIME,
       attendanceStatus: attendance?.attendanceStatus ?? "present",
       overtimeHours: attendance?.overtimeHours ?? 0,
-      notes: attendance?.notes ?? "",
+      notes: toDisplayAttendanceNotes(attendance?.notes) ?? "",
     },
   });
 

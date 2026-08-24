@@ -2,6 +2,10 @@
 
 import * as React from "react"
 
+import {
+  TABLE_HEADER_CELL_CLASS,
+  TABLE_HEADER_STICKY_CLASS,
+} from "@/components/common/table-header-classes"
 import { cn } from "@/lib/utils"
 
 function Table({ className, ...props }: React.ComponentProps<"table">) {
@@ -23,7 +27,11 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
       data-slot="table-header"
-      className={cn("[&_tr]:border-b", className)}
+      className={cn(
+        "[&_tr]:border-b",
+        TABLE_HEADER_STICKY_CLASS,
+        className,
+      )}
       {...props}
     />
   )
@@ -70,8 +78,9 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        "h-10 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0",
-        className
+        TABLE_HEADER_CELL_CLASS,
+        "[&:has([role=checkbox])]:pr-0",
+        className,
       )}
       {...props}
     />

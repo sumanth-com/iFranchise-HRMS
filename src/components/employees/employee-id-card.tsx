@@ -6,7 +6,12 @@ import { Camera, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { EmploymentStatusBadge } from "@/components/employees/employment-status-badge";
+import {
+  EmployeeDeactivatedBadge,
+  isEmployeeAccountDeactivated,
+} from "@/components/employees/employee-account-status-badge";
 import { PROFILE_IMAGE_MAX_BYTES } from "@/lib/employees/constants";
+import { getSignedUrlAction } from "@/lib/employees/actions";
 import {
   removeProfileImageAction,
   uploadProfileImageAction,
@@ -14,6 +19,7 @@ import {
 import { optimizeProfileImageFile } from "@/lib/media/client-image-optimize";
 import { cn } from "@/lib/utils";
 import type { EmploymentStatus } from "@/types/auth";
+import type { EmployeeAccountStatus } from "@/types/employee";
 
 type EmployeeIdCardProps = {
   employeeId: string;
@@ -24,6 +30,8 @@ type EmployeeIdCardProps = {
   departmentName: string | null;
   employmentTypeName: string;
   employmentStatus: EmploymentStatus;
+  accountStatus?: EmployeeAccountStatus;
+  profileImagePath?: string | null;
   imageUrl: string | null;
   profilePath: string;
   canEdit: boolean;
@@ -39,6 +47,8 @@ export function EmployeeIdCard({
   departmentName: _departmentName,
   employmentTypeName,
   employmentStatus,
+  accountStatus,
+  profileImagePath,
   imageUrl: initialUrl,
   profilePath: _profilePath,
   canEdit,
@@ -47,16 +57,64 @@ export function EmployeeIdCard({
   const router = useRouter();
   const waveGradientId = useId().replace(/:/g, "");
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [imageUrl, setImageUrl] = useState(initialUrl);
+  const previewUrlRef = useRef<string | null>(null);
+  const resolvedPathRef = useRef<string | null>(profileImagePath ?? null);
+  const [imageUrl, setImageUrl] = useState<string | null>(initialUrl);
   const [isPending, startTransition] = useTransition();
   const [photoHovered, setPhotoHovered] = useState(false);
 
   const fullName = `${firstName} ${lastName}`.trim();
   const roleTitle = designation?.trim() || "Team Member";
+  const roleAndId = `${roleTitle} · ID · ${employeeCode}`;
+  const accountDeactivated =
+    accountStatus != null && isEmployeeAccountDeactivated(accountStatus);
 
   useEffect(() => {
-    setImageUrl(initialUrl);
-  }, [initialUrl]);
+    if (previewUrlRef.current) return;
+
+    if (initialUrl?.startsWith("blob:")) {
+      setImageUrl(initialUrl);
+      return;
+    }
+
+    if (initialUrl) {
+      setImageUrl(initialUrl);
+      resolvedPathRef.current = profileImagePath ?? null;
+      return;
+    }
+
+    if (!profileImagePath) {
+      setImageUrl(null);
+      resolvedPathRef.current = null;
+      return;
+    }
+
+    if (resolvedPathRef.current === profileImagePath) return;
+
+    let cancelled = false;
+    void getSignedUrlAction("profileImages", profileImagePath).then((result) => {
+      if (cancelled) return;
+      if (result.success) {
+        setImageUrl(result.data);
+        resolvedPathRef.current = profileImagePath;
+      } else {
+        setImageUrl(null);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profileImagePath, initialUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
+    };
+  }, []);
 
   const openPicker = () => {
     if (!canEdit || isPending) return;
@@ -88,6 +146,10 @@ export function EmployeeIdCard({
       }
 
       const preview = URL.createObjectURL(optimized);
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+      }
+      previewUrlRef.current = preview;
       setImageUrl(preview);
 
       const formData = new FormData();
@@ -96,11 +158,16 @@ export function EmployeeIdCard({
       const result = await uploadProfileImageAction(employeeId, formData);
       if (!result.success) {
         toast.error(result.message);
+        if (previewUrlRef.current === preview) {
+          URL.revokeObjectURL(preview);
+          previewUrlRef.current = null;
+        }
         setImageUrl(initialUrl);
-        URL.revokeObjectURL(preview);
         return;
       }
 
+      previewUrlRef.current = null;
+      URL.revokeObjectURL(preview);
       toast.success("Profile photo updated");
       router.refresh();
     });
@@ -118,6 +185,7 @@ export function EmployeeIdCard({
       }
 
       setImageUrl(null);
+      resolvedPathRef.current = null;
       toast.success("Profile photo removed");
       router.refresh();
     });
@@ -170,6 +238,12 @@ export function EmployeeIdCard({
               src={imageUrl}
               alt={fullName}
               decoding="async"
+              loading="eager"
+              onError={() => {
+                if (previewUrlRef.current) return;
+                setImageUrl(null);
+                resolvedPathRef.current = null;
+              }}
               className="size-full object-cover object-[center_20%]"
             />
           ) : (
@@ -256,23 +330,24 @@ export function EmployeeIdCard({
                 d="M0 68V28C44 10 86 4 128 10C178 18 210 38 260 46C300 52 330 46 360 36V68H0Z"
               />
             </svg>
-            <div className="relative bg-gradient-to-br from-white via-[#f4eefc] to-[#d9c8f0] px-5 pb-5 pt-9">
-              <p className="break-words text-[1.15rem] font-bold leading-snug tracking-tight text-neutral-950">
+            <div className="relative bg-gradient-to-br from-white via-[#f4eefc] to-[#d9c8f0] px-5 pb-5 pt-9 text-center">
+              <p className="break-words text-[1.2rem] font-bold leading-snug tracking-tight text-neutral-950">
                 {fullName}
               </p>
-              <p className="mt-2 break-words text-[0.92rem] leading-relaxed text-neutral-500">
-                {roleTitle}
+              <p className="mt-2 line-clamp-2 break-words text-[0.82rem] leading-snug text-neutral-500">
+                {roleAndId}
               </p>
-              <p className="mt-2.5 font-mono text-[0.7rem] font-semibold tracking-[0.08em] text-neutral-600">
-                ID · {employeeCode}
-              </p>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
+              <div className="mt-3.5 flex flex-wrap items-center justify-center gap-2">
                 <p className="inline-flex w-fit rounded-full bg-white/70 px-2.5 py-1 text-[0.68rem] font-semibold tracking-wide text-neutral-700 shadow-sm ring-1 ring-black/5">
                   {employmentTypeName}
                 </p>
-                <EmploymentStatusBadge
-                  status={employmentStatus === "draft" ? "active" : employmentStatus}
-                />
+                {accountDeactivated ? (
+                  <EmployeeDeactivatedBadge />
+                ) : (
+                  <EmploymentStatusBadge
+                    status={employmentStatus === "draft" ? "active" : employmentStatus}
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -303,24 +378,25 @@ export function EmployeeIdCard({
                 d="M0 68V28C44 10 86 4 128 10C178 18 210 38 260 46C300 52 330 46 360 36V68H0Z"
               />
             </svg>
-            <div className="relative bg-[#0b1224] px-5 pb-5 pt-9">
-              <p className="break-words text-[1.15rem] font-bold leading-snug tracking-tight text-white">
+            <div className="relative bg-[#0b1224] px-5 pb-5 pt-9 text-center">
+              <p className="break-words text-[1.2rem] font-bold leading-snug tracking-tight text-white">
                 {fullName}
               </p>
-              <p className="mt-2 break-words text-[0.92rem] leading-relaxed text-slate-200">
-                {roleTitle}
+              <p className="mt-2 line-clamp-2 break-words text-[0.82rem] leading-snug text-slate-200">
+                {roleAndId}
               </p>
-              <p className="mt-2.5 font-mono text-[0.7rem] font-semibold tracking-[0.08em] text-slate-100">
-                ID · {employeeCode}
-              </p>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
+              <div className="mt-3.5 flex flex-wrap items-center justify-center gap-2">
                 <p className="inline-flex w-fit rounded-full bg-white/10 px-2.5 py-1 text-[0.68rem] font-semibold tracking-wide text-slate-100 ring-1 ring-white/20">
                   {employmentTypeName}
                 </p>
-                <EmploymentStatusBadge
-                  status={employmentStatus === "draft" ? "active" : employmentStatus}
-                  className="shadow-none"
-                />
+                {accountDeactivated ? (
+                  <EmployeeDeactivatedBadge className="shadow-none" />
+                ) : (
+                  <EmploymentStatusBadge
+                    status={employmentStatus === "draft" ? "active" : employmentStatus}
+                    className="shadow-none"
+                  />
+                )}
               </div>
             </div>
           </div>

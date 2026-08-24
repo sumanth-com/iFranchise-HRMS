@@ -257,13 +257,13 @@ export function ManagerLeaveDetailDrawer({
               <h3 className="text-sm font-semibold">Remaining Leave Balance</h3>
               <div className="overflow-hidden rounded-lg border">
                 <table className="w-full text-sm">
-                  <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
+                  <thead className="sticky top-0 z-30 bg-black text-left shadow-[0_1px_0_rgba(255,255,255,0.08)]">
                     <tr>
-                      <th className="px-3 py-2 font-medium">Type</th>
-                      <th className="px-3 py-2 font-medium">Allocated</th>
-                      <th className="px-3 py-2 font-medium">Used</th>
-                      <th className="px-3 py-2 font-medium">Pending</th>
-                      <th className="px-3 py-2 font-medium">Balance</th>
+                      <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Type</th>
+                      <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Allocated</th>
+                      <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Used</th>
+                      <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Pending</th>
+                      <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Balance</th>
                     </tr>
                   </thead>
                   <tbody>

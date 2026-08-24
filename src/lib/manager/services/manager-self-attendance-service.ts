@@ -26,6 +26,7 @@ import {
   getTodayDateString,
   OFFICE_CHECK_IN_LOCK_TIME,
   OFFICE_TIMEZONE,
+  toDisplayAttendanceNotes,
   type AttendanceRules,
 } from "@/lib/attendance/services/attendance-utils";
 import { getEmployeeBranchId } from "@/lib/attendance/services/attendance-queries";
@@ -706,7 +707,7 @@ function buildHistoryRows(input: {
       isWithinRegularizationWindow(date, input.today) &&
       (!correction || correction.correction_status !== "pending");
 
-    let remarks = attendance?.notes ?? null;
+    let remarks = toDisplayAttendanceNotes(attendance?.notes);
     if (!remarks && holidayName) remarks = holidayName;
     if (!remarks && leaveTypeName) remarks = leaveTypeName;
     if (!remarks && weekendStatus === "week_off") {

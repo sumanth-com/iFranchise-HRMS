@@ -47,14 +47,14 @@ export function CeoExitProcessedTable({
 
       <div className="max-h-[26rem] overflow-auto">
         <table className="w-full min-w-[52rem] text-sm">
-          <thead className="sticky top-0 z-10 bg-muted/95 text-left text-xs tracking-wide text-muted-foreground uppercase backdrop-blur supports-[backdrop-filter]:bg-muted/80">
+          <thead className="sticky top-0 z-30 bg-black text-left shadow-[0_1px_0_rgba(255,255,255,0.08)]">
             <tr>
-              <th className="px-4 py-3 font-medium">Employee</th>
-              <th className="px-4 py-3 font-medium">Department</th>
-              <th className="px-4 py-3 font-medium">Last day</th>
-              <th className="px-4 py-3 font-medium">Reason</th>
-              <th className="px-4 py-3 font-medium">Decided</th>
-              <th className="px-4 py-3 font-medium">Status</th>
+              <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Employee</th>
+              <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Department</th>
+              <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Last day</th>
+              <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Reason</th>
+              <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Decided</th>
+              <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Status</th>
             </tr>
           </thead>
           <tbody>

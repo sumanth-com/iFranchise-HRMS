@@ -51,10 +51,18 @@ function resolveYearFilter(
   return {};
 }
 
+function payrollMonthTime(value: string | null | undefined): number | null {
+  if (!value?.trim()) return null;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : null;
+}
+
 function groupPayslipsByYear(payslips: PayslipListItem[]): PayslipHistoryYearGroup[] {
   const map = new Map<number, PayslipListItem[]>();
   for (const row of payslips) {
-    const year = new Date(row.payrollMonth).getUTCFullYear();
+    const time = payrollMonthTime(row.payrollMonth);
+    if (time == null) continue;
+    const year = new Date(time).getUTCFullYear();
     const bucket = map.get(year) ?? [];
     bucket.push(row);
     map.set(year, bucket);
@@ -63,9 +71,11 @@ function groupPayslipsByYear(payslips: PayslipListItem[]): PayslipHistoryYearGro
     .sort(([a], [b]) => b - a)
     .map(([year, items]) => ({
       year,
-      payslips: items.sort(
-        (a, b) => new Date(b.payrollMonth).getTime() - new Date(a.payrollMonth).getTime(),
-      ),
+      payslips: items.sort((a, b) => {
+        const aTime = payrollMonthTime(a.payrollMonth) ?? 0;
+        const bTime = payrollMonthTime(b.payrollMonth) ?? 0;
+        return bTime - aTime;
+      }),
     }));
 }
 
@@ -80,7 +90,12 @@ function buildStats(rows: PayslipListItem[]): PayslipHistoryStats {
   const underReview = rows.filter((row) => row.availability === "under_review");
   const employeeIds = new Set(rows.map((row) => row.employeeId).filter(Boolean));
   const years = Array.from(
-    new Set(rows.map((row) => new Date(row.payrollMonth).getUTCFullYear())),
+    new Set(
+      rows
+        .map((row) => payrollMonthTime(row.payrollMonth))
+        .filter((time): time is number => time != null)
+        .map((time) => new Date(time).getUTCFullYear()),
+    ),
   ).sort((a, b) => b - a);
 
   const nets = published.map((row) => row.netSalary);
@@ -175,7 +190,7 @@ export async function listPayslipHistory(
   }
 
   let filterMonth = month;
-  let filterYear = yearResolved.year;
+  let filterYear = yearResolved.year ?? (month ? new Date().getFullYear() : undefined);
   let payslipNumberTerm: string | undefined;
 
   if (search) {
@@ -195,18 +210,37 @@ export async function listPayslipHistory(
     }
   }
 
+  let payrollQuery = supabase
+    .schema("hrms")
+    .from("payrolls")
+    .select("id")
+    .eq("organization_id", profile.employee.organizationId)
+    .is("deleted_at", null);
+
   if (filterMonth && filterYear) {
-    query = query.eq(
-      "payrolls.payroll_month",
-      getPayrollMonthDate(filterMonth, filterYear),
-    );
+    payrollQuery = payrollQuery.eq("payroll_month", getPayrollMonthDate(filterMonth, filterYear));
   } else if (filterYear) {
-    const start = `${filterYear}-01-01`;
-    const end = `${filterYear}-12-01`;
-    query = query.gte("payrolls.payroll_month", start).lte("payrolls.payroll_month", end);
-  } else if (filterMonth) {
-    const monthStr = String(filterMonth).padStart(2, "0");
-    query = query.like("payrolls.payroll_month", `%-${monthStr}-%`);
+    payrollQuery = payrollQuery
+      .gte("payroll_month", getPayrollMonthDate(1, filterYear))
+      .lte("payroll_month", getPayrollMonthDate(12, filterYear));
+  }
+
+  let periodPayrollIds: string[] | null = null;
+  if (filterMonth || filterYear) {
+    const { data: payrollRows, error: payrollError } = await payrollQuery;
+    if (payrollError) throw new Error(payrollError.message);
+    periodPayrollIds = (payrollRows ?? []).map((row) => row.id);
+    if (periodPayrollIds.length === 0) {
+      return {
+        data: [],
+        groups: [],
+        stats: buildStats([]),
+        total: 0,
+        page,
+        pageSize,
+      };
+    }
+    query = query.in("payroll_id", periodPayrollIds);
   }
 
   if (payslipNumberTerm) {
@@ -249,6 +283,10 @@ export async function listPayslipHistory(
     );
     const versionCount = (versionCounts.get(row.id) ?? 0) + 1;
 
+    const payrollMonthValue =
+      payroll?.payroll_month ||
+      (filterMonth && filterYear ? getPayrollMonthDate(filterMonth, filterYear) : "");
+
     return {
       id: row.id,
       payslipNumber: row.payslip_number,
@@ -257,7 +295,7 @@ export async function listPayslipHistory(
       employeeName: employee
         ? `${employee.first_name} ${employee.last_name}`.trim()
         : "",
-      payrollMonth: payroll?.payroll_month ?? "",
+      payrollMonth: payrollMonthValue,
       grossSalary: Number(payrollItem?.gross_salary ?? 0),
       netSalary: Number(payrollItem?.net_salary ?? 0),
       payrollStatus: payroll?.payroll_status ?? "draft",
@@ -303,18 +341,8 @@ export async function listPayslipHistory(
       statsQuery = statsQuery.eq("employee_id", employeeScope);
     }
     if (!includeArchived) statsQuery = statsQuery.is("archived_at", null);
-    if (filterMonth && filterYear) {
-      statsQuery = statsQuery.eq(
-        "payrolls.payroll_month",
-        getPayrollMonthDate(filterMonth, filterYear),
-      );
-    } else if (filterYear) {
-      statsQuery = statsQuery
-        .gte("payrolls.payroll_month", `${filterYear}-01-01`)
-        .lte("payrolls.payroll_month", `${filterYear}-12-01`);
-    } else if (filterMonth) {
-      const monthStr = String(filterMonth).padStart(2, "0");
-      statsQuery = statsQuery.like("payrolls.payroll_month", `%-${monthStr}-%`);
+    if (periodPayrollIds) {
+      statsQuery = statsQuery.in("payroll_id", periodPayrollIds);
     }
     if (payslipNumberTerm) {
       statsQuery = statsQuery.ilike("payslip_number", `%${payslipNumberTerm}%`);
@@ -333,13 +361,18 @@ export async function listPayslipHistory(
         new Date(),
         { employeeFacing: row.employee_id === profile.employee.id },
       );
+
+      const payrollMonthValue =
+        payroll?.payroll_month ||
+        (filterMonth && filterYear ? getPayrollMonthDate(filterMonth, filterYear) : "");
+
       return {
         id: row.id,
         payslipNumber: "",
         employeeId: row.employee_id ?? "",
         employeeCode: "",
         employeeName: "",
-        payrollMonth: payroll?.payroll_month ?? "",
+        payrollMonth: payrollMonthValue,
         grossSalary: 0,
         netSalary: Number(payrollItem?.net_salary ?? 0),
         payrollStatus: payroll?.payroll_status ?? "draft",

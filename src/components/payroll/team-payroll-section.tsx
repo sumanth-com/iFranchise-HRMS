@@ -167,12 +167,11 @@ export async function TeamPayrollSection({
       page: rawSearchParams.page,
       pageSize: rawSearchParams.pageSize,
       search: firstString(rawSearchParams.search),
-      month: rawSearchParams.month,
-      year: rawSearchParams.year,
-      yearFilter: firstString(rawSearchParams.yearFilter),
+      month: firstString(rawSearchParams.month) ?? now.getMonth() + 1,
+      year: firstString(rawSearchParams.year) ?? now.getFullYear(),
       employeeId: firstString(rawSearchParams.employeeId),
       includeArchived: rawSearchParams.includeArchived === "true",
-      groupByYear: true,
+      groupByYear: false,
     });
     const history = await listPayslipHistory(supabase, profile, params);
 
@@ -181,6 +180,8 @@ export async function TeamPayrollSection({
         history={history}
         mode="hr"
         embedded
+        month={params.month ?? now.getMonth() + 1}
+        year={params.year ?? now.getFullYear()}
         basePath={
           teamBasePath
             ? `${teamBasePath}/${TEAM_PAYROLL_SECTIONS.payslips}`

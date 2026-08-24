@@ -1,12 +1,16 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Eye, EyeOff, KeyRound, Mail } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
+import {
+  ONBOARDING_AUTH_FIELD_CLASS,
+  ONBOARDING_AUTH_SUBMIT_CLASS,
+} from "@/components/onboarding/candidate/onboarding-auth-styles";
 import {
   requestCandidatePasswordResetAction,
   resetCandidatePasswordWithOtpAction,
@@ -14,14 +18,10 @@ import {
 import { ONBOARDING_ROUTES } from "@/types/onboarding";
 import { cn } from "@/lib/utils";
 
-const inputClassName =
-  "h-10 bg-background text-sm text-foreground caret-foreground placeholder:text-muted-foreground dark:bg-background dark:text-foreground";
-
 const MIN_PASSWORD_LENGTH = 8;
 
 type OnboardingForgotPasswordPanelProps = {
   email: string;
-  /** When true, render an email field inside the panel. Default: false (parent owns email). */
   showEmailField?: boolean;
   onEmailChange?: (email: string) => void;
   onBack?: () => void;
@@ -46,8 +46,7 @@ export function OnboardingForgotPasswordPanel({
   const canRequest = email.trim().length > 0 && !isPending;
   const lengthMet = password.length >= MIN_PASSWORD_LENGTH;
   const passwordsMatch = confirmPassword.length > 0 && password === confirmPassword;
-  const canReset =
-    canRequest && otp.length === 6 && lengthMet && passwordsMatch && !isPending;
+  const canReset = canRequest && otp.length === 6 && lengthMet && passwordsMatch;
 
   function sendCode() {
     startTransition(async () => {
@@ -84,46 +83,46 @@ export function OnboardingForgotPasswordPanel({
   }
 
   return (
-    <div className={cn("space-y-3", className)}>
-      <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
-        {otpSent
-          ? "Enter the code from your email, then choose a new password."
-          : "We will email a 6-digit code to reset your portal password."}
-      </p>
-
+    <div className={cn("space-y-4", className)}>
       {showEmailField && onEmailChange ? (
-        <div className="space-y-1.5">
-          <Label className="text-xs font-medium text-foreground">
-            Personal email <span className="text-foreground">*</span>
-          </Label>
+        <div className="space-y-2">
+          <Label className="text-sm font-semibold text-foreground">Personal email</Label>
           <div className="relative">
-            <Mail className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="email"
               value={email}
               onChange={(e) => onEmailChange(e.target.value)}
-              placeholder="you@email.com"
-              className={cn(inputClassName, "pl-9")}
+              placeholder="Enter your personal email"
+              className={ONBOARDING_AUTH_FIELD_CLASS}
             />
           </div>
         </div>
       ) : null}
 
       {!otpSent ? (
-        <Button
-          type="button"
-          className="h-10 w-full text-sm font-semibold"
-          onClick={sendCode}
-          disabled={!canRequest}
-        >
-          {isPending ? "Sending…" : "Send reset code"}
+        <Button type="button" className={ONBOARDING_AUTH_SUBMIT_CLASS} onClick={sendCode} disabled={!canRequest}>
+          {isPending ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Sending...
+            </>
+          ) : (
+            <>
+              Send reset code
+              <span
+                className="inline-flex size-5 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/30"
+                aria-hidden
+              >
+                <ArrowRight className="size-3.5" strokeWidth={2.75} />
+              </span>
+            </>
+          )}
         </Button>
       ) : (
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-foreground">
-              Reset code <span className="text-foreground">*</span>
-            </Label>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold text-foreground">Reset code</Label>
             <Input
               inputMode="numeric"
               autoComplete="one-time-code"
@@ -131,42 +130,38 @@ export function OnboardingForgotPasswordPanel({
               maxLength={6}
               value={otp}
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              className={inputClassName}
+              className={cn(ONBOARDING_AUTH_FIELD_CLASS, "pl-4")}
             />
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-foreground">
-              New password <span className="text-foreground">*</span>
-            </Label>
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold text-foreground">New password</Label>
             <div className="relative">
-              <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Lock className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type={showPassword ? "text" : "password"}
                 minLength={MIN_PASSWORD_LENGTH}
                 placeholder="Min. 8 characters"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className={cn(inputClassName, "pl-9 pr-9")}
+                className={cn(ONBOARDING_AUTH_FIELD_CLASS, "pr-10")}
                 autoComplete="new-password"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute inset-y-0 right-2 flex items-center px-1 text-muted-foreground hover:text-foreground"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
-                {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-foreground">
-              Confirm new password <span className="text-foreground">*</span>
-            </Label>
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold text-foreground">Confirm new password</Label>
             <div className="relative">
-              <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Lock className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type={showConfirm ? "text" : "password"}
                 minLength={MIN_PASSWORD_LENGTH}
@@ -174,8 +169,8 @@ export function OnboardingForgotPasswordPanel({
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className={cn(
-                  inputClassName,
-                  "pl-9 pr-9",
+                  ONBOARDING_AUTH_FIELD_CLASS,
+                  "pr-10",
                   confirmPassword && !passwordsMatch && "border-red-400 dark:border-red-500",
                   passwordsMatch && "border-emerald-500 dark:border-emerald-400",
                 )}
@@ -184,17 +179,17 @@ export function OnboardingForgotPasswordPanel({
               <button
                 type="button"
                 onClick={() => setShowConfirm((v) => !v)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute inset-y-0 right-2 flex items-center px-1 text-muted-foreground hover:text-foreground"
                 aria-label={showConfirm ? "Hide password" : "Show password"}
               >
-                {showConfirm ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                {showConfirm ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
             </div>
           </div>
 
           <Button
             type="button"
-            className="h-10 w-full text-sm font-semibold"
+            className={ONBOARDING_AUTH_SUBMIT_CLASS}
             onClick={resetPassword}
             disabled={!canReset}
           >
@@ -203,7 +198,7 @@ export function OnboardingForgotPasswordPanel({
 
           <button
             type="button"
-            className="w-full text-center text-[11px] font-semibold text-primary hover:underline"
+            className="w-full text-center text-xs font-semibold text-sky-600 hover:underline dark:text-sky-400"
             onClick={sendCode}
             disabled={!canRequest}
           >
@@ -215,7 +210,7 @@ export function OnboardingForgotPasswordPanel({
       {onBack ? (
         <button
           type="button"
-          className="w-full text-center text-[11px] font-semibold text-muted-foreground hover:text-foreground hover:underline"
+          className="w-full text-center text-sm font-medium text-muted-foreground hover:text-foreground"
           onClick={onBack}
         >
           Back to sign in

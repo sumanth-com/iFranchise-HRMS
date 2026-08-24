@@ -25,7 +25,7 @@ import {
   fetchTeamAttendanceDetailAction,
   rejectTeamAttendanceCorrectionAction,
 } from "@/lib/manager/actions/manager-attendance-actions";
-import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils";
+import { formatAttendanceTime, toDisplayAttendanceNotes } from "@/lib/attendance/services/attendance-utils";
 import type { AttendanceStatus } from "@/types/attendance";
 import type { TeamAttendanceDetailBundle } from "@/types/manager-attendance";
 import { cn } from "@/lib/utils";
@@ -147,6 +147,7 @@ export function ManagerAttendanceDetailDrawer({
         detail.monitoring.missingCheckOut ? "Missing check-out" : null,
       ].filter(Boolean)
     : [];
+  const displayNotes = toDisplayAttendanceNotes(detail?.notes);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -230,9 +231,9 @@ export function ManagerAttendanceDetailDrawer({
               {detail.deviceLabel ? (
                 <DetailField label="Device Used" value={detail.deviceLabel} />
               ) : null}
-              {detail.notes ? (
+              {displayNotes ? (
                 <div className="sm:col-span-2">
-                  <DetailField label="Notes" value={detail.notes} />
+                  <DetailField label="Notes" value={displayNotes} />
                 </div>
               ) : null}
             </section>

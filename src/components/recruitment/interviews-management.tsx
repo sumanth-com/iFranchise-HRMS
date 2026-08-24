@@ -15,6 +15,10 @@ import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/common/modal";
 import { FilterSelect } from "@/components/common/filter-select";
+import {
+  TABLE_HEADER_CELL_CLASS,
+  TABLE_HEADER_STICKY_CLASS,
+} from "@/components/common/table-header-classes";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { toSelectItems } from "@/components/payroll/select-utils";
 import { RecruitmentPagination } from "@/components/recruitment/recruitment-pagination";
@@ -227,16 +231,16 @@ export function InterviewsManagement({
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/30 text-left text-muted-foreground">
-                  <th className="px-4 py-3">Candidate</th>
-                  <th className="px-4 py-3">Position</th>
-                  <th className="px-4 py-3">Round</th>
-                  <th className="px-4 py-3">Interviewer</th>
-                  <th className="px-4 py-3">Date & Time</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3" />
+              <thead className={TABLE_HEADER_STICKY_CLASS}>
+                <tr className="border-white/10 bg-black hover:bg-black">
+                  <th className={TABLE_HEADER_CELL_CLASS}>Candidate</th>
+                  <th className={TABLE_HEADER_CELL_CLASS}>Position</th>
+                  <th className={TABLE_HEADER_CELL_CLASS}>Round</th>
+                  <th className={TABLE_HEADER_CELL_CLASS}>Interviewer</th>
+                  <th className={TABLE_HEADER_CELL_CLASS}>Date & Time</th>
+                  <th className={TABLE_HEADER_CELL_CLASS}>Type</th>
+                  <th className={TABLE_HEADER_CELL_CLASS}>Status</th>
+                  <th className={TABLE_HEADER_CELL_CLASS} />
                 </tr>
               </thead>
               <tbody>

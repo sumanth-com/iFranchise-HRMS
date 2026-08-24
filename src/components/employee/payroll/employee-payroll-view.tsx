@@ -525,14 +525,14 @@ export function EmployeePayrollView({
           <>
           <table className="w-full min-w-[44rem] text-sm">
             <thead>
-              <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="pb-2 pr-3 font-medium">Month</th>
-                <th className="pb-2 pr-3 font-medium">Payslip #</th>
-                <th className="pb-2 pr-3 font-medium">Gross</th>
-                <th className="pb-2 pr-3 font-medium">Net</th>
-                <th className="pb-2 pr-3 font-medium">Credit Date</th>
-                <th className="pb-2 pr-3 font-medium">Status</th>
-                <th className="pb-2 font-medium text-right">Actions</th>
+              <tr className="border-white/10 bg-black hover:bg-black">
+                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Month</th>
+                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Payslip #</th>
+                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Gross</th>
+                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Net</th>
+                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Credit Date</th>
+                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Status</th>
+                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 text-right align-middle text-xs font-semibold uppercase tracking-wide text-white">Actions</th>
               </tr>
             </thead>
             <tbody>

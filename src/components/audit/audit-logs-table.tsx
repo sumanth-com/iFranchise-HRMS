@@ -10,6 +10,9 @@ import { AuditDetailView } from "@/components/audit/audit-detail-view";
 import { AuditExportButtons } from "@/components/audit/audit-export-buttons";
 import { AuditStatusBadge } from "@/components/audit/audit-status-badge";
 import { Button } from "@/components/common/button";
+import {
+  SECTION_HEADING_ROW_CLASS,
+} from "@/components/common/table-header-classes";
 import { EmptyState } from "@/components/common/empty-state";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { Modal } from "@/components/common/modal";
@@ -341,7 +344,8 @@ export function AuditLogsTable({
             <header
               className={cn(
                 rowGrid(canDelete),
-                "sticky top-0 z-10 border-b bg-muted/95 py-3.5 text-[11px] font-semibold tracking-wide text-foreground uppercase shadow-sm backdrop-blur supports-[backdrop-filter]:bg-muted/85",
+                SECTION_HEADING_ROW_CLASS,
+                "sticky top-0 z-10 grid items-center",
               )}
             >
               {canDelete ? (
