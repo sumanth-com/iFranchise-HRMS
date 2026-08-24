@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { format, parseISO } from "date-fns";
 import {
   ChevronRight,
   Download,
   Eye,
-  FileText,
   History,
   Loader2,
   Mail,
@@ -61,6 +60,8 @@ type Props = {
   history: PayslipHistoryResult;
   mode: "employee" | "hr";
   basePath: string;
+  month: number;
+  year: number;
   currencyCode?: string;
   /** When true, omits standalone page header (e.g. inside Team Payroll hub). */
   embedded?: boolean;
@@ -75,17 +76,9 @@ function fmtDate(value: string | null | undefined): string {
   }
 }
 
-function getYearFilterLabel(value: string): string {
-  if (value === "all") return "Year";
-  if (value === "current") return "Current year";
-  if (value === "last") return "Last year";
-  return value;
-}
-
 function getMonthFilterLabel(value: string): string {
-  if (value === "all") return "Month";
   const index = Number(value) - 1;
-  return MONTHS[index] ?? "Month";
+  return MONTHS[index] ?? "this month";
 }
 
 function PayslipRowActions({
@@ -191,74 +184,72 @@ function PayslipTable({
   onPreview: (id: string) => void;
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[56rem] text-sm">
-        <thead className={TABLE_HEADER_STICKY_CLASS}>
-          <tr className="border-white/10 bg-black hover:bg-black">
-            <th className={TABLE_HEADER_CELL_CLASS}>Payroll Month</th>
-            {showEmployee ? <th className={TABLE_HEADER_CELL_CLASS}>Employee</th> : null}
-            <th className={TABLE_HEADER_CELL_CLASS}>Credit Date</th>
-            <th className={TABLE_HEADER_CELL_CLASS}>Published</th>
-            <th className={TABLE_HEADER_CELL_CLASS}>Gross</th>
-            <th className={TABLE_HEADER_CELL_CLASS}>Net</th>
-            <th className={TABLE_HEADER_CELL_CLASS}>Payment</th>
-            <th className={TABLE_HEADER_CELL_CLASS}>Version</th>
-            <th className={cn(TABLE_HEADER_CELL_CLASS, "text-right")}>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr
-              key={row.id}
-              className={cn("border-b last:border-0", row.isArchived && "opacity-60")}
-            >
-              <td className="py-3 pr-3">
-                <div className="font-medium">{formatPayrollMonthLabel(row.payrollMonth)}</div>
-                <div className="text-xs text-muted-foreground">{row.payslipNumber}</div>
+    <table className="w-full min-w-[56rem] text-sm">
+      <thead className={TABLE_HEADER_STICKY_CLASS}>
+        <tr className="border-white/10 bg-black hover:bg-black">
+          <th className={TABLE_HEADER_CELL_CLASS}>Payroll Month</th>
+          {showEmployee ? <th className={TABLE_HEADER_CELL_CLASS}>Employee</th> : null}
+          <th className={TABLE_HEADER_CELL_CLASS}>Credit Date</th>
+          <th className={TABLE_HEADER_CELL_CLASS}>Published</th>
+          <th className={TABLE_HEADER_CELL_CLASS}>Gross</th>
+          <th className={TABLE_HEADER_CELL_CLASS}>Net</th>
+          <th className={TABLE_HEADER_CELL_CLASS}>Payment</th>
+          <th className={TABLE_HEADER_CELL_CLASS}>Version</th>
+          <th className={cn(TABLE_HEADER_CELL_CLASS, "text-right")}>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr
+            key={row.id}
+            className={cn("border-b last:border-0", row.isArchived && "opacity-60")}
+          >
+            <td className="px-4 py-3">
+              <div className="font-medium">{formatPayrollMonthLabel(row.payrollMonth)}</div>
+              <div className="text-xs text-muted-foreground">{row.payslipNumber}</div>
+            </td>
+            {showEmployee ? (
+              <td className="px-4 py-3">
+                <div>{row.employeeName}</div>
+                <div className="text-xs text-muted-foreground">{row.employeeCode}</div>
               </td>
-              {showEmployee ? (
-                <td className="py-3 pr-3">
-                  <div>{row.employeeName}</div>
-                  <div className="text-xs text-muted-foreground">{row.employeeCode}</div>
-                </td>
+            ) : null}
+            <td className="px-4 py-3 text-muted-foreground">
+              {fmtDate(row.salaryCreditDate)}
+            </td>
+            <td className="px-4 py-3 text-muted-foreground">{fmtDate(row.publishedAt)}</td>
+            <td className="px-4 py-3 tabular-nums">{formatCurrency(row.grossSalary)}</td>
+            <td className="px-4 py-3 tabular-nums font-medium">
+              {formatCurrency(row.netSalary)}
+            </td>
+            <td className="px-4 py-3">
+              {row.availability === "under_review" ? (
+                <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-800">
+                  HR Review
+                </span>
+              ) : row.isArchived ? (
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                  Archived
+                </span>
+              ) : (
+                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-800">
+                  {row.paymentStatus}
+                </span>
+              )}
+            </td>
+            <td className="px-4 py-3 text-muted-foreground">
+              v{row.payslipVersion}
+              {row.versionCount > 1 ? (
+                <span className="ml-1 text-[10px]">({row.versionCount})</span>
               ) : null}
-              <td className="py-3 pr-3 text-muted-foreground">
-                {fmtDate(row.salaryCreditDate)}
-              </td>
-              <td className="py-3 pr-3 text-muted-foreground">{fmtDate(row.publishedAt)}</td>
-              <td className="py-3 pr-3 tabular-nums">{formatCurrency(row.grossSalary)}</td>
-              <td className="py-3 pr-3 tabular-nums font-medium">
-                {formatCurrency(row.netSalary)}
-              </td>
-              <td className="py-3 pr-3">
-                {row.availability === "under_review" ? (
-                  <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-800">
-                    HR Review
-                  </span>
-                ) : row.isArchived ? (
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                    Archived
-                  </span>
-                ) : (
-                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-800">
-                    {row.paymentStatus}
-                  </span>
-                )}
-              </td>
-              <td className="py-3 pr-3 text-muted-foreground">
-                v{row.payslipVersion}
-                {row.versionCount > 1 ? (
-                  <span className="ml-1 text-[10px]">({row.versionCount})</span>
-                ) : null}
-              </td>
-              <td className="py-3">
-                <PayslipRowActions row={row} mode={mode} onPreview={onPreview} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+            </td>
+            <td className="px-4 py-3">
+              <PayslipRowActions row={row} mode={mode} onPreview={onPreview} />
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
@@ -266,44 +257,54 @@ export function PayslipHistoryView({
   history,
   mode,
   basePath,
+  month,
+  year,
   embedded = false,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
   const [activePayslipId, setActivePayslipId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [searchInput, setSearchInput] = useState(searchParams.get("search") ?? "");
+  const [monthValue, setMonthValue] = useState(String(month));
+  const [yearValue, setYearValue] = useState(String(year));
+
+  useEffect(() => {
+    setMonthValue(String(month));
+    setYearValue(String(year));
+  }, [month, year]);
 
   const currentYear = new Date().getFullYear();
   const yearOptions = useMemo(() => {
-    const years =
-      history.stats.yearsAvailable.length > 0
-        ? history.stats.yearsAvailable
-        : [currentYear, currentYear - 1, currentYear - 2, currentYear - 3];
-    return years;
-  }, [history.stats.yearsAvailable, currentYear]);
+    const years = new Set([
+      currentYear,
+      currentYear - 1,
+      currentYear - 2,
+      currentYear - 3,
+      year,
+      ...history.stats.yearsAvailable,
+    ]);
+    return Array.from(years).sort((a, b) => b - a);
+  }, [history.stats.yearsAvailable, currentYear, year]);
 
   const updateParams = useCallback(
-    (updates: Record<string, string | undefined>) => {
+    (nextMonth: string, nextYear: string, extra?: Record<string, string | undefined>) => {
       const params = new URLSearchParams(searchParams.toString());
-      Object.entries(updates).forEach(([key, value]) => {
-        if (!value || value === "all") params.delete(key);
-        else params.set(key, value);
-      });
+      params.set("month", nextMonth);
+      params.set("year", nextYear);
+      params.delete("yearFilter");
       params.delete("page");
+      if (extra) {
+        Object.entries(extra).forEach(([key, value]) => {
+          if (!value) params.delete(key);
+          else params.set(key, value);
+        });
+      }
       startTransition(() => router.push(`${basePath}?${params.toString()}`));
     },
     [basePath, router, searchParams, startTransition],
   );
-
-  const yearDefault =
-    searchParams.get("yearFilter") ?? searchParams.get("year") ?? String(currentYear);
-  const monthDefault = searchParams.get("month") || "all";
-  const hasActiveFilters =
-    Boolean(searchParams.get("search")) ||
-    yearDefault !== "all" ||
-    monthDefault !== "all";
 
   const underReview = history.data.find((row) => row.availability === "under_review");
 
@@ -360,65 +361,42 @@ export function PayslipHistoryView({
                 onChange={(event) => setSearchInput(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
-                    updateParams({ search: searchInput.trim() || undefined });
+                    updateParams(monthValue, yearValue, {
+                      search: searchInput.trim() || undefined,
+                    });
                   }
                 }}
               />
             </div>
             <Select
-              value={yearDefault}
+              value={yearValue}
               onValueChange={(value) => {
-                if (!value || value === "all") {
-                  updateParams({ year: undefined, yearFilter: undefined });
-                } else {
-                  updateParams({ year: value, yearFilter: undefined });
-                }
+                setYearValue(value);
+                updateParams(monthValue, value);
               }}
             >
               <SelectTrigger className="w-full lg:w-44">
-                <SelectValue placeholder="Year">
-                  {(value) => {
-                    const label = getYearFilterLabel(String(value ?? "all"));
-                    const isDefault = !value || value === "all";
-                    return (
-                      <span className={isDefault ? "text-muted-foreground" : undefined}>
-                        {label}
-                      </span>
-                    );
-                  }}
-                </SelectValue>
+                <SelectValue>{yearValue}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All years</SelectItem>
-                {yearOptions.map((year) => (
-                  <SelectItem key={year} value={String(year)}>
-                    {year}
+                {yearOptions.map((optionYear) => (
+                  <SelectItem key={optionYear} value={String(optionYear)}>
+                    {optionYear}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Select
-              value={monthDefault}
+              value={monthValue}
               onValueChange={(value) => {
-                const month = value && value !== "all" ? value : undefined;
-                updateParams({ month });
+                setMonthValue(value);
+                updateParams(value, yearValue);
               }}
             >
               <SelectTrigger className="w-full lg:w-44">
-                <SelectValue placeholder="Month">
-                  {(value) => {
-                    const label = getMonthFilterLabel(String(value ?? "all"));
-                    const isDefault = !value || value === "all";
-                    return (
-                      <span className={isDefault ? "text-muted-foreground" : undefined}>
-                        {label}
-                      </span>
-                    );
-                  }}
-                </SelectValue>
+                <SelectValue>{getMonthFilterLabel(monthValue)}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All months</SelectItem>
                 {MONTHS.map((label, index) => (
                   <SelectItem key={label} value={String(index + 1)}>
                     {label}
@@ -436,40 +414,26 @@ export function PayslipHistoryView({
         </div>
       ) : null}
 
-      <div className="rounded-xl border bg-card shadow-sm">
-        {history.data.length > 0 ? (
-          history.groups.length > 0 ? (
-            <div className="divide-y">
-              {history.groups.map((group) => (
-                <section key={group.year} className="p-4 md:p-5">
-                  <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
-                    <FileText className="size-4 text-muted-foreground" />
-                    {group.year}
-                  </h2>
-                  <PayslipTable
-                    rows={group.payslips}
-                    mode={mode}
-                    showEmployee={mode === "hr"}
-                    onPreview={openPreview}
-                  />
-                </section>
-              ))}
+      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+        <div className="max-h-[calc(100vh-22rem)] overflow-auto">
+          {isPending ? (
+            <div className="flex items-center justify-center gap-2 px-4 py-16 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              Loading payslips...
             </div>
+          ) : history.data.length > 0 ? (
+            <PayslipTable
+              rows={history.data}
+              mode={mode}
+              showEmployee={mode === "hr"}
+              onPreview={openPreview}
+            />
           ) : (
-            <div className="p-4 md:p-5">
-              <PayslipTable
-                rows={history.data}
-                mode={mode}
-                showEmployee={mode === "hr"}
-                onPreview={openPreview}
-              />
-            </div>
-          )
-        ) : (
-          <p className="py-16 text-center text-sm text-muted-foreground">
-            No payslips match your filters.
-          </p>
-        )}
+            <p className="py-16 text-center text-sm text-muted-foreground">
+              No payslips found for {getMonthFilterLabel(monthValue)} {yearValue}.
+            </p>
+          )}
+        </div>
       </div>
 
       {history.total > history.pageSize ? (
@@ -480,6 +444,8 @@ export function PayslipHistoryView({
             disabled={history.page <= 1}
             onClick={() => {
               const params = new URLSearchParams(searchParams.toString());
+              params.set("month", monthValue);
+              params.set("year", yearValue);
               params.set("page", String(history.page - 1));
               router.push(`${basePath}?${params.toString()}`);
             }}
@@ -492,6 +458,8 @@ export function PayslipHistoryView({
             disabled={history.page * history.pageSize >= history.total}
             onClick={() => {
               const params = new URLSearchParams(searchParams.toString());
+              params.set("month", monthValue);
+              params.set("year", yearValue);
               params.set("page", String(history.page + 1));
               router.push(`${basePath}?${params.toString()}`);
             }}

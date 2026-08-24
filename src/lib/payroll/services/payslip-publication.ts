@@ -77,10 +77,43 @@ export function resolvePayslipSchedule(
   stored?: Partial<PayslipScheduleDates>,
   options?: { salaryCreditDay?: number; publishDay?: number },
 ): PayslipScheduleDates {
-  const computed = computePayslipSchedule(payrollMonth, options);
+  const storedSalaryCreditDate = stored?.salaryCreditDate;
+  const storedPublishedAt = stored?.publishedAt;
+
+  const hasValidPublishedAt =
+    typeof storedPublishedAt === "string" &&
+    storedPublishedAt.length > 0 &&
+    !Number.isNaN(new Date(storedPublishedAt).getTime());
+
+  const hasValidSalaryCreditDate =
+    typeof storedSalaryCreditDate === "string" && storedSalaryCreditDate.length > 0;
+
+  // If we have stored dates, do not depend on `payrollMonth` being present from joins.
+  // Some rows may not have `payrolls.payroll_month` selected correctly, which would otherwise crash
+  // when computing `publishedAt`.
+  if (hasValidPublishedAt && hasValidSalaryCreditDate) {
+    return {
+      salaryCreditDate: storedSalaryCreditDate,
+      publishedAt: storedPublishedAt,
+    };
+  }
+
+  // If payrollMonth is missing/invalid and we can't compute, fall back to safe defaults
+  // to avoid hard crashes during filter changes.
+  const trimmedPayrollMonth = payrollMonth?.trim() ?? "";
+  if (!trimmedPayrollMonth) {
+    const today = new Date();
+    const fallbackSalaryCreditDate = today.toISOString().slice(0, 10);
+    return {
+      salaryCreditDate: hasValidSalaryCreditDate ? storedSalaryCreditDate! : fallbackSalaryCreditDate,
+      publishedAt: hasValidPublishedAt ? storedPublishedAt! : today.toISOString(),
+    };
+  }
+
+  const computed = computePayslipSchedule(trimmedPayrollMonth, options);
   return {
-    salaryCreditDate: stored?.salaryCreditDate ?? computed.salaryCreditDate,
-    publishedAt: computed.publishedAt,
+    salaryCreditDate: hasValidSalaryCreditDate ? storedSalaryCreditDate! : computed.salaryCreditDate,
+    publishedAt: hasValidPublishedAt ? storedPublishedAt! : computed.publishedAt,
   };
 }
 

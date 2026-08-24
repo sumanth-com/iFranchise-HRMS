@@ -20,8 +20,12 @@ export function formatPayrollMonth(month: number, year: number): string {
   return format(new Date(year, month - 1, 1), "MMMM yyyy");
 }
 
-export function formatPayrollMonthLabel(dateString: string): string {
-  return format(new Date(dateString), "MMMM yyyy");
+export function formatPayrollMonthLabel(dateString: string | null | undefined): string {
+  const value = dateString?.trim();
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return format(d, "MMMM yyyy");
 }
 
 const MONTH_NAME_TO_NUMBER: Record<string, number> = {
