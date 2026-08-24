@@ -16,7 +16,6 @@ import { EmployeeCardsGrid } from "@/components/employees/employee-cards-grid";
 import { EmployeeDeleteConfirmDialog } from "@/components/employees/employee-delete-confirm-dialog";
 import { deleteEmployeeAction, fetchEmployeesAction } from "@/lib/employees/actions";
 import {
-  EMPLOYEE_ACCOUNT_STATUS_LABELS,
   EMPLOYMENT_STATUS_LABELS,
   resolveEmployeeModuleRoutes,
 } from "@/lib/employees/constants";
@@ -37,7 +36,6 @@ type EmployeeTableProps = {
   sortOrder: "asc" | "desc";
   department?: string;
   employmentStatus?: string;
-  accountStatus?: string;
   departments: LookupOption[];
   canEdit: boolean;
   canDelete: boolean;
@@ -55,7 +53,6 @@ export function EmployeeTable({
   sortOrder: initialSortOrder,
   department: initialDepartment,
   employmentStatus: initialEmploymentStatus,
-  accountStatus: initialAccountStatus,
   departments,
   canEdit,
   canDelete,
@@ -78,7 +75,6 @@ export function EmployeeTable({
     sortOrder: initialSortOrder,
     department: initialDepartment,
     employmentStatus: initialEmploymentStatus as EmployeeListParams["employmentStatus"],
-    accountStatus: initialAccountStatus as EmployeeListParams["accountStatus"],
   });
   const [searchInput, setSearchInput] = useState(initialSearch ?? "");
 
@@ -136,7 +132,7 @@ export function EmployeeTable({
   }, [searchInput, filters.search, updateParams]);
 
   const { employees, total, page, pageSize } = tableState;
-  const { search, department, employmentStatus, accountStatus } = filters;
+  const { department, employmentStatus } = filters;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const departmentItems = useMemo(
@@ -161,17 +157,6 @@ export function EmployeeTable({
           value,
           label,
         })),
-    ],
-    [],
-  );
-
-  const accountStatusItems = useMemo(
-    () => [
-      { value: "", label: "All accounts" },
-      { value: "active", label: EMPLOYEE_ACCOUNT_STATUS_LABELS.active },
-      { value: "invitation_pending", label: "Pending Invitation" },
-      { value: "suspended", label: EMPLOYEE_ACCOUNT_STATUS_LABELS.suspended },
-      { value: "inactive", label: EMPLOYEE_ACCOUNT_STATUS_LABELS.inactive },
     ],
     [],
   );
@@ -264,27 +249,6 @@ export function EmployeeTable({
             <SelectContent align="start" alignItemWithTrigger={false}>
               {employmentStatusItems.map((item) => (
                 <SelectItem key={item.value || "all-statuses"} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            items={accountStatusItems}
-            value={accountStatus ?? ""}
-            onValueChange={(value) =>
-              updateParams({
-                accountStatus: value || undefined,
-                page: "1",
-              })
-            }
-          >
-            <SelectTrigger className="h-8 w-full min-w-0 sm:w-48">
-              <SelectValue placeholder="All accounts" />
-            </SelectTrigger>
-            <SelectContent align="start" alignItemWithTrigger={false}>
-              {accountStatusItems.map((item) => (
-                <SelectItem key={item.value || "all-accounts"} value={item.value}>
                   {item.label}
                 </SelectItem>
               ))}

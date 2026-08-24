@@ -11,6 +11,10 @@ import {
 
 import { PayrollStatusBadge } from "@/components/payroll/payroll-status-badge";
 import {
+  TABLE_HEADER_CELL_CLASS,
+} from "@/components/common/table-header-classes";
+import { cn } from "@/lib/utils";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -163,13 +167,13 @@ export function PayrollRunSummaryDialog({
                   </div>
                   <div className="max-h-[min(38vh,260px)] overflow-y-auto">
                     <table className="w-full text-xs">
-                      <thead className="sticky top-0 z-10 bg-muted/90 text-left text-muted-foreground">
+                      <thead className="sticky top-0 z-30 bg-black text-left shadow-[0_1px_0_rgba(255,255,255,0.08)]">
                         <tr className="border-b">
-                          <th className="px-3 py-2 font-medium">Employee</th>
-                          <th className="px-3 py-2 font-medium">Dept</th>
-                          <th className="px-3 py-2 font-medium text-right">Gross</th>
-                          <th className="px-3 py-2 font-medium text-right">Ded.</th>
-                          <th className="px-3 py-2 font-medium text-right">Net</th>
+                          <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Employee</th>
+                          <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Dept</th>
+                          <th className={cn(TABLE_HEADER_CELL_CLASS, "text-right")}>Gross</th>
+                          <th className={cn(TABLE_HEADER_CELL_CLASS, "text-right")}>Ded.</th>
+                          <th className={cn(TABLE_HEADER_CELL_CLASS, "text-right")}>Net</th>
                         </tr>
                       </thead>
                       <tbody>

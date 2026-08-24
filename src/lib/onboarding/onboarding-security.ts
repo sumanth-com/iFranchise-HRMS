@@ -130,7 +130,7 @@ export type ValidatedInvitation = {
   status: string;
 };
 
-async function portalAccountHasPassword(caseId: string): Promise<boolean> {
+export async function portalAccountHasPassword(caseId: string): Promise<boolean> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .schema("hrms")
@@ -143,9 +143,25 @@ async function portalAccountHasPassword(caseId: string): Promise<boolean> {
   return typeof data?.password_hash === "string" && data.password_hash.length > 0;
 }
 
+export async function onboardingEmailAlreadyHasPassword(email: string): Promise<boolean> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .schema("hrms")
+    .from("onboarding_portal_accounts")
+    .select("password_hash")
+    .eq("personal_email", email.trim().toLowerCase())
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return typeof data?.password_hash === "string" && data.password_hash.length > 0;
+}
+
 export async function validateOnboardingInvitationToken(
   rawToken: string,
-): Promise<{ ok: true; data: ValidatedInvitation } | { ok: false; reason: string }> {
+): Promise<
+  | { ok: true; data: ValidatedInvitation }
+  | { ok: false; reason: string; personalEmail?: string }
+> {
   const admin = createAdminClient();
   const tokenHash = hashOnboardingToken(rawToken);
 
@@ -164,16 +180,6 @@ export async function validateOnboardingInvitationToken(
     return { ok: false, reason: "This invitation is no longer active." };
   }
 
-  if (tokenRow.consumed_at) {
-    // Incomplete setup: token was marked used but password never saved — allow password screen again.
-    const hasPassword = await portalAccountHasPassword(tokenRow.case_id);
-    if (hasPassword) {
-      return { ok: false, reason: "This invitation link has already been used." };
-    }
-  } else if (new Date(tokenRow.expires_at) < new Date()) {
-    return { ok: false, reason: "This invitation link has expired." };
-  }
-
   const { data: caseRow, error: caseError } = await admin
     .schema("hrms")
     .from("onboarding_cases")
@@ -186,6 +192,19 @@ export async function validateOnboardingInvitationToken(
   }
   if (caseRow.cancelled_at || caseRow.archived_at) {
     return { ok: false, reason: "This onboarding has been cancelled or archived." };
+  }
+
+  const hasPassword = await portalAccountHasPassword(tokenRow.case_id);
+  if (hasPassword) {
+    return {
+      ok: false,
+      reason: "PASSWORD_ALREADY_SET",
+      personalEmail: caseRow.personal_email,
+    };
+  }
+
+  if (!tokenRow.consumed_at && new Date(tokenRow.expires_at) < new Date()) {
+    return { ok: false, reason: "This invitation link has expired." };
   }
 
   return {
@@ -273,6 +292,82 @@ export async function ensurePortalAccountForInvitation(caseId: string, email: st
     { onConflict: "case_id" },
   );
   if (error) throw new Error(error.message);
+}
+
+const CLOSED_ONBOARDING_STATUSES = new Set([
+  "cancelled",
+  "archived",
+  "completed",
+  "rejected",
+  "employee_created",
+]);
+
+function isInvitedOnboardingCase(row: {
+  status: string;
+  deleted_at?: string | null;
+  cancelled_at?: string | null;
+  archived_at?: string | null;
+  invitation_sent_at?: string | null;
+}) {
+  if (row.deleted_at || row.cancelled_at || row.archived_at) return false;
+  if (CLOSED_ONBOARDING_STATUSES.has(row.status)) return false;
+  if (row.status === "draft" && !row.invitation_sent_at) return false;
+  return true;
+}
+
+/**
+ * Find the invited onboarding case for a personal email and ensure a portal
+ * account row exists. Used by first-time password setup, OTP, and forgot-password
+ * so invited candidates can continue even if the portal account row was missing.
+ */
+export async function resolveInvitedOnboardingByEmail(
+  email: string,
+): Promise<{ caseId: string } | null> {
+  const admin = createAdminClient();
+  const normalized = email.trim().toLowerCase();
+  const caseFields =
+    "id, status, deleted_at, cancelled_at, archived_at, invitation_sent_at";
+
+  const { data: account, error: accountError } = await admin
+    .schema("hrms")
+    .from("onboarding_portal_accounts")
+    .select("case_id, is_active")
+    .eq("personal_email", normalized)
+    .maybeSingle();
+
+  if (accountError) throw new Error(accountError.message);
+
+  if (account?.case_id) {
+    const { data: caseRow, error: caseError } = await admin
+      .schema("hrms")
+      .from("onboarding_cases")
+      .select(caseFields)
+      .eq("id", account.case_id)
+      .maybeSingle();
+
+    if (caseError) throw new Error(caseError.message);
+    if (caseRow && isInvitedOnboardingCase(caseRow)) {
+      await ensurePortalAccountForInvitation(account.case_id, normalized);
+      return { caseId: account.case_id };
+    }
+  }
+
+  const { data: cases, error: casesError } = await admin
+    .schema("hrms")
+    .from("onboarding_cases")
+    .select(caseFields)
+    .eq("personal_email", normalized)
+    .is("deleted_at", null)
+    .order("updated_at", { ascending: false })
+    .limit(8);
+
+  if (casesError) throw new Error(casesError.message);
+
+  const match = (cases ?? []).find((row) => isInvitedOnboardingCase(row));
+  if (!match) return null;
+
+  await ensurePortalAccountForInvitation(match.id, normalized);
+  return { caseId: match.id };
 }
 
 export async function storePortalPassword(caseId: string, email: string, password: string) {

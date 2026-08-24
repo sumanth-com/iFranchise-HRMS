@@ -1,5 +1,4 @@
 import { MyProfileView } from "@/components/employee/profile/my-profile-view";
-import { PageScroll } from "@/components/common/sticky-layout";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import {
   canEditSelfProfileContactDetails,
@@ -25,11 +24,9 @@ export default async function DashboardProfilePage() {
 
   if (!data) {
     return (
-      <PageScroll>
-        <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
-          Profile not found.
-        </div>
-      </PageScroll>
+      <div className="flex min-h-0 flex-1 items-center justify-center p-6 text-sm text-muted-foreground">
+        Profile not found.
+      </div>
     );
   }
 
@@ -49,13 +46,13 @@ export default async function DashboardProfilePage() {
   })) ?? [];
 
   return (
-    <PageScroll>
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-4 md:p-5">
       <MyProfileView
         data={data}
         canEditContactDetails={canEditContactDetails}
         canEditReportingManager={canEditReportingManager}
         managerOptions={managerOptions}
       />
-    </PageScroll>
+    </div>
   );
 }

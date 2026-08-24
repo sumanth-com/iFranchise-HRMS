@@ -342,14 +342,14 @@ export function OnboardingDashboardView({
       ) : (
         <div className="w-full overflow-hidden rounded-xl border">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-left">
+            <thead className="sticky top-0 z-30 bg-black text-left shadow-[0_1px_0_rgba(255,255,255,0.08)]">
               <tr>
-                <th className="p-3 font-medium">Candidate</th>
-                <th className="p-3 font-medium">Role</th>
-                <th className="p-3 font-medium">Joining</th>
-                <th className="p-3 font-medium">Progress</th>
-                <th className="p-3 font-medium">Status</th>
-                <th className="w-[120px] p-3 font-medium text-right">Actions</th>
+                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Candidate</th>
+                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Role</th>
+                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Joining</th>
+                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Progress</th>
+                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Status</th>
+                <th className="h-11 w-[120px] whitespace-nowrap bg-black px-4 py-3 text-right align-middle text-xs font-semibold uppercase tracking-wide text-white">Actions</th>
               </tr>
             </thead>
             <tbody>

@@ -138,7 +138,6 @@ export default async function SuperAdminEmployeesPage({
               sortOrder={params.sortOrder}
               department={departmentCode}
               employmentStatus={params.employmentStatus}
-              accountStatus={params.accountStatus}
               departments={departments}
               canEdit={hasPermission(profile.permissionCodes, "employee.edit")}
               canDelete={false}

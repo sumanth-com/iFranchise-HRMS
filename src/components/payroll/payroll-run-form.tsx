@@ -15,6 +15,10 @@ import {
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
+import {
+  TABLE_HEADER_CELL_CLASS,
+} from "@/components/common/table-header-classes";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/common/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -730,15 +734,15 @@ function EmployeePayrollTable({
   return (
     <div className="overflow-auto max-h-[min(32rem,calc(100dvh-18rem))] rounded-lg border">
       <table className="w-full text-sm">
-        <thead className="sticky top-0 z-10 border-b bg-muted/90 text-left text-xs text-muted-foreground">
+        <thead className="sticky top-0 z-30 bg-black text-left shadow-[0_1px_0_rgba(255,255,255,0.08)]">
           <tr>
-            <th className="px-3 py-2.5 font-medium">Employee</th>
-            <th className="px-3 py-2.5 font-medium">Department</th>
-            <th className="px-3 py-2.5 font-medium">Gross</th>
-            <th className="px-3 py-2.5 font-medium">Deductions</th>
-            <th className="px-3 py-2.5 font-medium">Net</th>
-            <th className="px-3 py-2.5 font-medium">LOP</th>
-            <th className="px-3 py-2.5 text-right font-medium">View</th>
+            <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Employee</th>
+            <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Department</th>
+            <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Gross</th>
+            <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Deductions</th>
+            <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Net</th>
+            <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">LOP</th>
+            <th className={cn(TABLE_HEADER_CELL_CLASS, "text-right")}>View</th>
           </tr>
         </thead>
         <tbody>

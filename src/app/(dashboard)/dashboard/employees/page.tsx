@@ -73,7 +73,6 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
               sortOrder={params.sortOrder}
               department={params.department}
               employmentStatus={params.employmentStatus}
-              accountStatus={params.accountStatus}
               departments={departments}
               canEdit={hasPermission(profile.permissionCodes, "employee.edit")}
               canDelete={hasPermission(profile.permissionCodes, "employee.delete")}
@@ -163,7 +162,6 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
             sortOrder={params.sortOrder}
             department={departmentCode}
             employmentStatus={params.employmentStatus}
-            accountStatus={params.accountStatus}
             departments={departments}
             canEdit={hasPermission(profile.permissionCodes, "employee.edit")}
             canDelete={hasPermission(profile.permissionCodes, "employee.delete")}

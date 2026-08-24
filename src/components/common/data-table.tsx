@@ -1,6 +1,11 @@
 import { type ReactNode } from "react";
 
 import {
+  TABLE_HEADER_CELL_CLASS,
+  TABLE_HEADER_ROW_CLASS,
+  TABLE_HEADER_STICKY_CLASS,
+} from "@/components/common/table-header-classes";
+import {
   Table,
   TableBody,
   TableCell,
@@ -64,13 +69,13 @@ export function DataTable<T extends Record<string, unknown>>({
         )}
       >
         <table className="w-full caption-bottom text-sm">
-          <thead className="sticky top-0 z-20 border-b bg-card shadow-sm">
-            <tr className="border-b">
+          <thead className={TABLE_HEADER_STICKY_CLASS}>
+            <tr className={TABLE_HEADER_ROW_CLASS}>
               {columns.map((column) => (
                 <th
                   key={String(column.key)}
                   className={cn(
-                    "h-10 bg-card px-2 text-left align-middle text-sm font-medium whitespace-nowrap text-foreground",
+                    TABLE_HEADER_CELL_CLASS,
                     headAlign,
                     column.className,
                   )}
@@ -122,7 +127,7 @@ export function DataTable<T extends Record<string, unknown>>({
     <div className={cn("rounded-lg border overflow-x-auto", className)}>
       <Table>
         <TableHeader>
-          <TableRow>
+          <TableRow className={TABLE_HEADER_ROW_CLASS}>
             {columns.map((column) => (
               <TableHead
                 key={String(column.key)}

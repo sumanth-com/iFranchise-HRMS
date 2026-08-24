@@ -37,6 +37,7 @@ import {
   formatNotificationDisplayText,
   formatNotificationModule,
   getNotificationsRoutesForPath,
+  NOTIFICATIONS_READ_EVENT,
 } from "@/lib/notifications/constants";
 import {
   attachNotificationSoundUnlock,
@@ -103,6 +104,20 @@ export function NotificationBell() {
   useEffect(() => {
     if (open) void refresh();
   }, [open, refresh]);
+
+  useEffect(() => {
+    function onNotificationRead(event: Event) {
+      const id = (event as CustomEvent<{ id?: string }>).detail?.id;
+      if (id) {
+        removeFromBell(id);
+        return;
+      }
+      void refresh();
+    }
+
+    window.addEventListener(NOTIFICATIONS_READ_EVENT, onNotificationRead);
+    return () => window.removeEventListener(NOTIFICATIONS_READ_EVENT, onNotificationRead);
+  }, [refresh]);
 
   function removeFromBell(itemId: string) {
     setData((prev) => ({

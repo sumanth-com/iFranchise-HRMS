@@ -23,6 +23,7 @@ export type MyProfileBundle = {
   dateOfJoining: string | null;
   attendanceSummary: MyProfileAttendanceSummary;
   profileImageUrl: string | null;
+  profileImagePath: string | null;
   profileSettings: EmployeeSelfProfileSettings;
   selfProfileSubmittedAt: string | null;
   profilePath: string;

@@ -216,10 +216,10 @@ export function PermissionMatrix({
               </p>
             ) : (
               <table className="w-full border-collapse text-sm">
-                <thead className="sticky top-0 z-10 border-b bg-card">
+                <thead className="sticky top-0 z-30 bg-black text-left shadow-[0_1px_0_rgba(255,255,255,0.08)]">
                   <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="w-[180px] px-3 py-2.5 font-medium sm:w-[220px]">Module</th>
-                    <th className="px-3 py-2.5 font-medium">Actions</th>
+                    <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Actions</th>
                   </tr>
                 </thead>
                 <tbody>

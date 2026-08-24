@@ -7,6 +7,10 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import type { z } from "zod";
 
+import {
+  TABLE_HEADER_CELL_CLASS,
+  TABLE_HEADER_STICKY_CLASS,
+} from "@/components/common/table-header-classes";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
@@ -91,14 +95,14 @@ export function SalaryRevisionTable({ records }: { records: SalaryRevisionItem[]
   return (
     <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
       <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b bg-muted/30 text-left text-muted-foreground">
-            <th className="px-4 py-3">Employee</th>
-            <th className="px-4 py-3">Old gross</th>
-            <th className="px-4 py-3">New gross</th>
-            <th className="px-4 py-3">Effective</th>
-            <th className="px-4 py-3">Approved by</th>
-            <th className="px-4 py-3">Status</th>
+        <thead className={TABLE_HEADER_STICKY_CLASS}>
+          <tr className="border-white/10 bg-black hover:bg-black">
+            <th className={TABLE_HEADER_CELL_CLASS}>Employee</th>
+            <th className={TABLE_HEADER_CELL_CLASS}>Old gross</th>
+            <th className={TABLE_HEADER_CELL_CLASS}>New gross</th>
+            <th className={TABLE_HEADER_CELL_CLASS}>Effective</th>
+            <th className={TABLE_HEADER_CELL_CLASS}>Approved by</th>
+            <th className={TABLE_HEADER_CELL_CLASS}>Status</th>
           </tr>
         </thead>
         <tbody>

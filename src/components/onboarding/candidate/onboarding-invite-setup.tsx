@@ -2,13 +2,17 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { Check, Eye, EyeOff, LogIn, Lock, Mail } from "lucide-react";
+import { ArrowRight, Check, Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
 import { useMemo, useState, useTransition, useEffect } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
+import {
+  ONBOARDING_AUTH_FIELD_CLASS,
+  ONBOARDING_AUTH_SUBMIT_CLASS,
+} from "@/components/onboarding/candidate/onboarding-auth-styles";
 import { setupCandidateAccountAction } from "@/lib/onboarding/actions/candidate-onboarding-actions";
 import {
   clearOnboardingInviteToken,
@@ -165,29 +169,33 @@ export function OnboardingInviteSetup({
   const firstName = fullName.trim().split(/\s+/)[0] ?? fullName;
 
   return (
-    <div className="flex w-full max-w-md flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-lg shadow-black/5 ring-1 ring-border/50 dark:shadow-black/25">
-      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-5 py-5 text-center text-white sm:px-6">
-        <div className="mx-auto flex max-w-sm flex-col items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15">
-            <Lock className="h-4 w-4" strokeWidth={2} />
-          </div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50">
-            Secure account setup
+    <div className="flex flex-col gap-6">
+      <div className="space-y-1.5 text-center">
+        <h1 className="text-[1.75rem] font-semibold tracking-tight text-foreground">
+          Welcome, {firstName}
+        </h1>
+        <p className="text-sm font-medium text-muted-foreground">
+          Create a password for your onboarding portal using the email on your invitation.
+        </p>
+      </div>
+
+      <div className="flex items-start gap-3 rounded-2xl border border-sky-200/90 bg-sky-50/90 px-4 py-3.5 text-left shadow-sm dark:border-sky-500/25 dark:bg-sky-500/10">
+        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 text-sky-600 dark:bg-sky-400/15 dark:text-sky-300">
+          <Mail className="size-4" strokeWidth={2.25} />
+        </span>
+        <div className="min-w-0 space-y-0.5">
+          <p className="text-sm font-semibold text-sky-950 dark:text-sky-100">Invitation email</p>
+          <p className="truncate text-[13px] leading-snug text-slate-600 dark:text-slate-300">
+            {personalEmail}
           </p>
-          <h1 className="text-xl font-semibold tracking-tight">Welcome, {firstName}</h1>
-          <p className="text-xs leading-snug text-white/65">
-            Create your permanent password for the pre-joining portal. You will use it to sign in later.
-          </p>
-          <div className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] text-white/90">
-            <Mail className="h-3 w-3 shrink-0 text-white/55" />
-            <span className="truncate">{personalEmail}</span>
-          </div>
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 bg-card px-5 py-5 sm:px-6">
-        <Field label="Password">
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label className="text-sm font-semibold text-foreground">Password</Label>
           <div className="relative">
+            <Lock className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type={showPassword ? "text" : "password"}
               minLength={MIN_PASSWORD_LENGTH}
@@ -195,19 +203,19 @@ export function OnboardingInviteSetup({
               placeholder="Min. 8 characters"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className={inputClassName}
+              className={cn(ONBOARDING_AUTH_FIELD_CLASS, "pr-10")}
               autoComplete="new-password"
             />
             <button
               type="button"
               onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute inset-y-0 right-2 flex items-center px-1 text-muted-foreground hover:text-foreground"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
-              {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
           </div>
-        </Field>
+        </div>
 
         <div className="rounded-lg border border-border bg-muted/50 px-3 py-2.5 dark:bg-muted/30">
           <div className="flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -238,8 +246,10 @@ export function OnboardingInviteSetup({
           </div>
         </div>
 
-        <Field label="Confirm password">
+        <div className="space-y-2">
+          <Label className="text-sm font-semibold text-foreground">Confirm password</Label>
           <div className="relative">
+            <Lock className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type={showConfirm ? "text" : "password"}
               minLength={MIN_PASSWORD_LENGTH}
@@ -248,8 +258,8 @@ export function OnboardingInviteSetup({
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className={cn(
-                inputClassName,
-                "transition-colors",
+                ONBOARDING_AUTH_FIELD_CLASS,
+                "pr-10",
                 confirmPassword && !passwordsMatch && "border-red-400 dark:border-red-500",
                 passwordsMatch && "border-emerald-500 dark:border-emerald-400",
               )}
@@ -258,29 +268,43 @@ export function OnboardingInviteSetup({
             <button
               type="button"
               onClick={() => setShowConfirm((v) => !v)}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute inset-y-0 right-2 flex items-center px-1 text-muted-foreground hover:text-foreground"
               aria-label={showConfirm ? "Hide password" : "Show password"}
             >
-              {showConfirm ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+              {showConfirm ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
           </div>
-        </Field>
+        </div>
 
         <Button
-          className="h-10 w-full text-sm font-semibold"
+          className={ONBOARDING_AUTH_SUBMIT_CLASS}
           onClick={submit}
           disabled={!canSubmit}
         >
-          {isPending ? "Creating account…" : "Create account & continue"}
+          {isPending ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Creating account...
+            </>
+          ) : (
+            <>
+              Create account & continue
+              <span
+                className="inline-flex size-5 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/30"
+                aria-hidden
+              >
+                <ArrowRight className="size-3.5" strokeWidth={2.75} />
+              </span>
+            </>
+          )}
         </Button>
 
-        <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
+        <p className="text-center text-sm text-muted-foreground">
           Already set up?{" "}
           <Link
             href={ONBOARDING_ROUTES.login}
-            className="inline-flex items-center gap-1 font-semibold text-primary hover:underline"
+            className="font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-400"
           >
-            <LogIn className="h-3 w-3" />
             Sign in
           </Link>
         </p>

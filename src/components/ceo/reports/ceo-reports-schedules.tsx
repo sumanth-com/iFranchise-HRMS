@@ -5,6 +5,7 @@ import { CalendarClock, Mail, Pause, Play, Trash2 } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 
 import { Button } from "@/components/common/button";
+import { SECTION_HEADING_ROW_CLASS } from "@/components/common/table-header-classes";
 import { Input } from "@/components/common/input";
 import {
   Select,
@@ -215,7 +216,7 @@ export function CeoReportsSchedules({
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-          <div className="hidden grid-cols-[minmax(0,1.4fr)_minmax(0,1.2fr)_7rem_5.5rem_7.5rem_6.5rem_auto] gap-3 border-b bg-muted/40 px-4 py-2.5 text-[10px] font-medium tracking-wide text-muted-foreground uppercase xl:grid">
+          <div className={cn("hidden grid-cols-[minmax(0,1.4fr)_minmax(0,1.2fr)_7rem_5.5rem_7.5rem_6.5rem_auto] gap-3 xl:grid", SECTION_HEADING_ROW_CLASS)}>
             <span>Delivery</span>
             <span>Report</span>
             <span>Cadence</span>

@@ -7,7 +7,7 @@ import { Pencil } from "lucide-react";
 import { AttendanceStatusBadge } from "@/components/attendance/attendance-status-badge";
 import { Button, buttonVariants } from "@/components/common/button";
 import { ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
-import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils";
+import { formatAttendanceTime, toDisplayAttendanceNotes } from "@/lib/attendance/services/attendance-utils";
 import type { AttendanceDetail } from "@/types/attendance";
 import { cn } from "@/lib/utils";
 
@@ -148,7 +148,10 @@ export function AttendanceDetailView({
               label="Overtime"
               value={`${attendance.overtimeHours.toFixed(2)} hours`}
             />
-            <DetailRow label="Remarks" value={attendance.notes ?? "—"} />
+            <DetailRow
+              label="Remarks"
+              value={toDisplayAttendanceNotes(attendance.notes) ?? "—"}
+            />
           </section>
         </div>
 

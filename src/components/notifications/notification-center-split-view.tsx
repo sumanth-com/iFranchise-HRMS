@@ -3,7 +3,7 @@
 import { format, formatDistanceToNow } from "date-fns";
 import { Check, Bell, Loader2, MoreHorizontal, Search, Trash2, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
@@ -30,6 +30,7 @@ import {
 import { runServerActionSafely } from "@/lib/errors/stale-server-action";
 import {
   NOTIFICATION_CENTER_TABS,
+  NOTIFICATIONS_READ_EVENT,
   NOTIFICATIONS_ROUTES,
   formatNotificationModule,
   formatNotificationPriority,
@@ -37,6 +38,25 @@ import {
 } from "@/lib/notifications/constants";
 import { cn } from "@/lib/utils";
 import type { NotificationListItem, NotificationListResult } from "@/types/notifications";
+
+function dispatchNotificationRead(notificationId: string) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent(NOTIFICATIONS_READ_EVENT, { detail: { id: notificationId } }),
+  );
+}
+
+function withReadStatus(
+  item: NotificationListItem,
+  readIds: ReadonlySet<string>,
+): NotificationListItem {
+  if (item.status !== "unread" || !readIds.has(item.id)) return item;
+  return {
+    ...item,
+    status: "read",
+    readAt: item.readAt ?? new Date().toISOString(),
+  };
+}
 
 type Props = {
   result: NotificationListResult;
@@ -77,23 +97,35 @@ export function NotificationCenterSplitView({
   const [activeNotification, setActiveNotification] = useState<NotificationListItem | null>(
     null,
   );
+  const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
+  const markedOnServerRef = useRef<Set<string>>(new Set());
 
   const urlSelectedId = selectedId ?? searchParams.get("id") ?? null;
+
+  const displayItems = useMemo(
+    () => result.items.map((item) => withReadStatus(item, readIds)),
+    [readIds, result.items],
+  );
 
   // Keep detail open from local state so Unread → mark-read refresh cannot auto-close it.
   const selected = useMemo(() => {
     if (!activeNotification) return null;
-    const fresh = result.items.find((item) => item.id === activeNotification.id);
-    return fresh ?? activeNotification;
-  }, [activeNotification, result.items]);
+    const fresh = displayItems.find((item) => item.id === activeNotification.id);
+    return fresh ?? withReadStatus(activeNotification, readIds);
+  }, [activeNotification, displayItems, readIds]);
 
   useEffect(() => {
     if (!urlSelectedId) return;
-    const fromList = result.items.find((item) => item.id === urlSelectedId);
-    if (fromList) {
-      setActiveNotification((prev) => (prev?.id === fromList.id ? prev : fromList));
+    const raw = result.items.find((item) => item.id === urlSelectedId);
+    if (!raw) return;
+    setActiveNotification((prev) => {
+      const display = withReadStatus(raw, readIds);
+      return prev?.id === display.id ? prev : display;
+    });
+    if (raw.status === "unread" && !readIds.has(raw.id)) {
+      markAsRead(raw);
     }
-  }, [urlSelectedId, result.items]);
+  }, [urlSelectedId, result.items, readIds]);
 
   const visibleIds = useMemo(
     () => result.items.map((item) => item.id),
@@ -157,18 +189,40 @@ export function NotificationCenterSplitView({
   }
 
   function markAsRead(item: NotificationListItem) {
-    if (item.status === "read" || item.status === "archived") return;
-    // Optimistic local status so detail stays open and feels instant.
+    const alreadyRead =
+      item.status === "read" ||
+      item.status === "archived" ||
+      readIds.has(item.id);
+    if (alreadyRead) return;
+
+    setReadIds((prev) => {
+      const next = new Set(prev);
+      next.add(item.id);
+      return next;
+    });
     setActiveNotification((prev) =>
       prev?.id === item.id
-        ? { ...prev, status: "read", readAt: prev.readAt ?? new Date().toISOString() }
+        ? {
+            ...prev,
+            status: "read",
+            readAt: prev.readAt ?? new Date().toISOString(),
+          }
         : prev,
     );
+    dispatchNotificationRead(item.id);
+
+    if (markedOnServerRef.current.has(item.id)) return;
+    markedOnServerRef.current.add(item.id);
+
     startTransition(async () => {
       const res = await runServerActionSafely(() => markNotificationReadAction(item.id));
       if (res === null) return;
-      if (res.success) router.refresh();
-      else toast.error(res.message);
+      if (res.success) {
+        router.refresh();
+      } else {
+        markedOnServerRef.current.delete(item.id);
+        toast.error(res.message);
+      }
     });
   }
 
@@ -218,15 +272,18 @@ export function NotificationCenterSplitView({
     });
   }
 
-  function selectNotification(item: NotificationListItem) {
+  function selectNotification(displayItem: NotificationListItem) {
     if (bulkSelectMode) {
-      toggleSelect(item.id, !selectedIds.has(item.id));
+      toggleSelect(displayItem.id, !selectedIds.has(displayItem.id));
       return;
     }
+    const raw = result.items.find((item) => item.id === displayItem.id);
     // Open detail immediately — do not wait for navigation/refresh.
-    setActiveNotification(item);
-    setParams({ id: item.id });
-    if (item.status === "unread") markAsRead(item);
+    setActiveNotification(withReadStatus(raw ?? displayItem, readIds));
+    setParams({ id: displayItem.id });
+    if (raw?.status === "unread" && !readIds.has(raw.id)) {
+      markAsRead(raw);
+    }
   }
 
   function closeDetail() {
@@ -355,6 +412,17 @@ export function NotificationCenterSplitView({
                   disabled={isPending}
                   onClick={() => {
                     startTransition(async () => {
+                      const unreadIds = displayItems
+                        .filter((item) => item.status === "unread")
+                        .map((item) => item.id);
+                      if (unreadIds.length > 0) {
+                        setReadIds((prev) => {
+                          const next = new Set(prev);
+                          unreadIds.forEach((id) => next.add(id));
+                          return next;
+                        });
+                        unreadIds.forEach((id) => dispatchNotificationRead(id));
+                      }
                       const res = await runServerActionSafely(() =>
                         markAllNotificationsReadAction(),
                       );
@@ -383,7 +451,7 @@ export function NotificationCenterSplitView({
                 No notifications in this view.
               </div>
             ) : (
-              result.items.map((item) => (
+              displayItems.map((item) => (
                 <NotificationListRow
                   key={item.id}
                   item={item}

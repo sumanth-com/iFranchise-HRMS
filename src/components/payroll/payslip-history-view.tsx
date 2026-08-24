@@ -19,6 +19,10 @@ import { toast } from "sonner";
 import { EmployeePayslipDrawer } from "@/components/employee/payroll/employee-payslip-drawer";
 import { EmployeeDetailPayslipDrawer } from "@/components/employees/employee-detail-payslip-drawer";
 import { Button, buttonVariants } from "@/components/common/button";
+import {
+  TABLE_HEADER_CELL_CLASS,
+  TABLE_HEADER_STICKY_CLASS,
+} from "@/components/common/table-header-classes";
 import { Input } from "@/components/common/input";
 import { PayslipHistorySummaryCards } from "@/components/payroll/payslip-history-summary-cards";
 import {
@@ -189,17 +193,17 @@ function PayslipTable({
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[56rem] text-sm">
-        <thead>
-          <tr className="border-b text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-            <th className="pb-2.5 pr-3 font-medium">Payroll Month</th>
-            {showEmployee ? <th className="pb-2.5 pr-3 font-medium">Employee</th> : null}
-            <th className="pb-2.5 pr-3 font-medium">Credit Date</th>
-            <th className="pb-2.5 pr-3 font-medium">Published</th>
-            <th className="pb-2.5 pr-3 font-medium">Gross</th>
-            <th className="pb-2.5 pr-3 font-medium">Net</th>
-            <th className="pb-2.5 pr-3 font-medium">Payment</th>
-            <th className="pb-2.5 pr-3 font-medium">Version</th>
-            <th className="pb-2.5 font-medium text-right">Actions</th>
+        <thead className={TABLE_HEADER_STICKY_CLASS}>
+          <tr className="border-white/10 bg-black hover:bg-black">
+            <th className={TABLE_HEADER_CELL_CLASS}>Payroll Month</th>
+            {showEmployee ? <th className={TABLE_HEADER_CELL_CLASS}>Employee</th> : null}
+            <th className={TABLE_HEADER_CELL_CLASS}>Credit Date</th>
+            <th className={TABLE_HEADER_CELL_CLASS}>Published</th>
+            <th className={TABLE_HEADER_CELL_CLASS}>Gross</th>
+            <th className={TABLE_HEADER_CELL_CLASS}>Net</th>
+            <th className={TABLE_HEADER_CELL_CLASS}>Payment</th>
+            <th className={TABLE_HEADER_CELL_CLASS}>Version</th>
+            <th className={cn(TABLE_HEADER_CELL_CLASS, "text-right")}>Actions</th>
           </tr>
         </thead>
         <tbody>

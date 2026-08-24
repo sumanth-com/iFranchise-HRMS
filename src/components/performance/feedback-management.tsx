@@ -229,7 +229,7 @@ export function FeedbackTable({
       >
         {paged.rows.length > 0 ? (
           <table className="w-full min-w-[52rem] text-sm">
-            <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
+            <thead className="sticky top-0 z-30 bg-black text-left shadow-[0_1px_0_rgba(255,255,255,0.08)]">
               <tr className="text-left text-muted-foreground">
                 <th className="min-w-[14rem] px-4 py-3 font-medium">From</th>
                 <th className="min-w-[14rem] px-4 py-3 font-medium">To</th>

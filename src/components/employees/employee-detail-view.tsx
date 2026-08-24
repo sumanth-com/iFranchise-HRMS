@@ -7,8 +7,8 @@ import { CalendarDays, CheckCircle2, Clock3, FileStack, Hourglass, Pencil, Walle
 
 import { EmployeeIdCard } from "@/components/employees/employee-id-card";
 import {
-  EmployeeAccountStatusBadge,
-  getEmployeeLoginStatus,
+  EmployeeDeactivatedBadge,
+  isEmployeeAccountDeactivated,
 } from "@/components/employees/employee-account-status-badge";
 import { EmployeeEditForm } from "@/components/employees/employee-edit-form";
 import { EmploymentStatusBadge } from "@/components/employees/employment-status-badge";
@@ -24,8 +24,12 @@ import {
   type DataTableColumn,
 } from "@/components/common/data-table";
 import { LeaveStatusBadge } from "@/components/leave/leave-status-badge";
-import { ATTENDANCE_DISPLAY_STATUS_LABELS, ATTENDANCE_STATUS_LABELS } from "@/lib/attendance/constants";
-import { EMPLOYEE_ACCOUNT_STATUS_LABELS, type EmployeeTab } from "@/lib/employees/constants";
+import { SECTION_HEADING_ROW_CLASS } from "@/components/common/table-header-classes";
+import {
+  ATTENDANCE_DISPLAY_STATUS_LABELS,
+  ATTENDANCE_STATUS_LABELS,
+} from "@/lib/attendance/constants";
+import { type EmployeeTab } from "@/lib/employees/constants";
 import { getMonthSelectItems, getYearSelectItems } from "@/components/payroll/select-utils";
 import { buildEmployeeRouteRef } from "@/lib/employees/routing";
 import type {
@@ -155,7 +159,7 @@ function TabEditButton({
 
 function OverviewSectionTitle({ children }: { children: string }) {
   return (
-    <p className="bg-black px-5 py-2.5 text-xs font-semibold uppercase tracking-wide text-white shadow-[0_1px_0_rgba(255,255,255,0.08)]">
+    <p className={SECTION_HEADING_ROW_CLASS}>
       {children}
     </p>
   );
@@ -235,9 +239,7 @@ export function EmployeeDetailView({
   const canEditProfile = hasPermission(permissionCodes, "employee_profile.edit");
   const statutory = salaryStructure?.components ?? {};
   const employeeFullName = `${employee.firstName} ${employee.lastName}`.trim();
-  const accountStatusLabel =
-    EMPLOYEE_ACCOUNT_STATUS_LABELS[employee.accountStatus] ?? employee.accountStatus;
-  const loginStatusLabel = getEmployeeLoginStatus(employee.accountStatus);
+  const accountDeactivated = isEmployeeAccountDeactivated(employee.accountStatus);
   const probationEnd =
     typeof statutory.probation_end_date === "string"
       ? statutory.probation_end_date
@@ -263,7 +265,9 @@ export function EmployeeDetailView({
       {activeTab === "overview" ? (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(300px,22rem)] lg:items-start">
           <section className="flex flex-col space-y-3">
-            <h2 className="text-base font-semibold">Employee Information</h2>
+            <h2 className="text-lg font-semibold tracking-tight text-foreground">
+              Employee Information
+            </h2>
             {isEditing && canEditEmployee ? (
               <div className="rounded-xl border bg-card p-4 md:p-5">
                 <EmployeeEditForm
@@ -317,10 +321,6 @@ export function EmployeeDetailView({
                 value={formatDisplayDate(employee.dateOfLeaving)}
               />
               <OverviewInfoRow
-                label="Account status"
-                value={`${accountStatusLabel} · ${loginStatusLabel}`}
-              />
-              <OverviewInfoRow
                 label="Probation ends"
                 value={formatDisplayDate(probationEnd)}
               />
@@ -334,8 +334,8 @@ export function EmployeeDetailView({
                 label="Address line 2"
                 value={displayOrDash(primaryAddress?.addressLine2)}
               />
-              <OverviewInfoRow label="City" value={displayOrDash(primaryAddress?.city)} />
               <OverviewInfoRow label="State" value={displayOrDash(primaryAddress?.state)} />
+              <OverviewInfoRow label="City" value={displayOrDash(primaryAddress?.city)} />
               <OverviewInfoRow
                 label="Postal code"
                 value={displayOrDash(primaryAddress?.postalCode)}
@@ -409,10 +409,9 @@ export function EmployeeDetailView({
 
           <aside className="flex flex-col items-center gap-3 overflow-visible pr-5 lg:sticky lg:top-6 lg:self-start">
             <div className="flex w-full max-w-[19rem] flex-wrap items-center justify-center gap-2">
-              <EmployeeAccountStatusBadge
-                status={employee.accountStatus}
-                className="h-7 px-3 text-xs leading-none"
-              />
+              {accountDeactivated ? (
+                <EmployeeDeactivatedBadge className="h-7 px-3 text-xs leading-none" />
+              ) : null}
               {canEditEmployee ? (
                 <TabEditButton
                   label={isEditing ? "Cancel editing" : "Edit employee"}
@@ -429,6 +428,8 @@ export function EmployeeDetailView({
               departmentName={employee.departmentName}
               employmentTypeName={formatDisplayLabel(employee.employmentTypeName)}
               employmentStatus={employee.employmentStatus}
+              accountStatus={employee.accountStatus}
+              profileImagePath={employee.profile?.profileImageStoragePath ?? null}
               imageUrl={profileImageUrl}
               profilePath={`/e/${buildEmployeeRouteRef(employee)}`}
               canEdit={canEditProfile}

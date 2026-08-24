@@ -18,6 +18,9 @@ export const NOTIFICATIONS_ROUTES = {
   preferences: "/dashboard/notifications/preferences",
 } as const;
 
+/** Client event: fired when a notification is marked read in the inbox UI. */
+export const NOTIFICATIONS_READ_EVENT = "hrms:notifications-read";
+
 export const NOTIFICATIONS_SUB_NAV = [
   { title: "My Notifications", href: "/dashboard/notifications" },
   { title: "Alerts & Broadcasts", href: "/dashboard/notifications/team", admin: true },

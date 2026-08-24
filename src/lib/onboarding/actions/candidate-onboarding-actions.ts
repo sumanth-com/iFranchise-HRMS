@@ -14,6 +14,9 @@ import {
   createPortalSession,
   generateOtpCode,
   markInvitationViewed,
+  onboardingEmailAlreadyHasPassword,
+  portalAccountHasPassword,
+  resolveInvitedOnboardingByEmail,
   storePortalOtp,
   storePortalPassword,
   validateOnboardingInvitationToken,
@@ -79,13 +82,32 @@ export async function validateInviteTokenAction(rawToken: string) {
   return validateOnboardingInvitationToken(rawToken);
 }
 
+/** True when this invited email already has a portal password (setup must not show again). */
+export async function onboardingEmailHasPasswordAction(email: string): Promise<boolean> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return false;
+  try {
+    return await onboardingEmailAlreadyHasPassword(normalized);
+  } catch {
+    return false;
+  }
+}
+
 export async function setupCandidateAccountAction(
   rawToken: string,
   input: unknown,
 ): Promise<ActionResult> {
   try {
     const validation = await validateOnboardingInvitationToken(rawToken);
-    if (!validation.ok) return { success: false, message: validation.reason };
+    if (!validation.ok) {
+      if (validation.reason === "PASSWORD_ALREADY_SET") {
+        return {
+          success: false,
+          message: "A password is already set for this invitation. Sign in with that password.",
+        };
+      }
+      return { success: false, message: validation.reason };
+    }
 
     const parsed = candidatePasswordSchema.parse(input);
     if (validation.data.personalEmail.toLowerCase() !== validation.data.personalEmail.toLowerCase()) {
@@ -93,6 +115,12 @@ export async function setupCandidateAccountAction(
     }
 
     await markInvitationViewed(validation.data.caseId);
+    if (await portalAccountHasPassword(validation.data.caseId)) {
+      return {
+        success: false,
+        message: "A password is already set for this invitation. Sign in with that password.",
+      };
+    }
     // Persist password first so sign-in works even if token consume/session steps fail after.
     await storePortalPassword(validation.data.caseId, validation.data.personalEmail, parsed.password);
     try {
@@ -131,17 +159,8 @@ export async function setupCandidatePasswordByEmailAction(
       return { success: false, message: "Too many setup attempts. Please try again later." };
     }
 
-    const admin = createAdminClient();
-    const { data: account, error: accountError } = await admin
-      .schema("hrms")
-      .from("onboarding_portal_accounts")
-      .select("case_id, password_hash, is_active, personal_email")
-      .eq("personal_email", email)
-      .maybeSingle();
-
-    if (accountError) throw new Error(accountError.message);
-
-    if (!account?.is_active) {
+    const resolved = await resolveInvitedOnboardingByEmail(email);
+    if (!resolved) {
       return {
         success: false,
         message:
@@ -149,7 +168,17 @@ export async function setupCandidatePasswordByEmailAction(
       };
     }
 
-    if (typeof account.password_hash === "string" && account.password_hash.length > 0) {
+    const admin = createAdminClient();
+    const { data: account, error: accountError } = await admin
+      .schema("hrms")
+      .from("onboarding_portal_accounts")
+      .select("case_id, password_hash, is_active, personal_email")
+      .eq("case_id", resolved.caseId)
+      .maybeSingle();
+
+    if (accountError) throw new Error(accountError.message);
+
+    if (typeof account?.password_hash === "string" && account.password_hash.length > 0) {
       return {
         success: false,
         message:
@@ -161,24 +190,24 @@ export async function setupCandidatePasswordByEmailAction(
       .schema("hrms")
       .from("onboarding_cases")
       .select("id, status, deleted_at, cancelled_at, archived_at, onboarding_account_active")
-      .eq("id", account.case_id)
+      .eq("id", resolved.caseId)
       .maybeSingle();
 
     if (caseError) throw new Error(caseError.message);
     if (!caseRow || caseRow.deleted_at) {
       return { success: false, message: "Onboarding case not found for this email." };
     }
-    if (caseRow.cancelled_at || caseRow.archived_at || !caseRow.onboarding_account_active) {
+    if (caseRow.cancelled_at || caseRow.archived_at) {
       return { success: false, message: "This onboarding account is no longer available." };
     }
     if (["cancelled", "archived", "completed", "rejected"].includes(caseRow.status)) {
       return { success: false, message: "This onboarding is closed. Contact HR for assistance." };
     }
 
-    await markInvitationViewed(account.case_id);
-    await storePortalPassword(account.case_id, email, parsed.password);
+    await markInvitationViewed(resolved.caseId);
+    await storePortalPassword(resolved.caseId, email, parsed.password);
 
-    const session = await createPortalSession(account.case_id);
+    const session = await createPortalSession(resolved.caseId);
     await setCandidateSession(session);
 
     return { success: true, message: "Password saved. You can sign in with this password anytime." };
@@ -219,20 +248,14 @@ export async function requestCandidateOtpAction(input: unknown): Promise<ActionR
       return { success: false, message: "Too many code requests. Please try again later." };
     }
 
-    const admin = createAdminClient();
-    const { data: account } = await admin
-      .schema("hrms")
-      .from("onboarding_portal_accounts")
-      .select("case_id, is_active")
-      .eq("personal_email", parsed.personalEmail.trim().toLowerCase())
-      .maybeSingle();
-
-    if (!account?.is_active) {
-      return { success: false, message: "No active onboarding account found for this email" };
+    const email = parsed.personalEmail.trim().toLowerCase();
+    const resolved = await resolveInvitedOnboardingByEmail(email);
+    if (!resolved) {
+      return { success: false, message: "No active onboarding invitation found for this email" };
     }
 
     const otp = generateOtpCode();
-    await storePortalOtp(account.case_id, parsed.personalEmail, otp);
+    await storePortalOtp(resolved.caseId, email, otp);
 
     const otpEmail = renderOnboardingOtpEmail({
       otp,
@@ -300,20 +323,17 @@ export async function requestCandidatePasswordResetAction(
       return { success: false, message: "Too many reset requests. Please try again later." };
     }
 
-    const admin = createAdminClient();
-    const { data: account } = await admin
-      .schema("hrms")
-      .from("onboarding_portal_accounts")
-      .select("case_id, is_active")
-      .eq("personal_email", email)
-      .maybeSingle();
-
-    if (!account?.is_active) {
-      return { success: false, message: "No active onboarding account found for this email" };
+    const resolved = await resolveInvitedOnboardingByEmail(email);
+    if (!resolved) {
+      return {
+        success: false,
+        message:
+          "No onboarding invitation found for this email. Use the invitation from HR, or contact HR.",
+      };
     }
 
     const otp = generateOtpCode();
-    await storePortalOtp(account.case_id, email, otp);
+    await storePortalOtp(resolved.caseId, email, otp);
 
     const resetEmail = renderOnboardingPasswordResetEmail({
       otp,

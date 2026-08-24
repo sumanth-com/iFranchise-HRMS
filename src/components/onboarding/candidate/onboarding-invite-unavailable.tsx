@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { AlertCircle, KeyRound, LogIn, Mail } from "lucide-react";
+import { Mail, ShieldAlert } from "lucide-react";
 
 import { ONBOARDING_ROUTES } from "@/types/onboarding";
+import { ONBOARDING_AUTH_SUBMIT_CLASS } from "@/components/onboarding/candidate/onboarding-auth-styles";
+import { cn } from "@/lib/utils";
 
 type OnboardingInviteUnavailableProps = {
   reason: string;
@@ -12,11 +14,10 @@ function resolveUnavailableContent(reason: string) {
 
   if (normalized.includes("already been used") || normalized.includes("no longer active")) {
     return {
-      title: "Invitation link already used",
+      title: "Invitation already used",
       description:
-        "You have already set up your onboarding password. Sign in with your personal email and password to continue where you left off.",
+        "You already set up your onboarding password. Sign in with your personal email and password to continue.",
       showLogin: true,
-      hint: "Use the same personal email address that received this invitation.",
     };
   }
 
@@ -24,9 +25,8 @@ function resolveUnavailableContent(reason: string) {
     return {
       title: "Invitation link expired",
       description:
-        "This secure link has expired for your protection. Contact your HR team to request a new onboarding invitation.",
+        "This link has expired. If you already created a password, you can still sign in. Otherwise ask HR for a new invitation.",
       showLogin: true,
-      hint: "If you already created your password before the link expired, you can still sign in below.",
     };
   }
 
@@ -35,7 +35,6 @@ function resolveUnavailableContent(reason: string) {
       title: "Onboarding not available",
       description: reason,
       showLogin: false,
-      hint: "Please reach out to your HR administrator for assistance.",
     };
   }
 
@@ -43,7 +42,6 @@ function resolveUnavailableContent(reason: string) {
     title: "Invitation unavailable",
     description: reason,
     showLogin: true,
-    hint: "If you previously completed account setup, sign in to access the onboarding portal.",
   };
 }
 
@@ -51,50 +49,43 @@ export function OnboardingInviteUnavailable({ reason }: OnboardingInviteUnavaila
   const content = resolveUnavailableContent(reason);
 
   return (
-    <div className="w-full max-w-md overflow-hidden rounded-2xl border border-border/70 bg-card shadow-xl shadow-slate-900/[0.06] ring-1 ring-black/[0.03]">
-      <div className="border-b border-border/50 bg-gradient-to-r from-slate-900 to-slate-800 px-6 py-8 text-center text-white">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/20">
-          <AlertCircle className="h-5 w-5" strokeWidth={2} />
+    <div className="flex flex-col gap-6">
+      <div className="space-y-1.5 text-center">
+        <h1 className="text-[1.75rem] font-semibold tracking-tight text-foreground">
+          {content.title}
+        </h1>
+        <p className="text-sm font-medium text-muted-foreground">{content.description}</p>
+      </div>
+
+      <div className="flex items-start gap-3 rounded-2xl border border-sky-200/90 bg-sky-50/90 px-4 py-3.5 text-left shadow-sm dark:border-sky-500/25 dark:bg-sky-500/10">
+        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 text-sky-600 dark:bg-sky-400/15 dark:text-sky-300">
+          {content.showLogin ? (
+            <Mail className="size-4" strokeWidth={2.25} />
+          ) : (
+            <ShieldAlert className="size-4" strokeWidth={2.25} />
+          )}
+        </span>
+        <div className="min-w-0 space-y-0.5">
+          <p className="text-sm font-semibold text-sky-950 dark:text-sky-100">
+            {content.showLogin ? "Use your invitation email" : "Contact HR"}
+          </p>
+          <p className="text-[13px] leading-snug text-slate-600 dark:text-slate-300">
+            {content.showLogin
+              ? "Sign in with the same personal email that received this invitation."
+              : "Ask your HR administrator if you need a new invitation."}
+          </p>
         </div>
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{content.title}</h1>
-        <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-white/75">
-          {content.description}
-        </p>
       </div>
 
-      <div className="space-y-5 px-6 py-7 text-center">
-        <p className="text-sm leading-relaxed text-muted-foreground">{content.hint}</p>
+      {content.showLogin ? (
+        <Link href={ONBOARDING_ROUTES.login} className={cn(ONBOARDING_AUTH_SUBMIT_CLASS)}>
+          Sign in
+        </Link>
+      ) : null}
 
-        {content.showLogin ? (
-          <div className="space-y-3">
-            <Link
-              href={ONBOARDING_ROUTES.login}
-              className="inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-            >
-              <LogIn className="mr-2 h-4 w-4" />
-              Sign in to onboarding portal
-            </Link>
-            <div className="rounded-xl border border-border bg-muted/40 p-4 text-left dark:bg-muted/25">
-              <div className="flex items-start gap-3">
-                <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                <div className="space-y-1 text-xs text-muted-foreground">
-                  <p className="font-medium text-foreground">Already have a password?</p>
-                  <p>Use your personal email and the password you created during setup.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-xl border border-border bg-muted/40 p-4 dark:bg-muted/25">
-            <div className="flex items-start gap-3 text-left">
-              <Mail className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Contact your HR team if you believe this is an error or need a new invitation.
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
+      <p className="pt-2 text-center text-xs text-muted-foreground">
+        © {new Date().getFullYear()} iFranchise HRMS. All rights reserved.
+      </p>
     </div>
   );
 }

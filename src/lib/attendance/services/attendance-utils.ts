@@ -194,3 +194,26 @@ export function validateAttendanceStatusConsistency(input: {
 
   return null;
 }
+
+/**
+ * Strip internal import/provenance tags from attendance notes for UI display.
+ * Historical imports store notes like `src:P|import:<batchId>`.
+ */
+export function toDisplayAttendanceNotes(notes?: string | null): string | null {
+  if (!notes?.trim()) return null;
+
+  const cleaned = notes
+    .split("|")
+    .map((part) => part.trim())
+    .filter((part) => {
+      if (!part) return false;
+      if (/^src:/i.test(part)) return false;
+      if (/^import:/i.test(part)) return false;
+      if (/^historical_import:/i.test(part)) return false;
+      return true;
+    })
+    .join(" | ")
+    .trim();
+
+  return cleaned || null;
+}

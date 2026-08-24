@@ -1,6 +1,9 @@
+import { redirect } from "next/navigation";
+
 import { OnboardingInviteSetup } from "@/components/onboarding/candidate/onboarding-invite-setup";
 import { OnboardingInviteUnavailable } from "@/components/onboarding/candidate/onboarding-invite-unavailable";
 import { validateInviteTokenAction } from "@/lib/onboarding/actions/candidate-onboarding-actions";
+import { ONBOARDING_ROUTES } from "@/types/onboarding";
 
 export const dynamic = "force-dynamic";
 
@@ -13,20 +16,19 @@ export default async function OnboardingInvitePage({ params }: PageProps) {
   const validation = await validateInviteTokenAction(token);
 
   if (!validation.ok) {
-    return (
-      <div className="flex min-h-[calc(100dvh-3.25rem)] flex-1 items-center justify-center py-6">
-        <OnboardingInviteUnavailable reason={validation.reason} />
-      </div>
-    );
+    if (validation.reason === "PASSWORD_ALREADY_SET" && validation.personalEmail) {
+      redirect(
+        `${ONBOARDING_ROUTES.login}?email=${encodeURIComponent(validation.personalEmail)}&setup=done`,
+      );
+    }
+    return <OnboardingInviteUnavailable reason={validation.reason} />;
   }
 
   return (
-    <div className="flex min-h-[calc(100dvh-3.25rem)] flex-1 items-center justify-center py-6">
-      <OnboardingInviteSetup
-        token={token}
-        personalEmail={validation.data.personalEmail}
-        fullName={validation.data.fullName}
-      />
-    </div>
+    <OnboardingInviteSetup
+      token={token}
+      personalEmail={validation.data.personalEmail}
+      fullName={validation.data.fullName}
+    />
   );
 }

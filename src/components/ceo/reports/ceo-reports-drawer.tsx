@@ -227,10 +227,10 @@ export function CeoReportsDrawer({
                   </h4>
                   <div className="overflow-hidden rounded-lg border">
                     <table className="w-full text-sm">
-                      <thead className="bg-muted/50 text-left text-[10px] tracking-wide text-muted-foreground uppercase">
+                      <thead className="sticky top-0 z-30 bg-black text-left shadow-[0_1px_0_rgba(255,255,255,0.08)]">
                         <tr>
                           {columns.map((key) => (
-                            <th key={key} className="px-3 py-2.5 font-medium">
+                            <th key={key} className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">
                               {key}
                             </th>
                           ))}

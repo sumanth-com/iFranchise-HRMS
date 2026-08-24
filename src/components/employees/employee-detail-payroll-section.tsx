@@ -9,6 +9,7 @@ import { EmployeeDetailPayslipDrawer } from "@/components/employees/employee-det
 import { EmployeeStatCard } from "@/components/employee/dashboard/employee-module-primitives";
 import { Button } from "@/components/common/button";
 import { FilterSelect } from "@/components/common/filter-select";
+import { SECTION_HEADING_ROW_CLASS } from "@/components/common/table-header-classes";
 import { getMonthSelectItems, getYearSelectItems } from "@/components/payroll/select-utils";
 import { PAYROLL_STATUS_LABELS } from "@/lib/payroll/constants";
 import { formatCurrency } from "@/lib/payroll/services/payroll-utils";
@@ -245,7 +246,7 @@ export function EmployeeDetailPayrollSection({ data }: EmployeeDetailPayrollSect
       </div>
 
       <section className="overflow-hidden rounded-xl border-0 bg-card">
-        <p className="bg-black px-5 py-2.5 text-xs font-semibold uppercase tracking-wide text-white">
+        <p className={SECTION_HEADING_ROW_CLASS}>
           Salary structure
         </p>
         {data?.salaryStructure ? (
@@ -284,7 +285,7 @@ export function EmployeeDetailPayrollSection({ data }: EmployeeDetailPayrollSect
 
       {data?.bank ? (
         <section className="overflow-hidden rounded-xl border-0 bg-card">
-          <p className="bg-black px-5 py-2.5 text-xs font-semibold uppercase tracking-wide text-white">
+          <p className={SECTION_HEADING_ROW_CLASS}>
             Bank account
           </p>
           <div className="grid gap-4 p-4 md:grid-cols-2">
@@ -297,21 +298,21 @@ export function EmployeeDetailPayrollSection({ data }: EmployeeDetailPayrollSect
       ) : null}
 
       <section className="overflow-hidden rounded-xl border-0 bg-card">
-        <p className="bg-black px-5 py-2.5 text-xs font-semibold uppercase tracking-wide text-white">
+        <p className={SECTION_HEADING_ROW_CLASS}>
           Payslip history
         </p>
         {filteredPayslips.length > 0 ? (
           <div className="max-h-[min(28rem,calc(100dvh-22rem))] overflow-auto p-4">
             <table className="w-full min-w-[44rem] text-sm">
-              <thead className="sticky top-0 z-10 bg-card">
-                <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="pb-2 pr-3 font-medium">Month</th>
-                  <th className="pb-2 pr-3 font-medium">Payslip #</th>
-                  <th className="pb-2 pr-3 font-medium">Gross</th>
-                  <th className="pb-2 pr-3 font-medium">Net</th>
-                  <th className="pb-2 pr-3 font-medium">Credit date</th>
-                  <th className="pb-2 pr-3 font-medium">Status</th>
-                  <th className="pb-2 font-medium text-right">Actions</th>
+              <thead className="sticky top-0 z-30 bg-black text-left shadow-[0_1px_0_rgba(255,255,255,0.08)]">
+                <tr className="border-white/10 bg-black hover:bg-black">
+                  <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Month</th>
+                  <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Payslip #</th>
+                  <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Gross</th>
+                  <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Net</th>
+                  <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Credit date</th>
+                  <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Status</th>
+                  <th className="h-11 whitespace-nowrap bg-black px-4 py-3 text-right align-middle text-xs font-semibold uppercase tracking-wide text-white">Actions</th>
                 </tr>
               </thead>
               <tbody>

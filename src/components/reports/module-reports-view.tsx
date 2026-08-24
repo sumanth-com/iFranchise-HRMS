@@ -722,7 +722,7 @@ export function ModuleReportsView({
 
           <div className="overflow-auto rounded-xl border bg-card max-h-[min(70vh,calc(100dvh-16rem))] [scrollbar-gutter:stable]">
             <table className="w-full min-w-[42rem] text-sm">
-              <thead className="sticky top-0 z-10 bg-muted/95 text-left text-xs tracking-wide text-muted-foreground uppercase backdrop-blur supports-[backdrop-filter]:bg-muted/80">
+              <thead className="sticky top-0 z-30 bg-black text-left shadow-[0_1px_0_rgba(255,255,255,0.08)]">
                 <tr className="border-b">
                   {result.columns.map((col) => (
                     <th key={col.key} className="px-4 py-3 font-medium whitespace-nowrap">

@@ -275,7 +275,7 @@ function TeamCelebrationsPanel({
             Team Celebrations
           </p>
           <p className="text-[11px] text-muted-foreground">
-            Birthdays and work anniversaries coming up
+            Birthdays coming up
           </p>
         </div>
       </div>
@@ -321,7 +321,7 @@ function HrInsightsPanel({
   birthdays,
   anniversaries,
   title = "HR Insights",
-  description = "People to watch and upcoming celebrations",
+  description = "People to watch and upcoming birthdays",
 }: {
   watchItems: DashboardWatchItem[];
   birthdays: DashboardPersonEvent[];
