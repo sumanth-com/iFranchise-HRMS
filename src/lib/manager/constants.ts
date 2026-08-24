@@ -1,5 +1,4 @@
 import { buildEmployeeRouteRef } from "@/lib/employees/routing";
-import { REPORTS_ROUTES } from "@/lib/reports/constants";
 import type { EmployeeRouteIdentity } from "@/types/employee";
 
 export const MANAGER_ROUTES = {
@@ -38,14 +37,18 @@ export const MANAGER_ROUTES = {
   recruitmentCandidates: "/manager/recruitment/candidates",
   recruitmentOffers: "/manager/recruitment/offers",
   recruitmentInterviews: "/manager/recruitment/interviews",
+  recruitmentOnboarding: "/manager/recruitment/onboarding",
   recruitmentDetail: (candidateId: string) =>
     `${MANAGER_ROUTES.recruitmentCandidates}?candidateId=${candidateId}`,
   reports: "/manager/reports",
   reportsAttendance: "/manager/reports/attendance",
   reportsLeave: "/manager/reports/leave",
+  reportsPayroll: "/manager/reports/payroll",
   reportsPerformance: "/manager/reports/performance",
   reportsRecruitment: "/manager/reports/recruitment",
-  reportsTeam: "/manager/reports/hr",
+  reportsAssets: "/manager/reports/assets",
+  reportsExit: "/manager/reports/exit",
+  reportsHr: "/manager/reports/hr",
   notifications: "/manager/notifications",
   notificationsCenter: "/manager/notifications/center",
   notificationsHistory: "/manager/notifications/history",
@@ -65,11 +68,13 @@ export const MANAGER_GOALS_SUB_NAV = [
 ] as const;
 
 export const MANAGER_REPORTS_SUB_NAV = [
-  { title: "Attendance", href: REPORTS_ROUTES.attendance },
-  { title: "Leave", href: REPORTS_ROUTES.leave },
-  { title: "Performance", href: REPORTS_ROUTES.performance },
-  { title: "Recruitment", href: REPORTS_ROUTES.recruitment },
-  { title: "Team", href: REPORTS_ROUTES.hr },
+  { title: "Attendance", href: MANAGER_ROUTES.reportsAttendance },
+  { title: "Leave", href: MANAGER_ROUTES.reportsLeave },
+  { title: "Payroll", href: MANAGER_ROUTES.reportsPayroll },
+  { title: "Performance", href: MANAGER_ROUTES.reportsPerformance },
+  { title: "Recruitment", href: MANAGER_ROUTES.reportsRecruitment },
+  { title: "Assets", href: MANAGER_ROUTES.reportsAssets },
+  { title: "Exit", href: MANAGER_ROUTES.reportsExit },
 ] as const;
 
 export const MANAGER_SELF_SERVICE_DASHBOARD_KPI_LINKS = {
@@ -88,7 +93,7 @@ export const MANAGER_DASHBOARD_KPI_LINKS = {
   pendingLeaveApprovals: `${MANAGER_ROUTES.leaveTeam}?summaryFilter=pendingRequests`,
   pendingPerformanceReviews: MANAGER_ROUTES.performanceGoals,
   openRecruitmentRequests: MANAGER_ROUTES.recruitmentJobs,
-  probationEndingSoon: MANAGER_ROUTES.reportsTeam,
+  probationEndingSoon: MANAGER_ROUTES.reportsHr,
 } as const;
 
 export const MANAGER_QUICK_ACTIONS = [

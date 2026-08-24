@@ -2,6 +2,7 @@ import { Suspense } from "react";
 
 import { PageSkeleton } from "@/components/common/page-skeleton";
 import { OfferQueueManagement } from "@/components/recruitment/offer-queue-management";
+import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { loadManagerRecruitmentPage } from "@/lib/manager/load-admin-context";
 import {
   getOfferWorkspaceCandidateById,
@@ -52,6 +53,7 @@ async function ManagerOffersPageContent({ searchParams }: PageProps) {
       lookups={lookups}
       initialSelected={scopedSelected}
       canOffer
+      onboardingHref={MANAGER_ROUTES.recruitmentOnboarding}
       filters={{
         search: params.search,
         departmentId: params.departmentId,

@@ -17,6 +17,14 @@ import {
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
 
+import {
+  dashboardEmptyStateClass,
+  dashboardGradientTileClass,
+  dashboardInsetTileClass,
+  dashboardNestedPanelClass,
+  dashboardSectionClass,
+  dashboardTileClass,
+} from "@/components/dashboard/dashboard-surface-classes";
 import { HrUpcomingHolidaysPanel } from "@/components/dashboard/hr-today-pulse-section";
 import type {
   DashboardListItem,
@@ -49,7 +57,12 @@ const TASK_HINTS: Record<string, string> = {
 
 function PeopleWatchlistCard({ items }: { items: DashboardWatchItem[] }) {
   return (
-    <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-xl border-0 bg-muted/20 p-3 dark:bg-white/[0.03]">
+    <div
+      className={cn(
+        "relative flex h-full min-h-0 flex-1 flex-col overflow-hidden",
+        dashboardNestedPanelClass,
+      )}
+    >
       <p className="mb-2 shrink-0 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         People watchlist
       </p>
@@ -61,7 +74,7 @@ function PeopleWatchlistCard({ items }: { items: DashboardWatchItem[] }) {
             <Link
               key={item.id}
               href={item.href}
-              className="flex min-h-0 flex-col items-center justify-center rounded-lg border-0 bg-background/60 px-2.5 py-3 text-center outline-none transition-colors hover:bg-background dark:bg-white/[0.04] dark:hover:bg-white/[0.07]"
+              className={dashboardInsetTileClass}
             >
               <p className="text-[10px] font-medium leading-tight text-muted-foreground">
                 {item.label}
@@ -91,11 +104,7 @@ function FocusTaskCard({ item }: { item: DashboardTaskItem }) {
   return (
     <Link
       href={item.href}
-      className={cn(
-        "flex min-h-0 flex-col justify-between rounded-xl border-0 bg-muted/25 p-3 outline-none transition-colors",
-        "hover:bg-muted/40 dark:bg-white/[0.04] dark:hover:bg-white/[0.07]",
-        "focus-visible:ring-2 focus-visible:ring-ring/40",
-      )}
+      className={cn("flex min-h-0 flex-col justify-between", dashboardTileClass)}
     >
       <div className="flex items-start gap-2.5">
         <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -135,7 +144,7 @@ function HrPriorityFocus({
   if (cards.length === 0) return null;
 
   return (
-    <section className="flex h-full min-h-0 flex-col rounded-xl border-0 bg-card p-3 shadow-sm md:p-4">
+    <section className={cn("flex h-full min-h-0 flex-col", dashboardSectionClass)}>
       <div className="mb-3 flex shrink-0 items-center gap-2">
         <span className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Sparkles className="size-3.5" />
@@ -191,7 +200,8 @@ function CelebrationFeaturedCard({
     <Link
       href={event.href}
       className={cn(
-        "group relative flex h-full min-h-0 flex-col overflow-hidden rounded-xl border-0 bg-gradient-to-br p-2.5 shadow-none transition-all hover:bg-muted/20",
+        "flex h-full min-h-0 flex-col p-2.5 dark:hover:bg-muted/20",
+        dashboardGradientTileClass,
         theme.gradient,
         className,
       )}
@@ -250,7 +260,12 @@ function TeamCelebrationsPanel({
   const scrollable = events.length > 2;
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-xl border-0 bg-muted/20 p-3 dark:bg-white/[0.03]">
+    <div
+      className={cn(
+        "flex h-full min-h-0 flex-1 flex-col overflow-hidden",
+        dashboardNestedPanelClass,
+      )}
+    >
       <div className="mb-2 flex shrink-0 items-center gap-2">
         <span className="flex size-7 items-center justify-center rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400">
           <Cake className="size-3.5" />
@@ -266,7 +281,7 @@ function TeamCelebrationsPanel({
       </div>
 
       {events.length === 0 ? (
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center rounded-lg border-0 bg-background/40 px-3 py-6 text-center dark:bg-white/[0.02]">
+        <div className={dashboardEmptyStateClass}>
           <Medal className="size-5 text-muted-foreground/60" />
           <p className="mt-2 text-sm font-medium text-foreground">No celebrations soon</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
@@ -315,7 +330,7 @@ function HrInsightsPanel({
   description?: string;
 }) {
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border-0 bg-card p-3 shadow-sm md:p-4">
+    <section className={cn("flex h-full min-h-0 flex-col overflow-hidden", dashboardSectionClass)}>
       <div className="mb-2 shrink-0">
         <h2 className="text-[11px] font-semibold tracking-wide text-foreground uppercase">
           {title}

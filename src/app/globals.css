@@ -49,7 +49,7 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
+  --background: oklch(0.965 0.006 265);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
@@ -57,15 +57,15 @@
   --popover-foreground: oklch(0.145 0 0);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
+  --secondary: oklch(0.955 0.006 265);
   --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
+  --muted: oklch(0.955 0.006 265);
   --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
+  --accent: oklch(0.955 0.006 265);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
+  --border: oklch(0.93 0.004 265);
+  --input: oklch(0.91 0.006 265);
   --ring: oklch(0.708 0 0);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
@@ -73,13 +73,13 @@
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
+  --sidebar: oklch(0.99 0.003 265);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent: oklch(0.955 0.006 265);
   --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-border: oklch(0.93 0.004 265);
   --sidebar-ring: oklch(0.708 0 0);
 }
 
@@ -130,6 +130,113 @@
   html {
     @apply font-sans;
   }
+}
+
+/* Light mode shell: soft canvas so white cards read clearly */
+html:not(.dark) .app-shell-canvas {
+  background-color: var(--background);
+}
+
+html:not(.dark) .app-shell-sidebar {
+  background-color: var(--sidebar);
+  border-right-color: color-mix(in oklch, var(--border) 88%, transparent);
+}
+
+html:not(.dark) .app-shell-topnav {
+  background-color: color-mix(in oklch, var(--card) 92%, var(--background));
+  border-bottom-color: color-mix(in oklch, var(--border) 88%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+/*
+  Light cards: white panels on soft canvas — elevation via shadow only (no harsh borders).
+*/
+html:not(.dark) .rounded-md.bg-card,
+html:not(.dark) .rounded-lg.bg-card,
+html:not(.dark) .rounded-xl.bg-card,
+html:not(.dark) .rounded-2xl.bg-card,
+html:not(.dark) .rounded-3xl.bg-card {
+  background-color: var(--card);
+  box-shadow:
+    0 1px 2px oklch(0.45 0.02 265 / 3.5%),
+    0 4px 16px oklch(0.45 0.02 265 / 4.5%);
+  transition: box-shadow 0.15s ease;
+}
+
+html:not(.dark) .rounded-md.border.bg-card,
+html:not(.dark) .rounded-lg.border.bg-card,
+html:not(.dark) .rounded-xl.border.bg-card,
+html:not(.dark) .rounded-2xl.border.bg-card {
+  border-color: transparent;
+}
+
+html:not(.dark) .rounded-xl.bg-card:not(.card-surface-static):hover,
+html:not(.dark) .rounded-2xl.bg-card:not(.card-surface-static):hover,
+html:not(.dark) a.rounded-xl.bg-card:hover,
+html:not(.dark) a.rounded-2xl.bg-card:hover {
+  box-shadow:
+    0 2px 4px oklch(0.45 0.02 265 / 5%),
+    0 8px 22px oklch(0.45 0.02 265 / 6.5%);
+}
+
+html:not(.dark) .card-surface-static:hover,
+html:not(.dark) .card-surface-static:focus-within {
+  box-shadow:
+    0 2px 4px oklch(0.45 0.02 265 / 5%),
+    0 8px 22px oklch(0.45 0.02 265 / 6.5%) !important;
+}
+
+/* Nested inset panels — tint only, no inset border line */
+html:not(.dark) .rounded-lg.bg-muted\/20,
+html:not(.dark) .rounded-lg.bg-muted\/25,
+html:not(.dark) .rounded-lg.bg-muted\/30,
+html:not(.dark) .rounded-lg.bg-muted\/40,
+html:not(.dark) .rounded-lg.bg-muted\/45,
+html:not(.dark) .rounded-xl.bg-muted\/20,
+html:not(.dark) .rounded-xl.bg-muted\/25,
+html:not(.dark) .rounded-xl.bg-muted\/30 {
+  background-color: color-mix(in oklch, var(--card) 65%, var(--muted));
+  box-shadow: none;
+}
+
+html:not(.dark) .rounded-lg.bg-background\/60,
+html:not(.dark) .rounded-lg.bg-background\/40,
+html:not(.dark) .rounded-lg.bg-background\/80,
+html:not(.dark) .rounded-lg.bg-background\/90 {
+  background-color: color-mix(in oklch, var(--card) 92%, var(--background));
+  box-shadow: none;
+}
+
+/* Modals, dropdowns, and nav pills */
+html:not(.dark) [data-slot="dialog-content"],
+html:not(.dark) [data-slot="sheet-content"],
+html:not(.dark) [data-slot="popover-content"],
+html:not(.dark) [data-slot="dropdown-menu-content"] {
+  box-shadow:
+    0 2px 8px oklch(0.45 0.02 265 / 5%),
+    0 12px 32px oklch(0.45 0.02 265 / 10%);
+}
+
+html:not(.dark) nav.rounded-lg.border.bg-card,
+html:not(.dark) nav.inline-flex.rounded-lg.border.bg-card {
+  border-color: oklch(0.94 0.004 265 / 40%);
+  box-shadow:
+    0 1px 2px oklch(0.45 0.02 265 / 4%),
+    0 3px 10px oklch(0.45 0.02 265 / 5%);
+}
+
+/* Dashboard / employee surfaces — borderless in light mode, soft lift */
+html:not(.dark) .dashboard-surface {
+  border: none !important;
+  box-shadow:
+    0 1px 2px oklch(0.45 0.02 265 / 3.5%),
+    0 4px 16px oklch(0.45 0.02 265 / 4.5%);
+}
+
+html:not(.dark) .dashboard-surface:hover {
+  box-shadow:
+    0 2px 4px oklch(0.45 0.02 265 / 5%),
+    0 8px 22px oklch(0.45 0.02 265 / 6.5%);
 }
 
 /* Dark mode shell: one shared canvas for sidebar + main */
@@ -362,6 +469,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html:not(.dark) .rounded-xl.bg-card,
+  html:not(.dark) .rounded-2xl.bg-card,
   .dark .rounded-xl.bg-card,
   .dark .rounded-2xl.bg-card {
     transition: none;

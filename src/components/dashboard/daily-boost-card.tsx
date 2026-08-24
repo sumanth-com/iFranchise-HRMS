@@ -46,7 +46,7 @@ export function DailyBoostCard({
     <section
       aria-label="Workspace"
       className={cn(
-        "relative overflow-hidden rounded-2xl border bg-card shadow-sm",
+        "dashboard-surface relative overflow-hidden rounded-2xl border-0 bg-card",
         compact ? "min-h-[7.5rem]" : "min-h-[16rem]",
         className,
       )}

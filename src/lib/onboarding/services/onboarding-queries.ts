@@ -137,13 +137,20 @@ export async function getOnboardingLookups(
 export async function getOnboardingDashboardStats(
   supabase: AuthSupabaseClient,
   organizationId: string,
+  departmentIds?: string[],
 ): Promise<OnboardingDashboardStats> {
-  const { data, error } = await supabase
+  let query = supabase
     .schema("hrms")
     .from("onboarding_cases")
     .select("status")
     .eq("organization_id", organizationId)
     .is("deleted_at", null);
+
+  if (departmentIds?.length) {
+    query = query.in("department_id", departmentIds);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw new Error(error.message);
   const rows = data ?? [];
@@ -232,6 +239,7 @@ export async function listOnboardingCases(
     designationId?: string;
     joiningMonth?: number;
     joiningYear?: number;
+    departmentIds?: string[];
   },
 ): Promise<{ data: OnboardingCaseListItem[]; total: number }> {
   const from = (params.page - 1) * params.pageSize;
@@ -257,6 +265,7 @@ export async function listOnboardingCases(
 
   if (params.status) query = applyOnboardingListStatusFilter(query, params.status);
   if (params.designationId) query = query.eq("designation_id", params.designationId);
+  if (params.departmentIds?.length) query = query.in("department_id", params.departmentIds);
   if (params.search) {
     const term = `%${params.search}%`;
     query = query.or(`full_name.ilike.${term},personal_email.ilike.${term}`);

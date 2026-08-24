@@ -2,6 +2,11 @@ import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { CalendarDays, ClipboardList, Users } from "lucide-react";
 
+import {
+  dashboardGradientTileClass,
+  dashboardMetricClass,
+  dashboardSectionClass,
+} from "@/components/dashboard/dashboard-surface-classes";
 import { HolidayGlyph } from "@/components/employee/dashboard/holiday-glyph";
 import { DASHBOARD_KPI_LINKS } from "@/lib/dashboard/constants";
 import type { DashboardListItem, HrTodayPulse } from "@/types/dashboard";
@@ -19,7 +24,7 @@ function PulseMetric({
   accent?: string;
 }) {
   const content = (
-    <div className="flex h-full min-h-[4.25rem] flex-col justify-between rounded-lg bg-muted/30 px-2.5 py-2.5 transition-colors hover:bg-muted/45 dark:bg-white/[0.045] dark:hover:bg-white/[0.08]">
+    <div className={dashboardMetricClass}>
       <p className="text-[10px] font-medium leading-tight tracking-wide text-muted-foreground uppercase">
         {label}
       </p>
@@ -65,7 +70,8 @@ function HolidayFeaturedCard({
     <Link
       href={holiday.href}
       className={cn(
-        "group relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border-0 bg-gradient-to-br p-3 shadow-none transition-all hover:bg-muted/20",
+        "group relative flex min-h-0 flex-1 flex-col dark:hover:bg-muted/20",
+        dashboardGradientTileClass,
         HOLIDAY_CARD_THEMES[themeIndex % HOLIDAY_CARD_THEMES.length],
       )}
     >
@@ -133,7 +139,7 @@ export function HrUpcomingHolidaysPanel({
 
   if (items.length === 0) {
     return (
-      <section className="flex h-full min-h-0 flex-col rounded-xl border-0 bg-card p-3 shadow-sm md:p-4">
+      <section className={cn("flex h-full min-h-0 flex-col", dashboardSectionClass)}>
         <div className="flex items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400">
             <CalendarDays className="size-4" />
@@ -154,7 +160,7 @@ export function HrUpcomingHolidaysPanel({
   }
 
   return (
-    <section className="flex h-full min-h-0 flex-col rounded-xl border-0 bg-card p-3 shadow-sm md:p-4">
+    <section className={cn("flex h-full min-h-0 flex-col", dashboardSectionClass)}>
       <div className="mb-3 flex shrink-0 items-center gap-2">
         <span className="flex size-7 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400">
           <CalendarDays className="size-3.5" />
@@ -198,10 +204,7 @@ export function HrTodayPulseSection({
   };
 }) {
   return (
-    <section
-      className="rounded-xl border-0 bg-card p-3 shadow-sm md:p-4"
-      aria-label="Today's Pulse"
-    >
+    <section className={dashboardSectionClass} aria-label="Today's Pulse">
       <div className="mb-3 flex items-center gap-2">
         <Users className="size-3.5 text-primary" />
         <div>

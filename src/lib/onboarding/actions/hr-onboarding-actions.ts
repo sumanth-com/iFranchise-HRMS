@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import { managerOrPermissions } from "@/lib/manager/portal-scope";
+import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { ONBOARDING_PERMISSIONS } from "@/lib/onboarding/constants";
 import {
   loadOnboardingCaseDetail,
@@ -29,19 +31,25 @@ import {
   onboardingReviewSchema,
 } from "@/lib/validations/onboarding";
 
-const MANAGE_PERMISSIONS = [ONBOARDING_PERMISSIONS.manage];
-const REVIEW_PERMISSIONS = [ONBOARDING_PERMISSIONS.review, ONBOARDING_PERMISSIONS.activate];
-const VIEW_PERMISSIONS = [
-  ONBOARDING_PERMISSIONS.view,
-  ONBOARDING_PERMISSIONS.manage,
+const MANAGE_PERMISSIONS = managerOrPermissions(ONBOARDING_PERMISSIONS.manage);
+const REVIEW_PERMISSIONS = managerOrPermissions(
   ONBOARDING_PERMISSIONS.review,
   ONBOARDING_PERMISSIONS.activate,
+);
+const VIEW_PERMISSIONS = [
+  ...managerOrPermissions(
+    ONBOARDING_PERMISSIONS.view,
+    ONBOARDING_PERMISSIONS.manage,
+    ONBOARDING_PERMISSIONS.review,
+    ONBOARDING_PERMISSIONS.activate,
+  ),
   PORTAL_PERMISSIONS.ceo,
 ];
 
 function revalidateOnboarding() {
   revalidatePath("/dashboard/recruitment/onboarding", "layout");
   revalidatePath("/dashboard/onboarding", "layout");
+  revalidatePath(`${MANAGER_ROUTES.recruitment}/onboarding`, "layout");
 }
 
 type ActionResult =

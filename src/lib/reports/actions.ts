@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { ceoOrViewPermission } from "@/lib/ceo/read-only-permissions";
+import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { isManagerAllowedReportKey } from "@/lib/manager/reports/manager-report-definitions";
 import { isManagerOnlyProfile } from "@/lib/manager/portal-scope";
 import {
@@ -41,6 +42,17 @@ import type { ReportExportFormat, ReportKey, ReportResult } from "@/types/report
 
 function revalidateReports() {
   Object.values(REPORTS_ROUTES).forEach((path) => revalidatePath(path));
+  [
+    MANAGER_ROUTES.reports,
+    MANAGER_ROUTES.reportsAttendance,
+    MANAGER_ROUTES.reportsLeave,
+    MANAGER_ROUTES.reportsPayroll,
+    MANAGER_ROUTES.reportsPerformance,
+    MANAGER_ROUTES.reportsRecruitment,
+    MANAGER_ROUTES.reportsAssets,
+    MANAGER_ROUTES.reportsExit,
+    MANAGER_ROUTES.reportsHr,
+  ].forEach((path) => revalidatePath(path));
 }
 
 async function scopedReportFilters(

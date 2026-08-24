@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { ceoOrViewPermission } from "@/lib/ceo/read-only-permissions";
+import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { managerOrPermissions } from "@/lib/manager/portal-scope";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -57,6 +58,12 @@ function revalidateRecruitment() {
   revalidatePath(RECRUITMENT_ROUTES.interviews);
   revalidatePath(RECRUITMENT_ROUTES.offers);
   revalidatePath(RECRUITMENT_ROUTES.onboarding);
+  revalidatePath(MANAGER_ROUTES.recruitment);
+  revalidatePath(MANAGER_ROUTES.recruitmentJobs);
+  revalidatePath(MANAGER_ROUTES.recruitmentCandidates);
+  revalidatePath(MANAGER_ROUTES.recruitmentInterviews);
+  revalidatePath(MANAGER_ROUTES.recruitmentOffers);
+  revalidatePath(MANAGER_ROUTES.recruitmentOnboarding);
   revalidatePath("/dashboard/employees");
 }
 

@@ -6,6 +6,22 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
+/** Employee dashboard surfaces — borderless soft lift in light mode. */
+export const employeeSectionClass =
+  "dashboard-surface flex flex-col overflow-hidden rounded-xl border-0 bg-card p-4 dark:shadow-none";
+
+export const employeeStatCardClass =
+  "dashboard-surface flex h-full min-h-[6.75rem] min-w-0 flex-col rounded-xl border-0 bg-card p-3.5 text-left dark:shadow-none";
+
+export const employeeEventRowClass =
+  "dashboard-surface flex items-center gap-3 rounded-lg border-0 bg-card px-3 py-2.5 transition-[box-shadow,background-color] dark:shadow-none";
+
+export const employeeEmptyClass =
+  "dashboard-surface flex h-full min-h-[6rem] items-center justify-center rounded-lg border-0 border-dashed bg-muted/15 px-4 py-6 text-center text-xs text-muted-foreground dark:bg-white/[0.02] dark:shadow-none";
+
+export const employeeDateBadgeClass =
+  "flex w-11 shrink-0 flex-col overflow-hidden rounded-lg bg-card text-center shadow-[0_1px_3px_oklch(0.45_0.02_265/6%)] dark:border dark:border-border/60 dark:shadow-none";
+
 export function EmployeeStatCard({
   label,
   value,
@@ -54,10 +70,10 @@ export function EmployeeStatCard({
   );
 
   const className = cn(
-    "flex h-full min-h-[6.75rem] min-w-0 flex-col rounded-xl border bg-card p-3.5 text-left shadow-sm",
+    employeeStatCardClass,
     (href || onClick) &&
-      "cursor-pointer transition-[border-color,box-shadow,background-color] duration-150 hover:border-primary/40 hover:bg-accent/30 dark:hover:border-indigo-300/50 dark:hover:bg-transparent",
-    active && "border-primary/50 bg-accent/25 ring-1 ring-primary/30 dark:border-indigo-300/45",
+      "cursor-pointer transition-[box-shadow,background-color] duration-150 dark:hover:bg-transparent",
+    active && "bg-accent/25 ring-1 ring-primary/30 dark:border-indigo-300/45",
   );
 
   if (href) {
@@ -95,7 +111,7 @@ export function EmployeeSectionCard({
   bodyClassName?: string;
 }) {
   return (
-    <section className={cn("flex flex-col overflow-hidden rounded-xl border bg-card p-4 shadow-sm", className)}>
+    <section className={cn(employeeSectionClass, className)}>
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold tracking-tight">{title}</h2>
@@ -111,9 +127,5 @@ export function EmployeeSectionCard({
 }
 
 export function EmployeeEmpty({ message }: { message: string }) {
-  return (
-    <div className="flex h-full min-h-[6rem] items-center justify-center rounded-lg border border-dashed bg-muted/20 px-4 py-6 text-center text-xs text-muted-foreground">
-      {message}
-    </div>
-  );
+  return <div className={employeeEmptyClass}>{message}</div>;
 }

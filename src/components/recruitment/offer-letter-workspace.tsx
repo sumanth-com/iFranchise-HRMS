@@ -29,6 +29,7 @@ type OfferLetterWorkspaceProps = {
   detail: CandidateDetail | null;
   loading: boolean;
   canOffer: boolean;
+  onboardingHref?: string;
   onClose: () => void;
   onRefresh: () => void | Promise<void>;
 };
@@ -37,6 +38,7 @@ export function OfferLetterWorkspace({
   detail,
   loading,
   canOffer,
+  onboardingHref = RECRUITMENT_ROUTES.onboarding,
   onClose,
   onRefresh,
 }: OfferLetterWorkspaceProps) {
@@ -376,7 +378,7 @@ export function OfferLetterWorkspace({
               <>
                 Listed in{" "}
                 <Link
-                  href={RECRUITMENT_ROUTES.onboarding}
+                  href={onboardingHref}
                   className="font-medium text-primary hover:underline"
                 >
                   Employee Onboarding

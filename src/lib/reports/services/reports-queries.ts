@@ -795,6 +795,9 @@ async function runPayrollReport(
       .is("effective_to", null)
       .limit(2000);
     if (filters.employeeId) query = query.eq("employee_id", filters.employeeId);
+    if (filters.teamEmployeeIds?.length) {
+      query = query.in("employee_id", filters.teamEmployeeIds);
+    }
     const { data, error } = await query;
     if (error) throw new Error(error.message);
     const rows = ((data ?? []) as ReportRowLoose[])
@@ -843,6 +846,9 @@ async function runPayrollReport(
       .order("bonus_month", { ascending: false })
       .limit(2000);
     if (filters.employeeId) query = query.eq("employee_id", filters.employeeId);
+    if (filters.teamEmployeeIds?.length) {
+      query = query.in("employee_id", filters.teamEmployeeIds);
+    }
     if (filters.status) query = query.eq("bonus_status", filters.status);
     const { data, error } = await query;
     if (error) throw new Error(error.message);
@@ -886,6 +892,9 @@ async function runPayrollReport(
       .order("expense_date", { ascending: false })
       .limit(2000);
     if (filters.employeeId) query = query.eq("employee_id", filters.employeeId);
+    if (filters.teamEmployeeIds?.length) {
+      query = query.in("employee_id", filters.teamEmployeeIds);
+    }
     if (filters.status) query = query.eq("reimbursement_status", filters.status);
     const { data, error } = await query;
     if (error) throw new Error(error.message);
@@ -929,6 +938,9 @@ async function runPayrollReport(
       .order("issued_at", { ascending: false })
       .limit(3000);
     if (filters.employeeId) query = query.eq("employee_id", filters.employeeId);
+    if (filters.teamEmployeeIds?.length) {
+      query = query.in("employee_id", filters.teamEmployeeIds);
+    }
     const { data, error } = await query;
     if (error) throw new Error(error.message);
     const fromMonth = `${dateFrom.slice(0, 7)}-01`;
@@ -1498,6 +1510,12 @@ async function runAssetsReport(
       if (dateTo && day > dateTo) return false;
       return true;
     })
+    .filter((row) => {
+      if (filters.teamEmployeeIds?.length) {
+        return row.employeeId ? filters.teamEmployeeIds.includes(row.employeeId) : false;
+      }
+      return true;
+    })
     .filter((row) => !filters.employeeId || row.employeeId === filters.employeeId)
     .map((row) => ({
       action: row.actionLabel,
@@ -1577,6 +1595,9 @@ async function runExitReport(
       .lte("approved_at", dateTo)
       .limit(1000);
     if (filters.status) settlementQuery = settlementQuery.eq("settlement_status", filters.status);
+    if (filters.teamEmployeeIds?.length) {
+      settlementQuery = settlementQuery.in("employee_id", filters.teamEmployeeIds);
+    }
     const { data, error } = await settlementQuery;
     if (error) throw new Error(error.message);
     return buildResult(
@@ -1620,6 +1641,9 @@ async function runExitReport(
     .order("resignation_date", { ascending: false })
     .limit(1000);
   if (filters.status) query = query.eq("exit_status", filters.status);
+  if (filters.teamEmployeeIds?.length) {
+    query = query.in("employee_id", filters.teamEmployeeIds);
+  }
   const { data, error } = await query;
   if (error) throw new Error(error.message);
 

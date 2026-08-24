@@ -46,22 +46,21 @@ export const MANAGER_REPORT_CATEGORIES: {
   },
 ];
 
+/** Same report modules as HR (team-scoped at query time). HR module page exists but is not in sub-nav. */
 const MANAGER_ALLOWED_MODULES: ReportModuleKey[] = [
+  "hr",
   "attendance",
   "leave",
+  "payroll",
   "performance",
   "recruitment",
-  "hr",
+  "assets",
+  "exit",
 ];
 
-const MANAGER_ALLOWED_HR_KEYS: ReportKey[] = ["hr_joining", "hr_probation"];
-
-export const MANAGER_REPORT_DEFINITIONS = REPORT_DEFINITIONS.filter((definition) => {
-  if (definition.module === "hr") {
-    return MANAGER_ALLOWED_HR_KEYS.includes(definition.key);
-  }
-  return MANAGER_ALLOWED_MODULES.includes(definition.module);
-});
+export const MANAGER_REPORT_DEFINITIONS = REPORT_DEFINITIONS.filter((definition) =>
+  MANAGER_ALLOWED_MODULES.includes(definition.module),
+);
 
 export function getManagerReportsForCategory(category: ManagerReportCategory) {
   if (category === "training" || category === "team") return [];

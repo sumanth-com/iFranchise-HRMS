@@ -50,6 +50,7 @@ export function OfferQueueManagement({
   lookups,
   initialSelected,
   canOffer,
+  onboardingHref,
   listOnly = false,
   filters,
 }: {
@@ -60,6 +61,7 @@ export function OfferQueueManagement({
   lookups: RecruitmentLookups;
   initialSelected: CandidateDetail | null;
   canOffer: boolean;
+  onboardingHref?: string;
   listOnly?: boolean;
   filters: {
     search?: string;
@@ -295,6 +297,7 @@ export function OfferQueueManagement({
               detail={selectedDetail}
               loading={detailLoading}
               canOffer={canOffer}
+              onboardingHref={onboardingHref}
               onClose={closePanel}
               onRefresh={() => {
                 if (selectedId) void refreshDetail(selectedId);
