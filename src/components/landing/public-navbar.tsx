@@ -6,15 +6,13 @@ import { useState } from "react";
 import { ArrowRight } from "lucide-react";
 
 import brandLogo from "@/assets/Logo.png";
-import { AuthThemeToggle } from "@/components/auth/auth-theme-toggle";
 import { PUBLIC_LANDING_ROUTE, WHATS_NEW_ROUTE } from "@/lib/auth/constants";
 import { navigateToLogin } from "@/lib/landing/navigate-to-login";
 
 const NAV_LINKS = [
   { href: `${PUBLIC_LANDING_ROUTE}#features`, label: "Features" },
   { href: `${PUBLIC_LANDING_ROUTE}#security`, label: "Security" },
-  { href: WHATS_NEW_ROUTE, label: "What's New" },
-  { href: `${PUBLIC_LANDING_ROUTE}#help`, label: "Help" },
+  { href: WHATS_NEW_ROUTE, label: "What's new" },
 ] as const;
 
 type PublicNavbarProps = {
@@ -38,7 +36,7 @@ function NavbarChrome({ compact = false }: PublicNavbarProps) {
               priority={!compact}
             />
           </span>
-          <span className="landing-nav-brand-text">HRMS</span>
+          <span className="landing-nav-brand-text">iFranchise</span>
         </Link>
 
         {!compact ? (
@@ -49,22 +47,22 @@ function NavbarChrome({ compact = false }: PublicNavbarProps) {
               </Link>
             ))}
           </nav>
-        ) : null}
+        ) : (
+          <span className="landing-nav-center-spacer" aria-hidden />
+        )}
 
         <div className="landing-nav-actions">
-          <AuthThemeToggle className={compact ? undefined : "hidden sm:inline-flex"} />
-
           <button
             type="button"
             onClick={navigateToLogin}
             className={
               compact
                 ? "landing-nav-signin landing-nav-signin--outline"
-                : "landing-cta landing-nav-signin hidden sm:inline-flex"
+                : "landing-nav-signin hidden sm:inline-flex"
             }
           >
             Sign In
-            {!compact ? <ArrowRight className="size-4" aria-hidden /> : null}
+            {!compact ? <ArrowRight className="size-3.5" aria-hidden /> : null}
           </button>
 
           {!compact ? (
@@ -77,7 +75,7 @@ function NavbarChrome({ compact = false }: PublicNavbarProps) {
               onClick={() => setMenuOpen((open) => !open)}
             >
               <span className="sr-only">Menu</span>
-              <span className="flex flex-col gap-1" aria-hidden>
+              <span className="flex flex-col gap-1.5" aria-hidden>
                 <span className="block h-0.5 w-4 rounded bg-foreground" />
                 <span className="block h-0.5 w-4 rounded bg-foreground" />
               </span>
@@ -97,14 +95,13 @@ function NavbarChrome({ compact = false }: PublicNavbarProps) {
                     {link.label}
                   </Link>
                 ))}
-                <AuthThemeToggle className="mt-2 self-start sm:hidden" />
                 <button
                   type="button"
                   onClick={() => {
                     setMenuOpen(false);
                     navigateToLogin();
                   }}
-                  className="landing-cta landing-nav-signin mt-2 w-full"
+                  className="landing-nav-signin mt-2 w-full"
                 >
                   Sign In
                   <ArrowRight className="size-4" aria-hidden />

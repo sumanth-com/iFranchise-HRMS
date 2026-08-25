@@ -17,6 +17,10 @@ export const WHATS_NEW_ROUTE = "/whats-new";
 export const PUBLIC_ROUTES = [
   PUBLIC_LANDING_ROUTE,
   WHATS_NEW_ROUTE,
+  "/terms",
+  "/privacy",
+  "/cookies",
+  "/security",
   AUTH_ROUTES.login,
   AUTH_ROUTES.forgotPassword,
   AUTH_ROUTES.resetPassword,

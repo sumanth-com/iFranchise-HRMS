@@ -1,4 +1,4 @@
-import { LandingConnectedSection, LandingFeaturesSection } from "@/components/landing/landing-sections";
+import { LandingFeaturesSection } from "@/components/landing/landing-sections";
 import {
   LandingFinalCta,
   LandingFooter,
@@ -15,7 +15,6 @@ export function LandingPage() {
       <PublicNavbar />
       <main>
         <LandingHero />
-        <LandingConnectedSection />
         <LandingFeaturesSection />
         <LandingPeopleSection />
         <LandingSecuritySection />
