@@ -277,8 +277,11 @@ export async function middleware(request: NextRequest) {
         "cached-account-allowed",
       );
       if (allowed == null) {
-        // Session is valid; avoid 504. Portal layouts still require a live profile.
-        return supabaseResponse;
+        // Fail closed: do not continue as authenticated when account check timed out.
+        const redirectUrl = request.nextUrl.clone();
+        redirectUrl.pathname = AUTH_ROUTES.login;
+        redirectUrl.search = "";
+        return NextResponse.redirect(redirectUrl);
       }
       accountAllowed = allowed;
     }
@@ -308,7 +311,11 @@ export async function middleware(request: NextRequest) {
         "cached-role-codes",
       );
       if (!resolvedRoles) {
-        return supabaseResponse;
+        // Fail closed: do not continue as authenticated when role lookup timed out.
+        const redirectUrl = request.nextUrl.clone();
+        redirectUrl.pathname = AUTH_ROUTES.login;
+        redirectUrl.search = "";
+        return NextResponse.redirect(redirectUrl);
       }
       roleCodes = resolvedRoles;
       try {
@@ -363,9 +370,11 @@ export async function middleware(request: NextRequest) {
   );
 
   if (!bootstrapped) {
-    // Authenticated session is present; do not hold Edge open for a slow DB.
-    // PortalShellLayout + RLS still enforce access on the page itself.
-    return supabaseResponse;
+    // Fail closed: permission/role bootstrap timed out or failed.
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = AUTH_ROUTES.login;
+    redirectUrl.search = "";
+    return NextResponse.redirect(redirectUrl);
   }
 
   const [accountAllowed, permissionCodes, roleCodes] = bootstrapped;
