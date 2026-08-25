@@ -21,10 +21,17 @@ function initials(firstName: string, lastName: string) {
 }
 
 function CardPhoto({ employee }: { employee: EmployeeListItem }) {
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(
+    employee.profileImageSignedUrl ?? null,
+  );
   const label = initials(employee.firstName, employee.lastName);
 
   useEffect(() => {
+    if (employee.profileImageSignedUrl) {
+      setImageUrl(employee.profileImageSignedUrl);
+      return;
+    }
+
     if (!employee.profileImagePath) {
       setImageUrl(null);
       return;
@@ -40,7 +47,7 @@ function CardPhoto({ employee }: { employee: EmployeeListItem }) {
     return () => {
       cancelled = true;
     };
-  }, [employee.profileImagePath]);
+  }, [employee.profileImagePath, employee.profileImageSignedUrl]);
 
   if (imageUrl) {
     return (

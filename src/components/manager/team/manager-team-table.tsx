@@ -95,6 +95,7 @@ export function ManagerTeamTable({
             firstName={row.original.firstName}
             lastName={row.original.lastName}
             profileImagePath={row.original.profileImagePath}
+            signedUrl={row.original.profileImageSignedUrl}
             className="size-8"
           />
         ),

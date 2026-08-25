@@ -515,7 +515,9 @@ export async function getLeaveSummary(
     return query.not("employee_id", "in", `(${hrApplicantIds.join(",")})`);
   };
 
-  const [pendingResult, approvedResult, rejectedResult, onLeaveResult, balancesResult, upcomingResult] =
+  const balanceYear = getCurrentBalanceYear(today);
+
+  const [pendingResult, approvedResult, rejectedResult, onLeaveResult, upcomingResult, balanceUtilizationPercent] =
     await Promise.all([
     applyHrExclusion(
       supabase
@@ -559,13 +561,6 @@ export async function getLeaveSummary(
         .eq("employees.organization_id", organizationId)
         .is("deleted_at", null),
     ),
-    supabase
-      .schema("hrms")
-      .from("leave_balances")
-      .select("allocated_days, used_days, employees!inner(organization_id)")
-      .eq("balance_year", getCurrentBalanceYear(today))
-      .eq("employees.organization_id", organizationId)
-      .is("deleted_at", null),
     applyHrExclusion(
       supabase
         .schema("hrms")
@@ -576,22 +571,8 @@ export async function getLeaveSummary(
         .eq("employees.organization_id", organizationId)
         .is("deleted_at", null),
     ),
+    computeOrgLeaveBalanceUtilizationPercent(supabase, organizationId, balanceYear),
   ]);
-
-  let balanceUtilizationPercent = 0;
-  const balanceRows = balancesResult.data ?? [];
-  if (balanceRows.length > 0) {
-    const totals = balanceRows.reduce(
-      (acc, row) => ({
-        allocated: acc.allocated + Number(row.allocated_days ?? 0),
-        used: acc.used + Number(row.used_days ?? 0),
-      }),
-      { allocated: 0, used: 0 },
-    );
-    if (totals.allocated > 0) {
-      balanceUtilizationPercent = Math.round((totals.used / totals.allocated) * 100);
-    }
-  }
 
   return {
     pendingRequests: pendingResult.count ?? 0,
@@ -601,6 +582,93 @@ export async function getLeaveSummary(
     balanceUtilizationPercent,
     upcomingPlannedLeaves: upcomingResult.count ?? 0,
   };
+}
+
+function parseBalanceAggregateRow(
+  row: Record<string, unknown> | null | undefined,
+): { allocated: number; used: number } {
+  if (!row) return { allocated: 0, used: 0 };
+  return {
+    allocated: Number(row.allocated ?? row.allocated_days ?? 0),
+    used: Number(row.used ?? row.used_days ?? 0),
+  };
+}
+
+/**
+ * Org-wide leave utilization without shipping every leave_balances row.
+ * Prefer a single SQL aggregate; fall back to chunked aggregates by employee id.
+ */
+async function computeOrgLeaveBalanceUtilizationPercent(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  balanceYear: number,
+): Promise<number> {
+  const joined = await supabase
+    .schema("hrms")
+    .from("leave_balances")
+    .select(
+      "allocated:allocated_days.sum(), used:used_days.sum(), employees!inner(organization_id)",
+    )
+    .eq("balance_year", balanceYear)
+    .eq("employees.organization_id", organizationId)
+    .is("deleted_at", null);
+
+  if (!joined.error) {
+    const { allocated, used } = parseBalanceAggregateRow(
+      (joined.data?.[0] ?? null) as Record<string, unknown> | null,
+    );
+    if (allocated > 0) return Math.round((used / allocated) * 100);
+    return 0;
+  }
+
+  const { data: employeeRows, error: employeeError } = await supabase
+    .schema("hrms")
+    .from("employees")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null);
+
+  if (employeeError) {
+    console.error(
+      "[leave] balance utilization employee scope failed",
+      employeeError.message,
+      "join:",
+      joined.error.message,
+    );
+    return 0;
+  }
+
+  const employeeIds = (employeeRows ?? []).map((row) => row.id as string);
+  if (employeeIds.length === 0) return 0;
+
+  let allocatedTotal = 0;
+  let usedTotal = 0;
+  const chunkSize = 500;
+
+  for (let index = 0; index < employeeIds.length; index += chunkSize) {
+    const chunk = employeeIds.slice(index, index + chunkSize);
+    const { data, error } = await supabase
+      .schema("hrms")
+      .from("leave_balances")
+      .select("allocated:allocated_days.sum(), used:used_days.sum()")
+      .in("employee_id", chunk)
+      .eq("balance_year", balanceYear)
+      .is("deleted_at", null);
+
+    if (error) {
+      console.error("[leave] balance utilization chunk aggregate failed", error.message);
+      return 0;
+    }
+
+    const { allocated, used } = parseBalanceAggregateRow(
+      (data?.[0] ?? null) as Record<string, unknown> | null,
+    );
+    allocatedTotal += allocated;
+    usedTotal += used;
+  }
+
+  if (allocatedTotal <= 0) return 0;
+  return Math.round((usedTotal / allocatedTotal) * 100);
 }
 
 export async function getEmployeeLeaveBalanceSnapshot(

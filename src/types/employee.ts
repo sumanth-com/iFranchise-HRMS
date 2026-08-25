@@ -49,6 +49,8 @@ export type EmployeeListItem = {
   designationId: string | null;
   designationTitle: string | null;
   profileImagePath: string | null;
+  /** Prefetched signed URL for list avatars (avoids per-card client N+1). */
+  profileImageSignedUrl?: string | null;
   accountStatus: EmployeeAccountStatus;
   invitationSentAt: string | null;
   lastLoginAt: string | null;
