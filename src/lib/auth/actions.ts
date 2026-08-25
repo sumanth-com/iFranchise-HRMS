@@ -206,13 +206,6 @@ export async function loginAction(
 
     if (!profileResult.success) {
       await supabase.auth.signOut();
-      if (profileResult.error === "PROFILE_LOOKUP_FAILED") {
-        return {
-          success: false,
-          error: "NETWORK_ERROR",
-          message: getAuthErrorMessage("NETWORK_ERROR"),
-        };
-      }
       return {
         success: false,
         error: profileResult.error,
