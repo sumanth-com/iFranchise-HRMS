@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { getWhatsNewUpdate } from "@/config/whats-new-updates";
-import { PublicNavbarMinimal } from "@/components/landing/public-navbar";
+import { LandingFooter } from "@/components/landing/landing-cta-footer";
+import { PublicNavbar } from "@/components/landing/public-navbar";
 import { WHATS_NEW_ROUTE } from "@/lib/auth/constants";
 import { cn } from "@/lib/utils";
 
@@ -18,7 +19,7 @@ export function WhatsNewDetailContent({ slug }: WhatsNewDetailContentProps) {
   return (
     <div className="landing-page min-h-screen">
       <div className="landing-ambient landing-ambient--subtle" aria-hidden />
-      <PublicNavbarMinimal />
+      <PublicNavbar />
 
       <main className="mx-auto max-w-3xl px-5 py-12 sm:px-8 lg:px-10">
         <Link
@@ -69,7 +70,9 @@ export function WhatsNewDetailContent({ slug }: WhatsNewDetailContentProps) {
               <ul className="mt-4 space-y-2 text-sm leading-relaxed text-muted-foreground">
                 {update.improvements.map((item) => (
                   <li key={item} className="flex gap-2">
-                    <span aria-hidden className="text-sky-500">•</span>
+                    <span aria-hidden className="text-sky-500">
+                      •
+                    </span>
                     <span>{item}</span>
                   </li>
                 ))}
@@ -89,6 +92,8 @@ export function WhatsNewDetailContent({ slug }: WhatsNewDetailContentProps) {
           ) : null}
         </article>
       </main>
+
+      <LandingFooter />
     </div>
   );
 }

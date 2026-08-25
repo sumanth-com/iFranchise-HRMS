@@ -1,46 +1,42 @@
 "use client";
 
-import { ArrowRight, Shield, ShieldCheck, Users } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import {
+  ArrowRight,
+  Fingerprint,
+  LockKeyhole,
+  ShieldCheck,
+} from "lucide-react";
 
+import brandLogo from "@/assets/Logo.png";
+import { LandingPeopleBento } from "@/components/landing/landing-people-bento";
 import { Button } from "@/components/common/button";
+import { LEGAL_FOOTER_LINKS } from "@/lib/landing/legal-content";
+import { PUBLIC_LANDING_ROUTE } from "@/lib/auth/constants";
 import { navigateToLogin } from "@/lib/landing/navigate-to-login";
-
-const PEOPLE = [
-  {
-    title: "Employee",
-    description: "Everything you need for your everyday work.",
-  },
-  {
-    title: "Manager",
-    description: "Clear visibility into your team's activities and requests.",
-  },
-  {
-    title: "HR",
-    description: "Centralized tools to manage people and workplace processes.",
-  },
-] as const;
 
 const SECURITY = [
   {
     title: "Secure Access",
-    description: "Authentication designed to protect employee accounts.",
-    icon: ShieldCheck,
+    description: "Authentication designed to protect employee accounts and sessions.",
+    icon: LockKeyhole,
   },
   {
     title: "Role-Based Access",
-    description: "Employees, managers and HR see information relevant to their role.",
-    icon: Users,
+    description: "Employees, managers and HR see only what their role needs.",
+    icon: Fingerprint,
   },
   {
     title: "Centralized Information",
-    description: "Workplace information stays organized in one controlled platform.",
-    icon: Shield,
+    description: "Workplace data stays organized in one controlled platform.",
+    icon: ShieldCheck,
   },
 ] as const;
 
 export function LandingPeopleSection() {
   return (
-    <section className="landing-section" aria-labelledby="landing-people-heading">
+    <section className="landing-section landing-people" aria-labelledby="landing-people-heading">
       <div className="mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
         <div className="mx-auto max-w-2xl text-center">
           <h2 id="landing-people-heading" className="landing-section-title">
@@ -51,22 +47,7 @@ export function LandingPeopleSection() {
           </p>
         </div>
 
-        <ul className="landing-people-grid">
-          {PEOPLE.map((item, index) => (
-            <li
-              key={item.title}
-              className="landing-people-card landing-animate-up"
-              style={{ animationDelay: `${0.08 + index * 0.08}s` }}
-            >
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-600 dark:text-sky-300">
-                {item.title}
-              </p>
-              <p className="mt-3 text-base leading-relaxed text-foreground/90">
-                {item.description}
-              </p>
-            </li>
-          ))}
-        </ul>
+        <LandingPeopleBento />
       </div>
     </section>
   );
@@ -99,13 +80,13 @@ export function LandingSecuritySection() {
                 className="landing-security-item landing-animate-up"
                 style={{ animationDelay: `${0.08 + index * 0.08}s` }}
               >
-                <div className="landing-feature-icon">
-                  <Icon className="size-5" strokeWidth={2.2} />
+                <div className="landing-security-icon">
+                  <Icon className="size-5" strokeWidth={2.15} />
                 </div>
-                <h3 className="text-base font-semibold text-foreground">{item.title}</h3>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {item.description}
-                </p>
+                <div className="landing-security-copy">
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                </div>
               </li>
             );
           })}
@@ -118,39 +99,58 @@ export function LandingSecuritySection() {
 export function LandingFinalCta() {
   return (
     <section className="landing-section landing-final-cta" aria-labelledby="landing-final-heading">
-      <div className="landing-final-cta-inner mx-auto max-w-3xl px-5 py-16 text-center sm:px-8 lg:px-10">
-        <h2 id="landing-final-heading" className="landing-section-title">
-          Your workplace starts here.
-        </h2>
-        <p className="landing-section-copy mx-auto mt-4 max-w-xl">
-          Everything you need is just one sign-in away.
-        </p>
-        <Button
-          type="button"
-          onClick={navigateToLogin}
-          className="landing-cta mt-8 h-12 rounded-full px-8 text-sm font-semibold"
-        >
-          Enter HRMS
-          <ArrowRight className="size-4" aria-hidden />
-        </Button>
+      <div className="landing-final-cta-shell mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
+        <div className="landing-final-cta-inner">
+          <h2 id="landing-final-heading" className="landing-section-title">
+            Your workplace starts here.
+          </h2>
+          <p className="landing-section-copy landing-final-cta-copy">
+            Everything you need is just one sign-in away.
+          </p>
+          <Button
+            type="button"
+            onClick={navigateToLogin}
+            className="landing-cta landing-final-cta-button h-12 rounded-full px-8 text-sm font-semibold"
+          >
+            Enter HRMS
+            <ArrowRight className="size-4" aria-hidden />
+          </Button>
+        </div>
       </div>
     </section>
   );
 }
 
 export function LandingFooter() {
+  const year = new Date().getFullYear();
+
   return (
-    <footer id="help" className="landing-footer border-t border-border/60">
-      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-5 py-10 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
-        <div>
-          <p className="text-sm font-semibold text-foreground">iFranchise HRMS</p>
-          <p className="mt-1 max-w-md text-sm text-muted-foreground">
-            Internal workplace platform for employees, managers and HR teams.
-          </p>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Need help? Contact your HR administrator or IT support team.
+    <footer className="landing-footer">
+      <div className="landing-footer-inner">
+        <Link href={PUBLIC_LANDING_ROUTE} className="landing-footer-brand">
+          <span className="landing-footer-brand-mark">
+            <Image
+              src={brandLogo}
+              alt=""
+              width={28}
+              height={28}
+              className="size-7 rounded-lg object-contain"
+            />
+          </span>
+          <span className="landing-footer-brand-inline">iFranchise</span>
+        </Link>
+
+        <p className="landing-footer-copy">
+          © {year} iFranchise. All rights reserved.
         </p>
+
+        <nav className="landing-footer-links" aria-label="Legal">
+          {LEGAL_FOOTER_LINKS.map((link) => (
+            <Link key={link.href} href={link.href} className="landing-footer-link">
+              {link.label}
+            </Link>
+          ))}
+        </nav>
       </div>
     </footer>
   );
