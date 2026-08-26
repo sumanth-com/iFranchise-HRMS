@@ -348,7 +348,11 @@ export async function listPayslipHistory(
       statsQuery = statsQuery.ilike("payslip_number", `%${payslipNumberTerm}%`);
     }
 
-    const { data: statsRows } = await statsQuery.order("issued_at", { ascending: false });
+    // Cap stats aggregation — unbounded org-wide payslip fetch was blocking history nav.
+    const STATS_ROW_CAP = 500;
+    const { data: statsRows } = await statsQuery
+      .order("issued_at", { ascending: false })
+      .limit(STATS_ROW_CAP);
     const statItems: PayslipListItem[] = (statsRows ?? []).map((row) => {
       const payrollItem = unwrapRelation(row.payroll_items);
       const payroll = unwrapRelation(row.payrolls);

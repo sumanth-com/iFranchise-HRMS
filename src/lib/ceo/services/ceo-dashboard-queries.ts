@@ -75,7 +75,8 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
   const payrollMonthDate = getPayrollMonthDate(now.getMonth() + 1, now.getFullYear());
   const startedAt = performance.now();
 
-  await syncExecutiveApprovalsFromDomain(supabase, profile).catch((error) => {
+  // Kick off domain sync without blocking non-approval KPI queries.
+  const syncPromise = syncExecutiveApprovalsFromDomain(supabase, profile).catch((error) => {
     console.error("[ceo-dashboard] executive approval sync failed", error);
   });
 
@@ -101,10 +102,12 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
     pendingApprovalsRes,
     holidaysResult,
   ] = await Promise.all([
-    listCeoApprovalQueue(supabase, profile).catch((error) => {
-      console.error("[ceo-dashboard] leave approval queue failed", error);
-      return [] as Awaited<ReturnType<typeof listCeoApprovalQueue>>;
-    }),
+    syncPromise.then(() =>
+      listCeoApprovalQueue(supabase, profile).catch((error) => {
+        console.error("[ceo-dashboard] leave approval queue failed", error);
+        return [] as Awaited<ReturnType<typeof listCeoApprovalQueue>>;
+      }),
+    ),
     fromHrms(supabase, "employees")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
@@ -133,11 +136,13 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
       .eq("payroll_month", payrollMonthDate)
       .is("deleted_at", null)
       .maybeSingle(),
-    fromHrms(supabase, "executive_approval_requests")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .in("request_status", CEO_PENDING_APPROVAL_STATUSES)
-      .is("deleted_at", null),
+    syncPromise.then(() =>
+      fromHrms(supabase, "executive_approval_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .in("request_status", CEO_PENDING_APPROVAL_STATUSES)
+        .is("deleted_at", null),
+    ),
     listHolidays(supabase, organizationId, { year: now.getFullYear() }).catch((error) => {
       console.error("[ceo-dashboard] holidays query failed", error);
       return { data: [] as Awaited<ReturnType<typeof listHolidays>>["data"] };

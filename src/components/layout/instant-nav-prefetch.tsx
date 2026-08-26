@@ -55,14 +55,25 @@ export function InstantNavPrefetch() {
       .map((item) => (typeof item.href === "string" ? item.href : null))
       .filter((href): href is string => Boolean(href));
 
-    // Immediate: home + first sidebar items for snappy module switches.
+    const isHeavyTeamRoute = (href: string) =>
+      href.includes("/team") ||
+      href.includes("/user-provisioning") ||
+      href.includes("/recruitment");
+
+    // Immediate: home + light sidebar modules. Defer team/admin heavy RSC to idle.
     prefetch(portalHome);
-    for (const href of navHrefs.slice(0, 8)) {
+    const lightNav = navHrefs.filter((href) => !isHeavyTeamRoute(href));
+    const heavyNav = navHrefs.filter((href) => isHeavyTeamRoute(href));
+    const IMMEDIATE_PREFETCH = 10;
+    for (const href of lightNav.slice(0, IMMEDIATE_PREFETCH)) {
       prefetch(href);
     }
 
     const warmRemainingNav = () => {
-      for (const href of navHrefs.slice(8)) {
+      for (const href of lightNav.slice(IMMEDIATE_PREFETCH)) {
+        prefetch(href);
+      }
+      for (const href of heavyNav) {
         prefetch(href);
       }
     };

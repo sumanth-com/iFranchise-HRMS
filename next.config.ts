@@ -64,6 +64,16 @@ const nextConfig: NextConfig = {
         destination: "/ceo/approvals/regularization",
         permanent: false,
       },
+      {
+        source: "/dashboard/recruitment",
+        destination: "/dashboard/recruitment/jobs",
+        permanent: false,
+      },
+      {
+        source: "/dashboard/reports",
+        destination: "/dashboard/reports/attendance",
+        permanent: false,
+      },
     ];
   },
   experimental: {

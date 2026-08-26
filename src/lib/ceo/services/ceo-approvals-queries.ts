@@ -571,13 +571,14 @@ export async function getCeoApprovalsPageData(
   profile: UserProfile,
   params: CeoApprovalsListParams,
 ): Promise<CeoApprovalsPageData> {
-  await syncExecutiveApprovalsFromDomain(supabase, profile);
+  const syncPromise = syncExecutiveApprovalsFromDomain(supabase, profile);
 
   // Categories/insights are not rendered on the main approvals view — skip those
   // full-table scans on the critical path (same queue/KPI/lookup semantics).
+  // Lookups do not depend on sync; overlap them with the sync work.
   const [kpis, queue, lookups] = await Promise.all([
-    getCeoApprovalsKpis(supabase, profile, params),
-    listCeoApprovalsQueue(supabase, profile, params),
+    syncPromise.then(() => getCeoApprovalsKpis(supabase, profile, params)),
+    syncPromise.then(() => listCeoApprovalsQueue(supabase, profile, params)),
     getCeoApprovalsFilterLookups(supabase, profile.employee.organizationId),
   ]);
 

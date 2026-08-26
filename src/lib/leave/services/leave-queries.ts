@@ -703,6 +703,7 @@ export async function getEmployeeLeaveBalanceSnapshot(
   employeeId: string,
   balanceYearParam = getCurrentBalanceYear(),
   monthYear?: { month: number; year: number },
+  organizationIdHint?: string,
 ): Promise<LeaveEmployeeBalanceSnapshot[]> {
   const now = new Date();
   const calendarYear = monthYear?.year ?? balanceYearParam;
@@ -711,14 +712,7 @@ export async function getEmployeeLeaveBalanceSnapshot(
   const monthRange = getMonthDateRange(month, calendarYear);
   const yearRange = { start: `${calendarYear}-01-01`, end: `${calendarYear}-12-31` };
 
-  const [employeeResult, balancesResult] = await Promise.all([
-    supabase
-      .schema("hrms")
-      .from("employees")
-      .select("organization_id")
-      .eq("id", employeeId)
-      .is("deleted_at", null)
-      .maybeSingle(),
+  const balancesQuery = () =>
     supabase
       .schema("hrms")
       .from("leave_balances")
@@ -727,13 +721,21 @@ export async function getEmployeeLeaveBalanceSnapshot(
       )
       .eq("employee_id", employeeId)
       .eq("balance_year", balanceYear)
-      .is("deleted_at", null),
-  ]);
+      .is("deleted_at", null);
 
-  if (employeeResult.error) throw new Error(employeeResult.error.message);
-  if (balancesResult.error) throw new Error(balancesResult.error.message);
+  let organizationId = organizationIdHint;
+  if (!organizationId) {
+    const { data: employeeRow, error: employeeError } = await supabase
+      .schema("hrms")
+      .from("employees")
+      .select("organization_id")
+      .eq("id", employeeId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (employeeError) throw new Error(employeeError.message);
+    organizationId = employeeRow?.organization_id as string | undefined;
+  }
 
-  const organizationId = employeeResult.data?.organization_id as string | undefined;
   let typeRows: Array<{ code: string; name: string; days_per_year: number | string | null }> = [];
   let requestRows: Array<{
     start_date: string;
@@ -744,9 +746,11 @@ export async function getEmployeeLeaveBalanceSnapshot(
     leave_types: { code: string } | { code: string }[] | null;
   }> = [];
   let calendar = DEFAULT_LEAVE_CALENDAR;
+  let balancesResult: Awaited<ReturnType<typeof balancesQuery>>;
 
   if (organizationId) {
-    const [typesResult, requestsResult, runtime] = await Promise.all([
+    const [balances, typesResult, requestsResult, runtime] = await Promise.all([
+      balancesQuery(),
       supabase
         .schema("hrms")
         .from("leave_types")
@@ -769,13 +773,18 @@ export async function getEmployeeLeaveBalanceSnapshot(
       loadLeavePolicyRuntime(supabase, organizationId),
     ]);
 
+    balancesResult = balances;
     if (typesResult.error) throw new Error(typesResult.error.message);
     if (requestsResult.error) throw new Error(requestsResult.error.message);
 
     typeRows = typesResult.data ?? [];
     requestRows = (requestsResult.data ?? []) as typeof requestRows;
     calendar = runtime.calendar;
+  } else {
+    balancesResult = await balancesQuery();
   }
+
+  if (balancesResult.error) throw new Error(balancesResult.error.message);
   const monthUsedByCode: Record<string, number> = {};
   const yearUsedByCode: Record<string, number> = {};
   const yearTakenByCode: Record<string, number> = {};

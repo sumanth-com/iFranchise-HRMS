@@ -851,6 +851,7 @@ export async function getManagerProfilePageData(
   const employeeId = profile.employee.id;
   const organizationId = profile.employee.organizationId;
 
+  const monthRowsPromise = loadMonthAttendance(supabase, employeeId, month, year);
   const [
     rules,
     todayRow,
@@ -859,21 +860,23 @@ export async function getManagerProfilePageData(
     holidays,
     weekendRules,
     profileCard,
+    corrections,
   ] = await Promise.all([
     getOrganizationAttendanceRules(supabase, organizationId),
     getAttendanceForDate(supabase, employeeId, today),
-    loadMonthAttendance(supabase, employeeId, month, year),
+    monthRowsPromise,
     loadMonthLeaves(supabase, employeeId, month, year),
     loadMonthHolidays(supabase, organizationId, month, year),
     loadWeekendRules(supabase, organizationId),
     buildProfileCard(supabase, profile),
+    monthRowsPromise.then((rows) =>
+      loadMonthCorrections(
+        supabase,
+        employeeId,
+        rows.map((row) => row.id),
+      ),
+    ),
   ]);
-
-  const corrections = await loadMonthCorrections(
-    supabase,
-    employeeId,
-    monthRows.map((row) => row.id),
-  );
 
   const attendanceByDate = new Map(
     monthRows.map((row) => [row.attendance_date, row]),

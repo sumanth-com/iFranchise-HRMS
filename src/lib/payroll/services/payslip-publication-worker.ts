@@ -26,6 +26,8 @@ export async function processDuePayslipPublications(
 ): Promise<PayslipPublicationResult> {
   const scopedOrganizationId = organizationId ?? profile.employee.organizationId;
 
+  // Bound each run so cron never scans/processes an unbounded backlog in one shot.
+  const BATCH_LIMIT = 25;
   const { data: dueRows, error } = await supabase
     .schema("hrms")
     .from("payslips")
@@ -34,7 +36,9 @@ export async function processDuePayslipPublications(
     )
     .is("deleted_at", null)
     .is("email_sent_at", null)
-    .eq("payrolls.organization_id", scopedOrganizationId);
+    .eq("payrolls.organization_id", scopedOrganizationId)
+    .order("published_at", { ascending: true, nullsFirst: false })
+    .limit(BATCH_LIMIT);
 
   if (error) throw new Error(error.message);
 

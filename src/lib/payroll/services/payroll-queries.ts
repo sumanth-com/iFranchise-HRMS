@@ -177,7 +177,8 @@ export async function getPayrollLookups(
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
       .in("employment_status", ["active", "probation", "on_leave"])
-      .order("first_name"),
+      .order("first_name")
+      .limit(250),
     getDepartments(supabase, organizationId),
     getBranches(supabase, organizationId),
   ]);

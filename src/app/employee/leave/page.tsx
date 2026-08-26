@@ -36,7 +36,13 @@ export default async function EmployeeLeavePage() {
   const [balances, requests, calendar, applyLookups] = await Promise.all([
     safeServerCall(
       () =>
-        getEmployeeLeaveBalanceSnapshot(supabase, employeeId, calendarYear),
+        getEmployeeLeaveBalanceSnapshot(
+          supabase,
+          employeeId,
+          calendarYear,
+          undefined,
+          profile.employee.organizationId,
+        ),
       [],
       "[employee/leave] balances",
     ),

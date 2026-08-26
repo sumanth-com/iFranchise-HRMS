@@ -128,7 +128,7 @@ export const mainNavItems: NavigationItem[] = [
   },
   {
     title: "Recruitment",
-    href: "/dashboard/recruitment",
+    href: "/dashboard/recruitment/jobs",
     icon: BriefcaseBusiness,
     section: "Administration",
     permissions: ["recruitment.view"],
@@ -170,7 +170,7 @@ export const mainNavItems: NavigationItem[] = [
   },
   {
     title: "Reports",
-    href: "/dashboard/reports",
+    href: "/dashboard/reports/attendance",
     icon: BarChart3,
     section: "Administration",
     permissions: ["reports.view"],

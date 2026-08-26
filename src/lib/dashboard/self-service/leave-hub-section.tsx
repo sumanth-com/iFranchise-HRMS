@@ -104,7 +104,13 @@ export async function LeaveHubSection({
     applyLookupsSettled,
   ] = await Promise.all([
     loadMySection
-      ? getEmployeeLeaveBalanceSnapshot(supabase, employeeId, calendarYear).catch((error) => {
+      ? getEmployeeLeaveBalanceSnapshot(
+          supabase,
+          employeeId,
+          calendarYear,
+          undefined,
+          profile.employee.organizationId,
+        ).catch((error) => {
           console.error("[leave] balance snapshot failed", error);
           return [] as Awaited<ReturnType<typeof getEmployeeLeaveBalanceSnapshot>>;
         })

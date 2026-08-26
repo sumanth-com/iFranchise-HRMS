@@ -39,8 +39,16 @@ const ROLE_ROUTES: Record<RoleKey, string[]> = {
     "/dashboard",
     "/dashboard/hr-overview",
     "/dashboard/employees",
+    "/dashboard/recruitment/jobs",
     "/dashboard/attendance/team",
     "/dashboard/leave/team",
+    "/dashboard/payroll/team/run",
+    "/dashboard/assets/team",
+    "/dashboard/performance",
+    "/dashboard/reports/attendance",
+    "/dashboard/organization",
+    "/dashboard/user-provisioning",
+    "/dashboard/roles",
   ],
   ceo: [
     "/ceo",
@@ -81,7 +89,8 @@ function projectRefFromUrl(url: string): string {
 
 async function resolveRoleUsers(
   admin: ReturnType<typeof createClient>,
-): Promise<Record<RoleKey, { userId: string; email: string }>> {
+  roles: RoleKey[] = ["employee", "manager", "hr", "ceo"],
+): Promise<Partial<Record<RoleKey, { userId: string; email: string }>>> {
   const { data: ur, error } = await admin
     .schema("hrms")
     .from("user_roles")
@@ -124,11 +133,11 @@ async function resolveRoleUsers(
     ceo: pick((c) => c.has("ceo") || c.has("founder") || c.has("co_founder")),
   };
 
-  const out = {} as Record<RoleKey, { userId: string; email: string }>;
-  for (const role of Object.keys(ids) as RoleKey[]) {
+  const out: Partial<Record<RoleKey, { userId: string; email: string }>> = {};
+  for (const role of roles) {
     const { data, error: userError } = await admin.auth.admin.getUserById(ids[role]);
     if (userError || !data.user?.email) {
-      throw new Error(`Missing email for ${role}: ${userError?.message}`);
+      throw new Error(`Missing email for ${role}: ${userError?.message ?? JSON.stringify(data)}`);
     }
     out[role] = { userId: ids[role], email: data.user.email };
   }
@@ -398,11 +407,17 @@ async function main() {
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const users = await resolveRoleUsers(admin);
+  const selectedRoles = (
+    process.env.PERF_ROLES
+      ? process.env.PERF_ROLES.split(",").map((r) => r.trim())
+      : (Object.keys(ROLE_ROUTES) as RoleKey[])
+  ).filter((r): r is RoleKey => r in ROLE_ROUTES);
+
+  const users = await resolveRoleUsers(admin, selectedRoles);
   console.log(
     "Resolved roles:",
     Object.fromEntries(
-      Object.entries(users).map(([role, u]) => [role, u.userId.slice(0, 8)]),
+      Object.entries(users).map(([role, u]) => [role, u!.userId.slice(0, 8)]),
     ),
   );
 
@@ -411,12 +426,9 @@ async function main() {
   const rapidByRole: Record<string, string[]> = {};
   const cookiesByRole: Record<string, Awaited<ReturnType<typeof inspectPermissionCookies>>> = {};
 
-  for (const role of Object.keys(ROLE_ROUTES) as RoleKey[]) {
-    if (process.env.PERF_ROLES && !process.env.PERF_ROLES.split(",").includes(role)) {
-      continue;
-    }
+  for (const role of selectedRoles) {
     console.log(`\n=== ${role} ===`);
-    const result = await runRole(browser, role, users[role].email);
+    const result = await runRole(browser, role, users[role]!.email);
     allMetrics.push(...result.metrics);
     rapidByRole[role] = result.rapidErrors;
     cookiesByRole[role] = result.cookies;

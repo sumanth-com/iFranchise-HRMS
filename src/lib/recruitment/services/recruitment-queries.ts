@@ -92,19 +92,22 @@ export async function getRecruitmentLookups(
         .eq("organization_id", organizationId)
         .is("deleted_at", null)
         .in("employment_status", ["active", "probation"])
-        .order("first_name"),
+        .order("first_name")
+        .limit(250),
       fromHrms(supabase, "recruitment_job_openings")
         .select("id, title, job_code, job_status, department_id")
         .eq("organization_id", organizationId)
         .is("deleted_at", null)
-        .order("created_at", { ascending: false }),
+        .order("created_at", { ascending: false })
+        .limit(200),
       getRecruitmentSettings(supabase, organizationId),
       fromHrms(supabase, "document_templates")
         .select("id, name, subject, body_html")
         .eq("organization_id", organizationId)
         .eq("letter_type", "offer_letter")
         .is("deleted_at", null)
-        .order("name"),
+        .order("name")
+        .limit(50),
     ]);
 
   let departmentRows = departments.data ?? [];
@@ -726,7 +729,7 @@ export async function listJobOpenings(
       designations:designation_id(title),
       employment_types:employment_type_id(name),
       hiring_manager:hiring_manager_id(first_name, last_name)`,
-      { count: "exact" },
+      { count: "estimated" },
     )
     .eq("organization_id", organizationId)
     .is("deleted_at", null)

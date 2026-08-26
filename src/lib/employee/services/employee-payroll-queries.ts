@@ -11,7 +11,6 @@ import {
   resolvePayslipSchedule,
   SALARY_CREDIT_DAY,
 } from "@/lib/payroll/services/payslip-publication";
-import { processDuePayslipPublications } from "@/lib/payroll/services/payslip-publication-worker";
 import { listBonuses, listReimbursements } from "@/lib/payroll/services/payroll-queries";
 import { getPayrollSettings } from "@/lib/payroll/services/payroll-settings";
 import { maskAccountNumber, roundCurrency, toEmployeeFacingEarnings } from "@/lib/payroll/services/payroll-utils";
@@ -386,13 +385,9 @@ export async function getEmployeePayrollData(
 ): Promise<EmployeePayrollData> {
   const employeeId = options?.targetEmployeeId ?? profile.employee.id;
   const organizationId = profile.employee.organizationId;
-  const appOrigin = options?.appOrigin;
-
-  if (appOrigin && employeeId === profile.employee.id) {
-    void processDuePayslipPublications(supabase, profile, appOrigin).catch((error) => {
-      console.error("[employee-payroll] publication worker failed", error);
-    });
-  }
+  // Payslip publication is owned by /api/cron/publish-payslips — never kick off
+  // org-wide sequential getPayslipById/PDF/email work on navigation paint.
+  void options?.appOrigin;
 
   const employeeMeta =
     employeeId === profile.employee.id
