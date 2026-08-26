@@ -132,9 +132,16 @@
   }
 }
 
-/* Light mode shell: soft canvas so white cards read clearly */
+/* Light mode shell: soft purple gradient canvas so white cards read clearly */
 html:not(.dark) .app-shell-canvas {
   background-color: var(--background);
+  background-image:
+    radial-gradient(ellipse 95% 75% at 92% -8%, rgba(124, 58, 237, 0.16), transparent 56%),
+    radial-gradient(ellipse 65% 55% at 5% 105%, rgba(139, 92, 246, 0.1), transparent 52%),
+    radial-gradient(ellipse 50% 40% at 48% 42%, rgba(167, 139, 250, 0.07), transparent 58%),
+    linear-gradient(165deg, oklch(0.975 0.014 295) 0%, oklch(0.96 0.018 285) 45%, oklch(0.965 0.01 275) 100%);
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
 }
 
 html:not(.dark) .app-shell-sidebar {
@@ -570,15 +577,15 @@ html:not(.dark) .dashboard-surface:hover {
   justify-content: center;
   overflow: hidden;
   border-radius: 1.75rem;
-  /* Light mode: bright cyan → blue mesh like the design reference */
+  /* Light mode: purple brand mesh — consistent with landing */
   background:
-    radial-gradient(ellipse 80% 60% at 12% 8%, rgba(125, 211, 252, 0.95), transparent 52%),
-    radial-gradient(ellipse 70% 55% at 88% 88%, rgba(59, 130, 246, 0.75), transparent 55%),
-    radial-gradient(circle at 48% 48%, rgba(147, 197, 253, 0.55), transparent 45%),
-    linear-gradient(160deg, #7dd3fc 0%, #38bdf8 32%, #3b82f6 68%, #2563eb 100%);
+    radial-gradient(ellipse 80% 60% at 12% 8%, rgba(196, 181, 253, 0.9), transparent 52%),
+    radial-gradient(ellipse 70% 55% at 88% 88%, rgba(124, 58, 237, 0.72), transparent 55%),
+    radial-gradient(circle at 48% 48%, rgba(167, 139, 250, 0.5), transparent 45%),
+    linear-gradient(160deg, #a78bfa 0%, #8b5cf6 32%, #7c3aed 68%, #5b21b6 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    0 18px 48px rgba(37, 99, 235, 0.22);
+    0 18px 48px rgba(109, 40, 217, 0.24);
 }
 
 .auth-glass-brand {
@@ -622,33 +629,43 @@ html:not(.dark) .dashboard-surface:hover {
   flex: 1;
   width: 100%;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
+  flex-direction: column;
   min-height: 0;
+  /* Sit the orb a bit lower toward the tagline */
+  padding-top: 5.5rem;
+  padding-bottom: 0.35rem;
 }
 
 .auth-glass-tagline {
   position: relative;
   z-index: 5;
-  width: min(90%, 24rem);
-  padding: 0 1.25rem 2rem;
+  display: flex;
+  width: min(92%, 30rem);
+  flex-direction: column;
+  align-items: center;
+  padding: 0.85rem 1.5rem 2.35rem;
   text-align: center;
 }
 
 .auth-glass-tagline-title {
   margin: 0;
-  font-size: 1.2rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  font-size: clamp(1.55rem, 2.4vw, 1.85rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
   color: #ffffff;
-  text-shadow: 0 1px 10px rgba(15, 23, 42, 0.22);
+  text-shadow: 0 2px 14px rgba(15, 23, 42, 0.28);
 }
 
 .auth-glass-tagline-copy {
-  margin: 0.55rem 0 0;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  color: rgba(255, 255, 255, 0.9);
-  text-shadow: 0 1px 8px rgba(15, 23, 42, 0.18);
+  margin: 0.75rem 0 0;
+  max-width: 26rem;
+  font-size: clamp(0.98rem, 1.35vw, 1.08rem);
+  font-weight: 400;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 10px rgba(15, 23, 42, 0.2);
 }
 
 .dark .auth-glass-tagline-title {
@@ -661,10 +678,10 @@ html:not(.dark) .dashboard-surface:hover {
 
 .dark .auth-glass-stage {
   background:
-    radial-gradient(ellipse 70% 55% at 18% 12%, rgba(139, 92, 246, 0.38), transparent 55%),
-    radial-gradient(ellipse 55% 45% at 82% 78%, rgba(37, 99, 235, 0.28), transparent 50%),
-    radial-gradient(circle at 48% 42%, rgba(56, 189, 248, 0.14), transparent 42%),
-    linear-gradient(165deg, #0a1024 0%, #101b3a 42%, #070d1c 100%);
+    radial-gradient(ellipse 70% 55% at 18% 12%, rgba(139, 92, 246, 0.42), transparent 55%),
+    radial-gradient(ellipse 55% 45% at 82% 78%, rgba(124, 58, 237, 0.32), transparent 50%),
+    radial-gradient(circle at 48% 42%, rgba(167, 139, 250, 0.16), transparent 42%),
+    linear-gradient(165deg, #2e1065 0%, #4c1d95 42%, #1e1b4b 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
     0 24px 60px rgba(0, 0, 0, 0.35);
@@ -684,7 +701,7 @@ html:not(.dark) .dashboard-surface:hover {
   left: -6%;
   width: 52%;
   height: 42%;
-  background: rgba(186, 230, 253, 0.7);
+  background: rgba(196, 181, 253, 0.7);
 }
 
 .auth-glass-aurora-b {
@@ -692,7 +709,7 @@ html:not(.dark) .dashboard-surface:hover {
   bottom: 8%;
   width: 48%;
   height: 40%;
-  background: rgba(37, 99, 235, 0.45);
+  background: rgba(124, 58, 237, 0.45);
   animation-delay: -4s;
 }
 
@@ -701,7 +718,7 @@ html:not(.dark) .dashboard-surface:hover {
   top: 38%;
   width: 36%;
   height: 28%;
-  background: rgba(56, 189, 248, 0.35);
+  background: rgba(167, 139, 250, 0.4);
   animation-delay: -7s;
 }
 
@@ -710,11 +727,11 @@ html:not(.dark) .dashboard-surface:hover {
 }
 
 .dark .auth-glass-aurora-b {
-  background: rgba(37, 99, 235, 0.4);
+  background: rgba(139, 92, 246, 0.4);
 }
 
 .dark .auth-glass-aurora-c {
-  background: rgba(56, 189, 248, 0.22);
+  background: rgba(167, 139, 250, 0.28);
 }
 
 .auth-glass-grid {
@@ -733,14 +750,14 @@ html:not(.dark) .dashboard-surface:hover {
 }
 
 .auth-glass-bounce {
-  --orb-size: 9.5rem;
-  --icon-size: 2.35rem;
+  --orb-size: 13rem;
+  --icon-size: 2.55rem;
   /* Orbit = orb radius + gap + half icon → icons sit outside with a clear gap */
-  --icon-orbit: calc((var(--orb-size) / 2) + 1.15rem + (var(--icon-size) / 2));
+  --icon-orbit: calc((var(--orb-size) / 2) + 1.35rem + (var(--icon-size) / 2));
   position: relative;
   z-index: 1;
   display: flex;
-  width: min(68%, 420px);
+  width: min(78%, 520px);
   aspect-ratio: 1;
   align-items: center;
   justify-content: center;
@@ -755,7 +772,8 @@ html:not(.dark) .dashboard-surface:hover {
   height: 100%;
   align-items: center;
   justify-content: center;
-  animation: auth-glass-bounce 3.2s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
+  /* ~6s loop: bounce up, hold peak while people stay visible ~2.5s, then settle */
+  animation: auth-glass-bounce 6s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
 }
 
 .auth-glass-people {
@@ -780,23 +798,23 @@ html:not(.dark) .dashboard-surface:hover {
   border-radius: 9999px;
   border: 1.5px solid #ffffff;
   background: #ffffff;
-  color: #1d4ed8;
+  color: #6d28d9;
   box-shadow:
     0 8px 18px rgba(15, 23, 42, 0.28),
-    0 0 0 3px rgba(59, 130, 246, 0.22);
+    0 0 0 3px rgba(139, 92, 246, 0.28);
   opacity: 0;
   transform-origin: center;
-  /* Same timeline as ball bounce — no delay so reveal matches the peak */
-  animation: auth-glass-person-reveal 3.2s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
+  /* Synced with bounce — hold visible ~2.5s at the peak */
+  animation: auth-glass-person-reveal 6s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
 }
 
 .dark .auth-glass-person {
-  border-color: #eff6ff;
-  background: #eff6ff;
-  color: #1e40af;
+  border-color: #ede9fe;
+  background: #ede9fe;
+  color: #5b21b6;
   box-shadow:
     0 10px 22px rgba(2, 6, 23, 0.55),
-    0 0 0 3px rgba(96, 165, 250, 0.35);
+    0 0 0 3px rgba(167, 139, 250, 0.4);
 }
 
 .auth-glass-bounce--static .auth-glass-orb-cluster,
@@ -828,7 +846,7 @@ html:not(.dark) .dashboard-surface:hover {
   background: radial-gradient(
     circle,
     rgba(255, 255, 255, 0.55) 0%,
-    rgba(125, 211, 252, 0.35) 35%,
+    rgba(196, 181, 253, 0.4) 35%,
     transparent 70%
   );
   filter: blur(16px);
@@ -838,8 +856,8 @@ html:not(.dark) .dashboard-surface:hover {
 .dark .auth-glass-orb-glow {
   background: radial-gradient(
     circle,
-    rgba(59, 130, 246, 0.45) 0%,
-    rgba(99, 102, 241, 0.18) 42%,
+    rgba(167, 139, 250, 0.45) 0%,
+    rgba(124, 58, 237, 0.2) 42%,
     transparent 70%
   );
 }
@@ -850,25 +868,26 @@ html:not(.dark) .dashboard-surface:hover {
   overflow: hidden;
   border-radius: 9999px;
   background:
-    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.72), transparent 30%),
-    radial-gradient(circle at 50% 45%, rgba(186, 230, 253, 0.55) 0%, rgba(59, 130, 246, 0.35) 48%, rgba(30, 64, 175, 0.45) 100%);
+    radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.85), transparent 28%),
+    radial-gradient(circle at 68% 72%, rgba(124, 58, 237, 0.3), transparent 42%),
+    radial-gradient(circle at 50% 46%, rgba(221, 214, 254, 0.65) 0%, rgba(139, 92, 246, 0.42) 46%, rgba(91, 33, 182, 0.55) 100%);
   box-shadow:
-    inset -18px -14px 36px rgba(30, 64, 175, 0.28),
-    inset 12px 10px 28px rgba(255, 255, 255, 0.35),
-    0 0 0 1px rgba(255, 255, 255, 0.35),
-    0 18px 40px rgba(37, 99, 235, 0.28);
-  backdrop-filter: blur(2px);
+    inset -20px -16px 40px rgba(76, 29, 149, 0.32),
+    inset 14px 12px 32px rgba(255, 255, 255, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.42),
+    0 22px 48px rgba(109, 40, 217, 0.34);
+  backdrop-filter: blur(2.5px);
 }
 
 .dark .auth-glass-orb-body {
   background:
-    radial-gradient(circle at 32% 28%, rgba(147, 197, 253, 0.55), transparent 28%),
-    radial-gradient(circle at 50% 48%, rgba(37, 99, 235, 0.55) 0%, rgba(15, 23, 42, 0.2) 48%, rgba(2, 6, 23, 0.55) 100%);
+    radial-gradient(circle at 32% 28%, rgba(196, 181, 253, 0.55), transparent 28%),
+    radial-gradient(circle at 50% 48%, rgba(124, 58, 237, 0.55) 0%, rgba(15, 23, 42, 0.2) 48%, rgba(2, 6, 23, 0.55) 100%);
   box-shadow:
     inset -28px -20px 50px rgba(2, 6, 23, 0.55),
-    inset 16px 14px 36px rgba(191, 219, 254, 0.22),
-    0 0 0 1px rgba(191, 219, 254, 0.18),
-    0 30px 80px rgba(37, 99, 235, 0.35);
+    inset 16px 14px 36px rgba(221, 214, 254, 0.22),
+    0 0 0 1px rgba(196, 181, 253, 0.18),
+    0 30px 80px rgba(109, 40, 217, 0.35);
 }
 
 .auth-glass-orb-core {
@@ -878,7 +897,7 @@ html:not(.dark) .dashboard-surface:hover {
   background: radial-gradient(
     circle at 45% 40%,
     rgba(255, 255, 255, 0.55),
-    rgba(125, 211, 252, 0.35) 55%,
+    rgba(196, 181, 253, 0.4) 55%,
     transparent 75%
   );
   filter: blur(6px);
@@ -888,8 +907,8 @@ html:not(.dark) .dashboard-surface:hover {
 .dark .auth-glass-orb-core {
   background: radial-gradient(
     circle at 45% 40%,
-    rgba(96, 165, 250, 0.7),
-    rgba(29, 78, 216, 0.25) 55%,
+    rgba(167, 139, 250, 0.7),
+    rgba(91, 33, 182, 0.28) 55%,
     transparent 75%
   );
 }
@@ -904,7 +923,7 @@ html:not(.dark) .dashboard-surface:hover {
     180deg,
     transparent 0%,
     rgba(255, 255, 255, 0.18) 28%,
-    rgba(191, 219, 254, 0.45) 100%
+    rgba(221, 214, 254, 0.5) 100%
   );
   backdrop-filter: blur(5px);
   -webkit-backdrop-filter: blur(5px);
@@ -934,23 +953,23 @@ html:not(.dark) .dashboard-surface:hover {
 }
 
 .dark .auth-glass-orb-caustic {
-  background: radial-gradient(ellipse at 50% 0%, rgba(125, 211, 252, 0.28), transparent 70%);
+  background: radial-gradient(ellipse at 50% 0%, rgba(196, 181, 253, 0.3), transparent 70%);
 }
 
 .auth-glass-orb-specular {
   position: absolute;
-  top: 12%;
-  left: 18%;
-  width: 34%;
-  height: 22%;
+  top: 11%;
+  left: 16%;
+  width: 38%;
+  height: 24%;
   border-radius: 50%;
   background: radial-gradient(
-    ellipse at 30% 30%,
-    rgba(255, 255, 255, 0.95),
-    rgba(255, 255, 255, 0.28) 45%,
-    transparent 70%
+    ellipse at 28% 28%,
+    rgba(255, 255, 255, 0.98),
+    rgba(255, 255, 255, 0.35) 42%,
+    transparent 72%
   );
-  filter: blur(1px);
+  filter: blur(1.1px);
   transform: rotate(-18deg);
   animation: auth-glass-shine 8s ease-in-out infinite;
 }
@@ -960,14 +979,14 @@ html:not(.dark) .dashboard-surface:hover {
   inset: 0;
   border-radius: 9999px;
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.35),
-    inset 0 -24px 32px rgba(30, 64, 175, 0.12);
+    inset 0 0 0 1.5px rgba(255, 255, 255, 0.42),
+    inset 0 -28px 36px rgba(91, 33, 182, 0.16);
   background: linear-gradient(
     145deg,
-    rgba(255, 255, 255, 0.35) 0%,
-    transparent 28%,
-    transparent 62%,
-    rgba(30, 64, 175, 0.12) 100%
+    rgba(255, 255, 255, 0.42) 0%,
+    transparent 30%,
+    transparent 60%,
+    rgba(91, 33, 182, 0.14) 100%
   );
 }
 
@@ -975,21 +994,21 @@ html:not(.dark) .dashboard-surface:hover {
 .auth-glass-ground-shadow {
   position: absolute;
   left: 50%;
-  bottom: 16%;
+  bottom: 12%;
   z-index: 0;
   width: calc(var(--orb-size) * 0.92);
   height: 9%;
   border-radius: 50%;
   background: radial-gradient(
     ellipse at center,
-    rgba(30, 64, 175, 0.42) 0%,
-    rgba(30, 64, 175, 0.18) 45%,
+    rgba(91, 33, 182, 0.42) 0%,
+    rgba(91, 33, 182, 0.18) 45%,
     transparent 72%
   );
   filter: blur(7px);
   transform: translateX(-50%) scale(1);
   transform-origin: center;
-  animation: auth-glass-shadow 3.2s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
+  animation: auth-glass-shadow 6s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
   pointer-events: none;
 }
 
@@ -1005,32 +1024,37 @@ html:not(.dark) .dashboard-surface:hover {
 @keyframes auth-glass-bounce {
   0%,
   100% {
-    transform: translateY(22px) scale(1.02, 0.96);
+    transform: translateY(26px) scale(1.02, 0.96);
   }
-  20% {
-    transform: translateY(8px) scale(1.01, 0.98);
+  12% {
+    transform: translateY(10px) scale(1.01, 0.98);
   }
-  50% {
-    transform: translateY(-52px) scale(0.98, 1.03);
+  /* Reach peak ~1.6s into the 6s loop */
+  28% {
+    transform: translateY(-56px) scale(0.98, 1.03);
   }
-  72% {
-    transform: translateY(4px) scale(1.01, 0.98);
+  /* Hold near peak while person icons stay visible (~2.5s) */
+  68% {
+    transform: translateY(-52px) scale(0.985, 1.02);
+  }
+  82% {
+    transform: translateY(6px) scale(1.01, 0.98);
   }
 }
 
 @keyframes auth-glass-person-reveal {
-  /* Hidden while ball is down / rising / falling */
+  /* Hidden while ball is down / rising / descending */
   0%,
-  36%,
-  62%,
+  24%,
+  78%,
   100% {
     opacity: 0;
     transform: translate(-50%, -50%) rotate(var(--angle)) translateY(0)
       rotate(calc(-1 * var(--angle))) scale(0.4);
   }
-  /* Only visible at the upside peak of the jump */
-  46%,
-  52% {
+  /* Reveal + hold ~2.5s at the upside peak (30%–70% of 6s) */
+  30%,
+  70% {
     opacity: 1;
     transform: translate(-50%, -50%) rotate(var(--angle))
       translateY(calc(-1 * var(--icon-orbit))) rotate(calc(-1 * var(--angle)))
@@ -1045,9 +1069,10 @@ html:not(.dark) .dashboard-surface:hover {
     transform: translateX(-50%) scale(1.05, 1);
     filter: blur(5px);
   }
-  50% {
-    opacity: 0.28;
-    transform: translateX(-50%) scale(1.55, 0.7);
+  28%,
+  68% {
+    opacity: 0.26;
+    transform: translateX(-50%) scale(1.6, 0.68);
     filter: blur(12px);
   }
 }
@@ -1829,8 +1854,10 @@ html:not(.dark) .dashboard-surface:hover {
   min-height: 100dvh;
   background: transparent;
   color: var(--foreground);
+  /* Match in-app typeface (Lato via --font-sans). */
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   /* Offset page content under the fixed navbar (not space above the nav). */
-  padding-top: 4.25rem;
+  padding-top: 4.75rem;
 }
 
 .landing-whats-new-page {
@@ -1904,6 +1931,29 @@ html:not(.dark) .dashboard-surface:hover {
   -webkit-backdrop-filter: blur(14px);
 }
 
+/* Solid purple navbar over vivid hero (top of page only) */
+.landing-page--vivid-hero > .landing-nav:not(.landing-nav--scrolled) {
+  border-bottom-color: rgba(255, 255, 255, 0.14);
+  background: #5b21b6;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.landing-page--vivid-hero > .landing-nav:not(.landing-nav--scrolled) .landing-nav-brand-text,
+.landing-page--vivid-hero > .landing-nav:not(.landing-nav--scrolled) .landing-nav-link {
+  color: #ffffff;
+}
+
+.landing-page--vivid-hero > .landing-nav:not(.landing-nav--scrolled) .landing-nav-link:hover {
+  color: #ffffff;
+  opacity: 0.9;
+}
+
+.landing-page--vivid-hero > .landing-nav:not(.landing-nav--scrolled) .landing-nav-menu-btn span.block {
+  background: #ffffff;
+}
+
 /* Win over `.landing-page > :not(.landing-ambient) { position: relative }` */
 .landing-page > .landing-nav {
   position: fixed;
@@ -1924,7 +1974,7 @@ html:not(.dark) .dashboard-surface:hover {
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 1rem;
-  height: 4.25rem;
+  height: 4.75rem;
   max-width: 72rem;
   margin-inline: auto;
   padding-inline: 1.25rem;
@@ -1960,7 +2010,7 @@ html:not(.dark) .dashboard-surface:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 1.05rem;
+  font-size: 1.2rem;
   font-weight: 700;
   letter-spacing: -0.03em;
   color: var(--foreground);
@@ -1968,7 +2018,7 @@ html:not(.dark) .dashboard-surface:hover {
 
 @media (min-width: 640px) {
   .landing-nav-brand-text {
-    font-size: 1.15rem;
+    font-size: 1.35rem;
   }
 }
 
@@ -1991,9 +2041,9 @@ html:not(.dark) .dashboard-surface:hover {
 }
 
 .landing-nav-link {
-  font-size: 0.8rem;
+  font-size: 0.95rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   text-transform: none;
   color: color-mix(in oklch, var(--muted-foreground) 92%, var(--foreground));
   transition: color 0.15s ease;
@@ -2020,13 +2070,13 @@ html:not(.dark) .dashboard-surface:hover {
 
 .landing-nav-signin {
   display: inline-flex;
-  height: 2.55rem;
+  height: 2.75rem;
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
   border-radius: 9999px;
-  padding-inline: 1.2rem;
-  font-size: 0.8125rem;
+  padding-inline: 1.35rem;
+  font-size: 0.9rem;
   font-weight: 700;
   border: none;
   cursor: pointer;
@@ -2125,13 +2175,15 @@ html:not(.dark) .dashboard-surface:hover {
   inset: 0;
   z-index: 0;
   background:
-    radial-gradient(ellipse 58% 40% at 50% 100%, rgba(147, 197, 253, 0.22), transparent 62%),
-    linear-gradient(180deg, #ffffff 0%, #f8fbff 48%, #f5f8fc 100%);
+    radial-gradient(ellipse 70% 48% at 50% -8%, rgba(139, 92, 246, 0.09), transparent 55%),
+    radial-gradient(ellipse 55% 40% at 50% 100%, rgba(147, 197, 253, 0.18), transparent 62%),
+    linear-gradient(180deg, #fbfcfe 0%, #f7f9fc 42%, #f4f7fb 100%);
 }
 
 .dark .landing-ambient {
   background:
-    radial-gradient(ellipse 55% 40% at 50% 100%, rgba(59, 130, 246, 0.14), transparent 58%),
+    radial-gradient(ellipse 60% 42% at 50% -6%, rgba(124, 58, 237, 0.16), transparent 52%),
+    radial-gradient(ellipse 55% 40% at 50% 100%, rgba(59, 130, 246, 0.12), transparent 58%),
     linear-gradient(180deg, #0b1220 0%, #0d1526 40%, #0e1729 70%, #0f172a 100%);
 }
 
@@ -2146,8 +2198,12 @@ html:not(.dark) .dashboard-surface:hover {
 
 .landing-section {
   padding: 4.75rem 0;
-  background: transparent;
+  background: #ffffff;
   border: none;
+}
+
+.dark .landing-section {
+  background: transparent;
 }
 
 .landing-features {
@@ -2155,6 +2211,11 @@ html:not(.dark) .dashboard-surface:hover {
   isolation: isolate;
   padding-top: 4.25rem;
   padding-bottom: 3.5rem;
+  background: #ffffff;
+}
+
+.dark .landing-features {
+  background: transparent;
 }
 
 .landing-features::before {
@@ -2164,7 +2225,7 @@ html:not(.dark) .dashboard-surface:hover {
   inset: 0;
   z-index: 0;
   background:
-    radial-gradient(ellipse 55% 40% at 50% 0%, rgba(167, 139, 250, 0.12), transparent 58%);
+    radial-gradient(ellipse 55% 40% at 50% 0%, rgba(124, 58, 237, 0.06), transparent 58%);
 }
 
 .dark .landing-features::before {
@@ -2185,8 +2246,8 @@ html:not(.dark) .dashboard-surface:hover {
   justify-content: center;
   box-sizing: border-box;
   flex: 0 0 auto;
-  min-height: calc(100svh - 4.25rem);
-  padding: 1.5rem 0 0;
+  min-height: calc(100svh - 4.75rem);
+  padding: 1.75rem 0 0;
   overflow: visible;
 }
 
@@ -2194,53 +2255,207 @@ html:not(.dark) .dashboard-surface:hover {
   position: relative;
   display: grid;
   place-items: center;
-  min-height: clamp(20rem, 44vh, 26rem);
-  padding: 6rem 0 2rem;
+  min-height: clamp(22rem, 46vh, 28rem);
+  padding: 5.5rem 0 2.75rem;
 }
 
+/* Vivid purple hero atmosphere (reference-style depth + glow) */
 .landing-hero-bg {
   pointer-events: none;
   position: absolute;
-  inset: 0;
+  inset: 0 0 auto;
   z-index: 0;
+  height: min(96vh, 56rem);
   overflow: hidden;
-  background: transparent;
 }
 
-.landing-hero-bg::before {
-  content: "";
+.landing-hero-bg-base {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 70% 48% at 50% 100%, rgba(125, 211, 252, 0.35), transparent 58%),
-    radial-gradient(ellipse 48% 42% at 18% 88%, rgba(134, 239, 172, 0.28), transparent 55%),
-    radial-gradient(ellipse 46% 40% at 82% 90%, rgba(253, 224, 71, 0.18), transparent 55%);
-  animation: landing-hero-bg-shift 22s ease-in-out infinite;
+    radial-gradient(ellipse 70% 55% at 50% 18%, rgba(167, 139, 250, 0.45) 0%, transparent 58%),
+    radial-gradient(ellipse 55% 45% at 18% 72%, rgba(99, 102, 241, 0.28) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 40% at 88% 78%, rgba(124, 58, 237, 0.32) 0%, transparent 52%),
+    linear-gradient(180deg, #4c1d95 0%, #5b21b6 28%, #4338ca 58%, #312e81 100%);
 }
 
-.landing-hero-bg::after {
-  content: none;
+.landing-hero-bg-glow {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(72px);
+  opacity: 0.95;
+  will-change: transform, opacity;
+  animation: landing-hero-bg-shift 26s ease-in-out infinite;
 }
 
-.dark .landing-hero-bg {
-  background: transparent;
+.landing-hero-bg-glow--primary {
+  top: -8%;
+  left: 50%;
+  width: min(78vw, 46rem);
+  height: min(56vw, 32rem);
+  --hero-glow-x: -50%;
+  transform: translateX(-50%);
+  background: radial-gradient(
+    circle,
+    rgba(237, 233, 254, 0.55) 0%,
+    rgba(196, 181, 253, 0.28) 38%,
+    transparent 70%
+  );
 }
 
-.dark .landing-hero-bg::before {
+.landing-hero-bg-glow--secondary {
+  top: 28%;
+  left: -12%;
+  width: min(52vw, 30rem);
+  height: min(42vw, 24rem);
+  background: radial-gradient(
+    circle,
+    rgba(129, 140, 248, 0.42) 0%,
+    rgba(99, 102, 241, 0.16) 45%,
+    transparent 72%
+  );
+  animation-delay: -8s;
+}
+
+.landing-hero-bg-glow--accent {
+  top: 24%;
+  right: -14%;
+  width: min(50vw, 28rem);
+  height: min(40vw, 22rem);
+  background: radial-gradient(
+    circle,
+    rgba(192, 132, 252, 0.38) 0%,
+    rgba(168, 85, 247, 0.14) 48%,
+    transparent 72%
+  );
+  animation-delay: -14s;
+}
+
+.landing-hero-bg-particles {
+  position: absolute;
+  inset: 0;
+  opacity: 0.55;
+  background-image:
+    radial-gradient(1.5px 1.5px at 12% 18%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1.5px 1.5px at 28% 42%, rgba(255, 255, 255, 0.45), transparent),
+    radial-gradient(1px 1px at 46% 22%, rgba(255, 255, 255, 0.55), transparent),
+    radial-gradient(1.5px 1.5px at 64% 36%, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1px 1px at 78% 16%, rgba(255, 255, 255, 0.65), transparent),
+    radial-gradient(1.5px 1.5px at 88% 48%, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1px 1px at 18% 68%, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1.5px 1.5px at 38% 78%, rgba(255, 255, 255, 0.3), transparent),
+    radial-gradient(1px 1px at 58% 62%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1.5px 1.5px at 72% 74%, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1px 1px at 92% 66%, rgba(255, 255, 255, 0.45), transparent),
+    radial-gradient(1px 1px at 8% 88%, rgba(255, 255, 255, 0.25), transparent);
+  background-size: 100% 100%;
+}
+
+.landing-hero-side-frame {
+  pointer-events: none;
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 1;
+  height: min(44vh, 24rem);
+  overflow: hidden;
+}
+
+.landing-hero-side-wave {
+  position: absolute;
+  bottom: 0;
+  width: min(52vw, 40rem);
+  height: 100%;
+  opacity: 0.95;
+}
+
+.landing-hero-side-wave--left {
+  left: 0;
+}
+
+.landing-hero-side-wave--right {
+  right: 0;
+}
+
+@media (max-width: 767px) {
+  .landing-hero-side-frame {
+    height: min(30vh, 12rem);
+  }
+
+  .landing-hero-side-wave {
+    width: min(70vw, 18rem);
+    opacity: 0.7;
+  }
+}
+
+.landing-hero-bg-fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  height: 26%;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(247, 249, 252, 0.18) 55%,
+    rgba(247, 249, 252, 0.7) 100%
+  );
+}
+
+.dark .landing-hero-bg-base {
   background:
-    radial-gradient(ellipse 70% 48% at 50% 100%, rgba(37, 99, 235, 0.28), transparent 58%),
-    radial-gradient(ellipse 48% 42% at 18% 88%, rgba(16, 185, 129, 0.14), transparent 55%),
-    radial-gradient(ellipse 46% 40% at 82% 90%, rgba(59, 130, 246, 0.16), transparent 55%);
+    radial-gradient(ellipse 70% 55% at 50% 18%, rgba(139, 92, 246, 0.4) 0%, transparent 58%),
+    radial-gradient(ellipse 55% 45% at 18% 72%, rgba(79, 70, 229, 0.28) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 40% at 88% 78%, rgba(124, 58, 237, 0.3) 0%, transparent 52%),
+    linear-gradient(180deg, #2e1065 0%, #4c1d95 32%, #312e81 62%, #0f172a 100%);
+}
+
+.dark .landing-hero-bg-glow--primary {
+  background: radial-gradient(
+    circle,
+    rgba(237, 233, 254, 0.42) 0%,
+    rgba(167, 139, 250, 0.22) 40%,
+    transparent 72%
+  );
+}
+
+.dark .landing-hero-bg-glow--secondary {
+  background: radial-gradient(
+    circle,
+    rgba(99, 102, 241, 0.35) 0%,
+    rgba(79, 70, 229, 0.12) 48%,
+    transparent 72%
+  );
+}
+
+.dark .landing-hero-bg-glow--accent {
+  background: radial-gradient(
+    circle,
+    rgba(168, 85, 247, 0.32) 0%,
+    rgba(124, 58, 237, 0.12) 50%,
+    transparent 72%
+  );
+}
+
+.dark .landing-hero-bg-fade {
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(49, 46, 129, 0.35) 40%,
+    rgba(15, 23, 42, 0.75) 72%,
+    rgba(15, 23, 42, 0.98) 100%
+  );
 }
 
 @keyframes landing-hero-bg-shift {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
+  0%,
+  100% {
+    opacity: 0.9;
+    transform: translateX(var(--hero-glow-x, 0)) scale(1);
   }
   50% {
-    opacity: 0.9;
-    transform: scale(1.03);
+    opacity: 1;
+    transform: translateX(var(--hero-glow-x, 0)) scale(1.05);
   }
 }
 
@@ -2253,61 +2468,104 @@ html:not(.dark) .dashboard-surface:hover {
 .landing-hero-copy {
   position: relative;
   z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
   margin-inline: auto;
-  max-width: 38rem;
-  padding-inline: 0.5rem;
+  max-width: 42rem;
+  padding-inline: 0.75rem;
+}
+
+.landing-hero-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0 1.15rem;
+  padding: 0.4rem 0.95rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset;
 }
 
 .landing-hero-title {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.08em;
+  gap: 0.1em;
   margin: 0 auto;
-  font-size: clamp(2.05rem, 4.4vw, 3.2rem);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(2.35rem, 4.8vw, 3.55rem);
   font-weight: 700;
   line-height: 1.12;
-  letter-spacing: -0.035em;
-  color: #0f172a;
+  letter-spacing: -0.03em;
+  color: #ffffff;
   max-width: none;
+  text-wrap: balance;
 }
 
 .landing-hero-title-line {
   display: block;
 }
 
-.dark .landing-hero-title {
-  color: #f8fafc;
+.landing-hero-accent {
+  color: #ede9fe;
 }
 
-.landing-hero-accent {
-  color: #7c3aed;
+.dark .landing-hero-title {
+  color: #ffffff;
 }
 
 .dark .landing-hero-accent {
-  color: #c4b5fd;
+  color: #e9d5ff;
 }
 
 .landing-hero-subtitle {
-  margin: 1rem auto 0;
-  max-width: 30rem;
-  font-size: 1rem;
-  line-height: 1.6;
-  color: #64748b;
+  margin: 1.15rem auto 0;
+  max-width: 34rem;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(1.05rem, 1.5vw, 1.18rem);
+  font-weight: 400;
+  line-height: 1.65;
+  color: #ffffff;
+  text-wrap: pretty;
 }
 
 .dark .landing-hero-subtitle {
-  color: #94a3b8;
+  color: #ffffff;
 }
 
 .landing-hero-actions {
   display: flex;
   justify-content: center;
-  margin-top: 1.5rem;
+  margin-top: 1.75rem;
 }
 
-.landing-hero-cta,
+/* Hero CTA: white pill on deep purple (reference-style contrast) */
+.landing-hero-cta {
+  background: #ffffff !important;
+  color: #312e81 !important;
+  border: none !important;
+  box-shadow:
+    0 14px 32px rgba(49, 46, 129, 0.28),
+    0 2px 0 rgba(255, 255, 255, 0.9) inset !important;
+}
+
+.landing-hero-cta:hover {
+  filter: none;
+  background: #f8fafc !important;
+  color: #1e1b4b !important;
+}
+
 .landing-cta,
 .landing-nav-signin:not(.landing-nav-signin--outline),
 .landing-nav .landing-nav-signin:not(.landing-nav-signin--outline),
@@ -2322,14 +2580,12 @@ html:not(.dark) .dashboard-surface:hover {
     inset 0 1px 0 rgba(255, 255, 255, 0.38) !important;
 }
 
-.landing-hero-cta:hover,
 .landing-cta:hover,
 .landing-nav-signin:not(.landing-nav-signin--outline):hover,
 .landing-nav .landing-nav-signin:not(.landing-nav-signin--outline):hover {
   filter: brightness(1.06);
 }
 
-.dark .landing-hero-cta,
 .dark .landing-cta,
 .dark .landing-nav-signin:not(.landing-nav-signin--outline),
 .dark .landing-nav .landing-nav-signin:not(.landing-nav-signin--outline) {
@@ -2338,6 +2594,59 @@ html:not(.dark) .dashboard-surface:hover {
   box-shadow:
     0 12px 28px rgba(124, 58, 237, 0.4),
     inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
+}
+
+/* Hero nav Sign In: white pill, purple text (wins over shared gradient CTA rules) */
+.landing-page--vivid-hero .landing-nav:not(.landing-nav--scrolled) .landing-nav-signin:not(.landing-nav-signin--outline),
+.landing-page--vivid-hero .landing-nav:not(.landing-nav--scrolled) .landing-nav .landing-nav-signin:not(.landing-nav-signin--outline) {
+  background: #ffffff !important;
+  color: #5b21b6 !important;
+  border: none !important;
+  box-shadow: 0 8px 20px rgba(49, 46, 129, 0.2) !important;
+  filter: none !important;
+}
+
+.landing-page--vivid-hero .landing-nav:not(.landing-nav--scrolled) .landing-nav-signin:not(.landing-nav-signin--outline):hover {
+  background: #f8fafc !important;
+  color: #4c1d95 !important;
+  filter: none !important;
+}
+
+/* Scrolled: restore normal white navbar + purple CTA */
+.landing-page--vivid-hero > .landing-nav.landing-nav--scrolled {
+  border-bottom-color: color-mix(in oklch, var(--border) 55%, transparent);
+  background: color-mix(in oklch, var(--background) 94%, transparent);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.landing-page--vivid-hero > .landing-nav.landing-nav--scrolled .landing-nav-brand-text,
+.landing-page--vivid-hero > .landing-nav.landing-nav--scrolled .landing-nav-link {
+  color: var(--foreground);
+}
+
+.landing-page--vivid-hero > .landing-nav.landing-nav--scrolled .landing-nav-link:hover {
+  color: #5b21b6;
+  opacity: 1;
+}
+
+.landing-page--vivid-hero > .landing-nav.landing-nav--scrolled .landing-nav-menu-btn span.block {
+  background: var(--foreground);
+}
+
+.landing-page--vivid-hero > .landing-nav.landing-nav--scrolled .landing-nav-signin:not(.landing-nav-signin--outline) {
+  background: linear-gradient(180deg, #b794f6 0%, #8b5cf6 42%, #7c3aed 100%) !important;
+  color: #ffffff !important;
+  box-shadow:
+    0 12px 28px rgba(109, 40, 217, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.38) !important;
+  filter: none !important;
+}
+
+.landing-page--vivid-hero > .landing-nav.landing-nav--scrolled .landing-nav-signin:not(.landing-nav-signin--outline):hover {
+  filter: brightness(1.06) !important;
+  color: #ffffff !important;
 }
 
 .landing-hero-orbit {
@@ -2358,77 +2667,94 @@ html:not(.dark) .dashboard-surface:hover {
   position: absolute;
   display: grid;
   place-items: center;
-  width: 3.35rem;
-  height: 3.35rem;
+  width: 3.25rem;
+  height: 3.25rem;
   border-radius: 1rem;
-  border: 1px solid rgba(226, 232, 240, 0.95);
-  background: #fff;
-  color: #2563eb;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: rgba(255, 255, 255, 0.88);
+  color: #4f46e5;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   box-shadow:
-    0 16px 34px rgba(15, 23, 42, 0.08),
-    0 1px 0 rgba(255, 255, 255, 0.9) inset;
-  animation: landing-hero-orbit-float 5.6s ease-in-out infinite;
+    0 14px 30px rgba(15, 23, 42, 0.07),
+    0 1px 0 rgba(255, 255, 255, 0.95) inset;
+  animation: landing-hero-orbit-float 6.2s ease-in-out infinite;
 }
 
 .dark .landing-hero-orbit-card {
-  border-color: rgba(148, 163, 184, 0.18);
-  background: rgba(30, 41, 59, 0.88);
-  color: #93c5fd;
-  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.28);
+  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(30, 41, 59, 0.72);
+  color: #a5b4fc;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.28);
 }
 
-.landing-hero-orbit-card--tl { top: 18%; left: 10%; }
-.landing-hero-orbit-card--tr { top: 18%; right: 10%; }
-.landing-hero-orbit-card--ml { top: 50%; left: 2%; }
-.landing-hero-orbit-card--mr { top: 50%; right: 2%; }
-.landing-hero-orbit-card--bl { bottom: 6%; left: 14%; }
-.landing-hero-orbit-card--br { bottom: 6%; right: 14%; }
+/* Keep orbit icons in a wide ring with clear space around the copy block */
+.landing-hero-orbit-card--tl { top: 10%; left: 8%; }
+.landing-hero-orbit-card--tr { top: 10%; right: 8%; }
+.landing-hero-orbit-card--ml { top: 46%; left: 1%; }
+.landing-hero-orbit-card--mr { top: 46%; right: 1%; }
+.landing-hero-orbit-card--bl { bottom: 8%; left: 12%; }
+.landing-hero-orbit-card--br { bottom: 8%; right: 12%; }
 
 @media (min-width: 768px) {
   .landing-hero-orbit-card {
-    width: 3.75rem;
-    height: 3.75rem;
-    border-radius: 1.15rem;
+    width: 3.55rem;
+    height: 3.55rem;
+    border-radius: 1.1rem;
   }
 
-  .landing-hero-orbit-card--tl { top: 16%; left: 15%; }
-  .landing-hero-orbit-card--tr { top: 16%; right: 15%; }
-  .landing-hero-orbit-card--ml { top: 52%; left: 5%; }
-  .landing-hero-orbit-card--mr { top: 52%; right: 5%; }
-  .landing-hero-orbit-card--bl { bottom: 4%; left: 19%; }
-  .landing-hero-orbit-card--br { bottom: 4%; right: 19%; }
+  .landing-hero-orbit-card--tl { top: 8%; left: 12%; }
+  .landing-hero-orbit-card--tr { top: 8%; right: 12%; }
+  .landing-hero-orbit-card--ml { top: 48%; left: 3%; }
+  .landing-hero-orbit-card--mr { top: 48%; right: 3%; }
+  .landing-hero-orbit-card--bl { bottom: 6%; left: 16%; }
+  .landing-hero-orbit-card--br { bottom: 6%; right: 16%; }
 }
 
 @media (min-width: 1024px) {
-  .landing-hero-orbit-card--tl { top: 14%; left: 19%; }
-  .landing-hero-orbit-card--tr { top: 14%; right: 19%; }
-  .landing-hero-orbit-card--ml { top: 54%; left: 9%; }
-  .landing-hero-orbit-card--mr { top: 54%; right: 9%; }
-  .landing-hero-orbit-card--bl { bottom: 2%; left: 23%; }
-  .landing-hero-orbit-card--br { bottom: 2%; right: 23%; }
+  .landing-hero-orbit-card--tl { top: 6%; left: 16%; }
+  .landing-hero-orbit-card--tr { top: 6%; right: 16%; }
+  .landing-hero-orbit-card--ml { top: 48%; left: 6%; }
+  .landing-hero-orbit-card--mr { top: 48%; right: 6%; }
+  .landing-hero-orbit-card--bl { bottom: 4%; left: 20%; }
+  .landing-hero-orbit-card--br { bottom: 4%; right: 20%; }
 }
 
 @keyframes landing-hero-orbit-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
 }
 
 .landing-hero-mesh {
   pointer-events: none;
-  height: 3rem;
-  margin-top: 0;
-  background: transparent;
+  height: 2.5rem;
+  margin-top: 0.25rem;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(247, 249, 252, 0.35) 100%
+  );
 }
 
 .dark .landing-hero-mesh {
-  background: transparent;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(15, 23, 42, 0.35) 100%
+  );
 }
 
 .landing-hero-preview {
   position: relative;
-  margin: 3.25rem auto 0;
-  width: min(100%, 1120px);
-  padding-bottom: 1.25rem;
+  z-index: 2;
+  margin: 2rem auto 0;
+  width: min(100%, 1040px);
+  padding-bottom: 2.5rem;
 }
 
 .landing-hero-preview-glow {
@@ -2463,7 +2789,7 @@ html:not(.dark) .dashboard-surface:hover {
   grid-template-columns: 4.25rem 1fr;
   min-height: 44rem;
   overflow: hidden;
-  border-radius: 1.35rem;
+  border-radius: 1.75rem;
   border: 1px solid rgba(148, 163, 184, 0.22);
   background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   box-shadow:
@@ -3171,23 +3497,32 @@ html:not(.dark) .dashboard-surface:hover {
 
 .landing-section-title {
   margin: 0;
-  font-size: clamp(1.75rem, 3vw, 2.35rem);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(1.95rem, 3.2vw, 2.65rem);
   font-weight: 700;
   line-height: 1.15;
   letter-spacing: -0.02em;
-  color: var(--foreground);
+  color: #0f172a;
+}
+
+.landing-section-title-accent {
+  color: #7c3aed;
 }
 
 .landing-section-copy {
   margin: 0;
   margin-top: 0.85rem;
-  font-size: 1.05rem;
+  font-size: 1.125rem;
   line-height: 1.65;
-  color: var(--muted-foreground);
+  color: #64748b;
 }
 
 .dark .landing-section-title {
   color: #f8fafc;
+}
+
+.dark .landing-section-title-accent {
+  color: #c4b5fd;
 }
 
 .dark .landing-section-copy {
@@ -3468,6 +3803,11 @@ html:not(.dark) .dashboard-surface:hover {
 .landing-section.landing-people {
   padding-top: 3.75rem;
   padding-bottom: 4.5rem;
+  background: #f8fafc;
+}
+
+.dark .landing-section.landing-people {
+  background: transparent;
 }
 
 .landing-people-card {
@@ -3482,9 +3822,13 @@ html:not(.dark) .dashboard-surface:hover {
 }
 
 .landing-security {
-  background: transparent;
+  background: #ffffff;
   padding-top: 3.5rem;
   padding-bottom: 4.25rem;
+}
+
+.dark .landing-security {
+  background: transparent;
 }
 
 .landing-security-item {
@@ -4187,6 +4531,11 @@ html:not(.dark) .dashboard-surface:hover {
 .landing-final-cta {
   padding-top: 3.25rem;
   padding-bottom: 2.75rem;
+  background: #f8fafc;
+}
+
+.dark .landing-final-cta {
+  background: transparent;
 }
 
 .landing-final-cta-shell {
@@ -4305,7 +4654,7 @@ html:not(.dark) .dashboard-surface:hover {
 
 .landing-footer-brand-inline {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: 1.05rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--foreground);
@@ -4372,7 +4721,7 @@ html:not(.dark) .dashboard-surface:hover {
 
 .landing-legal-subnav {
   position: sticky;
-  top: 4.25rem;
+  top: 4.75rem;
   z-index: 190;
   border-bottom: 1px solid rgba(91, 33, 182, 0.35);
   background: #4c1d95;
@@ -4380,7 +4729,7 @@ html:not(.dark) .dashboard-surface:hover {
 
 .landing-page > .landing-legal-subnav {
   position: sticky;
-  top: 4.25rem;
+  top: 4.75rem;
   z-index: 190;
 }
 
@@ -4672,7 +5021,7 @@ html:not(.dark) .dashboard-surface:hover {
   .landing-animate-in,
   .landing-animate-up,
   .landing-eco-card,
-  .landing-hero-bg::before,
+  .landing-hero-bg-glow,
   .auth-enter-from-landing > main {
     animation: none !important;
   }

@@ -7,10 +7,14 @@ import {
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
-import { EMPLOYMENT_STATUS_LABELS } from "@/lib/employees/constants";
+import {
+  EMPLOYEE_STORAGE_BUCKETS,
+  EMPLOYMENT_STATUS_LABELS,
+} from "@/lib/employees/constants";
 import { getManagerTeamContext } from "@/lib/manager/services/team-hierarchy";
 import { buildHierarchyTree } from "@/lib/organization/services/org-queries";
 import { fromHrms, unwrapRelation } from "@/lib/reports/services/reports-utils";
+import { createSignedStorageUrls } from "@/lib/storage/signed-url";
 import { teamListParamsSchema } from "@/lib/validations/manager-team";
 import type { UserProfile } from "@/types/auth";
 import type { HierarchyEmployee, HierarchyNode } from "@/types/organization";
@@ -436,6 +440,15 @@ export async function listTeamEmployees(
     );
   }
 
+  const imagePaths = rows.map(
+    (row) => unwrap(row.employee_profiles)?.profile_image_storage_path ?? null,
+  );
+  const signedByPath = await createSignedStorageUrls(
+    supabase,
+    EMPLOYEE_STORAGE_BUCKETS.profileImages,
+    imagePaths,
+  );
+
   return {
     data: rows.map((row): TeamMemberListItem => {
       const branch = unwrap(row.branches);
@@ -445,6 +458,7 @@ export async function listTeamEmployees(
       const manager = unwrap(row.manager);
       const employeeProfile = unwrap(row.employee_profiles);
       const employmentStatusValue = row.employment_status as TeamMemberListItem["employmentStatus"];
+      const profileImagePath = employeeProfile?.profile_image_storage_path ?? null;
 
       return {
         id: row.id,
@@ -469,7 +483,10 @@ export async function listTeamEmployees(
         managerName: manager
           ? `${manager.first_name} ${manager.last_name}`
           : null,
-        profileImagePath: employeeProfile?.profile_image_storage_path ?? null,
+        profileImagePath,
+        profileImageSignedUrl: profileImagePath
+          ? (signedByPath.get(profileImagePath) ?? null)
+          : null,
         attendanceToday: attendanceByEmployee.get(row.id) ?? null,
         leaveBalanceDays: leaveBalanceByEmployee.get(row.id) ?? 0,
         currentStatus:

@@ -2,6 +2,7 @@ import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
+import { requireActiveCeoApproverEmployeeIds } from "@/lib/leave/services/leave-queries";
 import { notifyEmployee } from "@/lib/notifications/services/notification-service";
 
 function formatHoursLabel(hours: number) {
@@ -94,17 +95,26 @@ export async function notifyAttendanceRegularizationRequested(
     createdBy: profile.userId,
   });
 
-  if (executiveApplicant && options?.ceoEmployeeId) {
+  if (!executiveApplicant) return;
+
+  const ceoIds = await requireActiveCeoApproverEmployeeIds(
+    supabase,
+    profile.employee.organizationId,
+  ).catch(() =>
+    options?.ceoEmployeeId ? [options.ceoEmployeeId] : ([] as string[]),
+  );
+
+  for (const ceoEmployeeId of ceoIds) {
     await notifyEmployee(supabase, {
       organizationId: profile.employee.organizationId,
-      employeeId: options.ceoEmployeeId,
+      employeeId: ceoEmployeeId,
       title: "Regularization pending CEO approval",
       message: `An HR or Manager attendance regularization for ${attendanceDate} requires your approval.`,
       notificationType: "attendance_regularization_requested",
       module: "attendance",
       priority: "high",
       actionUrl: CEO_ROUTES.approvalsRegularization,
-      sourceEventKey: `attendance_regularization_ceo:${correctionId}:${options.ceoEmployeeId}`,
+      sourceEventKey: `attendance_regularization_ceo:${correctionId}:${ceoEmployeeId}`,
       templateKey: "attendance_correction",
       createdBy: profile.userId,
     });

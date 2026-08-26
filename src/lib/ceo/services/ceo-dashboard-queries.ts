@@ -1,68 +1,30 @@
-import { format, startOfMonth, subMonths } from "date-fns";
+import { format } from "date-fns";
 import { cache } from "react";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
-import { getAttendanceSummary } from "@/lib/attendance/services/attendance-queries";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
-import {
-  CEO_PENDING_APPROVAL_STATUSES,
-  EXECUTIVE_APPROVAL_TYPE_LABELS,
-} from "@/lib/ceo/executive-approvals-constants";
+import { CEO_PENDING_APPROVAL_STATUSES } from "@/lib/ceo/executive-approvals-constants";
 import { syncExecutiveApprovalsFromDomain } from "@/lib/ceo/services/ceo-approvals-sync";
 import { listCeoApprovalQueue } from "@/lib/ceo/services/ceo-leave-queries";
-import { isWorkFromHomeBranch } from "@/lib/manager/services/attendance-correction-service";
-import { getExitSummary } from "@/lib/exit/services/exit-queries";
-import { getLeaveSummary } from "@/lib/leave/services/leave-queries";
-import { PAYROLL_STATUS_LABELS } from "@/lib/payroll/constants";
-import { getPayrollSummary } from "@/lib/payroll/services/payroll-queries";
-import { getPerformanceSummary } from "@/lib/performance/services/performance-queries";
 import { getRecruitmentSummary } from "@/lib/recruitment/services/recruitment-queries";
 import { listHolidays } from "@/lib/organization/services/org-queries";
-import {
-  fromHrms,
-  unwrapRelation,
-} from "@/lib/reports/services/reports-utils";
+import { getPayrollMonthDate } from "@/lib/payroll/services/payroll-utils";
+import { fromHrms } from "@/lib/reports/services/reports-utils";
 import type { UserProfile } from "@/types/auth";
-import type {
-  CeoActivityItem,
-  CeoApprovalItem,
-  CeoDashboardData,
-  CeoInsight,
-} from "@/types/ceo-dashboard";
-import type { PayrollStatus } from "@/types/payroll";
-import type { ExecutiveApprovalType } from "@/types/ceo-approvals";
+import type { CeoActivityItem, CeoDashboardData } from "@/types/ceo-dashboard";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LooseRow = Record<string, any>;
 
-function mapExecutiveKind(
-  type: ExecutiveApprovalType,
-): CeoApprovalItem["kind"] {
-  switch (type) {
-    case "senior_hiring":
-    case "strategic_recruitment":
-      return "senior_hiring";
-    case "budget_approval":
-    case "salary_revision":
-      return "payroll";
-    case "executive_promotion":
-      return "promotion";
-    case "organization_policy":
-      return "policy";
-    case "department_creation":
-    case "department_closure":
-    case "organization_structure":
-      return "department";
-    case "new_branch":
-    case "asset_purchase":
-      return "manager_creation";
-    default:
-      return "department";
-  }
-}
-
-const ACTIVE_STATUSES = new Set(["active", "probation", "on_leave"]);
+const EMPTY_CHARTS: CeoDashboardData["charts"] = {
+  employeeGrowth: [],
+  hiringTrend: [],
+  attendanceTrend: [],
+  attritionTrend: [],
+  payrollTrend: [],
+  departmentGrowth: [],
+};
 
 function preferredActivityTitle(action: string | null, module: string | null, table: string | null) {
   const key = `${module ?? ""}:${action ?? ""}:${table ?? ""}`.toLowerCase();
@@ -98,109 +60,10 @@ function activityHref(module: string | null): string | null {
   }
 }
 
-function buildInsights(input: {
-  attritionRate: number;
-  attendancePercent: number;
-  prevAttendancePercent: number;
-  payrollPending: boolean;
-  payrollCompleted: boolean;
-  recruitmentDelayed: boolean;
-  pendingReviews: number;
-  pendingApprovals: number;
-  newJoiners: number;
-  openPositions: number;
-}): CeoInsight[] {
-  const insights: CeoInsight[] = [];
-
-  if (input.attritionRate >= 5) {
-    insights.push({
-      id: "attrition-up",
-      title: "Attrition increased this month",
-      description: `Company attrition is at ${input.attritionRate.toFixed(1)}%. Review exit reasons and retention risk.`,
-      priority: input.attritionRate >= 10 ? "high" : "medium",
-      href: CEO_ROUTES.organization,
-    });
-  }
-
-  if (input.attendancePercent > input.prevAttendancePercent + 1) {
-    insights.push({
-      id: "attendance-improved",
-      title: "Attendance improved",
-      description: `Present rate is ${input.attendancePercent.toFixed(1)}%, up from ${input.prevAttendancePercent.toFixed(1)}%.`,
-      priority: "low",
-      href: CEO_ROUTES.attendance,
-    });
-  } else if (input.attendancePercent < 85) {
-    insights.push({
-      id: "attendance-low",
-      title: "Attendance below target",
-      description: `Company attendance is ${input.attendancePercent.toFixed(1)}%. Investigate absenteeism hotspots.`,
-      priority: "high",
-      href: CEO_ROUTES.attendance,
-    });
-  }
-
-  if (input.payrollCompleted) {
-    insights.push({
-      id: "payroll-ready",
-      title: "Payroll ready",
-      description: "Current month payroll has been completed successfully.",
-      priority: "low",
-      href: CEO_ROUTES.analytics,
-    });
-  } else if (input.payrollPending) {
-    insights.push({
-      id: "payroll-pending",
-      title: "Payroll pending review",
-      description: "Payroll is awaiting completion or executive acknowledgment.",
-      priority: "high",
-      href: CEO_ROUTES.analytics,
-    });
-  }
-
-  if (input.recruitmentDelayed) {
-    insights.push({
-      id: "recruitment-delayed",
-      title: "Recruitment delayed",
-      description: `${input.openPositions} open position(s) with candidates waiting in the pipeline.`,
-      priority: "medium",
-      href: CEO_ROUTES.recruitment,
-    });
-  }
-
-  if (input.pendingReviews > 0) {
-    insights.push({
-      id: "performance-pending",
-      title: "Performance review pending",
-      description: `${input.pendingReviews} company reviews still need completion.`,
-      priority: input.pendingReviews > 10 ? "high" : "medium",
-      href: CEO_ROUTES.performance,
-    });
-  }
-
-  if (input.pendingApprovals > 0) {
-    insights.push({
-      id: "approvals-waiting",
-      title: "Executive approvals waiting",
-      description: `${input.pendingApprovals} high-level request(s) need CEO attention.`,
-      priority: "high",
-      href: CEO_ROUTES.approvals,
-    });
-  }
-
-  if (input.newJoiners > 0) {
-    insights.push({
-      id: "new-joiners",
-      title: "New joiners this month",
-      description: `${input.newJoiners} employee(s) joined the organization this month.`,
-      priority: "low",
-      href: CEO_ROUTES.organization,
-    });
-  }
-
-  return insights.slice(0, 8);
-}
-
+/**
+ * Lean CEO home loader: only data the home UI renders
+ * (KPIs, today's attendance, upcoming holidays).
+ */
 export const getCeoDashboardData = cache(async function getCeoDashboardData(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -208,264 +71,89 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
   const organizationId = profile.employee.organizationId;
   const today = getTodayDateString();
   const now = new Date();
-  const monthStart = format(startOfMonth(now), "yyyy-MM-dd");
-  const yesterday = format(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1), "yyyy-MM-dd");
+  const monthStart = format(new Date(now.getFullYear(), now.getMonth(), 1), "yyyy-MM-dd");
+  const payrollMonthDate = getPayrollMonthDate(now.getMonth() + 1, now.getFullYear());
+  const startedAt = performance.now();
 
   await syncExecutiveApprovalsFromDomain(supabase, profile).catch((error) => {
     console.error("[ceo-dashboard] executive approval sync failed", error);
   });
 
-  const leaveApprovalQueue = await listCeoApprovalQueue(supabase, profile).catch(
-    (error) => {
+  const [
+    leaveApprovalQueue,
+    activeEmployeesRes,
+    exitingRes,
+    attendanceTodayRes,
+    openJobsRes,
+    payrollRes,
+    pendingApprovalsRes,
+    holidaysResult,
+  ] = await Promise.all([
+    listCeoApprovalQueue(supabase, profile).catch((error) => {
       console.error("[ceo-dashboard] leave approval queue failed", error);
       return [] as Awaited<ReturnType<typeof listCeoApprovalQueue>>;
-    },
-  );
-
-  const [
-    yesterdayAttendance,
-    leave,
-    payroll,
-    performance,
-    recruitment,
-    exitSummary,
-    employeesRes,
-    departmentsRes,
-    managersRes,
-    attendanceTodayRes,
-    attendanceTrendRes,
-    executiveApprovalsRes,
-    auditRes,
-    kpiCompletionRes,
-  ] = await Promise.all([
-    getAttendanceSummary(supabase, profile, yesterday, yesterday).catch((error) => {
-      console.error("[ceo-dashboard] yesterday attendance failed", error);
-      return {
-        date: yesterday,
-        presentToday: 0,
-        absentToday: 0,
-        lateToday: 0,
-        halfDayToday: 0,
-        onLeaveToday: 0,
-        totalEmployees: 0,
-      };
-    }),
-    getLeaveSummary(supabase, profile).catch((error) => {
-      console.error("[ceo-dashboard] leave summary failed", error);
-      return {
-        pendingRequests: 0,
-        approvedThisMonth: 0,
-        rejectedThisMonth: 0,
-        employeesOnLeaveToday: 0,
-        balanceUtilizationPercent: 0,
-        upcomingPlannedLeaves: 0,
-      };
-    }),
-    getPayrollSummary(supabase, profile).catch((error) => {
-      console.error("[ceo-dashboard] payroll summary failed", error);
-      return {
-        totalPayroll: 0,
-        employeesProcessed: 0,
-        pendingPayroll: 0,
-        grossPayroll: 0,
-        totalDeductions: 0,
-        netPayroll: 0,
-        monthlyOverview: [],
-      };
-    }),
-    getPerformanceSummary(supabase, profile).catch((error) => {
-      console.error("[ceo-dashboard] performance summary failed", error);
-      return {
-        activeGoals: 0,
-        completedGoals: 0,
-        goalCompletionRate: 0,
-        pendingReviews: 0,
-        completedReviews: 0,
-        averageRating: 0,
-        promotionReady: 0,
-        feedbackCount: 0,
-        upcomingMeetings: 0,
-        departmentPerformance: [],
-        reviewStatusBreakdown: [],
-        goalProgressByMonth: [],
-        activeKpis: 0,
-        completedKpis: 0,
-        overdueKpis: 0,
-        averageKpiCompletion: 0,
-        topPerformingDepartment: null,
-        employeesNeedingKpiReview: 0,
-        kpiDepartmentPerformance: [],
-      };
-    }),
-    getRecruitmentSummary(supabase, profile).catch((error) => {
-      console.error("[ceo-dashboard] recruitment summary failed", error);
-      return {
-        openPositions: 0,
-        activeCandidates: 0,
-        interviewsToday: 0,
-        offersPending: 0,
-        offersAccepted: 0,
-        hiresThisMonth: 0,
-        averageHiringTimeDays: 0,
-        pendingOfferCount: 0,
-        candidatesByStage: [],
-        candidateSources: [],
-        hiringByDepartment: [],
-        upcomingInterviews: [],
-        recentActivity: [],
-        openJobSnapshots: [],
-        interviewTracks: [],
-        overview: {
-          hours: [],
-          week: [],
-          month: [],
-          thisMonth: 0,
-          lastMonth: 0,
-          thisWeek: 0,
-          lastWeek: 0,
-          thisHours: 0,
-          lastHours: 0,
-          maxThisMonth: 0,
-          updatedAt: new Date().toISOString(),
-        },
-      };
-    }),
-    getExitSummary(supabase, profile).catch((error) => {
-      console.error("[ceo-dashboard] exit summary failed", error);
-      return {
-        pendingResignations: 0,
-        noticePeriod: 0,
-        pendingClearance: 0,
-        assetsPendingReturn: 0,
-        settlementsPending: 0,
-        leavingThisMonth: 0,
-        exitByDepartment: [],
-        monthlyAttrition: [],
-        exitReasons: [],
-        recentActivities: [],
-      };
     }),
     fromHrms(supabase, "employees")
-      .select(
-        "id, employment_status, date_of_joining, date_of_leaving, department_id, reporting_manager_id, departments:department_id(id, name)",
-      )
+      .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .is("deleted_at", null)
-      .limit(5000),
-    fromHrms(supabase, "departments")
-      .select("id, name, status")
-      .eq("organization_id", organizationId)
+      .in("employment_status", ["active", "probation", "on_leave"])
       .is("deleted_at", null),
-    fromHrms(supabase, "user_roles")
-      .select("id, roles:role_id!inner(code), employees:employee_id(id, department_id, departments:department_id(name), employment_status)")
+    fromHrms(supabase, "employees")
+      .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .eq("status", "active")
-      .is("deleted_at", null)
-      .eq("roles.code", "manager"),
+      .in("employment_status", ["resigned", "terminated"])
+      .gte("date_of_leaving", monthStart)
+      .is("deleted_at", null),
     fromHrms(supabase, "attendance")
-      .select(
-        "id, attendance_status, notes, branches:branch_id(name)",
-      )
+      .select("attendance_status")
       .eq("organization_id", organizationId)
       .eq("attendance_date", today)
       .is("deleted_at", null),
-    fromHrms(supabase, "attendance")
-      .select("attendance_date, attendance_status")
+    fromHrms(supabase, "recruitment_jobs")
+      .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
+      .eq("job_status", "open")
+      .is("deleted_at", null),
+    fromHrms(supabase, "payrolls")
+      .select("total_net, total_gross")
+      .eq("organization_id", organizationId)
+      .eq("payroll_month", payrollMonthDate)
       .is("deleted_at", null)
-      .gte("attendance_date", format(subMonths(now, 5), "yyyy-MM-01"))
-      .order("attendance_date"),
+      .maybeSingle(),
     fromHrms(supabase, "executive_approval_requests")
-      .select(
-        "id, request_code, approval_type, title, summary, priority, request_status, due_at, submitted_at",
-      )
+      .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
       .in("request_status", CEO_PENDING_APPROVAL_STATUSES)
-      .is("deleted_at", null)
-      .order("due_at", { ascending: true, nullsFirst: false })
-      .limit(20),
-    fromHrms(supabase, "audit_logs")
-      .select("id, action, module, table_name, description, occurred_at, user_id")
-      .eq("organization_id", organizationId)
-      .order("occurred_at", { ascending: false })
-      .limit(30),
-    fromHrms(supabase, "performance_kpis")
-      .select("completion_percentage, kpi_status")
-      .eq("organization_id", organizationId)
-      .is("deleted_at", null)
-      .limit(3000),
+      .is("deleted_at", null),
+    listHolidays(supabase, organizationId, { year: now.getFullYear() }).catch((error) => {
+      console.error("[ceo-dashboard] holidays query failed", error);
+      return { data: [] as Awaited<ReturnType<typeof listHolidays>>["data"] };
+    }),
   ]);
 
-  if (employeesRes.error) throw new Error(employeesRes.error.message);
-  if (departmentsRes.error) throw new Error(departmentsRes.error.message);
-  // Non-critical panels degrade instead of blanking the executive home.
-  if (managersRes.error) {
-    console.error("[ceo-dashboard] managers query failed", managersRes.error.message);
+  if (activeEmployeesRes.error) throw new Error(activeEmployeesRes.error.message);
+  if (exitingRes.error) {
+    console.error("[ceo-dashboard] exiting count failed", exitingRes.error.message);
   }
   if (attendanceTodayRes.error) {
-    console.error(
-      "[ceo-dashboard] attendance today query failed",
-      attendanceTodayRes.error.message,
-    );
+    console.error("[ceo-dashboard] attendance today failed", attendanceTodayRes.error.message);
   }
-  if (attendanceTrendRes.error) {
-    console.error(
-      "[ceo-dashboard] attendance trend query failed",
-      attendanceTrendRes.error.message,
-    );
+  if (openJobsRes.error) {
+    console.error("[ceo-dashboard] open jobs failed", openJobsRes.error.message);
   }
-  if (executiveApprovalsRes.error) {
-    console.error(
-      "[ceo-dashboard] executive approvals query failed",
-      executiveApprovalsRes.error.message,
-    );
+  if (payrollRes.error) {
+    console.error("[ceo-dashboard] payroll failed", payrollRes.error.message);
   }
-  if (auditRes.error) {
-    console.error("[ceo-dashboard] audit query failed", auditRes.error.message);
-  }
-  if (kpiCompletionRes.error) {
-    console.error("[ceo-dashboard] kpi query failed", kpiCompletionRes.error.message);
+  if (pendingApprovalsRes.error) {
+    console.error("[ceo-dashboard] approvals count failed", pendingApprovalsRes.error.message);
   }
 
-  const empRows = (employeesRes.data ?? []) as LooseRow[];
-  const deptRows = (departmentsRes.data ?? []) as LooseRow[];
-  const activeEmployees = empRows.filter((e) => ACTIVE_STATUSES.has(e.employment_status));
-  const totalEmployees = activeEmployees.length;
-  const newJoiners = empRows.filter(
-    (e) => e.date_of_joining && String(e.date_of_joining) >= monthStart,
-  ).length;
-  const employeesExiting = empRows.filter(
-    (e) =>
-      ["resigned", "terminated"].includes(e.employment_status) &&
-      e.date_of_leaving &&
-      String(e.date_of_leaving) >= monthStart,
-  ).length;
+  const totalEmployees = activeEmployeesRes.count ?? 0;
+  const employeesExiting = exitingRes.count ?? 0;
+  const openPositions = openJobsRes.count ?? 0;
+  const payrollCost = Number(payrollRes.data?.total_net ?? payrollRes.data?.total_gross ?? 0);
+  const pendingApprovals = pendingApprovalsRes.count ?? 0;
 
-  const activeDepartments = deptRows.filter((d) => d.status === "active" || !d.status);
-  const managerRows = (managersRes.data ?? []) as LooseRow[];
-  const activeManagers = managerRows.filter((row) => {
-    const employee = unwrapRelation(row.employees);
-    return employee && ACTIVE_STATUSES.has(employee.employment_status);
-  });
-
-  const deptMap = new Map<string, number>();
-  for (const e of activeEmployees) {
-    const dept = unwrapRelation(e.departments)?.name ?? "Unassigned";
-    deptMap.set(dept, (deptMap.get(dept) ?? 0) + 1);
-  }
-
-  const managerDeptMap = new Map<string, number>();
-  for (const row of activeManagers) {
-    const employee = unwrapRelation(row.employees);
-    const dept = unwrapRelation(employee?.departments)?.name ?? "Unassigned";
-    managerDeptMap.set(dept, (managerDeptMap.get(dept) ?? 0) + 1);
-  }
-
-  const withManager = activeEmployees.filter((e) => e.reporting_manager_id).length;
-  const reportingCoveragePercent =
-    totalEmployees > 0 ? Math.round((withManager / totalEmployees) * 1000) / 10 : 0;
-
-  const attendanceRows = (attendanceTodayRes.data ?? []) as LooseRow[];
   const attendance = {
     presentToday: 0,
     absentToday: 0,
@@ -473,8 +161,7 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
     halfDayToday: 0,
     onLeaveToday: 0,
   };
-  let workFromHome = 0;
-  for (const row of attendanceRows) {
+  for (const row of (attendanceTodayRes.data ?? []) as LooseRow[]) {
     switch (row.attendance_status) {
       case "present":
         attendance.presentToday += 1;
@@ -494,202 +181,32 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
       default:
         break;
     }
-    const branch = unwrapRelation(row.branches);
-    if (
-      ["present", "late", "half_day"].includes(row.attendance_status) &&
-      isWorkFromHomeBranch(branch?.name, row.notes)
-    ) {
-      workFromHome += 1;
-    }
   }
 
   const presentCount =
     attendance.presentToday + attendance.lateToday + attendance.halfDayToday;
   const attendancePercent =
     totalEmployees > 0 ? Math.round((presentCount / totalEmployees) * 1000) / 10 : 0;
-  const yesterdayPresent =
-    yesterdayAttendance.presentToday +
-    yesterdayAttendance.lateToday +
-    yesterdayAttendance.halfDayToday;
-  const prevAttendancePercent =
-    yesterdayAttendance.totalEmployees > 0
-      ? Math.round((yesterdayPresent / yesterdayAttendance.totalEmployees) * 1000) / 10
-      : attendancePercent;
-
-  const leavePercent = leave.balanceUtilizationPercent ?? 0;
   const attritionBase = totalEmployees + employeesExiting;
   const attritionRate =
     attritionBase > 0 ? Math.round((employeesExiting / attritionBase) * 1000) / 10 : 0;
 
-  const kpiRows = (kpiCompletionRes.data ?? []) as LooseRow[];
-  const trainingCompletion =
-    kpiRows.length > 0
-      ? Math.round(
-          (kpiRows.reduce((sum, row) => sum + Number(row.completion_percentage ?? 0), 0) /
-            kpiRows.length) *
-            10,
-        ) / 10
-      : performance.averageKpiCompletion ?? 0;
-
-  const averageProductivity =
-    performance.goalCompletionRate > 0
-      ? performance.goalCompletionRate
-      : performance.averageKpiCompletion ?? 0;
-
-  const officeAttendance = Math.max(0, presentCount - workFromHome);
-
-  const presentPercent =
-    totalEmployees > 0 ? Math.round((attendance.presentToday / totalEmployees) * 1000) / 10 : 0;
-  const absentPercent =
-    totalEmployees > 0 ? Math.round((attendance.absentToday / totalEmployees) * 1000) / 10 : 0;
-  const latePercent =
-    totalEmployees > 0 ? Math.round((attendance.lateToday / totalEmployees) * 1000) / 10 : 0;
-
-  const currentPayroll = payroll.monthlyOverview.find(
-    (m) => m.month === format(now, "yyyy-MM"),
-  );
-  const payrollStatus = currentPayroll?.status
-    ? PAYROLL_STATUS_LABELS[currentPayroll.status as PayrollStatus] ?? currentPayroll.status
-    : payroll.pendingPayroll > 0
-      ? "Pending"
-      : "Not started";
-  const payrollCompleted = ["paid", "approved"].includes(currentPayroll?.status ?? "");
-  const payrollPending =
-    payroll.pendingPayroll > 0 ||
-    ["draft", "processing", "processed"].includes(currentPayroll?.status ?? "");
-
-  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  const upcomingPayrollDate = format(nextMonth, "yyyy-MM-dd");
-
-  const benefitsCost = Math.round((payroll.totalDeductions || 0) * 100) / 100;
-
-  if (executiveApprovalsRes.error) {
-    // Already logged above — continue with an empty approvals strip.
-  }
-
-  const approvals: CeoApprovalItem[] = (
-    (executiveApprovalsRes.error ? [] : executiveApprovalsRes.data ?? []) as LooseRow[]
-  ).map((row) => {
-    const approvalType = row.approval_type as ExecutiveApprovalType;
-    const priority =
-      row.priority === "critical" || row.priority === "high"
-        ? "high"
-        : row.priority === "medium"
-          ? "medium"
-          : "low";
-    return {
-      id: row.id,
-      kind: mapExecutiveKind(approvalType),
-      title: row.title,
-      subtitle: row.summary || row.request_code,
-      meta: EXECUTIVE_APPROVAL_TYPE_LABELS[approvalType] ?? approvalType,
-      priority,
-      href: CEO_ROUTES.approvals,
-    };
-  });
-
-  const activities: CeoActivityItem[] = ((auditRes.data ?? []) as LooseRow[])
-    .slice(0, 20)
-    .map((row) => ({
-      id: row.id,
-      title: preferredActivityTitle(row.action, row.module, row.table_name),
-      description: row.description || `${row.module ?? "system"} · ${row.action ?? "update"}`,
-      module: row.module ?? "system",
-      occurredAt: row.occurred_at,
-      href: activityHref(row.module),
+  const holidayItems: CeoDashboardData["upcomingHolidays"] = (holidaysResult.data ?? [])
+    .filter((holiday) => holiday.holidayDate >= today)
+    .sort((a, b) => a.holidayDate.localeCompare(b.holidayDate))
+    .map((holiday) => ({
+      id: `holiday-${holiday.id}`,
+      type: "holiday" as const,
+      title: holiday.name,
+      subtitle: holiday.isOptional ? "Optional holiday" : "Company holiday",
+      date: holiday.holidayDate,
     }));
 
-  if (activities.length === 0) {
-    for (const item of recruitment.recentActivity.slice(0, 5)) {
-      activities.push({
-        id: `recruit-${item.id}`,
-        title: item.title || "Recruitment update",
-        description: item.description || "Pipeline activity",
-        module: "recruitment",
-        occurredAt: item.createdAt,
-        href: CEO_ROUTES.recruitment,
-      });
-    }
-  }
-
-  const deptPerformance = [...(performance.departmentPerformance ?? [])].sort(
-    (a, b) => b.averageProgress - a.averageProgress,
-  );
-  const topPerformingDepartments = deptPerformance.slice(0, 5).map((d) => ({
-    label: d.departmentName,
-    value: Math.round(d.averageProgress * 10) / 10,
-  }));
-  const lowPerformingTeams = [...deptPerformance]
-    .reverse()
-    .slice(0, 5)
-    .map((d) => ({
-      label: d.departmentName,
-      value: Math.round(d.averageProgress * 10) / 10,
-    }));
-
-  const insights = buildInsights({
-    attritionRate,
-    attendancePercent,
-    prevAttendancePercent,
-    payrollPending,
-    payrollCompleted,
-    recruitmentDelayed: recruitment.openPositions > 0 && recruitment.averageHiringTimeDays > 30,
-    pendingReviews: performance.pendingReviews,
-    pendingApprovals: approvals.length,
-    newJoiners,
-    openPositions: recruitment.openPositions,
-  });
-
-  const growthMap = new Map<string, number>();
-  const hiringMap = new Map<string, number>();
-  for (let i = 11; i >= 0; i--) {
-    const key = format(subMonths(now, i), "yyyy-MM");
-    growthMap.set(key, 0);
-    if (i <= 5) hiringMap.set(key, 0);
-  }
-  for (const e of empRows) {
-    if (!e.date_of_joining) continue;
-    const key = String(e.date_of_joining).slice(0, 7);
-    if (growthMap.has(key)) growthMap.set(key, (growthMap.get(key) ?? 0) + 1);
-    if (hiringMap.has(key)) hiringMap.set(key, (hiringMap.get(key) ?? 0) + 1);
-  }
-
-  const attendanceTrendMap = new Map<string, number>();
-  for (const row of (attendanceTrendRes.data ?? []) as LooseRow[]) {
-    if (!["present", "late", "half_day"].includes(row.attendance_status)) continue;
-    const key = String(row.attendance_date).slice(0, 7);
-    attendanceTrendMap.set(key, (attendanceTrendMap.get(key) ?? 0) + 1);
-  }
-
-  const departmentGrowthMap = new Map<string, number>();
-  for (let i = 5; i >= 0; i--) {
-    departmentGrowthMap.set(format(subMonths(now, i), "yyyy-MM"), 0);
-  }
-  for (const e of empRows) {
-    if (!e.date_of_joining) continue;
-    const key = String(e.date_of_joining).slice(0, 7);
-    if (departmentGrowthMap.has(key)) {
-      departmentGrowthMap.set(key, (departmentGrowthMap.get(key) ?? 0) + 1);
-    }
-  }
-
-  let holidayItems: CeoDashboardData["upcomingHolidays"] = [];
-  try {
-    const holidays = await listHolidays(supabase, organizationId, {
-      year: now.getFullYear(),
+  if (process.env.NODE_ENV === "development") {
+    console.info("[module-timing]", {
+      label: "getCeoDashboardData",
+      atMs: Math.round(performance.now() - startedAt),
     });
-    holidayItems = holidays.data
-      .filter((holiday) => holiday.holidayDate >= today)
-      .sort((a, b) => a.holidayDate.localeCompare(b.holidayDate))
-      .map((holiday) => ({
-        id: `holiday-${holiday.id}`,
-        type: "holiday" as const,
-        title: holiday.name,
-        subtitle: holiday.isOptional ? "Optional holiday" : "Company holiday",
-        date: holiday.holidayDate,
-      }));
-  } catch (error) {
-    console.error("[ceo-dashboard] holidays query failed", error);
   }
 
   return {
@@ -697,107 +214,81 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
     kpis: {
       totalEmployees,
       activeEmployees: totalEmployees,
-      newJoiners,
+      newJoiners: 0,
       employeesExiting,
-      departments: activeDepartments.length,
-      managers: activeManagers.length,
-      openPositions: recruitment.openPositions,
-      recruitmentPipeline: recruitment.activeCandidates,
-      pendingApprovals: approvals.length,
+      departments: 0,
+      managers: 0,
+      openPositions,
+      recruitmentPipeline: 0,
+      pendingApprovals,
       pendingLeaveApprovals: leaveApprovalQueue.length,
       attendancePercent,
-      leavePercent,
-      averageProductivity,
-      payrollCost: payroll.netPayroll || payroll.grossPayroll || 0,
+      leavePercent: 0,
+      averageProductivity: 0,
+      payrollCost,
       monthlyRevenue: null,
       attritionRate,
-      employeeSatisfaction:
-        performance.averageRating > 0 ? performance.averageRating : null,
-      trainingCompletion,
+      employeeSatisfaction: null,
+      trainingCompletion: 0,
     },
-    insights,
+    insights: [],
     organization: {
-      departmentDistribution: Array.from(deptMap.entries())
-        .map(([label, value]) => ({ label, value }))
-        .sort((a, b) => b.value - a.value),
-      managerDistribution: Array.from(managerDeptMap.entries())
-        .map(([label, value]) => ({ label, value }))
-        .sort((a, b) => b.value - a.value),
-      hierarchyDepth: withManager > 0 ? 2 : 1,
-      totalDepartments: activeDepartments.length,
-      totalManagers: activeManagers.length,
-      reportingCoveragePercent,
+      departmentDistribution: [],
+      managerDistribution: [],
+      hierarchyDepth: 0,
+      totalDepartments: 0,
+      totalManagers: 0,
+      reportingCoveragePercent: 0,
     },
     recruitment: {
-      openJobs: recruitment.openPositions,
-      candidates: recruitment.activeCandidates,
-      interviewsToday: recruitment.interviewsToday,
-      offersPending: recruitment.offersPending,
-      hiringThisMonth: recruitment.hiresThisMonth,
-      timeToHireDays: recruitment.averageHiringTimeDays,
-      funnel: (recruitment.candidatesByStage ?? []).map((f) => ({
-        label: f.stage,
-        value: f.count,
-      })),
+      openJobs: openPositions,
+      candidates: 0,
+      interviewsToday: 0,
+      offersPending: 0,
+      hiringThisMonth: 0,
+      timeToHireDays: 0,
+      funnel: [],
     },
     performance: {
-      companyAverageRating: performance.averageRating,
-      topPerformingDepartments,
-      lowPerformingTeams,
-      pendingReviews: performance.pendingReviews,
-      promotionRecommendations: performance.promotionReady,
+      companyAverageRating: 0,
+      topPerformingDepartments: [],
+      lowPerformingTeams: [],
+      pendingReviews: 0,
+      promotionRecommendations: 0,
     },
     payroll: {
-      status: payrollStatus,
-      completed: payrollCompleted,
-      pending: payrollPending,
-      salaryCost: payroll.netPayroll || payroll.grossPayroll || 0,
-      benefitsCost,
-      upcomingPayrollDate,
-      monthlyTrend: payroll.monthlyOverview.map((m) => ({
-        label: m.label,
-        value: m.net,
-      })),
+      status: "Not started",
+      completed: false,
+      pending: false,
+      salaryCost: payrollCost,
+      benefitsCost: 0,
+      upcomingPayrollDate: null,
+      monthlyTrend: [],
     },
     attendance: {
-      presentPercent,
-      absentPercent,
-      latePercent,
-      workFromHome,
-      officeAttendance,
+      presentPercent:
+        totalEmployees > 0
+          ? Math.round((attendance.presentToday / totalEmployees) * 1000) / 10
+          : 0,
+      absentPercent:
+        totalEmployees > 0
+          ? Math.round((attendance.absentToday / totalEmployees) * 1000) / 10
+          : 0,
+      latePercent:
+        totalEmployees > 0
+          ? Math.round((attendance.lateToday / totalEmployees) * 1000) / 10
+          : 0,
+      workFromHome: 0,
+      officeAttendance: presentCount,
       presentToday: attendance.presentToday,
       absentToday: attendance.absentToday,
       lateToday: attendance.lateToday,
       onLeaveToday: attendance.onLeaveToday,
     },
     upcomingHolidays: holidayItems,
-    activities,
-    approvals,
-    charts: {
-      employeeGrowth: Array.from(growthMap.entries()).map(([label, value]) => ({
-        label,
-        value,
-      })),
-      hiringTrend: Array.from(hiringMap.entries()).map(([label, value]) => ({
-        label,
-        value,
-      })),
-      attendanceTrend: Array.from(attendanceTrendMap.entries())
-        .sort(([a], [b]) => (a > b ? 1 : -1))
-        .map(([label, value]) => ({ label, value })),
-      attritionTrend: exitSummary.monthlyAttrition.map((m) => ({
-        label: m.month,
-        value: m.count,
-      })),
-      payrollTrend: payroll.monthlyOverview.map((m) => ({
-        label: m.label,
-        value: m.net,
-      })),
-      departmentGrowth: Array.from(departmentGrowthMap.entries()).map(([label, value]) => ({
-        label,
-        value,
-      })),
-    },
+    activities: [],
+    approvals: [],
+    charts: EMPTY_CHARTS,
   };
 });
 

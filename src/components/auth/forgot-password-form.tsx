@@ -21,10 +21,10 @@ import {
 } from "@/lib/validations/auth";
 
 const fieldClass =
-  "h-11 rounded-full border-sky-200/80 bg-sky-50/80 pl-10 text-sm text-foreground shadow-none placeholder:text-muted-foreground focus-visible:border-sky-500 focus-visible:ring-sky-500/25 dark:border-border/80 dark:bg-muted/40";
+  "h-11 rounded-full border-violet-200/80 bg-violet-50/80 pl-10 text-sm text-foreground shadow-none placeholder:text-muted-foreground focus-visible:border-violet-500 focus-visible:ring-violet-500/25 dark:border-border/80 dark:bg-muted/40";
 
 const submitClass =
-  "h-11 w-full rounded-full bg-gradient-to-r from-sky-500 to-blue-600 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(37,99,235,0.35)] hover:from-sky-400 hover:to-blue-500";
+  "h-11 w-full rounded-full bg-gradient-to-r from-violet-500 to-violet-700 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(109,40,217,0.35)] hover:from-violet-400 hover:to-violet-600";
 
 export function ForgotPasswordForm() {
   const [isPending, startTransition] = useTransition();
@@ -103,12 +103,12 @@ export function ForgotPasswordForm() {
         </p>
       </div>
 
-      <div className="flex items-start gap-3 rounded-2xl border border-sky-200/90 bg-sky-50/90 px-4 py-3.5 text-left shadow-sm dark:border-sky-500/25 dark:bg-sky-500/10">
-        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 text-sky-600 dark:bg-sky-400/15 dark:text-sky-300">
+      <div className="flex items-start gap-3 rounded-2xl border border-violet-200/90 bg-violet-50/90 px-4 py-3.5 text-left shadow-sm dark:border-violet-500/25 dark:bg-violet-500/10">
+        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-600 dark:bg-violet-400/15 dark:text-violet-300">
           <ShieldCheck className="size-4" strokeWidth={2.25} />
         </span>
         <div className="min-w-0 space-y-0.5">
-          <p className="text-sm font-semibold text-sky-950 dark:text-sky-100">
+          <p className="text-sm font-semibold text-violet-950 dark:text-violet-100">
             Secure recovery
           </p>
           <p className="text-[13px] leading-snug text-slate-600 dark:text-slate-300">

@@ -23,6 +23,7 @@ import {
   rejectLeaveRequest,
   updateLeaveRequest,
 } from "@/lib/leave/services/leave-mutations";
+import { assertCanApplyLeaveForEmployee } from "@/lib/leave/services/leave-access";
 import {
   getLeaveCalendarData,
   getLeaveLookups,
@@ -81,6 +82,7 @@ export async function createLeaveRequestAction(
     const profile = await requireServerPermission("leave.create");
     const supabase = await getAuthenticatedSupabase();
     const parsed = leaveFormSchema.parse(input);
+    await assertCanApplyLeaveForEmployee(supabase, profile, parsed.employeeId);
     const id = await createLeaveRequest(supabase, profile, parsed);
     revalidateLeaveSelfServicePaths(id);
     return { success: true, data: id };
@@ -103,6 +105,7 @@ export async function updateLeaveRequestAction(
     ]);
     const supabase = await getAuthenticatedSupabase();
     const parsed = leaveFormSchema.parse(input);
+    await assertCanApplyLeaveForEmployee(supabase, profile, parsed.employeeId);
     await updateLeaveRequest(supabase, profile, leaveRequestId, parsed);
     revalidateLeaveSelfServicePaths(leaveRequestId);
     return { success: true, data: undefined };
@@ -319,8 +322,9 @@ export async function getEmployeeLeaveBalanceSnapshotAction(
   employeeId: string,
 ): Promise<LeaveActionResult<LeaveEmployeeBalanceSnapshot[]>> {
   try {
-    await requireServerPermission("leave.create");
+    const profile = await requireServerPermission("leave.create");
     const supabase = await getAuthenticatedSupabase();
+    await assertCanApplyLeaveForEmployee(supabase, profile, employeeId);
     const data = await getEmployeeLeaveBalanceSnapshot(supabase, employeeId);
     return { success: true, data };
   } catch (error) {
@@ -338,6 +342,7 @@ export async function getLeaveApplyContextAction(
   try {
     const profile = await requireServerPermission("leave.create");
     const supabase = await getAuthenticatedSupabase();
+    await assertCanApplyLeaveForEmployee(supabase, profile, employeeId);
     const [runtime, employee, balances, applicantRoleCodes] = await Promise.all([
       loadLeavePolicyRuntime(supabase, profile.employee.organizationId),
       loadLeaveEmployeePolicyState(

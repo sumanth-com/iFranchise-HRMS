@@ -63,7 +63,7 @@ export function UserProfileDropdown() {
               aria-label={`${displayName} account menu`}
             >
               <Avatar className="h-8 w-9 rounded-lg after:rounded-lg">
-                <AvatarFallback className="rounded-lg bg-neutral-900 text-[0.7rem] font-semibold tracking-wide text-white">
+                <AvatarFallback className="rounded-lg bg-gradient-to-br from-blue-600 to-violet-600 text-[0.7rem] font-semibold tracking-wide text-white">
                   {getInitials(employee.firstName, employee.lastName)}
                 </AvatarFallback>
               </Avatar>

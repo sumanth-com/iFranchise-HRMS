@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { DOCUMENTS_ROUTES, DOCUMENTS_STORAGE_BUCKET, SELF_DOCUMENTS_ROUTES } from "@/lib/documents/constants";
+import { DOCUMENTS_ROUTES, DOCUMENTS_STORAGE_BUCKET, SELF_DOCUMENTS_ROUTES, isHrOrAdmin, isManager } from "@/lib/documents/constants";
 import {
   archiveDocument,
   createSignedDocumentUrl,
@@ -20,6 +20,7 @@ import {
   updateDocumentSettings,
 } from "@/lib/documents/services/document-settings";
 import { isEmployeeScoped, fromHrms, unwrapRelation } from "@/lib/documents/services/documents-utils";
+import { getManagerTeamScope } from "@/lib/manager/services/team-queries";
 import { requireServerAnyPermission, requireServerPermission } from "@/lib/permissions/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -158,6 +159,16 @@ export async function getDocumentSignedUrlAction(documentId: string) {
     }
     if (isEmployeeScoped(profile) && doc.employee_id !== profile.employee.id) {
       return { success: false as const, message: "Document not found" };
+    }
+    if (
+      isManager(profile) &&
+      !isHrOrAdmin(profile) &&
+      doc.employee_id !== profile.employee.id
+    ) {
+      const { teamIds } = await getManagerTeamScope(supabase, profile);
+      if (!teamIds.includes(doc.employee_id)) {
+        return { success: false as const, message: "Document not found" };
+      }
     }
 
     const admin = createAdminClient();

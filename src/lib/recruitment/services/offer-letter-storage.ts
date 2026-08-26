@@ -1,31 +1,16 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import {
+  contentTypeForOfferLetterExtension,
+  resolveOfferLetterExtension,
+} from "@/lib/recruitment/services/offer-letter-file-meta";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const BUCKET = "employee-documents";
 
-const EXTENSION_CONTENT_TYPES: Record<string, string> = {
-  pdf: "application/pdf",
-  doc: "application/msword",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  txt: "text/plain",
-  rtf: "application/rtf",
-  odt: "application/vnd.oasis.opendocument.text",
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  webp: "image/webp",
-  zip: "application/zip",
+export {
+  contentTypeForOfferLetterExtension,
+  resolveOfferLetterExtension,
 };
-
-export function resolveOfferLetterExtension(filename: string): string {
-  const raw = filename.split(".").pop()?.toLowerCase() ?? "";
-  const cleaned = raw.replace(/[^a-z0-9]/g, "");
-  return cleaned || "bin";
-}
-
-export function contentTypeForOfferLetterExtension(ext: string): string {
-  return EXTENSION_CONTENT_TYPES[ext] ?? "application/octet-stream";
-}
 
 export async function storeOfferLetterFile(
   _supabase: AuthSupabaseClient,

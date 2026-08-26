@@ -9,7 +9,7 @@ import { ManagerReportsFilters } from "@/components/manager/reports/manager-repo
 import { ManagerReportsKpis } from "@/components/manager/reports/manager-reports-kpis";
 import { MANAGER_REPORT_CATEGORIES } from "@/lib/manager/reports/manager-report-definitions";
 import type { ManagerReportCategory } from "@/lib/manager/reports/manager-report-definitions";
-import { categoryBundleFor } from "@/lib/manager/services/team-reports-queries";
+import { categoryBundleFor } from "@/lib/manager/services/manager-report-category";
 import { refreshManagerReportsAction } from "@/lib/manager/actions/manager-reports-actions";
 import { hasAnyPermission } from "@/lib/permissions/utils";
 import type { ManagerReportsListParams, ManagerReportsPageData } from "@/types/manager-reports";

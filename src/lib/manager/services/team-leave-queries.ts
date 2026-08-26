@@ -6,7 +6,7 @@ import { formatCleanEmployeeName } from "@/lib/employees/parse-employee-name";
 import { ALLOWED_LEAVE_TYPE_CODES } from "@/lib/leave/constants";
 import {
   getEmployeeLeaveBalanceSnapshot,
-  getEmployeeRoleCodes,
+  getEmployeeRoleCodesByEmployeeIds,
 } from "@/lib/leave/services/leave-queries";
 import { requiresCeoLeaveApproval } from "@/lib/approvals/executive-request-routing";
 import { classifyCalendarDay, DEFAULT_LEAVE_CALENDAR } from "@/lib/leave/services/leave-calendar-engine";
@@ -95,6 +95,45 @@ export function resolveManagerLeaveWorkflowStatus(
   return "pending";
 }
 
+async function loadTeamOverlappingLeaves(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  teamIds: string[],
+  startBound: string,
+  endBound: string,
+): Promise<OverlappingLeaveRow[]> {
+  if (teamIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("leave_requests")
+    .select(
+      `
+        id,
+        employee_id,
+        start_date,
+        end_date,
+        leave_status,
+        employees!inner (
+          first_name,
+          last_name,
+          department_id,
+          organization_id,
+          designations:designation_id (title)
+        )
+      `,
+    )
+    .eq("employees.organization_id", organizationId)
+    .in("employee_id", teamIds)
+    .in("leave_status", ["pending", "approved"])
+    .lte("start_date", endBound)
+    .gte("end_date", startBound)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as OverlappingLeaveRow[];
+}
+
 export async function detectTeamLeaveConflicts(
   supabase: AuthSupabaseClient,
   organizationId: string,
@@ -109,6 +148,7 @@ export async function detectTeamLeaveConflicts(
   },
   teamMeta: TeamMemberMeta[],
   holidays: Array<{ name: string; holidayDate: string }>,
+  preloadedOverlapRows?: OverlappingLeaveRow[],
 ): Promise<TeamLeaveConflict[]> {
   const conflicts: TeamLeaveConflict[] = [];
   const requestDates = expandDateRange(input.startDate, input.endDate);
@@ -155,40 +195,24 @@ export async function detectTeamLeaveConflicts(
 
   if (teamIds.length === 0) return conflicts;
 
-  let overlapQuery = supabase
-    .schema("hrms")
-    .from("leave_requests")
-    .select(
-      `
-        id,
-        employee_id,
-        start_date,
-        end_date,
-        leave_status,
-        employees!inner (
-          first_name,
-          last_name,
-          department_id,
-          organization_id,
-          designations:designation_id (title)
-        )
-      `,
-    )
-    .eq("employees.organization_id", organizationId)
-    .in("employee_id", teamIds)
-    .in("leave_status", ["pending", "approved"])
-    .lte("start_date", input.endDate)
-    .gte("end_date", input.startDate)
-    .is("deleted_at", null);
-
-  if (input.leaveRequestId) {
-    overlapQuery = overlapQuery.neq("id", input.leaveRequestId);
+  let overlapRows: OverlappingLeaveRow[];
+  if (preloadedOverlapRows) {
+    overlapRows = preloadedOverlapRows.filter(
+      (row) =>
+        row.id !== input.leaveRequestId &&
+        row.start_date <= input.endDate &&
+        row.end_date >= input.startDate,
+    );
+  } else {
+    overlapRows = (await loadTeamOverlappingLeaves(
+      supabase,
+      organizationId,
+      teamIds,
+      input.startDate,
+      input.endDate,
+    )).filter((row) => row.id !== input.leaveRequestId);
   }
 
-  const { data: overlappingLeaves, error } = await overlapQuery;
-  if (error) throw new Error(error.message);
-
-  const overlapRows = (overlappingLeaves ?? []) as OverlappingLeaveRow[];
   const overlappingNames = overlapRows
     .filter((row) => row.employee_id !== input.employeeId)
     .map((row) => {
@@ -452,6 +476,10 @@ export async function listTeamLeaveRequests(
       "",
     ) || getTodayDateString());
   const holidays = await loadHolidayDates(supabase, organizationId, minDate, maxDate);
+  const [rolesByEmployee, overlapRows] = await Promise.all([
+    getEmployeeRoleCodesByEmployeeIds(rows.map((row) => row.employee_id)),
+    loadTeamOverlappingLeaves(supabase, organizationId, teamIds, minDate, maxDate),
+  ]);
 
   const mapped = await Promise.all(
     rows.map(async (row) => {
@@ -472,7 +500,7 @@ export async function listTeamLeaveRequests(
       const currentApprover = pendingApproval
         ? unwrap(pendingApproval.employees)
         : null;
-      const applicantRoles = await getEmployeeRoleCodes(supabase, row.employee_id);
+      const applicantRoles = rolesByEmployee.get(row.employee_id) ?? [];
       const executiveApplicant = requiresCeoLeaveApproval(applicantRoles);
 
       const conflicts = await detectTeamLeaveConflicts(
@@ -489,6 +517,7 @@ export async function listTeamLeaveRequests(
         },
         teamMeta,
         holidays,
+        overlapRows,
       );
 
       const workflowStatus = resolveManagerLeaveWorkflowStatus(
@@ -694,6 +723,13 @@ export async function getTeamLeaveSummary(
   }
 
   const holidays = await loadHolidayDates(supabase, organizationId, minDate, maxDate);
+  const overlapRows = await loadTeamOverlappingLeaves(
+    supabase,
+    organizationId,
+    teamIds,
+    minDate,
+    maxDate,
+  );
 
   let leaveConflicts = 0;
   for (const row of pendingRows) {
@@ -713,6 +749,7 @@ export async function getTeamLeaveSummary(
       },
       teamMeta,
       holidays,
+      overlapRows,
     );
     if (conflicts.some((item) => item.severity === "warning")) {
       leaveConflicts += 1;

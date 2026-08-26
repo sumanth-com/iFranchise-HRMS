@@ -11,7 +11,7 @@ export const employeeSectionClass =
   "dashboard-surface flex flex-col overflow-hidden rounded-xl border-0 bg-card p-4 dark:shadow-none";
 
 export const employeeStatCardClass =
-  "dashboard-surface flex h-full min-h-[6.75rem] min-w-0 flex-col rounded-xl border-0 bg-card p-3.5 text-left dark:shadow-none";
+  "dashboard-surface relative flex h-full min-h-[7.25rem] min-w-0 flex-col overflow-hidden rounded-xl border-0 bg-card p-4 text-left dark:shadow-none";
 
 export const employeeEventRowClass =
   "dashboard-surface flex items-center gap-3 rounded-lg border-0 bg-card px-3 py-2.5 transition-[box-shadow,background-color] dark:shadow-none";
@@ -22,6 +22,49 @@ export const employeeEmptyClass =
 export const employeeDateBadgeClass =
   "flex w-11 shrink-0 flex-col overflow-hidden rounded-lg bg-card text-center shadow-[0_1px_3px_oklch(0.45_0.02_265/6%)] dark:border dark:border-border/60 dark:shadow-none";
 
+export type EmployeeStatCardTone = "emerald" | "sky" | "violet" | "amber";
+
+const STAT_CARD_WAVE: Record<
+  EmployeeStatCardTone,
+  { soft: string; strong: string }
+> = {
+  emerald: { soft: "fill-emerald-400/20", strong: "fill-emerald-500/25" },
+  sky: { soft: "fill-sky-400/20", strong: "fill-sky-500/25" },
+  violet: { soft: "fill-violet-400/20", strong: "fill-violet-500/25" },
+  amber: { soft: "fill-amber-400/20", strong: "fill-amber-500/25" },
+};
+
+const STAT_CARD_HINT: Record<EmployeeStatCardTone, string> = {
+  emerald:
+    "bg-emerald-500/12 text-emerald-700 ring-emerald-500/15 dark:bg-emerald-400/15 dark:text-emerald-300 dark:ring-emerald-400/20",
+  sky: "bg-sky-500/12 text-sky-700 ring-sky-500/15 dark:bg-sky-400/15 dark:text-sky-300 dark:ring-sky-400/20",
+  violet:
+    "bg-violet-500/12 text-violet-700 ring-violet-500/15 dark:bg-violet-400/15 dark:text-violet-300 dark:ring-violet-400/20",
+  amber:
+    "bg-amber-500/12 text-amber-800 ring-amber-500/15 dark:bg-amber-400/15 dark:text-amber-300 dark:ring-amber-400/20",
+};
+
+function StatCardWave({ tone }: { tone: EmployeeStatCardTone }) {
+  const colors = STAT_CARD_WAVE[tone];
+  return (
+    <svg
+      className="pointer-events-none absolute inset-x-0 bottom-0 h-[3.25rem] w-full"
+      viewBox="0 0 360 72"
+      preserveAspectRatio="none"
+      aria-hidden
+    >
+      <path
+        className={colors.soft}
+        d="M0 72V34C48 18 92 12 140 20C196 30 228 52 278 58C318 63 342 56 360 46V72H0Z"
+      />
+      <path
+        className={colors.strong}
+        d="M0 72V46C52 36 96 40 148 50C204 62 240 70 292 66C328 63 348 56 360 50V72H0Z"
+      />
+    </svg>
+  );
+}
+
 export function EmployeeStatCard({
   label,
   value,
@@ -29,6 +72,7 @@ export function EmployeeStatCard({
   accent = "text-foreground",
   iconBg = "bg-muted",
   hint,
+  tone,
   href,
   onClick,
   active = false,
@@ -39,33 +83,55 @@ export function EmployeeStatCard({
   accent?: string;
   iconBg?: string;
   hint?: string;
+  tone?: EmployeeStatCardTone;
   href?: string;
   onClick?: () => void;
   active?: boolean;
 }) {
   const content = (
     <>
-      <div className="flex items-start justify-between gap-2">
-        <p className="truncate whitespace-nowrap text-[11px] font-medium leading-none text-foreground/90 dark:text-white">
-          {label}
-        </p>
-        <span
-          className={cn(
-            "flex size-8 shrink-0 items-center justify-center rounded-lg",
-            iconBg,
+      <div className="relative z-10 flex flex-1 flex-col">
+        <div className="flex items-start justify-between gap-2">
+          <p className="truncate whitespace-nowrap text-[11px] font-medium leading-none text-muted-foreground">
+            {label}
+          </p>
+          <span
+            className={cn(
+              "flex size-8 shrink-0 items-center justify-center rounded-lg",
+              iconBg,
+            )}
+          >
+            <Icon className={cn("size-4", accent)} />
+          </span>
+        </div>
+        <div className="mt-3 flex min-w-0 flex-1 flex-col justify-end gap-2.5 pb-0.5">
+          <p
+            className={cn(
+              "truncate text-2xl font-semibold leading-7 tracking-tight tabular-nums",
+              accent,
+            )}
+          >
+            {value}
+          </p>
+          {hint ? (
+            <span
+              className={cn(
+                "inline-flex w-fit max-w-full truncate rounded-md px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase ring-1 ring-inset",
+                tone
+                  ? STAT_CARD_HINT[tone]
+                  : "bg-muted/70 text-muted-foreground ring-border/60",
+              )}
+            >
+              {hint}
+            </span>
+          ) : (
+            <span className="h-[1.375rem]" aria-hidden>
+              {"\u00a0"}
+            </span>
           )}
-        >
-          <Icon className={cn("size-4", accent)} />
-        </span>
+        </div>
       </div>
-      <div className="mt-3 min-w-0">
-        <p className={cn("truncate text-xl font-semibold leading-7 tracking-tight tabular-nums", accent)}>
-          {value}
-        </p>
-        <p className="mt-1 truncate text-[11px] leading-4 text-foreground/80 dark:text-white/90">
-          {hint || "\u00a0"}
-        </p>
-      </div>
+      {tone ? <StatCardWave tone={tone} /> : null}
     </>
   );
 

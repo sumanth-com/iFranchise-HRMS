@@ -1,4 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
 import { allocateNextEmployeeCode } from "@/lib/employees/services/employee-code";
 import { cleanDisplayText } from "@/lib/employees/parse-employee-name";
 import {
@@ -6,6 +7,7 @@ import {
   scopedEmployeeIds,
 } from "@/lib/manager/portal-scope";
 import { listEligibleHrLeaveApproverOptions } from "@/lib/leave/services/leave-queries";
+import { createSignedStorageUrls } from "@/lib/storage/signed-url";
 import type { UserProfile } from "@/types/auth";
 import type {
   EmployeeAccountProvisioningItem,
@@ -184,6 +186,14 @@ export async function listEmployees(
   }
 
   const rows = (data ?? []) as EmployeeRow[];
+  const imagePaths = rows.map(
+    (row) => unwrapRelation(row.employee_profiles)?.profile_image_storage_path ?? null,
+  );
+  const signedByPath = await createSignedStorageUrls(
+    supabase,
+    EMPLOYEE_STORAGE_BUCKETS.profileImages,
+    imagePaths,
+  );
 
   return {
     data: rows.map((row) => {
@@ -191,6 +201,7 @@ export async function listEmployees(
       const department = unwrapRelation(row.departments);
       const designation = unwrapRelation(row.designations);
       const employeeProfile = unwrapRelation(row.employee_profiles);
+      const profileImagePath = employeeProfile?.profile_image_storage_path ?? null;
 
       return {
         id: row.id,
@@ -208,7 +219,10 @@ export async function listEmployees(
         departmentName: department?.name ?? null,
         designationId: row.designation_id,
         designationTitle: designation?.title ?? null,
-        profileImagePath: employeeProfile?.profile_image_storage_path ?? null,
+        profileImagePath,
+        profileImageSignedUrl: profileImagePath
+          ? (signedByPath.get(profileImagePath) ?? null)
+          : null,
         accountStatus: row.account_status as EmployeeListResult["data"][number]["accountStatus"],
         invitationSentAt: row.invitation_sent_at,
         lastLoginAt: row.last_login_at,

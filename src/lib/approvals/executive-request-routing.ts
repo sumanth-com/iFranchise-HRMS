@@ -1,4 +1,4 @@
-import { isHrLeaveApplicant } from "@/lib/leave/services/leave-queries";
+import { isHrLeaveApplicant } from "@/lib/leave/leave-applicant-roles";
 
 export const MANAGER_LEAVE_APPLICANT_ROLE_CODES = ["manager"] as const;
 

@@ -52,6 +52,8 @@ export type CeoLeaveRecord = {
   reason: string | null;
   leaveStatus: LeaveStatus;
   appliedAt: string;
+  /** CEO decision timestamp (leave_approvals.acted_at) when listing processed approvals. */
+  decidedAt?: string | null;
   managerName: string | null;
   currentApprovalLevel: number | null;
   currentApproverName: string | null;

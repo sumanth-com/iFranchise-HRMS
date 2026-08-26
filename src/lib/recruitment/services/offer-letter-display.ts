@@ -1,4 +1,4 @@
-import { resolveOfferLetterExtension } from "@/lib/recruitment/services/offer-letter-storage";
+import { resolveOfferLetterExtension } from "@/lib/recruitment/services/offer-letter-file-meta";
 
 const UUID_FILE_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-z0-9]+$/i;

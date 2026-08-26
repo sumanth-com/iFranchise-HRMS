@@ -308,7 +308,7 @@ export async function getExitSummary(
       ),
     ).length,
     pendingClearance: active.filter((i) =>
-      ["hr_approved", "clearance"].includes(i.exitStatus),
+      ["clearance"].includes(i.exitStatus),
     ).length,
     assetsPendingReturn: assetPending?.length ?? 0,
     settlementsPending: settlementPending?.length ?? 0,
@@ -384,7 +384,7 @@ export async function listClearanceQueue(
     pageSize: 100,
   });
   const active = resignations.data.filter((r) =>
-    ["hr_approved", "clearance", "asset_return", "settlement", "interview", "documents"].includes(
+    ["clearance", "asset_return", "settlement", "interview", "documents"].includes(
       r.exitStatus,
     ),
   );

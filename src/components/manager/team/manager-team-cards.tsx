@@ -31,7 +31,7 @@ function toDirectoryCardPerson(member: TeamMemberListItem): DirectoryCardPerson 
     departmentId: member.departmentId,
     departmentName: member.departmentName,
     verticalName: member.branchName,
-    avatarUrl: null,
+    avatarUrl: member.profileImageSignedUrl ?? null,
     profileImagePath: member.profileImagePath,
     managerName: member.managerName,
   };

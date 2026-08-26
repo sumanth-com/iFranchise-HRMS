@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 
 import {
   DEFAULT_SESSION_MAX_AGE,
@@ -27,7 +28,6 @@ import { hashPasswordResetToken } from "@/lib/security/signed-flow-tokens";
 import { recordEmployeeSuccessfulLogin, acceptInvitationOnPasswordSet } from "@/lib/employees/services/employee-account";
 import { sendBirthdayRemindersOnLogin } from "@/lib/employee/services/birthday-reminder-notifications";
 import { resolveUserPortalRoute } from "@/lib/auth/permission-resolver";
-import { getPortalRedirectPath } from "@/lib/auth/portals";
 import { recordUserLoginSession } from "@/lib/ceo/services/ceo-profile-queries";
 import { requireAuthenticatedProfile } from "@/lib/permissions/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -38,6 +38,29 @@ import {
   resetPasswordSchema,
 } from "@/lib/validations/auth";
 import type { AuthActionResult } from "@/types/auth";
+
+/** Bound Auth so a stalled Supabase gateway cannot hold "Signing in..." for ~40s+. */
+const LOGIN_AUTH_TIMEOUT_MS = 25_000;
+
+async function signInWithPasswordBounded(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  email: string,
+  password: string,
+) {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      supabase.auth.signInWithPassword({ email, password }),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error("AUTH_TIMEOUT"));
+        }, LOGIN_AUTH_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
 
 async function applyRememberMePreference(rememberMe: boolean) {
   const cookieStore = await cookies();
@@ -126,25 +149,43 @@ export async function loginAction(
 
     const supabase = await createClient();
 
-    const { data: authData, error: authError } =
-      await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+    let authData: Awaited<
+      ReturnType<typeof supabase.auth.signInWithPassword>
+    >["data"] = { user: null, session: null };
+    let authError: Awaited<
+      ReturnType<typeof supabase.auth.signInWithPassword>
+    >["error"] = null;
+
+    try {
+      const result = await signInWithPasswordBounded(supabase, email, password);
+      authData = result.data;
+      authError = result.error;
+    } catch (error) {
+      authError = {
+        name: "AuthTimeout",
+        message: error instanceof Error ? error.message : "AUTH_TIMEOUT",
+        status: 504,
+      } as typeof authError;
+    }
 
     if (authError || !authData.user) {
       const mappedError = mapSupabaseAuthError(authError?.message ?? "");
-      await writeApplicationAudit(supabase, {
-        organizationId: null,
-        module: "dashboard",
-        action: "login",
-        description: `Failed login attempt for ${email}`,
-        recordId: email,
-        eventStatus: "failed",
-        priority: "high",
-        reason: authError?.message,
-        ...ctx,
-      });
+      // Keep failed-login audit off the redirect-critical path.
+      after(() =>
+        writeApplicationAudit(supabase, {
+          organizationId: null,
+          module: "dashboard",
+          action: "login",
+          description: `Failed login attempt for ${email}`,
+          recordId: email,
+          eventStatus: "failed",
+          priority: "high",
+          reason: authError?.message,
+          ...ctx,
+        }).catch((auditError) => {
+          console.error("[loginAction] Failed login audit error:", auditError);
+        }),
+      );
 
       if (process.env.NODE_ENV === "development" && authError?.message) {
         console.error("[loginAction] Supabase auth error:", authError.message);
@@ -175,53 +216,70 @@ export async function loginAction(
     await applyRememberMePreference(rememberMe);
     await touchIdleActivityCookie(rememberMe);
 
-    try {
-      await recordEmployeeSuccessfulLogin(supabase, authData.user.id, email);
-    } catch (loginRecordError) {
-      console.error("[loginAction] Failed to record successful login:", loginRecordError);
+    const userId = authData.user.id;
+    const employee = profileResult.profile.employee;
+    const needsActivation =
+      employee.accountStatus === "invited" ||
+      employee.accountStatus === "invitation_pending" ||
+      employee.accountStatus === "invitation_accepted" ||
+      employee.employmentStatus === "draft";
+
+    // Invitation/draft activation must finish before portal entry.
+    if (needsActivation) {
+      try {
+        await recordEmployeeSuccessfulLogin(supabase, userId, email);
+      } catch (loginRecordError) {
+        console.error("[loginAction] Failed to record successful login:", loginRecordError);
+      }
     }
 
-    try {
-      await sendBirthdayRemindersOnLogin(supabase, profileResult.profile);
-    } catch (birthdayReminderError) {
-      console.error("[loginAction] Failed to send birthday reminders:", birthdayReminderError);
-    }
+    const portalRoute = await resolveUserPortalRoute(supabase, userId);
+    const redirectTo = getAuthenticatedRedirectPath(
+      profileResult.profile.roles,
+      profileResult.profile.permissionCodes,
+      portalRoute,
+    );
 
-    try {
-      await recordUserLoginSession(supabase, {
-        organizationId: profileResult.profile.employee.organizationId,
-        userId: authData.user.id,
-        employeeId: profileResult.profile.employee.id,
-        deviceType: ctx.deviceType,
-        browser: ctx.browser,
-        operatingSystem: ctx.operatingSystem,
-        ipAddress: ctx.ipAddress,
-        userAgent: ctx.userAgent,
+    // Birthday / audit / session bookkeeping must not block portal redirect.
+    after(() => {
+      const tasks: Promise<unknown>[] = [
+        sendBirthdayRemindersOnLogin(supabase, profileResult.profile),
+        recordUserLoginSession(supabase, {
+          organizationId: employee.organizationId,
+          userId,
+          employeeId: employee.id,
+          deviceType: ctx.deviceType,
+          browser: ctx.browser,
+          operatingSystem: ctx.operatingSystem,
+          ipAddress: ctx.ipAddress,
+          userAgent: ctx.userAgent,
+        }),
+        writeApplicationAudit(supabase, {
+          organizationId: employee.organizationId,
+          module: "dashboard",
+          action: "login",
+          description: `User ${email} logged in successfully`,
+          recordId: userId,
+          priority: "medium",
+          ...ctx,
+          metadata: { email },
+        }),
+      ];
+      if (!needsActivation) {
+        tasks.push(recordEmployeeSuccessfulLogin(supabase, userId, email));
+      }
+      return Promise.allSettled(tasks).then((results) => {
+        for (const result of results) {
+          if (result.status === "rejected") {
+            console.error("[loginAction] Background login task failed:", result.reason);
+          }
+        }
       });
-    } catch (sessionError) {
-      console.error("[loginAction] Failed to record login session:", sessionError);
-    }
-
-    await writeApplicationAudit(supabase, {
-      organizationId: profileResult.profile.employee.organizationId,
-      module: "dashboard",
-      action: "login",
-      description: `User ${email} logged in successfully`,
-      recordId: authData.user.id,
-      priority: "medium",
-      ...ctx,
-      metadata: { email },
     });
-
-    const portalRoute = await resolveUserPortalRoute(supabase, authData.user.id);
 
     return {
       success: true,
-      redirectTo: getAuthenticatedRedirectPath(
-        profileResult.profile.roles,
-        profileResult.profile.permissionCodes,
-        portalRoute,
-      ),
+      redirectTo,
     };
   } catch (error) {
     console.error("[loginAction] Unexpected failure:", error);

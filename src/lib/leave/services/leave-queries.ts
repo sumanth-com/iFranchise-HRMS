@@ -3,6 +3,7 @@ import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { hasPermission } from "@/lib/permissions/utils";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { UserProfile } from "@/types/auth";
+import type { LookupOption } from "@/types/employee";
 import type {
   LeaveBalanceItem,
   LeaveCalendarEntry,
@@ -43,6 +44,10 @@ import {
   scopedEmployeeIds,
 } from "@/lib/manager/portal-scope";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
+import {
+  HR_LEAVE_APPLICANT_ROLE_CODES,
+  isHrLeaveApplicant,
+} from "@/lib/leave/leave-applicant-roles";
 import {
   getCurrentBalanceYear,
   getMonthDateRange,
@@ -515,7 +520,9 @@ export async function getLeaveSummary(
     return query.not("employee_id", "in", `(${hrApplicantIds.join(",")})`);
   };
 
-  const [pendingResult, approvedResult, rejectedResult, onLeaveResult, balancesResult, upcomingResult] =
+  const balanceYear = getCurrentBalanceYear(today);
+
+  const [pendingResult, approvedResult, rejectedResult, onLeaveResult, upcomingResult, balanceUtilizationPercent] =
     await Promise.all([
     applyHrExclusion(
       supabase
@@ -559,13 +566,6 @@ export async function getLeaveSummary(
         .eq("employees.organization_id", organizationId)
         .is("deleted_at", null),
     ),
-    supabase
-      .schema("hrms")
-      .from("leave_balances")
-      .select("allocated_days, used_days, employees!inner(organization_id)")
-      .eq("balance_year", getCurrentBalanceYear(today))
-      .eq("employees.organization_id", organizationId)
-      .is("deleted_at", null),
     applyHrExclusion(
       supabase
         .schema("hrms")
@@ -576,22 +576,8 @@ export async function getLeaveSummary(
         .eq("employees.organization_id", organizationId)
         .is("deleted_at", null),
     ),
+    computeOrgLeaveBalanceUtilizationPercent(supabase, organizationId, balanceYear),
   ]);
-
-  let balanceUtilizationPercent = 0;
-  const balanceRows = balancesResult.data ?? [];
-  if (balanceRows.length > 0) {
-    const totals = balanceRows.reduce(
-      (acc, row) => ({
-        allocated: acc.allocated + Number(row.allocated_days ?? 0),
-        used: acc.used + Number(row.used_days ?? 0),
-      }),
-      { allocated: 0, used: 0 },
-    );
-    if (totals.allocated > 0) {
-      balanceUtilizationPercent = Math.round((totals.used / totals.allocated) * 100);
-    }
-  }
 
   return {
     pendingRequests: pendingResult.count ?? 0,
@@ -601,6 +587,93 @@ export async function getLeaveSummary(
     balanceUtilizationPercent,
     upcomingPlannedLeaves: upcomingResult.count ?? 0,
   };
+}
+
+function parseBalanceAggregateRow(
+  row: Record<string, unknown> | null | undefined,
+): { allocated: number; used: number } {
+  if (!row) return { allocated: 0, used: 0 };
+  return {
+    allocated: Number(row.allocated ?? row.allocated_days ?? 0),
+    used: Number(row.used ?? row.used_days ?? 0),
+  };
+}
+
+/**
+ * Org-wide leave utilization without shipping every leave_balances row.
+ * Prefer a single SQL aggregate; fall back to chunked aggregates by employee id.
+ */
+async function computeOrgLeaveBalanceUtilizationPercent(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  balanceYear: number,
+): Promise<number> {
+  const joined = await supabase
+    .schema("hrms")
+    .from("leave_balances")
+    .select(
+      "allocated:allocated_days.sum(), used:used_days.sum(), employees!inner(organization_id)",
+    )
+    .eq("balance_year", balanceYear)
+    .eq("employees.organization_id", organizationId)
+    .is("deleted_at", null);
+
+  if (!joined.error) {
+    const { allocated, used } = parseBalanceAggregateRow(
+      (joined.data?.[0] ?? null) as Record<string, unknown> | null,
+    );
+    if (allocated > 0) return Math.round((used / allocated) * 100);
+    return 0;
+  }
+
+  const { data: employeeRows, error: employeeError } = await supabase
+    .schema("hrms")
+    .from("employees")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null);
+
+  if (employeeError) {
+    console.error(
+      "[leave] balance utilization employee scope failed",
+      employeeError.message,
+      "join:",
+      joined.error.message,
+    );
+    return 0;
+  }
+
+  const employeeIds = (employeeRows ?? []).map((row) => row.id as string);
+  if (employeeIds.length === 0) return 0;
+
+  let allocatedTotal = 0;
+  let usedTotal = 0;
+  const chunkSize = 500;
+
+  for (let index = 0; index < employeeIds.length; index += chunkSize) {
+    const chunk = employeeIds.slice(index, index + chunkSize);
+    const { data, error } = await supabase
+      .schema("hrms")
+      .from("leave_balances")
+      .select("allocated:allocated_days.sum(), used:used_days.sum()")
+      .in("employee_id", chunk)
+      .eq("balance_year", balanceYear)
+      .is("deleted_at", null);
+
+    if (error) {
+      console.error("[leave] balance utilization chunk aggregate failed", error.message);
+      return 0;
+    }
+
+    const { allocated, used } = parseBalanceAggregateRow(
+      (data?.[0] ?? null) as Record<string, unknown> | null,
+    );
+    allocatedTotal += allocated;
+    usedTotal += used;
+  }
+
+  if (allocatedTotal <= 0) return 0;
+  return Math.round((usedTotal / allocatedTotal) * 100);
 }
 
 export async function getEmployeeLeaveBalanceSnapshot(
@@ -992,7 +1065,9 @@ export async function getEmployeeLeaveCalendarData(
 export async function getLeaveLookups(
   supabase: AuthSupabaseClient,
   organizationId: string,
+  options?: { selfApplicant?: LookupOption | null },
 ): Promise<LeaveLookups> {
+  const selfApplicant = options?.selfApplicant ?? null;
   const [leaveTypesResult, departments, branches, employeesResult, managers, employmentTypes] =
     await Promise.all([
       supabase
@@ -1001,18 +1076,28 @@ export async function getLeaveLookups(
         .select("id, name, code, deleted_at")
         .eq("organization_id", organizationId)
         .in("code", [...ALLOWED_LEAVE_TYPE_CODES]),
-      getDepartments(supabase, organizationId),
-      getBranches(supabase, organizationId),
-      supabase
-        .schema("hrms")
-        .from("employees")
-        .select("id, first_name, last_name, employee_code")
-        .eq("organization_id", organizationId)
-        .is("deleted_at", null)
-        .in("employment_status", ["active", "probation", "on_leave"])
-        .order("first_name"),
-      getManagers(supabase, organizationId),
-      getEmploymentTypes(supabase, organizationId),
+      selfApplicant
+        ? Promise.resolve([] as LookupOption[])
+        : getDepartments(supabase, organizationId),
+      selfApplicant
+        ? Promise.resolve([] as LookupOption[])
+        : getBranches(supabase, organizationId),
+      selfApplicant
+        ? Promise.resolve({ data: [] as { id: string; first_name: string; last_name: string; employee_code: string }[], error: null })
+        : supabase
+            .schema("hrms")
+            .from("employees")
+            .select("id, first_name, last_name, employee_code")
+            .eq("organization_id", organizationId)
+            .is("deleted_at", null)
+            .in("employment_status", ["active", "probation", "on_leave"])
+            .order("first_name"),
+      selfApplicant
+        ? Promise.resolve([] as LookupOption[])
+        : getManagers(supabase, organizationId),
+      selfApplicant
+        ? Promise.resolve([] as LookupOption[])
+        : getEmploymentTypes(supabase, organizationId),
     ]);
 
   if (leaveTypesResult.error) throw new Error(leaveTypesResult.error.message);
@@ -1032,11 +1117,13 @@ export async function getLeaveLookups(
   }
   const leaveTypes = sortByLeaveTypeCode([...leaveTypesByCode.values()]);
 
-  const employees = (employeesResult.data ?? []).map((row) => ({
-    id: row.id,
-    label: `${row.first_name} ${row.last_name}`.trim(),
-    code: row.employee_code,
-  }));
+  const employees = selfApplicant
+    ? [selfApplicant]
+    : (employeesResult.data ?? []).map((row) => ({
+        id: row.id,
+        label: `${row.first_name} ${row.last_name}`.trim(),
+        code: row.employee_code,
+      }));
 
   return {
     leaveTypes,
@@ -1064,23 +1151,16 @@ export async function getEmployeeReportingManagerId(
   return data?.reporting_manager_id ?? null;
 }
 
-export const HR_LEAVE_APPLICANT_ROLE_CODES = [
-  "hr_admin",
-  "hr_executive",
-  "super_admin",
-] as const;
+export {
+  HR_LEAVE_APPLICANT_ROLE_CODES,
+  isHrLeaveApplicant,
+};
 
 export const CEO_LEAVE_APPROVER_ROLE_CODES = [
   "ceo",
   "founder",
   "co_founder",
 ] as const;
-
-export function isHrLeaveApplicant(roleCodes: string[]): boolean {
-  return roleCodes.some((code) =>
-    (HR_LEAVE_APPLICANT_ROLE_CODES as readonly string[]).includes(code),
-  );
-}
 
 export async function listHrLeaveApplicantEmployeeIds(
   organizationId: string,
@@ -1549,20 +1629,37 @@ export async function getEmployeeRoleCodes(
   _supabase: AuthSupabaseClient,
   employeeId: string,
 ): Promise<string[]> {
+  const byEmployee = await getEmployeeRoleCodesByEmployeeIds([employeeId]);
+  return byEmployee.get(employeeId) ?? [];
+}
+
+export async function getEmployeeRoleCodesByEmployeeIds(
+  employeeIds: string[],
+): Promise<Map<string, string[]>> {
+  const uniqueIds = [...new Set(employeeIds.filter(Boolean))];
+  const result = new Map<string, string[]>();
+  if (uniqueIds.length === 0) return result;
+
   const admin = createAdminClient();
   const { data, error } = await admin
     .schema("hrms")
     .from("user_roles")
-    .select("roles!inner (code)")
-    .eq("employee_id", employeeId)
+    .select("employee_id, roles!inner (code)")
+    .in("employee_id", uniqueIds)
     .is("deleted_at", null);
 
   if (error) throw new Error(error.message);
 
-  return (data ?? []).map((row) => {
+  for (const row of data ?? []) {
     const role = Array.isArray(row.roles) ? row.roles[0] : row.roles;
-    return role?.code as string;
-  }).filter(Boolean);
+    const code = role?.code as string | undefined;
+    if (!code || !row.employee_id) continue;
+    const current = result.get(row.employee_id) ?? [];
+    current.push(code);
+    result.set(row.employee_id, current);
+  }
+
+  return result;
 }
 
 /**

@@ -10,7 +10,7 @@ export function LandingHeroSignInButton() {
     <Button
       type="button"
       onClick={navigateToLogin}
-      className="group landing-hero-cta inline-flex h-12 items-center justify-center gap-2.5 rounded-full px-8 text-[0.95rem] font-semibold tracking-tight"
+      className="group landing-hero-cta inline-flex h-12 items-center justify-center gap-2.5 rounded-full px-8 text-[0.95rem] font-bold tracking-tight"
     >
       Sign in to HRMS
       <ArrowRight

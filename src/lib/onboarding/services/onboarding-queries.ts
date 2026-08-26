@@ -139,31 +139,46 @@ export async function getOnboardingDashboardStats(
   organizationId: string,
   departmentIds?: string[],
 ): Promise<OnboardingDashboardStats> {
-  let query = supabase
-    .schema("hrms")
-    .from("onboarding_cases")
-    .select("status")
-    .eq("organization_id", organizationId)
-    .is("deleted_at", null);
+  const base = () => {
+    let query = supabase
+      .schema("hrms")
+      .from("onboarding_cases")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null);
+    if (departmentIds?.length) {
+      query = query.in("department_id", departmentIds);
+    }
+    return query;
+  };
 
-  if (departmentIds?.length) {
-    query = query.in("department_id", departmentIds);
-  }
+  const [totalRes, pendingRes, inProgressRes, completedRes, invitationRes] = await Promise.all([
+    base(),
+    base().eq("status", "pending_hr_review"),
+    base().in("status", [
+      "in_progress",
+      "documents_uploaded",
+      "invitation_viewed",
+      "corrections_requested",
+    ]),
+    base().in("status", ["completed", "employee_created"]),
+    base().eq("status", "invitation_sent"),
+  ]);
 
-  const { data, error } = await query;
+  const firstError =
+    totalRes.error ||
+    pendingRes.error ||
+    inProgressRes.error ||
+    completedRes.error ||
+    invitationRes.error;
+  if (firstError) throw new Error(firstError.message);
 
-  if (error) throw new Error(error.message);
-  const rows = data ?? [];
   return {
-    total: rows.length,
-    pendingReview: rows.filter((r) => r.status === "pending_hr_review").length,
-    inProgress: rows.filter((r) =>
-      ["in_progress", "documents_uploaded", "invitation_viewed", "corrections_requested"].includes(
-        r.status as string,
-      ),
-    ).length,
-    completed: rows.filter((r) => ["completed", "employee_created"].includes(r.status as string)).length,
-    invitationSent: rows.filter((r) => r.status === "invitation_sent").length,
+    total: totalRes.count ?? 0,
+    pendingReview: pendingRes.count ?? 0,
+    inProgress: inProgressRes.count ?? 0,
+    completed: completedRes.count ?? 0,
+    invitationSent: invitationRes.count ?? 0,
   };
 }
 

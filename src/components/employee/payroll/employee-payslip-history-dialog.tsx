@@ -221,14 +221,14 @@ export function EmployeePayslipHistoryDialog({
             <div className="overflow-x-auto">
               <table className="w-full min-w-[44rem] text-sm">
                 <thead>
-                  <tr className="border-white/10 bg-black hover:bg-black">
-                    <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Month</th>
-                    <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Payslip #</th>
-                    <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Gross</th>
-                    <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Net</th>
-                    <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Credit Date</th>
-                    <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Status</th>
-                    <th className="h-11 whitespace-nowrap bg-black px-4 py-3 text-right align-middle text-xs font-semibold uppercase tracking-wide text-white">Actions</th>
+                  <tr className="bg-gradient-to-r from-blue-600 to-violet-600">
+                    <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Month</th>
+                    <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Payslip #</th>
+                    <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Gross</th>
+                    <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Net</th>
+                    <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Credit Date</th>
+                    <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Status</th>
+                    <th className="h-11 whitespace-nowrap px-4 py-3 text-right align-middle text-xs font-semibold uppercase tracking-wide text-white">Actions</th>
                   </tr>
                 </thead>
                 <tbody>

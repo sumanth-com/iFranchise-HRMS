@@ -1,5 +1,7 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
 import { fromHrms, unwrapRelation } from "@/lib/reports/services/reports-utils";
+import { createSignedStorageUrls } from "@/lib/storage/signed-url";
 import type { UserProfile } from "@/types/auth";
 import type { EmployeeDirectoryPerson } from "@/types/employee-directory";
 
@@ -37,6 +39,17 @@ export async function listEmployeeDirectory(
   if (error) throw new Error(error.message);
 
   const rows = (data ?? []) as LooseRow[];
+  const imagePaths = rows.map((row) => {
+    const employeeProfile = unwrapRelation(row.employee_profiles) as {
+      profile_image_storage_path?: string | null;
+    } | null;
+    return employeeProfile?.profile_image_storage_path ?? null;
+  });
+  const signedByPath = await createSignedStorageUrls(
+    supabase,
+    EMPLOYEE_STORAGE_BUCKETS.profileImages,
+    imagePaths,
+  );
 
   return rows.map((row): EmployeeDirectoryPerson => {
     const department = unwrapRelation(row.departments) as { name?: string } | null;
@@ -60,7 +73,7 @@ export async function listEmployeeDirectory(
       departmentId: (row.department_id as string | null) ?? null,
       departmentName: department?.name ?? null,
       verticalName: branch?.name ?? null,
-      avatarUrl: null,
+      avatarUrl: imagePath ? (signedByPath.get(imagePath) ?? null) : null,
       profileImagePath: imagePath,
     };
   });

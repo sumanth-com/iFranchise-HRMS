@@ -22,6 +22,7 @@ export function ManagerProfileIdCard({ profile, className }: Props) {
       employmentTypeName={profile.employmentTypeName}
       employmentStatus={profile.employmentStatus}
       imageUrl={profile.imageUrl}
+      profileImagePath={profile.profileImagePath}
       profilePath={profile.profilePath}
       canEdit={true}
       className={cn("mx-auto h-full min-h-[28rem] max-w-[18.5rem] xl:mx-0", className)}

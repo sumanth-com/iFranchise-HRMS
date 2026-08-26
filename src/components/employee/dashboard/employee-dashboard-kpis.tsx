@@ -70,35 +70,43 @@ export function EmployeeDashboardKpiCards({
       <EmployeeStatCard
         label="Today's Attendance"
         value={attendanceLabel(kpis)}
+        hint="Status"
         icon={CalendarClock}
         accent="text-emerald-600 dark:text-emerald-400"
         iconBg="bg-emerald-500/10"
+        tone="emerald"
         href={links.attendance}
       />
       <EmployeeStatCard
         label="Working Hours Today"
         value={formatHoursLabel(kpis.workingHours)}
+        hint="Duration"
         icon={Timer}
         accent="text-sky-600 dark:text-sky-400"
         iconBg="bg-sky-500/10"
+        tone="sky"
         href={links.workingHours}
       />
       {hideLeaveBalance ? null : (
         <EmployeeStatCard
           label="Leave Balance"
           value={`${formatLeaveDayCount(kpis.leaveBalanceDays)} days`}
+          hint="Available"
           icon={CalendarDays}
-          accent="text-indigo-600 dark:text-indigo-400"
-          iconBg="bg-indigo-500/10"
+          accent="text-violet-600 dark:text-violet-400"
+          iconBg="bg-violet-500/10"
+          tone="violet"
           href={links.leaveBalance}
         />
       )}
       <EmployeeStatCard
         label="Pending Leave Requests"
         value={String(kpis.pendingLeaveRequests)}
+        hint={kpis.pendingLeaveRequests === 1 ? "Request" : "Requests"}
         icon={Clock}
         accent="text-amber-600 dark:text-amber-400"
         iconBg="bg-amber-500/10"
+        tone="amber"
         href={links.pendingLeaveRequests}
       />
     </section>
