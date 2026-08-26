@@ -37,7 +37,7 @@ CREATE POLICY data_import_batches_select
   FOR SELECT
   TO authenticated
   USING (
-    organization_id = hrms.current_user_organization_id()
+    hrms.user_belongs_to_organization(organization_id)
     AND (
       hrms.user_has_permission('payroll.view')
       OR hrms.user_has_permission('employee.edit')

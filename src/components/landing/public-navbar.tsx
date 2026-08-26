@@ -2,12 +2,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight } from "lucide-react";
 
 import brandLogo from "@/assets/Logo.png";
 import { PUBLIC_LANDING_ROUTE, WHATS_NEW_ROUTE } from "@/lib/auth/constants";
 import { navigateToLogin } from "@/lib/landing/navigate-to-login";
+import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
   { href: `${PUBLIC_LANDING_ROUTE}#features`, label: "Features" },
@@ -21,17 +22,27 @@ type PublicNavbarProps = {
 
 function NavbarChrome({ compact = false }: PublicNavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      setScrolled(window.scrollY > 72);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
-    <header className="landing-nav">
+    <header className={cn("landing-nav", scrolled && "landing-nav--scrolled")}>
       <div className="landing-nav-inner">
         <Link href={PUBLIC_LANDING_ROUTE} className="landing-nav-brand">
-          <span className="landing-brand-mark relative flex size-9 shrink-0 overflow-hidden rounded-xl">
+          <span className="landing-brand-mark relative flex size-11 shrink-0 overflow-hidden rounded-xl">
             <Image
               src={brandLogo}
               alt="iFranchise"
-              width={36}
-              height={36}
+              width={44}
+              height={44}
               className="size-full object-contain"
               priority={!compact}
             />

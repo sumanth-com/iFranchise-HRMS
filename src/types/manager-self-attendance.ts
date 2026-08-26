@@ -54,6 +54,7 @@ export type ManagerProfileCardData = {
   email: string;
   phone: string | null;
   imageUrl: string | null;
+  profileImagePath?: string | null;
   profilePath: string;
 };
 

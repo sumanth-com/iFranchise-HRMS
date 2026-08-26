@@ -1,4 +1,4 @@
-import { formatHoursLabel } from "@/lib/manager/services/manager-self-attendance-service";
+import { formatHoursLabel } from "@/lib/employee/attendance-format";
 import type { ManagerAttendanceMonthSummary } from "@/types/manager-self-attendance";
 import { cn } from "@/lib/utils";
 

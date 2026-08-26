@@ -302,8 +302,12 @@ export function ResignationsManagement({
         header: "Actions",
         render: (row) => {
           const terminal = ["completed", "rejected", "withdrawn"].includes(row.exitStatus);
+          // Backend allows HR (and CEO) to perform the manager stage; HR UI previously hid it,
+          // which stuck resignations at `submitted` when no reporting manager was assigned.
           const showManager =
-            canApprove && !isHrAdmin && !isCeoAdmin && row.exitStatus === "submitted";
+            canApprove &&
+            row.exitStatus === "submitted" &&
+            (isHrAdmin || (!isHrAdmin && !isCeoAdmin));
           const showHr = canApprove && isHrAdmin && row.exitStatus === "manager_approved";
           const showCeo = canApprove && isCeoAdmin && row.exitStatus === "hr_approved";
           const showWithdraw =

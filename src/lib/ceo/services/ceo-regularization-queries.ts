@@ -8,7 +8,7 @@ import {
   executiveRequestCategoryLabel,
   getExecutiveRequestCategory,
 } from "@/lib/approvals/executive-request-routing";
-import { getEmployeeRoleCodes } from "@/lib/leave/services/leave-queries";
+import { getEmployeeRoleCodes, isCeoLeaveApprover } from "@/lib/leave/services/leave-queries";
 import { getMonthDateRange } from "@/lib/leave/services/leave-utils";
 
 function unwrap<T>(value: T | T[] | null | undefined): T | null {
@@ -112,14 +112,17 @@ export async function listCeoRegularizationApprovalQueue(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
 ): Promise<CeoRegularizationQueueItem[]> {
-  const organizationId = profile.employee.organizationId;
-  const ceoEmployeeId = profile.employee.id;
+  if (!isCeoLeaveApprover(profile)) return [];
 
+  const organizationId = profile.employee.organizationId;
+
+  // CEO-routed rows set approver_employee_id (any active CEO). Do not require exact
+  // assignee match — leave uses the same any-of CEO queue semantics.
   const { data, error } = await supabase
     .schema("hrms")
     .from("attendance_corrections")
     .select(CORRECTION_SELECT)
-    .eq("approver_employee_id", ceoEmployeeId)
+    .not("approver_employee_id", "is", null)
     .eq("correction_status", "pending")
     .eq("employees.organization_id", organizationId)
     .is("deleted_at", null)
@@ -135,7 +138,6 @@ export async function listCeoProcessedRegularizations(
   filters: { month?: number; year?: number } = {},
 ): Promise<CeoRegularizationQueueItem[]> {
   const organizationId = profile.employee.organizationId;
-  const ceoEmployeeId = profile.employee.id;
   const now = new Date();
   const month = filters.month ?? now.getMonth() + 1;
   const year = filters.year ?? now.getFullYear();
@@ -145,7 +147,7 @@ export async function listCeoProcessedRegularizations(
     .schema("hrms")
     .from("attendance_corrections")
     .select(CORRECTION_SELECT)
-    .eq("approver_employee_id", ceoEmployeeId)
+    .eq("reviewed_by", profile.userId)
     .in("correction_status", ["approved", "rejected"])
     .eq("employees.organization_id", organizationId)
     .is("deleted_at", null)

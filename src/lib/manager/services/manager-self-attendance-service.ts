@@ -37,9 +37,6 @@ import {
 } from "@/lib/leave/services/leave-queries";
 import { requiresCeoRegularizationApproval } from "@/lib/approvals/executive-request-routing";
 import { parseWorkingConfiguration } from "@/lib/company-settings/services/company-settings-parsers";
-import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
-import { getEmployeeById } from "@/lib/employees/services/employee-detail";
-import { createSignedStorageUrl } from "@/lib/storage/signed-url";
 import { buildEmployeeRouteRef } from "@/lib/employees/routing";
 import { expandDateRange, getMonthDateRange } from "@/lib/leave/services/leave-utils";
 import { classifyCalendarDay } from "@/lib/leave/services/leave-calendar-engine";
@@ -751,39 +748,93 @@ async function buildProfileCard(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
 ): Promise<ManagerProfileCardData> {
-  const employee = await getEmployeeById(supabase, profile.employee.id);
+  const employeeId = profile.employee.id;
+  const startedAt = performance.now();
+
+  const [employeeResult, profileResult] = await Promise.all([
+    supabase
+      .schema("hrms")
+      .from("employees")
+      .select(
+        `
+        id,
+        employee_code,
+        first_name,
+        last_name,
+        email,
+        phone,
+        employment_status,
+        account_status,
+        date_of_joining,
+        departments:department_id (name),
+        designations:designation_id (title),
+        employment_types:employment_type_id (name),
+        manager:reporting_manager_id (first_name, last_name)
+      `,
+      )
+      .eq("id", employeeId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    supabase
+      .schema("hrms")
+      .from("employee_profiles")
+      .select("profile_image_storage_path")
+      .eq("employee_id", employeeId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+  ]);
+
+  if (employeeResult.error) throw new Error(employeeResult.error.message);
+  const employee = employeeResult.data;
   if (!employee) {
     throw new Error("Employee profile not found.");
   }
 
-  const imagePath = employee.profile?.profileImageStoragePath ?? null;
-  const imageUrl = imagePath
-    ? await createSignedStorageUrl(
-        supabase,
-        EMPLOYEE_STORAGE_BUCKETS.profileImages,
-        imagePath,
-      )
+  const department = unwrap(employee.departments as { name?: string } | { name?: string }[] | null);
+  const designation = unwrap(
+    employee.designations as { title?: string } | { title?: string }[] | null,
+  );
+  const employmentType = unwrap(
+    employee.employment_types as { name?: string } | { name?: string }[] | null,
+  );
+  const manager = unwrap(
+    employee.manager as
+      | { first_name?: string; last_name?: string }
+      | { first_name?: string; last_name?: string }[]
+      | null,
+  );
+  const reportingTo = manager
+    ? `${manager.first_name ?? ""} ${manager.last_name ?? ""}`.trim() || null
     : null;
+  const profileImagePath = profileResult.data?.profile_image_storage_path ?? null;
+
+  if (process.env.NODE_ENV === "development") {
+    console.info("[module-timing]", {
+      label: "buildProfileCard",
+      atMs: Math.round(performance.now() - startedAt),
+    });
+  }
 
   return {
     employeeId: employee.id,
-    firstName: employee.firstName,
-    lastName: employee.lastName,
-    employeeCode: employee.employeeCode,
-    designation: employee.designationTitle,
-    departmentName: employee.departmentName,
-    employmentTypeName: employee.employmentTypeName ?? "Full Time",
-    employmentStatus: employee.employmentStatus,
-    accountStatus: employee.accountStatus,
-    reportingTo: employee.reportingManagerName,
-    joiningDate: employee.dateOfJoining,
+    firstName: employee.first_name,
+    lastName: employee.last_name,
+    employeeCode: employee.employee_code,
+    designation: designation?.title ?? null,
+    departmentName: department?.name ?? null,
+    employmentTypeName: employmentType?.name ?? "Full Time",
+    employmentStatus: employee.employment_status,
+    accountStatus: employee.account_status,
+    reportingTo,
+    joiningDate: employee.date_of_joining,
     email: employee.email,
     phone: employee.phone,
-    imageUrl,
+    imageUrl: null,
+    profileImagePath,
     profilePath: `/e/${buildEmployeeRouteRef({
-      employeeCode: employee.employeeCode,
-      firstName: employee.firstName,
-      lastName: employee.lastName,
+      employeeCode: employee.employee_code,
+      firstName: employee.first_name,
+      lastName: employee.last_name,
     })}/card`,
   };
 }
@@ -1261,7 +1312,11 @@ export async function requestManagerAttendanceRegularization(
   }
 
   const applicantRoles = await getEmployeeRoleCodes(supabase, employeeId);
-  const executiveApplicant = requiresCeoRegularizationApproval(applicantRoles);
+  const submitterRoles = profile.roles.map((role) => role.code);
+  const executiveApplicant =
+    requiresCeoRegularizationApproval(applicantRoles) ||
+    (employeeId === profile.employee.id &&
+      requiresCeoRegularizationApproval(submitterRoles));
   let approverEmployeeId: string | null = null;
   if (executiveApplicant) {
     approverEmployeeId = await requireCeoApproverEmployeeId(

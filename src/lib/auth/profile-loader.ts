@@ -84,17 +84,40 @@ export type ProfileLoadError =
   | "EMPLOYEE_DELETED"
   | "EMPLOYEE_INACTIVE"
   | "NO_ROLES"
-  | "ORGANIZATION_NOT_FOUND";
+  | "ORGANIZATION_NOT_FOUND"
+  | "PROFILE_LOOKUP_FAILED";
 
 export type ProfileLoadResult =
   | { success: true; profile: UserProfile }
   | { success: false; error: ProfileLoadError };
 
+export type LoadUserProfileOptions = {
+  /** When false, skip storage signed-URL work (layout critical path). */
+  includeOrganizationLogo?: boolean;
+  /**
+   * HMAC-verified permission codes from the signed cookie.
+   * When provided and non-empty, skips get_user_permission_codes RPC.
+   * Callers must only pass codes from getVerifiedPermissionCodesForUser.
+   */
+  verifiedPermissionCodes?: string[] | null;
+};
+
 export const loadUserProfile = cache(async function loadUserProfile(
   userId: string,
   email: string,
   supabaseClient?: AuthSupabaseClient,
+  options?: LoadUserProfileOptions,
 ): Promise<ProfileLoadResult> {
+  const t0 = performance.now();
+  const mark = (label: string) => {
+    if (process.env.NODE_ENV === "development") {
+      console.info("[layout-timing]", {
+        atMs: Math.round(performance.now() - t0),
+        label: `loadUserProfile:${label}`,
+      });
+    }
+  };
+
   const supabase = supabaseClient ?? (await createClient());
 
   // HRMS RLS policies depend on auth.uid(). Reuse the client that holds the
@@ -108,6 +131,7 @@ export const loadUserProfile = cache(async function loadUserProfile(
     if (userError || !sessionUser || sessionUser.id !== userId) {
       return { success: false, error: "EMPLOYEE_NOT_FOUND" };
     }
+    mark("getUser");
   }
 
   const { data: employeeRow, error: employeeError } = await supabase
@@ -118,8 +142,27 @@ export const loadUserProfile = cache(async function loadUserProfile(
     )
     .eq("user_id", userId)
     .maybeSingle();
+  mark("employee");
 
-  if (employeeError || !employeeRow) {
+  if (employeeError) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("[loadUserProfile] employee query failed:", {
+        code: employeeError.code,
+        message: employeeError.message,
+        hasUserId: Boolean(userId),
+      });
+    }
+    // Do not pretend the employee is unlinked when PostgREST/DB failed.
+    return { success: false, error: "PROFILE_LOOKUP_FAILED" };
+  }
+
+  if (!employeeRow) {
+    if (process.env.NODE_ENV === "development") {
+      console.info("[login-timing]", {
+        label: "loadUserProfile:employee_missing",
+        hasUserId: Boolean(userId),
+      });
+    }
     return { success: false, error: "EMPLOYEE_NOT_FOUND" };
   }
 
@@ -170,6 +213,7 @@ export const loadUserProfile = cache(async function loadUserProfile(
       .is("deleted_at", null)
       .eq("status", "active"),
   ]);
+  mark("organization+user_roles");
 
   if (organizationError || !organizationRow) {
     return { success: false, error: "ORGANIZATION_NOT_FOUND" };
@@ -181,11 +225,20 @@ export const loadUserProfile = cache(async function loadUserProfile(
 
   const roleIds = userRoleRows.map((row) => row.role_id);
 
-  // Overlap logo signing with role + permission resolution (was a serial wait).
-  const logoPromise = getOrganizationLogoSignedUrl(
-    supabase,
-    organizationRow.logo_storage_path,
-  );
+  const cachedPermissionCodes =
+    Array.isArray(options?.verifiedPermissionCodes) &&
+    options.verifiedPermissionCodes.length > 0
+      ? options.verifiedPermissionCodes
+      : null;
+
+  // Layout critical path: skip storage signing (caller may load logo after paint).
+  const logoPromise =
+    options?.includeOrganizationLogo === false
+      ? Promise.resolve(null)
+      : getOrganizationLogoSignedUrl(
+          supabase,
+          organizationRow.logo_storage_path,
+        );
 
   const rolesPromise = supabase
     .schema("hrms")
@@ -195,9 +248,12 @@ export const loadUserProfile = cache(async function loadUserProfile(
     .is("deleted_at", null)
     .eq("status", "active");
 
-  const permissionCodesRpcPromise = supabase
-    .schema("hrms")
-    .rpc("get_user_permission_codes", { p_user_id: userId });
+  // Fail-closed: only skip RPC when HMAC-verified codes were supplied by caller.
+  const permissionCodesRpcPromise = cachedPermissionCodes
+    ? Promise.resolve({ data: cachedPermissionCodes, error: null })
+    : supabase.schema("hrms").rpc("get_user_permission_codes", {
+        p_user_id: userId,
+      });
 
   const [
     organizationLogoUrl,
@@ -208,6 +264,14 @@ export const loadUserProfile = cache(async function loadUserProfile(
     rolesPromise,
     permissionCodesRpcPromise,
   ]);
+  mark(
+    cachedPermissionCodes
+      ? "roles+permission_cookie"
+      : "roles+permission_rpc",
+  );
+  if (options?.includeOrganizationLogo === false) {
+    mark("logo_skipped");
+  }
 
   if (rolesError || !roleRows?.length) {
     return { success: false, error: "NO_ROLES" };

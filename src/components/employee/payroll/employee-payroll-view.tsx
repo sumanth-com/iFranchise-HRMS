@@ -203,8 +203,6 @@ export function EmployeePayrollView({
   const net = breakdown.netSalary;
   const usingStructure = breakdown.usingStructure;
   const extrasIncluded = breakdown.extrasIncluded;
-  const maxTrend = Math.max(1, ...data.trend.map((point) => point.gross));
-
   return (
     <>
       {header}
@@ -469,32 +467,6 @@ export function EmployeePayrollView({
         </div>
       </div>
 
-      {/* Monthly trend */}
-      {data.trend.length >= 2 ? (
-        <EmployeeSectionCard
-          title="Monthly Earnings"
-          description={`Gross salary trend · ${data.ytd.financialYearLabel}`}
-        >
-          <div className="flex items-end gap-2 overflow-x-auto pb-1">
-            {data.trend.map((point) => (
-              <div
-                key={point.month}
-                className="flex min-w-12 flex-1 flex-col items-center gap-1.5"
-              >
-                <div className="flex h-32 w-full items-end justify-center">
-                  <div
-                    className="w-7 rounded-t-md bg-primary/70 transition-all"
-                    style={{ height: `${Math.max(6, (point.gross / maxTrend) * 100)}%` }}
-                    title={money(point.gross)}
-                  />
-                </div>
-                <span className="text-[11px] text-muted-foreground">{point.label}</span>
-              </div>
-            ))}
-          </div>
-        </EmployeeSectionCard>
-      ) : null}
-
       {/* Payslip history */}
       <EmployeeSectionCard
         title="Payslip History"
@@ -525,14 +497,14 @@ export function EmployeePayrollView({
           <>
           <table className="w-full min-w-[44rem] text-sm">
             <thead>
-              <tr className="border-white/10 bg-black hover:bg-black">
-                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Month</th>
-                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Payslip #</th>
-                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Gross</th>
-                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Net</th>
-                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Credit Date</th>
-                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Status</th>
-                <th className="h-11 whitespace-nowrap bg-black px-4 py-3 text-right align-middle text-xs font-semibold uppercase tracking-wide text-white">Actions</th>
+              <tr className="bg-gradient-to-r from-blue-600 to-violet-600">
+                <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Month</th>
+                <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Payslip #</th>
+                <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Gross</th>
+                <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Net</th>
+                <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Credit Date</th>
+                <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Status</th>
+                <th className="h-11 whitespace-nowrap px-4 py-3 text-right align-middle text-xs font-semibold uppercase tracking-wide text-white">Actions</th>
               </tr>
             </thead>
             <tbody>

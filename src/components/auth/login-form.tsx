@@ -160,6 +160,7 @@ export function LoginForm() {
   const onSubmit = handleSubmit(async (data) => {
     setFormError(null);
     setIsSubmitting(true);
+    const clientT0 = performance.now();
 
     const formData = new FormData();
     formData.set("email", data.email);
@@ -170,6 +171,13 @@ export function LoginForm() {
 
     try {
       const result = await loginAction(formData);
+      if (process.env.NODE_ENV === "development") {
+        console.info("[login-timing]", {
+          atMs: Math.round(performance.now() - clientT0),
+          label: "client:loginAction returned",
+          success: result.success,
+        });
+      }
 
       if (!result.success) {
         setFormError(result.message);
@@ -196,6 +204,13 @@ export function LoginForm() {
         ? getSafeRedirectPath(requestedRedirect, result.redirectTo)
         : result.redirectTo;
 
+      if (process.env.NODE_ENV === "development") {
+        console.info("[login-timing]", {
+          atMs: Math.round(performance.now() - clientT0),
+          label: "client:router.replace",
+          redirectTo,
+        });
+      }
       router.replace(redirectTo);
     } catch {
       setFormError(getAuthErrorMessage("SERVER_ERROR"));
@@ -213,7 +228,7 @@ export function LoginForm() {
       : null;
 
   const fieldClass =
-    "h-11 rounded-full border-sky-200/80 bg-sky-50/80 pl-10 text-sm font-medium text-foreground shadow-none placeholder:text-muted-foreground/80 focus-visible:border-sky-500 focus-visible:ring-sky-500/25 dark:border-border/80 dark:bg-muted/40";
+    "h-11 rounded-full border-violet-200/80 bg-violet-50/80 pl-10 text-sm font-medium text-foreground shadow-none placeholder:text-muted-foreground/80 focus-visible:border-violet-500 focus-visible:ring-violet-500/25 dark:border-border/80 dark:bg-muted/40";
 
   return (
     <div className="flex flex-col gap-6">
@@ -226,12 +241,12 @@ export function LoginForm() {
         </p>
       </div>
 
-      <div className="flex items-start gap-3 rounded-2xl border border-sky-200/90 bg-sky-50/90 px-4 py-3.5 text-left shadow-sm dark:border-sky-500/25 dark:bg-sky-500/10">
-        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 text-sky-600 dark:bg-sky-400/15 dark:text-sky-300">
+      <div className="flex items-start gap-3 rounded-2xl border border-violet-200/90 bg-violet-50/90 px-4 py-3.5 text-left shadow-sm dark:border-violet-500/25 dark:bg-violet-500/10">
+        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-600 dark:bg-violet-400/15 dark:text-violet-300">
           <ShieldCheck className="size-4" strokeWidth={2.25} />
         </span>
         <div className="min-w-0 space-y-0.5">
-          <p className="text-sm font-semibold text-sky-950 dark:text-sky-100">
+          <p className="text-sm font-semibold text-violet-950 dark:text-violet-100">
             Secure access
           </p>
           <p className="text-[13px] leading-snug text-slate-600 dark:text-slate-300">
@@ -299,7 +314,7 @@ export function LoginForm() {
             </Label>
             <Link
               href="/forgot-password"
-              className="text-xs font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300"
+              className="text-xs font-semibold text-violet-600 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300"
             >
               Forgot Password?
             </Link>
@@ -331,7 +346,7 @@ export function LoginForm() {
         <label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-foreground/90">
           <input
             type="checkbox"
-            className="size-4 rounded border-border bg-background text-sky-500 focus:ring-sky-500/30"
+            className="size-4 rounded border-border bg-background text-violet-600 focus:ring-violet-500/30"
             {...register("rememberMe")}
           />
           Remember me
@@ -339,7 +354,7 @@ export function LoginForm() {
 
         <Button
           type="submit"
-          className="group inline-flex h-11 w-full items-center justify-center gap-2.5 rounded-full bg-gradient-to-r from-sky-500 to-blue-600 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(37,99,235,0.35)] hover:from-sky-400 hover:to-blue-500 disabled:opacity-100"
+          className="group inline-flex h-11 w-full items-center justify-center gap-2.5 rounded-full bg-gradient-to-r from-violet-500 to-violet-700 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(109,40,217,0.35)] hover:from-violet-400 hover:to-violet-600 disabled:opacity-100"
           disabled={isSubmitting}
         >
           {isSubmitting ? (

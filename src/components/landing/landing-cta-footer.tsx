@@ -4,9 +4,12 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
-  Fingerprint,
+  Database,
+  EyeOff,
+  FileLock2,
   LockKeyhole,
   ShieldCheck,
+  UserCog,
 } from "lucide-react";
 
 import brandLogo from "@/assets/Logo.png";
@@ -25,12 +28,27 @@ const SECURITY = [
   {
     title: "Role-Based Access",
     description: "Employees, managers and HR see only what their role needs.",
-    icon: Fingerprint,
+    icon: UserCog,
   },
   {
     title: "Centralized Information",
     description: "Workplace data stays organized in one controlled platform.",
     icon: ShieldCheck,
+  },
+  {
+    title: "Data Privacy",
+    description: "Sensitive employee records stay protected with controlled visibility.",
+    icon: EyeOff,
+  },
+  {
+    title: "Audit-Ready Records",
+    description: "Track key workplace actions with clear, organized activity history.",
+    icon: FileLock2,
+  },
+  {
+    title: "Reliable Storage",
+    description: "Documents and payroll data stay securely stored and easy to find.",
+    icon: Database,
   },
 ] as const;
 
@@ -40,7 +58,7 @@ export function LandingPeopleSection() {
       <div className="mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
         <div className="mx-auto max-w-2xl text-center">
           <h2 id="landing-people-heading" className="landing-section-title">
-            Built around people.
+            Built around <span className="landing-section-title-accent">people.</span>
           </h2>
           <p className="landing-section-copy">
             The right tools for every part of your workplace.
@@ -63,7 +81,8 @@ export function LandingSecuritySection() {
       <div className="mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
         <div className="mx-auto max-w-2xl text-center">
           <h2 id="landing-security-heading" className="landing-section-title">
-            Your workplace. Protected.
+            Your workplace.{" "}
+            <span className="landing-section-title-accent">Protected.</span>
           </h2>
           <p className="landing-section-copy">
             Secure access and controlled permissions keep workplace information
@@ -102,7 +121,8 @@ export function LandingFinalCta() {
       <div className="landing-final-cta-shell mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
         <div className="landing-final-cta-inner">
           <h2 id="landing-final-heading" className="landing-section-title">
-            Your workplace starts here.
+            Your workplace starts{" "}
+            <span className="landing-section-title-accent">here.</span>
           </h2>
           <p className="landing-section-copy landing-final-cta-copy">
             Everything you need is just one sign-in away.
@@ -132,9 +152,9 @@ export function LandingFooter() {
             <Image
               src={brandLogo}
               alt=""
-              width={28}
-              height={28}
-              className="size-7 rounded-lg object-contain"
+              width={36}
+              height={36}
+              className="size-9 rounded-lg object-contain"
             />
           </span>
           <span className="landing-footer-brand-inline">iFranchise</span>

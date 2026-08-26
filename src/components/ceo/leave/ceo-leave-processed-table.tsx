@@ -62,7 +62,8 @@ export function CeoLeaveProcessedTable({
         <div>
           <h2 className="text-base font-semibold tracking-tight">Processed this month</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Your approved and rejected decisions for {formatLeaveMonthYear(month, year)}.
+            Your approved and rejected decisions for {formatLeaveMonthYear(month, year)}{" "}
+            (by decision date).
           </p>
         </div>
         <span className="inline-flex w-fit items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground tabular-nums">
@@ -71,12 +72,13 @@ export function CeoLeaveProcessedTable({
       </div>
 
       <div className="max-h-[26rem] overflow-auto">
-        <table className="w-full min-w-[52rem] text-sm">
+        <table className="w-full min-w-[56rem] text-sm">
           <thead className="sticky top-0 z-30 bg-black text-left shadow-[0_1px_0_rgba(255,255,255,0.08)]">
             <tr>
               <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Employee</th>
               <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Leave</th>
-              <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Dates</th>
+              <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Leave dates</th>
+              <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Decided</th>
               <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Department</th>
               <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Status</th>
               <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Actions</th>
@@ -85,7 +87,7 @@ export function CeoLeaveProcessedTable({
           <tbody>
             {isLoading && items.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
                   Loading…
                 </td>
               </tr>
@@ -93,7 +95,7 @@ export function CeoLeaveProcessedTable({
 
             {!isLoading && items.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
                   No processed leave for this month yet. Approved and rejected requests will
                   appear here.
                 </td>
@@ -119,6 +121,11 @@ export function CeoLeaveProcessedTable({
                   </div>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">{dateRangeLabel(row)}</td>
+                <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                  {row.decidedAt
+                    ? format(parseISO(row.decidedAt), "dd MMM yyyy")
+                    : "—"}
+                </td>
                 <td className="px-4 py-3 text-muted-foreground">
                   {row.departmentName ?? "—"}
                 </td>

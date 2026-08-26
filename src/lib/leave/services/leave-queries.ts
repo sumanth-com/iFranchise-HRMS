@@ -3,6 +3,7 @@ import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { hasPermission } from "@/lib/permissions/utils";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { UserProfile } from "@/types/auth";
+import type { LookupOption } from "@/types/employee";
 import type {
   LeaveBalanceItem,
   LeaveCalendarEntry,
@@ -43,6 +44,10 @@ import {
   scopedEmployeeIds,
 } from "@/lib/manager/portal-scope";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
+import {
+  HR_LEAVE_APPLICANT_ROLE_CODES,
+  isHrLeaveApplicant,
+} from "@/lib/leave/leave-applicant-roles";
 import {
   getCurrentBalanceYear,
   getMonthDateRange,
@@ -1060,7 +1065,9 @@ export async function getEmployeeLeaveCalendarData(
 export async function getLeaveLookups(
   supabase: AuthSupabaseClient,
   organizationId: string,
+  options?: { selfApplicant?: LookupOption | null },
 ): Promise<LeaveLookups> {
+  const selfApplicant = options?.selfApplicant ?? null;
   const [leaveTypesResult, departments, branches, employeesResult, managers, employmentTypes] =
     await Promise.all([
       supabase
@@ -1069,18 +1076,28 @@ export async function getLeaveLookups(
         .select("id, name, code, deleted_at")
         .eq("organization_id", organizationId)
         .in("code", [...ALLOWED_LEAVE_TYPE_CODES]),
-      getDepartments(supabase, organizationId),
-      getBranches(supabase, organizationId),
-      supabase
-        .schema("hrms")
-        .from("employees")
-        .select("id, first_name, last_name, employee_code")
-        .eq("organization_id", organizationId)
-        .is("deleted_at", null)
-        .in("employment_status", ["active", "probation", "on_leave"])
-        .order("first_name"),
-      getManagers(supabase, organizationId),
-      getEmploymentTypes(supabase, organizationId),
+      selfApplicant
+        ? Promise.resolve([] as LookupOption[])
+        : getDepartments(supabase, organizationId),
+      selfApplicant
+        ? Promise.resolve([] as LookupOption[])
+        : getBranches(supabase, organizationId),
+      selfApplicant
+        ? Promise.resolve({ data: [] as { id: string; first_name: string; last_name: string; employee_code: string }[], error: null })
+        : supabase
+            .schema("hrms")
+            .from("employees")
+            .select("id, first_name, last_name, employee_code")
+            .eq("organization_id", organizationId)
+            .is("deleted_at", null)
+            .in("employment_status", ["active", "probation", "on_leave"])
+            .order("first_name"),
+      selfApplicant
+        ? Promise.resolve([] as LookupOption[])
+        : getManagers(supabase, organizationId),
+      selfApplicant
+        ? Promise.resolve([] as LookupOption[])
+        : getEmploymentTypes(supabase, organizationId),
     ]);
 
   if (leaveTypesResult.error) throw new Error(leaveTypesResult.error.message);
@@ -1100,11 +1117,13 @@ export async function getLeaveLookups(
   }
   const leaveTypes = sortByLeaveTypeCode([...leaveTypesByCode.values()]);
 
-  const employees = (employeesResult.data ?? []).map((row) => ({
-    id: row.id,
-    label: `${row.first_name} ${row.last_name}`.trim(),
-    code: row.employee_code,
-  }));
+  const employees = selfApplicant
+    ? [selfApplicant]
+    : (employeesResult.data ?? []).map((row) => ({
+        id: row.id,
+        label: `${row.first_name} ${row.last_name}`.trim(),
+        code: row.employee_code,
+      }));
 
   return {
     leaveTypes,
@@ -1132,23 +1151,16 @@ export async function getEmployeeReportingManagerId(
   return data?.reporting_manager_id ?? null;
 }
 
-export const HR_LEAVE_APPLICANT_ROLE_CODES = [
-  "hr_admin",
-  "hr_executive",
-  "super_admin",
-] as const;
+export {
+  HR_LEAVE_APPLICANT_ROLE_CODES,
+  isHrLeaveApplicant,
+};
 
 export const CEO_LEAVE_APPROVER_ROLE_CODES = [
   "ceo",
   "founder",
   "co_founder",
 ] as const;
-
-export function isHrLeaveApplicant(roleCodes: string[]): boolean {
-  return roleCodes.some((code) =>
-    (HR_LEAVE_APPLICANT_ROLE_CODES as readonly string[]).includes(code),
-  );
-}
 
 export async function listHrLeaveApplicantEmployeeIds(
   organizationId: string,
@@ -1617,20 +1629,37 @@ export async function getEmployeeRoleCodes(
   _supabase: AuthSupabaseClient,
   employeeId: string,
 ): Promise<string[]> {
+  const byEmployee = await getEmployeeRoleCodesByEmployeeIds([employeeId]);
+  return byEmployee.get(employeeId) ?? [];
+}
+
+export async function getEmployeeRoleCodesByEmployeeIds(
+  employeeIds: string[],
+): Promise<Map<string, string[]>> {
+  const uniqueIds = [...new Set(employeeIds.filter(Boolean))];
+  const result = new Map<string, string[]>();
+  if (uniqueIds.length === 0) return result;
+
   const admin = createAdminClient();
   const { data, error } = await admin
     .schema("hrms")
     .from("user_roles")
-    .select("roles!inner (code)")
-    .eq("employee_id", employeeId)
+    .select("employee_id, roles!inner (code)")
+    .in("employee_id", uniqueIds)
     .is("deleted_at", null);
 
   if (error) throw new Error(error.message);
 
-  return (data ?? []).map((row) => {
+  for (const row of data ?? []) {
     const role = Array.isArray(row.roles) ? row.roles[0] : row.roles;
-    return role?.code as string;
-  }).filter(Boolean);
+    const code = role?.code as string | undefined;
+    if (!code || !row.employee_id) continue;
+    const current = result.get(row.employee_id) ?? [];
+    current.push(code);
+    result.set(row.employee_id, current);
+  }
+
+  return result;
 }
 
 /**

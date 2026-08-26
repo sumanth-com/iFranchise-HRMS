@@ -2,7 +2,6 @@ import { format, startOfMonth, subMonths } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getManagerRecruitmentContext } from "@/lib/manager/services/manager-recruitment-context";
-import type { ManagerReportCategory } from "@/lib/manager/reports/manager-report-definitions";
 import { getTeamAttendanceSummary } from "@/lib/manager/services/team-attendance-queries";
 import { getTeamLeaveSummary } from "@/lib/manager/services/team-leave-queries";
 import { getTeamPerformanceSummary, getTeamPerformanceTrends } from "@/lib/manager/services/team-performance-queries";
@@ -656,9 +655,4 @@ export async function getManagerTeamReportsPageData(
   };
 }
 
-export function categoryBundleFor(
-  bundles: ManagerCategoryReportBundle[],
-  category: ManagerReportCategory,
-) {
-  return bundles.find((bundle) => bundle.category === category);
-}
+export { categoryBundleFor } from "@/lib/manager/services/manager-report-category";

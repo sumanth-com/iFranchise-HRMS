@@ -147,7 +147,13 @@ export async function LeaveHubSection({
         })
       : Promise.resolve(null),
     loadMySection && (canApply || canEdit)
-      ? getLeaveLookups(supabase, profile.employee.organizationId).catch((error) => {
+      ? getLeaveLookups(supabase, profile.employee.organizationId, {
+          selfApplicant: {
+            id: employeeId,
+            label: `${profile.employee.firstName} ${profile.employee.lastName}`.trim(),
+            code: profile.employee.employeeCode,
+          },
+        }).catch((error) => {
           console.error("[leave] apply lookups failed", error);
           return null;
         })

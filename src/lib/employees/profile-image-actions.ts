@@ -31,16 +31,21 @@ export async function uploadProfileImageAction(
   try {
     const profile = await requireAuthenticatedProfile();
     const isSelf = profile.employee.id === employeeId;
-    const canEditOthers = hasPermission(
-      profile.permissionCodes,
-      "employee_profile.edit",
-    );
+    const canEditOthers = hasPermission(profile.permissionCodes, "employee.edit");
 
     if (!isSelf && !canEditOthers) {
       return {
         success: false,
         message: "You do not have permission to update this profile photo",
       };
+    }
+
+    const supabase = await getAuthenticatedSupabase();
+    if (!isSelf) {
+      const target = await getEmployeeById(supabase, employeeId);
+      if (!target || target.organizationId !== profile.employee.organizationId) {
+        return { success: false, message: "Employee not found" };
+      }
     }
 
     const file = formData.get("file");
@@ -57,7 +62,6 @@ export async function uploadProfileImageAction(
       return { success: false, message: "Profile image must be 10 MB or smaller" };
     }
 
-    const supabase = await getAuthenticatedSupabase();
     const storagePath = await uploadProfileImage(
       supabase,
       profile.employee.organizationId,
@@ -107,10 +111,7 @@ export async function removeProfileImageAction(
   try {
     const profile = await requireAuthenticatedProfile();
     const isSelf = profile.employee.id === employeeId;
-    const canEditOthers = hasPermission(
-      profile.permissionCodes,
-      "employee_profile.edit",
-    );
+    const canEditOthers = hasPermission(profile.permissionCodes, "employee.edit");
 
     if (!isSelf && !canEditOthers) {
       return {
@@ -122,7 +123,7 @@ export async function removeProfileImageAction(
     const supabase = await getAuthenticatedSupabase();
     const employee = await getEmployeeById(supabase, employeeId);
 
-    if (!employee) {
+    if (!employee || employee.organizationId !== profile.employee.organizationId) {
       return { success: false, message: "Employee not found" };
     }
 

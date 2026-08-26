@@ -1,9 +1,11 @@
 "use client";
 
 import Image from "next/image";
+import { useEffect, useState } from "react";
 import { AppNavLink as Link } from "@/components/layout/app-nav-link";
 
 import { DEFAULT_BRAND_LOGO_PATH } from "@/lib/brand/constants";
+import { getCurrentOrganizationLogoSignedUrlAction } from "@/lib/organization/actions";
 import { useAuth } from "@/providers/auth-provider";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +25,36 @@ export function SidebarBrand({
   const { profile } = useAuth();
   const organization = profile.organization;
   const displayName = organization.name.trim() || "Company";
-  const brandLogoSrc = organization.logoUrl ?? DEFAULT_BRAND_LOGO_PATH;
+  const [brandLogoSrc, setBrandLogoSrc] = useState(
+    () => organization.logoUrl ?? DEFAULT_BRAND_LOGO_PATH,
+  );
+
+  useEffect(() => {
+    if (organization.logoUrl) {
+      setBrandLogoSrc(organization.logoUrl);
+      return;
+    }
+
+    if (!organization.logoStoragePath) {
+      setBrandLogoSrc(DEFAULT_BRAND_LOGO_PATH);
+      return;
+    }
+
+    // Keep fallback immediately (fixed 32×32 slot — no layout shift).
+    setBrandLogoSrc(DEFAULT_BRAND_LOGO_PATH);
+
+    let cancelled = false;
+    void getCurrentOrganizationLogoSignedUrlAction().then((result) => {
+      if (cancelled) return;
+      if (result.success && result.data) {
+        setBrandLogoSrc(result.data);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [organization.logoUrl, organization.logoStoragePath]);
 
   return (
     <Link

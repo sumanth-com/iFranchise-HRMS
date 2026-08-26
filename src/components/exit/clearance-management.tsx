@@ -101,7 +101,7 @@ export function ClearanceManagement({ queue, permissionCodes }: Props) {
       {queue.length === 0 ? (
         <EmptyState
           title="No clearance items"
-          description="Clearance appears after HR approves a resignation."
+          description="Clearance appears after the CEO approves a resignation."
         />
       ) : (
         <div className="space-y-4">

@@ -41,6 +41,17 @@ export async function getCachedPermissionCodes(
   return payload?.codes ?? null;
 }
 
+function isUsablePermissionPayload(
+  payload: PermissionCachePayload | null,
+  userId: string,
+): payload is PermissionCachePayload {
+  if (!payload) return false;
+  if (payload.userId !== userId) return false;
+  if (payload.expiresAt <= Date.now()) return false;
+  if (!Array.isArray(payload.codes) || payload.codes.length === 0) return false;
+  return true;
+}
+
 export async function getCachedPermissionPayload(
   request: NextRequest,
   userId: string,
@@ -50,12 +61,33 @@ export async function getCachedPermissionPayload(
     if (!value) return null;
 
     const payload = await parseSignedPayload(value);
-    if (!payload) return null;
-    if (payload.userId !== userId) return null;
-    if (payload.expiresAt <= Date.now()) return null;
+    if (!isUsablePermissionPayload(payload, userId)) return null;
     return payload;
   } catch (error) {
     console.error("[permission-cache] read failed", error);
+    return null;
+  }
+}
+
+/**
+ * RSC/server-action reader for the HMAC-signed permission cookie.
+ * Fail-closed: missing, invalid, expired, wrong user, or empty codes → null
+ * (caller must resolve permissions via DB/RPC).
+ */
+export async function getVerifiedPermissionCodesForUser(
+  userId: string,
+): Promise<string[] | null> {
+  try {
+    const { cookies } = await import("next/headers");
+    const cookieStore = await cookies();
+    const value = cookieStore.get(COOKIE_NAME)?.value;
+    if (!value) return null;
+
+    const payload = await parseSignedPayload(value);
+    if (!isUsablePermissionPayload(payload, userId)) return null;
+    return payload.codes;
+  } catch (error) {
+    console.error("[permission-cache] RSC read failed", error);
     return null;
   }
 }
@@ -96,6 +128,35 @@ export function clearPermissionCache(response: NextResponse): void {
     path: "/",
     maxAge: 0,
   });
+}
+
+/** Set the signed permission cookie from a Server Action (login) so middleware can skip bootstrap RPCs. */
+export async function setPermissionCacheCookie(
+  userId: string,
+  codes: string[],
+  accountAllowed = true,
+  roleCodes: string[] = [],
+): Promise<void> {
+  try {
+    const { cookies } = await import("next/headers");
+    const cookieStore = await cookies();
+    const payload: PermissionCachePayload = {
+      userId,
+      codes,
+      roleCodes,
+      accountAllowed,
+      expiresAt: Date.now() + TTL_SECONDS * 1000,
+    };
+    cookieStore.set(COOKIE_NAME, await serializeSignedPayload(payload), {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: TTL_SECONDS,
+    });
+  } catch (error) {
+    console.error("[permission-cache] set cookie failed", error);
+  }
 }
 
 export async function clearPermissionCacheCookie(): Promise<void> {

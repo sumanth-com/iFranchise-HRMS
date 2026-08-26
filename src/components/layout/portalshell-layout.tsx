@@ -5,6 +5,8 @@ import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { DashboardShellFallback } from "@/components/layout/dashboard-shell-fallback";
 import { AUTH_ROUTES } from "@/lib/auth/constants";
 import { getLayoutUserProfile } from "@/lib/auth/layout-profile";
+import { PORTAL_PERMISSIONS, type PortalKey } from "@/lib/auth/portals";
+import { hasPermission } from "@/lib/permissions/utils";
 import { AuthProvider, type PortalVariant } from "@/providers/auth-provider";
 import { getServerSession } from "@/lib/supabase/server";
 
@@ -36,7 +38,19 @@ async function ResolvedPortalShell({
   portalVariant = "hr",
   portalLabel,
 }: PortalShellLayoutProps) {
+  const layoutStartedAt = performance.now();
+  const logLayout = (label: string, startedAt: number) => {
+    if (process.env.NODE_ENV !== "development") return;
+    console.info("[layout-timing]", {
+      atMs: Math.round(performance.now() - startedAt),
+      label,
+    });
+  };
+
+  const sessionStartedAt = performance.now();
   const session = await getServerSession();
+  logLayout("layout:getServerSession", sessionStartedAt);
+
   if (!session) {
     redirect(AUTH_ROUTES.login);
   }
@@ -47,12 +61,22 @@ async function ResolvedPortalShell({
     redirect(AUTH_ROUTES.login);
   }
 
+  const profileStartedAt = performance.now();
   const profileResult = await getLayoutUserProfile(user.id, email, supabase);
+  logLayout("layout:getLayoutUserProfile", profileStartedAt);
 
   if (!profileResult.success) {
     await supabase.auth.signOut();
     redirect(`${AUTH_ROUTES.login}?error=${profileResult.error}`);
   }
+
+  const requiredPortalPermission =
+    PORTAL_PERMISSIONS[portalVariant as PortalKey] ?? PORTAL_PERMISSIONS.hr;
+  if (!hasPermission(profileResult.profile.permissionCodes, requiredPortalPermission)) {
+    redirect(AUTH_ROUTES.unauthorized);
+  }
+
+  logLayout("layout:total_before_children", layoutStartedAt);
 
   return (
     <AuthProvider

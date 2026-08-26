@@ -90,7 +90,7 @@ function emptyDashboard(): CeoDashboardData {
   };
 }
 
-export default async function CeoPortalPage() {
+async function CeoDashboardLoader() {
   const profile = await requireServerPermission(PORTAL_PERMISSIONS.ceo);
   const supabase = await createClient();
 
@@ -107,6 +107,10 @@ export default async function CeoPortalPage() {
     data = emptyDashboard();
   }
 
+  return <CeoDashboard data={data} error={error} />;
+}
+
+export default function CeoPortalPage() {
   return (
     <Suspense
       fallback={
@@ -115,7 +119,7 @@ export default async function CeoPortalPage() {
         </div>
       }
     >
-      <CeoDashboard data={data} error={error} />
+      <CeoDashboardLoader />
     </Suspense>
   );
 }

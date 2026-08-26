@@ -24,7 +24,7 @@ import {
 } from "@/lib/attendance/services/attendance-utils";
 import { ATTENDANCE_STATUS_LABELS } from "@/lib/attendance/constants";
 import { updateManagerCheckoutAction } from "@/lib/manager/actions/manager-self-attendance-actions";
-import { formatHoursLabel } from "@/lib/manager/services/manager-self-attendance-service";
+import { formatHoursLabel } from "@/lib/employee/attendance-format";
 import type { AttendanceStatus } from "@/types/attendance";
 import type {
   ManagerAttendanceHistoryResult,

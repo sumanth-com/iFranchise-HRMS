@@ -4,6 +4,7 @@ import {
   NOTIFICATION_MODULES,
 } from "@/lib/notifications/constants";
 import { parseNotificationsGlobal } from "@/lib/company-settings/services/company-settings-parsers";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   NotificationChannel,
   NotificationModule,
@@ -203,7 +204,11 @@ export async function createNotification(
 
   if (channels.length === 0) return null;
 
-  const { data, error } = await supabase
+  // Insert via service role so RETURNING is not filtered by notifications SELECT RLS.
+  // Approvers create rows for applicants; authenticated SELECT only allows the recipient
+  // (or notifications.manage), so insert().select().single() otherwise raises PGRST116
+  // after the underlying workflow mutation already succeeded.
+  const { data, error } = await createAdminClient()
     .schema("hrms")
     .from("notifications")
     .insert({

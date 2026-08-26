@@ -50,7 +50,8 @@ export function LandingFeaturesSection() {
       <div className="mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
         <div className="mx-auto max-w-2xl text-center">
           <h2 id="landing-features-heading" className="landing-section-title">
-            Everything you need for your workday.
+            Everything you need for your{" "}
+            <span className="landing-section-title-accent">workday.</span>
           </h2>
           <p className="landing-section-copy">
             One platform bringing the essential parts of your workday together.

@@ -164,10 +164,9 @@ async function reviewAttendanceCorrection(
   }
 
   if (correction.approver_employee_id) {
-    if (
-      !isCeoLeaveApprover(profile) ||
-      correction.approver_employee_id !== profile.employee.id
-    ) {
+    // CEO-routed regularization (HR/Manager applicants): any active CEO approver may act,
+    // matching leave's any-of CEO model. Employee-path rows keep approver_employee_id null.
+    if (!isCeoLeaveApprover(profile)) {
       throw new Error(
         "Only the assigned CEO can approve or reject this regularization request",
       );

@@ -12,9 +12,11 @@ const AUTH_ERROR_MESSAGES: Record<AuthErrorCode, string> = {
     "No roles are assigned to your account. Contact your HR administrator.",
   ORGANIZATION_NOT_FOUND:
     "Your organization could not be loaded. Contact your HR administrator.",
+  PROFILE_LOOKUP_FAILED:
+    "Unable to load your employee profile right now. Please try again in a moment.",
   SESSION_EXPIRED: "Your session has expired. Please sign in again.",
   NETWORK_ERROR:
-    "Unable to reach the server. Check your connection and try again.",
+    "Unable to reach authentication services right now. Please wait a moment and try again.",
   EMAIL_NOT_CONFIRMED:
     "Your email is not confirmed yet. Check your inbox or ask HR to resend the invitation.",
   EMAIL_LOGIN_DISABLED:
@@ -34,8 +36,38 @@ export function getAuthErrorMessage(code: AuthErrorCode): string {
   return AUTH_ERROR_MESSAGES[code];
 }
 
+/** Safe diagnostic string for Auth failures (never includes tokens/passwords). */
+export function describeAuthFailure(error: unknown): string {
+  if (!error || typeof error !== "object") {
+    return typeof error === "string" ? error : "";
+  }
+
+  const record = error as {
+    message?: unknown;
+    status?: unknown;
+    code?: unknown;
+    name?: unknown;
+    statusCode?: unknown;
+  };
+
+  const parts: string[] = [];
+  if (typeof record.name === "string" && record.name) parts.push(record.name);
+  if (typeof record.code === "string" && record.code) parts.push(record.code);
+  if (typeof record.status === "number") parts.push(`status=${record.status}`);
+  if (typeof record.statusCode === "number") {
+    parts.push(`statusCode=${record.statusCode}`);
+  }
+  if (typeof record.message === "string" && record.message.trim()) {
+    parts.push(record.message.trim());
+  } else if (record.message != null) {
+    parts.push(String(record.message));
+  }
+
+  return parts.join(" | ");
+}
+
 export function mapSupabaseAuthError(message: string): AuthErrorCode {
-  const normalized = message.toLowerCase();
+  const normalized = message.toLowerCase().trim();
 
   if (
     normalized.includes("invalid login credentials") ||
@@ -63,9 +95,21 @@ export function mapSupabaseAuthError(message: string): AuthErrorCode {
   }
 
   if (
+    !normalized ||
+    normalized === "{}" ||
     normalized.includes("network") ||
     normalized.includes("fetch failed") ||
-    normalized.includes("failed to fetch")
+    normalized.includes("failed to fetch") ||
+    normalized.includes("auth_timeout") ||
+    normalized.includes("aborted") ||
+    normalized.includes("timeout") ||
+    normalized.includes("timed out") ||
+    normalized.includes("upstream request timeout") ||
+    normalized.includes("504") ||
+    normalized.includes("503") ||
+    normalized.includes("502") ||
+    normalized.includes("schema cache") ||
+    normalized.includes("cloudflare")
   ) {
     return "NETWORK_ERROR";
   }

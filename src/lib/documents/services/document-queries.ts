@@ -348,6 +348,22 @@ export async function getLetterById(
   return letter;
 }
 
+function scopedDocumentQuery(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  scopedEmployeeId: string | null | undefined,
+  select: string,
+  options?: { count?: "exact"; head?: boolean },
+) {
+  let query = fromHrms(supabase, "employee_documents")
+    .select(select, options)
+    .eq("employees.organization_id", organizationId)
+    .is("deleted_at", null)
+    .is("archived_at", null);
+  if (scopedEmployeeId) query = query.eq("employee_id", scopedEmployeeId);
+  return query;
+}
+
 export async function getDocumentsSummary(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -357,59 +373,91 @@ export async function getDocumentsSummary(
   const today = format(startOfDay(new Date()), "yyyy-MM-dd");
   const soon = format(addDays(startOfDay(new Date()), 30), "yyyy-MM-dd");
   const monthStart = format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), "yyyy-MM-dd");
+  const startedAt = performance.now();
 
-  let base = fromHrms(supabase, "employee_documents")
-    .select(DOCUMENT_SELECT)
-    .eq("employees.organization_id", organizationId)
-    .is("deleted_at", null)
-    .is("archived_at", null);
+  const countSelect = "id, employees!inner(organization_id)";
+  const countOptions = { count: "exact" as const, head: true };
 
-  if (scopedEmployeeId) base = base.eq("employee_id", scopedEmployeeId);
+  const [
+    totalRes,
+    pendingRes,
+    expiringRes,
+    generatedRes,
+    uploadedTodayRes,
+    recentRes,
+    recentUploadsRes,
+    ...typeCountResults
+  ] = await Promise.all([
+    scopedDocumentQuery(supabase, organizationId, scopedEmployeeId, countSelect, countOptions),
+    scopedDocumentQuery(supabase, organizationId, scopedEmployeeId, countSelect, countOptions).eq(
+      "document_status",
+      "pending",
+    ),
+    scopedDocumentQuery(supabase, organizationId, scopedEmployeeId, countSelect, countOptions)
+      .not("expiry_date", "is", null)
+      .gte("expiry_date", today)
+      .lte("expiry_date", soon),
+    scopedDocumentQuery(supabase, organizationId, scopedEmployeeId, countSelect, countOptions)
+      .eq("source", "generated")
+      .gte("created_at", `${monthStart}T00:00:00`),
+    scopedDocumentQuery(supabase, organizationId, scopedEmployeeId, countSelect, countOptions)
+      .eq("source", "upload")
+      .gte("created_at", `${today}T00:00:00`)
+      .lte("created_at", `${today}T23:59:59`),
+    scopedDocumentQuery(supabase, organizationId, scopedEmployeeId, DOCUMENT_SELECT)
+      .order("created_at", { ascending: false })
+      .limit(8),
+    scopedDocumentQuery(supabase, organizationId, scopedEmployeeId, DOCUMENT_SELECT)
+      .eq("source", "upload")
+      .order("created_at", { ascending: false })
+      .limit(8),
+    ...DASHBOARD_CHART_TYPES.map((code) =>
+      scopedDocumentQuery(
+        supabase,
+        organizationId,
+        scopedEmployeeId,
+        "id, employees!inner(organization_id), document_types!inner(code)",
+        countOptions,
+      ).eq("document_types.code", code),
+    ),
+  ]);
 
-  const { data, error } = await base.order("created_at", { ascending: false });
-  if (error) throw new Error(error.message);
+  const errors = [
+    totalRes.error,
+    pendingRes.error,
+    expiringRes.error,
+    generatedRes.error,
+    uploadedTodayRes.error,
+    recentRes.error,
+    recentUploadsRes.error,
+    ...typeCountResults.map((result) => result.error),
+  ].filter(Boolean);
+  if (errors[0]) throw new Error(errors[0]!.message);
 
-  const docs: EmployeeDocumentItem[] = (data ?? []).map(mapDocument);
-  const pendingVerification = docs.filter((d: EmployeeDocumentItem) => d.documentStatus === "pending").length;
-  const expiringSoon = docs.filter(
-    (d: EmployeeDocumentItem) => d.expiryDate && d.expiryDate >= today && d.expiryDate <= soon,
-  ).length;
-  const generatedThisMonth = docs.filter(
-    (d: EmployeeDocumentItem) => d.source === "generated" && d.createdAt.slice(0, 10) >= monthStart,
-  ).length;
-  const uploadedToday = docs.filter((d: EmployeeDocumentItem) => d.createdAt.slice(0, 10) === today).length;
+  const recentDocs = ((recentRes.data ?? []) as DocRow[]).map(mapDocument);
+  const recentUploads = ((recentUploadsRes.data ?? []) as DocRow[]).map(mapDocument);
 
-  const typeCounts = new Map<string, { typeCode: string; typeName: string; count: number }>();
-  for (const doc of docs) {
-    const key = doc.documentTypeCode;
-    const existing = typeCounts.get(key);
-    if (existing) existing.count += 1;
-    else {
-      typeCounts.set(key, {
-        typeCode: key,
-        typeName: doc.documentTypeName,
-        count: 1,
-      });
-    }
+  const documentsByType = DASHBOARD_CHART_TYPES.map((code, index) => ({
+    typeCode: code,
+    typeName: code.replaceAll("_", " "),
+    count: typeCountResults[index]?.count ?? 0,
+  }));
+
+  if (process.env.NODE_ENV === "development") {
+    console.info("[module-timing]", {
+      label: "getDocumentsSummary",
+      atMs: Math.round(performance.now() - startedAt),
+    });
   }
 
-  const documentsByType = DASHBOARD_CHART_TYPES.map((code) => {
-    const found = typeCounts.get(code);
-    return {
-      typeCode: code,
-      typeName: found?.typeName ?? code.replaceAll("_", " "),
-      count: found?.count ?? 0,
-    };
-  });
-
   return {
-    totalDocuments: docs.length,
-    pendingVerification,
-    expiringSoon,
-    generatedThisMonth,
-    uploadedToday,
+    totalDocuments: totalRes.count ?? 0,
+    pendingVerification: pendingRes.count ?? 0,
+    expiringSoon: expiringRes.count ?? 0,
+    generatedThisMonth: generatedRes.count ?? 0,
+    uploadedToday: uploadedTodayRes.count ?? 0,
     documentsByType,
-    recentActivity: docs.slice(0, 8).map((d) => ({
+    recentActivity: recentDocs.map((d) => ({
       id: d.id,
       title: d.title,
       employeeName: d.employeeName,
@@ -417,7 +465,7 @@ export async function getDocumentsSummary(
       action: d.source === "generated" ? "Generated" : "Uploaded",
       createdAt: d.createdAt,
     })),
-    recentUploads: docs.filter((d) => d.source === "upload").slice(0, 8),
+    recentUploads,
   };
 }
 

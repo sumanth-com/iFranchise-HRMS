@@ -373,6 +373,11 @@ export async function listCeoProcessedLeaveApprovals(
   const month = filters.month ?? now.getMonth() + 1;
   const year = filters.year ?? now.getFullYear();
   const range = getMonthDateRange(month, year);
+  // Exclusive end avoids timezone edge cases with T23:59:59.999 on timestamptz.
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const nextYear = month === 12 ? year + 1 : year;
+  const rangeEndExclusive = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01T00:00:00.000+05:30`;
+  const rangeStartIso = `${range.start}T00:00:00.000+05:30`;
 
   const { data: actedRows, error: actedError } = await supabase
     .schema("hrms")
@@ -381,18 +386,28 @@ export async function listCeoProcessedLeaveApprovals(
     .eq("approver_employee_id", ceoEmployeeId)
     .in("approval_status", ["approved", "rejected"])
     .is("deleted_at", null)
-    .gte("acted_at", `${range.start}T00:00:00`)
-    .lte("acted_at", `${range.end}T23:59:59.999`);
+    .not("acted_at", "is", null)
+    .gte("acted_at", rangeStartIso)
+    .lt("acted_at", rangeEndExclusive);
 
   if (actedError) throw new Error(actedError.message);
-  const acted = actedRows ?? [];
+  const acted = (actedRows ?? []).filter((row) => {
+    if (!row.acted_at) return false;
+    const actedAt = new Date(row.acted_at).getTime();
+    return (
+      actedAt >= new Date(rangeStartIso).getTime() &&
+      actedAt < new Date(rangeEndExclusive).getTime()
+    );
+  });
   if (acted.length === 0) return [];
 
   const requestIds = Array.from(new Set(acted.map((row) => row.leave_request_id)));
   const statusByRequest = new Map<string, string>();
+  const actedAtByRequest = new Map<string, string>();
   for (const row of acted) {
     if (!statusByRequest.has(row.leave_request_id)) {
       statusByRequest.set(row.leave_request_id, row.approval_status);
+      actedAtByRequest.set(row.leave_request_id, row.acted_at);
     }
   }
 
@@ -409,14 +424,28 @@ export async function listCeoProcessedLeaveApprovals(
 
   if (error) throw new Error(error.message);
 
-  return ((data as unknown as LeaveRow[]) ?? []).map((row) => {
-    const record = mapLeaveRow(row);
-    const decision = statusByRequest.get(row.id);
-    if (decision === "approved" || decision === "rejected") {
-      return { ...record, leaveStatus: decision };
-    }
-    return record;
-  });
+  return ((data as unknown as LeaveRow[]) ?? [])
+    .map((row) => {
+      const record = mapLeaveRow(row);
+      const decision = statusByRequest.get(row.id);
+      const decidedAt = actedAtByRequest.get(row.id) ?? null;
+      if (decision === "approved" || decision === "rejected") {
+        return {
+          ...record,
+          leaveStatus: decision as LeaveStatus,
+          decidedAt,
+        };
+      }
+      return { ...record, decidedAt };
+    })
+    .filter((row) => {
+      if (!row.decidedAt) return false;
+      const actedAt = new Date(row.decidedAt).getTime();
+      return (
+        actedAt >= new Date(rangeStartIso).getTime() &&
+        actedAt < new Date(rangeEndExclusive).getTime()
+      );
+    });
 }
 
 export async function getCeoLeaveSummary(

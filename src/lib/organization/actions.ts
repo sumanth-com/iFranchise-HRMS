@@ -50,7 +50,7 @@ import {
 import {
   requireServerAnyPermission,
 } from "@/lib/permissions/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getServerSession } from "@/lib/supabase/server";
 import {
   branchFormSchema,
   departmentFormSchema,
@@ -64,6 +64,61 @@ import {
   workLocationFormSchema,
 } from "@/lib/validations/organization";
 import type { OrganizationActionResult, OrgExportFormat } from "@/types/organization";
+
+/**
+ * Non-blocking sidebar brand helper: signs the caller's org logo after shell paint.
+ * Does not accept a client-supplied path — reads the org row for the authenticated user.
+ */
+export async function getCurrentOrganizationLogoSignedUrlAction(): Promise<
+  OrganizationActionResult<string | null>
+> {
+  try {
+    const session = await getServerSession();
+    if (!session?.user) {
+      return { success: false, message: "Unauthorized" };
+    }
+
+    const { supabase, user } = session;
+    const { data: employee, error: employeeError } = await supabase
+      .schema("hrms")
+      .from("employees")
+      .select("organization_id")
+      .eq("user_id", user.id)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (employeeError || !employee?.organization_id) {
+      return { success: false, message: "Unauthorized" };
+    }
+
+    const { data: organization, error: organizationError } = await supabase
+      .schema("hrms")
+      .from("organizations")
+      .select("logo_storage_path")
+      .eq("id", employee.organization_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (organizationError) {
+      return { success: false, message: organizationError.message };
+    }
+
+    if (!organization?.logo_storage_path) {
+      return { success: true, data: null };
+    }
+
+    const logoUrl = await getOrganizationLogoSignedUrl(
+      supabase,
+      organization.logo_storage_path,
+    );
+    return { success: true, data: logoUrl };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to load company logo",
+    };
+  }
+}
 
 function revalidateOrganization() {
   for (const route of Object.values(ORGANIZATION_ROUTES)) {

@@ -10,7 +10,7 @@ import { PublicNavbar } from "@/components/landing/public-navbar";
 
 export function LandingPage() {
   return (
-    <div className="landing-page">
+    <div className="landing-page landing-page--vivid-hero">
       <div className="landing-ambient" aria-hidden />
       <PublicNavbar />
       <main>

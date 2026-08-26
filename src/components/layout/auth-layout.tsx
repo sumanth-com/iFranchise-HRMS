@@ -69,7 +69,7 @@ function AuthGlassOrb() {
                     className="auth-glass-person"
                     style={{ "--angle": person.angle } as CSSProperties}
                   >
-                    <User className="size-4" strokeWidth={2.4} />
+                    <User className="size-[1.15rem]" strokeWidth={2.35} />
                   </span>
                 ))}
               </div>
@@ -108,8 +108,8 @@ function AuthGlassOrb() {
       <div className="auth-glass-tagline">
         <p className="auth-glass-tagline-title">iFranchise HRMS</p>
         <p className="auth-glass-tagline-copy">
-          Your complete people platform — attendance, leave, payroll, and
-          performance in one secure workplace system.
+          Your complete people platform for attendance, leave, payroll, and
+          performance.
         </p>
       </div>
     </div>
