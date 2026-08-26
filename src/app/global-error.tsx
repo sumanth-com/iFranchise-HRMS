@@ -24,7 +24,12 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
       if (!recovered) setReloadExhausted(true);
       return;
     }
-    console.error("[global-error]", error);
+    // Log real error for debugging — never silently ignore.
+    console.error("[global-error]", {
+      name: error.name,
+      message: error.message,
+      digest: error.digest,
+    });
   }, [error, isRecoverable]);
 
   return (

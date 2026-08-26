@@ -35,7 +35,12 @@ export function AppRouteError({ error, reset }: AppRouteErrorProps) {
       return;
     }
 
-    console.error("[route-error]", error);
+    console.error("[route-error]", {
+      name: error.name,
+      message: error.message,
+      digest: error.digest,
+      pathname,
+    });
   }, [error, isRecoverable, pathname, reset]);
 
   if (isRecoverable && !reloadExhausted) {

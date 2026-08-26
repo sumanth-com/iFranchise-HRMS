@@ -20,6 +20,9 @@ import type {
 /** Soft per-employee storage budget used for the "remaining storage" indicator. */
 const SOFT_STORAGE_LIMIT_BYTES = 500 * 1024 * 1024;
 
+/** Cap archived rows used only to reconstruct version chains (first-paint). */
+const MAX_ARCHIVED_VERSION_ROWS = 200;
+
 const EXPLORER_SELECT = `
   id, document_type_id, title, storage_path, file_name, mime_type, file_size_bytes,
   document_status, source, is_official, archived_at, replaced_by_id, created_at,
@@ -60,14 +63,23 @@ async function buildEmployeeDocumentsExplorer(
 ): Promise<EmployeeDocumentsExplorerData> {
   const explorerStartedAt = performance.now();
 
-  // Fetch documents, settings, and types together — settings/types do not depend on rows.
-  const [documentsResult, settings, typesResult] = await Promise.all([
+  // Fetch current docs + a bounded archived set (for version chains) + settings/types together.
+  const [documentsResult, archivedResult, settings, typesResult] = await Promise.all([
     fromHrms(supabase, "employee_documents")
       .select(EXPLORER_SELECT)
       .eq("employee_id", employeeId)
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
+      .is("archived_at", null)
       .order("created_at", { ascending: false }),
+    fromHrms(supabase, "employee_documents")
+      .select(EXPLORER_SELECT)
+      .eq("employee_id", employeeId)
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .not("archived_at", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(MAX_ARCHIVED_VERSION_ROWS),
     getDocumentSettings(supabase, organizationId),
     fromHrms(supabase, "document_types")
       .select("id, name, code")
@@ -78,9 +90,13 @@ async function buildEmployeeDocumentsExplorer(
   ]);
 
   if (documentsResult.error) throw new Error(documentsResult.error.message);
+  if (archivedResult.error) throw new Error(archivedResult.error.message);
   if (typesResult.error) throw new Error(typesResult.error.message);
 
-  const rows = (documentsResult.data ?? []) as DocRow[];
+  const rows = [
+    ...((documentsResult.data ?? []) as DocRow[]),
+    ...((archivedResult.data ?? []) as DocRow[]),
+  ];
 
   // successorId -> predecessor rows (older versions that were replaced by it)
   const predecessorsOf = new Map<string, DocRow[]>();

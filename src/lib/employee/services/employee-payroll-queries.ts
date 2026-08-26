@@ -1,7 +1,6 @@
 import { addMonths, format } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
-import { getPayslipById } from "@/lib/payroll/services/payroll-mutations";
 import {
   paymentStatusLabel,
 } from "@/lib/payroll/services/payslip-history-queries";
@@ -463,7 +462,9 @@ export async function getEmployeePayrollData(
         .eq("is_current", true)
         .is("archived_at", null)
         .is("deleted_at", null)
-        .order("issued_at", { ascending: false });
+        .order("issued_at", { ascending: false })
+        // Hub only needs recent slips for KPIs/list; full history loads via dialog action.
+        .limit(24);
       if (error) throw new Error(error.message);
       return data ?? [];
     }, [] as unknown[]),
@@ -501,12 +502,12 @@ export async function getEmployeePayrollData(
     }, null),
     safe(() => getPayrollSettings(supabase, organizationId), null),
     safe(
-      () => listBonuses(supabase, profile, { employeeId, page: 1, pageSize: 50 }),
+      () => listBonuses(supabase, profile, { employeeId, page: 1, pageSize: 12 }),
       { data: [] as BonusItem[], total: 0, page: 1, pageSize: 12 },
     ),
     safe(
       () =>
-        listReimbursements(supabase, profile, { employeeId, page: 1, pageSize: 50 }),
+        listReimbursements(supabase, profile, { employeeId, page: 1, pageSize: 12 }),
       { data: [] as ReimbursementItem[], total: 0, page: 1, pageSize: 12 },
     ),
     safe(async () => {
@@ -689,15 +690,92 @@ export async function getEmployeePayrollData(
     return access.canEmployeeAccess || hrPayslipAccess;
   });
 
-  const latest = latestAccessible
-    ? await safe(
-        () =>
-          getPayslipById(supabase, profile, latestAccessible.row.id, {
-            bypassAccessCheck: hrPayslipAccess,
-          }),
-        null,
-      )
-    : null;
+  // Build latest detail from the already-fetched list row (includes breakdown).
+  // Avoids a sequential getPayslipById + logo signing on first paint; PDF download
+  // still uses the dedicated API path when the user requests it.
+  const latest = (() => {
+    if (!latestAccessible) return null;
+    const { row, item, payroll } = latestAccessible;
+    const schedule = resolvePayslipSchedule(
+      payroll?.payroll_month ?? "",
+      {
+        salaryCreditDate: row.salary_credit_date ?? undefined,
+        publishedAt: row.published_at ?? undefined,
+      },
+      scheduleOptions,
+    );
+    const access = resolvePayslipAvailability(
+      schedule.publishedAt,
+      profile.permissionCodes,
+      new Date(),
+      { employeeFacing: viewingOwnPayroll },
+    );
+    const breakdown = (item?.breakdown ?? {
+      earnings: [],
+      deductions: [],
+      attendance: {
+        workingDays: 0,
+        presentDays: 0,
+        absentDays: 0,
+        lopDays: 0,
+        leaveLopDays: 0,
+        overtimeHours: 0,
+      },
+    }) as PayrollBreakdown;
+    return {
+      id: row.id,
+      payslipNumber: row.payslip_number,
+      issuedAt: row.issued_at,
+      payrollMonth: payroll?.payroll_month ?? "",
+      payrollStatus: payroll?.payroll_status ?? "draft",
+      salaryCreditDate: schedule.salaryCreditDate,
+      publishedAt: schedule.publishedAt,
+      payrollGeneratedAt: payroll?.created_at ?? row.issued_at,
+      paymentMode: "bank_transfer",
+      transactionReference: null,
+      payslipVersion: row.payslip_version ?? "1.0",
+      availability: access.availability,
+      canEmployeeAccess: access.canEmployeeAccess,
+      reviewMessage: access.reviewMessage,
+      employee: {
+        id: employeeId,
+        employeeCode: employeeMeta.employeeCode,
+        firstName: employeeMeta.firstName,
+        lastName: employeeMeta.lastName,
+        email: profile.employee.email ?? "",
+        departmentName: null,
+        designationTitle: null,
+        employmentType: null,
+        branchName: null,
+        dateOfJoining: null,
+        pan: null,
+        uan: null,
+        pfNumber: null,
+      },
+      organization: {
+        name: "",
+        addressLines: [],
+        logoUrl: null,
+        email: null,
+        phone: null,
+        footerMessage: "",
+        gstNumber: null,
+        cin: null,
+      },
+      currencyCode,
+      basicSalary: 0,
+      totalAllowances: 0,
+      totalDeductions: Number(item?.total_deductions ?? 0),
+      grossSalary: Number(item?.gross_salary ?? 0),
+      netSalary: Number(item?.net_salary ?? 0),
+      totalEarnings: Number(item?.gross_salary ?? 0),
+      employerContributionTotal: 0,
+      breakdown,
+      employerContributions: [],
+      bankAccount: null,
+      storagePath: null,
+    } satisfies NonNullable<EmployeePayrollData["latest"]>;
+  })();
 
   const latestTimeline = latestRow?.payroll
     ? buildTimeline(latestRow.payroll)
