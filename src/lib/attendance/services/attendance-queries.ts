@@ -13,7 +13,6 @@ import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import {
   getBranches,
   getDepartments,
-  getManagers,
 } from "@/lib/employees/services/employee-queries";
 import { cleanDisplayText, formatCleanEmployeeName } from "@/lib/employees/parse-employee-name";
 import {
@@ -122,7 +121,7 @@ export async function listAttendance(
           designations:designation_id (title)
         )
       `,
-      { count: "exact" },
+      { count: "estimated" },
     )
     .eq("organization_id", organizationId)
     .is("deleted_at", null);
@@ -331,15 +330,26 @@ export async function getAttendanceLookups(
   const [branches, departments, employees] = await Promise.all([
     getBranches(supabase, organizationId),
     getDepartments(supabase, organizationId),
-    getManagers(supabase, organizationId),
+    supabase
+      .schema("hrms")
+      .from("employees")
+      .select("id, first_name, last_name, employee_code")
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .in("employment_status", ["active", "probation", "on_leave"])
+      .order("first_name")
+      .limit(250),
   ]);
+
+  if (employees.error) throw new Error(employees.error.message);
 
   return {
     branches,
     departments,
-    employees: employees.map((employee) => ({
-      ...employee,
-      label: cleanDisplayText(employee.label),
+    employees: (employees.data ?? []).map((employee) => ({
+      id: employee.id,
+      label: cleanDisplayText(`${employee.first_name} ${employee.last_name}`.trim()),
+      code: employee.employee_code,
     })),
   };
 }

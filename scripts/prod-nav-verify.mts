@@ -39,8 +39,8 @@ const ROLE_ROUTES: Record<RoleKey, string[]> = {
     "/dashboard",
     "/dashboard/hr-overview",
     "/dashboard/employees",
-    "/dashboard/attendance",
-    "/dashboard/leave",
+    "/dashboard/attendance/team",
+    "/dashboard/leave/team",
   ],
   ceo: [
     "/ceo",
@@ -247,8 +247,8 @@ async function measureRoute(
     } catch {
       firstUsefulMs = Date.now() - started;
     }
-    // Settle network briefly
-    await page.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => undefined);
+    // Settle briefly — avoid networkidle (can hang under middleware load).
+    await page.waitForTimeout(400);
   } catch (error) {
     errors.push(`goto:${error instanceof Error ? error.message : String(error)}`);
   }

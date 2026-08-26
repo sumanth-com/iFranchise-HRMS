@@ -101,114 +101,75 @@ export async function appendApprovalEvent(
   if (error) throw new Error(error.message);
 }
 
-async function upsertSyncedRequest(
+function candidateKey(sourceModule: string, sourceRecordId: string) {
+  return `${sourceModule}::${sourceRecordId}`;
+}
+
+type ExistingSyncedRequest = {
+  id: string;
+  request_status: string;
+  source_module: string;
+  source_record_id: string;
+};
+
+async function loadExistingSyncedRequests(
   supabase: AuthSupabaseClient,
   organizationId: string,
-  userId: string | null,
-  candidate: SyncCandidate,
-) {
-  const { data: existing, error: existingError } = await fromHrms(
-    supabase,
-    "executive_approval_requests",
-  )
-    .select("id, request_status")
-    .eq("organization_id", organizationId)
-    .eq("source_module", candidate.sourceModule)
-    .eq("source_record_id", candidate.sourceRecordId)
-    .is("deleted_at", null)
-    .maybeSingle();
+  candidates: SyncCandidate[],
+): Promise<Map<string, ExistingSyncedRequest>> {
+  const map = new Map<string, ExistingSyncedRequest>();
+  if (candidates.length === 0) return map;
 
-  if (existingError) throw new Error(existingError.message);
+  const recordIds = [...new Set(candidates.map((c) => c.sourceRecordId))];
+  const chunkSize = 100;
 
-  if (existing) {
-    const status = existing.request_status as string;
-    if (["approved", "rejected", "completed"].includes(status)) return existing.id as string;
-
-    const { error } = await fromHrms(supabase, "executive_approval_requests")
-      .update({
-        title: candidate.title,
-        summary: candidate.summary,
-        business_justification: candidate.businessJustification,
-        financial_impact: candidate.financialImpact,
-        risk_assessment: candidate.riskAssessment,
-        priority: candidate.priority,
-        department_id: candidate.departmentId,
-        requested_by_employee_id: candidate.requestedByEmployeeId,
-        due_at: candidate.dueAt,
-        supporting_documents: candidate.supportingDocuments,
-        payload: candidate.payload,
-        updated_by: userId,
-      })
-      .eq("id", existing.id);
+  for (let index = 0; index < recordIds.length; index += chunkSize) {
+    const chunk = recordIds.slice(index, index + chunkSize);
+    const { data, error } = await fromHrms(supabase, "executive_approval_requests")
+      .select("id, request_status, source_module, source_record_id")
+      .eq("organization_id", organizationId)
+      .in("source_record_id", chunk)
+      .is("deleted_at", null);
 
     if (error) throw new Error(error.message);
-    return existing.id as string;
+
+    for (const row of (data ?? []) as ExistingSyncedRequest[]) {
+      map.set(candidateKey(row.source_module, row.source_record_id), row);
+    }
   }
 
-  const requestCode = await nextRequestCode(supabase, organizationId);
-  const submittedAt = candidate.submittedAt;
-  const reviewedAt = addDays(submittedAt, 1);
-  const escalatedAt = addDays(submittedAt, 2);
+  return map;
+}
 
-  const { data, error } = await fromHrms(supabase, "executive_approval_requests")
-    .insert({
-      organization_id: organizationId,
-      request_code: requestCode,
-      approval_type: candidate.approvalType,
-      title: candidate.title,
-      summary: candidate.summary,
-      business_justification: candidate.businessJustification,
-      financial_impact: candidate.financialImpact,
-      risk_assessment: candidate.riskAssessment,
-      priority: candidate.priority,
-      request_status: "pending_ceo",
-      department_id: candidate.departmentId,
-      requested_by_employee_id: candidate.requestedByEmployeeId,
-      source_module: candidate.sourceModule,
-      source_record_id: candidate.sourceRecordId,
-      submitted_at: submittedAt,
-      reviewed_at: reviewedAt,
-      escalated_at: escalatedAt,
-      due_at: candidate.dueAt,
-      supporting_documents: candidate.supportingDocuments,
-      attachments: [],
-      payload: candidate.payload,
-      created_by: userId,
-      updated_by: userId,
-    })
-    .select("id")
-    .single();
+function updatePayloadFromCandidate(
+  candidate: SyncCandidate,
+  userId: string | null,
+) {
+  return {
+    title: candidate.title,
+    summary: candidate.summary,
+    business_justification: candidate.businessJustification,
+    financial_impact: candidate.financialImpact,
+    risk_assessment: candidate.riskAssessment,
+    priority: candidate.priority,
+    department_id: candidate.departmentId,
+    requested_by_employee_id: candidate.requestedByEmployeeId,
+    due_at: candidate.dueAt,
+    supporting_documents: candidate.supportingDocuments,
+    payload: candidate.payload,
+    updated_by: userId,
+  };
+}
 
-  if (error) throw new Error(error.message);
-
-  const requestId = data.id as string;
-  await appendApprovalEvent(supabase, {
-    organizationId,
-    requestId,
-    eventKey: "submitted",
-    title: "Submitted",
-    description: "Request submitted for executive review.",
-    actorEmployeeId: candidate.requestedByEmployeeId,
-    occurredAt: submittedAt,
-  });
-  await appendApprovalEvent(supabase, {
-    organizationId,
-    requestId,
-    eventKey: "reviewed",
-    title: "Reviewed",
-    description: "Reviewed by HR / Manager.",
-    occurredAt: reviewedAt,
-  });
-  await appendApprovalEvent(supabase, {
-    organizationId,
-    requestId,
-    eventKey: "escalated",
-    title: "Escalated",
-    description: "Escalated to CEO for authorization.",
-    occurredAt: escalatedAt,
-  });
-
-  return requestId;
+async function runInChunks<T>(
+  items: T[],
+  chunkSize: number,
+  worker: (item: T) => Promise<void>,
+): Promise<void> {
+  for (let index = 0; index < items.length; index += chunkSize) {
+    const chunk = items.slice(index, index + chunkSize);
+    await Promise.all(chunk.map((item) => worker(item)));
+  }
 }
 
 async function collectDomainCandidates(
@@ -402,10 +363,149 @@ export async function syncExecutiveApprovalsFromDomain(
   profile: UserProfile,
 ) {
   const organizationId = profile.employee.organizationId;
+  const userId = profile.userId;
   const candidates = await collectDomainCandidates(supabase, organizationId);
+  if (candidates.length === 0) return 0;
+
+  const existingByKey = await loadExistingSyncedRequests(
+    supabase,
+    organizationId,
+    candidates,
+  );
+
+  const toUpdate: Array<{ id: string; candidate: SyncCandidate }> = [];
+  const toInsert: SyncCandidate[] = [];
 
   for (const candidate of candidates) {
-    await upsertSyncedRequest(supabase, organizationId, profile.userId, candidate);
+    const existing = existingByKey.get(
+      candidateKey(candidate.sourceModule, candidate.sourceRecordId),
+    );
+    if (!existing) {
+      toInsert.push(candidate);
+      continue;
+    }
+    if (["approved", "rejected", "completed"].includes(existing.request_status)) {
+      continue;
+    }
+    toUpdate.push({ id: existing.id, candidate });
+  }
+
+  // Parallel update chunks — same fields/semantics as the previous per-row upsert.
+  await runInChunks(toUpdate, 25, async ({ id, candidate }) => {
+    const { error } = await fromHrms(supabase, "executive_approval_requests")
+      .update(updatePayloadFromCandidate(candidate, userId))
+      .eq("id", id);
+    if (error) throw new Error(error.message);
+  });
+
+  if (toInsert.length > 0) {
+    const firstCode = await nextRequestCode(supabase, organizationId);
+    const year = new Date().getFullYear();
+    const prefix = `EAR-${year}-`;
+    const startNumber = Number(firstCode.replace(prefix, ""));
+    const baseNumber = Number.isFinite(startNumber) ? startNumber : 1;
+
+    const insertRows = toInsert.map((candidate, index) => {
+      const submittedAt = candidate.submittedAt;
+      return {
+        organization_id: organizationId,
+        request_code: `${prefix}${String(baseNumber + index).padStart(4, "0")}`,
+        approval_type: candidate.approvalType,
+        title: candidate.title,
+        summary: candidate.summary,
+        business_justification: candidate.businessJustification,
+        financial_impact: candidate.financialImpact,
+        risk_assessment: candidate.riskAssessment,
+        priority: candidate.priority,
+        request_status: "pending_ceo" as const,
+        department_id: candidate.departmentId,
+        requested_by_employee_id: candidate.requestedByEmployeeId,
+        source_module: candidate.sourceModule,
+        source_record_id: candidate.sourceRecordId,
+        submitted_at: submittedAt,
+        reviewed_at: addDays(submittedAt, 1),
+        escalated_at: addDays(submittedAt, 2),
+        due_at: candidate.dueAt,
+        supporting_documents: candidate.supportingDocuments,
+        attachments: [],
+        payload: candidate.payload,
+        created_by: userId,
+        updated_by: userId,
+      };
+    });
+
+    const insertChunkSize = 40;
+    const inserted: Array<{
+      id: string;
+      source_module: string;
+      source_record_id: string;
+      submitted_at: string;
+      reviewed_at: string;
+      escalated_at: string;
+      requested_by_employee_id: string | null;
+    }> = [];
+
+    for (let index = 0; index < insertRows.length; index += insertChunkSize) {
+      const chunk = insertRows.slice(index, index + insertChunkSize);
+      const { data, error } = await fromHrms(supabase, "executive_approval_requests")
+        .insert(chunk)
+        .select(
+          "id, source_module, source_record_id, submitted_at, reviewed_at, escalated_at, requested_by_employee_id",
+        );
+      if (error) throw new Error(error.message);
+      inserted.push(
+        ...((data ?? []) as typeof inserted),
+      );
+    }
+
+    const eventRows = inserted.flatMap((row) => {
+      const candidate = toInsert.find(
+        (item) =>
+          item.sourceModule === row.source_module &&
+          item.sourceRecordId === row.source_record_id,
+      );
+      return [
+        {
+          organization_id: organizationId,
+          request_id: row.id,
+          event_key: "submitted",
+          title: "Submitted",
+          description: "Request submitted for executive review.",
+          actor_employee_id: candidate?.requestedByEmployeeId ?? row.requested_by_employee_id,
+          actor_user_id: null,
+          metadata: {},
+          occurred_at: row.submitted_at,
+        },
+        {
+          organization_id: organizationId,
+          request_id: row.id,
+          event_key: "reviewed",
+          title: "Reviewed",
+          description: "Reviewed by HR / Manager.",
+          actor_employee_id: null,
+          actor_user_id: null,
+          metadata: {},
+          occurred_at: row.reviewed_at,
+        },
+        {
+          organization_id: organizationId,
+          request_id: row.id,
+          event_key: "escalated",
+          title: "Escalated",
+          description: "Escalated to CEO for authorization.",
+          actor_employee_id: null,
+          actor_user_id: null,
+          metadata: {},
+          occurred_at: row.escalated_at,
+        },
+      ];
+    });
+
+    for (let index = 0; index < eventRows.length; index += 90) {
+      const chunk = eventRows.slice(index, index + 90);
+      const { error } = await fromHrms(supabase, "executive_approval_events").insert(chunk);
+      if (error) throw new Error(error.message);
+    }
   }
 
   return candidates.length;

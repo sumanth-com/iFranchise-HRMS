@@ -96,8 +96,11 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
     getAttendanceSummary(supabase, profile),
     getLeaveSummary(supabase, profile, undefined, undefined, {
       excludeHrApplicants: true,
+      // Full leave_balances scan is secondary KPI chrome — skip on pulse path.
+      skipBalanceUtilization: true,
     }),
     listHolidays(supabase, organizationId, { year: todayDate.getFullYear() }),
+    // Slim columns only for birthday/anniversary widgets (not full profile dump).
     fromHrms(supabase, "employees")
       .select(
         "id, employee_code, first_name, last_name, employment_status, date_of_joining",

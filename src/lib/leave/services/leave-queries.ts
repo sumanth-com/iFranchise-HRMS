@@ -37,7 +37,6 @@ import {
   getBranches,
   getDepartments,
   getEmploymentTypes,
-  getManagers,
 } from "@/lib/employees/services/employee-queries";
 import {
   resolveOrgDataEmployeeScope,
@@ -243,7 +242,7 @@ export async function listLeaveRequests(
           employees:approver_employee_id (first_name, last_name)
         )
       `,
-      { count: "exact" },
+      { count: "estimated" },
     )
     .eq("employees.organization_id", organizationId)
     .is("deleted_at", null);
@@ -502,7 +501,7 @@ export async function getLeaveSummary(
   profile: UserProfile,
   month?: number,
   year?: number,
-  options?: { excludeHrApplicants?: boolean },
+  options?: { excludeHrApplicants?: boolean; skipBalanceUtilization?: boolean },
 ): Promise<LeaveSummary> {
   const organizationId = profile.employee.organizationId;
   const today = getTodayDateString();
@@ -576,7 +575,9 @@ export async function getLeaveSummary(
         .eq("employees.organization_id", organizationId)
         .is("deleted_at", null),
     ),
-    computeOrgLeaveBalanceUtilizationPercent(supabase, organizationId, balanceYear),
+    options?.skipBalanceUtilization
+      ? Promise.resolve(0)
+      : computeOrgLeaveBalanceUtilizationPercent(supabase, organizationId, balanceYear),
   ]);
 
   return {
@@ -1061,13 +1062,16 @@ export async function getEmployeeLeaveCalendarData(
   return { leaves, holidays, calendar: runtime.calendar };
 }
 
+/** Cap filter dropdown size — full org employee dumps dominate team hub latency. */
+const FILTER_EMPLOYEE_LOOKUP_LIMIT = 250;
+
 export async function getLeaveLookups(
   supabase: AuthSupabaseClient,
   organizationId: string,
   options?: { selfApplicant?: LookupOption | null },
 ): Promise<LeaveLookups> {
   const selfApplicant = options?.selfApplicant ?? null;
-  const [leaveTypesResult, departments, branches, employeesResult, managers, employmentTypes] =
+  const [leaveTypesResult, departments, branches, employeesResult, employmentTypes] =
     await Promise.all([
       supabase
         .schema("hrms")
@@ -1090,10 +1094,8 @@ export async function getLeaveLookups(
             .eq("organization_id", organizationId)
             .is("deleted_at", null)
             .in("employment_status", ["active", "probation", "on_leave"])
-            .order("first_name"),
-      selfApplicant
-        ? Promise.resolve([] as LookupOption[])
-        : getManagers(supabase, organizationId),
+            .order("first_name")
+            .limit(FILTER_EMPLOYEE_LOOKUP_LIMIT),
       selfApplicant
         ? Promise.resolve([] as LookupOption[])
         : getEmploymentTypes(supabase, organizationId),
@@ -1124,13 +1126,15 @@ export async function getLeaveLookups(
         code: row.employee_code,
       }));
 
+  // Reuse the same bounded employee list for manager/approver filters (avoids a
+  // second full-org employees scan that previously mirrored getManagers()).
   return {
     leaveTypes,
     departments,
     branches,
     employees,
-    managers,
-    approvers: managers,
+    managers: employees,
+    approvers: employees,
     employmentTypes,
   };
 }
