@@ -67,6 +67,17 @@ const EMPTY_CHARTS: HrDashboardData["charts"] = {
   employmentTypeDistribution: [],
 };
 
+function monthDayKeysInWindow(from: Date, days: number): string[] {
+  const keys: string[] = [];
+  for (let offset = 0; offset <= days; offset += 1) {
+    const date = addDays(from, offset);
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    keys.push(`${mm}-${dd}`);
+  }
+  return keys;
+}
+
 /**
  * Lean loader for HR Overview / Today's Pulse.
  * Only fetches widgets the page renders (avoids heavy analytics payloads).
@@ -83,12 +94,23 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
   const payrollYear = todayDate.getFullYear();
   const payrollMonthDate = getPayrollMonthDate(payrollMonth, payrollYear);
 
+  const birthdayKeys = monthDayKeysInWindow(todayDate, 7);
+  const anniversaryKeys = monthDayKeysInWindow(todayDate, 30);
+  // PostgREST `or` of `like.*-MM-DD` keeps birthday/anniversary queries bounded
+  // to the visible calendar window instead of materializing the whole org.
+  const birthdayOr = birthdayKeys.map((key) => `date_of_birth.like.*-${key}`).join(",");
+  const anniversaryOr = anniversaryKeys
+    .map((key) => `date_of_joining.like.*-${key}`)
+    .join(",");
+
   const [
     attendance,
     leave,
     holidays,
-    employeesRes,
-    profilesRes,
+    headcountRes,
+    probationCountRes,
+    anniversaryEmployeesRes,
+    birthdayProfilesRes,
     payrollRes,
     interviewsTodayRes,
     onboardingStats,
@@ -96,25 +118,38 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
     getAttendanceSummary(supabase, profile),
     getLeaveSummary(supabase, profile, undefined, undefined, {
       excludeHrApplicants: true,
-      // Full leave_balances scan is secondary KPI chrome — skip on pulse path.
       skipBalanceUtilization: true,
     }),
     listHolidays(supabase, organizationId, { year: todayDate.getFullYear() }),
-    // Slim columns only for birthday/anniversary widgets (not full profile dump).
     fromHrms(supabase, "employees")
-      .select(
-        "id, employee_code, first_name, last_name, employment_status, date_of_joining",
-      )
+      .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
       .in("employment_status", ACTIVE_EMPLOYMENT_STATUSES)
       .is("deleted_at", null),
+    fromHrms(supabase, "employees")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("employment_status", "probation")
+      .is("deleted_at", null),
+    fromHrms(supabase, "employees")
+      .select("id, employee_code, first_name, last_name, employment_status, date_of_joining")
+      .eq("organization_id", organizationId)
+      .in("employment_status", ACTIVE_EMPLOYMENT_STATUSES)
+      .is("deleted_at", null)
+      .not("date_of_joining", "is", null)
+      .or(anniversaryOr),
     fromHrms(supabase, "employee_profiles")
       .select(
-        "employee_id, date_of_birth, employees:employee_id!inner(organization_id, employment_status)",
+        `employee_id, date_of_birth,
+         employees:employee_id!inner(
+           id, employee_code, first_name, last_name, organization_id, employment_status
+         )`,
       )
       .eq("employees.organization_id", organizationId)
       .in("employees.employment_status", ACTIVE_EMPLOYMENT_STATUSES)
-      .is("deleted_at", null),
+      .is("deleted_at", null)
+      .not("date_of_birth", "is", null)
+      .or(birthdayOr),
     fromHrms(supabase, "payrolls")
       .select("id, payroll_status")
       .eq("organization_id", organizationId)
@@ -129,39 +164,34 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
     getOnboardingDashboardStats(supabase, organizationId),
   ]);
 
-  if (employeesRes.error) throw new Error(employeesRes.error.message);
-  if (profilesRes.error) throw new Error(profilesRes.error.message);
+  if (headcountRes.error) throw new Error(headcountRes.error.message);
+  if (probationCountRes.error) throw new Error(probationCountRes.error.message);
+  if (anniversaryEmployeesRes.error) throw new Error(anniversaryEmployeesRes.error.message);
+  if (birthdayProfilesRes.error) throw new Error(birthdayProfilesRes.error.message);
   if (payrollRes.error) throw new Error(payrollRes.error.message);
   if (interviewsTodayRes.error) throw new Error(interviewsTodayRes.error.message);
 
-  const activeEmployees = employeesRes.data ?? [];
-  const totalEmployees = activeEmployees.length;
-  const profileByEmployee = new Map<string, { date_of_birth?: string | null }>(
-    (profilesRes.data ?? []).map((row: { employee_id: string; date_of_birth?: string | null }) => [
-      row.employee_id,
-      row,
-    ]),
-  );
+  const totalEmployees = headcountRes.count ?? 0;
+  const probationEndingSoon = probationCountRes.count ?? 0;
 
   const upcomingBirthdays = [];
-  const upcomingAnniversaries = [];
-  let probationEndingSoon = 0;
-
-  for (const e of activeEmployees) {
-    const href = employeeHref(e);
-    const name = formatEmployeeName(e.first_name, e.last_name);
-    const dob = profileByEmployee.get(e.id)?.date_of_birth as string | null | undefined;
+  for (const row of birthdayProfilesRes.data ?? []) {
+    const employee = Array.isArray(row.employees) ? row.employees[0] : row.employees;
+    if (!employee) continue;
+    const dob = row.date_of_birth as string | null | undefined;
     const bday = upcomingWithinDays(dob, todayDate, 7);
-    if (bday) {
-      upcomingBirthdays.push({
-        id: `bday-${e.id}`,
-        name,
-        date: format(bday, "yyyy-MM-dd"),
-        subtitle: e.employee_code,
-        href,
-      });
-    }
+    if (!bday) continue;
+    upcomingBirthdays.push({
+      id: `bday-${employee.id}`,
+      name: formatEmployeeName(employee.first_name, employee.last_name),
+      date: format(bday, "yyyy-MM-dd"),
+      subtitle: employee.employee_code,
+      href: employeeHref(employee),
+    });
+  }
 
+  const upcomingAnniversaries = [];
+  for (const e of anniversaryEmployeesRes.data ?? []) {
     const doj = e.date_of_joining as string | null | undefined;
     const ann = upcomingWithinDays(doj, todayDate, 30);
     if (ann && doj) {
@@ -169,16 +199,12 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
       if (years >= 1) {
         upcomingAnniversaries.push({
           id: `ann-${e.id}`,
-          name,
+          name: formatEmployeeName(e.first_name, e.last_name),
           date: format(ann, "yyyy-MM-dd"),
           subtitle: `${years} year${years === 1 ? "" : "s"}`,
-          href,
+          href: employeeHref(e),
         });
       }
-    }
-
-    if (e.employment_status === "probation") {
-      probationEndingSoon += 1;
     }
   }
 

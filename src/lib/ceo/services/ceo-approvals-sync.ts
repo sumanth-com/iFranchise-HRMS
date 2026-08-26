@@ -40,6 +40,14 @@ type SyncCandidate = {
   payload: Record<string, unknown>;
 };
 
+function recentPayrollMonthFloor(): string {
+  const date = new Date();
+  date.setUTCMonth(date.getUTCMonth() - 11, 1);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  return `${year}-${month}-01`;
+}
+
 function addDays(iso: string, days: number) {
   const date = new Date(iso);
   date.setDate(date.getDate() + days);
@@ -110,6 +118,11 @@ type ExistingSyncedRequest = {
   request_status: string;
   source_module: string;
   source_record_id: string;
+  title: string | null;
+  summary: string | null;
+  financial_impact: number | null;
+  priority: string | null;
+  due_at: string | null;
 };
 
 async function loadExistingSyncedRequests(
@@ -126,7 +139,9 @@ async function loadExistingSyncedRequests(
   for (let index = 0; index < recordIds.length; index += chunkSize) {
     const chunk = recordIds.slice(index, index + chunkSize);
     const { data, error } = await fromHrms(supabase, "executive_approval_requests")
-      .select("id, request_status, source_module, source_record_id")
+      .select(
+        "id, request_status, source_module, source_record_id, title, summary, financial_impact, priority, due_at",
+      )
       .eq("organization_id", organizationId)
       .in("source_record_id", chunk)
       .is("deleted_at", null);
@@ -139,6 +154,20 @@ async function loadExistingSyncedRequests(
   }
 
   return map;
+}
+
+function candidateNeedsUpdate(
+  existing: ExistingSyncedRequest,
+  candidate: SyncCandidate,
+): boolean {
+  if (existing.title !== candidate.title) return true;
+  if (existing.summary !== candidate.summary) return true;
+  if (Number(existing.financial_impact ?? 0) !== Number(candidate.financialImpact)) {
+    return true;
+  }
+  if (existing.priority !== candidate.priority) return true;
+  if ((existing.due_at ?? null) !== (candidate.dueAt ?? null)) return true;
+  return false;
 }
 
 function updatePayloadFromCandidate(
@@ -210,6 +239,10 @@ async function collectDomainCandidates(
       .select("id, payroll_month, payroll_status, total_net, total_gross, created_at, created_by")
       .eq("organization_id", organizationId)
       .in("payroll_status", ["processed", "processing", "draft"])
+      // Keep recent open payroll runs only — historical processed runs already
+      // synced (or terminal) dominate candidate volume without changing semantics
+      // for active CEO budget approvals.
+      .gte("payroll_month", recentPayrollMonthFloor())
       .is("deleted_at", null),
   ]);
 
@@ -385,6 +418,10 @@ export async function syncExecutiveApprovalsFromDomain(
       continue;
     }
     if (["approved", "rejected", "completed"].includes(existing.request_status)) {
+      continue;
+    }
+    // Skip no-op updates — previously every open request was rewritten on each page load.
+    if (!candidateNeedsUpdate(existing, candidate)) {
       continue;
     }
     toUpdate.push({ id: existing.id, candidate });

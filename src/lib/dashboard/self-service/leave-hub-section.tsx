@@ -141,6 +141,8 @@ export async function LeaveHubSection({
     loadTeamSection
       ? getLeaveSummary(supabase, profile, teamParams.month, teamParams.year, {
           excludeHrApplicants: true,
+          // Summary cards do not display utilization — skip full leave_balances scan.
+          skipBalanceUtilization: true,
         }).catch((error) => {
           console.error("[leave] summary failed", error);
           return null;

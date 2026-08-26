@@ -133,30 +133,6 @@ function resolveApproverDisplayName(
   return first ? approvalPersonName(first, nameById) : null;
 }
 
-async function loadApproverNameMap(
-  supabase: AuthSupabaseClient,
-  approverIds: string[],
-): Promise<Map<string, string>> {
-  const uniqueIds = Array.from(new Set(approverIds.filter(Boolean)));
-  const nameById = new Map<string, string>();
-  if (uniqueIds.length === 0) return nameById;
-
-  const { data, error } = await supabase
-    .schema("hrms")
-    .from("employees")
-    .select("id, first_name, last_name")
-    .in("id", uniqueIds)
-    .is("deleted_at", null);
-
-  if (error) throw new Error(error.message);
-
-  for (const row of data ?? []) {
-    const name = `${row.first_name} ${row.last_name}`.trim();
-    if (name) nameById.set(row.id, name);
-  }
-  return nameById;
-}
-
 function parseListParams(params: LeaveListParams) {
   return leaveListParamsSchema.parse(params);
 }
@@ -224,23 +200,14 @@ export async function listLeaveRequests(
           employee_code,
           first_name,
           last_name,
-          email,
           department_id,
           designation_id,
           branch_id,
-          employment_type_id,
-          reporting_manager_id,
           departments:department_id (name),
           designations:designation_id (title),
           branches:branch_id (name)
         ),
-        leave_types:leave_type_id (name, code),
-        leave_approvals (
-          approval_level,
-          approval_status,
-          approver_employee_id,
-          employees:approver_employee_id (first_name, last_name)
-        )
+        leave_types:leave_type_id (name, code)
       `,
       { count: "estimated" },
     )
@@ -256,6 +223,30 @@ export async function listLeaveRequests(
     if (hrApplicantIds.length > 0) {
       query = query.not("employee_id", "in", `(${hrApplicantIds.join(",")})`);
     }
+  }
+
+  // Approver filter: resolve matching leave_request ids first (bounded), avoid
+  // forcing a nested leave_approvals embed on the paged list query.
+  if (approverId) {
+    const { data: approvalScope, error: approvalScopeError } = await supabase
+      .schema("hrms")
+      .from("leave_approvals")
+      .select("leave_request_id")
+      .eq("approver_employee_id", approverId)
+      .is("deleted_at", null)
+      .limit(2000);
+    if (approvalScopeError) throw new Error(approvalScopeError.message);
+    const scopedLeaveIds = [
+      ...new Set(
+        (approvalScope ?? [])
+          .map((row) => row.leave_request_id as string)
+          .filter(Boolean),
+      ),
+    ];
+    if (scopedLeaveIds.length === 0) {
+      return { data: [], total: 0, page, pageSize };
+    }
+    query = query.in("id", scopedLeaveIds);
   }
 
   const today = getTodayDateString();
@@ -316,14 +307,11 @@ export async function listLeaveRequests(
   if (typeof isHalfDay === "boolean") {
     query = query.eq("is_half_day", isHalfDay);
   }
-  if (approverId) {
-    query = query.eq("leave_approvals.approver_employee_id", approverId);
-  }
 
   if (search) {
     const term = `%${search}%`;
     query = query.or(
-      `employee_code.ilike.${term},first_name.ilike.${term},last_name.ilike.${term},email.ilike.${term}`,
+      `employee_code.ilike.${term},first_name.ilike.${term},last_name.ilike.${term}`,
       { referencedTable: "employees" },
     );
   }
@@ -344,10 +332,44 @@ export async function listLeaveRequests(
   if (error) throw new Error(error.message);
 
   const rows = (data ?? []) as LeaveRequestRow[];
-  const nameById = await loadApproverNameMap(
-    supabase,
-    rows.flatMap((row) => (row.leave_approvals ?? []).map((a) => a.approver_employee_id)),
-  );
+  const leaveIds = rows.map((row) => row.id);
+
+  // Approvals only for the visible page of requests (not nested on the list join).
+  const approvalsByLeaveId = new Map<
+    string,
+    NonNullable<LeaveRequestRow["leave_approvals"]>
+  >();
+  if (leaveIds.length > 0) {
+    const { data: approvalRows, error: approvalsError } = await supabase
+      .schema("hrms")
+      .from("leave_approvals")
+      .select(
+        `
+          leave_request_id,
+          approval_level,
+          approval_status,
+          approver_employee_id,
+          employees:approver_employee_id (first_name, last_name)
+        `,
+      )
+      .in("leave_request_id", leaveIds)
+      .is("deleted_at", null);
+    if (approvalsError) throw new Error(approvalsError.message);
+
+    for (const row of approvalRows ?? []) {
+      const leaveRequestId = row.leave_request_id as string;
+      const list = approvalsByLeaveId.get(leaveRequestId) ?? [];
+      list.push({
+        approval_level: Number(row.approval_level),
+        approval_status: String(row.approval_status),
+        approver_employee_id: String(row.approver_employee_id),
+        employees: (row.employees ?? null) as NonNullable<
+          LeaveRequestRow["leave_approvals"]
+        >[number]["employees"],
+      });
+      approvalsByLeaveId.set(leaveRequestId, list);
+    }
+  }
 
   const mapped = rows.map((row) => {
       const employee = unwrapRelation(row.employees);
@@ -355,7 +377,7 @@ export async function listLeaveRequests(
       const department = unwrapRelation(employee?.departments ?? null);
       const designation = unwrapRelation(employee?.designations ?? null);
       const branch = unwrapRelation(employee?.branches ?? null);
-      const approvals = row.leave_approvals ?? [];
+      const approvals = approvalsByLeaveId.get(row.id) ?? [];
       const pendingApproval = approvals
         .filter((a) => a.approval_status === "pending")
         .sort((a, b) => a.approval_level - b.approval_level)[0];
@@ -394,7 +416,7 @@ export async function listLeaveRequests(
         reason: row.reason,
         leaveStatus: row.leave_status as LeaveListResult["data"][number]["leaveStatus"],
         appliedAt: row.created_at,
-        approverName: resolveApproverDisplayName(approvals, nameById),
+        approverName: resolveApproverDisplayName(approvals, new Map()),
         currentApprovalLevel: pendingApproval?.approval_level ?? null,
         pendingApproverEmployeeId,
         canActOnApproval: isAssignedApprover,
