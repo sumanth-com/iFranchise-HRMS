@@ -67,17 +67,6 @@ const EMPTY_CHARTS: HrDashboardData["charts"] = {
   employmentTypeDistribution: [],
 };
 
-function monthDayKeysInWindow(from: Date, days: number): string[] {
-  const keys: string[] = [];
-  for (let offset = 0; offset <= days; offset += 1) {
-    const date = addDays(from, offset);
-    const mm = String(date.getMonth() + 1).padStart(2, "0");
-    const dd = String(date.getDate()).padStart(2, "0");
-    keys.push(`${mm}-${dd}`);
-  }
-  return keys;
-}
-
 /**
  * Lean loader for HR Overview / Today's Pulse.
  * Only fetches widgets the page renders (avoids heavy analytics payloads).
@@ -94,14 +83,8 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
   const payrollYear = todayDate.getFullYear();
   const payrollMonthDate = getPayrollMonthDate(payrollMonth, payrollYear);
 
-  const birthdayKeys = monthDayKeysInWindow(todayDate, 7);
-  const anniversaryKeys = monthDayKeysInWindow(todayDate, 30);
-  // PostgREST `or` of `like.*-MM-DD` keeps birthday/anniversary queries bounded
-  // to the visible calendar window instead of materializing the whole org.
-  const birthdayOr = birthdayKeys.map((key) => `date_of_birth.like.*-${key}`).join(",");
-  const anniversaryOr = anniversaryKeys
-    .map((key) => `date_of_joining.like.*-${key}`)
-    .join(",");
+  // DATE columns cannot use PostgREST `like` (`~~`). Keep org/status-scoped
+  // fetches and filter month-day windows in JS via upcomingWithinDays.
 
   const [
     attendance,
@@ -136,8 +119,7 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
       .eq("organization_id", organizationId)
       .in("employment_status", ACTIVE_EMPLOYMENT_STATUSES)
       .is("deleted_at", null)
-      .not("date_of_joining", "is", null)
-      .or(anniversaryOr),
+      .not("date_of_joining", "is", null),
     fromHrms(supabase, "employee_profiles")
       .select(
         `employee_id, date_of_birth,
@@ -148,8 +130,7 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
       .eq("employees.organization_id", organizationId)
       .in("employees.employment_status", ACTIVE_EMPLOYMENT_STATUSES)
       .is("deleted_at", null)
-      .not("date_of_birth", "is", null)
-      .or(birthdayOr),
+      .not("date_of_birth", "is", null),
     fromHrms(supabase, "payrolls")
       .select("id, payroll_status")
       .eq("organization_id", organizationId)
