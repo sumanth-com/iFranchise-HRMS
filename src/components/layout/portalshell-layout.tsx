@@ -41,7 +41,9 @@ async function ResolvedPortalShell({
   const layoutStartedAt = performance.now();
   const logLayout = (label: string, startedAt: number) => {
     if (process.env.NODE_ENV !== "development") return;
-    console.info("[layout-timing]", {
+    console.info("[perf]", {
+      area: "layout",
+      source: "layout-timing",
       atMs: Math.round(performance.now() - startedAt),
       label,
     });

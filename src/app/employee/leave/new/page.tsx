@@ -12,16 +12,17 @@ export default async function EmployeeNewLeavePage() {
     "leave.create",
   ]);
   const supabase = await createClient();
-  const lookups = await getLeaveLookups(supabase, profile.employee.organizationId);
-
-  // Employees may only apply for themselves — never expose other employees.
-  const self =
-    lookups.employees.find((employee) => employee.id === profile.employee.id) ?? {
-      id: profile.employee.id,
-      label: `${profile.employee.firstName} ${profile.employee.lastName}`.trim(),
-      code: profile.employee.employeeCode,
-    };
-  const scopedLookups = { ...lookups, employees: [self] };
+  // Employees may only apply for themselves — never load the org employee directory.
+  const self = {
+    id: profile.employee.id,
+    label: `${profile.employee.firstName} ${profile.employee.lastName}`.trim(),
+    code: profile.employee.employeeCode,
+  };
+  const scopedLookups = await getLeaveLookups(
+    supabase,
+    profile.employee.organizationId,
+    { selfApplicant: self },
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-5">

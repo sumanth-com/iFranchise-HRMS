@@ -672,19 +672,20 @@ export async function getManagerDashboardData(
   if (recentPromotionsResult.error) throw new Error(recentPromotionsResult.error.message);
   if (completedInterviewsResult.error) throw new Error(completedInterviewsResult.error.message);
 
-  const [holidaysResult, attendanceTrendCountsRes, exitRequestsResult] = await Promise.all([
+  const trendStart = dayKeys[0]!;
+  const trendEnd = dayKeys[dayKeys.length - 1]!;
+
+  const [holidaysResult, attendanceTrendRowsRes, exitRequestsResult] = await Promise.all([
     listHolidays(supabase, organizationId, { year: todayDate.getFullYear() }),
-    Promise.all(
-      dayKeys.map((day) =>
-        fromHrms(supabase, "attendance")
-          .select("id", { count: "exact", head: true })
-          .eq("organization_id", organizationId)
-          .eq("attendance_date", day)
-          .in("employee_id", teamIds)
-          .in("attendance_status", ["present", "late", "half_day"])
-          .is("deleted_at", null),
-      ),
-    ),
+    // One bounded range read instead of 7 sequential head-count round-trips.
+    fromHrms(supabase, "attendance")
+      .select("attendance_date")
+      .eq("organization_id", organizationId)
+      .in("employee_id", teamIds)
+      .gte("attendance_date", trendStart)
+      .lte("attendance_date", trendEnd)
+      .in("attendance_status", ["present", "late", "half_day"])
+      .is("deleted_at", null),
     fromHrms(supabase, "exit_resignations")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
@@ -694,6 +695,17 @@ export async function getManagerDashboardData(
   ]);
 
   if (exitRequestsResult.error) throw new Error(exitRequestsResult.error.message);
+  if (attendanceTrendRowsRes.error) {
+    throw new Error(attendanceTrendRowsRes.error.message);
+  }
+
+  const attendanceTrendByDay = new Map<string, number>(dayKeys.map((day) => [day, 0]));
+  for (const row of attendanceTrendRowsRes.data ?? []) {
+    const day = row.attendance_date as string;
+    if (attendanceTrendByDay.has(day)) {
+      attendanceTrendByDay.set(day, (attendanceTrendByDay.get(day) ?? 0) + 1);
+    }
+  }
 
   const attendanceCounts = {
     presentToday: 0,
@@ -992,11 +1004,20 @@ export async function getManagerDashboardData(
   ];
 
   const charts = emptyCharts(
-    dayKeys.map((day, index) => ({
+    dayKeys.map((day) => ({
       label: format(parseISO(day), "dd MMM"),
-      value: attendanceTrendCountsRes[index]?.count ?? 0,
+      value: attendanceTrendByDay.get(day) ?? 0,
     })),
   );
+
+  if (process.env.NODE_ENV === "development") {
+    console.info("[perf]", {
+      area: "manager",
+      label: "getManagerDashboardData",
+      teamSize: teamIds.length,
+      note: "7-day attendance trend via single range query",
+    });
+  }
 
   return {
     generatedAt: new Date().toISOString(),

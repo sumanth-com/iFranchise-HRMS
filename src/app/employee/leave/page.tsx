@@ -56,7 +56,15 @@ export default async function EmployeeLeavePage() {
     ),
     canApply || canEdit
       ? safeServerCall(
-          () => getLeaveLookups(supabase, profile.employee.organizationId),
+          () =>
+            getLeaveLookups(supabase, profile.employee.organizationId, {
+              // Self-apply only — skip org-wide employee/dept/manager lookups.
+              selfApplicant: {
+                id: employeeId,
+                label: `${profile.employee.firstName} ${profile.employee.lastName}`.trim(),
+                code: profile.employee.employeeCode,
+              },
+            }),
           {
             leaveTypes: [],
             departments: [],
