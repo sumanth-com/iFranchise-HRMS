@@ -20,7 +20,11 @@ import {
 import { loadUserProfile } from "@/lib/auth/profile-loader";
 import { getAuthenticatedRedirectPath } from "@/lib/auth/redirect";
 import { resolveApprovedLoginEmail } from "@/lib/auth/login-email";
-import { clearPermissionCacheCookie } from "@/lib/auth/permission-cache";
+import {
+  clearPermissionCacheCookie,
+  getVerifiedPermissionCodesForUser,
+  setPermissionCacheCookie,
+} from "@/lib/auth/permission-cache";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
 import { assertRateLimit } from "@/lib/security/rate-limit";
@@ -218,6 +222,30 @@ export async function loginAction(
 
     const userId = authData.user.id;
     const employee = profileResult.profile.employee;
+    const permissionCodes = profileResult.profile.permissionCodes;
+    const roleCodes = profileResult.profile.roles.map((role) => role.code);
+
+    // Seed HMAC permission cookie from the already-trusted login profile so the
+    // first portal navigation is a cookie HIT (no middleware permission-bootstrap).
+    // accountAllowed=true: loadUserProfile already rejected inactive/suspended accounts.
+    await setPermissionCacheCookie(userId, permissionCodes, true, roleCodes);
+    const seededCodes = await getVerifiedPermissionCodesForUser(userId);
+    if (
+      !seededCodes ||
+      seededCodes.length === 0 ||
+      seededCodes.length !== permissionCodes.length ||
+      !permissionCodes.every((code) => seededCodes.includes(code))
+    ) {
+      // Fail closed: do not complete login without a usable permission cookie.
+      await clearPermissionCacheCookie();
+      await supabase.auth.signOut();
+      return {
+        success: false,
+        error: "SERVER_ERROR",
+        message: getAuthErrorMessage("SERVER_ERROR"),
+      };
+    }
+
     const needsActivation =
       employee.accountStatus === "invited" ||
       employee.accountStatus === "invitation_pending" ||
@@ -236,7 +264,7 @@ export async function loginAction(
     const portalRoute = await resolveUserPortalRoute(supabase, userId);
     const redirectTo = getAuthenticatedRedirectPath(
       profileResult.profile.roles,
-      profileResult.profile.permissionCodes,
+      permissionCodes,
       portalRoute,
     );
 
