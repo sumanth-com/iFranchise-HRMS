@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import {
   parseLeavePolicies,
@@ -79,7 +81,7 @@ export function calendarContextFromSettings(
   };
 }
 
-export async function loadLeavePolicyRuntime(
+export const loadLeavePolicyRuntime = cache(async function loadLeavePolicyRuntime(
   supabase: AuthSupabaseClient,
   organizationId: string,
 ): Promise<LeavePolicyRuntime> {
@@ -173,7 +175,7 @@ export async function loadLeavePolicyRuntime(
     approvalLevels: leave.approvalLevels,
     leaveTypes: sortByLeaveTypeCode([...leaveTypesByCode.values()]),
   };
-}
+});
 
 export async function loadLeaveEmployeePolicyState(
   supabase: AuthSupabaseClient,

@@ -3,32 +3,33 @@
 import { useEffect } from "react";
 
 import {
-  isChunkLoadError,
-  isStaleHmrModuleError,
+  clearChunkRecoveryStateIfHealthy,
+  isRecoverableRouteError,
   recoverFromChunkLoadError,
 } from "@/lib/next/chunk-load-recovery";
 
 /**
- * Catches stale Turbopack/Next chunk failures during client navigations and
- * silently reloads so users never see a blocking error when switching modules.
+ * Catches deploy/chunk/RSC skew during client navigations and performs a
+ * bounded hard reload. Application bugs are left alone (error boundaries handle them).
  */
 export function ChunkLoadRecovery() {
   useEffect(() => {
-    function isRecoverableClientError(candidate: unknown) {
-      return isChunkLoadError(candidate) || isStaleHmrModuleError(candidate);
-    }
+    clearChunkRecoveryStateIfHealthy();
 
     function handleError(event: ErrorEvent) {
       const candidate = event.error ?? event.message;
-      if (!isRecoverableClientError(candidate)) return;
+      // Always preserve the original exception in the console.
+      if (!isRecoverableRouteError(candidate)) return;
+      console.error("[chunk-recovery] window error (recoverable)", candidate);
       event.preventDefault();
-      recoverFromChunkLoadError();
+      recoverFromChunkLoadError({ cause: candidate });
     }
 
     function handleRejection(event: PromiseRejectionEvent) {
-      if (!isRecoverableClientError(event.reason)) return;
+      if (!isRecoverableRouteError(event.reason)) return;
+      console.error("[chunk-recovery] unhandledrejection (recoverable)", event.reason);
       event.preventDefault();
-      recoverFromChunkLoadError();
+      recoverFromChunkLoadError({ cause: event.reason });
     }
 
     window.addEventListener("error", handleError);

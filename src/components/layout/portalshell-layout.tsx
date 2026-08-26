@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { DashboardShellFallback } from "@/components/layout/dashboard-shell-fallback";
+import { ModulePageSkeleton } from "@/components/layout/module-page-skeleton";
 import { AUTH_ROUTES } from "@/lib/auth/constants";
 import { getLayoutUserProfile } from "@/lib/auth/layout-profile";
 import { PORTAL_PERMISSIONS, type PortalKey } from "@/lib/auth/portals";
@@ -41,7 +42,9 @@ async function ResolvedPortalShell({
   const layoutStartedAt = performance.now();
   const logLayout = (label: string, startedAt: number) => {
     if (process.env.NODE_ENV !== "development") return;
-    console.info("[layout-timing]", {
+    console.info("[perf]", {
+      area: "layout",
+      source: "layout-timing",
       atMs: Math.round(performance.now() - startedAt),
       label,
     });
@@ -84,7 +87,10 @@ async function ResolvedPortalShell({
       portalVariant={portalVariant}
       portalLabel={portalLabel}
     >
-      <DashboardShell>{children}</DashboardShell>
+      <DashboardShell>
+        {/* Stream page RSC after shell chrome so soft-nav is not blank while module data loads. */}
+        <Suspense fallback={<ModulePageSkeleton />}>{children}</Suspense>
+      </DashboardShell>
     </AuthProvider>
   );
 }

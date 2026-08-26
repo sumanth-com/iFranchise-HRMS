@@ -37,7 +37,6 @@ import {
   getBranches,
   getDepartments,
   getEmploymentTypes,
-  getManagers,
 } from "@/lib/employees/services/employee-queries";
 import {
   resolveOrgDataEmployeeScope,
@@ -134,30 +133,6 @@ function resolveApproverDisplayName(
   return first ? approvalPersonName(first, nameById) : null;
 }
 
-async function loadApproverNameMap(
-  supabase: AuthSupabaseClient,
-  approverIds: string[],
-): Promise<Map<string, string>> {
-  const uniqueIds = Array.from(new Set(approverIds.filter(Boolean)));
-  const nameById = new Map<string, string>();
-  if (uniqueIds.length === 0) return nameById;
-
-  const { data, error } = await supabase
-    .schema("hrms")
-    .from("employees")
-    .select("id, first_name, last_name")
-    .in("id", uniqueIds)
-    .is("deleted_at", null);
-
-  if (error) throw new Error(error.message);
-
-  for (const row of data ?? []) {
-    const name = `${row.first_name} ${row.last_name}`.trim();
-    if (name) nameById.set(row.id, name);
-  }
-  return nameById;
-}
-
 function parseListParams(params: LeaveListParams) {
   return leaveListParamsSchema.parse(params);
 }
@@ -225,25 +200,16 @@ export async function listLeaveRequests(
           employee_code,
           first_name,
           last_name,
-          email,
           department_id,
           designation_id,
           branch_id,
-          employment_type_id,
-          reporting_manager_id,
           departments:department_id (name),
           designations:designation_id (title),
           branches:branch_id (name)
         ),
-        leave_types:leave_type_id (name, code),
-        leave_approvals (
-          approval_level,
-          approval_status,
-          approver_employee_id,
-          employees:approver_employee_id (first_name, last_name)
-        )
+        leave_types:leave_type_id (name, code)
       `,
-      { count: "exact" },
+      { count: "estimated" },
     )
     .eq("employees.organization_id", organizationId)
     .is("deleted_at", null);
@@ -257,6 +223,30 @@ export async function listLeaveRequests(
     if (hrApplicantIds.length > 0) {
       query = query.not("employee_id", "in", `(${hrApplicantIds.join(",")})`);
     }
+  }
+
+  // Approver filter: resolve matching leave_request ids first (bounded), avoid
+  // forcing a nested leave_approvals embed on the paged list query.
+  if (approverId) {
+    const { data: approvalScope, error: approvalScopeError } = await supabase
+      .schema("hrms")
+      .from("leave_approvals")
+      .select("leave_request_id")
+      .eq("approver_employee_id", approverId)
+      .is("deleted_at", null)
+      .limit(2000);
+    if (approvalScopeError) throw new Error(approvalScopeError.message);
+    const scopedLeaveIds = [
+      ...new Set(
+        (approvalScope ?? [])
+          .map((row) => row.leave_request_id as string)
+          .filter(Boolean),
+      ),
+    ];
+    if (scopedLeaveIds.length === 0) {
+      return { data: [], total: 0, page, pageSize };
+    }
+    query = query.in("id", scopedLeaveIds);
   }
 
   const today = getTodayDateString();
@@ -317,14 +307,11 @@ export async function listLeaveRequests(
   if (typeof isHalfDay === "boolean") {
     query = query.eq("is_half_day", isHalfDay);
   }
-  if (approverId) {
-    query = query.eq("leave_approvals.approver_employee_id", approverId);
-  }
 
   if (search) {
     const term = `%${search}%`;
     query = query.or(
-      `employee_code.ilike.${term},first_name.ilike.${term},last_name.ilike.${term},email.ilike.${term}`,
+      `employee_code.ilike.${term},first_name.ilike.${term},last_name.ilike.${term}`,
       { referencedTable: "employees" },
     );
   }
@@ -345,10 +332,44 @@ export async function listLeaveRequests(
   if (error) throw new Error(error.message);
 
   const rows = (data ?? []) as LeaveRequestRow[];
-  const nameById = await loadApproverNameMap(
-    supabase,
-    rows.flatMap((row) => (row.leave_approvals ?? []).map((a) => a.approver_employee_id)),
-  );
+  const leaveIds = rows.map((row) => row.id);
+
+  // Approvals only for the visible page of requests (not nested on the list join).
+  const approvalsByLeaveId = new Map<
+    string,
+    NonNullable<LeaveRequestRow["leave_approvals"]>
+  >();
+  if (leaveIds.length > 0) {
+    const { data: approvalRows, error: approvalsError } = await supabase
+      .schema("hrms")
+      .from("leave_approvals")
+      .select(
+        `
+          leave_request_id,
+          approval_level,
+          approval_status,
+          approver_employee_id,
+          employees:approver_employee_id (first_name, last_name)
+        `,
+      )
+      .in("leave_request_id", leaveIds)
+      .is("deleted_at", null);
+    if (approvalsError) throw new Error(approvalsError.message);
+
+    for (const row of approvalRows ?? []) {
+      const leaveRequestId = row.leave_request_id as string;
+      const list = approvalsByLeaveId.get(leaveRequestId) ?? [];
+      list.push({
+        approval_level: Number(row.approval_level),
+        approval_status: String(row.approval_status),
+        approver_employee_id: String(row.approver_employee_id),
+        employees: (row.employees ?? null) as NonNullable<
+          LeaveRequestRow["leave_approvals"]
+        >[number]["employees"],
+      });
+      approvalsByLeaveId.set(leaveRequestId, list);
+    }
+  }
 
   const mapped = rows.map((row) => {
       const employee = unwrapRelation(row.employees);
@@ -356,7 +377,7 @@ export async function listLeaveRequests(
       const department = unwrapRelation(employee?.departments ?? null);
       const designation = unwrapRelation(employee?.designations ?? null);
       const branch = unwrapRelation(employee?.branches ?? null);
-      const approvals = row.leave_approvals ?? [];
+      const approvals = approvalsByLeaveId.get(row.id) ?? [];
       const pendingApproval = approvals
         .filter((a) => a.approval_status === "pending")
         .sort((a, b) => a.approval_level - b.approval_level)[0];
@@ -395,7 +416,7 @@ export async function listLeaveRequests(
         reason: row.reason,
         leaveStatus: row.leave_status as LeaveListResult["data"][number]["leaveStatus"],
         appliedAt: row.created_at,
-        approverName: resolveApproverDisplayName(approvals, nameById),
+        approverName: resolveApproverDisplayName(approvals, new Map()),
         currentApprovalLevel: pendingApproval?.approval_level ?? null,
         pendingApproverEmployeeId,
         canActOnApproval: isAssignedApprover,
@@ -502,7 +523,7 @@ export async function getLeaveSummary(
   profile: UserProfile,
   month?: number,
   year?: number,
-  options?: { excludeHrApplicants?: boolean },
+  options?: { excludeHrApplicants?: boolean; skipBalanceUtilization?: boolean },
 ): Promise<LeaveSummary> {
   const organizationId = profile.employee.organizationId;
   const today = getTodayDateString();
@@ -576,7 +597,9 @@ export async function getLeaveSummary(
         .eq("employees.organization_id", organizationId)
         .is("deleted_at", null),
     ),
-    computeOrgLeaveBalanceUtilizationPercent(supabase, organizationId, balanceYear),
+    options?.skipBalanceUtilization
+      ? Promise.resolve(0)
+      : computeOrgLeaveBalanceUtilizationPercent(supabase, organizationId, balanceYear),
   ]);
 
   return {
@@ -589,19 +612,22 @@ export async function getLeaveSummary(
   };
 }
 
-function parseBalanceAggregateRow(
-  row: Record<string, unknown> | null | undefined,
+function sumBalanceDays(
+  rows: Array<{ allocated_days?: number | null; used_days?: number | null }> | null | undefined,
 ): { allocated: number; used: number } {
-  if (!row) return { allocated: 0, used: 0 };
-  return {
-    allocated: Number(row.allocated ?? row.allocated_days ?? 0),
-    used: Number(row.used ?? row.used_days ?? 0),
-  };
+  let allocated = 0;
+  let used = 0;
+  for (const row of rows ?? []) {
+    allocated += Number(row.allocated_days ?? 0);
+    used += Number(row.used_days ?? 0);
+  }
+  return { allocated, used };
 }
 
 /**
- * Org-wide leave utilization without shipping every leave_balances row.
- * Prefer a single SQL aggregate; fall back to chunked aggregates by employee id.
+ * Org-wide leave utilization.
+ * Hosted Supabase often disables PostgREST aggregates ("Use of aggregate functions
+ * is not allowed"), so we select only allocated/used columns and sum in memory.
  */
 async function computeOrgLeaveBalanceUtilizationPercent(
   supabase: AuthSupabaseClient,
@@ -611,16 +637,14 @@ async function computeOrgLeaveBalanceUtilizationPercent(
   const joined = await supabase
     .schema("hrms")
     .from("leave_balances")
-    .select(
-      "allocated:allocated_days.sum(), used:used_days.sum(), employees!inner(organization_id)",
-    )
+    .select("allocated_days, used_days, employees!inner(organization_id)")
     .eq("balance_year", balanceYear)
     .eq("employees.organization_id", organizationId)
     .is("deleted_at", null);
 
   if (!joined.error) {
-    const { allocated, used } = parseBalanceAggregateRow(
-      (joined.data?.[0] ?? null) as Record<string, unknown> | null,
+    const { allocated, used } = sumBalanceDays(
+      (joined.data ?? []) as Array<{ allocated_days?: number | null; used_days?: number | null }>,
     );
     if (allocated > 0) return Math.round((used / allocated) * 100);
     return 0;
@@ -655,19 +679,17 @@ async function computeOrgLeaveBalanceUtilizationPercent(
     const { data, error } = await supabase
       .schema("hrms")
       .from("leave_balances")
-      .select("allocated:allocated_days.sum(), used:used_days.sum()")
+      .select("allocated_days, used_days")
       .in("employee_id", chunk)
       .eq("balance_year", balanceYear)
       .is("deleted_at", null);
 
     if (error) {
-      console.error("[leave] balance utilization chunk aggregate failed", error.message);
+      console.error("[leave] balance utilization chunk select failed", error.message);
       return 0;
     }
 
-    const { allocated, used } = parseBalanceAggregateRow(
-      (data?.[0] ?? null) as Record<string, unknown> | null,
-    );
+    const { allocated, used } = sumBalanceDays(data);
     allocatedTotal += allocated;
     usedTotal += used;
   }
@@ -681,6 +703,7 @@ export async function getEmployeeLeaveBalanceSnapshot(
   employeeId: string,
   balanceYearParam = getCurrentBalanceYear(),
   monthYear?: { month: number; year: number },
+  organizationIdHint?: string,
 ): Promise<LeaveEmployeeBalanceSnapshot[]> {
   const now = new Date();
   const calendarYear = monthYear?.year ?? balanceYearParam;
@@ -689,14 +712,7 @@ export async function getEmployeeLeaveBalanceSnapshot(
   const monthRange = getMonthDateRange(month, calendarYear);
   const yearRange = { start: `${calendarYear}-01-01`, end: `${calendarYear}-12-31` };
 
-  const [employeeResult, balancesResult] = await Promise.all([
-    supabase
-      .schema("hrms")
-      .from("employees")
-      .select("organization_id")
-      .eq("id", employeeId)
-      .is("deleted_at", null)
-      .maybeSingle(),
+  const balancesQuery = () =>
     supabase
       .schema("hrms")
       .from("leave_balances")
@@ -705,13 +721,21 @@ export async function getEmployeeLeaveBalanceSnapshot(
       )
       .eq("employee_id", employeeId)
       .eq("balance_year", balanceYear)
-      .is("deleted_at", null),
-  ]);
+      .is("deleted_at", null);
 
-  if (employeeResult.error) throw new Error(employeeResult.error.message);
-  if (balancesResult.error) throw new Error(balancesResult.error.message);
+  let organizationId = organizationIdHint;
+  if (!organizationId) {
+    const { data: employeeRow, error: employeeError } = await supabase
+      .schema("hrms")
+      .from("employees")
+      .select("organization_id")
+      .eq("id", employeeId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (employeeError) throw new Error(employeeError.message);
+    organizationId = employeeRow?.organization_id as string | undefined;
+  }
 
-  const organizationId = employeeResult.data?.organization_id as string | undefined;
   let typeRows: Array<{ code: string; name: string; days_per_year: number | string | null }> = [];
   let requestRows: Array<{
     start_date: string;
@@ -722,9 +746,11 @@ export async function getEmployeeLeaveBalanceSnapshot(
     leave_types: { code: string } | { code: string }[] | null;
   }> = [];
   let calendar = DEFAULT_LEAVE_CALENDAR;
+  let balancesResult: Awaited<ReturnType<typeof balancesQuery>>;
 
   if (organizationId) {
-    const [typesResult, requestsResult, runtime] = await Promise.all([
+    const [balances, typesResult, requestsResult, runtime] = await Promise.all([
+      balancesQuery(),
       supabase
         .schema("hrms")
         .from("leave_types")
@@ -747,13 +773,18 @@ export async function getEmployeeLeaveBalanceSnapshot(
       loadLeavePolicyRuntime(supabase, organizationId),
     ]);
 
+    balancesResult = balances;
     if (typesResult.error) throw new Error(typesResult.error.message);
     if (requestsResult.error) throw new Error(requestsResult.error.message);
 
     typeRows = typesResult.data ?? [];
     requestRows = (requestsResult.data ?? []) as typeof requestRows;
     calendar = runtime.calendar;
+  } else {
+    balancesResult = await balancesQuery();
   }
+
+  if (balancesResult.error) throw new Error(balancesResult.error.message);
   const monthUsedByCode: Record<string, number> = {};
   const yearUsedByCode: Record<string, number> = {};
   const yearTakenByCode: Record<string, number> = {};
@@ -1062,13 +1093,16 @@ export async function getEmployeeLeaveCalendarData(
   return { leaves, holidays, calendar: runtime.calendar };
 }
 
+/** Cap filter dropdown size — full org employee dumps dominate team hub latency. */
+const FILTER_EMPLOYEE_LOOKUP_LIMIT = 250;
+
 export async function getLeaveLookups(
   supabase: AuthSupabaseClient,
   organizationId: string,
   options?: { selfApplicant?: LookupOption | null },
 ): Promise<LeaveLookups> {
   const selfApplicant = options?.selfApplicant ?? null;
-  const [leaveTypesResult, departments, branches, employeesResult, managers, employmentTypes] =
+  const [leaveTypesResult, departments, branches, employeesResult, employmentTypes] =
     await Promise.all([
       supabase
         .schema("hrms")
@@ -1091,10 +1125,8 @@ export async function getLeaveLookups(
             .eq("organization_id", organizationId)
             .is("deleted_at", null)
             .in("employment_status", ["active", "probation", "on_leave"])
-            .order("first_name"),
-      selfApplicant
-        ? Promise.resolve([] as LookupOption[])
-        : getManagers(supabase, organizationId),
+            .order("first_name")
+            .limit(FILTER_EMPLOYEE_LOOKUP_LIMIT),
       selfApplicant
         ? Promise.resolve([] as LookupOption[])
         : getEmploymentTypes(supabase, organizationId),
@@ -1125,13 +1157,15 @@ export async function getLeaveLookups(
         code: row.employee_code,
       }));
 
+  // Reuse the same bounded employee list for manager/approver filters (avoids a
+  // second full-org employees scan that previously mirrored getManagers()).
   return {
     leaveTypes,
     departments,
     branches,
     employees,
-    managers,
-    approvers: managers,
+    managers: employees,
+    approvers: employees,
     employmentTypes,
   };
 }

@@ -2,10 +2,8 @@ import { PayslipHistoryView } from "@/components/payroll/payslip-history-view";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { listPayslipHistory } from "@/lib/payroll/services/payslip-history-queries";
-import { processDuePayslipPublications } from "@/lib/payroll/services/payslip-publication-worker";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
-import { siteConfig } from "@/config/site";
 import { payslipHistoryParamsSchema } from "@/lib/validations/payroll";
 
 type PageProps = {
@@ -23,8 +21,6 @@ export default async function EmployeePayrollHistoryPage({ searchParams }: PageP
   ]);
   const supabase = await createClient();
   const raw = await searchParams;
-
-  void processDuePayslipPublications(supabase, profile, siteConfig.url).catch(() => undefined);
 
   const now = new Date();
   const params = payslipHistoryParamsSchema.parse({

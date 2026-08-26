@@ -22,6 +22,16 @@ export function AppRouteError({ error, reset }: AppRouteErrorProps) {
   const [reloadExhausted, setReloadExhausted] = useState(false);
 
   useEffect(() => {
+    // Always log the real exception — recovery must not hide the cause.
+    console.error("[route-error]", {
+      name: error.name,
+      message: error.message,
+      digest: error.digest,
+      pathname,
+      recoverable: isRecoverable,
+      stack: error.stack,
+    });
+
     if (previousPathname.current !== pathname) {
       previousPathname.current = pathname;
       setReloadExhausted(false);
@@ -30,12 +40,9 @@ export function AppRouteError({ error, reset }: AppRouteErrorProps) {
     }
 
     if (isRecoverable) {
-      const recovered = recoverFromChunkLoadError();
+      const recovered = recoverFromChunkLoadError({ cause: error });
       if (!recovered) setReloadExhausted(true);
-      return;
     }
-
-    console.error("[route-error]", error);
   }, [error, isRecoverable, pathname, reset]);
 
   if (isRecoverable && !reloadExhausted) {
@@ -54,7 +61,7 @@ export function AppRouteError({ error, reset }: AppRouteErrorProps) {
         description="We couldn't load this page. Please try again, or contact your HR administrator if the problem continues."
         onRetry={() => {
           if (isRecoverable) {
-            recoverFromChunkLoadError({ force: true });
+            recoverFromChunkLoadError({ force: true, cause: error });
             return;
           }
           reset();

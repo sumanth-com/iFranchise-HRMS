@@ -104,7 +104,13 @@ export async function LeaveHubSection({
     applyLookupsSettled,
   ] = await Promise.all([
     loadMySection
-      ? getEmployeeLeaveBalanceSnapshot(supabase, employeeId, calendarYear).catch((error) => {
+      ? getEmployeeLeaveBalanceSnapshot(
+          supabase,
+          employeeId,
+          calendarYear,
+          undefined,
+          profile.employee.organizationId,
+        ).catch((error) => {
           console.error("[leave] balance snapshot failed", error);
           return [] as Awaited<ReturnType<typeof getEmployeeLeaveBalanceSnapshot>>;
         })
@@ -141,6 +147,8 @@ export async function LeaveHubSection({
     loadTeamSection
       ? getLeaveSummary(supabase, profile, teamParams.month, teamParams.year, {
           excludeHrApplicants: true,
+          // Summary cards do not display utilization — skip full leave_balances scan.
+          skipBalanceUtilization: true,
         }).catch((error) => {
           console.error("[leave] summary failed", error);
           return null;

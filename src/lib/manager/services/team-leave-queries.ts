@@ -731,30 +731,31 @@ export async function getTeamLeaveSummary(
     maxDate,
   );
 
-  let leaveConflicts = 0;
-  for (const row of pendingRows) {
-    const employee = unwrap(row.employees);
-    const designation = unwrap(employee?.designations ?? null);
-    const conflicts = await detectTeamLeaveConflicts(
-      supabase,
-      organizationId,
-      teamIds,
-      {
-        leaveRequestId: row.id,
-        employeeId: row.employee_id,
-        departmentId: employee?.department_id ?? null,
-        designationTitle: designation?.title ?? null,
-        startDate: row.start_date,
-        endDate: row.end_date,
-      },
-      teamMeta,
-      holidays,
-      overlapRows,
-    );
-    if (conflicts.some((item) => item.severity === "warning")) {
-      leaveConflicts += 1;
-    }
-  }
+  // Preloaded overlap/holiday data — compute conflicts in parallel (no extra DB).
+  const conflictFlags = await Promise.all(
+    pendingRows.map(async (row) => {
+      const employee = unwrap(row.employees);
+      const designation = unwrap(employee?.designations ?? null);
+      const conflicts = await detectTeamLeaveConflicts(
+        supabase,
+        organizationId,
+        teamIds,
+        {
+          leaveRequestId: row.id,
+          employeeId: row.employee_id,
+          departmentId: employee?.department_id ?? null,
+          designationTitle: designation?.title ?? null,
+          startDate: row.start_date,
+          endDate: row.end_date,
+        },
+        teamMeta,
+        holidays,
+        overlapRows,
+      );
+      return conflicts.some((item) => item.severity === "warning");
+    }),
+  );
+  const leaveConflicts = conflictFlags.filter(Boolean).length;
 
   return {
     pendingRequests: pendingResult.count ?? 0,

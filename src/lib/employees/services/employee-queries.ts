@@ -1,5 +1,4 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
-import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
 import { allocateNextEmployeeCode } from "@/lib/employees/services/employee-code";
 import { cleanDisplayText } from "@/lib/employees/parse-employee-name";
 import {
@@ -7,7 +6,6 @@ import {
   scopedEmployeeIds,
 } from "@/lib/manager/portal-scope";
 import { listEligibleHrLeaveApproverOptions } from "@/lib/leave/services/leave-queries";
-import { createSignedStorageUrls } from "@/lib/storage/signed-url";
 import type { UserProfile } from "@/types/auth";
 import type {
   EmployeeAccountProvisioningItem,
@@ -24,18 +22,8 @@ type EmployeeRow = {
   employee_code: string;
   first_name: string;
   last_name: string;
-  email: string;
-  phone: string | null;
-  employment_status: string;
-  date_of_joining: string | null;
-  branch_id: string;
-  department_id: string | null;
-  designation_id: string | null;
+  employment_status?: string | null;
   account_status: string;
-  invitation_sent_at: string | null;
-  last_login_at: string | null;
-  branches: { name: string } | { name: string }[] | null;
-  departments: { name: string } | { name: string }[] | null;
   designations: { title: string } | { title: string }[] | null;
   employee_profiles:
     | { profile_image_storage_path: string | null }
@@ -124,22 +112,12 @@ export async function listEmployees(
         employee_code,
         first_name,
         last_name,
-        email,
-        phone,
         employment_status,
-        date_of_joining,
-        branch_id,
-        department_id,
-        designation_id,
         account_status,
-        invitation_sent_at,
-        last_login_at,
-        branches:branch_id (name),
-        departments:department_id (name),
         designations:designation_id (title),
         employee_profiles (profile_image_storage_path)
       `,
-      { count: "exact" },
+      { count: "estimated" },
     )
     .eq("organization_id", profile.employee.organizationId)
     .is("deleted_at", null);
@@ -186,19 +164,11 @@ export async function listEmployees(
   }
 
   const rows = (data ?? []) as EmployeeRow[];
-  const imagePaths = rows.map(
-    (row) => unwrapRelation(row.employee_profiles)?.profile_image_storage_path ?? null,
-  );
-  const signedByPath = await createSignedStorageUrls(
-    supabase,
-    EMPLOYEE_STORAGE_BUCKETS.profileImages,
-    imagePaths,
-  );
+  // Defer avatar signing to the client CardPhoto path — do not block the list
+  // round-trip on storage signed-URL generation for every card.
 
   return {
     data: rows.map((row) => {
-      const branch = unwrapRelation(row.branches);
-      const department = unwrapRelation(row.departments);
       const designation = unwrapRelation(row.designations);
       const employeeProfile = unwrapRelation(row.employee_profiles);
       const profileImagePath = employeeProfile?.profile_image_storage_path ?? null;
@@ -209,23 +179,22 @@ export async function listEmployees(
         firstName: cleanDisplayText(row.first_name),
         lastName: cleanDisplayText(row.last_name),
         fullName: `${cleanDisplayText(row.first_name)} ${cleanDisplayText(row.last_name)}`.trim(),
-        email: row.email,
-        phone: row.phone,
-        employmentStatus: row.employment_status as EmployeeListResult["data"][number]["employmentStatus"],
-        dateOfJoining: row.date_of_joining,
-        branchId: row.branch_id,
-        branchName: branch?.name ?? null,
-        departmentId: row.department_id,
-        departmentName: department?.name ?? null,
-        designationId: row.designation_id,
+        email: "",
+        phone: null,
+        employmentStatus: (row.employment_status ??
+          "active") as EmployeeListResult["data"][number]["employmentStatus"],
+        dateOfJoining: null,
+        branchId: "",
+        branchName: null,
+        departmentId: null,
+        departmentName: null,
+        designationId: null,
         designationTitle: designation?.title ?? null,
         profileImagePath,
-        profileImageSignedUrl: profileImagePath
-          ? (signedByPath.get(profileImagePath) ?? null)
-          : null,
+        profileImageSignedUrl: null,
         accountStatus: row.account_status as EmployeeListResult["data"][number]["accountStatus"],
-        invitationSentAt: row.invitation_sent_at,
-        lastLoginAt: row.last_login_at,
+        invitationSentAt: null,
+        lastLoginAt: null,
       };
     }),
     total: count ?? 0,

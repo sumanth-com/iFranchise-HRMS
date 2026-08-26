@@ -113,6 +113,7 @@ export async function getCeoApprovalsFilterLookups(
       )
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
+      .in("request_status", [...CEO_PENDING_APPROVAL_STATUSES])
       .not("requested_by_employee_id", "is", null),
     fromHrms(supabase, "employees")
       .select("id, first_name, last_name")
@@ -570,15 +571,31 @@ export async function getCeoApprovalsPageData(
   profile: UserProfile,
   params: CeoApprovalsListParams,
 ): Promise<CeoApprovalsPageData> {
-  await syncExecutiveApprovalsFromDomain(supabase, profile);
+  const syncPromise = syncExecutiveApprovalsFromDomain(supabase, profile);
 
-  const [kpis, categories, queue, insights, lookups] = await Promise.all([
-    getCeoApprovalsKpis(supabase, profile, params),
-    getCeoApprovalsCategories(supabase, profile, params),
-    listCeoApprovalsQueue(supabase, profile, params),
-    getCeoApprovalsInsights(supabase, profile, params),
+  // Categories/insights are not rendered on the main approvals view — skip those
+  // full-table scans on the critical path (same queue/KPI/lookup semantics).
+  // Lookups do not depend on sync; overlap them with the sync work.
+  const [kpis, queue, lookups] = await Promise.all([
+    syncPromise.then(() => getCeoApprovalsKpis(supabase, profile, params)),
+    syncPromise.then(() => listCeoApprovalsQueue(supabase, profile, params)),
     getCeoApprovalsFilterLookups(supabase, profile.employee.organizationId),
   ]);
 
-  return { kpis, categories, queue, insights, lookups };
+  const emptyInsights: CeoApprovalsInsights = {
+    pendingByDepartment: [],
+    pendingByPriority: [],
+    approvalTurnaroundHours: [],
+    monthlyApprovalTrend: [],
+    approvalSuccessRate: 0,
+    averageProcessingTimeHours: 0,
+  };
+
+  return {
+    kpis,
+    categories: [],
+    queue,
+    insights: emptyInsights,
+    lookups,
+  };
 }

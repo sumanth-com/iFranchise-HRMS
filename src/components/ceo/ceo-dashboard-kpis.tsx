@@ -92,7 +92,7 @@ export function CeoDashboardKpis({ kpis }: { kpis: CeoKpis }) {
         icon={Wallet}
         accent="text-amber-700 dark:text-amber-400"
         iconBg="bg-amber-500/10"
-        href={CEO_ROUTES.payroll}
+        href={CEO_ROUTES.payrollRun}
       />
     </section>
   );

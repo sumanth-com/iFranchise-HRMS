@@ -75,24 +75,39 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
   const payrollMonthDate = getPayrollMonthDate(now.getMonth() + 1, now.getFullYear());
   const startedAt = performance.now();
 
-  await syncExecutiveApprovalsFromDomain(supabase, profile).catch((error) => {
+  // Kick off domain sync without blocking non-approval KPI queries.
+  const syncPromise = syncExecutiveApprovalsFromDomain(supabase, profile).catch((error) => {
     console.error("[ceo-dashboard] executive approval sync failed", error);
   });
+
+  const attendanceStatusCount = (status: string) =>
+    fromHrms(supabase, "attendance")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("attendance_date", today)
+      .eq("attendance_status", status)
+      .is("deleted_at", null);
 
   const [
     leaveApprovalQueue,
     activeEmployeesRes,
     exitingRes,
-    attendanceTodayRes,
+    presentTodayRes,
+    absentTodayRes,
+    lateTodayRes,
+    halfDayTodayRes,
+    onLeaveTodayRes,
     openJobsRes,
     payrollRes,
     pendingApprovalsRes,
     holidaysResult,
   ] = await Promise.all([
-    listCeoApprovalQueue(supabase, profile).catch((error) => {
-      console.error("[ceo-dashboard] leave approval queue failed", error);
-      return [] as Awaited<ReturnType<typeof listCeoApprovalQueue>>;
-    }),
+    syncPromise.then(() =>
+      listCeoApprovalQueue(supabase, profile).catch((error) => {
+        console.error("[ceo-dashboard] leave approval queue failed", error);
+        return [] as Awaited<ReturnType<typeof listCeoApprovalQueue>>;
+      }),
+    ),
     fromHrms(supabase, "employees")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
@@ -104,11 +119,12 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
       .in("employment_status", ["resigned", "terminated"])
       .gte("date_of_leaving", monthStart)
       .is("deleted_at", null),
-    fromHrms(supabase, "attendance")
-      .select("attendance_status")
-      .eq("organization_id", organizationId)
-      .eq("attendance_date", today)
-      .is("deleted_at", null),
+    // Head counts only — avoid downloading every attendance row for org-wide KPIs.
+    attendanceStatusCount("present"),
+    attendanceStatusCount("absent"),
+    attendanceStatusCount("late"),
+    attendanceStatusCount("half_day"),
+    attendanceStatusCount("on_leave"),
     fromHrms(supabase, "recruitment_jobs")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
@@ -120,11 +136,13 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
       .eq("payroll_month", payrollMonthDate)
       .is("deleted_at", null)
       .maybeSingle(),
-    fromHrms(supabase, "executive_approval_requests")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .in("request_status", CEO_PENDING_APPROVAL_STATUSES)
-      .is("deleted_at", null),
+    syncPromise.then(() =>
+      fromHrms(supabase, "executive_approval_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .in("request_status", CEO_PENDING_APPROVAL_STATUSES)
+        .is("deleted_at", null),
+    ),
     listHolidays(supabase, organizationId, { year: now.getFullYear() }).catch((error) => {
       console.error("[ceo-dashboard] holidays query failed", error);
       return { data: [] as Awaited<ReturnType<typeof listHolidays>>["data"] };
@@ -135,8 +153,16 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
   if (exitingRes.error) {
     console.error("[ceo-dashboard] exiting count failed", exitingRes.error.message);
   }
-  if (attendanceTodayRes.error) {
-    console.error("[ceo-dashboard] attendance today failed", attendanceTodayRes.error.message);
+  for (const [label, result] of [
+    ["present", presentTodayRes],
+    ["absent", absentTodayRes],
+    ["late", lateTodayRes],
+    ["half_day", halfDayTodayRes],
+    ["on_leave", onLeaveTodayRes],
+  ] as const) {
+    if (result.error) {
+      console.error(`[ceo-dashboard] attendance ${label} count failed`, result.error.message);
+    }
   }
   if (openJobsRes.error) {
     console.error("[ceo-dashboard] open jobs failed", openJobsRes.error.message);
@@ -155,33 +181,12 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
   const pendingApprovals = pendingApprovalsRes.count ?? 0;
 
   const attendance = {
-    presentToday: 0,
-    absentToday: 0,
-    lateToday: 0,
-    halfDayToday: 0,
-    onLeaveToday: 0,
+    presentToday: presentTodayRes.count ?? 0,
+    absentToday: absentTodayRes.count ?? 0,
+    lateToday: lateTodayRes.count ?? 0,
+    halfDayToday: halfDayTodayRes.count ?? 0,
+    onLeaveToday: onLeaveTodayRes.count ?? 0,
   };
-  for (const row of (attendanceTodayRes.data ?? []) as LooseRow[]) {
-    switch (row.attendance_status) {
-      case "present":
-        attendance.presentToday += 1;
-        break;
-      case "absent":
-        attendance.absentToday += 1;
-        break;
-      case "on_leave":
-        attendance.onLeaveToday += 1;
-        break;
-      case "late":
-        attendance.lateToday += 1;
-        break;
-      case "half_day":
-        attendance.halfDayToday += 1;
-        break;
-      default:
-        break;
-    }
-  }
 
   const presentCount =
     attendance.presentToday + attendance.lateToday + attendance.halfDayToday;
@@ -203,9 +208,11 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
     }));
 
   if (process.env.NODE_ENV === "development") {
-    console.info("[module-timing]", {
+    console.info("[perf]", {
+      area: "ceo",
       label: "getCeoDashboardData",
       atMs: Math.round(performance.now() - startedAt),
+      note: "attendance KPIs via head counts; domain sync still blocks before KPIs",
     });
   }
 

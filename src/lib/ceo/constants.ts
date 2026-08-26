@@ -5,10 +5,15 @@ export const CEO_ROUTES = {
   recruitment: "/ceo/recruitment",
   performance: "/ceo/performance",
   performanceGoals: "/ceo/performance/goals",
+  /** Team payroll base path (section routes hang under this). */
   payroll: "/ceo/payroll",
+  /** Default payroll landing — use for links/nav (avoid bare `/ceo/payroll` soft-nav redirect). */
+  payrollRun: "/ceo/payroll/run",
   attendance: "/ceo/attendance",
-  leave: "/ceo/leave",
-  exit: "/ceo/exit",
+  /** @deprecated Prefer `approvalsLeave` for links; kept as alias for revalidate/bookmarks. */
+  leave: "/ceo/approvals/leave",
+  /** @deprecated Prefer `approvalsExit` for links; kept as alias for revalidate/bookmarks. */
+  exit: "/ceo/approvals/exit",
   analytics: "/ceo/analytics",
   approvals: "/ceo/approvals",
   approvalsLeave: "/ceo/approvals/leave",

@@ -58,16 +58,31 @@ async function buildEmployeeDocumentsExplorer(
   organizationId: string,
   employeeId: string,
 ): Promise<EmployeeDocumentsExplorerData> {
-  const { data, error } = await fromHrms(supabase, "employee_documents")
-    .select(EXPLORER_SELECT)
-    .eq("employee_id", employeeId)
-    .eq("organization_id", organizationId)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false });
+  const explorerStartedAt = performance.now();
 
-  if (error) throw new Error(error.message);
+  // Current docs + settings/types only on first paint. Archived rows (version
+  // chains) are not required to render folders/files; omit that second query.
+  const [documentsResult, settings, typesResult] = await Promise.all([
+    fromHrms(supabase, "employee_documents")
+      .select(EXPLORER_SELECT)
+      .eq("employee_id", employeeId)
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .is("archived_at", null)
+      .order("created_at", { ascending: false }),
+    getDocumentSettings(supabase, organizationId),
+    fromHrms(supabase, "document_types")
+      .select("id, name, code")
+      .eq("organization_id", organizationId)
+      .eq("status", "active")
+      .is("deleted_at", null)
+      .order("name"),
+  ]);
 
-  const rows = (data ?? []) as DocRow[];
+  if (documentsResult.error) throw new Error(documentsResult.error.message);
+  if (typesResult.error) throw new Error(typesResult.error.message);
+
+  const rows = (documentsResult.data ?? []) as DocRow[];
 
   // successorId -> predecessor rows (older versions that were replaced by it)
   const predecessorsOf = new Map<string, DocRow[]>();
@@ -157,18 +172,6 @@ async function buildEmployeeDocumentsExplorer(
     null,
   );
 
-  const [settings, typesResult] = await Promise.all([
-    getDocumentSettings(supabase, organizationId),
-    fromHrms(supabase, "document_types")
-      .select("id, name, code")
-      .eq("organization_id", organizationId)
-      .eq("status", "active")
-      .is("deleted_at", null)
-      .order("name"),
-  ]);
-
-  if (typesResult.error) throw new Error(typesResult.error.message);
-
   const documentTypes = ((typesResult.data ?? []) as DocRow[])
     .map((type) => ({
       id: type.id as string,
@@ -177,6 +180,16 @@ async function buildEmployeeDocumentsExplorer(
       categoryKey: categoryForCode(type.code as string),
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
+
+  if (process.env.NODE_ENV === "development") {
+    console.info("[perf]", {
+      area: "documents",
+      label: "buildEmployeeDocumentsExplorer",
+      atMs: Math.round(performance.now() - explorerStartedAt),
+      fileCount: files.length,
+      note: "documents+settings+types fetched in parallel",
+    });
+  }
 
   return {
     folders,
