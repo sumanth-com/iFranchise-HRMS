@@ -11,9 +11,9 @@ import {
 export function ServerActionStaleRecovery() {
   useEffect(() => {
     function handle(reason: unknown) {
-      if (isStaleServerActionError(reason)) {
-        reloadForStaleServerAction();
-      }
+      if (!isStaleServerActionError(reason)) return;
+      console.error("[server-action-recovery] stale action id — reloading once", reason);
+      reloadForStaleServerAction();
     }
 
     const onError = (event: ErrorEvent) => {

@@ -1,5 +1,9 @@
 const CHUNK_RELOAD_KEY = "hrms.chunk-reload-at";
+const CHUNK_RELOAD_COUNT_KEY = "hrms.chunk-reload-count";
+/** Cooldown between automatic recovery reloads. */
 const CHUNK_RELOAD_COOLDOWN_MS = 12_000;
+/** Hard cap on automatic recoveries per tab session (force retry still allowed once). */
+const CHUNK_RELOAD_MAX_ATTEMPTS = 2;
 
 function errorHaystack(error: unknown): string {
   if (!error) return "";
@@ -17,6 +21,10 @@ function errorHaystack(error: unknown): string {
   return `${name} ${message} ${digest}`;
 }
 
+/**
+ * Stale/missing JS or CSS chunks after a deploy (or broken dynamic import).
+ * These are deployment/asset skew — not application business logic bugs.
+ */
 export function isChunkLoadError(error: unknown): boolean {
   if (!error) return false;
 
@@ -53,46 +61,131 @@ export function isStaleHmrModuleError(error: unknown): boolean {
   );
 }
 
-/** Stale client bundles and interrupted RSC navigations should never strand the user. */
-export function isRecoverableRouteError(error: unknown): boolean {
-  if (isChunkLoadError(error) || isStaleHmrModuleError(error)) return true;
-
+/**
+ * Client/server build skew after a deployment (RSC manifest, Server Actions).
+ * Intentionally excludes AbortError / generic "Failed to fetch" — those are common
+ * during rapid soft-navigation cancellations and must not trigger a hard reload.
+ */
+export function isDeploymentSkewError(error: unknown): boolean {
+  if (!error) return false;
   const haystack = errorHaystack(error);
   return (
-    /Failed to fetch/i.test(haystack) ||
-    /Load failed/i.test(haystack) ||
-    /NetworkError/i.test(haystack) ||
-    /The operation was aborted/i.test(haystack) ||
-    /AbortError/i.test(haystack) ||
-    // Post-deploy client/server skew — hard reload picks up the new build.
     /Failed to find Server Action/i.test(haystack) ||
-    /older or newer deployment/i.test(haystack) ||
+    /UnrecognizedAction/i.test(haystack) ||
+    /was not found on the server/i.test(haystack) ||
+    /(?:older or newer|newer or older) deployment/i.test(haystack) ||
+    /React Server Components? Payload/i.test(haystack) ||
     /React Client Manifest/i.test(haystack) ||
     /Could not find the module/i.test(haystack) ||
-    /NEXT_HTTP_ERROR/i.test(haystack)
+    /Failed to fetch RSC payload/i.test(haystack) ||
+    /Invalid RSC response/i.test(haystack)
   );
 }
 
-/** Reloads once to pick up new chunks; returns false if already retried recently. */
-export function recoverFromChunkLoadError(options?: { force?: boolean }): boolean {
+/**
+ * Only true deployment/chunk/RSC/action skew is recoverable via hard reload.
+ * Application exceptions must surface to the error UI (and be fixed in code).
+ */
+export function isRecoverableRouteError(error: unknown): boolean {
+  return (
+    isChunkLoadError(error) ||
+    isStaleHmrModuleError(error) ||
+    isDeploymentSkewError(error)
+  );
+}
+
+function readAttemptCount(): number {
+  try {
+    const raw = Number(sessionStorage.getItem(CHUNK_RELOAD_COUNT_KEY) ?? "0");
+    return Number.isFinite(raw) && raw > 0 ? raw : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeAttemptMeta(now: number, count: number): void {
+  try {
+    sessionStorage.setItem(CHUNK_RELOAD_KEY, String(now));
+    sessionStorage.setItem(CHUNK_RELOAD_COUNT_KEY, String(count));
+  } catch {
+    // Private mode / blocked storage — still attempt reload below.
+  }
+}
+
+/**
+ * Reloads to pick up new chunks/manifests.
+ * Returns false when cooldown or max attempts block another automatic reload.
+ * Always logs the decision; never silently swallows the original exception.
+ */
+export function recoverFromChunkLoadError(options?: {
+  force?: boolean;
+  cause?: unknown;
+}): boolean {
   if (typeof window === "undefined") return false;
 
   const force = options?.force === true;
+  const cause = options?.cause;
+  const now = Date.now();
 
   try {
     const last = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) ?? "0");
-    const now = Date.now();
+    const attempts = readAttemptCount();
+
     if (!force && last && now - last < CHUNK_RELOAD_COOLDOWN_MS) {
+      console.error("[chunk-recovery] skipped (cooldown)", {
+        attempts,
+        cause:
+          cause instanceof Error
+            ? { name: cause.name, message: cause.message }
+            : cause,
+      });
       return false;
     }
-    sessionStorage.setItem(CHUNK_RELOAD_KEY, String(now));
+
+    if (!force && attempts >= CHUNK_RELOAD_MAX_ATTEMPTS) {
+      console.error("[chunk-recovery] skipped (max attempts)", {
+        attempts,
+        cause:
+          cause instanceof Error
+            ? { name: cause.name, message: cause.message }
+            : cause,
+      });
+      return false;
+    }
+
+    writeAttemptMeta(now, attempts + 1);
   } catch {
-    // Private mode / blocked storage — still attempt a single reload.
+    // continue
   }
 
+  console.error("[chunk-recovery] reloading for deploy/chunk skew", {
+    force,
+    attempts: readAttemptCount(),
+    href: window.location.href,
+    cause:
+      cause instanceof Error
+        ? { name: cause.name, message: cause.message, stack: cause.stack }
+        : cause,
+  });
+
   const url = new URL(window.location.href);
-  // Bust any sticky client/HMR graph so the reload cannot reuse a dead module factory.
-  url.searchParams.set("_r", String(Date.now()));
+  // Bust sticky client/HMR graph so the reload cannot reuse a dead module factory.
+  url.searchParams.set("_r", String(now));
   window.location.replace(`${url.pathname}${url.search}${url.hash}`);
   return true;
+}
+
+/** Clear recovery counters after a successful page load (call once from root providers). */
+export function clearChunkRecoveryStateIfHealthy(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("_r")) return;
+    url.searchParams.delete("_r");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    sessionStorage.removeItem(CHUNK_RELOAD_COUNT_KEY);
+    sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+  } catch {
+    // ignore
+  }
 }

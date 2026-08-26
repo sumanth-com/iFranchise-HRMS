@@ -58,7 +58,7 @@ export const ceoNavItems: NavigationItem[] = [
   },
   {
     title: "Company Payroll",
-    href: CEO_ROUTES.payroll,
+    href: CEO_ROUTES.payrollRun,
     icon: Wallet,
   },
   {

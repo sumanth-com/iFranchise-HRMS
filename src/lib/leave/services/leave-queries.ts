@@ -589,19 +589,22 @@ export async function getLeaveSummary(
   };
 }
 
-function parseBalanceAggregateRow(
-  row: Record<string, unknown> | null | undefined,
+function sumBalanceDays(
+  rows: Array<{ allocated_days?: number | null; used_days?: number | null }> | null | undefined,
 ): { allocated: number; used: number } {
-  if (!row) return { allocated: 0, used: 0 };
-  return {
-    allocated: Number(row.allocated ?? row.allocated_days ?? 0),
-    used: Number(row.used ?? row.used_days ?? 0),
-  };
+  let allocated = 0;
+  let used = 0;
+  for (const row of rows ?? []) {
+    allocated += Number(row.allocated_days ?? 0);
+    used += Number(row.used_days ?? 0);
+  }
+  return { allocated, used };
 }
 
 /**
- * Org-wide leave utilization without shipping every leave_balances row.
- * Prefer a single SQL aggregate; fall back to chunked aggregates by employee id.
+ * Org-wide leave utilization.
+ * Hosted Supabase often disables PostgREST aggregates ("Use of aggregate functions
+ * is not allowed"), so we select only allocated/used columns and sum in memory.
  */
 async function computeOrgLeaveBalanceUtilizationPercent(
   supabase: AuthSupabaseClient,
@@ -611,16 +614,14 @@ async function computeOrgLeaveBalanceUtilizationPercent(
   const joined = await supabase
     .schema("hrms")
     .from("leave_balances")
-    .select(
-      "allocated:allocated_days.sum(), used:used_days.sum(), employees!inner(organization_id)",
-    )
+    .select("allocated_days, used_days, employees!inner(organization_id)")
     .eq("balance_year", balanceYear)
     .eq("employees.organization_id", organizationId)
     .is("deleted_at", null);
 
   if (!joined.error) {
-    const { allocated, used } = parseBalanceAggregateRow(
-      (joined.data?.[0] ?? null) as Record<string, unknown> | null,
+    const { allocated, used } = sumBalanceDays(
+      (joined.data ?? []) as Array<{ allocated_days?: number | null; used_days?: number | null }>,
     );
     if (allocated > 0) return Math.round((used / allocated) * 100);
     return 0;
@@ -655,19 +656,17 @@ async function computeOrgLeaveBalanceUtilizationPercent(
     const { data, error } = await supabase
       .schema("hrms")
       .from("leave_balances")
-      .select("allocated:allocated_days.sum(), used:used_days.sum()")
+      .select("allocated_days, used_days")
       .in("employee_id", chunk)
       .eq("balance_year", balanceYear)
       .is("deleted_at", null);
 
     if (error) {
-      console.error("[leave] balance utilization chunk aggregate failed", error.message);
+      console.error("[leave] balance utilization chunk select failed", error.message);
       return 0;
     }
 
-    const { allocated, used } = parseBalanceAggregateRow(
-      (data?.[0] ?? null) as Record<string, unknown> | null,
-    );
+    const { allocated, used } = sumBalanceDays(data);
     allocatedTotal += allocated;
     usedTotal += used;
   }

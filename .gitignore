@@ -10,8 +10,8 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
-/coverage
+# perf verification artifacts (local only)
+.perf-artifacts/
 
 # next.js
 /.next/

@@ -36,6 +36,36 @@ const nextConfig: NextConfig = {
     formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 60 * 60 * 24 * 30,
   },
+  /**
+   * Prefer HTTP redirects over page-level `redirect()` for these aliases.
+   * App Router client navigations through Server Component `redirect()` can
+   * trip React #310 (Next `useActionQueue` conditionally calls `use()` when
+   * router state is a thenable during the redirect flight).
+   */
+  async redirects() {
+    return [
+      {
+        source: "/ceo/leave",
+        destination: "/ceo/approvals/leave",
+        permanent: false,
+      },
+      {
+        source: "/ceo/exit",
+        destination: "/ceo/approvals/exit",
+        permanent: false,
+      },
+      {
+        source: "/ceo/payroll",
+        destination: "/ceo/payroll/run",
+        permanent: false,
+      },
+      {
+        source: "/ceo/regularization",
+        destination: "/ceo/approvals/regularization",
+        permanent: false,
+      },
+    ];
+  },
   experimental: {
     optimizePackageImports: [
       "lucide-react",

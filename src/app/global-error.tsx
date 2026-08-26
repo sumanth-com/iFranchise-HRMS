@@ -19,17 +19,18 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
   const [reloadExhausted, setReloadExhausted] = useState(false);
 
   useEffect(() => {
-    if (isRecoverable) {
-      const recovered = recoverFromChunkLoadError();
-      if (!recovered) setReloadExhausted(true);
-      return;
-    }
-    // Log real error for debugging — never silently ignore.
     console.error("[global-error]", {
       name: error.name,
       message: error.message,
       digest: error.digest,
+      recoverable: isRecoverable,
+      stack: error.stack,
     });
+
+    if (isRecoverable) {
+      const recovered = recoverFromChunkLoadError({ cause: error });
+      if (!recovered) setReloadExhausted(true);
+    }
   }, [error, isRecoverable]);
 
   return (
@@ -47,7 +48,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
               description="We couldn't load this page. Please refresh or try again in a moment."
               onRetry={() => {
                 if (isRecoverable) {
-                  recoverFromChunkLoadError({ force: true });
+                  recoverFromChunkLoadError({ force: true, cause: error });
                   return;
                 }
                 reset();

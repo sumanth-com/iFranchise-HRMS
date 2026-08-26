@@ -301,7 +301,7 @@ export function PrioritiesPanel({
           label="Payroll Status"
           value={payroll.status}
           detail={formatCurrencyInr(payroll.salaryCost)}
-          href={CEO_ROUTES.payroll}
+          href={CEO_ROUTES.payrollRun}
           icon={<Wallet className="size-3.5" />}
           tone={payroll.pending ? "text-amber-700 dark:text-amber-400" : undefined}
         />
