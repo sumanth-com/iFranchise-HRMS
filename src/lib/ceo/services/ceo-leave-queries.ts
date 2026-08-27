@@ -34,6 +34,7 @@ import {
   ensurePendingExecutiveLeaveAssignedToCeo,
   getEmployeeRoleCodes,
   isCeoLeaveApprover,
+  listCeoLeaveApproverEmployeeIds,
 } from "@/lib/leave/services/leave-queries";
 import {
   executiveRequestCategoryLabel,
@@ -379,11 +380,14 @@ export async function listCeoProcessedLeaveApprovals(
   const rangeEndExclusive = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01T00:00:00.000+05:30`;
   const rangeStartIso = `${range.start}T00:00:00.000+05:30`;
 
+  const ceoIds = await listCeoLeaveApproverEmployeeIds(organizationId).catch(() => []);
+  const approverIds = ceoIds.length > 0 ? Array.from(new Set([...ceoIds, ceoEmployeeId])) : [ceoEmployeeId];
+
   const { data: actedRows, error: actedError } = await supabase
     .schema("hrms")
     .from("leave_approvals")
     .select("leave_request_id, approval_status, acted_at")
-    .eq("approver_employee_id", ceoEmployeeId)
+    .in("approver_employee_id", approverIds)
     .in("approval_status", ["approved", "rejected"])
     .is("deleted_at", null)
     .not("acted_at", "is", null)

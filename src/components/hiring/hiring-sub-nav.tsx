@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect, useTransition } from "react";
 import { AppNavLink as Link } from "@/components/layout/app-nav-link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { HIRING_SUB_NAV, RECRUITMENT_ROUTES } from "@/lib/recruitment/constants";
 import { remapSubNavItems } from "@/lib/navigation/remap-sub-nav";
@@ -27,11 +28,45 @@ export function HiringSubNav({
   items,
 }: HiringSubNavProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+
   const navItems = remapSubNavItems(
     items ?? HIRING_SUB_NAV,
     RECRUITMENT_ROUTES.dashboard,
     basePath,
   );
+
+  // Proactively warm and prefetch all sibling tab routes on mount
+  useEffect(() => {
+    const idleId = window.requestIdleCallback
+      ? window.requestIdleCallback(() => {
+          for (const item of navItems) {
+            try {
+              router.prefetch(item.href);
+            } catch {
+              // ignore
+            }
+          }
+        })
+      : setTimeout(() => {
+          for (const item of navItems) {
+            try {
+              router.prefetch(item.href);
+            } catch {
+              // ignore
+            }
+          }
+        }, 50);
+
+    return () => {
+      if (window.cancelIdleCallback && typeof idleId === "number") {
+        window.cancelIdleCallback(idleId);
+      } else {
+        clearTimeout(idleId as NodeJS.Timeout);
+      }
+    };
+  }, [navItems, router]);
 
   return (
     <div className="flex justify-center">
@@ -43,10 +78,23 @@ export function HiringSubNav({
             <Link
               key={item.href}
               href={item.href}
+              prefetch={true}
+              onMouseEnter={() => {
+                try {
+                  router.prefetch(item.href);
+                } catch {
+                  // ignore
+                }
+              }}
+              onPointerDown={() => {
+                startTransition(() => {
+                  router.prefetch(item.href);
+                });
+              }}
               className={cn(
                 "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                 isActive
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-sm font-semibold"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >

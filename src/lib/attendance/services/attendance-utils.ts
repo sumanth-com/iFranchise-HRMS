@@ -2,14 +2,31 @@ import { differenceInMinutes, parseISO } from "date-fns";
 
 export const OFFICE_TIMEZONE = "Asia/Kolkata";
 export const OFFICE_CHECK_IN_TIME = "10:00";
-/** Grace period ends at this time — check-in after this is marked late. */
-export const OFFICE_LATE_AFTER_TIME = "10:10";
+/** Official start time — check-in after this is marked late. */
+export const OFFICE_LATE_AFTER_TIME = "10:00";
 /** Check-in closes automatically at this office time (legacy; self-service punch no longer locks). */
 export const OFFICE_CHECK_IN_LOCK_TIME = "10:07";
 export const OFFICE_CHECK_OUT_TIME = "19:00";
 
 export function getTodayDateString(timeZone = OFFICE_TIMEZONE) {
   return new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
+}
+
+/**
+ * Returns true if current time in IST is at or after office checkout time (19:00 / 7:00 PM).
+ * Before 7:00 PM on the present day, employees with no punch record are considered pending/unrecorded ("—"),
+ * not marked absent until the workday closes at 7:00 PM.
+ */
+export function isAfterOfficeCheckoutTime(now = new Date(), timeZone = OFFICE_TIMEZONE): boolean {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "numeric",
+    minute: "numeric",
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(now);
+  const hour = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
+  return hour >= 19;
 }
 
 export type AttendanceRules = {

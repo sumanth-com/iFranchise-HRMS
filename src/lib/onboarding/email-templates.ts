@@ -148,6 +148,8 @@ export type OnboardingAccountReadyEmailParams = {
   candidateName: string;
   companyEmail: string;
   employeeCode: string;
+  roleName?: string | null;
+  portalLabel?: string | null;
   loginUrl: string;
 };
 
@@ -159,21 +161,25 @@ export function renderOnboardingAccountReadyEmail(params: OnboardingAccountReady
 } {
   const firstName = params.candidateName.trim().split(/\s+/)[0] ?? "there";
 
+  const detailRows = [
+    { label: "Company email", value: params.companyEmail },
+    { label: "Employee ID", value: params.employeeCode },
+    ...(params.roleName ? [{ label: "Portal role", value: params.roleName }] : []),
+    ...(params.portalLabel ? [{ label: "Portal access", value: params.portalLabel }] : []),
+  ];
+
   const content = `
     ${renderParagraph(`Dear ${firstName},`)}
     ${renderParagraph(
       `Your onboarding has been approved and your official <strong>${siteConfig.name}</strong> employee account is now active.`,
     )}
-    ${renderDetailTable([
-      { label: "Company email", value: params.companyEmail },
-      { label: "Employee ID", value: params.employeeCode },
-    ])}
+    ${renderDetailTable(detailRows)}
     ${renderParagraph(
-      `Sign in to the employee portal with your <strong>company email</strong> and the <strong>same password</strong> you created during pre-joining onboarding.`,
+      `Sign in to the employee portal with your <strong>company email</strong> and the <strong>password</strong> you created during onboarding.`,
     )}
     ${renderEmailButtons([{ label: "Open employee portal", href: params.loginUrl, variant: "primary" }])}
     ${renderNote(
-      "Your temporary pre-joining onboarding portal access has been deactivated. All documents you submitted are now stored in your employee profile.",
+      "Your onboarding information, documents, and banking details have been transferred to your employee profile. You can now use your account daily.",
     )}
   `;
 
@@ -192,9 +198,10 @@ export function renderOnboardingAccountReadyEmail(params: OnboardingAccountReady
     "Your company account is ready.",
     `Company email: ${params.companyEmail}`,
     `Employee ID: ${params.employeeCode}`,
+    ...(params.roleName ? [`Portal role: ${params.roleName}`] : []),
     `Login: ${params.loginUrl}`,
     "",
-    "Use your company email and the same password you set during onboarding.",
+    "Use your company email and the password you set during onboarding.",
   ].join("\n");
 
   return {

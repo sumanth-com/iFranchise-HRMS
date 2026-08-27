@@ -20,6 +20,7 @@ import { EmployeeDetailPayslipDrawer } from "@/components/employees/employee-det
 import { Button, buttonVariants } from "@/components/common/button";
 import {
   TABLE_HEADER_CELL_CLASS,
+  TABLE_HEADER_ROW_CLASS,
   TABLE_HEADER_STICKY_CLASS,
 } from "@/components/common/table-header-classes";
 import { Input } from "@/components/common/input";
@@ -186,7 +187,7 @@ function PayslipTable({
   return (
     <table className="w-full min-w-[56rem] text-sm">
       <thead className={TABLE_HEADER_STICKY_CLASS}>
-        <tr className="border-white/10 bg-black hover:bg-black">
+        <tr className={TABLE_HEADER_ROW_CLASS}>
           <th className={TABLE_HEADER_CELL_CLASS}>Payroll Month</th>
           {showEmployee ? <th className={TABLE_HEADER_CELL_CLASS}>Employee</th> : null}
           <th className={TABLE_HEADER_CELL_CLASS}>Credit Date</th>

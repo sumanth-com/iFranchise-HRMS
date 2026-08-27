@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { CheckCircle2, Loader2, Trash2, XCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, Trash2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
@@ -21,27 +21,8 @@ import {
 } from "@/lib/leave/services/leave-utils";
 import type { LeaveDetail, LeaveListItem, LeaveStatus } from "@/types/leave";
 
-type LeavePreview = Pick<
-  LeaveListItem,
-  | "id"
-  | "employeeCode"
-  | "employeeName"
-  | "departmentName"
-  | "branchName"
-  | "leaveTypeName"
-  | "startDate"
-  | "endDate"
-  | "totalDays"
-  | "isHalfDay"
-  | "halfDayPeriod"
-  | "reason"
-  | "leaveStatus"
-  | "appliedAt"
->;
-
 type HrLeaveDetailPopupProps = {
   leaveRequestId: string | null;
-  preview?: LeavePreview | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onActionComplete?: (result?: {
@@ -62,44 +43,8 @@ function DetailField({ label, value }: { label: string; value: string }) {
   );
 }
 
-function toPartialDetail(
-  preview: LeavePreview,
-  flags: { canApprove: boolean; canReject: boolean; canDelete: boolean },
-): LeaveDetail {
-  return {
-    id: preview.id,
-    employeeId: "",
-    employeeCode: preview.employeeCode,
-    employeeName: preview.employeeName,
-    departmentName: preview.departmentName,
-    branchName: preview.branchName,
-    leaveTypeId: "",
-    leaveTypeName: preview.leaveTypeName,
-    leaveTypeCode: "",
-    startDate: preview.startDate,
-    endDate: preview.endDate,
-    totalDays: preview.totalDays,
-    isHalfDay: preview.isHalfDay,
-    halfDayPeriod: preview.halfDayPeriod,
-    reason: preview.reason,
-    emergencyContactName: null,
-    emergencyContactPhone: null,
-    attachmentPath: null,
-    leaveStatus: preview.leaveStatus,
-    appliedAt: preview.appliedAt,
-    updatedAt: preview.appliedAt,
-    approvals: [],
-    canApprove: flags.canApprove && preview.leaveStatus === "pending",
-    canReject: flags.canReject && preview.leaveStatus === "pending",
-    canCancel: false,
-    canEdit: false,
-    canDelete: flags.canDelete,
-  };
-}
-
 export function HrLeaveDetailPopup({
   leaveRequestId,
-  preview = null,
   open,
   onOpenChange,
   onActionComplete,
@@ -114,23 +59,28 @@ export function HrLeaveDetailPopup({
     null,
   );
   const [comments, setComments] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
   const [isPending, startAction] = useTransition();
+
+  const pendingApprover =
+    detail?.approvals?.find((a) => a.approvalStatus === "pending")?.approverName ?? null;
 
   useEffect(() => {
     if (!open || !leaveRequestId) {
       setDetail(null);
       setLoadError(null);
+      setActionError(null);
       setIsFetching(false);
       return;
     }
 
     let cancelled = false;
-    const flags = { canApprove, canReject, canDelete };
 
     setLoadError(null);
+    setActionError(null);
     setActionMode(null);
     setComments("");
-    setDetail(preview ? toPartialDetail(preview, flags) : null);
+    setDetail(null);
     setIsFetching(true);
 
     void (async () => {
@@ -139,7 +89,7 @@ export function HrLeaveDetailPopup({
         if (cancelled) return;
         if (!result.success) {
           setLoadError(result.message);
-          if (!preview) setDetail(null);
+          setDetail(null);
           toast.error(result.message);
           return;
         }
@@ -150,7 +100,7 @@ export function HrLeaveDetailPopup({
         const message =
           error instanceof Error ? error.message : "Failed to load leave request";
         setLoadError(message);
-        if (!preview) setDetail(null);
+        setDetail(null);
         toast.error(message);
       } finally {
         if (!cancelled) setIsFetching(false);
@@ -160,8 +110,6 @@ export function HrLeaveDetailPopup({
     return () => {
       cancelled = true;
     };
-    // Intentionally omit onOpenChange / can* / preview object identity to avoid re-fetch loops.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch only when dialog opens or id changes
   }, [open, leaveRequestId]);
 
   function refreshAndClose(
@@ -174,19 +122,21 @@ export function HrLeaveDetailPopup({
     toast.success(message);
     setActionMode(null);
     setComments("");
+    setActionError(null);
     onOpenChange(false);
     onActionComplete?.(result);
   }
 
   function handleApprove() {
     if (!detail) return;
+    setActionError(null);
     startAction(async () => {
       const result = await approveLeaveRequestAction({
         leaveRequestId: detail.id,
         comments: comments.trim() || "",
       });
       if (!result.success) {
-        toast.error(result.message);
+        setActionError(result.message);
         return;
       }
       refreshAndClose("Leave request approved", {
@@ -199,16 +149,17 @@ export function HrLeaveDetailPopup({
   function handleReject() {
     if (!detail) return;
     if (comments.trim().length < 3) {
-      toast.error("Rejection reason is required");
+      setActionError("Rejection reason is required (minimum 3 characters)");
       return;
     }
+    setActionError(null);
     startAction(async () => {
       const result = await rejectLeaveRequestAction({
         leaveRequestId: detail.id,
         comments: comments.trim(),
       });
       if (!result.success) {
-        toast.error(result.message);
+        setActionError(result.message);
         return;
       }
       refreshAndClose("Leave request rejected", {
@@ -220,10 +171,11 @@ export function HrLeaveDetailPopup({
 
   function handleDelete() {
     if (!detail) return;
+    setActionError(null);
     startAction(async () => {
       const result = await deleteLeaveRequestAction(detail.id);
       if (!result.success) {
-        toast.error(result.message);
+        setActionError(result.message);
         return;
       }
       refreshAndClose("Leave request deleted", {
@@ -233,7 +185,7 @@ export function HrLeaveDetailPopup({
     });
   }
 
-  const status = (detail?.leaveStatus ?? preview?.leaveStatus) as LeaveStatus | undefined;
+  const status = detail?.leaveStatus as LeaveStatus | undefined;
   const showApprove =
     Boolean(detail?.canApprove ?? canApprove) && status === "pending";
   const showReject =
@@ -390,6 +342,28 @@ export function HrLeaveDetailPopup({
             Accept this leave request for {detail.employeeName}? Status will show as
             Approved by HR.
           </p>
+
+          {pendingApprover ? (
+            <div className="rounded-lg border bg-muted/30 p-2.5 text-xs flex items-center justify-between dark:border-white/10">
+              <span className="text-muted-foreground font-medium">Assigned Approver:</span>
+              <span className="font-semibold text-primary">{pendingApprover}</span>
+            </div>
+          ) : null}
+
+          {actionError ? (
+            <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-900 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
+              <AlertCircle className="size-4 shrink-0 text-red-600 dark:text-red-400 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-semibold">{actionError}</p>
+                {pendingApprover ? (
+                  <p className="text-red-800 dark:text-red-300">
+                    The designated approver for this request is <strong className="font-semibold">{pendingApprover}</strong>.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
           <div className="space-y-2">
             <Label htmlFor="hr-leave-approve-note">Note (optional)</Label>
             <textarea
@@ -407,6 +381,28 @@ export function HrLeaveDetailPopup({
             Reject this leave request for {detail.employeeName}? Status will show as
             Rejected by HR.
           </p>
+
+          {pendingApprover ? (
+            <div className="rounded-lg border bg-muted/30 p-2.5 text-xs flex items-center justify-between dark:border-white/10">
+              <span className="text-muted-foreground font-medium">Assigned Approver:</span>
+              <span className="font-semibold text-primary">{pendingApprover}</span>
+            </div>
+          ) : null}
+
+          {actionError ? (
+            <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-900 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
+              <AlertCircle className="size-4 shrink-0 text-red-600 dark:text-red-400 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-semibold">{actionError}</p>
+                {pendingApprover ? (
+                  <p className="text-red-800 dark:text-red-300">
+                    The designated approver for this request is <strong className="font-semibold">{pendingApprover}</strong>.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
           <div className="space-y-2">
             <Label htmlFor="hr-leave-reject-note">Rejection reason *</Label>
             <textarea
@@ -420,6 +416,12 @@ export function HrLeaveDetailPopup({
         </div>
       ) : actionMode === "delete" ? (
         <div className="space-y-2">
+          {actionError ? (
+            <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-900 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
+              <AlertCircle className="size-4 shrink-0 text-red-600 dark:text-red-400 mt-0.5" />
+              <p className="font-semibold">{actionError}</p>
+            </div>
+          ) : null}
           <p className="text-sm text-muted-foreground">
             Delete leave for {detail.employeeName}? This removes it from Team Leave and
             restores balance when applicable. This cannot be undone.

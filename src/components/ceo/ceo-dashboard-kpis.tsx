@@ -1,10 +1,8 @@
 "use client";
 
 import {
-  BriefcaseBusiness,
   CalendarCheck,
   CheckSquare,
-  TrendingDown,
   Users,
   Wallet,
 } from "lucide-react";
@@ -26,7 +24,6 @@ function formatPercent(value: number | null | undefined) {
 
 export function CeoDashboardKpis({ kpis }: { kpis: CeoKpis }) {
   const attendancePercent = asNumber(kpis.attendancePercent);
-  const attritionRate = asNumber(kpis.attritionRate);
   const pendingApprovals = asNumber(kpis.pendingApprovals);
   const pendingLeaveApprovals = asNumber(kpis.pendingLeaveApprovals);
   const totalPendingApprovals = pendingApprovals + pendingLeaveApprovals;
@@ -34,19 +31,22 @@ export function CeoDashboardKpis({ kpis }: { kpis: CeoKpis }) {
   return (
     <section
       aria-label="Company at a glance"
-      className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
+      className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4"
     >
       <EmployeeStatCard
         label="Employees"
         value={String(asNumber(kpis.totalEmployees))}
+        hint="Headcount"
         icon={Users}
         accent="text-sky-600 dark:text-sky-400"
         iconBg="bg-sky-500/10"
+        tone="sky"
         href={CEO_ROUTES.organization}
       />
       <EmployeeStatCard
         label="Attendance"
         value={formatPercent(attendancePercent)}
+        hint="Today"
         icon={CalendarCheck}
         accent={
           attendancePercent < 85
@@ -54,27 +54,13 @@ export function CeoDashboardKpis({ kpis }: { kpis: CeoKpis }) {
             : "text-emerald-600 dark:text-emerald-400"
         }
         iconBg={attendancePercent < 85 ? "bg-destructive/10" : "bg-emerald-500/10"}
+        tone="emerald"
         href={CEO_ROUTES.attendance}
-      />
-      <EmployeeStatCard
-        label="Attrition"
-        value={formatPercent(attritionRate)}
-        icon={TrendingDown}
-        accent={attritionRate >= 5 ? "text-destructive" : "text-foreground"}
-        iconBg={attritionRate >= 5 ? "bg-destructive/10" : "bg-muted"}
-        href={CEO_ROUTES.organization}
-      />
-      <EmployeeStatCard
-        label="Open Roles"
-        value={String(asNumber(kpis.openPositions))}
-        icon={BriefcaseBusiness}
-        accent="text-indigo-600 dark:text-indigo-400"
-        iconBg="bg-indigo-500/10"
-        href={CEO_ROUTES.recruitment}
       />
       <EmployeeStatCard
         label="Pending Approvals"
         value={String(totalPendingApprovals)}
+        hint={totalPendingApprovals > 0 ? "Pending" : "Cleared"}
         icon={CheckSquare}
         accent={
           totalPendingApprovals > 0
@@ -82,6 +68,7 @@ export function CeoDashboardKpis({ kpis }: { kpis: CeoKpis }) {
             : "text-foreground"
         }
         iconBg={totalPendingApprovals > 0 ? "bg-violet-500/10" : "bg-muted"}
+        tone="violet"
         href={
           pendingLeaveApprovals > 0 ? CEO_ROUTES.approvalsLeave : CEO_ROUTES.approvals
         }
@@ -89,9 +76,11 @@ export function CeoDashboardKpis({ kpis }: { kpis: CeoKpis }) {
       <EmployeeStatCard
         label="Payroll Cost"
         value={formatCurrencyInr(asNumber(kpis.payrollCost))}
+        hint="Monthly"
         icon={Wallet}
         accent="text-amber-700 dark:text-amber-400"
         iconBg="bg-amber-500/10"
+        tone="amber"
         href={CEO_ROUTES.payrollRun}
       />
     </section>

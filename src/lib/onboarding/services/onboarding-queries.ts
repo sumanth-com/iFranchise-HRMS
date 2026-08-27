@@ -152,7 +152,7 @@ export async function getOnboardingDashboardStats(
     return query;
   };
 
-  const [totalRes, pendingRes, inProgressRes, completedRes, invitationRes] = await Promise.all([
+  const [totalRes, pendingRes, inProgressRes, completedRes, invitationRes, readyRes] = await Promise.all([
     base(),
     base().eq("status", "pending_hr_review"),
     base().in("status", [
@@ -163,6 +163,7 @@ export async function getOnboardingDashboardStats(
     ]),
     base().in("status", ["completed", "employee_created"]),
     base().eq("status", "invitation_sent"),
+    base().eq("status", "draft"),
   ]);
 
   const firstError =
@@ -170,7 +171,8 @@ export async function getOnboardingDashboardStats(
     pendingRes.error ||
     inProgressRes.error ||
     completedRes.error ||
-    invitationRes.error;
+    invitationRes.error ||
+    readyRes.error;
   if (firstError) throw new Error(firstError.message);
 
   return {
@@ -179,6 +181,7 @@ export async function getOnboardingDashboardStats(
     inProgress: inProgressRes.count ?? 0,
     completed: completedRes.count ?? 0,
     invitationSent: invitationRes.count ?? 0,
+    readyForInvitation: readyRes.count ?? 0,
   };
 }
 

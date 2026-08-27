@@ -40,7 +40,7 @@ const PILL_STYLES: Record<string, string> = {
   absent: "bg-red-500 text-white",
   half_day: "bg-emerald-200 text-emerald-800",
   on_leave: "bg-violet-400 text-white",
-  holiday: "bg-sky-400 text-white",
+  holiday: "bg-muted-foreground/20 text-muted-foreground dark:bg-white/15 dark:text-slate-200",
   week_off: "",
   on_request: "bg-amber-400 text-white",
 };
@@ -51,7 +51,7 @@ const TOOLTIP_STYLES: Record<string, string> = {
   absent: "border-red-600/30 bg-red-600 text-white",
   half_day: "border-emerald-500/30 bg-emerald-500 text-white",
   on_leave: "border-violet-500/30 bg-violet-500 text-white",
-  holiday: "border-sky-500/30 bg-sky-500 text-white",
+  holiday: "border-border bg-muted-foreground text-white",
   week_off: "border-border bg-muted-foreground text-white",
   on_request: "border-amber-500/30 bg-amber-500 text-white",
   today: "border-emerald-700/30 bg-emerald-600 text-white",
@@ -63,8 +63,8 @@ const LEGEND = [
   { key: "absent", label: "Absent", className: "bg-red-500" },
   { key: "half_day", label: "Half Day", className: "bg-emerald-200" },
   { key: "on_leave", label: "Leave", className: "bg-violet-400" },
-  { key: "holiday", label: "Holiday", className: "bg-sky-400" },
-  { key: "week_off", label: "Weekend off", className: "bg-muted-foreground/25" },
+  { key: "holiday", label: "Holiday", className: "bg-muted-foreground/35 dark:bg-white/30" },
+  { key: "week_off", label: "Weekend off", className: "bg-muted-foreground/25 dark:bg-white/15" },
 ];
 
 type Props = {

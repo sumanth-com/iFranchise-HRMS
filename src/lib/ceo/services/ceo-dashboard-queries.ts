@@ -6,9 +6,8 @@ import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { CEO_PENDING_APPROVAL_STATUSES } from "@/lib/ceo/executive-approvals-constants";
 import { syncExecutiveApprovalsFromDomain } from "@/lib/ceo/services/ceo-approvals-sync";
-import { listCeoApprovalQueue } from "@/lib/ceo/services/ceo-leave-queries";
 import { getRecruitmentSummary } from "@/lib/recruitment/services/recruitment-queries";
-import { listHolidays } from "@/lib/organization/services/org-queries";
+import { loadUpcomingCelebrations } from "@/lib/employee/services/employee-dashboard-queries";
 import { getPayrollMonthDate } from "@/lib/payroll/services/payroll-utils";
 import { fromHrms } from "@/lib/reports/services/reports-utils";
 import type { UserProfile } from "@/types/auth";
@@ -75,8 +74,8 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
   const payrollMonthDate = getPayrollMonthDate(now.getMonth() + 1, now.getFullYear());
   const startedAt = performance.now();
 
-  // Kick off domain sync without blocking non-approval KPI queries.
-  const syncPromise = syncExecutiveApprovalsFromDomain(supabase, profile).catch((error) => {
+  // Kick off domain sync in background without blocking dashboard load.
+  void syncExecutiveApprovalsFromDomain(supabase, profile).catch((error) => {
     console.error("[ceo-dashboard] executive approval sync failed", error);
   });
 
@@ -89,7 +88,7 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
       .is("deleted_at", null);
 
   const [
-    leaveApprovalQueue,
+    pendingLeaveRes,
     activeEmployeesRes,
     exitingRes,
     presentTodayRes,
@@ -102,12 +101,11 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
     pendingApprovalsRes,
     holidaysResult,
   ] = await Promise.all([
-    syncPromise.then(() =>
-      listCeoApprovalQueue(supabase, profile).catch((error) => {
-        console.error("[ceo-dashboard] leave approval queue failed", error);
-        return [] as Awaited<ReturnType<typeof listCeoApprovalQueue>>;
-      }),
-    ),
+    fromHrms(supabase, "leave_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("leave_status", "pending")
+      .is("deleted_at", null),
     fromHrms(supabase, "employees")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
@@ -136,16 +134,14 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
       .eq("payroll_month", payrollMonthDate)
       .is("deleted_at", null)
       .maybeSingle(),
-    syncPromise.then(() =>
-      fromHrms(supabase, "executive_approval_requests")
-        .select("id", { count: "exact", head: true })
-        .eq("organization_id", organizationId)
-        .in("request_status", CEO_PENDING_APPROVAL_STATUSES)
-        .is("deleted_at", null),
-    ),
-    listHolidays(supabase, organizationId, { year: now.getFullYear() }).catch((error) => {
-      console.error("[ceo-dashboard] holidays query failed", error);
-      return { data: [] as Awaited<ReturnType<typeof listHolidays>>["data"] };
+    fromHrms(supabase, "executive_approval_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .in("request_status", CEO_PENDING_APPROVAL_STATUSES)
+      .is("deleted_at", null),
+    loadUpcomingCelebrations(supabase, organizationId, today).catch((error) => {
+      console.error("[ceo-dashboard] upcoming celebrations query failed", error);
+      return [] as Awaited<ReturnType<typeof loadUpcomingCelebrations>>;
     }),
   ]);
 
@@ -196,16 +192,9 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
   const attritionRate =
     attritionBase > 0 ? Math.round((employeesExiting / attritionBase) * 1000) / 10 : 0;
 
-  const holidayItems: CeoDashboardData["upcomingHolidays"] = (holidaysResult.data ?? [])
-    .filter((holiday) => holiday.holidayDate >= today)
-    .sort((a, b) => a.holidayDate.localeCompare(b.holidayDate))
-    .map((holiday) => ({
-      id: `holiday-${holiday.id}`,
-      type: "holiday" as const,
-      title: holiday.name,
-      subtitle: holiday.isOptional ? "Optional holiday" : "Company holiday",
-      date: holiday.holidayDate,
-    }));
+  const upcomingCelebrations = Array.isArray(holidaysResult)
+    ? holidaysResult
+    : [];
 
   if (process.env.NODE_ENV === "development") {
     console.info("[perf]", {
@@ -228,7 +217,7 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
       openPositions,
       recruitmentPipeline: 0,
       pendingApprovals,
-      pendingLeaveApprovals: leaveApprovalQueue.length,
+      pendingLeaveApprovals: pendingLeaveRes.count ?? 0,
       attendancePercent,
       leavePercent: 0,
       averageProductivity: 0,
@@ -292,7 +281,7 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
       lateToday: attendance.lateToday,
       onLeaveToday: attendance.onLeaveToday,
     },
-    upcomingHolidays: holidayItems,
+    upcomingHolidays: upcomingCelebrations,
     activities: [],
     approvals: [],
     charts: EMPTY_CHARTS,

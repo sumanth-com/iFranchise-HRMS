@@ -475,7 +475,7 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
     (interview) => interview.interviewDate === today,
   ).length;
 
-  const onboardingAwaitingReview = onboardingStats.pendingReview;
+  const onboardingReadyCount = onboardingStats.readyForInvitation ?? 0;
   const documentsExpiring =
     expiringDocs.next30Days + expiringDocs.expired + expiringDocs.expiringToday;
   const onLeaveToday = leave.employeesOnLeaveToday;
@@ -505,9 +505,9 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
     {
       id: "onboarding-review",
       label: "Onboarding",
-      count: onboardingAwaitingReview,
+      count: onboardingReadyCount,
       href: DASHBOARD_ACTION_LINKS.onboardingReview,
-      urgency: onboardingAwaitingReview > 0 ? "high" : "low",
+      urgency: onboardingReadyCount > 0 ? "high" : "low",
     },
   ];
 

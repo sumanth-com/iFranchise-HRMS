@@ -14,6 +14,7 @@ import {
   approveCeoLeaveAction,
   rejectCeoLeaveAction,
 } from "@/lib/ceo/actions/ceo-leave-actions";
+import { broadcastApprovalChange } from "@/lib/approvals/use-approvals-sync";
 import { leaveApprovalStageLabel } from "@/lib/leave/constants";
 import { formatHalfDayPeriod } from "@/lib/leave/services/leave-utils";
 import type { CeoApprovalQueueItem } from "@/types/ceo-leave";
@@ -22,7 +23,7 @@ type CeoLeaveApprovalQueueProps = {
   items: CeoApprovalQueueItem[];
   isLoading?: boolean;
   onView: (id: string) => void;
-  onActed: () => void;
+  onActed: (item?: CeoApprovalQueueItem, status?: "approved" | "rejected") => void;
 };
 
 function durationLabel(item: CeoApprovalQueueItem) {
@@ -63,9 +64,10 @@ export function CeoLeaveApprovalQueue({
 
   const handleApprove = () => {
     if (!target) return;
+    const item = target.item;
     startActing(async () => {
       const result = await approveCeoLeaveAction({
-        leaveRequestId: target.item.id,
+        leaveRequestId: item.id,
       });
       if (!result.success) {
         toast.error(result.message);
@@ -73,19 +75,21 @@ export function CeoLeaveApprovalQueue({
       }
       toast.success("Leave request approved");
       closeModal();
-      onActed();
+      broadcastApprovalChange("leave");
+      onActed(item, "approved");
     });
   };
 
   const handleReject = () => {
     if (!target) return;
+    const item = target.item;
     if (rejectComments.trim().length < 3) {
       toast.error("Rejection reason is required");
       return;
     }
     startActing(async () => {
       const result = await rejectCeoLeaveAction({
-        leaveRequestId: target.item.id,
+        leaveRequestId: item.id,
         comments: rejectComments,
       });
       if (!result.success) {
@@ -94,7 +98,8 @@ export function CeoLeaveApprovalQueue({
       }
       toast.success("Leave request rejected");
       closeModal();
-      onActed();
+      broadcastApprovalChange("leave");
+      onActed(item, "rejected");
     });
   };
 

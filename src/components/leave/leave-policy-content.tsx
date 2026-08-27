@@ -170,12 +170,12 @@ export function LeavePolicyHolidayTable({
       <h2 className={`shrink-0 border-b px-4 py-3 ${policyHeadingClass}`}>{title}</h2>
       <div className={HOLIDAY_TABLE_SCROLL_CLASS}>
         <table className="w-full table-fixed text-sm">
-          <thead className="sticky top-0 z-30 bg-black text-left shadow-[0_1px_0_rgba(255,255,255,0.08)]">
-            <tr className="text-left text-xs text-foreground/60">
-              <th className="h-11 w-14 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Sl. No.</th>
-              <th className="h-11 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Occasion / Festival</th>
-              <th className="h-11 w-24 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Date</th>
-              <th className="h-11 w-24 whitespace-nowrap bg-black px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Day</th>
+          <thead className="sticky top-0 z-30 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 text-left text-white shadow-[0_1px_0_rgba(255,255,255,0.12)]">
+            <tr className="text-left text-xs">
+              <th className="h-11 w-14 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Sl. No.</th>
+              <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Occasion / Festival</th>
+              <th className="h-11 w-24 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Date</th>
+              <th className="h-11 w-24 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Day</th>
             </tr>
           </thead>
           <tbody>

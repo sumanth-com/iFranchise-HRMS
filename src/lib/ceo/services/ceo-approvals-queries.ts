@@ -571,14 +571,16 @@ export async function getCeoApprovalsPageData(
   profile: UserProfile,
   params: CeoApprovalsListParams,
 ): Promise<CeoApprovalsPageData> {
-  const syncPromise = syncExecutiveApprovalsFromDomain(supabase, profile);
+  // Fire domain sync asynchronously in background without delaying the page response
+  void syncExecutiveApprovalsFromDomain(supabase, profile).catch((error) => {
+    console.error("[ceo-approvals] syncExecutiveApprovalsFromDomain failed", error);
+  });
 
   // Categories/insights are not rendered on the main approvals view — skip those
   // full-table scans on the critical path (same queue/KPI/lookup semantics).
-  // Lookups do not depend on sync; overlap them with the sync work.
   const [kpis, queue, lookups] = await Promise.all([
-    syncPromise.then(() => getCeoApprovalsKpis(supabase, profile, params)),
-    syncPromise.then(() => listCeoApprovalsQueue(supabase, profile, params)),
+    getCeoApprovalsKpis(supabase, profile, params),
+    listCeoApprovalsQueue(supabase, profile, params),
     getCeoApprovalsFilterLookups(supabase, profile.employee.organizationId),
   ]);
 

@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 
 import { CeoUserProvisioningView } from "@/components/ceo/user-provisioning/ceo-user-provisioning-view";
-import { LoadingSpinner } from "@/components/common/loading-spinner";
+import { PageSkeleton } from "@/components/common/page-skeleton";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { getCeoUserProvisioningModuleData } from "@/lib/ceo/actions/ceo-user-provisioning-actions";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
@@ -27,7 +27,7 @@ export default async function CeoUserProvisioningPage({
 
   const parsed = ceoProvisioningListParamsSchema.parse({
     page: firstString(rawParams.page),
-    pageSize: firstString(rawParams.pageSize) ?? "8",
+    pageSize: firstString(rawParams.pageSize) ?? "9",
     search: firstString(rawParams.search),
     roleCode: firstString(rawParams.roleCode),
     departmentId: firstString(rawParams.departmentId),
@@ -40,13 +40,7 @@ export default async function CeoUserProvisioningPage({
   const data = await getCeoUserProvisioningModuleData(parsed);
 
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-1 items-center justify-center">
-          <LoadingSpinner />
-        </div>
-      }
-    >
+    <Suspense fallback={<PageSkeleton />}>
       <CeoUserProvisioningView {...data} initialFilters={parsed} variant="hr" />
     </Suspense>
   );

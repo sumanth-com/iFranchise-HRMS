@@ -47,6 +47,7 @@ import {
   type OnboardingStatus,
 } from "@/types/onboarding";
 import type { OnboardingCaseDetail } from "@/types/onboarding";
+import { cn } from "@/lib/utils";
 
 type OnboardingReviewViewProps = {
   detail: OnboardingCaseDetail;
@@ -455,37 +456,37 @@ export function OnboardingReviewView({
           {canReview ? (
             <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
               <div className="border-b bg-muted/30 px-6 py-5 text-center">
-                <h2 className="text-base font-semibold tracking-tight">
+                <h2 className="text-base font-semibold tracking-tight text-foreground">
                   HR review & portal activation
                 </h2>
-                <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                  Enter the official company email for this employee. After approval, they receive
-                  a notification at their personal email and can sign in with that company email and
-                  the password they created during onboarding.
+                <p className="mx-auto mt-1.5 max-w-xl text-xs leading-relaxed text-muted-foreground">
+                  Assign the employee&apos;s official company email and portal role. Upon approval, all submitted onboarding data, documents, and banking details are automatically stored in their employee profile, and the candidate will receive an activation email to log in and use their account daily.
                 </p>
               </div>
 
               <div className="mx-auto max-w-lg space-y-5 px-6 py-6">
                 <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">
+                  <Label className="text-sm font-medium text-foreground">
                     Company email <span className="text-foreground">*</span>
                   </Label>
                   <Input
                     type="email"
                     className="h-10"
-                    placeholder="e.g. coder@yourcompany.com"
+                    placeholder="e.g. name@yourcompany.com"
                     value={companyEmail}
                     onChange={(e) => setCompanyEmail(e.target.value)}
                     disabled={isPending}
                     autoComplete="off"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    This is the login email the employee will use on the company portal.
+                  <p className="text-[11px] text-muted-foreground">
+                    This is the official login email the employee will use on the company portal.
                   </p>
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Portal role when employee is created</Label>
+                  <Label className="text-sm font-medium text-foreground">
+                    Portal role when employee is created
+                  </Label>
                   <LabeledSelect
                     value={intendedRoleId}
                     placeholder="Select portal role"
@@ -494,63 +495,42 @@ export function OnboardingReviewView({
                     disabled={isPending}
                     triggerClassName="h-10 w-full"
                   />
+                  <p className="text-[11px] text-muted-foreground">
+                    Determines role permissions and portal dashboard access for this user.
+                  </p>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <Label className="text-sm font-medium text-muted-foreground">
-                      HR comments (optional)
-                    </Label>
-                    <Input
-                      className="h-10"
-                      placeholder="Internal notes for this review"
-                      value={hrComments}
-                      onChange={(e) => setHrComments(e.target.value)}
-                      disabled={isPending}
-                    />
-                  </div>
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <Label className="text-sm font-medium text-muted-foreground">
-                      Correction notes
-                    </Label>
-                    <Input
-                      className="h-10"
-                      placeholder="Required only when requesting changes"
-                      value={correctionNotes}
-                      onChange={(e) => setCorrectionNotes(e.target.value)}
-                      disabled={isPending}
-                    />
-                  </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium text-muted-foreground">
+                    HR comments (optional)
+                  </Label>
+                  <Input
+                    className="h-10"
+                    placeholder="Internal approval notes"
+                    value={hrComments}
+                    onChange={(e) => setHrComments(e.target.value)}
+                    disabled={isPending}
+                  />
                 </div>
 
-                <div className="flex flex-col gap-2 border-t border-border/60 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="border-t border-border/60 pt-5">
                   <Button
                     onClick={() => processReview("approve")}
                     disabled={isPending || !companyEmail.trim()}
-                    className="sm:min-w-[11rem]"
+                    className={cn(
+                      "h-10.5 w-full font-semibold transition-all shadow-sm",
+                      companyEmail.trim()
+                        ? "bg-gradient-to-r from-blue-600 to-violet-600 text-white hover:opacity-95"
+                        : "opacity-70",
+                    )}
                   >
                     {isPending ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : null}
-                    Approve & create employee
+                    ) : (
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                    )}
+                    Approve & activate employee
                   </Button>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => processReview("request_corrections")}
-                      disabled={isPending}
-                    >
-                      Request corrections
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="text-destructive hover:bg-destructive/5 hover:text-destructive"
-                      onClick={() => processReview("reject")}
-                      disabled={isPending}
-                    >
-                      Reject
-                    </Button>
-                  </div>
                 </div>
               </div>
             </section>

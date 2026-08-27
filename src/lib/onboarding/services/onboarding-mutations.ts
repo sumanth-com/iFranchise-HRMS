@@ -1,5 +1,6 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
+import { getInviteableRoleById } from "@/lib/auth/iam-roles";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import { allocateNextEmployeeCode } from "@/lib/employees/services/employee-code";
 import { activateEmployeeAccountFromOnboarding } from "@/lib/employees/services/employee-account";
@@ -583,22 +584,48 @@ export async function syncOnboardingCasesFromSentOffers(
   profile: UserProfile,
 ): Promise<void> {
   const organizationId = profile.employee.organizationId;
-  const { data: offers, error } = await supabase
-    .schema("hrms")
-    .from("recruitment_offers")
-    .select(
-      `offer_code, joining_date, reporting_manager_id,
-      candidate:candidate_id(first_name, last_name, email, phone),
-      job:job_opening_id(title, department_id, designation_id, employment_type_id, hiring_manager_id)`,
-    )
-    .eq("organization_id", organizationId)
-    .not("offer_letter_path", "is", null)
-    .in("offer_status", ["draft", "sent", "accepted"])
-    .is("deleted_at", null);
+  const [offersRes, existingCasesRes] = await Promise.all([
+    supabase
+      .schema("hrms")
+      .from("recruitment_offers")
+      .select(
+        `offer_code, joining_date, reporting_manager_id,
+        candidate:candidate_id(first_name, last_name, email, phone),
+        job:job_opening_id(title, department_id, designation_id, employment_type_id, hiring_manager_id)`,
+      )
+      .eq("organization_id", organizationId)
+      .not("offer_letter_path", "is", null)
+      .in("offer_status", ["draft", "sent", "accepted"])
+      .is("deleted_at", null),
+    supabase
+      .schema("hrms")
+      .from("onboarding_cases")
+      .select("personal_email, offer_reference_number")
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null),
+  ]);
 
-  if (error) throw new Error(error.message);
+  if (offersRes.error) throw new Error(offersRes.error.message);
+  if (existingCasesRes.error) throw new Error(existingCasesRes.error.message);
 
-  for (const offer of offers ?? []) {
+  const offers = offersRes.data ?? [];
+  if (offers.length === 0) return;
+
+  const existingEmails = new Set(
+    (existingCasesRes.data ?? [])
+      .map((c) => (c.personal_email as string | null)?.trim().toLowerCase())
+      .filter(Boolean),
+  );
+
+  const offersToSync = offers.filter((offer) => {
+    const candidate = Array.isArray(offer.candidate) ? offer.candidate[0] : offer.candidate;
+    const email = candidate?.email?.trim().toLowerCase();
+    return email && !existingEmails.has(email);
+  });
+
+  if (offersToSync.length === 0) return;
+
+  for (const offer of offersToSync) {
     const candidate = Array.isArray(offer.candidate) ? offer.candidate[0] : offer.candidate;
     const job = Array.isArray(offer.job) ? offer.job[0] : offer.job;
     if (!candidate?.email) continue;
@@ -1196,12 +1223,28 @@ async function finalizeEmployeeActivation(
     intendedRoleId,
   );
 
+  let roleName: string | null = null;
+  let portalLabel: string | null = null;
+  try {
+    const roleInfo = await getInviteableRoleById(
+      admin,
+      profile.employee.organizationId,
+      intendedRoleId,
+    );
+    roleName = roleInfo.name;
+    portalLabel = roleInfo.portalLabel;
+  } catch {
+    // fallback gracefully if role info fails to resolve
+  }
+
   const loginUrl = `${siteConfig.url}/login`;
 
   const accountReadyEmail = renderOnboardingAccountReadyEmail({
     candidateName: detail.fullName,
     companyEmail,
     employeeCode,
+    roleName,
+    portalLabel,
     loginUrl,
   });
 

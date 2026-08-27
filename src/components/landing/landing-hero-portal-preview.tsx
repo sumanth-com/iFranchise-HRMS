@@ -212,7 +212,6 @@ export function LandingHeroPortalPreview() {
           <header className="landing-hero-preview-topbar">
             <span>Dashboard</span>
             <div className="landing-hero-preview-topbar-right">
-              <span className="landing-hero-preview-portal-chip">Self-service</span>
               <span className="landing-hero-preview-bell" title="Notifications">
                 <Bell className="size-3.5" strokeWidth={2.25} />
                 <em>1</em>

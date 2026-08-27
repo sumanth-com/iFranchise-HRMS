@@ -54,7 +54,6 @@ export const ORGANIZATION_SUB_NAV = [
   { title: "Departments", href: ORGANIZATION_ROUTES.departments },
   { title: "Designations", href: ORGANIZATION_ROUTES.designations },
   { title: "Holidays", href: ORGANIZATION_ROUTES.holidays },
-  { title: "Hierarchy", href: ORGANIZATION_ROUTES.hierarchy },
 ] as const;
 
 /** Focused master-data nav for Super Admin — not a full HR config dump. */
@@ -67,7 +66,6 @@ export function buildSuperAdminOrganizationSubNav(basePath: string) {
     { title: "Designations", href: routes.designations },
     { title: "Locations", href: `${routes.branches}#work-locations` },
     { title: "Employment Types", href: routes.employmentTypes },
-    { title: "Hierarchy", href: routes.hierarchy },
   ] as const;
 }
 

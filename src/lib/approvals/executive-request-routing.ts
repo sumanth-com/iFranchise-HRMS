@@ -14,7 +14,7 @@ export function requiresCeoLeaveApproval(roleCodes: string[]): boolean {
 }
 
 export function requiresCeoRegularizationApproval(roleCodes: string[]): boolean {
-  return requiresCeoLeaveApproval(roleCodes);
+  return isHrLeaveApplicant(roleCodes) || isManagerLeaveApplicant(roleCodes);
 }
 
 export type ExecutiveRequestCategory = "hr" | "manager";

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
@@ -112,9 +113,11 @@ function buildLiveSectionPatch(
   sectionKey: string,
   saved: Record<string, unknown>,
   draft: Record<string, string>,
-  fullName: string,
+  fullName?: string | null,
+  personalEmail?: string | null,
 ): Record<string, string> {
   const safeFullName = typeof fullName === "string" ? fullName.trim() : "";
+  const safePersonalEmail = typeof personalEmail === "string" ? personalEmail.trim() : "";
   const patch: Record<string, string> = {};
   for (const [key, value] of Object.entries(saved)) {
     const text = readSectionField(value);
@@ -122,9 +125,16 @@ function buildLiveSectionPatch(
   }
   for (const [key, value] of Object.entries(draft)) {
     if (value.trim()) patch[key] = value.trim();
+    else patch[key] = "";
   }
 
   if (sectionKey === "personal") {
+    if (!patch.fullName?.trim() && safeFullName) {
+      patch.fullName = safeFullName;
+    }
+    if (!patch.personalEmail?.trim() && safePersonalEmail) {
+      patch.personalEmail = safePersonalEmail;
+    }
     const dob = toIsoDate(draft.dateOfBirth ?? saved.dateOfBirth);
     if (/^\d{4}-\d{2}-\d{2}$/.test(dob)) patch.dateOfBirth = dob;
 
@@ -269,8 +279,15 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
     [contextWithOptimisticDocs],
   );
   const liveSectionPatch = useMemo(
-    () => buildLiveSectionPatch(sectionKey, sectionData, form, context.fullName),
-    [sectionKey, sectionData, form, context.fullName],
+    () =>
+      buildLiveSectionPatch(
+        sectionKey,
+        sectionData,
+        form,
+        context.fullName,
+        context.personalEmail,
+      ),
+    [sectionKey, sectionData, form, context.fullName, context.personalEmail],
   );
 
   function validateCurrentSection() {
@@ -303,12 +320,41 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
     return { valid: missing.length === 0, missing };
   }, [contextWithOptimisticDocs, sectionKey, liveSectionPatch]);
 
+  const correctionSteps = useMemo(() => {
+    const indices: number[] = [];
+    ONBOARDING_WIZARD_SECTIONS.forEach((sKey, sIdx) => {
+      const hasCorrection = (context.documents ?? []).some((d) => {
+        if (d.reviewStatus !== "correction_requested") return false;
+        if (sKey === "identity" && d.documentCategory === "identity") return true;
+        if (sKey === "education" && d.documentCategory === "education") return true;
+        if (sKey === "employment_history" && d.documentCategory === "employment") return true;
+        if (sKey === "bank" && d.documentCategory === "bank") return true;
+        if (
+          sKey === "signature" &&
+          (d.documentCategory === "offer_acceptance" || d.documentCategory === "signature")
+        ) {
+          return true;
+        }
+        return false;
+      });
+      if (hasCorrection) indices.push(sIdx);
+    });
+    return indices;
+  }, [context.documents]);
+
+  const hasCorrectionsRequested =
+    context.status === "corrections_requested" || correctionSteps.length > 0;
+
   useEffect(() => {
     if (!initializedRef.current) {
-      setStep(getFirstIncompleteStepIndex(context));
+      if (correctionSteps.length > 0) {
+        setStep(correctionSteps[0]);
+      } else {
+        setStep(getFirstIncompleteStepIndex(context));
+      }
       initializedRef.current = true;
     }
-  }, [context]);
+  }, [context, correctionSteps]);
 
   useEffect(() => {
     const enteredSection = prevSectionKeyRef.current !== sectionKey;
@@ -529,6 +575,8 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
       fileName: saved?.fileName ?? slot?.pendingFileName ?? null,
       uploading: Boolean(slot?.uploading),
       pendingFileName: slot?.pendingFileName ?? null,
+      reviewStatus: saved?.reviewStatus ?? null,
+      hrComment: saved?.hrComment ?? null,
     };
   }
 
@@ -745,6 +793,51 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           />
         </div>
 
+        {hasCorrectionsRequested ? (
+          <div className="shrink-0 border-b border-amber-300 bg-amber-50/90 px-4 py-3 sm:px-6 dark:border-amber-500/40 dark:bg-amber-950/40">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="mt-0.5 size-4.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                <div className="space-y-0.5">
+                  <p className="text-sm font-semibold text-amber-950 dark:text-amber-100">
+                    Action required: HR requested corrections
+                  </p>
+                  {context.correctionNotes ? (
+                    <p className="text-xs leading-relaxed text-amber-900/90 dark:text-amber-200">
+                      {context.correctionNotes}
+                    </p>
+                  ) : (
+                    <p className="text-xs leading-relaxed text-amber-900/90 dark:text-amber-200">
+                      Please update the requested documents below and submit again for review.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {correctionSteps.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-1.5 pt-1 sm:pt-0">
+                  <span className="text-xs font-medium text-amber-900 dark:text-amber-200">
+                    Jump to:
+                  </span>
+                  {correctionSteps.map((sIdx) => (
+                    <button
+                      key={sIdx}
+                      type="button"
+                      onClick={() => goToStep(sIdx)}
+                      className={cn(
+                        "rounded-md border border-amber-300 bg-white px-2.5 py-1 text-xs font-medium text-amber-950 shadow-2xs transition-colors hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-900/50 dark:text-amber-200",
+                        step === sIdx && "ring-1 ring-amber-600 font-semibold bg-amber-100/80",
+                      )}
+                    >
+                      {SECTION_TITLES[ONBOARDING_WIZARD_SECTIONS[sIdx]]}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
         <div className="shrink-0 border-b border-border/60 px-4 py-3 sm:px-6">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-0.5">
@@ -800,6 +893,8 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                       fileName={meta.fileName}
                       uploading={meta.uploading}
                       pendingFileName={meta.pendingFileName}
+                      reviewStatus={meta.reviewStatus}
+                      hrComment={meta.hrComment}
                       onSelectFile={(file) => uploadDoc("identity", doc.code, file)}
                     />
                   );
@@ -819,6 +914,8 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                       fileName={meta.fileName}
                       uploading={meta.uploading}
                       pendingFileName={meta.pendingFileName}
+                      reviewStatus={meta.reviewStatus}
+                      hrComment={meta.hrComment}
                       onSelectFile={(file) => uploadDoc("identity", doc.code, file)}
                     />
                   );
@@ -987,6 +1084,8 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                   fileName={uploadMeta("bank", "cancelled_cheque").fileName}
                   uploading={uploadMeta("bank", "cancelled_cheque").uploading}
                   pendingFileName={uploadMeta("bank", "cancelled_cheque").pendingFileName}
+                  reviewStatus={uploadMeta("bank", "cancelled_cheque").reviewStatus}
+                  hrComment={uploadMeta("bank", "cancelled_cheque").hrComment}
                   onSelectFile={(file) => uploadDoc("bank", "cancelled_cheque", file)}
                 />
               </div>
@@ -1060,16 +1159,26 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
             {isLastStep ? (
               <Button
                 onClick={submitAll}
-                disabled={isPending || !submitValidation.valid}
-                className="w-full sm:w-auto"
+                disabled={isPending}
+                className={cn(
+                  "w-full sm:w-auto font-semibold transition-all",
+                  submitValidation.valid
+                    ? "bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-sm hover:opacity-95"
+                    : "opacity-80",
+                )}
               >
                 Submit for HR review
               </Button>
             ) : (
               <Button
                 onClick={goNext}
-                disabled={isPending || !currentValidation.valid}
-                className="w-full sm:w-auto"
+                disabled={isPending}
+                className={cn(
+                  "w-full sm:w-auto font-semibold transition-all",
+                  currentValidation.valid
+                    ? "bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-sm hover:opacity-95"
+                    : "opacity-80",
+                )}
               >
                 Next
               </Button>

@@ -1,4 +1,4 @@
-import type { AttendanceStatus } from "@/types/attendance";
+import type { AttendanceStatus, AttendanceDisplayStatus } from "@/types/attendance";
 import type { LookupOption } from "@/types/employee";
 
 export type CorrectionStatus = "pending" | "approved" | "rejected" | "cancelled";
@@ -48,7 +48,7 @@ export type TeamAttendanceListItem = {
   workHours: number;
   breakMinutes: number;
   overtimeHours: number;
-  attendanceStatus: AttendanceStatus;
+  attendanceStatus: AttendanceDisplayStatus;
   lateMinutes: number;
   correctionId: string | null;
   correctionStatus: CorrectionStatus | null;

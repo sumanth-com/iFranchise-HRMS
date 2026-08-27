@@ -5,22 +5,53 @@ type NavHrefItem = {
   href: string;
 };
 
-/** Management module paths highlight the corresponding Team * sidebar item. */
-const TEAM_ADMIN_PATH_PREFIXES: Record<string, string> = {
+/** Management and module roots that map nested URLs or aliased paths to their corresponding sidebar nav item. */
+const MODULE_PREFIX_MAPPINGS: Record<string, string> = {
+  // Team management hubs (Administration)
   "/dashboard/leave-management": HR_HUB_ROUTES.teamLeave,
+  "/dashboard/leave/team": HR_HUB_ROUTES.teamLeave,
   "/dashboard/attendance-management": HR_HUB_ROUTES.teamAttendance,
+  "/dashboard/attendance/team": HR_HUB_ROUTES.teamAttendance,
   "/dashboard/payroll-management": HR_HUB_ROUTES.teamPayroll,
+  "/dashboard/payroll/team": HR_HUB_ROUTES.teamPayroll,
   "/dashboard/documents-management": HR_HUB_ROUTES.teamDocuments,
+  "/dashboard/documents/team": HR_HUB_ROUTES.teamDocuments,
   "/dashboard/assets-management": HR_HUB_ROUTES.teamAssets,
-  "/dashboard/onboarding": "/dashboard/recruitment",
-};
+  "/dashboard/assets/team": HR_HUB_ROUTES.teamAssets,
 
-/** Module roots so nested tabs (e.g. Performance > Feedback) keep the sidebar item active. */
-const MODULE_SECTION_ROOTS = [
-  "/dashboard/performance",
-  "/manager/performance",
-  "/ceo/performance",
-] as const;
+  // Recruitment and Onboarding modules
+  "/dashboard/onboarding": "/dashboard/recruitment/jobs",
+  "/dashboard/recruitment": "/dashboard/recruitment/jobs",
+  "/manager/recruitment": "/manager/recruitment",
+  "/ceo/recruitment": "/ceo/recruitment",
+
+  // Reports
+  "/dashboard/reports": "/dashboard/reports/attendance",
+  "/manager/reports": "/manager/reports",
+  "/ceo/reports": "/ceo/reports",
+
+  // Performance
+  "/dashboard/performance": "/dashboard/performance",
+  "/manager/performance": "/manager/performance",
+  "/ceo/performance": "/ceo/performance",
+
+  // Organization & Setup
+  "/dashboard/organization": "/dashboard/organization",
+  "/ceo/organization": "/ceo/organization",
+
+  // User Provisioning & Roles
+  "/dashboard/user-provisioning": "/dashboard/user-provisioning",
+  "/ceo/user-provisioning": "/ceo/user-provisioning",
+  "/dashboard/roles": "/dashboard/roles",
+
+  // Notifications
+  "/dashboard/notifications": "/dashboard/notifications",
+  "/manager/notifications": "/manager/notifications",
+  "/ceo/notifications": "/ceo/notifications",
+
+  // Manager Teammates
+  "/manager/team": "/manager/team",
+};
 
 function navItemPath(href: string | null | undefined) {
   if (typeof href !== "string" || href.length === 0) return "";
@@ -32,36 +63,20 @@ function resolvePrefixNavHref(
   prefixes: Record<string, string>,
   items: NavHrefItem[],
 ): string | null {
-  for (const [prefix, navHref] of Object.entries(prefixes)) {
+  for (const [prefix, targetRoot] of Object.entries(prefixes)) {
     if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
-      const match = items.find((item) => navItemPath(item.href) === navHref);
+      const match = items.find((item) => {
+        const itemPath = navItemPath(item.href);
+        return itemPath === targetRoot || itemPath.startsWith(`${targetRoot}/`);
+      });
       if (match) return match.href;
     }
   }
   return null;
 }
 
-function resolveModuleSectionHref(
-  pathname: string,
-  items: NavHrefItem[],
-): string | null {
-  for (const root of MODULE_SECTION_ROOTS) {
-    if (pathname !== root && !pathname.startsWith(`${root}/`)) continue;
-
-    const exact = items.find((item) => navItemPath(item.href) === root);
-    if (exact) return exact.href;
-
-    const nested = items.find((item) => {
-      const itemPath = navItemPath(item.href);
-      return itemPath === root || itemPath.startsWith(`${root}/`);
-    });
-    if (nested) return nested.href;
-  }
-  return null;
-}
-
 /**
- * Pick the sidebar link that matches the current path (my vs team hub sections).
+ * Pick the sidebar link that matches the current path (my vs team hub sections, module child tabs).
  */
 export function resolveActiveNavHref(
   pathname: string,
@@ -73,11 +88,8 @@ export function resolveActiveNavHref(
 
   const navItems = items.filter((item) => typeof item?.href === "string" && item.href.length > 0);
 
-  const teamAdminMatch = resolvePrefixNavHref(pathname, TEAM_ADMIN_PATH_PREFIXES, navItems);
-  if (teamAdminMatch) return teamAdminMatch;
-
-  const moduleSectionMatch = resolveModuleSectionHref(pathname, navItems);
-  if (moduleSectionMatch) return moduleSectionMatch;
+  const prefixMatch = resolvePrefixNavHref(pathname, MODULE_PREFIX_MAPPINGS, navItems);
+  if (prefixMatch) return prefixMatch;
 
   const matches = navItems.filter((item) => {
     const itemPath = navItemPath(item.href);

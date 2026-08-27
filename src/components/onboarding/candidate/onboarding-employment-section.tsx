@@ -30,6 +30,8 @@ type UploadMeta = {
   fileName: string | null;
   uploading: boolean;
   pendingFileName: string | null;
+  reviewStatus?: string | null;
+  hrComment?: string | null;
 };
 
 type EmploymentFormUpdater =
@@ -134,6 +136,8 @@ export function OnboardingEmploymentSection({
           fileName={meta.fileName}
           uploading={meta.uploading}
           pendingFileName={meta.pendingFileName}
+          reviewStatus={meta.reviewStatus}
+          hrComment={meta.hrComment}
           onSelectFile={(file) => onUpload(code, file)}
         />
       </div>

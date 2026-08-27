@@ -1,3 +1,5 @@
+import type { EmployeeUpcomingEvent } from "@/types/employee-dashboard";
+
 export type CeoInsightPriority = "high" | "medium" | "low";
 
 export type CeoChartItem = {
@@ -129,12 +131,6 @@ export type CeoDashboardData = {
   attendance: CeoAttendanceOverview;
   activities: CeoActivityItem[];
   approvals: CeoApprovalItem[];
-  upcomingHolidays: Array<{
-    id: string;
-    type: "holiday";
-    title: string;
-    subtitle: string | null;
-    date: string;
-  }>;
+  upcomingHolidays: EmployeeUpcomingEvent[];
   charts: CeoDashboardCharts;
 };

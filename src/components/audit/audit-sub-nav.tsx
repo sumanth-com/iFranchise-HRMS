@@ -68,9 +68,9 @@ export function AuditSubNav({
               prefetch
               className={cn(
                 "rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    isActive
+                      ? "bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-sm font-semibold"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
               {item.title}

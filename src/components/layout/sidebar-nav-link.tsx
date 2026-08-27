@@ -1,6 +1,5 @@
 "use client";
 
-import { usePathname } from "next/navigation";
 import type { ComponentProps, ReactNode } from "react";
 
 import { AppNavLink } from "@/components/layout/app-nav-link";
@@ -31,9 +30,7 @@ export function SidebarNavLink({
   onNavigate,
   children,
 }: SidebarNavLinkProps) {
-  const pathname = usePathname();
-  const { pendingHref, startNavigation } = useSidebar();
-  const isPending = pendingHref === href && pathname !== href;
+  const { startNavigation } = useSidebar();
 
   return (
     <AppNavLink
@@ -53,14 +50,11 @@ export function SidebarNavLink({
         active
           ? "sidebar-nav-active bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-[0_10px_28px_-12px_rgba(79,70,229,0.65)] dark:from-blue-600 dark:to-violet-600"
           : "text-sidebar-foreground/80 hover:bg-muted hover:text-foreground dark:hover:bg-white/[0.06] dark:hover:text-white/90",
-        isPending &&
-          !active &&
-          "bg-muted text-foreground dark:bg-white/[0.06] dark:text-white/90",
         disabled && "pointer-events-none opacity-50",
         collapsed && "justify-center px-2",
       )}
     >
-      <SidebarNavIcon icon={icon} active={active || isPending} />
+      <SidebarNavIcon icon={icon} active={active} />
       {!collapsed ? <span className="truncate">{children ?? title}</span> : null}
     </AppNavLink>
   );

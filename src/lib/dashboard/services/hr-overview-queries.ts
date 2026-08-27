@@ -198,7 +198,7 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
   const payrollDue = !payrollStatus || payrollStatus === "draft" ? 1 : 0;
   const interviewsToday = interviewsTodayRes.count ?? 0;
   const onLeaveToday = leave.employeesOnLeaveToday;
-  const onboardingAwaitingReview = onboardingStats.pendingReview;
+  const onboardingReadyCount = onboardingStats.readyForInvitation ?? 0;
 
   const upcomingHolidays = holidays.data
     .filter((h) => h.holidayDate >= today && h.holidayDate <= format(eventHorizon, "yyyy-MM-dd"))
@@ -270,7 +270,7 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
       {
         id: "onboarding-review",
         label: "Onboarding",
-        count: onboardingAwaitingReview,
+        count: onboardingReadyCount,
         href: DASHBOARD_ACTION_LINKS.onboardingReview,
         urgency: "low",
       },

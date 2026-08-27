@@ -64,6 +64,7 @@ type SalaryStructureDbRow = {
   tax_deduction: number;
   other_deductions: number;
   components: Record<string, number> | null;
+  employees?: SalaryStructureEmployeeRow | SalaryStructureEmployeeRow[] | null;
 };
 
 function mapSalaryStructureRow(
@@ -481,11 +482,40 @@ export async function listSalaryStructures(
 ): Promise<SalaryStructureListResult> {
   const parsed = salaryStructureListParamsSchema.parse(params);
   const { page, pageSize, search, employeeId } = parsed;
-  const from = (page - 1) * pageSize;
-  const to = from + pageSize - 1;
   const organizationId = profile.employee.organizationId;
 
-  let query = supabase
+  // 1. Fetch active employees in organization
+  let empQuery = supabase
+    .schema("hrms")
+    .from("employees")
+    .select(
+      `
+        id,
+        employee_code,
+        first_name,
+        last_name,
+        date_of_joining,
+        department_id,
+        departments:department_id (name)
+      `,
+    )
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .in("employment_status", ["active", "probation", "on_leave"]);
+
+  if (employeeId) {
+    empQuery = empQuery.eq("id", employeeId);
+  }
+
+  if (search) {
+    const term = `%${search}%`;
+    empQuery = empQuery.or(
+      `first_name.ilike.${term},last_name.ilike.${term},employee_code.ilike.${term}`,
+    );
+  }
+
+  // 2. Fetch existing salary structures
+  let salaryQuery = supabase
     .schema("hrms")
     .from("salary_structures")
     .select(
@@ -513,44 +543,86 @@ export async function listSalaryStructures(
           departments:department_id (name)
         )
       `,
-      { count: "exact" },
     )
     .eq("employees.organization_id", organizationId)
     .is("employees.deleted_at", null)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .order("effective_from", { ascending: false });
 
   if (employeeId) {
-    query = query.eq("employee_id", employeeId);
+    salaryQuery = salaryQuery.eq("employee_id", employeeId);
   }
 
   if (search) {
-    query = query.or(
-      `employees.first_name.ilike.%${search}%,employees.last_name.ilike.%${search}%,employees.employee_code.ilike.%${search}%`,
+    const term = `%${search}%`;
+    salaryQuery = salaryQuery.or(
+      `employees.first_name.ilike.${term},employees.last_name.ilike.${term},employees.employee_code.ilike.${term}`,
     );
   }
 
-  query = query.order("effective_from", { ascending: false }).range(from, to);
-
-  const { data, error, count } = await query;
-  if (error) throw new Error(error.message);
+  const [empRes, salaryRes] = await Promise.all([empQuery, salaryQuery]);
+  if (empRes.error) throw new Error(empRes.error.message);
+  if (salaryRes.error) throw new Error(salaryRes.error.message);
 
   const today = new Date().toISOString().slice(0, 10);
+  const existingRows = (salaryRes.data ?? []) as SalaryStructureDbRow[];
+  const existingEmployeeIds = new Set(existingRows.map((r) => r.employee_id));
+
+  const items: SalaryStructureItem[] = existingRows.map((row) => {
+    const employee = unwrapRelation(
+      row.employees as SalaryStructureEmployeeRow | SalaryStructureEmployeeRow[] | null,
+    );
+    const department = employee
+      ? unwrapRelation(
+          employee.departments as { name: string } | { name: string }[] | null,
+        )
+      : null;
+    const isCurrent =
+      row.effective_from <= today &&
+      (!row.effective_to || row.effective_to >= today);
+    const components = (row.components as Record<string, number>) ?? {};
+    return mapSalaryStructureRow(row, employee, department, components, isCurrent);
+  });
+
+  // For active employees without any configured salary structure, include them so all persons are displayed
+  for (const emp of empRes.data ?? []) {
+    if (!existingEmployeeIds.has(emp.id)) {
+      const department = unwrapRelation(
+        emp.departments as { name: string } | { name: string }[] | null,
+      );
+      items.push({
+        id: `not_set_${emp.id}`,
+        employeeId: emp.id,
+        employeeCode: emp.employee_code ?? "",
+        employeeName: `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim(),
+        departmentName: department?.name ?? null,
+        effectiveFrom: emp.date_of_joining ?? today,
+        effectiveTo: null,
+        currencyCode: "INR",
+        basicSalary: 0,
+        hraAmount: 0,
+        transportAllowance: 0,
+        otherAllowances: 0,
+        grossSalary: 0,
+        netSalary: 0,
+        taxDeduction: 0,
+        otherDeductions: 0,
+        components: {},
+        isCurrent: false,
+      });
+    }
+  }
+
+  // Sort items: Alphabetical by employee name
+  items.sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+
+  const total = items.length;
+  const from = (page - 1) * pageSize;
+  const pageData = items.slice(from, from + pageSize);
 
   return {
-    data: (data ?? []).map((row) => {
-      const employee = unwrapRelation(row.employees);
-      const department = employee
-        ? unwrapRelation(
-            employee.departments as { name: string } | { name: string }[] | null,
-          )
-        : null;
-      const isCurrent =
-        row.effective_from <= today &&
-        (!row.effective_to || row.effective_to >= today);
-      const components = (row.components as Record<string, number>) ?? {};
-      return mapSalaryStructureRow(row, employee, department, components, isCurrent);
-    }),
-    total: count ?? 0,
+    data: pageData,
+    total,
     page,
     pageSize,
   };

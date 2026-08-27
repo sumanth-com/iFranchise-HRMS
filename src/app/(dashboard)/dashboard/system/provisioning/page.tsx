@@ -25,7 +25,7 @@ export default async function SuperAdminUserProvisioningPage({
 
   const parsed = ceoProvisioningListParamsSchema.parse({
     page: firstString(rawParams.page),
-    pageSize: firstString(rawParams.pageSize) ?? "8",
+    pageSize: firstString(rawParams.pageSize) ?? "9",
     search: firstString(rawParams.search),
     roleCode: firstString(rawParams.roleCode),
     departmentId: firstString(rawParams.departmentId),

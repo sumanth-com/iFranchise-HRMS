@@ -116,20 +116,22 @@ export async function listCeoRegularizationApprovalQueue(
 
   const organizationId = profile.employee.organizationId;
 
-  // CEO-routed rows set approver_employee_id (any active CEO). Do not require exact
-  // assignee match — leave uses the same any-of CEO queue semantics.
+  // CEO-routed rows: all pending requests from HR or Manager applicants (or with approver_employee_id set).
+  // Any active CEO in the organization can view and decide these requests.
   const { data, error } = await supabase
     .schema("hrms")
     .from("attendance_corrections")
     .select(CORRECTION_SELECT)
-    .not("approver_employee_id", "is", null)
     .eq("correction_status", "pending")
     .eq("employees.organization_id", organizationId)
     .is("deleted_at", null)
     .order("created_at", { ascending: true });
 
   if (error) throw new Error(error.message);
-  return mapCorrectionRows(supabase, (data ?? []) as CorrectionRow[]);
+  const mapped = await mapCorrectionRows(supabase, (data ?? []) as CorrectionRow[]);
+  return mapped.filter(
+    (item) => item.requestCategory === "hr" || item.requestCategory === "manager",
+  );
 }
 
 export async function listCeoProcessedRegularizations(
@@ -143,11 +145,11 @@ export async function listCeoProcessedRegularizations(
   const year = filters.year ?? now.getFullYear();
   const range = getMonthDateRange(month, year);
 
+  // Processed requests across the organization for HR/Manager applicants visible to all CEOs.
   const { data, error } = await supabase
     .schema("hrms")
     .from("attendance_corrections")
     .select(CORRECTION_SELECT)
-    .eq("reviewed_by", profile.userId)
     .in("correction_status", ["approved", "rejected"])
     .eq("employees.organization_id", organizationId)
     .is("deleted_at", null)
@@ -157,5 +159,8 @@ export async function listCeoProcessedRegularizations(
     .limit(100);
 
   if (error) throw new Error(error.message);
-  return mapCorrectionRows(supabase, (data ?? []) as CorrectionRow[]);
+  const mapped = await mapCorrectionRows(supabase, (data ?? []) as CorrectionRow[]);
+  return mapped.filter(
+    (item) => item.requestCategory === "hr" || item.requestCategory === "manager",
+  );
 }

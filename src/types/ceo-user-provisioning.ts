@@ -48,7 +48,8 @@ export type ProvisioningInvitationStatus =
   | "expired"
   | "cancelled"
   | "revoked"
-  | "inactive";
+  | "inactive"
+  | "deactivated";
 
 export type CeoProvisioningUser = {
   employeeId: string;

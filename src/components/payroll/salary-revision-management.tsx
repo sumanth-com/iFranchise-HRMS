@@ -9,6 +9,7 @@ import type { z } from "zod";
 
 import {
   TABLE_HEADER_CELL_CLASS,
+  TABLE_HEADER_ROW_CLASS,
   TABLE_HEADER_STICKY_CLASS,
 } from "@/components/common/table-header-classes";
 import { Button } from "@/components/common/button";
@@ -96,7 +97,7 @@ export function SalaryRevisionTable({ records }: { records: SalaryRevisionItem[]
     <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
       <table className="w-full text-sm">
         <thead className={TABLE_HEADER_STICKY_CLASS}>
-          <tr className="border-white/10 bg-black hover:bg-black">
+          <tr className={TABLE_HEADER_ROW_CLASS}>
             <th className={TABLE_HEADER_CELL_CLASS}>Employee</th>
             <th className={TABLE_HEADER_CELL_CLASS}>Old gross</th>
             <th className={TABLE_HEADER_CELL_CLASS}>New gross</th>

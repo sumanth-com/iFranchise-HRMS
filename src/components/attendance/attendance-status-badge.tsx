@@ -15,7 +15,7 @@ const STATUS_STYLES: Record<AttendanceDisplayStatus, string> = {
   on_leave:
     "bg-violet-500/15 text-violet-800 ring-1 ring-inset ring-violet-500/25 dark:bg-violet-500/20 dark:text-violet-200 dark:ring-violet-400/35",
   holiday:
-    "bg-sky-500/15 text-sky-800 ring-1 ring-inset ring-sky-500/25 dark:bg-sky-500/20 dark:text-sky-200 dark:ring-sky-400/35",
+    "bg-slate-500/15 text-slate-700 ring-1 ring-inset ring-slate-500/20 dark:bg-slate-400/15 dark:text-slate-100 dark:ring-slate-300/25",
   week_off:
     "bg-slate-500/15 text-slate-700 ring-1 ring-inset ring-slate-500/20 dark:bg-slate-400/15 dark:text-slate-100 dark:ring-slate-300/25",
   upcoming:
@@ -33,6 +33,10 @@ export function AttendanceStatusBadge({
   status,
   className,
 }: AttendanceStatusBadgeProps) {
+  if (!status || status === "upcoming" || (status as string) === "-") {
+    return <span className={cn("text-muted-foreground font-medium", className)}>—</span>;
+  }
+
   return (
     <span
       className={cn(
@@ -51,8 +55,8 @@ export function AttendanceHistoryStatusCell({
   status,
   className,
 }: AttendanceStatusBadgeProps) {
-  if (status === "upcoming") {
-    return <span className={cn("text-muted-foreground", className)}>—</span>;
+  if (!status || status === "upcoming" || (status as string) === "-") {
+    return <span className={cn("text-muted-foreground font-medium", className)}>—</span>;
   }
 
   return <AttendanceStatusBadge status={status} className={className} />;

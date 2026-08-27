@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import { LoadingSpinner } from "@/components/common/loading-spinner";
+import { PageSkeleton } from "@/components/common/page-skeleton";
 import { CeoApprovalsView } from "@/components/ceo/approvals/ceo-approvals-view";
 import { getCeoApprovalsModuleData } from "@/lib/ceo/actions/ceo-approvals-actions";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
@@ -37,13 +37,7 @@ export default async function CeoApprovalsPage({
   const data = await getCeoApprovalsModuleData(parsed);
 
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-1 items-center justify-center">
-          <LoadingSpinner />
-        </div>
-      }
-    >
+    <Suspense fallback={<PageSkeleton />}>
       <CeoApprovalsView {...data} initialFilters={parsed} />
     </Suspense>
   );

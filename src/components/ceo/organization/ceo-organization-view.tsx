@@ -9,7 +9,6 @@ import {
 import { CeoOrganizationDistribution } from "@/components/ceo/organization/ceo-organization-distribution";
 import { CeoOrganizationDrawer } from "@/components/ceo/organization/ceo-organization-drawer";
 import { CeoOrganizationFilters } from "@/components/ceo/organization/ceo-organization-filters";
-import { CeoOrganizationHierarchy } from "@/components/ceo/organization/ceo-organization-hierarchy";
 import { CeoOrganizationPeople } from "@/components/ceo/organization/ceo-organization-people";
 import { CeoOrganizationSignals } from "@/components/ceo/organization/ceo-organization-signals";
 import { CeoOrganizationSummary } from "@/components/ceo/organization/ceo-organization-summary";
@@ -119,11 +118,6 @@ export function CeoOrganizationView({
         isLoading={isPending}
         onPageChange={(page) => updateFilters({ page })}
         onView={openEmployee}
-      />
-
-      <CeoOrganizationHierarchy
-        roots={hierarchyRoots}
-        onSelectEmployee={openEmployee}
       />
 
       <CeoOrganizationDrawer

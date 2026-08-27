@@ -21,6 +21,7 @@ import {
   fetchCeoLeaveDetailAction,
   rejectCeoLeaveAction,
 } from "@/lib/ceo/actions/ceo-leave-actions";
+import { broadcastApprovalChange } from "@/lib/approvals/use-approvals-sync";
 import { leaveApprovalStageLabel } from "@/lib/leave/constants";
 import {
   formatHalfDayPeriod,
@@ -116,6 +117,7 @@ export function CeoLeaveDetailDrawer({
       }
       toast.success("Leave request approved");
       setApproveOpen(false);
+      broadcastApprovalChange("leave");
       loadDetail();
       onActed?.();
     });
@@ -139,6 +141,7 @@ export function CeoLeaveDetailDrawer({
       toast.success("Leave request rejected");
       setRejectOpen(false);
       setRejectComments("");
+      broadcastApprovalChange("leave");
       loadDetail();
       onActed?.();
     });

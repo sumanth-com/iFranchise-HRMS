@@ -577,15 +577,15 @@ html:not(.dark) .dashboard-surface:hover {
   justify-content: center;
   overflow: hidden;
   border-radius: 1.75rem;
-  /* Light mode: purple brand mesh — consistent with landing */
+  /* Light mode: purple/indigo brand mesh — matching landing CTA */
   background:
-    radial-gradient(ellipse 80% 60% at 12% 8%, rgba(196, 181, 253, 0.9), transparent 52%),
-    radial-gradient(ellipse 70% 55% at 88% 88%, rgba(124, 58, 237, 0.72), transparent 55%),
-    radial-gradient(circle at 48% 48%, rgba(167, 139, 250, 0.5), transparent 45%),
-    linear-gradient(160deg, #a78bfa 0%, #8b5cf6 32%, #7c3aed 68%, #5b21b6 100%);
+    radial-gradient(ellipse 80% 60% at 12% 8%, rgba(199, 210, 254, 0.85), transparent 52%),
+    radial-gradient(ellipse 70% 55% at 88% 88%, rgba(79, 70, 229, 0.8), transparent 55%),
+    radial-gradient(circle at 48% 48%, rgba(95, 85, 238, 0.5), transparent 45%),
+    linear-gradient(160deg, #7c72f8 0%, #5f55ee 40%, #4f46e5 75%, #3730a3 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    0 18px 48px rgba(109, 40, 217, 0.24);
+    0 18px 48px rgba(95, 85, 238, 0.3);
 }
 
 .auth-glass-brand {
@@ -701,7 +701,7 @@ html:not(.dark) .dashboard-surface:hover {
   left: -6%;
   width: 52%;
   height: 42%;
-  background: rgba(196, 181, 253, 0.7);
+  background: rgba(199, 210, 254, 0.75);
 }
 
 .auth-glass-aurora-b {
@@ -709,7 +709,7 @@ html:not(.dark) .dashboard-surface:hover {
   bottom: 8%;
   width: 48%;
   height: 40%;
-  background: rgba(124, 58, 237, 0.45);
+  background: rgba(95, 85, 238, 0.55);
   animation-delay: -4s;
 }
 
@@ -718,7 +718,7 @@ html:not(.dark) .dashboard-surface:hover {
   top: 38%;
   width: 36%;
   height: 28%;
-  background: rgba(167, 139, 250, 0.4);
+  background: rgba(129, 140, 248, 0.45);
   animation-delay: -7s;
 }
 
@@ -869,13 +869,13 @@ html:not(.dark) .dashboard-surface:hover {
   border-radius: 9999px;
   background:
     radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.85), transparent 28%),
-    radial-gradient(circle at 68% 72%, rgba(124, 58, 237, 0.3), transparent 42%),
-    radial-gradient(circle at 50% 46%, rgba(221, 214, 254, 0.65) 0%, rgba(139, 92, 246, 0.42) 46%, rgba(91, 33, 182, 0.55) 100%);
+    radial-gradient(circle at 68% 72%, rgba(95, 85, 238, 0.35), transparent 42%),
+    radial-gradient(circle at 50% 46%, rgba(224, 231, 255, 0.65) 0%, rgba(129, 140, 248, 0.45) 46%, rgba(79, 70, 229, 0.55) 100%);
   box-shadow:
-    inset -20px -16px 40px rgba(76, 29, 149, 0.32),
+    inset -20px -16px 40px rgba(49, 46, 129, 0.32),
     inset 14px 12px 32px rgba(255, 255, 255, 0.4),
     0 0 0 1px rgba(255, 255, 255, 0.42),
-    0 22px 48px rgba(109, 40, 217, 0.34);
+    0 22px 48px rgba(95, 85, 238, 0.34);
   backdrop-filter: blur(2.5px);
 }
 
@@ -1931,13 +1931,13 @@ html:not(.dark) .dashboard-surface:hover {
   -webkit-backdrop-filter: blur(14px);
 }
 
-/* Solid purple navbar over vivid hero (top of page only) */
+/* Seamless navbar over vivid hero (top of page only) */
 .landing-page--vivid-hero > .landing-nav:not(.landing-nav--scrolled) {
-  border-bottom-color: rgba(255, 255, 255, 0.14);
-  background: #5b21b6;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+  background: rgba(10, 0, 38, 0.4);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .landing-page--vivid-hero > .landing-nav:not(.landing-nav--scrolled) .landing-nav-brand-text,
@@ -2078,40 +2078,52 @@ html:not(.dark) .dashboard-surface:hover {
   padding-inline: 1.35rem;
   font-size: 0.9rem;
   font-weight: 700;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.22);
   cursor: pointer;
-  background: linear-gradient(180deg, #b794f6 0%, #8b5cf6 42%, #7c3aed 100%) !important;
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 45%, #4f46e5 100%) !important;
   color: #fff !important;
   box-shadow:
-    0 10px 22px rgba(109, 40, 217, 0.3),
+    0 10px 24px rgba(99, 102, 241, 0.38),
+    0 2px 8px rgba(124, 58, 237, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.38);
 }
 
 .landing-nav-signin:hover {
-  filter: brightness(1.06);
+  background: linear-gradient(135deg, #9333ea 0%, #6366f1 50%, #4338ca 100%) !important;
+  filter: brightness(1.08);
+  box-shadow:
+    0 14px 32px rgba(99, 102, 241, 0.48),
+    0 4px 12px rgba(124, 58, 237, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .dark .landing-nav-signin {
-  background: linear-gradient(180deg, #c4b5fd 0%, #8b5cf6 45%, #7c3aed 100%) !important;
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 45%, #4f46e5 100%) !important;
   color: #fff !important;
 }
 
 .landing-nav .landing-nav-signin:not(.landing-nav-signin--outline) {
-  background: linear-gradient(180deg, #b794f6 0%, #8b5cf6 42%, #7c3aed 100%) !important;
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 45%, #4f46e5 100%) !important;
   color: #fff !important;
   box-shadow:
-    0 10px 22px rgba(109, 40, 217, 0.3),
+    0 10px 24px rgba(99, 102, 241, 0.38),
+    0 2px 8px rgba(124, 58, 237, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.38);
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.22);
 }
 
 .dark .landing-nav .landing-nav-signin:not(.landing-nav-signin--outline) {
-  background: linear-gradient(180deg, #c4b5fd 0%, #8b5cf6 45%, #7c3aed 100%) !important;
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 45%, #4f46e5 100%) !important;
   color: #fff !important;
 }
 
 .landing-nav .landing-nav-signin:not(.landing-nav-signin--outline):hover {
-  filter: brightness(1.06);
+  background: linear-gradient(135deg, #9333ea 0%, #6366f1 50%, #4338ca 100%) !important;
+  filter: brightness(1.08);
+  box-shadow:
+    0 14px 32px rgba(99, 102, 241, 0.48),
+    0 4px 12px rgba(124, 58, 237, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .landing-nav-signin--outline {
@@ -2259,13 +2271,13 @@ html:not(.dark) .dashboard-surface:hover {
   padding: 5.5rem 0 2.75rem;
 }
 
-/* Vivid purple hero atmosphere (reference-style depth + glow) */
+/* Vivid hero atmosphere (reference-style depth + glow) */
 .landing-hero-bg {
   pointer-events: none;
   position: absolute;
-  inset: 0 0 auto;
+  inset: -4.75rem 0 auto;
   z-index: 0;
-  height: min(96vh, 56rem);
+  height: min(100vh, 60rem);
   overflow: hidden;
 }
 
@@ -2550,20 +2562,23 @@ html:not(.dark) .dashboard-surface:hover {
   margin-top: 1.75rem;
 }
 
-/* Hero CTA: white pill on deep purple (reference-style contrast) */
+/* Landing Hero & Global CTA: solid vibrant brand purple/indigo #5f55ee (matching Enter HRMS) */
 .landing-hero-cta {
-  background: #ffffff !important;
-  color: #312e81 !important;
+  background: #5f55ee !important;
+  color: #ffffff !important;
   border: none !important;
   box-shadow:
-    0 14px 32px rgba(49, 46, 129, 0.28),
-    0 2px 0 rgba(255, 255, 255, 0.9) inset !important;
+    0 10px 24px rgba(95, 85, 238, 0.4),
+    0 2px 6px rgba(0, 0, 0, 0.08) !important;
 }
 
 .landing-hero-cta:hover {
-  filter: none;
-  background: #f8fafc !important;
-  color: #1e1b4b !important;
+  background: #5247e3 !important;
+  color: #ffffff !important;
+  filter: none !important;
+  box-shadow:
+    0 14px 30px rgba(95, 85, 238, 0.5),
+    0 4px 10px rgba(0, 0, 0, 0.12) !important;
 }
 
 .landing-cta,
@@ -2572,43 +2587,44 @@ html:not(.dark) .dashboard-surface:hover {
 .landing-hero-preview-checkout,
 .landing-bento-ceo-cta,
 .landing-bento-board-cta {
-  background: linear-gradient(180deg, #b794f6 0%, #8b5cf6 42%, #7c3aed 100%) !important;
+  background: #5f55ee !important;
   color: #fff !important;
   border: none !important;
   box-shadow:
-    0 12px 28px rgba(109, 40, 217, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.38) !important;
+    0 8px 20px rgba(95, 85, 238, 0.35) !important;
 }
 
 .landing-cta:hover,
 .landing-nav-signin:not(.landing-nav-signin--outline):hover,
 .landing-nav .landing-nav-signin:not(.landing-nav-signin--outline):hover {
-  filter: brightness(1.06);
+  background: #5247e3 !important;
+  filter: none !important;
+  box-shadow:
+    0 12px 26px rgba(95, 85, 238, 0.45) !important;
 }
 
 .dark .landing-cta,
 .dark .landing-nav-signin:not(.landing-nav-signin--outline),
 .dark .landing-nav .landing-nav-signin:not(.landing-nav-signin--outline) {
-  background: linear-gradient(180deg, #c4b5fd 0%, #8b5cf6 45%, #7c3aed 100%) !important;
+  background: #5f55ee !important;
   color: #fff !important;
   box-shadow:
-    0 12px 28px rgba(124, 58, 237, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.35) !important;
+    0 10px 24px rgba(95, 85, 238, 0.4) !important;
 }
 
-/* Hero nav Sign In: white pill, purple text (wins over shared gradient CTA rules) */
+/* Hero nav Sign In */
 .landing-page--vivid-hero .landing-nav:not(.landing-nav--scrolled) .landing-nav-signin:not(.landing-nav-signin--outline),
 .landing-page--vivid-hero .landing-nav:not(.landing-nav--scrolled) .landing-nav .landing-nav-signin:not(.landing-nav-signin--outline) {
-  background: #ffffff !important;
-  color: #5b21b6 !important;
+  background: #5f55ee !important;
+  color: #ffffff !important;
   border: none !important;
-  box-shadow: 0 8px 20px rgba(49, 46, 129, 0.2) !important;
+  box-shadow: 0 8px 20px rgba(95, 85, 238, 0.35) !important;
   filter: none !important;
 }
 
 .landing-page--vivid-hero .landing-nav:not(.landing-nav--scrolled) .landing-nav-signin:not(.landing-nav-signin--outline):hover {
-  background: #f8fafc !important;
-  color: #4c1d95 !important;
+  background: #5247e3 !important;
+  color: #ffffff !important;
   filter: none !important;
 }
 
@@ -2636,17 +2652,21 @@ html:not(.dark) .dashboard-surface:hover {
 }
 
 .landing-page--vivid-hero > .landing-nav.landing-nav--scrolled .landing-nav-signin:not(.landing-nav-signin--outline) {
-  background: linear-gradient(180deg, #b794f6 0%, #8b5cf6 42%, #7c3aed 100%) !important;
+  background: #5f55ee !important;
   color: #ffffff !important;
   box-shadow:
-    0 12px 28px rgba(109, 40, 217, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.38) !important;
+    0 10px 24px rgba(95, 85, 238, 0.4),
+    0 2px 6px rgba(0, 0, 0, 0.08) !important;
   filter: none !important;
 }
 
 .landing-page--vivid-hero > .landing-nav.landing-nav--scrolled .landing-nav-signin:not(.landing-nav-signin--outline):hover {
-  filter: brightness(1.06) !important;
+  background: #5247e3 !important;
+  filter: none !important;
   color: #ffffff !important;
+  box-shadow:
+    0 14px 30px rgba(95, 85, 238, 0.5),
+    0 4px 10px rgba(0, 0, 0, 0.12) !important;
 }
 
 .landing-hero-orbit {
@@ -3506,7 +3526,7 @@ html:not(.dark) .dashboard-surface:hover {
 }
 
 .landing-section-title-accent {
-  color: #7c3aed;
+  color: #5f55ee;
 }
 
 .landing-section-copy {
@@ -3522,7 +3542,7 @@ html:not(.dark) .dashboard-surface:hover {
 }
 
 .dark .landing-section-title-accent {
-  color: #c4b5fd;
+  color: #5f55ee;
 }
 
 .dark .landing-section-copy {
@@ -4038,28 +4058,28 @@ html:not(.dark) .dashboard-surface:hover {
 .landing-bento-float--a {
   top: 18%;
   left: 10%;
-  color: #2563eb;
+  color: #5f55ee;
   animation: landing-bento-float 4.8s ease-in-out infinite;
 }
 
 .landing-bento-float--b {
   top: 42%;
   right: 8%;
-  color: #2563eb;
+  color: #5f55ee;
   animation: landing-bento-float 5.4s ease-in-out infinite 0.4s;
 }
 
 .landing-bento-float--c {
   bottom: 16%;
   left: 18%;
-  color: #2563eb;
+  color: #5f55ee;
   animation: landing-bento-float 5s ease-in-out infinite 0.8s;
 }
 
 .landing-bento-chip--soft {
   top: 12%;
   right: 16%;
-  color: #2563eb;
+  color: #5f55ee;
   animation: landing-bento-float 6s ease-in-out infinite 0.2s;
 }
 
@@ -4100,7 +4120,7 @@ html:not(.dark) .dashboard-surface:hover {
   border-radius: 9999px;
   border: 2px solid #fff;
   margin-left: -0.35rem;
-  background: linear-gradient(135deg, #60a5fa, #2563eb);
+  background: linear-gradient(135deg, #818cf8, #5f55ee);
 }
 
 .landing-bento-avatars i:first-child {
@@ -4108,15 +4128,15 @@ html:not(.dark) .dashboard-surface:hover {
 }
 
 .landing-bento-avatars i:nth-child(2) {
-  background: linear-gradient(135deg, #93c5fd, #3b82f6);
+  background: linear-gradient(135deg, #a5b4fc, #6366f1);
 }
 
 .landing-bento-panel-head em {
   font-style: normal;
   font-size: 0.65rem;
   font-weight: 700;
-  color: #2563eb;
-  background: rgba(37, 99, 235, 0.1);
+  color: #5f55ee;
+  background: rgba(95, 85, 238, 0.1);
   border-radius: 9999px;
   padding: 0.2rem 0.45rem;
 }
@@ -4146,8 +4166,8 @@ html:not(.dark) .dashboard-surface:hover {
   gap: 0.3rem;
   margin-top: 0.7rem;
   border-radius: 0.75rem;
-  background: rgba(37, 99, 235, 0.1);
-  color: #2563eb;
+  background: rgba(95, 85, 238, 0.1);
+  color: #5f55ee;
   padding: 0.4rem 0.55rem;
   font-size: 0.66rem;
   font-weight: 600;
@@ -4175,8 +4195,8 @@ html:not(.dark) .dashboard-surface:hover {
   font-style: normal;
   font-size: 0.62rem;
   font-weight: 700;
-  color: #2563eb;
-  background: rgba(37, 99, 235, 0.1);
+  color: #5f55ee;
+  background: rgba(95, 85, 238, 0.1);
   border-radius: 9999px;
   padding: 0.2rem 0.45rem;
 }
@@ -4198,12 +4218,12 @@ html:not(.dark) .dashboard-surface:hover {
 }
 
 .landing-bento-calendar-grid span.is-soft {
-  background: rgba(37, 99, 235, 0.18);
+  background: rgba(95, 85, 238, 0.18);
 }
 
 .landing-bento-calendar-grid span.is-active {
-  background: #2563eb;
-  box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.45);
+  background: #5f55ee;
+  box-shadow: 0 0 0 0 rgba(95, 85, 238, 0.45);
   animation: landing-bento-day 2.4s ease-out infinite;
 }
 
@@ -4264,8 +4284,8 @@ html:not(.dark) .dashboard-surface:hover {
   font-style: normal;
   flex-shrink: 0;
   border-radius: 9999px;
-  background: rgba(37, 99, 235, 0.1);
-  color: #2563eb;
+  background: rgba(95, 85, 238, 0.1);
+  color: #5f55ee;
   padding: 0.28rem 0.55rem;
   font-size: 0.65rem;
   font-weight: 700;
@@ -4302,12 +4322,12 @@ html:not(.dark) .dashboard-surface:hover {
   font-size: 1.05rem;
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: #2563eb;
+  color: #5f55ee;
   font-variant-numeric: tabular-nums;
 }
 
 .dark .landing-bento-ceo-metrics strong {
-  color: #60a5fa;
+  color: #5f55ee;
 }
 
 .landing-bento-ceo-foot {
@@ -4335,10 +4355,9 @@ html:not(.dark) .dashboard-surface:hover {
   font-size: 0.72rem;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(180deg, #b794f6 0%, #8b5cf6 42%, #7c3aed 100%);
+  background: #5f55ee !important;
   box-shadow:
-    0 10px 22px rgba(109, 40, 217, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    0 8px 18px rgba(95, 85, 238, 0.35);
   animation: landing-bento-pulse 3s ease-in-out infinite;
 }
 

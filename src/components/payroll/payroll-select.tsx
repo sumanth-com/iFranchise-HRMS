@@ -78,7 +78,7 @@ export function LabeledSelect({
   contentClassName,
   align = "start",
   side = "bottom",
-  alignItemWithTrigger = true,
+  alignItemWithTrigger = false,
 }: LabeledSelectProps) {
   const safeValue = items.some((item) => item.value === value) ? value : null;
 

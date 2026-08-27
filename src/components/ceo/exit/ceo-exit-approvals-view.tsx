@@ -12,6 +12,7 @@ import {
   CEO_APPROVALS_SECTION_HELP,
   CEO_SECTION_HELP_DESCRIPTION,
 } from "@/lib/ceo/section-help";
+import { useApprovalsSync } from "@/lib/approvals/use-approvals-sync";
 import { LEAVE_MONTH_OPTIONS } from "@/lib/leave/services/leave-utils";
 import type { ExitResignationItem } from "@/types/exit";
 
@@ -76,6 +77,29 @@ export function CeoExitApprovalsView({
     [month, year],
   );
 
+  useApprovalsSync({
+    onRefresh: refreshQueue,
+    tables: ["exit_resignations"],
+  });
+
+  const handleItemActed = useCallback(
+    (item?: ExitResignationItem, status?: "approved" | "rejected") => {
+      if (item && status) {
+        setApprovalQueue((prev) => prev.filter((row) => row.id !== item.id));
+        setProcessedItems((prev) => [
+          {
+            ...item,
+            exitStatus: status === "approved" ? "clearance" : "rejected",
+            ceoActedAt: new Date().toISOString(),
+          },
+          ...prev.filter((row) => row.id !== item.id),
+        ]);
+      }
+      refreshQueue();
+    },
+    [refreshQueue],
+  );
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -125,7 +149,7 @@ export function CeoExitApprovalsView({
       <CeoExitApprovalQueue
         items={approvalQueue}
         isLoading={isPending}
-        onActed={() => refreshQueue()}
+        onActed={handleItemActed}
       />
 
       <CeoExitProcessedTable

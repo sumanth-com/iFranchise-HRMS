@@ -3,7 +3,7 @@
 import { format, parseISO } from "date-fns";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Ban, CheckCircle2, XCircle } from "lucide-react";
+import { AlertCircle, Ban, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import { LeaveStatusBadge } from "@/components/leave/leave-status-badge";
@@ -71,9 +71,15 @@ export function LeaveDetailView({ leave }: LeaveDetailViewProps) {
   const [rejectOpen, setRejectOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [approveComments, setApproveComments] = useState("");
+  const [approveError, setApproveError] = useState<string | null>(null);
   const [rejectComments, setRejectComments] = useState("");
+  const [rejectError, setRejectError] = useState<string | null>(null);
+
+  const pendingApprover =
+    leave.approvals.find((a) => a.approvalStatus === "pending")?.approverName ?? null;
 
   const handleApprove = () => {
+    setApproveError(null);
     startTransition(async () => {
       const result = await approveLeaveRequestAction({
         leaveRequestId: leave.id,
@@ -81,23 +87,25 @@ export function LeaveDetailView({ leave }: LeaveDetailViewProps) {
       });
 
       if (!result.success) {
-        toast.error(result.message);
+        setApproveError(result.message);
         return;
       }
 
       toast.success("Leave request approved");
       setApproveOpen(false);
       setApproveComments("");
+      setApproveError(null);
       router.refresh();
     });
   };
 
   const handleReject = () => {
     if (rejectComments.trim().length < 3) {
-      toast.error("Rejection reason is required");
+      setRejectError("Rejection reason is required (minimum 3 characters)");
       return;
     }
 
+    setRejectError(null);
     startTransition(async () => {
       const result = await rejectLeaveRequestAction({
         leaveRequestId: leave.id,
@@ -105,13 +113,14 @@ export function LeaveDetailView({ leave }: LeaveDetailViewProps) {
       });
 
       if (!result.success) {
-        toast.error(result.message);
+        setRejectError(result.message);
         return;
       }
 
       toast.success("Leave request rejected");
       setRejectOpen(false);
       setRejectComments("");
+      setRejectError(null);
       router.refresh();
     });
   };
@@ -299,76 +308,159 @@ export function LeaveDetailView({ leave }: LeaveDetailViewProps) {
 
       <Modal
         open={approveOpen}
-        onOpenChange={setApproveOpen}
+        onOpenChange={(open) => {
+          setApproveOpen(open);
+          if (!open) {
+            setApproveComments("");
+            setApproveError(null);
+          }
+        }}
+        showCancel={false}
         title="Approve leave request"
-        description={`Approve leave for ${leave.employeeName}?`}
+        description={`Review and approve leave for ${leave.employeeName}?`}
         footer={
-          <>
-            <Button variant="outline" onClick={() => setApproveOpen(false)}>
+          <div className="flex w-full items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              disabled={isPending}
+              onClick={() => {
+                setApproveOpen(false);
+                setApproveComments("");
+                setApproveError(null);
+              }}
+            >
               Cancel
             </Button>
             <Button disabled={isPending} onClick={handleApprove}>
-              Approve
+              {isPending ? "Approving…" : "Approve"}
             </Button>
-          </>
+          </div>
         }
       >
-        <div className="space-y-2">
-          <Label htmlFor="approveComments">Comments (optional)</Label>
-          <textarea
-            id="approveComments"
-            rows={3}
-            value={approveComments}
-            disabled={isPending}
-            className="flex min-h-16 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-            onChange={(event) => setApproveComments(event.currentTarget.value)}
-          />
+        <div className="space-y-4">
+          {pendingApprover ? (
+            <div className="rounded-lg border bg-muted/30 p-3 text-xs space-y-1.5 dark:border-white/10">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground font-medium">Assigned Approver:</span>
+                <span className="font-semibold text-primary">{pendingApprover}</span>
+              </div>
+            </div>
+          ) : null}
+
+          {approveError ? (
+            <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-900 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
+              <AlertCircle className="size-4 shrink-0 text-red-600 dark:text-red-400 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-semibold">{approveError}</p>
+                {pendingApprover ? (
+                  <p className="text-red-800 dark:text-red-300">
+                    The designated approver for this request is <strong className="font-semibold">{pendingApprover}</strong>.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="space-y-2">
+            <Label htmlFor="approveComments">Comments (optional)</Label>
+            <textarea
+              id="approveComments"
+              rows={3}
+              value={approveComments}
+              disabled={isPending}
+              placeholder="Add optional notes for this approval…"
+              className="flex min-h-16 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              onChange={(event) => setApproveComments(event.currentTarget.value)}
+            />
+          </div>
         </div>
       </Modal>
 
       <Modal
         open={rejectOpen}
-        onOpenChange={setRejectOpen}
+        onOpenChange={(open) => {
+          setRejectOpen(open);
+          if (!open) {
+            setRejectComments("");
+            setRejectError(null);
+          }
+        }}
+        showCancel={false}
         title="Reject leave request"
-        description={`Reject leave for ${leave.employeeName}?`}
+        description={`Review and reject leave for ${leave.employeeName}?`}
         footer={
-          <>
-            <Button variant="outline" onClick={() => setRejectOpen(false)}>
+          <div className="flex w-full items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              disabled={isPending}
+              onClick={() => {
+                setRejectOpen(false);
+                setRejectComments("");
+                setRejectError(null);
+              }}
+            >
               Cancel
             </Button>
             <Button variant="destructive" disabled={isPending} onClick={handleReject}>
-              Reject
+              {isPending ? "Rejecting…" : "Reject"}
             </Button>
-          </>
+          </div>
         }
       >
-        <div className="space-y-2">
-          <Label htmlFor="rejectComments">Rejection reason</Label>
-          <textarea
-            id="rejectComments"
-            rows={3}
-            value={rejectComments}
-            disabled={isPending}
-            className="flex min-h-16 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-            onChange={(event) => setRejectComments(event.currentTarget.value)}
-          />
+        <div className="space-y-4">
+          {pendingApprover ? (
+            <div className="rounded-lg border bg-muted/30 p-3 text-xs space-y-1.5 dark:border-white/10">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground font-medium">Assigned Approver:</span>
+                <span className="font-semibold text-primary">{pendingApprover}</span>
+              </div>
+            </div>
+          ) : null}
+
+          {rejectError ? (
+            <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-900 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
+              <AlertCircle className="size-4 shrink-0 text-red-600 dark:text-red-400 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-semibold">{rejectError}</p>
+                {pendingApprover ? (
+                  <p className="text-red-800 dark:text-red-300">
+                    The designated approver for this request is <strong className="font-semibold">{pendingApprover}</strong>.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="space-y-2">
+            <Label htmlFor="rejectComments">Rejection reason *</Label>
+            <textarea
+              id="rejectComments"
+              rows={3}
+              value={rejectComments}
+              disabled={isPending}
+              placeholder="State the reason for rejecting this leave request…"
+              className="flex min-h-16 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              onChange={(event) => setRejectComments(event.currentTarget.value)}
+            />
+          </div>
         </div>
       </Modal>
 
       <Modal
         open={cancelOpen}
         onOpenChange={setCancelOpen}
+        showCancel={false}
         title="Cancel leave request"
         description={`Cancel leave for ${leave.employeeName}?`}
         footer={
-          <>
+          <div className="flex w-full items-center justify-end gap-2">
             <Button variant="outline" onClick={() => setCancelOpen(false)}>
               Keep request
             </Button>
             <Button variant="destructive" disabled={isPending} onClick={handleCancel}>
               Cancel leave
             </Button>
-          </>
+          </div>
         }
       >
         <p className="text-sm text-muted-foreground">

@@ -232,6 +232,7 @@ export type OnboardingDashboardStats = {
   inProgress: number;
   completed: number;
   invitationSent: number;
+  readyForInvitation: number;
 };
 
 export type OnboardingLookups = {

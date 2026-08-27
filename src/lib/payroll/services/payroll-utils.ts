@@ -189,6 +189,5 @@ export function generatePayslipNumber(
 }
 
 export function maskAccountNumber(accountNumber: string): string {
-  if (accountNumber.length <= 4) return accountNumber;
-  return `XXXX${accountNumber.slice(-4)}`;
+  return accountNumber;
 }

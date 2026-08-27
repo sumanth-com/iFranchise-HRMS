@@ -103,7 +103,7 @@ export function EmployeeAttendanceView({
         today={data.today}
       />
 
-      <div className="grid gap-3 xl:min-h-[min(32rem,calc(100dvh-16rem))] xl:grid-cols-[minmax(0,1fr)_9.75rem] xl:items-stretch">
+      <div className="grid gap-3 xl:min-h-[min(32rem,calc(100dvh-16rem))] xl:grid-cols-[minmax(0,1fr)_12.5rem] xl:items-stretch">
         <ManagerAttendanceCalendar
           days={data.calendarDays}
           month={data.month}
@@ -123,7 +123,7 @@ export function EmployeeAttendanceView({
             });
           }}
         />
-        <div className="flex h-full min-h-[22rem] w-full justify-center xl:w-[9.75rem] xl:max-w-[9.75rem]">
+        <div className="flex h-full min-h-[22rem] w-full justify-center xl:w-[12.5rem] xl:max-w-[12.5rem]">
           <ManagerProfileSummaryCards summary={data.summary} layout="sidebar" className="w-full" />
         </div>
       </div>

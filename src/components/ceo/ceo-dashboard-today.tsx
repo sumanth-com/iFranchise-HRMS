@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { EmployeeSectionCard } from "@/components/employee/dashboard/employee-module-primitives";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
+import { cn } from "@/lib/utils";
 import type { CeoAttendanceOverview } from "@/types/ceo-dashboard";
 
 function Stat({
@@ -32,7 +33,13 @@ function Stat({
   );
 }
 
-export function CeoDashboardToday({ attendance }: { attendance: CeoAttendanceOverview }) {
+export function CeoDashboardToday({
+  attendance,
+  className,
+}: {
+  attendance: CeoAttendanceOverview;
+  className?: string;
+}) {
   const presentToday = Number(attendance?.presentToday) || 0;
   const lateToday = Number(attendance?.lateToday) || 0;
   const absentToday = Number(attendance?.absentToday) || 0;
@@ -43,7 +50,8 @@ export function CeoDashboardToday({ attendance }: { attendance: CeoAttendanceOve
     <EmployeeSectionCard
       title="Today's Workforce"
       description="Who is in, away, or on leave today."
-      className="shrink-0"
+      className={cn("flex flex-col h-full", className)}
+      bodyClassName="flex flex-col justify-center min-h-0 flex-1"
       action={
         <Link
           href={CEO_ROUTES.attendance}
@@ -54,10 +62,9 @@ export function CeoDashboardToday({ attendance }: { attendance: CeoAttendanceOve
         </Link>
       }
     >
-      <div className="grid grid-cols-4 divide-x rounded-xl border bg-gradient-to-br from-primary/5 via-card to-card">
+      <div className="grid grid-cols-3 divide-x rounded-xl border bg-gradient-to-br from-primary/5 via-card to-card">
         <Stat label="Present" value={String(onSite)} highlight />
         <Stat label="Absent" value={String(absentToday)} />
-        <Stat label="Late" value={String(lateToday)} />
         <Stat label="On leave" value={String(onLeaveToday)} />
       </div>
     </EmployeeSectionCard>

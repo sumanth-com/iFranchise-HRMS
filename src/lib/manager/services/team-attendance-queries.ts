@@ -5,6 +5,7 @@ import { getOrganizationAttendanceRules } from "@/lib/attendance/services/attend
 import {
   computeLateMinutes,
   getTodayDateString,
+  isAfterOfficeCheckoutTime,
 } from "@/lib/attendance/services/attendance-utils";
 import {
   computeMonitoringFlags,
@@ -14,7 +15,7 @@ import {
 import { getTeamFilterLookups, getTeamMemberOptions } from "@/lib/manager/services/team-queries";
 import { teamAttendanceListParamsSchema } from "@/lib/validations/manager-attendance";
 import type { UserProfile } from "@/types/auth";
-import type { AttendanceStatus } from "@/types/attendance";
+import type { AttendanceStatus, AttendanceDisplayStatus } from "@/types/attendance";
 import type {
   ManagerTeamAttendancePageData,
   TeamAttendanceListParams,
@@ -141,6 +142,241 @@ export async function listTeamAttendance(
   const breakMinutes = await getDefaultBreakMinutes(supabase, organizationId);
   const from = (parsed.page - 1) * parsed.pageSize;
   const to = from + parsed.pageSize - 1;
+
+  const isSingleDayTeamView = !parsed.dateFrom || !parsed.dateTo || parsed.dateFrom === parsed.dateTo;
+  const targetSingleDate = parsed.dateFrom ?? new Date().toISOString().slice(0, 10);
+
+  if (isSingleDayTeamView) {
+    let empQuery = supabase
+      .schema("hrms")
+      .from("employees")
+      .select(
+        `
+          id,
+          employee_code,
+          first_name,
+          last_name,
+          department_id,
+          designation_id,
+          employment_type_id,
+          branch_id,
+          branches:branch_id (name),
+          departments:department_id (name),
+          designations:designation_id (title),
+          employment_types:employment_type_id (name)
+        `,
+      )
+      .eq("organization_id", organizationId)
+      .in("id", teamIds)
+      .is("deleted_at", null)
+      .in("employment_status", ["active", "probation", "on_leave"]);
+
+    if (parsed.employeeId) empQuery = empQuery.eq("id", parsed.employeeId);
+    if (parsed.departmentId) empQuery = empQuery.eq("department_id", parsed.departmentId);
+    if (parsed.employmentTypeId) empQuery = empQuery.eq("employment_type_id", parsed.employmentTypeId);
+    if (parsed.search) {
+      const term = `%${parsed.search}%`;
+      empQuery = empQuery.or(`employee_code.ilike.${term},first_name.ilike.${term},last_name.ilike.${term}`);
+    }
+
+    const [empRes, attRes, leavesRes] = await Promise.all([
+      empQuery,
+      supabase
+        .schema("hrms")
+        .from("attendance")
+        .select(
+          `
+            id,
+            branch_id,
+            employee_id,
+            attendance_date,
+            check_in_at,
+            check_out_at,
+            work_hours,
+            overtime_hours,
+            attendance_status,
+            notes
+          `,
+        )
+        .eq("organization_id", organizationId)
+        .in("employee_id", teamIds)
+        .eq("attendance_date", targetSingleDate)
+        .is("deleted_at", null),
+      (async () => {
+        try {
+          const res = await supabase
+            .schema("hrms")
+            .from("leave_requests")
+            .select("employee_id, leave_status")
+            .in("employee_id", teamIds)
+            .eq("leave_status", "approved")
+            .is("deleted_at", null)
+            .lte("start_date", targetSingleDate)
+            .gte("end_date", targetSingleDate);
+          if (res.error) {
+            console.warn("Non-critical leave query failed in listTeamAttendance:", res.error.message);
+            return { data: [] as LooseRow[], error: null };
+          }
+          return { data: (res.data ?? []) as LooseRow[], error: null };
+        } catch {
+          return { data: [] as LooseRow[], error: null };
+        }
+      })(),
+    ]);
+
+    if (empRes.error) {
+      console.error("Failed to load team members for attendance:", empRes.error);
+      throw new Error("Unable to load team attendance records. Please try again.");
+    }
+    if (attRes.error) {
+      console.error("Failed to load team attendance records:", attRes.error);
+      throw new Error("Unable to load team attendance records. Please try again.");
+    }
+
+    const employees = (empRes.data ?? []) as LooseRow[];
+    const attendanceMap = new Map<string, LooseRow>();
+    for (const a of attRes.data ?? []) {
+      attendanceMap.set(a.employee_id, a);
+    }
+    const leaveSet = new Set((leavesRes.data ?? []).map((l: LooseRow) => l.employee_id));
+
+    const attendanceIds = (attRes.data ?? []).map((a: LooseRow) => a.id as string);
+    const correctionsResult = attendanceIds.length
+      ? await (async () => {
+          try {
+            const res = await supabase
+              .schema("hrms")
+              .from("attendance_corrections")
+              .select("id, attendance_id, correction_status")
+              .in("attendance_id", attendanceIds)
+              .is("deleted_at", null)
+              .order("created_at", { ascending: false });
+            if (res.error) {
+              console.warn("Non-critical corrections query failed in listTeamAttendance:", res.error.message);
+              return { data: [] as LooseRow[], error: null };
+            }
+            return { data: (res.data ?? []) as LooseRow[], error: null };
+          } catch {
+            return { data: [] as LooseRow[], error: null };
+          }
+        })()
+      : { data: [] as LooseRow[], error: null };
+
+    const correctionByAttendance = new Map<string, { id: string; status: string }>();
+    for (const row of correctionsResult.data ?? []) {
+      if (!correctionByAttendance.has(row.attendance_id)) {
+        correctionByAttendance.set(row.attendance_id, {
+          id: row.id,
+          status: row.correction_status,
+        });
+      }
+    }
+
+    const todayStr = getTodayDateString();
+    const isToday = targetSingleDate === todayStr;
+    const isFuture = targetSingleDate > todayStr;
+    const isAfter7Pm = isAfterOfficeCheckoutTime();
+
+    type TeamAttendanceItem = TeamAttendanceListResult["data"][number];
+    const allRecords: TeamAttendanceItem[] = employees.map((emp) => {
+      const att = attendanceMap.get(emp.id);
+      const branch = unwrap(emp.branches);
+      const department = unwrap(emp.departments);
+      const designation = unwrap(emp.designations);
+      const employmentType = unwrap(emp.employment_types);
+      const hasApprovedLeave = leaveSet.has(emp.id);
+
+      let status: AttendanceDisplayStatus;
+      if (att?.check_in_at) {
+        status = att.attendance_status as AttendanceStatus;
+      } else if (hasApprovedLeave) {
+        status = "on_leave";
+      } else if (att?.attendance_status) {
+        status = att.attendance_status as AttendanceStatus;
+      } else if (isToday) {
+        status = isAfter7Pm ? "absent" : "upcoming";
+      } else if (isFuture) {
+        status = "upcoming";
+      } else {
+        status = "absent";
+      }
+
+      const lateMinutes = computeLateMinutes(
+        att?.check_in_at ?? null,
+        targetSingleDate,
+        rules.lateAfter,
+      );
+      const correction = att ? correctionByAttendance.get(att.id) : undefined;
+
+      return {
+        id: att?.id ?? `virtual-${emp.id}-${targetSingleDate}`,
+        employeeId: emp.id,
+        employeeCode: emp.employee_code ?? "",
+        employeeName: `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim(),
+        departmentId: emp.department_id ?? null,
+        departmentName: department?.name ?? null,
+        designationId: emp.designation_id ?? null,
+        designationTitle: designation?.title ?? null,
+        branchId: att?.branch_id ?? emp.branch_id ?? "",
+        branchName: branch?.name ?? null,
+        employmentTypeName: employmentType?.name ?? null,
+        attendanceDate: targetSingleDate,
+        checkInAt: att?.check_in_at ?? null,
+        checkOutAt: att?.check_out_at ?? null,
+        workHours: Number(att?.work_hours ?? 0),
+        breakMinutes,
+        overtimeHours: Number(att?.overtime_hours ?? 0),
+        attendanceStatus: status,
+        lateMinutes,
+        correctionId: correction?.id ?? null,
+        correctionStatus: (correction?.status as TeamAttendanceListResult["data"][number]["correctionStatus"]) ?? null,
+        monitoring: computeMonitoringFlags(
+          status,
+          att?.check_in_at ?? null,
+          att?.check_out_at ?? null,
+          lateMinutes,
+          targetSingleDate,
+        ),
+        isWorkFromHome: isWorkFromHomeBranch(branch?.name, att?.notes),
+      };
+    });
+
+    const filteredRecords = allRecords.filter((record) => {
+      if (!parsed.attendanceStatus) return true;
+      if (parsed.attendanceStatus === "absent") {
+        return record.attendanceStatus === "absent" || record.attendanceStatus === "on_leave";
+      }
+      return record.attendanceStatus === parsed.attendanceStatus;
+    });
+
+    const ascending = parsed.sortOrder === "asc";
+    filteredRecords.sort((a, b) => {
+      if (parsed.sortBy === "employee_code") {
+        return ascending
+          ? a.employeeCode.localeCompare(b.employeeCode)
+          : b.employeeCode.localeCompare(a.employeeCode);
+      }
+      if (parsed.sortBy === "check_in_at") {
+        const timeA = a.checkInAt ?? "";
+        const timeB = b.checkInAt ?? "";
+        if (!timeA && !timeB) return a.employeeName.localeCompare(b.employeeName);
+        if (!timeA) return 1;
+        if (!timeB) return -1;
+        return ascending ? timeA.localeCompare(timeB) : timeB.localeCompare(timeA);
+      }
+      return a.employeeName.localeCompare(b.employeeName);
+    });
+
+    const total = filteredRecords.length;
+    const pageData = filteredRecords.slice(from, from + parsed.pageSize);
+
+    return {
+      data: pageData,
+      total,
+      page: parsed.page,
+      pageSize: parsed.pageSize,
+    };
+  }
 
   let query = supabase
     .schema("hrms")

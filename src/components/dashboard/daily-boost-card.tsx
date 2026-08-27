@@ -2,14 +2,12 @@
 
 import Image from "next/image";
 
+import dashboardImg from "@/assets/dashboard.png";
 import {
   resolveDailyBoostLine,
   type DailyBoostTone,
 } from "@/lib/dashboard/daily-boost-messages";
 import { cn } from "@/lib/utils";
-
-/** Compressed public asset (replaces ~1.5MB PNG import on every dashboard). */
-const DASHBOARD_BOOST_IMAGE = "/images/dashboard-boost.jpg";
 
 type DailyBoostCardProps = {
   firstName?: string;
@@ -46,44 +44,44 @@ export function DailyBoostCard({
     <section
       aria-label="Workspace"
       className={cn(
-        "dashboard-surface relative overflow-hidden rounded-2xl border-0 bg-card",
+        "dashboard-surface relative flex overflow-hidden rounded-2xl border-0 bg-white dark:bg-card",
         compact ? "min-h-[7.5rem]" : "min-h-[16rem]",
         className,
       )}
     >
       <Image
-        src={DASHBOARD_BOOST_IMAGE}
-        alt=""
+        src={dashboardImg}
+        alt="iFranchise workspace"
         fill
-        priority={false}
-        quality={72}
+        priority
+        quality={100}
         sizes="(max-width: 1024px) 100vw, 55vw"
-        className="object-cover object-[70%_center]"
+        className="object-contain object-right"
       />
 
       <div
         className={cn(
-          "absolute inset-y-0 left-0 z-10 flex items-center",
-          compact ? "p-3" : "p-4 sm:p-5",
+          "relative z-10 flex h-full items-center",
+          compact ? "p-3" : "p-4 sm:p-5 lg:p-6",
         )}
       >
         <blockquote
           className={cn(
-            "w-fit max-w-[min(22rem,52%)] rounded-2xl border border-white/50 bg-[linear-gradient(180deg,#fff8ea_0%,#f3e6c9_100%)] text-left shadow-[0_8px_28px_rgba(120,90,40,0.10),0_0_18px_rgba(255,248,232,0.55)]",
-            compact ? "px-3.5 py-2.5" : "px-4 py-3.5",
+            "w-fit max-w-[min(20rem,38%)] rounded-2xl border border-slate-200/80 bg-white/85 text-left shadow-[0_10px_28px_rgba(15,23,42,0.08),0_1px_4px_rgba(15,23,42,0.04)] backdrop-blur-md dark:border-white/15 dark:bg-slate-900/85",
+            compact ? "px-3.5 py-2.5" : "px-4 py-3.5 sm:px-4.5 sm:py-4",
           )}
         >
           <p
             className={cn(
-              "font-sans font-medium not-italic leading-relaxed text-pretty text-[#4a3b28]",
-              compact ? "text-sm" : "text-[15px] sm:text-base",
+              "font-sans font-medium not-italic leading-relaxed text-pretty text-slate-800 dark:text-slate-100",
+              compact ? "text-xs" : "text-xs sm:text-[13.5px] lg:text-[14px]",
             )}
           >
-            <span aria-hidden className="mr-0.5 text-[#b08950]">
+            <span aria-hidden className="mr-0.5 font-serif text-base text-[#5f55ee]">
               “
             </span>
             {message}
-            <span aria-hidden className="ml-0.5 text-[#b08950]">
+            <span aria-hidden className="ml-0.5 font-serif text-base text-[#5f55ee]">
               ”
             </span>
           </p>

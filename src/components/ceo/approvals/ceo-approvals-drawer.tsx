@@ -15,6 +15,7 @@ import {
   fetchCeoApprovalsDetailAction,
   rejectCeoApprovalAction,
 } from "@/lib/ceo/actions/ceo-approvals-actions";
+import { broadcastApprovalChange } from "@/lib/approvals/use-approvals-sync";
 import { EXECUTIVE_APPROVAL_PRIORITY_LABELS } from "@/lib/ceo/executive-approvals-constants";
 import type { CeoApprovalsDetail } from "@/types/ceo-approvals";
 
@@ -91,6 +92,7 @@ export function CeoApprovalsDrawer({
 
   function finishAction(message: string) {
     toast.success(message);
+    broadcastApprovalChange("executive");
     onChanged();
     closePopup();
   }

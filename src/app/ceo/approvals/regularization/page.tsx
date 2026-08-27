@@ -2,7 +2,7 @@ import { Suspense } from "react";
 
 import { CeoRegularizationApprovalsView } from "@/components/ceo/regularization/ceo-regularization-approvals-view";
 import { EmptyState } from "@/components/common/empty-state";
-import { LoadingSpinner } from "@/components/common/loading-spinner";
+import { PageSkeleton } from "@/components/common/page-skeleton";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import {
   listCeoProcessedRegularizations,
@@ -55,13 +55,7 @@ async function CeoRegularizationApprovalsContent() {
 
 export default function CeoApprovalsRegularizationPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-1 items-center justify-center">
-          <LoadingSpinner />
-        </div>
-      }
-    >
+    <Suspense fallback={<PageSkeleton />}>
       <CeoRegularizationApprovalsContent />
     </Suspense>
   );

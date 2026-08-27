@@ -3,6 +3,7 @@ export const CEO_ROUTES = {
   organization: "/ceo/organization",
   organizationProfile: "/ceo/organization/profile",
   recruitment: "/ceo/recruitment",
+  recruitmentJobs: "/ceo/recruitment/jobs",
   performance: "/ceo/performance",
   performanceGoals: "/ceo/performance/goals",
   /** Team payroll base path (section routes hang under this). */

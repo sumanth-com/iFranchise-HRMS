@@ -109,7 +109,7 @@ export async function notifyAttendanceRegularizationRequested(
       organizationId: profile.employee.organizationId,
       employeeId: ceoEmployeeId,
       title: "Regularization pending CEO approval",
-      message: `An HR or Manager attendance regularization for ${attendanceDate} requires your approval.`,
+      message: `An HR attendance regularization for ${attendanceDate} requires your approval.`,
       notificationType: "attendance_regularization_requested",
       module: "attendance",
       priority: "high",

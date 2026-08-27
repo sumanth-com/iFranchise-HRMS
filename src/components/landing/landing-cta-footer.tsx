@@ -9,7 +9,9 @@ import {
   FileLock2,
   LockKeyhole,
   ShieldCheck,
+  User,
   UserCog,
+  Users,
 } from "lucide-react";
 
 import brandLogo from "@/assets/Logo.png";
@@ -117,24 +119,136 @@ export function LandingSecuritySection() {
 
 export function LandingFinalCta() {
   return (
-    <section className="landing-section landing-final-cta" aria-labelledby="landing-final-heading">
-      <div className="landing-final-cta-shell mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
-        <div className="landing-final-cta-inner">
-          <h2 id="landing-final-heading" className="landing-section-title">
-            Your workplace starts{" "}
-            <span className="landing-section-title-accent">here.</span>
-          </h2>
-          <p className="landing-section-copy landing-final-cta-copy">
-            Everything you need is just one sign-in away.
-          </p>
-          <Button
-            type="button"
-            onClick={navigateToLogin}
-            className="landing-cta landing-final-cta-button h-12 rounded-full px-8 text-sm font-semibold"
+    <section
+      className="relative overflow-hidden py-14 sm:py-20"
+      aria-labelledby="landing-final-heading"
+    >
+      <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+        <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-r from-[#170a4a] via-[#1c0d5a] to-[#124296] p-8 text-white shadow-2xl sm:p-12 lg:p-14">
+          {/* Ambient Lighting */}
+          <div
+            className="pointer-events-none absolute -top-24 -left-24 size-96 rounded-full bg-violet-600/30 blur-3xl"
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute -right-24 -bottom-24 size-96 rounded-full bg-blue-500/30 blur-3xl"
+            aria-hidden
+          />
+
+          {/* Flowing background lines on right */}
+          <svg
+            className="pointer-events-none absolute inset-y-0 right-0 h-full w-2/3 opacity-30"
+            viewBox="0 0 600 400"
+            fill="none"
+            preserveAspectRatio="none"
+            aria-hidden
           >
-            Enter HRMS
-            <ArrowRight className="size-4" aria-hidden />
-          </Button>
+            <path
+              d="M100 400C250 300 350 200 600 250V400H100Z"
+              fill="url(#ctaWaveGrad)"
+            />
+            <path
+              d="M0 400C200 250 400 320 600 150"
+              stroke="rgba(255,255,255,0.25)"
+              strokeWidth="1.5"
+            />
+            <path
+              d="M50 400C220 280 380 340 600 200"
+              stroke="rgba(147,197,253,0.3)"
+              strokeWidth="1.5"
+            />
+            <path
+              d="M120 400C280 310 420 300 600 120"
+              stroke="rgba(196,181,253,0.25)"
+              strokeWidth="1.5"
+            />
+            <defs>
+              <linearGradient id="ctaWaveGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.3" />
+                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.4" />
+              </linearGradient>
+            </defs>
+          </svg>
+
+          <div className="relative z-10 grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-8">
+            {/* Left Column: Heading, Subtitle & Button */}
+            <div className="lg:col-span-7">
+              <h2
+                id="landing-final-heading"
+                className="text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-[2.65rem] lg:leading-tight"
+              >
+                Your workplace starts here.
+              </h2>
+              <p className="mt-3 text-sm text-slate-300 sm:text-base">
+                Everything you need is just one sign-in-away.
+              </p>
+              <div className="mt-7 sm:mt-8">
+                <button
+                  type="button"
+                  onClick={navigateToLogin}
+                  className="landing-hero-cta inline-flex h-12 items-center justify-center gap-2 rounded-full px-8 text-sm font-bold text-white shadow-xl transition-all hover:scale-105 active:scale-95"
+                >
+                  <span>Enter HRMS</span>
+                  <ArrowRight className="size-4" strokeWidth={2.5} />
+                </button>
+              </div>
+            </div>
+
+            {/* Right Column: Glass Card UI with curved dotted line and floating badge */}
+            <div className="relative flex justify-center lg:col-span-5 lg:justify-end">
+              {/* Outer Wrapper for exact positioning */}
+              <div className="relative w-full max-w-[340px] sm:max-w-[360px]">
+                {/* SVG Dotted Guide Track matching reference image */}
+                <svg
+                  className="pointer-events-none absolute -top-6 -left-10 h-[calc(100%+3rem)] w-16 overflow-visible"
+                  fill="none"
+                  aria-hidden
+                >
+                  <path
+                    d="M60,10 H24 A18,18 0 0 0 6,28 V240 A18,18 0 0 0 24,258 H60"
+                    stroke="rgba(165,180,252,0.45)"
+                    strokeWidth="1.5"
+                    strokeDasharray="3 4"
+                  />
+                  {/* Glowing Node halfway down the track */}
+                  <circle cx="6" cy="134" r="5" fill="#818cf8" filter="drop-shadow(0 0 6px #818cf8)" />
+                  <circle cx="6" cy="134" r="2" fill="#ffffff" />
+                </svg>
+
+                {/* Main Glass Card */}
+                <div className="relative w-full rounded-3xl border border-white/20 bg-gradient-to-b from-white/15 to-white/5 p-4.5 shadow-[0_20px_50px_rgba(0,0,0,0.35)] backdrop-blur-xl sm:p-5">
+                  {/* Card Header Skeletons */}
+                  <div className="flex items-center gap-2.5 pb-4">
+                    <div className="size-6.5 rounded-full bg-white/25" />
+                    <div className="h-3 w-28 rounded-full bg-white/25" />
+                  </div>
+
+                  {/* 3 Frosted List Items */}
+                  <div className="flex flex-col gap-2.5">
+                    {[1, 2, 3].map((item) => (
+                      <div
+                        key={item}
+                        className="flex items-center gap-3.5 rounded-2xl border border-white/15 bg-white/10 p-3 shadow-xs"
+                      >
+                        <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-white/20">
+                          <User className="size-4 text-white/80" />
+                        </div>
+                        <div className="flex flex-1 flex-col gap-1.5">
+                          <div className="h-2.5 w-24 rounded-full bg-white/40" />
+                          <div className="h-2 w-14 rounded-full bg-white/25" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Floating Frosted Icon Badge */}
+                  <div className="absolute -right-5 top-1/2 flex size-18 -translate-y-1/2 items-center justify-center rounded-2xl border border-white/30 bg-white/90 p-3 text-[#5f55ee] shadow-[0_16px_36px_rgba(0,0,0,0.28)] backdrop-blur-xl dark:bg-white/95 sm:-right-8 sm:size-20 sm:rounded-3xl">
+                    <Users className="size-8 sm:size-9" strokeWidth={2.2} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
