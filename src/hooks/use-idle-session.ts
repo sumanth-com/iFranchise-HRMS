@@ -99,14 +99,17 @@ export function useIdleSession() {
     const handleActivity = () => recordActivity(true);
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
-        evaluateIdleTimeout();
         recordActivity(true);
       }
     };
 
     const handleStorage = (event: StorageEvent) => {
       if (event.key === IDLE_ACTIVITY_STORAGE_KEY && event.newValue) {
-        evaluateIdleTimeout();
+        // User is active in another tab; keep last activity updated in this tab
+        const parsed = Number(event.newValue);
+        if (Number.isFinite(parsed) && parsed > 0) {
+          lastTouchAtRef.current = parsed;
+        }
         return;
       }
 

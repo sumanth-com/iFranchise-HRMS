@@ -3,8 +3,8 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { getSupabaseAnonKey, getSupabaseUrl, hasSupabaseEnv } from "@/lib/supabase/env";
 
-/** Keep Edge middleware under Vercel's invocation limit even if Supabase stalls. */
-export const MIDDLEWARE_SUPABASE_FETCH_TIMEOUT_MS = 4_000;
+/** Bound fetch timeout for Supabase auth in middleware (allows token refresh to complete cleanly). */
+export const MIDDLEWARE_SUPABASE_FETCH_TIMEOUT_MS = 15_000;
 
 function createBoundedFetch(timeoutMs: number): typeof fetch {
   return (input, init = {}) => {

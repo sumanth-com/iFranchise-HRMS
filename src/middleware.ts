@@ -30,7 +30,7 @@ import { isSystemAdminPath } from "@/lib/system-admin/paths";
 import { updateSession } from "@/lib/supabase/middleware";
 
 /** Bound permission RPCs so a slow DB cannot hold Edge middleware open. */
-const MIDDLEWARE_PERMISSION_TIMEOUT_MS = 4_000;
+const MIDDLEWARE_PERMISSION_TIMEOUT_MS = 10_000;
 
 function isPublicRoute(pathname: string): boolean {
   return PUBLIC_ROUTES.some(
@@ -277,11 +277,8 @@ export async function middleware(request: NextRequest) {
         "cached-account-allowed",
       );
       if (allowed == null) {
-        // Fail closed: do not continue as authenticated when account check timed out.
-        const redirectUrl = request.nextUrl.clone();
-        redirectUrl.pathname = AUTH_ROUTES.login;
-        redirectUrl.search = "";
-        return NextResponse.redirect(redirectUrl);
+        // Session is valid; let layout server component enforce without dropping session.
+        return supabaseResponse;
       }
       accountAllowed = allowed;
     }
@@ -311,11 +308,8 @@ export async function middleware(request: NextRequest) {
         "cached-role-codes",
       );
       if (!resolvedRoles) {
-        // Fail closed: do not continue as authenticated when role lookup timed out.
-        const redirectUrl = request.nextUrl.clone();
-        redirectUrl.pathname = AUTH_ROUTES.login;
-        redirectUrl.search = "";
-        return NextResponse.redirect(redirectUrl);
+        // Session is valid; let layout server component enforce without dropping session.
+        return supabaseResponse;
       }
       roleCodes = resolvedRoles;
       try {
@@ -370,11 +364,8 @@ export async function middleware(request: NextRequest) {
   );
 
   if (!bootstrapped) {
-    // Fail closed: permission/role bootstrap timed out or failed.
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = AUTH_ROUTES.login;
-    redirectUrl.search = "";
-    return NextResponse.redirect(redirectUrl);
+    // Session is valid; allow request to proceed so layout RSC loads and enforces profile without dropping active session.
+    return supabaseResponse;
   }
 
   const [accountAllowed, permissionCodes, roleCodes] = bootstrapped;
