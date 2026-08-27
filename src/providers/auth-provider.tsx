@@ -165,8 +165,11 @@ export function AuthProvider({
         pathname !== AUTH_ROUTES.login &&
         !isPublicAuthRoute
       ) {
-        router.push(`${AUTH_ROUTES.login}?expired=1`);
-        router.refresh();
+        const isExplicitLogout = Boolean(localStorage.getItem(LOGOUT_BROADCAST_KEY));
+        if (isExplicitLogout) {
+          router.push(`${AUTH_ROUTES.login}?signedOut=1`);
+          router.refresh();
+        }
         return;
       }
 

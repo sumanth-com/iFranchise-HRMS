@@ -69,7 +69,9 @@ async function ResolvedPortalShell({
   logLayout("layout:getLayoutUserProfile", profileStartedAt);
 
   if (!profileResult.success) {
-    await supabase.auth.signOut();
+    if (profileResult.error !== "PROFILE_LOOKUP_FAILED") {
+      await supabase.auth.signOut();
+    }
     redirect(`${AUTH_ROUTES.login}?error=${profileResult.error}`);
   }
 

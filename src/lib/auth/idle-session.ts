@@ -34,10 +34,10 @@ export function shouldRefreshActivityInMiddleware(request: {
   pathname: string;
   headers: Headers;
 }): boolean {
-  if (request.method !== "GET") return false;
-  if (request.pathname.startsWith("/api/")) return false;
+  if (request.pathname.startsWith("/api/cron")) return false;
   if (request.headers.get("Next-Router-Prefetch") === "1") return false;
   if (request.headers.get("Purpose") === "prefetch") return false;
+  if (request.headers.get("Sec-Purpose") === "prefetch") return false;
   return true;
 }
 
