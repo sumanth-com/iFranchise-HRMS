@@ -29,7 +29,7 @@ export type AttendanceListItem = {
   checkOutAt: string | null;
   workHours: number;
   overtimeHours: number;
-  attendanceStatus: AttendanceStatus;
+  attendanceStatus: AttendanceDisplayStatus;
   correctionId: string | null;
   correctionStatus: CorrectionStatus | null;
 };

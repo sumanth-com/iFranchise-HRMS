@@ -335,7 +335,11 @@ async function loadExecutiveUsers(
     `,
     )
     .eq("organization_id", organizationId)
-    .in("account_status", [...PENDING_ACCOUNT_STATUSES])
+    .in("account_status", [
+      ...PENDING_ACCOUNT_STATUSES,
+      "inactive",
+      "suspended",
+    ])
     .is("deleted_at", null);
 
   if (pendingError) throw new Error(pendingError.message);
@@ -366,10 +370,12 @@ async function loadExecutiveUsers(
       rolesByInvitation,
     );
     const roleCode = String(role.code).toLowerCase();
-    // Keep invite records visible even when role metadata was cleared after cancel.
+    // Keep invite and deactivated records visible even when role metadata was cleared.
     if (
       !directoryRoleCodes.has(roleCode) &&
-      !isPendingProvisioningAccount(employee.account_status)
+      !isPendingProvisioningAccount(employee.account_status) &&
+      employee.account_status !== "inactive" &&
+      employee.account_status !== "suspended"
     ) {
       continue;
     }
@@ -463,7 +469,7 @@ function paginateUsers(
   params: CeoProvisioningListParams,
 ): CeoProvisioningListResult {
   const page = Math.max(1, params.page ?? 1);
-  const pageSize = Math.max(1, params.pageSize ?? 10);
+  const pageSize = Math.max(1, params.pageSize ?? 9);
   const search = params.search?.trim().toLowerCase();
 
   let filtered = users;
@@ -492,7 +498,36 @@ function paginateUsers(
     filtered = filtered.filter((u) => u.employmentTypeId === params.employmentTypeId);
   }
   if (params.invitationStatus) {
-    filtered = filtered.filter((u) => u.invitationStatus === params.invitationStatus);
+    if (
+      params.invitationStatus === "deactivated" ||
+      params.invitationStatus === "inactive" ||
+      params.invitationStatus === "revoked"
+    ) {
+      filtered = filtered.filter(
+        (u) =>
+          u.invitationStatus === "inactive" ||
+          u.invitationStatus === "revoked" ||
+          (u.invitationStatus as string) === "deactivated" ||
+          u.accountStatus === "inactive" ||
+          u.accountStatus === "suspended",
+      );
+    } else if (params.invitationStatus === "pending") {
+      filtered = filtered.filter(
+        (u) =>
+          u.invitationStatus === "pending" ||
+          u.invitationStatus === "expired" ||
+          u.invitationStatus === "cancelled" ||
+          isPendingProvisioningAccount(u.accountStatus),
+      );
+    } else if (params.invitationStatus === "accepted") {
+      filtered = filtered.filter(
+        (u) =>
+          u.invitationStatus === "accepted" ||
+          u.accountStatus === "active",
+      );
+    } else {
+      filtered = filtered.filter((u) => u.invitationStatus === params.invitationStatus);
+    }
   }
   // department/branch filters operate on names via lookups on the client side,
   // but here we accept ids resolved against the employee row is not available,
@@ -631,7 +666,7 @@ export async function getCeoProvisioningLookups(
     { id: "expired", label: "Expired" },
     { id: "cancelled", label: "Cancelled" },
     { id: "revoked", label: "Suspended" },
-    { id: "inactive", label: "Inactive" },
+    { id: "deactivated", label: "Deactivated" },
   ];
 
   return {

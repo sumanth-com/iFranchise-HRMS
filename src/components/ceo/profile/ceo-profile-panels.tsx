@@ -55,7 +55,7 @@ export function CeoProfileSecuritySection({
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="sticky top-0 z-30 bg-black text-left shadow-[0_1px_0_rgba(255,255,255,0.08)]">
+            <thead className="sticky top-0 z-30 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 text-left text-white shadow-[0_1px_0_rgba(255,255,255,0.12)]">
               <tr>
                 <th className="px-2 py-2 font-medium">Device</th>
                 <th className="px-2 py-2 font-medium">Browser</th>

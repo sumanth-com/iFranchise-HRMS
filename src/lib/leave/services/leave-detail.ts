@@ -74,17 +74,39 @@ export async function getLeaveRequestById(
   const department = unwrapRelation(employee?.departments ?? null);
   const branch = unwrapRelation(employee?.branches ?? null);
 
-  const approvals = (data.leave_approvals ?? [])
-    .filter((row) => row.deleted_at == null)
+  const rawApprovals = (data.leave_approvals ?? []).filter((row) => row.deleted_at == null);
+  const approverIdsMissingName = rawApprovals
+    .filter((row) => !unwrapRelation(row.employees))
+    .map((row) => row.approver_employee_id)
+    .filter(Boolean);
+
+  const fallbackNamesById = new Map<string, string>();
+  if (approverIdsMissingName.length > 0) {
+    const { data: missingEmps } = await supabase
+      .schema("hrms")
+      .from("employees")
+      .select("id, first_name, last_name")
+      .in("id", Array.from(new Set(approverIdsMissingName)));
+
+    for (const emp of missingEmps ?? []) {
+      const name = `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim();
+      if (name) {
+        fallbackNamesById.set(emp.id, name);
+      }
+    }
+  }
+
+  const approvals = rawApprovals
     .map((row) => {
       const approver = unwrapRelation(row.employees);
+      const nameFromJoin = approver ? `${approver.first_name} ${approver.last_name}`.trim() : "";
+      const finalName = nameFromJoin || fallbackNamesById.get(row.approver_employee_id) || "";
+
       return {
         id: row.id,
         approvalLevel: row.approval_level,
         approverEmployeeId: row.approver_employee_id,
-        approverName: approver
-          ? `${approver.first_name} ${approver.last_name}`
-          : "",
+        approverName: finalName,
         approvalStatus: row.approval_status as LeaveDetail["approvals"][number]["approvalStatus"],
         comments: row.comments,
         actedAt: row.acted_at,

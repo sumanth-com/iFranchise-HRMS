@@ -11,10 +11,12 @@ import {
   notifyAttendanceCorrectionApproved,
   notifyAttendanceCorrectionRejected,
 } from "@/lib/attendance/services/attendance-notifications";
-import { isCeoLeaveApprover } from "@/lib/leave/services/leave-queries";
+import { getEmployeeRoleCodes, isCeoLeaveApprover } from "@/lib/leave/services/leave-queries";
+import { isHrLeaveApplicant } from "@/lib/leave/leave-applicant-roles";
+import { isManagerLeaveApplicant } from "@/lib/approvals/executive-request-routing";
 import { teamCorrectionReviewSchema } from "@/lib/validations/manager-team";
 import type { UserProfile } from "@/types/auth";
-import type { AttendanceStatus } from "@/types/attendance";
+import type { AttendanceStatus, AttendanceDisplayStatus } from "@/types/attendance";
 
 function unwrap<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
@@ -34,7 +36,7 @@ function isWorkFromHomeBranch(branchName: string | null | undefined, notes: stri
 }
 
 function computeMonitoringFlags(
-  attendanceStatus: AttendanceStatus,
+  attendanceStatus: AttendanceDisplayStatus,
   checkInAt: string | null,
   checkOutAt: string | null,
   lateMinutes: number,
@@ -163,33 +165,61 @@ async function reviewAttendanceCorrection(
     throw new Error("This correction has already been reviewed.");
   }
 
-  if (correction.approver_employee_id) {
-    // CEO-routed regularization (HR/Manager applicants): any active CEO approver may act,
-    // matching leave's any-of CEO model. Employee-path rows keep approver_employee_id null.
-    if (!isCeoLeaveApprover(profile)) {
+  // 1. Never allow the requester to approve their own request
+  if (profile.employee.id === correction.employee_id) {
+    throw new Error(
+      "You cannot approve or reject your own attendance regularization request.",
+    );
+  }
+
+  // 2. Enforce strict approval hierarchy based on applicant role:
+  //    - Employee -> HR
+  //    - Manager  -> CEO
+  //    - HR       -> CEO
+  const applicantRoles = await getEmployeeRoleCodes(supabase, correction.employee_id);
+  const applicantIsHr = isHrLeaveApplicant(applicantRoles);
+  const applicantIsManager = isManagerLeaveApplicant(applicantRoles);
+  const reviewerRoles = profile.roles.map((r) => r.code);
+  const reviewerIsHr = isHrLeaveApplicant(reviewerRoles);
+  const reviewerIsCeo = isCeoLeaveApprover(profile);
+
+  if (applicantIsHr || applicantIsManager || correction.approver_employee_id) {
+    // HR or Manager applicant regularization: ANY CEO can approve or reject.
+    if (!reviewerIsCeo) {
       throw new Error(
-        "Only the assigned CEO can approve or reject this regularization request",
+        "Only the CEO can approve or reject HR and Manager attendance regularization requests.",
       );
     }
-  } else if ("requireAssignedCeo" in scope && scope.requireAssignedCeo) {
-    throw new Error("This regularization request is not assigned to you");
+  } else {
+    // Employee applicant regularization: ONLY authorized HR users can approve or reject.
+    if (!reviewerIsHr && !reviewerIsCeo) {
+      throw new Error(
+        "Only authorized HR users can approve or reject attendance regularization requests.",
+      );
+    }
+  }
+
+  if ("requireAssignedCeo" in scope && scope.requireAssignedCeo) {
+    if (!reviewerIsCeo) {
+      throw new Error("Only the CEO can review this regularization request.");
+    }
   } else if ("allowedEmployeeIds" in scope) {
     if (!scope.allowedEmployeeIds.includes(correction.employee_id)) {
       throw new Error("You can only review corrections for your team.");
     }
-  } else if ("organizationId" in scope) {
-    const { data: employeeRow, error: employeeError } = await supabase
-      .schema("hrms")
-      .from("employees")
-      .select("organization_id")
-      .eq("id", correction.employee_id)
-      .is("deleted_at", null)
-      .maybeSingle();
+  }
 
-    if (employeeError) throw new Error(employeeError.message);
-    if (!employeeRow || employeeRow.organization_id !== scope.organizationId) {
-      throw new Error("Correction request not found.");
-    }
+  const { data: employeeRow, error: employeeError } = await supabase
+    .schema("hrms")
+    .from("employees")
+    .select("organization_id")
+    .eq("id", correction.employee_id)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (employeeError) throw new Error(employeeError.message);
+  if (!employeeRow || employeeRow.organization_id !== profile.employee.organizationId) {
+    throw new Error("Correction request not found.");
   }
 
   const reviewedAt = new Date().toISOString();

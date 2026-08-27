@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-table";
 import { format, parseISO } from "date-fns";
 import {
+  AlertCircle,
   BadgeCheck,
   Ban,
   Briefcase,
@@ -110,7 +111,7 @@ const TABLE_DATA_CELL_CLASS = "whitespace-nowrap py-3.5 pl-10 pr-4";
 const TABLE_ACTIONS_CELL_CLASS = "w-12 px-2 py-3.5";
 
 const TABLE_HEAD_CLASS =
-  "sticky top-0 z-20 bg-black text-white shadow-[0_1px_0_rgba(255,255,255,0.08)]";
+  "sticky top-0 z-20 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-[0_1px_0_rgba(255,255,255,0.12)]";
 const TABLE_CELL_CLASS = "relative align-middle";
 
 const FILTER_CONTROL_CLASS =
@@ -238,14 +239,14 @@ export function LeaveTable({
   const [cancelTarget, setCancelTarget] = useState<LeaveListItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<LeaveListItem | null>(null);
   const [viewLeaveId, setViewLeaveId] = useState<string | null>(null);
-  const [viewLeavePreview, setViewLeavePreview] = useState<LeaveListItem | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
   const [approveComments, setApproveComments] = useState("");
+  const [approveError, setApproveError] = useState<string | null>(null);
   const [rejectComments, setRejectComments] = useState("");
+  const [rejectError, setRejectError] = useState<string | null>(null);
 
   function openLeavePopup(row: LeaveListItem) {
     setViewLeaveId(row.id);
-    setViewLeavePreview(row);
     setViewOpen(true);
   }
 
@@ -312,9 +313,6 @@ export function LeaveTable({
           row.id === leaveRequestId ? { ...row, leaveStatus: nextStatus } : row,
         ),
       }));
-      setViewLeavePreview((prev) =>
-        prev?.id === leaveRequestId ? { ...prev, leaveStatus: nextStatus } : prev,
-      );
     },
     [],
   );
@@ -586,6 +584,7 @@ export function LeaveTable({
   const handleApprove = () => {
     if (!approveTarget) return;
     const targetId = approveTarget.id;
+    setApproveError(null);
 
     startTransition(async () => {
       const result = await approveLeaveRequestAction({
@@ -594,13 +593,14 @@ export function LeaveTable({
       });
 
       if (!result.success) {
-        toast.error(result.message);
+        setApproveError(result.message);
         return;
       }
 
       toast.success("Leave request approved");
       setApproveTarget(null);
       setApproveComments("");
+      setApproveError(null);
       await afterMutation(targetId, "approved");
     });
   };
@@ -609,11 +609,12 @@ export function LeaveTable({
     if (!rejectTarget) return;
 
     if (rejectComments.trim().length < 3) {
-      toast.error("Rejection reason is required");
+      setRejectError("Rejection reason is required (minimum 3 characters)");
       return;
     }
 
     const targetId = rejectTarget.id;
+    setRejectError(null);
 
     startTransition(async () => {
       const result = await rejectLeaveRequestAction({
@@ -622,13 +623,14 @@ export function LeaveTable({
       });
 
       if (!result.success) {
-        toast.error(result.message);
+        setRejectError(result.message);
         return;
       }
 
       toast.success("Leave request rejected");
       setRejectTarget(null);
       setRejectComments("");
+      setRejectError(null);
       await afterMutation(targetId, "rejected");
     });
   };
@@ -846,8 +848,8 @@ export function LeaveTable({
           data-slot="table"
           className="w-max min-w-full caption-bottom text-sm"
         >
-          <TableHeader className="sticky top-0 z-30 bg-black">
-            <TableRow className="border-white/10 bg-black hover:bg-black">
+          <TableHeader className="sticky top-0 z-30 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600">
+            <TableRow className="border-white/10 bg-transparent hover:bg-white/5">
               <TableHead
                 className={cn(
                   "min-w-[14rem]",
@@ -1025,13 +1027,11 @@ export function LeaveTable({
 
       <HrLeaveDetailPopup
         leaveRequestId={viewLeaveId}
-        preview={viewLeavePreview}
         open={viewOpen}
         onOpenChange={(open) => {
           setViewOpen(open);
           if (!open) {
             setViewLeaveId(null);
-            setViewLeavePreview(null);
           }
         }}
         canApprove={canApprove}
@@ -1052,41 +1052,95 @@ export function LeaveTable({
           if (!open) {
             setApproveTarget(null);
             setApproveComments("");
+            setApproveError(null);
           }
         }}
+        showCancel={false}
         title="Approve leave request"
         description={
           approveTarget
-            ? `Approve leave for ${approveTarget.employeeName}?`
+            ? `Review and approve leave for ${formatCleanEmployeeName(approveTarget.employeeName)}.`
             : undefined
         }
         footer={
-          <>
+          <div className="flex w-full items-center justify-end gap-2">
             <Button
               variant="outline"
+              disabled={isPending}
               onClick={() => {
                 setApproveTarget(null);
                 setApproveComments("");
+                setApproveError(null);
               }}
             >
               Cancel
             </Button>
             <Button disabled={isPending} onClick={handleApprove}>
-              Approve
+              {isPending ? "Approving…" : "Approve"}
             </Button>
-          </>
+          </div>
         }
       >
-        <div className="space-y-2">
-          <Label htmlFor="tableApproveComments">Comments (optional)</Label>
-          <textarea
-            id="tableApproveComments"
-            rows={3}
-            value={approveComments}
-            disabled={isPending}
-            className="flex min-h-16 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-            onChange={(event) => setApproveComments(event.currentTarget.value)}
-          />
+        <div className="space-y-4">
+          {approveTarget ? (
+            <div className="rounded-lg border bg-muted/30 p-3 text-xs space-y-1.5 dark:border-white/10">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Employee:</span>
+                <span className="font-semibold text-foreground">
+                  {formatCleanEmployeeName(approveTarget.employeeName)} ({approveTarget.employeeCode})
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Leave Type:</span>
+                <span className="font-medium text-foreground">
+                  {approveTarget.leaveTypeName} (
+                  {approveTarget.isHalfDay
+                    ? "0.5 day"
+                    : `${approveTarget.totalDays} day${approveTarget.totalDays === 1 ? "" : "s"}`}
+                  )
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Dates:</span>
+                <span className="font-medium text-foreground">
+                  {formatLeaveDate(approveTarget.startDate)} — {formatLeaveDate(approveTarget.endDate)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between border-t pt-1.5 dark:border-white/10">
+                <span className="text-muted-foreground font-medium">Assigned Approver:</span>
+                <span className="font-semibold text-primary">
+                  {approveTarget.approverName || "Assigned Manager / Approver"}
+                </span>
+              </div>
+            </div>
+          ) : null}
+
+          {approveError ? (
+            <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-900 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
+              <AlertCircle className="size-4 shrink-0 text-red-600 dark:text-red-400 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-semibold">{approveError}</p>
+                {approveTarget?.approverName ? (
+                  <p className="text-red-800 dark:text-red-300">
+                    The designated approver for this request is <strong className="font-semibold">{approveTarget.approverName}</strong>.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="space-y-2">
+            <Label htmlFor="tableApproveComments">Comments (optional)</Label>
+            <textarea
+              id="tableApproveComments"
+              rows={3}
+              value={approveComments}
+              disabled={isPending}
+              placeholder="Add optional notes for this approval…"
+              className="flex min-h-16 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              onChange={(event) => setApproveComments(event.currentTarget.value)}
+            />
+          </div>
         </div>
       </Modal>
 
@@ -1096,62 +1150,117 @@ export function LeaveTable({
           if (!open) {
             setRejectTarget(null);
             setRejectComments("");
+            setRejectError(null);
           }
         }}
+        showCancel={false}
         title="Reject leave request"
         description={
           rejectTarget
-            ? `Reject leave for ${rejectTarget.employeeName}?`
+            ? `Review and reject leave for ${formatCleanEmployeeName(rejectTarget.employeeName)}.`
             : undefined
         }
         footer={
-          <>
+          <div className="flex w-full items-center justify-end gap-2">
             <Button
               variant="outline"
+              disabled={isPending}
               onClick={() => {
                 setRejectTarget(null);
                 setRejectComments("");
+                setRejectError(null);
               }}
             >
               Cancel
             </Button>
             <Button variant="destructive" disabled={isPending} onClick={handleReject}>
-              Reject
+              {isPending ? "Rejecting…" : "Reject"}
             </Button>
-          </>
+          </div>
         }
       >
-        <div className="space-y-2">
-          <Label htmlFor="tableRejectComments">Rejection reason</Label>
-          <textarea
-            id="tableRejectComments"
-            rows={3}
-            value={rejectComments}
-            disabled={isPending}
-            className="flex min-h-16 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-            onChange={(event) => setRejectComments(event.currentTarget.value)}
-          />
+        <div className="space-y-4">
+          {rejectTarget ? (
+            <div className="rounded-lg border bg-muted/30 p-3 text-xs space-y-1.5 dark:border-white/10">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Employee:</span>
+                <span className="font-semibold text-foreground">
+                  {formatCleanEmployeeName(rejectTarget.employeeName)} ({rejectTarget.employeeCode})
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Leave Type:</span>
+                <span className="font-medium text-foreground">
+                  {rejectTarget.leaveTypeName} (
+                  {rejectTarget.isHalfDay
+                    ? "0.5 day"
+                    : `${rejectTarget.totalDays} day${rejectTarget.totalDays === 1 ? "" : "s"}`}
+                  )
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Dates:</span>
+                <span className="font-medium text-foreground">
+                  {formatLeaveDate(rejectTarget.startDate)} — {formatLeaveDate(rejectTarget.endDate)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between border-t pt-1.5 dark:border-white/10">
+                <span className="text-muted-foreground font-medium">Assigned Approver:</span>
+                <span className="font-semibold text-primary">
+                  {rejectTarget.approverName || "Assigned Manager / Approver"}
+                </span>
+              </div>
+            </div>
+          ) : null}
+
+          {rejectError ? (
+            <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-900 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
+              <AlertCircle className="size-4 shrink-0 text-red-600 dark:text-red-400 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-semibold">{rejectError}</p>
+                {rejectTarget?.approverName ? (
+                  <p className="text-red-800 dark:text-red-300">
+                    The designated approver for this request is <strong className="font-semibold">{rejectTarget.approverName}</strong>.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="space-y-2">
+            <Label htmlFor="tableRejectComments">Rejection reason *</Label>
+            <textarea
+              id="tableRejectComments"
+              rows={3}
+              value={rejectComments}
+              disabled={isPending}
+              placeholder="State the reason for rejecting this leave request…"
+              className="flex min-h-16 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              onChange={(event) => setRejectComments(event.currentTarget.value)}
+            />
+          </div>
         </div>
       </Modal>
 
       <Modal
         open={Boolean(cancelTarget)}
         onOpenChange={(open) => !open && setCancelTarget(null)}
+        showCancel={false}
         title="Cancel leave request"
         description={
           cancelTarget
-            ? `Cancel leave for ${cancelTarget.employeeName}?`
+            ? `Cancel leave for ${formatCleanEmployeeName(cancelTarget.employeeName)}?`
             : undefined
         }
         footer={
-          <>
+          <div className="flex w-full items-center justify-end gap-2">
             <Button variant="outline" onClick={() => setCancelTarget(null)}>
               Keep request
             </Button>
             <Button variant="destructive" disabled={isPending} onClick={handleCancel}>
               Cancel leave
             </Button>
-          </>
+          </div>
         }
       >
         <p className="text-sm text-muted-foreground">
@@ -1163,21 +1272,22 @@ export function LeaveTable({
       <Modal
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
+        showCancel={false}
         title="Delete leave request"
         description={
           deleteTarget
-            ? `Permanently remove leave for ${deleteTarget.employeeName}?`
+            ? `Permanently remove leave for ${formatCleanEmployeeName(deleteTarget.employeeName)}?`
             : undefined
         }
         footer={
-          <>
+          <div className="flex w-full items-center justify-end gap-2">
             <Button variant="outline" onClick={() => setDeleteTarget(null)}>
               Keep request
             </Button>
             <Button variant="destructive" disabled={isPending} onClick={handleDelete}>
               Delete
             </Button>
-          </>
+          </div>
         }
       >
         <p className="text-sm text-muted-foreground">

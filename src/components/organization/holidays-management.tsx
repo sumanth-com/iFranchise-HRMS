@@ -125,7 +125,7 @@ export function HolidaysManagement({
   branches,
   departments,
   permissionCodes,
-  viewMode,
+  viewMode = "list",
   search,
   month: monthProp,
 }: Props) {
@@ -137,13 +137,16 @@ export function HolidaysManagement({
   const [deleting, setDeleting] = useState<HolidayListItem | null>(null);
   const [isDeletePending, startDeleteTransition] = useTransition();
   const [searchInput, setSearchInput] = useState(search);
+  const [currentView, setCurrentView] = useState<"list" | "calendar">(viewMode);
+  const [calendarMonth, setCalendarMonth] = useState<number>(
+    () => monthProp ?? new Date().getMonth() + 1,
+  );
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const canCreate = canManageHolidays(permissionCodes);
   const canEdit = canEditOrganization(permissionCodes) || canManageHolidays(permissionCodes);
   const canDelete = canDeleteOrganization(permissionCodes) || canManageHolidays(permissionCodes);
 
-  const calendarMonth = monthProp ?? new Date().getMonth() + 1;
   const calendarYear = result.year;
 
   const form = useForm<HolidayFormInput>({
@@ -154,6 +157,14 @@ export function HolidaysManagement({
   useEffect(() => {
     setSearchInput(search);
   }, [search]);
+
+  useEffect(() => {
+    if (viewMode) setCurrentView(viewMode);
+  }, [viewMode]);
+
+  useEffect(() => {
+    if (typeof monthProp === "number") setCalendarMonth(monthProp);
+  }, [monthProp]);
 
   const selectedDepartments = form.watch("applicableDepartmentIds") ?? [];
 
@@ -167,6 +178,19 @@ export function HolidaysManagement({
     startTransition(() => {
       router.push(`?${params.toString()}`);
     });
+  }
+
+  function handleSwitchView(nextView: "list" | "calendar") {
+    setCurrentView(nextView);
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (nextView === "calendar") {
+        params.set("view", "calendar");
+      } else {
+        params.delete("view");
+      }
+      window.history.replaceState(null, "", `?${params.toString()}`);
+    }
   }
 
   function handleSearchChange(value: string) {
@@ -341,18 +365,32 @@ export function HolidaysManagement({
 
   function goToPreviousMonth() {
     if (calendarMonth === 1) {
+      setCalendarMonth(12);
       updateParams({ month: "12", year: String(calendarYear - 1) });
       return;
     }
-    updateParams({ month: String(calendarMonth - 1) });
+    const next = calendarMonth - 1;
+    setCalendarMonth(next);
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      params.set("month", String(next));
+      window.history.replaceState(null, "", `?${params.toString()}`);
+    }
   }
 
   function goToNextMonth() {
     if (calendarMonth === 12) {
+      setCalendarMonth(1);
       updateParams({ month: "1", year: String(calendarYear + 1) });
       return;
     }
-    updateParams({ month: String(calendarMonth + 1) });
+    const next = calendarMonth + 1;
+    setCalendarMonth(next);
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      params.set("month", String(next));
+      window.history.replaceState(null, "", `?${params.toString()}`);
+    }
   }
 
   return (
@@ -376,19 +414,19 @@ export function HolidaysManagement({
         </div>
         <div className="flex shrink-0 gap-1 rounded-lg border p-1">
           <Button
-            variant={viewMode === "list" ? "secondary" : "ghost"}
+            variant={currentView === "list" ? "secondary" : "ghost"}
             size="sm"
             className="h-8"
-            onClick={() => updateParams({ view: "list" })}
+            onClick={() => handleSwitchView("list")}
           >
             <List className="mr-1.5 h-4 w-4" />
             List
           </Button>
           <Button
-            variant={viewMode === "calendar" ? "secondary" : "ghost"}
+            variant={currentView === "calendar" ? "secondary" : "ghost"}
             size="sm"
             className="h-8"
-            onClick={() => updateParams({ view: "calendar" })}
+            onClick={() => handleSwitchView("calendar")}
           >
             <Calendar className="mr-1.5 h-4 w-4" />
             Calendar
@@ -402,14 +440,7 @@ export function HolidaysManagement({
         ) : null}
       </div>
 
-      {isPending ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Updating…
-        </div>
-      ) : null}
-
-      {viewMode === "list" ? (
+      {currentView === "list" ? (
         <>
           {result.data.length === 0 ? (
             <EmptyState

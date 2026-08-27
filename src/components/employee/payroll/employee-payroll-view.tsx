@@ -497,7 +497,7 @@ export function EmployeePayrollView({
           <>
           <table className="w-full min-w-[44rem] text-sm">
             <thead>
-              <tr className="bg-gradient-to-r from-blue-600 to-violet-600">
+              <tr className="bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600">
                 <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Month</th>
                 <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Payslip #</th>
                 <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Gross</th>

@@ -263,8 +263,8 @@ export async function getRecruitmentSummary(
 ): Promise<RecruitmentSummary> {
   const organizationId = profile.employee.organizationId;
   const departmentIds = await resolveManagerDepartmentIds(supabase, profile);
-  // Apply auto-archive before summary/list metrics
-  await archiveRejectedCandidates(supabase, organizationId).catch(() => 0);
+  // Apply auto-archive in background (non-blocking)
+  void archiveRejectedCandidates(supabase, organizationId).catch(() => 0);
   const today = new Date().toISOString().slice(0, 10);
   const monthStart = new Date();
   monthStart.setDate(1);

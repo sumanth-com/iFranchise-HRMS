@@ -20,7 +20,6 @@ import {
 } from "@/components/ui/table";
 import {
   INTERVIEW_STATUS_LABELS,
-  INTERVIEW_TYPE_LABELS,
 } from "@/lib/recruitment/constants";
 import type { CeoRecruitmentInterviewRow } from "@/types/ceo-recruitment";
 
@@ -73,11 +72,6 @@ export function CeoRecruitmentInterviewsTable({
         accessorKey: "interviewTime",
         header: "Time",
         cell: ({ row }) => row.original.interviewTime || "—",
-      },
-      {
-        accessorKey: "interviewType",
-        header: "Interview Type",
-        cell: ({ row }) => INTERVIEW_TYPE_LABELS[row.original.interviewType],
       },
       {
         accessorKey: "interviewStatus",

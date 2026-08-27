@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import { LoadingSpinner } from "@/components/common/loading-spinner";
+import { PageSkeleton } from "@/components/common/page-skeleton";
 import { OnboardingDashboardView } from "@/components/onboarding/hr/onboarding-dashboard-view";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { requireCeoPortal } from "@/lib/ceo/read-only-permissions";
@@ -33,13 +33,7 @@ export default async function CeoOnboardingListPage({ searchParams }: PageProps)
   const joiningYearAnchor = new Date().getFullYear();
 
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-1 items-center justify-center p-12">
-          <LoadingSpinner />
-        </div>
-      }
-    >
+    <Suspense fallback={<PageSkeleton />}>
       <OnboardingDashboardView
         {...data}
         initialFilters={parsed}

@@ -130,9 +130,9 @@ type AttendanceColumnMeta = {
 };
 
 const TABLE_HEAD_ROW_CLASS =
-  "border-white/10 bg-black hover:bg-black";
+  "border-white/10 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 text-white hover:bg-transparent";
 const TABLE_HEAD_CELL_BASE =
-  "h-11 whitespace-nowrap bg-black px-4 py-3 align-middle font-medium text-white";
+  "h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white";
 const TABLE_DATA_CELL_BASE = "whitespace-nowrap px-4 py-3 align-middle";
 const TABLE_ACTIONS_CELL_CLASS = "min-w-36 px-2 py-3 text-center align-middle";
 
@@ -240,8 +240,7 @@ export function AttendanceTable({
   );
 
   function selectFilterValue(raw: string | null | undefined) {
-    if (raw == null || navigationLockRef.current) return null;
-    return raw;
+    return raw ?? null;
   }
 
   const totalPages = Math.max(1, Math.ceil(rowTotal / pageSize));
@@ -702,7 +701,7 @@ export function AttendanceTable({
           data-slot="table"
           className="w-full min-w-[72rem] caption-bottom text-sm"
         >
-          <TableHeader className="sticky top-0 z-30 bg-black shadow-[0_1px_0_rgba(255,255,255,0.08)]">
+          <TableHeader className="sticky top-0 z-30 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 shadow-[0_1px_0_rgba(255,255,255,0.12)]">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className={TABLE_HEAD_ROW_CLASS}>
                 {headerGroup.headers.map((header) => {

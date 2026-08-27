@@ -17,6 +17,7 @@ import { Modal } from "@/components/common/modal";
 import { FilterSelect } from "@/components/common/filter-select";
 import {
   TABLE_HEADER_CELL_CLASS,
+  TABLE_HEADER_ROW_CLASS,
   TABLE_HEADER_STICKY_CLASS,
 } from "@/components/common/table-header-classes";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
@@ -29,7 +30,6 @@ import {
 } from "@/lib/recruitment/actions";
 import {
   INTERVIEW_STATUS_LABELS,
-  INTERVIEW_TYPE_LABELS,
   RECOMMENDATION_LABELS,
   RECRUITMENT_ROUTES,
 } from "@/lib/recruitment/constants";
@@ -113,7 +113,6 @@ export function InterviewsManagement({
 
   const [monthFilter, setMonthFilter] = useState(currentMonth);
   const [yearFilter, setYearFilter] = useState(currentYear);
-  const [typeFilter, setTypeFilter] = useState("all");
   const [roundFilter, setRoundFilter] = useState("all");
   const [positionFilter, setPositionFilter] = useState("all");
 
@@ -143,9 +142,6 @@ export function InterviewsManagement({
     let items = [...records];
     const prefix = `${yearFilter}-${monthFilter}`;
     items = items.filter((r) => r.interviewDate.startsWith(prefix));
-    if (typeFilter !== "all") {
-      items = items.filter((r) => r.interviewType === typeFilter);
-    }
     if (roundFilter !== "all") {
       items = items.filter((r) => r.roundName === roundFilter);
     }
@@ -158,7 +154,7 @@ export function InterviewsManagement({
       return dateB.localeCompare(dateA);
     });
     return items;
-  }, [records, monthFilter, yearFilter, typeFilter, roundFilter, positionFilter]);
+  }, [records, monthFilter, yearFilter, roundFilter, positionFilter]);
 
   return (
     <div className="space-y-4">
@@ -196,16 +192,6 @@ export function InterviewsManagement({
           onValueChange={setYearFilter}
         />
         <FilterSelect
-          className="w-[150px]"
-          items={[
-            { value: "all", label: "All types" },
-            ...toSelectItems(INTERVIEW_TYPE_LABELS),
-          ]}
-          value={typeFilter}
-          placeholder="All types"
-          onValueChange={setTypeFilter}
-        />
-        <FilterSelect
           className="w-[160px]"
           items={roundOptions}
           value={roundFilter}
@@ -232,13 +218,12 @@ export function InterviewsManagement({
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className={TABLE_HEADER_STICKY_CLASS}>
-                <tr className="border-white/10 bg-black hover:bg-black">
+                <tr className={TABLE_HEADER_ROW_CLASS}>
                   <th className={TABLE_HEADER_CELL_CLASS}>Candidate</th>
                   <th className={TABLE_HEADER_CELL_CLASS}>Position</th>
                   <th className={TABLE_HEADER_CELL_CLASS}>Round</th>
                   <th className={TABLE_HEADER_CELL_CLASS}>Interviewer</th>
                   <th className={TABLE_HEADER_CELL_CLASS}>Date & Time</th>
-                  <th className={TABLE_HEADER_CELL_CLASS}>Type</th>
                   <th className={TABLE_HEADER_CELL_CLASS}>Status</th>
                   <th className={TABLE_HEADER_CELL_CLASS} />
                 </tr>
@@ -253,7 +238,6 @@ export function InterviewsManagement({
                     <td className="px-4 py-3 whitespace-nowrap">
                       {row.interviewDate} · {row.interviewTime}
                     </td>
-                    <td className="px-4 py-3">{INTERVIEW_TYPE_LABELS[row.interviewType]}</td>
                     <td className="px-4 py-3">
                       <RecruitmentStatusBadge
                         label={INTERVIEW_STATUS_LABELS[row.interviewStatus]}

@@ -2,7 +2,7 @@
 
 import { format } from "date-fns";
 import { Loader2, Pencil, Save, X } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { type Resolver, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -29,6 +29,7 @@ import {
 } from "@/lib/employee/profile-contact";
 import { COUNTRIES, INDIAN_STATES, STATE_DISTRICTS } from "@/lib/geo/india";
 import { updateEmployeeSelfProfileAction } from "@/lib/employees/actions";
+import { cn } from "@/lib/utils";
 import type { MyProfileBundle } from "@/types/my-profile";
 import {
   employeeSelfProfilePreferencesOnlySchema,
@@ -71,18 +72,21 @@ function ProfileInfoRow({
   required?: boolean;
 }) {
   return (
-    <div className="flex items-start gap-4 border-b px-4 py-3 last:border-b-0 sm:gap-6">
-      <dt className="w-32 shrink-0 pt-0.5 text-sm text-muted-foreground sm:w-36">
+    <div className="flex items-start justify-between gap-4 border-b border-border/70 px-5 py-2.5 last:border-b-0 sm:gap-6">
+      <dt className="w-40 shrink-0 pt-0.5 text-sm font-medium text-foreground/90 dark:text-foreground/90 sm:w-48">
         {label}
         {required ? (
-          <span className="text-destructive dark:text-white" aria-hidden="true">
+          <span className="font-semibold text-destructive" aria-hidden="true">
             {" "}
             *
           </span>
         ) : null}
       </dt>
       <dd
-        className={`min-w-0 flex-1 text-right text-sm font-medium ${valueClassName ?? ""}`}
+        className={cn(
+          "min-w-0 flex-1 text-right text-sm font-medium text-foreground",
+          valueClassName,
+        )}
       >
         {editing && children ? (
           <div className="flex justify-end">{children}</div>
@@ -169,6 +173,8 @@ export function MyProfileView({
     },
   });
 
+  const employeeName = `${data.firstName} ${data.lastName}`.trim() || data.firstName;
+
   const emergencyRelationship = watch("emergencyContactRelationship");
   const reportingManagerId = watch("reportingManagerId");
   const personalPhone = watch("personalPhone") ?? "";
@@ -249,6 +255,11 @@ export function MyProfileView({
       ? "View and update your personal contact details below. Employment information is managed separately."
       : "View your employment and contact details below. You can update your profile photo. Other fields are managed by HR.";
 
+  const pathname = usePathname();
+  const isCeo = pathname.startsWith("/ceo");
+  const isManager = pathname.startsWith("/manager");
+  const isEmployee = pathname.startsWith("/employee");
+
   const selectedManagerLabel =
     !reportingManagerId || reportingManagerId === "none"
       ? "None"
@@ -259,13 +270,18 @@ export function MyProfileView({
         "Select manager";
 
   return (
-    <div className="mx-auto w-full max-w-6xl">
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+    <div className="w-full max-w-5xl">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
-          <h1 className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
-            Employee Information
-          </h1>
-          <p className="max-w-2xl text-sm text-muted-foreground">{helperText}</p>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
+              {employeeName}
+            </h1>
+            <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+              {data.employmentStatus === "active" ? "Active" : formatDisplayLabel(data.employmentStatus)}
+            </span>
+          </div>
+          <p className="max-w-2xl text-xs text-muted-foreground sm:text-sm">{helperText}</p>
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
@@ -311,50 +327,62 @@ export function MyProfileView({
 
       <form
         onSubmit={handleSubmit(onSubmit)}
-        className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,22rem)]"
+        className="grid items-stretch gap-6 lg:grid-cols-[minmax(0,1fr)_19rem] xl:grid-cols-[minmax(0,1fr)_20rem]"
       >
-        <dl className="rounded-xl border bg-card">
-          <input type="hidden" {...register("personalEmail")} />
-          <input type="hidden" {...register("timezone")} />
-          <input type="hidden" {...register("language")} />
+        <div className="flex flex-col space-y-3">
+          <h2 className="text-base font-semibold text-foreground">
+            Employee Information
+          </h2>
+          <dl className="flex-1 rounded-xl border bg-card shadow-xs">
+            <input type="hidden" {...register("personalEmail")} />
+            <input type="hidden" {...register("timezone")} />
+            <input type="hidden" {...register("language")} />
 
-          <ProfileInfoRow
-            label="Manager"
-            value={data.reportingManagerName ?? "—"}
-            editing={isEditing && canEditReportingManager}
-          >
-            <ProfileFieldControl>
-              <Select
-                value={reportingManagerId || "none"}
-                onValueChange={(value) => {
-                  if (!value) return;
-                  setValue("reportingManagerId", value === "none" ? "" : value, {
-                    shouldValidate: true,
-                  });
-                }}
-                disabled={isPending}
-              >
-                <SelectTrigger className="h-8 w-full">
-                  <SelectValue placeholder="Select manager">
-                    {() => selectedManagerLabel}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent
-                  align="end"
-                  alignItemWithTrigger={false}
-                  className={PROFILE_SELECT_CONTENT_CLASS}
+          {isEmployee ? (
+            <ProfileInfoRow
+              label="Manager"
+              value={data.reportingManagerName ?? "—"}
+              editing={isEditing && canEditReportingManager}
+            >
+              <ProfileFieldControl>
+                <Select
+                  value={reportingManagerId || "none"}
+                  onValueChange={(value) => {
+                    if (!value) return;
+                    setValue("reportingManagerId", value === "none" ? "" : value, {
+                      shouldValidate: true,
+                    });
+                  }}
+                  disabled={isPending}
                 >
-                  <SelectItem value="none">None</SelectItem>
-                  {managerOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </ProfileFieldControl>
-          </ProfileInfoRow>
-          <ProfileInfoRow label="Joining date" value={formatJoiningDate(data.dateOfJoining)} />
+                  <SelectTrigger className="h-8 w-full">
+                    <SelectValue placeholder="Select manager">
+                      {() => selectedManagerLabel}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent
+                    align="end"
+                    alignItemWithTrigger={false}
+                    className={PROFILE_SELECT_CONTENT_CLASS}
+                  >
+                    <SelectItem value="none">None</SelectItem>
+                    {managerOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </ProfileFieldControl>
+            </ProfileInfoRow>
+          ) : isManager && data.reportingManagerName ? (
+            <ProfileInfoRow label="HR" value={data.reportingManagerName} />
+          ) : null}
+
+          {!isCeo ? (
+            <ProfileInfoRow label="Joining date" value={formatJoiningDate(data.dateOfJoining)} />
+          ) : null}
+
           <ProfileInfoRow label="Company email" value={data.email} />
 
           <ProfileInfoRow
@@ -617,28 +645,36 @@ export function MyProfileView({
           </ProfileInfoRow>
 
         </dl>
+        </div>
 
-        <aside className="flex flex-col items-center lg:self-start">
-          <EmployeeIdCard
-            employeeId={data.employeeId}
-            firstName={data.firstName}
-            lastName={data.lastName}
-            employeeCode={data.employeeCode}
-            designation={data.designationTitle}
-            departmentName={data.departmentName}
-            employmentTypeName={formatDisplayLabel(data.employmentTypeName)}
-            employmentStatus={data.employmentStatus}
-            accountStatus={data.accountStatus}
-            profileImagePath={data.profileImagePath}
-            imageUrl={data.profileImageUrl}
-            profilePath={data.profilePath}
-            canEdit={true}
-          />
-          <p className="mt-3 max-w-[19rem] text-center text-xs leading-relaxed text-slate-500 dark:text-slate-300">
-            Tap the photo on your digital ID to update your profile picture anytime.
-          </p>
+        <aside className="flex flex-col space-y-3">
+          <h2 className="text-base font-semibold text-foreground">
+            Digital ID
+          </h2>
+          <div className="flex flex-1 flex-col">
+            <EmployeeIdCard
+              employeeId={data.employeeId}
+              firstName={data.firstName}
+              lastName={data.lastName}
+              employeeCode={data.employeeCode}
+              designation={isCeo ? "CEO" : data.designationTitle}
+              departmentName={data.departmentName}
+              employmentTypeName={formatDisplayLabel(data.employmentTypeName)}
+              employmentStatus={data.employmentStatus}
+              accountStatus={data.accountStatus}
+              profileImagePath={data.profileImagePath}
+              imageUrl={data.profileImageUrl}
+              profilePath={data.profilePath}
+              canEdit={true}
+              className="h-full min-h-[30rem] w-full max-w-[19rem]"
+            />
+          </div>
         </aside>
       </form>
+
+      <p className="mt-3 text-right text-xs leading-relaxed text-muted-foreground">
+        Tap the photo on your digital ID to update your profile picture anytime.
+      </p>
 
       <NoticeDialog
         open={notice != null}

@@ -16,8 +16,8 @@ export function EmployeeDashboardView({
   subtitle,
 }: EmployeeDashboardData & { subtitle?: string }) {
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-5 lg:overflow-hidden">
-      <div className="mx-auto flex h-full min-h-0 w-full max-w-[88rem] flex-col gap-3 md:gap-4 lg:overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-5">
+      <div className="mx-auto flex w-full max-w-[88rem] flex-col gap-4">
         <div className="shrink-0">
           <EmployeeDashboardHeader greeting={greeting} subtitle={subtitle} />
         </div>
@@ -26,8 +26,8 @@ export function EmployeeDashboardView({
           <EmployeeDashboardKpiCards kpis={kpis} />
         </div>
 
-        <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[3fr_2fr] lg:items-stretch lg:overflow-hidden">
-          <div className="flex min-h-0 flex-col gap-3 lg:h-full lg:gap-4">
+        <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[3fr_2fr] lg:items-stretch">
+          <div className="flex min-h-0 flex-col gap-3 lg:gap-4">
             <SelfAttendanceTodayCard
               firstName={greeting.firstName}
               today={today}
@@ -37,7 +37,7 @@ export function EmployeeDashboardView({
               lastName={greeting.lastName}
               personKey={greeting.employeeId}
               referenceDate={referenceDate}
-              className="min-h-0 flex-1"
+              className="min-h-[11rem]"
             />
           </div>
           <EmployeeUpcomingEvents

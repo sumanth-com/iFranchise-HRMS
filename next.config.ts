@@ -5,12 +5,13 @@ const contentSecurityPolicy = [
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
-  "object-src 'none'",
+  "frame-src 'self' blob: data: https://*.supabase.co",
+  "object-src 'self' blob: data: https://*.supabase.co",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co blob: data:",
   "worker-src 'self' blob:",
 ].join("; ");
 
@@ -67,6 +68,16 @@ const nextConfig: NextConfig = {
       {
         source: "/dashboard/recruitment",
         destination: "/dashboard/recruitment/jobs",
+        permanent: false,
+      },
+      {
+        source: "/ceo/recruitment",
+        destination: "/ceo/recruitment/jobs",
+        permanent: false,
+      },
+      {
+        source: "/manager/recruitment",
+        destination: "/manager/recruitment/jobs",
         permanent: false,
       },
       {

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  AlertCircle,
   Briefcase,
   Check,
   FileText,
@@ -96,6 +97,21 @@ export function OnboardingStepNav({
             const isLocked = !isAccessible;
             const StepIcon = STEP_ICONS[key] ?? User;
 
+            const hasStepCorrection = (context.documents ?? []).some((d) => {
+              if (d.reviewStatus !== "correction_requested") return false;
+              if (key === "identity" && d.documentCategory === "identity") return true;
+              if (key === "education" && d.documentCategory === "education") return true;
+              if (key === "employment_history" && d.documentCategory === "employment") return true;
+              if (key === "bank" && d.documentCategory === "bank") return true;
+              if (
+                key === "signature" &&
+                (d.documentCategory === "offer_acceptance" || d.documentCategory === "signature")
+              ) {
+                return true;
+              }
+              return false;
+            });
+
             return (
               <button
                 key={key}
@@ -123,16 +139,20 @@ export function OnboardingStepNav({
                   <span
                     className={cn(
                       "flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-all duration-300",
-                      isComplete
-                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
-                        : isActive
-                          ? "bg-primary text-primary-foreground shadow-sm"
-                          : isLocked
-                            ? "bg-muted text-muted-foreground"
-                            : "bg-muted text-muted-foreground group-hover:bg-muted/80 dark:group-hover:bg-muted/60",
+                      hasStepCorrection
+                        ? "bg-amber-100 text-amber-800 ring-1 ring-amber-500/50 dark:bg-amber-950 dark:text-amber-300"
+                        : isComplete
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
+                          : isActive
+                            ? "bg-primary text-primary-foreground shadow-sm"
+                            : isLocked
+                              ? "bg-muted text-muted-foreground"
+                              : "bg-muted text-muted-foreground group-hover:bg-muted/80 dark:group-hover:bg-muted/60",
                     )}
                   >
-                    {isComplete ? (
+                    {hasStepCorrection ? (
+                      <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" strokeWidth={2.5} />
+                    ) : isComplete ? (
                       <Check className="h-3.5 w-3.5" strokeWidth={3} />
                     ) : isLocked ? (
                       <Lock className="h-3 w-3" strokeWidth={2.5} />

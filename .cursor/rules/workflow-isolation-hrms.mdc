@@ -1,0 +1,81 @@
+---
+description: Strict workflow isolation — no cascade changes, regression protection, controlled scope
+alwaysApply: true
+---
+
+# iFranchise HRMS — Strict workflow isolation
+
+## Authority
+
+The user’s explicit instruction is the only authority for changing workflows. If they did not ask to change something, preserve it. If changing shared code is unavoidable, stop and report before doing it. If something is unrelated, leave it untouched.
+
+## Strict workflow isolation
+
+When asked to modify a workflow or business rule, treat that workflow as an **isolated** change.
+
+Do **not** modify unrelated workflows, modules, portals, permissions, database structures, APIs, or shared functionality unless explicitly approved.
+
+Before changing workflow logic:
+
+1. Identify exactly which workflow was requested.
+2. Trace the relevant code path and dependencies.
+3. Identify whether any shared component, API, DB table, server action, hook, utility, or permission system is used by other modules.
+4. Identify potential side effects before making changes.
+
+If the requested workflow shares code with another part of the app:
+
+- Do **not** change shared behavior globally for convenience.
+- Isolate / scope the change to the requested workflow where possible.
+- Preserve existing behavior everywhere else.
+- Reuse existing functionality where safe.
+- Avoid unnecessary refactoring.
+
+## No unauthorized cascade changes
+
+A change to one workflow must **not** automatically become a change to another workflow, module, portal, role, permission, DB operation, API, notification/email flow, approval process, calculation, or shared component — unless that dependency genuinely must change for the requested workflow to function.
+
+If a dependency **must** change, stop and report clearly:
+
+> To implement this workflow safely, the following shared component/code must also change:  
+> [component/code]  
+> This may affect: [affected areas]  
+> I have not changed the affected areas yet.
+
+Wait for approval if the impact is significant.
+
+## Regression protection
+
+After every workflow change, verify unrelated functionality was not affected. At minimum check:
+
+- Routes, permissions, roles, portal access, auth
+- CRUD / API / DB behavior
+- Approval, notification, and email flows
+- Shared components and loading/error states
+
+Do not declare work complete only because the requested workflow works — the surrounding system must keep working too.
+
+## Do not fix unrelated problems automatically
+
+If an unrelated bug is discovered while working on the requested task:
+
+- Do **not** silently fix it.
+- Report it separately as outside scope.
+- Only fix when explicitly asked.
+
+## Controlled change scope
+
+Before implementation, establish:
+
+- **REQUESTED SCOPE** — what was asked
+- **ALLOWED CHANGES** — files/components/logic genuinely required
+- **OUT OF SCOPE** — unrelated functionality
+
+Do not expand scope without permission. If implementation requires significant out-of-scope changes, stop and ask first.
+
+## Process
+
+Follow: **Understand → Isolate → Implement → Verify → Regression check**
+
+Never: Understand → Rewrite everything → Hope nothing breaks.
+
+Never trade existing system stability for a new feature. Treat this HRMS as a protected production codebase.

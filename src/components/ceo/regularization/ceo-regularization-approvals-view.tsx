@@ -9,6 +9,7 @@ import { SectionHelpButton } from "@/components/common/section-help-button";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { fetchCeoRegularizationQueueAction } from "@/lib/ceo/actions/ceo-regularization-actions";
 import { CEO_SECTION_HELP_DESCRIPTION } from "@/lib/ceo/section-help";
+import { useApprovalsSync } from "@/lib/approvals/use-approvals-sync";
 import { LEAVE_MONTH_OPTIONS } from "@/lib/leave/services/leave-utils";
 import type { CeoRegularizationQueueItem } from "@/types/ceo-regularization";
 
@@ -71,6 +72,29 @@ export function CeoRegularizationApprovalsView({
       });
     },
     [month, year],
+  );
+
+  useApprovalsSync({
+    onRefresh: refreshQueue,
+    tables: ["attendance_corrections"],
+  });
+
+  const handleItemActed = useCallback(
+    (item?: CeoRegularizationQueueItem, status?: "approved" | "rejected") => {
+      if (item && status) {
+        setApprovalQueue((prev) => prev.filter((row) => row.id !== item.id));
+        setProcessedItems((prev) => [
+          {
+            ...item,
+            correctionStatus: status,
+            reviewedAt: new Date().toISOString(),
+          },
+          ...prev.filter((row) => row.id !== item.id),
+        ]);
+      }
+      refreshQueue();
+    },
+    [refreshQueue],
   );
 
   return (
@@ -136,7 +160,7 @@ export function CeoRegularizationApprovalsView({
       <CeoRegularizationApprovalQueue
         items={approvalQueue}
         isLoading={isPending}
-        onActed={() => refreshQueue()}
+        onActed={handleItemActed}
       />
 
       <CeoRegularizationProcessedTable

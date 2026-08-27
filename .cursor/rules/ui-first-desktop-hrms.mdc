@@ -1,0 +1,74 @@
+---
+description: UI-first desktop HRMS development — preserve workflows, scope UI changes narrowly
+alwaysApply: true
+---
+
+# iFranchise HRMS — UI-first desktop development
+
+## Current priority
+
+Focus primarily on **desktop UI/UX**. Do not optimize or redesign for mobile/tablet unless explicitly asked.
+
+## Default: UI request = UI only
+
+When the request is about visual design, layout, spacing, typography, alignment, cards, tables, buttons, modals, navigation, colors, hierarchy, desktop polish, or similar:
+
+- Change **only** what is needed for that UI/UX request.
+- Do **not** unnecessarily touch business logic, DB/Supabase queries, auth, permissions, APIs, server actions, validations, leave/attendance/payroll calculations, approval/provisioning/notification/email workflows, CRUD behavior, data relationships, state management, security, env vars, or integrations.
+- Existing functionality must keep working exactly as before.
+
+## Never break workflows
+
+- Understand current behavior before changing a component.
+- Do not replace working functionality for “cleaner” code.
+- Preserve props, callbacks, API/server actions, hooks, state, permissions, routes, DB interactions, validation, loading/error handling.
+- If UI needs a logic touch, make the **smallest** change and keep behavior.
+- No unrelated refactors, cleanups, renames, or removals unless explicitly asked.
+
+## Real UI on real data
+
+- Use existing data and actions. No fake data, dummy buttons, placeholder workflows, fake success/API/DB, or non-functional interactions.
+- Keep existing submit/load/action wiring intact.
+
+## Workflow changes — only when asked
+
+Only modify underlying logic when explicitly asked (e.g. leave approval, provisioning, attendance calculation). Then: map current flow → touch only what’s needed → preserve unrelated flows → check permissions/security and loading/error → verify end-to-end → no regressions.
+
+## Before large or risky changes
+
+Inspect where UI lives, data sources, actions/APIs, permissions, shared portal usage, and cross-role impact. Prefer the smallest safe change. Do not blindly rewrite.
+
+## Shared components
+
+Components used across HR / Employee / Manager / Executive / Super Admin: do not change global behavior for one portal’s UI. Scope visually; never alter another role’s permissions or functionality by accident.
+
+## Desktop UI standard
+
+Professional enterprise desktop HRMS: alignment, spacing, hierarchy, typography, consistent cards/tables/forms/buttons/modals, clear empty/loading/error states, status badges, navigation, content density, information architecture. No unnecessary mobile/tablet work unless asked.
+
+## Performance
+
+Do not hurt performance for polish: avoid extra re-renders, duplicate fetches, needless state/client fetching, heavy deps, expensive/blocking animations. Animations: subtle, fast, professional.
+
+## Loading and errors
+
+Never remove loading/error handling. Keep loading, empty, success, failure, permission denied, validation, and network/API error UX. Do not hide errors for aesthetics.
+
+## Codebase safety
+
+Production-oriented, interconnected code. Inspect dependencies, shared components, server/client boundaries, APIs/actions, permissions before edit. After edit: TS, imports, routes, interactions, no unrelated breakage. No broad architecture changes unless asked.
+
+## Ambiguous UI vs workflow
+
+If a UI request truly requires business/workflow change: **do not silently change the workflow**. Say what logic would need to change and wait if significant.
+
+## Priority order
+
+1. Preserve functionality  
+2. Preserve security and permissions  
+3. Preserve existing workflows  
+4. Deliver the requested UI/UX  
+5. Touch code only as needed for that request  
+6. Avoid unrelated changes  
+
+UI request → UI only. Workflow request → workflow + necessary UI. Architecture → only where explicitly requested. Do not over-engineer, rewrite working code, or introduce regressions.

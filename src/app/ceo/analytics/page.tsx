@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { endOfMonth, format, startOfMonth } from "date-fns";
 
-import { LoadingSpinner } from "@/components/common/loading-spinner";
+import { PageSkeleton } from "@/components/common/page-skeleton";
 import { CeoAnalyticsView } from "@/components/ceo/analytics/ceo-analytics-view";
 import { getCeoAnalyticsModuleData } from "@/lib/ceo/actions/ceo-analytics-actions";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
@@ -40,13 +40,7 @@ export default async function CeoAnalyticsPage({
   const data = await getCeoAnalyticsModuleData(parsed);
 
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-1 items-center justify-center">
-          <LoadingSpinner />
-        </div>
-      }
-    >
+    <Suspense fallback={<PageSkeleton />}>
       <CeoAnalyticsView {...data} initialFilters={parsed} />
     </Suspense>
   );

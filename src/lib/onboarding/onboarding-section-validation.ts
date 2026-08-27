@@ -65,7 +65,21 @@ function sectionData(
   const saved = normalizeOnboardingSectionData(
     context.sections.find((s) => s.sectionKey === sectionKey)?.data,
   );
-  return { ...saved, ...patch };
+  const result: Record<string, unknown> = { ...saved, ...patch };
+  if (sectionKey === "personal") {
+    if (!result.fullName && context.fullName) {
+      result.fullName = context.fullName;
+    }
+    if (!result.personalEmail && context.personalEmail) {
+      result.personalEmail = context.personalEmail;
+    }
+  }
+  if (sectionKey === "bank") {
+    if (!result.accountHolderName && context.fullName) {
+      result.accountHolderName = context.fullName;
+    }
+  }
+  return result;
 }
 
 function hasUploadedDocument(

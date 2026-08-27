@@ -95,7 +95,7 @@ export function SalaryStructureForm({
   onCancel,
 }: SalaryStructureFormProps) {
   const router = useRouter();
-  const isEdit = mode === "edit" && record;
+  const isEdit = mode === "edit" && record && !record.id.startsWith("not_set_");
   const isDialog = variant === "dialog";
   const [isPending, startTransition] = useTransition();
   const form = useForm<FormValues>({

@@ -1,23 +1,7 @@
-import { HierarchyManagement } from "@/components/organization/hierarchy-management";
-import { ORGANIZATION_VIEW_PERMISSIONS } from "@/lib/organization/constants";
-import {
-  buildHierarchyTree,
-  listHierarchyEmployees,
-} from "@/lib/organization/services/org-queries";
-import { requireServerAnyPermission } from "@/lib/permissions/server";
-import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
-export default async function HierarchyPage() {
-  const profile = await requireServerAnyPermission([...ORGANIZATION_VIEW_PERMISSIONS]);
-  const supabase = await createClient();
-  const employees = await listHierarchyEmployees(supabase, profile.employee.organizationId);
-  const tree = buildHierarchyTree(employees);
+import { ORGANIZATION_ROUTES } from "@/lib/organization/constants";
 
-  return (
-    <HierarchyManagement
-      tree={tree}
-      employees={employees}
-      permissionCodes={profile.permissionCodes}
-    />
-  );
+export default function HierarchyPage() {
+  redirect(ORGANIZATION_ROUTES.profile);
 }

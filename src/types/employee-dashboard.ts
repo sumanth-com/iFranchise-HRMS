@@ -28,6 +28,10 @@ export type EmployeeUpcomingEvent = {
   title: string;
   subtitle: string | null;
   date: string;
+  avatarUrl?: string | null;
+  profileImagePath?: string | null;
+  firstName?: string;
+  lastName?: string;
 };
 
 export type EmployeeDashboardData = {

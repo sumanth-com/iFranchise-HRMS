@@ -33,7 +33,7 @@ const TABLE_HEAD_CELL_CLASS = "h-11 whitespace-nowrap py-3.5 pl-10 pr-4";
 const TABLE_DATA_CELL_CLASS = "whitespace-nowrap py-3.5 pl-10 pr-4";
 
 const TABLE_HEAD_CLASS =
-  "sticky top-0 z-20 bg-black text-white shadow-[0_1px_0_rgba(255,255,255,0.08)]";
+  "sticky top-0 z-20 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-[0_1px_0_rgba(255,255,255,0.12)]";
 const TABLE_CELL_CLASS = "relative align-middle";
 
 function HeadLabel({
@@ -143,8 +143,8 @@ export function LeaveBalanceTable({ balances }: LeaveBalanceTableProps) {
         data-slot="table"
         className="w-max min-w-full caption-bottom text-sm"
       >
-        <TableHeader className="sticky top-0 z-30 bg-black">
-          <TableRow className="border-white/10 bg-black hover:bg-black">
+        <TableHeader className="sticky top-0 z-30 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600">
+          <TableRow className="border-white/10 bg-transparent hover:bg-white/5">
             <TableHead
               className={cn(
                 "min-w-[8.5rem]",

@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import { LoadingSpinner } from "@/components/common/loading-spinner";
+import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
 import { CeoDashboard } from "@/components/ceo/ceo-dashboard";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { getCeoDashboardData } from "@/lib/ceo/services/ceo-dashboard-queries";
@@ -112,13 +112,7 @@ async function CeoDashboardLoader() {
 
 export default function CeoPortalPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-1 items-center justify-center">
-          <LoadingSpinner />
-        </div>
-      }
-    >
+    <Suspense fallback={<DashboardSkeleton />}>
       <CeoDashboardLoader />
     </Suspense>
   );

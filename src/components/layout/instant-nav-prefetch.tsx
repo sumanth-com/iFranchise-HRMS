@@ -55,33 +55,11 @@ export function InstantNavPrefetch() {
       .map((item) => (typeof item.href === "string" ? item.href : null))
       .filter((href): href is string => Boolean(href));
 
-    const isHeavyTeamRoute = (href: string) =>
-      href.includes("/team") ||
-      href.includes("/user-provisioning") ||
-      href.includes("/recruitment");
-
-    // Immediate: home + light sidebar modules. Defer team/admin heavy RSC to idle.
+    // Immediately prefetch all sidebar navigation modules for instant switching
     prefetch(portalHome);
-    const lightNav = navHrefs.filter((href) => !isHeavyTeamRoute(href));
-    const heavyNav = navHrefs.filter((href) => isHeavyTeamRoute(href));
-    const IMMEDIATE_PREFETCH = 10;
-    for (const href of lightNav.slice(0, IMMEDIATE_PREFETCH)) {
+    for (const href of navHrefs) {
       prefetch(href);
     }
-
-    const warmRemainingNav = () => {
-      for (const href of lightNav.slice(IMMEDIATE_PREFETCH)) {
-        prefetch(href);
-      }
-      for (const href of heavyNav) {
-        prefetch(href);
-      }
-    };
-
-    const idleId =
-      typeof window.requestIdleCallback === "function"
-        ? window.requestIdleCallback(warmRemainingNav, { timeout: 1500 })
-        : window.setTimeout(warmRemainingNav, 600);
 
     const onPointerOver = (event: Event) => {
       const target = event.target;
@@ -108,11 +86,6 @@ export function InstantNavPrefetch() {
     document.addEventListener("focusin", onPointerOver, { capture: true });
 
     return () => {
-      if (typeof window.cancelIdleCallback === "function") {
-        window.cancelIdleCallback(idleId as number);
-      } else {
-        window.clearTimeout(idleId as number);
-      }
       document.removeEventListener("pointerover", onPointerOver, true);
       document.removeEventListener("pointerdown", onPointerDown, true);
       document.removeEventListener("focusin", onPointerOver, true);

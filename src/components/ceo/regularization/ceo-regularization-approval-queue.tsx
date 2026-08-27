@@ -14,12 +14,13 @@ import {
   approveCeoRegularizationAction,
   rejectCeoRegularizationAction,
 } from "@/lib/ceo/actions/ceo-regularization-actions";
+import { broadcastApprovalChange } from "@/lib/approvals/use-approvals-sync";
 import type { CeoRegularizationQueueItem } from "@/types/ceo-regularization";
 
 type CeoRegularizationApprovalQueueProps = {
   items: CeoRegularizationQueueItem[];
   isLoading?: boolean;
-  onActed: () => void;
+  onActed: (item?: CeoRegularizationQueueItem, status?: "approved" | "rejected") => void;
 };
 
 function formatTime(value: string | null) {
@@ -50,9 +51,10 @@ export function CeoRegularizationApprovalQueue({
 
   const handleApprove = () => {
     if (!target) return;
+    const item = target.item;
     startActing(async () => {
       const result = await approveCeoRegularizationAction({
-        correctionId: target.item.id,
+        correctionId: item.id,
       });
       if (!result.success) {
         toast.error(result.message);
@@ -60,15 +62,17 @@ export function CeoRegularizationApprovalQueue({
       }
       toast.success("Regularization approved");
       closeModal();
-      onActed();
+      broadcastApprovalChange("regularization");
+      onActed(item, "approved");
     });
   };
 
   const handleReject = () => {
     if (!target) return;
+    const item = target.item;
     startActing(async () => {
       const result = await rejectCeoRegularizationAction({
-        correctionId: target.item.id,
+        correctionId: item.id,
         reviewNotes: rejectNotes.trim() || undefined,
       });
       if (!result.success) {
@@ -77,7 +81,8 @@ export function CeoRegularizationApprovalQueue({
       }
       toast.success("Regularization rejected");
       closeModal();
-      onActed();
+      broadcastApprovalChange("regularization");
+      onActed(item, "rejected");
     });
   };
 

@@ -40,6 +40,8 @@ type CeoProvisioningPeopleProps = {
   pageSize: number;
   isRefreshing?: boolean;
   busyEmployeeId?: string | null;
+  statusFilter?: string;
+  onStatusFilterChange?: (status: string) => void;
   onPageChange: (page: number) => void;
   onAction: (action: ProvisioningRowAction, user: CeoProvisioningUser) => void;
 };
@@ -239,16 +241,49 @@ export function CeoProvisioningPeople({
   pageSize,
   isRefreshing,
   busyEmployeeId,
+  statusFilter: controlledStatusFilter,
+  onStatusFilterChange,
   onPageChange,
   onAction,
 }: CeoProvisioningPeopleProps) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [internalStatusFilter, setInternalStatusFilter] = useState("all");
+  const statusFilter = controlledStatusFilter ?? internalStatusFilter;
+
+  const handleFilterChange = (nextStatus: string) => {
+    if (onStatusFilterChange) {
+      onStatusFilterChange(nextStatus);
+    } else {
+      setInternalStatusFilter(nextStatus);
+    }
+  };
+
+  const isDeactivated = (u: CeoProvisioningUser) =>
+    u.invitationStatus === "inactive" ||
+    u.invitationStatus === "revoked" ||
+    (u.invitationStatus as string) === "deactivated" ||
+    u.accountStatus === "inactive" ||
+    u.accountStatus === "suspended";
+
+  const isPending = (u: CeoProvisioningUser) =>
+    u.invitationStatus === "pending" ||
+    u.invitationStatus === "expired" ||
+    u.invitationStatus === "cancelled" ||
+    u.accountStatus === "invitation_pending" ||
+    u.accountStatus === "draft" ||
+    u.accountStatus === "invited";
+
+  const isAccepted = (u: CeoProvisioningUser) =>
+    u.invitationStatus === "accepted" || u.accountStatus === "active";
 
   const filteredUsers = useMemo(() => {
+    if (onStatusFilterChange) return users;
     if (statusFilter === "all") return users;
+    if (statusFilter === "deactivated") return users.filter(isDeactivated);
+    if (statusFilter === "pending") return users.filter(isPending);
+    if (statusFilter === "accepted") return users.filter(isAccepted);
     return users.filter((u) => u.invitationStatus === statusFilter);
-  }, [users, statusFilter]);
+  }, [users, statusFilter, onStatusFilterChange]);
 
   return (
     <section className="rounded-xl border bg-card p-4 shadow-sm">
@@ -270,7 +305,7 @@ export function CeoProvisioningPeople({
           ]}
           value={statusFilter}
           placeholder="All statuses"
-          onValueChange={setStatusFilter}
+          onValueChange={handleFilterChange}
         />
         {isRefreshing && users.length > 0 ? (
           <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
@@ -279,14 +314,20 @@ export function CeoProvisioningPeople({
 
       {filteredUsers.length === 0 ? (
         <p className="py-12 text-center text-sm text-muted-foreground">
-          No executive users yet. Use “Invite User” to get started.
+          {statusFilter === "deactivated"
+            ? "No deactivated users found."
+            : statusFilter === "pending"
+              ? "No pending invitations found."
+              : statusFilter === "accepted"
+                ? "No active users found."
+                : "No users found. Use “Invite User” to get started."}
         </p>
       ) : (
         <div
           className={
             isRefreshing
-              ? "grid gap-4 opacity-80 transition-opacity sm:grid-cols-2 xl:grid-cols-3"
-              : "grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+              ? "grid gap-4 opacity-80 transition-opacity grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+              : "grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
           }
         >
           {filteredUsers.map((user) => (
@@ -303,7 +344,7 @@ export function CeoProvisioningPeople({
       {total > pageSize ? (
         <div className="mt-4 flex items-center justify-between gap-3 border-t pt-3">
           <p className="text-xs text-muted-foreground">
-            Showing {users.length} of {total} users
+            Showing {filteredUsers.length} of {total} user{total === 1 ? "" : "s"}
           </p>
           <div className="flex items-center gap-2">
             <Button

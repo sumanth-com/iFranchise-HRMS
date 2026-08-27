@@ -2,7 +2,7 @@ import { Suspense } from "react";
 
 import { CeoExitApprovalsView } from "@/components/ceo/exit/ceo-exit-approvals-view";
 import { EmptyState } from "@/components/common/empty-state";
-import { LoadingSpinner } from "@/components/common/loading-spinner";
+import { PageSkeleton } from "@/components/common/page-skeleton";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import {
   listCeoExitApprovalQueue,
@@ -62,13 +62,7 @@ async function CeoExitApprovalsContent() {
 
 export default function CeoApprovalsExitPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-1 items-center justify-center">
-          <LoadingSpinner />
-        </div>
-      }
-    >
+    <Suspense fallback={<PageSkeleton />}>
       <CeoExitApprovalsContent />
     </Suspense>
   );

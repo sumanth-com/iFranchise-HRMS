@@ -1,3 +1,5 @@
+import { addDays, format, isWithinInterval, parseISO } from "date-fns";
+
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { LEAVE_BALANCE_DISPLAY_CODES } from "@/lib/leave/constants";
@@ -101,30 +103,119 @@ async function loadLeaveKpis(
   };
 }
 
-async function loadUpcomingHolidays(
+function nextOccurrence(monthDay: string, from: Date): Date | null {
+  const [mm, dd] = monthDay.split("-").map(Number);
+  if (!mm || !dd) return null;
+  const thisYear = new Date(from.getFullYear(), mm - 1, dd);
+  if (thisYear >= new Date(from.getFullYear(), from.getMonth(), from.getDate())) {
+    return thisYear;
+  }
+  return new Date(from.getFullYear() + 1, mm - 1, dd);
+}
+
+function upcomingWithinDays(
+  dateValue: string | null | undefined,
+  from: Date,
+  days: number,
+): Date | null {
+  if (!dateValue || dateValue.length < 10) return null;
+  const monthDay = dateValue.slice(5, 10);
+  const next = nextOccurrence(monthDay, from);
+  if (!next) return null;
+  const end = addDays(from, days);
+  if (isWithinInterval(next, { start: from, end })) return next;
+  return null;
+}
+
+export async function loadUpcomingCelebrations(
   supabase: AuthSupabaseClient,
   organizationId: string,
   today: string,
 ): Promise<EmployeeUpcomingEvent[]> {
-  const { data, error } = await supabase
-    .schema("hrms")
-    .from("holidays")
-    .select("id, name, holiday_date, is_optional")
-    .eq("organization_id", organizationId)
-    .is("deleted_at", null)
-    .gte("holiday_date", today)
-    .order("holiday_date")
-    .limit(8);
+  const todayDate = parseISO(today);
+  const windowEnd = format(addDays(todayDate, 7), "yyyy-MM-dd");
 
-  if (error) throw new Error(error.message);
+  const [holidaysResult, birthdayProfilesResult] = await Promise.all([
+    supabase
+      .schema("hrms")
+      .from("holidays")
+      .select("id, name, holiday_date, is_optional, holiday_type")
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .gte("holiday_date", today)
+      .lte("holiday_date", windowEnd)
+      .order("holiday_date")
+      .limit(8),
+    supabase
+      .schema("hrms")
+      .from("employee_profiles")
+      .select(
+        `employee_id, date_of_birth, profile_image_storage_path,
+         employees:employee_id!inner(
+           id, employee_code, first_name, last_name, organization_id, employment_status
+         )`,
+      )
+      .eq("employees.organization_id", organizationId)
+      .in("employees.employment_status", ["active", "probation", "on_leave"])
+      .is("deleted_at", null)
+      .not("date_of_birth", "is", null),
+  ]);
 
-  return (data ?? []).map((holiday) => ({
-    id: `holiday-${holiday.id}`,
-    type: "holiday" as const,
-    title: holiday.name,
-    subtitle: holiday.is_optional ? "Optional holiday" : "Company holiday",
-    date: holiday.holiday_date,
-  }));
+  if (holidaysResult.error) throw new Error(holidaysResult.error.message);
+  if (birthdayProfilesResult.error) throw new Error(birthdayProfilesResult.error.message);
+
+  const events: EmployeeUpcomingEvent[] = [];
+
+  for (const holiday of holidaysResult.data ?? []) {
+    const rawType = (holiday as { holiday_type?: string | null }).holiday_type;
+    const formattedType = rawType
+      ? rawType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+      : null;
+    const subtitle = holiday.is_optional
+      ? "Optional Holiday"
+      : formattedType || "Company Holiday";
+
+    events.push({
+      id: `holiday-${holiday.id}`,
+      type: "holiday",
+      title: holiday.name,
+      subtitle,
+      date: holiday.holiday_date,
+    });
+  }
+
+  for (const row of birthdayProfilesResult.data ?? []) {
+    const employee = Array.isArray(row.employees) ? row.employees[0] : row.employees;
+    if (!employee) continue;
+    const dob = row.date_of_birth as string | null | undefined;
+    const bday = upcomingWithinDays(dob, todayDate, 7);
+    if (!bday) continue;
+
+    const firstName = (employee.first_name as string | null) ?? "";
+    const lastName = (employee.last_name as string | null) ?? "";
+    const fullName = `${firstName} ${lastName}`.trim() || "Team member";
+
+    events.push({
+      id: `birthday-${employee.id}`,
+      type: "birthday",
+      title: fullName,
+      subtitle: "Birthday",
+      date: format(bday, "yyyy-MM-dd"),
+      profileImagePath: (row.profile_image_storage_path as string | null) ?? null,
+      firstName,
+      lastName,
+    });
+  }
+
+  events.sort((a, b) => {
+    const aIsToday = a.date === today;
+    const bIsToday = b.date === today;
+    if (aIsToday && !bIsToday) return -1;
+    if (!aIsToday && bIsToday) return 1;
+    return a.date.localeCompare(b.date);
+  });
+
+  return events;
 }
 
 export async function getEmployeeDashboardData(
@@ -142,7 +233,7 @@ export async function getEmployeeDashboardData(
       totalBalanceDays: 0,
       pendingCount: 0,
     }),
-    safe(() => loadUpcomingHolidays(supabase, organizationId, today), []),
+    safe(() => loadUpcomingCelebrations(supabase, organizationId, today), []),
   ]);
 
   return {

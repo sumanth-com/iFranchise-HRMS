@@ -2,7 +2,7 @@ import { Suspense } from "react";
 
 import { CeoLeaveApprovalsView } from "@/components/ceo/leave/ceo-leave-approvals-view";
 import { EmptyState } from "@/components/common/empty-state";
-import { LoadingSpinner } from "@/components/common/loading-spinner";
+import { PageSkeleton } from "@/components/common/page-skeleton";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import {
   getCeoForwardTargets,
@@ -25,7 +25,7 @@ async function CeoLeaveApprovalsContent() {
   const period = { month, year };
 
   try {
-    await ensurePendingExecutiveLeaveAssignedToCeo(
+    void ensurePendingExecutiveLeaveAssignedToCeo(
       profile.employee.organizationId,
       profile.employee.id,
     ).catch((error) => {
@@ -69,13 +69,7 @@ async function CeoLeaveApprovalsContent() {
 
 export default function CeoApprovalsLeavePage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-1 items-center justify-center">
-          <LoadingSpinner />
-        </div>
-      }
-    >
+    <Suspense fallback={<PageSkeleton />}>
       <CeoLeaveApprovalsContent />
     </Suspense>
   );

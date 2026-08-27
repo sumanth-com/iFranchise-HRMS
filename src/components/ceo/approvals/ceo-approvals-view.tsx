@@ -11,6 +11,7 @@ import {
   fetchCeoApprovalsKpisAction,
   fetchCeoApprovalsQueueAction,
 } from "@/lib/ceo/actions/ceo-approvals-actions";
+import { useApprovalsSync } from "@/lib/approvals/use-approvals-sync";
 import type {
   CeoApprovalsListParams,
   CeoApprovalsPageData,
@@ -52,14 +53,19 @@ export function CeoApprovalsView({
     setDrawerOpen(true);
   }
 
-  async function refreshAfterChange() {
+  const refreshAfterChange = useCallback(async () => {
     const [nextKpis, nextQueue] = await Promise.all([
       fetchCeoApprovalsKpisAction(filters),
       fetchCeoApprovalsQueueAction(filters),
     ]);
     setKpis(nextKpis);
     setQueue(nextQueue);
-  }
+  }, [filters]);
+
+  useApprovalsSync({
+    onRefresh: refreshAfterChange,
+    tables: ["executive_approvals"],
+  });
 
   return (
     <div className="flex w-full min-h-0 flex-1 flex-col gap-3 overflow-y-auto scroll-smooth p-3 pb-8 md:gap-4 md:p-4 md:pb-10 lg:p-5">

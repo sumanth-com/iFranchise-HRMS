@@ -28,8 +28,8 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
     <thead
       data-slot="table-header"
       className={cn(
-        "[&_tr]:border-b",
         TABLE_HEADER_STICKY_CLASS,
+        "[&_tr]:border-b [&_tr]:border-white/10 [&_tr]:bg-blue-600 [&_tr]:bg-gradient-to-r [&_tr]:from-blue-600 [&_tr]:to-violet-600 [&_tr]:text-white [&_tr]:hover:bg-transparent",
         className,
       )}
       {...props}

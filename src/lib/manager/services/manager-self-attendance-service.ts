@@ -24,6 +24,7 @@ import {
   extractTimeFromTimestamp,
   formatAttendanceTime,
   getTodayDateString,
+  isAfterOfficeCheckoutTime,
   OFFICE_CHECK_IN_LOCK_TIME,
   OFFICE_TIMEZONE,
   toDisplayAttendanceNotes,
@@ -196,20 +197,23 @@ function resolveSelfAttendanceDayStatus(input: {
     return "on_request";
   }
 
+  const checkInAt = input.attendance?.check_in_at ?? null;
+  const checkOutAt = input.attendance?.check_out_at ?? null;
+
+  // Actual attendance takes precedence if employee checked in on a leave/holiday/weekend day.
+  if (checkInAt) {
+    return resolvePunchStatus(checkInAt, checkOutAt, input.date, input.rules);
+  }
+
   if (input.holidayName) return "holiday";
   if (input.leaveTypeName) return "on_leave";
   if (input.weekendStatus) return input.weekendStatus;
   if (input.date > input.today) return "upcoming";
 
-  const checkInAt = input.attendance?.check_in_at ?? null;
-  const checkOutAt = input.attendance?.check_out_at ?? null;
-
-  if (!checkInAt) {
-    if (input.date === input.today) return "upcoming";
-    return "absent";
+  if (input.date === input.today) {
+    return isAfterOfficeCheckoutTime() ? "absent" : "upcoming";
   }
-
-  return resolvePunchStatus(checkInAt, checkOutAt, input.date, input.rules);
+  return "absent";
 }
 
 function calendarStatusFromDisplay(

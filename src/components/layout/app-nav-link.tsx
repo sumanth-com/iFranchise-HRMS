@@ -49,6 +49,10 @@ export function AppNavLink({
       href={href}
       prefetch={prefetch}
       {...props}
+      onPointerEnter={(event: PointerEvent<HTMLAnchorElement>) => {
+        prefetchRoute();
+        props.onPointerEnter?.(event);
+      }}
       onPointerDown={(event: PointerEvent<HTMLAnchorElement>) => {
         prefetchRoute();
         onPointerDown?.(event);
@@ -60,6 +64,10 @@ export function AppNavLink({
       onFocus={(event: FocusEvent<HTMLAnchorElement>) => {
         prefetchRoute();
         onFocus?.(event);
+      }}
+      onTouchStart={(event) => {
+        prefetchRoute();
+        props.onTouchStart?.(event);
       }}
     />
   );

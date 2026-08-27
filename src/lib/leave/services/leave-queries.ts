@@ -72,9 +72,11 @@ type LeaveRequestRow = {
     department_id: string | null;
     designation_id: string | null;
     branch_id: string;
+    reporting_manager_id?: string | null;
     departments: { name: string } | { name: string }[] | null;
     designations: { title: string } | { title: string }[] | null;
     branches: { name: string } | { name: string }[] | null;
+    reporting_manager?: { first_name: string; last_name: string } | { first_name: string; last_name: string }[] | null;
   } | {
     employee_code: string;
     first_name: string;
@@ -82,9 +84,11 @@ type LeaveRequestRow = {
     department_id: string | null;
     designation_id: string | null;
     branch_id: string;
+    reporting_manager_id?: string | null;
     departments: { name: string } | { name: string }[] | null;
     designations: { title: string } | { title: string }[] | null;
     branches: { name: string } | { name: string }[] | null;
+    reporting_manager?: { first_name: string; last_name: string } | { first_name: string; last_name: string }[] | null;
   }[] | null;
   leave_types: { name: string; code: string } | { name: string; code: string }[] | null;
   leave_approvals: Array<{
@@ -203,9 +207,11 @@ export async function listLeaveRequests(
           department_id,
           designation_id,
           branch_id,
+          reporting_manager_id,
           departments:department_id (name),
           designations:designation_id (title),
-          branches:branch_id (name)
+          branches:branch_id (name),
+          reporting_manager:reporting_manager_id (first_name, last_name)
         ),
         leave_types:leave_type_id (name, code)
       `,
@@ -339,6 +345,8 @@ export async function listLeaveRequests(
     string,
     NonNullable<LeaveRequestRow["leave_approvals"]>
   >();
+  const approverNameById = new Map<string, string>();
+
   if (leaveIds.length > 0) {
     const { data: approvalRows, error: approvalsError } = await supabase
       .schema("hrms")
@@ -356,9 +364,21 @@ export async function listLeaveRequests(
       .is("deleted_at", null);
     if (approvalsError) throw new Error(approvalsError.message);
 
+    const approverIdsToFetch: string[] = [];
+
     for (const row of approvalRows ?? []) {
       const leaveRequestId = row.leave_request_id as string;
       const list = approvalsByLeaveId.get(leaveRequestId) ?? [];
+      const empJoin = unwrapRelation(row.employees);
+      if (empJoin) {
+        const empName = formatCleanEmployeeName(empJoin.first_name, empJoin.last_name);
+        if (empName) {
+          approverNameById.set(String(row.approver_employee_id), empName);
+        }
+      } else if (row.approver_employee_id) {
+        approverIdsToFetch.push(String(row.approver_employee_id));
+      }
+
       list.push({
         approval_level: Number(row.approval_level),
         approval_status: String(row.approval_status),
@@ -369,6 +389,22 @@ export async function listLeaveRequests(
       });
       approvalsByLeaveId.set(leaveRequestId, list);
     }
+
+    if (approverIdsToFetch.length > 0) {
+      const uniqueIds = Array.from(new Set(approverIdsToFetch));
+      const { data: approverEmps } = await supabase
+        .schema("hrms")
+        .from("employees")
+        .select("id, first_name, last_name")
+        .in("id", uniqueIds);
+
+      for (const emp of approverEmps ?? []) {
+        const name = formatCleanEmployeeName(emp.first_name, emp.last_name);
+        if (name) {
+          approverNameById.set(emp.id, name);
+        }
+      }
+    }
   }
 
   const mapped = rows.map((row) => {
@@ -377,6 +413,11 @@ export async function listLeaveRequests(
       const department = unwrapRelation(employee?.departments ?? null);
       const designation = unwrapRelation(employee?.designations ?? null);
       const branch = unwrapRelation(employee?.branches ?? null);
+      const reportingManager = unwrapRelation(employee?.reporting_manager ?? null);
+      const reportingManagerName = reportingManager
+        ? formatCleanEmployeeName(reportingManager.first_name, reportingManager.last_name)
+        : null;
+
       const approvals = approvalsByLeaveId.get(row.id) ?? [];
       const pendingApproval = approvals
         .filter((a) => a.approval_status === "pending")
@@ -386,6 +427,11 @@ export async function listLeaveRequests(
       const isAssignedApprover =
         pendingApproverEmployeeId === profile.employee.id &&
         row.leave_status === "pending";
+
+      const resolvedApprover =
+        resolveApproverDisplayName(approvals, approverNameById) ||
+        reportingManagerName ||
+        null;
 
       return {
         id: row.id,
@@ -416,7 +462,7 @@ export async function listLeaveRequests(
         reason: row.reason,
         leaveStatus: row.leave_status as LeaveListResult["data"][number]["leaveStatus"],
         appliedAt: row.created_at,
-        approverName: resolveApproverDisplayName(approvals, new Map()),
+        approverName: resolvedApprover,
         currentApprovalLevel: pendingApproval?.approval_level ?? null,
         pendingApproverEmployeeId,
         canActOnApproval: isAssignedApprover,

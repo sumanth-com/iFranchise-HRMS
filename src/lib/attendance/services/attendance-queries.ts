@@ -6,10 +6,14 @@ import type {
   AttendanceLookups,
   AttendanceSortField,
   AttendanceStatus,
+  AttendanceDisplayStatus,
   AttendanceSummary,
 } from "@/types/attendance";
 import { attendanceListParamsSchema } from "@/lib/validations/attendance";
-import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
+import {
+  getTodayDateString,
+  isAfterOfficeCheckoutTime,
+} from "@/lib/attendance/services/attendance-utils";
 import {
   getBranches,
   getDepartments,
@@ -19,6 +23,9 @@ import {
   resolveOrgDataEmployeeScope,
   scopedEmployeeIds,
 } from "@/lib/manager/portal-scope";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type LooseRow = Record<string, any>;
 
 type AttendanceRow = {
   id: string;
@@ -83,7 +90,7 @@ export async function listAttendance(
     employeeId,
   } = parseListParams(params);
 
-  const isEmployeeHistoryView = Boolean(employeeId && dateFrom && dateTo);
+  const isEmployeeHistoryView = Boolean(employeeId && dateFrom && dateTo && dateFrom !== dateTo);
   const effectivePage = isEmployeeHistoryView ? 1 : page;
   const effectivePageSize = isEmployeeHistoryView ? EMPLOYEE_HISTORY_PAGE_SIZE : pageSize;
   const from = (effectivePage - 1) * effectivePageSize;
@@ -94,6 +101,237 @@ export async function listAttendance(
   const scopedIds = scopedEmployeeIds(employeeScope, employeeId);
   if (scopedIds && scopedIds.length === 0) {
     return { data: [], total: 0, page: effectivePage, pageSize: effectivePageSize };
+  }
+
+  const isSingleDayTeamView = !isEmployeeHistoryView && (!dateFrom || !dateTo || dateFrom === dateTo);
+  const targetSingleDate = dateFrom ?? getTodayDateString();
+
+  if (isSingleDayTeamView) {
+    // 1. Fetch all active employees in organization / scope
+    let empQuery = supabase
+      .schema("hrms")
+      .from("employees")
+      .select(
+        `
+          id,
+          employee_code,
+          first_name,
+          last_name,
+          department_id,
+          designation_id,
+          branch_id,
+          branches:branch_id (name),
+          departments:department_id (name),
+          designations:designation_id (title)
+        `,
+      )
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .in("employment_status", ["active", "probation", "on_leave"]);
+
+    if (scopedIds) {
+      empQuery = empQuery.in("id", scopedIds);
+    } else if (employeeId) {
+      empQuery = empQuery.eq("id", employeeId);
+    }
+    if (departmentId) {
+      empQuery = empQuery.eq("department_id", departmentId);
+    }
+    if (branchId) {
+      empQuery = empQuery.eq("branch_id", branchId);
+    }
+    if (search) {
+      const term = `%${search}%`;
+      empQuery = empQuery.or(
+        `employee_code.ilike.${term},first_name.ilike.${term},last_name.ilike.${term}`,
+      );
+    }
+
+    const [empRes, attRes, leavesRes] = await Promise.all([
+      empQuery,
+      supabase
+        .schema("hrms")
+        .from("attendance")
+        .select(
+          `
+            id,
+            branch_id,
+            employee_id,
+            attendance_date,
+            check_in_at,
+            check_out_at,
+            work_hours,
+            overtime_hours,
+            attendance_status
+          `,
+        )
+        .eq("organization_id", organizationId)
+        .eq("attendance_date", targetSingleDate)
+        .is("deleted_at", null),
+      (async () => {
+        try {
+          const res = await supabase
+            .schema("hrms")
+            .from("leave_requests")
+            .select("employee_id, leave_status, employees!inner(organization_id)")
+            .eq("employees.organization_id", organizationId)
+            .eq("leave_status", "approved")
+            .is("deleted_at", null)
+            .lte("start_date", targetSingleDate)
+            .gte("end_date", targetSingleDate);
+          if (res.error) {
+            console.warn("Non-critical leave query failed in listAttendance:", res.error.message);
+            return { data: [] as LooseRow[], error: null };
+          }
+          return { data: (res.data ?? []) as LooseRow[], error: null };
+        } catch {
+          return { data: [] as LooseRow[], error: null };
+        }
+      })(),
+    ]);
+
+    if (empRes.error) {
+      console.error("Failed to load employees for attendance:", empRes.error);
+      throw new Error("Unable to load attendance records. Please try again.");
+    }
+    if (attRes.error) {
+      console.error("Failed to load attendance records:", attRes.error);
+      throw new Error("Unable to load attendance records. Please try again.");
+    }
+
+    const employees = (empRes.data ?? []) as LooseRow[];
+    const attendanceMap = new Map<string, LooseRow>();
+    for (const a of attRes.data ?? []) {
+      attendanceMap.set(a.employee_id, a);
+    }
+
+    const leaveSet = new Set((leavesRes.data ?? []).map((l: LooseRow) => l.employee_id));
+
+    // Fetch corrections for attendance records found (non-critical supporting data)
+    const attendanceIds = (attRes.data ?? []).map((a: LooseRow) => a.id as string);
+    const correctionsResult = attendanceIds.length
+      ? await (async () => {
+          try {
+            const res = await supabase
+              .schema("hrms")
+              .from("attendance_corrections")
+              .select("id, attendance_id, correction_status")
+              .in("attendance_id", attendanceIds)
+              .is("deleted_at", null)
+              .order("created_at", { ascending: false });
+            if (res.error) {
+              console.warn("Non-critical corrections query failed in listAttendance:", res.error.message);
+              return { data: [] as LooseRow[], error: null };
+            }
+            return { data: (res.data ?? []) as LooseRow[], error: null };
+          } catch {
+            return { data: [] as LooseRow[], error: null };
+          }
+        })()
+      : { data: [] as LooseRow[], error: null };
+
+    const correctionByAttendance = new Map<string, { id: string; status: string }>();
+    for (const row of correctionsResult.data ?? []) {
+      if (!correctionByAttendance.has(row.attendance_id)) {
+        correctionByAttendance.set(row.attendance_id, {
+          id: row.id,
+          status: row.correction_status,
+        });
+      }
+    }
+
+    const todayStr = getTodayDateString();
+    const isToday = targetSingleDate === todayStr;
+    const isFuture = targetSingleDate > todayStr;
+    const isAfter7Pm = isAfterOfficeCheckoutTime();
+
+    type AttendanceItem = AttendanceListResult["data"][number];
+    const allRecords: AttendanceItem[] = employees.map((emp) => {
+      const att = attendanceMap.get(emp.id);
+      const branch = unwrapRelation(emp.branches);
+      const department = unwrapRelation(emp.departments);
+      const designation = unwrapRelation(emp.designations);
+      const hasApprovedLeave = leaveSet.has(emp.id);
+
+      let status: AttendanceDisplayStatus;
+      if (att?.check_in_at) {
+        status = att.attendance_status as AttendanceStatus;
+      } else if (hasApprovedLeave) {
+        status = "on_leave";
+      } else if (att?.attendance_status) {
+        status = att.attendance_status as AttendanceStatus;
+      } else if (isToday) {
+        // Present day before 7:00 PM without punch is unrecorded/pending ("—"), marked absent only after 7:00 PM.
+        status = isAfter7Pm ? "absent" : "upcoming";
+      } else if (isFuture) {
+        status = "upcoming";
+      } else {
+        status = "absent";
+      }
+
+      const correction = att ? correctionByAttendance.get(att.id) : undefined;
+
+      return {
+        id: att?.id ?? `virtual-${emp.id}-${targetSingleDate}`,
+        employeeId: emp.id,
+        employeeCode: emp.employee_code ?? "",
+        employeeName: formatCleanEmployeeName(emp.first_name, emp.last_name),
+        departmentId: emp.department_id ?? null,
+        departmentName: department?.name ?? null,
+        designationId: emp.designation_id ?? null,
+        designationTitle: designation?.title ?? null,
+        branchId: att?.branch_id ?? emp.branch_id ?? "",
+        branchName: branch?.name ?? null,
+        attendanceDate: targetSingleDate,
+        checkInAt: att?.check_in_at ?? null,
+        checkOutAt: att?.check_out_at ?? null,
+        workHours: Number(att?.work_hours ?? 0),
+        overtimeHours: Number(att?.overtime_hours ?? 0),
+        attendanceStatus: status,
+        correctionId: correction?.id ?? null,
+        correctionStatus:
+          (correction?.status as AttendanceListResult["data"][number]["correctionStatus"]) ??
+          null,
+      };
+    });
+
+    // Apply attendanceStatus filter
+    const filteredRecords = allRecords.filter((record) => {
+      if (!attendanceStatus) return true;
+      if (attendanceStatus === "absent") {
+        return record.attendanceStatus === "absent" || record.attendanceStatus === "on_leave";
+      }
+      return record.attendanceStatus === attendanceStatus;
+    });
+
+    // Sort
+    const ascending = sortOrder === "asc";
+    filteredRecords.sort((a, b) => {
+      if (sortBy === "employee_code") {
+        return ascending
+          ? a.employeeCode.localeCompare(b.employeeCode)
+          : b.employeeCode.localeCompare(a.employeeCode);
+      }
+      if (sortBy === "check_in_at") {
+        const timeA = a.checkInAt ?? "";
+        const timeB = b.checkInAt ?? "";
+        if (!timeA && !timeB) return a.employeeName.localeCompare(b.employeeName);
+        if (!timeA) return 1;
+        if (!timeB) return -1;
+        return ascending ? timeA.localeCompare(timeB) : timeB.localeCompare(timeA);
+      }
+      return a.employeeName.localeCompare(b.employeeName);
+    });
+
+    const total = filteredRecords.length;
+    const pageData = filteredRecords.slice(from, from + effectivePageSize);
+
+    return {
+      data: pageData,
+      total,
+      page: effectivePage,
+      pageSize: effectivePageSize,
+    };
   }
 
   let query = supabase
@@ -281,6 +519,7 @@ export async function getAttendanceSummary(
     absentResult,
     lateResult,
     halfDayResult,
+    leaveResult,
   ] = await Promise.all([
     supabase
       .schema("hrms")
@@ -290,10 +529,29 @@ export async function getAttendanceSummary(
       .is("deleted_at", null)
       .in("employment_status", ["active", "probation", "on_leave"]),
     attendanceBase().eq("attendance_status", "present"),
-    // Preserve existing summary semantics: absent + on_leave both count as absentToday.
     attendanceBase().in("attendance_status", ["absent", "on_leave"]),
     attendanceBase().eq("attendance_status", "late"),
     attendanceBase().eq("attendance_status", "half_day"),
+    (async () => {
+      try {
+        const res = await supabase
+          .schema("hrms")
+          .from("leave_requests")
+          .select("id, employees!inner(organization_id)", { count: "exact", head: true })
+          .eq("employees.organization_id", organizationId)
+          .eq("leave_status", "approved")
+          .is("deleted_at", null)
+          .lte("start_date", toDate)
+          .gte("end_date", fromDate);
+        if (res.error) {
+          console.warn("Non-critical leave query failed in getAttendanceSummary:", res.error.message);
+          return { count: 0, error: null };
+        }
+        return res;
+      } catch {
+        return { count: 0, error: null };
+      }
+    })(),
   ]);
 
   if (employeesResult.error) {
@@ -312,14 +570,42 @@ export async function getAttendanceSummary(
     throw new Error(halfDayResult.error.message);
   }
 
+  const totalEmployees = employeesResult.count ?? 0;
+  const presentToday = presentResult.count ?? 0;
+  const lateToday = lateResult.count ?? 0;
+  const halfDayToday = halfDayResult.count ?? 0;
+  const explicitAbsent = absentResult.count ?? 0;
+  const onLeaveToday = leaveResult.count ?? 0;
+
+  const totalPunched = presentToday + lateToday + halfDayToday;
+  const isSingleDay = fromDate === toDate;
+  const todayStr = getTodayDateString();
+  const isToday = isSingleDay && fromDate === todayStr;
+  const isAfter7Pm = isAfterOfficeCheckoutTime();
+
+  let absentToday = explicitAbsent;
+  if (isSingleDay) {
+    if (isToday) {
+      absentToday = isAfter7Pm
+        ? Math.max(explicitAbsent, totalEmployees - totalPunched - onLeaveToday)
+        : explicitAbsent;
+    } else if (fromDate < todayStr) {
+      absentToday = Math.max(explicitAbsent, totalEmployees - totalPunched - onLeaveToday);
+    } else {
+      absentToday = explicitAbsent;
+    }
+  } else {
+    absentToday = Math.max(explicitAbsent, totalEmployees - totalPunched);
+  }
+
   return {
     date: fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`,
-    presentToday: presentResult.count ?? 0,
-    absentToday: absentResult.count ?? 0,
-    lateToday: lateResult.count ?? 0,
-    halfDayToday: halfDayResult.count ?? 0,
-    onLeaveToday: 0,
-    totalEmployees: employeesResult.count ?? 0,
+    presentToday,
+    absentToday,
+    lateToday,
+    halfDayToday,
+    onLeaveToday,
+    totalEmployees,
   };
 }
 

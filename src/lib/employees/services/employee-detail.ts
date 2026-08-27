@@ -1,7 +1,10 @@
 import { eachDayOfInterval, format, lastDayOfMonth, startOfMonth } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
-import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
+import {
+  getTodayDateString,
+  isAfterOfficeCheckoutTime,
+} from "@/lib/attendance/services/attendance-utils";
 import { LEAVE_BALANCE_DISPLAY_CODES } from "@/lib/leave/constants";
 import { cleanDisplayText } from "@/lib/employees/parse-employee-name";
 import type {
@@ -147,6 +150,17 @@ function fillMonthAttendanceRows(
       }
 
       if (date > today) {
+        return {
+          id: `upcoming-${date}`,
+          attendance_date: date,
+          check_in_at: null,
+          check_out_at: null,
+          attendance_status: "upcoming",
+          work_hours: 0,
+        };
+      }
+
+      if (date === today && !isAfterOfficeCheckoutTime()) {
         return {
           id: `upcoming-${date}`,
           attendance_date: date,

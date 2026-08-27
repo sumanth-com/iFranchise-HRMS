@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import { LoadingSpinner } from "@/components/common/loading-spinner";
+import { PageSkeleton } from "@/components/common/page-skeleton";
 import { CeoNotificationsView } from "@/components/ceo/notifications/ceo-notifications-view";
 import { getCeoNotificationsModuleData } from "@/lib/ceo/actions/ceo-notifications-actions";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
@@ -34,13 +34,7 @@ export default async function CeoNotificationsPage({ searchParams }: Props) {
   const data = await getCeoNotificationsModuleData(parsed);
 
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-1 items-center justify-center">
-          <LoadingSpinner />
-        </div>
-      }
-    >
+    <Suspense fallback={<PageSkeleton />}>
       <CeoNotificationsView {...data} initialFilters={parsed} />
     </Suspense>
   );

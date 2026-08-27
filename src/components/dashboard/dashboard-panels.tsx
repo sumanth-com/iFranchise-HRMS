@@ -47,7 +47,7 @@ const TASK_ICONS: Record<string, LucideIcon> = {
 };
 
 const TASK_HINTS: Record<string, string> = {
-  "onboarding-review": "Review candidates still in onboarding",
+  "onboarding-review": "Candidates ready for onboarding invitation",
   "documents-expiring": "Renew or verify employee documents before they lapse",
   "payroll-due": "Process this month's payroll run for your team",
   "active-candidates": "Follow up on candidates still in the hiring pipeline",
@@ -372,7 +372,11 @@ export function DashboardOperationsRow({
     <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-3 overflow-hidden">
       <div className="grid min-h-0 gap-3 overflow-hidden xl:grid-cols-2 xl:items-stretch">
         <HrPriorityFocus items={tasks} description={focusDescription} />
-        <HrUpcomingHolidaysPanel holidays={upcomingHolidays} />
+        <HrUpcomingHolidaysPanel
+          holidays={upcomingHolidays}
+          birthdays={upcomingBirthdays}
+          anniversaries={upcomingAnniversaries}
+        />
       </div>
 
       <div className="min-h-0 overflow-hidden">

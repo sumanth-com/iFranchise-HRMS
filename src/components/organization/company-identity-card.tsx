@@ -108,10 +108,10 @@ export function CompanyIdentityCard({
 
   return (
     <div className={cn("relative mx-auto w-full max-w-[22rem]", className)}>
-      <div className="relative flex flex-col overflow-hidden rounded-[1.35rem] border border-white/10 bg-[#0b1220] shadow-[0_18px_40px_-20px_rgba(0,0,0,0.65)]">
+      <div className="relative flex flex-col overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-sm">
         <div
           className={cn(
-            "relative flex aspect-square items-center justify-center overflow-hidden bg-[#121a2e] p-6",
+            "relative flex aspect-square items-center justify-center overflow-hidden bg-muted/40 p-6",
             canEdit && "cursor-pointer",
           )}
           onMouseEnter={() => setPhotoHovered(true)}
@@ -131,7 +131,7 @@ export function CompanyIdentityCard({
           tabIndex={canEdit ? 0 : undefined}
           aria-label={canEdit ? "Change company logo" : undefined}
         >
-          <div className="relative flex size-full items-center justify-center overflow-hidden rounded-2xl bg-[#1a1030] ring-1 ring-white/10">
+          <div className="relative flex size-full items-center justify-center overflow-hidden rounded-2xl border bg-background/80 shadow-inner">
             {previewUrl ? (
               <img
                 src={previewUrl}
@@ -139,7 +139,7 @@ export function CompanyIdentityCard({
                 className="max-h-full max-w-full object-contain p-4"
               />
             ) : (
-              <span className="flex size-16 items-center justify-center rounded-full bg-white/10 text-white/80 ring-1 ring-white/15">
+              <span className="flex size-16 items-center justify-center rounded-full bg-muted text-muted-foreground ring-1 ring-border">
                 <Camera className="size-7" strokeWidth={1.75} />
               </span>
             )}
@@ -147,7 +147,7 @@ export function CompanyIdentityCard({
             {canEdit ? (
               <div
                 className={cn(
-                  "absolute inset-0 flex items-center justify-center bg-black/55 transition-opacity duration-200",
+                  "absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px] transition-opacity duration-200",
                   showHoverActions ? "opacity-100" : "opacity-0",
                 )}
                 aria-hidden={!showHoverActions}
@@ -162,8 +162,8 @@ export function CompanyIdentityCard({
                     disabled={isPending}
                     className={cn(
                       "inline-flex size-11 items-center justify-center rounded-full",
-                      "bg-white text-slate-900 shadow-lg shadow-black/40",
-                      "hover:bg-white/95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80",
+                      "bg-primary text-primary-foreground shadow-lg shadow-black/20",
+                      "hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/80",
                       "disabled:cursor-not-allowed disabled:opacity-70",
                     )}
                     aria-label={isPending ? "Uploading logo" : "Upload company logo"}
@@ -178,8 +178,8 @@ export function CompanyIdentityCard({
                       disabled={isPending}
                       className={cn(
                         "inline-flex size-11 items-center justify-center rounded-full",
-                        "bg-white/15 text-white ring-1 ring-white/30 backdrop-blur-sm",
-                        "hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60",
+                        "bg-white/20 text-white ring-1 ring-white/40 backdrop-blur-sm",
+                        "hover:bg-destructive hover:text-white hover:ring-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/60",
                         "disabled:cursor-not-allowed disabled:opacity-70",
                       )}
                       aria-label="Remove company logo"
@@ -204,11 +204,11 @@ export function CompanyIdentityCard({
           ) : null}
         </div>
 
-        <div className="border-t border-white/10 bg-[#0b1220] px-5 py-4">
-          <p className="break-words text-base font-semibold leading-snug tracking-tight text-white">
+        <div className="border-t bg-card px-5 py-4">
+          <p className="break-words text-base font-semibold leading-snug tracking-tight text-foreground">
             {companyName}
           </p>
-          <p className="mt-1 break-words text-sm leading-relaxed text-slate-400">
+          <p className="mt-1 break-words text-sm leading-relaxed text-muted-foreground">
             {legalName?.trim() || "Company profile"}
           </p>
         </div>

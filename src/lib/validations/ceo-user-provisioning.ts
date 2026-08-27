@@ -9,9 +9,11 @@ export const invitationStatusSchema = z.enum([
   "cancelled",
   "revoked",
   "inactive",
+  "deactivated",
 ]);
 
 export const ceoProvisioningListParamsSchema = paginationSchema.extend({
+  pageSize: z.coerce.number().int().min(1).max(100).default(9),
   search: z.string().trim().max(200).optional(),
   roleCode: z.string().trim().optional(),
   departmentId: z.string().uuid().optional(),

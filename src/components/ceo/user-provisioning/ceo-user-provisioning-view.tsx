@@ -31,6 +31,7 @@ import type {
   CeoProvisioningListParams,
   CeoProvisioningUser,
   CeoUserProvisioningPageData,
+  ProvisioningInvitationStatus,
   ProvisioningRowAction,
 } from "@/types/ceo-user-provisioning";
 
@@ -63,7 +64,7 @@ export function CeoUserProvisioningView({
   const [lookups, setLookups] = useState(initialLookups);
   const [pageParams, setPageParams] = useState<CeoProvisioningListParams>({
     page: initialFilters.page ?? 1,
-    pageSize: initialFilters.pageSize ?? 8,
+    pageSize: initialFilters.pageSize ?? 9,
     search: initialFilters.search,
     roleCode: initialFilters.roleCode,
     departmentId: initialFilters.departmentId,
@@ -228,9 +229,21 @@ export function CeoUserProvisioningView({
         users={users?.data ?? []}
         total={users?.total ?? 0}
         page={users?.page ?? 1}
-        pageSize={users?.pageSize ?? pageParams.pageSize ?? 8}
+        pageSize={users?.pageSize ?? pageParams.pageSize ?? 9}
         isRefreshing={isRefreshing}
         busyEmployeeId={busyEmployeeId}
+        statusFilter={pageParams.invitationStatus ?? "all"}
+        onStatusFilterChange={(status) => {
+          const next = {
+            ...pageParams,
+            page: 1,
+            invitationStatus:
+              status === "all"
+                ? undefined
+                : (status as ProvisioningInvitationStatus),
+          };
+          applyFilters(next);
+        }}
         onPageChange={changePage}
         onAction={requestAction}
       />

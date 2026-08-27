@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import {
   TABLE_HEADER_CELL_CLASS,
+  TABLE_HEADER_ROW_CLASS,
   TABLE_HEADER_STICKY_CLASS,
 } from "@/components/common/table-header-classes";
 import { saveNotificationSettingsAction } from "@/lib/notifications/actions";
@@ -55,7 +56,7 @@ export function NotificationSettingsForm({ settings, canEdit }: Props) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className={TABLE_HEADER_STICKY_CLASS}>
-              <tr className="border-white/10 bg-black hover:bg-black">
+              <tr className={TABLE_HEADER_ROW_CLASS}>
                 <th className={TABLE_HEADER_CELL_CLASS}>Type</th>
                 <th className={TABLE_HEADER_CELL_CLASS}>In-App</th>
                 <th className={TABLE_HEADER_CELL_CLASS}>Email</th>
