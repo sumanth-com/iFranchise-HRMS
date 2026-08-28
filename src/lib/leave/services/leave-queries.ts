@@ -25,6 +25,11 @@ import {
   sortByLeaveTypeCode,
 } from "@/lib/leave/constants";
 import { loadLeavePolicyRuntime } from "@/lib/leave/services/leave-policy-runtime";
+import { DEFAULT_LEAVE_PROBATION_RULES } from "@/lib/leave/services/leave-policy-engine";
+import {
+  isPeriodLeaveCode,
+  isPeriodLeaveEligible,
+} from "@/lib/leave/period-leave-eligibility";
 import {
   DEFAULT_LEAVE_CALENDAR,
   type LeaveCalendarContext,
@@ -782,6 +787,16 @@ export async function getEmployeeLeaveBalanceSnapshot(
     organizationId = employeeRow?.organization_id as string | undefined;
   }
 
+  const genderQuery = () =>
+    supabase
+      .schema("hrms")
+      .from("employee_profiles")
+      .select("gender")
+      .eq("employee_id", employeeId)
+      .maybeSingle();
+
+  let gender: string | null = null;
+  let periodLeaveFemaleOnly = DEFAULT_LEAVE_PROBATION_RULES.periodLeaveFemaleOnly;
   let typeRows: Array<{ code: string; name: string; days_per_year: number | string | null }> = [];
   let requestRows: Array<{
     start_date: string;
@@ -795,7 +810,7 @@ export async function getEmployeeLeaveBalanceSnapshot(
   let balancesResult: Awaited<ReturnType<typeof balancesQuery>>;
 
   if (organizationId) {
-    const [balances, typesResult, requestsResult, runtime] = await Promise.all([
+    const [balances, typesResult, requestsResult, runtime, genderResult] = await Promise.all([
       balancesQuery(),
       supabase
         .schema("hrms")
@@ -817,6 +832,7 @@ export async function getEmployeeLeaveBalanceSnapshot(
         .gte("end_date", yearRange.start)
         .is("deleted_at", null),
       loadLeavePolicyRuntime(supabase, organizationId),
+      genderQuery(),
     ]);
 
     balancesResult = balances;
@@ -826,9 +842,15 @@ export async function getEmployeeLeaveBalanceSnapshot(
     typeRows = typesResult.data ?? [];
     requestRows = (requestsResult.data ?? []) as typeof requestRows;
     calendar = runtime.calendar;
+    gender = (genderResult.data?.gender as string | null) ?? null;
+    periodLeaveFemaleOnly = runtime.probation.periodLeaveFemaleOnly;
   } else {
-    balancesResult = await balancesQuery();
+    const [balances, genderResult] = await Promise.all([balancesQuery(), genderQuery()]);
+    balancesResult = balances;
+    gender = (genderResult.data?.gender as string | null) ?? null;
   }
+
+  const showPeriodLeave = isPeriodLeaveEligible(gender, periodLeaveFemaleOnly);
 
   if (balancesResult.error) throw new Error(balancesResult.error.message);
   const monthUsedByCode: Record<string, number> = {};
@@ -895,7 +917,11 @@ export async function getEmployeeLeaveBalanceSnapshot(
     ]),
   );
 
-  return LEAVE_BALANCE_DISPLAY_CODES.map((code) => {
+  // Display codes are synthesized even without a balance row, so an ineligible
+  // employee would otherwise still get a Menstruation Leave card showing 0/12.
+  return LEAVE_BALANCE_DISPLAY_CODES.filter(
+    (code) => showPeriodLeave || !isPeriodLeaveCode(code),
+  ).map((code) => {
     const balance = balanceByCode.get(code);
     const type = typeByCode.get(code);
     const daysPerYear = balance?.daysPerYear || type?.daysPerYear || 0;

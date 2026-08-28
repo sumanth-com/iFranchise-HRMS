@@ -7,6 +7,7 @@ import {
   LEAVE_BALANCE_DISPLAY_CODES,
   LEAVE_BALANCE_DISPLAY_LABELS,
 } from "@/lib/leave/constants";
+import { isPeriodLeaveCode } from "@/lib/leave/period-leave-eligibility";
 import {
   formatLeaveBalanceUsedTotal,
   LEAVE_BALANCE_USAGE_CAPTION,
@@ -44,7 +45,14 @@ export function LeaveBalanceSummaryCards({
   );
   const selectable = typeof onSelectCode === "function";
 
-  const cards = LEAVE_BALANCE_DISPLAY_CODES.map((code) => {
+  // Cards come from the display constant rather than the rows, so Menstruation
+  // Leave has to be dropped explicitly when the employee has no PL balance —
+  // the snapshot already omits that row for anyone who is not eligible.
+  const visibleCodes = LEAVE_BALANCE_DISPLAY_CODES.filter(
+    (code) => !isPeriodLeaveCode(code) || byCode.has(code),
+  );
+
+  const cards = visibleCodes.map((code) => {
     const row = byCode.get(code);
     const used = row ? getLeaveBalanceYearUsage(row) : 0;
     const total = row ? getLeaveBalanceAnnualEntitlement(row) : 0;
