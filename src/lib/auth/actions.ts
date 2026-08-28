@@ -19,7 +19,8 @@ import {
 } from "@/lib/auth/errors";
 import { loadUserProfile } from "@/lib/auth/profile-loader";
 import { getAuthenticatedRedirectPath } from "@/lib/auth/redirect";
-import { resolveApprovedLoginEmail } from "@/lib/auth/login-email";
+import { resolveApprovedLoginEmail, findEligiblePasswordResetTarget } from "@/lib/auth/login-email";
+import { sendHrmsPasswordResetEmail } from "@/lib/auth/password-reset-service";
 import {
   clearPermissionCacheCookie,
   getVerifiedPermissionCodesForUser,
@@ -366,13 +367,18 @@ export async function forgotPasswordAction(
     };
   }
 
-  const email = await resolveApprovedLoginEmail(parsed.data.email);
+  const emailInput = parsed.data.email.trim().toLowerCase();
   const ctx = await getRequestAuditContext();
 
   try {
     assertRateLimit({
-      key: `forgot-password:${hashPasswordResetToken(`${ctx.ipAddress ?? "unknown"}:${email.toLowerCase()}`)}`,
+      key: `forgot-password:${hashPasswordResetToken(`${ctx.ipAddress ?? "unknown"}:${emailInput}`)}`,
       limit: 3,
+      windowMs: 60 * 60 * 1000,
+    });
+    assertRateLimit({
+      key: `forgot-password-email:${hashPasswordResetToken(emailInput)}`,
+      limit: 5,
       windowMs: 60 * 60 * 1000,
     });
   } catch {
@@ -384,13 +390,31 @@ export async function forgotPasswordAction(
   }
 
   const supabase = await createClient();
+  const sendResult = await sendHrmsPasswordResetEmail(emailInput);
+
+  if (!sendResult.ok && sendResult.errorCode === "RATE_LIMITED") {
+    return {
+      success: false,
+      error: "RATE_LIMITED",
+      message: sendResult.message,
+    };
+  }
+
+  if (!sendResult.ok) {
+    console.error("[forgotPasswordAction] password reset email failed", {
+      emailInput,
+      errorCode: sendResult.errorCode,
+    });
+  }
+
+  const auditEmail = (await findEligiblePasswordResetTarget(emailInput)) ?? emailInput;
 
   await writeApplicationAudit(supabase, {
     organizationId: null,
     module: "dashboard",
     action: "password_reset",
-    description: `Password reset requested for ${email}`,
-    recordId: email,
+    description: `Password reset requested for ${auditEmail}`,
+    recordId: auditEmail,
     priority: "high",
     ...ctx,
   });
@@ -398,7 +422,6 @@ export async function forgotPasswordAction(
   return {
     success: true,
     redirectTo: AUTH_ROUTES.forgotPassword,
-    resolvedEmail: email,
   };
 }
 
@@ -473,10 +496,18 @@ export async function requestPasswordResetEmailAction(): Promise<AuthActionResul
       ...ctx,
     });
 
+    const sendResult = await sendHrmsPasswordResetEmail(email);
+    if (!sendResult.ok) {
+      return {
+        success: false,
+        error: sendResult.errorCode,
+        message: sendResult.message,
+      };
+    }
+
     return {
       success: true,
       redirectTo: "",
-      resolvedEmail: email,
     };
   } catch {
     return {
@@ -524,10 +555,16 @@ export async function resetPasswordAction(
   });
 
   if (error) {
+    const errorCode = mapSupabaseAuthError(error.message);
+    console.error("[resetPasswordAction] updateUser failed", {
+      userId: user.id,
+      code: errorCode,
+      message: error.message,
+    });
     return {
       success: false,
-      error: mapSupabaseAuthError(error.message),
-      message: getAuthErrorMessage("SERVER_ERROR"),
+      error: errorCode,
+      message: getAuthErrorMessage(errorCode),
     };
   }
 
@@ -536,8 +573,6 @@ export async function resetPasswordAction(
   try {
     await acceptInvitationOnPasswordSet(supabase, user.id, email);
   } catch (inviteError) {
-    // The thrown text can be a raw PostgREST/RLS message from the invite helpers,
-    // so it is logged here and never returned to the browser.
     console.error("[auth] invitation acceptance failed", {
       userId: user.id,
       name: inviteError instanceof Error ? inviteError.name : "unknown",
@@ -549,6 +584,25 @@ export async function resetPasswordAction(
       error: "RESET_LINK_INVALID",
       message: getAuthErrorMessage("RESET_LINK_INVALID"),
     };
+  }
+
+  const now = new Date().toISOString();
+  try {
+    const admin = createAdminClient();
+    await admin
+      .schema("hrms")
+      .from("employees")
+      .update({ password_last_reset_at: now, updated_at: now })
+      .eq("user_id", user.id)
+      .is("deleted_at", null);
+  } catch (employeeUpdateError) {
+    console.error("[resetPasswordAction] password_last_reset_at update failed", {
+      userId: user.id,
+      message:
+        employeeUpdateError instanceof Error
+          ? employeeUpdateError.message
+          : "unknown",
+    });
   }
 
   await supabase.auth.signOut();

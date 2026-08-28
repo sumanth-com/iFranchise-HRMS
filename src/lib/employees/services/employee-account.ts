@@ -1409,15 +1409,6 @@ export async function acceptInvitationOnPasswordSet(
   userId: string,
   email: string,
 ) {
-  const validation = await validateInvitationForUser(supabase, userId, email);
-  if (!validation.valid) {
-    throw new Error(
-      validation.reason === "expired"
-        ? "This invitation has expired. Contact HR for a new invitation."
-        : "This invitation link is invalid.",
-    );
-  }
-
   const { data: employee, error } = await supabase
     .schema("hrms")
     .from("employees")
@@ -1427,6 +1418,15 @@ export async function acceptInvitationOnPasswordSet(
 
   if (error || !employee) return;
   if (employee.account_status !== "invitation_pending") return;
+
+  const validation = await validateInvitationForUser(supabase, userId, email);
+  if (!validation.valid) {
+    throw new Error(
+      validation.reason === "expired"
+        ? "This invitation has expired. Contact HR for a new invitation."
+        : "This invitation link is invalid.",
+    );
+  }
 
   const now = new Date().toISOString();
   await updateEmployeeAccountWithClient(supabase, employee.id, {

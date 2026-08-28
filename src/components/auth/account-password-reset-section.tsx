@@ -14,8 +14,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { requestPasswordResetEmailAction } from "@/lib/auth/actions";
-import { getAuthErrorMessage } from "@/lib/auth/errors";
-import { sendPasswordResetEmail } from "@/lib/auth/password-reset-client";
 import { cn } from "@/lib/utils";
 
 type AccountPasswordResetSectionProps = {
@@ -65,29 +63,6 @@ function PasswordResetContent({
         setError(result.message);
         toast.error(result.message);
         return;
-      }
-
-      if (result.resolvedEmail) {
-        const { error: resetError } = await sendPasswordResetEmail(
-          result.resolvedEmail,
-        );
-
-        if (resetError) {
-          const mapped = getAuthErrorMessage(
-            resetError.message.toLowerCase().includes("rate")
-              ? "RATE_LIMITED"
-              : "SERVER_ERROR",
-          );
-          if (resetError.message.toLowerCase().includes("rate")) {
-            showDailyLimit(
-              "You've reached today's password reset limit. For your account's security, please try again tomorrow.",
-            );
-            return;
-          }
-          setError(mapped);
-          toast.error(mapped);
-          return;
-        }
       }
 
       setSent(true);

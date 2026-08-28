@@ -13,6 +13,29 @@ import type { CandidatePortalContext } from "@/types/onboarding";
 const LOAD_ERROR_TITLE = "We couldn't load this section";
 const LOAD_ERROR_DESCRIPTION = "Your saved progress is safe. Please try again.";
 
+function documentSlotKey(documentCategory: string, documentTypeCode: string) {
+  return `${documentCategory}:${documentTypeCode}`;
+}
+
+/** Prevents a slower/stale refetch from dropping documents the candidate just uploaded. */
+function mergePortalContext(
+  previous: CandidatePortalContext | null | undefined,
+  next: CandidatePortalContext,
+): CandidatePortalContext {
+  if (!previous || previous.caseId !== next.caseId) return next;
+
+  const nextDocKeys = new Set(
+    next.documents.map((doc) => documentSlotKey(doc.documentCategory, doc.documentTypeCode)),
+  );
+  const preservedDocs = previous.documents.filter(
+    (doc) => !nextDocKeys.has(documentSlotKey(doc.documentCategory, doc.documentTypeCode)),
+  );
+
+  if (preservedDocs.length === 0) return next;
+
+  return { ...next, documents: [...next.documents, ...preservedDocs] };
+}
+
 /** Mirrors the wizard card so the content area is never an empty white block. */
 function OnboardingPortalSkeleton() {
   return (
@@ -53,28 +76,61 @@ function OnboardingPortalSkeleton() {
   );
 }
 
+/** Survives soft remounts during server actions so the wizard never flashes empty. */
+let cachedPortalContext: CandidatePortalContext | null = null;
+
 export default function OnboardingPortalPage() {
   const router = useRouter();
-  const [context, setContext] = useState<CandidatePortalContext | null | undefined>(undefined);
+  const [context, setContextState] = useState<CandidatePortalContext | null | undefined>(
+    () => cachedPortalContext ?? undefined,
+  );
   const [loadFailed, setLoadFailed] = useState(false);
+
+  const setContext = useCallback(
+    (
+      value:
+        | CandidatePortalContext
+        | null
+        | undefined
+        | ((prev: CandidatePortalContext | null | undefined) => CandidatePortalContext | null | undefined),
+    ) => {
+      setContextState((prev) => {
+        const next = typeof value === "function" ? value(prev) : value;
+        if (next) cachedPortalContext = next;
+        return next;
+      });
+    },
+    [],
+  );
 
   // Uploads and section saves can each trigger a refetch, so responses may arrive
   // out of order. Only apply the newest one, otherwise a slow earlier request can
   // overwrite fresher data and make just-saved values look like they vanished.
   const refreshSeqRef = useRef(0);
+  const contextRef = useRef<CandidatePortalContext | null | undefined>(undefined);
+  contextRef.current = context;
 
   const refresh = useCallback(async () => {
     const seq = ++refreshSeqRef.current;
     try {
       const data = await getCandidatePortalContextAction();
       if (seq !== refreshSeqRef.current) return;
-      setContext(data);
+
+      if (!data) {
+        // A background refresh must never wipe an in-progress wizard (e.g. mid-upload).
+        if (contextRef.current) {
+          setLoadFailed(true);
+          return;
+        }
+        setContext(null);
+        return;
+      }
+
+      setContext((prev) => mergePortalContext(prev, data));
       setLoadFailed(false);
     } catch (error) {
       console.error("[onboarding-portal] context refresh failed", error);
       if (seq !== refreshSeqRef.current) return;
-      // Data already on screen stays on screen: a failed background refresh must
-      // never blank out a section the candidate is part-way through filling in.
       setLoadFailed(true);
     }
   }, []);
@@ -128,7 +184,7 @@ export default function OnboardingPortalPage() {
         description={LOAD_ERROR_DESCRIPTION}
         retryLabel="Retry"
         className="m-auto w-full max-w-md"
-        contentClassName="contents"
+        contentClassName="flex min-h-0 flex-1 flex-col"
       >
         <OnboardingWizard context={context} onRefresh={refresh} />
       </ClientSectionBoundary>
