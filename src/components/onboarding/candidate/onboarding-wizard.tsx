@@ -77,6 +77,9 @@ import {
 } from "@/types/onboarding";
 import { cn } from "@/lib/utils";
 
+/** Long enough that typing a field is a single write, short enough to feel instant. */
+const AUTO_SAVE_DEBOUNCE_MS = 900;
+
 const wizardInputClassName =
   "h-9 bg-background text-sm text-foreground caret-foreground placeholder:text-muted-foreground dark:bg-background dark:text-foreground";
 
@@ -231,6 +234,11 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
     Record<string, { uploading: boolean; pendingFileName?: string }>
   >({});
   const contentScrollRef = useRef<HTMLDivElement>(null);
+  const [autoSaveState, setAutoSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Writes are chained rather than fired in parallel, so a slower earlier save can
+  // never land after a newer one and clobber more recent input.
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
 
   const contextWithOptimisticDocs = useMemo(() => {
     const extras = Object.entries(uploadSlots)
@@ -376,6 +384,23 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
     }
   }, [sectionKey, sectionData]);
 
+  // Debounced auto-save: one write after the candidate pauses, not one per keystroke.
+  useEffect(() => {
+    if (context.locked) return;
+    if (!sectionHasDraftChanges()) return;
+
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      autoSaveTimerRef.current = null;
+      void queueAutoSave();
+    }, AUTO_SAVE_DEBOUNCE_MS);
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- draft state drives the debounce
+  }, [form, educationForm, employmentForm, sectionKey, context.locked]);
+
   useEffect(() => {
     const el = contentScrollRef.current;
     if (!el) return;
@@ -395,6 +420,13 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
       progressCtx?.setWizardStep(null);
     };
   }, [progressCtx]);
+
+  // Next follows validation live. A section that was already completed and is
+  // untouched stays passable so a later rule change cannot trap the candidate.
+  const canAdvance =
+    currentValidation.valid ||
+    (isOnboardingSectionComplete(sectionKey, contextWithOptimisticDocs) &&
+      !sectionHasDraftChanges());
 
   function sectionHintText(): string {
     if (!currentValidation.valid) {
@@ -450,6 +482,47 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
   function updateField(key: string, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  /**
+   * Persists the current section draft in the background. It deliberately does not
+   * refetch or clear the draft: the draft is what the inputs render from, so
+   * dropping it mid-flight is what made saved values briefly disappear.
+   */
+  async function performAutoSave() {
+    if (context.locked || !sectionHasDraftChanges()) return;
+
+    setAutoSaveState("saving");
+    try {
+      const result = await saveCandidateSectionAction({
+        caseId: context.caseId,
+        sectionKey,
+        data: sectionPayload(),
+        // Auto-save must never flip an already finished section back to incomplete.
+        markComplete: Boolean(
+          context.sections.find((s) => s.sectionKey === sectionKey)?.completedAt,
+        ),
+      });
+      setAutoSaveState(result.success ? "saved" : "idle");
+    } catch (error) {
+      console.error("[onboarding-portal] auto-save failed", error);
+      setAutoSaveState("idle");
+    }
+  }
+
+  function queueAutoSave(): Promise<void> {
+    saveChainRef.current = saveChainRef.current.then(() => performAutoSave());
+    return saveChainRef.current;
+  }
+
+  /** Writes any pending draft immediately, used before navigating away. */
+  async function flushAutoSave(): Promise<void> {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    if (!sectionHasDraftChanges()) return;
+    await queueAutoSave();
   }
 
   function sectionHasDraftChanges(): boolean {
@@ -550,6 +623,11 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   function saveSection(markComplete = true) {
     if (!validateBeforeSave(markComplete)) return;
 
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+
     startTransition(async () => {
       const merged = sectionPayload();
       const result = await saveCandidateSectionAction({
@@ -561,8 +639,11 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
       if (!result.success) toast.error(result.message);
       else {
         toast.success(markComplete ? "Section saved" : "Progress saved");
+        // Refreshed context must be in place before the draft is dropped, otherwise
+        // the inputs briefly fall back to pre-save values.
+        await onRefresh();
         setForm({});
-        onRefresh();
+        setAutoSaveState("saved");
       }
     });
   }
@@ -636,7 +717,19 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
       toast.error("Complete earlier sections before opening this step");
       return;
     }
+    void navigateToStep(index);
+  }
+
+  /**
+   * Any debounced draft is written before leaving the section, so switching steps
+   * can never drop what the candidate just typed.
+   */
+  async function navigateToStep(index: number) {
+    const hadDraft = sectionHasDraftChanges();
+    await flushAutoSave();
+    if (hadDraft) await onRefresh();
     setForm({});
+    setAutoSaveState("idle");
     setStepAnimKey((k) => k + 1);
     setStep(index);
   }
@@ -699,6 +792,11 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
     const isFormSection = sectionKey !== "signature";
 
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+
     startTransition(async () => {
       try {
         if (isFormSection) {
@@ -720,9 +818,10 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           await markSectionCompleteIfNeeded();
         }
 
+        await onRefresh();
         setForm({});
+        setAutoSaveState("idle");
         advanceStep();
-        void onRefresh();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Could not save section");
       }
@@ -1133,17 +1232,22 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           <Button
             variant="outline"
             disabled={step === 0 || isPending}
-            onClick={() => {
-              setForm({});
-              setStepAnimKey((k) => k + 1);
-              setStep((s) => s - 1);
-            }}
+            onClick={() => void navigateToStep(step - 1)}
             className="w-full sm:w-auto"
           >
             Previous
           </Button>
 
           <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+            {autoSaveState !== "idle" ? (
+              <span
+                aria-live="polite"
+                className="mr-1 shrink-0 text-xs text-muted-foreground"
+              >
+                {autoSaveState === "saving" ? "Saving…" : "Saved"}
+              </span>
+            ) : null}
+
             {sectionKey !== "signature" ? (
               <Button
                 variant="outline"
@@ -1172,10 +1276,10 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
             ) : (
               <Button
                 onClick={goNext}
-                disabled={isPending}
+                disabled={isPending || !canAdvance}
                 className={cn(
                   "w-full sm:w-auto font-semibold transition-all",
-                  currentValidation.valid
+                  canAdvance
                     ? "bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-sm hover:opacity-95"
                     : "opacity-80",
                 )}
