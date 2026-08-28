@@ -536,14 +536,18 @@ export async function resetPasswordAction(
   try {
     await acceptInvitationOnPasswordSet(supabase, user.id, email);
   } catch (inviteError) {
+    // The thrown text can be a raw PostgREST/RLS message from the invite helpers,
+    // so it is logged here and never returned to the browser.
+    console.error("[auth] invitation acceptance failed", {
+      userId: user.id,
+      name: inviteError instanceof Error ? inviteError.name : "unknown",
+      message: inviteError instanceof Error ? inviteError.message : "unknown",
+    });
     await supabase.auth.signOut();
     return {
       success: false,
       error: "RESET_LINK_INVALID",
-      message:
-        inviteError instanceof Error
-          ? inviteError.message
-          : getAuthErrorMessage("RESET_LINK_INVALID"),
+      message: getAuthErrorMessage("RESET_LINK_INVALID"),
     };
   }
 

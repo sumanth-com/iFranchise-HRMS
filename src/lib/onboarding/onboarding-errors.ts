@@ -25,9 +25,11 @@ export function onboardingPortalErrorMessage(
     return "Choose a stronger password with at least 8 characters.";
   }
 
-  if (raw.length > 0 && raw.length < 200 && !msg.includes("pgrst") && !msg.includes("postgres")) {
-    return raw;
+  if (msg.includes("expired")) {
+    return "This invitation has expired. Contact HR for a new invitation link.";
   }
 
+  // Anything else is raw Supabase/PostgREST text: log it, show the safe fallback.
+  console.error("[onboarding] portal error", { name: error.name, message: raw });
   return fallback;
 }

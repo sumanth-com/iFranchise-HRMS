@@ -16,7 +16,7 @@ const AUTH_ERROR_MESSAGES: Record<AuthErrorCode, string> = {
     "Unable to load your employee profile right now. Please try again in a moment.",
   SESSION_EXPIRED: "Your session has expired. Please sign in again.",
   NETWORK_ERROR:
-    "Unable to reach authentication services right now. Please wait a moment and try again.",
+    "Something went wrong. Please wait a moment and try again.",
   EMAIL_NOT_CONFIRMED:
     "Your email is not confirmed yet. Check your inbox or ask HR to resend the invitation.",
   EMAIL_LOGIN_DISABLED:
