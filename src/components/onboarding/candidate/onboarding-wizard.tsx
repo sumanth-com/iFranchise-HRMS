@@ -15,7 +15,7 @@ import { OnboardingTermsSection } from "@/components/onboarding/candidate/onboar
 import { OnboardingOfferAcceptanceSection } from "@/components/onboarding/candidate/onboarding-offer-acceptance-section";
 import { useOnboardingPortalProgress } from "@/components/onboarding/candidate/onboarding-portal-progress-context";
 import { OnboardingStepNav } from "@/components/onboarding/candidate/onboarding-step-nav";
-import { OnboardingSubmittedCelebration } from "@/components/onboarding/candidate/onboarding-submitted-celebration";
+import { OnboardingSubmittedCelebration, type OnboardingCelebrationMode } from "@/components/onboarding/candidate/onboarding-submitted-celebration";
 import { OnboardingWizardSelect } from "@/components/onboarding/candidate/onboarding-wizard-select";
 import {
   downloadCandidateOfferLetterAction,
@@ -26,6 +26,11 @@ import {
   submitCandidateOnboardingAction,
   uploadCandidateDocumentAction,
 } from "@/lib/onboarding/actions/candidate-onboarding-actions";
+import {
+  buildOnboardingCorrectionItems,
+  getOnboardingDocumentForSlot,
+  hasOpenOnboardingCorrections,
+} from "@/lib/onboarding/onboarding-correction-utils";
 import { ONBOARDING_STEP_LABELS } from "@/lib/onboarding/onboarding-step-labels";
 import {
   ONBOARDING_OFFER_ACCEPTANCE_CATEGORY,
@@ -187,9 +192,10 @@ function documentRecord(
   category: string,
   code: string,
 ) {
-  return context.documents.find(
+  const matches = context.documents.filter(
     (doc) => doc.documentCategory === category && doc.documentTypeCode === code,
   );
+  return matches.at(-1) ?? getOnboardingDocumentForSlot(context, category, code);
 }
 
 function FieldLabel({ label, required }: { label: string; required?: boolean }) {
@@ -216,6 +222,8 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   const [step, setStep] = useState(0);
   const [isPending, startTransition] = useTransition();
   const [showCelebration, setShowCelebration] = useState(false);
+  const [celebrationMode, setCelebrationMode] = useState<OnboardingCelebrationMode>("submitted");
+  const [correctionModeActive, setCorrectionModeActive] = useState(false);
   const initializedRef = useRef(false);
   const prevSectionKeyRef = useRef<string | null>(null);
   const sectionKey = ONBOARDING_WIZARD_SECTIONS[step];
@@ -346,41 +354,46 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
     return { valid: missing.length === 0, missing };
   }, [contextWithOptimisticDocs, sectionKey, liveSectionPatch]);
 
-  const correctionSteps = useMemo(() => {
-    const indices: number[] = [];
-    ONBOARDING_WIZARD_SECTIONS.forEach((sKey, sIdx) => {
-      const hasCorrection = (context.documents ?? []).some((d) => {
-        if (d.reviewStatus !== "correction_requested") return false;
-        if (sKey === "identity" && d.documentCategory === "identity") return true;
-        if (sKey === "education" && d.documentCategory === "education") return true;
-        if (sKey === "employment_history" && d.documentCategory === "employment") return true;
-        if (sKey === "bank" && d.documentCategory === "bank") return true;
-        if (
-          sKey === "signature" &&
-          (d.documentCategory === "offer_acceptance" || d.documentCategory === "signature")
-        ) {
-          return true;
-        }
-        return false;
-      });
-      if (hasCorrection) indices.push(sIdx);
-    });
-    return indices;
-  }, [context.documents]);
+  const correctionItems = useMemo(
+    () => buildOnboardingCorrectionItems(context),
+    [context],
+  );
 
-  const hasCorrectionsRequested =
-    context.status === "corrections_requested" || correctionSteps.length > 0;
+  const correctionSteps = useMemo(
+    () => correctionItems.map((item) => item.stepIndex),
+    [correctionItems],
+  );
+
+  const hasCorrectionsRequested = hasOpenOnboardingCorrections(context);
 
   useEffect(() => {
     if (!initializedRef.current) {
-      if (correctionSteps.length > 0) {
+      if (hasCorrectionsRequested && correctionSteps.length > 0) {
         setStep(correctionSteps[0]);
       } else {
         setStep(getFirstIncompleteStepIndex(context));
       }
       initializedRef.current = true;
     }
-  }, [context, correctionSteps]);
+  }, [context, correctionSteps, hasCorrectionsRequested]);
+
+  const prevCorrectionCountRef = useRef(correctionItems.length);
+  useEffect(() => {
+    if (correctionItems.length > prevCorrectionCountRef.current) {
+      setCorrectionModeActive(false);
+      setShowCelebration(false);
+    }
+    prevCorrectionCountRef.current = correctionItems.length;
+  }, [correctionItems.length]);
+
+  function enterCorrectionWizard(stepIndex?: number) {
+    const target =
+      stepIndex ?? correctionItems[0]?.stepIndex ?? correctionSteps[0] ?? 0;
+    setCorrectionModeActive(true);
+    setShowCelebration(false);
+    setStep(target);
+    setStepAnimKey((k) => k + 1);
+  }
 
   useEffect(() => {
     const enteredSection = prevSectionKeyRef.current !== sectionKey;
@@ -855,12 +868,15 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           });
         }
 
+        const wasCorrection = hasCorrectionsRequested;
         const result = await submitCandidateOnboardingAction();
         if (!result.success) {
           toast.error(result.message);
           return;
         }
 
+        setCelebrationMode(wasCorrection ? "correction_resubmitted" : "submitted");
+        setCorrectionModeActive(false);
         setShowCelebration(true);
         await onRefresh();
       } catch (error) {
@@ -869,7 +885,23 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
     });
   }
 
-  if (context.locked || showCelebration) {
+  if (hasCorrectionsRequested && !correctionModeActive) {
+    return (
+      <div className="mx-auto flex min-h-0 w-full min-w-0 max-w-6xl flex-1 flex-col items-center justify-center px-4 py-8">
+        <OnboardingSubmittedCelebration
+          fullName={context.fullName}
+          status={context.status}
+          mode="correction_required"
+          correctionItems={correctionItems}
+          correctionNotes={context.correctionNotes}
+          onFixCorrections={() => enterCorrectionWizard()}
+          onOpenCorrectionStep={(stepIndex) => enterCorrectionWizard(stepIndex)}
+        />
+      </div>
+    );
+  }
+
+  if ((context.locked || showCelebration) && !hasCorrectionsRequested) {
     return (
       <div className="mx-auto flex min-h-0 w-full min-w-0 max-w-6xl flex-1 flex-col items-center justify-center px-4 py-8">
         <div
@@ -880,7 +912,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           <OnboardingSubmittedCelebration
             fullName={context.fullName}
             status={context.status}
-            joiningDate={context.joiningDate}
+            mode={celebrationMode}
           />
         </div>
       </div>
@@ -1283,7 +1315,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                     : "opacity-80",
                 )}
               >
-                Submit for HR review
+                {hasCorrectionsRequested ? "Resubmit for HR review" : "Submit for HR review"}
               </Button>
             ) : (
               <Button

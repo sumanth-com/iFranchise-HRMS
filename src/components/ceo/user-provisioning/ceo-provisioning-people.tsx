@@ -18,6 +18,7 @@ import {
 import { useMemo, useState } from "react";
 
 import { CeoProvisioningStatusBadge } from "@/components/ceo/user-provisioning/ceo-provisioning-status-badge";
+import { CeoProvisioningUserSearch } from "@/components/ceo/user-provisioning/ceo-provisioning-user-search";
 import { Button } from "@/components/common/button";
 import { FilterSelect } from "@/components/common/filter-select";
 import { EmployeeAvatar } from "@/components/employees/employee-avatar";
@@ -32,6 +33,10 @@ import type {
   CeoProvisioningUser,
   ProvisioningRowAction,
 } from "@/types/ceo-user-provisioning";
+import {
+  canCancelProvisioningInvitation,
+  canResendProvisioningInvitation,
+} from "@/lib/ceo/provisioning-user-permissions";
 
 type CeoProvisioningPeopleProps = {
   users: CeoProvisioningUser[];
@@ -42,6 +47,9 @@ type CeoProvisioningPeopleProps = {
   busyEmployeeId?: string | null;
   statusFilter?: string;
   onStatusFilterChange?: (status: string) => void;
+  searchQuery?: string;
+  onSearchChange?: (search: string | undefined) => void;
+  onFetchSearchSuggestions?: (query: string) => Promise<CeoProvisioningUser[]>;
   onPageChange: (page: number) => void;
   onAction: (action: ProvisioningRowAction, user: CeoProvisioningUser) => void;
 };
@@ -51,10 +59,10 @@ function fmtDate(value: string | null) {
 }
 
 function canResend(user: CeoProvisioningUser) {
-  return user.accountStatus === "invitation_pending";
+  return canResendProvisioningInvitation(user);
 }
 function canCancel(user: CeoProvisioningUser) {
-  return user.accountStatus === "invitation_pending";
+  return canCancelProvisioningInvitation(user);
 }
 function canDeactivate(user: CeoProvisioningUser) {
   return user.accountStatus === "active" && !user.isSelf;
@@ -107,7 +115,7 @@ function PersonCard({
     canReactivate(user);
 
   return (
-    <article className="group relative flex flex-col overflow-hidden rounded-xl border bg-card shadow-sm transition-all hover:border-primary/40 hover:shadow-md">
+    <article className="group relative flex flex-col overflow-hidden rounded-xl border border-border/80 bg-card shadow-md transition-all hover:border-primary/50 hover:shadow-lg">
       <div className="absolute top-2 right-2 z-10">
         <DropdownMenu>
           <DropdownMenuTrigger
@@ -204,7 +212,7 @@ function PersonCard({
         </div>
       </button>
 
-      <div className="space-y-1.5 border-t px-4 py-3 text-xs">
+      <div className="space-y-1.5 border-t border-border/60 px-4 py-3 text-xs text-foreground/90">
         <MetaRow icon={<Mail className="size-3.5" />} value={user.email} />
         <MetaRow
           icon={<Building2 className="size-3.5" />}
@@ -220,7 +228,7 @@ function PersonCard({
         />
       </div>
 
-      <div className="flex items-center justify-between gap-2 border-t bg-muted/30 px-4 py-2 text-[11px] text-muted-foreground">
+      <div className="flex items-center justify-between gap-2 border-t border-border/60 bg-muted/40 px-4 py-2 text-[11px] text-muted-foreground">
         <span className="truncate">Invited {fmtDate(user.invitationSentAt)}</span>
         <span className="truncate">
           {user.invitationStatus === "accepted"
@@ -243,6 +251,9 @@ export function CeoProvisioningPeople({
   busyEmployeeId,
   statusFilter: controlledStatusFilter,
   onStatusFilterChange,
+  searchQuery,
+  onSearchChange,
+  onFetchSearchSuggestions,
   onPageChange,
   onAction,
 }: CeoProvisioningPeopleProps) {
@@ -286,17 +297,26 @@ export function CeoProvisioningPeople({
   }, [users, statusFilter, onStatusFilterChange]);
 
   return (
-    <section className="rounded-xl border bg-card p-4 shadow-sm">
-      <div className="mb-4 flex items-center gap-2">
-        <Users className="size-4 text-muted-foreground" />
+    <section className="rounded-xl border border-border/80 bg-card p-4 shadow-md">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Users className="size-4 shrink-0 text-muted-foreground" />
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold">Portal Users</h2>
           <p className="text-xs text-muted-foreground">
             Invited and active portal users, including pending invitations.
           </p>
         </div>
+        {onSearchChange && onFetchSearchSuggestions ? (
+          <CeoProvisioningUserSearch
+            value={searchQuery ?? ""}
+            disabled={isRefreshing}
+            className="w-full min-w-[12rem] sm:w-[min(100%,16rem)]"
+            onChange={onSearchChange}
+            onFetchSuggestions={onFetchSearchSuggestions}
+          />
+        ) : null}
         <FilterSelect
-          className="w-[140px] shrink-0"
+          className="w-full min-w-[10rem] shrink-0 sm:w-[140px]"
           items={[
             { value: "all", label: "All statuses" },
             { value: "pending", label: "Pending" },

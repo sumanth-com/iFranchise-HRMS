@@ -1,4 +1,5 @@
 import type { PortalKey } from "@/lib/auth/portals";
+import type { ProvisioningEligibleCandidate } from "@/lib/onboarding/provisioning-eligibility";
 import type { LookupOption } from "@/types/employee";
 
 /** Known executive role codes used for labels and sorting fallbacks. */
@@ -132,4 +133,5 @@ export type CeoUserProvisioningPageData = {
   users: CeoProvisioningListResult;
   lookups: CeoProvisioningLookups;
   inviteServiceReady: boolean;
+  eligibleOnboardingCandidates: ProvisioningEligibleCandidate[];
 };

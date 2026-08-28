@@ -26,15 +26,22 @@ export function CeoStatCard({
   accent,
   valueClassName,
   wrapValue,
+  className,
 }: {
   label: string;
   value: string;
   accent?: string;
   valueClassName?: string;
   wrapValue?: boolean;
+  className?: string;
 }) {
   return (
-    <div className="flex h-full min-h-[4.25rem] w-full min-w-0 flex-col justify-between gap-1.5 rounded-xl border bg-card px-3.5 py-3 shadow-sm">
+    <div
+      className={cn(
+        "flex h-full min-h-[4.25rem] w-full min-w-0 flex-col justify-between gap-1.5 rounded-xl border bg-card px-3.5 py-3 shadow-sm",
+        className,
+      )}
+    >
       <p className="truncate text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
         {label}
       </p>

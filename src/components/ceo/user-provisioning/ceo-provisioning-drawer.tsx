@@ -13,6 +13,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { fetchCeoProvisioningUserDetailAction } from "@/lib/ceo/actions/ceo-user-provisioning-actions";
+import {
+  canCancelProvisioningInvitation,
+  canResendProvisioningInvitation,
+} from "@/lib/ceo/provisioning-user-permissions";
 import type {
   CeoProvisioningUserDetail,
   ProvisioningRowAction,
@@ -70,8 +74,8 @@ export function CeoProvisioningDrawer({
 
   const user = detail?.user;
   const accountStatus = user?.accountStatus;
-  const showResend = accountStatus === "invitation_pending";
-  const showCancel = accountStatus === "invitation_pending";
+  const showResend = user != null && canResendProvisioningInvitation(user);
+  const showCancel = user != null && canCancelProvisioningInvitation(user);
   const showDelete =
     user != null &&
     !user.isSelf &&

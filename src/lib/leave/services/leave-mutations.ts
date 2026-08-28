@@ -206,6 +206,37 @@ async function ensureLeaveBalanceRow(
   return getLeaveBalanceRow(supabase, employeeId, leaveTypeId, balanceYear);
 }
 
+/** Creates annual leave ledger rows for every active leave type in the organization. */
+export async function initializeEmployeeLeaveBalances(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  employeeId: string,
+  balanceYear = getCurrentBalanceYear(),
+): Promise<void> {
+  const organizationId = profile.employee.organizationId;
+  const { data: leaveTypes, error } = await supabase
+    .schema("hrms")
+    .from("leave_types")
+    .select("id, days_per_year")
+    .eq("organization_id", organizationId)
+    .eq("status", "active")
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+
+  for (const leaveType of leaveTypes ?? []) {
+    const allocatedDays = Math.max(Number(leaveType.days_per_year ?? 0), 0);
+    await ensureLeaveBalanceRow(
+      supabase,
+      employeeId,
+      leaveType.id as string,
+      balanceYear,
+      allocatedDays,
+      profile.userId,
+    );
+  }
+}
+
 async function assertEmployeeInOrganization(
   supabase: AuthSupabaseClient,
   employeeId: string,

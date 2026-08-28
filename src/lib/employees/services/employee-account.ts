@@ -563,6 +563,7 @@ export async function activateEmployeeAccountFromOnboarding(
     user_id: authUserId,
     email: normalizedEmail,
     account_status: "active",
+    employment_status: "active",
     account_activated_at: now,
     invitation_sent_at: now,
     invitation_cancelled_at: null,

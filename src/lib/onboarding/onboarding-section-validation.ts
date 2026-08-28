@@ -23,6 +23,7 @@ import {
   ONBOARDING_SIGNED_OFFER_DOCUMENT_CODE,
 } from "@/lib/onboarding/offer-acceptance-constants";
 import { isValidStoredPhone } from "@/lib/onboarding/personal-field-options";
+import { hasOpenOnboardingCorrections, sectionKeyHasCorrection } from "@/lib/onboarding/onboarding-correction-utils";
 import {
   ONBOARDING_AGREEMENT_TYPES,
   ONBOARDING_IDENTITY_DOCUMENTS,
@@ -88,7 +89,10 @@ function hasUploadedDocument(
   typeCode: string,
 ): boolean {
   return context.documents.some(
-    (doc) => doc.documentCategory === category && doc.documentTypeCode === typeCode,
+    (doc) =>
+      doc.documentCategory === category &&
+      doc.documentTypeCode === typeCode &&
+      doc.reviewStatus !== "correction_requested",
   );
 }
 
@@ -397,6 +401,13 @@ export function getFirstIncompleteStepIndex(context: CandidatePortalContext): nu
 export function canNavigateToStep(stepIndex: number, context: CandidatePortalContext): boolean {
   if (stepIndex < 0 || stepIndex >= ONBOARDING_WIZARD_SECTIONS.length) return false;
   const sectionKey = ONBOARDING_WIZARD_SECTIONS[stepIndex];
+
+  if (hasOpenOnboardingCorrections(context)) {
+    if (sectionKeyHasCorrection(sectionKey, context.documents)) return true;
+    if (isOnboardingSectionComplete(sectionKey, context)) return true;
+    return stepIndex <= getFirstIncompleteStepIndex(context);
+  }
+
   if (isOnboardingSectionComplete(sectionKey, context)) return true;
   return stepIndex <= getFirstIncompleteStepIndex(context);
 }

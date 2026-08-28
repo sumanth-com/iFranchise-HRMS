@@ -11,13 +11,30 @@ export function CeoProvisioningSummaryCards({
       aria-label="User provisioning summary"
       className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5"
     >
-      <CeoStatCard label="Executive Users" value={String(summary.executiveUsers)} />
-      <CeoStatCard label="HR Users" value={String(summary.hrUsers)} />
-      <CeoStatCard label="Managers" value={String(summary.managers)} />
-      <CeoStatCard label="Employees" value={String(summary.employees)} />
+      <CeoStatCard
+        label="Executive Users"
+        value={String(summary.executiveUsers)}
+        className="border-border/80 shadow-md"
+      />
+      <CeoStatCard
+        label="HR Users"
+        value={String(summary.hrUsers)}
+        className="border-border/80 shadow-md"
+      />
+      <CeoStatCard
+        label="Managers"
+        value={String(summary.managers)}
+        className="border-border/80 shadow-md"
+      />
+      <CeoStatCard
+        label="Employees"
+        value={String(summary.employees)}
+        className="border-border/80 shadow-md"
+      />
       <CeoStatCard
         label="Deactivated"
         value={String(summary.deactivatedUsers)}
+        className="border-border/80 shadow-md"
         accent={
           summary.deactivatedUsers > 0
             ? "text-orange-600 dark:text-orange-400"

@@ -20,6 +20,8 @@ import {
   reactivateExecutiveUser,
   resendExecutiveInvitation,
 } from "@/lib/ceo/services/ceo-user-provisioning-mutations";
+import { listProvisioningEligibleOnboardingCandidates } from "@/lib/onboarding/services/onboarding-provisioning-queries";
+import { provisionOnboardingCandidate } from "@/lib/onboarding/services/onboarding-provisioning-mutations";
 import {
   requireServerAnyPermission,
 } from "@/lib/permissions/server";
@@ -35,6 +37,8 @@ import {
   ceoProvisioningListParamsSchema,
   inviteExecutiveUserSchema,
 } from "@/lib/validations/ceo-user-provisioning";
+import { provisionOnboardingCandidateSchema } from "@/lib/validations/onboarding-provisioning";
+import type { ProvisioningEligibleCandidate } from "@/lib/onboarding/provisioning-eligibility";
 
 const VIEW_PERMISSIONS = [
   PORTAL_PERMISSIONS.ceo,
@@ -65,10 +69,11 @@ export async function getCeoUserProvisioningModuleData(
   const supabase = await createClient();
   const parsed = ceoProvisioningListParamsSchema.parse(params);
 
-  const [summary, users, lookups] = await Promise.all([
+  const [summary, users, lookups, eligibleOnboardingCandidates] = await Promise.all([
     getCeoProvisioningSummary(supabase, profile),
     listCeoProvisioningUsers(supabase, profile, parsed),
     getCeoProvisioningLookups(supabase, profile),
+    listProvisioningEligibleOnboardingCandidates(supabase, profile),
   ]);
 
   return {
@@ -76,6 +81,7 @@ export async function getCeoUserProvisioningModuleData(
     users,
     lookups,
     inviteServiceReady: hasSupabaseServiceRoleEnv(),
+    eligibleOnboardingCandidates,
   };
 }
 
@@ -122,6 +128,57 @@ export async function fetchCeoProvisioningUserDetailAction(
       success: false,
       message: error instanceof Error ? error.message : "Failed to load user details.",
     };
+  }
+}
+
+export async function fetchProvisioningEligibleCandidatesAction(): Promise<
+  | { success: true; candidates: ProvisioningEligibleCandidate[] }
+  | { success: false; message: string }
+> {
+  try {
+    const profile = await requireServerAnyPermission(VIEW_PERMISSIONS);
+    const supabase = await createClient();
+    const candidates = await listProvisioningEligibleOnboardingCandidates(supabase, profile);
+    return { success: true, candidates };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to load onboarding candidates.",
+    };
+  }
+}
+
+export async function provisionOnboardingCandidateAction(
+  input: unknown,
+): Promise<ActionResult> {
+  try {
+    if (!hasSupabaseServiceRoleEnv()) {
+      return {
+        success: false,
+        message:
+          "User provisioning is not configured on this environment. Contact your administrator.",
+      };
+    }
+
+    const profile = await requireServerAnyPermission(MANAGE_PERMISSIONS);
+    const supabase = await createClient();
+    const parsed = provisionOnboardingCandidateSchema.parse(input);
+
+    const result = await provisionOnboardingCandidate(supabase, profile, parsed);
+    revalidateUserProvisioning();
+    revalidatePath("/dashboard/recruitment/onboarding", "layout");
+    revalidatePath("/dashboard/onboarding", "layout");
+
+    return {
+      success: true,
+      message: `${result.fullName} is provisioned. Portal access email sent to ${result.companyEmail}.`,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to provision candidate.";
+    if (message.toLowerCase().includes("duplicate key")) {
+      return { success: false, message: "This company email is already in use." };
+    }
+    return { success: false, message };
   }
 }
 

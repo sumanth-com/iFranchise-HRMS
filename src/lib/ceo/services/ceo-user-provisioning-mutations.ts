@@ -7,6 +7,7 @@ import {
   deactivateEmployeeAccount,
   inviteEmployeeByEmail,
   resendEmployeeInvitation,
+  sendEmployeeInvitation,
 } from "@/lib/employees/services/employee-account";
 import { permanentlyDeleteEmployee } from "@/lib/employees/services/employee-permanent-delete";
 import { resolveOrCreateDesignation } from "@/lib/employees/services/employee-mutations";
@@ -171,6 +172,19 @@ export async function resendExecutiveInvitation(
   profile: UserProfile,
   employeeId: string,
 ): Promise<void> {
+  const admin = createAdminClient();
+  const { data: employee, error } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select("account_status")
+    .eq("id", employeeId)
+    .eq("organization_id", profile.employee.organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!employee) throw new Error("User not found.");
+
   const roleCode = await resolveEmployeeRoleCode(
     supabase,
     profile.employee.organizationId,
@@ -185,7 +199,22 @@ export async function resendExecutiveInvitation(
     );
     roleId = inviteRole.id;
   }
-  await resendEmployeeInvitation(supabase, profile, employeeId, roleId);
+
+  if (employee.account_status === "invitation_pending") {
+    await resendEmployeeInvitation(supabase, profile, employeeId, roleId);
+  } else if (employee.account_status === "draft" || employee.account_status === "invited") {
+    if (!roleId) {
+      const fallbackRole = await getInviteableRoleByCode(
+        createAdminClient(),
+        profile.employee.organizationId,
+        "employee",
+      );
+      roleId = fallbackRole.id;
+    }
+    await sendEmployeeInvitation(supabase, profile, employeeId, roleId);
+  } else {
+    throw new Error("This invitation cannot be resent.");
+  }
   await audit(
     supabase,
     profile,
