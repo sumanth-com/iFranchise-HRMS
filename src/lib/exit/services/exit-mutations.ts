@@ -11,7 +11,7 @@ import {
   fromHrms,
   isEmployeeOnly,
   isHrAdmin,
-  isCeoRole,
+  canPerformExecutiveExitApproval,
 } from "@/lib/exit/services/exit-utils";
 import type {
   AssetReturnDecisionValues,
@@ -433,6 +433,10 @@ export async function decideResignation(
     throw new Error("Resignation is not awaiting CEO approval");
   }
 
+  if (!canPerformExecutiveExitApproval(profile)) {
+    throw new Error("You do not have permission to perform executive exit approval");
+  }
+
   if (input.decision === "reject") {
     await setResignationStatus(supabase, row.id, profile.userId, "rejected", {
       rejected_reason: emptyToNull(input.rejectedReason) ?? emptyToNull(input.remarks),
@@ -451,8 +455,6 @@ export async function decideResignation(
     );
     return;
   }
-
-  if (!isCeoRole(profile)) throw new Error("Only CEO can perform final approval");
 
   await finalizeResignationAfterCeoApproval(
     supabase,

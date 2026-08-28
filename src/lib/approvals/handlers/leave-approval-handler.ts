@@ -31,6 +31,21 @@ function fmtDate(value: string | null | undefined): string {
   }
 }
 
+function formatLeaveStatusLabel(status: string): string {
+  switch (status) {
+    case "pending":
+      return "Pending approval";
+    case "approved":
+      return "Approved";
+    case "rejected":
+      return "Rejected";
+    case "cancelled":
+      return "Cancelled";
+    default:
+      return status.replace(/_/g, " ");
+  }
+}
+
 type LeaveSummaryRow = {
   id: string;
   employee_id: string;
@@ -129,9 +144,10 @@ export const leaveApprovalHandler: ApprovalHandler = {
       { label: "Start Date", value: fmtDate(row.start_date) },
       { label: "End Date", value: fmtDate(row.end_date) },
       {
-        label: "Total Days",
-        value: `${Number(row.total_days)}${row.is_half_day ? " (half day)" : ""}`,
+        label: "Duration",
+        value: `${Number(row.total_days)} day${Number(row.total_days) === 1 ? "" : "s"}${row.is_half_day ? " (half day)" : ""}`,
       },
+      { label: "Current Status", value: formatLeaveStatusLabel(row.leave_status) },
       { label: "Submitted On", value: fmtDate(row.created_at) },
       {
         label: "Current Leave Balance",

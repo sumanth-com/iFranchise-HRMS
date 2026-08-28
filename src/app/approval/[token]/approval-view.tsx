@@ -13,7 +13,7 @@ import { useState, useTransition } from "react";
 
 import { submitEmailApprovalAction } from "@/app/approval/[token]/actions";
 import { Button } from "@/components/common/button";
-import type { ProcessOutcome } from "@/lib/approvals/types";
+import type { ProcessOutcome, ApprovalRequestSummary } from "@/lib/approvals/types";
 
 type DetailRow = { label: string; value: string };
 
@@ -38,7 +38,12 @@ type ApprovalViewProps = {
   token: string;
   initialAction: "approve" | "reject";
   state: ApprovalViewState;
+  initialOutcome?: ProcessOutcome;
 };
+
+function isLeaveSummary(summary: ApprovalRequestSummary | undefined): boolean {
+  return summary?.heading.startsWith("Leave request") ?? false;
+}
 
 function Shell({
   heading,
@@ -95,9 +100,18 @@ function DetailsCard({ rows, reason }: { rows: DetailRow[]; reason: string | nul
 function ResultScreen({ outcome }: { outcome: ProcessOutcome }) {
   if (outcome.status === "approved" || outcome.status === "rejected") {
     const approved = outcome.status === "approved";
+    const leave = isLeaveSummary(outcome.summary);
     return (
       <Shell
-        heading={approved ? "Request approved" : "Request rejected"}
+        heading={
+          leave
+            ? approved
+              ? "Leave approved successfully"
+              : "Leave rejected"
+            : approved
+              ? "Request approved"
+              : "Request rejected"
+        }
         subheading="Recorded via secure email approval"
       >
         <div className="flex flex-col items-center py-4 text-center">
@@ -139,11 +153,16 @@ function ResultScreen({ outcome }: { outcome: ProcessOutcome }) {
   );
 }
 
-export function ApprovalView({ token, initialAction, state }: ApprovalViewProps) {
+export function ApprovalView({
+  token,
+  initialAction,
+  state,
+  initialOutcome,
+}: ApprovalViewProps) {
   const [mode, setMode] = useState<"approve" | "reject">(initialAction);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [outcome, setOutcome] = useState<ProcessOutcome | null>(null);
+  const [outcome, setOutcome] = useState<ProcessOutcome | null>(initialOutcome ?? null);
   const [isPending, startTransition] = useTransition();
 
   if (state.kind === "error") {
