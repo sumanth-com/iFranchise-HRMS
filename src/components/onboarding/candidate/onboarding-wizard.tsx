@@ -880,7 +880,6 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           <OnboardingSubmittedCelebration
             fullName={context.fullName}
             status={context.status}
-            joiningDate={context.joiningDate}
           />
         </div>
       </div>

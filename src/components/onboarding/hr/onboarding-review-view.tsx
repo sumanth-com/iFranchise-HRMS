@@ -19,10 +19,6 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
 import { OnboardingDocumentsPanel } from "@/components/onboarding/hr/onboarding-documents-panel";
-import { Input } from "@/components/common/input";
-import { LabeledSelect } from "@/components/payroll/payroll-select";
-import type { SelectItemOption } from "@/components/payroll/select-utils";
-import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -35,7 +31,6 @@ import {
   archiveOnboardingAction,
   cancelOnboardingAction,
   fetchOnboardingDetailAction,
-  processOnboardingReviewAction,
   resendOnboardingInvitationAction,
   reviewDocumentAction,
 } from "@/lib/onboarding/actions/hr-onboarding-actions";
@@ -47,11 +42,9 @@ import {
   type OnboardingStatus,
 } from "@/types/onboarding";
 import type { OnboardingCaseDetail } from "@/types/onboarding";
-import { cn } from "@/lib/utils";
 
 type OnboardingReviewViewProps = {
   detail: OnboardingCaseDetail;
-  roles: { id: string; name: string; code: string }[];
   readOnly?: boolean;
   listHref?: string;
 };
@@ -93,23 +86,16 @@ function formatDateTime(value: string) {
 
 export function OnboardingReviewView({
   detail: initialDetail,
-  roles,
   readOnly = false,
   listHref = ONBOARDING_ROUTES.hrList,
 }: OnboardingReviewViewProps) {
   const router = useRouter();
   const [detail, setDetail] = useState(initialDetail);
-  const [hrComments, setHrComments] = useState("");
-  const [correctionNotes, setCorrectionNotes] = useState("");
-  const [companyEmail, setCompanyEmail] = useState("");
-  const [intendedRoleId, setIntendedRoleId] = useState(initialDetail.intendedRoleId);
   const [isResending, setIsResending] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   useSetBreadcrumbLabel(detail.fullName);
-
-  const roleItems: SelectItemOption[] = roles.map((r) => ({ value: r.id, label: r.name }));
 
   const completedSections = ONBOARDING_WIZARD_SECTIONS.filter((key) =>
     detail.sections.some((s) => s.sectionKey === key && s.completedAt),
@@ -146,24 +132,6 @@ export function OnboardingReviewView({
   ) {
     startTransition(async () => {
       const result = await reviewDocumentAction({ documentId, reviewStatus });
-      if (!result.success) toast.error(result.message);
-      else {
-        toast.success(result.message);
-        refresh();
-      }
-    });
-  }
-
-  function processReview(action: "approve" | "reject" | "request_corrections") {
-    startTransition(async () => {
-      const result = await processOnboardingReviewAction({
-        caseId: detail.id,
-        action,
-        hrComments: hrComments || null,
-        correctionNotes: correctionNotes || null,
-        intendedRoleId: action === "approve" ? intendedRoleId : null,
-        companyEmail: action === "approve" ? companyEmail.trim() : null,
-      });
       if (!result.success) toast.error(result.message);
       else {
         toast.success(result.message);
@@ -452,89 +420,6 @@ export function OnboardingReviewView({
               />
             </div>
           </section>
-
-          {canReview ? (
-            <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-              <div className="border-b bg-muted/30 px-6 py-5 text-center">
-                <h2 className="text-base font-semibold tracking-tight text-foreground">
-                  HR review & portal activation
-                </h2>
-                <p className="mx-auto mt-1.5 max-w-xl text-xs leading-relaxed text-muted-foreground">
-                  Assign the employee&apos;s official company email and portal role. Upon approval, all submitted onboarding data, documents, and banking details are automatically stored in their employee profile, and the candidate will receive an activation email to log in and use their account daily.
-                </p>
-              </div>
-
-              <div className="mx-auto max-w-lg space-y-5 px-6 py-6">
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium text-foreground">
-                    Company email <span className="text-foreground">*</span>
-                  </Label>
-                  <Input
-                    type="email"
-                    className="h-10"
-                    placeholder="e.g. name@yourcompany.com"
-                    value={companyEmail}
-                    onChange={(e) => setCompanyEmail(e.target.value)}
-                    disabled={isPending}
-                    autoComplete="off"
-                  />
-                  <p className="text-[11px] text-muted-foreground">
-                    This is the official login email the employee will use on the company portal.
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium text-foreground">
-                    Portal role when employee is created
-                  </Label>
-                  <LabeledSelect
-                    value={intendedRoleId}
-                    placeholder="Select portal role"
-                    items={roleItems}
-                    onValueChange={setIntendedRoleId}
-                    disabled={isPending}
-                    triggerClassName="h-10 w-full"
-                  />
-                  <p className="text-[11px] text-muted-foreground">
-                    Determines role permissions and portal dashboard access for this user.
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium text-muted-foreground">
-                    HR comments (optional)
-                  </Label>
-                  <Input
-                    className="h-10"
-                    placeholder="Internal approval notes"
-                    value={hrComments}
-                    onChange={(e) => setHrComments(e.target.value)}
-                    disabled={isPending}
-                  />
-                </div>
-
-                <div className="border-t border-border/60 pt-5">
-                  <Button
-                    onClick={() => processReview("approve")}
-                    disabled={isPending || !companyEmail.trim()}
-                    className={cn(
-                      "h-10.5 w-full font-semibold transition-all shadow-sm",
-                      companyEmail.trim()
-                        ? "bg-gradient-to-r from-blue-600 to-violet-600 text-white hover:opacity-95"
-                        : "opacity-70",
-                    )}
-                  >
-                    {isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <CheckCircle2 className="mr-2 h-4 w-4" />
-                    )}
-                    Approve & activate employee
-                  </Button>
-                </div>
-              </div>
-            </section>
-          ) : null}
 
           <section className="rounded-xl border bg-card p-5 shadow-sm">
             <h2 className="text-center font-semibold">Activity timeline</h2>

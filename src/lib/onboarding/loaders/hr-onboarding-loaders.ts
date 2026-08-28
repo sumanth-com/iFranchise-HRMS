@@ -141,15 +141,12 @@ export async function loadOnboardingReviewPageData(routeRef: string) {
   const organizationId = profile.employee.organizationId;
   const caseId = await resolveOnboardingCaseId(supabase, organizationId, routeRef);
   await assertManagerOnboardingCaseAccess(supabase, profile, organizationId, caseId);
-  const [detail, lookups, routeRefCanonical] = await Promise.all([
+  const [detail, routeRefCanonical] = await Promise.all([
     getOnboardingCaseDetail(supabase, organizationId, caseId),
-    getOnboardingLookups(supabase, organizationId),
     getOnboardingCaseRouteRef(supabase, organizationId, caseId),
   ]);
-  const departmentIds = await resolveOnboardingDepartmentScope(supabase, profile);
   return {
     detail,
-    roles: scopeOnboardingLookups(lookups, departmentIds).roles,
     routeRef: routeRefCanonical,
   };
 }

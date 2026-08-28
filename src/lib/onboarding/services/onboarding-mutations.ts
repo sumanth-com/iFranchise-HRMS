@@ -1099,11 +1099,21 @@ export async function activateOnboardingCase(
   companyEmail: string,
   hrComments?: string | null,
   intendedRoleId?: string,
-) {
+): Promise<string> {
   const organizationId = profile.employee.organizationId;
   const detail = await getOnboardingCaseDetail(supabase, organizationId, caseId);
   const admin = createAdminClient();
   const normalizedCompanyEmail = companyEmail.trim().toLowerCase();
+
+  if (detail.employeeId) {
+    throw new Error("This candidate has already been provisioned.");
+  }
+
+  if (detail.status !== "pending_hr_review" || !detail.submittedAt) {
+    throw new Error(
+      "Only candidates who submitted completed onboarding for HR review can be provisioned.",
+    );
+  }
 
   await assertCompanyEmailAvailable(organizationId, normalizedCompanyEmail);
 
@@ -1145,7 +1155,7 @@ export async function activateOnboardingCase(
       last_name: lastName,
       email: normalizedCompanyEmail,
       phone: detail.mobileNumber ?? (personalSection.personalMobile as string | undefined) ?? null,
-      employment_status: "draft",
+      employment_status: "active",
       account_status: "draft",
       date_of_joining: detail.joiningDate,
       created_by: profile.userId,
@@ -1173,6 +1183,8 @@ export async function activateOnboardingCase(
     resolvedRoleId,
     authUserId,
   );
+
+  return employee.id;
 }
 
 async function finalizeEmployeeActivation(
@@ -1249,7 +1261,7 @@ async function finalizeEmployeeActivation(
   });
 
   await sendEmail({
-    to: detail.personalEmail,
+    to: companyEmail,
     subject: accountReadyEmail.subject,
     html: accountReadyEmail.html,
     text: accountReadyEmail.text,

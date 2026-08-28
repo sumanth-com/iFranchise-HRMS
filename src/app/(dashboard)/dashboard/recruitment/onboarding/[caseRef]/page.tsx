@@ -22,13 +22,13 @@ export default async function OnboardingDetailPage({ params }: PageProps) {
   const { caseRef } = await params;
 
   try {
-    const { detail, roles, routeRef } = await loadOnboardingReviewPageData(caseRef);
+    const { detail, routeRef } = await loadOnboardingReviewPageData(caseRef);
 
     if (isOnboardingCaseUuid(caseRef) && caseRef !== routeRef) {
       redirect(ONBOARDING_ROUTES.hrDetail(routeRef));
     }
 
-    return <OnboardingReviewView detail={detail} roles={roles} />;
+    return <OnboardingReviewView detail={detail} />;
   } catch {
     notFound();
   }

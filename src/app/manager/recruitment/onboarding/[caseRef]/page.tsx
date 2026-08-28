@@ -17,7 +17,7 @@ export default async function ManagerOnboardingDetailPage({ params }: PageProps)
   const listHref = MANAGER_ROUTES.recruitmentOnboarding;
 
   try {
-    const { detail, roles, routeRef } = await loadOnboardingReviewPageData(caseRef);
+    const { detail, routeRef } = await loadOnboardingReviewPageData(caseRef);
 
     if (isOnboardingCaseUuid(caseRef) && caseRef !== routeRef) {
       redirect(`${listHref}/${routeRef}`);
@@ -26,7 +26,6 @@ export default async function ManagerOnboardingDetailPage({ params }: PageProps)
     return (
       <OnboardingReviewView
         detail={detail}
-        roles={roles}
         listHref={listHref}
       />
     );

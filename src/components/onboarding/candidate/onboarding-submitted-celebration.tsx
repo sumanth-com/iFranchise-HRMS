@@ -8,19 +8,9 @@ import { ONBOARDING_STATUS_LABELS, type OnboardingStatus } from "@/types/onboard
 type OnboardingSubmittedCelebrationProps = {
   fullName: string;
   status: OnboardingStatus;
-  joiningDate: string | null;
 };
 
 const CONFETTI_COLORS = ["#10b981", "#2563eb", "#8b5cf6", "#f59e0b", "#ec4899", "#06b6d4"];
-
-function formatJoiningDate(value: string | null) {
-  if (!value) return "To be confirmed";
-  return new Date(value).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
 
 function ConfettiBurst() {
   const particles = Array.from({ length: 28 }, (_, i) => ({
@@ -75,7 +65,6 @@ const TIMELINE = [
 export function OnboardingSubmittedCelebration({
   fullName,
   status,
-  joiningDate,
 }: OnboardingSubmittedCelebrationProps) {
   const [stage, setStage] = useState(0);
 
@@ -125,7 +114,7 @@ export function OnboardingSubmittedCelebration({
           </div>
 
           <div
-            className={`grid gap-3 transition-all duration-700 delay-100 ease-out sm:grid-cols-3 ${
+            className={`grid gap-3 transition-all duration-700 delay-100 ease-out sm:grid-cols-2 ${
               stage >= 2 ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
             }`}
           >
@@ -134,14 +123,6 @@ export function OnboardingSubmittedCelebration({
                 Status
               </p>
               <p className="mt-1 text-sm font-semibold text-foreground">{statusLabel}</p>
-            </div>
-            <div className="rounded-2xl border border-border bg-card/90 p-4 text-center backdrop-blur-sm">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Joining date
-              </p>
-              <p className="mt-1 text-sm font-semibold text-foreground">
-                {formatJoiningDate(joiningDate)}
-              </p>
             </div>
             <div className="rounded-2xl border border-border bg-card/90 p-4 text-center backdrop-blur-sm">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">

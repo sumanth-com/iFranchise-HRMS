@@ -56,12 +56,16 @@ export function CeoUserProvisioningView({
   users: initialUsers,
   lookups: initialLookups,
   inviteServiceReady,
+  eligibleOnboardingCandidates: initialEligibleCandidates,
   initialFilters,
   variant = "ceo",
 }: CeoUserProvisioningViewProps) {
   const [summary, setSummary] = useState(initialSummary);
   const [users, setUsers] = useState(initialUsers);
   const [lookups, setLookups] = useState(initialLookups);
+  const [eligibleOnboardingCandidates, setEligibleOnboardingCandidates] = useState(
+    initialEligibleCandidates,
+  );
   const [pageParams, setPageParams] = useState<CeoProvisioningListParams>({
     page: initialFilters.page ?? 1,
     pageSize: initialFilters.pageSize ?? 9,
@@ -92,6 +96,7 @@ export function CeoUserProvisioningView({
         setSummary(data.summary);
         setUsers(data.users);
         setLookups(data.lookups);
+        setEligibleOnboardingCandidates(data.eligibleOnboardingCandidates);
       } finally {
         if (options?.showRefreshing) setIsRefreshing(false);
       }
@@ -110,6 +115,19 @@ export function CeoUserProvisioningView({
       }
     },
     [],
+  );
+
+  const fetchSearchSuggestions = useCallback(
+    async (query: string) => {
+      const result = await fetchCeoProvisioningUsersAction({
+        ...pageParams,
+        search: query,
+        page: 1,
+        pageSize: 8,
+      });
+      return result.data;
+    },
+    [pageParams],
   );
 
   function applyFilters(next: CeoProvisioningListParams) {
@@ -244,6 +262,15 @@ export function CeoUserProvisioningView({
           };
           applyFilters(next);
         }}
+        searchQuery={variant === "hr" ? pageParams.search ?? "" : undefined}
+        onSearchChange={
+          variant === "hr"
+            ? (search) => {
+                applyFilters({ ...pageParams, page: 1, search });
+              }
+            : undefined
+        }
+        onFetchSearchSuggestions={variant === "hr" ? fetchSearchSuggestions : undefined}
         onPageChange={changePage}
         onAction={requestAction}
       />
@@ -252,6 +279,7 @@ export function CeoUserProvisioningView({
         open={inviteOpen}
         onOpenChange={setInviteOpen}
         lookups={lookups}
+        eligibleCandidates={eligibleOnboardingCandidates}
         inviteServiceReady={inviteServiceReady}
         onInvited={() => void refreshModuleData(pageParams)}
       />
