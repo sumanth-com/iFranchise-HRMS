@@ -169,6 +169,7 @@ export function CeoExitApprovalQueue({
             ? `${target.item.employeeName} · ${target.item.reason}`
             : undefined
         }
+        showCancel={false}
         footer={
           <>
             <Button variant="outline" onClick={closeModal} disabled={isActing}>

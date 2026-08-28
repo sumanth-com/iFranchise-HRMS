@@ -846,6 +846,7 @@ export function AttendanceTable({
             ? `Remove the attendance record for ${deleteTarget.employeeName} on ${format(parseISO(deleteTarget.attendanceDate), "dd MMM yyyy")}? This cannot be undone from this list.`
             : undefined
         }
+        showCancel={false}
         footer={
           <>
             <Button
