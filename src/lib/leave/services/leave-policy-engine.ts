@@ -1,6 +1,7 @@
 import { addDays, addMonths, differenceInCalendarDays, format, parseISO } from "date-fns";
 
 import type { LeaveDurationBreakdown } from "@/lib/leave/services/leave-calendar-engine";
+import { roundLeaveDays } from "@/lib/leave/services/leave-usage";
 
 export const PERIOD_LEAVE_CODE = "PL";
 export const CASUAL_LEAVE_CODE = "CL";
@@ -267,12 +268,47 @@ export function validateLeavePolicy(input: {
     if (input.duration.totalLeaveDays > input.availableBalance + 1e-9) {
       issues.push({
         code: "balance",
-        message: "This request exceeds your available leave balance.",
+        message:
+          "This exceeds your paid leave balance. The extra days will be applied as Loss of Pay (LOP).",
       });
     }
   }
 
   return issues;
+}
+
+/**
+ * A balance shortfall is informational, not a rejection: the request is still
+ * submitted and the days beyond the paid balance are recorded as LOP. Every other
+ * issue (probation caps, notice period, overlap, gender rules) remains blocking.
+ */
+const NON_BLOCKING_LEAVE_ISSUE_CODES = new Set<string>(["balance"]);
+
+export function isBlockingLeaveIssue(issue: LeavePolicyIssue) {
+  return !NON_BLOCKING_LEAVE_ISSUE_CODES.has(issue.code);
+}
+
+export type LeaveDaySplit = { paidDays: number; lopDays: number };
+
+/**
+ * Splits a request into the portion covered by paid balance and the remainder,
+ * which becomes Loss of Pay. Unpaid leave types are entirely LOP; a paid type with
+ * no balance cap (availableBalance === null) is entirely paid.
+ */
+export function splitLeaveDaysByBalance(input: {
+  totalDays: number;
+  availableBalance: number | null;
+  isPaid: boolean;
+}): LeaveDaySplit {
+  const total = roundLeaveDays(Math.max(0, input.totalDays));
+
+  if (!input.isPaid) return { paidDays: 0, lopDays: total };
+  if (input.availableBalance == null) return { paidDays: total, lopDays: 0 };
+
+  const paidDays = roundLeaveDays(
+    Math.min(total, Math.max(0, input.availableBalance)),
+  );
+  return { paidDays, lopDays: roundLeaveDays(total - paidDays) };
 }
 
 export function buildLeavePreviewMessages(input: {

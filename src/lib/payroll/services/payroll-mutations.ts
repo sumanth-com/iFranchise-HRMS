@@ -165,22 +165,14 @@ async function getLeaveLopDays(
 ): Promise<number> {
   const range = getMonthDateRange(month, year);
 
-  const { data: lopType } = await supabase
-    .schema("hrms")
-    .from("leave_types")
-    .select("id")
-    .eq("code", "LOP")
-    .is("deleted_at", null)
-    .maybeSingle();
-
-  if (!lopType) return 0;
-
+  // Only approved leave is payable. A request is unpaid either because its leave
+  // type is unpaid (LOP), or because it exceeded the employee's paid balance, in
+  // which case the overflow was recorded on the request as `lopDays`.
   const { data, error } = await supabase
     .schema("hrms")
     .from("leave_requests")
-    .select("total_days")
+    .select("total_days, duration_breakdown, leave_types!inner(code, is_paid)")
     .eq("employee_id", employeeId)
-    .eq("leave_type_id", lopType.id)
     .eq("leave_status", "approved")
     .lte("start_date", range.endDate)
     .gte("end_date", range.startDate)
@@ -188,7 +180,13 @@ async function getLeaveLopDays(
 
   if (error) throw new Error(error.message);
 
-  return (data ?? []).reduce((sum, row) => sum + Number(row.total_days), 0);
+  return (data ?? []).reduce((sum, row) => {
+    const leaveType = Array.isArray(row.leave_types) ? row.leave_types[0] : row.leave_types;
+    if (leaveType?.is_paid === false) return sum + Number(row.total_days);
+
+    const breakdown = row.duration_breakdown as { lopDays?: unknown } | null;
+    return sum + (typeof breakdown?.lopDays === "number" ? breakdown.lopDays : 0);
+  }, 0);
 }
 
 function monthKey(value: string | null | undefined): string {
