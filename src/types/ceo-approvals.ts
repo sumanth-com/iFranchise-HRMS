@@ -116,6 +116,36 @@ export type CeoApprovalsCommentItem = {
   createdAt: string;
 };
 
+export type CeoApprovalsPromotionApproval = {
+  id: string;
+  level: number;
+  levelLabel: string;
+  status: string;
+  statusLabel: string;
+  actorName: string | null;
+  comments: string | null;
+  actedAt: string | null;
+};
+
+export type CeoApprovalsPromotionDetail = {
+  promotionId: string;
+  employeeName: string;
+  employeeCode: string | null;
+  departmentName: string | null;
+  currentDesignation: string | null;
+  proposedDesignation: string | null;
+  currentSalary: number | null;
+  proposedSalary: number | null;
+  salaryIncrease: number | null;
+  salaryIncreasePercent: number | null;
+  effectiveFrom: string | null;
+  reason: string | null;
+  statusLabel: string;
+  recommendedByName: string | null;
+  recommendedAt: string;
+  approvals: CeoApprovalsPromotionApproval[];
+};
+
 export type CeoApprovalsDetail = {
   id: string;
   requestCode: string;
@@ -153,6 +183,7 @@ export type CeoApprovalsDetail = {
   timeline: CeoApprovalsTimelineItem[];
   previousDecisions: CeoApprovalsHistoryItem[];
   comments: CeoApprovalsCommentItem[];
+  promotion: CeoApprovalsPromotionDetail | null;
   canAct: boolean;
   canDelete: boolean;
 };

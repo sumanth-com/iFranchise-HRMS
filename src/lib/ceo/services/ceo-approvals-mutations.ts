@@ -4,15 +4,15 @@ import {
   CEO_ACTIONABLE_APPROVAL_STATUSES,
   CEO_APPROVALS_SOURCE,
   EXECUTIVE_APPROVAL_STATUS_LABELS,
+  PROMOTION_APPROVAL_TYPE,
 } from "@/lib/ceo/executive-approvals-constants";
 import {
   appendApprovalEvent,
   notifyRequesterOfDecision,
 } from "@/lib/ceo/services/ceo-approvals-sync";
-import { approvePayrollStep, rejectPayrollRun } from "@/lib/payroll/services/payroll-mutations";
 import { approvePromotionFully } from "@/lib/performance/services/performance-mutations";
 import { fromHrms } from "@/lib/reports/services/reports-utils";
-import { moveCandidateStage } from "@/lib/recruitment/services/recruitment-mutations";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   createNotification,
   getEmployeeUserId,
@@ -31,6 +31,10 @@ async function loadRequest(
 ) {
   const { data, error } = await fromHrms(supabase, "executive_approval_requests")
     .select("*")
+    // The executive queue is promotion-only, so every decision here must resolve to a
+    // real performance_promotions record before any domain side effect runs.
+    .eq("source_module", CEO_APPROVALS_SOURCE.performancePromotion)
+    .eq("approval_type", PROMOTION_APPROVAL_TYPE)
     .eq("id", requestId)
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
@@ -56,81 +60,42 @@ async function applyDomainDecision(
   decision: "approved" | "rejected",
   reason?: string,
 ) {
-  const sourceModule = request.source_module as string | null;
   const sourceRecordId = request.source_record_id as string | null;
-  if (!sourceModule || !sourceRecordId) return;
+  if (!sourceRecordId) {
+    throw new Error("This approval is not linked to a promotion record.");
+  }
 
-  if (sourceModule === CEO_APPROVALS_SOURCE.recruitmentCandidate) {
-    await moveCandidateStage(supabase, profile, {
-      candidateId: sourceRecordId,
-      stage: decision === "approved" ? "offer" : "rejected",
-      reason:
-        reason ??
-        (decision === "approved"
-          ? "Approved by CEO"
-          : "Rejected by CEO"),
-    });
+  if (decision === "approved") {
+    await approvePromotionFully(supabase, profile, sourceRecordId, reason);
     return;
   }
 
-  if (sourceModule === CEO_APPROVALS_SOURCE.performancePromotion) {
-    if (decision === "approved") {
-      await approvePromotionFully(supabase, profile, sourceRecordId, reason);
-      return;
-    }
+  const { error } = await fromHrms(supabase, "performance_promotions")
+    .update({
+      promotion_status: "rejected",
+      approver_employee_id: profile.employee.id,
+      updated_by: profile.userId,
+    })
+    .eq("id", sourceRecordId)
+    .eq("organization_id", profile.employee.organizationId);
 
-    const { error } = await fromHrms(supabase, "performance_promotions")
-      .update({
-        promotion_status: "rejected",
-        approver_employee_id: profile.employee.id,
-        updated_by: profile.userId,
-      })
-      .eq("id", sourceRecordId)
-      .eq("organization_id", profile.employee.organizationId);
+  if (error) throw new Error(error.message);
 
-    if (error) throw new Error(error.message);
+  const { error: approvalsError } = await fromHrms(
+    supabase,
+    "performance_promotion_approvals",
+  )
+    .update({
+      approval_status: "rejected",
+      comments: reason ?? "Rejected by CEO",
+      acted_at: new Date().toISOString(),
+      approver_employee_id: profile.employee.id,
+      updated_by: profile.userId,
+    })
+    .eq("promotion_id", sourceRecordId)
+    .eq("approval_status", "pending");
 
-    await fromHrms(supabase, "performance_promotion_approvals")
-      .update({
-        approval_status: "rejected",
-        comments: reason ?? "Rejected by CEO",
-        acted_at: new Date().toISOString(),
-        approver_employee_id: profile.employee.id,
-        updated_by: profile.userId,
-      })
-      .eq("promotion_id", sourceRecordId)
-      .eq("approval_status", "pending");
-
-    return;
-  }
-
-  if (sourceModule === CEO_APPROVALS_SOURCE.salaryRevision) {
-    const { error } = await fromHrms(supabase, "salary_revisions")
-      .update({
-        revision_status: decision === "approved" ? "approved" : "rejected",
-        approver_employee_id: profile.employee.id,
-        approved_at: decision === "approved" ? new Date().toISOString() : null,
-        updated_by: profile.userId,
-      })
-      .eq("id", sourceRecordId)
-      .eq("organization_id", profile.employee.organizationId);
-
-    if (error) throw new Error(error.message);
-    return;
-  }
-
-  if (sourceModule === CEO_APPROVALS_SOURCE.payroll) {
-    if (decision === "approved") {
-      await approvePayrollStep(supabase, profile, sourceRecordId, reason);
-    } else {
-      await rejectPayrollRun(
-        supabase,
-        profile,
-        sourceRecordId,
-        reason ?? "Rejected by CEO",
-      );
-    }
-  }
+  if (approvalsError) throw new Error(approvalsError.message);
 }
 
 async function finalizeRequest(
@@ -207,16 +172,22 @@ async function finalizeRequest(
   }
 
   if (input.notifyTemplate) {
-    await notifyRequesterOfDecision(supabase, {
-      organizationId,
-      requesterEmployeeId: request.requested_by_employee_id,
-      title: request.title,
-      requestCode: request.request_code,
-      requestId: request.id,
-      templateKey: input.notifyTemplate,
-      reason: input.reason,
-      createdBy: profile.userId,
-    });
+    // The decision is already applied at this point — a notification failure must not
+    // report the decision back to the CEO as failed.
+    try {
+      await notifyRequesterOfDecision(supabase, {
+        organizationId,
+        requesterEmployeeId: request.requested_by_employee_id,
+        title: request.title,
+        requestCode: request.request_code,
+        requestId: request.id,
+        templateKey: input.notifyTemplate,
+        reason: input.reason,
+        createdBy: profile.userId,
+      });
+    } catch (error) {
+      console.error("[ceo-approvals] decision notification failed", error);
+    }
   }
 }
 
@@ -453,14 +424,21 @@ export async function deleteExecutiveRequest(
     );
   }
 
+  // The request row is already proven to belong to this CEO's organization by
+  // loadRequest() above, which reads under the caller's RLS context. The soft-delete
+  // itself runs through the service role because the table's UPDATE check rejects a
+  // row once deleted_at is set. The write stays pinned to that single verified row.
   const now = new Date().toISOString();
-  const { error } = await fromHrms(supabase, "executive_approval_requests")
+  const { error } = await createAdminClient()
+    .schema("hrms")
+    .from("executive_approval_requests")
     .update({
       deleted_at: now,
       updated_by: profile.userId,
     })
     .eq("id", request.id)
-    .eq("organization_id", profile.employee.organizationId);
+    .eq("organization_id", profile.employee.organizationId)
+    .is("deleted_at", null);
 
   if (error) throw new Error(error.message);
 

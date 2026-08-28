@@ -65,6 +65,12 @@ export const CEO_SALARY_REVISION_DELTA_THRESHOLD = 25_000;
 /** Relative increase threshold requiring CEO authorization */
 export const CEO_SALARY_REVISION_PERCENT_THRESHOLD = 15;
 
+/**
+ * The executive approvals queue is a promotion-only decision surface; every request
+ * shown there mirrors a real `performance_promotions` record.
+ */
+export const PROMOTION_APPROVAL_TYPE: ExecutiveApprovalType = "executive_promotion";
+
 export const CEO_APPROVALS_SOURCE = {
   recruitmentCandidate: "recruitment_candidates",
   performancePromotion: "performance_promotions",

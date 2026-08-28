@@ -3,11 +3,12 @@ import { format, parseISO, startOfMonth, startOfWeek, subMonths } from "date-fns
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import {
   CEO_ACTIONABLE_APPROVAL_STATUSES,
+  CEO_APPROVALS_SOURCE,
   CEO_PENDING_APPROVAL_STATUSES,
   EXECUTIVE_APPROVAL_PRIORITY_LABELS,
   EXECUTIVE_APPROVAL_STATUS_LABELS,
   EXECUTIVE_APPROVAL_TYPE_LABELS,
-  EXECUTIVE_APPROVAL_TYPES,
+  PROMOTION_APPROVAL_TYPE,
 } from "@/lib/ceo/executive-approvals-constants";
 import { syncExecutiveApprovalsFromDomain } from "@/lib/ceo/services/ceo-approvals-sync";
 import {
@@ -15,7 +16,9 @@ import {
   fromHrms,
   unwrapRelation,
 } from "@/lib/reports/services/reports-utils";
+import { PROMOTION_STATUS_LABELS } from "@/lib/performance/constants";
 import { ceoApprovalsListParamsSchema } from "@/lib/validations/ceo-approvals";
+import type { PromotionStatus } from "@/types/performance";
 import type { UserProfile } from "@/types/auth";
 import type {
   CeoApprovalsCategoryCount,
@@ -26,6 +29,7 @@ import type {
   CeoApprovalsKpis,
   CeoApprovalsListParams,
   CeoApprovalsPageData,
+  CeoApprovalsPromotionDetail,
   CeoApprovalsQueueResult,
   ExecutiveApprovalPriority,
   ExecutiveApprovalStatus,
@@ -69,12 +73,27 @@ function avg(values: number[]) {
   return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
 }
 
+/**
+ * The executive approvals page is scoped to promotion decisions only. Every read on
+ * this page is restricted to requests mirrored from a real `performance_promotions`
+ * record so payroll, hiring, leave and other queues never leak into this view.
+ */
+function scopeToPromotions(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  query: any,
+) {
+  return query
+    .eq("source_module", CEO_APPROVALS_SOURCE.performancePromotion)
+    .eq("approval_type", PROMOTION_APPROVAL_TYPE)
+    .not("source_record_id", "is", null);
+}
+
 function applyListFilters(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   query: any,
   params: ReturnType<typeof parseParams>,
 ) {
-  if (params.approvalType) query = query.eq("approval_type", params.approvalType);
+  query = scopeToPromotions(query);
   if (params.priority) query = query.eq("priority", params.priority);
   if (params.departmentId) query = query.eq("department_id", params.departmentId);
   if (params.status) query = query.eq("request_status", params.status);
@@ -107,14 +126,16 @@ export async function getCeoApprovalsFilterLookups(
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
       .order("name"),
-    fromHrms(supabase, "executive_approval_requests")
-      .select(
-        "requested_by_employee_id, requester:requested_by_employee_id(id, first_name, last_name)",
-      )
-      .eq("organization_id", organizationId)
-      .is("deleted_at", null)
-      .in("request_status", [...CEO_PENDING_APPROVAL_STATUSES])
-      .not("requested_by_employee_id", "is", null),
+    scopeToPromotions(
+      fromHrms(supabase, "executive_approval_requests")
+        .select(
+          "requested_by_employee_id, requester:requested_by_employee_id(id, first_name, last_name)",
+        )
+        .eq("organization_id", organizationId)
+        .is("deleted_at", null)
+        .in("request_status", [...CEO_PENDING_APPROVAL_STATUSES])
+        .not("requested_by_employee_id", "is", null),
+    ),
     fromHrms(supabase, "employees")
       .select("id, first_name, last_name")
       .eq("organization_id", organizationId)
@@ -225,19 +246,18 @@ export async function getCeoApprovalsCategories(
   if (error) throw new Error(error.message);
 
   const rows = (data ?? []) as LooseRow[];
-  return EXECUTIVE_APPROVAL_TYPES.map((type) => {
-    const typed = rows.filter((row) => row.approval_type === type);
-    return {
-      type,
-      label: EXECUTIVE_APPROVAL_TYPE_LABELS[type],
-      pending: typed.filter((row) =>
+  return [
+    {
+      type: PROMOTION_APPROVAL_TYPE,
+      label: EXECUTIVE_APPROVAL_TYPE_LABELS[PROMOTION_APPROVAL_TYPE],
+      pending: rows.filter((row) =>
         CEO_PENDING_APPROVAL_STATUSES.includes(
           row.request_status as ExecutiveApprovalStatus,
         ),
       ).length,
-      total: typed.length,
-    };
-  });
+      total: rows.length,
+    },
+  ];
 }
 
 export async function listCeoApprovalsQueue(
@@ -408,6 +428,118 @@ export async function getCeoApprovalsInsights(
   };
 }
 
+const PROMOTION_APPROVAL_LEVEL_LABELS: Record<number, string> = {
+  1: "Manager",
+  2: "HR",
+  3: "Executive",
+};
+
+const PROMOTION_APPROVAL_STATUS_LABELS: Record<string, string> = {
+  pending: "Pending",
+  approved: "Approved",
+  rejected: "Rejected",
+  cancelled: "Cancelled",
+};
+
+/**
+ * Reads the real promotion record backing an executive request so the review popup
+ * shows the promotion itself rather than the mirrored queue metadata.
+ */
+async function loadPromotionDetail(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  promotionId: string,
+): Promise<CeoApprovalsPromotionDetail | null> {
+  const { data, error } = await fromHrms(supabase, "performance_promotions")
+    .select(
+      `id, promotion_status, current_salary, recommended_salary, reason, created_at, approved_at,
+       employee:employee_id(employee_code, first_name, last_name, department:department_id(name)),
+       recommender:recommended_by_employee_id(first_name, last_name),
+       current_designation:current_designation_id(title),
+       recommended_designation:recommended_designation_id(title)`,
+    )
+    .eq("id", promotionId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+
+  const row = data as LooseRow;
+  const employee = unwrapRelation(row.employee);
+  const recommender = unwrapRelation(row.recommender);
+  const department = unwrapRelation(employee?.department);
+  const currentSalary =
+    row.current_salary != null ? Number(row.current_salary) : null;
+  const proposedSalary =
+    row.recommended_salary != null ? Number(row.recommended_salary) : null;
+  const salaryIncrease =
+    currentSalary != null && proposedSalary != null
+      ? Math.round((proposedSalary - currentSalary) * 100) / 100
+      : null;
+
+  const { data: approvalRows, error: approvalsError } = await fromHrms(
+    supabase,
+    "performance_promotion_approvals",
+  )
+    .select(
+      `id, approval_level, approval_status, comments, acted_at,
+       approver:approver_employee_id(first_name, last_name)`,
+    )
+    .eq("promotion_id", promotionId)
+    .is("deleted_at", null)
+    .order("approval_level", { ascending: true });
+
+  if (approvalsError) throw new Error(approvalsError.message);
+
+  return {
+    promotionId: row.id as string,
+    employeeName: formatEmployeeName(employee?.first_name, employee?.last_name),
+    employeeCode: (employee?.employee_code as string | null) ?? null,
+    departmentName: (department?.name as string | null) ?? null,
+    currentDesignation:
+      (unwrapRelation(row.current_designation)?.title as string | null) ?? null,
+    proposedDesignation:
+      (unwrapRelation(row.recommended_designation)?.title as string | null) ?? null,
+    currentSalary,
+    proposedSalary,
+    salaryIncrease,
+    salaryIncreasePercent:
+      currentSalary != null && currentSalary > 0 && salaryIncrease != null
+        ? Math.round((salaryIncrease / currentSalary) * 1000) / 10
+        : null,
+    effectiveFrom: (row.approved_at as string | null) ?? null,
+    reason: (row.reason as string | null) ?? null,
+    statusLabel:
+      PROMOTION_STATUS_LABELS[row.promotion_status as PromotionStatus] ??
+      String(row.promotion_status),
+    recommendedByName: recommender
+      ? formatEmployeeName(recommender.first_name, recommender.last_name)
+      : null,
+    recommendedAt: row.created_at as string,
+    approvals: ((approvalRows ?? []) as LooseRow[]).map((item) => {
+      const approver = unwrapRelation(item.approver);
+      const level = Number(item.approval_level ?? 0);
+      const status = String(item.approval_status);
+      return {
+        id: item.id as string,
+        level,
+        levelLabel: PROMOTION_APPROVAL_LEVEL_LABELS[level] ?? `Level ${level}`,
+        status,
+        statusLabel: PROMOTION_APPROVAL_STATUS_LABELS[status] ?? status,
+        // Only a completed step has a meaningful actor; pending rows carry the creator.
+        actorName:
+          item.acted_at && approver
+            ? formatEmployeeName(approver.first_name, approver.last_name)
+            : null,
+        comments: (item.comments as string | null) ?? null,
+        actedAt: (item.acted_at as string | null) ?? null,
+      };
+    }),
+  };
+}
+
 export async function getCeoApprovalsDetail(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -415,26 +547,27 @@ export async function getCeoApprovalsDetail(
 ): Promise<CeoApprovalsDetail> {
   const organizationId = profile.employee.organizationId;
 
-  const { data, error } = await fromHrms(supabase, "executive_approval_requests")
-    .select(
-      `*,
+  const { data, error } = await scopeToPromotions(
+    fromHrms(supabase, "executive_approval_requests")
+      .select(
+        `*,
        department:department_id(name),
        requester:requested_by_employee_id(id, first_name, last_name, email),
        reviewer:reviewed_by_employee_id(first_name, last_name),
        escalator:escalated_by_employee_id(first_name, last_name),
        decider:decided_by_employee_id(first_name, last_name),
        forwarded:forwarded_to_employee_id(first_name, last_name)`,
-    )
-    .eq("id", requestId)
-    .eq("organization_id", organizationId)
-    .is("deleted_at", null)
-    .maybeSingle();
+      )
+      .eq("id", requestId)
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null),
+  ).maybeSingle();
 
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Approval request not found.");
 
   const row = data as LooseRow;
-  const [eventsRes, commentsRes, historyRes] = await Promise.all([
+  const [eventsRes, commentsRes, historyRes, promotion] = await Promise.all([
     fromHrms(supabase, "executive_approval_events")
       .select(
         `id, event_key, title, description, occurred_at,
@@ -462,6 +595,7 @@ export async function getCeoApprovalsDetail(
       .is("deleted_at", null)
       .order("decided_at", { ascending: false })
       .limit(5),
+    loadPromotionDetail(supabase, organizationId, row.source_record_id as string),
   ]);
 
   if (eventsRes.error) throw new Error(eventsRes.error.message);
@@ -561,6 +695,7 @@ export async function getCeoApprovalsDetail(
         createdAt: comment.created_at,
       };
     }),
+    promotion,
     canAct: CEO_ACTIONABLE_APPROVAL_STATUSES.includes(status),
     canDelete: true,
   };

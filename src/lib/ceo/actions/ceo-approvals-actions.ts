@@ -1,6 +1,7 @@
 "use server";
 
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import { toCeoApprovalErrorMessage } from "@/lib/ceo/approval-error-message";
 import {
   addExecutiveApprovalComment,
   approveExecutiveRequest,
@@ -113,12 +114,17 @@ export async function fetchCeoApprovalsDetailAction(input: {
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to load approval details.",
+      message: toCeoApprovalErrorMessage(
+        "load detail",
+        error,
+        "We could not load this approval. Please try again.",
+      ),
     };
   }
 }
 
 async function runDecision(
+  context: string,
   runner: () => Promise<void>,
   successMessage: string,
 ): Promise<CeoApprovalsActionResult> {
@@ -128,7 +134,11 @@ async function runDecision(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Action failed.",
+      message: toCeoApprovalErrorMessage(
+        context,
+        error,
+        "We could not complete this action. Please try again.",
+      ),
     };
   }
 }
@@ -141,8 +151,9 @@ export async function approveCeoApprovalAction(input: {
   const supabase = await createClient();
   const parsed = ceoApprovalsDecisionSchema.parse(input);
   return runDecision(
+    "approve",
     () => approveExecutiveRequest(supabase, profile, parsed),
-    "Approval recorded.",
+    "Promotion approved.",
   );
 }
 
@@ -155,8 +166,9 @@ export async function rejectCeoApprovalAction(input: {
   const supabase = await createClient();
   const parsed = ceoApprovalsRejectSchema.parse(input);
   return runDecision(
+    "reject",
     () => rejectExecutiveRequest(supabase, profile, parsed),
-    "Rejection recorded.",
+    "Promotion rejected.",
   );
 }
 
@@ -169,6 +181,7 @@ export async function clarifyCeoApprovalAction(input: {
   const supabase = await createClient();
   const parsed = ceoApprovalsClarificationSchema.parse(input);
   return runDecision(
+    "request clarification",
     () => requestClarificationOnExecutiveRequest(supabase, profile, parsed),
     "Clarification requested.",
   );
@@ -183,6 +196,7 @@ export async function reviseCeoApprovalAction(input: {
   const supabase = await createClient();
   const parsed = ceoApprovalsRevisionSchema.parse(input);
   return runDecision(
+    "request revision",
     () => sendBackExecutiveRequestForRevision(supabase, profile, parsed),
     "Sent back for revision.",
   );
@@ -197,6 +211,7 @@ export async function commentCeoApprovalAction(input: {
   const supabase = await createClient();
   const parsed = ceoApprovalsCommentSchema.parse(input);
   return runDecision(
+    "add comment",
     () => addExecutiveApprovalComment(supabase, profile, parsed),
     "Comment added.",
   );
@@ -211,6 +226,7 @@ export async function forwardCeoApprovalAction(input: {
   const supabase = await createClient();
   const parsed = ceoApprovalsForwardSchema.parse(input);
   return runDecision(
+    "forward",
     () => forwardExecutiveRequest(supabase, profile, parsed),
     "Request forwarded.",
   );
@@ -223,6 +239,7 @@ export async function deleteCeoApprovalAction(input: {
   const supabase = await createClient();
   const parsed = ceoApprovalsRequestIdSchema.parse(input);
   return runDecision(
+    "delete",
     () => deleteExecutiveRequest(supabase, profile, parsed),
     "Request removed.",
   );

@@ -11,8 +11,6 @@ import {
 import {
   EXECUTIVE_APPROVAL_PRIORITY_LABELS,
   EXECUTIVE_APPROVAL_STATUS_LABELS,
-  EXECUTIVE_APPROVAL_TYPE_LABELS,
-  EXECUTIVE_APPROVAL_TYPES,
 } from "@/lib/ceo/executive-approvals-constants";
 import {
   FILTER_ANY_VALUE,
@@ -25,7 +23,6 @@ import type {
   CeoApprovalsListParams,
   ExecutiveApprovalPriority,
   ExecutiveApprovalStatus,
-  ExecutiveApprovalType,
 } from "@/types/ceo-approvals";
 import {
   CEO_APPROVALS_SECTION_HELP,
@@ -38,7 +35,6 @@ type CeoApprovalsFiltersProps = {
   onChange: (next: Partial<CeoApprovalsListParams>) => void;
 };
 
-const TYPE_LABEL = "All Types";
 const PRIORITY_LABEL = "Any Priority";
 const STATUS_LABEL = "Any Status";
 const DEPARTMENT_LABEL = "All Departments";
@@ -55,7 +51,6 @@ export function CeoApprovalsFilters({
   lookups,
   onChange,
 }: CeoApprovalsFiltersProps) {
-  const typeValue = filters.approvalType ?? FILTER_ANY_VALUE;
   const priorityValue = filters.priority ?? FILTER_ANY_VALUE;
   const departmentValue = filters.departmentId ?? FILTER_ANY_VALUE;
   const statusValue = filters.status ?? FILTER_ANY_VALUE;
@@ -64,11 +59,6 @@ export function CeoApprovalsFilters({
     value: item.id,
     label: item.label,
   }));
-  const typeOptions = EXECUTIVE_APPROVAL_TYPES.map((type) => ({
-    value: type,
-    label: EXECUTIVE_APPROVAL_TYPE_LABELS[type],
-  }));
-
   return (
     <section className="w-full rounded-xl border bg-card p-3 shadow-sm sm:p-4">
       <div className="mb-3">
@@ -81,36 +71,6 @@ export function CeoApprovalsFilters({
         </SectionHelpButton>
       </div>
       <div className="flex w-full flex-wrap items-center gap-2 lg:flex-nowrap lg:gap-3">
-        <Select
-          value={typeValue}
-          onValueChange={(value) =>
-            onChange({
-              approvalType:
-                !value || value === FILTER_ANY_VALUE
-                  ? undefined
-                  : (value as ExecutiveApprovalType),
-              page: 1,
-            })
-          }
-        >
-          <SelectTrigger className="h-10 min-w-0 flex-1 basis-[10rem]">
-            <SelectValue placeholder={TYPE_LABEL}>
-              {filterSelectLabel(typeValue, TYPE_LABEL, typeOptions)}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent
-            alignItemWithTrigger={false}
-            className={MANAGER_FILTER_SELECT_CONTENT_CLASS}
-          >
-            <SelectItem value={FILTER_ANY_VALUE}>{TYPE_LABEL}</SelectItem>
-            {typeOptions.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
         <Select
           value={priorityValue}
           onValueChange={(value) =>
