@@ -2,9 +2,12 @@ import { redirect } from "next/navigation";
 
 import {
   previewEmailApproval,
+  processEmailApproval,
   resolveViewDetailPath,
 } from "@/lib/approvals/email-approval-service";
 import { ApprovalView, type ApprovalViewState } from "@/app/approval/[token]/approval-view";
+import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
+import type { ProcessOutcome } from "@/lib/approvals/types";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +28,16 @@ export default async function ApprovalPage({ params, searchParams }: PageProps) 
   const initialAction: "approve" | "reject" = action === "reject" ? "reject" : "approve";
   const preview = await previewEmailApproval(token);
 
+  let initialOutcome: ProcessOutcome | undefined;
+  if (initialAction === "approve" && preview.status === "ready") {
+    const ctx = await getRequestAuditContext();
+    initialOutcome = await processEmailApproval({
+      rawToken: token,
+      action: "approve",
+      context: { ip: ctx.ipAddress, userAgent: ctx.userAgent },
+    });
+  }
+
   let state: ApprovalViewState;
   if (preview.status === "ready") {
     state = {
@@ -39,10 +52,23 @@ export default async function ApprovalPage({ params, searchParams }: PageProps) 
   } else if (preview.status === "expired") {
     state = { kind: "error", tone: "expired", title: "This approval link has expired", message: preview.message };
   } else if (preview.status === "already_processed") {
-    state = { kind: "error", tone: "done", title: "Already completed", message: preview.message };
+    const isLeave = preview.summary?.heading.startsWith("Leave request");
+    state = {
+      kind: "error",
+      tone: "done",
+      title: isLeave ? "Already processed" : "Already completed",
+      message: preview.message,
+    };
   } else {
     state = { kind: "error", tone: "invalid", title: "Invalid link", message: preview.message };
   }
 
-  return <ApprovalView token={token} initialAction={initialAction} state={state} />;
+  return (
+    <ApprovalView
+      token={token}
+      initialAction={initialAction}
+      state={state}
+      initialOutcome={initialOutcome}
+    />
+  );
 }

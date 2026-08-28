@@ -38,6 +38,16 @@ function absoluteUrl(path: string): string {
   return `${siteConfig.url}${path}`;
 }
 
+function alreadyProcessedMessage(requestType: ApprovalRequestType): string {
+  return requestType === "leave"
+    ? "Leave request has already been processed."
+    : "This request has already been completed.";
+}
+
+function genericApprovalFailureMessage(): string {
+  return "We could not complete this action. Please sign in to the portal or try again later.";
+}
+
 async function fetchApproverName(
   client: AuthSupabaseClient,
   employeeId: string,
@@ -145,7 +155,13 @@ export async function previewEmailApproval(rawToken: string): Promise<PreviewOut
       return { status: "expired", message: "This approval link has expired." };
     }
     if (peek.reason === "consumed") {
-      return { status: "already_processed", message: "This request has already been completed." };
+      const row = await lookupApprovalToken(client, rawToken);
+      return {
+        status: "already_processed",
+        message: row
+          ? alreadyProcessedMessage(row.request_type)
+          : "This request has already been completed.",
+      };
     }
     return { status: "invalid", message: "This approval link is invalid." };
   }
@@ -159,7 +175,7 @@ export async function previewEmailApproval(rawToken: string): Promise<PreviewOut
   if (!summary.isPending) {
     return {
       status: "already_processed",
-      message: "This request has already been completed.",
+      message: alreadyProcessedMessage(peek.row.request_type),
       summary,
     };
   }
@@ -221,7 +237,10 @@ export async function processEmailApproval(params: {
   const summary = await handler.loadSummary(client, found.source_record_id);
   if (!summary) return { status: "invalid", message: "The request could not be found." };
   if (!summary.isPending) {
-    return { status: "already_processed", message: "This request has already been completed." };
+    return {
+      status: "already_processed",
+      message: alreadyProcessedMessage(found.request_type),
+    };
   }
 
   // Atomically claim the token so concurrent clicks cannot double-process.
@@ -235,7 +254,10 @@ export async function processEmailApproval(params: {
     if (claim.reason === "expired") {
       return { status: "expired", message: "This approval link has expired." };
     }
-    return { status: "already_processed", message: "This approval link has already been used." };
+    return {
+      status: "already_processed",
+      message: alreadyProcessedMessage(found.request_type),
+    };
   }
 
   await writeApplicationAudit(client, {
@@ -285,10 +307,13 @@ export async function processEmailApproval(params: {
         message: "You are not authorized to action this request.",
       };
     }
-    if (/pending/i.test(message)) {
-      return { status: "already_processed", message: "This request has already been completed." };
+    if (/pending|already processed/i.test(message)) {
+      return {
+        status: "already_processed",
+        message: alreadyProcessedMessage(found.request_type),
+      };
     }
-    return { status: "error", message };
+    return { status: "error", message: genericApprovalFailureMessage() };
   }
 
   await handler.markActedViaEmail(client, found.source_record_id, found.approver_employee_id);
