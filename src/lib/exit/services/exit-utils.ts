@@ -1,5 +1,7 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { formatCleanEmployeeName } from "@/lib/employees/parse-employee-name";
+import { hasPermission } from "@/lib/permissions/utils";
 import type { UserProfile } from "@/types/auth";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -34,6 +36,19 @@ export function isManagerRole(profile: UserProfile) {
 export function isCeoRole(profile: UserProfile) {
   return profile.roles.some((r) =>
     ["ceo", "founder", "co_founder"].includes(r.code),
+  );
+}
+
+/** Executive portal final resignation approval (permission + portal/role, not a single CEO user). */
+export function canPerformExecutiveExitApproval(profile: UserProfile): boolean {
+  if (!hasPermission(profile.permissionCodes, "exit.approve")) {
+    return false;
+  }
+  if (hasPermission(profile.permissionCodes, PORTAL_PERMISSIONS.ceo)) {
+    return true;
+  }
+  return profile.roles.some((r) =>
+    ["ceo", "founder", "co_founder", "super_admin"].includes(r.code),
   );
 }
 

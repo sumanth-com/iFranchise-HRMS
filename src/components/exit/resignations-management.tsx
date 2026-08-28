@@ -449,6 +449,7 @@ export function ResignationsManagement({
         title="Submit Resignation"
         description="Provide resignation details and preferred last working day."
         contentClassName="sm:max-w-lg"
+        showCancel={false}
         footer={
           <Button
             disabled={isPending}
@@ -558,15 +559,26 @@ export function ResignationsManagement({
             ? `${selected.employeeName} · ${exitStatusLabelForSettings(selected.exitStatus)}`
             : undefined
         }
+        showCancel={false}
         footer={
-          <Button
-            disabled={isPending}
-            variant={decisionType === "reject" ? "destructive" : "default"}
-            onClick={decisionForm.handleSubmit(onDecision)}
-          >
-            {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            {decisionType === "approve" ? "Approve" : "Reject"}
-          </Button>
+          <div className="flex w-full flex-wrap items-center justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPending}
+              onClick={() => setMode(null)}
+            >
+              Close
+            </Button>
+            <Button
+              disabled={isPending}
+              variant={decisionType === "reject" ? "destructive" : "default"}
+              onClick={decisionForm.handleSubmit(onDecision)}
+            >
+              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {decisionType === "approve" ? "Approve" : "Reject"}
+            </Button>
+          </div>
         }
       >
         <div className="space-y-4">

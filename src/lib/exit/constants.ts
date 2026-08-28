@@ -1,4 +1,6 @@
+import { canPerformExecutiveExitApproval } from "@/lib/exit/services/exit-utils";
 import { hasAnyPermission } from "@/lib/permissions/utils";
+import type { UserProfile } from "@/types/auth";
 import type { ExitAssetReturnStatus, ExitClearanceStatus, ExitSettlementStatus, ExitStatus } from "@/types/exit";
 
 export const EXIT_ROUTES = {
@@ -112,11 +114,9 @@ export function canCreateExit(codes: string[]) {
 export function canApproveExit(codes: string[]) {
   return hasAnyPermission(codes, ["exit.approve"]);
 }
-export function canCeoApproveExit(codes: string[], profile?: { roles: { code: string }[] }) {
-  if (profile?.roles.some((r) => ["ceo", "founder", "co_founder"].includes(r.code))) {
-    return hasAnyPermission(codes, ["exit.approve"]);
-  }
-  return false;
+export function canCeoApproveExit(codes: string[], profile?: UserProfile) {
+  if (!profile) return hasAnyPermission(codes, ["exit.approve"]);
+  return canPerformExecutiveExitApproval(profile);
 }
 export function canClearanceExit(codes: string[]) {
   return hasAnyPermission(codes, ["exit.clearance", "exit.approve"]);
