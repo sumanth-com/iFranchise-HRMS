@@ -590,7 +590,6 @@ export async function submitCandidateOnboardingAction(): Promise<ActionResult> {
     if (!caseId) return { success: false, message: "Session expired" };
 
     await submitOnboardingForReview(caseId);
-    await clearCandidateSession();
     return { success: true, message: "Onboarding submitted for HR review" };
   } catch (error) {
     return { success: false, message: error instanceof Error ? error.message : "Submit failed" };

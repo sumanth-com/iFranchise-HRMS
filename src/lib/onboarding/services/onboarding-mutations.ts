@@ -770,7 +770,14 @@ export async function saveOnboardingSection(
     .from("onboarding_cases")
     .update({ status: "in_progress", updated_at: now })
     .eq("id", caseId)
-    .in("status", ["invitation_sent", "invitation_viewed", "corrections_requested", "draft", "documents_uploaded"]);
+    .in("status", [
+      "invitation_sent",
+      "invitation_viewed",
+      "corrections_requested",
+      "pending_hr_review",
+      "draft",
+      "documents_uploaded",
+    ]);
 
   await refreshCompletionPercent(caseId);
 }
@@ -789,6 +796,7 @@ export async function uploadOnboardingDocument(
   },
 ): Promise<string> {
   const admin = createAdminClient();
+  const now = new Date().toISOString();
   const path = `${organizationId}/${caseId}/${crypto.randomUUID()}-${input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
 
   const { error: uploadError } = await admin.storage
@@ -797,32 +805,83 @@ export async function uploadOnboardingDocument(
 
   if (uploadError) throw new Error(uploadError.message);
 
-  const { data, error } = await supabase
+  const { data: existing } = await supabase
     .schema("hrms")
     .from("onboarding_documents")
-    .insert({
-      case_id: caseId,
-      document_category: input.documentCategory,
-      document_type_code: input.documentTypeCode,
-      storage_path: path,
-      file_name: input.fileName,
-      file_size: input.fileSize,
-      mime_type: input.mimeType,
-      review_status: "pending",
-    })
     .select("id")
-    .single();
+    .eq("case_id", caseId)
+    .eq("document_category", input.documentCategory)
+    .eq("document_type_code", input.documentTypeCode)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  if (error) throw new Error(error.message);
+  let documentId: string;
 
-  await supabase
+  if (existing) {
+    const { data: updated, error: updateError } = await supabase
+      .schema("hrms")
+      .from("onboarding_documents")
+      .update({
+        storage_path: path,
+        file_name: input.fileName,
+        file_size: input.fileSize,
+        mime_type: input.mimeType,
+        review_status: "pending",
+        hr_comment: null,
+        reviewed_by: null,
+        reviewed_at: null,
+        updated_at: now,
+      })
+      .eq("id", existing.id)
+      .select("id")
+      .single();
+
+    if (updateError) throw new Error(updateError.message);
+    documentId = updated.id;
+  } else {
+    const { data, error } = await supabase
+      .schema("hrms")
+      .from("onboarding_documents")
+      .insert({
+        case_id: caseId,
+        document_category: input.documentCategory,
+        document_type_code: input.documentTypeCode,
+        storage_path: path,
+        file_name: input.fileName,
+        file_size: input.fileSize,
+        mime_type: input.mimeType,
+        review_status: "pending",
+      })
+      .select("id")
+      .single();
+
+    if (error) throw new Error(error.message);
+    documentId = data.id;
+  }
+
+  const { data: caseRow } = await admin
     .schema("hrms")
     .from("onboarding_cases")
-    .update({ status: "documents_uploaded", updated_at: new Date().toISOString() })
-    .eq("id", caseId);
+    .select("status")
+    .eq("id", caseId)
+    .maybeSingle();
+
+  const caseUpdate: Record<string, unknown> = { updated_at: now };
+  if (
+    caseRow?.status === "corrections_requested" ||
+    caseRow?.status === "pending_hr_review"
+  ) {
+    caseUpdate.status = "corrections_requested";
+  } else {
+    caseUpdate.status = "documents_uploaded";
+  }
+
+  await supabase.schema("hrms").from("onboarding_cases").update(caseUpdate).eq("id", caseId);
 
   await refreshCompletionPercent(caseId);
-  return data.id;
+  return documentId;
 }
 
 export async function savePolicyAcknowledgements(caseId: string, policyCodes: string[]) {
@@ -927,6 +986,17 @@ export async function submitOnboardingForReview(caseId: string, actorUserId?: st
   const completionPercent = await refreshCompletionPercent(caseId);
   const now = new Date().toISOString();
 
+  const { data: existingCase } = await admin
+    .schema("hrms")
+    .from("onboarding_cases")
+    .select("status")
+    .eq("id", caseId)
+    .maybeSingle();
+
+  const wasCorrectionResubmit =
+    existingCase?.status === "corrections_requested" ||
+    existingCase?.status === "pending_hr_review";
+
   const { error } = await admin
     .schema("hrms")
     .from("onboarding_cases")
@@ -941,8 +1011,10 @@ export async function submitOnboardingForReview(caseId: string, actorUserId?: st
   if (error) throw new Error(error.message);
 
   await addTimelineEvent(admin, caseId, {
-    eventType: "submitted",
-    title: "Onboarding submitted for HR review",
+    eventType: wasCorrectionResubmit ? "corrections_resubmitted" : "submitted",
+    title: wasCorrectionResubmit
+      ? "Corrected onboarding resubmitted for HR review"
+      : "Onboarding submitted for HR review",
     actorUserId,
   });
 }
@@ -977,6 +1049,47 @@ export async function reviewOnboardingDocument(
     description: hrComment ?? undefined,
     actorUserId: profile.userId,
   });
+
+  if (reviewStatus === "correction_requested") {
+    const organizationId = profile.employee.organizationId;
+    const detail = await getOnboardingCaseDetail(supabase, organizationId, data.case_id);
+
+    const caseUpdate: Record<string, unknown> = {
+      status: "corrections_requested",
+      onboarding_account_active: true,
+      updated_at: now,
+    };
+    if (hrComment?.trim()) {
+      caseUpdate.correction_notes = hrComment.trim();
+    }
+
+    await supabase
+      .schema("hrms")
+      .from("onboarding_cases")
+      .update(caseUpdate)
+      .eq("id", data.case_id);
+
+    await addTimelineEvent(supabase, data.case_id, {
+      eventType: "corrections_requested",
+      title: "Corrections requested",
+      description: hrComment ?? undefined,
+      actorUserId: profile.userId,
+    });
+
+    const portalLoginUrl = `${siteConfig.url}${ONBOARDING_ROUTES.login}`;
+    const correctionsEmail = renderOnboardingCorrectionsEmail({
+      candidateName: detail.fullName,
+      personalEmail: detail.personalEmail,
+      portalLoginUrl,
+      correctionNotes: hrComment ?? detail.correctionNotes ?? null,
+    });
+    await sendEmail({
+      to: detail.personalEmail,
+      subject: correctionsEmail.subject,
+      html: correctionsEmail.html,
+      text: correctionsEmail.text,
+    });
+  }
 }
 
 export async function processOnboardingReview(
