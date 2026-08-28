@@ -3,10 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { ArrowRight } from "lucide-react";
 
 import brandLogo from "@/assets/Logo.png";
+import { LandingCtaContext } from "@/components/landing/landing-cta-provider";
 import { PUBLIC_LANDING_ROUTE, WHATS_NEW_ROUTE } from "@/lib/auth/constants";
 import { navigateToLogin } from "@/lib/landing/navigate-to-login";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,10 @@ function NavbarChrome({ compact = false }: PublicNavbarProps) {
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const pathname = usePathname();
   const isLandingRoute = pathname === PUBLIC_LANDING_ROUTE;
+  const landingCta = useContext(LandingCtaContext);
+  const isLandingCta = landingCta != null;
+  const showGetStarted = isLandingCta && landingCta.isMobileOrTablet;
+  const handleCta = landingCta?.handleLandingCta ?? navigateToLogin;
 
   useEffect(() => {
     const onScroll = () => {
@@ -46,8 +51,6 @@ function NavbarChrome({ compact = false }: PublicNavbarProps) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Highlight the section currently under the reading line. IntersectionObserver
-  // keeps this off the scroll thread, and state only changes when the section does.
   useEffect(() => {
     if (compact || !isLandingRoute) {
       setActiveSection(null);
@@ -70,13 +73,14 @@ function NavbarChrome({ compact = false }: PublicNavbarProps) {
           SPY_SECTION_IDS.find((id) => visible.has(id)) ?? null,
         );
       },
-      // A thin band across the upper-middle of the viewport acts as the reading line.
       { rootMargin: "-45% 0px -50% 0px" },
     );
 
     for (const element of elements) observer.observe(element);
     return () => observer.disconnect();
   }, [compact, isLandingRoute]);
+
+  const mobileCtaLabel = showGetStarted ? "Get Started" : "Sign In";
 
   return (
     <header className={cn("landing-nav", scrolled && "landing-nav--scrolled")}>
@@ -122,18 +126,15 @@ function NavbarChrome({ compact = false }: PublicNavbarProps) {
         )}
 
         <div className="landing-nav-actions">
-          <button
-            type="button"
-            onClick={navigateToLogin}
-            className={
-              compact
-                ? "landing-nav-signin landing-nav-signin--outline"
-                : "landing-nav-signin hidden sm:inline-flex"
-            }
-          >
-            Sign In
-            {!compact ? <ArrowRight className="size-3.5" aria-hidden /> : null}
-          </button>
+          {compact ? (
+            <button
+              type="button"
+              onClick={handleCta}
+              className="landing-nav-signin landing-nav-signin--outline"
+            >
+              Sign In
+            </button>
+          ) : null}
 
           {!compact ? (
             <button
@@ -169,11 +170,11 @@ function NavbarChrome({ compact = false }: PublicNavbarProps) {
                   type="button"
                   onClick={() => {
                     setMenuOpen(false);
-                    navigateToLogin();
+                    handleCta();
                   }}
                   className="landing-nav-signin mt-2 w-full"
                 >
-                  Sign In
+                  {mobileCtaLabel}
                   <ArrowRight className="size-4" aria-hidden />
                 </button>
               </nav>
