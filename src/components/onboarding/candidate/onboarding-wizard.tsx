@@ -231,7 +231,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   );
   const [stepAnimKey, setStepAnimKey] = useState(0);
   const [uploadSlots, setUploadSlots] = useState<
-    Record<string, { uploading: boolean; pendingFileName?: string }>
+    Record<string, { uploading: boolean; pendingFileName?: string; error?: string }>
   >({});
   const contentScrollRef = useRef<HTMLDivElement>(null);
   const [autoSaveState, setAutoSaveState] = useState<"idle" | "saving" | "saved">("idle");
@@ -242,7 +242,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
   const contextWithOptimisticDocs = useMemo(() => {
     const extras = Object.entries(uploadSlots)
-      .filter(([, slot]) => Boolean(slot.pendingFileName) && !slot.uploading)
+      .filter(([, slot]) => Boolean(slot.pendingFileName))
       .flatMap(([key, slot]) => {
         const separator = key.indexOf(":");
         if (separator <= 0) return [];
@@ -277,6 +277,24 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
       documents: [...context.documents, ...extras],
     };
   }, [context, uploadSlots]);
+
+  // Drop local upload slots once the server context includes the saved document.
+  useEffect(() => {
+    const savedKeys = new Set(
+      context.documents.map((doc) => uploadSlotKey(doc.documentCategory, doc.documentTypeCode)),
+    );
+    setUploadSlots((prev) => {
+      if (Object.keys(prev).length === 0) return prev;
+      const next = { ...prev };
+      let changed = false;
+      for (const [key, slot] of Object.entries(prev)) {
+        if (slot.uploading || !savedKeys.has(key)) continue;
+        delete next[key];
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [context.documents]);
 
   const completedSteps = useMemo(
     () => getCompletedStepIndices(contextWithOptimisticDocs),
@@ -651,11 +669,12 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   function uploadMeta(documentCategory: string, documentTypeCode: string) {
     const key = uploadSlotKey(documentCategory, documentTypeCode);
     const slot = uploadSlots[key];
-    const saved = documentRecord(context, documentCategory, documentTypeCode);
+    const saved = documentRecord(contextWithOptimisticDocs, documentCategory, documentTypeCode);
     return {
       fileName: saved?.fileName ?? slot?.pendingFileName ?? null,
       uploading: Boolean(slot?.uploading),
       pendingFileName: slot?.pendingFileName ?? null,
+      uploadError: slot?.error ?? null,
       reviewStatus: saved?.reviewStatus ?? null,
       hrComment: saved?.hrComment ?? null,
     };
@@ -665,7 +684,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
     const key = uploadSlotKey(documentCategory, documentTypeCode);
     setUploadSlots((prev) => ({
       ...prev,
-      [key]: { uploading: true, pendingFileName: file.name },
+      [key]: { uploading: true, pendingFileName: file.name, error: undefined },
     }));
 
     const fd = new FormData();
@@ -678,35 +697,25 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
         const result = await uploadCandidateDocumentAction(fd);
         if (!result.success) {
           toast.error(result.message);
-          setUploadSlots((prev) => {
-            const next = { ...prev };
-            delete next[key];
-            return next;
-          });
+          setUploadSlots((prev) => ({
+            ...prev,
+            [key]: { uploading: false, pendingFileName: file.name, error: result.message },
+          }));
           return;
         }
         toast.success(`${file.name} uploaded`);
-        // Keep the filename visible immediately; clear once server context refreshes.
         setUploadSlots((prev) => ({
           ...prev,
-          [key]: { uploading: false, pendingFileName: file.name },
+          [key]: { uploading: false, pendingFileName: file.name, error: undefined },
         }));
-        try {
-          await onRefresh();
-        } finally {
-          setUploadSlots((prev) => {
-            const next = { ...prev };
-            delete next[key];
-            return next;
-          });
-        }
+        await onRefresh();
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Upload failed");
-        setUploadSlots((prev) => {
-          const next = { ...prev };
-          delete next[key];
-          return next;
-        });
+        const message = error instanceof Error ? error.message : "Upload failed";
+        toast.error(message);
+        setUploadSlots((prev) => ({
+          ...prev,
+          [key]: { uploading: false, pendingFileName: file.name, error: message },
+        }));
       }
     })();
   }
@@ -766,7 +775,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
 
   function goNext() {
     const validation = validateCurrentSection();
-    const sectionComplete = isOnboardingSectionComplete(sectionKey, context);
+    const sectionComplete = isOnboardingSectionComplete(sectionKey, contextWithOptimisticDocs);
     const hasChanges = sectionHasDraftChanges();
 
     if (!validation.valid) {
@@ -994,6 +1003,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                       pendingFileName={meta.pendingFileName}
                       reviewStatus={meta.reviewStatus}
                       hrComment={meta.hrComment}
+                      uploadError={meta.uploadError}
                       onSelectFile={(file) => uploadDoc("identity", doc.code, file)}
                     />
                   );
@@ -1015,6 +1025,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                       pendingFileName={meta.pendingFileName}
                       reviewStatus={meta.reviewStatus}
                       hrComment={meta.hrComment}
+                      uploadError={meta.uploadError}
                       onSelectFile={(file) => uploadDoc("identity", doc.code, file)}
                     />
                   );
@@ -1185,6 +1196,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
                   pendingFileName={uploadMeta("bank", "cancelled_cheque").pendingFileName}
                   reviewStatus={uploadMeta("bank", "cancelled_cheque").reviewStatus}
                   hrComment={uploadMeta("bank", "cancelled_cheque").hrComment}
+                  uploadError={uploadMeta("bank", "cancelled_cheque").uploadError}
                   onSelectFile={(file) => uploadDoc("bank", "cancelled_cheque", file)}
                 />
               </div>

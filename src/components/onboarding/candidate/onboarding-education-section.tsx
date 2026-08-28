@@ -49,6 +49,7 @@ type UploadMeta = {
   fileName: string | null;
   uploading: boolean;
   pendingFileName: string | null;
+  uploadError?: string | null;
   reviewStatus?: string | null;
   hrComment?: string | null;
 };
@@ -148,6 +149,7 @@ export function OnboardingEducationSection({
         pendingFileName={meta.pendingFileName}
         reviewStatus={meta.reviewStatus}
         hrComment={meta.hrComment}
+        uploadError={meta.uploadError}
         onSelectFile={(file) => onUpload(code, file)}
       />
     );

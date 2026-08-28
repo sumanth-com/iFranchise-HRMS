@@ -28,6 +28,7 @@ type SignedOfferUploadMeta = {
   fileName: string | null;
   uploading: boolean;
   pendingFileName?: string | null;
+  uploadError?: string | null;
 };
 
 type OnboardingOfferAcceptanceSectionProps = {
@@ -303,6 +304,11 @@ export function OnboardingOfferAcceptanceSection({
                   }}
                 />
               </div>
+              {signedOfferMeta.uploadError ? (
+                <p className="mt-2 text-xs font-medium text-destructive">
+                  {signedOfferMeta.uploadError} Choose the file again to retry.
+                </p>
+              ) : null}
             </div>
 
             <label className="mt-4 flex w-full cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/15 p-4">

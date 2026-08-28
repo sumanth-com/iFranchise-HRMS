@@ -23,6 +23,7 @@ type OnboardingDocumentUploadProps = {
   uploadHint?: string;
   reviewStatus?: string | null;
   hrComment?: string | null;
+  uploadError?: string | null;
   onSelectFile: (file: File) => void;
 };
 
@@ -39,6 +40,7 @@ export function OnboardingDocumentUpload({
   uploadHint: uploadHintProp,
   reviewStatus,
   hrComment,
+  uploadError,
   onSelectFile,
 }: OnboardingDocumentUploadProps) {
   const displayName = fileName ?? pendingFileName;
@@ -153,6 +155,11 @@ export function OnboardingDocumentUpload({
         <p className="mt-3 text-center text-[11px] leading-relaxed text-muted-foreground">
           {uploadHint}
         </p>
+        {uploadError ? (
+          <p className="mt-2 text-center text-[11px] font-medium text-destructive">
+            {uploadError} Choose the file again to retry.
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -228,6 +235,11 @@ export function OnboardingDocumentUpload({
       />
 
       <p className="text-[11px] text-muted-foreground">{uploadHint}</p>
+      {uploadError ? (
+        <p className="text-[11px] font-medium text-destructive">
+          {uploadError} Choose the file again to retry.
+        </p>
+      ) : null}
     </div>
   );
 }
