@@ -123,7 +123,8 @@ async function signOutExpiredIdleSession(
 
   const redirectUrl = request.nextUrl.clone();
   redirectUrl.pathname = AUTH_ROUTES.login;
-  redirectUrl.search = "expired=1";
+  // Clear the query so an expired session lands on the plain login screen.
+  redirectUrl.search = "";
   const redirectResponse = NextResponse.redirect(redirectUrl);
   redirectResponse.cookies.delete(IDLE_ACTIVITY_COOKIE);
   return redirectResponse;
@@ -251,10 +252,6 @@ export async function middleware(request: NextRequest) {
       `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`,
     );
 
-    if (searchParams.get("expired") === "1") {
-      redirectUrl.searchParams.set("expired", "1");
-    }
-
     return NextResponse.redirect(redirectUrl);
   }
 
@@ -268,7 +265,7 @@ export async function middleware(request: NextRequest) {
 
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = AUTH_ROUTES.login;
-    redirectUrl.search = "expired=1";
+    redirectUrl.search = "";
     return NextResponse.redirect(redirectUrl);
   }
 

@@ -84,7 +84,7 @@ export function useIdleSession() {
         if (digest.startsWith("NEXT_REDIRECT")) {
           return;
         }
-        window.location.assign("/login?expired=1");
+        window.location.assign("/login");
       }
     };
 

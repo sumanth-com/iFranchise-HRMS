@@ -112,7 +112,7 @@ export async function idleSessionLogoutAction(): Promise<void> {
   cookieStore.delete(IDLE_ACTIVITY_COOKIE);
   await supabase.auth.signOut();
   await clearPermissionCacheCookie();
-  redirect(`${AUTH_ROUTES.login}?expired=1`);
+  redirect(AUTH_ROUTES.login);
 }
 
 export async function loginAction(
