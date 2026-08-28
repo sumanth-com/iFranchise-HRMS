@@ -42,6 +42,7 @@ import {
   type OnboardingStatus,
 } from "@/types/onboarding";
 import type { OnboardingCaseDetail } from "@/types/onboarding";
+import { cn } from "@/lib/utils";
 
 type OnboardingReviewViewProps = {
   detail: OnboardingCaseDetail;
@@ -390,12 +391,15 @@ export function OnboardingReviewView({
                 return (
                   <div
                     key={key}
-                    className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-sm ${
-                      done ? "border-emerald-200 bg-emerald-50/50" : "bg-muted/20"
-                    }`}
+                    className={cn(
+                      "flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-sm dark:border-border dark:bg-card",
+                      done
+                        ? "border-emerald-200 bg-emerald-50/50"
+                        : "border-border/50 bg-muted/20",
+                    )}
                   >
                     {done ? (
-                      <Check className="h-4 w-4 shrink-0 text-emerald-600" />
+                      <Check className="h-4 w-4 shrink-0 text-emerald-600 dark:text-white" />
                     ) : (
                       <Clock className="h-4 w-4 shrink-0 text-muted-foreground" />
                     )}

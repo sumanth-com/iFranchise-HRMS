@@ -9,94 +9,21 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
-import { Input } from "@/components/common/input";
 import { NoticeDialog } from "@/components/common/notice-dialog";
-import { PhoneInput } from "@/components/common/phone-input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/common/select";
-import { SearchableSelect } from "@/components/common/searchable-select";
 import { EmployeeIdCard } from "@/components/employees/employee-id-card";
+import { MyProfileFormFields } from "@/components/employee/profile/my-profile-form-fields";
 import {
-  EMERGENCY_RELATIONSHIP_OPTIONS,
   formatRelationshipLabel,
   normalizeCountryForSelect,
   normalizeRelationshipValue,
 } from "@/lib/employee/profile-contact";
-import { COUNTRIES, INDIAN_STATES, STATE_DISTRICTS } from "@/lib/geo/india";
 import { updateEmployeeSelfProfileAction } from "@/lib/employees/actions";
-import { cn } from "@/lib/utils";
 import type { MyProfileBundle } from "@/types/my-profile";
 import {
   employeeSelfProfilePreferencesOnlySchema,
   employeeSelfProfileSchema,
   type EmployeeSelfProfileInput,
 } from "@/lib/validations/employee";
-
-const PROFILE_SELECT_CONTENT_CLASS = "min-w-[14rem] max-w-[20rem]";
-
-function ProfileFieldControl({
-  children,
-  wide,
-}: {
-  children: React.ReactNode;
-  wide?: boolean;
-}) {
-  return (
-    <div className={wide ? "w-full max-w-md" : "w-full max-w-xs"}>{children}</div>
-  );
-}
-
-function ProfileFieldError({ message }: { message?: string }) {
-  if (!message) return null;
-  return <p className="text-xs text-destructive text-right">{message}</p>;
-}
-
-function ProfileInfoRow({
-  label,
-  value,
-  editing,
-  children,
-  valueClassName,
-  required,
-}: {
-  label: string;
-  value?: string;
-  editing?: boolean;
-  children?: React.ReactNode;
-  valueClassName?: string;
-  required?: boolean;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-4 border-b border-border/70 px-5 py-2.5 last:border-b-0 sm:gap-6">
-      <dt className="w-40 shrink-0 pt-0.5 text-sm font-medium text-foreground/90 dark:text-foreground/90 sm:w-48">
-        {label}
-        {required ? (
-          <span className="font-semibold text-destructive" aria-hidden="true">
-            {" "}
-            *
-          </span>
-        ) : null}
-      </dt>
-      <dd
-        className={cn(
-          "min-w-0 flex-1 text-right text-sm font-medium text-foreground",
-          valueClassName,
-        )}
-      >
-        {editing && children ? (
-          <div className="flex justify-end">{children}</div>
-        ) : (
-          value ?? "—"
-        )}
-      </dd>
-    </div>
-  );
-}
 
 function formatJoiningDate(value: string | null) {
   if (!value) return "—";
@@ -173,8 +100,6 @@ export function MyProfileView({
     },
   });
 
-  const employeeName = `${data.firstName} ${data.lastName}`.trim() || data.firstName;
-
   const emergencyRelationship = watch("emergencyContactRelationship");
   const reportingManagerId = watch("reportingManagerId");
   const personalPhone = watch("personalPhone") ?? "";
@@ -245,20 +170,11 @@ export function MyProfileView({
     });
   }
 
-  const helperText = isEditing
-    ? canEditContactDetails
-      ? canEditReportingManager
-        ? "Save your personal and contact details. Employment fields are managed separately."
-        : "Save your phone, address, and emergency contact. Employment fields stay read-only."
-      : "Profile photo can be updated on your digital ID. Other fields are managed by HR."
-    : canEditContactDetails
-      ? "View and update your personal contact details below. Employment information is managed separately."
-      : "View your employment and contact details below. You can update your profile photo. Other fields are managed by HR.";
-
   const pathname = usePathname();
   const isCeo = pathname.startsWith("/ceo");
   const isManager = pathname.startsWith("/manager");
   const isEmployee = pathname.startsWith("/employee");
+  const isHrPortal = pathname.startsWith("/dashboard");
 
   const selectedManagerLabel =
     !reportingManagerId || reportingManagerId === "none"
@@ -269,389 +185,102 @@ export function MyProfileView({
           : null) ??
         "Select manager";
 
+  const displayName = `${data.firstName} ${data.lastName}`.trim() || data.firstName;
+  const roleLine = isCeo
+    ? "CEO"
+    : [
+        data.designationTitle,
+        isHrPortal ? "HR" : data.departmentName,
+      ]
+        .filter(Boolean)
+        .join(" · ") || "—";
+
   return (
-    <div className="w-full max-w-5xl">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
-              {employeeName}
-            </h1>
-            <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-              {data.employmentStatus === "active" ? "Active" : formatDisplayLabel(data.employmentStatus)}
-            </span>
-          </div>
-          <p className="max-w-2xl text-xs text-muted-foreground sm:text-sm">{helperText}</p>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-2">
-          {isEditing ? (
-            <>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={isPending}
-                onClick={handleCancelEdit}
-              >
-                <X className="size-4" />
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                disabled={isPending}
-                onClick={handleSubmit(onSubmit)}
-              >
-                {isPending ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Save className="size-4" />
-                )}
-                Save
-              </Button>
-            </>
-          ) : (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={handleStartEdit}
-            >
-              <Pencil className="size-4" />
-              Edit
-            </Button>
-          )}
-        </div>
-      </div>
-
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <form
         onSubmit={handleSubmit(onSubmit)}
-        className="grid items-stretch gap-6 lg:grid-cols-[minmax(0,1fr)_19rem] xl:grid-cols-[minmax(0,1fr)_20rem]"
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
       >
-        <div className="flex flex-col space-y-3">
-          <h2 className="text-base font-semibold text-foreground">
-            Employee Information
-          </h2>
-          <dl className="flex-1 rounded-xl border bg-card shadow-xs">
-            <input type="hidden" {...register("personalEmail")} />
-            <input type="hidden" {...register("timezone")} />
-            <input type="hidden" {...register("language")} />
-
-          {isEmployee ? (
-            <ProfileInfoRow
-              label="Manager"
-              value={data.reportingManagerName ?? "—"}
-              editing={isEditing && canEditReportingManager}
-            >
-              <ProfileFieldControl>
-                <Select
-                  value={reportingManagerId || "none"}
-                  onValueChange={(value) => {
-                    if (!value) return;
-                    setValue("reportingManagerId", value === "none" ? "" : value, {
-                      shouldValidate: true,
-                    });
-                  }}
-                  disabled={isPending}
-                >
-                  <SelectTrigger className="h-8 w-full">
-                    <SelectValue placeholder="Select manager">
-                      {() => selectedManagerLabel}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent
-                    align="end"
-                    alignItemWithTrigger={false}
-                    className={PROFILE_SELECT_CONTENT_CLASS}
-                  >
-                    <SelectItem value="none">None</SelectItem>
-                    {managerOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </ProfileFieldControl>
-            </ProfileInfoRow>
-          ) : isManager && data.reportingManagerName ? (
-            <ProfileInfoRow label="HR" value={data.reportingManagerName} />
-          ) : null}
-
-          {!isCeo ? (
-            <ProfileInfoRow label="Joining date" value={formatJoiningDate(data.dateOfJoining)} />
-          ) : null}
-
-          <ProfileInfoRow label="Company email" value={data.email} />
-
-          <ProfileInfoRow
-            label="Personal phone"
-            value={data.profileSettings.personalPhone || "—"}
-            editing={isEditing && canEditContactDetails}
-            required={contactFieldsRequired}
-          >
-            <ProfileFieldControl>
-              <div className="flex w-full flex-col gap-1">
-                <PhoneInput
-                  id="personalPhone"
-                  value={personalPhone}
-                  onChange={(value) =>
-                    setValue("personalPhone", value, { shouldValidate: true })
-                  }
-                  disabled={isPending}
+        <div
+          className="relative shrink-0 overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-primary via-primary/95 to-indigo-600 px-4 py-5 sm:px-6 sm:py-6 dark:border-primary/30 dark:from-primary/90 dark:via-indigo-950 dark:to-slate-950"
+        >
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.22] dark:hidden"
+            aria-hidden
+            style={{
+              backgroundImage:
+                "linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.35) 40%, rgba(255,255,255,0.35) 42%, transparent 42%), linear-gradient(225deg, transparent 45%, rgba(255,255,255,0.2) 45%, rgba(255,255,255,0.2) 47%, transparent 47%)",
+              backgroundSize: "48px 48px",
+            }}
+          />
+          <div
+            className="pointer-events-none absolute inset-0 hidden opacity-[0.14] dark:block"
+            aria-hidden
+            style={{
+              backgroundImage:
+                "linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.12) 40%, rgba(255,255,255,0.12) 42%, transparent 42%), linear-gradient(225deg, transparent 45%, rgba(255,255,255,0.08) 45%, rgba(255,255,255,0.08) 47%, transparent 47%)",
+              backgroundSize: "48px 48px",
+            }}
+          />
+          <div
+            className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/5 via-transparent to-black/10 dark:from-white/5 dark:to-black/35"
+            aria-hidden
+          />
+          <div className="absolute right-3 top-3 z-10 sm:right-4 sm:top-4">
+            {isEditing ? (
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
                   size="sm"
-                  showHint
-                  required={contactFieldsRequired}
-                  error={errors.personalPhone?.message}
-                />
-              </div>
-            </ProfileFieldControl>
-          </ProfileInfoRow>
-
-          <ProfileInfoRow
-            label="Address line 1"
-            value={data.profileSettings.address.addressLine1 || "—"}
-            valueClassName="leading-snug whitespace-normal"
-            editing={isEditing && canEditContactDetails}
-            required={contactFieldsRequired}
-          >
-            <ProfileFieldControl wide>
-              <div className="flex w-full flex-col gap-1">
-                <Input
-                  placeholder="Street, building, area"
+                  variant="secondary"
+                  className="bg-white/95 text-foreground hover:bg-white"
                   disabled={isPending}
-                  className="h-8 w-full text-right"
-                  {...register("addressLine1")}
-                />
-                <ProfileFieldError message={errors.addressLine1?.message} />
-              </div>
-            </ProfileFieldControl>
-          </ProfileInfoRow>
-
-          <ProfileInfoRow
-            label="Address line 2"
-            value={data.profileSettings.address.addressLine2 || "—"}
-            valueClassName="leading-snug whitespace-normal"
-            editing={isEditing && canEditContactDetails}
-            required={contactFieldsRequired}
-          >
-            <ProfileFieldControl wide>
-              <div className="flex w-full flex-col gap-1">
-                <Input
-                  placeholder="Apartment, suite, landmark"
-                  disabled={isPending}
-                  className="h-8 w-full text-right"
-                  {...register("addressLine2")}
-                />
-                <ProfileFieldError message={errors.addressLine2?.message} />
-              </div>
-            </ProfileFieldControl>
-          </ProfileInfoRow>
-
-          <ProfileInfoRow
-            label="State"
-            value={data.profileSettings.address.state || "—"}
-            editing={isEditing && canEditContactDetails}
-            required={contactFieldsRequired}
-          >
-            <ProfileFieldControl wide>
-              <div className="flex w-full flex-col gap-1">
-                <SearchableSelect
-                  options={INDIAN_STATES.map((state) => ({ value: state, label: state }))}
-                  value={addressState || null}
-                  onValueChange={(value) => {
-                    setValue("state", value ?? "", { shouldValidate: true });
-                    setValue("city", "", { shouldValidate: true });
-                  }}
-                  placeholder="Search state…"
-                  allowNone={false}
-                  disabled={isPending}
-                />
-                <ProfileFieldError message={errors.state?.message} />
-              </div>
-            </ProfileFieldControl>
-          </ProfileInfoRow>
-
-          <ProfileInfoRow
-            label="City"
-            value={data.profileSettings.address.city || "—"}
-            editing={isEditing && canEditContactDetails}
-            required={contactFieldsRequired}
-          >
-            <ProfileFieldControl wide>
-              <div className="flex w-full flex-col gap-1">
-                <SearchableSelect
-                  options={(STATE_DISTRICTS[addressState] ?? []).map((district) => ({
-                    value: district,
-                    label: district,
-                  }))}
-                  value={addressCity || null}
-                  onValueChange={(value) =>
-                    setValue("city", value ?? "", { shouldValidate: true })
-                  }
-                  placeholder="Search city…"
-                  allowNone={false}
-                  disabled={isPending}
-                  emptyMessage={
-                    addressState ? "No matches — type to search" : "Select a state first"
-                  }
-                />
-                <ProfileFieldError message={errors.city?.message} />
-              </div>
-            </ProfileFieldControl>
-          </ProfileInfoRow>
-
-          <ProfileInfoRow
-            label="Postal code"
-            value={data.profileSettings.address.postalCode || "—"}
-            editing={isEditing && canEditContactDetails}
-            required={contactFieldsRequired}
-          >
-            <ProfileFieldControl>
-              <div className="flex w-full flex-col gap-1">
-                <Input
-                  placeholder="Postal code"
-                  disabled={isPending}
-                  className="h-8 w-full text-right"
-                  {...register("postalCode")}
-                />
-                <ProfileFieldError message={errors.postalCode?.message} />
-              </div>
-            </ProfileFieldControl>
-          </ProfileInfoRow>
-
-          <ProfileInfoRow
-            label="Country"
-            value={normalizeCountryForSelect(data.profileSettings.address.country) || "—"}
-            editing={isEditing && canEditContactDetails}
-            required={contactFieldsRequired}
-          >
-            <ProfileFieldControl wide>
-              <div className="flex w-full flex-col gap-1">
-                <SearchableSelect
-                  options={COUNTRIES.map((country) => ({ value: country, label: country }))}
-                  value={addressCountry || null}
-                  onValueChange={(value) =>
-                    setValue("country", value ?? "", { shouldValidate: true })
-                  }
-                  placeholder="Search country…"
-                  allowNone={false}
-                  disabled={isPending}
-                />
-                <ProfileFieldError message={errors.country?.message} />
-              </div>
-            </ProfileFieldControl>
-          </ProfileInfoRow>
-
-          <ProfileInfoRow
-            label="Emergency relation"
-            value={relationshipDisplay}
-            editing={isEditing && canEditContactDetails}
-            required={contactFieldsRequired}
-          >
-            <ProfileFieldControl>
-              <div className="flex w-full flex-col gap-1">
-                <Select
-                  value={emergencyRelationship || undefined}
-                  onValueChange={(value) => {
-                    if (value) {
-                      setValue("emergencyContactRelationship", value, { shouldValidate: true });
-                    }
-                  }}
-                  disabled={isPending}
+                  onClick={handleCancelEdit}
                 >
-                  <SelectTrigger className="h-8 w-full">
-                    <SelectValue placeholder="Select relationship" />
-                  </SelectTrigger>
-                  <SelectContent
-                    align="end"
-                    alignItemWithTrigger={false}
-                    className={PROFILE_SELECT_CONTENT_CLASS}
-                  >
-                    {EMERGENCY_RELATIONSHIP_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <ProfileFieldError message={errors.emergencyContactRelationship?.message} />
-              </div>
-            </ProfileFieldControl>
-          </ProfileInfoRow>
-
-          <ProfileInfoRow
-            label="Emergency name"
-            value={data.profileSettings.emergencyContact.name || "—"}
-            editing={isEditing && canEditContactDetails}
-            required={contactFieldsRequired}
-          >
-            <ProfileFieldControl>
-              <div className="flex w-full flex-col gap-1">
-                <Input
-                  placeholder="Name"
-                  disabled={isPending}
-                  className="h-8 w-full text-right"
-                  {...register("emergencyContactName")}
-                />
-                <ProfileFieldError message={errors.emergencyContactName?.message} />
-              </div>
-            </ProfileFieldControl>
-          </ProfileInfoRow>
-
-          <ProfileInfoRow
-            label="Emergency contact"
-            value={data.profileSettings.emergencyContact.phone || "—"}
-            editing={isEditing && canEditContactDetails}
-            required={contactFieldsRequired}
-          >
-            <ProfileFieldControl>
-              <div className="flex w-full flex-col gap-1">
-                <PhoneInput
-                  id="emergencyContactPhone"
-                  value={emergencyContactPhone}
-                  onChange={(value) =>
-                    setValue("emergencyContactPhone", value, { shouldValidate: true })
-                  }
-                  disabled={isPending}
+                  <X className="size-4" />
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
                   size="sm"
-                  showHint
-                  required={contactFieldsRequired}
-                  error={errors.emergencyContactPhone?.message}
-                />
-              </div>
-            </ProfileFieldControl>
-          </ProfileInfoRow>
-
-          <ProfileInfoRow
-            label="Emergency email"
-            value={data.profileSettings.emergencyContact.email || "—"}
-            editing={isEditing && canEditContactDetails}
-            required={contactFieldsRequired}
-          >
-            <ProfileFieldControl>
-              <div className="flex flex-col gap-1">
-                <Input
-                  placeholder="Email"
-                  type="email"
+                  className="bg-white text-primary hover:bg-white/90"
                   disabled={isPending}
-                  className="h-8 w-full text-right"
-                  {...register("emergencyContactEmail")}
-                />
-                <ProfileFieldError message={errors.emergencyContactEmail?.message} />
+                  onClick={handleSubmit(onSubmit)}
+                >
+                  {isPending ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Save className="size-4" />
+                  )}
+                  Save
+                </Button>
               </div>
-            </ProfileFieldControl>
-          </ProfileInfoRow>
-
-        </dl>
+            ) : (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="bg-white/95 text-foreground hover:bg-white"
+                onClick={handleStartEdit}
+              >
+                <Pencil className="size-4" />
+                Edit
+              </Button>
+            )}
+          </div>
+          <div className="relative z-[1] flex flex-col items-center px-10 py-1 text-center sm:px-14">
+            <p className="text-xs font-medium uppercase tracking-wider text-primary-foreground/80">
+              My profile
+            </p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-primary-foreground sm:text-[1.65rem]">
+              {displayName}
+            </h1>
+            <p className="mt-1 text-sm text-primary-foreground/85">{roleLine}</p>
+          </div>
         </div>
 
-        <aside className="flex flex-col space-y-3">
-          <h2 className="text-base font-semibold text-foreground">
-            Digital ID
-          </h2>
-          <div className="flex flex-1 flex-col">
+        <div className="mt-4 grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,17.5rem)_minmax(0,1fr)] lg:items-stretch">
+          <div className="mx-auto flex w-full max-w-[17.5rem] flex-col self-stretch lg:mx-0">
             <EmployeeIdCard
               employeeId={data.employeeId}
               firstName={data.firstName}
@@ -666,15 +295,45 @@ export function MyProfileView({
               imageUrl={data.profileImageUrl}
               profilePath={data.profilePath}
               canEdit={true}
-              className="h-full min-h-[30rem] w-full max-w-[19rem]"
+              hideHeaderLabel
+              stretchHeight
+              className="h-full w-full max-w-full shadow-md"
             />
           </div>
-        </aside>
-      </form>
 
-      <p className="mt-3 text-right text-xs leading-relaxed text-muted-foreground">
-        Tap the photo on your digital ID to update your profile picture anytime.
-      </p>
+          <div className="self-stretch rounded-xl border bg-card p-3.5 shadow-xs sm:p-5">
+            <input type="hidden" {...register("personalEmail")} />
+            <input type="hidden" {...register("timezone")} />
+            <input type="hidden" {...register("language")} />
+
+            <MyProfileFormFields
+              data={data}
+              isEditing={isEditing}
+              isPending={isPending}
+              isCeo={isCeo}
+              isManager={isManager}
+              isEmployee={isEmployee}
+              canEditContactDetails={canEditContactDetails}
+              canEditReportingManager={canEditReportingManager}
+              contactFieldsRequired={contactFieldsRequired}
+              personalPhone={personalPhone}
+              emergencyContactPhone={emergencyContactPhone}
+              addressState={addressState}
+              addressCity={addressCity}
+              addressCountry={addressCountry}
+              emergencyRelationship={emergencyRelationship}
+              reportingManagerId={reportingManagerId}
+              selectedManagerLabel={selectedManagerLabel}
+              managerOptions={managerOptions}
+              relationshipDisplay={relationshipDisplay}
+              formatJoiningDate={formatJoiningDate}
+              register={register}
+              setValue={setValue}
+              errors={errors}
+            />
+          </div>
+        </div>
+      </form>
 
       <NoticeDialog
         open={notice != null}
