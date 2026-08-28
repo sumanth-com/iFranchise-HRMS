@@ -37,6 +37,23 @@ export const EXIT_STATUS_LABELS: Record<ExitStatus, string> = {
   withdrawn: "Withdrawn",
 };
 
+/** Resignation statuses that are waiting on CEO (legacy manager/HR stages included). */
+export const EXIT_AWAITING_CEO_STATUSES: ExitStatus[] = [
+  "submitted",
+  "manager_approved",
+  "hr_approved",
+];
+
+export function isExitAwaitingCeoApproval(status: ExitStatus): boolean {
+  return EXIT_AWAITING_CEO_STATUSES.includes(status);
+}
+
+/** Employee-facing label in Settings and self-service resignation views. */
+export function exitStatusLabelForSettings(status: ExitStatus): string {
+  if (isExitAwaitingCeoApproval(status)) return "Awaiting CEO approval";
+  return EXIT_STATUS_LABELS[status];
+}
+
 export const CLEARANCE_STATUS_LABELS: Record<ExitClearanceStatus, string> = {
   pending: "Pending",
   approved: "Approved",

@@ -9,7 +9,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { ResignationSubmitForm } from "@/components/exit/resignation-submit-form";
 import { withdrawResignationAction } from "@/lib/exit/actions";
-import { EXIT_STATUS_LABELS } from "@/lib/exit/constants";
+import {
+  EXIT_STATUS_LABELS,
+  exitStatusLabelForSettings,
+  isExitAwaitingCeoApproval,
+} from "@/lib/exit/constants";
 import { cn } from "@/lib/utils";
 import type { ExitResignationItem } from "@/types/exit";
 
@@ -18,13 +22,14 @@ type Props = {
   employeeId: string;
   defaultNoticePeriodDays: number;
   activeResignation: ExitResignationItem | null;
+  rejectedResignation?: ExitResignationItem | null;
   onSubmitted?: () => void;
 };
 
 function statusClass(status: ExitResignationItem["exitStatus"]) {
   if (status === "completed") return "bg-emerald-500/10 text-emerald-700";
   if (status === "rejected" || status === "withdrawn") return "bg-destructive/10 text-destructive";
-  if (["submitted", "manager_approved", "hr_approved"].includes(status)) {
+  if (isExitAwaitingCeoApproval(status)) {
     return "bg-amber-500/10 text-amber-700";
   }
   return "bg-muted text-foreground";
@@ -35,15 +40,15 @@ export function SettingsResignationModalContent({
   employeeId,
   defaultNoticePeriodDays,
   activeResignation,
+  rejectedResignation = null,
   onSubmitted,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   if (activeResignation) {
-    const canWithdraw = ["submitted", "manager_approved", "hr_approved"].includes(
-      activeResignation.exitStatus,
-    );
+    const canWithdraw = isExitAwaitingCeoApproval(activeResignation.exitStatus);
+    const ceoApproved = activeResignation.exitStatus === "completed";
 
     return (
       <div className="space-y-4">
@@ -64,28 +69,13 @@ export function SettingsResignationModalContent({
                 statusClass(activeResignation.exitStatus),
               )}
             >
-              {EXIT_STATUS_LABELS[activeResignation.exitStatus]}
+              {exitStatusLabelForSettings(activeResignation.exitStatus)}
             </span>
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
             <ApprovalStep done label="Submitted" />
-            <ApprovalStep
-              done={activeResignation.exitStatus !== "submitted"}
-              label="Manager"
-            />
-            <ApprovalStep
-              done={!["submitted", "manager_approved"].includes(activeResignation.exitStatus)}
-              label="HR"
-            />
-            <ApprovalStep
-              done={
-                !["submitted", "manager_approved", "hr_approved"].includes(
-                  activeResignation.exitStatus,
-                )
-              }
-              label="CEO"
-            />
+            <ApprovalStep done={ceoApproved} label="CEO approval" />
           </div>
 
           {canWithdraw ? (
@@ -115,8 +105,32 @@ export function SettingsResignationModalContent({
         </div>
 
         <p className="text-xs text-muted-foreground">
-          HR will contact you about clearance, asset return, and final settlement after approvals
-          are complete.
+          Your request is reviewed by the CEO. After approval your portal access will be
+          deactivated.
+        </p>
+      </div>
+    );
+  }
+
+  if (rejectedResignation) {
+    return (
+      <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-destructive">Resignation rejected</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Submitted {format(new Date(rejectedResignation.createdAt), "dd MMM yyyy")}
+              {rejectedResignation.rejectedReason
+                ? ` · ${rejectedResignation.rejectedReason}`
+                : ""}
+            </p>
+          </div>
+          <span className="rounded-full bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive">
+            {EXIT_STATUS_LABELS.rejected}
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Your account remains active. You may submit a new resignation request if needed.
         </p>
       </div>
     );
@@ -134,7 +148,7 @@ export function SettingsResignationModalContent({
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        Your request is sent to your manager, then HR, and CEO for approval.
+        Your request is sent to the CEO for final approval.
       </p>
       <ResignationSubmitForm
         employeeId={employeeId}

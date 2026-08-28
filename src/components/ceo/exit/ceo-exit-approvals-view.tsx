@@ -112,7 +112,7 @@ export function CeoExitApprovalsView({
             <h1 className="text-2xl font-semibold tracking-tight">Exit Approvals</h1>
           </SectionHelpButton>
           <p className="mt-1 text-sm text-muted-foreground">
-            Final CEO approval for resignations already cleared by manager and HR.
+            Final CEO approval for resignations submitted by employees, HR, or managers.
           </p>
         </div>
 

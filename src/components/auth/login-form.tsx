@@ -113,6 +113,20 @@ export function LoginForm() {
   }, [router]);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("suspended") !== "1") return;
+
+    setFormError(
+      "Your account has been deactivated. Contact your HR administrator if you need access restored.",
+    );
+    params.delete("suspended");
+    const query = params.toString();
+    router.replace(query ? `${AUTH_ROUTES.login}?${query}` : AUTH_ROUTES.login, {
+      scroll: false,
+    });
+  }, [router]);
+
+  useEffect(() => {
     const hash = window.location.hash.startsWith("#")
       ? window.location.hash.slice(1)
       : "";

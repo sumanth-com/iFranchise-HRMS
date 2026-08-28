@@ -21,6 +21,7 @@ import type {
   ResignationFormValues,
   SettlementFormValues,
 } from "@/lib/validations/exit";
+import { deactivateEmployeeAccount } from "@/lib/employees/services/employee-account";
 import type { ExitStatus } from "@/types/exit";
 
 async function addTimeline(
@@ -57,6 +58,51 @@ async function setResignationStatus(
     })
     .eq("id", resignationId);
   if (error) throw new Error(error.message);
+}
+
+/**
+ * CEO approval is the final step: complete the resignation, mark the employee
+ * resigned/inactive, and deactivate portal access through the provisioning path.
+ */
+async function finalizeResignationAfterCeoApproval(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  row: {
+    id: string;
+    employee_id: string;
+    last_working_day: string;
+  },
+  remarks: string | null,
+) {
+  const organizationId = profile.employee.organizationId;
+  const now = new Date().toISOString();
+
+  await setResignationStatus(supabase, row.id, profile.userId, "completed", {
+    ceo_acted_at: now,
+    ceo_acted_by: profile.userId,
+    ceo_remarks: emptyToNull(remarks),
+    completed_at: now,
+  });
+
+  await fromHrms(supabase, "employees")
+    .update({
+      employment_status: "resigned",
+      date_of_leaving: row.last_working_day,
+      status: "inactive",
+      updated_by: profile.userId,
+    })
+    .eq("id", row.employee_id)
+    .eq("organization_id", organizationId);
+
+  try {
+    await deactivateEmployeeAccount(supabase, profile, row.employee_id);
+  } catch (error) {
+    // A repeat approve click or an already-inactive account must not fail the flow.
+    const message = error instanceof Error ? error.message : "";
+    if (!message.includes("Only active accounts can be deactivated")) {
+      throw error;
+    }
+  }
 }
 
 async function seedClearanceAndAssets(
@@ -371,143 +417,82 @@ export async function decideResignation(
   if (error) throw new Error(error.message);
   if (!row) throw new Error("Resignation not found");
 
-  if (input.decision === "reject") {
-    const rejectUpdates =
-      stage === "manager"
-        ? {
-            manager_acted_at: new Date().toISOString(),
-            manager_remarks: emptyToNull(input.remarks),
-          }
-        : stage === "hr"
-          ? {
-              hr_acted_at: new Date().toISOString(),
-              hr_acted_by: profile.userId,
-              hr_remarks: emptyToNull(input.remarks),
-            }
-          : {
-              ceo_acted_at: new Date().toISOString(),
-              ceo_acted_by: profile.userId,
-              ceo_remarks: emptyToNull(input.remarks),
-            };
+  if (stage === "manager" || stage === "hr") {
+    throw new Error("Resignation approval is performed by the CEO only");
+  }
 
+  if (stage !== "ceo") {
+    throw new Error("Invalid approval stage");
+  }
+
+  if (input.decision === "approve" && row.exit_status === "completed") {
+    return;
+  }
+
+  if (!["submitted", "manager_approved", "hr_approved"].includes(row.exit_status)) {
+    throw new Error("Resignation is not awaiting CEO approval");
+  }
+
+  if (input.decision === "reject") {
     await setResignationStatus(supabase, row.id, profile.userId, "rejected", {
       rejected_reason: emptyToNull(input.rejectedReason) ?? emptyToNull(input.remarks),
-      ...rejectUpdates,
+      ceo_acted_at: new Date().toISOString(),
+      ceo_acted_by: profile.userId,
+      ceo_remarks: emptyToNull(input.remarks),
     });
-    const actorLabel =
-      stage === "manager" ? "Manager" : stage === "hr" ? "HR" : "CEO";
     await addTimeline(
       supabase,
       organizationId,
       row.id,
       profile.userId,
       "rejected",
-      `${actorLabel} rejected resignation`,
+      "CEO rejected resignation",
       input.rejectedReason ?? input.remarks,
     );
     return;
   }
 
-  if (stage === "manager") {
-    if (row.exit_status !== "submitted") throw new Error("Resignation is not awaiting manager approval");
-    if (
-      !isHrAdmin(profile) &&
-      !isCeoRole(profile) &&
-      row.manager_employee_id &&
-      row.manager_employee_id !== profile.employee.id
-    ) {
-      throw new Error("Only the reporting manager can approve this resignation");
-    }
+  if (!isCeoRole(profile)) throw new Error("Only CEO can perform final approval");
 
-    await setResignationStatus(supabase, row.id, profile.userId, "manager_approved", {
-      manager_acted_at: new Date().toISOString(),
-      manager_remarks: emptyToNull(input.remarks),
-    });
-    await addTimeline(
-      supabase,
-      organizationId,
-      row.id,
-      profile.userId,
-      "manager_approved",
-      "Manager approved resignation",
-      input.remarks,
-    );
-    return;
-  }
+  await finalizeResignationAfterCeoApproval(
+    supabase,
+    profile,
+    row,
+    emptyToNull(input.remarks),
+  );
 
-  if (stage === "hr") {
-    if (row.exit_status !== "manager_approved") {
-      throw new Error("Resignation is not awaiting HR approval");
-    }
-    if (!isHrAdmin(profile)) throw new Error("Only HR can perform HR approval");
+  await autoGenerateLetterForEmployee(supabase, profile, {
+    employeeId: row.employee_id,
+    letterType: "resignation_acceptance_letter",
+    sourceModule: "exit",
+    sourceRecordId: row.id,
+    publishNow: true,
+  });
 
-    await setResignationStatus(supabase, row.id, profile.userId, "hr_approved", {
-      hr_acted_at: new Date().toISOString(),
-      hr_acted_by: profile.userId,
-      hr_remarks: emptyToNull(input.remarks),
-    });
+  await addTimeline(
+    supabase,
+    organizationId,
+    row.id,
+    profile.userId,
+    "ceo_approved",
+    "CEO approved resignation",
+    "Resignation completed and employee account deactivated.",
+  );
 
-    await addTimeline(
-      supabase,
-      organizationId,
-      row.id,
-      profile.userId,
-      "hr_approved",
-      "HR approved resignation",
-      "Awaiting CEO approval before clearance starts.",
-    );
-    return;
-  }
-
-  if (stage === "ceo") {
-    if (row.exit_status !== "hr_approved") {
-      throw new Error("Resignation is not awaiting CEO approval");
-    }
-    if (!isCeoRole(profile)) throw new Error("Only CEO can perform final approval");
-
-    await setResignationStatus(supabase, row.id, profile.userId, "clearance", {
-      ceo_acted_at: new Date().toISOString(),
-      ceo_acted_by: profile.userId,
-      ceo_remarks: emptyToNull(input.remarks),
-    });
-
-    await seedClearanceAndAssets(supabase, profile, row.id, row.employee_id);
-
-    await autoGenerateLetterForEmployee(supabase, profile, {
-      employeeId: row.employee_id,
-      letterType: "resignation_acceptance_letter",
-      sourceModule: "exit",
-      sourceRecordId: row.id,
-      publishNow: true,
-    });
-
-    await addTimeline(
-      supabase,
-      organizationId,
-      row.id,
-      profile.userId,
-      "ceo_approved",
-      "CEO approved resignation",
-      "Clearance checklist and asset return list created.",
-    );
-
-    await notifyEmployee(supabase, {
-      organizationId,
-      employeeId: row.employee_id,
-      title: "Exit approved",
-      message: "Your exit request has been approved. Clearance process has started.",
-      notificationType: "exit_approved",
-      module: "exit",
-      priority: "high",
-      actionUrl: EXIT_ROUTES.clearance,
-      sourceEventKey: `exit_approved:${row.id}`,
-      templateKey: "exit_approved",
-      createdBy: profile.userId,
-    });
-    return;
-  }
-
-  throw new Error("Invalid approval stage");
+  await notifyEmployee(supabase, {
+    organizationId,
+    employeeId: row.employee_id,
+    title: "Resignation approved",
+    message:
+      "Your resignation has been approved. Your portal access has been deactivated.",
+    notificationType: "exit_approved",
+    module: "exit",
+    priority: "high",
+    actionUrl: EXIT_ROUTES.clearance,
+    sourceEventKey: `exit_approved:${row.id}`,
+    templateKey: "exit_approved",
+    createdBy: profile.userId,
+  });
 }
 
 export async function withdrawResignation(

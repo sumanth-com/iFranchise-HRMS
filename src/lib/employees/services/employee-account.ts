@@ -1169,6 +1169,36 @@ export async function activateEmployeeAccount(
     account_activated_at: new Date().toISOString(),
     updated_by: profile.userId,
   });
+
+  const admin = createAdminClient();
+  const { data: employmentRow, error: employmentError } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select("employment_status, status")
+    .eq("id", employeeId)
+    .eq("organization_id", profile.employee.organizationId)
+    .maybeSingle();
+
+  if (employmentError) throw new Error(employmentError.message);
+
+  const employmentUpdates: Record<string, unknown> = {};
+  if (employmentRow?.employment_status === "resigned") {
+    employmentUpdates.employment_status = "active";
+  }
+  if (employmentRow?.status === "inactive") {
+    employmentUpdates.status = "active";
+  }
+  if (Object.keys(employmentUpdates).length > 0) {
+    employmentUpdates.updated_by = profile.userId;
+    const { error: restoreError } = await admin
+      .schema("hrms")
+      .from("employees")
+      .update(employmentUpdates)
+      .eq("id", employeeId)
+      .eq("organization_id", profile.employee.organizationId);
+    if (restoreError) throw new Error(restoreError.message);
+  }
+
   await notifyEmployeeAccount(
     employee,
     "employee_account_activated",

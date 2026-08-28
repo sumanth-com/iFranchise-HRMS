@@ -6,11 +6,7 @@ import { SectionHelpButton } from "@/components/common/section-help-button";
 import { CeoApprovalsDrawer } from "@/components/ceo/approvals/ceo-approvals-drawer";
 import { CeoApprovalsFilters } from "@/components/ceo/approvals/ceo-approvals-filters";
 import { CeoApprovalsQueueTable } from "@/components/ceo/approvals/ceo-approvals-queue-table";
-import { CeoApprovalsSummary } from "@/components/ceo/approvals/ceo-approvals-summary";
-import {
-  fetchCeoApprovalsKpisAction,
-  fetchCeoApprovalsQueueAction,
-} from "@/lib/ceo/actions/ceo-approvals-actions";
+import { fetchCeoApprovalsQueueAction } from "@/lib/ceo/actions/ceo-approvals-actions";
 import { useApprovalsSync } from "@/lib/approvals/use-approvals-sync";
 import type {
   CeoApprovalsListParams,
@@ -26,12 +22,10 @@ type CeoApprovalsViewProps = CeoApprovalsPageData & {
 };
 
 export function CeoApprovalsView({
-  kpis: initialKpis,
   queue: initialQueue,
   lookups,
   initialFilters,
 }: CeoApprovalsViewProps) {
-  const [kpis, setKpis] = useState(initialKpis);
   const [queue, setQueue] = useState(initialQueue);
   const [filters, setFilters] = useState<CeoApprovalsListParams>(initialFilters);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
@@ -54,11 +48,7 @@ export function CeoApprovalsView({
   }
 
   const refreshAfterChange = useCallback(async () => {
-    const [nextKpis, nextQueue] = await Promise.all([
-      fetchCeoApprovalsKpisAction(filters),
-      fetchCeoApprovalsQueueAction(filters),
-    ]);
-    setKpis(nextKpis);
+    const nextQueue = await fetchCeoApprovalsQueueAction(filters);
     setQueue(nextQueue);
   }, [filters]);
 
@@ -81,8 +71,6 @@ export function CeoApprovalsView({
           Review and decide on employee promotions requiring CEO authorization.
         </p>
       </div>
-
-      <CeoApprovalsSummary kpis={kpis} />
 
       <CeoApprovalsFilters
         filters={filters}
