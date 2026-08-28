@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
+import { revalidateOneOnOnePaths } from "@/lib/performance/one-on-one-revalidation";
 import {
   createTeamPerformanceFeedback,
   createTeamPerformanceGoal,
@@ -238,6 +239,7 @@ export async function createTeamPerformanceOneOnOneAction(input: unknown) {
     const { profile, supabase, teamIds } = await getAuthenticatedContext();
     const result = await createTeamPerformanceOneOnOne(supabase, profile, teamIds, input);
     revalidatePerformancePaths();
+    revalidateOneOnOnePaths();
     return result;
   } catch (error) {
     return {

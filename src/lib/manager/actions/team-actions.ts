@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
+import { revalidateOneOnOnePaths } from "@/lib/performance/one-on-one-revalidation";
 import {
   getManagerTeamScope,
   getTeamDesignationOptions,
@@ -228,6 +229,7 @@ export async function createTeamOneOnOneAction(input: unknown) {
     }
     await createOneOnOne(supabase, profile, parsed);
     revalidateTeamPaths();
+    revalidateOneOnOnePaths();
     return { success: true as const, message: "1:1 scheduled." };
   } catch (error) {
     return {

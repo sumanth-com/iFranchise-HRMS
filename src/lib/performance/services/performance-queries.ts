@@ -804,12 +804,13 @@ export async function listOneOnOnes(
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
   const organizationId = profile.employee.organizationId;
-  const teamIds = await resolveListTeamIds(
-    supabase,
-    profile,
-    explicitTeamIds,
-    employeeId,
-  );
+
+  // Manager team scope holds reports only, never the manager, so scoping a manager's
+  // own 1:1 list against it would return nothing. Everyone may always see their own.
+  const isSelfView = employeeId === profile.employee.id;
+  const teamIds = isSelfView
+    ? null
+    : await resolveListTeamIds(supabase, profile, explicitTeamIds, employeeId);
 
   if (teamIds && teamIds.length === 0) {
     return emptyPagedResult(page, pageSize);
@@ -817,7 +818,7 @@ export async function listOneOnOnes(
 
   let query = fromHrms(supabase, "performance_one_on_ones")
     .select(
-      `id, employee_id, scheduled_at, agenda, notes, follow_up_date, meeting_status, created_at,
+      `id, employee_id, manager_employee_id, scheduled_at, agenda, notes, follow_up_date, meeting_status, created_at,
       employee:employee_id(first_name, last_name),
       manager:manager_employee_id(first_name, last_name),
       performance_one_on_one_actions(id, is_completed)`,
@@ -828,8 +829,18 @@ export async function listOneOnOnes(
     .order("scheduled_at", { ascending: false })
     .range(from, to);
 
-  if (employeeId) query = query.eq("employee_id", employeeId);
-  if (teamIds) query = query.in("employee_id", teamIds);
+  // A meeting has two participants stored on one row. Match either column so the
+  // scheduler and the invitee both retrieve the same record exactly once.
+  if (employeeId) {
+    query = query.or(
+      `employee_id.eq.${employeeId},manager_employee_id.eq.${employeeId}`,
+    );
+  } else if (teamIds) {
+    const scopedIds = teamIds.join(",");
+    query = query.or(
+      `employee_id.in.(${scopedIds}),manager_employee_id.in.(${scopedIds})`,
+    );
+  }
   if (meetingStatus) query = query.eq("meeting_status", meetingStatus);
 
   const { data, error, count } = await query;
@@ -844,6 +855,7 @@ export async function listOneOnOnes(
       id: row.id,
       employeeId: row.employee_id,
       employeeName: emp ? formatEmployeeName(emp.first_name, emp.last_name) : "—",
+      managerEmployeeId: row.manager_employee_id,
       managerName: manager ? formatEmployeeName(manager.first_name, manager.last_name) : "—",
       scheduledAt: row.scheduled_at,
       agenda: parsedAgenda.agenda,

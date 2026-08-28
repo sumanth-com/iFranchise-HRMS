@@ -258,8 +258,11 @@ export type FeedbackListResult = {
 
 export type OneOnOneListItem = {
   id: string;
+  /** First participant. A 1:1 belongs to both participants equally. */
   employeeId: string;
   employeeName: string;
+  /** Second participant ("Meeting with"). Needed so either side can be matched. */
+  managerEmployeeId: string;
   managerName: string;
   scheduledAt: string;
   agenda: string | null;

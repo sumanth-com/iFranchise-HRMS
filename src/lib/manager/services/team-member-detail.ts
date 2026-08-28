@@ -80,7 +80,8 @@ export async function getTeamMemberDetailBundle(
     fromHrms(supabase, "performance_one_on_ones")
       .select("id, scheduled_at, meeting_status, agenda")
       .eq("organization_id", organizationId)
-      .eq("employee_id", employeeId)
+      // Include meetings where this member is the invitee, not just the scheduler.
+      .or(`employee_id.eq.${employeeId},manager_employee_id.eq.${employeeId}`)
       .is("deleted_at", null)
       .order("scheduled_at", { ascending: false })
       .limit(20),

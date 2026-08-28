@@ -12,7 +12,13 @@ import {
 } from "@/components/performance/performance-ui-primitives";
 import type { OneOnOneListItem } from "@/types/performance";
 
-export function EmployeeOneOnOnesView({ meetings }: { meetings: OneOnOneListItem[] }) {
+export function EmployeeOneOnOnesView({
+  meetings,
+  viewerEmployeeId,
+}: {
+  meetings: OneOnOneListItem[];
+  viewerEmployeeId: string;
+}) {
   const [viewId, setViewId] = useState<string | null>(null);
 
   return (
@@ -40,7 +46,11 @@ export function EmployeeOneOnOnesView({ meetings }: { meetings: OneOnOneListItem
             <tbody>
               {meetings.map((row) => (
                 <tr key={row.id} className="border-t align-middle">
-                  <td className="px-4 py-3">{row.managerName}</td>
+                  <td className="px-4 py-3">
+                    {row.employeeId === viewerEmployeeId
+                      ? row.managerName
+                      : row.employeeName}
+                  </td>
                   <td className="px-4 py-3 whitespace-nowrap text-xs">
                     {format(new Date(row.scheduledAt), "MMM d, yyyy h:mm a")}
                   </td>

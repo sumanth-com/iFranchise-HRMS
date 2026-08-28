@@ -5,7 +5,9 @@ import { requireServerAnyPermission } from "@/lib/permissions/server";
 
 export default async function ManagerOneOnOnesPage() {
   await requireServerAnyPermission([PORTAL_PERMISSIONS.manager, "performance.view"]);
-  const meetings = await fetchMyOneOnOnesAction();
+  const { meetings, viewerEmployeeId } = await fetchMyOneOnOnesAction();
 
-  return <EmployeeOneOnOnesView meetings={meetings} />;
+  return (
+    <EmployeeOneOnOnesView meetings={meetings} viewerEmployeeId={viewerEmployeeId} />
+  );
 }
