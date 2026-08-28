@@ -157,7 +157,15 @@ export function OneOnOneTable({
 
   const filtered = useMemo(() => {
     return records.filter((row) => {
-      if (employeeId && row.employeeId !== employeeId) return false;
+      // Match either participant so filtering by a person finds their meetings
+      // whether they were the scheduler or the invitee.
+      if (
+        employeeId &&
+        row.employeeId !== employeeId &&
+        row.managerEmployeeId !== employeeId
+      ) {
+        return false;
+      }
       if (meetingStatus && row.meetingStatus !== meetingStatus) return false;
       const scheduledLabel = format(new Date(row.scheduledAt), "MMM d, yyyy h:mm a");
       return matchesTextQuery(

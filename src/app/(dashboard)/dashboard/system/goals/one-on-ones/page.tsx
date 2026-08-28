@@ -4,7 +4,9 @@ import { requireSuperAdminProfile } from "@/lib/system-admin/guards";
 
 export default async function SuperAdminOneOnOnesPage() {
   await requireSuperAdminProfile();
-  const meetings = await fetchMyOneOnOnesAction();
+  const { meetings, viewerEmployeeId } = await fetchMyOneOnOnesAction();
 
-  return <EmployeeOneOnOnesView meetings={meetings} />;
+  return (
+    <EmployeeOneOnOnesView meetings={meetings} viewerEmployeeId={viewerEmployeeId} />
+  );
 }

@@ -4,7 +4,9 @@ import { requireServerPermission } from "@/lib/permissions/server";
 
 export default async function MyOneOnOnesPage() {
   await requireServerPermission("performance.view");
-  const meetings = await fetchMyOneOnOnesAction();
+  const { meetings, viewerEmployeeId } = await fetchMyOneOnOnesAction();
 
-  return <EmployeeOneOnOnesView meetings={meetings} />;
+  return (
+    <EmployeeOneOnOnesView meetings={meetings} viewerEmployeeId={viewerEmployeeId} />
+  );
 }

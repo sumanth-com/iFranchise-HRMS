@@ -235,7 +235,10 @@ export async function candidateLoginAction(input: unknown): Promise<ActionResult
     await setCandidateSession(session);
     return { success: true, message: "Signed in" };
   } catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : "Login failed" };
+    return {
+      success: false,
+      message: onboardingActionErrorMessage(error, "Could not sign you in. Please try again."),
+    };
   }
 }
 
@@ -270,23 +273,28 @@ export async function requestCandidateOtpAction(input: unknown): Promise<ActionR
     });
 
     if (!emailResult.delivered) {
-      if (emailResult.skipped) {
-        return {
-          success: false,
-          message:
-            emailResult.error ??
-            "Verification email could not be sent — SMTP is not configured. Contact HR for assistance.",
-        };
-      }
+      // emailResult.error is raw transport text — log it, never show it.
+      console.error("[onboarding] verification code email not delivered", {
+        skipped: emailResult.skipped,
+        error: emailResult.error,
+      });
       return {
         success: false,
-        message: emailResult.error ?? "Failed to send verification code. Please try again.",
+        message: emailResult.skipped
+          ? "We could not send the verification email. Contact HR for assistance."
+          : "Could not send the verification code. Please try again.",
       };
     }
 
     return { success: true, message: "Verification code sent to your email" };
   } catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : "OTP request failed" };
+    return {
+      success: false,
+      message: onboardingActionErrorMessage(
+        error,
+        "Could not send the verification code. Please try again.",
+      ),
+    };
   }
 }
 
@@ -306,7 +314,13 @@ export async function verifyCandidateOtpAction(input: unknown): Promise<ActionRe
     await setCandidateSession(session);
     return { success: true, message: "Verified" };
   } catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : "Verification failed" };
+    return {
+      success: false,
+      message: onboardingActionErrorMessage(
+        error,
+        "Could not verify that code. Please try again.",
+      ),
+    };
   }
 }
 
@@ -348,17 +362,16 @@ export async function requestCandidatePasswordResetAction(
     });
 
     if (!emailResult.delivered) {
-      if (emailResult.skipped) {
-        return {
-          success: false,
-          message:
-            emailResult.error ??
-            "Reset email could not be sent — SMTP is not configured. Contact HR for assistance.",
-        };
-      }
+      // emailResult.error is raw transport text — log it, never show it.
+      console.error("[onboarding] reset code email not delivered", {
+        skipped: emailResult.skipped,
+        error: emailResult.error,
+      });
       return {
         success: false,
-        message: emailResult.error ?? "Failed to send reset code. Please try again.",
+        message: emailResult.skipped
+          ? "We could not send the reset email. Contact HR for assistance."
+          : "Could not send the reset code. Please try again.",
       };
     }
 
@@ -366,7 +379,10 @@ export async function requestCandidatePasswordResetAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Could not send reset code",
+      message: onboardingActionErrorMessage(
+        error,
+        "Could not send the reset code. Please try again.",
+      ),
     };
   }
 }

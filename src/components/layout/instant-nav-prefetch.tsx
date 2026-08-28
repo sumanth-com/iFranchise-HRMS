@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 
 import { useSidebarNavigation } from "@/hooks/use-sidebar-navigation";
 
@@ -27,11 +27,14 @@ function isAuthorizedPath(path: string, allowedPrefixes: string[]) {
  */
 export function InstantNavPrefetch() {
   const router = useRouter();
-  const pathname = usePathname();
   const { navigation, portalHome } = useSidebarNavigation();
 
+  // Persisted across navigations: re-warming every module on each pathname change
+  // fires a burst of full RSC requests that compete with the page being navigated to.
+  const seenRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
-    const seen = new Set<string>([pathname]);
+    const seen = seenRef.current;
     const allowedPrefixes = [
       portalHome,
       ...navigation
@@ -55,11 +58,20 @@ export function InstantNavPrefetch() {
       .map((item) => (typeof item.href === "string" ? item.href : null))
       .filter((href): href is string => Boolean(href));
 
-    // Immediately prefetch all sidebar navigation modules for instant switching
-    prefetch(portalHome);
-    for (const href of navHrefs) {
-      prefetch(href);
-    }
+    // Warm sidebar modules when the browser is idle so this never competes with the
+    // in-flight navigation. Hover/pointer-down below still prefetches immediately, so
+    // switching stays instant.
+    const warmNavModules = () => {
+      prefetch(portalHome);
+      for (const href of navHrefs) {
+        prefetch(href);
+      }
+    };
+
+    const supportsIdle = typeof window.requestIdleCallback === "function";
+    const warmHandle = supportsIdle
+      ? window.requestIdleCallback(warmNavModules, { timeout: 2000 })
+      : window.setTimeout(warmNavModules, 300);
 
     const onPointerOver = (event: Event) => {
       const target = event.target;
@@ -86,11 +98,16 @@ export function InstantNavPrefetch() {
     document.addEventListener("focusin", onPointerOver, { capture: true });
 
     return () => {
+      if (supportsIdle) {
+        window.cancelIdleCallback(warmHandle);
+      } else {
+        window.clearTimeout(warmHandle);
+      }
       document.removeEventListener("pointerover", onPointerOver, true);
       document.removeEventListener("pointerdown", onPointerDown, true);
       document.removeEventListener("focusin", onPointerOver, true);
     };
-  }, [navigation, pathname, portalHome, router]);
+  }, [navigation, portalHome, router]);
 
   return null;
 }

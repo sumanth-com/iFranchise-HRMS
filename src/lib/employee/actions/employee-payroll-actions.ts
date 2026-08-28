@@ -2,6 +2,7 @@
 
 import { siteConfig } from "@/config/site";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import { PayslipEmailError } from "@/lib/payroll/services/payslip-email-errors";
 import { emailPayslip, getPayslipById } from "@/lib/payroll/services/payroll-mutations";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -49,9 +50,17 @@ export async function emailMyPayslipAction(
     await emailPayslip(supabase, profile, payslipId, siteConfig.url);
     return { success: true };
   } catch (error) {
+    console.error("[payroll] employee payslip email failed", {
+      payslipId,
+      name: error instanceof Error ? error.name : "unknown",
+      message: error instanceof Error ? error.message : "unknown",
+    });
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to email payslip",
+      message:
+        error instanceof PayslipEmailError
+          ? error.message
+          : "Could not email this payslip right now. Please try again.",
     };
   }
 }

@@ -70,6 +70,16 @@ async function withMiddlewareTimeout<T>(
   }
 }
 
+/** True when the browser still presents Supabase session cookies (@supabase/ssr naming). */
+function hasSupabaseSessionCookie(request: NextRequest): boolean {
+  return request.cookies
+    .getAll()
+    .some(
+      (cookie) =>
+        /^sb-.+-auth-token(\.\d+)?$/.test(cookie.name) && Boolean(cookie.value),
+    );
+}
+
 function isAuthRoute(pathname: string): boolean {
   return (
     pathname === AUTH_ROUTES.login ||
@@ -120,7 +130,8 @@ async function signOutExpiredIdleSession(
 }
 
 export async function middleware(request: NextRequest) {
-  const { supabase, supabaseResponse, user } = await updateSession(request);
+  const { supabase, supabaseResponse, user, authUnavailable } =
+    await updateSession(request);
   const { pathname, searchParams } = request.nextUrl;
 
   if (pathname === "/") {
@@ -226,6 +237,13 @@ export async function middleware(request: NextRequest) {
   }
 
   if (!user || !supabase) {
+    // Auth was unreachable rather than negative, and the browser still holds session
+    // cookies: do not sign this user out over a blip. Same fallback the permission
+    // layer already uses below — the layout RSC still enforces before rendering.
+    if (authUnavailable && hasSupabaseSessionCookie(request)) {
+      return supabaseResponse;
+    }
+
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = AUTH_ROUTES.login;
     redirectUrl.searchParams.set(

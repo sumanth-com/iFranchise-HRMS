@@ -155,7 +155,14 @@ export async function fetchMyFeedbackAction(): Promise<FeedbackListItem[]> {
   return result.data;
 }
 
-export async function fetchMyOneOnOnesAction(): Promise<OneOnOneListItem[]> {
+/**
+ * The caller's own 1:1s, from either participant side. Returns the viewer id so the
+ * list can show the other participant rather than a fixed column.
+ */
+export async function fetchMyOneOnOnesAction(): Promise<{
+  meetings: OneOnOneListItem[];
+  viewerEmployeeId: string;
+}> {
   const profile = await requireEmployeeProfile();
   const supabase = await createClient();
   const result = await listOneOnOnes(supabase, profile, {
@@ -163,7 +170,7 @@ export async function fetchMyOneOnOnesAction(): Promise<OneOnOneListItem[]> {
     pageSize: 100,
     employeeId: profile.employee.id,
   });
-  return result.data;
+  return { meetings: result.data, viewerEmployeeId: profile.employee.id };
 }
 
 export async function fetchMyOneOnOneDetailAction(meetingId: string): Promise<OneOnOneDetail | null> {
@@ -174,7 +181,11 @@ export async function fetchMyOneOnOneDetailAction(meetingId: string): Promise<On
     profile.employee.organizationId,
     meetingId,
   );
-  if (!detail || detail.employeeId !== profile.employee.id) return null;
+  // Either participant owns the meeting equally.
+  const isParticipant =
+    detail?.employeeId === profile.employee.id ||
+    detail?.managerEmployeeId === profile.employee.id;
+  if (!detail || !isParticipant) return null;
   return detail;
 }
 

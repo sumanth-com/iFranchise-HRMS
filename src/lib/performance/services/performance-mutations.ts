@@ -1222,6 +1222,7 @@ export async function getOneOnOneById(
     id: data.id,
     employeeId: data.employee_id,
     employeeName: employee ? formatEmployeeName(employee.first_name, employee.last_name) : "—",
+    managerEmployeeId: data.manager_employee_id,
     managerName: manager ? formatEmployeeName(manager.first_name, manager.last_name) : "—",
     scheduledAt: data.scheduled_at,
     agenda: parsedAgenda.agenda,

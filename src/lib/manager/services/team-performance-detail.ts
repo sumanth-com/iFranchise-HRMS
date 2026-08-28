@@ -145,6 +145,7 @@ export async function getTeamEmployeePerformanceProfile(
         `
           id,
           employee_id,
+          manager_employee_id,
           scheduled_at,
           agenda,
           notes,
@@ -157,7 +158,8 @@ export async function getTeamEmployeePerformanceProfile(
         `,
       )
       .eq("organization_id", organizationId)
-      .eq("employee_id", employeeId)
+      // Include meetings where this member is the invitee, not just the scheduler.
+      .or(`employee_id.eq.${employeeId},manager_employee_id.eq.${employeeId}`)
       .is("deleted_at", null)
       .order("scheduled_at", { ascending: false })
       .limit(20),
@@ -291,6 +293,7 @@ export async function getTeamEmployeePerformanceProfile(
         employeeName: employeeRow
           ? formatEmployeeName(employeeRow.first_name, employeeRow.last_name)
           : "—",
+        managerEmployeeId: row.manager_employee_id,
         managerName: managerRow
           ? formatEmployeeName(managerRow.first_name, managerRow.last_name)
           : "—",

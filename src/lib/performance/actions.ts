@@ -18,6 +18,7 @@ import {
   requireServerPermission,
 } from "@/lib/permissions/server";
 import { PERFORMANCE_ROUTES } from "@/lib/performance/constants";
+import { revalidateOneOnOnePaths } from "@/lib/performance/one-on-one-revalidation";
 import {
   addGoalComment,
   approvePromotionStep,
@@ -531,7 +532,7 @@ export async function createOneOnOneAction(
     const supabase = await getAuthenticatedSupabase();
     const parsed = oneOnOneFormSchema.parse(input);
     const id = await createOneOnOne(supabase, profile, parsed);
-    revalidatePath(PERFORMANCE_ROUTES.oneOnOnes);
+    revalidateOneOnOnePaths();
     return { success: true, data: id };
   } catch (error) {
     return {
@@ -552,6 +553,7 @@ export async function deleteOneOnOneAction(
     const parsed = oneOnOneDeleteSchema.parse(input);
     await deleteOneOnOne(supabase, profile, parsed.meetingId);
     revalidatePerformancePaths();
+    revalidateOneOnOnePaths();
     return { success: true, data: undefined };
   } catch (error) {
     return {
@@ -576,7 +578,7 @@ export async function updateOneOnOneAction(
       followUpDate: parsed.followUpDate,
       meetingStatus: parsed.meetingStatus,
     });
-    revalidatePath(PERFORMANCE_ROUTES.oneOnOnes);
+    revalidateOneOnOnePaths();
     return { success: true, data: undefined };
   } catch (error) {
     return {
@@ -597,7 +599,11 @@ export async function fetchOneOnOneDetailAction(meetingId: string): Promise<OneO
   const canViewOrg =
     profile.permissionCodes.includes("performance.view") ||
     profile.permissionCodes.includes(PORTAL_PERMISSIONS.ceo);
-  if (!canViewOrg && detail?.employeeId !== profile.employee.id) {
+  // Either participant owns the meeting equally.
+  const isParticipant =
+    detail?.employeeId === profile.employee.id ||
+    detail?.managerEmployeeId === profile.employee.id;
+  if (!canViewOrg && !isParticipant) {
     return null;
   }
   return detail;

@@ -217,9 +217,10 @@ export function NotificationCenterSplitView({
     startTransition(async () => {
       const res = await runServerActionSafely(() => markNotificationReadAction(item.id));
       if (res === null) return;
-      if (res.success) {
-        router.refresh();
-      } else {
+      // No router.refresh() on success: read state is already applied optimistically
+      // above, and refreshing would drop the Router Cache, making the next module
+      // navigation render cold.
+      if (!res.success) {
         markedOnServerRef.current.delete(item.id);
         toast.error(res.message);
       }

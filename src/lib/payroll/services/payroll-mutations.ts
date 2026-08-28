@@ -1,6 +1,7 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { emitHrmsWebhook } from "@/lib/public-api/emit";
 import { getPayslipBranding } from "@/lib/payroll/services/payslip-branding";
+import { PayslipEmailError } from "@/lib/payroll/services/payslip-email-errors";
 import { sendPayslipReadyEmail } from "@/lib/payroll/services/payslip-email-service";
 import { storePayslipPdf } from "@/lib/payroll/services/payslip-storage";
 import {
@@ -875,42 +876,59 @@ export async function emailPayslip(
   const payslip = await getPayslipById(supabase, profile, payslipId, {
     bypassAccessCheck: true,
   });
-  if (!payslip) throw new Error("Payslip not found.");
+  if (!payslip) throw new PayslipEmailError("Payslip not found.");
 
   if (!payslip.canEmployeeAccess) {
     const isOwnPayslip = payslip.employee.id === profile.employee.id;
     if (isOwnPayslip || !canAccessPayslipDuringReview(profile.permissionCodes)) {
-      throw new Error("Payslip is not yet published to employees.");
+      throw new PayslipEmailError("Payslip is not yet published to employees.");
     }
   }
 
   if (!payslip.storagePath) {
-    await storePayslipPdf(supabase, payslip);
+    await storePayslipPdf(supabase, payslip, profile.employee.organizationId);
   }
 
-  await sendPayslipReadyEmail(payslip, appOrigin);
+  const emailResult = await sendPayslipReadyEmail(payslip, appOrigin);
+  if (!emailResult.delivered) {
+    throw new PayslipEmailError(
+      emailResult.skipped
+        ? "Email delivery is not configured yet. Contact your administrator."
+        : "The payslip email could not be delivered. Please try again.",
+    );
+  }
 
+  // The email has already been delivered at this point, so bookkeeping failures must
+  // not be reported back as a failed send. Log them and let the caller report success.
   const monthLabel = formatPayrollMonthLabel(payslip.payrollMonth);
-  await notifyEmployee(supabase, {
-    organizationId: profile.employee.organizationId,
-    employeeId: payslip.employee.id,
-    title: "Payslip available",
-    message: `Your payslip for ${monthLabel} (${payslip.payslipNumber}) is ready to view.`,
-    notificationType: "payslip_available",
-    module: "payroll",
-    priority: "medium",
-    actionUrl: PAYROLL_ROUTES.payslipDetail(payslipId),
-    sourceEventKey: `payslip_available:${payslipId}`,
-    templateKey: "payslip_available",
-    templateVariables: { month: monthLabel, payslipNumber: payslip.payslipNumber },
-    createdBy: profile.userId,
-  });
+  try {
+    await notifyEmployee(supabase, {
+      organizationId: profile.employee.organizationId,
+      employeeId: payslip.employee.id,
+      title: "Payslip available",
+      message: `Your payslip for ${monthLabel} (${payslip.payslipNumber}) is ready to view.`,
+      notificationType: "payslip_available",
+      module: "payroll",
+      priority: "medium",
+      actionUrl: PAYROLL_ROUTES.payslipDetail(payslipId),
+      sourceEventKey: `payslip_available:${payslipId}`,
+      templateKey: "payslip_available",
+      templateVariables: { month: monthLabel, payslipNumber: payslip.payslipNumber },
+      createdBy: profile.userId,
+    });
 
-  await supabase
-    .schema("hrms")
-    .from("payslips")
-    .update({ email_sent_at: new Date().toISOString() })
-    .eq("id", payslipId);
+    await supabase
+      .schema("hrms")
+      .from("payslips")
+      .update({ email_sent_at: new Date().toISOString() })
+      .eq("id", payslipId);
+  } catch (error) {
+    console.error("[payroll] payslip email sent but bookkeeping failed", {
+      payslipId,
+      name: error instanceof Error ? error.name : "unknown",
+      message: error instanceof Error ? error.message : "unknown",
+    });
+  }
 }
 
 export async function archivePayslip(
