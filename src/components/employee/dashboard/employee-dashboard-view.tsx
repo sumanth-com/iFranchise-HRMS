@@ -37,7 +37,7 @@ export function EmployeeDashboardView({
               lastName={greeting.lastName}
               personKey={greeting.employeeId}
               referenceDate={referenceDate}
-              className="min-h-[11rem]"
+              className="min-h-[15rem] flex-1"
             />
           </div>
           <EmployeeUpcomingEvents

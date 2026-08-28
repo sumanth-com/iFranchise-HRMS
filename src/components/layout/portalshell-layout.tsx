@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { DashboardShellFallback } from "@/components/layout/dashboard-shell-fallback";
+import { DesktopOnlyGate } from "@/components/layout/desktop-only-gate";
 import { ModulePageSkeleton } from "@/components/layout/module-page-skeleton";
 import { AUTH_ROUTES } from "@/lib/auth/constants";
 import { getLayoutUserProfile } from "@/lib/auth/layout-profile";
@@ -89,10 +90,13 @@ async function ResolvedPortalShell({
       portalVariant={portalVariant}
       portalLabel={portalLabel}
     >
-      <DashboardShell>
-        {/* Stream page RSC after shell chrome so soft-nav is not blank while module data loads. */}
-        <Suspense fallback={<ModulePageSkeleton />}>{children}</Suspense>
-      </DashboardShell>
+      {/* Phones and tablets get the desktop notice instead of the portal. */}
+      <DesktopOnlyGate>
+        <DashboardShell>
+          {/* Stream page RSC after shell chrome so soft-nav is not blank while module data loads. */}
+          <Suspense fallback={<ModulePageSkeleton />}>{children}</Suspense>
+        </DashboardShell>
+      </DesktopOnlyGate>
     </AuthProvider>
   );
 }

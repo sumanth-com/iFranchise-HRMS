@@ -16,6 +16,7 @@ import {
 
 import brandLogo from "@/assets/Logo.png";
 import { LandingPeopleBento } from "@/components/landing/landing-people-bento";
+import { LandingSectionHeading } from "@/components/landing/landing-section-heading";
 import { Button } from "@/components/common/button";
 import { LEGAL_FOOTER_LINKS } from "@/lib/landing/legal-content";
 import { PUBLIC_LANDING_ROUTE } from "@/lib/auth/constants";
@@ -56,16 +57,22 @@ const SECURITY = [
 
 export function LandingPeopleSection() {
   return (
-    <section className="landing-section landing-people" aria-labelledby="landing-people-heading">
+    <section
+      id="people"
+      className="landing-section landing-people"
+      aria-labelledby="landing-people-heading"
+    >
       <div className="mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 id="landing-people-heading" className="landing-section-title">
-            Built around <span className="landing-section-title-accent">people.</span>
-          </h2>
-          <p className="landing-section-copy">
-            The right tools for every part of your workplace.
-          </p>
-        </div>
+        <LandingSectionHeading
+          id="landing-people-heading"
+          eyebrow="Every role covered"
+          title={
+            <>
+              Built around <span className="landing-section-title-accent">people.</span>
+            </>
+          }
+          subtitle="The right tools for every part of your workplace."
+        />
 
         <LandingPeopleBento />
       </div>
@@ -81,16 +88,17 @@ export function LandingSecuritySection() {
       aria-labelledby="landing-security-heading"
     >
       <div className="mx-auto max-w-6xl px-5 sm:px-8 lg:px-10">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 id="landing-security-heading" className="landing-section-title">
-            Your workplace.{" "}
-            <span className="landing-section-title-accent">Protected.</span>
-          </h2>
-          <p className="landing-section-copy">
-            Secure access and controlled permissions keep workplace information
-            where it belongs.
-          </p>
-        </div>
+        <LandingSectionHeading
+          id="landing-security-heading"
+          eyebrow="Security & access"
+          title={
+            <>
+              Your workplace.{" "}
+              <span className="landing-section-title-accent">Protected.</span>
+            </>
+          }
+          subtitle="Secure access and controlled permissions keep workplace information where it belongs."
+        />
 
         <ul className="landing-security-grid">
           {SECURITY.map((item, index) => {
