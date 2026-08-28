@@ -1,5 +1,3 @@
-import Image from "next/image";
-
 import { LandingHeroOrbitIcons } from "@/components/landing/landing-hero-orbit-icons";
 import { LandingHeroPortalPreview } from "@/components/landing/landing-hero-portal-preview";
 import { LandingHeroSignInButton } from "@/components/landing/landing-hero-sign-in-button";
@@ -8,23 +6,12 @@ export function LandingHero() {
   return (
     <section className="landing-hero" aria-labelledby="landing-hero-heading">
       <div className="landing-hero-bg" aria-hidden>
-        {/* Realistic Wave Background Artwork */}
-        <div className="absolute inset-0 z-0 overflow-hidden bg-[#0a0026]">
-          <Image
-            src="/images/landing-hero-waves.png"
-            alt=""
-            fill
-            priority
-            quality={90}
-            className="object-cover object-center opacity-95 mix-blend-screen"
-          />
-        </div>
+        <div className="landing-hero-bg-base" />
 
-        {/* Dynamic Glow and Particles */}
+        {/* Soft drifting colour, kept subtle so dark copy stays readable */}
         <div className="landing-hero-bg-glow landing-hero-bg-glow--primary" />
         <div className="landing-hero-bg-glow landing-hero-bg-glow--secondary" />
         <div className="landing-hero-bg-glow landing-hero-bg-glow--accent" />
-        <div className="landing-hero-bg-particles" />
 
         <div className="landing-hero-bg-fade" />
       </div>

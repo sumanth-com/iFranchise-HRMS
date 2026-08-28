@@ -15,6 +15,8 @@ import {
 } from "@/lib/leave/services/leave-queries";
 import { requiresCeoLeaveApproval } from "@/lib/approvals/executive-request-routing";
 import { evaluateLeaveApplication } from "@/lib/leave/services/leave-policy-runtime";
+import { splitLeaveDaysByBalance } from "@/lib/leave/services/leave-policy-engine";
+import { roundLeaveDays } from "@/lib/leave/services/leave-usage";
 import { NON_APPLY_LEAVE_TYPE_CODES } from "@/lib/leave/constants";
 import {
   notifyLeaveApproved,
@@ -79,6 +81,10 @@ async function adjustLeaveBalance(
   balanceYear: number,
   delta: { pending?: number; used?: number },
 ) {
+  // A fully-LOP request reserves nothing, so there is no ledger row to touch and
+  // no reason to fail an employee who has never had a balance allocated.
+  if (!delta.pending && !delta.used) return;
+
   const balance = await getLeaveBalanceRow(
     supabase,
     employeeId,
@@ -118,6 +124,39 @@ async function adjustLeaveBalance(
   if (!data) {
     throw new Error("Leave balance was updated by another request. Please try again.");
   }
+}
+
+/**
+ * Days a request actually reserved against the paid balance. Requests created
+ * before the paid/LOP split existed reserved their full duration, so fall back to
+ * total_days to keep their release amounts symmetrical.
+ */
+function reservedPaidDays(request: {
+  total_days: number | string;
+  duration_breakdown?: unknown;
+}) {
+  const breakdown = request.duration_breakdown as { paidDays?: unknown } | null;
+  const stored = breakdown?.paidDays;
+  return typeof stored === "number" ? stored : Number(request.total_days);
+}
+
+/**
+ * Approval re-derives the duration (the holiday calendar may have moved since the
+ * request was filed) but must settle against the days that were actually reserved,
+ * otherwise the pending release and the used debit drift apart. The paid portion is
+ * therefore capped at the reservation and the remainder becomes LOP.
+ */
+function resolveApprovedSplit(
+  request: { total_days: number | string; duration_breakdown?: unknown },
+  approvedTotalDays: number,
+) {
+  const reservedDays = reservedPaidDays(request);
+  const paidDays = roundLeaveDays(Math.min(reservedDays, approvedTotalDays));
+  return {
+    reservedDays,
+    paidDays,
+    lopDays: roundLeaveDays(approvedTotalDays - paidDays),
+  };
 }
 
 async function ensureLeaveBalanceRow(
@@ -277,18 +316,20 @@ export async function createLeaveRequest(
   }
   const totalDays = evaluated.duration.totalLeaveDays;
   const balanceYear = getCurrentBalanceYear(input.startDate);
+  const { paidDays, lopDays } = evaluated.split;
+  const durationBreakdown = { ...evaluated.duration, paidDays, lopDays };
 
-  if (evaluated.leaveType.isPaid) {
+  if (evaluated.leaveType.isPaid && paidDays > 0) {
     await ensureLeaveBalanceRow(
       supabase,
       input.employeeId,
       input.leaveTypeId,
       balanceYear,
-      Math.max(evaluated.availableBalance ?? 0, totalDays),
+      evaluated.availableBalance ?? paidDays,
       profile.userId,
     );
     await adjustLeaveBalance(supabase, input.employeeId, input.leaveTypeId, balanceYear, {
-      pending: totalDays,
+      pending: paidDays,
     });
   }
 
@@ -307,7 +348,7 @@ export async function createLeaveRequest(
       emergency_contact_name: emptyToNull(input.emergencyContactName),
       emergency_contact_phone: emptyToNull(input.emergencyContactPhone),
       attachment_path: emptyToNull(input.attachmentPath),
-      duration_breakdown: evaluated.duration,
+      duration_breakdown: durationBreakdown,
       leave_status: "pending",
       status: "active",
       created_by: profile.userId,
@@ -319,7 +360,7 @@ export async function createLeaveRequest(
   if (error || !data) {
     if (evaluated.leaveType.isPaid) {
       await adjustLeaveBalance(supabase, input.employeeId, input.leaveTypeId, balanceYear, {
-        pending: -totalDays,
+        pending: -paidDays,
       }).catch(() => undefined);
     }
     throw new Error(error?.message ?? "Failed to create leave request");
@@ -336,7 +377,7 @@ export async function createLeaveRequest(
   } catch (approvalError) {
     if (evaluated.leaveType.isPaid) {
       await adjustLeaveBalance(supabase, input.employeeId, input.leaveTypeId, balanceYear, {
-        pending: -totalDays,
+        pending: -paidDays,
       }).catch(() => undefined);
     }
     await supabase.schema("hrms").from("leave_requests").update({
@@ -547,7 +588,9 @@ async function finalizeApprovalIfComplete(
   const { data: request, error: requestError } = await supabase
     .schema("hrms")
     .from("leave_requests")
-    .select("employee_id, leave_type_id, start_date, end_date, total_days, is_half_day, leave_status")
+    .select(
+      "employee_id, leave_type_id, start_date, end_date, total_days, duration_breakdown, is_half_day, leave_status",
+    )
     .eq("id", leaveRequestId)
     .single();
 
@@ -586,7 +629,7 @@ async function finalizeApprovalIfComplete(
   );
 
   const balanceYear = getCurrentBalanceYear(request.start_date);
-  const totalDays = Number(request.total_days);
+  const approved = resolveApprovedSplit(request, evaluated.duration.totalLeaveDays);
 
   const { data: finalized, error: finalizeError } = await supabase
     .schema("hrms")
@@ -594,7 +637,11 @@ async function finalizeApprovalIfComplete(
     .update({
       leave_status: "approved",
       total_days: evaluated.duration.totalLeaveDays,
-      duration_breakdown: evaluated.duration,
+      duration_breakdown: {
+        ...evaluated.duration,
+        paidDays: approved.paidDays,
+        lopDays: approved.lopDays,
+      },
       updated_by: profile.userId,
       updated_at: new Date().toISOString(),
     })
@@ -612,7 +659,7 @@ async function finalizeApprovalIfComplete(
       request.employee_id,
       request.leave_type_id,
       balanceYear,
-      { pending: -totalDays, used: evaluated.duration.totalLeaveDays },
+      { pending: -approved.reservedDays, used: approved.paidDays },
     );
   }
 
@@ -645,7 +692,9 @@ export async function approveLeaveRequest(
   const { data: request, error } = await supabase
     .schema("hrms")
     .from("leave_requests")
-    .select("id, employee_id, leave_status, leave_type_id, start_date, end_date, total_days, is_half_day")
+    .select(
+      "id, employee_id, leave_status, leave_type_id, start_date, end_date, total_days, duration_breakdown, is_half_day",
+    )
     .eq("id", leaveRequestId)
     .single();
 
@@ -700,7 +749,7 @@ export async function approveLeaveRequest(
     );
 
     const balanceYear = getCurrentBalanceYear(request.start_date);
-    const totalDays = Number(request.total_days);
+    const approved = resolveApprovedSplit(request, evaluated.duration.totalLeaveDays);
 
     const { data: finalized, error: finalizeError } = await supabase
       .schema("hrms")
@@ -708,7 +757,11 @@ export async function approveLeaveRequest(
       .update({
         leave_status: "approved",
         total_days: evaluated.duration.totalLeaveDays,
-        duration_breakdown: evaluated.duration,
+        duration_breakdown: {
+          ...evaluated.duration,
+          paidDays: approved.paidDays,
+          lopDays: approved.lopDays,
+        },
         updated_by: profile.userId,
         updated_at: actedAt,
       })
@@ -757,7 +810,7 @@ export async function approveLeaveRequest(
         request.employee_id,
         request.leave_type_id,
         balanceYear,
-        { pending: -totalDays, used: evaluated.duration.totalLeaveDays },
+        { pending: -approved.reservedDays, used: approved.paidDays },
       );
     }
 
@@ -833,7 +886,9 @@ export async function rejectLeaveRequest(
   const { data: request, error } = await supabase
     .schema("hrms")
     .from("leave_requests")
-    .select("id, employee_id, leave_type_id, start_date, total_days, leave_status")
+    .select(
+      "id, employee_id, leave_type_id, start_date, total_days, duration_breakdown, leave_status",
+    )
     .eq("id", leaveRequestId)
     .single();
 
@@ -927,7 +982,7 @@ export async function rejectLeaveRequest(
       request.employee_id,
       request.leave_type_id,
       balanceYear,
-      { pending: -Number(request.total_days) },
+      { pending: -reservedPaidDays(request) },
     );
   }
 
@@ -962,7 +1017,9 @@ export async function cancelLeaveRequest(
   const { data: request, error } = await supabase
     .schema("hrms")
     .from("leave_requests")
-    .select("id, employee_id, leave_type_id, start_date, total_days, leave_status")
+    .select(
+      "id, employee_id, leave_type_id, start_date, total_days, duration_breakdown, leave_status",
+    )
     .eq("id", leaveRequestId)
     .single();
 
@@ -1007,15 +1064,16 @@ export async function cancelLeaveRequest(
 
   const balanceYear = getCurrentBalanceYear(request.start_date);
   const totalDays = Number(request.total_days);
+  const reserved = reservedPaidDays(request);
 
   if (leaveType?.is_paid !== false) {
     if (previousStatus === "pending") {
       await adjustLeaveBalance(supabase, request.employee_id, request.leave_type_id, balanceYear, {
-        pending: -totalDays,
+        pending: -reserved,
       });
     } else if (previousStatus === "approved") {
       await adjustLeaveBalance(supabase, request.employee_id, request.leave_type_id, balanceYear, {
-        used: -totalDays,
+        used: -reserved,
       });
     }
   }
@@ -1093,7 +1151,7 @@ export async function updateLeaveRequest(
     .schema("hrms")
     .from("leave_requests")
     .select(
-      "id, employee_id, leave_type_id, start_date, end_date, total_days, leave_status",
+      "id, employee_id, leave_type_id, start_date, end_date, total_days, duration_breakdown, leave_status",
     )
     .eq("id", leaveRequestId)
     .is("deleted_at", null)
@@ -1141,7 +1199,7 @@ export async function updateLeaveRequest(
     },
   );
   const nextTotalDays = next.duration.totalLeaveDays;
-  const previousTotalDays = Number(request.total_days);
+  const previousReservedDays = reservedPaidDays(request);
   const previousBalanceYear = getCurrentBalanceYear(request.start_date);
   const nextBalanceYear = getCurrentBalanceYear(input.startDate);
 
@@ -1158,18 +1216,34 @@ export async function updateLeaveRequest(
       request.employee_id,
       request.leave_type_id,
       previousBalanceYear,
-      { pending: -previousTotalDays },
+      { pending: -previousReservedDays },
     );
   }
 
+  // The edit re-reserves against the same ledger row, so the days this request is
+  // already holding must be credited back before splitting paid days from LOP.
+  const reusesSameBalanceBucket =
+    previousType?.is_paid !== false &&
+    request.leave_type_id === input.leaveTypeId &&
+    previousBalanceYear === nextBalanceYear;
+  const nextAvailableBalance =
+    next.availableBalance == null
+      ? null
+      : next.availableBalance + (reusesSameBalanceBucket ? previousReservedDays : 0);
+  const nextSplit = splitLeaveDaysByBalance({
+    totalDays: nextTotalDays,
+    availableBalance: nextAvailableBalance,
+    isPaid: next.leaveType.isPaid,
+  });
+
   try {
-    if (next.leaveType.isPaid) {
+    if (next.leaveType.isPaid && nextSplit.paidDays > 0) {
       await ensureLeaveBalanceRow(
         supabase,
         input.employeeId,
         input.leaveTypeId,
         nextBalanceYear,
-        Math.max(next.availableBalance ?? 0, nextTotalDays),
+        nextAvailableBalance ?? nextSplit.paidDays,
         profile.userId,
       );
       await adjustLeaveBalance(
@@ -1177,7 +1251,7 @@ export async function updateLeaveRequest(
         input.employeeId,
         input.leaveTypeId,
         nextBalanceYear,
-        { pending: nextTotalDays },
+        { pending: nextSplit.paidDays },
       );
     }
   } catch (balanceError) {
@@ -1187,7 +1261,7 @@ export async function updateLeaveRequest(
         request.employee_id,
         request.leave_type_id,
         previousBalanceYear,
-        { pending: previousTotalDays },
+        { pending: previousReservedDays },
       );
     }
     throw balanceError;
@@ -1207,7 +1281,11 @@ export async function updateLeaveRequest(
       emergency_contact_name: emptyToNull(input.emergencyContactName),
       emergency_contact_phone: emptyToNull(input.emergencyContactPhone),
       attachment_path: emptyToNull(input.attachmentPath),
-      duration_breakdown: next.duration,
+      duration_breakdown: {
+        ...next.duration,
+        paidDays: nextSplit.paidDays,
+        lopDays: nextSplit.lopDays,
+      },
       updated_by: profile.userId,
       updated_at: new Date().toISOString(),
     })
@@ -1220,7 +1298,7 @@ export async function updateLeaveRequest(
         input.employeeId,
         input.leaveTypeId,
         nextBalanceYear,
-        { pending: -nextTotalDays },
+        { pending: -nextSplit.paidDays },
       );
     }
     if (previousType?.is_paid !== false) {
@@ -1229,7 +1307,7 @@ export async function updateLeaveRequest(
         request.employee_id,
         request.leave_type_id,
         previousBalanceYear,
-        { pending: previousTotalDays },
+        { pending: previousReservedDays },
       );
     }
     throw new Error(updateError.message);

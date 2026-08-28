@@ -213,7 +213,7 @@ export function SalaryStructureTable({
       ? [
           {
             id: "actions",
-            header: () => <span className="sr-only">Actions</span>,
+            header: () => "Actions",
             cell: ({ row }: { row: { original: SalaryStructureItem } }) => {
               const isUnset = row.original.id.startsWith("not_set_");
               return (
@@ -285,47 +285,52 @@ export function SalaryStructureTable({
         />
       </div>
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-        <table className="w-full text-sm">
-          <TableHeader className="bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 shadow-[0_1px_0_rgba(255,255,255,0.12)] hover:bg-transparent">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="border-white/10 bg-transparent hover:bg-transparent">
-                {headerGroup.headers.map((header) => (
-                  <TableHead
-                    key={header.id}
-                    className={`h-11 whitespace-nowrap bg-transparent px-4 py-3 text-xs font-semibold uppercase tracking-wide text-white hover:bg-transparent ${header.id === "actions" ? "text-right" : ""}`}
-                  >
-                    {flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell
-                      key={cell.id}
-                      className={`px-4 py-3 ${cell.column.id === "actions" ? "text-right" : ""}`}
+        <div className="max-h-[calc(100vh-19rem)] overflow-auto">
+          <table className="w-full text-sm">
+            <TableHeader className="bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 shadow-[0_1px_0_rgba(255,255,255,0.12)] hover:bg-transparent">
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow
+                  key={headerGroup.id}
+                  className="border-white/10 bg-transparent hover:bg-transparent"
+                >
+                  {headerGroup.headers.map((header) => (
+                    <TableHead
+                      key={header.id}
+                      className={`h-11 whitespace-nowrap bg-transparent px-4 py-3 text-xs font-semibold tracking-wide uppercase text-white hover:bg-transparent ${header.id === "actions" ? "text-right" : ""}`}
                     >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                    </TableHead>
                   ))}
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center text-muted-foreground"
-                >
-                  No salary structures found.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </table>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow key={row.id}>
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell
+                        key={cell.id}
+                        className={`px-4 py-3 ${cell.column.id === "actions" ? "text-right" : ""}`}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-24 text-center text-muted-foreground"
+                  >
+                    No salary structures found.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </table>
+        </div>
       </div>
 
       {canEdit ? (

@@ -2,8 +2,11 @@ import { calculateLeaveDuration } from "@/lib/leave/services/leave-calendar-engi
 import {
   buildLeavePreviewMessages,
   CASUAL_LEAVE_CODE,
+  isBlockingLeaveIssue,
   PERIOD_LEAVE_CODE,
+  splitLeaveDaysByBalance,
   validateLeavePolicy,
+  type LeaveDaySplit,
   type LeavePolicyIssue,
 } from "@/lib/leave/services/leave-policy-engine";
 import type { LeaveApplyContext } from "@/types/leave";
@@ -14,6 +17,8 @@ export type LeaveApplyPreview = {
   available: number | null;
   remaining: number | null;
   issues: LeavePolicyIssue[];
+  blockingIssues: LeavePolicyIssue[];
+  split: LeaveDaySplit;
   messages: string[];
   leaveType: LeaveApplyContext["leaveTypes"][number];
 };
@@ -83,5 +88,20 @@ export function previewLeaveApplication(input: {
     requiresManagerAndHr: input.context.approvalLevels >= 2,
   });
 
-  return { duration, available, remaining, issues, messages, leaveType };
+  const split = splitLeaveDaysByBalance({
+    totalDays: duration.totalLeaveDays,
+    availableBalance: available,
+    isPaid: leaveType.isPaid,
+  });
+
+  return {
+    duration,
+    available,
+    remaining,
+    issues,
+    blockingIssues: issues.filter(isBlockingLeaveIssue),
+    split,
+    messages,
+    leaveType,
+  };
 }

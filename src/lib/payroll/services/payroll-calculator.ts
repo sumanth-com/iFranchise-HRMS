@@ -128,17 +128,12 @@ export function calculateEmployeePayroll(
   const incomeTax = components.incomeTax ?? 0;
   const otherDeduction = components.other ?? 0;
 
-  const fullGross =
-    basic + hra + transport + otherAllowances + specialAllowance + medical;
   const fullDeductions = pf + esi + professionalTax + incomeTax + otherDeduction;
 
   const lopDays =
     attendance.absentDays + leaveLopDays + attendance.halfDays * 0.5;
   const paidDays = Math.max(0, workingDays - lopDays);
   const paidRatio = workingDays > 0 ? paidDays / workingDays : 0;
-
-  const perDayGross = fullGross / workingDays;
-  const lopDeduction = roundCurrency(perDayGross * lopDays);
 
   const earnedBasic = roundCurrency(basic * paidRatio);
   const earnedHra = roundCurrency(hra * paidRatio);
@@ -226,14 +221,9 @@ export function calculateEmployeePayroll(
     },
   ];
 
-  if (lopDeduction > 0) {
-    deductions.push({
-      code: "lop",
-      label: "Loss of Pay",
-      amount: lopDeduction,
-      type: "deduction",
-    });
-  }
+  // Loss of pay is already applied by prorating every earning line at paidRatio, so
+  // it must not be charged a second time as a deduction. The day count stays visible
+  // to the employee through breakdown.attendance.lopDays.
 
   const grossSalary = roundCurrency(
     earnings.reduce((sum, line) => sum + line.amount, 0),

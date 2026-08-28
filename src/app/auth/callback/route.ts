@@ -21,9 +21,8 @@ function buildAuthErrorRedirect(
     return NextResponse.redirect(redirectUrl);
   }
 
-  const redirectUrl = new URL(AUTH_ROUTES.login, origin);
-  redirectUrl.searchParams.set("expired", reason === "expired" ? "1" : "0");
-  return NextResponse.redirect(redirectUrl);
+  // Land on the plain login screen; the failure reason is not surfaced to the user.
+  return NextResponse.redirect(new URL(AUTH_ROUTES.login, origin));
 }
 
 export async function GET(request: NextRequest) {

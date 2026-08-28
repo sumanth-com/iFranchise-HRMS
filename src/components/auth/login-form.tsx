@@ -219,7 +219,6 @@ export function LoginForm() {
     }
   });
 
-  const expired = searchParams.get("expired") === "1";
   const errorParam = searchParams.get("error");
   const profileError =
     errorParam &&
@@ -259,12 +258,6 @@ export function LoginForm() {
         <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
           Preparing your account setup...
-        </div>
-      ) : null}
-
-      {expired ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-          {getAuthErrorMessage("SESSION_EXPIRED")}
         </div>
       ) : null}
 

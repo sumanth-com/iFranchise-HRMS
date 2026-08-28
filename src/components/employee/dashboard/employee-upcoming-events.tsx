@@ -168,6 +168,81 @@ function HolidayEventRow({
   );
 }
 
+/**
+ * Single-event layout: one row alone leaves most of the card empty, so the event
+ * is centred and enlarged to fill it instead. Two or more fall back to the list.
+ */
+function SoloEventView({
+  event,
+  referenceDate,
+}: {
+  event: EmployeeUpcomingEvent;
+  referenceDate: string;
+}) {
+  const eventDate = parseISO(event.date);
+  const timing = countdownLabel(event.date, referenceDate);
+  const isToday = timing === "Today";
+  const isBirthday = event.type === "birthday";
+
+  return (
+    <div
+      className={cn(
+        "flex min-h-[11rem] flex-1 flex-col items-center justify-center rounded-xl border px-5 py-6 text-center",
+        isBirthday
+          ? "border-rose-500/20 bg-gradient-to-b from-rose-500/[0.07] to-transparent"
+          : "border-violet-500/20 bg-gradient-to-b from-violet-500/[0.07] to-transparent",
+      )}
+    >
+      {isBirthday ? (
+        <div className="relative">
+          <EmployeeAvatar
+            firstName={event.firstName || event.title}
+            lastName={event.lastName || ""}
+            profileImagePath={event.profileImagePath}
+            signedUrl={event.avatarUrl}
+            className="size-16 rounded-2xl ring-2 ring-rose-500/25"
+          />
+          {isToday ? (
+            <span className="absolute -right-1.5 -bottom-1.5 flex size-6 items-center justify-center rounded-full bg-rose-500 text-white shadow-sm">
+              <Cake className="size-3.5" />
+            </span>
+          ) : null}
+        </div>
+      ) : (
+        <span className="flex size-24 items-center justify-center rounded-3xl bg-violet-500/10 ring-1 ring-violet-500/20 dark:bg-violet-500/15">
+          <span className="celebration-glyph">
+            <HolidayGlyph name={event.title} className="text-[3.4rem] leading-none" />
+          </span>
+        </span>
+      )}
+
+      <span
+        className={cn(
+          "mt-3.5 inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wide uppercase",
+          isBirthday
+            ? "bg-rose-500/15 text-rose-700 dark:bg-rose-400/20 dark:text-rose-300"
+            : "bg-violet-500/15 text-violet-700 dark:bg-violet-400/20 dark:text-violet-300",
+        )}
+      >
+        {isBirthday && !isToday ? "Birthday" : timing}
+      </span>
+
+      <p className="mt-2.5 text-lg font-semibold text-foreground">{event.title}</p>
+
+      {isBirthday ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          {isToday ? "Celebrating birthday today!" : `Birthday · ${timing}`}
+        </p>
+      ) : null}
+
+      <p className="mt-3 text-[11px] font-medium tracking-wide text-muted-foreground/80 tabular-nums uppercase">
+
+        {format(eventDate, "EEEE, d MMM yyyy")}
+      </p>
+    </div>
+  );
+}
+
 export function EmployeeUpcomingEvents({
   events,
   referenceDate,
@@ -184,7 +259,9 @@ export function EmployeeUpcomingEvents({
       className={cn("flex h-full min-h-0 flex-col", className)}
       bodyClassName="flex flex-col min-h-0 flex-1 overflow-y-auto pr-1"
     >
-      {events.length > 0 ? (
+      {events.length === 1 ? (
+        <SoloEventView event={events[0]} referenceDate={referenceDate} />
+      ) : events.length > 1 ? (
         <ul className="flex flex-col gap-2.5">
           {events.map((event) =>
             event.type === "birthday" ? (

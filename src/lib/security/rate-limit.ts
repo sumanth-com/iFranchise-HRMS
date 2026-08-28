@@ -32,3 +32,12 @@ export function assertRateLimit(input: {
 
   existing.count += 1;
 }
+
+/**
+ * Drops a throttle counter after the caller proves they are legitimate. Without
+ * this, a candidate whose earlier verification code simply expired stays locked out
+ * for the rest of the window even once they authenticate successfully.
+ */
+export function clearRateLimit(key: string): void {
+  buckets.delete(key);
+}

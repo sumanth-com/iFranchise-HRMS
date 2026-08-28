@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -13,12 +13,20 @@ export default function OnboardingPortalPage() {
   const router = useRouter();
   const [context, setContext] = useState<CandidatePortalContext | null | undefined>(undefined);
 
+  // Uploads and section saves can each trigger a refetch, so responses may arrive
+  // out of order. Only apply the newest one, otherwise a slow earlier request can
+  // overwrite fresher data and make just-saved values look like they vanished.
+  const refreshSeqRef = useRef(0);
+
   const refresh = useCallback(async () => {
+    const seq = ++refreshSeqRef.current;
     try {
       const data = await getCandidatePortalContextAction();
+      if (seq !== refreshSeqRef.current) return;
       setContext(data);
     } catch (error) {
       console.error("[onboarding-portal] context refresh failed", error);
+      if (seq !== refreshSeqRef.current) return;
       toast.error("Could not load your onboarding data. Please try again.");
     }
   }, []);

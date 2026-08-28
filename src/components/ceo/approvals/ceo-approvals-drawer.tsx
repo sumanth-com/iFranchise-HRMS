@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { CheckCircle2, Loader2, Trash2, XCircle } from "lucide-react";
+import { ArrowRight, CheckCircle2, Loader2, Trash2, XCircle } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -16,8 +16,10 @@ import {
   rejectCeoApprovalAction,
 } from "@/lib/ceo/actions/ceo-approvals-actions";
 import { broadcastApprovalChange } from "@/lib/approvals/use-approvals-sync";
-import { EXECUTIVE_APPROVAL_PRIORITY_LABELS } from "@/lib/ceo/executive-approvals-constants";
-import type { CeoApprovalsDetail } from "@/types/ceo-approvals";
+import type {
+  CeoApprovalsDetail,
+  CeoApprovalsPromotionDetail,
+} from "@/types/ceo-approvals";
 
 type CeoApprovalsDrawerProps = {
   requestId: string | null;
@@ -34,6 +36,156 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
     <div className="rounded-lg border bg-muted/20 px-3 py-2.5">
       <p className="text-xs text-muted-foreground">{label}</p>
       <div className="mt-0.5 text-sm font-medium break-words">{value || "—"}</div>
+    </div>
+  );
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+      {children}
+    </p>
+  );
+}
+
+function PromotionSummary({ promotion }: { promotion: CeoApprovalsPromotionDetail }) {
+  const hasSalary =
+    promotion.currentSalary != null || promotion.proposedSalary != null;
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <SectionTitle>Employee</SectionTitle>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field
+            label="Name"
+            value={
+              promotion.employeeCode
+                ? `${promotion.employeeName} · ${promotion.employeeCode}`
+                : promotion.employeeName
+            }
+          />
+          <Field label="Department" value={promotion.departmentName} />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <SectionTitle>Role change</SectionTitle>
+        <div className="flex flex-col gap-2 rounded-lg border px-3 py-3 sm:flex-row sm:items-center sm:gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-muted-foreground">Current role</p>
+            <p className="mt-0.5 truncate text-sm font-medium">
+              {promotion.currentDesignation ?? "—"}
+            </p>
+          </div>
+          <ArrowRight
+            className="hidden size-4 shrink-0 text-muted-foreground sm:block"
+            aria-hidden
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-muted-foreground">Proposed role</p>
+            <p className="mt-0.5 truncate text-sm font-semibold">
+              {promotion.proposedDesignation ?? "—"}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {hasSalary ? (
+        <div className="space-y-2">
+          <SectionTitle>Compensation impact</SectionTitle>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field
+              label="Current"
+              value={
+                promotion.currentSalary != null
+                  ? formatCeoCurrency(promotion.currentSalary)
+                  : null
+              }
+            />
+            <Field
+              label="Proposed"
+              value={
+                promotion.proposedSalary != null
+                  ? formatCeoCurrency(promotion.proposedSalary)
+                  : null
+              }
+            />
+            <Field
+              label="Increase"
+              value={
+                promotion.salaryIncrease != null
+                  ? `${formatCeoCurrency(promotion.salaryIncrease)}${
+                      promotion.salaryIncreasePercent != null
+                        ? ` (${promotion.salaryIncreasePercent}%)`
+                        : ""
+                    }`
+                  : null
+              }
+            />
+          </div>
+        </div>
+      ) : null}
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Status" value={promotion.statusLabel} />
+        <Field
+          label="Effective date"
+          value={
+            promotion.effectiveFrom
+              ? format(new Date(promotion.effectiveFrom), "dd MMM yyyy")
+              : "On approval"
+          }
+        />
+        <Field label="Recommended by" value={promotion.recommendedByName} />
+        <Field
+          label="Recommended on"
+          value={format(new Date(promotion.recommendedAt), "dd MMM yyyy")}
+        />
+      </div>
+
+      {promotion.reason ? (
+        <div className="space-y-2">
+          <SectionTitle>Reason</SectionTitle>
+          <p className="rounded-lg border px-3 py-2.5 text-sm whitespace-pre-wrap">
+            {promotion.reason}
+          </p>
+        </div>
+      ) : null}
+
+      {promotion.approvals.length > 0 ? (
+        <div className="space-y-2">
+          <SectionTitle>Approval history</SectionTitle>
+          <ul className="divide-y rounded-lg border">
+            {promotion.approvals.map((step) => (
+              <li
+                key={step.id}
+                className="flex items-start justify-between gap-3 px-3 py-2.5"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{step.levelLabel}</p>
+                  {step.actorName ? (
+                    <p className="text-xs text-muted-foreground">{step.actorName}</p>
+                  ) : null}
+                  {step.comments ? (
+                    <p className="mt-1 text-xs break-words text-muted-foreground">
+                      {step.comments}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-sm font-medium">{step.statusLabel}</p>
+                  {step.actedAt ? (
+                    <p className="text-xs text-muted-foreground">
+                      {format(new Date(step.actedAt), "dd MMM yyyy")}
+                    </p>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -160,23 +312,20 @@ export function CeoApprovalsDrawer({
         }
         onOpenChange(next);
       }}
-      title={detail?.title ?? "Approval details"}
+      title={
+        detail?.promotion
+          ? `Promotion · ${detail.promotion.employeeName}`
+          : (detail?.title ?? "Promotion approval")
+      }
       description={
         detail
-          ? `${detail.requestCode} · ${detail.approvalTypeLabel} · ${detail.statusLabel}`
+          ? `${detail.requestCode} · ${detail.statusLabel}`
           : loadError
             ? "Could not load this approval"
             : "Loading approval…"
       }
       contentClassName="sm:max-w-xl"
       showCancel={false}
-      headerAddon={
-        detail ? (
-          <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold tracking-wide uppercase">
-            {EXECUTIVE_APPROVAL_PRIORITY_LABELS[detail.priority]}
-          </span>
-        ) : null
-      }
       footer={
         detail && !actionMode ? (
           <div className="flex w-full flex-wrap items-center justify-end gap-2">
@@ -327,78 +476,11 @@ export function CeoApprovalsDrawer({
             are rejected. This cannot be undone.
           </p>
         </div>
+      ) : detail.promotion ? (
+        <PromotionSummary promotion={detail.promotion} />
       ) : (
-        <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Type" value={detail.approvalTypeLabel} />
-            <Field label="Status" value={detail.statusLabel} />
-            <Field
-              label="Priority"
-              value={EXECUTIVE_APPROVAL_PRIORITY_LABELS[detail.priority]}
-            />
-            <Field
-              label="Financial impact"
-              value={formatCeoCurrency(detail.financialImpact)}
-            />
-            <Field label="Department" value={detail.departmentName} />
-            <Field label="Requester" value={detail.requestedByName ?? "System / HR"} />
-            <Field
-              label="Submitted"
-              value={format(new Date(detail.submittedAt), "dd MMM yyyy HH:mm")}
-            />
-            <Field
-              label="Due"
-              value={
-                detail.dueAt ? format(new Date(detail.dueAt), "dd MMM yyyy") : "—"
-              }
-            />
-          </div>
-
-          <div className="rounded-lg border px-3 py-2.5">
-            <p className="text-xs text-muted-foreground">Business justification</p>
-            <p className="mt-1 text-sm whitespace-pre-wrap">
-              {detail.businessJustification || detail.summary || "—"}
-            </p>
-          </div>
-
-          {detail.riskAssessment ? (
-            <div className="rounded-lg border px-3 py-2.5">
-              <p className="text-xs text-muted-foreground">Risk assessment</p>
-              <p className="mt-1 text-sm whitespace-pre-wrap">{detail.riskAssessment}</p>
-            </div>
-          ) : null}
-
-          {detail.supportingDocuments.length > 0 || detail.attachments.length > 0 ? (
-            <div className="rounded-lg border px-3 py-2.5">
-              <p className="text-xs text-muted-foreground">Documents</p>
-              <ul className="mt-2 space-y-1.5 text-sm">
-                {[...detail.supportingDocuments, ...detail.attachments].map(
-                  (doc, index) => (
-                    <li key={`${doc.name}-${index}`}>
-                      {doc.url ? (
-                        <a
-                          href={doc.url}
-                          className="font-medium text-primary hover:underline"
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {doc.name}
-                        </a>
-                      ) : (
-                        <span>{doc.name}</span>
-                      )}
-                    </li>
-                  ),
-                )}
-              </ul>
-            </div>
-          ) : null}
-
-          {(showApprove || showReject || showDelete) && (
-            <p className="text-xs text-muted-foreground">
-              Use Approve, Reject, or Delete below to take action without leaving this page.
-            </p>
-          )}
+        <div className="py-10 text-center text-sm text-muted-foreground">
+          The promotion record for this request is no longer available.
         </div>
       )}
     </Modal>

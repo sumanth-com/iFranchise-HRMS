@@ -16,7 +16,9 @@ import {
   DEFAULT_LEAVE_NOTICE,
   DEFAULT_LEAVE_PROBATION_RULES,
   getProbationSnapshot,
+  isBlockingLeaveIssue,
   PERIOD_LEAVE_CODE,
+  splitLeaveDaysByBalance,
   validateLeavePolicy,
   type LeaveEmployeePolicyState,
   type LeavePolicyNoticeHours,
@@ -31,6 +33,7 @@ export type LeaveTypePolicyRow = {
   name: string;
   isPaid: boolean;
   isCarryForward: boolean;
+  daysPerYear: number;
 };
 
 export type LeavePolicyRuntime = {
@@ -105,7 +108,7 @@ export const loadLeavePolicyRuntime = cache(async function loadLeavePolicyRuntim
     supabase
       .schema("hrms")
       .from("leave_types")
-      .select("id, code, name, is_paid, is_carry_forward, deleted_at")
+      .select("id, code, name, is_paid, is_carry_forward, days_per_year, deleted_at")
       .eq("organization_id", organizationId)
       .in("code", [...ALLOWED_LEAVE_TYPE_CODES]),
   ]);
@@ -158,6 +161,7 @@ export const loadLeavePolicyRuntime = cache(async function loadLeavePolicyRuntim
         name: row.name,
         isPaid: Boolean(row.is_paid),
         isCarryForward: Boolean(row.is_carry_forward),
+        daysPerYear: Number(row.days_per_year ?? 0),
       });
     }
   }
@@ -358,7 +362,13 @@ export async function evaluateLeaveApplication(
     runtime.probation,
   );
   const code = leaveType.code.toUpperCase();
-  let availableBalance = leaveType.isPaid ? Number(balance?.balance_days ?? 0) : null;
+  // A ledger row is only created the first time an employee uses a leave type, so a
+  // new joiner has none. Fall back to the leave type's configured annual entitlement
+  // — the same figure the employee already sees as their balance — instead of
+  // treating them as having nothing and pushing the whole request to LOP.
+  let availableBalance = leaveType.isPaid
+    ? Number(balance?.balance_days ?? leaveType.daysPerYear)
+    : null;
   if (probation.onProbation && code === CASUAL_LEAVE_CODE) {
     availableBalance = Math.max(
       0,
@@ -389,11 +399,27 @@ export async function evaluateLeaveApplication(
     skipNotice: input.skipNotice,
   });
 
-  if (issues.length > 0) {
-    throw new Error(issues[0].message);
+  const blockingIssues = issues.filter(isBlockingLeaveIssue);
+  if (blockingIssues.length > 0) {
+    throw new Error(blockingIssues[0].message);
   }
 
-  return { runtime, employee, leaveType, duration, availableBalance, probation };
+  const split = splitLeaveDaysByBalance({
+    totalDays: duration.totalLeaveDays,
+    availableBalance,
+    isPaid: leaveType.isPaid,
+  });
+
+  return {
+    runtime,
+    employee,
+    leaveType,
+    duration,
+    availableBalance,
+    probation,
+    split,
+    issues,
+  };
 }
 
 export { PERIOD_LEAVE_CODE, DEFAULT_LEAVE_NOTICE };

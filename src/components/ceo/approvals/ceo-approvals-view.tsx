@@ -78,7 +78,7 @@ export function CeoApprovalsView({
           <h1 className="text-2xl font-semibold tracking-tight">Executive Approvals</h1>
         </SectionHelpButton>
         <p className="mt-1 text-sm text-muted-foreground">
-          Review and decide on strategic approvals requiring CEO authorization.
+          Review and decide on employee promotions requiring CEO authorization.
         </p>
       </div>
 

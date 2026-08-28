@@ -46,12 +46,24 @@ import {
 } from "@/lib/validations/leave";
 import type { LeaveApplyContext, LeaveListItem, LeaveLookups } from "@/types/leave";
 
+function formatLeaveDays(value: number): string {
+  const rounded = Number(value.toFixed(2));
+  return `${rounded} ${rounded === 1 ? "day" : "days"}`;
+}
+
 function explainLeaveSubmitError(message: string): {
   title: string;
   body: string;
   hint?: string;
 } {
   const normalized = message.toLowerCase();
+  if (normalized.includes("loss of pay")) {
+    return {
+      title: "Applied as Loss of Pay",
+      body: message,
+      hint: "You can still submit this request for approval.",
+    };
+  }
   if (normalized.includes("overlap")) {
     return {
       title: "These dates already have leave",
@@ -330,7 +342,10 @@ export function LeaveForm({
           isHalfDay,
         })
       : null;
-  const policyBlocksSubmit = Boolean(applyPreview?.issues.length);
+  // A shortfall in paid balance is not a blocker: the excess is submitted as LOP.
+  const policyBlocksSubmit = Boolean(applyPreview?.blockingIssues.length);
+  const lopSplit =
+    applyPreview && applyPreview.split.lopDays > 0 ? applyPreview.split : null;
   const submitErrorCopy = submitError ? explainLeaveSubmitError(submitError) : null;
 
   return (
@@ -629,6 +644,29 @@ export function LeaveForm({
       </div>
 
       <div className={cn("space-y-2 border-t", isSelfService ? "pt-2.5" : "pt-3")}>
+        {lopSplit ? (
+          <div
+            role="status"
+            className="flex gap-2.5 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2.5"
+          >
+            <Info className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-300" />
+            <div className="min-w-0 space-y-1">
+              <p className="text-sm font-medium text-amber-950 dark:text-amber-100">
+                {lopSplit.paidDays > 0
+                  ? `${formatLeaveDays(lopSplit.paidDays)} paid · ${formatLeaveDays(lopSplit.lopDays)} Loss of Pay`
+                  : `${formatLeaveDays(lopSplit.lopDays)} Loss of Pay`}
+              </p>
+              <p className="text-xs leading-relaxed text-amber-900/90 dark:text-amber-100/80">
+                {lopSplit.paidDays > 0
+                  ? "Your paid balance covers part of this request. The remaining days will be recorded as unpaid leave and deducted in payroll."
+                  : "You have no paid balance available for this leave type, so these days will be recorded as unpaid leave and deducted in payroll."}
+              </p>
+              <p className="text-xs leading-relaxed text-amber-900/75 dark:text-amber-100/65">
+                You can still submit this request for approval.
+              </p>
+            </div>
+          </div>
+        ) : null}
         {submitErrorCopy ? (
           <div
             role="status"

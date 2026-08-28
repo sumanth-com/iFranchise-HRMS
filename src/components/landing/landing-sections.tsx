@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 
 import { LandingLaptopMockup } from "@/components/landing/landing-laptop-mockup";
+import { LandingSectionHeading } from "@/components/landing/landing-section-heading";
 
 const LEFT_FEATURES = [
   {
@@ -77,24 +78,20 @@ export function LandingFeaturesSection() {
       aria-labelledby="landing-features-heading"
     >
       <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
-        {/* Section Header */}
-        <div className="mx-auto max-w-3xl text-center">
-          <p className="text-xs font-bold tracking-[0.2em] text-[#5f55ee] uppercase dark:text-indigo-400 sm:text-sm">
-            ALL-IN-ONE HR SUITE
-          </p>
-          <h2
-            id="landing-features-heading"
-            className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-4xl lg:text-5xl"
-          >
-            Everything you need for your workday.
-          </h2>
-          <p className="mt-3 text-sm text-slate-600 dark:text-slate-400 sm:text-base lg:text-lg">
-            One platform bringing the essential parts of your workday together.
-          </p>
-        </div>
+        <LandingSectionHeading
+          id="landing-features-heading"
+          eyebrow="All-in-one HR suite"
+          title={
+            <>
+              Everything you need for{" "}
+              <span className="landing-section-title-accent">your workday.</span>
+            </>
+          }
+          subtitle="One platform bringing the essential parts of your workday together."
+        />
 
         {/* 3-Column Showcase Layout */}
-        <div className="mt-12 grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12 lg:gap-6">
+        <div className="mt-14 grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12 lg:gap-6">
           {/* Left Column (3 cards) */}
           <div className="flex flex-col justify-between gap-4 sm:gap-5 lg:col-span-3">
             {LEFT_FEATURES.map((feature) => (

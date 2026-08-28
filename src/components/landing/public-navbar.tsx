@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowRight } from "lucide-react";
 
@@ -10,11 +11,20 @@ import { PUBLIC_LANDING_ROUTE, WHATS_NEW_ROUTE } from "@/lib/auth/constants";
 import { navigateToLogin } from "@/lib/landing/navigate-to-login";
 import { cn } from "@/lib/utils";
 
+/**
+ * `section` links to an element on the landing page and highlights while that
+ * section is in view. `match` highlights on an exact pathname instead. No link is
+ * highlighted while the hero is in view.
+ */
 const NAV_LINKS = [
-  { href: `${PUBLIC_LANDING_ROUTE}#features`, label: "Features" },
-  { href: `${PUBLIC_LANDING_ROUTE}#security`, label: "Security" },
-  { href: WHATS_NEW_ROUTE, label: "What's new" },
+  { href: `${PUBLIC_LANDING_ROUTE}#features`, label: "Features", section: "features" },
+  { href: `${PUBLIC_LANDING_ROUTE}#people`, label: "Roles", section: "people" },
+  { href: `${PUBLIC_LANDING_ROUTE}#security`, label: "Security", section: "security" },
+  { href: WHATS_NEW_ROUTE, label: "What's new", match: WHATS_NEW_ROUTE },
 ] as const;
+
+/** Observed in document order, so the topmost visible one wins. */
+const SPY_SECTION_IDS = ["features", "people", "security"] as const;
 
 type PublicNavbarProps = {
   compact?: boolean;
@@ -23,6 +33,9 @@ type PublicNavbarProps = {
 function NavbarChrome({ compact = false }: PublicNavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const pathname = usePathname();
+  const isLandingRoute = pathname === PUBLIC_LANDING_ROUTE;
 
   useEffect(() => {
     const onScroll = () => {
@@ -32,6 +45,38 @@ function NavbarChrome({ compact = false }: PublicNavbarProps) {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  // Highlight the section currently under the reading line. IntersectionObserver
+  // keeps this off the scroll thread, and state only changes when the section does.
+  useEffect(() => {
+    if (compact || !isLandingRoute) {
+      setActiveSection(null);
+      return;
+    }
+
+    const elements = SPY_SECTION_IDS.map((id) =>
+      document.getElementById(id),
+    ).filter((el): el is HTMLElement => el !== null);
+    if (elements.length === 0) return;
+
+    const visible = new Set<string>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) visible.add(entry.target.id);
+          else visible.delete(entry.target.id);
+        }
+        setActiveSection(
+          SPY_SECTION_IDS.find((id) => visible.has(id)) ?? null,
+        );
+      },
+      // A thin band across the upper-middle of the viewport acts as the reading line.
+      { rootMargin: "-45% 0px -50% 0px" },
+    );
+
+    for (const element of elements) observer.observe(element);
+    return () => observer.disconnect();
+  }, [compact, isLandingRoute]);
 
   return (
     <header className={cn("landing-nav", scrolled && "landing-nav--scrolled")}>
@@ -52,11 +97,25 @@ function NavbarChrome({ compact = false }: PublicNavbarProps) {
 
         {!compact ? (
           <nav className="landing-nav-links" aria-label="Primary">
-            {NAV_LINKS.map((link) => (
-              <Link key={link.href} href={link.href} className="landing-nav-link">
-                {link.label}
-              </Link>
-            ))}
+            {NAV_LINKS.map((link) => {
+              const isActive =
+                "section" in link
+                  ? isLandingRoute && activeSection === link.section
+                  : pathname === link.match;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  aria-current={isActive ? "page" : undefined}
+                  className={cn(
+                    "landing-nav-link",
+                    isActive && "landing-nav-link--active",
+                  )}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
           </nav>
         ) : (
           <span className="landing-nav-center-spacer" aria-hidden />
