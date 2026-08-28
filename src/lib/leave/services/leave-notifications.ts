@@ -28,7 +28,7 @@ export async function notifyLeaveSubmitted(
     title: "Leave request submitted",
     message: executiveApplicant
       ? "Your leave request has been submitted and is pending CEO approval."
-      : "Your leave request has been submitted and is pending HR approval.",
+      : "Your leave request has been submitted and is pending HR approval, then CEO approval.",
     notificationType: "leave_submitted",
     module: "leave",
     priority: "medium",

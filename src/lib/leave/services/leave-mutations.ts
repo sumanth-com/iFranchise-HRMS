@@ -264,8 +264,14 @@ async function createApprovalSteps(
       });
       throw new Error(NO_HR_APPROVER_CONFIGURED_MESSAGE);
     }
-    // Level 2 keeps the existing "HR Approval" stage label.
-    steps.push({ approverId: hrId, level: 2 });
+    steps.push({ approverId: hrId, level: 1 });
+    const ceoIds = await requireActiveCeoApproverEmployeeIds(
+      supabase,
+      organizationId,
+    );
+    for (const ceoId of ceoIds) {
+      steps.push({ approverId: ceoId, level: 2 });
+    }
   }
 
   const { error } = await supabase.schema("hrms").from("leave_approvals").insert(
@@ -464,11 +470,12 @@ async function cancelSiblingPendingApprovals(
   leaveRequestId: string,
   actingApproverEmployeeId: string,
   userId: string,
+  approvalLevel?: number,
 ) {
   const admin = createAdminClient();
   const now = new Date().toISOString();
   // Admin client avoids RLS on sibling CEO rows (authenticated UPDATE can fail WITH CHECK).
-  const { error } = await admin
+  let query = admin
     .schema("hrms")
     .from("leave_approvals")
     .update({
@@ -481,6 +488,12 @@ async function cancelSiblingPendingApprovals(
     .eq("approval_status", "pending")
     .neq("approver_employee_id", actingApproverEmployeeId)
     .is("deleted_at", null);
+
+  if (approvalLevel != null) {
+    query = query.eq("approval_level", approvalLevel);
+  }
+
+  const { error } = await query;
 
   if (error) throw new Error(error.message);
 }
@@ -802,6 +815,7 @@ export async function approveLeaveRequest(
       leaveRequestId,
       profile.employee.id,
       profile.userId,
+      pendingStep.approval_level,
     );
 
     if (evaluated.leaveType.isPaid) {
@@ -857,17 +871,31 @@ export async function approveLeaveRequest(
     throw new Error("This approval step was already processed");
   }
 
+  const approvalActorLabel =
+    updatedStep.approval_level === 1
+      ? "HR"
+      : updatedStep.approval_level === 2
+        ? "CEO"
+        : "approver";
+
   await writeApplicationAudit(supabase, {
     organizationId: profile.employee.organizationId,
     module: "leave",
     action: "approve",
-    description:
-      updatedStep.approval_level === 1
-        ? "Leave request approved by manager"
-        : "Leave request approved by HR",
+    description: `Leave request approved by ${approvalActorLabel}`,
     recordId: leaveRequestId,
     metadata: { approvalLevel: updatedStep.approval_level },
   });
+
+  if (updatedStep.approval_level === 2 && isCeoLeaveApprover(profile)) {
+    await cancelSiblingPendingApprovals(
+      supabase,
+      leaveRequestId,
+      profile.employee.id,
+      profile.userId,
+      updatedStep.approval_level,
+    );
+  }
 
   await finalizeApprovalIfComplete(supabase, profile, leaveRequestId);
 
@@ -987,14 +1015,18 @@ export async function rejectLeaveRequest(
   }
 
   await notifyLeaveRejected(supabase, profile, leaveRequestId, request.employee_id);
+  const rejectActorLabel =
+    approvalRow.approval_level === 1
+      ? "HR"
+      : approvalRow.approval_level === 2
+        ? "CEO"
+        : "approver";
+
   await writeApplicationAudit(supabase, {
     organizationId: profile.employee.organizationId,
     module: "leave",
     action: "reject",
-    description:
-      approvalRow.approval_level === 1
-        ? "Leave request rejected by manager"
-        : "Leave request rejected by HR",
+    description: `Leave request rejected by ${rejectActorLabel}`,
     recordId: leaveRequestId,
     reason: comments,
     metadata: {

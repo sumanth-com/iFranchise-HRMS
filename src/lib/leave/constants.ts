@@ -59,8 +59,8 @@ export const LEAVE_CALENDAR_LEGEND = {
 } as const;
 
 export const APPROVAL_LEVEL_LABELS: Record<number, string> = {
-  1: "Manager Approval",
-  2: "HR Approval",
+  1: "HR Approval",
+  2: "CEO Approval",
 };
 
 /** Shown when leave is awaiting the CEO (e.g. HR applicants go straight to CEO). */
@@ -71,6 +71,9 @@ export function leaveApprovalStageLabel(
   options?: { awaitingCeo?: boolean; hrDirectToCeo?: boolean },
 ): string {
   if (options?.awaitingCeo || options?.hrDirectToCeo) {
+    return CEO_APPROVAL_STAGE_LABEL;
+  }
+  if (level === 2) {
     return CEO_APPROVAL_STAGE_LABEL;
   }
   if (level == null) return "Pending";
