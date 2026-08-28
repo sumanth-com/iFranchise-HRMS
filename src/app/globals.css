@@ -1852,12 +1852,18 @@ html:not(.dark) .dashboard-surface:hover {
 .landing-page {
   position: relative;
   min-height: 100dvh;
+  overflow-x: clip;
   background: transparent;
   color: var(--foreground);
+  color-scheme: light;
   /* Match in-app typeface (Lato via --font-sans). */
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   /* Offset page content under the fixed navbar (not space above the nav). */
   padding-top: 4.75rem;
+}
+
+.landing-page--light-locked {
+  color-scheme: light;
 }
 
 .landing-whats-new-page {
@@ -3903,10 +3909,18 @@ html:not(.dark) .dashboard-surface:hover {
 .landing-people-grid,
 .landing-security-grid {
   display: grid;
-  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
   margin: 3.25rem 0 0;
   padding: 0;
   list-style: none;
+}
+
+@media (min-width: 640px) {
+  .landing-people-grid,
+  .landing-security-grid {
+    gap: 1rem;
+  }
 }
 
 @media (min-width: 768px) {
@@ -4042,6 +4056,10 @@ html:not(.dark) .dashboard-surface:hover {
   .landing-people-bento-card--span {
     grid-column: span 2;
   }
+
+  .landing-people-bento-card--span-full {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (min-width: 1024px) {
@@ -4052,6 +4070,10 @@ html:not(.dark) .dashboard-surface:hover {
 
   .landing-people-bento-card--span {
     grid-column: span 2;
+  }
+
+  .landing-people-bento-card--span-full {
+    grid-column: 1 / -1;
   }
 }
 
@@ -4130,6 +4152,171 @@ html:not(.dark) .dashboard-surface:hover {
   background:
     radial-gradient(ellipse 70% 65% at 30% 35%, rgba(124, 58, 237, 0.16), transparent 60%),
     linear-gradient(180deg, rgba(46, 16, 101, 0.28) 0%, transparent 100%);
+}
+
+.landing-bento-visual--asset {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0.5rem 0.75rem 0;
+  background: linear-gradient(180deg, #f3f0ff 0%, #fafafa 100%);
+}
+
+.landing-bento-visual--asset.landing-bento-visual--wide {
+  min-height: 12.75rem;
+}
+
+.landing-bento-visual--asset.landing-bento-visual--full {
+  min-height: 14.5rem;
+  padding: 0.65rem 1rem 0;
+}
+
+.landing-bento-visual--full .landing-bento-asset-img {
+  width: 100%;
+  max-width: 56rem;
+  max-height: 15rem;
+  margin-inline: auto;
+}
+
+.dark .landing-bento-visual--asset {
+  background: linear-gradient(
+    180deg,
+    rgba(46, 16, 101, 0.32) 0%,
+    rgba(15, 23, 42, 0.15) 100%
+  );
+}
+
+.landing-bento-asset-img {
+  position: relative;
+  width: 100%;
+  max-height: 100%;
+  height: auto;
+  object-fit: contain;
+  object-position: center bottom;
+}
+
+/* Landing mobile/tablet responsive polish */
+@media (max-width: 1023px) {
+  .landing-hero {
+    min-height: auto;
+    padding-top: 0.35rem;
+  }
+
+  .landing-hero-stage {
+    min-height: 17.5rem;
+    padding: 3.25rem 0 1.75rem;
+  }
+
+  .landing-hero-title {
+    font-size: clamp(1.9rem, 7vw, 2.75rem);
+  }
+
+  .landing-hero-subtitle {
+    font-size: 0.95rem;
+    line-height: 1.65;
+  }
+
+  .landing-hero-preview {
+    margin-top: 1.25rem;
+    padding-bottom: 1.75rem;
+  }
+
+  .landing-section {
+    padding: 3.5rem 0;
+  }
+
+  .landing-people {
+    padding-top: 3.75rem;
+    padding-bottom: 3.75rem;
+  }
+
+  .landing-nav-inner {
+    padding-inline: 1rem;
+  }
+
+  .landing-security-item {
+    padding: 1.1rem 1rem 1.2rem;
+    gap: 0.85rem;
+  }
+
+  .landing-security-copy h3 {
+    font-size: 0.9rem;
+  }
+
+  .landing-security-copy p {
+    font-size: 0.75rem;
+    line-height: 1.5;
+  }
+}
+
+@media (max-width: 767px) {
+  .landing-nav-inner {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .landing-nav-brand {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .landing-nav-actions {
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+}
+
+/* Desktop experience modal (mobile/tablet landing CTA) */
+.landing-desktop-experience {
+  border-radius: 1.5rem !important;
+  background:
+    radial-gradient(ellipse 90% 60% at 50% 0%, #eceafd 0%, transparent 60%),
+    linear-gradient(180deg, #f7f7fe 0%, #ffffff 55%, #f6f5fd 100%) !important;
+  box-shadow:
+    0 28px 80px rgba(49, 46, 129, 0.18),
+    0 1px 0 rgba(255, 255, 255, 0.9) inset !important;
+  color-scheme: light;
+}
+
+.landing-desktop-experience-aurora {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(124, 58, 237, 0.14), transparent 42%),
+    radial-gradient(circle at 82% 8%, rgba(59, 130, 246, 0.12), transparent 40%);
+  opacity: 0.9;
+}
+
+.landing-desktop-experience-brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0.35rem;
+  box-shadow: 0 8px 20px rgba(49, 46, 129, 0.1);
+}
+
+.landing-desktop-experience-preview {
+  margin-top: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.landing-desktop-experience-primary {
+  background: linear-gradient(135deg, #5f55ee 0%, #7c3aed 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 12px 28px rgba(95, 85, 238, 0.35);
+}
+
+.landing-desktop-experience-primary:hover {
+  filter: brightness(1.03);
+}
+
+[data-slot="dialog-overlay"]:has(+ [data-slot="dialog-content"].landing-desktop-experience) {
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(6px);
 }
 
 .landing-bento-float,
@@ -4808,17 +4995,27 @@ html:not(.dark) .dashboard-surface:hover {
 }
 
 .landing-footer-links {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem 1.25rem;
+  width: min(100%, 18.5rem);
+  margin-inline: auto;
+  justify-items: center;
   align-items: center;
-  justify-content: center;
-  gap: 0.35rem 1.35rem;
+  text-align: center;
 }
 
 @media (min-width: 1024px) {
   .landing-footer-links {
+    display: flex;
+    flex-wrap: wrap;
+    width: auto;
+    margin-inline: 0;
     justify-content: flex-end;
     justify-self: end;
+    justify-items: auto;
+    text-align: left;
+    gap: 0.35rem 1.35rem;
     margin-right: 0;
     padding-right: 0.15rem;
   }

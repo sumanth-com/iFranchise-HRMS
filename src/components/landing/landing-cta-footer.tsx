@@ -17,10 +17,9 @@ import {
 import brandLogo from "@/assets/Logo.png";
 import { LandingPeopleBento } from "@/components/landing/landing-people-bento";
 import { LandingSectionHeading } from "@/components/landing/landing-section-heading";
-import { Button } from "@/components/common/button";
+import { useLandingCta } from "@/components/landing/landing-cta-provider";
 import { LEGAL_FOOTER_LINKS } from "@/lib/landing/legal-content";
 import { PUBLIC_LANDING_ROUTE } from "@/lib/auth/constants";
-import { navigateToLogin } from "@/lib/landing/navigate-to-login";
 
 const SECURITY = [
   {
@@ -126,6 +125,8 @@ export function LandingSecuritySection() {
 }
 
 export function LandingFinalCta() {
+  const { handleLandingCta, isMobileOrTablet } = useLandingCta();
+
   return (
     <section
       className="relative overflow-hidden py-14 sm:py-20"
@@ -188,15 +189,17 @@ export function LandingFinalCta() {
                 Your workplace starts here.
               </h2>
               <p className="mt-3 text-sm text-slate-300 sm:text-base">
-                Everything you need is just one sign-in-away.
+                {isMobileOrTablet
+                  ? "Explore the platform, then continue on desktop for the full HRMS experience."
+                  : "Everything you need is just one sign-in away."}
               </p>
               <div className="mt-7 sm:mt-8">
                 <button
                   type="button"
-                  onClick={navigateToLogin}
-                  className="landing-hero-cta inline-flex h-12 items-center justify-center gap-2 rounded-full px-8 text-sm font-bold text-white shadow-xl transition-all hover:scale-105 active:scale-95"
+                  onClick={handleLandingCta}
+                  className="landing-hero-cta inline-flex h-12 w-full items-center justify-center gap-2 rounded-full px-8 text-sm font-bold text-white shadow-xl transition-all hover:scale-105 active:scale-95 sm:w-auto"
                 >
-                  <span>Enter HRMS</span>
+                  <span>{isMobileOrTablet ? "Get Started" : "Enter HRMS"}</span>
                   <ArrowRight className="size-4" strokeWidth={2.5} />
                 </button>
               </div>
