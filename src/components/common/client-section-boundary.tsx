@@ -9,6 +9,12 @@ type Props = {
   title?: string;
   description?: string;
   className?: string;
+  retryLabel?: string;
+  /**
+   * Applied to the wrapper around children. Pass "contents" when the boundary sits
+   * inside a flex/grid layout that the wrapper would otherwise break.
+   */
+  contentClassName?: string;
 };
 
 type State = {
@@ -45,12 +51,16 @@ export class ClientSectionBoundary extends Component<Props, State> {
             "Something went wrong while loading this content. Please try again or refresh the page."
           }
           onRetry={this.handleRetry}
-          retryLabel="Try again"
+          retryLabel={this.props.retryLabel ?? "Try again"}
           className={this.props.className}
         />
       );
     }
 
-    return <div key={this.state.resetKey}>{this.props.children}</div>;
+    return (
+      <div key={this.state.resetKey} className={this.props.contentClassName}>
+        {this.props.children}
+      </div>
+    );
   }
 }

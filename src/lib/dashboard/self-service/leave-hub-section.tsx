@@ -223,7 +223,9 @@ export async function LeaveHubSection({
         canCreate: hasPermission(profile.permissionCodes, "leave.create"),
         canApprove: true,
         canReject: true,
-        canCancel: true,
+        // Reject already covers refusing a team request, so the row action is
+        // not offered here. Employees still cancel their own leave from My Leave.
+        canCancel: false,
         canDelete: true,
       }}
       teamApplyLeaveLookups={

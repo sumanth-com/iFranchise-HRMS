@@ -6,8 +6,6 @@ import {
   Eye,
   Loader2,
   Plus,
-  ThumbsDown,
-  ThumbsUp,
   Undo2,
   X,
 } from "lucide-react";
@@ -27,8 +25,6 @@ import { EmployeeSelect, LabeledSelect } from "@/components/payroll/payroll-sele
 import {
   ceoDecideResignationAction,
   getResignationDetailAction,
-  hrDecideResignationAction,
-  managerDecideResignationAction,
   submitResignationAction,
   withdrawResignationAction,
 } from "@/lib/exit/actions";
@@ -38,6 +34,8 @@ import {
   EXIT_REASON_OPTIONS,
   EXIT_ROUTES,
   EXIT_STATUS_LABELS,
+  exitStatusLabelForSettings,
+  isExitAwaitingCeoApproval,
 } from "@/lib/exit/constants";
 import { addDaysIso } from "@/lib/exit/services/exit-utils";
 import {
@@ -65,13 +63,7 @@ type Props = {
   defaultNoticePeriodDays: number;
 };
 
-type ModalMode =
-  | "submit"
-  | "manager"
-  | "hr"
-  | "ceo"
-  | "timeline"
-  | null;
+type ModalMode = "submit" | "ceo" | "timeline" | null;
 
 type DecisionFormInput = {
   resignationId: string;
@@ -166,7 +158,7 @@ export function ResignationsManagement({
   }
 
   const openDecision = useCallback(
-    (row: ExitResignationItem, actor: "manager" | "hr" | "ceo", decision: "approve" | "reject") => {
+    (row: ExitResignationItem, decision: "approve" | "reject") => {
       setSelected(row);
       setDecisionType(decision);
       decisionForm.reset({
@@ -175,7 +167,7 @@ export function ResignationsManagement({
         remarks: null,
         rejectedReason: decision === "reject" ? "" : null,
       });
-      setMode(actor);
+      setMode("ceo");
     },
     [decisionForm],
   );
@@ -216,13 +208,7 @@ export function ResignationsManagement({
       rejectedReason: values.decision === "reject" ? values.rejectedReason : null,
     };
     startTransition(async () => {
-      const action =
-        mode === "manager"
-          ? managerDecideResignationAction
-          : mode === "hr"
-            ? hrDecideResignationAction
-            : ceoDecideResignationAction;
-      const res = await action(payload);
+      const res = await ceoDecideResignationAction(payload);
       if (!res.success) {
         toast.error(res.message);
         return;
@@ -293,7 +279,7 @@ export function ResignationsManagement({
           <span
             className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(row.exitStatus)}`}
           >
-            {EXIT_STATUS_LABELS[row.exitStatus]}
+            {exitStatusLabelForSettings(row.exitStatus)}
           </span>
         ),
       },
@@ -302,16 +288,12 @@ export function ResignationsManagement({
         header: "Actions",
         render: (row) => {
           const terminal = ["completed", "rejected", "withdrawn"].includes(row.exitStatus);
-          // Backend allows HR (and CEO) to perform the manager stage; HR UI previously hid it,
-          // which stuck resignations at `submitted` when no reporting manager was assigned.
-          const showManager =
-            canApprove &&
-            row.exitStatus === "submitted" &&
-            (isHrAdmin || (!isHrAdmin && !isCeoAdmin));
-          const showHr = canApprove && isHrAdmin && row.exitStatus === "manager_approved";
-          const showCeo = canApprove && isCeoAdmin && row.exitStatus === "hr_approved";
+          const showCeo =
+            canApprove && isCeoAdmin && isExitAwaitingCeoApproval(row.exitStatus);
           const showWithdraw =
-            (canCreate || canApprove) && !terminal;
+            (canCreate || canApprove) &&
+            !terminal &&
+            isExitAwaitingCeoApproval(row.exitStatus);
 
           return (
             <div className="flex flex-wrap gap-1">
@@ -324,56 +306,12 @@ export function ResignationsManagement({
               >
                 <Eye className="h-4 w-4" />
               </Button>
-              {showManager ? (
-                <>
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    onClick={() => openDecision(row, "manager", "approve")}
-                    aria-label="Approve"
-                    title="Manager approve"
-                  >
-                    <ThumbsUp className="h-4 w-4 text-emerald-600" />
-                  </Button>
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    onClick={() => openDecision(row, "manager", "reject")}
-                    aria-label="Reject"
-                    title="Manager reject"
-                  >
-                    <ThumbsDown className="h-4 w-4 text-destructive" />
-                  </Button>
-                </>
-              ) : null}
-              {showHr ? (
-                <>
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    onClick={() => openDecision(row, "hr", "approve")}
-                    aria-label="HR approve"
-                    title="HR approve"
-                  >
-                    <Check className="h-4 w-4 text-emerald-600" />
-                  </Button>
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    onClick={() => openDecision(row, "hr", "reject")}
-                    aria-label="HR reject"
-                    title="HR reject"
-                  >
-                    <X className="h-4 w-4 text-destructive" />
-                  </Button>
-                </>
-              ) : null}
               {showCeo ? (
                 <>
                   <Button
                     size="icon-sm"
                     variant="ghost"
-                    onClick={() => openDecision(row, "ceo", "approve")}
+                    onClick={() => openDecision(row, "approve")}
                     aria-label="CEO approve"
                     title="CEO approve"
                   >
@@ -382,7 +320,7 @@ export function ResignationsManagement({
                   <Button
                     size="icon-sm"
                     variant="ghost"
-                    onClick={() => openDecision(row, "ceo", "reject")}
+                    onClick={() => openDecision(row, "reject")}
                     aria-label="CEO reject"
                     title="CEO reject"
                   >
@@ -407,7 +345,7 @@ export function ResignationsManagement({
         },
       },
     ],
-    [canApprove, canCreate, isCeoAdmin, isHrAdmin, isPending, openDecision, openTimeline],
+    [canApprove, canCreate, isCeoAdmin, isPending, openDecision, openTimeline],
   );
 
   return (
@@ -610,24 +548,14 @@ export function ResignationsManagement({
       </Modal>
 
       <Modal
-        open={mode === "manager" || mode === "hr" || mode === "ceo"}
+        open={mode === "ceo"}
         onOpenChange={(open) => !open && setMode(null)}
         title={
-          decisionType === "approve"
-            ? mode === "ceo"
-              ? "CEO Approve Resignation"
-              : mode === "hr"
-                ? "HR Approve Resignation"
-                : "Manager Approve Resignation"
-            : mode === "ceo"
-              ? "CEO Reject Resignation"
-              : mode === "hr"
-                ? "HR Reject Resignation"
-                : "Manager Reject Resignation"
+          decisionType === "approve" ? "CEO Approve Resignation" : "CEO Reject Resignation"
         }
         description={
           selected
-            ? `${selected.employeeName} · ${EXIT_STATUS_LABELS[selected.exitStatus]}`
+            ? `${selected.employeeName} · ${exitStatusLabelForSettings(selected.exitStatus)}`
             : undefined
         }
         footer={

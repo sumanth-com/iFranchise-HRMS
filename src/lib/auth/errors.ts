@@ -5,7 +5,7 @@ const AUTH_ERROR_MESSAGES: Record<AuthErrorCode, string> = {
   EMPLOYEE_NOT_FOUND:
     "No employee record is linked to this account. Contact your HR administrator.",
   EMPLOYEE_INACTIVE:
-    "Your employee account is not active. Contact your HR administrator.",
+    "Your account has been deactivated. Contact your HR administrator if you need access restored.",
   EMPLOYEE_DELETED:
     "This employee record is no longer available. Contact your HR administrator.",
   NO_ROLES:

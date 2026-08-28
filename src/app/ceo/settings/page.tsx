@@ -41,6 +41,9 @@ export default async function CeoSettingsPage() {
               employeeId={profile.employee.id}
               defaultNoticePeriodDays={exitSettings.defaultNoticePeriodDays}
               activeResignation={snapshot.activeResignation}
+              rejectedResignation={
+                snapshot.history.find((row) => row.exitStatus === "rejected") ?? null
+              }
               className="h-full"
             />
           }

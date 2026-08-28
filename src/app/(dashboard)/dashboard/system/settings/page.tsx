@@ -60,6 +60,9 @@ export default async function SuperAdminSettingsPage() {
               employeeId={profile.employee.id}
               defaultNoticePeriodDays={exitSettings.defaultNoticePeriodDays}
               activeResignation={snapshot.activeResignation}
+              rejectedResignation={
+                snapshot.history.find((row) => row.exitStatus === "rejected") ?? null
+              }
               className="h-full"
             />
           }

@@ -31,6 +31,10 @@ import {
   LEAVE_ROUTES,
   sortByLeaveTypeCode,
 } from "@/lib/leave/constants";
+import {
+  isPeriodLeaveCode,
+  isPeriodLeaveEligible,
+} from "@/lib/leave/period-leave-eligibility";
 import { LeaveDurationPreview, LeavePolicyInfo } from "@/components/leave/leave-apply-policy-panel";
 import { formatLeaveDayCount } from "@/lib/leave/services/leave-usage";
 import { formatLeaveBalanceUsedTotal } from "@/lib/leave/leave-balance-display";
@@ -144,6 +148,17 @@ export function LeaveForm({
 
   const isEdit = mode === "edit" && Boolean(initialRequest?.id);
 
+  // The apply context is reloaded per selected employee, so this follows the
+  // applicant rather than the signed-in user when HR applies on someone's behalf.
+  // Before it resolves, the server-filtered balances already say whether the
+  // applicant is eligible, which avoids the row flashing in and out.
+  const periodLeaveAllowed = applyContext
+    ? isPeriodLeaveEligible(
+        applyContext.employee.gender,
+        applyContext.probationRules.periodLeaveFemaleOnly,
+      )
+    : initialBalances.some((item) => isPeriodLeaveCode(item.leaveTypeCode));
+
   const leaveTypeItems = sortByLeaveTypeCode(
     lookups.leaveTypes.filter((leaveType) => Boolean(leaveType.id)),
   )
@@ -151,6 +166,9 @@ export function LeaveForm({
       if (!leaveType.code) return true;
       const code = leaveType.code.toUpperCase();
       if (isEdit && initialRequest?.leaveTypeId === leaveType.id) return true;
+      // Menstruation Leave is offered only to employees the server would accept
+      // it from, so an ineligible applicant never sees it in the list.
+      if (isPeriodLeaveCode(code) && !periodLeaveAllowed) return false;
       return (LEAVE_APPLY_TYPE_CODES as readonly string[]).includes(code);
     })
     .map((leaveType) => ({

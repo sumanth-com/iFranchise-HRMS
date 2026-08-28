@@ -152,40 +152,6 @@ function PromotionSummary({ promotion }: { promotion: CeoApprovalsPromotionDetai
           </p>
         </div>
       ) : null}
-
-      {promotion.approvals.length > 0 ? (
-        <div className="space-y-2">
-          <SectionTitle>Approval history</SectionTitle>
-          <ul className="divide-y rounded-lg border">
-            {promotion.approvals.map((step) => (
-              <li
-                key={step.id}
-                className="flex items-start justify-between gap-3 px-3 py-2.5"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">{step.levelLabel}</p>
-                  {step.actorName ? (
-                    <p className="text-xs text-muted-foreground">{step.actorName}</p>
-                  ) : null}
-                  {step.comments ? (
-                    <p className="mt-1 text-xs break-words text-muted-foreground">
-                      {step.comments}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-sm font-medium">{step.statusLabel}</p>
-                  {step.actedAt ? (
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(step.actedAt), "dd MMM yyyy")}
-                    </p>
-                  ) : null}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
     </div>
   );
 }

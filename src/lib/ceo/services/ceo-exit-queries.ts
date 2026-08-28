@@ -65,7 +65,7 @@ export async function listCeoExitApprovalQueue(
   const { data, error } = await fromHrms(supabase, "exit_resignations")
     .select(RESIGNATION_SELECT)
     .eq("organization_id", profile.employee.organizationId)
-    .eq("exit_status", "hr_approved")
+    .in("exit_status", ["submitted", "manager_approved", "hr_approved"])
     .is("deleted_at", null)
     .order("created_at", { ascending: true })
     .limit(100);

@@ -197,6 +197,7 @@ export function CeoRegularizationApprovalQueue({
             ? `Approve attendance regularization for ${target.item.employeeName}?`
             : undefined
         }
+        showCancel={false}
         footer={
           <>
             <Button variant="outline" onClick={closeModal} disabled={isActing}>
@@ -233,6 +234,7 @@ export function CeoRegularizationApprovalQueue({
             ? `Reject attendance regularization for ${target.item.employeeName}?`
             : undefined
         }
+        showCancel={false}
         footer={
           <>
             <Button variant="outline" onClick={closeModal} disabled={isActing}>

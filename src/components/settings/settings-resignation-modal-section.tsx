@@ -16,6 +16,7 @@ type Props = {
   employeeId: string;
   defaultNoticePeriodDays: number;
   activeResignation: ExitResignationItem | null;
+  rejectedResignation?: ExitResignationItem | null;
   className?: string;
 };
 
@@ -26,6 +27,7 @@ export function SettingsResignationModalSection({
   employeeId,
   defaultNoticePeriodDays,
   activeResignation,
+  rejectedResignation = null,
   className,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -78,6 +80,7 @@ export function SettingsResignationModalSection({
           employeeId={employeeId}
           defaultNoticePeriodDays={defaultNoticePeriodDays}
           activeResignation={activeResignation}
+          rejectedResignation={rejectedResignation}
           onSubmitted={() => setOpen(false)}
         />
       </Modal>
