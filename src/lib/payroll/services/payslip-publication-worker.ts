@@ -65,7 +65,7 @@ export async function processDuePayslipPublications(
 
     try {
       if (!payslip.storagePath) {
-        await storePayslipPdf(supabase, payslip);
+        await storePayslipPdf(supabase, payslip, scopedOrganizationId);
       }
 
       const monthLabel = formatPayrollMonthLabel(payslip.payrollMonth);

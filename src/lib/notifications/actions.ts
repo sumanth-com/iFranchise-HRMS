@@ -36,8 +36,16 @@ import {
 import type { NotificationActionResult } from "@/types/notifications";
 import { NOTIFICATION_MANAGE_PERMISSIONS, NOTIFICATION_SETTINGS_PERMISSIONS } from "@/lib/notifications/constants";
 
+/**
+ * Revalidates the notification routes.
+ *
+ * Calling this inside a Server Action also discards the client Router Cache for the
+ * whole app, so the next navigation to any module renders cold. Reserve it for actions
+ * that genuinely change the notification list (delete/archive/settings) and keep it out
+ * of high-frequency paths like marking a single notification read.
+ */
 function revalidateNotifications() {
-  for (const route of Object.values(NOTIFICATIONS_ROUTES)) {
+  for (const route of new Set(Object.values(NOTIFICATIONS_ROUTES))) {
     revalidatePath(route);
   }
 }
@@ -49,7 +57,9 @@ export async function markNotificationReadAction(
     const profile = await requireAuthenticatedProfile();
     const supabase = await createClient();
     await markNotificationRead(supabase, profile, notificationId);
-    revalidateNotifications();
+    // Intentionally no revalidate: this fires on every notification click, and the
+    // inbox and bell both update read state optimistically. Revalidating here would
+    // throw away the prefetched Router Cache for every module on each click.
     return { success: true, data: undefined };
   } catch (error) {
     return {

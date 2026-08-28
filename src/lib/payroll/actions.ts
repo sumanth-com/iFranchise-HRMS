@@ -35,6 +35,7 @@ import {
   processPayrollRun,
   rejectPayrollRun,
 } from "@/lib/payroll/services/payroll-mutations";
+import { PayslipEmailError } from "@/lib/payroll/services/payslip-email-errors";
 import {
   getPayrollSettings,
   savePayrollSettings,
@@ -464,9 +465,17 @@ export async function emailPayslipAction(payslipId: string): Promise<PayrollActi
     await emailPayslip(supabase, profile, payslipId, siteConfig.url);
     return { success: true, data: undefined };
   } catch (error) {
+    console.error("[payroll] payslip email failed", {
+      payslipId,
+      name: error instanceof Error ? error.name : "unknown",
+      message: error instanceof Error ? error.message : "unknown",
+    });
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to email payslip",
+      message:
+        error instanceof PayslipEmailError
+          ? error.message
+          : "Could not email this payslip right now. Please try again.",
     };
   }
 }
