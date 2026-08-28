@@ -212,7 +212,7 @@ type OnboardingWizardProps = {
 };
 
 export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) {
-  const progressCtx = useOnboardingPortalProgress();
+  const setWizardStep = useOnboardingPortalProgress()?.setWizardStep;
   const [step, setStep] = useState(0);
   const [isPending, startTransition] = useTransition();
   const [showCelebration, setShowCelebration] = useState(false);
@@ -408,18 +408,18 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
   }, [step, stepAnimKey]);
 
   useEffect(() => {
-    if (!progressCtx) return;
-    progressCtx.setWizardStep({
+    if (!setWizardStep) return;
+    setWizardStep({
       current: step + 1,
       total: ONBOARDING_WIZARD_SECTIONS.length,
     });
-  }, [step, progressCtx]);
+  }, [step, setWizardStep]);
 
   useEffect(() => {
     return () => {
-      progressCtx?.setWizardStep(null);
+      setWizardStep?.(null);
     };
-  }, [progressCtx]);
+  }, [setWizardStep]);
 
   // Next follows validation live. A section that was already completed and is
   // untouched stays passable so a later rule change cannot trap the candidate.
