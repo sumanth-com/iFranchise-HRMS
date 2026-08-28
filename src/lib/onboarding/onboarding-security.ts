@@ -143,17 +143,67 @@ export async function portalAccountHasPassword(caseId: string): Promise<boolean>
   return typeof data?.password_hash === "string" && data.password_hash.length > 0;
 }
 
-export async function onboardingEmailAlreadyHasPassword(email: string): Promise<boolean> {
+type PortalAccountRow = {
+  case_id: string;
+  personal_email: string;
+  password_hash: string | null;
+  otp_hash: string | null;
+  otp_expires_at: string | null;
+  is_active: boolean | null;
+  auth_user_id: string | null;
+};
+
+const PORTAL_ACCOUNT_COLUMNS =
+  "case_id, personal_email, password_hash, otp_hash, otp_expires_at, is_active, auth_user_id, updated_at";
+
+/**
+ * `personal_email` is not unique on onboarding_portal_accounts — re-onboarding or an
+ * archived case leaves a second row behind for the same address. A `.maybeSingle()`
+ * read fails outright on those rows, which broke password login, verification codes
+ * and password reset for every affected candidate. Read all matches instead and pick
+ * the account attached to a still-open invitation, preferring one that already has a
+ * password, so the choice is deterministic rather than an error.
+ */
+async function findPortalAccountByEmail(email: string): Promise<PortalAccountRow | null> {
   const admin = createAdminClient();
+  const normalized = email.trim().toLowerCase();
+
   const { data, error } = await admin
     .schema("hrms")
     .from("onboarding_portal_accounts")
-    .select("password_hash")
-    .eq("personal_email", email.trim().toLowerCase())
-    .maybeSingle();
+    .select(PORTAL_ACCOUNT_COLUMNS)
+    .eq("personal_email", normalized)
+    .order("updated_at", { ascending: false });
 
   if (error) throw new Error(error.message);
-  return typeof data?.password_hash === "string" && data.password_hash.length > 0;
+
+  const rows = (data ?? []) as unknown as PortalAccountRow[];
+  if (rows.length === 0) return null;
+  if (rows.length === 1) return rows[0];
+
+  const { data: caseRows, error: caseError } = await admin
+    .schema("hrms")
+    .from("onboarding_cases")
+    .select("id, status, deleted_at, cancelled_at, archived_at, invitation_sent_at")
+    .in(
+      "id",
+      rows.map((row) => row.case_id),
+    );
+
+  if (caseError) throw new Error(caseError.message);
+
+  const openCaseIds = new Set(
+    (caseRows ?? []).filter((row) => isInvitedOnboardingCase(row)).map((row) => row.id),
+  );
+  const openRows = rows.filter((row) => openCaseIds.has(row.case_id));
+  const candidates = openRows.length > 0 ? openRows : rows;
+
+  return candidates.find((row) => row.password_hash) ?? candidates[0];
+}
+
+export async function onboardingEmailAlreadyHasPassword(email: string): Promise<boolean> {
+  const account = await findPortalAccountByEmail(email);
+  return typeof account?.password_hash === "string" && account.password_hash.length > 0;
 }
 
 export async function validateOnboardingInvitationToken(
@@ -328,14 +378,7 @@ export async function resolveInvitedOnboardingByEmail(
   const caseFields =
     "id, status, deleted_at, cancelled_at, archived_at, invitation_sent_at";
 
-  const { data: account, error: accountError } = await admin
-    .schema("hrms")
-    .from("onboarding_portal_accounts")
-    .select("case_id, is_active")
-    .eq("personal_email", normalized)
-    .maybeSingle();
-
-  if (accountError) throw new Error(accountError.message);
+  const account = await findPortalAccountByEmail(normalized);
 
   if (account?.case_id) {
     const { data: caseRow, error: caseError } = await admin
@@ -559,14 +602,9 @@ export async function verifyPortalLogin(
   password: string,
 ): Promise<string | null> {
   const admin = createAdminClient();
-  const { data: account, error } = await admin
-    .schema("hrms")
-    .from("onboarding_portal_accounts")
-    .select("case_id, password_hash, auth_user_id, is_active, personal_email")
-    .eq("personal_email", email.trim().toLowerCase())
-    .maybeSingle();
+  const account = await findPortalAccountByEmail(email);
 
-  if (error || !account || !account.is_active || !account.password_hash) return null;
+  if (!account || !account.is_active || !account.password_hash) return null;
   const valid = await verifyPassword(password, account.password_hash);
   if (!valid) return null;
 
@@ -604,14 +642,9 @@ export async function verifyPortalLogin(
 
 export async function verifyPortalOtp(email: string, otp: string): Promise<string | null> {
   const admin = createAdminClient();
-  const { data: account, error } = await admin
-    .schema("hrms")
-    .from("onboarding_portal_accounts")
-    .select("case_id, otp_hash, otp_expires_at, is_active")
-    .eq("personal_email", email.trim().toLowerCase())
-    .maybeSingle();
+  const account = await findPortalAccountByEmail(email);
 
-  if (error || !account || !account.is_active || !account.otp_hash || !account.otp_expires_at) {
+  if (!account || !account.is_active || !account.otp_hash || !account.otp_expires_at) {
     return null;
   }
   if (new Date(account.otp_expires_at) < new Date()) return null;

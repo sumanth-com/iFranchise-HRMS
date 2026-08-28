@@ -34,7 +34,7 @@ import {
 import { getCandidatePortalContext } from "@/lib/onboarding/services/onboarding-queries";
 import { getCandidateOfferLetterFile, loadCandidateOfferLetter } from "@/lib/onboarding/services/candidate-offer-letter";
 import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
-import { assertRateLimit } from "@/lib/security/rate-limit";
+import { assertRateLimit, clearRateLimit } from "@/lib/security/rate-limit";
 import { hashEmailVerificationToken } from "@/lib/security/signed-flow-tokens";
 import {
   ONBOARDING_DOCUMENT_ALLOWED_EXTENSIONS,
@@ -76,6 +76,17 @@ async function assertOnboardingRateLimit(
     limit,
     windowMs,
   });
+}
+
+/**
+ * Throttles exist to slow down guessing, not to punish a candidate whose code
+ * expired. Once they authenticate, release the counters that gate retrying.
+ */
+async function clearOnboardingRateLimits(scopes: string[], email: string) {
+  const ctx = await getRequestAuditContext();
+  for (const scope of scopes) {
+    clearRateLimit(onboardingRateLimitKey(scope, email, ctx.ipAddress));
+  }
 }
 
 export async function validateInviteTokenAction(rawToken: string) {
@@ -233,6 +244,7 @@ export async function candidateLoginAction(input: unknown): Promise<ActionResult
 
     const session = await createPortalSession(caseId);
     await setCandidateSession(session);
+    await clearOnboardingRateLimits(["login"], parsed.personalEmail);
     return { success: true, message: "Signed in" };
   } catch (error) {
     return {
@@ -246,9 +258,14 @@ export async function requestCandidateOtpAction(input: unknown): Promise<ActionR
   try {
     const parsed = candidateOtpRequestSchema.parse(input);
     try {
-      await assertOnboardingRateLimit("otp-request", parsed.personalEmail, 3, 60 * 60 * 1000);
+      // Codes expire after 15 minutes, so the resend window matches that rather than
+      // locking a candidate out for an hour after their first code simply expired.
+      await assertOnboardingRateLimit("otp-request", parsed.personalEmail, 5, 15 * 60 * 1000);
     } catch {
-      return { success: false, message: "Too many code requests. Please try again later." };
+      return {
+        success: false,
+        message: "Too many code requests. Please wait a few minutes and try again.",
+      };
     }
 
     const email = parsed.personalEmail.trim().toLowerCase();
@@ -308,10 +325,19 @@ export async function verifyCandidateOtpAction(input: unknown): Promise<ActionRe
     }
 
     const caseId = await verifyPortalOtp(parsed.personalEmail, parsed.otp);
-    if (!caseId) return { success: false, message: "Invalid or expired code" };
+    if (!caseId) {
+      return {
+        success: false,
+        message: "That code is invalid or has expired. Request a new code and try again.",
+      };
+    }
 
     const session = await createPortalSession(caseId);
     await setCandidateSession(session);
+    await clearOnboardingRateLimits(
+      ["otp-verify", "otp-request", "login"],
+      parsed.personalEmail,
+    );
     return { success: true, message: "Verified" };
   } catch (error) {
     return {
@@ -332,9 +358,12 @@ export async function requestCandidatePasswordResetAction(
     const parsed = candidateOtpRequestSchema.parse(input);
     const email = parsed.personalEmail.trim().toLowerCase();
     try {
-      await assertOnboardingRateLimit("password-reset-request", email, 3, 60 * 60 * 1000);
+      await assertOnboardingRateLimit("password-reset-request", email, 5, 15 * 60 * 1000);
     } catch {
-      return { success: false, message: "Too many reset requests. Please try again later." };
+      return {
+        success: false,
+        message: "Too many reset requests. Please wait a few minutes and try again.",
+      };
     }
 
     const resolved = await resolveInvitedOnboardingByEmail(email);
@@ -401,12 +430,21 @@ export async function resetCandidatePasswordWithOtpAction(
     }
 
     const caseId = await verifyPortalOtp(email, parsed.otp);
-    if (!caseId) return { success: false, message: "Invalid or expired code" };
+    if (!caseId) {
+      return {
+        success: false,
+        message: "That code is invalid or has expired. Request a new code and try again.",
+      };
+    }
 
     await storePortalPassword(caseId, email, parsed.password);
 
     const session = await createPortalSession(caseId);
     await setCandidateSession(session);
+    await clearOnboardingRateLimits(
+      ["password-reset", "password-reset-request", "login", "otp-request"],
+      email,
+    );
 
     return {
       success: true,
