@@ -12,9 +12,5 @@ export function OnboardingPortalProgressSync({ completionPercent }: { completion
     setCompletionPercent(completionPercent);
   }, [completionPercent, setCompletionPercent]);
 
-  useEffect(() => {
-    return () => setCompletionPercent?.(null);
-  }, [setCompletionPercent]);
-
   return null;
 }

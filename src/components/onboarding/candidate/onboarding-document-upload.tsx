@@ -1,8 +1,8 @@
 "use client";
 
+import { useRef } from "react";
 import { AlertCircle, CheckCircle2, FileUp, Loader2 } from "lucide-react";
 
-import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import {
   ONBOARDING_DOCUMENT_ACCEPT,
@@ -27,6 +27,9 @@ type OnboardingDocumentUploadProps = {
   onSelectFile: (file: File) => void;
 };
 
+const nativeFileInputClassName =
+  "h-10 w-full min-w-0 cursor-pointer rounded-lg border border-input bg-background px-2.5 text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-foreground disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-background";
+
 export function OnboardingDocumentUpload({
   label,
   required = false,
@@ -43,10 +46,23 @@ export function OnboardingDocumentUpload({
   uploadError,
   onSelectFile,
 }: OnboardingDocumentUploadProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const displayName = fileName ?? pendingFileName;
   const isUploaded = Boolean(fileName) && !uploading;
   const isCorrectionRequested = reviewStatus === "correction_requested";
   const uploadHint = uploadHintProp ?? `PDF or image only · max ${maxUploadMb} MB`;
+  const inputDisabled = disabled || uploading;
+
+  function openFilePicker() {
+    if (inputDisabled) return;
+    fileInputRef.current?.click();
+  }
+
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (file) onSelectFile(file);
+    event.target.value = "";
+  }
 
   if (variant === "card") {
     return (
@@ -68,7 +84,7 @@ export function OnboardingDocumentUpload({
         {isCorrectionRequested ? (
           <div className="mb-2.5 rounded-lg border border-amber-300 bg-amber-100/60 p-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/50 dark:text-amber-200">
             <div className="flex items-center gap-1.5 font-semibold text-amber-950 dark:text-amber-100">
-              <AlertCircle className="size-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+              <AlertCircle className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
               <span>Correction requested by HR</span>
             </div>
             {hrComment ? (
@@ -105,52 +121,45 @@ export function OnboardingDocumentUpload({
               <p className="min-w-0 flex-1 truncate text-xs font-medium">{displayName}</p>
             </div>
           ) : (
-            <label
+            <button
+              type="button"
+              disabled={inputDisabled}
+              onClick={openFilePicker}
               className={cn(
-                "flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-background/60 px-3 py-4 text-center transition-colors hover:bg-muted/40",
-                (disabled || uploading) && "pointer-events-none opacity-60",
+                "flex flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-background/60 px-3 py-4 text-center transition-colors hover:bg-muted/40",
+                inputDisabled && "pointer-events-none opacity-60",
               )}
             >
               <FileUp className="h-4 w-4 text-muted-foreground" />
               <span className="text-xs font-medium text-foreground">Choose file</span>
-              <Input
-                type="file"
-                accept={accept}
-                disabled={disabled || uploading}
-                className="sr-only"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) onSelectFile(file);
-                  e.target.value = "";
-                }}
-              />
-            </label>
+            </button>
           )}
 
           {displayName && !uploading ? (
-            <label className="cursor-pointer text-center">
-              <span
-                className={cn(
-                  "text-xs font-medium underline-offset-2 hover:underline",
-                  isCorrectionRequested ? "font-semibold text-amber-700 dark:text-amber-300" : "text-primary",
-                )}
-              >
-                {isCorrectionRequested ? "Upload replacement file" : "Replace file"}
-              </span>
-              <Input
-                type="file"
-                accept={accept}
-                disabled={disabled || uploading}
-                className="sr-only"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) onSelectFile(file);
-                  e.target.value = "";
-                }}
-              />
-            </label>
+            <button
+              type="button"
+              disabled={inputDisabled}
+              onClick={openFilePicker}
+              className={cn(
+                "text-center text-xs font-medium underline-offset-2 hover:underline disabled:pointer-events-none disabled:opacity-60",
+                isCorrectionRequested
+                  ? "font-semibold text-amber-700 dark:text-amber-300"
+                  : "text-primary",
+              )}
+            >
+              {isCorrectionRequested ? "Upload replacement file" : "Replace file"}
+            </button>
           ) : null}
         </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={accept}
+          disabled={inputDisabled}
+          className="hidden"
+          onChange={handleFileChange}
+        />
 
         <p className="mt-3 text-center text-[11px] leading-relaxed text-muted-foreground">
           {uploadHint}
@@ -219,19 +228,12 @@ export function OnboardingDocumentUpload({
         </div>
       ) : null}
 
-      <Input
+      <input
         type="file"
         accept={accept}
-        disabled={disabled || uploading}
-        className={cn(
-          "h-10 cursor-pointer bg-background text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-foreground dark:bg-background",
-          uploading && "opacity-70",
-        )}
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) onSelectFile(file);
-          e.target.value = "";
-        }}
+        disabled={inputDisabled}
+        className={cn(nativeFileInputClassName, uploading && "opacity-70")}
+        onChange={handleFileChange}
       />
 
       <p className="text-[11px] text-muted-foreground">{uploadHint}</p>

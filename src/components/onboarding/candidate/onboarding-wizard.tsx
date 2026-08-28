@@ -708,7 +708,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           ...prev,
           [key]: { uploading: false, pendingFileName: file.name, error: undefined },
         }));
-        await onRefresh();
+        void onRefresh();
       } catch (error) {
         const message = error instanceof Error ? error.message : "Upload failed";
         toast.error(message);
@@ -973,7 +973,7 @@ export function OnboardingWizard({ context, onRefresh }: OnboardingWizardProps) 
           ref={contentScrollRef}
           className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain scroll-smooth px-4 py-4 sm:px-6 sm:py-5"
         >
-          <div key={sectionKey} className="onboarding-section-enter min-w-0">
+          <div key={sectionKey} className="min-w-0">
           {sectionKey === "personal" && (
             <OnboardingPersonalSection
               sectionData={sectionData}

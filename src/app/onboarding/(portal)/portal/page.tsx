@@ -76,10 +76,32 @@ function OnboardingPortalSkeleton() {
   );
 }
 
+/** Survives soft remounts during server actions so the wizard never flashes empty. */
+let cachedPortalContext: CandidatePortalContext | null = null;
+
 export default function OnboardingPortalPage() {
   const router = useRouter();
-  const [context, setContext] = useState<CandidatePortalContext | null | undefined>(undefined);
+  const [context, setContextState] = useState<CandidatePortalContext | null | undefined>(
+    () => cachedPortalContext ?? undefined,
+  );
   const [loadFailed, setLoadFailed] = useState(false);
+
+  const setContext = useCallback(
+    (
+      value:
+        | CandidatePortalContext
+        | null
+        | undefined
+        | ((prev: CandidatePortalContext | null | undefined) => CandidatePortalContext | null | undefined),
+    ) => {
+      setContextState((prev) => {
+        const next = typeof value === "function" ? value(prev) : value;
+        if (next) cachedPortalContext = next;
+        return next;
+      });
+    },
+    [],
+  );
 
   // Uploads and section saves can each trigger a refetch, so responses may arrive
   // out of order. Only apply the newest one, otherwise a slow earlier request can
@@ -162,7 +184,7 @@ export default function OnboardingPortalPage() {
         description={LOAD_ERROR_DESCRIPTION}
         retryLabel="Retry"
         className="m-auto w-full max-w-md"
-        contentClassName="contents"
+        contentClassName="flex min-h-0 flex-1 flex-col"
       >
         <OnboardingWizard context={context} onRefresh={refresh} />
       </ClientSectionBoundary>
