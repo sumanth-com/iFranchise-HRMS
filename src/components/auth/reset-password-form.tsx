@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,6 +26,7 @@ const submitClass =
   "h-11 w-full rounded-full bg-[#5f55ee] hover:bg-[#5247e3] text-sm font-semibold text-white shadow-[0_10px_24px_rgba(95,85,238,0.4)] transition-all";
 
 export function ResetPasswordForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [formError, setFormError] = useState<string | null>(null);
@@ -63,10 +64,14 @@ export function ResetPasswordForm() {
         return;
       }
 
-      toast.success(
-        isInviteSetup ? "Password created successfully" : "Password updated successfully",
-      );
-      setSignInHref(result.redirectTo);
+      if (isInviteSetup) {
+        toast.success("Password created successfully");
+        setSignInHref(result.redirectTo);
+        return;
+      }
+
+      toast.success("Password reset successfully");
+      router.replace(result.redirectTo);
     });
   });
 

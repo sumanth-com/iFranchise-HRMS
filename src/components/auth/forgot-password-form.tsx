@@ -13,8 +13,6 @@ import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { forgotPasswordAction } from "@/lib/auth/actions";
 import { AUTH_ROUTES } from "@/lib/auth/constants";
-import { getAuthErrorMessage } from "@/lib/auth/errors";
-import { sendPasswordResetEmail } from "@/lib/auth/password-reset-client";
 import {
   forgotPasswordSchema,
   type ForgotPasswordInput,
@@ -54,19 +52,8 @@ export function ForgotPasswordForm() {
         return;
       }
 
-      if (result.resolvedEmail) {
-        const { error } = await sendPasswordResetEmail(result.resolvedEmail);
-
-        if (error) {
-          const message = getAuthErrorMessage("SERVER_ERROR");
-          setFormError(message);
-          toast.error(message);
-          return;
-        }
-      }
-
       setIsSubmitted(true);
-      toast.success("Password reset instructions sent");
+      toast.success("If an account exists for this email, you'll receive a reset link shortly.");
     });
   });
 
@@ -78,8 +65,8 @@ export function ForgotPasswordForm() {
             Check your email
           </h1>
           <p className="text-sm text-muted-foreground">
-            If an account exists for that email, you will receive password reset
-            instructions shortly.
+            If an account exists for this email, you&apos;ll receive a password reset
+            link shortly.
           </p>
         </div>
         <Link

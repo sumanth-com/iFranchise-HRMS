@@ -93,3 +93,77 @@ export async function resolveApprovedLoginEmail(emailInput: string): Promise<str
 
   return normalized;
 }
+
+type EmployeeAuthEmailRow = {
+  email: string;
+  deleted_at: string | null;
+  account_status: string;
+  user_id: string | null;
+};
+
+async function lookupEligibleEmployeeAuthEmail(
+  normalized: string,
+): Promise<string | null> {
+  const admin = createAdminClient();
+
+  const { data: directMatch, error: directError } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select("email, account_status, deleted_at, user_id")
+    .eq("email", normalized)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (directError && process.env.NODE_ENV === "development") {
+    console.error("[findEligiblePasswordResetTarget] employees lookup failed:", directError.message);
+  }
+
+  const direct = directMatch as EmployeeAuthEmailRow | null;
+  if (
+    direct?.email &&
+    direct.user_id &&
+    ELIGIBLE_ACCOUNT_STATUSES.has(direct.account_status)
+  ) {
+    return String(direct.email).toLowerCase();
+  }
+
+  const { data: profileMatch, error: profileError } = await admin
+    .schema("hrms")
+    .from("employee_profiles")
+    .select(
+      "personal_email, employees:employee_id(email, account_status, deleted_at, user_id)",
+    )
+    .eq("personal_email", normalized)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (profileError && process.env.NODE_ENV === "development") {
+    console.error(
+      "[findEligiblePasswordResetTarget] personal email lookup failed:",
+      profileError.message,
+    );
+  }
+
+  const employee = unwrapEmployee(
+    profileMatch?.employees as EmployeeAuthEmailRow | EmployeeAuthEmailRow[] | null,
+  ) as EmployeeAuthEmailRow | null;
+  if (
+    employee?.email &&
+    employee.user_id &&
+    !employee.deleted_at &&
+    ELIGIBLE_ACCOUNT_STATUSES.has(employee.account_status)
+  ) {
+    return String(employee.email).toLowerCase();
+  }
+
+  return null;
+}
+
+/** Returns the Supabase auth email when the address maps to an eligible HRMS account. */
+export async function findEligiblePasswordResetTarget(
+  emailInput: string,
+): Promise<string | null> {
+  const normalized = emailInput.trim().toLowerCase();
+  if (!normalized) return null;
+  return lookupEligibleEmployeeAuthEmail(normalized);
+}
