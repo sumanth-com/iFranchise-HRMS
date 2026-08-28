@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, Trash2, Upload } from "lucide-react";
+import { Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { EmploymentStatusBadge } from "@/components/employees/employment-status-badge";
@@ -36,6 +36,8 @@ type EmployeeIdCardProps = {
   profilePath: string;
   canEdit: boolean;
   className?: string;
+  hideHeaderLabel?: boolean;
+  stretchHeight?: boolean;
 };
 
 export function EmployeeIdCard({
@@ -53,6 +55,8 @@ export function EmployeeIdCard({
   profilePath: _profilePath,
   canEdit,
   className,
+  hideHeaderLabel = false,
+  stretchHeight = false,
 }: EmployeeIdCardProps) {
   const router = useRouter();
   const waveGradientId = useId().replace(/:/g, "");
@@ -61,7 +65,6 @@ export function EmployeeIdCard({
   const resolvedPathRef = useRef<string | null>(profileImagePath ?? null);
   const [imageUrl, setImageUrl] = useState<string | null>(initialUrl);
   const [isPending, startTransition] = useTransition();
-  const [photoHovered, setPhotoHovered] = useState(false);
 
   const fullName = `${firstName} ${lastName}`.trim();
   const roleTitle = designation?.trim() || "Team Member";
@@ -194,7 +197,8 @@ export function EmployeeIdCard({
   return (
     <div
       className={cn(
-        "relative mx-auto h-[30rem] w-full max-w-[19rem]",
+        "relative mx-auto w-full max-w-[19rem]",
+        stretchHeight ? "h-full min-h-0" : "h-[30rem]",
         className,
       )}
     >
@@ -207,107 +211,138 @@ export function EmployeeIdCard({
       >
         <div className="pointer-events-none absolute inset-0 z-20 rounded-[1.65rem] ring-1 ring-inset ring-black/[0.04] dark:ring-white/14" />
 
-        <div className="absolute left-4 top-4 z-10 rounded-full bg-white/90 px-3 py-1 text-[0.65rem] font-semibold tracking-[0.16em] text-neutral-600 shadow-sm backdrop-blur dark:bg-black/70 dark:text-white dark:ring-1 dark:ring-white/25">
-          DIGITAL ID
-        </div>
+        {hideHeaderLabel ? null : (
+          <div className="absolute left-4 top-4 z-10 rounded-full bg-white/90 px-3 py-1 text-[0.65rem] font-semibold tracking-[0.16em] text-neutral-600 shadow-sm backdrop-blur dark:bg-black/70 dark:text-white dark:ring-1 dark:ring-white/25">
+            DIGITAL ID
+          </div>
+        )}
 
         <div
           className={cn(
-            "relative min-h-0 flex-1 overflow-hidden bg-muted",
-            canEdit && "cursor-pointer",
+            "relative overflow-hidden bg-muted",
+            stretchHeight
+              ? imageUrl
+                ? "min-h-[15rem] flex-1"
+                : "h-[13rem] shrink-0"
+              : "min-h-0 flex-1",
           )}
-          onMouseEnter={() => setPhotoHovered(true)}
-          onMouseLeave={() => setPhotoHovered(false)}
-          onClick={canEdit ? openPicker : undefined}
-          onKeyDown={
-            canEdit
-              ? (event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    openPicker();
-                  }
-                }
-              : undefined
-          }
-          role={canEdit ? "button" : undefined}
-          tabIndex={canEdit ? 0 : undefined}
-          aria-label={canEdit ? "Change profile photo" : undefined}
         >
-          {imageUrl ? (
-            <img
-              src={imageUrl}
-              alt={fullName}
-              decoding="async"
-              loading="eager"
-              onError={() => {
-                if (previewUrlRef.current) return;
-                setImageUrl(null);
-                resolvedPathRef.current = null;
-              }}
-              className="size-full object-cover object-[center_20%]"
-            />
-          ) : (
-            <div className="flex size-full items-center justify-center bg-muted">
-              <span
+          <div
+            className={cn(
+              "group/photo relative overflow-hidden",
+              imageUrl || !stretchHeight
+                ? "absolute inset-x-0 top-0 bottom-[3.5rem]"
+                : "h-full",
+            )}
+          >
+            {imageUrl ? (
+              <img
+                src={imageUrl}
+                alt={fullName}
+                decoding="async"
+                loading="eager"
+                onError={() => {
+                  if (previewUrlRef.current) return;
+                  setImageUrl(null);
+                  resolvedPathRef.current = null;
+                }}
+                className="size-full object-cover object-center"
+              />
+            ) : (
+              <div
+                className={cn("size-full", canEdit && "cursor-pointer")}
+                onClick={canEdit ? openPicker : undefined}
+                onKeyDown={
+                  canEdit
+                    ? (event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          openPicker();
+                        }
+                      }
+                    : undefined
+                }
+                role={canEdit ? "button" : undefined}
+                tabIndex={canEdit ? 0 : undefined}
+                aria-label={canEdit ? "Upload profile photo" : undefined}
+              >
+                {canEdit ? (
+                  <div
+                    className={cn(
+                      "absolute bottom-2.5 right-2.5 z-40 flex items-center gap-1.5 opacity-0 pointer-events-none transition-opacity duration-200 group-hover/photo:opacity-100 group-hover/photo:pointer-events-auto",
+                    )}
+                  >
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openPicker();
+                      }}
+                      disabled={isPending}
+                      className="flex size-8 items-center justify-center rounded-full bg-background/95 text-foreground shadow-md ring-1 ring-border/70 backdrop-blur-sm hover:bg-background disabled:cursor-not-allowed dark:bg-card/95 dark:ring-white/15"
+                      aria-label="Upload profile photo"
+                    >
+                      <Upload className="size-3.5 shrink-0" />
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            )}
+
+            {canEdit ? (
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+            ) : null}
+
+            {canEdit && imageUrl ? (
+              <div
                 className={cn(
-                  "flex size-[4.5rem] items-center justify-center rounded-full bg-card text-foreground shadow-md ring-1 ring-border/60 transition dark:ring-white/10",
-                  canEdit && photoHovered ? "scale-[1.03] shadow-lg" : "opacity-90",
+                  "absolute bottom-2.5 right-2.5 z-40 flex items-center gap-1.5 opacity-0 pointer-events-none transition-opacity duration-200 group-hover/photo:opacity-100 group-hover/photo:pointer-events-auto",
                 )}
               >
-                <Camera className="size-7" strokeWidth={1.75} />
-              </span>
-            </div>
-          )}
-
-          {canEdit ? (
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={handleFileChange}
-            />
-          ) : null}
-
-          {canEdit ? (
-            <div
-              className={cn(
-                "absolute bottom-14 right-3 z-30 flex items-center gap-1.5 transition-opacity duration-200",
-                photoHovered ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
-              )}
-            >
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openPicker();
-                }}
-                disabled={isPending}
-                className="flex size-8 items-center justify-center rounded-full bg-background/95 text-foreground shadow-md ring-1 ring-border/70 backdrop-blur-sm hover:bg-background disabled:cursor-not-allowed dark:bg-card/95 dark:ring-white/15"
-                aria-label="Upload profile photo"
-              >
-                <Upload className="size-3.5" />
-              </button>
-              {imageUrl ? (
                 <button
                   type="button"
-                  onClick={handleRemove}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    openPicker();
+                  }}
+                  disabled={isPending}
+                  className="flex size-8 items-center justify-center rounded-full bg-background/95 text-foreground shadow-md ring-1 ring-border/70 backdrop-blur-sm hover:bg-background disabled:cursor-not-allowed dark:bg-card/95 dark:ring-white/15"
+                  aria-label="Upload profile photo"
+                >
+                  <Upload className="size-3.5 shrink-0" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleRemove(event);
+                  }}
                   disabled={isPending}
                   className="flex size-8 items-center justify-center rounded-full bg-background/95 text-destructive shadow-md ring-1 ring-border/70 backdrop-blur-sm hover:bg-background disabled:cursor-not-allowed dark:bg-card/95 dark:ring-white/15"
                   aria-label="Remove profile photo"
                 >
-                  <Trash2 className="size-3.5" />
+                  <Trash2 className="size-3.5 shrink-0" />
                 </button>
-              ) : null}
-            </div>
-          ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
 
-        <div className="relative z-10 -mt-[3.1rem] shrink-0">
+        {stretchHeight && !imageUrl ? (
+          <div className="min-h-0 flex-1 bg-muted" aria-hidden />
+        ) : null}
+
+        <div className="relative z-10 -mt-[3.5rem] shrink-0">
           {/* Light wave + panel */}
           <div className="dark:hidden">
             <svg
-              className="absolute inset-x-0 top-0 h-[3.1rem] w-full"
+              className="absolute inset-x-0 top-0 h-[3.5rem] w-full"
               viewBox="0 0 360 68"
               preserveAspectRatio="none"
               aria-hidden
@@ -330,7 +365,7 @@ export function EmployeeIdCard({
                 d="M0 68V28C44 10 86 4 128 10C178 18 210 38 260 46C300 52 330 46 360 36V68H0Z"
               />
             </svg>
-            <div className="relative bg-gradient-to-br from-white via-[#f4eefc] to-[#d9c8f0] px-5 pb-5 pt-9 text-center">
+            <div className="relative min-h-[10.5rem] bg-gradient-to-br from-white via-[#f4eefc] to-[#d9c8f0] px-5 pb-6 pt-10 text-center">
               <p className="break-words text-[1.2rem] font-bold leading-snug tracking-tight text-neutral-950">
                 {fullName}
               </p>
@@ -355,7 +390,7 @@ export function EmployeeIdCard({
           {/* Dark wave + panel — separate tree so light gradient never paints in dark mode */}
           <div className="hidden dark:block">
             <svg
-              className="absolute inset-x-0 top-0 h-[3.1rem] w-full"
+              className="absolute inset-x-0 top-0 h-[3.5rem] w-full"
               viewBox="0 0 360 68"
               preserveAspectRatio="none"
               aria-hidden
@@ -378,7 +413,7 @@ export function EmployeeIdCard({
                 d="M0 68V28C44 10 86 4 128 10C178 18 210 38 260 46C300 52 330 46 360 36V68H0Z"
               />
             </svg>
-            <div className="relative bg-[#0b1224] px-5 pb-5 pt-9 text-center">
+            <div className="relative min-h-[10.5rem] bg-[#0b1224] px-5 pb-6 pt-10 text-center">
               <p className="break-words text-[1.2rem] font-bold leading-snug tracking-tight text-white">
                 {fullName}
               </p>
