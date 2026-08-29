@@ -20,7 +20,13 @@ export function LeavePolicyYearUsage({
         <h2 className="text-sm font-medium text-foreground/90">{year} leave year</h2>
         <p className="text-xs text-foreground/55">Used this year / annual entitlement, with days still available.</p>
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div
+        className={
+          balances.length >= 4
+            ? "grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4"
+            : "grid grid-cols-1 gap-3 sm:grid-cols-3"
+        }
+      >
         {balances.map((row) => {
           const tone = LEAVE_BALANCE_CARD_TONES[
             row.leaveTypeCode as keyof typeof LEAVE_BALANCE_CARD_TONES

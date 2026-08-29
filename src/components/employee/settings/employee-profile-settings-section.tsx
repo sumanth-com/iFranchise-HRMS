@@ -24,6 +24,7 @@ import {
   removeProfileImageAction,
   uploadProfileImageAction,
 } from "@/lib/employees/profile-image-actions";
+import { notifyProfilePhotoChanged } from "@/lib/employees/profile-photo-events";
 import { optimizeProfileImageFile } from "@/lib/media/client-image-optimize";
 import type { EmployeeSelfProfileSettings } from "@/lib/employee/services/employee-self-profile";
 import { TIMEZONE_OPTIONS } from "@/lib/validations/organization";
@@ -122,6 +123,12 @@ export function EmployeeProfileSettingsSection({
         toast.error(result.message);
         return;
       }
+      const preview = URL.createObjectURL(optimized);
+      setImageUrl(preview);
+      notifyProfilePhotoChanged({
+        employeeId: settings.employeeId,
+        imageUrl: preview,
+      });
       toast.success("Profile photo updated");
       router.refresh();
     });
@@ -135,6 +142,10 @@ export function EmployeeProfileSettingsSection({
         return;
       }
       setImageUrl(null);
+      notifyProfilePhotoChanged({
+        employeeId: settings.employeeId,
+        imageUrl: null,
+      });
       toast.success("Profile photo removed");
       router.refresh();
     });

@@ -20,6 +20,8 @@ export type MyProfileBundle = {
   employmentTypeName: string | null;
   reportingManagerId: string | null;
   reportingManagerName: string | null;
+  assignedHrEmployeeId: string | null;
+  assignedHrName: string | null;
   dateOfJoining: string | null;
   attendanceSummary: MyProfileAttendanceSummary;
   profileImageUrl: string | null;

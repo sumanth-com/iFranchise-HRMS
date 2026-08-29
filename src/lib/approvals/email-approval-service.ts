@@ -22,8 +22,14 @@ import type {
 } from "@/lib/approvals/types";
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
+import { CEO_ROUTES } from "@/lib/ceo/constants";
+import { EMPLOYEE_ROUTES as PORTAL_EMPLOYEE_ROUTES } from "@/lib/employee/constants";
+import { LEAVE_ROUTES, SELF_LEAVE_ROUTES } from "@/lib/leave/constants";
+import { MANAGER_ROUTES } from "@/lib/manager/constants";
+import { SYSTEM_ADMIN_ROUTES } from "@/lib/system-admin/constants";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasSupabaseServiceRoleEnv } from "@/lib/supabase/env";
+import { revalidatePath } from "next/cache";
 
 export type ApprovalRequestContext = {
   ip?: string | null;
@@ -40,12 +46,29 @@ function absoluteUrl(path: string): string {
 
 function alreadyProcessedMessage(requestType: ApprovalRequestType): string {
   return requestType === "leave"
-    ? "Leave request has already been processed."
+    ? "This leave request has already been processed."
     : "This request has already been completed.";
 }
 
 function genericApprovalFailureMessage(): string {
-  return "We could not complete this action. Please sign in to the portal or try again later.";
+  return "We could not complete this action. Please try again.";
+}
+
+/** Keep leave pages in sync after email approve/reject (DB already updated). */
+function revalidateAfterEmailDecision(requestType: ApprovalRequestType, sourceRecordId: string) {
+  if (requestType !== "leave") return;
+
+  revalidatePath(LEAVE_ROUTES.list);
+  revalidatePath(LEAVE_ROUTES.balances);
+  revalidatePath(LEAVE_ROUTES.detail(sourceRecordId));
+  revalidatePath(SELF_LEAVE_ROUTES.list);
+  revalidatePath(SELF_LEAVE_ROUTES.team);
+  revalidatePath(PORTAL_EMPLOYEE_ROUTES.leave);
+  revalidatePath(MANAGER_ROUTES.leave);
+  revalidatePath(MANAGER_ROUTES.leaveTeam);
+  revalidatePath(CEO_ROUTES.approvals);
+  revalidatePath(CEO_ROUTES.approvalsLeave);
+  revalidatePath(SYSTEM_ADMIN_ROUTES.leave);
 }
 
 async function fetchApproverName(
@@ -107,7 +130,6 @@ export async function dispatchApprovalEmails(params: {
       approverName: identity.name,
       approveUrl: absoluteUrl(approvalActionUrl(token.rawToken, "approve")),
       rejectUrl: absoluteUrl(approvalActionUrl(token.rawToken, "reject")),
-      viewUrl: absoluteUrl(approvalActionUrl(token.rawToken, "view")),
       expiresInHours: getApprovalTokenTtlHours(),
     });
 
@@ -368,6 +390,8 @@ export async function processEmailApproval(params: {
 
   // Note: multi-level "next approver" emails are dispatched by the module's core
   // approval mutation itself (so portal and email approvals behave identically).
+
+  revalidateAfterEmailDecision(found.request_type, found.source_record_id);
 
   return {
     status: action === "approve" ? "approved" : "rejected",

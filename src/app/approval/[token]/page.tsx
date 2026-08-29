@@ -1,9 +1,6 @@
-import { redirect } from "next/navigation";
-
 import {
   previewEmailApproval,
   processEmailApproval,
-  resolveViewDetailPath,
 } from "@/lib/approvals/email-approval-service";
 import { ApprovalView, type ApprovalViewState } from "@/app/approval/[token]/approval-view";
 import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
@@ -20,11 +17,7 @@ export default async function ApprovalPage({ params, searchParams }: PageProps) 
   const { token } = await params;
   const { action } = await searchParams;
 
-  if (action === "view") {
-    const path = await resolveViewDetailPath(token);
-    redirect(path ?? "/login");
-  }
-
+  // Email links only use approve | reject. Ignore legacy "view" and treat as approve.
   const initialAction: "approve" | "reject" = action === "reject" ? "reject" : "approve";
   const preview = await previewEmailApproval(token);
 
@@ -48,11 +41,19 @@ export default async function ApprovalPage({ params, searchParams }: PageProps) 
       approverName: preview.approverName,
       detailRows: preview.summary.detailRows,
       reason: preview.summary.reason,
+      leaveHighlight: preview.summary.leaveHighlight,
     };
   } else if (preview.status === "expired") {
-    state = { kind: "error", tone: "expired", title: "This approval link has expired", message: preview.message };
+    state = {
+      kind: "error",
+      tone: "expired",
+      title: "This approval link has expired",
+      message: preview.message,
+    };
   } else if (preview.status === "already_processed") {
-    const isLeave = preview.summary?.heading.startsWith("Leave request");
+    const isLeave =
+      Boolean(preview.summary?.leaveHighlight) ||
+      (preview.summary?.heading.startsWith("Leave request") ?? false);
     state = {
       kind: "error",
       tone: "done",
@@ -60,7 +61,12 @@ export default async function ApprovalPage({ params, searchParams }: PageProps) 
       message: preview.message,
     };
   } else {
-    state = { kind: "error", tone: "invalid", title: "Invalid link", message: preview.message };
+    state = {
+      kind: "error",
+      tone: "invalid",
+      title: "Invalid link",
+      message: preview.message,
+    };
   }
 
   return (

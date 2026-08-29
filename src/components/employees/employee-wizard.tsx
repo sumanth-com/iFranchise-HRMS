@@ -311,6 +311,31 @@ export function EmployeeWizard({ lookups }: EmployeeWizardProps) {
             ) : null}
           </div>
           <div className="space-y-2">
+            <Label>Gender *</Label>
+            <LabeledSelect
+              items={[
+                { value: "male", label: "Male" },
+                { value: "female", label: "Female" },
+                { value: "other", label: "Other" },
+                { value: "prefer_not_to_say", label: "Prefer not to say" },
+              ]}
+              value={basicForm.watch("gender") ?? ""}
+              onValueChange={(value) =>
+                basicForm.setValue(
+                  "gender",
+                  value as EmployeeWizardInputValidated["basic"]["gender"],
+                  { shouldValidate: true },
+                )
+              }
+              placeholder="Select gender"
+            />
+            {basicForm.formState.errors.gender?.message ? (
+              <p className="text-xs text-destructive">
+                {basicForm.formState.errors.gender.message}
+              </p>
+            ) : null}
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="personalEmail">Personal email</Label>
             <Input id="personalEmail" type="email" {...basicForm.register("personalEmail")} />
           </div>

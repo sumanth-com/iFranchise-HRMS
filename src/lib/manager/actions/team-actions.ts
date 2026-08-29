@@ -12,7 +12,6 @@ import {
   getTeamMemberOptions,
   getTeamSummary,
   listTeamEmployees,
-  buildManagerTeamTree,
 } from "@/lib/manager/services/team-queries";
 import {
   getTeamMemberDetailBundle,
@@ -334,7 +333,7 @@ export async function getManagerTeamPageData(
     "employee.view",
   ]);
 
-  const { teamIds, hierarchyEmployees } = await getManagerTeamScope(
+  const { teamIds } = await getManagerTeamScope(
     supabase,
     profile,
   );
@@ -349,17 +348,10 @@ export async function getManagerTeamPageData(
       getTeamDesignationOptions(supabase, organizationId),
     ]);
 
-  const hierarchyRoot = buildManagerTeamTree(
-    profile.employee.id,
-    hierarchyEmployees,
-    teamIds,
-  );
-
   return {
     summary,
     employees,
     lookups,
-    hierarchyRoot,
     teamMemberOptions,
     designationOptions,
   };

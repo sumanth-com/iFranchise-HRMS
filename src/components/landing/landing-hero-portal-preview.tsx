@@ -281,9 +281,9 @@ export function LandingHeroPortalPreview() {
                 <span className="landing-hero-preview-checkout">Check Out</span>
               </div>
               <div className="landing-hero-preview-holiday">
-                <span>Upcoming holiday</span>
-                <strong>Sri Krishnaashtami</strong>
-                <em>Optional · in 11 days</em>
+                <span>Performance goal</span>
+                <strong>Q3 objective</strong>
+                <em>On track · 72% complete</em>
               </div>
             </div>
           </div>

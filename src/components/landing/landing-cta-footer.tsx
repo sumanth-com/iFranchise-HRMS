@@ -205,27 +205,9 @@ export function LandingFinalCta() {
               </div>
             </div>
 
-            {/* Right Column: Glass Card UI with curved dotted line and floating badge */}
+            {/* Right Column: Glass Card UI with floating badge */}
             <div className="relative flex justify-center lg:col-span-5 lg:justify-end">
-              {/* Outer Wrapper for exact positioning */}
               <div className="relative w-full max-w-[340px] sm:max-w-[360px]">
-                {/* SVG Dotted Guide Track matching reference image */}
-                <svg
-                  className="pointer-events-none absolute -top-6 -left-10 h-[calc(100%+3rem)] w-16 overflow-visible"
-                  fill="none"
-                  aria-hidden
-                >
-                  <path
-                    d="M60,10 H24 A18,18 0 0 0 6,28 V240 A18,18 0 0 0 24,258 H60"
-                    stroke="rgba(165,180,252,0.45)"
-                    strokeWidth="1.5"
-                    strokeDasharray="3 4"
-                  />
-                  {/* Glowing Node halfway down the track */}
-                  <circle cx="6" cy="134" r="5" fill="#818cf8" filter="drop-shadow(0 0 6px #818cf8)" />
-                  <circle cx="6" cy="134" r="2" fill="#ffffff" />
-                </svg>
-
                 {/* Main Glass Card */}
                 <div className="relative w-full rounded-3xl border border-white/20 bg-gradient-to-b from-white/15 to-white/5 p-4.5 shadow-[0_20px_50px_rgba(0,0,0,0.35)] backdrop-blur-xl sm:p-5">
                   {/* Card Header Skeletons */}

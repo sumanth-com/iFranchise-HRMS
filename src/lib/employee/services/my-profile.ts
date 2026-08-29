@@ -55,10 +55,12 @@ export async function getMyProfileBundle(
           account_status,
           date_of_joining,
           reporting_manager_id,
+          assigned_hr_employee_id,
           departments:department_id (name),
           designations:designation_id (title),
           employment_types:employment_type_id (name),
-          manager:reporting_manager_id (first_name, last_name)
+          manager:reporting_manager_id (first_name, last_name),
+          assigned_hr:assigned_hr_employee_id (first_name, last_name)
         `,
         )
         .eq("id", employeeId)
@@ -68,7 +70,7 @@ export async function getMyProfileBundle(
         .schema("hrms")
         .from("employee_profiles")
         .select(
-          "personal_email, personal_phone, profile_image_storage_path, self_profile_submitted_at",
+          "personal_email, personal_phone, profile_image_storage_path, self_profile_submitted_at, gender",
         )
         .eq("employee_id", employeeId)
         .is("deleted_at", null)
@@ -126,12 +128,18 @@ export async function getMyProfileBundle(
       | { first_name?: string; last_name?: string }[]
       | null,
   );
+  const assignedHr = unwrapRelation(
+    employee.assigned_hr as
+      | { first_name?: string; last_name?: string }
+      | { first_name?: string; last_name?: string }[]
+      | null,
+  );
 
   const firstName = cleanDisplayText(employee.first_name);
   const lastName = cleanDisplayText(employee.last_name);
   const departmentName = department?.name ?? null;
   const designationTitle = designation?.title ?? null;
-  const profileImagePath = profileResult.data?.profile_image_storage_path ?? null;
+  const profileImagePath = profileResult.data?.profile_image_storage_path?.trim() || null;
 
   const profileSettings: EmployeeSelfProfileSettings = {
     employeeId: employee.id,
@@ -146,6 +154,7 @@ export async function getMyProfileBundle(
     language: prefsResult.data?.language ?? DEFAULT_LANGUAGE,
     timezone: prefsResult.data?.timezone ?? DEFAULT_TIMEZONE,
     profileImageStoragePath: profileImagePath,
+    gender: (profileResult.data?.gender as string | null) ?? null,
     address: {
       id: addressResult.data?.id ?? null,
       addressLine1: addressResult.data?.address_line1 ?? "",
@@ -168,6 +177,10 @@ export async function getMyProfileBundle(
     ? `${cleanDisplayText(manager.first_name ?? "")} ${cleanDisplayText(manager.last_name ?? "")}`.trim() ||
       null
     : null;
+  const assignedHrName = assignedHr
+    ? `${cleanDisplayText(assignedHr.first_name ?? "")} ${cleanDisplayText(assignedHr.last_name ?? "")}`.trim() ||
+      null
+    : null;
 
   const bundle: MyProfileBundle = {
     employeeId: employee.id,
@@ -182,6 +195,8 @@ export async function getMyProfileBundle(
     employmentTypeName: employmentType?.name ?? null,
     reportingManagerId: employee.reporting_manager_id,
     reportingManagerName,
+    assignedHrEmployeeId: employee.assigned_hr_employee_id ?? null,
+    assignedHrName,
     dateOfJoining: employee.date_of_joining,
     // Not rendered on My Profile — keep shape stable without an unbounded attendance scan.
     attendanceSummary: {

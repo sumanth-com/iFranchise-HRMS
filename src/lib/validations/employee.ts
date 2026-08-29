@@ -107,7 +107,8 @@ export const employeeSelfProfileSchema = z.object({
   personalEmail: z.string().email().optional().or(z.literal("")),
   personalPhone: requiredPhoneSchema,
   language: z.string().min(2, "Language is required").max(20),
-  timezone: z.string().min(1).max(80),
+  timezone: z.string().min(1, "Timezone is required").max(80),
+  gender: genderTypeSchema,
   addressLine1: z
     .string()
     .trim()
@@ -158,7 +159,7 @@ export const employeeBasicStepSchema = z.object({
   email: z.string().email("Enter a valid email address"),
   phone: optionalPhoneSchema,
   dateOfBirth: optionalPastOrTodayDateSchema,
-  gender: genderTypeSchema.optional(),
+  gender: genderTypeSchema,
   maritalStatus: maritalStatusSchema.optional(),
   nationality: z.string().max(100).optional(),
   bloodGroup: z.string().max(10).optional(),
@@ -240,7 +241,7 @@ export const employeeUpdateSchema = z
     dateOfJoining: z.string().optional().or(z.literal("")),
     dateOfLeaving: z.string().optional().or(z.literal("")),
     dateOfBirth: optionalPastOrTodayDateSchema,
-    gender: genderTypeSchema.optional(),
+    gender: genderTypeSchema,
     maritalStatus: maritalStatusSchema.optional(),
     nationality: z.string().max(100).optional().or(z.literal("")),
     bloodGroup: z.string().max(10).optional().or(z.literal("")),

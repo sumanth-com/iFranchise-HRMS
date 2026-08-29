@@ -548,14 +548,15 @@ export function EmployeeEditForm({
             ) : null}
           </div>
           <div className="space-y-2">
-            <Label>Gender</Label>
+            <Label>Gender *</Label>
             <Select
               items={genderItems}
               value={form.watch("gender") ?? ""}
               onValueChange={(value) =>
                 form.setValue(
                   "gender",
-                  (value || undefined) as EmployeeUpdateInput["gender"],
+                  value as EmployeeUpdateInput["gender"],
+                  { shouldValidate: true },
                 )
               }
             >
@@ -570,6 +571,11 @@ export function EmployeeEditForm({
                 ))}
               </SelectContent>
             </Select>
+            {form.formState.errors.gender?.message ? (
+              <p className="text-xs text-destructive">
+                {form.formState.errors.gender.message}
+              </p>
+            ) : null}
           </div>
           <div className="space-y-2">
             <Label>Marital status</Label>

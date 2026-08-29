@@ -66,10 +66,15 @@ export function LeaveBalanceSummaryCards({
     };
   });
 
+  const gridClassName =
+    cards.length >= 4
+      ? "grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4"
+      : "grid grid-cols-1 gap-3 sm:grid-cols-3";
+
   return (
     <div className={className}>
       <p className="mb-2 text-xs text-muted-foreground">{BALANCE_CARDS_CAPTION}</p>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className={gridClassName}>
         {cards.map((card) => {
           const isActive = selectedCode?.toUpperCase() === card.key;
           const cardClassName = cn(

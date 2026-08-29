@@ -28,6 +28,15 @@ export type PendingApprover = {
   level: number;
 };
 
+/** Optional leave fields for confirmation/result screens (display only). */
+export type ApprovalLeaveHighlight = {
+  leaveType: string;
+  startDate: string;
+  endDate: string;
+  duration: string;
+  statusLabel: string;
+};
+
 /** Everything needed to render an approval email + the public landing page. */
 export type ApprovalRequestSummary = {
   organizationId: string;
@@ -40,6 +49,8 @@ export type ApprovalRequestSummary = {
   status: string;
   /** Whether the request can still be actioned. */
   isPending: boolean;
+  /** Present for leave requests — used by email result screens. */
+  leaveHighlight?: ApprovalLeaveHighlight;
 };
 
 export type DecisionRecipient = {

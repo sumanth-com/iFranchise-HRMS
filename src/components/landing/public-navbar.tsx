@@ -134,7 +134,16 @@ function NavbarChrome({ compact = false }: PublicNavbarProps) {
             >
               Sign In
             </button>
-          ) : null}
+          ) : (
+            <button
+              type="button"
+              onClick={handleCta}
+              className="landing-nav-signin landing-nav-cta-desktop"
+            >
+              Get Started
+              <ArrowRight className="size-3.5" aria-hidden />
+            </button>
+          )}
 
           {!compact ? (
             <button

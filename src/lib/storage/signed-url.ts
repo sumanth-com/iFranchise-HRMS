@@ -1,5 +1,29 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 
+export async function storageObjectExists(
+  supabase: AuthSupabaseClient,
+  bucket: string,
+  path: string,
+): Promise<boolean> {
+  const normalized = path.trim().replace(/\\/g, "/");
+  if (!normalized || normalized.includes("..") || normalized.startsWith("/")) {
+    return false;
+  }
+
+  const lastSlash = normalized.lastIndexOf("/");
+  const folder = lastSlash >= 0 ? normalized.slice(0, lastSlash) : "";
+  const filename = lastSlash >= 0 ? normalized.slice(lastSlash + 1) : normalized;
+  if (!filename) return false;
+
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .list(folder, { limit: 100, search: filename });
+
+  if (error || !data?.length) return false;
+
+  return data.some((item) => item.name === filename);
+}
+
 export async function createSignedStorageUrl(
   supabase: AuthSupabaseClient,
   bucket: string,
@@ -14,6 +38,18 @@ export async function createSignedStorageUrl(
   }
 
   return data.signedUrl;
+}
+
+/** Sign only when the object is present in storage (avoids ghost avatars from stale DB paths). */
+export async function createSignedStorageUrlIfExists(
+  supabase: AuthSupabaseClient,
+  bucket: string,
+  path: string,
+): Promise<string | null> {
+  const normalized = path.trim();
+  if (!normalized) return null;
+  if (!(await storageObjectExists(supabase, bucket, normalized))) return null;
+  return createSignedStorageUrl(supabase, bucket, normalized);
 }
 
 /**

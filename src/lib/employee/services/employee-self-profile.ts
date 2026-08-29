@@ -16,6 +16,7 @@ export type EmployeeSelfProfileSettings = {
   designationTitle: string | null;
   personalEmail: string;
   personalPhone: string;
+  gender: string | null;
   language: string;
   timezone: string;
   profileImageStoragePath: string | null;
@@ -66,7 +67,7 @@ export async function getEmployeeSelfProfileSettings(
         .schema("hrms")
         .from("employee_profiles")
         .select(
-          "profile_image_storage_path, personal_email, personal_phone",
+          "profile_image_storage_path, personal_email, personal_phone, gender",
         )
         .eq("employee_id", employeeId)
         .is("deleted_at", null)
@@ -118,6 +119,7 @@ export async function getEmployeeSelfProfileSettings(
     designationTitle: desigTitle ?? null,
     personalEmail: profileResult.data?.personal_email ?? "",
     personalPhone: profileResult.data?.personal_phone ?? "",
+    gender: (profileResult.data?.gender as string | null) ?? null,
     language: prefsResult.data?.language ?? DEFAULT_LANGUAGE,
     timezone: prefsResult.data?.timezone ?? DEFAULT_TIMEZONE,
     profileImageStoragePath: profileResult.data?.profile_image_storage_path ?? null,
@@ -188,6 +190,7 @@ async function upsertEmployeeProfileRow(
   profile: UserProfile,
   personalEmail: string | null,
   personalPhone: string | null,
+  gender?: string | null,
 ) {
   const { data: existing } = await supabase
     .schema("hrms")
@@ -200,6 +203,7 @@ async function upsertEmployeeProfileRow(
   const payload = {
     personal_email: personalEmail,
     personal_phone: personalPhone,
+    ...(gender !== undefined ? { gender } : {}),
     updated_by: profile.userId,
   };
 
@@ -341,6 +345,7 @@ export async function updateEmployeeSelfProfileWithContact(
     profile,
     emptyToNull(input.personalEmail)?.toLowerCase() ?? null,
     emptyToNull(input.personalPhone),
+    input.gender,
   );
   await upsertUserPreferences(supabase, profile, input.language, input.timezone);
   await upsertCurrentAddress(

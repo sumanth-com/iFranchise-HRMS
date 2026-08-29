@@ -5,12 +5,14 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuthenticatedProfile } from "@/lib/permissions/server";
 import { hasPermission } from "@/lib/permissions/utils";
-import { EMPLOYEE_ROUTES, PROFILE_IMAGE_MAX_BYTES } from "@/lib/employees/constants";
+import { assertOrganizationStoragePath } from "@/lib/security/storage-path";
+import { EMPLOYEE_ROUTES, EMPLOYEE_STORAGE_BUCKETS, PROFILE_IMAGE_MAX_BYTES } from "@/lib/employees/constants";
 import { getEmployeeById } from "@/lib/employees/services/employee-detail";
 import {
   removeProfileImage,
   uploadProfileImage,
 } from "@/lib/employees/services/employee-mutations";
+import { createSignedStorageUrlIfExists } from "@/lib/storage/signed-url";
 import type { EmployeeActionResult } from "@/types/employee";
 
 async function getAuthenticatedSupabase() {
@@ -22,6 +24,105 @@ function revalidateSelfProfilePaths() {
   revalidatePath("/manager/profile");
   revalidatePath("/dashboard/profile");
   revalidatePath("/ceo/profile");
+  // Header avatar lives in the shared portal shell.
+  revalidatePath("/dashboard");
+  revalidatePath("/employee");
+  revalidatePath("/manager");
+  revalidatePath("/ceo");
+}
+
+/** Signed URL for the signed-in user's profile photo (header avatar). */
+export async function getMyProfileImageUrlAction(): Promise<
+  EmployeeActionResult<string | null>
+> {
+  try {
+    const profile = await requireAuthenticatedProfile();
+    const supabase = await getAuthenticatedSupabase();
+    const { data, error } = await supabase
+      .schema("hrms")
+      .from("employee_profiles")
+      .select("profile_image_storage_path")
+      .eq("employee_id", profile.employee.id)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const path = data?.profile_image_storage_path?.trim() || null;
+    if (!path) {
+      return { success: true, data: null };
+    }
+
+    try {
+      assertOrganizationStoragePath(path, profile.employee.organizationId);
+    } catch {
+      return { success: true, data: null };
+    }
+
+    const signedUrl = await createSignedStorageUrlIfExists(
+      supabase,
+      EMPLOYEE_STORAGE_BUCKETS.profileImages,
+      path,
+    );
+
+    return { success: true, data: signedUrl };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "Failed to load profile photo",
+    };
+  }
+}
+
+/** Signed URL for an employee profile photo when the storage object exists. */
+export async function getProfileImageSignedUrlAction(
+  employeeId: string,
+  storagePath: string,
+): Promise<EmployeeActionResult<string | null>> {
+  try {
+    const profile = await requireAuthenticatedProfile();
+    const isSelf = profile.employee.id === employeeId;
+    const canViewOthers = hasPermission(profile.permissionCodes, "employee.view");
+
+    if (!isSelf && !canViewOthers) {
+      return {
+        success: false,
+        message: "You do not have permission to view this profile photo",
+      };
+    }
+
+    const path = storagePath.trim();
+    if (!path) {
+      return { success: true, data: null };
+    }
+
+    assertOrganizationStoragePath(path, profile.employee.organizationId);
+
+    const supabase = await getAuthenticatedSupabase();
+    if (!isSelf) {
+      const target = await getEmployeeById(supabase, employeeId);
+      if (!target || target.organizationId !== profile.employee.organizationId) {
+        return { success: false, message: "Employee not found" };
+      }
+    }
+
+    const signedUrl = await createSignedStorageUrlIfExists(
+      supabase,
+      EMPLOYEE_STORAGE_BUCKETS.profileImages,
+      path,
+    );
+
+    return { success: true, data: signedUrl };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "Failed to load profile photo",
+    };
+  }
 }
 
 export async function uploadProfileImageAction(

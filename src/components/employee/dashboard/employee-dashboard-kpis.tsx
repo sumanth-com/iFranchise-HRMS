@@ -4,8 +4,9 @@ import { CalendarClock, CalendarDays, Clock, Timer } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { EmployeeStatCard } from "@/components/employee/dashboard/employee-module-primitives";
+import { useLiveWorkingSeconds } from "@/hooks/use-live-working-seconds";
 import { ATTENDANCE_STATUS_LABELS } from "@/lib/attendance/constants";
-import { formatHoursLabel } from "@/lib/employee/attendance-format";
+import { formatWorkingDuration } from "@/lib/employee/attendance-format";
 import {
   EMPLOYEE_DASHBOARD_KPI_LINKS,
   EMPLOYEE_ROUTES,
@@ -18,6 +19,7 @@ import {
   SYSTEM_ADMIN_ROUTES,
 } from "@/lib/system-admin/constants";
 import type { EmployeeDashboardKpis } from "@/types/employee-dashboard";
+import type { ManagerTodayAttendance } from "@/types/manager-self-attendance";
 
 function attendanceLabel(kpis: EmployeeDashboardKpis) {
   if (kpis.attendanceStatus) {
@@ -50,13 +52,16 @@ function resolveKpiLinks(pathname: string) {
 
 export function EmployeeDashboardKpiCards({
   kpis,
+  today,
   hideLeaveBalance = false,
 }: {
   kpis: EmployeeDashboardKpis;
+  today: Pick<ManagerTodayAttendance, "checkInAt" | "checkOutAt">;
   hideLeaveBalance?: boolean;
 }) {
   const pathname = usePathname();
   const links = resolveKpiLinks(pathname);
+  const workingSeconds = useLiveWorkingSeconds(today.checkInAt, today.checkOutAt);
 
   return (
     <section
@@ -79,7 +84,7 @@ export function EmployeeDashboardKpiCards({
       />
       <EmployeeStatCard
         label="Working Hours Today"
-        value={formatHoursLabel(kpis.workingHours)}
+        value={formatWorkingDuration(workingSeconds)}
         hint="Duration"
         icon={Timer}
         accent="text-sky-600 dark:text-sky-400"

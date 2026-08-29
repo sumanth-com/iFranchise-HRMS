@@ -16,8 +16,8 @@ import {
   buildEarlyCheckOutConfirm,
   isBeforeOfficeEnd,
 } from "@/lib/employee/attendance-punch-messages";
+import { useLiveWorkingSeconds } from "@/hooks/use-live-working-seconds";
 import {
-  elapsedWorkingSeconds,
   formatWorkingDuration,
 } from "@/lib/employee/attendance-format";
 import { cn } from "@/lib/utils";
@@ -143,18 +143,7 @@ export function AttendanceTodayPunchCard({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [dialog, setDialog] = useState<DialogState | null>(null);
-  const [elapsedSeconds, setElapsedSeconds] = useState(() =>
-    elapsedWorkingSeconds(today.checkInAt, today.checkOutAt),
-  );
-
-  useEffect(() => {
-    setElapsedSeconds(elapsedWorkingSeconds(today.checkInAt, today.checkOutAt));
-    if (!today.checkInAt || today.checkOutAt) return;
-    const id = window.setInterval(() => {
-      setElapsedSeconds(elapsedWorkingSeconds(today.checkInAt, null));
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, [today.checkInAt, today.checkOutAt]);
+  const elapsedSeconds = useLiveWorkingSeconds(today.checkInAt, today.checkOutAt);
 
   useEffect(() => {
     if (dialog?.kind !== "check_in" && dialog?.kind !== "check_out") return;

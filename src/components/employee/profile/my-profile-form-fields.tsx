@@ -24,6 +24,13 @@ import type { EmployeeSelfProfileInput } from "@/lib/validations/employee";
 
 const PROFILE_SELECT_CONTENT_CLASS = "min-w-[14rem] max-w-[20rem]";
 
+const PROFILE_GENDER_OPTIONS = [
+  { value: "male", label: "Male" },
+  { value: "female", label: "Female" },
+  { value: "other", label: "Other" },
+  { value: "prefer_not_to_say", label: "Prefer not to say" },
+] as const;
+
 function ProfileFieldError({ message }: { message?: string }) {
   if (!message) return null;
   return <p className="text-xs text-destructive">{message}</p>;
@@ -67,18 +74,15 @@ type MyProfileFormFieldsProps = {
   isManager: boolean;
   isEmployee: boolean;
   canEditContactDetails: boolean;
-  canEditReportingManager: boolean;
-  contactFieldsRequired: boolean;
   personalPhone: string;
   emergencyContactPhone: string;
   addressState: string;
   addressCity: string;
   addressCountry: string;
   emergencyRelationship: string | undefined;
-  reportingManagerId: string | undefined;
-  selectedManagerLabel: string;
-  managerOptions: { value: string; label: string }[];
   relationshipDisplay: string;
+  genderDisplay: string;
+  gender: string | undefined;
   formatJoiningDate: (value: string | null) => string;
   register: UseFormRegister<EmployeeSelfProfileInput>;
   setValue: UseFormSetValue<EmployeeSelfProfileInput>;
@@ -93,18 +97,15 @@ export function MyProfileFormFields({
   isManager,
   isEmployee,
   canEditContactDetails,
-  canEditReportingManager,
-  contactFieldsRequired,
   personalPhone,
   emergencyContactPhone,
   addressState,
   addressCity,
   addressCountry,
   emergencyRelationship,
-  reportingManagerId,
-  selectedManagerLabel,
-  managerOptions,
   relationshipDisplay,
+  genderDisplay,
+  gender,
   formatJoiningDate,
   register,
   setValue,
@@ -116,38 +117,17 @@ export function MyProfileFormFields({
     <div className="grid gap-3 sm:grid-cols-2">
       {isEmployee ? (
         <ProfileFormField label="Manager">
-          {isEditing && canEditReportingManager ? (
-            <Select
-              value={reportingManagerId || "none"}
-              onValueChange={(value) => {
-                if (!value) return;
-                setValue("reportingManagerId", value === "none" ? "" : value, {
-                  shouldValidate: true,
-                });
-              }}
-              disabled={isPending}
-            >
-              <SelectTrigger className="h-9 w-full">
-                <SelectValue placeholder="Select manager">
-                  {() => selectedManagerLabel}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent className={PROFILE_SELECT_CONTENT_CLASS}>
-                <SelectItem value="none">None</SelectItem>
-                {managerOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <ProfileReadonlyValue value={data.reportingManagerName} />
-          )}
+          <ProfileReadonlyValue value={data.reportingManagerName} />
         </ProfileFormField>
       ) : isManager && data.reportingManagerName ? (
         <ProfileFormField label="HR">
           <ProfileReadonlyValue value={data.reportingManagerName} />
+        </ProfileFormField>
+      ) : null}
+
+      {!isCeo ? (
+        <ProfileFormField label="Assigned HR">
+          <ProfileReadonlyValue value={data.assignedHrName} />
         </ProfileFormField>
       ) : null}
 
@@ -157,11 +137,44 @@ export function MyProfileFormFields({
         </ProfileFormField>
       ) : null}
 
+      <ProfileFormField label="Gender" required={editingContact}>
+        {editingContact ? (
+          <div className="space-y-1">
+            <Select
+              value={gender ?? ""}
+              onValueChange={(value) => {
+                if (!value) return;
+                setValue(
+                  "gender",
+                  value as EmployeeSelfProfileInput["gender"],
+                  { shouldValidate: true },
+                );
+              }}
+              disabled={isPending}
+            >
+              <SelectTrigger className="h-9 w-full">
+                <SelectValue placeholder="Select gender" />
+              </SelectTrigger>
+              <SelectContent className={PROFILE_SELECT_CONTENT_CLASS}>
+                {PROFILE_GENDER_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <ProfileFieldError message={errors.gender?.message} />
+          </div>
+        ) : (
+          <ProfileReadonlyValue value={genderDisplay} />
+        )}
+      </ProfileFormField>
+
       <ProfileFormField label="Company email">
         <ProfileReadonlyValue value={data.email} />
       </ProfileFormField>
 
-      <ProfileFormField label="Personal phone" required={contactFieldsRequired}>
+      <ProfileFormField label="Personal phone" required={editingContact}>
         {editingContact ? (
           <div className="space-y-1">
             <PhoneInput
@@ -171,7 +184,7 @@ export function MyProfileFormFields({
               disabled={isPending}
               size="sm"
               showHint
-              required={contactFieldsRequired}
+              required={editingContact}
               error={errors.personalPhone?.message}
             />
           </div>
@@ -180,7 +193,7 @@ export function MyProfileFormFields({
         )}
       </ProfileFormField>
 
-      <ProfileFormField label="Address line 1" required={contactFieldsRequired}>
+      <ProfileFormField label="Address line 1" required={editingContact}>
         {editingContact ? (
           <div className="space-y-1">
             <Input
@@ -196,7 +209,7 @@ export function MyProfileFormFields({
         )}
       </ProfileFormField>
 
-      <ProfileFormField label="Address line 2" required={contactFieldsRequired}>
+      <ProfileFormField label="Address line 2" required={editingContact}>
         {editingContact ? (
           <div className="space-y-1">
             <Input
@@ -212,7 +225,7 @@ export function MyProfileFormFields({
         )}
       </ProfileFormField>
 
-      <ProfileFormField label="State" required={contactFieldsRequired}>
+      <ProfileFormField label="State" required={editingContact}>
         {editingContact ? (
           <div className="space-y-1">
             <SearchableSelect
@@ -233,7 +246,7 @@ export function MyProfileFormFields({
         )}
       </ProfileFormField>
 
-      <ProfileFormField label="City" required={contactFieldsRequired}>
+      <ProfileFormField label="City" required={editingContact}>
         {editingContact ? (
           <div className="space-y-1">
             <SearchableSelect
@@ -257,7 +270,7 @@ export function MyProfileFormFields({
         )}
       </ProfileFormField>
 
-      <ProfileFormField label="Postal code" required={contactFieldsRequired}>
+      <ProfileFormField label="Postal code" required={editingContact}>
         {editingContact ? (
           <div className="space-y-1">
             <Input
@@ -273,7 +286,7 @@ export function MyProfileFormFields({
         )}
       </ProfileFormField>
 
-      <ProfileFormField label="Country" required={contactFieldsRequired}>
+      <ProfileFormField label="Country" required={editingContact}>
         {editingContact ? (
           <div className="space-y-1">
             <SearchableSelect
@@ -293,7 +306,7 @@ export function MyProfileFormFields({
         )}
       </ProfileFormField>
 
-      <ProfileFormField label="Emergency relation" required={contactFieldsRequired}>
+      <ProfileFormField label="Emergency relation" required={editingContact}>
         {editingContact ? (
           <div className="space-y-1">
             <Select
@@ -323,7 +336,7 @@ export function MyProfileFormFields({
         )}
       </ProfileFormField>
 
-      <ProfileFormField label="Emergency name" required={contactFieldsRequired}>
+      <ProfileFormField label="Emergency name" required={editingContact}>
         {editingContact ? (
           <div className="space-y-1">
             <Input
@@ -339,7 +352,7 @@ export function MyProfileFormFields({
         )}
       </ProfileFormField>
 
-      <ProfileFormField label="Emergency contact" required={contactFieldsRequired}>
+      <ProfileFormField label="Emergency contact" required={editingContact}>
         {editingContact ? (
           <div className="space-y-1">
             <PhoneInput
@@ -351,7 +364,7 @@ export function MyProfileFormFields({
               disabled={isPending}
               size="sm"
               showHint
-              required={contactFieldsRequired}
+              required={editingContact}
               error={errors.emergencyContactPhone?.message}
             />
           </div>
@@ -360,7 +373,7 @@ export function MyProfileFormFields({
         )}
       </ProfileFormField>
 
-      <ProfileFormField label="Emergency email" required={contactFieldsRequired}>
+      <ProfileFormField label="Emergency email" required={editingContact}>
         {editingContact ? (
           <div className="space-y-1">
             <Input

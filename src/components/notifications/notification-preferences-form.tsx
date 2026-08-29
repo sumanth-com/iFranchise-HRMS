@@ -39,16 +39,6 @@ const TOGGLES: { key: keyof FormInput; label: string; description: string }[] = 
     label: "Mute Notifications",
     description: "Pause all notifications and sounds temporarily.",
   },
-  {
-    key: "dailyDigest",
-    label: "Daily Digest",
-    description: "Receive a daily summary email.",
-  },
-  {
-    key: "weeklyDigest",
-    label: "Weekly Digest",
-    description: "Receive a weekly summary email.",
-  },
 ];
 
 export function NotificationPreferencesForm({ preferences }: Props) {

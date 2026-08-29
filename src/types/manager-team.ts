@@ -6,7 +6,6 @@ import type {
   LookupOption,
 } from "@/types/employee";
 import type { AssetAssignmentItem } from "@/types/assets";
-import type { HierarchyNode } from "@/types/organization";
 
 export type TeamListParams = {
   page?: number;
@@ -136,7 +135,6 @@ export type ManagerTeamPageData = {
   summary: TeamSummary;
   employees: TeamListResult;
   lookups: TeamFilterLookups;
-  hierarchyRoot: HierarchyNode | null;
   teamMemberOptions: LookupOption[];
   designationOptions: LookupOption[];
 };

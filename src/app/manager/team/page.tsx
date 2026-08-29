@@ -15,7 +15,7 @@ function firstString(value: string | string[] | undefined) {
 }
 
 async function ManagerTeamContent({ searchParams }: ManagerTeamPageProps) {
-  const profile = await requireServerPermission("portal.manager.access");
+  await requireServerPermission("portal.manager.access");
   const rawParams = await searchParams;
 
   const data = await getManagerTeamPageData(
@@ -25,7 +25,7 @@ async function ManagerTeamContent({ searchParams }: ManagerTeamPageProps) {
     }),
   );
 
-  return <ManagerTeamView {...data} managerEmployeeId={profile.employee.id} />;
+  return <ManagerTeamView {...data} />;
 }
 
 export default function ManagerTeamPage(props: ManagerTeamPageProps) {

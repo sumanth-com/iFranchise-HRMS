@@ -151,7 +151,7 @@ export function canEditSelfProfileContactDetails(permissionCodes: string[]): boo
   );
 }
 
-/** Reporting manager is employment data — not editable in pure self-service. */
-export function canEditSelfReportingManager(permissionCodes: string[]): boolean {
-  return hasPermission(permissionCodes, "employee.edit");
+/** Reporting manager is employment data — never editable via My Profile self-service. */
+export function canEditSelfReportingManager(_permissionCodes: string[]): boolean {
+  return false;
 }

@@ -39,23 +39,14 @@ function formatDisplayLabel(value: string | null | undefined) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-type ManagerOption = {
-  value: string;
-  label: string;
-};
-
 type MyProfileViewProps = {
   data: MyProfileBundle;
   canEditContactDetails?: boolean;
-  canEditReportingManager?: boolean;
-  managerOptions?: ManagerOption[];
 };
 
 export function MyProfileView({
   data,
   canEditContactDetails = false,
-  canEditReportingManager = false,
-  managerOptions = [],
 }: MyProfileViewProps) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
@@ -68,7 +59,6 @@ export function MyProfileView({
         : employeeSelfProfilePreferencesOnlySchema,
     [canEditContactDetails],
   );
-  const contactFieldsRequired = canEditContactDetails;
 
   const {
     register,
@@ -84,6 +74,7 @@ export function MyProfileView({
       personalPhone: data.profileSettings.personalPhone,
       language: data.profileSettings.language,
       timezone: data.profileSettings.timezone,
+      gender: data.profileSettings.gender as EmployeeSelfProfileInput["gender"] | undefined,
       addressLine1: data.profileSettings.address.addressLine1,
       addressLine2: data.profileSettings.address.addressLine2,
       city: data.profileSettings.address.city,
@@ -101,7 +92,7 @@ export function MyProfileView({
   });
 
   const emergencyRelationship = watch("emergencyContactRelationship");
-  const reportingManagerId = watch("reportingManagerId");
+  const gender = watch("gender");
   const personalPhone = watch("personalPhone") ?? "";
   const emergencyContactPhone = watch("emergencyContactPhone") ?? "";
   const addressState = watch("state") ?? "";
@@ -110,6 +101,7 @@ export function MyProfileView({
   const relationshipDisplay = formatRelationshipLabel(
     data.profileSettings.emergencyContact.relationship,
   );
+  const genderDisplay = formatDisplayLabel(data.profileSettings.gender);
 
   function resetFormState() {
     reset({
@@ -117,6 +109,7 @@ export function MyProfileView({
       personalPhone: data.profileSettings.personalPhone,
       language: data.profileSettings.language,
       timezone: data.profileSettings.timezone,
+      gender: data.profileSettings.gender as EmployeeSelfProfileInput["gender"] | undefined,
       addressLine1: data.profileSettings.address.addressLine1,
       addressLine2: data.profileSettings.address.addressLine2,
       city: data.profileSettings.address.city,
@@ -150,9 +143,7 @@ export function MyProfileView({
             ...formData,
             emergencyContactRelationship:
               formData.emergencyContactRelationship?.trim() || "",
-            reportingManagerId: canEditReportingManager
-              ? formData.reportingManagerId
-              : data.reportingManagerId ?? "",
+            reportingManagerId: data.reportingManagerId ?? "",
           }
         : formData;
 
@@ -175,16 +166,6 @@ export function MyProfileView({
   const isManager = pathname.startsWith("/manager");
   const isEmployee = pathname.startsWith("/employee");
   const isHrPortal = pathname.startsWith("/dashboard");
-
-  const selectedManagerLabel =
-    !reportingManagerId || reportingManagerId === "none"
-      ? "None"
-      : managerOptions.find((option) => option.value === reportingManagerId)?.label ??
-        (reportingManagerId === data.reportingManagerId
-          ? data.reportingManagerName
-          : null) ??
-        "Select manager";
-
   const displayName = `${data.firstName} ${data.lastName}`.trim() || data.firstName;
   const roleLine = isCeo
     ? "CEO"
@@ -279,8 +260,8 @@ export function MyProfileView({
           </div>
         </div>
 
-        <div className="mt-4 grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,17.5rem)_minmax(0,1fr)] lg:items-stretch">
-          <div className="mx-auto flex w-full max-w-[17.5rem] flex-col self-stretch lg:mx-0">
+        <div className="mt-4 grid min-h-0 gap-4 lg:grid-cols-[minmax(0,17.5rem)_minmax(0,1fr)] lg:items-start">
+          <div className="mx-auto flex w-full max-w-[17.5rem] flex-col lg:mx-0">
             <EmployeeIdCard
               employeeId={data.employeeId}
               firstName={data.firstName}
@@ -296,12 +277,11 @@ export function MyProfileView({
               profilePath={data.profilePath}
               canEdit={true}
               hideHeaderLabel
-              stretchHeight
-              className="h-full w-full max-w-full shadow-md"
+              className="w-full max-w-full shadow-md"
             />
           </div>
 
-          <div className="self-stretch rounded-xl border bg-card p-3.5 shadow-xs sm:p-5">
+          <div className="rounded-xl border bg-card p-3.5 shadow-xs sm:p-5">
             <input type="hidden" {...register("personalEmail")} />
             <input type="hidden" {...register("timezone")} />
             <input type="hidden" {...register("language")} />
@@ -314,18 +294,15 @@ export function MyProfileView({
               isManager={isManager}
               isEmployee={isEmployee}
               canEditContactDetails={canEditContactDetails}
-              canEditReportingManager={canEditReportingManager}
-              contactFieldsRequired={contactFieldsRequired}
               personalPhone={personalPhone}
               emergencyContactPhone={emergencyContactPhone}
               addressState={addressState}
               addressCity={addressCity}
               addressCountry={addressCountry}
               emergencyRelationship={emergencyRelationship}
-              reportingManagerId={reportingManagerId}
-              selectedManagerLabel={selectedManagerLabel}
-              managerOptions={managerOptions}
               relationshipDisplay={relationshipDisplay}
+              genderDisplay={genderDisplay}
+              gender={gender}
               formatJoiningDate={formatJoiningDate}
               register={register}
               setValue={setValue}

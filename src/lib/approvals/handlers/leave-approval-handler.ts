@@ -56,7 +56,6 @@ type LeaveSummaryRow = {
   is_half_day: boolean;
   reason: string | null;
   leave_status: string;
-  created_at: string;
   employees:
     | {
         employee_code: string;
@@ -108,7 +107,7 @@ export const leaveApprovalHandler: ApprovalHandler = {
       .select(
         `
         id, employee_id, leave_type_id, start_date, end_date, total_days,
-        is_half_day, reason, leave_status, created_at,
+        is_half_day, reason, leave_status,
         employees:employee_id (
           employee_code, first_name, last_name, email, organization_id,
           departments:department_id (name)
@@ -136,34 +135,45 @@ export const leaveApprovalHandler: ApprovalHandler = {
       getCurrentBalanceYear(row.start_date),
     );
 
+    const leaveTypeName = leaveType?.name ?? "—";
+    const startDate = fmtDate(row.start_date);
+    const endDate = fmtDate(row.end_date);
+    const duration = `${Number(row.total_days)} day${Number(row.total_days) === 1 ? "" : "s"}${row.is_half_day ? " (half day)" : ""}`;
+    const statusLabel = formatLeaveStatusLabel(row.leave_status);
+    const reason = row.reason?.trim() || null;
+
     const detailRows = [
-      { label: "Employee", value: employeeName },
+      { label: "Employee name", value: employeeName },
       { label: "Employee ID", value: employee.employee_code },
       { label: "Department", value: department?.name ?? "—" },
-      { label: "Leave Type", value: leaveType?.name ?? "—" },
-      { label: "Start Date", value: fmtDate(row.start_date) },
-      { label: "End Date", value: fmtDate(row.end_date) },
+      { label: "Leave type", value: leaveTypeName },
+      { label: "Start date", value: startDate },
+      { label: "End date", value: endDate },
+      { label: "Duration", value: duration },
+      { label: "Reason", value: reason || "—" },
       {
-        label: "Duration",
-        value: `${Number(row.total_days)} day${Number(row.total_days) === 1 ? "" : "s"}${row.is_half_day ? " (half day)" : ""}`,
-      },
-      { label: "Current Status", value: formatLeaveStatusLabel(row.leave_status) },
-      { label: "Submitted On", value: fmtDate(row.created_at) },
-      {
-        label: "Current Leave Balance",
+        label: "Current leave balance",
         value: balance === null ? "—" : `${balance} day${balance === 1 ? "" : "s"}`,
       },
+      { label: "Current status", value: statusLabel },
     ];
 
     return {
       organizationId: employee.organization_id,
-      subject: "New Leave Request Awaiting Approval",
+      subject: "Leave request awaiting approval",
       heading: `Leave request from ${employeeName}`,
       employeeName,
       detailRows,
-      reason: row.reason?.trim() || null,
+      reason,
       status: row.leave_status,
       isPending: row.leave_status === "pending",
+      leaveHighlight: {
+        leaveType: leaveTypeName,
+        startDate,
+        endDate,
+        duration,
+        statusLabel,
+      },
     };
   },
 

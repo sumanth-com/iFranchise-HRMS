@@ -372,6 +372,8 @@ export async function updateEmployee(
       to: input.employmentStatus,
     });
   }
+
+  await initializeEmployeeLeaveBalances(supabase, profile, employeeId);
 }
 
 async function upsertEmployeeAddressForUpdate(

@@ -11,11 +11,12 @@ import {
   isEmployeeAccountDeactivated,
 } from "@/components/employees/employee-account-status-badge";
 import { PROFILE_IMAGE_MAX_BYTES } from "@/lib/employees/constants";
-import { getSignedUrlAction } from "@/lib/employees/actions";
 import {
+  getProfileImageSignedUrlAction,
   removeProfileImageAction,
   uploadProfileImageAction,
 } from "@/lib/employees/profile-image-actions";
+import { notifyProfilePhotoChanged } from "@/lib/employees/profile-photo-events";
 import { optimizeProfileImageFile } from "@/lib/media/client-image-optimize";
 import { cn } from "@/lib/utils";
 import type { EmploymentStatus } from "@/types/auth";
@@ -95,7 +96,7 @@ export function EmployeeIdCard({
     if (resolvedPathRef.current === profileImagePath) return;
 
     let cancelled = false;
-    void getSignedUrlAction("profileImages", profileImagePath).then((result) => {
+    void getProfileImageSignedUrlAction(employeeId, profileImagePath).then((result) => {
       if (cancelled) return;
       if (result.success) {
         setImageUrl(result.data);
@@ -122,6 +123,11 @@ export function EmployeeIdCard({
   const openPicker = () => {
     if (!canEdit || isPending) return;
     fileInputRef.current?.click();
+  };
+
+  const handlePhotoAreaClick = () => {
+    if (!canEdit || isPending) return;
+    openPicker();
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -154,6 +160,7 @@ export function EmployeeIdCard({
       }
       previewUrlRef.current = preview;
       setImageUrl(preview);
+      notifyProfilePhotoChanged({ employeeId, imageUrl: preview });
 
       const formData = new FormData();
       formData.append("file", optimized);
@@ -166,11 +173,11 @@ export function EmployeeIdCard({
           previewUrlRef.current = null;
         }
         setImageUrl(initialUrl);
+        notifyProfilePhotoChanged({ employeeId, imageUrl: initialUrl });
         return;
       }
 
-      previewUrlRef.current = null;
-      URL.revokeObjectURL(preview);
+      notifyProfilePhotoChanged({ employeeId, imageUrl: preview });
       toast.success("Profile photo updated");
       router.refresh();
     });
@@ -189,6 +196,7 @@ export function EmployeeIdCard({
 
       setImageUrl(null);
       resolvedPathRef.current = null;
+      notifyProfilePhotoChanged({ employeeId, imageUrl: null });
       toast.success("Profile photo removed");
       router.refresh();
     });
@@ -223,17 +231,18 @@ export function EmployeeIdCard({
             stretchHeight
               ? imageUrl
                 ? "min-h-[15rem] flex-1"
-                : "h-[13rem] shrink-0"
+                : "min-h-[13rem] flex-1"
               : "min-h-0 flex-1",
           )}
         >
           <div
             className={cn(
               "group/photo relative overflow-hidden",
-              imageUrl || !stretchHeight
-                ? "absolute inset-x-0 top-0 bottom-[3.5rem]"
-                : "h-full",
+              canEdit && "cursor-pointer",
+              // Keep photo controls inside the image plane (above the wave/pad), not on the bottom card.
+              "absolute inset-x-0 top-0 bottom-[3.5rem]",
             )}
+            onClick={canEdit ? handlePhotoAreaClick : undefined}
           >
             {imageUrl ? (
               <img
@@ -245,48 +254,12 @@ export function EmployeeIdCard({
                   if (previewUrlRef.current) return;
                   setImageUrl(null);
                   resolvedPathRef.current = null;
+                  notifyProfilePhotoChanged({ employeeId, imageUrl: null });
                 }}
-                className="size-full object-cover object-center"
+                className="absolute inset-0 size-full object-cover object-[center_22%]"
               />
             ) : (
-              <div
-                className={cn("size-full", canEdit && "cursor-pointer")}
-                onClick={canEdit ? openPicker : undefined}
-                onKeyDown={
-                  canEdit
-                    ? (event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          openPicker();
-                        }
-                      }
-                    : undefined
-                }
-                role={canEdit ? "button" : undefined}
-                tabIndex={canEdit ? 0 : undefined}
-                aria-label={canEdit ? "Upload profile photo" : undefined}
-              >
-                {canEdit ? (
-                  <div
-                    className={cn(
-                      "absolute bottom-2.5 right-2.5 z-40 flex items-center gap-1.5 opacity-0 pointer-events-none transition-opacity duration-200 group-hover/photo:opacity-100 group-hover/photo:pointer-events-auto",
-                    )}
-                  >
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        openPicker();
-                      }}
-                      disabled={isPending}
-                      className="flex size-8 items-center justify-center rounded-full bg-background/95 text-foreground shadow-md ring-1 ring-border/70 backdrop-blur-sm hover:bg-background disabled:cursor-not-allowed dark:bg-card/95 dark:ring-white/15"
-                      aria-label="Upload profile photo"
-                    >
-                      <Upload className="size-3.5 shrink-0" />
-                    </button>
-                  </div>
-                ) : null}
-              </div>
+              <div className="absolute inset-0 bg-muted" aria-hidden />
             )}
 
             {canEdit ? (
@@ -299,44 +272,46 @@ export function EmployeeIdCard({
               />
             ) : null}
 
-            {canEdit && imageUrl ? (
+            {canEdit ? (
               <div
                 className={cn(
-                  "absolute bottom-2.5 right-2.5 z-40 flex items-center gap-1.5 opacity-0 pointer-events-none transition-opacity duration-200 group-hover/photo:opacity-100 group-hover/photo:pointer-events-auto",
+                  "pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-black/0 transition-colors duration-200",
+                  "opacity-0 group-hover/photo:bg-black/25 group-hover/photo:opacity-100 group-focus-within/photo:bg-black/25 group-focus-within/photo:opacity-100",
+                  isPending && "opacity-100 bg-black/20",
                 )}
               >
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    openPicker();
-                  }}
-                  disabled={isPending}
-                  className="flex size-8 items-center justify-center rounded-full bg-background/95 text-foreground shadow-md ring-1 ring-border/70 backdrop-blur-sm hover:bg-background disabled:cursor-not-allowed dark:bg-card/95 dark:ring-white/15"
-                  aria-label="Upload profile photo"
-                >
-                  <Upload className="size-3.5 shrink-0" />
-                </button>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    handleRemove(event);
-                  }}
-                  disabled={isPending}
-                  className="flex size-8 items-center justify-center rounded-full bg-background/95 text-destructive shadow-md ring-1 ring-border/70 backdrop-blur-sm hover:bg-background disabled:cursor-not-allowed dark:bg-card/95 dark:ring-white/15"
-                  aria-label="Remove profile photo"
-                >
-                  <Trash2 className="size-3.5 shrink-0" />
-                </button>
+                <div className="pointer-events-auto flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openPicker();
+                    }}
+                    disabled={isPending}
+                    className="flex size-10 items-center justify-center rounded-full bg-background/95 text-foreground shadow-md ring-1 ring-border/70 backdrop-blur-sm hover:bg-background disabled:cursor-not-allowed dark:bg-card/95 dark:ring-white/15"
+                    aria-label="Upload profile photo"
+                  >
+                    <Upload className="size-4 shrink-0" />
+                  </button>
+                  {imageUrl ? (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleRemove(event);
+                      }}
+                      disabled={isPending}
+                      className="flex size-10 items-center justify-center rounded-full bg-background/95 text-destructive shadow-md ring-1 ring-border/70 backdrop-blur-sm hover:bg-background disabled:cursor-not-allowed dark:bg-card/95 dark:ring-white/15"
+                      aria-label="Remove profile photo"
+                    >
+                      <Trash2 className="size-4 shrink-0" />
+                    </button>
+                  ) : null}
+                </div>
               </div>
             ) : null}
           </div>
         </div>
-
-        {stretchHeight && !imageUrl ? (
-          <div className="min-h-0 flex-1 bg-muted" aria-hidden />
-        ) : null}
 
         <div className="relative z-10 -mt-[3.5rem] shrink-0">
           {/* Light wave + panel */}

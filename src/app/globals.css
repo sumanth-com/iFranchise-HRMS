@@ -1871,6 +1871,11 @@ html:not(.dark) .dashboard-surface:hover {
   flex-direction: column;
 }
 
+.landing-whats-new-page--empty {
+  min-height: 100dvh;
+  background: var(--background);
+}
+
 .landing-whats-new-main {
   position: relative;
   z-index: 1;
@@ -1880,6 +1885,16 @@ html:not(.dark) .dashboard-surface:hover {
   justify-content: center;
   width: 100%;
   padding: 2rem 0 1.5rem;
+}
+
+.landing-whats-new-main--empty {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: stretch;
+  min-height: 0;
+  width: 100%;
+  max-width: none;
+  padding: 0;
 }
 
 .landing-whats-new-inner {
@@ -2165,6 +2180,17 @@ html:not(.dark) .dashboard-surface:hover {
   background: color-mix(in oklch, var(--background) 90%, transparent) !important;
   color: var(--foreground) !important;
   box-shadow: none;
+}
+
+/* Desktop navbar CTA — hidden on mobile/tablet (menu only there) */
+.landing-nav-cta-desktop {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .landing-nav-cta-desktop {
+    display: inline-flex;
+  }
 }
 
 .landing-nav-menu-btn {
@@ -5236,58 +5262,19 @@ html:not(.dark) .dashboard-surface:hover {
   background: color-mix(in oklch, var(--card) 94%, transparent);
 }
 
-.landing-empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+/* What's New — illustration fits main area between navbar and footer */
+.whats-new-page-visual {
+  position: relative;
+  flex: 1 1 auto;
   width: 100%;
-  max-width: 28rem;
-  margin-inline: auto;
-  padding: 0;
-  text-align: center;
+  max-width: none;
+  min-height: 0;
+  overflow: hidden;
 }
 
-.landing-empty-visual {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 1.25rem;
-}
-
-.landing-empty-orbit {
-  display: grid;
-  place-items: center;
-  width: 4rem;
-  height: 4rem;
-  border-radius: 9999px;
-  border: 1px solid rgba(167, 139, 250, 0.35);
-  background: radial-gradient(circle, rgba(124, 58, 237, 0.1), transparent 70%);
-  color: #7c3aed;
-}
-
-.landing-empty-title {
-  margin: 0;
-  font-size: clamp(1.55rem, 2.8vw, 1.9rem);
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
-  color: var(--foreground);
-}
-
-.landing-empty-copy {
-  margin: 0.75rem 0 0;
-  max-width: 24rem;
-  font-size: 0.98rem;
-  line-height: 1.6;
-  color: var(--muted-foreground);
-}
-
-.dark .landing-empty-title {
-  color: #f8fafc;
-}
-
-.dark .landing-empty-copy {
-  color: #94a3b8;
+.whats-new-page-visual-img {
+  object-fit: cover;
+  object-position: center;
 }
 
 .landing-animate-in {

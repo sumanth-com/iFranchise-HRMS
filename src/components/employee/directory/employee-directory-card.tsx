@@ -14,8 +14,6 @@ import { getSignedUrlAction } from "@/lib/employees/actions";
 import { cn } from "@/lib/utils";
 import type { EmployeeDirectoryPerson } from "@/types/employee-directory";
 
-const CARD_HEIGHT = "h-[21.5rem]";
-
 export type DirectoryCardPerson = EmployeeDirectoryPerson & {
   managerName?: string | null;
 };
@@ -92,7 +90,7 @@ function CardPhoto({
         className,
       )}
     >
-      <span className="text-3xl font-semibold tracking-wide text-muted-foreground/70">
+      <span className="text-2xl font-semibold tracking-wide text-muted-foreground/70 sm:text-3xl">
         {label}
       </span>
     </div>
@@ -117,27 +115,24 @@ export function EmployeeDirectoryCard({
   return (
     <article
       className={cn(
-        CARD_HEIGHT,
-        "relative overflow-hidden rounded-2xl border bg-card shadow-sm transition-shadow",
+        "relative flex h-full min-h-[19.5rem] flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition-shadow",
         "hover:shadow-md",
         showExpand && open && "ring-1 ring-primary/20",
       )}
     >
-      <div className="flex h-full flex-col pb-11">
-        <div className="relative h-[11.5rem] w-full shrink-0 bg-muted">
-          <CardPhoto person={person} />
-        </div>
+      <div className="relative aspect-[4/3] w-full shrink-0 bg-muted">
+        <CardPhoto person={person} />
+      </div>
 
-        <div className="flex flex-1 flex-col justify-center px-4 text-center">
-          <h3 className="line-clamp-1 text-[15px] font-semibold tracking-tight">
-            {person.fullName}
-          </h3>
-          <p className="mt-1.5 line-clamp-1 text-xs text-muted-foreground">
-            {person.designationTitle || "Team Member"}
-            <span className="mx-1.5 text-muted-foreground/40">·</span>
-            <span className="font-mono text-[11px] font-medium">{person.employeeCode}</span>
-          </p>
-        </div>
+      <div className="flex flex-1 flex-col justify-center gap-1 px-4 py-3.5 text-center">
+        <h3 className="line-clamp-1 text-[15px] font-semibold tracking-tight">
+          {person.fullName}
+        </h3>
+        <p className="line-clamp-2 text-xs leading-snug text-muted-foreground">
+          {person.designationTitle || "Team Member"}
+          <span className="mx-1.5 text-muted-foreground/40">·</span>
+          <span className="font-mono text-[11px] font-medium">{person.employeeCode}</span>
+        </p>
       </div>
 
       {showExpand ? (
@@ -150,8 +145,8 @@ export function EmployeeDirectoryCard({
           )}
           aria-hidden={!open}
         >
-          <div className="flex flex-1 flex-col overflow-hidden pb-11">
-            <div className="relative h-24 w-full shrink-0 bg-muted">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden pb-10">
+            <div className="relative h-20 w-full shrink-0 bg-muted">
               <CardPhoto person={person} />
               <div className="absolute inset-0 bg-gradient-to-t from-card via-card/20 to-transparent" />
             </div>
@@ -204,7 +199,7 @@ export function EmployeeDirectoryCard({
       ) : null}
 
       {directProfileLink && onViewProfile ? (
-        <div className="absolute inset-x-0 bottom-0 z-20 border-t bg-muted/30 px-4 py-2.5">
+        <div className="mt-auto shrink-0 border-t bg-muted/20 px-4 py-2.5">
           <Button
             type="button"
             variant="outline"
@@ -220,8 +215,8 @@ export function EmployeeDirectoryCard({
           type="button"
           onClick={() => setOpen((value) => !value)}
           className={cn(
-            "absolute inset-x-0 bottom-0 z-20 flex h-10 items-center justify-center gap-1 border-t bg-muted/30 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground",
-            open && "bg-primary/5 text-primary",
+            "mt-auto flex h-10 shrink-0 items-center justify-center gap-1.5 border-t bg-muted/20 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground",
+            open && "relative z-20 bg-primary/5 text-primary",
           )}
           aria-expanded={open}
           aria-label={
@@ -252,7 +247,7 @@ export function EmployeeDirectoryGrid({
   return (
     <div
       className={cn(
-        "grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5",
+        "grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
         className,
       )}
     >

@@ -89,6 +89,9 @@ import {
   updateEmployeeSelfPreferences,
   updateEmployeeSelfProfileWithContact,
 } from "@/lib/employee/services/employee-self-profile";
+import { initializeEmployeeLeaveBalances } from "@/lib/leave/services/leave-mutations";
+import { EMPLOYEE_ROUTES as PORTAL_EMPLOYEE_ROUTES } from "@/lib/employee/constants";
+import { MANAGER_ROUTES } from "@/lib/manager/constants";
 
 async function getAuthenticatedSupabase() {
   const supabase = await createClient();
@@ -110,6 +113,11 @@ function revalidateSelfProfilePaths() {
   revalidatePath("/manager/profile");
   revalidatePath("/dashboard/profile");
   revalidatePath("/ceo/profile");
+  revalidatePath(PORTAL_EMPLOYEE_ROUTES.leave);
+  revalidatePath(MANAGER_ROUTES.leave);
+  revalidatePath("/dashboard/system/leave");
+  revalidatePath("/dashboard/leave");
+  revalidatePath("/ceo/leave");
 }
 
 export async function fetchEmployeesAction(
@@ -757,6 +765,7 @@ export async function updateEmployeeSelfProfileAction(
       await updateEmployeeSelfProfileWithContact(supabase, profile, parsed, existing, {
         allowReportingManagerUpdate: canEditReportingManager,
       });
+      await initializeEmployeeLeaveBalances(supabase, profile, profile.employee.id);
     } else {
       const parsed = employeeSelfPreferencesSchema.parse(input);
       await updateEmployeeSelfPreferences(supabase, profile, parsed);
