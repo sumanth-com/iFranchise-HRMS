@@ -3,14 +3,18 @@ import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import {
   activateEmployeeAccount,
+  assignPendingInviteRole,
   cancelEmployeeInvitation,
   deactivateEmployeeAccount,
   inviteEmployeeByEmail,
+  inviteExistingEmployeePortalAccess,
   resendEmployeeInvitation,
   sendEmployeeInvitation,
+  updatePendingProvisioningEmployeeDetails,
 } from "@/lib/employees/services/employee-account";
 import { permanentlyDeleteEmployee } from "@/lib/employees/services/employee-permanent-delete";
 import { resolveOrCreateDesignation } from "@/lib/employees/services/employee-mutations";
+import { createSalaryStructure } from "@/lib/payroll/services/payroll-mutations";
 import { fromHrms, unwrapRelation } from "@/lib/reports/services/reports-utils";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getInviteableRoleByCode } from "@/lib/auth/iam-roles";
@@ -18,7 +22,12 @@ import { assertProvisionableRole } from "@/lib/user-provisioning/provisionable-r
 import { notifyProvisioningStakeholders } from "@/lib/user-provisioning/notifications";
 import type { UserProfile } from "@/types/auth";
 import { ROLE_LABELS } from "@/types/ceo-user-provisioning";
-import type { InviteExecutiveUserInput } from "@/lib/validations/ceo-user-provisioning";
+import type {
+  ChangeProvisioningRoleInput,
+  InviteExecutiveUserInput,
+  InviteExistingEmployeeInput,
+  UpdatePendingProvisioningUserInput,
+} from "@/lib/validations/ceo-user-provisioning";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LooseRow = Record<string, any>;
@@ -167,6 +176,131 @@ export async function inviteExecutiveUser(
   return { employeeId };
 }
 
+export async function inviteExistingEmployeeToPortal(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: InviteExistingEmployeeInput,
+): Promise<{ employeeId: string; email: string; fullName: string }> {
+  const organizationId = profile.employee.organizationId;
+  const role = await assertProvisionableRole(supabase, organizationId, input.roleCode);
+  const admin = createAdminClient();
+
+  const { data: employee, error } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select(
+      "id, employee_code, first_name, last_name, email, user_id, account_status, first_login_at",
+    )
+    .eq("id", input.employeeId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error || !employee) {
+    throw new Error("Employee not found.");
+  }
+
+  if (
+    employee.user_id &&
+    (employee.account_status === "active" || Boolean(employee.first_login_at))
+  ) {
+    throw new Error("This employee already has portal access.");
+  }
+
+  await inviteExistingEmployeePortalAccess(
+    supabase,
+    profile,
+    input.employeeId,
+    role.id,
+    input.companyEmail,
+  );
+
+  await createSalaryStructure(supabase, profile, {
+    employeeId: input.employeeId,
+    effectiveFrom: input.salaryEffectiveFrom,
+    currencyCode: input.currencyCode ?? "INR",
+    basicSalary: input.basicSalary,
+    hraAmount: input.hraAmount ?? 0,
+    transportAllowance: input.transportAllowance ?? 0,
+    otherAllowances: input.otherAllowances ?? 0,
+  });
+
+  const fullName = `${employee.first_name} ${employee.last_name}`.trim();
+  const email = (input.companyEmail?.trim().toLowerCase() || employee.email).toLowerCase();
+
+  await audit(
+    supabase,
+    profile,
+    "invitation_sent",
+    `Invited existing employee ${fullName} (${employee.employee_code}) as ${ROLE_LABELS[role.code] ?? role.name}`,
+    input.employeeId,
+    {
+      employeeId: input.employeeId,
+      employeeCode: employee.employee_code,
+      email,
+      roleCode: role.code,
+      existingEmployee: true,
+    },
+    "high",
+  );
+
+  return { employeeId: input.employeeId, email, fullName };
+}
+
+export async function changePendingProvisioningRole(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: ChangeProvisioningRoleInput,
+): Promise<void> {
+  const role = await assertProvisionableRole(
+    supabase,
+    profile.employee.organizationId,
+    input.roleCode,
+  );
+  await assignPendingInviteRole(supabase, profile, input.employeeId, role.id);
+  await audit(
+    supabase,
+    profile,
+    "role_assigned",
+    `Updated pending invite role to ${ROLE_LABELS[role.code] ?? role.name}`,
+    input.employeeId,
+    { employeeId: input.employeeId, roleCode: role.code },
+  );
+}
+
+export async function updatePendingProvisioningUser(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: UpdatePendingProvisioningUserInput,
+): Promise<void> {
+  let designationId: string | null | undefined;
+  if (input.designation && input.designation.trim()) {
+    designationId = await resolveOrCreateDesignation(
+      supabase,
+      profile.employee.organizationId,
+      profile.userId,
+      input.designation,
+    );
+  }
+
+  await updatePendingProvisioningEmployeeDetails(supabase, profile, input.employeeId, {
+    firstName: input.firstName,
+    lastName: input.lastName,
+    departmentId: input.departmentId,
+    designationId,
+    employmentTypeId: input.employmentTypeId,
+  });
+
+  await audit(
+    supabase,
+    profile,
+    "invitation_sent",
+    `Updated pending invite details for ${input.firstName} ${input.lastName}`,
+    input.employeeId,
+    { employeeId: input.employeeId },
+  );
+}
+
 export async function resendExecutiveInvitation(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -176,28 +310,36 @@ export async function resendExecutiveInvitation(
   const { data: employee, error } = await admin
     .schema("hrms")
     .from("employees")
-    .select("account_status")
+    .select("account_status, invited_role_id, first_name, last_name, email")
     .eq("id", employeeId)
     .eq("organization_id", profile.employee.organizationId)
     .is("deleted_at", null)
     .maybeSingle();
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error("Unable to send invitation. Please try again.");
   if (!employee) throw new Error("User not found.");
 
-  const roleCode = await resolveEmployeeRoleCode(
-    supabase,
-    profile.employee.organizationId,
-    employeeId,
-  );
-  let roleId: string | undefined;
-  if (roleCode) {
-    const inviteRole = await getInviteableRoleByCode(
-      createAdminClient(),
+  let roleId: string | undefined =
+    typeof employee.invited_role_id === "string" ? employee.invited_role_id : undefined;
+
+  if (!roleId) {
+    const roleCode = await resolveEmployeeRoleCode(
+      supabase,
       profile.employee.organizationId,
-      roleCode,
+      employeeId,
     );
-    roleId = inviteRole.id;
+    if (roleCode) {
+      try {
+        const inviteRole = await getInviteableRoleByCode(
+          createAdminClient(),
+          profile.employee.organizationId,
+          roleCode,
+        );
+        roleId = inviteRole.id;
+      } catch {
+        roleId = undefined;
+      }
+    }
   }
 
   if (employee.account_status === "invitation_pending") {
@@ -215,13 +357,15 @@ export async function resendExecutiveInvitation(
   } else {
     throw new Error("This invitation cannot be resent.");
   }
+
+  const fullName = `${employee.first_name ?? ""} ${employee.last_name ?? ""}`.trim() || "User";
   await audit(
     supabase,
     profile,
     "invitation_resent",
-    `Resent invitation for executive user`,
+    `Resent invitation for ${fullName}`,
     employeeId,
-    { employeeId, roleCode },
+    { employeeId, roleId },
   );
 }
 

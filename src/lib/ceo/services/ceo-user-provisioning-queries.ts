@@ -767,3 +767,96 @@ export async function getCeoProvisioningUserDetail(
     permissions,
   };
 }
+
+/**
+ * Existing HR employees who do not yet have portal access (no Auth login / never invited).
+ * Does not include active portal users or current pending invitations.
+ */
+export async function listPortalInviteEligibleEmployees(
+  _supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  search?: string,
+): Promise<import("@/types/ceo-user-provisioning").PortalInviteEligibleEmployee[]> {
+  const admin = createAdminClient();
+  const organizationId = profile.employee.organizationId;
+  const term = search?.trim();
+
+  let query = admin
+    .schema("hrms")
+    .from("employees")
+    .select(
+      `
+      id, employee_code, first_name, last_name, email, account_status, user_id, first_login_at,
+      departments:department_id ( name ),
+      designations:designation_id ( title ),
+      employee_profiles:employee_profiles ( personal_email, deleted_at ),
+      salary_structures:salary_structures ( id, effective_to, deleted_at )
+    `,
+    )
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .order("first_name", { ascending: true })
+    .limit(80);
+
+  if (term) {
+    query = query.or(
+      `first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%,employee_code.ilike.%${term}%`,
+    );
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error("Unable to load employees. Please try again.");
+
+  const rows = (data ?? []) as LooseRow[];
+  const results: import("@/types/ceo-user-provisioning").PortalInviteEligibleEmployee[] = [];
+
+  for (const row of rows) {
+    const accountStatus = String(row.account_status ?? "");
+    const userId = row.user_id ? String(row.user_id) : null;
+    const firstLoginAt = row.first_login_at ? String(row.first_login_at) : null;
+
+    // Already has portal access
+    if (userId && (accountStatus === "active" || firstLoginAt)) continue;
+    // Pending invites are managed via Resend on the list
+    if (accountStatus === "invitation_pending") continue;
+    // Suspended / inactive accounts are not invite targets here
+    if (accountStatus === "suspended" || accountStatus === "inactive") continue;
+    // Must be existing HR employee without portal, or draft invite shell not yet sent
+    if (userId) continue;
+
+    const profiles = Array.isArray(row.employee_profiles)
+      ? row.employee_profiles
+      : row.employee_profiles
+        ? [row.employee_profiles]
+        : [];
+    const activeProfile = profiles.find((p: LooseRow) => !p?.deleted_at);
+    const salaries = Array.isArray(row.salary_structures)
+      ? row.salary_structures
+      : row.salary_structures
+        ? [row.salary_structures]
+        : [];
+    const hasSalary = salaries.some(
+      (s: LooseRow) => !s?.deleted_at && (s?.effective_to == null || s?.effective_to === ""),
+    );
+    const department = unwrapRelation<LooseRow>(row.departments);
+    const designation = unwrapRelation<LooseRow>(row.designations);
+
+    results.push({
+      employeeId: String(row.id),
+      employeeCode: String(row.employee_code ?? ""),
+      firstName: String(row.first_name ?? ""),
+      lastName: String(row.last_name ?? ""),
+      fullName: fullName(row.first_name, row.last_name),
+      companyEmail: String(row.email ?? ""),
+      personalEmail: activeProfile?.personal_email
+        ? String(activeProfile.personal_email)
+        : null,
+      departmentName: department?.name ? String(department.name) : null,
+      designationTitle: designation?.title ? String(designation.title) : null,
+      accountStatus,
+      hasSalaryStructure: hasSalary,
+    });
+  }
+
+  return results.slice(0, 40);
+}

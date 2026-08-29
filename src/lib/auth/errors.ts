@@ -1,41 +1,108 @@
 import type { AuthErrorCode } from "@/types/auth";
 
 const AUTH_ERROR_MESSAGES: Record<AuthErrorCode, string> = {
-  INVALID_CREDENTIALS: "Invalid email or password. Please try again.",
+  INVALID_CREDENTIALS:
+    "The email or password is incorrect. Please check your details and try again.",
   EMPLOYEE_NOT_FOUND:
-    "No employee record is linked to this account. Contact your HR administrator.",
+    "Your account is not active yet. Please contact HR if you need assistance.",
   EMPLOYEE_INACTIVE:
-    "Your account has been deactivated. Contact your HR administrator if you need access restored.",
+    "Your account is currently inactive. Please contact HR for assistance.",
   EMPLOYEE_DELETED:
-    "This employee record is no longer available. Contact your HR administrator.",
+    "Your account is currently inactive. Please contact HR for assistance.",
   PORTAL_ACCESS_DENIED:
-    "Your account does not have access to this portal.",
+    "Your account does not currently have access to this portal.",
   NO_ROLES:
-    "No roles are assigned to your account. Contact your HR administrator.",
+    "Your account does not currently have access to this portal.",
   ORGANIZATION_NOT_FOUND:
-    "Your organization could not be loaded. Contact your HR administrator.",
+    "We couldn't complete your sign-in right now. Please try again.",
   PROFILE_LOOKUP_FAILED:
-    "Unable to load your employee profile right now. Please try again in a moment.",
+    "We couldn't complete your sign-in right now. Please try again.",
   SESSION_EXPIRED: "Your session has expired. Please sign in again.",
-  NETWORK_ERROR:
-    "Something went wrong. Please wait a moment and try again.",
+  NETWORK_ERROR: "We couldn't complete your sign-in right now. Please try again.",
   EMAIL_NOT_CONFIRMED:
-    "Your email is not confirmed yet. Check your inbox or ask HR to resend the invitation.",
+    "Your account is not active yet. Please contact HR if you need assistance.",
   EMAIL_LOGIN_DISABLED:
-    "Email sign-in is disabled for this workspace. Contact your administrator to enable email authentication.",
+    "Sign-in is temporarily unavailable. Please contact HR for assistance.",
   RATE_LIMITED:
-    "Too many sign-in attempts. Please wait a few minutes and try again.",
+    "Too many sign-in attempts. Please wait a moment and try again.",
   CONFIG_ERROR:
-    "Authentication is not configured correctly. Contact your administrator.",
-  SERVER_ERROR: "An unexpected error occurred. Please try again later.",
+    "Sign-in is temporarily unavailable. Please contact HR for assistance.",
+  SERVER_ERROR: "We couldn't complete your sign-in right now. Please try again.",
   VALIDATION_ERROR: "Please check the form and try again.",
   PASSWORD_MISMATCH: "Passwords do not match.",
   RESET_LINK_INVALID:
     "This password reset link is invalid or has expired. Request a new one.",
 };
 
+const AUTH_ERROR_CODE_SET = new Set<string>(Object.keys(AUTH_ERROR_MESSAGES));
+
+const KNOWN_USER_MESSAGES = new Set(Object.values(AUTH_ERROR_MESSAGES));
+
+export function isAuthErrorCode(value: unknown): value is AuthErrorCode {
+  return typeof value === "string" && AUTH_ERROR_CODE_SET.has(value);
+}
+
 export function getAuthErrorMessage(code: AuthErrorCode): string {
   return AUTH_ERROR_MESSAGES[code];
+}
+
+/** True when a string looks like a technical/raw failure, not HRMS copy. */
+export function looksLikeTechnicalAuthError(message: string): boolean {
+  const normalized = message.toLowerCase().trim();
+  if (!normalized) return true;
+  if (normalized === "undefined" || normalized === "null" || normalized === "{}") {
+    return true;
+  }
+
+  return (
+    normalized.includes("supabase") ||
+    normalized.includes("postgres") ||
+    normalized.includes("postgrest") ||
+    normalized.includes("pgrst") ||
+    normalized.includes("authapi") ||
+    normalized.includes("auth api") ||
+    normalized.includes("jwt") ||
+    normalized.includes("stack") ||
+    normalized.includes("exception") ||
+    normalized.includes("internal server") ||
+    normalized.includes("database") ||
+    normalized.includes("sql") ||
+    normalized.includes("schema cache") ||
+    normalized.includes("fetch failed") ||
+    normalized.includes("econn") ||
+    /\bstatus(code)?[=\s:]?\d{3}\b/.test(normalized) ||
+    /^[a-z_]+error:/.test(normalized) ||
+    /error code/.test(normalized)
+  );
+}
+
+/**
+ * Always returns short, human-readable HRMS copy for auth UI.
+ * Prefer typed AuthErrorCode; sanitize any free-form message.
+ */
+export function resolveUserFacingAuthMessage(
+  codeOrMessage?: AuthErrorCode | string | null,
+  fallback: AuthErrorCode = "NETWORK_ERROR",
+): string {
+  if (isAuthErrorCode(codeOrMessage)) {
+    return getAuthErrorMessage(codeOrMessage);
+  }
+
+  if (typeof codeOrMessage === "string") {
+    const trimmed = codeOrMessage.trim();
+    if (!trimmed || looksLikeTechnicalAuthError(trimmed)) {
+      return getAuthErrorMessage(fallback);
+    }
+    if (KNOWN_USER_MESSAGES.has(trimmed)) {
+      return trimmed;
+    }
+    // Allow short, already-human validation copy (e.g. Zod field messages).
+    if (trimmed.length <= 160 && !/[<>{}]/.test(trimmed)) {
+      return trimmed;
+    }
+  }
+
+  return getAuthErrorMessage(fallback);
 }
 
 /** Safe diagnostic string for Auth failures (never includes tokens/passwords). */
@@ -76,7 +143,9 @@ export function mapSupabaseAuthError(message: string): AuthErrorCode {
     normalized.includes("invalid email or password") ||
     normalized.includes("invalid credentials") ||
     normalized.includes("wrong password") ||
-    normalized.includes("user not found")
+    normalized.includes("user not found") ||
+    normalized.includes("invalid_grant") ||
+    normalized.includes("email not found")
   ) {
     return "INVALID_CREDENTIALS";
   }
@@ -139,5 +208,6 @@ export function mapSupabaseAuthError(message: string): AuthErrorCode {
     return "EMAIL_LOGIN_DISABLED";
   }
 
-  return "SERVER_ERROR";
+  // Prefer a soft network-facing outcome over a technical "unexpected" code.
+  return "NETWORK_ERROR";
 }

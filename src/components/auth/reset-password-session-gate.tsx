@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import type { EmailOtpType } from "@supabase/supabase-js";
 
 import { LoadingSpinner } from "@/components/common/loading-spinner";
+import { AuthNotice } from "@/components/auth/auth-notice";
 import { buttonVariants } from "@/components/common/button";
 import { AUTH_ROUTES } from "@/lib/auth/constants";
 import { getAuthErrorMessage } from "@/lib/auth/errors";
@@ -150,11 +151,15 @@ export function ResetPasswordSessionGate({
     return (
       <div className="space-y-6">
         <div className="space-y-2 text-center">
-          <h2 className="text-lg font-semibold">Reset link expired</h2>
+          <h2 className="text-lg font-semibold tracking-tight">Reset link expired</h2>
           <p className="text-sm text-muted-foreground">
-            {errorMessage ?? getAuthErrorMessage("RESET_LINK_INVALID")}
+            Request a new link to continue setting your password.
           </p>
         </div>
+
+        <AuthNotice variant="warning" title="Link unavailable">
+          {errorMessage ?? getAuthErrorMessage("RESET_LINK_INVALID")}
+        </AuthNotice>
 
         <Link
           href={AUTH_ROUTES.forgotPassword}

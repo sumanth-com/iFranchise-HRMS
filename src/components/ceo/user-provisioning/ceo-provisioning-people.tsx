@@ -8,8 +8,10 @@ import {
   Loader2,
   Mail,
   MoreVertical,
+  Pencil,
   Power,
   RotateCw,
+  Shield,
   ShieldX,
   Trash2,
   UserRound,
@@ -35,6 +37,8 @@ import type {
 } from "@/types/ceo-user-provisioning";
 import {
   canCancelProvisioningInvitation,
+  canChangePendingProvisioningRole,
+  canEditPendingProvisioningUser,
   canResendProvisioningInvitation,
 } from "@/lib/ceo/provisioning-user-permissions";
 
@@ -63,6 +67,12 @@ function canResend(user: CeoProvisioningUser) {
 }
 function canCancel(user: CeoProvisioningUser) {
   return canCancelProvisioningInvitation(user);
+}
+function canEdit(user: CeoProvisioningUser) {
+  return canEditPendingProvisioningUser(user);
+}
+function canChangeRole(user: CeoProvisioningUser) {
+  return canChangePendingProvisioningRole(user);
 }
 function canDeactivate(user: CeoProvisioningUser) {
   return user.accountStatus === "active" && !user.isSelf;
@@ -107,8 +117,9 @@ function PersonCard({
   busy: boolean;
   onAction: (action: ProvisioningRowAction, user: CeoProvisioningUser) => void;
 }) {
+  const pendingActions = canEdit(user) || canChangeRole(user) || canResend(user);
   const hasActions =
-    canResend(user) ||
+    pendingActions ||
     canCancel(user) ||
     canDelete(user) ||
     canDeactivate(user) ||
@@ -136,17 +147,32 @@ function PersonCard({
               </Button>
             }
           />
-          <DropdownMenuContent align="end" className="min-w-[12rem]">
+          <DropdownMenuContent align="end" className="min-w-[12.5rem]">
             <DropdownMenuItem onClick={() => onAction("view", user)}>
               <Eye className="mr-2 size-4" />
               View details
             </DropdownMenuItem>
-            {hasActions ? <DropdownMenuSeparator /> : null}
+            {pendingActions ? <DropdownMenuSeparator /> : null}
+            {canEdit(user) ? (
+              <DropdownMenuItem onClick={() => onAction("edit", user)}>
+                <Pencil className="mr-2 size-4" />
+                Edit
+              </DropdownMenuItem>
+            ) : null}
+            {canChangeRole(user) ? (
+              <DropdownMenuItem onClick={() => onAction("changeRole", user)}>
+                <Shield className="mr-2 size-4" />
+                Change role
+              </DropdownMenuItem>
+            ) : null}
             {canResend(user) ? (
               <DropdownMenuItem onClick={() => onAction("resend", user)}>
                 <RotateCw className="mr-2 size-4" />
                 Resend invitation
               </DropdownMenuItem>
+            ) : null}
+            {hasActions && (canCancel(user) || canDelete(user) || canDeactivate(user) || canReactivate(user)) ? (
+              <DropdownMenuSeparator />
             ) : null}
             {canCancel(user) ? (
               <DropdownMenuItem

@@ -7,12 +7,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Mail, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
+import { AuthNotice } from "@/components/auth/auth-notice";
 import { Button, buttonVariants } from "@/components/common/button";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { forgotPasswordAction } from "@/lib/auth/actions";
 import { AUTH_ROUTES } from "@/lib/auth/constants";
+import { resolveUserFacingAuthMessage } from "@/lib/auth/errors";
 import {
   forgotPasswordSchema,
   type ForgotPasswordInput,
@@ -44,16 +46,21 @@ export function ForgotPasswordForm() {
     formData.set("email", data.email);
 
     startTransition(async () => {
-      const result = await forgotPasswordAction(formData);
+      try {
+        const result = await forgotPasswordAction(formData);
 
-      if (!result.success) {
-        setFormError(result.message);
-        toast.error(result.message);
-        return;
+        if (!result.success) {
+          setFormError(resolveUserFacingAuthMessage(result.error, "NETWORK_ERROR"));
+          return;
+        }
+
+        setIsSubmitted(true);
+        toast.success(
+          "If an account exists for this email, you'll receive a reset link shortly.",
+        );
+      } catch {
+        setFormError(resolveUserFacingAuthMessage("NETWORK_ERROR"));
       }
-
-      setIsSubmitted(true);
-      toast.success("If an account exists for this email, you'll receive a reset link shortly.");
     });
   });
 
@@ -105,9 +112,9 @@ export function ForgotPasswordForm() {
       </div>
 
       {formError ? (
-        <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <AuthNotice variant="warning" title="Unable to send reset link">
           {formError}
-        </div>
+        </AuthNotice>
       ) : null}
 
       <form onSubmit={onSubmit} className="space-y-4">
@@ -128,7 +135,9 @@ export function ForgotPasswordForm() {
             />
           </div>
           {errors.email ? (
-            <p className="text-sm text-destructive">{errors.email.message}</p>
+            <p className="text-[13px] font-medium text-slate-600 dark:text-slate-300">
+              {resolveUserFacingAuthMessage(errors.email.message, "VALIDATION_ERROR")}
+            </p>
           ) : null}
         </div>
 

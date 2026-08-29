@@ -38,11 +38,27 @@ export type ProvisionableRoleOption = {
 
 export type ProvisioningRowAction =
   | "view"
+  | "edit"
+  | "changeRole"
   | "resend"
   | "cancel"
   | "delete"
   | "deactivate"
   | "reactivate";
+
+export type PortalInviteEligibleEmployee = {
+  employeeId: string;
+  employeeCode: string;
+  fullName: string;
+  firstName: string;
+  lastName: string;
+  companyEmail: string;
+  personalEmail: string | null;
+  departmentName: string | null;
+  designationTitle: string | null;
+  accountStatus: string;
+  hasSalaryStructure: boolean;
+};
 
 export type ProvisioningInvitationStatus =
   | "pending"

@@ -10,6 +10,10 @@ import {
 } from "@/components/ceo/ceo-module-primitives";
 import { CeoInviteUserDialog } from "@/components/ceo/user-provisioning/ceo-invite-user-dialog";
 import {
+  CeoPendingEditDialog,
+  CeoPendingRoleDialog,
+} from "@/components/ceo/user-provisioning/ceo-pending-user-dialogs";
+import {
   CeoProvisioningConfirmDialog,
   type ProvisioningConfirmAction,
 } from "@/components/ceo/user-provisioning/ceo-provisioning-confirm-dialog";
@@ -41,7 +45,7 @@ type CeoUserProvisioningViewProps = CeoUserProvisioningPageData & {
 };
 
 const MUTATION_ACTIONS: Record<
-  Exclude<ProvisioningRowAction, "view">,
+  Exclude<ProvisioningRowAction, "view" | "edit" | "changeRole">,
   (employeeId: string) => Promise<{ success: boolean; message: string }>
 > = {
   resend: resendProvisioningInvitationAction,
@@ -87,6 +91,8 @@ export function CeoUserProvisioningView({
     user: CeoProvisioningUser;
   } | null>(null);
   const [isConfirmPending, setIsConfirmPending] = useState(false);
+  const [editUser, setEditUser] = useState<CeoProvisioningUser | null>(null);
+  const [roleUser, setRoleUser] = useState<CeoProvisioningUser | null>(null);
 
   const refreshModuleData = useCallback(
     async (next: CeoProvisioningListParams, options?: { showRefreshing?: boolean }) => {
@@ -148,6 +154,16 @@ export function CeoUserProvisioningView({
       return;
     }
 
+    if (action === "edit") {
+      setEditUser(user);
+      return;
+    }
+
+    if (action === "changeRole") {
+      setRoleUser(user);
+      return;
+    }
+
     if (action === "resend" || action === "reactivate") {
       void runAction(action, user);
       return;
@@ -159,7 +175,7 @@ export function CeoUserProvisioningView({
   }
 
   async function runAction(
-    action: Exclude<ProvisioningRowAction, "view">,
+    action: Exclude<ProvisioningRowAction, "view" | "edit" | "changeRole">,
     user: CeoProvisioningUser,
   ) {
     const runner = MUTATION_ACTIONS[action];
@@ -171,9 +187,7 @@ export function CeoUserProvisioningView({
         return;
       }
 
-      if (action !== "resend") {
-        toast.success(result.message);
-      }
+      toast.success(result.message);
 
       if (action === "cancel" || action === "delete" || action === "deactivate") {
         setDrawerOpen(false);
@@ -282,6 +296,32 @@ export function CeoUserProvisioningView({
         eligibleCandidates={eligibleOnboardingCandidates}
         inviteServiceReady={inviteServiceReady}
         onInvited={() => void refreshModuleData(pageParams)}
+      />
+
+      <CeoPendingEditDialog
+        open={Boolean(editUser)}
+        user={editUser}
+        lookups={lookups}
+        onOpenChange={(open) => {
+          if (!open) setEditUser(null);
+        }}
+        onSaved={() => {
+          toast.success("Pending user details updated.");
+          void refreshModuleData(pageParams);
+        }}
+      />
+
+      <CeoPendingRoleDialog
+        open={Boolean(roleUser)}
+        user={roleUser}
+        lookups={lookups}
+        onOpenChange={(open) => {
+          if (!open) setRoleUser(null);
+        }}
+        onSaved={() => {
+          toast.success("Role updated for this pending invitation.");
+          void refreshModuleData(pageParams);
+        }}
       />
 
       <CeoProvisioningConfirmDialog

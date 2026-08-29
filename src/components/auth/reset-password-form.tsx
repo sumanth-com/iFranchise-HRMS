@@ -8,12 +8,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle2, Eye, EyeOff, Lock, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
+import { AuthNotice } from "@/components/auth/auth-notice";
 import { Button, buttonVariants } from "@/components/common/button";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { resetPasswordAction } from "@/lib/auth/actions";
 import { AUTH_ROUTES } from "@/lib/auth/constants";
+import { resolveUserFacingAuthMessage } from "@/lib/auth/errors";
 import {
   resetPasswordSchema,
   type ResetPasswordInput,
@@ -56,22 +58,25 @@ export function ResetPasswordForm() {
     formData.set("confirmPassword", data.confirmPassword);
 
     startTransition(async () => {
-      const result = await resetPasswordAction(formData);
+      try {
+        const result = await resetPasswordAction(formData);
 
-      if (!result.success) {
-        setFormError(result.message);
-        toast.error(result.message);
-        return;
+        if (!result.success) {
+          setFormError(resolveUserFacingAuthMessage(result.error, "NETWORK_ERROR"));
+          return;
+        }
+
+        if (isInviteSetup) {
+          toast.success("Password created successfully");
+          setSignInHref(result.redirectTo);
+          return;
+        }
+
+        toast.success("Password reset successfully");
+        router.replace(result.redirectTo);
+      } catch {
+        setFormError(resolveUserFacingAuthMessage("NETWORK_ERROR"));
       }
-
-      if (isInviteSetup) {
-        toast.success("Password created successfully");
-        setSignInHref(result.redirectTo);
-        return;
-      }
-
-      toast.success("Password reset successfully");
-      router.replace(result.redirectTo);
     });
   });
 
@@ -90,7 +95,7 @@ export function ResetPasswordForm() {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
           Password saved successfully.
         </div>
 
@@ -149,9 +154,9 @@ export function ResetPasswordForm() {
       )}
 
       {formError ? (
-        <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <AuthNotice variant="warning" title="Unable to save password">
           {formError}
-        </div>
+        </AuthNotice>
       ) : null}
 
       <form onSubmit={onSubmit} className="space-y-4">
@@ -180,7 +185,9 @@ export function ResetPasswordForm() {
             </button>
           </div>
           {errors.password ? (
-            <p className="text-sm text-destructive">{errors.password.message}</p>
+            <p className="text-[13px] font-medium text-slate-600 dark:text-slate-300">
+              {resolveUserFacingAuthMessage(errors.password.message, "VALIDATION_ERROR")}
+            </p>
           ) : (
             <p className="text-xs text-muted-foreground">
               At least 12 characters with uppercase, lowercase, number, and symbol.
@@ -219,7 +226,12 @@ export function ResetPasswordForm() {
             </button>
           </div>
           {errors.confirmPassword ? (
-            <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>
+            <p className="text-[13px] font-medium text-slate-600 dark:text-slate-300">
+              {resolveUserFacingAuthMessage(
+                errors.confirmPassword.message,
+                "PASSWORD_MISMATCH",
+              )}
+            </p>
           ) : null}
         </div>
 

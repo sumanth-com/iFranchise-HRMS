@@ -26,14 +26,17 @@ import { Label } from "@/components/ui/label";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { toLookupSelectItems } from "@/components/payroll/select-utils";
 import {
+  fetchPortalInviteEligibleEmployeesAction,
   fetchProvisioningEligibleCandidatesAction,
   fetchUserProvisioningInviteRolesAction,
   inviteExecutiveUserAction,
+  inviteExistingEmployeeAction,
   provisionOnboardingCandidateAction,
 } from "@/lib/ceo/actions/ceo-user-provisioning-actions";
 import type { ProvisioningEligibleCandidate } from "@/lib/onboarding/provisioning-eligibility";
 import {
   inviteExecutiveUserSchema,
+  inviteExistingEmployeeSchema,
   type InviteExecutiveUserInput,
 } from "@/lib/validations/ceo-user-provisioning";
 import {
@@ -42,10 +45,11 @@ import {
 import type { z } from "zod";
 import type {
   CeoProvisioningLookups,
+  PortalInviteEligibleEmployee,
   ProvisionableRoleOption,
 } from "@/types/ceo-user-provisioning";
 
-type InviteMode = "onboarding" | "direct";
+type InviteMode = "onboarding" | "existing" | "direct";
 
 type CeoInviteUserDialogProps = {
   open: boolean;
@@ -71,8 +75,10 @@ export function CeoInviteUserDialog({
   const [isPending, startTransition] = useTransition();
   const [inviteRoles, setInviteRoles] = useState<ProvisionableRoleOption[]>(lookups.roles);
   const [eligibleCandidates, setEligibleCandidates] = useState(initialEligibleCandidates);
+  const [existingEmployees, setExistingEmployees] = useState<PortalInviteEligibleEmployee[]>([]);
+  const [existingSearch, setExistingSearch] = useState("");
   const [inviteMode, setInviteMode] = useState<InviteMode>(
-    initialEligibleCandidates.length > 0 ? "onboarding" : "direct",
+    initialEligibleCandidates.length > 0 ? "onboarding" : "existing",
   );
   const [inviteSuccess, setInviteSuccess] = useState<{
     title: string;
@@ -108,15 +114,37 @@ export function CeoInviteUserDialog({
     },
   });
 
+  const existingForm = useForm<z.input<typeof inviteExistingEmployeeSchema>>({
+    resolver: zodResolver(inviteExistingEmployeeSchema),
+    defaultValues: {
+      employeeId: "",
+      roleCode: "",
+      companyEmail: "",
+      salaryEffectiveFrom: todayIsoDate(),
+      currencyCode: "INR",
+      basicSalary: 0,
+      hraAmount: 0,
+      transportAllowance: 0,
+      otherAllowances: 0,
+    },
+  });
+
   const roleCode = directForm.watch("roleCode");
   const departmentId = directForm.watch("departmentId");
   const employmentTypeId = directForm.watch("employmentTypeId");
   const selectedCaseId = onboardingForm.watch("caseId");
   const selectedRoleId = onboardingForm.watch("roleId");
+  const selectedExistingId = existingForm.watch("employeeId");
+  const existingRoleCode = existingForm.watch("roleCode");
 
   const selectedCandidate = useMemo(
     () => eligibleCandidates.find((candidate) => candidate.caseId === selectedCaseId),
     [eligibleCandidates, selectedCaseId],
+  );
+
+  const selectedExisting = useMemo(
+    () => existingEmployees.find((employee) => employee.employeeId === selectedExistingId),
+    [existingEmployees, selectedExistingId],
   );
 
   const candidateSelectItems = useMemo(
@@ -148,7 +176,8 @@ export function CeoInviteUserDialog({
   useEffect(() => {
     if (!open) return;
     setSubmitError(null);
-    setInviteMode(initialEligibleCandidates.length > 0 ? "onboarding" : "direct");
+    setInviteMode(initialEligibleCandidates.length > 0 ? "onboarding" : "existing");
+    setExistingSearch("");
 
     void fetchUserProvisioningInviteRolesAction().then((result) => {
       if (result.success) setInviteRoles(result.roles);
@@ -156,7 +185,20 @@ export function CeoInviteUserDialog({
     void fetchProvisioningEligibleCandidatesAction().then((result) => {
       if (result.success) setEligibleCandidates(result.candidates);
     });
+    void fetchPortalInviteEligibleEmployeesAction().then((result) => {
+      if (result.success) setExistingEmployees(result.employees);
+    });
   }, [open, initialEligibleCandidates.length]);
+
+  useEffect(() => {
+    if (!open || inviteMode !== "existing") return;
+    const handle = window.setTimeout(() => {
+      void fetchPortalInviteEligibleEmployeesAction(existingSearch).then((result) => {
+        if (result.success) setExistingEmployees(result.employees);
+      });
+    }, 250);
+    return () => window.clearTimeout(handle);
+  }, [existingSearch, inviteMode, open]);
 
   useEffect(() => {
     if (!selectedCandidate) return;
@@ -168,6 +210,13 @@ export function CeoInviteUserDialog({
     );
   }, [selectedCandidate, onboardingForm]);
 
+  useEffect(() => {
+    if (!selectedExisting) return;
+    existingForm.setValue("companyEmail", selectedExisting.companyEmail, {
+      shouldValidate: true,
+    });
+  }, [selectedExisting, existingForm]);
+
   function handleOpenChange(next: boolean) {
     if (!next) {
       directForm.reset();
@@ -176,6 +225,17 @@ export function CeoInviteUserDialog({
         companyEmail: "",
         roleId: "",
         hrComments: "",
+        salaryEffectiveFrom: todayIsoDate(),
+        currencyCode: "INR",
+        basicSalary: 0,
+        hraAmount: 0,
+        transportAllowance: 0,
+        otherAllowances: 0,
+      });
+      existingForm.reset({
+        employeeId: "",
+        roleCode: "",
+        companyEmail: "",
         salaryEffectiveFrom: todayIsoDate(),
         currencyCode: "INR",
         basicSalary: 0,
@@ -245,8 +305,58 @@ export function CeoInviteUserDialog({
     });
   });
 
+  const submitExistingInvite = existingForm.handleSubmit((data) => {
+    if (!inviteServiceReady) {
+      setSubmitError("Invitations are not configured on this environment.");
+      return;
+    }
+
+    setSubmitError(null);
+    startTransition(async () => {
+      const companyEmail =
+        typeof data.companyEmail === "string" && data.companyEmail.trim()
+          ? data.companyEmail.trim().toLowerCase()
+          : undefined;
+      const result = await inviteExistingEmployeeAction({
+        ...data,
+        companyEmail,
+      });
+      if (!result.success) {
+        setSubmitError(result.message);
+        return;
+      }
+      setInviteSuccess({
+        title: "Invitation sent",
+        description: result.message,
+      });
+      existingForm.reset({
+        employeeId: "",
+        roleCode: "",
+        companyEmail: "",
+        salaryEffectiveFrom: todayIsoDate(),
+        currencyCode: "INR",
+        basicSalary: 0,
+        hraAmount: 0,
+        transportAllowance: 0,
+        otherAllowances: 0,
+      });
+      handleOpenChange(false);
+      onInvited();
+    });
+  });
+
   const selectedDirectRole = inviteRoles.find((role) => role.code === roleCode);
   const selectedOnboardingRole = inviteRoles.find((role) => role.id === selectedRoleId);
+  const selectedExistingRole = inviteRoles.find((role) => role.code === existingRoleCode);
+
+  const existingSelectItems = useMemo(
+    () =>
+      existingEmployees.map((employee) => ({
+        value: employee.employeeId,
+        label: `${employee.fullName} · ${employee.employeeCode}`,
+      })),
+    [existingEmployees],
+  );
 
   return (
     <>
@@ -263,11 +373,20 @@ export function CeoInviteUserDialog({
           <DialogHeader className="shrink-0 border-b px-5 py-4">
             <DialogTitle>Invite User</DialogTitle>
             <DialogDescription>
-              Provision completed onboarding candidates or invite executives and managers directly.
+              Invite an existing employee without creating a duplicate record, provision
+              onboarding candidates, or send a direct invite.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex shrink-0 gap-2 border-b px-5 py-3">
+          <div className="flex shrink-0 flex-wrap gap-2 border-b px-5 py-3">
+            <Button
+              type="button"
+              size="sm"
+              variant={inviteMode === "existing" ? "default" : "outline"}
+              onClick={() => setInviteMode("existing")}
+            >
+              Existing employee
+            </Button>
             <Button
               type="button"
               size="sm"
@@ -286,6 +405,186 @@ export function CeoInviteUserDialog({
               Direct invite
             </Button>
           </div>
+
+          {inviteMode === "existing" ? (
+            <form onSubmit={submitExistingInvite} className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+                {submitError ? (
+                  <div
+                    role="alert"
+                    className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100"
+                  >
+                    {submitError}
+                  </div>
+                ) : null}
+
+                <div className="space-y-2">
+                  <Label htmlFor="existing-employee-search">Search employee</Label>
+                  <Input
+                    id="existing-employee-search"
+                    value={existingSearch}
+                    placeholder="Search by name, employee ID, or email"
+                    onChange={(event) => setExistingSearch(event.target.value)}
+                    disabled={isPending}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Employee *</Label>
+                  <LabeledSelect
+                    value={selectedExistingId}
+                    placeholder="Select existing employee"
+                    items={existingSelectItems}
+                    onValueChange={(value) =>
+                      existingForm.setValue("employeeId", value, { shouldValidate: true })
+                    }
+                    disabled={isPending || existingEmployees.length === 0}
+                  />
+                  {existingEmployees.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      No employees without portal access matched this search.
+                    </p>
+                  ) : null}
+                  {existingForm.formState.errors.employeeId ? (
+                    <p className="text-xs text-muted-foreground">
+                      {existingForm.formState.errors.employeeId.message}
+                    </p>
+                  ) : null}
+                </div>
+
+                {selectedExisting ? (
+                  <div className="grid gap-2 rounded-xl border bg-muted/30 p-3 text-sm sm:grid-cols-2">
+                    <div>
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Employee
+                      </p>
+                      <p className="font-medium">{selectedExisting.fullName}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Employee ID
+                      </p>
+                      <p className="font-medium">{selectedExisting.employeeCode}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Personal email
+                      </p>
+                      <p className="font-medium">{selectedExisting.personalEmail ?? "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Company email
+                      </p>
+                      <p className="font-medium">{selectedExisting.companyEmail}</p>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="space-y-2">
+                  <Label htmlFor="existing-company-email">Company email *</Label>
+                  <Input
+                    id="existing-company-email"
+                    type="email"
+                    disabled={isPending}
+                    {...existingForm.register("companyEmail")}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Role *</Label>
+                  <LabeledSelect
+                    value={existingRoleCode}
+                    placeholder="Select portal role"
+                    items={inviteRoles.map((role) => ({
+                      value: role.code,
+                      label: role.name,
+                    }))}
+                    onValueChange={(value) =>
+                      existingForm.setValue("roleCode", value, { shouldValidate: true })
+                    }
+                    disabled={isPending}
+                  />
+                  {selectedExistingRole ? (
+                    <p className="text-xs text-muted-foreground">
+                      Portal: {selectedExistingRole.portalLabel}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="space-y-3 rounded-xl border p-3">
+                  <p className="text-sm font-semibold">Salary structure</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="existing-salary-date">Effective from *</Label>
+                      <Input
+                        id="existing-salary-date"
+                        type="date"
+                        disabled={isPending}
+                        {...existingForm.register("salaryEffectiveFrom")}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="existing-basic-salary">Basic salary *</Label>
+                      <Input
+                        id="existing-basic-salary"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        disabled={isPending}
+                        {...existingForm.register("basicSalary", { valueAsNumber: true })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="existing-hra">HRA</Label>
+                      <Input
+                        id="existing-hra"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        disabled={isPending}
+                        {...existingForm.register("hraAmount", { valueAsNumber: true })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="existing-transport">Transport allowance</Label>
+                      <Input
+                        id="existing-transport"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        disabled={isPending}
+                        {...existingForm.register("transportAllowance", {
+                          valueAsNumber: true,
+                        })}
+                      />
+                    </div>
+                  </div>
+                  {selectedExisting?.hasSalaryStructure ? (
+                    <p className="text-xs text-muted-foreground">
+                      This employee already has a salary structure. Saving creates a new
+                      effective record and closes the previous one.
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="flex shrink-0 justify-end gap-2 border-t px-5 py-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleOpenChange(false)}
+                  disabled={isPending}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isPending || !inviteServiceReady}>
+                  {isPending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                  Send invitation
+                </Button>
+              </div>
+            </form>
+          ) : null}
 
           {inviteMode === "onboarding" ? (
             <form onSubmit={submitOnboardingProvision} className="flex min-h-0 flex-1 flex-col">
@@ -487,7 +786,9 @@ export function CeoInviteUserDialog({
                 </Button>
               </div>
             </form>
-          ) : (
+          ) : null}
+
+          {inviteMode === "direct" ? (
             <form onSubmit={submitDirectInvite} className="flex min-h-0 flex-1 flex-col">
               <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
                 {submitError ? (
@@ -657,7 +958,7 @@ export function CeoInviteUserDialog({
                 </Button>
               </div>
             </form>
-          )}
+          ) : null}
         </DialogContent>
       </Dialog>
     </>

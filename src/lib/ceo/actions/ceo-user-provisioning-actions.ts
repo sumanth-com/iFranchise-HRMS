@@ -7,19 +7,23 @@ import {
   userProvisioningPaths,
 } from "@/lib/user-provisioning/constants";
 import {
+  cancelExecutiveInvitation,
+  changePendingProvisioningRole,
+  deactivateExecutiveUser,
+  deleteProvisioningUser,
+  inviteExecutiveUser,
+  inviteExistingEmployeeToPortal,
+  reactivateExecutiveUser,
+  resendExecutiveInvitation,
+  updatePendingProvisioningUser,
+} from "@/lib/ceo/services/ceo-user-provisioning-mutations";
+import {
   getCeoProvisioningLookups,
   getCeoProvisioningSummary,
   getCeoProvisioningUserDetail,
   listCeoProvisioningUsers,
+  listPortalInviteEligibleEmployees,
 } from "@/lib/ceo/services/ceo-user-provisioning-queries";
-import {
-  cancelExecutiveInvitation,
-  deactivateExecutiveUser,
-  deleteProvisioningUser,
-  inviteExecutiveUser,
-  reactivateExecutiveUser,
-  resendExecutiveInvitation,
-} from "@/lib/ceo/services/ceo-user-provisioning-mutations";
 import { listProvisioningEligibleOnboardingCandidates } from "@/lib/onboarding/services/onboarding-provisioning-queries";
 import { provisionOnboardingCandidate } from "@/lib/onboarding/services/onboarding-provisioning-mutations";
 import {
@@ -27,15 +31,20 @@ import {
 } from "@/lib/permissions/server";
 import { hasSupabaseServiceRoleEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
+import { looksLikeTechnicalAuthError } from "@/lib/auth/errors";
 import type {
   CeoProvisioningListParams,
   CeoProvisioningListResult,
   CeoProvisioningUserDetail,
   CeoUserProvisioningPageData,
+  PortalInviteEligibleEmployee,
 } from "@/types/ceo-user-provisioning";
 import {
   ceoProvisioningListParamsSchema,
+  changeProvisioningRoleSchema,
   inviteExecutiveUserSchema,
+  inviteExistingEmployeeSchema,
+  updatePendingProvisioningUserSchema,
 } from "@/lib/validations/ceo-user-provisioning";
 import { provisionOnboardingCandidateSchema } from "@/lib/validations/onboarding-provisioning";
 import type { ProvisioningEligibleCandidate } from "@/lib/onboarding/provisioning-eligibility";
@@ -61,6 +70,14 @@ function revalidateUserProvisioning() {
 type ActionResult =
   | { success: true; message: string }
   | { success: false; message: string };
+
+function toProvisioningErrorMessage(error: unknown, fallback: string): string {
+  const message = error instanceof Error ? error.message.trim() : "";
+  if (!message) return fallback;
+  if (looksLikeTechnicalAuthError(message)) return fallback;
+  if (message.length > 180) return fallback;
+  return message;
+}
 
 export async function getCeoUserProvisioningModuleData(
   params: CeoProvisioningListParams,
@@ -174,7 +191,10 @@ export async function provisionOnboardingCandidateAction(
       message: `${result.fullName} is provisioned. Portal access email sent to ${result.companyEmail}.`,
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to provision candidate.";
+    const message = toProvisioningErrorMessage(
+      error,
+      "Unable to send invitation. Please try again.",
+    );
     if (message.toLowerCase().includes("duplicate key")) {
       return { success: false, message: "This company email is already in use." };
     }
@@ -206,7 +226,90 @@ export async function inviteExecutiveUserAction(input: unknown): Promise<ActionR
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to send invitation.",
+      message: toProvisioningErrorMessage(error, "Unable to send invitation. Please try again."),
+    };
+  }
+}
+
+export async function inviteExistingEmployeeAction(input: unknown): Promise<ActionResult> {
+  try {
+    if (!hasSupabaseServiceRoleEnv()) {
+      return {
+        success: false,
+        message:
+          "User invitations are not configured on this environment. Contact your administrator.",
+      };
+    }
+
+    const profile = await requireServerAnyPermission(MANAGE_PERMISSIONS);
+    const supabase = await createClient();
+    const parsed = inviteExistingEmployeeSchema.parse(input);
+    const result = await inviteExistingEmployeeToPortal(supabase, profile, parsed);
+    revalidateUserProvisioning();
+
+    return {
+      success: true,
+      message: `Invitation sent to ${result.email}. Existing employee record ${result.fullName} was linked — no duplicate employee was created.`,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: toProvisioningErrorMessage(error, "Unable to send invitation. Please try again."),
+    };
+  }
+}
+
+export async function fetchPortalInviteEligibleEmployeesAction(
+  search?: string,
+): Promise<
+  | { success: true; employees: PortalInviteEligibleEmployee[] }
+  | { success: false; message: string }
+> {
+  try {
+    const profile = await requireServerAnyPermission(VIEW_PERMISSIONS);
+    const supabase = await createClient();
+    const employees = await listPortalInviteEligibleEmployees(supabase, profile, search);
+    return { success: true, employees };
+  } catch (error) {
+    return {
+      success: false,
+      message: toProvisioningErrorMessage(error, "Unable to load employees. Please try again."),
+    };
+  }
+}
+
+export async function changePendingProvisioningRoleAction(
+  input: unknown,
+): Promise<ActionResult> {
+  try {
+    const profile = await requireServerAnyPermission(MANAGE_PERMISSIONS);
+    const supabase = await createClient();
+    const parsed = changeProvisioningRoleSchema.parse(input);
+    await changePendingProvisioningRole(supabase, profile, parsed);
+    revalidateUserProvisioning();
+    return { success: true, message: "Role updated for this pending invitation." };
+  } catch (error) {
+    return {
+      success: false,
+      message: toProvisioningErrorMessage(error, "Unable to update role. Please try again."),
+    };
+  }
+}
+
+export async function updatePendingProvisioningUserAction(
+  input: unknown,
+): Promise<ActionResult> {
+  try {
+    const profile = await requireServerAnyPermission(MANAGE_PERMISSIONS);
+    const supabase = await createClient();
+    const parsed = updatePendingProvisioningUserSchema.parse(input);
+    await updatePendingProvisioningUser(supabase, profile, parsed);
+    revalidateUserProvisioning();
+    return { success: true, message: "Pending user details updated." };
+  } catch (error) {
+    return {
+      success: false,
+      message: toProvisioningErrorMessage(error, "Unable to update user. Please try again."),
     };
   }
 }
@@ -237,7 +340,7 @@ async function runManageAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Action failed.",
+      message: toProvisioningErrorMessage(error, "Action failed. Please try again."),
     };
   }
 }
@@ -248,7 +351,7 @@ export async function resendProvisioningInvitationAction(
   return runManageAction(
     employeeId,
     resendExecutiveInvitation,
-    "Invitation resent successfully.",
+    "Invitation resent successfully. The previous invitation link is no longer valid.",
     true,
   );
 }

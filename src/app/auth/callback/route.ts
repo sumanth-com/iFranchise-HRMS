@@ -21,8 +21,10 @@ function buildAuthErrorRedirect(
     return NextResponse.redirect(redirectUrl);
   }
 
-  // Land on the plain login screen; the failure reason is not surfaced to the user.
-  return NextResponse.redirect(new URL(AUTH_ROUTES.login, origin));
+  // Land on login with a clean HRMS message (never raw auth errors).
+  const loginUrl = new URL(AUTH_ROUTES.login, origin);
+  loginUrl.searchParams.set("error", "RESET_LINK_INVALID");
+  return NextResponse.redirect(loginUrl);
 }
 
 export async function GET(request: NextRequest) {

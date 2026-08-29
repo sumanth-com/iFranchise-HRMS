@@ -4,6 +4,7 @@ import { KeyRound, Loader2, Lock, MailCheck, ShieldAlert } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { AuthNotice } from "@/components/auth/auth-notice";
 import { Button } from "@/components/common/button";
 import {
   Dialog,
@@ -14,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { requestPasswordResetEmailAction } from "@/lib/auth/actions";
+import { resolveUserFacingAuthMessage } from "@/lib/auth/errors";
 import { cn } from "@/lib/utils";
 
 type AccountPasswordResetSectionProps = {
@@ -57,11 +59,12 @@ function PasswordResetContent({
 
       if (!result.success) {
         if (result.error === "RATE_LIMITED") {
-          showDailyLimit(result.message);
+          showDailyLimit(
+            resolveUserFacingAuthMessage(result.error, "RATE_LIMITED"),
+          );
           return;
         }
-        setError(result.message);
-        toast.error(result.message);
+        setError(resolveUserFacingAuthMessage(result.error, "NETWORK_ERROR"));
         return;
       }
 
@@ -133,8 +136,10 @@ function PasswordResetContent({
       </div>
 
       {error ? (
-        <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {error}
+        <div className="mt-3">
+          <AuthNotice variant="warning" title="Unable to send reset email">
+            {error}
+          </AuthNotice>
         </div>
       ) : null}
 

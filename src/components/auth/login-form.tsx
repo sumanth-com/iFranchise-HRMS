@@ -8,12 +8,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
+import { AuthNotice } from "@/components/auth/auth-notice";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { loginAction } from "@/lib/auth/actions";
 import { AUTH_ROUTES, IDLE_ACTIVITY_STORAGE_KEY } from "@/lib/auth/constants";
-import { getAuthErrorMessage } from "@/lib/auth/errors";
+import {
+  getAuthErrorMessage,
+  resolveUserFacingAuthMessage,
+} from "@/lib/auth/errors";
 import {
   clearRememberedEmail,
   getRememberedEmail,
@@ -32,6 +36,9 @@ const PROFILE_ERROR_CODES: AuthErrorCode[] = [
   "NO_ROLES",
   "ORGANIZATION_NOT_FOUND",
   "PORTAL_ACCESS_DENIED",
+  "SESSION_EXPIRED",
+  "RESET_LINK_INVALID",
+  "EMAIL_NOT_CONFIRMED",
 ];
 
 const SIGNED_OUT_TOAST_ID = "auth-signed-out";
@@ -117,9 +124,7 @@ export function LoginForm() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("suspended") !== "1") return;
 
-    setFormError(
-      "Your account has been deactivated. Contact your HR administrator if you need access restored.",
-    );
+    setFormError(getAuthErrorMessage("EMPLOYEE_INACTIVE"));
     params.delete("suspended");
     const query = params.toString();
     router.replace(query ? `${AUTH_ROUTES.login}?${query}` : AUTH_ROUTES.login, {
@@ -166,7 +171,7 @@ export function LoginForm() {
         router.replace(target);
       })
       .catch(() => {
-        setFormError("Invitation link is invalid or expired. Ask HR to resend it.");
+        setFormError(getAuthErrorMessage("RESET_LINK_INVALID"));
         window.history.replaceState(null, "", window.location.pathname);
       })
       .finally(() => setInviteLinkPending(false));
@@ -195,7 +200,7 @@ export function LoginForm() {
       }
 
       if (!result.success) {
-        setFormError(result.message);
+        setFormError(resolveUserFacingAuthMessage(result.error));
         return;
       }
 
@@ -228,7 +233,7 @@ export function LoginForm() {
       }
       router.replace(redirectTo);
     } catch {
-      setFormError(getAuthErrorMessage("SERVER_ERROR"));
+      setFormError(getAuthErrorMessage("NETWORK_ERROR"));
     } finally {
       setIsSubmitting(false);
     }
@@ -236,13 +241,16 @@ export function LoginForm() {
 
   const errorParam = searchParams.get("error");
   const profileError =
-    errorParam &&
-    PROFILE_ERROR_CODES.includes(errorParam as AuthErrorCode)
+    errorParam && PROFILE_ERROR_CODES.includes(errorParam as AuthErrorCode)
       ? getAuthErrorMessage(errorParam as AuthErrorCode)
-      : null;
+      : errorParam
+        ? getAuthErrorMessage("PORTAL_ACCESS_DENIED")
+        : null;
 
   const fieldClass =
     "h-11 rounded-full border-indigo-200/80 bg-indigo-50/50 pl-10 text-sm font-medium text-foreground shadow-none placeholder:text-muted-foreground/80 focus-visible:border-[#5f55ee] focus-visible:ring-[#5f55ee]/25 dark:border-border/80 dark:bg-muted/40";
+
+  const noticeMessage = formError ?? profileError;
 
   return (
     <div className="flex flex-col gap-6">
@@ -270,28 +278,22 @@ export function LoginForm() {
       </div>
 
       {isInviteLinkPending ? (
-        <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
+        <div className="flex items-center justify-center gap-2 rounded-2xl border border-indigo-200/80 bg-indigo-50/50 px-3 py-3 text-sm text-slate-600 dark:border-indigo-500/25 dark:bg-indigo-500/10 dark:text-slate-300">
           <Loader2 className="size-4 animate-spin" />
           Preparing your account setup...
         </div>
       ) : null}
 
       {showPasswordUpdatedMessage ? (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900 transition-opacity duration-300 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+        <AuthNotice variant="success" title="Password updated">
           Password reset successfully. You can now sign in with your new password.
-        </div>
+        </AuthNotice>
       ) : null}
 
-      {profileError ? (
-        <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
-          {profileError}
-        </div>
-      ) : null}
-
-      {formError ? (
-        <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
-          {formError}
-        </div>
+      {noticeMessage ? (
+        <AuthNotice variant="warning" title="Unable to sign in">
+          {noticeMessage}
+        </AuthNotice>
       ) : null}
 
       <form onSubmit={onSubmit} className="space-y-4" autoComplete="on">
@@ -311,7 +313,9 @@ export function LoginForm() {
             />
           </div>
           {errors.email ? (
-            <p className="text-sm font-medium text-destructive">{errors.email.message}</p>
+            <p className="text-[13px] font-medium text-slate-600 dark:text-slate-300">
+              {resolveUserFacingAuthMessage(errors.email.message, "VALIDATION_ERROR")}
+            </p>
           ) : null}
         </div>
 
@@ -347,7 +351,9 @@ export function LoginForm() {
             </button>
           </div>
           {errors.password ? (
-            <p className="text-sm font-medium text-destructive">{errors.password.message}</p>
+            <p className="text-[13px] font-medium text-slate-600 dark:text-slate-300">
+              {resolveUserFacingAuthMessage(errors.password.message, "VALIDATION_ERROR")}
+            </p>
           ) : null}
         </div>
 

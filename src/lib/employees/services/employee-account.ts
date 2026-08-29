@@ -613,6 +613,172 @@ export async function activateEmployeeAccountFromOnboarding(
   });
 }
 
+export async function assignPendingInviteRole(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  employeeId: string,
+  roleId: string,
+) {
+  const employee = await getEmployeeAccountRow(employeeId, profile.employee.organizationId);
+  const pendingLike =
+    employee.account_status === "invitation_pending" ||
+    employee.account_status === "draft" ||
+    employee.account_status === "invited";
+
+  if (!pendingLike) {
+    throw new Error("Role can only be changed for pending invitations.");
+  }
+
+  if (employee.user_id && employee.first_login_at) {
+    throw new Error("This employee already has portal access.");
+  }
+
+  const assignedRole = await getInviteableRoleById(
+    createAdminClient(),
+    employee.organization_id,
+    roleId,
+  );
+
+  await updateEmployeeAccount(employee.id, {
+    invited_role_id: roleId,
+    updated_by: profile.userId,
+  });
+
+  if (employee.user_id) {
+    await setUserPrimaryRole(employee.user_id, employee, profile.userId, roleId);
+  }
+
+  const admin = createAdminClient();
+  await admin
+    .schema("hrms")
+    .from("employee_invitations")
+    .update({
+      role_id: roleId,
+      portal_route: assignedRole.portalRoute,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("employee_id", employee.id)
+    .eq("status", "pending")
+    .is("deleted_at", null);
+
+  await writeAccountAudit(
+    supabase,
+    profile,
+    employee,
+    "invitation_sent",
+    `Invite role updated to ${assignedRole.name} for ${fullName(employee)} (${employee.employee_code})`,
+    {
+      roleId,
+      roleCode: assignedRole.code,
+      roleName: assignedRole.name,
+      portalRoute: assignedRole.portalRoute,
+    },
+  );
+}
+
+export async function updatePendingProvisioningEmployeeDetails(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  employeeId: string,
+  input: {
+    firstName: string;
+    lastName: string;
+    departmentId?: string | null;
+    designationId?: string | null;
+    employmentTypeId?: string | null;
+  },
+) {
+  const employee = await getEmployeeAccountRow(employeeId, profile.employee.organizationId);
+  const pendingLike =
+    employee.account_status === "invitation_pending" ||
+    employee.account_status === "draft" ||
+    employee.account_status === "invited";
+
+  if (!pendingLike) {
+    throw new Error("Only pending invitations can be edited.");
+  }
+
+  const updates: Record<string, unknown> = {
+    first_name: input.firstName.trim(),
+    last_name: input.lastName.trim(),
+    updated_by: profile.userId,
+  };
+  if (input.departmentId !== undefined) updates.department_id = input.departmentId;
+  if (input.designationId !== undefined) updates.designation_id = input.designationId;
+  if (input.employmentTypeId !== undefined) {
+    updates.employment_type_id = input.employmentTypeId;
+  }
+
+  await updateEmployeeAccount(employee.id, updates);
+
+  await writeAccountAudit(
+    supabase,
+    profile,
+    { ...employee, first_name: input.firstName, last_name: input.lastName },
+    "invitation_sent",
+    `Updated pending invite details for ${input.firstName} ${input.lastName} (${employee.employee_code})`,
+  );
+}
+
+/**
+ * Invite an existing HRMS employee to portal access without creating a new employee row.
+ */
+export async function inviteExistingEmployeePortalAccess(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  employeeId: string,
+  roleId: string,
+  companyEmail?: string | null,
+) {
+  const employee = await getEmployeeAccountRow(employeeId, profile.employee.organizationId);
+
+  if (
+    employee.user_id &&
+    (employee.account_status === "active" || Boolean(employee.first_login_at))
+  ) {
+    throw new Error("This employee already has portal access.");
+  }
+
+  if (employee.account_status === "invitation_pending") {
+    await resendEmployeeInvitation(supabase, profile, employeeId, roleId);
+    return employeeId;
+  }
+
+  const normalizedEmail = companyEmail?.trim().toLowerCase();
+  if (normalizedEmail && normalizedEmail !== employee.email.toLowerCase()) {
+    const admin = createAdminClient();
+    const { data: conflict, error } = await admin
+      .schema("hrms")
+      .from("employees")
+      .select("id")
+      .eq("organization_id", employee.organization_id)
+      .ilike("email", normalizedEmail)
+      .neq("id", employee.id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (error) throw new Error("Unable to send invitation. Please try again.");
+    if (conflict?.id) {
+      throw new Error("This email is already linked to another employee.");
+    }
+    await updateEmployeeAccount(employee.id, {
+      email: normalizedEmail,
+      updated_by: profile.userId,
+    });
+  }
+
+  // Ensure draft-like invite path when the employee is active but has no portal login.
+  if (employee.account_status === "active" && !employee.user_id) {
+    await updateEmployeeAccount(employee.id, {
+      // Keep employment_status unchanged; only move account into invite workflow.
+      invited_role_id: roleId,
+      updated_by: profile.userId,
+    });
+  }
+
+  await sendEmployeeInvitation(supabase, profile, employeeId, roleId);
+  return employeeId;
+}
+
 export async function sendEmployeeInvitation(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -620,8 +786,28 @@ export async function sendEmployeeInvitation(
   roleId: string,
 ) {
   const employee = await getEmployeeAccountRow(employeeId, profile.employee.organizationId);
-  if (!["draft", "invited"].includes(employee.account_status)) {
-    throw new Error("Invitation can only be sent for draft employees");
+
+  if (employee.account_status === "invitation_pending") {
+    throw new Error(
+      "This employee already has a pending invitation. Resend it from the list.",
+    );
+  }
+
+  if (
+    employee.user_id &&
+    (employee.account_status === "active" || Boolean(employee.first_login_at))
+  ) {
+    throw new Error("This employee already has portal access.");
+  }
+
+  // Draft/invited invites, or existing HR employees who never received portal access.
+  const canSend =
+    ["draft", "invited"].includes(employee.account_status) ||
+    (!employee.user_id &&
+      ["active", "draft", "invited"].includes(employee.account_status));
+
+  if (!canSend) {
+    throw new Error("Unable to send invitation for this employee.");
   }
 
   await ensureEmployeeProfile(employee.id, profile.userId);
