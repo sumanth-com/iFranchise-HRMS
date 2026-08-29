@@ -310,7 +310,9 @@ export async function resendExecutiveInvitation(
   const { data: employee, error } = await admin
     .schema("hrms")
     .from("employees")
-    .select("account_status, invited_role_id, first_name, last_name, email")
+    .select(
+      "account_status, invited_role_id, first_name, last_name, email, user_id, first_login_at",
+    )
     .eq("id", employeeId)
     .eq("organization_id", profile.employee.organizationId)
     .is("deleted_at", null)
@@ -318,6 +320,10 @@ export async function resendExecutiveInvitation(
 
   if (error) throw new Error("Unable to send invitation. Please try again.");
   if (!employee) throw new Error("User not found.");
+
+  if (employee.user_id && (employee.account_status === "active" || employee.first_login_at)) {
+    throw new Error("This employee already has portal access.");
+  }
 
   let roleId: string | undefined =
     typeof employee.invited_role_id === "string" ? employee.invited_role_id : undefined;
@@ -342,9 +348,14 @@ export async function resendExecutiveInvitation(
     }
   }
 
+  const awaitingFirstInvite =
+    employee.account_status === "draft" ||
+    employee.account_status === "invited" ||
+    (employee.account_status === "active" && !employee.user_id && !employee.first_login_at);
+
   if (employee.account_status === "invitation_pending") {
     await resendEmployeeInvitation(supabase, profile, employeeId, roleId);
-  } else if (employee.account_status === "draft" || employee.account_status === "invited") {
+  } else if (awaitingFirstInvite) {
     if (!roleId) {
       const fallbackRole = await getInviteableRoleByCode(
         createAdminClient(),
@@ -353,6 +364,7 @@ export async function resendExecutiveInvitation(
       );
       roleId = fallbackRole.id;
     }
+    // Links the existing employee row — does not create a new employee.
     await sendEmployeeInvitation(supabase, profile, employeeId, roleId);
   } else {
     throw new Error("This invitation cannot be resent.");

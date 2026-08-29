@@ -45,7 +45,10 @@ export function ManagerDashboard({ data, error }: ManagerDashboardProps) {
       >
         <DashboardOperationsRow
           tasks={data.tasks}
-          watchItems={[
+          rightPanel="focus-pair"
+          rightFocusTitle="Team Snapshot"
+          rightFocusDescription="Team size and probation at a glance"
+          rightFocusItems={[
             {
               id: "team-size",
               label: "Team size",
@@ -61,11 +64,27 @@ export function ManagerDashboard({ data, error }: ManagerDashboardProps) {
               href: MANAGER_DASHBOARD_KPI_LINKS.probationEndingSoon,
             },
           ]}
+          watchItems={[
+            {
+              id: "pending-leave",
+              label: "Pending leave",
+              value: data.kpis.pendingLeaveApprovals,
+              hint: "Needs decision",
+              href: MANAGER_DASHBOARD_KPI_LINKS.pendingLeaveApprovals,
+            },
+            {
+              id: "performance-reviews",
+              label: "Performance reviews",
+              value: data.kpis.pendingPerformanceReviews,
+              hint: "Follow up",
+              href: MANAGER_DASHBOARD_KPI_LINKS.pendingPerformanceReviews,
+            },
+          ]}
           upcomingHolidays={data.todayPulse.upcomingHolidays}
           upcomingBirthdays={data.upcomingBirthdays}
           upcomingAnniversaries={data.upcomingAnniversaries}
-          insightsTitle="Team Insights"
-          insightsDescription="People to watch and upcoming birthdays"
+          insightsTitle="Team Focus"
+          insightsDescription="Leave and performance waiting on you"
           focusDescription="Interviews, probation, leave, and hiring"
         />
       </section>

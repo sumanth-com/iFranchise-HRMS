@@ -22,6 +22,17 @@ import {
 
 const INVITATION_EXPIRY_HOURS = 48;
 
+const PENDING_ACCOUNT_STATUSES = new Set([
+  "invitation_pending",
+  "draft",
+  "invited",
+  "invitation_accepted",
+]);
+
+function isPendingProvisioningAccount(status: string | null | undefined) {
+  return PENDING_ACCOUNT_STATUSES.has(String(status ?? ""));
+}
+
 const ROLE_PRIORITY: Record<string, number> = {
   founder: 0,
   co_founder: 1,
@@ -60,6 +71,14 @@ function fullName(first?: string | null, last?: string | null) {
 
 function deriveInvitationStatus(row: LooseRow): ProvisioningInvitationStatus {
   const status = String(row.account_status ?? "draft");
+  const hasPortalUser = Boolean(row.user_id);
+  const hasLoggedIn = Boolean(row.first_login_at);
+
+  // Existing HR employee with no portal account yet → treat as pending invite target.
+  if (status === "active" && !hasPortalUser && !hasLoggedIn) {
+    return "pending";
+  }
+
   if (status === "active") return "accepted";
   if (status === "suspended") return "revoked";
   if (status === "inactive") return "inactive";
@@ -72,6 +91,22 @@ function deriveInvitationStatus(row: LooseRow): ProvisioningInvitationStatus {
     if (ageMs > INVITATION_EXPIRY_HOURS * 60 * 60 * 1000) return "expired";
   }
   return "pending";
+}
+
+/** Pending invite shells, or active HR records that still have no portal login. */
+function isAwaitingPortalProvisioning(row: {
+  accountStatus?: string | null;
+  account_status?: string | null;
+  userId?: string | null;
+  user_id?: string | null;
+  firstLoginAt?: string | null;
+  first_login_at?: string | null;
+}) {
+  const status = String(row.accountStatus ?? row.account_status ?? "");
+  const userId = row.userId ?? row.user_id ?? null;
+  const firstLoginAt = row.firstLoginAt ?? row.first_login_at ?? null;
+  if (isPendingProvisioningAccount(status)) return true;
+  return status === "active" && !userId && !firstLoginAt;
 }
 
 function buildProvisioningUserRow(
@@ -133,17 +168,6 @@ const EMPLOYEE_SELECT_FIELDS = `
   employment_types:employment_type_id ( name ),
   manager:reporting_manager_id ( first_name, last_name )
 `;
-
-const PENDING_ACCOUNT_STATUSES = new Set([
-  "invitation_pending",
-  "draft",
-  "invited",
-  "invitation_accepted",
-]);
-
-function isPendingProvisioningAccount(status: string | null | undefined) {
-  return PENDING_ACCOUNT_STATUSES.has(String(status ?? ""));
-}
 
 async function loadRolesById(
   admin: ReturnType<typeof createAdminClient>,
@@ -344,8 +368,36 @@ async function loadExecutiveUsers(
 
   if (pendingError) throw new Error(pendingError.message);
 
-  const pendingRows = (pendingEmployees ?? []) as LooseRow[];
-  const missingEmployees = pendingRows.filter(
+  // Existing HR employees who never received portal access (active + no auth user).
+  const { data: portallessEmployees, error: portallessError } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select(
+      `
+      ${EMPLOYEE_SELECT_FIELDS},
+      invited_role:invited_role_id ( code, name, portal_key )
+    `,
+    )
+    .eq("organization_id", organizationId)
+    .eq("account_status", "active")
+    .is("user_id", null)
+    .is("deleted_at", null);
+
+  if (portallessError) throw new Error(portallessError.message);
+
+  const pendingRows = [
+    ...((pendingEmployees ?? []) as LooseRow[]),
+    ...((portallessEmployees ?? []) as LooseRow[]).filter(
+      (employee) => !employee.first_login_at,
+    ),
+  ];
+  const pendingById = new Map<string, LooseRow>();
+  for (const employee of pendingRows) {
+    if (!employee?.id) continue;
+    pendingById.set(String(employee.id), employee);
+  }
+  const uniquePendingRows = [...pendingById.values()];
+  const missingEmployees = uniquePendingRows.filter(
     (employee) => !employee.deleted_at && !byEmployee.has(employee.id),
   );
   const missingRoleEmployeeIds = missingEmployees.map((employee) => String(employee.id));
@@ -354,7 +406,7 @@ async function loadExecutiveUsers(
     loadRolesById(
       admin,
       organizationId,
-      pendingRows
+      uniquePendingRows
         .map((employee) => (employee.invited_role_id ? String(employee.invited_role_id) : null))
         .filter((value): value is string => Boolean(value)),
     ),
@@ -370,10 +422,10 @@ async function loadExecutiveUsers(
       rolesByInvitation,
     );
     const roleCode = String(role.code).toLowerCase();
-    // Keep invite and deactivated records visible even when role metadata was cleared.
+    // Keep invite, portal-less HR, and deactivated records visible.
     if (
       !directoryRoleCodes.has(roleCode) &&
-      !isPendingProvisioningAccount(employee.account_status) &&
+      !isAwaitingPortalProvisioning(employee) &&
       employee.account_status !== "inactive" &&
       employee.account_status !== "suspended"
     ) {
@@ -416,7 +468,7 @@ async function loadExecutiveUsers(
       }
     }
 
-    for (const employee of pendingRows) {
+    for (const employee of uniquePendingRows) {
       if (!employee.created_by) continue;
       const target = byEmployee.get(employee.id);
       if (target && !target.sentByName) {
@@ -426,8 +478,8 @@ async function loadExecutiveUsers(
   }
 
   return [...byEmployee.values()].sort((a, b) => {
-    const aPending = isPendingProvisioningAccount(a.accountStatus) ? 0 : 1;
-    const bPending = isPendingProvisioningAccount(b.accountStatus) ? 0 : 1;
+    const aPending = isAwaitingPortalProvisioning(a) ? 0 : 1;
+    const bPending = isAwaitingPortalProvisioning(b) ? 0 : 1;
     if (aPending !== bPending) return aPending - bPending;
     return a.fullName.localeCompare(b.fullName);
   });
@@ -436,7 +488,8 @@ async function loadExecutiveUsers(
 export function summarizeExecutiveUsers(
   users: NormalizedExecutiveUser[],
 ): CeoProvisioningSummary {
-  const isActive = (user: NormalizedExecutiveUser) => user.accountStatus === "active";
+  const isActive = (user: NormalizedExecutiveUser) =>
+    user.accountStatus === "active" && Boolean(user.userId);
   const isDeactivated = (user: NormalizedExecutiveUser) =>
     user.accountStatus === "inactive" ||
     user.accountStatus === "suspended" ||
@@ -517,13 +570,13 @@ function paginateUsers(
           u.invitationStatus === "pending" ||
           u.invitationStatus === "expired" ||
           u.invitationStatus === "cancelled" ||
-          isPendingProvisioningAccount(u.accountStatus),
+          isAwaitingPortalProvisioning(u),
       );
     } else if (params.invitationStatus === "accepted") {
       filtered = filtered.filter(
         (u) =>
-          u.invitationStatus === "accepted" ||
-          u.accountStatus === "active",
+          (u.invitationStatus === "accepted" || u.accountStatus === "active") &&
+          Boolean(u.userId),
       );
     } else {
       filtered = filtered.filter((u) => u.invitationStatus === params.invitationStatus);

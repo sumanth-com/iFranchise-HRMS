@@ -3,6 +3,7 @@
 import { ErrorState } from "@/components/common";
 import { DashboardOperationsRow } from "@/components/dashboard/dashboard-panels";
 import { HrTodayPulseSection } from "@/components/dashboard/hr-today-pulse-section";
+import { DASHBOARD_ACTION_LINKS, DASHBOARD_KPI_LINKS } from "@/lib/dashboard/constants";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
 import type { HrDashboardData } from "@/types/dashboard";
 
@@ -13,7 +14,6 @@ type Props = {
 };
 
 export function HrDashboard({ data, error }: Props) {
-
   if (error) {
     return (
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 md:p-5">
@@ -34,7 +34,10 @@ export function HrDashboard({ data, error }: Props) {
       >
         <DashboardOperationsRow
           tasks={data.tasks}
-          watchItems={[
+          rightPanel="focus-pair"
+          rightFocusTitle="Workforce"
+          rightFocusDescription="Headcount and probation at a glance"
+          rightFocusItems={[
             {
               id: "headcount",
               label: "Active employees",
@@ -50,10 +53,27 @@ export function HrDashboard({ data, error }: Props) {
               href: `${EMPLOYEE_ROUTES.list}?employmentStatus=probation`,
             },
           ]}
+          watchItems={[
+            {
+              id: "documents-expiring",
+              label: "Documents expiring",
+              value: data.secondary.documentsExpiring,
+              hint: "Renew soon",
+              href: DASHBOARD_ACTION_LINKS.documentsExpiring,
+            },
+            {
+              id: "exit-clearance",
+              label: "Exit clearance",
+              value: data.secondary.exitClearancePending,
+              hint: "Pending action",
+              href: DASHBOARD_KPI_LINKS.exitRequests,
+            },
+          ]}
           upcomingHolidays={data.todayPulse.upcomingHolidays}
           upcomingBirthdays={data.upcomingBirthdays}
           upcomingAnniversaries={data.upcomingAnniversaries}
-          insightsDescription="People to watch and upcoming birthdays"
+          insightsTitle="People Focus"
+          insightsDescription="Documents and exits to review"
         />
       </section>
     </div>

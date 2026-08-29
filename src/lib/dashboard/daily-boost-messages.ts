@@ -1,87 +1,197 @@
 export type DailyBoostTone = "team" | "executive";
 
-/** All 9 chars — keeps every team line the same length. */
-const TEAM_WHO = [
-  "this crew",
-  "this team",
-  "this room",
-  "this hall",
-  "our group",
-  "our squad",
-  "the floor",
-  "this desk",
+export type DailyBoostMessage = {
+  line1: string;
+  line2: string;
+};
+
+/**
+ * Heartfelt two-line team messages.
+ * `open` and `close` are kept near the same length so every day reads evenly.
+ */
+const TEAM_LINES = [
+  {
+    open: "your care lifts everyone around you.",
+    close: "Today feels warmer with you beside us.",
+  },
+  {
+    open: "your kindness settles the rush of work.",
+    close: "Grateful you walked into this day here.",
+  },
+  {
+    open: "you bring a calm that steadies our day.",
+    close: "Your presence makes this team feel safe.",
+  },
+  {
+    open: "your heart shows in quiet, honest ways.",
+    close: "Thank you for arriving with real warmth.",
+  },
+  {
+    open: "you make hard hours feel a little lighter.",
+    close: "We notice the care you give every day.",
+  },
+  {
+    open: "your smile softens the edges of this day.",
+    close: "It means more than words can ever say.",
+  },
+  {
+    open: "you remind us why showing up still matters.",
+    close: "Grateful for the heart you carry today.",
+  },
+  {
+    open: "your steady care holds this team together.",
+    close: "We feel stronger simply because you came.",
+  },
+  {
+    open: "you turn ordinary work into true belonging.",
+    close: "Today starts better because you arrived.",
+  },
+  {
+    open: "your warmth reaches past tasks and titles.",
+    close: "Thank you for being part of our story.",
+  },
+  {
+    open: "you leave people feeling seen and valued.",
+    close: "That quiet care changes this workplace.",
+  },
+  {
+    open: "your presence feels a little like home.",
+    close: "Lucky we get to share this path with you.",
+  },
+  {
+    open: "you carry grace into the smallest moments.",
+    close: "May today return that kindness to you.",
+  },
+  {
+    open: "your effort comes from a generous heart.",
+    close: "We see it, and we deeply appreciate you.",
+  },
+  {
+    open: "you make this team feel human and hopeful.",
+    close: "Your honesty sets a gentle, lasting tone.",
+  },
+  {
+    open: "your support means more than empty words.",
+    close: "Thank you for standing with us always.",
+  },
+  {
+    open: "you bring hope into quiet early mornings.",
+    close: "Even soft days feel fuller with you here.",
+  },
+  {
+    open: "your patience steadies everyone near you.",
+    close: "We grow kinder because you are around.",
+  },
+  {
+    open: "you make belonging look natural and easy.",
+    close: "This place feels whole when you are in.",
+  },
+  {
+    open: "your spirit softens the grind of the day.",
+    close: "Grateful you chose to be here with us.",
+  },
+  {
+    open: "you leave warmth in every quiet hallway.",
+    close: "May this day treat your heart gently too.",
+  },
+  {
+    open: "your care is felt deeply, never forced.",
+    close: "That sincerity is a gift to this team.",
+  },
+  {
+    open: "you help tired hearts feel less alone.",
+    close: "Thank you for the quiet strength you give.",
+  },
+  {
+    open: "your light reaches past roles and routines.",
+    close: "Today we celebrate simply having you here.",
+  },
 ] as const;
 
-/** All 8 chars. */
-const TEAM_FEEL = [
-  "brighter",
-  "stronger",
-  "steadier",
-  "composed",
-  "grounded",
-  "inspired",
-  "complete",
-  "grateful",
-] as const;
-
-/** All 16 chars. */
-const TEAM_WHEN = [
-  "when you walk in",
-  "when you show up",
-  "with you in here",
-  "by your side now",
-  "as you walked in",
-  "as you logged on",
-  "while you are in",
-  "next to us today",
-] as const;
-
-/** All 20 chars. */
-const EXEC_LEAD = [
-  "Aap ho the backbone.",
-  "System aap pe chale.",
-  "Aap the pillar, aaj.",
-  "Lead aap, speed hum.",
-  "Aapki spine pe fire.",
-  "Aapke hold pe chalo.",
-  "Aap ho backbone aaj.",
-  "Soch aapki, kaam ab.",
-  "Engine aapka, chalo.",
-  "Team follows aap ab.",
-  "Aap ho — hum strong.",
-  "Tum iska pillar ho —",
-  "Company aap par hai.",
-  "Vision aapka, chalo.",
-  "Poori company aapki.",
-  "Team aapke saath ab.",
-  "Dum aapka, chalo ab.",
-  "Aap captain, chalo —",
-  "Haath aapke, result.",
-  "Strength aapki, aaj.",
-] as const;
-
-/** All 21 chars. */
-const EXEC_PUSH = [
-  "Aaj crack karke jao —",
-  "Humko productive karo",
-  "Aaj aage le ke chalo.",
-  "Team ko sharp rakhna.",
-  "Speed do, clarity do.",
-  "Aaj ka din jeetna hai",
-  "Lead tight, move fast",
-  "Make us sharp aaj hi.",
-  "Pillar banke khade ho",
-  "Focus tight, go hard.",
-  "Crack it — next gear.",
-  "Productive mode on ab",
-  "Aaj fire on karke jao",
-  "Keep us moving aaj hi",
-  "Aaj results nikal do.",
-  "Chalo crack this day.",
-  "Aaj productive raho —",
-  "Humein aage le jao ab",
-  "Team ko fire do aaj —",
-  "Prove it, aaj dikhao.",
+/**
+ * Heartfelt two-line executive messages — warm leadership tone.
+ */
+const EXEC_LINES = [
+  {
+    open: "your leadership feels human and steady.",
+    close: "People follow the heart you lead with.",
+  },
+  {
+    open: "your calm guides this company with care.",
+    close: "Thank you for leading with quiet strength.",
+  },
+  {
+    open: "your vision carries real care for people.",
+    close: "The team feels safer under your guidance.",
+  },
+  {
+    open: "you lead with dignity and an open heart.",
+    close: "That balance shapes how we work today.",
+  },
+  {
+    open: "your judgment steadies everyone around you.",
+    close: "Grateful for the trust you place in us.",
+  },
+  {
+    open: "you make purpose feel personal and true.",
+    close: "We rise because you lead with sincerity.",
+  },
+  {
+    open: "your presence settles the room with grace.",
+    close: "Leadership like yours feels deeply human.",
+  },
+  {
+    open: "you hold this team with genuine respect.",
+    close: "That respect returns to you every day.",
+  },
+  {
+    open: "your courage opens kinder, braver paths.",
+    close: "Thank you for choosing people, then pace.",
+  },
+  {
+    open: "you lead without ever losing your kindness.",
+    close: "That kindness is this company's true edge.",
+  },
+  {
+    open: "your clarity comforts the whole team here.",
+    close: "We move with confidence because of you.",
+  },
+  {
+    open: "you carry weight with soft, steady hands.",
+    close: "Strong and gentle — that is rare leadership.",
+  },
+  {
+    open: "your care reaches every corridor and desk.",
+    close: "People feel seen when you walk the floor.",
+  },
+  {
+    open: "you turn pressure into shared purpose here.",
+    close: "Today, we follow the example you set.",
+  },
+  {
+    open: "your faith in us lifts the work we do.",
+    close: "We will honor that faith with our best.",
+  },
+  {
+    open: "you make ambition feel humane and worthy.",
+    close: "Progress matters more with heart like yours.",
+  },
+  {
+    open: "your steadiness is shelter for this team.",
+    close: "Thank you for leading with quiet resolve.",
+  },
+  {
+    open: "you keep people before process, always.",
+    close: "That priority makes this place worth it.",
+  },
+  {
+    open: "your words land with sincerity and care.",
+    close: "We listen because we trust your intent.",
+  },
+  {
+    open: "you build belonging from the very top.",
+    close: "A culture of care starts with leaders like you.",
+  },
 ] as const;
 
 function hashString(value: string) {
@@ -92,70 +202,47 @@ function hashString(value: string) {
   return hash;
 }
 
-function cartesian3<A extends string, B extends string, C extends string>(
-  a: readonly A[],
-  b: readonly B[],
-  c: readonly C[],
-  join: (left: A, mid: B, right: C) => string,
-) {
-  const out: string[] = [];
-  for (const left of a) {
-    for (const mid of b) {
-      for (const right of c) {
-        out.push(join(left, mid, right));
-      }
-    }
-  }
-  return out;
-}
-
-function cartesian2<A extends string, B extends string>(
-  a: readonly A[],
-  b: readonly B[],
-  join: (left: A, right: B) => string,
-) {
-  const out: string[] = [];
-  for (const left of a) {
-    for (const right of b) {
-      out.push(join(left, right));
-    }
-  }
-  return out;
-}
-
-const TEAM_BODIES = cartesian3(
-  TEAM_WHO,
-  TEAM_FEEL,
-  TEAM_WHEN,
-  (who, feel, when) => `${who} feels ${feel} ${when}.`,
-);
-
-const EXEC_BODIES = cartesian2(
-  EXEC_LEAD,
-  EXEC_PUSH,
-  (lead, push) => `${lead} ${push}`,
-);
-
 function dayIndex(referenceDate: string) {
-  const ms = Date.parse(`${referenceDate}T00:00:00`);
-  return Number.isNaN(ms) ? 0 : Math.floor(ms / 86_400_000);
+  const trimmed = referenceDate.trim();
+  const ms = Date.parse(`${trimmed}T12:00:00`);
+  if (!Number.isNaN(ms)) return Math.floor(ms / 86_400_000);
+  const fallback = Date.parse(`${new Date().toISOString().slice(0, 10)}T12:00:00`);
+  return Math.floor(fallback / 86_400_000);
 }
 
-/** One unique line per person per day. Does not repeat until the pool wraps. */
+/** One heartfelt two-line message per person per calendar day. */
+export function resolveDailyBoostMessage(options: {
+  tone: DailyBoostTone;
+  referenceDate: string;
+  personKey: string;
+  name: string;
+}): DailyBoostMessage {
+  const pool = options.tone === "executive" ? EXEC_LINES : TEAM_LINES;
+  const key =
+    options.personKey.trim().toLowerCase() ||
+    options.name.trim().toLowerCase() ||
+    "guest";
+  const start = hashString(key) % pool.length;
+  const index = (start + dayIndex(options.referenceDate)) % pool.length;
+  const row = pool[index] ?? pool[0]!;
+  return {
+    line1: `${options.name}, ${row.open}`,
+    line2: row.close,
+  };
+}
+
+/** Flat string for callers that still expect a single line. */
 export function resolveDailyBoostLine(options: {
   tone: DailyBoostTone;
   referenceDate: string;
   personKey: string;
   name: string;
 }) {
-  const pool = options.tone === "executive" ? EXEC_BODIES : TEAM_BODIES;
-  const start = hashString(options.personKey.trim().toLowerCase() || options.name) % pool.length;
-  const index = (start + dayIndex(options.referenceDate)) % pool.length;
-  const body = pool[index] ?? pool[0];
-  return `${options.name}, ${body}`;
+  const message = resolveDailyBoostMessage(options);
+  return `${message.line1} ${message.line2}`;
 }
 
 export const DAILY_BOOST_POOL_SIZE = {
-  team: TEAM_BODIES.length,
-  executive: EXEC_BODIES.length,
+  team: TEAM_LINES.length,
+  executive: EXEC_LINES.length,
 };

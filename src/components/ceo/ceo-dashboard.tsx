@@ -75,7 +75,7 @@ export function CeoDashboard({ data, error }: CeoDashboardProps) {
                 personKey={employeeId}
                 referenceDate={referenceDate}
                 tone="executive"
-                className="min-h-0 flex-1"
+                className="min-h-[11.5rem] flex-[1.15]"
               />
             </div>
             <EmployeeUpcomingEvents

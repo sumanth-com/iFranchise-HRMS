@@ -1,13 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { Sparkles } from "lucide-react";
+import { format } from "date-fns";
 
 import dashArt from "@/assets/Dash.png";
 import {
-  resolveDailyBoostLine,
+  resolveDailyBoostMessage,
   type DailyBoostTone,
 } from "@/lib/dashboard/daily-boost-messages";
+import { getDailyBoostDisplayName } from "@/lib/employees/parse-employee-name";
 import { cn } from "@/lib/utils";
 
 type DailyBoostCardProps = {
@@ -20,33 +21,30 @@ type DailyBoostCardProps = {
   tone?: DailyBoostTone;
 };
 
-function givenName(firstName?: string) {
-  const parts = firstName?.trim().split(/\s+/).filter(Boolean) ?? [];
-  return parts.at(-1) || "there";
-}
-
 export function DailyBoostCard({
   firstName,
+  lastName,
   personKey,
   referenceDate,
   className,
   compact = false,
   tone = "team",
 }: DailyBoostCardProps) {
-  const name = givenName(firstName);
-  const message = resolveDailyBoostLine({
+  const name = getDailyBoostDisplayName(firstName ?? "", lastName ?? "");
+  const dayKey = referenceDate?.trim() || format(new Date(), "yyyy-MM-dd");
+  const message = resolveDailyBoostMessage({
     tone,
-    referenceDate: referenceDate ?? "",
+    referenceDate: dayKey,
     personKey: personKey ?? name,
     name,
   });
 
   return (
     <section
-      aria-label="Daily boost"
+      aria-label="Daily message"
       className={cn(
         "relative overflow-hidden rounded-2xl",
-        compact ? "min-h-[7.5rem]" : "min-h-0",
+        compact ? "min-h-[7.5rem]" : "min-h-[11rem]",
         className,
       )}
     >
@@ -55,48 +53,47 @@ export function DailyBoostCard({
         alt=""
         fill
         sizes="(max-width: 1024px) 100vw, 55vw"
-        className="object-cover object-center"
+        className="object-cover object-[center_28%]"
         priority={false}
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#12082a]/55 via-[#12082a]/15 to-transparent"
         aria-hidden
       />
 
       <div
         className={cn(
-          "relative z-10 flex h-full items-center",
-          compact ? "p-3" : "p-5 sm:p-6",
+          "relative z-10 flex h-full items-start",
+          compact ? "p-3 pt-3.5" : "p-5 pt-5 sm:p-6 sm:pt-6",
         )}
       >
         <div
           className={cn(
-            "w-full max-w-[20rem] rounded-xl bg-white/12 shadow-[0_10px_28px_-14px_rgba(15,8,40,0.55)] ring-1 ring-white/22 backdrop-blur-md",
-            compact ? "px-3 py-2.5" : "px-4 py-3.5 sm:px-5 sm:py-4",
+            "w-full max-w-[24rem] rounded-2xl bg-[#0b0618]/45 shadow-[0_12px_32px_-16px_rgba(8,4,24,0.7)] ring-1 ring-white/18 backdrop-blur-md",
+            compact ? "px-3.5 py-3" : "px-4 py-3.5 sm:px-5 sm:py-4",
           )}
         >
-          <span
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full bg-white/15 font-semibold tracking-wide text-white uppercase ring-1 ring-white/25",
-              compact ? "px-2 py-0.5 text-[9px]" : "px-2.5 py-1 text-[10px]",
-            )}
-          >
-            <Sparkles className={compact ? "size-3" : "size-3.5"} strokeWidth={2.4} aria-hidden />
-            Daily boost
-          </span>
-
           <blockquote
             className={cn(
-              "mt-2.5 text-left font-medium text-pretty text-white",
+              "text-left font-medium text-pretty text-white",
               compact
-                ? "text-[12px] leading-relaxed"
-                : "text-sm leading-relaxed sm:text-[15px] sm:leading-snug",
+                ? "text-[12px] leading-snug"
+                : "text-sm leading-snug sm:text-[15px] sm:leading-snug",
             )}
           >
-            <span aria-hidden className="mr-1 font-serif text-white/55">
-              &ldquo;
-            </span>
-            {message}
-            <span aria-hidden className="ml-0.5 font-serif text-white/55">
-              &rdquo;
-            </span>
+            <p className="line-clamp-1">
+              <span aria-hidden className="mr-1 font-serif text-white/50">
+                &ldquo;
+              </span>
+              {message.line1}
+            </p>
+            <p className="mt-1 line-clamp-1 text-white/92">
+              {message.line2}
+              <span aria-hidden className="ml-0.5 font-serif text-white/50">
+                &rdquo;
+              </span>
+            </p>
           </blockquote>
         </div>
       </div>

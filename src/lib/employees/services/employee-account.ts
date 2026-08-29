@@ -620,12 +620,13 @@ export async function assignPendingInviteRole(
   roleId: string,
 ) {
   const employee = await getEmployeeAccountRow(employeeId, profile.employee.organizationId);
-  const pendingLike =
+  const awaitingPortal =
     employee.account_status === "invitation_pending" ||
     employee.account_status === "draft" ||
-    employee.account_status === "invited";
+    employee.account_status === "invited" ||
+    (employee.account_status === "active" && !employee.user_id && !employee.first_login_at);
 
-  if (!pendingLike) {
+  if (!awaitingPortal) {
     throw new Error("Role can only be changed for pending invitations.");
   }
 
@@ -689,12 +690,13 @@ export async function updatePendingProvisioningEmployeeDetails(
   },
 ) {
   const employee = await getEmployeeAccountRow(employeeId, profile.employee.organizationId);
-  const pendingLike =
+  const awaitingPortal =
     employee.account_status === "invitation_pending" ||
     employee.account_status === "draft" ||
-    employee.account_status === "invited";
+    employee.account_status === "invited" ||
+    (employee.account_status === "active" && !employee.user_id && !employee.first_login_at);
 
-  if (!pendingLike) {
+  if (!awaitingPortal) {
     throw new Error("Only pending invitations can be edited.");
   }
 
@@ -1131,10 +1133,11 @@ export async function resendEmployeeInvitation(
     (await adminLookupInvitedRoleId(employee.id)) ||
     (await getInviteableRoleByCode(createAdminClient(), employee.organization_id, "employee")).id;
 
-  let authUserId = employee.user_id;
-  if (employee.user_id && !employee.first_login_at) {
+  // Keep a single Auth user for this email: replace the unaccepted invite user, then re-invite.
+  let authUserId = employee.user_id ?? (await findAuthUserIdByEmail(employee.email));
+  if (authUserId && !employee.first_login_at) {
     const admin = createAdminClient();
-    await admin.auth.admin.deleteUser(employee.user_id);
+    await admin.auth.admin.deleteUser(authUserId).catch(() => {});
     authUserId = null;
   }
 

@@ -89,7 +89,8 @@ export function NotificationCenterSplitView({
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isPending, startTransition] = useTransition();
+  const [isDeleting, startDeleteTransition] = useTransition();
+  const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<NotificationListItem | null>(null);
   const [bulkSelectMode, setBulkSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -99,6 +100,8 @@ export function NotificationCenterSplitView({
   );
   const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
   const markedOnServerRef = useRef<Set<string>>(new Set());
+  /** Local selection is ahead of the URL until history/replace catches up. */
+  const localSelectionIdRef = useRef<string | null>(null);
 
   const urlSelectedId = selectedId ?? searchParams.get("id") ?? null;
 
@@ -107,25 +110,12 @@ export function NotificationCenterSplitView({
     [readIds, result.items],
   );
 
-  // Keep detail open from local state so Unread → mark-read refresh cannot auto-close it.
+  // Keep detail open from local state so list refresh cannot auto-switch it.
   const selected = useMemo(() => {
     if (!activeNotification) return null;
     const fresh = displayItems.find((item) => item.id === activeNotification.id);
     return fresh ?? withReadStatus(activeNotification, readIds);
   }, [activeNotification, displayItems, readIds]);
-
-  useEffect(() => {
-    if (!urlSelectedId) return;
-    const raw = result.items.find((item) => item.id === urlSelectedId);
-    if (!raw) return;
-    setActiveNotification((prev) => {
-      const display = withReadStatus(raw, readIds);
-      return prev?.id === display.id ? prev : display;
-    });
-    if (raw.status === "unread" && !readIds.has(raw.id)) {
-      markAsRead(raw);
-    }
-  }, [urlSelectedId, result.items, readIds]);
 
   const visibleIds = useMemo(
     () => result.items.map((item) => item.id),
@@ -144,7 +134,7 @@ export function NotificationCenterSplitView({
     });
   }, [visibleIds]);
 
-  const setParams = useCallback(
+  const buildParams = useCallback(
     (updates: Record<string, string | undefined>) => {
       const params = new URLSearchParams(searchParams.toString());
       if (preserveQuery) {
@@ -156,9 +146,33 @@ export function NotificationCenterSplitView({
         if (!value) params.delete(key);
         else params.set(key, value);
       }
+      return params;
+    },
+    [preserveQuery, searchParams],
+  );
+
+  /** Full navigation — tabs / search / pagination (needs fresh server data). */
+  const setParams = useCallback(
+    (updates: Record<string, string | undefined>) => {
+      const params = buildParams(updates);
       router.replace(`${centerPath}?${params.toString()}`);
     },
-    [centerPath, preserveQuery, router, searchParams],
+    [buildParams, centerPath, router],
+  );
+
+  /**
+   * Selection-only URL sync without RSC refetch/Suspense remount.
+   * Prevents the open notification from jumping when mark-as-read or list props refresh.
+   */
+  const syncSelectionInUrl = useCallback(
+    (id: string | undefined) => {
+      const params = buildParams({ id });
+      const next = `${centerPath}?${params.toString()}`;
+      if (typeof window !== "undefined") {
+        window.history.replaceState(window.history.state, "", next);
+      }
+    },
+    [buildParams, centerPath],
   );
 
   function exitBulkSelectMode() {
@@ -214,28 +228,53 @@ export function NotificationCenterSplitView({
     if (markedOnServerRef.current.has(item.id)) return;
     markedOnServerRef.current.add(item.id);
 
-    startTransition(async () => {
+    // Fire-and-forget — do not use shared transitions (keeps toolbar/list interactive).
+    void (async () => {
       const res = await runServerActionSafely(() => markNotificationReadAction(item.id));
       if (res === null) return;
-      // No router.refresh() on success: read state is already applied optimistically
-      // above, and refreshing would drop the Router Cache, making the next module
-      // navigation render cold.
       if (!res.success) {
         markedOnServerRef.current.delete(item.id);
         toast.error(res.message);
       }
-    });
+    })();
   }
 
+  // Deep-link / first paint only — never overwrite a newer local click with a stale URL id.
+  useEffect(() => {
+    if (!urlSelectedId) return;
+
+    const localId = localSelectionIdRef.current;
+    if (localId && localId !== urlSelectedId) {
+      return;
+    }
+
+    const raw = result.items.find((item) => item.id === urlSelectedId);
+    if (!raw) return;
+
+    setActiveNotification((prev) => {
+      if (prev?.id === raw.id) return prev;
+      if (localId && localId !== raw.id) return prev;
+      return withReadStatus(raw, readIds);
+    });
+    localSelectionIdRef.current = urlSelectedId;
+
+    if (raw.status === "unread" && !readIds.has(raw.id)) {
+      markAsRead(raw);
+    }
+    // Intentionally omit readIds: marking read must not re-drive selection from the URL.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- hydrate from URL id + list only
+  }, [urlSelectedId, result.items]);
+
   function confirmDelete(item: NotificationListItem) {
-    startTransition(async () => {
+    startDeleteTransition(async () => {
       const res = await runServerActionSafely(() => deleteNotificationAction(item.id));
       if (res === null) return;
       if (res.success) {
         toast.success("Notification deleted");
         if (activeNotification?.id === item.id) {
+          localSelectionIdRef.current = null;
           setActiveNotification(null);
-          setParams({ id: undefined });
+          syncSelectionInUrl(undefined);
         }
         setDeleteTarget(null);
         router.refresh();
@@ -249,7 +288,7 @@ export function NotificationCenterSplitView({
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
 
-    startTransition(async () => {
+    startDeleteTransition(async () => {
       const res = await runServerActionSafely(() =>
         deleteSelectedNotificationsAction(ids),
       );
@@ -262,8 +301,9 @@ export function NotificationCenterSplitView({
             : "No notifications deleted",
         );
         if (activeNotification && ids.includes(activeNotification.id)) {
+          localSelectionIdRef.current = null;
           setActiveNotification(null);
-          setParams({ id: undefined });
+          syncSelectionInUrl(undefined);
         }
         exitBulkSelectMode();
         router.refresh();
@@ -279,17 +319,22 @@ export function NotificationCenterSplitView({
       return;
     }
     const raw = result.items.find((item) => item.id === displayItem.id);
+    localSelectionIdRef.current = displayItem.id;
     // Open detail immediately — do not wait for navigation/refresh.
     setActiveNotification(withReadStatus(raw ?? displayItem, readIds));
-    setParams({ id: displayItem.id });
-    if (raw?.status === "unread" && !readIds.has(raw.id)) {
-      markAsRead(raw);
+    syncSelectionInUrl(displayItem.id);
+    if (
+      (raw?.status === "unread" || displayItem.status === "unread") &&
+      !readIds.has(displayItem.id)
+    ) {
+      markAsRead(raw ?? displayItem);
     }
   }
 
   function closeDetail() {
+    localSelectionIdRef.current = null;
     setActiveNotification(null);
-    setParams({ id: undefined });
+    syncSelectionInUrl(undefined);
   }
 
   return (
@@ -311,6 +356,7 @@ export function NotificationCenterSplitView({
                   type="button"
                   onClick={() => {
                     exitBulkSelectMode();
+                    localSelectionIdRef.current = null;
                     setActiveNotification(null);
                     setParams({
                       [filterParamKey]: item.value,
@@ -335,7 +381,7 @@ export function NotificationCenterSplitView({
                     variant="ghost"
                     size="sm"
                     className="h-8"
-                    disabled={isPending || visibleIds.length === 0}
+                    disabled={isDeleting || visibleIds.length === 0}
                     onClick={() => toggleSelectAllVisible(!allVisibleSelected)}
                   >
                     {allVisibleSelected ? "Clear selection" : "Select all"}
@@ -345,7 +391,7 @@ export function NotificationCenterSplitView({
                     variant="ghost"
                     size="sm"
                     className="h-8 gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                    disabled={isPending || selectedCount === 0}
+                    disabled={isDeleting || selectedCount === 0}
                     onClick={() => setBulkDeleteConfirmOpen(true)}
                   >
                     <Trash2 className="size-3.5" />
@@ -356,7 +402,7 @@ export function NotificationCenterSplitView({
                     variant="outline"
                     size="sm"
                     className="h-8"
-                    disabled={isPending}
+                    disabled={isDeleting}
                     onClick={exitBulkSelectMode}
                   >
                     Cancel
@@ -368,7 +414,6 @@ export function NotificationCenterSplitView({
                   variant="ghost"
                   size="sm"
                   className="h-8 gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  disabled={isPending || result.total === 0}
                   onClick={() => {
                     setBulkSelectMode(true);
                     setSelectedIds(new Set());
@@ -394,12 +439,13 @@ export function NotificationCenterSplitView({
                     className="h-9 w-full pl-9"
                     onKeyDown={(event) => {
                       if (event.key === "Enter") {
+                        localSelectionIdRef.current = null;
+                        setActiveNotification(null);
                         setParams({
                           search: event.currentTarget.value || undefined,
                           page: "1",
                           id: undefined,
                         });
-                        setActiveNotification(null);
                       }
                     }}
                   />
@@ -410,32 +456,46 @@ export function NotificationCenterSplitView({
                   variant="outline"
                   size="sm"
                   className="h-9 shrink-0"
-                  disabled={isPending}
+                  disabled={isMarkingAllRead}
                   onClick={() => {
-                    startTransition(async () => {
-                      const unreadIds = displayItems
-                        .filter((item) => item.status === "unread")
-                        .map((item) => item.id);
-                      if (unreadIds.length > 0) {
-                        setReadIds((prev) => {
-                          const next = new Set(prev);
-                          unreadIds.forEach((id) => next.add(id));
-                          return next;
-                        });
-                        unreadIds.forEach((id) => dispatchNotificationRead(id));
+                    if (isMarkingAllRead) return;
+                    setIsMarkingAllRead(true);
+                    void (async () => {
+                      try {
+                        const unreadIds = displayItems
+                          .filter((item) => item.status === "unread")
+                          .map((item) => item.id);
+                        if (unreadIds.length > 0) {
+                          setReadIds((prev) => {
+                            const next = new Set(prev);
+                            unreadIds.forEach((id) => next.add(id));
+                            return next;
+                          });
+                          unreadIds.forEach((id) => {
+                            markedOnServerRef.current.add(id);
+                            dispatchNotificationRead(id);
+                          });
+                        }
+                        const res = await runServerActionSafely(() =>
+                          markAllNotificationsReadAction(),
+                        );
+                        if (res === null) return;
+                        if (res.success) {
+                          toast.success("All notifications marked as read");
+                          // Keep the open detail; only refresh list counts/status.
+                          router.refresh();
+                        } else toast.error(res.message);
+                      } finally {
+                        setIsMarkingAllRead(false);
                       }
-                      const res = await runServerActionSafely(() =>
-                        markAllNotificationsReadAction(),
-                      );
-                      if (res === null) return;
-                      if (res.success) {
-                        toast.success("All notifications marked as read");
-                        router.refresh();
-                      } else toast.error(res.message);
-                    });
+                    })();
                   }}
                 >
-                  {isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                  {isMarkingAllRead ? (
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                  ) : (
+                    <Check className="mr-2 size-4" />
+                  )}
                   Mark all read
                 </Button>
               ) : null}
@@ -457,7 +517,7 @@ export function NotificationCenterSplitView({
                   key={item.id}
                   item={item}
                   isActive={selected?.id === item.id}
-                  isPending={isPending}
+                  isDeleting={isDeleting}
                   bulkSelectMode={bulkSelectMode}
                   isChecked={selectedIds.has(item.id)}
                   onToggleSelect={(checked) => toggleSelect(item.id, checked)}
@@ -532,12 +592,12 @@ export function NotificationCenterSplitView({
             </Button>
             <Button
               variant="destructive"
-              disabled={isPending}
+              disabled={isDeleting}
               onClick={() => {
                 if (deleteTarget) confirmDelete(deleteTarget);
               }}
             >
-              {isPending ? "Deleting…" : "Delete"}
+              {isDeleting ? "Deleting…" : "Delete"}
             </Button>
           </>
         }
@@ -565,10 +625,10 @@ export function NotificationCenterSplitView({
             </Button>
             <Button
               variant="destructive"
-              disabled={isPending || selectedCount === 0}
+              disabled={isDeleting || selectedCount === 0}
               onClick={confirmSelectedDelete}
             >
-              {isPending
+              {isDeleting
                 ? "Deleting…"
                 : `Delete ${selectedCount} notification${selectedCount === 1 ? "" : "s"}`}
             </Button>
@@ -587,7 +647,7 @@ export function NotificationCenterSplitView({
 function NotificationListRow({
   item,
   isActive,
-  isPending,
+  isDeleting,
   bulkSelectMode,
   isChecked,
   onToggleSelect,
@@ -597,7 +657,7 @@ function NotificationListRow({
 }: {
   item: NotificationListItem;
   isActive: boolean;
-  isPending: boolean;
+  isDeleting: boolean;
   bulkSelectMode: boolean;
   isChecked: boolean;
   onToggleSelect: (checked: boolean) => void;
@@ -608,8 +668,12 @@ function NotificationListRow({
   return (
     <div
       className={cn(
-        "flex items-start gap-1 border-b transition-colors",
-        isActive || isChecked ? "bg-accent" : "hover:bg-muted/60",
+        "relative flex items-start gap-1 border-b transition-colors",
+        isActive
+          ? "bg-primary/[0.08] before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-primary"
+          : isChecked
+            ? "bg-muted"
+            : "hover:bg-muted/60",
       )}
     >
       {bulkSelectMode ? (
@@ -618,7 +682,7 @@ function NotificationListRow({
             type="checkbox"
             className="size-4 rounded border-input"
             checked={isChecked}
-            disabled={isPending}
+            disabled={isDeleting}
             onChange={(event) => onToggleSelect(event.target.checked)}
             onClick={(event) => event.stopPropagation()}
             aria-label={`Select ${item.title}`}
@@ -635,7 +699,11 @@ function NotificationListRow({
           <p
             className={cn(
               "line-clamp-1 text-sm",
-              item.status === "unread" ? "font-semibold text-foreground" : "font-medium",
+              isActive
+                ? "font-semibold text-foreground"
+                : item.status === "unread"
+                  ? "font-semibold text-foreground"
+                  : "font-medium",
             )}
           >
             {item.title}
@@ -659,7 +727,7 @@ function NotificationListRow({
                 size="icon"
                 className="mr-1 mt-2 size-8 shrink-0"
                 aria-label="Notification actions"
-                disabled={isPending}
+                disabled={isDeleting}
                 onClick={(event) => event.stopPropagation()}
               >
                 <MoreHorizontal className="size-4" />
