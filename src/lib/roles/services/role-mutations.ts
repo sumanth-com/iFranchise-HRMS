@@ -665,6 +665,22 @@ export async function changeUserRole(
 
   if (error) throw new Error(error.message);
 
+  // Remove any other active role rows so portal access matches the new role only.
+  const now = new Date().toISOString();
+  await supabase
+    .schema("hrms")
+    .from("user_roles")
+    .update({
+      status: "inactive",
+      deleted_at: now,
+      updated_by: profile.userId,
+      updated_at: now,
+    })
+    .eq("organization_id", orgId)
+    .eq("user_id", assignment.user_id)
+    .neq("id", userRoleId)
+    .is("deleted_at", null);
+
   if (assignment.employee_id) {
     await supabase
       .schema("hrms")

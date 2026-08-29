@@ -335,7 +335,6 @@ export function CeoProvisioningPeople({
         {onSearchChange && onFetchSearchSuggestions ? (
           <CeoProvisioningUserSearch
             value={searchQuery ?? ""}
-            disabled={isRefreshing}
             className="w-full min-w-[12rem] sm:w-[min(100%,16rem)]"
             onChange={onSearchChange}
             onFetchSuggestions={onFetchSearchSuggestions}

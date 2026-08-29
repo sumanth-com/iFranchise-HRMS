@@ -78,6 +78,8 @@ export const updatePendingProvisioningUserSchema = z.object({
     .optional()
     .or(z.literal("")),
   employmentTypeId: z.string().uuid("Select an employment type").optional().nullable(),
+  reportingManagerId: z.string().uuid("Select a manager").optional().nullable(),
+  assignedHrEmployeeId: z.string().uuid("Select an HR contact").optional().nullable(),
 });
 
 export const changeProvisioningRoleSchema = z.object({

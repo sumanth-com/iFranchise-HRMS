@@ -38,9 +38,10 @@ function NavbarChrome({ compact = false }: PublicNavbarProps) {
   const pathname = usePathname();
   const isLandingRoute = pathname === PUBLIC_LANDING_ROUTE;
   const landingCta = useContext(LandingCtaContext);
-  const isLandingCta = landingCta != null;
-  const showGetStarted = isLandingCta && landingCta.isMobileOrTablet;
+  const isMobileOrTablet = landingCta?.isMobileOrTablet ?? false;
   const handleCta = landingCta?.handleLandingCta ?? navigateToLogin;
+  /** Mobile/tablet landing: no Get Started in the navbar. Desktop keeps Sign In. */
+  const showDesktopSignIn = compact || !isMobileOrTablet;
 
   useEffect(() => {
     const onScroll = () => {
@@ -79,8 +80,6 @@ function NavbarChrome({ compact = false }: PublicNavbarProps) {
     for (const element of elements) observer.observe(element);
     return () => observer.disconnect();
   }, [compact, isLandingRoute]);
-
-  const mobileCtaLabel = showGetStarted ? "Get Started" : "Sign In";
 
   return (
     <header className={cn("landing-nav", scrolled && "landing-nav--scrolled")}>
@@ -126,24 +125,21 @@ function NavbarChrome({ compact = false }: PublicNavbarProps) {
         )}
 
         <div className="landing-nav-actions">
-          {compact ? (
+          {showDesktopSignIn ? (
             <button
               type="button"
               onClick={handleCta}
-              className="landing-nav-signin landing-nav-signin--outline"
+              className={cn(
+                "landing-nav-signin",
+                compact
+                  ? "landing-nav-signin--outline"
+                  : "landing-nav-cta landing-nav-cta--desktop-only",
+              )}
             >
               Sign In
+              {!compact ? <ArrowRight className="size-3.5" aria-hidden /> : null}
             </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleCta}
-              className="landing-nav-signin landing-nav-cta-desktop"
-            >
-              Get Started
-              <ArrowRight className="size-3.5" aria-hidden />
-            </button>
-          )}
+          ) : null}
 
           {!compact ? (
             <button
@@ -151,7 +147,7 @@ function NavbarChrome({ compact = false }: PublicNavbarProps) {
               className="landing-nav-menu-btn"
               aria-expanded={menuOpen}
               aria-controls="public-mobile-nav"
-              aria-label="Open menu"
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
               onClick={() => setMenuOpen((open) => !open)}
             >
               <span className="sr-only">Menu</span>
@@ -175,17 +171,6 @@ function NavbarChrome({ compact = false }: PublicNavbarProps) {
                     {link.label}
                   </Link>
                 ))}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    handleCta();
-                  }}
-                  className="landing-nav-signin mt-2 w-full"
-                >
-                  {mobileCtaLabel}
-                  <ArrowRight className="size-4" aria-hidden />
-                </button>
               </nav>
             </div>
           ) : null}

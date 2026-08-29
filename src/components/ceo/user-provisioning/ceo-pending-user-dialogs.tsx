@@ -68,6 +68,8 @@ export function CeoPendingEditDialog({
       departmentId: null,
       designation: "",
       employmentTypeId: null,
+      reportingManagerId: null,
+      assignedHrEmployeeId: null,
     },
   });
 
@@ -77,18 +79,55 @@ export function CeoPendingEditDialog({
       employeeId: user.employeeId,
       firstName: user.firstName,
       lastName: user.lastName,
-      departmentId:
-        lookups.departments.find((d) => d.label === user.departmentName)?.id ?? null,
+      departmentId: user.departmentId,
       designation: user.designationTitle ?? "",
-      employmentTypeId: null,
+      employmentTypeId: user.employmentTypeId,
+      reportingManagerId: user.reportingManagerId,
+      assignedHrEmployeeId: user.assignedHrEmployeeId,
     });
     setSubmitError(null);
-  }, [open, user, lookups.departments, form]);
+  }, [open, user, form]);
+
+  const roleCode = (user?.roleCode ?? "").toLowerCase();
+  const isManagerRole = roleCode === "manager";
+  const isHrRole =
+    roleCode === "hr_admin" ||
+    roleCode === "hr_executive" ||
+    roleCode === "super_admin";
+  const isExecutiveRole =
+    roleCode === "ceo" ||
+    roleCode === "co_founder" ||
+    roleCode === "founder";
+
+  /** Manager → HR only. HR / CEO / exec → neither. Employee (default) → both. */
+  const showManagerField = !isManagerRole && !isHrRole && !isExecutiveRole;
+  const showHrField = !isHrRole && !isExecutiveRole;
+
+  const managerItems = useMemo(
+    () =>
+      lookups.managers
+        .filter((item) => item.id !== user?.employeeId)
+        .map((item) => ({ value: item.id, label: item.label })),
+    [lookups.managers, user?.employeeId],
+  );
+
+  const hrItems = useMemo(
+    () =>
+      (lookups.hrApprovers ?? [])
+        .filter((item) => item.id !== user?.employeeId)
+        .map((item) => ({ value: item.id, label: item.label })),
+    [lookups.hrApprovers, user?.employeeId],
+  );
 
   const onSubmit = form.handleSubmit((data) => {
     setSubmitError(null);
     startTransition(async () => {
-      const result = await updatePendingProvisioningUserAction(data);
+      const payload: UpdatePendingProvisioningUserInput = {
+        ...data,
+        reportingManagerId: showManagerField ? data.reportingManagerId ?? null : null,
+        assignedHrEmployeeId: showHrField ? data.assignedHrEmployeeId ?? null : null,
+      };
+      const result = await updatePendingProvisioningUserAction(payload);
       if (!result.success) {
         setSubmitError(result.message);
         return;
@@ -149,6 +188,46 @@ export function CeoPendingEditDialog({
               }
             />
           </div>
+          {showManagerField || showHrField ? (
+            <div
+              className={
+                showManagerField && showHrField
+                  ? "grid gap-3 sm:grid-cols-2"
+                  : "grid gap-3"
+              }
+            >
+              {showManagerField ? (
+                <div className="space-y-2">
+                  <Label>Manager</Label>
+                  <LabeledSelect
+                    value={form.watch("reportingManagerId") ?? ""}
+                    placeholder="Select manager"
+                    items={managerItems}
+                    onValueChange={(value) =>
+                      form.setValue("reportingManagerId", value || null, {
+                        shouldValidate: true,
+                      })
+                    }
+                  />
+                </div>
+              ) : null}
+              {showHrField ? (
+                <div className="space-y-2">
+                  <Label>HR</Label>
+                  <LabeledSelect
+                    value={form.watch("assignedHrEmployeeId") ?? ""}
+                    placeholder="Select HR contact"
+                    items={hrItems}
+                    onValueChange={(value) =>
+                      form.setValue("assignedHrEmployeeId", value || null, {
+                        shouldValidate: true,
+                      })
+                    }
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel

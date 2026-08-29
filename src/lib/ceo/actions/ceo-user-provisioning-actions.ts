@@ -73,9 +73,21 @@ type ActionResult =
 
 function toProvisioningErrorMessage(error: unknown, fallback: string): string {
   const message = error instanceof Error ? error.message.trim() : "";
-  if (!message) return fallback;
+  if (!message) {
+    console.error("[user-provisioning]", error);
+    return fallback;
+  }
+
+  console.error("[user-provisioning]", message);
+
   if (looksLikeTechnicalAuthError(message)) return fallback;
   if (message.length > 180) return fallback;
+
+  // Internal role-resolution failures — not a form field the user can fix mid-resend.
+  if (/select a valid role for this invitation/i.test(message)) {
+    return fallback;
+  }
+
   return message;
 }
 
@@ -323,6 +335,7 @@ async function runManageAction(
   ) => Promise<void>,
   successMessage: string,
   requireService = false,
+  failureFallback = "We couldn't complete that action right now. Please try again.",
 ): Promise<ActionResult> {
   try {
     if (requireService && !hasSupabaseServiceRoleEnv()) {
@@ -340,7 +353,7 @@ async function runManageAction(
   } catch (error) {
     return {
       success: false,
-      message: toProvisioningErrorMessage(error, "Action failed. Please try again."),
+      message: toProvisioningErrorMessage(error, failureFallback),
     };
   }
 }
@@ -351,8 +364,9 @@ export async function resendProvisioningInvitationAction(
   return runManageAction(
     employeeId,
     resendExecutiveInvitation,
-    "Invitation resent successfully. The previous invitation link is no longer valid.",
+    "Invitation sent successfully.",
     true,
+    "We couldn't send the invitation right now. Please try again.",
   );
 }
 

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, Copy, Monitor } from "lucide-react";
+import { Check, Copy, Sparkles } from "lucide-react";
 
 import { LandingDesktopPreview } from "@/components/landing/landing-desktop-preview";
 import { Button } from "@/components/common/button";
@@ -34,8 +34,12 @@ export function LandingDesktopExperience({
     };
   }, []);
 
+  useEffect(() => {
+    if (!open) setCopied(false);
+  }, [open]);
+
   const handleCopyLink = useCallback(async () => {
-    const url = window.location.href;
+    const url = window.location.origin;
 
     try {
       await navigator.clipboard.writeText(url);
@@ -76,45 +80,45 @@ export function LandingDesktopExperience({
           <LandingDesktopPreview />
 
           <div className="mt-5 flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-violet-700">
-            <Monitor className="size-3.5" strokeWidth={2.4} aria-hidden />
-            Desktop recommended
+            <Sparkles className="size-3.5" strokeWidth={2.4} aria-hidden />
+            Built for desktop
           </div>
 
-          <DialogTitle className="mt-3 text-center text-2xl font-bold tracking-tight text-slate-900">
-            Best experience on desktop
+          <DialogTitle className="mt-3 text-center text-2xl font-bold tracking-tight text-slate-900 text-balance">
+            Your full HRMS, ready on desktop
           </DialogTitle>
-          <DialogDescription className="mt-2 text-center text-sm leading-relaxed text-slate-600">
-            The full iFranchise HRMS experience is optimized for larger screens — dashboards,
-            approvals, and day-to-day workflows feel best on desktop.
+          <DialogDescription className="mt-2 text-center text-sm leading-relaxed text-slate-600 text-pretty">
+            Browse iFranchise here, then continue on a larger screen for the complete workspace —
+            dashboards, approvals, and day-to-day HR workflows.
           </DialogDescription>
 
           <div className="mt-6 flex flex-col gap-2.5">
             <Button
               type="button"
-              onClick={handleCopyLink}
+              onClick={() => onOpenChange(false)}
               className="landing-desktop-experience-primary h-11 rounded-full text-sm font-semibold"
+            >
+              Back to home
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 rounded-full border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              onClick={handleCopyLink}
             >
               {copied ? (
                 <Check className="size-4" strokeWidth={2.6} aria-hidden />
               ) : (
                 <Copy className="size-4" strokeWidth={2.3} aria-hidden />
               )}
-              {copied ? "Link copied" : "Continue on Desktop"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11 rounded-full border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              onClick={() => onOpenChange(false)}
-            >
-              Back to Landing Page
+              {copied ? "Link copied" : "Copy Desktop Link"}
             </Button>
           </div>
 
           <p className="mt-3 text-center text-xs text-slate-500" aria-live="polite">
             {copied
-              ? "Paste the link into your computer's browser to continue."
-              : "Copy this page's link and open it on your computer."}
+              ? "Paste the link in your computer browser to continue."
+              : "Optional: copy a link to open iFranchise on your computer."}
           </p>
         </div>
       </DialogContent>

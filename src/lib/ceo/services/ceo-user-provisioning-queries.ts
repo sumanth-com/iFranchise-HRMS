@@ -6,6 +6,7 @@ import {
   loadExecutiveDirectoryRoleCodes,
   loadUserProvisioningInviteRoles,
 } from "@/lib/user-provisioning/provisionable-roles";
+import { listEligibleHrLeaveApproverOptions } from "@/lib/leave/services/leave-queries";
 import type { UserProfile } from "@/types/auth";
 import type { LookupOption } from "@/types/employee";
 import {
@@ -58,7 +59,6 @@ function normalizePortalKey(value: string | null | undefined) {
 type LooseRow = Record<string, any>;
 
 type NormalizedExecutiveUser = CeoProvisioningUser & {
-  employmentTypeId: string | null;
   employmentTypeName: string | null;
   joiningDate: string | null;
   firstLoginAt: string | null;
@@ -134,11 +134,21 @@ function buildProvisioningUserRow(
     roleCode,
     portalKey,
     roleLabel: ROLE_LABELS[roleCode] ?? role.name ?? roleCode,
+    departmentId: employee.department_id ? String(employee.department_id) : null,
     departmentName: department?.name ?? null,
     branchName: branch?.name ?? null,
     designationTitle: designation?.title ?? null,
+    employmentTypeId: employee.employment_type_id
+      ? String(employee.employment_type_id)
+      : null,
+    reportingManagerId: employee.reporting_manager_id
+      ? String(employee.reporting_manager_id)
+      : null,
     reportingManagerName: manager
       ? fullName(manager.first_name, manager.last_name) || null
+      : null,
+    assignedHrEmployeeId: employee.assigned_hr_employee_id
+      ? String(employee.assigned_hr_employee_id)
       : null,
     invitationStatus: deriveInvitationStatus(employee),
     accountStatus: String(employee.account_status ?? "draft"),
@@ -147,7 +157,6 @@ function buildProvisioningUserRow(
     acceptedAt: employee.account_activated_at ?? employee.first_login_at ?? null,
     lastActivityAt: employee.last_login_at ?? employee.updated_at ?? null,
     isSelf: employee.id === profile.employee.id,
-    employmentTypeId: employee.employment_type_id ?? null,
     employmentTypeName: employmentType?.name ?? null,
     joiningDate: employee.date_of_joining ?? null,
     firstLoginAt: employee.first_login_at ?? null,
@@ -161,7 +170,8 @@ const EMPLOYEE_SELECT_FIELDS = `
   first_login_at, last_login_at, account_activated_at,
   account_deactivated_at, account_suspended_at, created_by,
   updated_at, date_of_joining, employment_type_id, invited_role_id,
-  department_id, branch_id, designation_id, reporting_manager_id, deleted_at,
+  department_id, branch_id, designation_id, reporting_manager_id,
+  assigned_hr_employee_id, deleted_at,
   departments:department_id ( name ),
   branches:branch_id ( name ),
   designations:designation_id ( title ),
@@ -313,7 +323,8 @@ async function loadExecutiveUsers(
         first_login_at, last_login_at, account_activated_at,
         account_deactivated_at, account_suspended_at, created_by,
         updated_at, date_of_joining, employment_type_id, invited_role_id,
-        department_id, branch_id, designation_id, reporting_manager_id, deleted_at,
+        department_id, branch_id, designation_id, reporting_manager_id,
+        assigned_hr_employee_id, deleted_at,
         departments:department_id ( name ),
         branches:branch_id ( name ),
         designations:designation_id ( title ),
@@ -595,14 +606,12 @@ function paginateUsers(
 
 function stripInternal(user: NormalizedExecutiveUser): CeoProvisioningUser {
   const {
-    employmentTypeId: _employmentTypeId,
     employmentTypeName: _employmentTypeName,
     joiningDate: _joiningDate,
     firstLoginAt: _firstLoginAt,
     invitationCancelledAt: _invitationCancelledAt,
     ...rest
   } = user;
-  void _employmentTypeId;
   void _employmentTypeName;
   void _joiningDate;
   void _firstLoginAt;
@@ -652,6 +661,7 @@ export async function getCeoProvisioningLookups(
     branchesRes,
     employmentTypesRes,
     managersRes,
+    hrApprovers,
   ] = await Promise.all([
       loadUserProvisioningInviteRoles(supabase, organizationId),
       fromHrms(supabase, "departments")
@@ -681,6 +691,7 @@ export async function getCeoProvisioningLookups(
         .eq("organization_id", organizationId)
         .eq("status", "active")
         .is("deleted_at", null),
+      listEligibleHrLeaveApproverOptions(organizationId),
     ]);
 
   for (const res of [departmentsRes, branchesRes, employmentTypesRes, managersRes]) {
@@ -745,6 +756,7 @@ export async function getCeoProvisioningLookups(
       label: row.name,
     })),
     managers,
+    hrApprovers,
     portals: portalOptions,
     statuses: statusOptions,
   };

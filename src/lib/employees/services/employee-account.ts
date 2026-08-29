@@ -687,6 +687,8 @@ export async function updatePendingProvisioningEmployeeDetails(
     departmentId?: string | null;
     designationId?: string | null;
     employmentTypeId?: string | null;
+    reportingManagerId?: string | null;
+    assignedHrEmployeeId?: string | null;
   },
 ) {
   const employee = await getEmployeeAccountRow(employeeId, profile.employee.organizationId);
@@ -709,6 +711,12 @@ export async function updatePendingProvisioningEmployeeDetails(
   if (input.designationId !== undefined) updates.designation_id = input.designationId;
   if (input.employmentTypeId !== undefined) {
     updates.employment_type_id = input.employmentTypeId;
+  }
+  if (input.reportingManagerId !== undefined) {
+    updates.reporting_manager_id = input.reportingManagerId;
+  }
+  if (input.assignedHrEmployeeId !== undefined) {
+    updates.assigned_hr_employee_id = input.assignedHrEmployeeId;
   }
 
   await updateEmployeeAccount(employee.id, updates);

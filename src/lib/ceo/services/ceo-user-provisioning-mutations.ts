@@ -17,7 +17,7 @@ import { resolveOrCreateDesignation } from "@/lib/employees/services/employee-mu
 import { createSalaryStructure } from "@/lib/payroll/services/payroll-mutations";
 import { fromHrms, unwrapRelation } from "@/lib/reports/services/reports-utils";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getInviteableRoleByCode } from "@/lib/auth/iam-roles";
+import { getInviteableRoleByCode, getOrganizationActiveRoleById } from "@/lib/auth/iam-roles";
 import { assertProvisionableRole } from "@/lib/user-provisioning/provisionable-roles";
 import { notifyProvisioningStakeholders } from "@/lib/user-provisioning/notifications";
 import type { UserProfile } from "@/types/auth";
@@ -289,6 +289,8 @@ export async function updatePendingProvisioningUser(
     departmentId: input.departmentId,
     designationId,
     employmentTypeId: input.employmentTypeId,
+    reportingManagerId: input.reportingManagerId,
+    assignedHrEmployeeId: input.assignedHrEmployeeId,
   });
 
   await audit(
@@ -318,15 +320,26 @@ export async function resendExecutiveInvitation(
     .is("deleted_at", null)
     .maybeSingle();
 
-  if (error) throw new Error("Unable to send invitation. Please try again.");
+  if (error) {
+    console.error("[user-provisioning] resend load employee failed", error.message);
+    throw new Error("We couldn't send the invitation right now. Please try again.");
+  }
   if (!employee) throw new Error("User not found.");
 
   if (employee.user_id && (employee.account_status === "active" || employee.first_login_at)) {
     throw new Error("This employee already has portal access.");
   }
 
-  let roleId: string | undefined =
-    typeof employee.invited_role_id === "string" ? employee.invited_role_id : undefined;
+  // Pending accounts: invited_role_id is the source of truth (not user_roles).
+  let roleId: string | undefined;
+  if (typeof employee.invited_role_id === "string" && employee.invited_role_id.trim()) {
+    const assignedRole = await getOrganizationActiveRoleById(
+      admin,
+      profile.employee.organizationId,
+      employee.invited_role_id,
+    );
+    roleId = assignedRole.id;
+  }
 
   if (!roleId) {
     const roleCode = await resolveEmployeeRoleCode(
@@ -337,12 +350,13 @@ export async function resendExecutiveInvitation(
     if (roleCode) {
       try {
         const inviteRole = await getInviteableRoleByCode(
-          createAdminClient(),
+          admin,
           profile.employee.organizationId,
           roleCode,
         );
         roleId = inviteRole.id;
-      } catch {
+      } catch (resolveError) {
+        console.error("[user-provisioning] resend role fallback failed", resolveError);
         roleId = undefined;
       }
     }
@@ -358,7 +372,7 @@ export async function resendExecutiveInvitation(
   } else if (awaitingFirstInvite) {
     if (!roleId) {
       const fallbackRole = await getInviteableRoleByCode(
-        createAdminClient(),
+        admin,
         profile.employee.organizationId,
         "employee",
       );

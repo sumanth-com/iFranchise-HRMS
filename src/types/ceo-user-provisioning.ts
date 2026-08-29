@@ -80,10 +80,14 @@ export type CeoProvisioningUser = {
   roleCode: string;
   portalKey: PortalKey | null;
   roleLabel: string;
+  departmentId: string | null;
   departmentName: string | null;
   branchName: string | null;
   designationTitle: string | null;
+  employmentTypeId: string | null;
+  reportingManagerId: string | null;
   reportingManagerName: string | null;
+  assignedHrEmployeeId: string | null;
   invitationStatus: ProvisioningInvitationStatus;
   accountStatus: string;
   sentByName: string | null;
@@ -126,6 +130,7 @@ export type CeoProvisioningLookups = {
   branches: LookupOption[];
   employmentTypes: LookupOption[];
   managers: LookupOption[];
+  hrApprovers: LookupOption[];
   portals: LookupOption[];
   statuses: LookupOption[];
 };
