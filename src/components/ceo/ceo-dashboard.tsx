@@ -25,7 +25,7 @@ export function CeoDashboard({ data, error }: CeoDashboardProps) {
 
   if (error) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 md:p-5">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 md:p-5">
         <ErrorState title="Unable to load executive dashboard" description={error} />
       </div>
     );
@@ -40,10 +40,10 @@ export function CeoDashboard({ data, error }: CeoDashboardProps) {
     <ClientSectionBoundary
       title="Unable to load executive dashboard"
       description="Please try again. If this keeps happening, refresh the page or contact your administrator."
-      className="m-4 md:m-5"
+      contentClassName="flex min-h-0 flex-1 flex-col"
     >
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-5">
-        <div className="mx-auto flex w-full max-w-[88rem] flex-col gap-4">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 md:p-5">
+        <div className="mx-auto flex h-full min-h-0 w-full max-w-[88rem] flex-col gap-3">
           <div className="shrink-0">
             <EmployeeDashboardHeader
               greeting={{
@@ -63,9 +63,9 @@ export function CeoDashboard({ data, error }: CeoDashboardProps) {
             <CeoDashboardKpis kpis={data.kpis} />
           </div>
 
-          <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[3fr_2fr] lg:items-stretch">
-            <div className="flex min-h-0 flex-col gap-3 lg:gap-4">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:gap-4">
+          <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[3fr_2fr] lg:items-stretch">
+            <div className="flex min-h-0 flex-col gap-3">
+              <div className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2">
                 <CeoDashboardToday attendance={data.attendance} />
                 <CeoDashboardPipeline recruitment={data.recruitment} />
               </div>
@@ -75,13 +75,13 @@ export function CeoDashboard({ data, error }: CeoDashboardProps) {
                 personKey={employeeId}
                 referenceDate={referenceDate}
                 tone="executive"
-                className="min-h-[15rem] lg:min-h-[16rem] flex-1"
+                className="min-h-0 flex-1"
               />
             </div>
             <EmployeeUpcomingEvents
               events={data.upcomingHolidays ?? []}
               referenceDate={referenceDate}
-              className="min-h-0 lg:h-full"
+              className="min-h-0 h-full"
             />
           </div>
         </div>

@@ -1,7 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import { Sparkles } from "lucide-react";
 
+import dashArt from "@/assets/Dash.png";
 import {
   resolveDailyBoostLine,
   type DailyBoostTone,
@@ -43,49 +45,60 @@ export function DailyBoostCard({
     <section
       aria-label="Daily boost"
       className={cn(
-        "daily-boost-card relative flex flex-col justify-center overflow-hidden rounded-2xl",
-        compact ? "min-h-[7.5rem] p-4" : "min-h-[16rem] p-5 sm:p-6 lg:p-7",
+        "relative overflow-hidden rounded-2xl",
+        compact ? "min-h-[7.5rem]" : "min-h-0",
         className,
       )}
     >
-      <div className="daily-boost-glow daily-boost-glow--a" aria-hidden />
-      <div className="daily-boost-glow daily-boost-glow--b" aria-hidden />
+      <Image
+        src={dashArt}
+        alt=""
+        fill
+        sizes="(max-width: 1024px) 100vw, 55vw"
+        className="object-cover object-center"
+        priority={false}
+        aria-hidden
+      />
 
-      <div className="relative z-10 flex flex-col items-start">
-        <span
+      <div
+        className={cn(
+          "relative z-10 flex h-full items-center",
+          compact ? "p-3" : "p-5 sm:p-6",
+        )}
+      >
+        <div
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-full bg-white/15 font-semibold tracking-wide text-white uppercase ring-1 ring-white/25",
-            compact ? "px-2 py-0.5 text-[9px]" : "px-2.5 py-1 text-[10px]",
+            "w-full max-w-[20rem] rounded-xl bg-white/12 shadow-[0_10px_28px_-14px_rgba(15,8,40,0.55)] ring-1 ring-white/22 backdrop-blur-md",
+            compact ? "px-3 py-2.5" : "px-4 py-3.5 sm:px-5 sm:py-4",
           )}
         >
-          <Sparkles className={compact ? "size-3" : "size-3.5"} strokeWidth={2.4} aria-hidden />
-          Daily boost
-        </span>
-
-        <blockquote
-          className={cn(
-            "mt-3 max-w-[34rem] text-left font-medium text-pretty text-white",
-            compact
-              ? "text-[13px] leading-relaxed"
-              : "text-base leading-relaxed sm:text-lg sm:leading-relaxed lg:text-[1.35rem] lg:leading-snug",
-          )}
-        >
-          <span aria-hidden className="mr-1 font-serif text-white/55">
-            &ldquo;
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full bg-white/15 font-semibold tracking-wide text-white uppercase ring-1 ring-white/25",
+              compact ? "px-2 py-0.5 text-[9px]" : "px-2.5 py-1 text-[10px]",
+            )}
+          >
+            <Sparkles className={compact ? "size-3" : "size-3.5"} strokeWidth={2.4} aria-hidden />
+            Daily boost
           </span>
-          {message}
-          <span aria-hidden className="ml-0.5 font-serif text-white/55">
-            &rdquo;
-          </span>
-        </blockquote>
 
-        <span
-          className={cn(
-            "mt-4 block rounded-full bg-white/35",
-            compact ? "h-0.5 w-8" : "h-1 w-12",
-          )}
-          aria-hidden
-        />
+          <blockquote
+            className={cn(
+              "mt-2.5 text-left font-medium text-pretty text-white",
+              compact
+                ? "text-[12px] leading-relaxed"
+                : "text-sm leading-relaxed sm:text-[15px] sm:leading-snug",
+            )}
+          >
+            <span aria-hidden className="mr-1 font-serif text-white/55">
+              &ldquo;
+            </span>
+            {message}
+            <span aria-hidden className="ml-0.5 font-serif text-white/55">
+              &rdquo;
+            </span>
+          </blockquote>
+        </div>
       </div>
     </section>
   );

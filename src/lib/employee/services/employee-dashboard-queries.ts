@@ -1,4 +1,4 @@
-import { addDays, format, isWithinInterval, parseISO } from "date-fns";
+import { addDays, format, isWithinInterval } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
@@ -103,13 +103,17 @@ async function loadLeaveKpis(
   };
 }
 
+function parseLocalDate(ymd: string): Date {
+  const [year, month, day] = ymd.slice(0, 10).split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
 function nextOccurrence(monthDay: string, from: Date): Date | null {
   const [mm, dd] = monthDay.split("-").map(Number);
   if (!mm || !dd) return null;
   const thisYear = new Date(from.getFullYear(), mm - 1, dd);
-  if (thisYear >= new Date(from.getFullYear(), from.getMonth(), from.getDate())) {
-    return thisYear;
-  }
+  const fromDay = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  if (thisYear >= fromDay) return thisYear;
   return new Date(from.getFullYear() + 1, mm - 1, dd);
 }
 
@@ -127,92 +131,117 @@ function upcomingWithinDays(
   return null;
 }
 
+const ACTIVE_EMPLOYMENT = ["active", "probation", "on_leave"] as const;
+
 export async function loadUpcomingCelebrations(
   supabase: AuthSupabaseClient,
   organizationId: string,
   today: string,
 ): Promise<EmployeeUpcomingEvent[]> {
-  const todayDate = parseISO(today);
+  const todayDate = parseLocalDate(today);
   const windowEnd = format(addDays(todayDate, 7), "yyyy-MM-dd");
-
-  const [holidaysResult, birthdayProfilesResult] = await Promise.all([
-    supabase
-      .schema("hrms")
-      .from("holidays")
-      .select("id, name, holiday_date, is_optional, holiday_type")
-      .eq("organization_id", organizationId)
-      .is("deleted_at", null)
-      .gte("holiday_date", today)
-      .lte("holiday_date", windowEnd)
-      .order("holiday_date")
-      .limit(8),
-    supabase
-      .schema("hrms")
-      .from("employee_profiles")
-      .select(
-        `employee_id, date_of_birth, profile_image_storage_path,
-         employees:employee_id!inner(
-           id, employee_code, first_name, last_name, organization_id, employment_status
-         )`,
-      )
-      .eq("employees.organization_id", organizationId)
-      .in("employees.employment_status", ["active", "probation", "on_leave"])
-      .is("deleted_at", null)
-      .not("date_of_birth", "is", null),
-  ]);
-
-  if (holidaysResult.error) throw new Error(holidaysResult.error.message);
-  if (birthdayProfilesResult.error) throw new Error(birthdayProfilesResult.error.message);
-
   const events: EmployeeUpcomingEvent[] = [];
 
-  for (const holiday of holidaysResult.data ?? []) {
-    const rawType = (holiday as { holiday_type?: string | null }).holiday_type;
-    const formattedType = rawType
-      ? rawType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-      : null;
-    const subtitle = holiday.is_optional
-      ? "Optional Holiday"
-      : formattedType || "Company Holiday";
+  const holidaysResult = await supabase
+    .schema("hrms")
+    .from("holidays")
+    .select("id, name, holiday_date, is_optional, holiday_type")
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .gte("holiday_date", today)
+    .lte("holiday_date", windowEnd)
+    .order("holiday_date")
+    .limit(8);
 
-    events.push({
-      id: `holiday-${holiday.id}`,
-      type: "holiday",
-      title: holiday.name,
-      subtitle,
-      date: holiday.holiday_date,
-    });
+  if (holidaysResult.error) {
+    console.error("[celebrations] holidays query failed", holidaysResult.error.message);
+  } else {
+    for (const holiday of holidaysResult.data ?? []) {
+      const rawType = (holiday as { holiday_type?: string | null }).holiday_type;
+      const formattedType = rawType
+        ? rawType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+        : null;
+      const subtitle = holiday.is_optional
+        ? "Optional Holiday"
+        : formattedType || "Company Holiday";
+
+      events.push({
+        id: `holiday-${holiday.id}`,
+        type: "holiday",
+        title: holiday.name,
+        subtitle,
+        date: holiday.holiday_date,
+      });
+    }
   }
 
-  for (const row of birthdayProfilesResult.data ?? []) {
-    const employee = Array.isArray(row.employees) ? row.employees[0] : row.employees;
-    if (!employee) continue;
-    const dob = row.date_of_birth as string | null | undefined;
-    const bday = upcomingWithinDays(dob, todayDate, 7);
-    if (!bday) continue;
+  // Birthdays: employees + profiles as separate queries so a join/RLS quirk
+  // cannot drop the whole celebrations panel (or hide DOBs for executives).
+  try {
+    const employeesResult = await supabase
+      .schema("hrms")
+      .from("employees")
+      .select("id, employee_code, first_name, last_name, employment_status")
+      .eq("organization_id", organizationId)
+      .in("employment_status", [...ACTIVE_EMPLOYMENT])
+      .is("deleted_at", null);
 
-    const firstName = (employee.first_name as string | null) ?? "";
-    const lastName = (employee.last_name as string | null) ?? "";
-    const fullName = `${firstName} ${lastName}`.trim() || "Team member";
+    if (employeesResult.error) throw new Error(employeesResult.error.message);
 
-    events.push({
-      id: `birthday-${employee.id}`,
-      type: "birthday",
-      title: fullName,
-      subtitle: "Birthday",
-      date: format(bday, "yyyy-MM-dd"),
-      profileImagePath: (row.profile_image_storage_path as string | null) ?? null,
-      firstName,
-      lastName,
-    });
+    const employees = employeesResult.data ?? [];
+    const employeeIds = employees.map((row) => row.id as string);
+    const employeeById = new Map(employees.map((row) => [row.id as string, row]));
+
+    if (employeeIds.length > 0) {
+      const profilesResult = await supabase
+        .schema("hrms")
+        .from("employee_profiles")
+        .select("employee_id, date_of_birth, profile_image_storage_path")
+        .in("employee_id", employeeIds)
+        .is("deleted_at", null)
+        .not("date_of_birth", "is", null);
+
+      if (profilesResult.error) throw new Error(profilesResult.error.message);
+
+      for (const row of profilesResult.data ?? []) {
+        const employeeId = row.employee_id as string;
+        const employee = employeeById.get(employeeId);
+        if (!employee) continue;
+
+        const dob = row.date_of_birth as string | null | undefined;
+        const bday = upcomingWithinDays(dob, todayDate, 7);
+        if (!bday) continue;
+
+        const firstName = (employee.first_name as string | null) ?? "";
+        const lastName = (employee.last_name as string | null) ?? "";
+        const fullName = `${firstName} ${lastName}`.trim() || "Team member";
+
+        events.push({
+          id: `birthday-${employeeId}`,
+          type: "birthday",
+          title: fullName,
+          subtitle: "Birthday",
+          date: format(bday, "yyyy-MM-dd"),
+          profileImagePath: (row.profile_image_storage_path as string | null) ?? null,
+          firstName,
+          lastName,
+        });
+      }
+    }
+  } catch (error) {
+    console.error("[celebrations] birthdays query failed", error);
   }
 
   events.sort((a, b) => {
+    const typeRank = (type: EmployeeUpcomingEvent["type"]) =>
+      type === "birthday" ? 0 : type === "holiday" ? 1 : 2;
     const aIsToday = a.date === today;
     const bIsToday = b.date === today;
     if (aIsToday && !bIsToday) return -1;
     if (!aIsToday && bIsToday) return 1;
-    return a.date.localeCompare(b.date);
+    const byDate = a.date.localeCompare(b.date);
+    if (byDate !== 0) return byDate;
+    return typeRank(a.type) - typeRank(b.type);
   });
 
   return events;

@@ -111,7 +111,7 @@ function CelebrationFeaturedCard({
       <div className="flex items-start gap-3">
         <span
           className={cn(
-            "flex size-11 shrink-0 items-center justify-center rounded-xl bg-background/90 shadow-sm dark:bg-background/80",
+            "flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-background/90 shadow-sm dark:bg-background/80",
             isBirthday
               ? "ring-1 ring-rose-500/20 text-rose-600 dark:text-rose-400"
               : isAnniversary
