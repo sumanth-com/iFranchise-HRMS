@@ -19,7 +19,11 @@ import {
 } from "@/lib/auth/errors";
 import { loadUserProfile } from "@/lib/auth/profile-loader";
 import { getAuthenticatedRedirectPath } from "@/lib/auth/redirect";
-import { resolveApprovedLoginEmail, findEligiblePasswordResetTarget } from "@/lib/auth/login-email";
+import {
+  evaluatePortalLoginAccess,
+  findEligiblePasswordResetTarget,
+  resolveApprovedLoginEmail,
+} from "@/lib/auth/login-email";
 import { sendHrmsPasswordResetEmail } from "@/lib/auth/password-reset-service";
 import {
   clearPermissionCacheCookie,
@@ -135,6 +139,15 @@ export async function loginAction(
     }
 
     const { email: rawEmail, password, rememberMe } = parsed.data;
+    const portalAccess = await evaluatePortalLoginAccess(rawEmail);
+    if (portalAccess === "denied") {
+      return {
+        success: false,
+        error: "PORTAL_ACCESS_DENIED",
+        message: getAuthErrorMessage("PORTAL_ACCESS_DENIED"),
+      };
+    }
+
     const email = await resolveApprovedLoginEmail(rawEmail);
     const ctx = await getRequestAuditContext();
 

@@ -23,6 +23,7 @@ export const ROLE_LABELS: Record<string, string> = {
   hr_executive: "HR Executive",
   manager: "Manager",
   employee: "Employee",
+  super_admin: "Super Admin",
 };
 
 export type ProvisionableRoleOption = {

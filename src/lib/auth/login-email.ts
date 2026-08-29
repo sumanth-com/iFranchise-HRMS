@@ -7,10 +7,25 @@ const ELIGIBLE_ACCOUNT_STATUSES = new Set([
   "active",
 ]);
 
+/** Account statuses that must never receive portal sessions via password login. */
+const PORTAL_DENIED_ACCOUNT_STATUSES = new Set([
+  "draft",
+  "inactive",
+  "suspended",
+  "archived",
+]);
+
 type EmployeeEmailRow = {
   email: string;
   deleted_at: string | null;
   account_status: string;
+};
+
+type EmployeeLoginAccessRow = {
+  email: string;
+  deleted_at: string | null;
+  account_status: string;
+  user_id: string | null;
 };
 
 function unwrapEmployee(
@@ -20,12 +35,84 @@ function unwrapEmployee(
   return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
+function unwrapLoginAccessEmployee(
+  value: EmployeeLoginAccessRow | EmployeeLoginAccessRow[] | null | undefined,
+): EmployeeLoginAccessRow | null {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+function isPortalLoginDenied(employee: EmployeeLoginAccessRow): boolean {
+  if (employee.deleted_at) return true;
+  if (!employee.user_id) return true;
+  return PORTAL_DENIED_ACCOUNT_STATUSES.has(String(employee.account_status ?? ""));
+}
+
 function logResolveTiming(t0: number, label: string) {
   if (process.env.NODE_ENV !== "development") return;
   console.info("[login-timing]", {
     atMs: Math.round(performance.now() - t0),
     label: `resolveApprovedLoginEmail:${label}`,
   });
+}
+
+/**
+ * Server-side gate: known HRMS employees without portal-ready auth must be
+ * denied before (and independently of) Supabase credential checks.
+ */
+export async function evaluatePortalLoginAccess(
+  emailInput: string,
+): Promise<"allowed" | "denied"> {
+  const normalized = emailInput.trim().toLowerCase();
+  if (!normalized) return "allowed";
+
+  const admin = createAdminClient();
+
+  const { data: directMatch, error: directError } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select("email, account_status, deleted_at, user_id")
+    .eq("email", normalized)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (directError && process.env.NODE_ENV === "development") {
+    console.error("[evaluatePortalLoginAccess] employees lookup failed:", directError.message);
+  }
+
+  const direct = directMatch as EmployeeLoginAccessRow | null;
+  if (direct) {
+    return isPortalLoginDenied(direct) ? "denied" : "allowed";
+  }
+
+  const { data: profileMatch, error: profileError } = await admin
+    .schema("hrms")
+    .from("employee_profiles")
+    .select(
+      "personal_email, employees:employee_id(email, account_status, deleted_at, user_id)",
+    )
+    .eq("personal_email", normalized)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (profileError && process.env.NODE_ENV === "development") {
+    console.error(
+      "[evaluatePortalLoginAccess] personal email lookup failed:",
+      profileError.message,
+    );
+  }
+
+  const employee = unwrapLoginAccessEmployee(
+    profileMatch?.employees as
+      | EmployeeLoginAccessRow
+      | EmployeeLoginAccessRow[]
+      | null,
+  );
+  if (employee) {
+    return isPortalLoginDenied(employee) ? "denied" : "allowed";
+  }
+
+  return "allowed";
 }
 
 /**
@@ -122,7 +209,8 @@ async function lookupEligibleEmployeeAuthEmail(
   if (
     direct?.email &&
     direct.user_id &&
-    ELIGIBLE_ACCOUNT_STATUSES.has(direct.account_status)
+    ELIGIBLE_ACCOUNT_STATUSES.has(direct.account_status) &&
+    !PORTAL_DENIED_ACCOUNT_STATUSES.has(direct.account_status)
   ) {
     return String(direct.email).toLowerCase();
   }
@@ -151,7 +239,8 @@ async function lookupEligibleEmployeeAuthEmail(
     employee?.email &&
     employee.user_id &&
     !employee.deleted_at &&
-    ELIGIBLE_ACCOUNT_STATUSES.has(employee.account_status)
+    ELIGIBLE_ACCOUNT_STATUSES.has(employee.account_status) &&
+    !PORTAL_DENIED_ACCOUNT_STATUSES.has(employee.account_status)
   ) {
     return String(employee.email).toLowerCase();
   }

@@ -31,6 +31,7 @@ const PROFILE_ERROR_CODES: AuthErrorCode[] = [
   "EMPLOYEE_DELETED",
   "NO_ROLES",
   "ORGANIZATION_NOT_FOUND",
+  "PORTAL_ACCESS_DENIED",
 ];
 
 const SIGNED_OUT_TOAST_ID = "auth-signed-out";

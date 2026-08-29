@@ -8,6 +8,8 @@ const AUTH_ERROR_MESSAGES: Record<AuthErrorCode, string> = {
     "Your account has been deactivated. Contact your HR administrator if you need access restored.",
   EMPLOYEE_DELETED:
     "This employee record is no longer available. Contact your HR administrator.",
+  PORTAL_ACCESS_DENIED:
+    "Your account does not have access to this portal.",
   NO_ROLES:
     "No roles are assigned to your account. Contact your HR administrator.",
   ORGANIZATION_NOT_FOUND:
