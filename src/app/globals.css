@@ -1848,6 +1848,356 @@ html:not(.dark) .dashboard-surface:hover {
   }
 }
 
+/* ── Landing splash (first visit / session only) ─────────────────────── */
+html[data-landing-splash="playing"] {
+  overflow: hidden;
+}
+
+.landing-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  pointer-events: auto;
+  background: #4f46e5;
+  opacity: 1;
+  transform: scale(1);
+  will-change: opacity, transform;
+}
+
+.landing-splash--boot {
+  opacity: 1;
+}
+
+.landing-splash--exit {
+  animation: landing-splash-exit 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  pointer-events: none;
+}
+
+.landing-splash-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 38%, rgba(167, 139, 250, 0.45) 0%, transparent 62%),
+    radial-gradient(ellipse 55% 45% at 18% 78%, rgba(99, 102, 241, 0.5) 0%, transparent 58%),
+    radial-gradient(ellipse 50% 40% at 88% 18%, rgba(129, 140, 248, 0.42) 0%, transparent 55%),
+    linear-gradient(165deg, #6366f1 0%, #5f55ee 38%, #4f46e5 72%, #3730a3 100%);
+  opacity: 1;
+}
+
+.landing-splash--play .landing-splash-bg {
+  animation: landing-splash-bg-in 0.7s ease-out both;
+}
+
+.landing-splash-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(40px);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.landing-splash-orb--a {
+  width: min(42vw, 22rem);
+  height: min(42vw, 22rem);
+  top: 12%;
+  left: 8%;
+  background: rgba(196, 181, 253, 0.35);
+}
+
+.landing-splash-orb--b {
+  width: min(36vw, 18rem);
+  height: min(36vw, 18rem);
+  right: 6%;
+  bottom: 18%;
+  background: rgba(129, 140, 248, 0.32);
+}
+
+.landing-splash-orb--c {
+  width: min(28vw, 14rem);
+  height: min(28vw, 14rem);
+  left: 42%;
+  bottom: 8%;
+  background: rgba(165, 180, 252, 0.22);
+}
+
+.landing-splash--play .landing-splash-orb--a {
+  animation: landing-splash-orb-drift 2.6s ease-in-out both;
+}
+
+.landing-splash--play .landing-splash-orb--b {
+  animation: landing-splash-orb-drift 2.6s ease-in-out 0.15s both;
+}
+
+.landing-splash--play .landing-splash-orb--c {
+  animation: landing-splash-orb-drift 2.6s ease-in-out 0.28s both;
+}
+
+.landing-splash-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: min(100% - 2rem, 28rem);
+  flex-direction: column;
+  align-items: center;
+  padding-inline: 1rem;
+  text-align: center;
+}
+
+.landing-splash-brand {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.65rem, 2.4vw, 1rem);
+  max-width: 100%;
+  opacity: 0;
+  transform: scale(0.94);
+}
+
+.landing-splash--boot .landing-splash-brand {
+  opacity: 1;
+  transform: scale(0.96);
+}
+
+.landing-splash--play .landing-splash-brand {
+  animation: landing-splash-brand-in 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.landing-splash-glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(120%, 18rem);
+  height: min(220%, 7.5rem);
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.12) 40%, transparent 72%);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.88);
+  pointer-events: none;
+}
+
+.landing-splash--play .landing-splash-glow {
+  animation: landing-splash-glow-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.05s both;
+}
+
+.landing-splash-sweep {
+  position: absolute;
+  inset: -20% -8%;
+  overflow: hidden;
+  border-radius: 9999px;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.landing-splash-sweep::before {
+  content: "";
+  position: absolute;
+  top: -30%;
+  left: -35%;
+  width: 32%;
+  height: 160%;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.5) 48%,
+    transparent 100%
+  );
+  transform: translateX(-120%) rotate(16deg);
+}
+
+.landing-splash--play .landing-splash-sweep {
+  opacity: 1;
+}
+
+.landing-splash--play .landing-splash-sweep::before {
+  animation: landing-splash-sweep 0.9s cubic-bezier(0.4, 0, 0.2, 1) 0.75s both;
+}
+
+.landing-splash-logo {
+  position: relative;
+  z-index: 1;
+  width: clamp(2.6rem, 9vw, 4rem);
+  height: clamp(2.6rem, 9vw, 4rem);
+  flex-shrink: 0;
+  object-fit: contain;
+  border-radius: clamp(0.65rem, 2vw, 0.95rem);
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow:
+    0 14px 32px rgba(49, 46, 129, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.landing-splash-wordmark {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  flex-shrink: 0;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(1.35rem, 5.5vw, 2.15rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1;
+  white-space: nowrap;
+  color: #ffffff;
+  text-shadow: 0 1px 18px rgba(49, 46, 129, 0.25);
+}
+
+.landing-splash-tagline {
+  margin: clamp(0.95rem, 3vw, 1.25rem) 0 0;
+  max-width: min(100%, 22rem);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(0.82rem, 2.6vw, 1.05rem);
+  font-weight: 400;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+  color: rgba(237, 233, 254, 0.94);
+  text-wrap: balance;
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.landing-splash--play .landing-splash-tagline {
+  animation: landing-splash-copy-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) 1.15s both;
+}
+
+@keyframes landing-splash-bg-in {
+  from { opacity: 0.86; }
+  to { opacity: 1; }
+}
+
+@keyframes landing-splash-brand-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes landing-splash-glow-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes landing-splash-copy-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes landing-splash-sweep {
+  from { transform: translateX(-130%) rotate(16deg); }
+  to { transform: translateX(320%) rotate(16deg); }
+}
+
+@keyframes landing-splash-orb-drift {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.96);
+  }
+  25% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0.75;
+    transform: translate3d(6px, -10px, 0) scale(1.04);
+  }
+}
+
+@keyframes landing-splash-exit {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.03);
+  }
+}
+
+@media (min-width: 768px) {
+  .landing-splash-content {
+    width: min(100% - 2rem, 32rem);
+  }
+
+  .landing-splash-tagline {
+    max-width: 24rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .landing-splash-logo {
+    width: 4.25rem;
+    height: 4.25rem;
+  }
+
+  .landing-splash-wordmark {
+    font-size: 2.25rem;
+  }
+
+  .landing-splash-tagline {
+    font-size: 1.08rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-splash--play .landing-splash-bg,
+  .landing-splash--play .landing-splash-brand,
+  .landing-splash--play .landing-splash-glow,
+  .landing-splash--play .landing-splash-tagline,
+  .landing-splash--play .landing-splash-orb--a,
+  .landing-splash--play .landing-splash-orb--b,
+  .landing-splash--play .landing-splash-orb--c,
+  .landing-splash--play .landing-splash-sweep::before {
+    animation: none !important;
+  }
+
+  .landing-splash--play .landing-splash-brand,
+  .landing-splash--play .landing-splash-glow,
+  .landing-splash--play .landing-splash-tagline {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .landing-splash--play .landing-splash-glow {
+    transform: translate(-50%, -50%) !important;
+  }
+
+  .landing-splash--play .landing-splash-orb--a,
+  .landing-splash--play .landing-splash-orb--b,
+  .landing-splash--play .landing-splash-orb--c {
+    opacity: 0.55 !important;
+    transform: none !important;
+  }
+
+  .landing-splash--exit {
+    animation: landing-splash-fade-out-simple 0.28s ease forwards !important;
+  }
+}
+
+@keyframes landing-splash-fade-out-simple {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
 /* ── Pre-login landing page ─────────────────────────────────────────── */
 .landing-page {
   position: relative;

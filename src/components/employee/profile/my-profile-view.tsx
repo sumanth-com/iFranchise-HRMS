@@ -182,86 +182,84 @@ export function MyProfileView({
         onSubmit={handleSubmit(onSubmit)}
         className="flex min-h-0 flex-1 flex-col overflow-hidden"
       >
-        <div
-          className="relative shrink-0 overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-primary via-primary/95 to-indigo-600 px-4 py-5 sm:px-6 sm:py-6 dark:border-primary/30 dark:from-primary/90 dark:via-indigo-950 dark:to-slate-950"
-        >
+        <div className="relative shrink-0 overflow-hidden rounded-2xl border border-primary/15 bg-[#5f55ee] shadow-sm dark:border-primary/25">
           <div
-            className="pointer-events-none absolute inset-0 opacity-[0.22] dark:hidden"
+            className="pointer-events-none absolute inset-0"
             aria-hidden
             style={{
-              backgroundImage:
-                "linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.35) 40%, rgba(255,255,255,0.35) 42%, transparent 42%), linear-gradient(225deg, transparent 45%, rgba(255,255,255,0.2) 45%, rgba(255,255,255,0.2) 47%, transparent 47%)",
-              backgroundSize: "48px 48px",
+              background:
+                "radial-gradient(ellipse 80% 120% at 0% 0%, rgba(255,255,255,0.22) 0%, transparent 55%), radial-gradient(ellipse 70% 100% at 100% 100%, rgba(49,46,129,0.35) 0%, transparent 50%), linear-gradient(135deg, #6d64f0 0%, #5f55ee 48%, #4f46e5 100%)",
             }}
           />
           <div
-            className="pointer-events-none absolute inset-0 hidden opacity-[0.14] dark:block"
+            className="pointer-events-none absolute -right-10 -top-16 size-48 rounded-full bg-white/10 blur-2xl"
             aria-hidden
-            style={{
-              backgroundImage:
-                "linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.12) 40%, rgba(255,255,255,0.12) 42%, transparent 42%), linear-gradient(225deg, transparent 45%, rgba(255,255,255,0.08) 45%, rgba(255,255,255,0.08) 47%, transparent 47%)",
-              backgroundSize: "48px 48px",
-            }}
           />
           <div
-            className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/5 via-transparent to-black/10 dark:from-white/5 dark:to-black/35"
+            className="pointer-events-none absolute -bottom-20 -left-8 size-56 rounded-full bg-indigo-950/20 blur-3xl"
             aria-hidden
           />
-          <div className="absolute right-3 top-3 z-10 sm:right-4 sm:top-4">
-            {isEditing ? (
-              <div className="flex items-center gap-2">
+
+          <div className="relative z-[1] flex items-start justify-between gap-3 px-4 py-5 sm:px-6 sm:py-6">
+            <div className="min-w-0 flex-1 pr-2 sm:pr-4">
+              <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-white/75">
+                My profile
+              </p>
+              <h1 className="mt-1.5 truncate text-2xl font-semibold tracking-tight text-white sm:text-[1.7rem]">
+                {displayName}
+              </h1>
+              <p className="mt-1.5 inline-flex max-w-full items-center rounded-full bg-white/15 px-2.5 py-0.5 text-sm text-white/95 ring-1 ring-white/20 backdrop-blur-sm">
+                <span className="truncate">{roleLine}</span>
+              </p>
+            </div>
+
+            <div className="shrink-0">
+              {isEditing ? (
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    className="bg-white/95 text-foreground hover:bg-white"
+                    disabled={isPending}
+                    onClick={handleCancelEdit}
+                  >
+                    <X className="size-4" />
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="bg-white text-primary hover:bg-white/90"
+                    disabled={isPending}
+                    onClick={handleSubmit(onSubmit)}
+                  >
+                    {isPending ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Save className="size-4" />
+                    )}
+                    Save
+                  </Button>
+                </div>
+              ) : (
                 <Button
                   type="button"
                   size="sm"
                   variant="secondary"
                   className="bg-white/95 text-foreground hover:bg-white"
-                  disabled={isPending}
-                  onClick={handleCancelEdit}
+                  onClick={handleStartEdit}
                 >
-                  <X className="size-4" />
-                  Cancel
+                  <Pencil className="size-4" />
+                  Edit
                 </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="bg-white text-primary hover:bg-white/90"
-                  disabled={isPending}
-                  onClick={handleSubmit(onSubmit)}
-                >
-                  {isPending ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Save className="size-4" />
-                  )}
-                  Save
-                </Button>
-              </div>
-            ) : (
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                className="bg-white/95 text-foreground hover:bg-white"
-                onClick={handleStartEdit}
-              >
-                <Pencil className="size-4" />
-                Edit
-              </Button>
-            )}
-          </div>
-          <div className="relative z-[1] flex flex-col items-center px-10 py-1 text-center sm:px-14">
-            <p className="text-xs font-medium uppercase tracking-wider text-primary-foreground/80">
-              My profile
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-primary-foreground sm:text-[1.65rem]">
-              {displayName}
-            </h1>
-            <p className="mt-1 text-sm text-primary-foreground/85">{roleLine}</p>
+              )}
+            </div>
           </div>
         </div>
 
         <div className="mt-4 grid min-h-0 gap-4 lg:grid-cols-[minmax(0,17.5rem)_minmax(0,1fr)] lg:items-start">
-          <div className="mx-auto flex w-full max-w-[17.5rem] flex-col lg:mx-0">
+          <div className="mx-auto flex w-full max-w-[17.5rem] flex-col lg:mx-0 lg:max-w-none">
             <EmployeeIdCard
               employeeId={data.employeeId}
               firstName={data.firstName}
@@ -279,6 +277,12 @@ export function MyProfileView({
               hideHeaderLabel
               className="w-full max-w-full shadow-md"
             />
+            <p className="mt-3 w-full max-w-full text-[0.8rem] leading-relaxed text-muted-foreground">
+              <span className="font-semibold text-foreground/80">Note:</span> Place your cursor
+              over the photo area on the ID card
+              <br />
+              to upload or update your profile picture.
+            </p>
           </div>
 
           <div className="rounded-xl border bg-card p-3.5 shadow-xs sm:p-5">
