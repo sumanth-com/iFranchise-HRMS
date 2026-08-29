@@ -2,9 +2,11 @@ import { siteConfig } from "@/config/site";
 import { loadApproverIdentity } from "@/lib/approvals/approver-identity";
 import { approvalActionUrl, getApprovalTokenTtlHours } from "@/lib/approvals/constants";
 import {
+  assertLeaveApprovalEmailHtml,
   renderApprovalRequestEmail,
   renderApproverConfirmationEmail,
   renderEmployeeDecisionEmail,
+  renderLeaveApprovalRequestEmail,
 } from "@/lib/approvals/email-templates";
 import { getApprovalHandler } from "@/lib/approvals/registry";
 import {
@@ -125,13 +127,27 @@ export async function dispatchApprovalEmails(params: {
     });
     if (!token) continue;
 
-    const html = renderApprovalRequestEmail({
-      summary,
-      approverName: identity.name,
-      approveUrl: absoluteUrl(approvalActionUrl(token.rawToken, "approve")),
-      rejectUrl: absoluteUrl(approvalActionUrl(token.rawToken, "reject")),
-      expiresInHours: getApprovalTokenTtlHours(),
-    });
+    const html =
+      handler.type === "leave"
+        ? renderLeaveApprovalRequestEmail({
+            summary,
+            approverName: identity.name,
+            approveUrl: absoluteUrl(approvalActionUrl(token.rawToken, "approve")),
+            rejectUrl: absoluteUrl(approvalActionUrl(token.rawToken, "reject")),
+            expiresInHours: getApprovalTokenTtlHours(),
+          })
+        : renderApprovalRequestEmail({
+            summary,
+            approverName: identity.name,
+            approveUrl: absoluteUrl(approvalActionUrl(token.rawToken, "approve")),
+            rejectUrl: absoluteUrl(approvalActionUrl(token.rawToken, "reject")),
+            expiresInHours: getApprovalTokenTtlHours(),
+          });
+
+    // Belt-and-suspenders: never dispatch leave HTML that still contains portal CTAs.
+    if (handler.type === "leave") {
+      assertLeaveApprovalEmailHtml(html);
+    }
 
     const result = await sendApprovalMail(identity.email, summary.subject, html);
 
