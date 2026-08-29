@@ -275,13 +275,13 @@ export function MyProfileView({
               profilePath={data.profilePath}
               canEdit={true}
               hideHeaderLabel
-              className="w-full max-w-full shadow-md"
+              className="w-full max-w-full"
             />
-            <p className="mt-3 w-full max-w-full text-[0.8rem] leading-relaxed text-muted-foreground">
+            <p className="mt-3 w-full text-center text-[0.8rem] leading-snug text-muted-foreground">
               <span className="font-semibold text-foreground/80">Note:</span> Place your cursor
-              over the photo area on the ID card
+              over the photo area
               <br />
-              to upload or update your profile picture.
+              on the ID card to upload your profile picture.
             </p>
           </div>
 

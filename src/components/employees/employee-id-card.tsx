@@ -212,13 +212,10 @@ export function EmployeeIdCard({
     >
       <div
         className={cn(
-          "card-surface-static relative flex h-full flex-col overflow-hidden rounded-[1.65rem] border bg-card",
-          "border-border/80 shadow-[0_2px_6px_rgba(15,23,42,0.06),0_18px_42px_-18px_rgba(15,23,42,0.28)]",
-          "dark:border-white/20 dark:bg-[#070d1a] dark:shadow-[0_2px_10px_rgba(0,0,0,0.45),0_22px_48px_-18px_rgba(0,0,0,0.7)]",
+          "card-surface-static relative flex h-full flex-col overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm",
+          "dark:border-white/15 dark:bg-[#070d1a] dark:shadow-none",
         )}
       >
-        <div className="pointer-events-none absolute inset-0 z-20 rounded-[1.65rem] ring-1 ring-inset ring-black/[0.04] dark:ring-white/14" />
-
         {hideHeaderLabel ? null : (
           <div className="absolute left-4 top-4 z-10 rounded-full bg-white/90 px-3 py-1 text-[0.65rem] font-semibold tracking-[0.16em] text-neutral-600 shadow-sm backdrop-blur dark:bg-black/70 dark:text-white dark:ring-1 dark:ring-white/25">
             DIGITAL ID
@@ -340,14 +337,14 @@ export function EmployeeIdCard({
                 d="M0 68V28C44 10 86 4 128 10C178 18 210 38 260 46C300 52 330 46 360 36V68H0Z"
               />
             </svg>
-            <div className="relative min-h-[10.5rem] bg-gradient-to-br from-white via-[#f4eefc] to-[#d9c8f0] px-5 pb-6 pt-10 text-center">
-              <p className="break-words text-[1.2rem] font-bold leading-snug tracking-tight text-neutral-950">
+            <div className="relative flex min-h-[10.5rem] flex-col items-center justify-center bg-gradient-to-br from-white via-[#f4eefc] to-[#d9c8f0] px-5 pb-6 pt-10 text-center">
+              <p className="w-full break-words text-[1.2rem] font-bold leading-snug tracking-tight text-neutral-950">
                 {fullName}
               </p>
-              <p className="mt-2 line-clamp-2 break-words text-[0.82rem] leading-snug text-neutral-500">
+              <p className="mt-2 w-full line-clamp-2 break-words text-[0.82rem] leading-snug text-neutral-500">
                 {roleAndId}
               </p>
-              <div className="mt-3.5 flex flex-wrap items-center justify-center gap-2">
+              <div className="mt-3.5 flex w-full flex-wrap items-center justify-center gap-2">
                 <p className="inline-flex w-fit rounded-full bg-white/70 px-2.5 py-1 text-[0.68rem] font-semibold tracking-wide text-neutral-700 shadow-sm ring-1 ring-black/5">
                   {employmentTypeName}
                 </p>
@@ -388,14 +385,14 @@ export function EmployeeIdCard({
                 d="M0 68V28C44 10 86 4 128 10C178 18 210 38 260 46C300 52 330 46 360 36V68H0Z"
               />
             </svg>
-            <div className="relative min-h-[10.5rem] bg-[#0b1224] px-5 pb-6 pt-10 text-center">
-              <p className="break-words text-[1.2rem] font-bold leading-snug tracking-tight text-white">
+            <div className="relative flex min-h-[10.5rem] flex-col items-center justify-center bg-[#0b1224] px-5 pb-6 pt-10 text-center">
+              <p className="w-full break-words text-[1.2rem] font-bold leading-snug tracking-tight text-white">
                 {fullName}
               </p>
-              <p className="mt-2 line-clamp-2 break-words text-[0.82rem] leading-snug text-slate-200">
+              <p className="mt-2 w-full line-clamp-2 break-words text-[0.82rem] leading-snug text-slate-200">
                 {roleAndId}
               </p>
-              <div className="mt-3.5 flex flex-wrap items-center justify-center gap-2">
+              <div className="mt-3.5 flex w-full flex-wrap items-center justify-center gap-2">
                 <p className="inline-flex w-fit rounded-full bg-white/10 px-2.5 py-1 text-[0.68rem] font-semibold tracking-wide text-slate-100 ring-1 ring-white/20">
                   {employmentTypeName}
                 </p>
