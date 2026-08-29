@@ -1888,58 +1888,58 @@ html[data-landing-splash="playing"] {
 }
 
 .landing-splash--play .landing-splash-bg {
-  animation: landing-splash-bg-in 0.7s ease-out both;
+  animation: landing-splash-bg-breathe 3.2s ease-in-out both;
 }
 
 .landing-splash-orb {
   position: absolute;
   border-radius: 9999px;
-  filter: blur(40px);
+  filter: blur(48px);
   opacity: 0;
   pointer-events: none;
 }
 
 .landing-splash-orb--a {
-  width: min(42vw, 22rem);
-  height: min(42vw, 22rem);
-  top: 12%;
-  left: 8%;
-  background: rgba(196, 181, 253, 0.35);
+  width: min(46vw, 24rem);
+  height: min(46vw, 24rem);
+  top: 8%;
+  left: 4%;
+  background: rgba(196, 181, 253, 0.38);
 }
 
 .landing-splash-orb--b {
-  width: min(36vw, 18rem);
-  height: min(36vw, 18rem);
-  right: 6%;
-  bottom: 18%;
-  background: rgba(129, 140, 248, 0.32);
+  width: min(40vw, 20rem);
+  height: min(40vw, 20rem);
+  right: 2%;
+  bottom: 14%;
+  background: rgba(129, 140, 248, 0.34);
 }
 
 .landing-splash-orb--c {
-  width: min(28vw, 14rem);
-  height: min(28vw, 14rem);
-  left: 42%;
-  bottom: 8%;
-  background: rgba(165, 180, 252, 0.22);
+  width: min(30vw, 15rem);
+  height: min(30vw, 15rem);
+  left: 40%;
+  bottom: 6%;
+  background: rgba(165, 180, 252, 0.24);
 }
 
 .landing-splash--play .landing-splash-orb--a {
-  animation: landing-splash-orb-drift 2.6s ease-in-out both;
+  animation: landing-splash-orb-drift 3.2s ease-in-out both;
 }
 
 .landing-splash--play .landing-splash-orb--b {
-  animation: landing-splash-orb-drift 2.6s ease-in-out 0.15s both;
+  animation: landing-splash-orb-drift 3.2s ease-in-out 0.18s both;
 }
 
 .landing-splash--play .landing-splash-orb--c {
-  animation: landing-splash-orb-drift 2.6s ease-in-out 0.28s both;
+  animation: landing-splash-orb-drift 3.2s ease-in-out 0.32s both;
 }
 
 .landing-splash-content {
   position: relative;
   z-index: 1;
   display: flex;
-  width: min(100% - 2rem, 28rem);
+  width: min(100% - 2rem, 44rem);
   flex-direction: column;
   align-items: center;
   padding-inline: 1rem;
@@ -1953,83 +1953,67 @@ html[data-landing-splash="playing"] {
   flex-wrap: nowrap;
   align-items: center;
   justify-content: center;
-  gap: clamp(0.65rem, 2.4vw, 1rem);
+  gap: clamp(0.85rem, 2.6vw, 1.35rem);
   max-width: 100%;
-  opacity: 0;
-  transform: scale(0.94);
 }
 
-.landing-splash--boot .landing-splash-brand {
-  opacity: 1;
-  transform: scale(0.96);
+.landing-splash-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: clamp(3.6rem, 8.5vw, 5.75rem);
+  height: clamp(3.6rem, 8.5vw, 5.75rem);
+  flex-shrink: 0;
 }
 
-.landing-splash--play .landing-splash-brand {
-  animation: landing-splash-brand-in 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.landing-splash-glow {
+.landing-splash-ripple {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  width: min(120%, 18rem);
-  height: min(220%, 7.5rem);
-  border-radius: 9999px;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.12) 40%, transparent 72%);
+  inset: -14%;
+  border-radius: 28%;
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
   opacity: 0;
-  transform: translate(-50%, -50%) scale(0.88);
   pointer-events: none;
 }
 
-.landing-splash--play .landing-splash-glow {
-  animation: landing-splash-glow-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.05s both;
+.landing-splash--play .landing-splash-ripple {
+  animation: landing-splash-ripple 1.35s cubic-bezier(0.22, 1, 0.36, 1) 0.28s both;
 }
 
-.landing-splash-sweep {
+.landing-splash-ring {
   position: absolute;
-  inset: -20% -8%;
-  overflow: hidden;
-  border-radius: 9999px;
+  inset: -9%;
+  width: 118%;
+  height: 118%;
+  overflow: visible;
   pointer-events: none;
-  opacity: 0;
 }
 
-.landing-splash-sweep::before {
-  content: "";
-  position: absolute;
-  top: -30%;
-  left: -35%;
-  width: 32%;
-  height: 160%;
-  background: linear-gradient(
-    105deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.5) 48%,
-    transparent 100%
-  );
-  transform: translateX(-120%) rotate(16deg);
+.landing-splash-ring rect {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.72);
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-dasharray: 280;
+  stroke-dashoffset: 280;
 }
 
-.landing-splash--play .landing-splash-sweep {
-  opacity: 1;
-}
-
-.landing-splash--play .landing-splash-sweep::before {
-  animation: landing-splash-sweep 0.9s cubic-bezier(0.4, 0, 0.2, 1) 0.75s both;
+.landing-splash--play .landing-splash-ring rect {
+  animation: landing-splash-ring-draw 1.15s cubic-bezier(0.4, 0, 0.2, 1) 0.38s both;
 }
 
 .landing-splash-logo {
   position: relative;
   z-index: 1;
-  width: clamp(2.6rem, 9vw, 4rem);
-  height: clamp(2.6rem, 9vw, 4rem);
-  flex-shrink: 0;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
-  border-radius: clamp(0.65rem, 2vw, 0.95rem);
-  background: rgba(255, 255, 255, 0.97);
-  box-shadow:
-    0 14px 32px rgba(49, 46, 129, 0.28),
-    0 0 0 1px rgba(255, 255, 255, 0.35);
+  border-radius: 22%;
+  opacity: 0;
+  transform: scale(0.58);
+}
+
+.landing-splash--play .landing-splash-logo {
+  animation: landing-splash-logo-in 0.78s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
 }
 
 .landing-splash-wordmark {
@@ -2037,65 +2021,107 @@ html[data-landing-splash="playing"] {
   z-index: 1;
   margin: 0;
   flex-shrink: 0;
+  overflow: hidden;
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
-  font-size: clamp(1.35rem, 5.5vw, 2.15rem);
-  font-weight: 700;
-  letter-spacing: -0.035em;
-  line-height: 1;
+  font-size: clamp(2.35rem, 8vw, 4.65rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
   white-space: nowrap;
   color: #ffffff;
-  text-shadow: 0 1px 18px rgba(49, 46, 129, 0.25);
+  clip-path: inset(0 100% 0 0);
+  opacity: 0;
+  transform: translateX(-0.7rem);
+}
+
+.landing-splash--play .landing-splash-wordmark {
+  animation: landing-splash-word-in 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.48s both;
 }
 
 .landing-splash-tagline {
-  margin: clamp(0.95rem, 3vw, 1.25rem) 0 0;
-  max-width: min(100%, 22rem);
+  margin: clamp(1.1rem, 3vw, 1.5rem) 0 0;
+  max-width: min(100%, 28rem);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
-  font-size: clamp(0.82rem, 2.6vw, 1.05rem);
+  font-size: clamp(0.95rem, 2.4vw, 1.2rem);
   font-weight: 400;
-  line-height: 1.45;
-  letter-spacing: 0.01em;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
   color: rgba(237, 233, 254, 0.94);
   text-wrap: balance;
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateY(12px);
 }
 
 .landing-splash--play .landing-splash-tagline {
   animation: landing-splash-copy-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) 1.15s both;
 }
 
-@keyframes landing-splash-bg-in {
-  from { opacity: 0.86; }
-  to { opacity: 1; }
+.landing-splash-rule {
+  display: block;
+  width: min(11rem, 42%);
+  height: 2px;
+  margin-top: clamp(1.35rem, 3.4vw, 1.75rem);
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.28);
+  transform: scaleX(0);
+  transform-origin: center;
+  opacity: 0;
 }
 
-@keyframes landing-splash-brand-in {
-  from {
+.landing-splash--play .landing-splash-rule {
+  animation: landing-splash-rule 1.45s cubic-bezier(0.22, 1, 0.36, 1) 1.35s both;
+}
+
+@keyframes landing-splash-bg-breathe {
+  0% { opacity: 0.88; transform: scale(1.04); }
+  35% { opacity: 1; transform: scale(1); }
+  100% { opacity: 1; transform: scale(1.02); }
+}
+
+@keyframes landing-splash-logo-in {
+  0% {
     opacity: 0;
-    transform: scale(0.94);
+    transform: scale(0.52);
   }
-  to {
+  62% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
     opacity: 1;
     transform: scale(1);
   }
 }
 
-@keyframes landing-splash-glow-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.88);
+@keyframes landing-splash-ripple {
+  0% {
+    opacity: 0.7;
+    transform: scale(0.72);
   }
+  100% {
+    opacity: 0;
+    transform: scale(1.55);
+  }
+}
+
+@keyframes landing-splash-ring-draw {
   to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes landing-splash-word-in {
+  to {
+    clip-path: inset(0 0 0 0);
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+    transform: translateX(0);
   }
 }
 
 @keyframes landing-splash-copy-in {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -2103,22 +2129,28 @@ html[data-landing-splash="playing"] {
   }
 }
 
-@keyframes landing-splash-sweep {
-  from { transform: translateX(-130%) rotate(16deg); }
-  to { transform: translateX(320%) rotate(16deg); }
+@keyframes landing-splash-rule {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
 }
 
 @keyframes landing-splash-orb-drift {
   0% {
     opacity: 0;
-    transform: translate3d(0, 8px, 0) scale(0.96);
+    transform: translate3d(0, 10px, 0) scale(0.94);
   }
-  25% {
-    opacity: 0.9;
+  28% {
+    opacity: 0.95;
   }
   100% {
-    opacity: 0.75;
-    transform: translate3d(6px, -10px, 0) scale(1.04);
+    opacity: 0.72;
+    transform: translate3d(10px, -14px, 0) scale(1.06);
   }
 }
 
@@ -2129,56 +2161,64 @@ html[data-landing-splash="playing"] {
   }
   to {
     opacity: 0;
-    transform: scale(1.03);
+    transform: scale(1.045);
   }
 }
 
 @media (min-width: 768px) {
   .landing-splash-content {
-    width: min(100% - 2rem, 32rem);
+    width: min(100% - 2rem, 52rem);
   }
 
   .landing-splash-tagline {
-    max-width: 24rem;
+    max-width: 30rem;
   }
 }
 
 @media (min-width: 1024px) {
-  .landing-splash-logo {
-    width: 4.25rem;
-    height: 4.25rem;
+  .landing-splash-mark {
+    width: 5.75rem;
+    height: 5.75rem;
   }
 
   .landing-splash-wordmark {
-    font-size: 2.25rem;
+    font-size: 4.75rem;
   }
 
   .landing-splash-tagline {
-    font-size: 1.08rem;
+    font-size: 1.22rem;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .landing-splash--play .landing-splash-bg,
-  .landing-splash--play .landing-splash-brand,
-  .landing-splash--play .landing-splash-glow,
+  .landing-splash--play .landing-splash-logo,
+  .landing-splash--play .landing-splash-ripple,
+  .landing-splash--play .landing-splash-ring rect,
+  .landing-splash--play .landing-splash-wordmark,
   .landing-splash--play .landing-splash-tagline,
+  .landing-splash--play .landing-splash-rule,
   .landing-splash--play .landing-splash-orb--a,
   .landing-splash--play .landing-splash-orb--b,
-  .landing-splash--play .landing-splash-orb--c,
-  .landing-splash--play .landing-splash-sweep::before {
+  .landing-splash--play .landing-splash-orb--c {
     animation: none !important;
   }
 
-  .landing-splash--play .landing-splash-brand,
-  .landing-splash--play .landing-splash-glow,
-  .landing-splash--play .landing-splash-tagline {
+  .landing-splash--play .landing-splash-logo,
+  .landing-splash--play .landing-splash-wordmark,
+  .landing-splash--play .landing-splash-tagline,
+  .landing-splash--play .landing-splash-rule {
     opacity: 1 !important;
     transform: none !important;
+    clip-path: none !important;
   }
 
-  .landing-splash--play .landing-splash-glow {
-    transform: translate(-50%, -50%) !important;
+  .landing-splash--play .landing-splash-ring rect {
+    stroke-dashoffset: 0;
+  }
+
+  .landing-splash--play .landing-splash-ripple {
+    opacity: 0 !important;
   }
 
   .landing-splash--play .landing-splash-orb--a,

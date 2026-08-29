@@ -7,10 +7,10 @@ import brandLogo from "@/assets/Logo.png";
 import { cn } from "@/lib/utils";
 
 /** Session-scoped: splash once per browser tab/session, including return from login. */
-export const LANDING_SPLASH_SESSION_KEY = "ifranchise.landing.splash.v1";
+export const LANDING_SPLASH_SESSION_KEY = "ifranchise.landing.splash.v2";
 
-const FULL_EXIT_MS = 2150;
-const FULL_GONE_MS = 2650;
+const FULL_EXIT_MS = 2850;
+const FULL_GONE_MS = 3450;
 const REDUCED_EXIT_MS = 260;
 const REDUCED_GONE_MS = 480;
 
@@ -117,20 +117,25 @@ export function LandingSplash() {
 
       <div className="landing-splash-content">
         <div className="landing-splash-brand">
-          <span className="landing-splash-glow" aria-hidden />
-          <span className="landing-splash-sweep" aria-hidden />
-          <Image
-            src={brandLogo}
-            alt=""
-            width={72}
-            height={72}
-            priority
-            className="landing-splash-logo"
-          />
+          <span className="landing-splash-mark">
+            <span className="landing-splash-ripple" aria-hidden />
+            <svg className="landing-splash-ring" viewBox="0 0 88 88" aria-hidden>
+              <rect x="5" y="5" width="78" height="78" rx="20" ry="20" />
+            </svg>
+            <Image
+              src={brandLogo}
+              alt=""
+              width={112}
+              height={112}
+              priority
+              className="landing-splash-logo"
+            />
+          </span>
           <span className="landing-splash-wordmark">iFranchise</span>
         </div>
 
         <p className="landing-splash-tagline">Empowering People. Simplifying Work.</p>
+        <span className="landing-splash-rule" aria-hidden />
       </div>
     </div>
   );
