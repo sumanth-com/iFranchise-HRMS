@@ -9,6 +9,7 @@ import {
 } from "@/lib/employees/constants";
 import { assertEligibleHrLeaveApprover } from "@/lib/leave/services/leave-queries";
 import { emitHrmsWebhook } from "@/lib/public-api/emit";
+import { initializeEmployeeLeaveBalances } from "@/lib/leave/services/leave-mutations";
 
 export { createSignedStorageUrl } from "@/lib/storage/signed-url";
 
@@ -224,6 +225,8 @@ export async function createEmployeeFromWizard(
     employeeCode: basic.employeeCode.trim(),
     employmentStatus: employment.employmentStatus,
   });
+
+  await initializeEmployeeLeaveBalances(supabase, profile, employeeId);
 
   return employeeId;
 }

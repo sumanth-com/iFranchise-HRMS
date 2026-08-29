@@ -4,6 +4,7 @@ import { getInviteableRoleById } from "@/lib/auth/iam-roles";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import { allocateNextEmployeeCode } from "@/lib/employees/services/employee-code";
 import { activateEmployeeAccountFromOnboarding } from "@/lib/employees/services/employee-account";
+import { initializeEmployeeLeaveBalances } from "@/lib/leave/services/leave-mutations";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/mailer";
 import { siteConfig } from "@/config/site";
@@ -1347,6 +1348,8 @@ async function finalizeEmployeeActivation(
     companyEmail,
     intendedRoleId,
   );
+
+  await initializeEmployeeLeaveBalances(supabase, profile, employeeId);
 
   let roleName: string | null = null;
   let portalLabel: string | null = null;

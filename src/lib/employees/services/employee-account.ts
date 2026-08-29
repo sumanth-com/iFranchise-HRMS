@@ -7,6 +7,7 @@ import type { ApplicationAuditInput } from "@/lib/audit/services/audit-utils";
 import { createNotification } from "@/lib/notifications/services/notification-service";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { allocateNextEmployeeCode } from "@/lib/employees/services/employee-code";
+import { initializeEmployeeLeaveBalances } from "@/lib/leave/services/leave-mutations";
 import {
   getEmployeeGreetingName,
   parseEmployeeFullName,
@@ -922,6 +923,8 @@ export async function inviteEmployeeByEmail(
 
   await ensureEmployeeProfile(createdId, profile.userId);
 
+  await initializeEmployeeLeaveBalances(supabase, profile, createdId);
+
   await sendEmployeeInvitation(supabase, profile, createdId, roleId);
   return createdId;
 }
@@ -1264,6 +1267,15 @@ export async function recordEmployeeSuccessfulLogin(
     } catch (syncError) {
       console.error("[login] failed to sync invited role assignment", syncError);
     }
+  }
+
+  if (shouldActivate || isFirstLogin) {
+    await initializeEmployeeLeaveBalances(supabase, {
+      organizationId: employeeRow.organization_id,
+      userId,
+    }, employeeRow.id).catch((initError) => {
+      console.error("[login] leave balance initialization failed", initError);
+    });
   }
 
   if (shouldActivate) {

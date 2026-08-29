@@ -49,7 +49,9 @@ export async function processDuePayslipPublications(
   for (const row of dueRows ?? []) {
     const payroll = Array.isArray(row.payrolls) ? row.payrolls[0] : row.payrolls;
     const payrollMonth = payroll?.payroll_month as string | undefined;
-    const publishedAt = payrollMonth ? computePublishedAt(payrollMonth) : row.published_at;
+    const publishedAt =
+      row.published_at ??
+      (payrollMonth ? computePublishedAt(payrollMonth) : null);
     if (!publishedAt || !isPayslipPublishedToEmployee(publishedAt)) {
       skipped += 1;
       continue;

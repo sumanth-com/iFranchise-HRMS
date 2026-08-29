@@ -76,6 +76,36 @@ async function getActiveEmployees(
   return data ?? [];
 }
 
+async function resolvePayslipSalaryComponents(
+  supabase: AuthSupabaseClient,
+  employeeId: string,
+  payrollMonth: string,
+  salaryStructureId: string | null | undefined,
+): Promise<Record<string, unknown> | null> {
+  if (salaryStructureId) {
+    const { data, error } = await supabase
+      .schema("hrms")
+      .from("salary_structures")
+      .select("components")
+      .eq("id", salaryStructureId)
+      .eq("employee_id", employeeId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    if (data?.components) {
+      return data.components as Record<string, unknown>;
+    }
+  }
+
+  const monthDate = payrollMonth.slice(0, 10);
+  const parsed = new Date(`${monthDate}T00:00:00.000Z`);
+  const month = parsed.getUTCMonth() + 1;
+  const year = parsed.getUTCFullYear();
+  const structure = await getEffectiveSalaryStructure(supabase, employeeId, month, year);
+  return (structure?.components as Record<string, unknown> | null) ?? null;
+}
+
 async function getEffectiveSalaryStructure(
   supabase: AuthSupabaseClient,
   employeeId: string,
@@ -861,7 +891,13 @@ export async function generatePayslips(
       updated_by: profile.userId,
     });
 
-    if (insertError) throw new Error(insertError.message);
+    if (insertError) {
+      const duplicate =
+        insertError.code === "23505" ||
+        insertError.message.toLowerCase().includes("duplicate");
+      if (duplicate) continue;
+      throw new Error(insertError.message);
+    }
   }
 }
 
@@ -1638,19 +1674,12 @@ export async function getPayslipById(
     .is("deleted_at", null)
     .maybeSingle();
 
-  const { data: salaryStructure } = await supabase
-    .schema("hrms")
-    .from("salary_structures")
-    .select("components")
-    .eq("employee_id", payslip.employee_id)
-    .is("deleted_at", null)
-    .lte("effective_from", payroll.payroll_month)
-    .order("effective_from", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const components =
-    (salaryStructure?.components as Record<string, unknown> | null) ?? null;
+  const components = await resolvePayslipSalaryComponents(
+    supabase,
+    payslip.employee_id,
+    payroll.payroll_month,
+    payrollItem?.salary_structure_id as string | null | undefined,
+  );
   const statutory = parseStatutoryIds(components);
   const branding = await getPayslipBranding(supabase, organizationId);
 

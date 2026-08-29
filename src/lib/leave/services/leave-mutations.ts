@@ -18,6 +18,9 @@ import { evaluateLeaveApplication } from "@/lib/leave/services/leave-policy-runt
 import { splitLeaveDaysByBalance } from "@/lib/leave/services/leave-policy-engine";
 import { roundLeaveDays } from "@/lib/leave/services/leave-usage";
 import { NON_APPLY_LEAVE_TYPE_CODES } from "@/lib/leave/constants";
+import { isPeriodLeaveEligible } from "@/lib/leave/period-leave-eligibility";
+import { loadLeavePolicyRuntime } from "@/lib/leave/services/leave-policy-runtime";
+import { PERIOD_LEAVE_CODE } from "@/lib/leave/services/leave-policy-engine";
 import {
   notifyLeaveApproved,
   notifyLeaveCancelled,
@@ -206,25 +209,70 @@ async function ensureLeaveBalanceRow(
   return getLeaveBalanceRow(supabase, employeeId, leaveTypeId, balanceYear);
 }
 
-/** Creates annual leave ledger rows for every active leave type in the organization. */
+type LeaveBalanceInitContext = {
+  organizationId: string;
+  userId: string;
+};
+
+function resolveLeaveBalanceInitContext(
+  profileOrContext: UserProfile | LeaveBalanceInitContext,
+): LeaveBalanceInitContext {
+  if ("organizationId" in profileOrContext) {
+    return profileOrContext;
+  }
+  return {
+    organizationId: profileOrContext.employee.organizationId,
+    userId: profileOrContext.userId,
+  };
+}
+
+/** Leave types tracked on the balance ledger — not OH/LOP application buckets. */
+const LEAVE_BALANCE_INIT_SKIP_CODES = new Set(["OH", "LOP"]);
+
+/**
+ * Creates annual leave ledger rows from the organization's configured leave types.
+ * Safe to call repeatedly — existing rows are left unchanged.
+ */
 export async function initializeEmployeeLeaveBalances(
   supabase: AuthSupabaseClient,
-  profile: UserProfile,
+  profileOrContext: UserProfile | LeaveBalanceInitContext,
   employeeId: string,
   balanceYear = getCurrentBalanceYear(),
 ): Promise<void> {
-  const organizationId = profile.employee.organizationId;
-  const { data: leaveTypes, error } = await supabase
-    .schema("hrms")
-    .from("leave_types")
-    .select("id, days_per_year")
-    .eq("organization_id", organizationId)
-    .eq("status", "active")
-    .is("deleted_at", null);
+  const { organizationId, userId } = resolveLeaveBalanceInitContext(profileOrContext);
+
+  const [{ data: leaveTypes, error }, { data: employeeProfile, error: profileError }, runtime] =
+    await Promise.all([
+      supabase
+        .schema("hrms")
+        .from("leave_types")
+        .select("id, code, days_per_year")
+        .eq("organization_id", organizationId)
+        .eq("status", "active")
+        .is("deleted_at", null),
+      supabase
+        .schema("hrms")
+        .from("employee_profiles")
+        .select("gender")
+        .eq("employee_id", employeeId)
+        .is("deleted_at", null)
+        .maybeSingle(),
+      loadLeavePolicyRuntime(supabase, organizationId),
+    ]);
 
   if (error) throw new Error(error.message);
+  if (profileError) throw new Error(profileError.message);
+
+  const periodLeaveEligible = isPeriodLeaveEligible(
+    employeeProfile?.gender as string | null | undefined,
+    runtime.probation.periodLeaveFemaleOnly,
+  );
 
   for (const leaveType of leaveTypes ?? []) {
+    const code = String(leaveType.code ?? "").toUpperCase();
+    if (LEAVE_BALANCE_INIT_SKIP_CODES.has(code)) continue;
+    if (code === PERIOD_LEAVE_CODE && !periodLeaveEligible) continue;
+
     const allocatedDays = Math.max(Number(leaveType.days_per_year ?? 0), 0);
     await ensureLeaveBalanceRow(
       supabase,
@@ -232,7 +280,7 @@ export async function initializeEmployeeLeaveBalances(
       leaveType.id as string,
       balanceYear,
       allocatedDays,
-      profile.userId,
+      userId,
     );
   }
 }
@@ -362,7 +410,7 @@ export async function createLeaveRequest(
       input.employeeId,
       input.leaveTypeId,
       balanceYear,
-      evaluated.availableBalance ?? paidDays,
+      Math.max(Number(evaluated.leaveType.daysPerYear ?? 0), 0),
       profile.userId,
     );
     await adjustLeaveBalance(supabase, input.employeeId, input.leaveTypeId, balanceYear, {
@@ -1306,7 +1354,7 @@ export async function updateLeaveRequest(
         input.employeeId,
         input.leaveTypeId,
         nextBalanceYear,
-        nextAvailableBalance ?? nextSplit.paidDays,
+        Math.max(Number(next.leaveType.daysPerYear ?? 0), 0),
         profile.userId,
       );
       await adjustLeaveBalance(
