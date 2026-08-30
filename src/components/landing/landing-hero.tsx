@@ -23,7 +23,8 @@ export function LandingHero() {
           <div className="landing-hero-copy">
             <p className="landing-hero-pill">All-in-one workplace HRMS</p>
             <h1 id="landing-hero-heading" className="landing-hero-title">
-              <span className="landing-hero-title-line">Your workplace, simplified.</span>
+              <span className="landing-hero-title-line">Your workplace,</span>
+              <span className="landing-hero-title-line">simplified.</span>
               <span className="landing-hero-title-line landing-hero-accent">
                 One HRMS for every role.
               </span>

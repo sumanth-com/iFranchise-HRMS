@@ -12,10 +12,10 @@ export function WhatsNewPageContent() {
     <div
       className={cn(
         "landing-page landing-whats-new-page landing-page--light-locked",
-        !hasUpdates && "landing-whats-new-page--empty",
+        !hasUpdates && "landing-whats-new-page--empty landing-page--vivid-hero",
       )}
     >
-      <div className="landing-ambient landing-ambient--subtle" aria-hidden />
+      {hasUpdates ? <div className="landing-ambient landing-ambient--subtle" aria-hidden /> : null}
       <PublicNavbar />
 
       <main

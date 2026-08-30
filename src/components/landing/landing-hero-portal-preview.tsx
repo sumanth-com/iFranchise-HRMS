@@ -109,6 +109,38 @@ const SIDEBAR_ITEMS: Array<{
   { label: "Settings", icon: Settings },
 ];
 
+const QUICK_CARDS: Array<{
+  title: string;
+  hint: string;
+  icon: typeof LayoutDashboard;
+  tone: "emerald" | "sky" | "violet" | "amber";
+}> = [
+  {
+    title: "Mark attendance",
+    hint: "Checked in 9:42 am",
+    icon: Clock3,
+    tone: "emerald",
+  },
+  {
+    title: "Request leave",
+    hint: "Quick apply",
+    icon: Palmtree,
+    tone: "sky",
+  },
+  {
+    title: "Payslips",
+    hint: "Ready this month",
+    icon: Wallet,
+    tone: "violet",
+  },
+  {
+    title: "Approvals",
+    hint: "Pending items",
+    icon: CheckCircle2,
+    tone: "amber",
+  },
+];
+
 /**
  * Decorative self-service portal mock for the public landing hero only.
  * Dummy numbers + motion — no auth, no live HRMS data, no portal routing.
@@ -119,10 +151,7 @@ export function LandingHeroPortalPreview() {
   const [wish, setWish] = useState("Good morning");
   const [clockLabel, setClockLabel] = useState("");
 
-  const teamPresent = useCountUp(86, active);
-  const leaveBalance = useCountUp(36, active, 1100);
-  const pendingRequests = useCountUp(4, active, 900);
-  const hoursLogged = useCountUp(164, active, 1300);
+  const pendingApprovals = useCountUp(4, active, 900);
 
   const dateLabel = useMemo(() => {
     try {
@@ -241,23 +270,28 @@ export function LandingHeroPortalPreview() {
             </div>
           </div>
 
-          <div className="landing-hero-preview-stats">
-            <article>
-              <span>Team present today</span>
-              <strong>{teamPresent}</strong>
-            </article>
-            <article>
-              <span>Hours logged (week)</span>
-              <strong>{hoursLogged}h</strong>
-            </article>
-            <article>
-              <span>Leave balance</span>
-              <strong>{leaveBalance} days</strong>
-            </article>
-            <article>
-              <span>Pending requests</span>
-              <strong>{pendingRequests}</strong>
-            </article>
+          <div className="landing-hero-preview-quickcards">
+            {QUICK_CARDS.map((item) => {
+              const Icon = item.icon;
+              const hint =
+                item.title === "Approvals"
+                  ? `${pendingApprovals} pending`
+                  : item.hint;
+
+              return (
+                <article key={item.title} className="landing-hero-preview-quickcard">
+                  <span
+                    className={`landing-hero-preview-quickcard-icon tone-${item.tone}`}
+                  >
+                    <Icon className="size-3.5" strokeWidth={2.2} />
+                  </span>
+                  <div className="landing-hero-preview-quickcard-copy">
+                    <strong>{item.title}</strong>
+                    <span>{hint}</span>
+                  </div>
+                </article>
+              );
+            })}
           </div>
 
           <div className="landing-hero-preview-panels">
