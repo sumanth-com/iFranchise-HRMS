@@ -394,9 +394,16 @@ export async function resendEmployeeInvitationAction(
     await revalidateEmployeeAccountPaths(employeeId);
     return { success: true, data: undefined };
   } catch (error) {
+    console.error("[resendEmployeeInvitationAction] failed", {
+      employeeId,
+      message: error instanceof Error ? error.message : "unknown",
+    });
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to resend invitation",
+      message:
+        error instanceof Error
+          ? error.message
+          : "We couldn't send the invitation right now. Please try again.",
     };
   }
 }

@@ -46,6 +46,16 @@ export function validateServerEnvironment(): void {
     sections.push(`Missing core configuration:\n${formatMissingList(missingCore)}`);
   }
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (
+    appUrl &&
+    (appUrl.includes("vercel.app") || appUrl.includes("localhost"))
+  ) {
+    console.warn(
+      "[env] NEXT_PUBLIC_APP_URL should be https://hrms.ifranchise.in in production.",
+    );
+  }
+
   if (sections.length > 0) {
     throw new Error(
       [

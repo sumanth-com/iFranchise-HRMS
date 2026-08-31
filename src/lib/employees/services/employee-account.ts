@@ -55,9 +55,6 @@ function deriveNameFromEmail(email: string) {
   return { firstName, lastName };
 }
 
-const INVITE_REDIRECT_TO = getPasswordResetRedirectTo(true);
-const RESET_REDIRECT_TO = getPasswordResetRedirectTo();
-
 function fullName(employee: Pick<EmployeeAccountRow, "first_name" | "last_name">) {
   return `${employee.first_name} ${employee.last_name}`.trim();
 }
@@ -427,7 +424,7 @@ async function sendSupabaseInvite(employee: EmployeeAccountRow, roleId?: string 
   const inviteContext = await loadInviteEmailContext(employee.id, roleId);
 
   const { data, error } = await admin.auth.admin.inviteUserByEmail(employee.email, {
-    redirectTo: INVITE_REDIRECT_TO,
+    redirectTo: getPasswordResetRedirectTo(true),
     data: {
       employee_id: employee.id,
       employee_code: employee.employee_code,
@@ -460,7 +457,7 @@ async function sendSupabaseInvite(employee: EmployeeAccountRow, roleId?: string 
     if (existingUserId) {
       await admin.auth.admin.deleteUser(existingUserId);
       const retry = await admin.auth.admin.inviteUserByEmail(employee.email, {
-        redirectTo: INVITE_REDIRECT_TO,
+        redirectTo: getPasswordResetRedirectTo(true),
         data: {
           employee_id: employee.id,
           employee_code: employee.employee_code,
@@ -1265,7 +1262,7 @@ export async function resetEmployeePassword(
 
   const admin = createAdminClient();
   const { error } = await admin.auth.resetPasswordForEmail(employee.email, {
-    redirectTo: RESET_REDIRECT_TO,
+    redirectTo: getPasswordResetRedirectTo(),
   });
   if (error) throw new Error(error.message);
 
@@ -1566,19 +1563,83 @@ export async function recordEmployeeSuccessfulLogin(
 }
 
 export async function validateInvitationForUser(
-  supabase: AuthSupabaseClient,
+  _supabase: AuthSupabaseClient,
   userId: string,
   email: string,
 ): Promise<{ valid: true } | { valid: false; reason: "expired" | "invalid" }> {
-  const { data: employee, error } = await supabase
+  const admin = createAdminClient();
+  const normalizedEmail = email.trim();
+
+  type InvitationEmployeeRow = {
+    id: string;
+    user_id: string | null;
+    account_status: EmployeeAccountStatus;
+    invitation_expires_at: string | null;
+    deleted_at: string | null;
+  };
+
+  const selectInvitationFields =
+    "id, user_id, account_status, invitation_expires_at, deleted_at";
+
+  let employee: InvitationEmployeeRow | null = null;
+
+  const { data: byUserId, error: byUserError } = await admin
     .schema("hrms")
     .from("employees")
-    .select("id, account_status, invitation_expires_at, deleted_at")
+    .select(selectInvitationFields)
     .eq("user_id", userId)
-    .ilike("email", email)
+    .ilike("email", normalizedEmail)
     .maybeSingle();
 
-  if (error || !employee || employee.deleted_at) {
+  if (byUserError) {
+    console.error("[validateInvitationForUser] lookup by user_id failed", {
+      userId,
+      message: byUserError.message,
+    });
+    return { valid: false, reason: "invalid" };
+  }
+
+  employee = (byUserId as InvitationEmployeeRow | null) ?? null;
+
+  if (!employee) {
+    const { data: byEmail, error: byEmailError } = await admin
+      .schema("hrms")
+      .from("employees")
+      .select(selectInvitationFields)
+      .ilike("email", normalizedEmail)
+      .eq("account_status", "invitation_pending")
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (byEmailError) {
+      console.error("[validateInvitationForUser] lookup by email failed", {
+        email: normalizedEmail,
+        message: byEmailError.message,
+      });
+      return { valid: false, reason: "invalid" };
+    }
+
+    employee = (byEmail as InvitationEmployeeRow | null) ?? null;
+
+    if (employee && employee.user_id !== userId) {
+      const { error: linkError } = await admin
+        .schema("hrms")
+        .from("employees")
+        .update({ user_id: userId, updated_at: new Date().toISOString() })
+        .eq("id", employee.id);
+
+      if (linkError) {
+        console.error("[validateInvitationForUser] failed to link auth user", {
+          employeeId: employee.id,
+          userId,
+          message: linkError.message,
+        });
+        return { valid: false, reason: "invalid" };
+      }
+    }
+  }
+
+  if (!employee || employee.deleted_at) {
     return { valid: false, reason: "invalid" };
   }
 
@@ -1592,7 +1653,6 @@ export async function validateInvitationForUser(
 
   const expiresAt = Date.parse(employee.invitation_expires_at);
   if (Number.isNaN(expiresAt) || expiresAt < Date.now()) {
-    const admin = createAdminClient();
     await admin
       .schema("hrms")
       .from("employees")
@@ -1619,14 +1679,79 @@ export async function acceptInvitationOnPasswordSet(
   userId: string,
   email: string,
 ) {
-  const { data: employee, error } = await supabase
+  const admin = createAdminClient();
+  const { data: employee, error } = await admin
     .schema("hrms")
     .from("employees")
     .select("id, organization_id, account_status, employee_code, first_name, last_name")
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (error || !employee) return;
+  if (error) {
+    console.error("[acceptInvitationOnPasswordSet] employee lookup failed", {
+      userId,
+      message: error.message,
+    });
+    return;
+  }
+
+  if (!employee) {
+    const { data: byEmail, error: byEmailError } = await admin
+      .schema("hrms")
+      .from("employees")
+      .select("id, organization_id, account_status, employee_code, first_name, last_name")
+      .ilike("email", email.trim())
+      .eq("account_status", "invitation_pending")
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (byEmailError || !byEmail) {
+      if (byEmailError) {
+        console.error("[acceptInvitationOnPasswordSet] email lookup failed", {
+          message: byEmailError.message,
+        });
+      }
+      return;
+    }
+
+    await admin
+      .schema("hrms")
+      .from("employees")
+      .update({ user_id: userId, updated_at: new Date().toISOString() })
+      .eq("id", byEmail.id);
+
+    if (byEmail.account_status !== "invitation_pending") return;
+
+    const validation = await validateInvitationForUser(supabase, userId, email);
+    if (!validation.valid) {
+      throw new Error(
+        validation.reason === "expired"
+          ? "This invitation has expired. Contact HR for a new invitation."
+          : "This invitation link is invalid.",
+      );
+    }
+
+    const now = new Date().toISOString();
+    await updateEmployeeAccountWithClient(supabase, byEmail.id, {
+      account_status: "invitation_accepted",
+      updated_at: now,
+    });
+
+    await admin
+      .schema("hrms")
+      .from("employee_invitations")
+      .update({
+        status: "accepted",
+        accepted_at: now,
+        updated_at: now,
+      })
+      .eq("employee_id", byEmail.id)
+      .eq("status", "pending")
+      .is("deleted_at", null);
+
+    return;
+  }
+
   if (employee.account_status !== "invitation_pending") return;
 
   const validation = await validateInvitationForUser(supabase, userId, email);
@@ -1644,7 +1769,6 @@ export async function acceptInvitationOnPasswordSet(
     updated_at: now,
   });
 
-  const admin = createAdminClient();
   await admin
     .schema("hrms")
     .from("employee_invitations")

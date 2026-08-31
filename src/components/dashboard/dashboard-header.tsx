@@ -29,7 +29,7 @@ export function DashboardHeader({
 }) {
   const router = useRouter();
   const { profile } = useAuth();
-  const [now, setNow] = useState(() => new Date());
+  const [now, setNow] = useState<Date | null>(null);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -44,6 +44,7 @@ export function DashboardHeader({
   );
 
   useEffect(() => {
+    setNow(new Date());
     const id = window.setInterval(() => setNow(new Date()), 30_000);
     return () => window.clearInterval(id);
   }, []);
@@ -106,10 +107,13 @@ export function DashboardHeader({
         <section className="rounded-xl border bg-card px-5 py-6 shadow-sm md:px-7 md:py-7">
           <div className="flex items-start justify-between gap-4">
             <h2 className="min-w-0 truncate text-2xl font-semibold tracking-tight md:text-[1.75rem]">
-              {greetingForHour(now.getHours())}, {firstName}
+              {now ? greetingForHour(now.getHours()) : "Welcome"}, {firstName}
             </h2>
-            <p className="shrink-0 pt-1.5 text-sm text-muted-foreground">
-              {format(now, "EEE, d MMM")} · {format(now, "hh:mm a")}
+            <p
+              className="shrink-0 pt-1.5 text-sm text-muted-foreground"
+              suppressHydrationWarning
+            >
+              {now ? `${format(now, "EEE, d MMM")} · ${format(now, "hh:mm a")}` : ""}
             </p>
           </div>
           <p className="mt-2 truncate text-sm text-muted-foreground md:text-[15px]">

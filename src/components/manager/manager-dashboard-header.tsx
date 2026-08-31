@@ -13,9 +13,10 @@ function greetingForHour(hour: number) {
 
 export function ManagerDashboardHeader() {
   const { profile } = useAuth();
-  const [now, setNow] = useState(() => new Date());
+  const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
+    setNow(new Date());
     const id = window.setInterval(() => setNow(new Date()), 30_000);
     return () => window.clearInterval(id);
   }, []);
@@ -29,15 +30,19 @@ export function ManagerDashboardHeader() {
         </p>
         <div className="mt-1 flex items-center justify-between gap-4">
           <h1 className="min-w-0 text-2xl font-semibold tracking-tight lg:text-3xl">
-            {greetingForHour(now.getHours())}, {profile.employee.firstName}
+            {now ? greetingForHour(now.getHours()) : "Welcome"}, {profile.employee.firstName}
           </h1>
-          <div className="shrink-0 text-right">
-            <p className="whitespace-nowrap text-sm font-medium">
-              {format(now, "EEEE, d MMMM yyyy")}
-            </p>
-            <p className="whitespace-nowrap text-xs text-muted-foreground">
-              {format(now, "hh:mm a")}
-            </p>
+          <div className="shrink-0 text-right" suppressHydrationWarning>
+            {now ? (
+              <>
+                <p className="whitespace-nowrap text-sm font-medium">
+                  {format(now, "EEEE, d MMMM yyyy")}
+                </p>
+                <p className="whitespace-nowrap text-xs text-muted-foreground">
+                  {format(now, "hh:mm a")}
+                </p>
+              </>
+            ) : null}
           </div>
         </div>
         <p className="mt-1.5 text-sm text-muted-foreground lg:text-base">

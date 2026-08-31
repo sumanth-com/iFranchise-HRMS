@@ -48,10 +48,10 @@ enabled = false
 
 [auth]
 enabled = true
-site_url = "https://hrmsifranchise.vercel.app"
+site_url = "https://hrms.ifranchise.in"
 additional_redirect_urls = [
-  "https://hrmsifranchise.vercel.app",
-  "https://hrmsifranchise.vercel.app/**",
+  "https://hrms.ifranchise.in",
+  "https://hrms.ifranchise.in/**",
   "http://localhost:3000",
   "http://localhost:3000/**",
 ]

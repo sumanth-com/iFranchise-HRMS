@@ -32,6 +32,7 @@ import { SYSTEM_ADMIN_ROUTES } from "@/lib/system-admin/constants";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasSupabaseServiceRoleEnv } from "@/lib/supabase/env";
 import { revalidatePath } from "next/cache";
+import { absoluteAppUrl } from "@/lib/url/app-origin";
 
 export type ApprovalRequestContext = {
   ip?: string | null;
@@ -43,7 +44,7 @@ function admin(): AuthSupabaseClient {
 }
 
 function absoluteUrl(path: string): string {
-  return `${siteConfig.url}${path}`;
+  return absoluteAppUrl(path);
 }
 
 function alreadyProcessedMessage(requestType: ApprovalRequestType): string {

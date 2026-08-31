@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { type ReactNode, Suspense } from "react";
 
 import { MobileSidebar } from "@/components/layout/mobile-sidebar";
 import { NavigationProgress } from "@/components/layout/navigation-progress";
@@ -26,8 +26,12 @@ export function DashboardShell({ children }: DashboardShellProps) {
         <InstantNavPrefetch />
         <ServerActionStaleRecovery />
         <div className="app-shell-canvas flex h-screen overflow-hidden bg-background">
-          <Sidebar />
-          <MobileSidebar />
+          <Suspense fallback={<div className="hidden w-16 shrink-0 lg:block lg:w-[4.5rem]" aria-hidden />}>
+            <Sidebar />
+          </Suspense>
+          <Suspense fallback={null}>
+            <MobileSidebar />
+          </Suspense>
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <TopNav />
             {/*
