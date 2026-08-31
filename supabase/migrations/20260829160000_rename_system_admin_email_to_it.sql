@@ -24,11 +24,44 @@ BEGIN
   LIMIT 1;
 
   IF v_conflict_user_id IS NOT NULL AND (v_user_id IS NULL OR v_conflict_user_id <> v_user_id) THEN
-    RAISE EXCEPTION
-      'Cannot rename system account: % already exists as a different auth user (%)',
+    -- it@ifranchise.in is already a separate auth account; sync display name only.
+    v_user_id := v_conflict_user_id;
+
+    SELECT e.id INTO v_employee_id
+    FROM hrms.employees e
+    WHERE lower(e.email::text) = lower(v_new_email)
+      AND e.deleted_at IS NULL
+    LIMIT 1;
+
+    IF v_user_id IS NOT NULL THEN
+      UPDATE auth.users
+      SET
+        raw_user_meta_data =
+          COALESCE(raw_user_meta_data, '{}'::jsonb)
+          || jsonb_build_object(
+            'first_name', 'IT',
+            'last_name', 'Team',
+            'full_name', 'IT Team'
+          ),
+        updated_at = timezone('utc', now())
+      WHERE id = v_user_id;
+    END IF;
+
+    IF v_employee_id IS NOT NULL THEN
+      UPDATE hrms.employees
+      SET
+        first_name = 'IT',
+        last_name = 'Team',
+        updated_at = public.utc_now()
+      WHERE id = v_employee_id;
+    END IF;
+
+    RAISE NOTICE
+      'System account % already exists; synced IT Team display name (user_id=%, employee_id=%)',
       v_new_email,
-      v_conflict_user_id
-      USING ERRCODE = 'P0001';
+      v_user_id,
+      v_employee_id;
+    RETURN;
   END IF;
 
   SELECT e.id INTO v_employee_id
@@ -46,11 +79,20 @@ BEGIN
 
   IF v_conflict_employee_id IS NOT NULL
      AND (v_employee_id IS NULL OR v_conflict_employee_id <> v_employee_id) THEN
-    RAISE EXCEPTION
-      'Cannot rename system account: % already exists as a different employee (%)',
+    v_employee_id := v_conflict_employee_id;
+
+    UPDATE hrms.employees
+    SET
+      first_name = 'IT',
+      last_name = 'Team',
+      updated_at = public.utc_now()
+    WHERE id = v_employee_id;
+
+    RAISE NOTICE
+      'Employee % already exists; synced IT Team display name (employee_id=%)',
       v_new_email,
-      v_conflict_employee_id
-      USING ERRCODE = 'P0001';
+      v_employee_id;
+    RETURN;
   END IF;
 
   IF v_user_id IS NULL AND v_employee_id IS NULL THEN
