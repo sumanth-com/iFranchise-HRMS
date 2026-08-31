@@ -30,6 +30,7 @@ import {
   toDisplayAttendanceNotes,
   type AttendanceRules,
 } from "@/lib/attendance/services/attendance-utils";
+import { canUpdateOwnCheckout } from "@/lib/attendance/self-checkout-permissions";
 import { getEmployeeBranchId } from "@/lib/attendance/services/attendance-queries";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import {
@@ -668,6 +669,7 @@ function buildHistoryRows(input: {
   searchDate?: string;
   page: number;
   pageSize: number;
+  allowUpdateCheckout: boolean;
 }): ManagerAttendanceHistoryResult {
   const { start, end } = getMonthDateRange(input.month, input.year);
   const days = eachDayOfInterval({
@@ -702,7 +704,9 @@ function buildHistoryRows(input: {
       input.rules.lateAfter,
     );
     const canUpdateCheckout = Boolean(
-      attendance?.check_in_at && date === input.today,
+      input.allowUpdateCheckout &&
+        attendance?.check_in_at &&
+        date === input.today,
     );
     const canRequestRegularization =
       isWithinRegularizationWindow(date, input.today) &&
@@ -932,6 +936,7 @@ export async function getManagerProfilePageData(
     searchDate: params.searchDate,
     page: params.page,
     pageSize: params.pageSize,
+    allowUpdateCheckout: canUpdateOwnCheckout(profile),
   });
 
   const selectedDate = params.date ?? null;
@@ -949,6 +954,7 @@ export async function getManagerProfilePageData(
     year,
     selectedDate,
     selectedDay,
+    canUpdateCheckout: canUpdateOwnCheckout(profile),
   };
 }
 
@@ -1132,6 +1138,12 @@ export async function updateManagerCheckout(
   profile: UserProfile,
   input: ManagerUpdateCheckoutInput,
 ) {
+  if (!canUpdateOwnCheckout(profile)) {
+    throw new Error(
+      "Only HR and executive users can update checkout after punching out.",
+    );
+  }
+
   const today = getTodayDateString();
   // Checkout is never auto-locked by time — only today can be updated.
   const employeeId = profile.employee.id;

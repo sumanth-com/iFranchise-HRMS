@@ -45,14 +45,21 @@ type Props = {
   onCheckIn: () => Promise<PunchResult>;
   onCheckOut: () => Promise<PunchResult>;
   onUpdateCheckout: () => Promise<PunchResult>;
+  /** When false, checked-out state is read-only (no Update Check Out). */
+  allowUpdateCheckout?: boolean;
 };
 
-function workflowHint(punchState: ManagerAttendancePunchState) {
+function workflowHint(
+  punchState: ManagerAttendancePunchState,
+  allowUpdateCheckout: boolean,
+) {
   switch (punchState) {
     case "checked_in":
       return "You're checked in. Tap Check Out when you finish for the day.";
     case "checked_out":
-      return "Checked out for today. Update Check Out if you left later than recorded.";
+      return allowUpdateCheckout
+        ? "Checked out for today. Update Check Out if you left later than recorded."
+        : "Checked out for today. Your attendance for today is complete.";
     default:
       return "Tap Check In when you start work. Check-out stays available all day.";
   }
@@ -139,6 +146,7 @@ export function AttendanceTodayPunchCard({
   onCheckIn,
   onCheckOut,
   onUpdateCheckout,
+  allowUpdateCheckout = false,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -243,7 +251,7 @@ export function AttendanceTodayPunchCard({
                 <span className="font-medium text-foreground">
                   {formatWorkingDuration(elapsedSeconds)}
                 </span>
-                . {workflowHint(punchState)}
+                . {workflowHint(punchState, allowUpdateCheckout)}
               </p>
             </div>
 
@@ -289,7 +297,7 @@ export function AttendanceTodayPunchCard({
               </PunchActionButton>
             ) : null}
 
-            {punchState === "checked_out" ? (
+            {punchState === "checked_out" && allowUpdateCheckout ? (
               <PunchActionButton
                 onClick={handleUpdateCheckout}
                 disabled={isPending}

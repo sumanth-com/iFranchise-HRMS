@@ -50,6 +50,8 @@ export type EmployeeDashboardData = {
   referenceDate: string;
   upcomingHolidays: EmployeeUpcomingEvent[];
   canManageAnnouncements?: boolean;
+  /** HR / executive only — employees see checkout as read-only after check-out. */
+  canUpdateCheckout?: boolean;
 };
 
 export type EmployeeAttendanceActionResult =

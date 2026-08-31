@@ -108,4 +108,6 @@ export type ManagerProfilePageData = {
   year: number;
   selectedDate: string | null;
   selectedDay: ManagerAttendanceCalendarDay | null;
+  /** HR / executive only — employees see checkout as read-only. */
+  canUpdateCheckout: boolean;
 };

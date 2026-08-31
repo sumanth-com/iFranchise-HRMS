@@ -101,6 +101,7 @@ export function EmployeeAttendanceView({
       <SelfAttendanceTodayCard
         firstName={data.profileCard.firstName}
         today={data.today}
+        allowUpdateCheckout={data.canUpdateCheckout}
       />
 
       <div className="grid gap-3 xl:min-h-[min(32rem,calc(100dvh-16rem))] xl:grid-cols-[minmax(0,1fr)_12.5rem] xl:items-stretch">

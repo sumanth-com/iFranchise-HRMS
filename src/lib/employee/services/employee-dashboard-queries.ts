@@ -4,6 +4,7 @@ import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { canManageDashboardAnnouncements } from "@/lib/dashboard/dashboard-announcement-permissions";
 import { listPublishedDashboardAnnouncements } from "@/lib/dashboard/services/dashboard-announcement-queries";
+import { canUpdateOwnCheckout } from "@/lib/attendance/self-checkout-permissions";
 import { LEAVE_BALANCE_CARD_CODES } from "@/lib/leave/constants";
 import { ensureEmployeeMonthlyLeaveAccruals } from "@/lib/leave/services/leave-monthly-accrual";
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
@@ -321,5 +322,6 @@ export async function getEmployeeDashboardData(
     referenceDate: today,
     upcomingHolidays,
     canManageAnnouncements: canManageDashboardAnnouncements(profile.permissionCodes),
+    canUpdateCheckout: canUpdateOwnCheckout(profile),
   };
 }

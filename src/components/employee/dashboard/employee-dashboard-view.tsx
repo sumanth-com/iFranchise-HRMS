@@ -14,6 +14,7 @@ export function EmployeeDashboardView({
   referenceDate,
   upcomingHolidays,
   canManageAnnouncements = false,
+  canUpdateCheckout = false,
   subtitle,
 }: EmployeeDashboardData & { subtitle?: string }) {
   return (
@@ -33,6 +34,7 @@ export function EmployeeDashboardView({
               <SelfAttendanceTodayCard
                 firstName={greeting.firstName}
                 today={today}
+                allowUpdateCheckout={canUpdateCheckout}
               />
             </div>
             <DailyBoostCard

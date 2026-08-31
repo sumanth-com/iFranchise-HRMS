@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
+import { canUpdateOwnCheckout } from "@/lib/attendance/self-checkout-permissions";
 import { HR_PORTAL_HOME } from "@/lib/auth/portal-paths";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
@@ -70,6 +71,13 @@ export async function selfAttendanceUpdateCheckoutAction(
     const profile = await requireServerAnyPermission([
       ...SELF_ATTENDANCE_PUNCH_PERMISSIONS,
     ]);
+    if (!canUpdateOwnCheckout(profile)) {
+      return {
+        success: false,
+        message:
+          "Only HR and executive users can update checkout after punching out.",
+      };
+    }
     const supabase = await createClient();
     const parsed = managerUpdateCheckoutSchema.parse(input);
     await updateManagerCheckout(supabase, profile, parsed);

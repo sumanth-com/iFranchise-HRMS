@@ -10,14 +10,21 @@ import type { ManagerTodayAttendance } from "@/types/manager-self-attendance";
 type Props = {
   firstName: string;
   today: ManagerTodayAttendance;
+  /** HR / executive only. Defaults to false (employee read-only after checkout). */
+  allowUpdateCheckout?: boolean;
 };
 
 /** Shared check-in/out card for every self-service portal (HR, employee, manager, system). */
-export function SelfAttendanceTodayCard({ firstName, today }: Props) {
+export function SelfAttendanceTodayCard({
+  firstName,
+  today,
+  allowUpdateCheckout = false,
+}: Props) {
   return (
     <AttendanceTodayPunchCard
       firstName={firstName}
       today={today}
+      allowUpdateCheckout={allowUpdateCheckout}
       onCheckIn={() => selfAttendancePunchAction({ type: "in" })}
       onCheckOut={() => selfAttendancePunchAction({ type: "out" })}
       onUpdateCheckout={() =>
