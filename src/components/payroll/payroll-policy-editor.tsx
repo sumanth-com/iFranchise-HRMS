@@ -28,10 +28,12 @@ type FormValues = Omit<PayrollPolicyDocument, "updatedAt">;
 
 export function PayrollPolicyEditor({
   backHref,
+  backLabel = "Back to Payroll",
   employeeName,
   initialDocument,
 }: {
   backHref: string;
+  backLabel?: string;
   employeeName: string;
   initialDocument: PayrollPolicyDocument;
 }) {
@@ -72,7 +74,7 @@ export function PayrollPolicyEditor({
       <div className="flex justify-start">
         <Button variant="outline" size="sm" nativeButton={false} render={<Link href={backHref} />}>
           <ArrowLeft className="size-4" />
-          Back to Payroll
+          {backLabel}
         </Button>
       </div>
 

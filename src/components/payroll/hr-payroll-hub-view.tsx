@@ -18,6 +18,7 @@ import {
 import { TeamPayrollHeaderActionsReset } from "@/components/payroll/team-payroll-header-actions-reset";
 import {
   parseTeamPayrollSection,
+  PAYROLL_ROUTES,
   SELF_PAYROLL_ROUTES,
   teamPayrollSectionDescription,
   teamPayrollSectionTitle,
@@ -280,7 +281,20 @@ export function HrPayrollHubView({
             ) : null}
           </div>
           {isTeamView ? (
-            <TeamPayrollHeaderActionsOutlet />
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                nativeButton={false}
+                render={<Link href={PAYROLL_ROUTES.policy} />}
+              >
+                <FileText className="size-4" />
+                Payroll Policy
+              </Button>
+              <TeamPayrollHeaderActionsOutlet />
+            </div>
           ) : (
             <div className="flex shrink-0 flex-wrap items-center gap-2">
               <Button

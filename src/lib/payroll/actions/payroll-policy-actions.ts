@@ -14,6 +14,7 @@ import type { PayrollPolicyActionResult } from "@/types/payroll-policy";
 function revalidatePayrollPolicyPaths() {
   revalidatePath(EMPLOYEE_ROUTES.payrollPolicy);
   revalidatePath(PAYROLL_ROUTES.policy);
+  revalidatePath(SELF_PAYROLL_ROUTES.policy);
   revalidatePath(EMPLOYEE_ROUTES.payroll);
   revalidatePath(SELF_PAYROLL_ROUTES.list);
 }

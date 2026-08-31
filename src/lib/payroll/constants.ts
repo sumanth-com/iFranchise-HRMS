@@ -32,7 +32,7 @@ export const PAYROLL_ROUTES = {
   payslips: "/dashboard/payroll-management/payslips",
   payslipHistory: "/dashboard/payroll-management/payslips/history",
   payslipDetail: (id: string) => `/dashboard/payroll-management/payslips/${id}`,
-  policy: SELF_PAYROLL_ROUTES.policy,
+  policy: "/dashboard/payroll-management/policy",
   settings: "/dashboard/payroll-management/settings",
 } as const;
 
