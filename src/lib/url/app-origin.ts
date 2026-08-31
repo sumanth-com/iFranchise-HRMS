@@ -4,6 +4,9 @@
  */
 export const PRODUCTION_CANONICAL_APP_URL = "https://hrms.ifranchise.in";
 
+/** Legacy Vercel production hostname — redirect to canonical domain only. */
+export const LEGACY_VERCEL_PRODUCTION_HOST = "hrmsifranchise.vercel.app";
+
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
 }
@@ -36,14 +39,25 @@ export function resolveAppOrigin(): string {
       }
       return PRODUCTION_CANONICAL_APP_URL;
     }
-    return trimTrailingSlash(configured);
+    const origin = trimTrailingSlash(configured);
+    return isValidHttpUrl(origin) ? origin : PRODUCTION_CANONICAL_APP_URL;
   }
 
-  return trimTrailingSlash(configured ?? "http://localhost:3000");
+  const devOrigin = trimTrailingSlash(configured ?? "http://localhost:3000");
+  return isValidHttpUrl(devOrigin) ? devOrigin : "http://localhost:3000";
 }
 
 /** Builds an absolute URL for a same-origin path (must start with `/`). */
 export function absoluteAppUrl(path: string): string {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   return `${resolveAppOrigin()}${normalizedPath}`;
+}
+
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
 }

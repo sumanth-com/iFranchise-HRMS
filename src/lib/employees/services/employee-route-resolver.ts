@@ -1,6 +1,8 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import {
   buildEmployeeCodeCandidates,
+  buildEmployeeSlug,
+  extractSlugFromRouteRef,
   isEmployeeUuid,
 } from "@/lib/employees/routing";
 import type { EmployeeRouteIdentity } from "@/types/employee";
@@ -8,6 +10,42 @@ import type { EmployeeRouteIdentity } from "@/types/employee";
 export type ResolvedEmployeeRoute = EmployeeRouteIdentity & {
   id: string;
 };
+
+async function resolveEmployeeBySlug(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  slug: string,
+): Promise<ResolvedEmployeeRoute | null> {
+  const normalizedSlug = slug.trim().toLowerCase();
+  if (!normalizedSlug) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("employees")
+    .select("id, employee_code, first_name, last_name")
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  for (const row of data ?? []) {
+    const rowSlug = buildEmployeeSlug(row.first_name, row.last_name);
+    if (rowSlug === normalizedSlug) {
+      return {
+        id: row.id,
+        employeeCode: row.employee_code,
+        firstName: row.first_name,
+        lastName: row.last_name,
+      };
+    }
+  }
+
+  return null;
+}
 
 export async function resolveEmployeeFromRouteRef(
   supabase: AuthSupabaseClient,
@@ -62,6 +100,11 @@ export async function resolveEmployeeFromRouteRef(
     }
   }
 
+  const slug = extractSlugFromRouteRef(routeRef);
+  if (slug) {
+    return resolveEmployeeBySlug(supabase, organizationId, slug);
+  }
+
   return null;
 }
 
@@ -114,6 +157,35 @@ export async function resolveEmployeeFromRouteRefGlobal(
         firstName: data.first_name,
         lastName: data.last_name,
         organizationId: data.organization_id as string,
+      };
+    }
+  }
+
+  const slug = extractSlugFromRouteRef(routeRef);
+  if (!slug) {
+    return null;
+  }
+
+  const normalizedSlug = slug.trim().toLowerCase();
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("employees")
+    .select("id, employee_code, first_name, last_name, organization_id")
+    .is("deleted_at", null);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  for (const row of data ?? []) {
+    const rowSlug = buildEmployeeSlug(row.first_name, row.last_name);
+    if (rowSlug === normalizedSlug) {
+      return {
+        id: row.id,
+        employeeCode: row.employee_code,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        organizationId: row.organization_id as string,
       };
     }
   }

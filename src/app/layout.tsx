@@ -3,6 +3,7 @@ import { Lato } from "next/font/google";
 
 import { AppProviders } from "@/providers/app-providers";
 import { siteConfig } from "@/config/site";
+import { resolveAppOrigin } from "@/lib/url/app-origin";
 
 import "./globals.css";
 
@@ -15,6 +16,7 @@ const lato = Lato({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(resolveAppOrigin()),
   title: {
     default: siteConfig.name,
     template: `%s | ${siteConfig.name}`,

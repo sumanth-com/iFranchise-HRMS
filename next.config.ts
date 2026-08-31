@@ -46,6 +46,12 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
+        source: "/:path*",
+        has: [{ type: "host", value: "hrmsifranchise.vercel.app" }],
+        destination: "https://hrms.ifranchise.in/:path*",
+        permanent: true,
+      },
+      {
         source: "/ceo/leave",
         destination: "/ceo/approvals/leave",
         permanent: false,

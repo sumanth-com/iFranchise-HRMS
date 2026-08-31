@@ -27,6 +27,10 @@ import {
 import { HR_PORTAL_HOME } from "@/lib/auth/portal-paths";
 import { SYSTEM_ADMIN_PERMISSION } from "@/lib/system-admin/constants";
 import { isSystemAdminPath } from "@/lib/system-admin/paths";
+import {
+  LEGACY_VERCEL_PRODUCTION_HOST,
+  PRODUCTION_CANONICAL_APP_URL,
+} from "@/lib/url/app-origin";
 import { updateSession } from "@/lib/supabase/middleware";
 
 /** Bound permission RPCs so a slow DB cannot hold Edge middleware open. */
@@ -131,6 +135,14 @@ async function signOutExpiredIdleSession(
 }
 
 export async function middleware(request: NextRequest) {
+  const host = request.headers.get("host")?.split(":")[0]?.toLowerCase();
+  if (host === LEGACY_VERCEL_PRODUCTION_HOST) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.protocol = "https:";
+    redirectUrl.host = new URL(PRODUCTION_CANONICAL_APP_URL).host;
+    return NextResponse.redirect(redirectUrl, 308);
+  }
+
   const { supabase, supabaseResponse, user, authUnavailable } =
     await updateSession(request);
   const { pathname, searchParams } = request.nextUrl;

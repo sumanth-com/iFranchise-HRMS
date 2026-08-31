@@ -652,6 +652,14 @@ export async function getEmployeeDetailBundleAction(
     employeeResult.status === "fulfilled" ? employeeResult.value : null;
 
   if (!employee) {
+    if (employeeResult.status === "rejected") {
+      console.error("[employee-detail] failed to load employee record", {
+        employeeId: resolved.id,
+        employeeRef,
+        reason: employeeResult.reason,
+      });
+      throw employeeResult.reason;
+    }
     return null;
   }
 

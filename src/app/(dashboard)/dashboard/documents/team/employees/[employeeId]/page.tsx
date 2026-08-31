@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { DocumentsSubNav } from "@/components/documents/documents-sub-nav";
 import { EmployeeDocumentDetailView } from "@/components/documents/employee-document-detail-view";
+import { resolveEmployeeFromRouteRef } from "@/lib/employees/services/employee-route-resolver";
 import { createClient } from "@/lib/supabase/server";
 import { isEmployeeScoped } from "@/lib/documents/services/documents-utils";
 import {
@@ -17,12 +18,21 @@ type Props = {
 };
 
 export default async function TeamEmployeeDocumentDetailPage({ params }: Props) {
-  const { employeeId } = await params;
+  const { employeeId: employeeRouteRef } = await params;
   const profile = await requireServerPermission("documents.view");
   const supabase = await createClient();
 
+  const resolved = await resolveEmployeeFromRouteRef(
+    supabase,
+    profile.employee.organizationId,
+    employeeRouteRef,
+  );
+  if (!resolved) {
+    notFound();
+  }
+
   const [employeeProfile, lookups] = await Promise.all([
-    getEmployeeDocumentProfile(supabase, profile, employeeId),
+    getEmployeeDocumentProfile(supabase, profile, resolved.id),
     getDocumentsLookups(supabase, profile),
   ]);
 

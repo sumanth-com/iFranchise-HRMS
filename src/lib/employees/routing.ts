@@ -109,3 +109,12 @@ export function formatEmployeeRouteRefLabel(routeRef: string): string {
 export function isEmployeeDetailRouteSegment(segment: string): boolean {
   return segment !== "new" && segment !== "employees";
 }
+
+/** Slug suffix after the employee code in a route ref (e.g. ekta-pattanaik). */
+export function extractSlugFromRouteRef(routeRef: string): string | null {
+  const parsed = parseEmployeeRouteRef(routeRef);
+  if (parsed.kind === "legacy-uuid") {
+    return null;
+  }
+  return parsed.slug;
+}
