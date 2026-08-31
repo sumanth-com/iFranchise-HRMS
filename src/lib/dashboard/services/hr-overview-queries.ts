@@ -97,6 +97,7 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
     payrollRes,
     interviewsTodayRes,
     onboardingStats,
+    assignedAssetsRes,
   ] = await Promise.all([
     getAttendanceSummary(supabase, profile),
     getLeaveSummary(supabase, profile, undefined, undefined, {
@@ -143,6 +144,11 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
       .eq("interview_date", today)
       .is("deleted_at", null),
     getOnboardingDashboardStats(supabase, organizationId),
+    fromHrms(supabase, "assets")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("asset_status", "assigned")
+      .is("deleted_at", null),
   ]);
 
   if (headcountRes.error) throw new Error(headcountRes.error.message);
@@ -239,6 +245,7 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
       probationEndingSoon,
       documentsExpiring: 0,
       assetsPendingReturn: 0,
+      assignedAssetsCount: assignedAssetsRes.count ?? 0,
       interviewsToday,
       birthdaysToday: upcomingBirthdays.filter((event) => event.date === today).length,
       exitClearancePending: 0,

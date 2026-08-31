@@ -3,7 +3,8 @@
 import { ErrorState } from "@/components/common";
 import { DashboardOperationsRow } from "@/components/dashboard/dashboard-panels";
 import { HrTodayPulseSection } from "@/components/dashboard/hr-today-pulse-section";
-import { DASHBOARD_ACTION_LINKS, DASHBOARD_KPI_LINKS } from "@/lib/dashboard/constants";
+import { ASSETS_ROUTES } from "@/lib/assets/constants";
+import { DASHBOARD_KPI_LINKS } from "@/lib/dashboard/constants";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
 import type { HrDashboardData } from "@/types/dashboard";
 
@@ -36,7 +37,7 @@ export function HrDashboard({ data, error }: Props) {
           tasks={data.tasks}
           rightPanel="focus-pair"
           rightFocusTitle="Workforce"
-          rightFocusDescription="Headcount and probation at a glance"
+          rightFocusDescription="Headcount and upcoming celebrations"
           rightFocusItems={[
             {
               id: "headcount",
@@ -46,20 +47,20 @@ export function HrDashboard({ data, error }: Props) {
               href: EMPLOYEE_ROUTES.list,
             },
             {
-              id: "probation-ending",
-              label: "On probation",
-              value: data.secondary.probationEndingSoon,
-              hint: "Review status",
-              href: `${EMPLOYEE_ROUTES.list}?employmentStatus=probation`,
+              id: "upcoming-birthdays",
+              label: "Upcoming birthdays",
+              value: data.secondary.upcomingBirthdaysCount,
+              hint: "Next 7 days",
+              href: EMPLOYEE_ROUTES.list,
             },
           ]}
           watchItems={[
             {
-              id: "documents-expiring",
-              label: "Documents expiring",
-              value: data.secondary.documentsExpiring,
-              hint: "Renew soon",
-              href: DASHBOARD_ACTION_LINKS.documentsExpiring,
+              id: "company-assets",
+              label: "Company Assets",
+              value: data.secondary.assignedAssetsCount,
+              hint: "Assigned inventory",
+              href: ASSETS_ROUTES.dashboard,
             },
             {
               id: "exit-clearance",
@@ -73,7 +74,7 @@ export function HrDashboard({ data, error }: Props) {
           upcomingBirthdays={data.upcomingBirthdays}
           upcomingAnniversaries={data.upcomingAnniversaries}
           insightsTitle="People Focus"
-          insightsDescription="Documents and exits to review"
+          insightsDescription="Assets and exits to review"
         />
       </section>
     </div>

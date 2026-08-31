@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { resetPasswordAction } from "@/lib/auth/actions";
-import { AUTH_ROUTES } from "@/lib/auth/constants";
+import { AUTH_ROUTES, HRMS_PASSWORD_MIN_LENGTH } from "@/lib/auth/constants";
 import { resolveUserFacingAuthMessage } from "@/lib/auth/errors";
 import {
   resetPasswordSchema,
@@ -190,7 +190,7 @@ export function ResetPasswordForm() {
             </p>
           ) : (
             <p className="text-xs text-muted-foreground">
-              At least 12 characters with uppercase, lowercase, number, and symbol.
+              At least {HRMS_PASSWORD_MIN_LENGTH} characters with uppercase, lowercase, number, and symbol.
             </p>
           )}
         </div>

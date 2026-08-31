@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 
+import { HRMS_PASSWORD_MIN_LENGTH } from "@/lib/auth/constants";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -11,7 +12,10 @@ const changePasswordSchema = z
     currentPassword: z.string().min(1, "Enter your current password"),
     newPassword: z
       .string()
-      .min(12, "Password must be at least 12 characters")
+      .min(
+        HRMS_PASSWORD_MIN_LENGTH,
+        `Password must be at least ${HRMS_PASSWORD_MIN_LENGTH} characters`,
+      )
       .regex(/[a-z]/, "Password must include a lowercase letter")
       .regex(/[A-Z]/, "Password must include an uppercase letter")
       .regex(/[0-9]/, "Password must include a number")

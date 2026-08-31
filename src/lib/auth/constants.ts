@@ -7,6 +7,9 @@ export const AUTH_ROUTES = {
   dashboard: "/dashboard",
 } as const;
 
+/** Minimum password length for portal invite, reset, and change-password flows. */
+export const HRMS_PASSWORD_MIN_LENGTH = 8;
+
 /** Base path for the Universal Email Approval Engine landing page. */
 export const APPROVAL_PUBLIC_ROUTE = "/approval";
 

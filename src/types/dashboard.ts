@@ -54,6 +54,7 @@ export type DashboardSecondaryMetrics = {
   probationEndingSoon: number;
   documentsExpiring: number;
   assetsPendingReturn: number;
+  assignedAssetsCount: number;
   interviewsToday: number;
   birthdaysToday: number;
   exitClearancePending: number;

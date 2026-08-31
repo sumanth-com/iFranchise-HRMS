@@ -682,6 +682,7 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
       probationEndingSoon,
       documentsExpiring,
       assetsPendingReturn: exitSummary.assetsPendingReturn || 0,
+      assignedAssetsCount: 0,
       interviewsToday,
       birthdaysToday: upcomingBirthdays.filter((event) => event.date === today).length,
       exitClearancePending: exitSummary.pendingClearance || 0,

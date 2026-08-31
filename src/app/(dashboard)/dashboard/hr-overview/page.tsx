@@ -33,6 +33,7 @@ const EMPTY_DASHBOARD: HrDashboardData = {
     probationEndingSoon: 0,
     documentsExpiring: 0,
     assetsPendingReturn: 0,
+    assignedAssetsCount: 0,
     interviewsToday: 0,
     birthdaysToday: 0,
     exitClearancePending: 0,

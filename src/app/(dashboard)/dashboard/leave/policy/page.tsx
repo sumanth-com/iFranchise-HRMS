@@ -1,7 +1,6 @@
 import { LeavePolicyView } from "@/components/leave/leave-policy-view";
 import { SELF_LEAVE_ROUTES } from "@/lib/leave/constants";
 import { getEmployeeById } from "@/lib/employees/services/employee-detail";
-import { getEmployeeLeaveBalanceSnapshot } from "@/lib/leave/services/leave-queries";
 import { getLeavePolicyPageData } from "@/lib/leave/services/leave-policy-queries";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -21,10 +20,9 @@ function resolveEmployeeGreetingName(
 export default async function SelfLeavePolicyPage() {
   const profile = await requireServerAnyPermission(["leave.view"]);
   const supabase = await createClient();
-  const [employee, policy, yearUsage] = await Promise.all([
+  const [employee, policy] = await Promise.all([
     getEmployeeById(supabase, profile.employee.id),
     getLeavePolicyPageData(supabase, profile.employee.organizationId),
-    getEmployeeLeaveBalanceSnapshot(supabase, profile.employee.id),
   ]);
 
   return (
@@ -37,7 +35,6 @@ export default async function SelfLeavePolicyPage() {
         mandatoryHolidays={policy.mandatoryHolidays}
         optionalHolidays={policy.optionalHolidays}
         holidayYear={policy.holidayYear}
-        yearUsage={yearUsage}
       />
     </div>
   );

@@ -60,7 +60,7 @@ function evaluatePasswordStrength(password: string): StrengthTier {
     /[^A-Za-z0-9]/.test(password),
   ].filter(Boolean).length;
 
-  if (password.length >= 12 && variety >= 3) {
+  if (password.length >= MIN_PASSWORD_LENGTH && variety >= 3) {
     score = 5;
     label = "Strong";
   } else if (password.length >= 10 || variety >= 2) {

@@ -27,7 +27,7 @@ site_url = "env(NEXT_PUBLIC_APP_URL)"
 allowed_redirect_urls = ["env(NEXT_PUBLIC_APP_URL)"]
 
 [password_policy]
-minimum_length = 12
+minimum_length = 8
 require_mixed_case = true
 require_digits = true
 require_symbols = true
