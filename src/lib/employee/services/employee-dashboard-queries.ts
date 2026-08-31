@@ -2,7 +2,10 @@ import { addDays, format, isWithinInterval } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
-import { LEAVE_BALANCE_DISPLAY_CODES } from "@/lib/leave/constants";
+import { canManageDashboardAnnouncements } from "@/lib/dashboard/dashboard-announcement-permissions";
+import { listPublishedDashboardAnnouncements } from "@/lib/dashboard/services/dashboard-announcement-queries";
+import { LEAVE_BALANCE_CARD_CODES } from "@/lib/leave/constants";
+import { ensureEmployeeMonthlyLeaveAccruals } from "@/lib/leave/services/leave-monthly-accrual";
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
 import { roundLeaveDays } from "@/lib/leave/services/leave-usage";
 import { getSelfTodayAttendance } from "@/lib/manager/services/manager-self-attendance-service";
@@ -15,7 +18,8 @@ import type {
 } from "@/types/employee-dashboard";
 import type { ManagerTodayAttendance } from "@/types/manager-self-attendance";
 
-const DISPLAY_LEAVE_CODES = new Set<string>(LEAVE_BALANCE_DISPLAY_CODES);
+/** Match Leave page cards: Casual + Earned available balance only. */
+const DASHBOARD_LEAVE_BALANCE_CODES = new Set<string>(LEAVE_BALANCE_CARD_CODES);
 
 /** Runs a widget query but never lets one failing panel break the whole dashboard. */
 async function safe<T>(operation: () => Promise<T>, fallback: T): Promise<T> {
@@ -67,6 +71,9 @@ async function loadLeaveKpis(
 ): Promise<{ totalBalanceDays: number; pendingCount: number }> {
   const balanceYear = getCurrentBalanceYear();
 
+  // Apply due monthly CL/EL accruals so the KPI matches the Leave page.
+  await ensureEmployeeMonthlyLeaveAccruals(supabase, employeeId, { balanceYear });
+
   const [balancesResult, pendingResult] = await Promise.all([
     supabase
       .schema("hrms")
@@ -87,13 +94,13 @@ async function loadLeaveKpis(
   if (balancesResult.error) throw new Error(balancesResult.error.message);
   if (pendingResult.error) throw new Error(pendingResult.error.message);
 
-  // Match Leave page cards: CL + SL + EL + PL remaining only (exclude LOP/OH/etc.).
+  // Casual + Earned remaining only (monthly accrual types — exclude SL/PL/LOP/OH).
   const totalBalanceDays = (balancesResult.data ?? []).reduce((sum, row) => {
     const leaveType = unwrapRelation(
       row.leave_types as { code: string } | { code: string }[] | null,
     );
     const code = leaveType?.code;
-    if (!code || !DISPLAY_LEAVE_CODES.has(code)) return sum;
+    if (!code || !DASHBOARD_LEAVE_BALANCE_CODES.has(code)) return sum;
     return sum + Math.max(0, Number(row.balance_days ?? 0));
   }, 0);
 
@@ -232,7 +239,8 @@ export async function loadUpcomingCelebrations(
     console.error("[celebrations] birthdays query failed", error);
   }
 
-  events.sort((a, b) => {
+  const celebrationEvents = [...events];
+  celebrationEvents.sort((a, b) => {
     const typeRank = (type: EmployeeUpcomingEvent["type"]) =>
       type === "birthday" ? 0 : type === "holiday" ? 1 : 2;
     const aIsToday = a.date === today;
@@ -244,7 +252,42 @@ export async function loadUpcomingCelebrations(
     return typeRank(a.type) - typeRank(b.type);
   });
 
-  return events;
+  const announcements = await listPublishedDashboardAnnouncements(
+    supabase,
+    organizationId,
+  ).catch((error) => {
+    console.error("[celebrations] announcements query failed", error);
+    return [];
+  });
+
+  const importantAnnouncementEvents: EmployeeUpcomingEvent[] = [];
+  const normalAnnouncementEvents: EmployeeUpcomingEvent[] = [];
+
+  for (const announcement of announcements) {
+    const slide: EmployeeUpcomingEvent = {
+      id: `announcement-${announcement.id}`,
+      type: "announcement",
+      title: announcement.title,
+      subtitle: announcement.priority === "important" ? "Important" : "Announcement",
+      date: (announcement.publishedAt ?? announcement.updatedAt).slice(0, 10) || today,
+      message: announcement.message,
+      priority: announcement.priority,
+      imageUrl: announcement.imageUrl,
+      iconKey: announcement.iconKey,
+    };
+    if (announcement.priority === "important") {
+      importantAnnouncementEvents.push(slide);
+    } else {
+      normalAnnouncementEvents.push(slide);
+    }
+  }
+
+  // Important announcements first, then birthdays/holidays, then normal notices.
+  return [
+    ...importantAnnouncementEvents,
+    ...celebrationEvents,
+    ...normalAnnouncementEvents,
+  ];
 }
 
 export async function getEmployeeDashboardData(
@@ -277,5 +320,6 @@ export async function getEmployeeDashboardData(
     },
     referenceDate: today,
     upcomingHolidays,
+    canManageAnnouncements: canManageDashboardAnnouncements(profile.permissionCodes),
   };
 }

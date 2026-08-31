@@ -83,8 +83,8 @@ export function leaveApprovalStageLabel(
 /** iFranchise leave policy — active leave types (including LOP for payroll tracking). */
 export const ALLOWED_LEAVE_TYPE_CODES = ["CL", "SL", "EL", "OH", "PL", "LOP"] as const;
 
-/** Types available in Apply Leave — LOP is unpaid leave; OH uses optional holiday workflow. */
-export const LEAVE_APPLY_TYPE_CODES = ["CL", "SL", "EL", "PL", "LOP"] as const;
+/** Types available in Apply Leave — CL/EL monthly accrual; PL when eligible; LOP unpaid. SL not offered. */
+export const LEAVE_APPLY_TYPE_CODES = ["CL", "EL", "PL", "LOP"] as const;
 
 /** Types that cannot be applied through the normal leave form. */
 export const NON_APPLY_LEAVE_TYPE_CODES = ["OH"] as const;
@@ -100,6 +100,9 @@ export function sortByLeaveTypeCode<T extends { code?: string | null }>(items: T
     return (leftRank ?? 99) - (rightRank ?? 99);
   });
 }
+
+/** Leave balance summary cards on My Leave — Casual + Earned only (monthly accrual). */
+export const LEAVE_BALANCE_CARD_CODES = ["CL", "EL"] as const;
 
 /** Leave balance UI cards — OH is not shown here; LOP is unpaid and shown via Apply Leave / payroll. */
 export const LEAVE_BALANCE_DISPLAY_CODES = ["CL", "SL", "EL", "PL"] as const;

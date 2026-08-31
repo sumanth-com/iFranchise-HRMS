@@ -166,28 +166,48 @@ export function SalaryStructureForm({
           <Label>Effective from</Label>
           <Input type="date" disabled={isPending} {...form.register("effectiveFrom")} />
         </div>
-        <CurrencyField label="Basic salary" name="basicSalary" form={form} disabled={isPending} />
+        <CurrencyField label="Basic Salary" name="basicSalary" form={form} disabled={isPending} />
         <CurrencyField label="HRA" name="hraAmount" form={form} disabled={isPending} />
-        <CurrencyField label="Travel allowance" name="transportAllowance" form={form} disabled={isPending} />
         <CurrencyField
-          label="Special allowance"
+          label="Travel Allowance"
+          name="transportAllowance"
+          form={form}
+          disabled={isPending}
+        />
+        <CurrencyField
+          label="Special Allowance"
           name="components.specialAllowance"
           form={form}
           disabled={isPending}
         />
-        <CurrencyField label="Medical" name="components.medical" form={form} disabled={isPending} />
-        <CurrencyField label="Other allowances" name="otherAllowances" form={form} disabled={isPending} />
+        <CurrencyField
+          label="Medical Allowance"
+          name="components.medical"
+          form={form}
+          disabled={isPending}
+        />
+        <CurrencyField
+          label="Other Allowances"
+          name="otherAllowances"
+          form={form}
+          disabled={isPending}
+        />
         <CurrencyField label="PF" name="components.pf" form={form} disabled={isPending} />
         <CurrencyField label="ESI" name="components.esi" form={form} disabled={isPending} />
         <CurrencyField
-          label="Professional tax"
+          label="Professional Tax"
           name="components.professionalTax"
           form={form}
           disabled={isPending}
         />
-        <CurrencyField label="Income tax" name="components.incomeTax" form={form} disabled={isPending} />
         <CurrencyField
-          label="Other deductions"
+          label="Income Tax"
+          name="components.incomeTax"
+          form={form}
+          disabled={isPending}
+        />
+        <CurrencyField
+          label="Other Deductions"
           name="components.other"
           form={form}
           disabled={isPending}

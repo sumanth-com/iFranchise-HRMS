@@ -10,6 +10,7 @@ import type {
 import { createClient } from "@/lib/supabase/server";
 import { getOrganizationLogoSignedUrl } from "@/lib/organization/services/org-logo";
 import { cleanDisplayText } from "@/lib/employees/parse-employee-name";
+import { isEmployeeAppVisible } from "@/lib/employees/app-hidden";
 
 export type AuthSupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -38,6 +39,7 @@ type EmployeeRow = {
   account_status: NonNullable<Employee["accountStatus"]>;
   status: Employee["status"];
   deleted_at: string | null;
+  app_hidden_at: string | null;
 };
 
 type OrganizationRow = {
@@ -138,7 +140,7 @@ export const loadUserProfile = cache(async function loadUserProfile(
     .schema("hrms")
     .from("employees")
     .select(
-      "id, organization_id, branch_id, employee_code, first_name, last_name, email, employment_status, account_status, status, deleted_at",
+      "id, organization_id, branch_id, employee_code, first_name, last_name, email, employment_status, account_status, status, deleted_at, app_hidden_at",
     )
     .eq("user_id", userId)
     .maybeSingle();
@@ -166,7 +168,7 @@ export const loadUserProfile = cache(async function loadUserProfile(
     return { success: false, error: "EMPLOYEE_NOT_FOUND" };
   }
 
-  if (employeeRow.deleted_at) {
+  if (employeeRow.deleted_at || !isEmployeeAppVisible(employeeRow)) {
     return { success: false, error: "EMPLOYEE_DELETED" };
   }
 

@@ -522,7 +522,7 @@ export function EmployeePayrollView({
                   <td className="py-2.5 pr-3">
                     {row.availability === "under_review" ? (
                       <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-800">
-                        HR Review
+                        {row.reviewMessage ?? "Pending release"}
                       </span>
                     ) : (
                       <StatusPill status={row.payrollStatus} />

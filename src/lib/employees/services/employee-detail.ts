@@ -242,6 +242,7 @@ export async function getEmployeeById(
     )
     .eq("id", employeeId)
     .is("deleted_at", null)
+    .is("app_hidden_at", null)
     .maybeSingle();
 
   if (error || !employee) {

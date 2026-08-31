@@ -171,7 +171,7 @@ const EMPLOYEE_SELECT_FIELDS = `
   account_deactivated_at, account_suspended_at, created_by,
   updated_at, date_of_joining, employment_type_id, invited_role_id,
   department_id, branch_id, designation_id, reporting_manager_id,
-  assigned_hr_employee_id, deleted_at,
+  assigned_hr_employee_id, deleted_at, app_hidden_at,
   departments:department_id ( name ),
   branches:branch_id ( name ),
   designations:designation_id ( title ),
@@ -345,7 +345,7 @@ async function loadExecutiveUsers(
   for (const row of (data ?? []) as LooseRow[]) {
     const role = unwrapRelation<LooseRow>(row.roles);
     const employee = unwrapRelation<LooseRow>(row.employee);
-    if (!role || !employee || employee.deleted_at) continue;
+    if (!role || !employee || employee.deleted_at || employee.app_hidden_at) continue;
 
     const roleCode = String(role.code);
     if (!directoryRoleCodes.has(roleCode.toLowerCase())) continue;
@@ -375,7 +375,8 @@ async function loadExecutiveUsers(
       "inactive",
       "suspended",
     ])
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .is("app_hidden_at", null);
 
   if (pendingError) throw new Error(pendingError.message);
 
@@ -392,7 +393,8 @@ async function loadExecutiveUsers(
     .eq("organization_id", organizationId)
     .eq("account_status", "active")
     .is("user_id", null)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .is("app_hidden_at", null);
 
   if (portallessError) throw new Error(portallessError.message);
 
@@ -409,7 +411,8 @@ async function loadExecutiveUsers(
   }
   const uniquePendingRows = [...pendingById.values()];
   const missingEmployees = uniquePendingRows.filter(
-    (employee) => !employee.deleted_at && !byEmployee.has(employee.id),
+    (employee) =>
+      !employee.deleted_at && !employee.app_hidden_at && !byEmployee.has(employee.id),
   );
   const missingRoleEmployeeIds = missingEmployees.map((employee) => String(employee.id));
 
@@ -704,7 +707,7 @@ export async function getCeoProvisioningLookups(
   for (const row of (managersRes.data ?? []) as LooseRow[]) {
     const role = unwrapRelation<LooseRow>(row.roles);
     const employee = unwrapRelation<LooseRow>(row.employee);
-    if (!role || !employee || employee.deleted_at) continue;
+    if (!role || !employee || employee.deleted_at || employee.app_hidden_at) continue;
     if (!directoryRoleCodes.has(String(role.code).toLowerCase())) continue;
     if (String(employee.employment_status ?? "") === "draft") continue;
     if (managersMap.has(employee.id)) continue;
@@ -860,6 +863,7 @@ export async function listPortalInviteEligibleEmployees(
     )
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
+    .is("app_hidden_at", null)
     .order("first_name", { ascending: true })
     .limit(80);
 

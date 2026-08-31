@@ -81,6 +81,7 @@ export function CeoDashboard({ data, error }: CeoDashboardProps) {
             <EmployeeUpcomingEvents
               events={data.upcomingHolidays ?? []}
               referenceDate={referenceDate}
+              canManageAnnouncements={data.canManageAnnouncements === true}
               className="min-h-0 h-full"
             />
           </div>

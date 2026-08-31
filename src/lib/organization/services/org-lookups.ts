@@ -151,6 +151,7 @@ export async function getEmployeeLookups(
     .select("id, first_name, last_name, employee_code")
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
+    .is("app_hidden_at", null)
     .in("employment_status", ["active", "probation", "on_leave"])
     .order("first_name");
 

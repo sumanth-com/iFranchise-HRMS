@@ -132,5 +132,6 @@ export type CeoDashboardData = {
   activities: CeoActivityItem[];
   approvals: CeoApprovalItem[];
   upcomingHolidays: EmployeeUpcomingEvent[];
+  canManageAnnouncements?: boolean;
   charts: CeoDashboardCharts;
 };

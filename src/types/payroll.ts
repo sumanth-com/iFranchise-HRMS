@@ -64,6 +64,18 @@ export type PayrollBreakdown = {
     holidayCount?: number;
   };
   notes?: string[];
+  /**
+   * Immutable salary-structure values captured at payroll generate time.
+   * Historical payslip PDFs must prefer this over live salary_structures.
+   */
+  salaryStructureSnapshot?: {
+    salaryStructureId: string | null;
+    basicSalary: number;
+    hraAmount: number;
+    transportAllowance: number;
+    otherAllowances: number;
+    components: Record<string, unknown>;
+  };
 };
 
 export type PayrollListItem = {
@@ -328,6 +340,11 @@ export type PayslipDetail = {
     ifscCode: string | null;
     accountHolderName: string | null;
   } | null;
+  /** Casual / Earned leave used in payroll month and current balances (no Sick Leave). */
+  leaveBalances: {
+    casual: { usedInMonth: number; balance: number };
+    earned: { usedInMonth: number; balance: number };
+  };
   storagePath: string | null;
 };
 

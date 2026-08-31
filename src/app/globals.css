@@ -6582,10 +6582,30 @@ html.dark [data-slot="dialog-content"].landing-desktop-experience .desktop-previ
   }
 }
 
+@keyframes birthday-celebration-float {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.35);
+  }
+  18% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1);
+  }
+}
+
+.birthday-celebration-particle {
+  animation: birthday-celebration-float 1.55s ease-out forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .daily-boost-glow,
-  .celebration-glyph {
-    animation: none;
+  .celebration-glyph,
+  .birthday-celebration-particle,
+  .celebrations-slide-fade {
+    animation: none !important;
   }
 }
 

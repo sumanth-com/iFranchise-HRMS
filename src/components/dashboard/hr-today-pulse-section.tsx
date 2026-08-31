@@ -1,6 +1,15 @@
 import Link from "next/link";
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
-import { Cake, Medal, Sparkles, Users } from "lucide-react";
+import {
+  Cake,
+  CircleAlert,
+  Clock3,
+  Medal,
+  Sparkles,
+  UserCheck,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 
 import {
   dashboardGradientTileClass,
@@ -12,23 +21,109 @@ import { DASHBOARD_KPI_LINKS } from "@/lib/dashboard/constants";
 import type { DashboardListItem, DashboardPersonEvent, HrTodayPulse } from "@/types/dashboard";
 import { cn } from "@/lib/utils";
 
+type DashboardVisualTone = "default" | "vibrant";
+
+type PulseTone = {
+  accent: string;
+  icon: LucideIcon;
+  iconWrap: string;
+  tile: string;
+  glow: string;
+};
+
+const PULSE_TONES: Record<string, PulseTone> = {
+  present: {
+    accent: "text-emerald-700 dark:text-emerald-300",
+    icon: UserCheck,
+    iconWrap: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300",
+    tile: "bg-gradient-to-br from-emerald-500/14 via-emerald-500/6 to-card ring-1 ring-inset ring-emerald-500/15",
+    glow: "bg-emerald-400/25",
+  },
+  absent: {
+    accent: "text-rose-700 dark:text-rose-300",
+    icon: CircleAlert,
+    iconWrap: "bg-rose-500/15 text-rose-600 dark:text-rose-300",
+    tile: "bg-gradient-to-br from-rose-500/14 via-rose-500/6 to-card ring-1 ring-inset ring-rose-500/15",
+    glow: "bg-rose-400/25",
+  },
+  late: {
+    accent: "text-fuchsia-700 dark:text-fuchsia-300",
+    icon: Clock3,
+    iconWrap: "bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-300",
+    tile: "bg-gradient-to-br from-fuchsia-500/14 via-fuchsia-500/6 to-card ring-1 ring-inset ring-fuchsia-500/15",
+    glow: "bg-fuchsia-400/25",
+  },
+  half: {
+    accent: "text-sky-700 dark:text-sky-300",
+    icon: Clock3,
+    iconWrap: "bg-sky-500/15 text-sky-600 dark:text-sky-300",
+    tile: "bg-gradient-to-br from-sky-500/14 via-sky-500/6 to-card ring-1 ring-inset ring-sky-500/15",
+    glow: "bg-sky-400/25",
+  },
+  pending: {
+    accent: "text-violet-700 dark:text-violet-300",
+    icon: Sparkles,
+    iconWrap: "bg-violet-500/15 text-violet-600 dark:text-violet-300",
+    tile: "bg-gradient-to-br from-violet-500/14 via-violet-500/6 to-card ring-1 ring-inset ring-violet-500/15",
+    glow: "bg-violet-400/25",
+  },
+};
+
 function PulseMetric({
   label,
   value,
   href,
   accent,
+  toneKey,
+  visualTone = "default",
 }: {
   label: string;
   value: number;
   href?: string;
   accent?: string;
+  toneKey?: keyof typeof PULSE_TONES;
+  visualTone?: DashboardVisualTone;
 }) {
+  const tone = toneKey ? PULSE_TONES[toneKey] : undefined;
+  const Icon = tone?.icon;
   const content = (
-    <div className={dashboardMetricClass}>
-      <p className="text-[10px] font-medium leading-tight tracking-wide text-muted-foreground uppercase">
-        {label}
-      </p>
-      <p className={cn("text-2xl font-semibold tracking-tight tabular-nums", accent)}>
+    <div
+      className={cn(
+        dashboardMetricClass,
+        "relative overflow-hidden",
+        visualTone === "vibrant" && tone?.tile,
+      )}
+    >
+      {visualTone === "vibrant" && tone ? (
+        <span
+          className={cn(
+            "pointer-events-none absolute -right-4 -top-4 size-16 rounded-full blur-2xl",
+            tone.glow,
+          )}
+          aria-hidden
+        />
+      ) : null}
+      <div className="relative z-10 flex items-start justify-between gap-2">
+        <p className="text-[10px] font-medium leading-tight tracking-wide text-muted-foreground uppercase">
+          {label}
+        </p>
+        {visualTone === "vibrant" && Icon ? (
+          <span
+            className={cn(
+              "flex size-7 shrink-0 items-center justify-center rounded-lg",
+              tone.iconWrap,
+            )}
+          >
+            <Icon className="size-3.5" />
+          </span>
+        ) : null}
+      </div>
+      <p
+        className={cn(
+          "relative z-10 text-2xl font-semibold tracking-tight tabular-nums",
+          visualTone === "vibrant" && tone ? tone.accent : accent,
+        )}
+      >
         {value}
       </p>
     </div>
@@ -341,6 +436,7 @@ export function HrTodayPulseSection({
   pulse,
   subtitle = "Live workforce snapshot for today",
   links = DASHBOARD_KPI_LINKS,
+  visualTone = "default",
 }: {
   pulse: HrTodayPulse;
   subtitle?: string;
@@ -352,11 +448,28 @@ export function HrTodayPulseSection({
     pendingLeaveApprovals: string;
     exitRequests: string;
   };
+  visualTone?: DashboardVisualTone;
 }) {
   return (
-    <section className={dashboardSectionClass} aria-label="Today's Pulse">
+    <section
+      className={cn(
+        dashboardSectionClass,
+        visualTone === "vibrant" &&
+          "bg-gradient-to-br from-violet-500/[0.07] via-card to-sky-500/[0.06] ring-1 ring-inset ring-violet-500/10",
+      )}
+      aria-label="Today's Pulse"
+    >
       <div className="mb-3 flex items-center gap-2">
-        <Users className="size-3.5 text-primary" />
+        <span
+          className={cn(
+            "flex size-7 items-center justify-center rounded-lg",
+            visualTone === "vibrant"
+              ? "bg-violet-500/15 text-violet-600 dark:text-violet-300"
+              : "text-primary",
+          )}
+        >
+          <Users className="size-3.5" />
+        </span>
         <div>
           <h2 className="text-sm font-semibold tracking-tight">Today&apos;s Pulse</h2>
           <p className="text-[11px] text-muted-foreground">{subtitle}</p>
@@ -369,30 +482,40 @@ export function HrTodayPulseSection({
           value={pulse.presentToday}
           href={links.presentToday}
           accent="text-emerald-600 dark:text-emerald-400"
+          toneKey="present"
+          visualTone={visualTone}
         />
         <PulseMetric
           label="Absent Today"
           value={pulse.absentToday}
           href={links.absentToday}
           accent="text-destructive"
+          toneKey="absent"
+          visualTone={visualTone}
         />
         <PulseMetric
           label="Late Employees"
           value={pulse.lateToday}
           href={links.lateToday}
           accent="text-rose-600 dark:text-rose-400"
+          toneKey="late"
+          visualTone={visualTone}
         />
         <PulseMetric
           label="Half Day"
           value={pulse.halfDayToday ?? 0}
           href={links.halfDayToday}
           accent="text-sky-600 dark:text-sky-400"
+          toneKey="half"
+          visualTone={visualTone}
         />
         <PulseMetric
           label="Pending Approvals"
           value={pulse.pendingApprovals}
           href={links.pendingLeaveApprovals}
           accent="text-violet-600 dark:text-violet-400"
+          toneKey="pending"
+          visualTone={visualTone}
         />
       </div>
     </section>

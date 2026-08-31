@@ -25,6 +25,7 @@ import {
   sortByLeaveTypeCode,
 } from "@/lib/leave/constants";
 import { loadLeavePolicyRuntime } from "@/lib/leave/services/leave-policy-runtime";
+import { ensureEmployeeMonthlyLeaveAccruals, isMonthlyAccrualLeaveCode } from "@/lib/leave/services/leave-monthly-accrual";
 import { DEFAULT_LEAVE_PROBATION_RULES } from "@/lib/leave/services/leave-policy-engine";
 import {
   isPeriodLeaveCode,
@@ -763,6 +764,9 @@ export async function getEmployeeLeaveBalanceSnapshot(
   const monthRange = getMonthDateRange(month, calendarYear);
   const yearRange = { start: `${calendarYear}-01-01`, end: `${calendarYear}-12-31` };
 
+  // Apply any due monthly CL/EL accruals before reading balances (idempotent).
+  await ensureEmployeeMonthlyLeaveAccruals(supabase, employeeId, { balanceYear });
+
   const balancesQuery = () =>
     supabase
       .schema("hrms")
@@ -925,12 +929,15 @@ export async function getEmployeeLeaveBalanceSnapshot(
     const balance = balanceByCode.get(code);
     const type = typeByCode.get(code);
     const daysPerYear = balance?.daysPerYear || type?.daysPerYear || 0;
-    const allocatedDays = Math.max(balance?.allocatedDays || 0, daysPerYear);
+    const allocatedDays = isMonthlyAccrualLeaveCode(code)
+      ? (balance?.allocatedDays ?? 0)
+      : Math.max(balance?.allocatedDays || 0, daysPerYear);
     const usedFromRequests = yearUsedByCode[code] ?? 0;
     const usedDays = Math.max(balance?.usedDays ?? 0, usedFromRequests);
     const pendingDays = balance?.pendingDays ?? 0;
     const balanceDays =
-      balance?.balanceDays ?? Math.max(0, roundLeaveDays(allocatedDays - usedDays - pendingDays));
+      balance?.balanceDays ??
+      Math.max(0, roundLeaveDays(allocatedDays - usedDays - pendingDays));
 
     return {
       leaveTypeCode: code,

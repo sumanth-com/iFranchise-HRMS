@@ -768,6 +768,10 @@ export async function getEmployeePayrollData(
       breakdown,
       employerContributions: [],
       bankAccount: null,
+      leaveBalances: {
+        casual: { usedInMonth: 0, balance: 0 },
+        earned: { usedInMonth: 0, balance: 0 },
+      },
       storagePath: null,
     } satisfies NonNullable<EmployeePayrollData["latest"]>;
   })();

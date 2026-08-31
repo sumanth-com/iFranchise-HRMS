@@ -279,6 +279,8 @@ export async function createSalaryStructureAction(
     const id = await createSalaryStructure(supabase, profile, input);
     revalidatePath(PAYROLL_ROUTES.salaryStructures);
     revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS["salary-structures"]));
+    revalidatePath(PAYROLL_ROUTES.run);
+    revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS.run));
     return { success: true, data: id };
   } catch (error) {
     return {
@@ -303,6 +305,8 @@ export async function updateSalaryStructureAction(
     await updateSalaryStructure(supabase, profile, structureId, input);
     revalidatePath(PAYROLL_ROUTES.salaryStructures);
     revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS["salary-structures"]));
+    revalidatePath(PAYROLL_ROUTES.run);
+    revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS.run));
     return { success: true, data: structureId };
   } catch (error) {
     return {

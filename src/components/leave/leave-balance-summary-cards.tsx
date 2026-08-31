@@ -3,23 +3,18 @@
 import { CalendarDays } from "lucide-react";
 
 import {
+  LEAVE_BALANCE_CARD_CODES,
   LEAVE_BALANCE_CARD_TONES,
-  LEAVE_BALANCE_DISPLAY_CODES,
   LEAVE_BALANCE_DISPLAY_LABELS,
 } from "@/lib/leave/constants";
-import { isPeriodLeaveCode } from "@/lib/leave/period-leave-eligibility";
 import {
-  formatLeaveBalanceUsedTotal,
-  LEAVE_BALANCE_USAGE_CAPTION,
-  getLeaveBalanceYearUsage,
-  getLeaveBalanceAnnualEntitlement,
+  formatLeaveBalanceAvailable,
+  getLeaveBalanceAvailableDays,
+  LEAVE_BALANCE_AVAILABLE_CAPTION,
 } from "@/lib/leave/leave-balance-display";
 import { formatLeaveDayCount } from "@/lib/leave/services/leave-usage";
 import { cn } from "@/lib/utils";
 import type { LeaveEmployeeBalanceSnapshot } from "@/types/leave";
-
-/** Fixed copy — annual pool; total does not reset when the calendar month changes. */
-const BALANCE_CARDS_CAPTION = LEAVE_BALANCE_USAGE_CAPTION;
 
 type Props = {
   balances: LeaveEmployeeBalanceSnapshot[];
@@ -30,7 +25,7 @@ type Props = {
   onSelectCode?: (code: string) => void;
 };
 
-/** Shared CL / SL / EL / Menstruation leave balance cards (used / annual entitlement). */
+/** Casual + Earned leave balance cards showing currently available days (monthly accrual). */
 export function LeaveBalanceSummaryCards({
   balances: balancesProp,
   month: _month,
@@ -45,36 +40,23 @@ export function LeaveBalanceSummaryCards({
   );
   const selectable = typeof onSelectCode === "function";
 
-  // Cards come from the display constant rather than the rows, so Menstruation
-  // Leave has to be dropped explicitly when the employee has no PL balance —
-  // the snapshot already omits that row for anyone who is not eligible.
-  const visibleCodes = LEAVE_BALANCE_DISPLAY_CODES.filter(
-    (code) => !isPeriodLeaveCode(code) || byCode.has(code),
-  );
-
-  const cards = visibleCodes.map((code) => {
+  const cards = LEAVE_BALANCE_CARD_CODES.map((code) => {
     const row = byCode.get(code);
-    const used = row ? getLeaveBalanceYearUsage(row) : 0;
-    const total = row ? getLeaveBalanceAnnualEntitlement(row) : 0;
+    const available = row ? Math.max(0, getLeaveBalanceAvailableDays(row)) : 0;
     return {
       key: code,
-      label: row?.leaveTypeName || LEAVE_BALANCE_DISPLAY_LABELS[code],
-      value: row
-        ? formatLeaveBalanceUsedTotal(row)
-        : `${formatLeaveDayCount(used)} / ${formatLeaveDayCount(total)}`,
-      tone: LEAVE_BALANCE_CARD_TONES[code],
+      label:
+        row?.leaveTypeName ||
+        LEAVE_BALANCE_DISPLAY_LABELS[code as keyof typeof LEAVE_BALANCE_DISPLAY_LABELS] ||
+        code,
+      value: row ? formatLeaveBalanceAvailable(row) : formatLeaveDayCount(available),
+      tone: LEAVE_BALANCE_CARD_TONES[code as keyof typeof LEAVE_BALANCE_CARD_TONES],
     };
   });
 
-  const gridClassName =
-    cards.length >= 4
-      ? "grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4"
-      : "grid grid-cols-1 gap-3 sm:grid-cols-3";
-
   return (
     <div className={className}>
-      <p className="mb-2 text-xs text-muted-foreground">{BALANCE_CARDS_CAPTION}</p>
-      <div className={gridClassName}>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {cards.map((card) => {
           const isActive = selectedCode?.toUpperCase() === card.key;
           const cardClassName = cn(
@@ -100,7 +82,7 @@ export function LeaveBalanceSummaryCards({
                   <CalendarDays className={cn("size-4", card.tone.accent)} />
                 </span>
               </div>
-              <div className="mt-3 min-w-0">
+              <div className="mt-3 min-h-0">
                 <p
                   className={cn(
                     "truncate text-xl font-semibold leading-7 tracking-tight tabular-nums",
@@ -110,11 +92,12 @@ export function LeaveBalanceSummaryCards({
                   {card.value}
                 </p>
                 <p className="mt-1 truncate text-[11px] leading-4 text-foreground/80 dark:text-white/90">
+                  {LEAVE_BALANCE_AVAILABLE_CAPTION}
                   {selectable
                     ? isActive
-                    ? "Showing this month's history"
-                    : "Click for this month's history"
-                    : "\u00a0"}
+                      ? " · showing this month's history"
+                      : " · click for this month's history"
+                    : null}
                 </p>
               </div>
             </>

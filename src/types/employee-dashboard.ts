@@ -20,7 +20,11 @@ export type EmployeeDashboardKpis = {
   pendingLeaveRequests: number;
 };
 
-export type EmployeeUpcomingEventType = "holiday" | "birthday" | "anniversary";
+export type EmployeeUpcomingEventType =
+  | "holiday"
+  | "birthday"
+  | "anniversary"
+  | "announcement";
 
 export type EmployeeUpcomingEvent = {
   id: string;
@@ -32,6 +36,11 @@ export type EmployeeUpcomingEvent = {
   profileImagePath?: string | null;
   firstName?: string;
   lastName?: string;
+  /** Announcement-only fields */
+  message?: string | null;
+  priority?: "normal" | "important";
+  imageUrl?: string | null;
+  iconKey?: string | null;
 };
 
 export type EmployeeDashboardData = {
@@ -40,6 +49,7 @@ export type EmployeeDashboardData = {
   kpis: EmployeeDashboardKpis;
   referenceDate: string;
   upcomingHolidays: EmployeeUpcomingEvent[];
+  canManageAnnouncements?: boolean;
 };
 
 export type EmployeeAttendanceActionResult =

@@ -12,9 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PAYROLL_STATUS_LABELS } from "@/lib/payroll/constants";
-import type { PayrollStatus, PayslipListItem } from "@/types/payroll";
-import { cn } from "@/lib/utils";
+import type { PayslipListItem } from "@/types/payroll";
 
 const FILTER_SELECT_CONTENT_CLASS =
   "z-[100] min-w-[var(--anchor-width)] w-max max-w-[min(100vw-2rem,12rem)]";
@@ -33,25 +31,6 @@ const MONTHS = [
   "November",
   "December",
 ];
-
-const STATUS_STYLES: Record<PayrollStatus, string> = {
-  draft: "bg-muted text-muted-foreground",
-  processing: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
-  processed: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300",
-  approved: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  paid: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  cancelled: "bg-destructive/10 text-destructive",
-};
-
-type Props = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  payslips: PayslipListItem[];
-  money: (value: number) => string;
-  fmtDate: (value: string | null) => string;
-  fmtMonth: (value: string) => string;
-  onViewPayslip: (id: string) => void;
-};
 
 function parsePayrollMonth(value: string): { year: number; month: number } {
   const [yearPart, monthPart] = value.split("-");
@@ -74,18 +53,15 @@ function getMonthFilterLabel(value: string): string {
   return MONTHS[index] ?? "All Months";
 }
 
-function StatusPill({ status }: { status: PayrollStatus }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-        STATUS_STYLES[status],
-      )}
-    >
-      {PAYROLL_STATUS_LABELS[status] ?? status}
-    </span>
-  );
-}
+type Props = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  payslips: PayslipListItem[];
+  money: (value: number) => string;
+  fmtDate: (value: string | null) => string;
+  fmtMonth: (value: string) => string;
+  onViewPayslip: (id: string) => void;
+};
 
 export function EmployeePayslipHistoryDialog({
   open,
@@ -245,11 +221,16 @@ export function EmployeePayslipHistoryDialog({
                       </td>
                       <td className="py-2.5 pr-3">
                         {row.availability === "under_review" ? (
-                          <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-800">
-                            HR Review
+                          <span
+                            className="inline-flex max-w-[14rem] items-center rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-800"
+                            title={row.reviewMessage ?? undefined}
+                          >
+                            {row.reviewMessage ?? "Pending release"}
                           </span>
                         ) : (
-                          <StatusPill status={row.payrollStatus} />
+                          <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
+                            Available
+                          </span>
                         )}
                       </td>
                       <td className="py-2.5 text-right">

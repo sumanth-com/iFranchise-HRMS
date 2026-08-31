@@ -96,7 +96,7 @@ export function EmployeeDashboardKpiCards({
         <EmployeeStatCard
           label="Leave Balance"
           value={`${formatLeaveDayCount(kpis.leaveBalanceDays)} days`}
-          hint="Available"
+          hint="This month"
           icon={CalendarDays}
           accent="text-violet-600 dark:text-violet-400"
           iconBg="bg-violet-500/10"

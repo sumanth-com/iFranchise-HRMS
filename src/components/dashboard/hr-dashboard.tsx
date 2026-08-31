@@ -24,16 +24,21 @@ export function HrDashboard({ data, error }: Props) {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 md:p-4">
-      <section className="shrink-0" aria-label="Today's Pulse">
-        <HrTodayPulseSection pulse={data.todayPulse} />
+    <div className="relative flex h-full min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 md:p-4">
+      <div
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(139,92,246,0.14),transparent_55%),radial-gradient(ellipse_at_top_right,rgba(14,165,233,0.12),transparent_50%),radial-gradient(ellipse_at_bottom,rgba(16,185,129,0.10),transparent_55%)] dark:opacity-40"
+        aria-hidden
+      />
+      <section className="relative z-10 shrink-0" aria-label="Today's Pulse">
+        <HrTodayPulseSection pulse={data.todayPulse} visualTone="vibrant" />
       </section>
 
       <section
-        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden"
         aria-label="Operations"
       >
         <DashboardOperationsRow
+          visualTone="vibrant"
           tasks={data.tasks}
           rightPanel="focus-pair"
           rightFocusTitle="Workforce"

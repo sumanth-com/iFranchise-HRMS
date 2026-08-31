@@ -120,7 +120,8 @@ export async function listEmployees(
       { count: "estimated" },
     )
     .eq("organization_id", profile.employee.organizationId)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .is("app_hidden_at", null);
 
   if (scopedIds) {
     query = query.in("id", scopedIds);
@@ -236,7 +237,8 @@ export async function getEmployeeAccountProvisioningSummary(
       .from("employees")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
-      .is("deleted_at", null);
+      .is("deleted_at", null)
+      .is("app_hidden_at", null);
 
   const previewSelect =
     "id, employee_code, first_name, last_name, email, account_status, invitation_sent_at, last_login_at";
@@ -268,6 +270,7 @@ export async function getEmployeeAccountProvisioningSummary(
       .select(previewSelect)
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
+      .is("app_hidden_at", null)
       .in("account_status", ["draft", "invited"])
       .order("updated_at", { ascending: false })
       .limit(5),
@@ -277,6 +280,7 @@ export async function getEmployeeAccountProvisioningSummary(
       .select(previewSelect)
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
+      .is("app_hidden_at", null)
       .eq("account_status", "invitation_pending")
       .order("updated_at", { ascending: false })
       .limit(5),
@@ -286,6 +290,7 @@ export async function getEmployeeAccountProvisioningSummary(
       .select(previewSelect)
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
+      .is("app_hidden_at", null)
       .eq("account_status", "suspended")
       .order("updated_at", { ascending: false })
       .limit(5),
@@ -348,6 +353,7 @@ export async function getManagers(
     .select("id, first_name, last_name, employee_code")
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
+    .is("app_hidden_at", null)
     .in("employment_status", ["active", "probation", "on_leave"])
     .order("first_name");
 

@@ -179,6 +179,99 @@ export function toEmployeeFacingEarnings(
   return earnings;
 }
 
+const PAYSLIP_COMPONENT_LABELS: Record<string, string> = {
+  basic: "Basic Salary",
+  hra: "HRA",
+  transport: "Travel Allowance",
+  medical: "Medical Allowance",
+  special_allowance: "Special Allowance",
+  other_allowances: "Other Allowances",
+  allowances: "Other Allowances",
+  overtime: "Overtime",
+  bonus: "Bonus",
+  claims: "Claims",
+  pf: "PF",
+  esi: "ESI",
+  pt: "Professional Tax",
+  income_tax: "Income Tax",
+  other_ded: "Other Deductions",
+  salary: "Salary",
+  gross: "Gross Salary",
+};
+
+/** Professional payslip labels — preserves real component lines (does not collapse to "Salary"). */
+export function normalizePayslipComponentLabel(line: PayrollBreakdownLine): string {
+  const code = line.code.toLowerCase();
+  if (PAYSLIP_COMPONENT_LABELS[code]) return PAYSLIP_COMPONENT_LABELS[code];
+  if (code.startsWith("bonus")) return line.label?.trim() || "Bonus";
+  if (code.startsWith("reimb")) return line.label?.trim() || "Reimbursement";
+  const trimmed = line.label?.trim();
+  if (!trimmed) return line.code;
+  // Expand common leave/abbreviation leftovers if any appear in labels
+  return trimmed
+    .replace(/\bProvident Fund\b/i, "PF")
+    .replace(/\bSpecial & Other Allowances\b/i, "Other Allowances");
+}
+
+export function toPayslipDisplayLines(
+  lines: PayrollBreakdownLine[],
+): PayrollBreakdownLine[] {
+  return lines
+    .filter((line) => Number(line.amount) > 0)
+    .map((line) => ({
+      ...line,
+      label: normalizePayslipComponentLabel(line),
+      amount: roundCurrency(Number(line.amount) || 0),
+    }));
+}
+
+/**
+ * Payslip earnings from stored payroll breakdown only.
+ * Falls back to payroll item totals (never invents HRA/Basic ratios).
+ */
+export function getPayslipEarningsLines(input: {
+  earnings: PayrollBreakdownLine[] | null | undefined;
+  basicSalary: number;
+  totalAllowances: number;
+  grossSalary: number;
+}): PayrollBreakdownLine[] {
+  const fromBreakdown = toPayslipDisplayLines(input.earnings ?? []);
+  if (fromBreakdown.length > 0) return fromBreakdown;
+
+  const fallback: PayrollBreakdownLine[] = [];
+  if (input.basicSalary > 0) {
+    fallback.push({
+      code: "basic",
+      label: "Basic Salary",
+      amount: roundCurrency(input.basicSalary),
+      type: "earning",
+    });
+  }
+  if (input.totalAllowances > 0) {
+    fallback.push({
+      code: "allowances",
+      label: "Other Allowances",
+      amount: roundCurrency(input.totalAllowances),
+      type: "earning",
+    });
+  }
+  if (fallback.length === 0 && input.grossSalary > 0) {
+    fallback.push({
+      code: "gross",
+      label: "Gross Salary",
+      amount: roundCurrency(input.grossSalary),
+      type: "earning",
+    });
+  }
+  return fallback;
+}
+
+export function getPayslipDeductionLines(
+  lines: PayrollBreakdownLine[] | null | undefined,
+): PayrollBreakdownLine[] {
+  return toPayslipDisplayLines(lines ?? []);
+}
+
 export function generatePayslipNumber(
   employeeCode: string,
   payrollMonth: string,

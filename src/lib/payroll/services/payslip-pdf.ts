@@ -3,7 +3,10 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf
 
 import { amountToIndianWords } from "@/lib/payroll/services/amount-in-words";
 import { loadLogoBytesCached } from "@/lib/payroll/services/payslip-logo-cache";
-import { toEmployeeFacingEarnings } from "@/lib/payroll/services/payroll-utils";
+import {
+  getPayslipDeductionLines,
+  getPayslipEarningsLines,
+} from "@/lib/payroll/services/payroll-utils";
 import type { PayslipDetail } from "@/types/payroll";
 
 const PAGE_WIDTH = 595.28;
@@ -138,42 +141,24 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
   const lopDays = attendance?.lopDays ?? attendance?.leaveLopDays ?? 0;
   const paidDays = attendance?.presentDays && attendance.presentDays > 0 ? attendance.presentDays : Math.max(0, workDays - lopDays);
 
-  // Standard Indian earnings
-  const rawEarnings = payslip.breakdown?.earnings?.length > 0
-    ? toEmployeeFacingEarnings(payslip.breakdown.earnings)
-    : [
-        {
-          code: "basic",
-          label: "Basic",
-          amount: payslip.basicSalary > 0 ? payslip.basicSalary : Math.round(payslip.grossSalary * 0.5),
-          type: "earning" as const,
-        },
-        {
-          code: "hra",
-          label: "HRA",
-          amount: payslip.totalAllowances > 0 ? Math.round(payslip.totalAllowances * 0.4) : Math.round(payslip.grossSalary * 0.2),
-          type: "earning" as const,
-        },
-        {
-          code: "special_allowance",
-          label: "Special Allowance",
-          amount: Math.max(0, payslip.grossSalary - (payslip.basicSalary > 0 ? payslip.basicSalary : Math.round(payslip.grossSalary * 0.5)) - (payslip.totalAllowances > 0 ? Math.round(payslip.totalAllowances * 0.4) : Math.round(payslip.grossSalary * 0.2))),
-          type: "earning" as const,
-        },
-      ];
+  const earnings = getPayslipEarningsLines({
+    earnings: payslip.breakdown?.earnings,
+    basicSalary: payslip.basicSalary,
+    totalAllowances: payslip.totalAllowances,
+    grossSalary: payslip.grossSalary,
+  });
+  const deductions = getPayslipDeductionLines(payslip.breakdown?.deductions);
 
-  const earnings = rawEarnings.filter((item) => item.amount > 0);
-  const deductions = (payslip.breakdown?.deductions ?? []).filter((line) => Number(line.amount) > 0);
+  const totalEarnings =
+    earnings.reduce((sum, item) => sum + Number(item.amount || 0), 0) || payslip.grossSalary;
+  const totalDeductions =
+    deductions.reduce((sum, item) => sum + Number(item.amount || 0), 0) || payslip.totalDeductions;
+  const netPay = payslip.netSalary || totalEarnings - totalDeductions;
 
-  const totalEarnings = earnings.reduce((sum, item) => sum + Number(item.amount || 0), 0) || payslip.grossSalary;
-  const totalDeductions = deductions.reduce((sum, item) => sum + Number(item.amount || 0), 0) || payslip.totalDeductions;
-  const netPay = payslip.netSalary || (totalEarnings - totalDeductions);
-
-  // Leave balances
-  const sickLeaveUsed = "0.00";
-  const casualLeaveUsed = "0.00";
-  const sickLeaveBal = "1.00";
-  const casualLeaveBal = "3.00";
+  const leave = payslip.leaveBalances ?? {
+    casual: { usedInMonth: 0, balance: 0 },
+    earned: { usedInMonth: 0, balance: 0 },
+  };
 
   // Header Drawing
   const logoBytes = await loadLogoBytesCached(payslip.organization.logoUrl);
@@ -216,24 +201,24 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
   // Start Box Table
   const boxTop = headerTop - 56;
   let currentY = boxTop;
-  const rowH = 17;
+  const rowH = 18;
 
-  // Grid coordinates for 4-column section
+  // Grid coordinates for 4-column section (equal label/value pairs)
   const col1X = MARGIN;
-  const col1W = CONTENT_WIDTH * 0.18;
+  const col1W = CONTENT_WIDTH * 0.22;
   const col2X = col1X + col1W;
-  const col2W = CONTENT_WIDTH * 0.32;
+  const col2W = CONTENT_WIDTH * 0.28;
   const col3X = col2X + col2W;
-  const col3W = CONTENT_WIDTH * 0.20;
+  const col3W = CONTENT_WIDTH * 0.22;
   const col4X = col3X + col3W;
 
   const infoRows = [
     [
-      { label: "EMP CODE", value: payslip.employee.employeeCode, boldVal: false },
+      { label: "EMPLOYEE ID", value: payslip.employee.employeeCode, boldVal: false },
       { label: "PAYMENT MODE", value: (payslip.paymentMode || "BANK").toUpperCase(), boldVal: false },
     ],
     [
-      { label: "EMP NAME", value: employeeName, boldVal: true },
+      { label: "EMPLOYEE NAME", value: employeeName, boldVal: true },
       { label: "BANK NAME", value: fmt(payslip.bankAccount?.bankName), boldVal: false },
     ],
     [
@@ -242,14 +227,16 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
     ],
     [
       { label: "DESIGNATION", value: fmt(payslip.employee.designationTitle).toUpperCase(), boldVal: true },
-      { label: "ESIC NO", value: fmt(payslip.employee.pan), boldVal: false },
-    ],
-    [
-      { label: "LOCATION", value: fmt(payslip.employee.branchName || payslip.employee.departmentName || "CHENNAI").toUpperCase(), boldVal: false },
       { label: "WORK DAYS", value: Number(workDays).toFixed(2), boldVal: false },
     ],
     [
-      { label: "UAN NO", value: fmt(payslip.employee.uan), boldVal: false },
+      {
+        label: "LOCATION",
+        value: fmt(
+          payslip.employee.branchName || payslip.employee.departmentName || "CHENNAI",
+        ).toUpperCase(),
+        boldVal: false,
+      },
       { label: "PAID DAYS", value: Number(paidDays).toFixed(2), boldVal: false },
     ],
     [
@@ -258,18 +245,33 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
     ],
   ];
 
-  // Draw 7 info rows
   for (const row of infoRows) {
     const yBot = currentY - rowH;
-    // Row horizontal bottom line
-    ctx.page.drawLine({ start: { x: MARGIN, y: yBot }, end: { x: MARGIN + CONTENT_WIDTH, y: yBot }, thickness: 0.8, color: BORDER_COLOR });
+    ctx.page.drawLine({
+      start: { x: MARGIN, y: yBot },
+      end: { x: MARGIN + CONTENT_WIDTH, y: yBot },
+      thickness: 0.8,
+      color: BORDER_COLOR,
+    });
+    ctx.page.drawLine({
+      start: { x: col2X, y: currentY },
+      end: { x: col2X, y: yBot },
+      thickness: 0.8,
+      color: BORDER_COLOR,
+    });
+    ctx.page.drawLine({
+      start: { x: col3X, y: currentY },
+      end: { x: col3X, y: yBot },
+      thickness: 0.8,
+      color: BORDER_COLOR,
+    });
+    ctx.page.drawLine({
+      start: { x: col4X, y: currentY },
+      end: { x: col4X, y: yBot },
+      thickness: 0.8,
+      color: BORDER_COLOR,
+    });
 
-    // Vertical column dividers
-    ctx.page.drawLine({ start: { x: col2X, y: currentY }, end: { x: col2X, y: yBot }, thickness: 0.8, color: BORDER_COLOR });
-    ctx.page.drawLine({ start: { x: col3X, y: currentY }, end: { x: col3X, y: yBot }, thickness: 0.8, color: BORDER_COLOR });
-    ctx.page.drawLine({ start: { x: col4X, y: currentY }, end: { x: col4X, y: yBot }, thickness: 0.8, color: BORDER_COLOR });
-
-    // Texts
     const textY = yBot + 5;
     drawText(ctx, row[0].label, col1X + 4, textY, { size: 7.5, bold: true });
     drawText(ctx, row[0].value, col2X + 4, textY, { size: 7.5, bold: row[0].boldVal });
@@ -281,27 +283,55 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
 
   // Section 2: Leave Days Header
   const leaveHeaderY = currentY - rowH;
-  ctx.page.drawLine({ start: { x: MARGIN, y: leaveHeaderY }, end: { x: MARGIN + CONTENT_WIDTH, y: leaveHeaderY }, thickness: 0.8, color: BORDER_COLOR });
-  drawCentered(ctx, "NO. OF AVAILABLE LEAVE DAYS:", PAGE_WIDTH / 2, leaveHeaderY + 5, { size: 8, bold: true });
+  ctx.page.drawLine({
+    start: { x: MARGIN, y: leaveHeaderY },
+    end: { x: MARGIN + CONTENT_WIDTH, y: leaveHeaderY },
+    thickness: 0.8,
+    color: BORDER_COLOR,
+  });
+  drawCentered(ctx, "NO. OF AVAILABLE LEAVE DAYS", PAGE_WIDTH / 2, leaveHeaderY + 5, {
+    size: 8,
+    bold: true,
+  });
   currentY = leaveHeaderY;
 
   const leaveRows = [
     [
-      { label: "SL", value: sickLeaveUsed },
-      { label: "CL", value: casualLeaveUsed },
+      { label: "Casual Leave", value: leave.casual.usedInMonth.toFixed(2) },
+      { label: "Earned Leave", value: leave.earned.usedInMonth.toFixed(2) },
     ],
     [
-      { label: "BAL. SL", value: sickLeaveBal },
-      { label: "BAL. CL", value: casualLeaveBal },
+      { label: "Casual Leave Balance", value: leave.casual.balance.toFixed(2) },
+      { label: "Earned Leave Balance", value: leave.earned.balance.toFixed(2) },
     ],
   ];
 
   for (const row of leaveRows) {
     const yBot = currentY - rowH;
-    ctx.page.drawLine({ start: { x: MARGIN, y: yBot }, end: { x: MARGIN + CONTENT_WIDTH, y: yBot }, thickness: 0.8, color: BORDER_COLOR });
-    ctx.page.drawLine({ start: { x: col2X, y: currentY }, end: { x: col2X, y: yBot }, thickness: 0.8, color: BORDER_COLOR });
-    ctx.page.drawLine({ start: { x: col3X, y: currentY }, end: { x: col3X, y: yBot }, thickness: 0.8, color: BORDER_COLOR });
-    ctx.page.drawLine({ start: { x: col4X, y: currentY }, end: { x: col4X, y: yBot }, thickness: 0.8, color: BORDER_COLOR });
+    ctx.page.drawLine({
+      start: { x: MARGIN, y: yBot },
+      end: { x: MARGIN + CONTENT_WIDTH, y: yBot },
+      thickness: 0.8,
+      color: BORDER_COLOR,
+    });
+    ctx.page.drawLine({
+      start: { x: col2X, y: currentY },
+      end: { x: col2X, y: yBot },
+      thickness: 0.8,
+      color: BORDER_COLOR,
+    });
+    ctx.page.drawLine({
+      start: { x: col3X, y: currentY },
+      end: { x: col3X, y: yBot },
+      thickness: 0.8,
+      color: BORDER_COLOR,
+    });
+    ctx.page.drawLine({
+      start: { x: col4X, y: currentY },
+      end: { x: col4X, y: yBot },
+      thickness: 0.8,
+      color: BORDER_COLOR,
+    });
 
     const textY = yBot + 5;
     drawText(ctx, row[0].label, col1X + 4, textY, { size: 7.5, bold: true });
@@ -312,42 +342,76 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
     currentY = yBot;
   }
 
-  // Section 3: Salary Components (5 Columns)
+  // Section 3: Earnings / Deductions (4 equal columns)
   const sc1X = MARGIN;
-  const sc1W = CONTENT_WIDTH * 0.26;
+  const sc1W = CONTENT_WIDTH * 0.3;
   const sc2X = sc1X + sc1W;
-  const sc2W = CONTENT_WIDTH * 0.14;
+  const sc2W = CONTENT_WIDTH * 0.2;
   const sc3X = sc2X + sc2W;
-  const sc3W = CONTENT_WIDTH * 0.14;
+  const sc3W = CONTENT_WIDTH * 0.3;
   const sc4X = sc3X + sc3W;
-  const sc4W = CONTENT_WIDTH * 0.26;
-  const sc5X = sc4X + sc4W;
 
-  // Components Header
   const compHeaderY = currentY - rowH;
-  ctx.page.drawLine({ start: { x: MARGIN, y: compHeaderY }, end: { x: MARGIN + CONTENT_WIDTH, y: compHeaderY }, thickness: 0.8, color: BORDER_COLOR });
-  ctx.page.drawLine({ start: { x: sc2X, y: currentY }, end: { x: sc2X, y: compHeaderY }, thickness: 0.8, color: BORDER_COLOR });
-  ctx.page.drawLine({ start: { x: sc3X, y: currentY }, end: { x: sc3X, y: compHeaderY }, thickness: 0.8, color: BORDER_COLOR });
-  ctx.page.drawLine({ start: { x: sc4X, y: currentY }, end: { x: sc4X, y: compHeaderY }, thickness: 0.8, color: BORDER_COLOR });
-  ctx.page.drawLine({ start: { x: sc5X, y: currentY }, end: { x: sc5X, y: compHeaderY }, thickness: 0.8, color: BORDER_COLOR });
+  ctx.page.drawLine({
+    start: { x: MARGIN, y: compHeaderY },
+    end: { x: MARGIN + CONTENT_WIDTH, y: compHeaderY },
+    thickness: 0.8,
+    color: BORDER_COLOR,
+  });
+  ctx.page.drawLine({
+    start: { x: sc2X, y: currentY },
+    end: { x: sc2X, y: compHeaderY },
+    thickness: 0.8,
+    color: BORDER_COLOR,
+  });
+  ctx.page.drawLine({
+    start: { x: sc3X, y: currentY },
+    end: { x: sc3X, y: compHeaderY },
+    thickness: 0.8,
+    color: BORDER_COLOR,
+  });
+  ctx.page.drawLine({
+    start: { x: sc4X, y: currentY },
+    end: { x: sc4X, y: compHeaderY },
+    thickness: 0.8,
+    color: BORDER_COLOR,
+  });
 
-  drawText(ctx, "COMPONENTS", sc1X + 4, compHeaderY + 5, { size: 7.5, bold: true });
-  drawRight(ctx, "FIXED SALARY", sc3X - 4, compHeaderY + 5, { size: 7.5, bold: true });
-  drawRight(ctx, "EARNED SALARY", sc4X - 4, compHeaderY + 5, { size: 7.5, bold: true });
-  drawText(ctx, "COMPONENTS", sc4X + 4, compHeaderY + 5, { size: 7.5, bold: true });
-  drawRight(ctx, "SALARY", MARGIN + CONTENT_WIDTH - 4, compHeaderY + 5, { size: 7.5, bold: true });
+  drawText(ctx, "EARNINGS", sc1X + 4, compHeaderY + 5, { size: 7.5, bold: true });
+  drawRight(ctx, "AMOUNT", sc3X - 4, compHeaderY + 5, { size: 7.5, bold: true });
+  drawText(ctx, "DEDUCTIONS", sc3X + 4, compHeaderY + 5, { size: 7.5, bold: true });
+  drawRight(ctx, "AMOUNT", MARGIN + CONTENT_WIDTH - 4, compHeaderY + 5, { size: 7.5, bold: true });
 
   currentY = compHeaderY;
 
-  const maxRows = Math.max(earnings.length, deductions.length, 5);
+  const maxRows = Math.max(earnings.length, deductions.length, 1);
 
   for (let i = 0; i < maxRows; i++) {
     const yBot = currentY - rowH;
-    ctx.page.drawLine({ start: { x: MARGIN, y: yBot }, end: { x: MARGIN + CONTENT_WIDTH, y: yBot }, thickness: 0.4, color: BORDER_COLOR });
-    ctx.page.drawLine({ start: { x: sc2X, y: currentY }, end: { x: sc2X, y: yBot }, thickness: 0.8, color: BORDER_COLOR });
-    ctx.page.drawLine({ start: { x: sc3X, y: currentY }, end: { x: sc3X, y: yBot }, thickness: 0.8, color: BORDER_COLOR });
-    ctx.page.drawLine({ start: { x: sc4X, y: currentY }, end: { x: sc4X, y: yBot }, thickness: 0.8, color: BORDER_COLOR });
-    ctx.page.drawLine({ start: { x: sc5X, y: currentY }, end: { x: sc5X, y: yBot }, thickness: 0.8, color: BORDER_COLOR });
+    ctx.page.drawLine({
+      start: { x: MARGIN, y: yBot },
+      end: { x: MARGIN + CONTENT_WIDTH, y: yBot },
+      thickness: 0.4,
+      color: BORDER_COLOR,
+    });
+    ctx.page.drawLine({
+      start: { x: sc2X, y: currentY },
+      end: { x: sc2X, y: yBot },
+      thickness: 0.8,
+      color: BORDER_COLOR,
+    });
+    ctx.page.drawLine({
+      start: { x: sc3X, y: currentY },
+      end: { x: sc3X, y: yBot },
+      thickness: 0.8,
+      color: BORDER_COLOR,
+    });
+    ctx.page.drawLine({
+      start: { x: sc4X, y: currentY },
+      end: { x: sc4X, y: yBot },
+      thickness: 0.8,
+      color: BORDER_COLOR,
+    });
 
     const earning = earnings[i];
     const deduction = deductions[i];
@@ -356,50 +420,98 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
     if (earning) {
       drawText(ctx, earning.label, sc1X + 4, textY, { size: 7.5 });
       drawRight(ctx, formatAmount2(earning.amount), sc3X - 4, textY, { size: 7.5 });
-      drawRight(ctx, formatAmount2(earning.amount), sc4X - 4, textY, { size: 7.5 });
     }
 
     if (deduction) {
-      drawText(ctx, deduction.label, sc4X + 4, textY, { size: 7.5 });
-      drawRight(ctx, formatAmount2(deduction.amount), MARGIN + CONTENT_WIDTH - 4, textY, { size: 7.5 });
+      drawText(ctx, deduction.label, sc3X + 4, textY, { size: 7.5 });
+      drawRight(ctx, formatAmount2(deduction.amount), MARGIN + CONTENT_WIDTH - 4, textY, {
+        size: 7.5,
+      });
     }
 
     currentY = yBot;
   }
 
-  // Amount Total Row
+  // Total Earnings / Total Deductions
   const totalRowY = currentY - rowH;
-  ctx.page.drawLine({ start: { x: MARGIN, y: totalRowY }, end: { x: MARGIN + CONTENT_WIDTH, y: totalRowY }, thickness: 1.0, color: BORDER_COLOR });
-  ctx.page.drawLine({ start: { x: sc2X, y: currentY }, end: { x: sc2X, y: totalRowY }, thickness: 0.8, color: BORDER_COLOR });
-  ctx.page.drawLine({ start: { x: sc3X, y: currentY }, end: { x: sc3X, y: totalRowY }, thickness: 0.8, color: BORDER_COLOR });
-  ctx.page.drawLine({ start: { x: sc4X, y: currentY }, end: { x: sc4X, y: totalRowY }, thickness: 0.8, color: BORDER_COLOR });
-  ctx.page.drawLine({ start: { x: sc5X, y: currentY }, end: { x: sc5X, y: totalRowY }, thickness: 0.8, color: BORDER_COLOR });
+  ctx.page.drawLine({
+    start: { x: MARGIN, y: totalRowY },
+    end: { x: MARGIN + CONTENT_WIDTH, y: totalRowY },
+    thickness: 1.0,
+    color: BORDER_COLOR,
+  });
+  ctx.page.drawLine({
+    start: { x: sc2X, y: currentY },
+    end: { x: sc2X, y: totalRowY },
+    thickness: 0.8,
+    color: BORDER_COLOR,
+  });
+  ctx.page.drawLine({
+    start: { x: sc3X, y: currentY },
+    end: { x: sc3X, y: totalRowY },
+    thickness: 0.8,
+    color: BORDER_COLOR,
+  });
+  ctx.page.drawLine({
+    start: { x: sc4X, y: currentY },
+    end: { x: sc4X, y: totalRowY },
+    thickness: 0.8,
+    color: BORDER_COLOR,
+  });
 
-  drawRight(ctx, "Amount Total :", sc2X - 4, totalRowY + 5, { size: 8, bold: true });
+  drawText(ctx, "Total Earnings", sc1X + 4, totalRowY + 5, { size: 8, bold: true });
   drawRight(ctx, formatAmount2(totalEarnings), sc3X - 4, totalRowY + 5, { size: 8, bold: true });
-  drawRight(ctx, formatAmount2(totalEarnings), sc4X - 4, totalRowY + 5, { size: 8, bold: true });
-  drawRight(ctx, "Amount Total :", sc5X - 4, totalRowY + 5, { size: 8, bold: true });
-  drawRight(ctx, formatAmount2(totalDeductions), MARGIN + CONTENT_WIDTH - 4, totalRowY + 5, { size: 8, bold: true });
+  drawText(ctx, "Total Deductions", sc3X + 4, totalRowY + 5, { size: 8, bold: true });
+  drawRight(ctx, formatAmount2(totalDeductions), MARGIN + CONTENT_WIDTH - 4, totalRowY + 5, {
+    size: 8,
+    bold: true,
+  });
 
   currentY = totalRowY;
 
   // Net Pay Row
   const netPayY = currentY - rowH;
-  ctx.page.drawLine({ start: { x: MARGIN, y: netPayY }, end: { x: MARGIN + CONTENT_WIDTH, y: netPayY }, thickness: 0.8, color: BORDER_COLOR });
-  ctx.page.drawLine({ start: { x: sc4X, y: currentY }, end: { x: sc4X, y: netPayY }, thickness: 0.8, color: BORDER_COLOR });
-  ctx.page.drawLine({ start: { x: sc5X, y: currentY }, end: { x: sc5X, y: netPayY }, thickness: 0.8, color: BORDER_COLOR });
+  ctx.page.drawLine({
+    start: { x: MARGIN, y: netPayY },
+    end: { x: MARGIN + CONTENT_WIDTH, y: netPayY },
+    thickness: 0.8,
+    color: BORDER_COLOR,
+  });
+  ctx.page.drawLine({
+    start: { x: sc3X, y: currentY },
+    end: { x: sc3X, y: netPayY },
+    thickness: 0.8,
+    color: BORDER_COLOR,
+  });
+  ctx.page.drawLine({
+    start: { x: sc4X, y: currentY },
+    end: { x: sc4X, y: netPayY },
+    thickness: 0.8,
+    color: BORDER_COLOR,
+  });
 
-  drawRight(ctx, "Net Pay :", sc5X - 4, netPayY + 5, { size: 8.5, bold: true });
-  drawRight(ctx, formatAmountIndian(netPay), MARGIN + CONTENT_WIDTH - 4, netPayY + 5, { size: 8.5, bold: true });
+  drawRight(ctx, "NET PAY", sc4X - 4, netPayY + 5, { size: 8.5, bold: true });
+  drawRight(ctx, formatAmountIndian(netPay), MARGIN + CONTENT_WIDTH - 4, netPayY + 5, {
+    size: 8.5,
+    bold: true,
+  });
 
   currentY = netPayY;
 
   // Net Pay in Words Row
   const inWordsRowH = 22;
   const inWordsY = currentY - inWordsRowH;
-  ctx.page.drawLine({ start: { x: MARGIN, y: inWordsY }, end: { x: MARGIN + CONTENT_WIDTH, y: inWordsY }, thickness: 1.0, color: BORDER_COLOR });
+  ctx.page.drawLine({
+    start: { x: MARGIN, y: inWordsY },
+    end: { x: MARGIN + CONTENT_WIDTH, y: inWordsY },
+    thickness: 1.0,
+    color: BORDER_COLOR,
+  });
 
-  drawText(ctx, `Net Pay: ${amountToIndianWords(netPay)}`, MARGIN + 4, inWordsY + 7, { size: 8.5, bold: true });
+  drawText(ctx, `Net Pay: ${amountToIndianWords(netPay)}`, MARGIN + 4, inWordsY + 7, {
+    size: 8.5,
+    bold: true,
+  });
 
   currentY = inWordsY;
 

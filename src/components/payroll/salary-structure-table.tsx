@@ -152,7 +152,7 @@ export function SalaryStructureTable({
         <div>
           <div className="font-medium">{row.original.employeeName}</div>
           <div className="text-xs text-muted-foreground">
-            {row.original.employeeCode}
+            Employee ID: {row.original.employeeCode}
           </div>
         </div>
       ),

@@ -1,4 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  isAppHiddenEmployeeEmail,
+  isEmployeeAppVisible,
+} from "@/lib/employees/app-hidden";
 
 const ELIGIBLE_ACCOUNT_STATUSES = new Set([
   "draft",
@@ -18,12 +22,14 @@ const PORTAL_DENIED_ACCOUNT_STATUSES = new Set([
 type EmployeeEmailRow = {
   email: string;
   deleted_at: string | null;
+  app_hidden_at?: string | null;
   account_status: string;
 };
 
 type EmployeeLoginAccessRow = {
   email: string;
   deleted_at: string | null;
+  app_hidden_at?: string | null;
   account_status: string;
   user_id: string | null;
 };
@@ -44,6 +50,8 @@ function unwrapLoginAccessEmployee(
 
 function isPortalLoginDenied(employee: EmployeeLoginAccessRow): boolean {
   if (employee.deleted_at) return true;
+  if (!isEmployeeAppVisible(employee)) return true;
+  if (isAppHiddenEmployeeEmail(employee.email)) return true;
   if (!employee.user_id) return true;
   return PORTAL_DENIED_ACCOUNT_STATUSES.has(String(employee.account_status ?? ""));
 }
@@ -68,10 +76,14 @@ export async function evaluatePortalLoginAccess(
 
   const admin = createAdminClient();
 
+  if (isAppHiddenEmployeeEmail(normalized)) {
+    return "denied";
+  }
+
   const { data: directMatch, error: directError } = await admin
     .schema("hrms")
     .from("employees")
-    .select("email, account_status, deleted_at, user_id")
+    .select("email, account_status, deleted_at, app_hidden_at, user_id")
     .eq("email", normalized)
     .is("deleted_at", null)
     .maybeSingle();
@@ -89,7 +101,7 @@ export async function evaluatePortalLoginAccess(
     .schema("hrms")
     .from("employee_profiles")
     .select(
-      "personal_email, employees:employee_id(email, account_status, deleted_at, user_id)",
+      "personal_email, employees:employee_id(email, account_status, deleted_at, app_hidden_at, user_id)",
     )
     .eq("personal_email", normalized)
     .is("deleted_at", null)
@@ -126,13 +138,17 @@ export async function resolveApprovedLoginEmail(emailInput: string): Promise<str
   const normalized = emailInput.trim().toLowerCase();
   if (!normalized) return normalized;
 
+  if (isAppHiddenEmployeeEmail(normalized)) {
+    return normalized;
+  }
+
   const t0 = performance.now();
   const admin = createAdminClient();
 
   const { data: directMatch, error: directError } = await admin
     .schema("hrms")
     .from("employees")
-    .select("email, account_status, deleted_at")
+    .select("email, account_status, deleted_at, app_hidden_at")
     .eq("email", normalized)
     .is("deleted_at", null)
     .maybeSingle();
@@ -144,6 +160,7 @@ export async function resolveApprovedLoginEmail(emailInput: string): Promise<str
 
   if (
     directMatch?.email &&
+    isEmployeeAppVisible(directMatch) &&
     ELIGIBLE_ACCOUNT_STATUSES.has(directMatch.account_status)
   ) {
     return String(directMatch.email).toLowerCase();
@@ -153,7 +170,7 @@ export async function resolveApprovedLoginEmail(emailInput: string): Promise<str
     .schema("hrms")
     .from("employee_profiles")
     .select(
-      "personal_email, employees:employee_id(email, account_status, deleted_at)",
+      "personal_email, employees:employee_id(email, account_status, deleted_at, app_hidden_at)",
     )
     .eq("personal_email", normalized)
     .is("deleted_at", null)
@@ -172,7 +189,7 @@ export async function resolveApprovedLoginEmail(emailInput: string): Promise<str
   );
   if (
     employee?.email &&
-    !employee.deleted_at &&
+    isEmployeeAppVisible(employee) &&
     ELIGIBLE_ACCOUNT_STATUSES.has(employee.account_status)
   ) {
     return String(employee.email).toLowerCase();
@@ -184,6 +201,7 @@ export async function resolveApprovedLoginEmail(emailInput: string): Promise<str
 type EmployeeAuthEmailRow = {
   email: string;
   deleted_at: string | null;
+  app_hidden_at?: string | null;
   account_status: string;
   user_id: string | null;
 };
@@ -191,12 +209,16 @@ type EmployeeAuthEmailRow = {
 async function lookupEligibleEmployeeAuthEmail(
   normalized: string,
 ): Promise<string | null> {
+  if (isAppHiddenEmployeeEmail(normalized)) {
+    return null;
+  }
+
   const admin = createAdminClient();
 
   const { data: directMatch, error: directError } = await admin
     .schema("hrms")
     .from("employees")
-    .select("email, account_status, deleted_at, user_id")
+    .select("email, account_status, deleted_at, app_hidden_at, user_id")
     .eq("email", normalized)
     .is("deleted_at", null)
     .maybeSingle();
@@ -209,6 +231,7 @@ async function lookupEligibleEmployeeAuthEmail(
   if (
     direct?.email &&
     direct.user_id &&
+    isEmployeeAppVisible(direct) &&
     ELIGIBLE_ACCOUNT_STATUSES.has(direct.account_status) &&
     !PORTAL_DENIED_ACCOUNT_STATUSES.has(direct.account_status)
   ) {
@@ -219,7 +242,7 @@ async function lookupEligibleEmployeeAuthEmail(
     .schema("hrms")
     .from("employee_profiles")
     .select(
-      "personal_email, employees:employee_id(email, account_status, deleted_at, user_id)",
+      "personal_email, employees:employee_id(email, account_status, deleted_at, app_hidden_at, user_id)",
     )
     .eq("personal_email", normalized)
     .is("deleted_at", null)
@@ -238,7 +261,7 @@ async function lookupEligibleEmployeeAuthEmail(
   if (
     employee?.email &&
     employee.user_id &&
-    !employee.deleted_at &&
+    isEmployeeAppVisible(employee) &&
     ELIGIBLE_ACCOUNT_STATUSES.has(employee.account_status) &&
     !PORTAL_DENIED_ACCOUNT_STATUSES.has(employee.account_status)
   ) {

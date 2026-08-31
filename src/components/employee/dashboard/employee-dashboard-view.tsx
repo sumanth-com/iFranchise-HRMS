@@ -13,6 +13,7 @@ export function EmployeeDashboardView({
   kpis,
   referenceDate,
   upcomingHolidays,
+  canManageAnnouncements = false,
   subtitle,
 }: EmployeeDashboardData & { subtitle?: string }) {
   return (
@@ -45,6 +46,7 @@ export function EmployeeDashboardView({
           <EmployeeUpcomingEvents
             events={upcomingHolidays}
             referenceDate={referenceDate}
+            canManageAnnouncements={canManageAnnouncements}
             className="min-h-0 h-full"
           />
         </div>

@@ -4,6 +4,15 @@ import type { LeaveFormInput } from "@/lib/validations/leave";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
 import {
+  isMonthlyAccrualLeaveCode,
+  resolveMonthlyAccrualOpeningAllocation,
+  ensureEmployeeMonthlyLeaveAccruals,
+} from "@/lib/leave/services/leave-monthly-accrual";
+import {
+  evaluateLeaveApplication,
+  loadLeavePolicyRuntime,
+} from "@/lib/leave/services/leave-policy-runtime";
+import {
   getEmployeeReportingManagerId,
   getEmployeeRoleCodes,
   getHrApproverEmployeeId,
@@ -14,12 +23,10 @@ import {
   requireActiveCeoApproverEmployeeIds,
 } from "@/lib/leave/services/leave-queries";
 import { requiresCeoLeaveApproval } from "@/lib/approvals/executive-request-routing";
-import { evaluateLeaveApplication } from "@/lib/leave/services/leave-policy-runtime";
 import { splitLeaveDaysByBalance } from "@/lib/leave/services/leave-policy-engine";
 import { roundLeaveDays } from "@/lib/leave/services/leave-usage";
 import { NON_APPLY_LEAVE_TYPE_CODES } from "@/lib/leave/constants";
 import { isPeriodLeaveEligible } from "@/lib/leave/period-leave-eligibility";
-import { loadLeavePolicyRuntime } from "@/lib/leave/services/leave-policy-runtime";
 import { PERIOD_LEAVE_CODE } from "@/lib/leave/services/leave-policy-engine";
 import {
   notifyLeaveApproved,
@@ -169,6 +176,7 @@ async function ensureLeaveBalanceRow(
   balanceYear: number,
   allocatedDays: number,
   userId: string,
+  options?: { accruedThroughMonth?: string | null },
 ) {
   const existing = await getLeaveBalanceRow(
     supabase,
@@ -190,6 +198,7 @@ async function ensureLeaveBalanceRow(
       used_days: 0,
       pending_days: 0,
       balance_days: allocated,
+      accrued_through_month: options?.accruedThroughMonth ?? null,
       status: "active",
       created_by: userId,
       updated_by: userId,
@@ -273,7 +282,20 @@ export async function initializeEmployeeLeaveBalances(
     if (LEAVE_BALANCE_INIT_SKIP_CODES.has(code)) continue;
     if (code === PERIOD_LEAVE_CODE && !periodLeaveEligible) continue;
 
-    const allocatedDays = Math.max(Number(leaveType.days_per_year ?? 0), 0);
+    let allocatedDays = Math.max(Number(leaveType.days_per_year ?? 0), 0);
+    let accruedThroughMonth: string | null = null;
+
+    if (isMonthlyAccrualLeaveCode(code)) {
+      const opening = await resolveMonthlyAccrualOpeningAllocation(
+        supabase,
+        employeeId,
+        leaveType.id as string,
+        balanceYear,
+      );
+      allocatedDays = opening.allocatedDays;
+      accruedThroughMonth = opening.accruedThroughMonth;
+    }
+
     await ensureLeaveBalanceRow(
       supabase,
       employeeId,
@@ -281,8 +303,14 @@ export async function initializeEmployeeLeaveBalances(
       balanceYear,
       allocatedDays,
       userId,
+      { accruedThroughMonth },
     );
   }
+
+  await ensureEmployeeMonthlyLeaveAccruals(supabase, employeeId, {
+    balanceYear,
+    actorUserId: userId,
+  });
 }
 
 async function assertEmployeeInOrganization(
@@ -378,6 +406,12 @@ export async function createLeaveRequest(
     profile.employee.organizationId,
   );
 
+  await ensureEmployeeMonthlyLeaveAccruals(supabase, input.employeeId, {
+    balanceYear: getCurrentBalanceYear(input.startDate),
+    asOfDate: input.startDate,
+    actorUserId: profile.userId,
+  });
+
   const evaluated = await evaluateLeaveApplication(
     supabase,
     profile.employee.organizationId,
@@ -405,13 +439,27 @@ export async function createLeaveRequest(
   const durationBreakdown = { ...evaluated.duration, paidDays, lopDays };
 
   if (evaluated.leaveType.isPaid && paidDays > 0) {
+    let openingAllocated = Math.max(Number(evaluated.leaveType.daysPerYear ?? 0), 0);
+    let accruedThroughMonth: string | null = null;
+    if (isMonthlyAccrualLeaveCode(evaluated.leaveType.code)) {
+      const opening = await resolveMonthlyAccrualOpeningAllocation(
+        supabase,
+        input.employeeId,
+        input.leaveTypeId,
+        balanceYear,
+        input.startDate,
+      );
+      openingAllocated = opening.allocatedDays;
+      accruedThroughMonth = opening.accruedThroughMonth;
+    }
     await ensureLeaveBalanceRow(
       supabase,
       input.employeeId,
       input.leaveTypeId,
       balanceYear,
-      Math.max(Number(evaluated.leaveType.daysPerYear ?? 0), 0),
+      openingAllocated,
       profile.userId,
+      { accruedThroughMonth },
     );
     await adjustLeaveBalance(supabase, input.employeeId, input.leaveTypeId, balanceYear, {
       pending: paidDays,

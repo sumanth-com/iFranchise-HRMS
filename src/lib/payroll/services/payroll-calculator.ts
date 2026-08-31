@@ -138,8 +138,11 @@ export function calculateEmployeePayroll(
   const earnedBasic = roundCurrency(basic * paidRatio);
   const earnedHra = roundCurrency(hra * paidRatio);
   const earnedTransport = roundCurrency(transport * paidRatio);
+  const earnedSpecial = roundCurrency(specialAllowance * paidRatio);
+  const earnedMedical = roundCurrency(medical * paidRatio);
+  const earnedOtherAllowances = roundCurrency(otherAllowances * paidRatio);
   const earnedOther = roundCurrency(
-    (otherAllowances + specialAllowance + medical) * paidRatio,
+    earnedSpecial + earnedMedical + earnedOtherAllowances,
   );
 
   const hourlyRate = workingDays > 0 ? basic / (workingDays * 8) : 0;
@@ -164,9 +167,21 @@ export function calculateEmployeePayroll(
       type: "earning" as const,
     },
     {
-      code: "allowances",
-      label: "Special & Other Allowances",
-      amount: earnedOther,
+      code: "special_allowance",
+      label: "Special Allowance",
+      amount: earnedSpecial,
+      type: "earning" as const,
+    },
+    {
+      code: "medical",
+      label: "Medical Allowance",
+      amount: earnedMedical,
+      type: "earning" as const,
+    },
+    {
+      code: "other_allowances",
+      label: "Other Allowances",
+      amount: earnedOtherAllowances,
       type: "earning" as const,
     },
   ];
@@ -199,7 +214,7 @@ export function calculateEmployeePayroll(
   }
 
   const deductions = [
-    { code: "pf", label: "Provident Fund", amount: roundCurrency(pf * paidRatio), type: "deduction" as const },
+    { code: "pf", label: "PF", amount: roundCurrency(pf * paidRatio), type: "deduction" as const },
     { code: "esi", label: "ESI", amount: roundCurrency(esi * paidRatio), type: "deduction" as const },
     {
       code: "pt",
@@ -253,6 +268,24 @@ export function calculateEmployeePayroll(
         lopDays,
         leaveLopDays,
         overtimeHours: attendance.overtimeHours,
+        paidDays,
+      },
+      salaryStructureSnapshot: {
+        salaryStructureId: salaryStructure.id,
+        basicSalary: basic,
+        hraAmount: hra,
+        transportAllowance: transport,
+        otherAllowances: otherAllowances + specialAllowance + medical,
+        components: {
+          specialAllowance,
+          medical,
+          pf,
+          esi,
+          professionalTax,
+          incomeTax,
+          other: otherDeduction,
+          ...(salaryStructure.components ?? {}),
+        },
       },
     },
   };

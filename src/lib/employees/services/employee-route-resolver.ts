@@ -26,7 +26,8 @@ async function resolveEmployeeBySlug(
     .from("employees")
     .select("id, employee_code, first_name, last_name")
     .eq("organization_id", organizationId)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .is("app_hidden_at", null);
 
   if (error) {
     throw new Error(error.message);
@@ -60,6 +61,7 @@ export async function resolveEmployeeFromRouteRef(
       .eq("id", routeRef)
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
+      .is("app_hidden_at", null)
       .maybeSingle();
 
     if (error || !data) {
@@ -84,6 +86,7 @@ export async function resolveEmployeeFromRouteRef(
       .eq("organization_id", organizationId)
       .eq("employee_code", employeeCode)
       .is("deleted_at", null)
+      .is("app_hidden_at", null)
       .maybeSingle();
 
     if (error) {
@@ -120,6 +123,7 @@ export async function resolveEmployeeFromRouteRefGlobal(
       .select("id, employee_code, first_name, last_name, organization_id")
       .eq("id", routeRef)
       .is("deleted_at", null)
+      .is("app_hidden_at", null)
       .maybeSingle();
 
     if (error || !data) {
@@ -144,6 +148,7 @@ export async function resolveEmployeeFromRouteRefGlobal(
       .select("id, employee_code, first_name, last_name, organization_id")
       .eq("employee_code", employeeCode)
       .is("deleted_at", null)
+      .is("app_hidden_at", null)
       .maybeSingle();
 
     if (error) {
@@ -171,7 +176,8 @@ export async function resolveEmployeeFromRouteRefGlobal(
     .schema("hrms")
     .from("employees")
     .select("id, employee_code, first_name, last_name, organization_id")
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .is("app_hidden_at", null);
 
   if (error) {
     throw new Error(error.message);

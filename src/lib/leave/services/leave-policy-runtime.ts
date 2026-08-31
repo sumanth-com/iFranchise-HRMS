@@ -25,6 +25,11 @@ import {
   type LeaveProbationRules,
 } from "@/lib/leave/services/leave-policy-engine";
 import { ALLOWED_LEAVE_TYPE_CODES, sortByLeaveTypeCode } from "@/lib/leave/constants";
+import {
+  ensureEmployeeMonthlyLeaveAccruals,
+  isMonthlyAccrualLeaveCode,
+  MONTHLY_ACCRUAL_DAYS_PER_MONTH,
+} from "@/lib/leave/services/leave-monthly-accrual";
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
 
 export type LeaveTypePolicyRow = {
@@ -317,9 +322,14 @@ export async function evaluateLeaveApplication(
       ? await pendingCreditForRequest(supabase, input.excludeRequestId)
       : undefined);
 
+  await ensureEmployeeMonthlyLeaveAccruals(supabase, input.employeeId, {
+    balanceYear: getCurrentBalanceYear(input.startDate),
+    asOfDate: input.startDate,
+  });
+
   const [runtime, employee, overlapping] = await Promise.all([
     loadLeavePolicyRuntime(supabase, organizationId),
-    loadLeaveEmployeePolicyState(supabase, input.employeeId, getCurrentBalanceYear(), organizationId),
+    loadLeaveEmployeePolicyState(supabase, input.employeeId, getCurrentBalanceYear(input.startDate), organizationId),
     hasOverlappingLeave(
       supabase,
       input.employeeId,
@@ -362,13 +372,18 @@ export async function evaluateLeaveApplication(
     runtime.probation,
   );
   const code = leaveType.code.toUpperCase();
-  // A ledger row is only created the first time an employee uses a leave type, so a
-  // new joiner has none. Fall back to the leave type's configured annual entitlement
-  // — the same figure the employee already sees as their balance — instead of
-  // treating them as having nothing and pushing the whole request to LOP.
+  // Ledger may be missing for a brand-new type. Monthly CL/EL start at 1 for the
+  // current month; other paid types fall back to configured days_per_year.
+  const fallbackAvailable = isMonthlyAccrualLeaveCode(code)
+    ? MONTHLY_ACCRUAL_DAYS_PER_MONTH
+    : Number(leaveType.daysPerYear ?? 0);
   let availableBalance = leaveType.isPaid
-    ? Number(balance?.balance_days ?? leaveType.daysPerYear)
+    ? Number(balance?.balance_days ?? fallbackAvailable)
     : null;
+  // Never allow negative available for paid monthly types.
+  if (availableBalance != null) {
+    availableBalance = Math.max(0, availableBalance);
+  }
   if (probation.onProbation && code === CASUAL_LEAVE_CODE) {
     availableBalance = Math.max(
       0,

@@ -8,6 +8,7 @@ import { CEO_PENDING_APPROVAL_STATUSES } from "@/lib/ceo/executive-approvals-con
 import { syncExecutiveApprovalsFromDomain } from "@/lib/ceo/services/ceo-approvals-sync";
 import { getRecruitmentSummary } from "@/lib/recruitment/services/recruitment-queries";
 import { loadUpcomingCelebrations } from "@/lib/employee/services/employee-dashboard-queries";
+import { canManageDashboardAnnouncements } from "@/lib/dashboard/dashboard-announcement-permissions";
 import { getPayrollMonthDate } from "@/lib/payroll/services/payroll-utils";
 import { fromHrms } from "@/lib/reports/services/reports-utils";
 import type { UserProfile } from "@/types/auth";
@@ -282,6 +283,7 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
       onLeaveToday: attendance.onLeaveToday,
     },
     upcomingHolidays: upcomingCelebrations,
+    canManageAnnouncements: canManageDashboardAnnouncements(profile.permissionCodes),
     activities: [],
     approvals: [],
     charts: EMPTY_CHARTS,

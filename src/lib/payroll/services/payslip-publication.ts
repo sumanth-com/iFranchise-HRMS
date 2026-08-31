@@ -5,8 +5,21 @@ export const SALARY_CREDIT_DAY = 2;
 export const PAYSLIP_PUBLISH_DAY = 5;
 export const PAYSLIP_ENGINE_NAME = "iFranchise HRMS Payroll Engine";
 export const PAYSLIP_VERSION = "2.0";
+export const PAYROLL_BUSINESS_TIMEZONE = "Asia/Kolkata";
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+/** Previous calendar month in the payroll business timezone (Asia/Kolkata). */
+export function getPreviousPayrollMonthParts(now = new Date()): {
+  month: number;
+  year: number;
+} {
+  const ist = new Date(now.toLocaleString("en-US", { timeZone: PAYROLL_BUSINESS_TIMEZONE }));
+  const year = ist.getFullYear();
+  const month = ist.getMonth() + 1;
+  if (month === 1) return { month: 12, year: year - 1 };
+  return { month: month - 1, year };
+}
 
 export type PayslipScheduleDates = {
   salaryCreditDate: string;
@@ -150,11 +163,11 @@ export function resolvePayslipAvailability(
   return {
     availability: "under_review",
     canEmployeeAccess: false,
-    reviewMessage: `Payroll is currently under review by HR. Your payslip will be available on ${publishDate}.`,
+    reviewMessage: `Payslip will be available on ${publishDate}`,
   };
 }
 
 export function formatReviewBannerMessage(publishedAt: string): string {
   const publishDate = formatPublishDate(publishedAt);
-  return `Payroll is currently under review by HR. Your salary has already been credited. Your official payslip will be available after payroll verification on ${publishDate}.`;
+  return `Payslip will be available on ${publishDate}. You can download it once it is released.`;
 }

@@ -1,4 +1,7 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { LEAVE_BALANCE_CARD_CODES } from "@/lib/leave/constants";
+import { getEmployeeLeaveBalanceSnapshot } from "@/lib/leave/services/leave-queries";
+import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
 import { emitHrmsWebhook } from "@/lib/public-api/emit";
 import { getPayslipBranding } from "@/lib/payroll/services/payslip-branding";
 import { PayslipEmailError } from "@/lib/payroll/services/payslip-email-errors";
@@ -51,6 +54,17 @@ function unwrapRelation<T>(value: T | T[] | null): T | null {
   return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
+/** auth.users FK — cron / system actors must use null, not a fake string. */
+function actorUserId(profile: UserProfile): string | null {
+  const id = profile.userId?.trim();
+  if (!id || id === "system-cron") return null;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    id,
+  )
+    ? id
+    : null;
+}
+
 async function getActiveEmployees(
   supabase: AuthSupabaseClient,
   organizationId: string,
@@ -70,6 +84,7 @@ async function getActiveEmployees(
     .eq("organization_id", organizationId)
     .eq("employment_status", "active")
     .is("deleted_at", null)
+    .is("app_hidden_at", null)
     .order("employee_code", { ascending: true });
 
   if (error) throw new Error(error.message);
@@ -81,7 +96,13 @@ async function resolvePayslipSalaryComponents(
   employeeId: string,
   payrollMonth: string,
   salaryStructureId: string | null | undefined,
+  breakdown?: PayrollBreakdown | null,
 ): Promise<Record<string, unknown> | null> {
+  const snapshotComponents = breakdown?.salaryStructureSnapshot?.components;
+  if (snapshotComponents && typeof snapshotComponents === "object") {
+    return snapshotComponents;
+  }
+
   if (salaryStructureId) {
     const { data, error } = await supabase
       .schema("hrms")
@@ -489,6 +510,7 @@ export async function generatePayrollRun(
   }
 
   let payrollId = existing?.id;
+  const actorId = actorUserId(profile);
 
   if (!payrollId) {
     const { data: created, error: createError } = await supabase
@@ -502,8 +524,8 @@ export async function generatePayrollRun(
         total_deductions: preview.totalDeductions,
         total_net: preview.totalNet,
         notes: input.notes ?? null,
-        created_by: profile.userId,
-        updated_by: profile.userId,
+        created_by: actorId,
+        updated_by: actorId,
       })
       .select("id")
       .single();
@@ -520,7 +542,7 @@ export async function generatePayrollRun(
         total_net: preview.totalNet,
         notes: input.notes ?? null,
         payroll_status: "draft",
-        updated_by: profile.userId,
+        updated_by: actorId,
       })
       .eq("id", payrollId);
 
@@ -559,8 +581,8 @@ export async function generatePayrollRun(
       gross_salary: item.grossSalary,
       net_salary: item.netSalary,
       breakdown: item.breakdown,
-      created_by: profile.userId,
-      updated_by: profile.userId,
+      created_by: actorId,
+      updated_by: actorId,
     });
 
     if (itemError) {
@@ -580,7 +602,7 @@ export async function generatePayrollRun(
     await supabase
       .schema("hrms")
       .from("employee_bonuses")
-      .update({ payroll_id: payrollId, updated_by: profile.userId })
+      .update({ payroll_id: payrollId, updated_by: actorId })
       .eq("employee_id", employee.id)
       .eq("bonus_month", payrollMonth)
       .in("bonus_status", ["pending", "approved"])
@@ -590,7 +612,7 @@ export async function generatePayrollRun(
     await supabase
       .schema("hrms")
       .from("employee_reimbursements")
-      .update({ payroll_id: payrollId, updated_by: profile.userId })
+      .update({ payroll_id: payrollId, updated_by: actorId })
       .eq("employee_id", employee.id)
       .in("reimbursement_status", ["pending", "approved"])
       .is("payroll_id", null)
@@ -626,14 +648,17 @@ export async function processPayrollRun(
     .update({
       payroll_status: "processed",
       processed_at: new Date().toISOString(),
-      processed_by: profile.userId,
-      updated_by: profile.userId,
+      processed_by: actorUserId(profile),
+      updated_by: actorUserId(profile),
     })
     .eq("id", payrollId);
 
   if (updateError) throw new Error(updateError.message);
 
-  await initializePayrollApprovals(supabase, profile, payrollId);
+  // Cron/system actors have no employee row; skip multi-level approvals (auto-finalize locks next).
+  if (actorUserId(profile) && profile.employee.id) {
+    await initializePayrollApprovals(supabase, profile, payrollId);
+  }
   emitHrmsWebhook(profile.employee.organizationId, "payroll.processed", {
     id: payrollId,
   });
@@ -877,6 +902,7 @@ export async function generatePayslips(
 
     if (existing) continue;
 
+    const actorId = actorUserId(profile);
     const { error: insertError } = await supabase.schema("hrms").from("payslips").insert({
       payroll_id: payrollId,
       payroll_item_id: item.id,
@@ -887,8 +913,8 @@ export async function generatePayslips(
       payroll_generated_at: new Date().toISOString(),
       payment_mode: "Bank Transfer",
       payslip_version: PAYSLIP_VERSION,
-      created_by: profile.userId,
-      updated_by: profile.userId,
+      created_by: actorId,
+      updated_by: actorId,
     });
 
     if (insertError) {
@@ -1057,6 +1083,11 @@ export async function createSalaryStructure(
     .maybeSingle();
 
   if (previous) {
+    if (previous.effective_from === parsed.effectiveFrom) {
+      throw new Error(
+        "A salary structure already exists for this employee with the same effective date. Edit that record or choose a different effective date.",
+      );
+    }
     const dayBefore = new Date(parsed.effectiveFrom);
     dayBefore.setDate(dayBefore.getDate() - 1);
     const effectiveTo = dayBefore.toISOString().slice(0, 10);
@@ -1095,7 +1126,191 @@ export async function createSalaryStructure(
     .single();
 
   if (error) throw new Error(error.message);
+
+  await refreshDraftPayrollItemsForEmployee(
+    supabase,
+    profile,
+    parsed.employeeId,
+  );
+
   return data.id;
+}
+
+async function isSalaryStructureUsedInFinalizedPayroll(
+  supabase: AuthSupabaseClient,
+  structureId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("payroll_items")
+    .select(
+      "id, payrolls!inner(is_locked, payroll_status, deleted_at)",
+    )
+    .eq("salary_structure_id", structureId)
+    .is("deleted_at", null)
+    .limit(25);
+
+  if (error) throw new Error(error.message);
+
+  for (const row of data ?? []) {
+    const payroll = unwrapRelation(
+      row.payrolls as
+        | { is_locked: boolean; payroll_status: string; deleted_at: string | null }
+        | { is_locked: boolean; payroll_status: string; deleted_at: string | null }[]
+        | null,
+    );
+    if (!payroll || payroll.deleted_at) continue;
+    if (
+      payroll.is_locked ||
+      payroll.payroll_status === "approved" ||
+      payroll.payroll_status === "paid"
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Recalculate this employee's line items on any unlocked draft/processing payroll
+ * so Team Payroll salary edits flow into the applicable month without a second manual entry.
+ * Finalized (locked/approved/paid) runs are never touched.
+ */
+export async function refreshDraftPayrollItemsForEmployee(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  employeeId: string,
+): Promise<void> {
+  const organizationId = profile.employee.organizationId;
+
+  const { data: draftPayrolls, error } = await supabase
+    .schema("hrms")
+    .from("payrolls")
+    .select("id, payroll_month, payroll_status, is_locked")
+    .eq("organization_id", organizationId)
+    .in("payroll_status", ["draft", "processing"])
+    .eq("is_locked", false)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+  if (!draftPayrolls?.length) return;
+
+  for (const payroll of draftPayrolls) {
+    const monthDate = new Date(`${payroll.payroll_month.slice(0, 10)}T00:00:00.000Z`);
+    if (Number.isNaN(monthDate.getTime())) continue;
+    const month = monthDate.getUTCMonth() + 1;
+    const year = monthDate.getUTCFullYear();
+
+    const [salaryStructure, attendance, leaveLopDays, bonuses, reimbursements] =
+      await Promise.all([
+        getEffectiveSalaryStructure(supabase, employeeId, month, year),
+        getAttendanceSummary(supabase, employeeId, month, year),
+        getLeaveLopDays(supabase, employeeId, month, year),
+        getPayableBonuses(supabase, employeeId, [getPayrollMonthDate(month, year)], {
+          includeAttached: true,
+        }),
+        getPayableReimbursements(supabase, employeeId, [getMonthDateRange(month, year)], {
+          includeAttached: true,
+        }),
+      ]);
+
+    const calc = calculateEmployeePayroll({
+      month,
+      year,
+      salaryStructure: salaryStructure
+        ? {
+            id: salaryStructure.id,
+            employee_id: salaryStructure.employee_id,
+            basic_salary: salaryStructure.basic_salary,
+            hra_amount: salaryStructure.hra_amount,
+            transport_allowance: salaryStructure.transport_allowance,
+            other_allowances: salaryStructure.other_allowances,
+            tax_deduction: salaryStructure.tax_deduction,
+            other_deductions: salaryStructure.other_deductions,
+            gross_salary: salaryStructure.gross_salary,
+            net_salary: salaryStructure.net_salary,
+            components: salaryStructure.components as Record<string, unknown> | null,
+          }
+        : null,
+      attendance,
+      leaveLopDays,
+      bonuses,
+      reimbursements,
+    });
+
+    const { data: existingItem } = await supabase
+      .schema("hrms")
+      .from("payroll_items")
+      .select("id")
+      .eq("payroll_id", payroll.id)
+      .eq("employee_id", employeeId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (existingItem) {
+      const { error: updateError } = await supabase
+        .schema("hrms")
+        .from("payroll_items")
+        .update({
+          salary_structure_id: salaryStructure?.id ?? null,
+          basic_salary: calc.basicSalary,
+          total_allowances: calc.totalAllowances,
+          total_deductions: calc.totalDeductions,
+          gross_salary: calc.grossSalary,
+          net_salary: calc.netSalary,
+          breakdown: calc.breakdown,
+          updated_by: actorUserId(profile),
+        })
+        .eq("id", existingItem.id);
+      if (updateError) throw new Error(updateError.message);
+    } else if (salaryStructure || calc.grossSalary > 0) {
+      const actorId = actorUserId(profile);
+      const { error: insertError } = await supabase.schema("hrms").from("payroll_items").insert({
+        payroll_id: payroll.id,
+        employee_id: employeeId,
+        salary_structure_id: salaryStructure?.id ?? null,
+        basic_salary: calc.basicSalary,
+        total_allowances: calc.totalAllowances,
+        total_deductions: calc.totalDeductions,
+        gross_salary: calc.grossSalary,
+        net_salary: calc.netSalary,
+        breakdown: calc.breakdown,
+        created_by: actorId,
+        updated_by: actorId,
+      });
+      if (insertError && insertError.code !== "23505") {
+        throw new Error(insertError.message);
+      }
+    }
+
+    const { data: items } = await supabase
+      .schema("hrms")
+      .from("payroll_items")
+      .select("gross_salary, total_deductions, net_salary")
+      .eq("payroll_id", payroll.id)
+      .is("deleted_at", null);
+
+    const totalGross = roundCurrency(
+      (items ?? []).reduce((sum, row) => sum + Number(row.gross_salary ?? 0), 0),
+    );
+    const totalDeductions = roundCurrency(
+      (items ?? []).reduce((sum, row) => sum + Number(row.total_deductions ?? 0), 0),
+    );
+    const totalNet = roundCurrency(
+      (items ?? []).reduce((sum, row) => sum + Number(row.net_salary ?? 0), 0),
+    );
+
+    await supabase
+      .schema("hrms")
+      .from("payrolls")
+      .update({
+        total_gross: totalGross,
+        total_deductions: totalDeductions,
+        total_net: totalNet,
+        updated_by: actorUserId(profile),
+      })
+      .eq("id", payroll.id);
+  }
 }
 
 export async function updateSalaryStructure(
@@ -1109,7 +1324,9 @@ export async function updateSalaryStructure(
   const { data: existing, error: fetchError } = await supabase
     .schema("hrms")
     .from("salary_structures")
-    .select("id, employee_id, employees!inner(organization_id)")
+    .select(
+      "id, employee_id, effective_from, effective_to, employees!inner(organization_id)",
+    )
     .eq("id", structureId)
     .is("deleted_at", null)
     .maybeSingle();
@@ -1128,10 +1345,37 @@ export async function updateSalaryStructure(
     throw new Error("Employee cannot be changed when editing a salary structure.");
   }
 
-  const { error } = await supabase
-    .schema("hrms")
-    .from("salary_structures")
-    .update({
+  const usedInFinalized = await isSalaryStructureUsedInFinalizedPayroll(
+    supabase,
+    structureId,
+  );
+  const effectiveFromChanged = existing.effective_from !== parsed.effectiveFrom;
+
+  // Preserve historical payroll: never mutate a structure already used on a locked run.
+  // Instead close it and insert a new effective version (source of truth going forward).
+  if (usedInFinalized || effectiveFromChanged) {
+    if (usedInFinalized && !effectiveFromChanged) {
+      throw new Error(
+        "This salary structure is already used on a finalized payroll. Save a new structure with a later Effective from date so historical payslips stay unchanged.",
+      );
+    }
+
+    const dayBefore = new Date(parsed.effectiveFrom);
+    dayBefore.setDate(dayBefore.getDate() - 1);
+    const effectiveTo = dayBefore.toISOString().slice(0, 10);
+
+    const { error: closeError } = await supabase
+      .schema("hrms")
+      .from("salary_structures")
+      .update({
+        effective_to: effectiveTo,
+        updated_by: profile.userId,
+      })
+      .eq("id", structureId);
+    if (closeError) throw new Error(closeError.message);
+
+    const { error: insertError } = await supabase.schema("hrms").from("salary_structures").insert({
+      employee_id: parsed.employeeId,
       effective_from: parsed.effectiveFrom,
       effective_to: parsed.effectiveTo ?? null,
       currency_code: parsed.currencyCode,
@@ -1144,11 +1388,35 @@ export async function updateSalaryStructure(
       gross_salary: parsed.grossSalary,
       net_salary: parsed.netSalary,
       components: parsed.components,
+      created_by: profile.userId,
       updated_by: profile.userId,
-    })
-    .eq("id", structureId);
+    });
+    if (insertError) throw new Error(insertError.message);
+  } else {
+    const { error } = await supabase
+      .schema("hrms")
+      .from("salary_structures")
+      .update({
+        effective_from: parsed.effectiveFrom,
+        effective_to: parsed.effectiveTo ?? null,
+        currency_code: parsed.currencyCode,
+        basic_salary: parsed.basicSalary,
+        hra_amount: parsed.hraAmount,
+        transport_allowance: parsed.transportAllowance,
+        other_allowances: parsed.otherAllowances,
+        tax_deduction: parsed.taxDeduction,
+        other_deductions: parsed.otherDeductions,
+        gross_salary: parsed.grossSalary,
+        net_salary: parsed.netSalary,
+        components: parsed.components,
+        updated_by: profile.userId,
+      })
+      .eq("id", structureId);
 
-  if (error) throw new Error(error.message);
+    if (error) throw new Error(error.message);
+  }
+
+  await refreshDraftPayrollItemsForEmployee(supabase, profile, parsed.employeeId);
 }
 
 export async function deleteSalaryStructure(
@@ -1674,15 +1942,7 @@ export async function getPayslipById(
     .is("deleted_at", null)
     .maybeSingle();
 
-  const components = await resolvePayslipSalaryComponents(
-    supabase,
-    payslip.employee_id,
-    payroll.payroll_month,
-    payrollItem?.salary_structure_id as string | null | undefined,
-  );
-  const statutory = parseStatutoryIds(components);
-  const branding = await getPayslipBranding(supabase, organizationId);
-
+  // Prefer payroll_item.breakdown snapshot — never recompute historical amounts from live salary.
   const breakdown = (payrollItem?.breakdown as PayrollBreakdown) ?? {
     earnings: [],
     deductions: [],
@@ -1696,11 +1956,56 @@ export async function getPayslipById(
     },
   };
 
+  const components = await resolvePayslipSalaryComponents(
+    supabase,
+    payslip.employee_id,
+    payroll.payroll_month,
+    payrollItem?.salary_structure_id as string | null | undefined,
+    breakdown,
+  );
+  const statutory = parseStatutoryIds(components);
+  const branding = await getPayslipBranding(supabase, organizationId);
+
   const employerContributions = buildEmployerContributions(components, breakdown);
   const employerContributionTotal = employerContributions.reduce(
     (sum, line) => sum + line.amount,
     0,
   );
+
+  const payrollMonthDate = new Date(payroll.payroll_month);
+  const payrollYear = Number.isNaN(payrollMonthDate.getTime())
+    ? new Date().getFullYear()
+    : payrollMonthDate.getFullYear();
+  const payrollMonthNum = Number.isNaN(payrollMonthDate.getTime())
+    ? new Date().getMonth() + 1
+    : payrollMonthDate.getMonth() + 1;
+  const leaveMonthKey = `${payrollYear}-${String(payrollMonthNum).padStart(2, "0")}-01`;
+
+  const leaveBalances: PayslipDetail["leaveBalances"] = {
+    casual: { usedInMonth: 0, balance: 0 },
+    earned: { usedInMonth: 0, balance: 0 },
+  };
+  try {
+    const leaveSnapshots = await getEmployeeLeaveBalanceSnapshot(
+      supabase,
+      payslip.employee_id,
+      getCurrentBalanceYear(leaveMonthKey),
+      { month: payrollMonthNum, year: payrollYear },
+      organizationId,
+    );
+    for (const code of LEAVE_BALANCE_CARD_CODES) {
+      const row = leaveSnapshots.find((item) => item.leaveTypeCode === code);
+      if (!row) continue;
+      const entry = {
+        usedInMonth: Number(row.monthUsedDays) || 0,
+        balance: Number(row.balanceDays) || 0,
+      };
+      if (code === "CL") leaveBalances.casual = entry;
+      if (code === "EL") leaveBalances.earned = entry;
+    }
+  } catch {
+    // Leave snapshot is display-only; never block payslip load.
+  }
 
   const detail: PayslipDetail = {
     id: payslip.id,
@@ -1761,6 +2066,7 @@ export async function getPayslipById(
           accountHolderName: bankAccount.account_holder_name ?? null,
         }
       : null,
+    leaveBalances,
     storagePath: payslip.storage_path ?? null,
   };
 

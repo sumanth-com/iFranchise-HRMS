@@ -2,7 +2,10 @@ import Image from "next/image";
 import { format, parseISO, lastDayOfMonth } from "date-fns";
 
 import { amountToIndianWords } from "@/lib/payroll/services/amount-in-words";
-import { toEmployeeFacingEarnings } from "@/lib/payroll/services/payroll-utils";
+import {
+  getPayslipDeductionLines,
+  getPayslipEarningsLines,
+} from "@/lib/payroll/services/payroll-utils";
 import type { PayslipDetail } from "@/types/payroll";
 
 function fmt(value: string | null | undefined, fallback = "—"): string {
@@ -54,7 +57,6 @@ export function PayslipTemplate({
   const organizationName = payslip.organization.name.toUpperCase();
   const monthHeader = formatMonthYearHeader(payslip.payrollMonth);
 
-  // Compute work days & paid days
   let totalDaysInMonth = 30;
   try {
     const monthDate = new Date(payslip.payrollMonth);
@@ -64,53 +66,38 @@ export function PayslipTemplate({
   }
 
   const attendance = payslip.breakdown?.attendance;
-  const workDays = attendance?.workingDays && attendance.workingDays > 0 ? attendance.workingDays : totalDaysInMonth;
+  const workDays =
+    attendance?.workingDays && attendance.workingDays > 0
+      ? attendance.workingDays
+      : totalDaysInMonth;
   const lopDays = attendance?.lopDays ?? attendance?.leaveLopDays ?? 0;
-  const paidDays = attendance?.presentDays && attendance.presentDays > 0 ? attendance.presentDays : Math.max(0, workDays - lopDays);
+  const paidDays =
+    attendance?.presentDays && attendance.presentDays > 0
+      ? attendance.presentDays
+      : Math.max(0, workDays - lopDays);
 
-  // Standard Indian earnings
-  const rawEarnings = payslip.breakdown?.earnings?.length > 0
-    ? toEmployeeFacingEarnings(payslip.breakdown.earnings)
-    : [
-        {
-          code: "basic",
-          label: "Basic",
-          amount: payslip.basicSalary > 0 ? payslip.basicSalary : Math.round(payslip.grossSalary * 0.5),
-          type: "earning" as const,
-        },
-        {
-          code: "hra",
-          label: "HRA",
-          amount: payslip.totalAllowances > 0 ? Math.round(payslip.totalAllowances * 0.4) : Math.round(payslip.grossSalary * 0.2),
-          type: "earning" as const,
-        },
-        {
-          code: "special_allowance",
-          label: "Special Allowance",
-          amount: Math.max(0, payslip.grossSalary - (payslip.basicSalary > 0 ? payslip.basicSalary : Math.round(payslip.grossSalary * 0.5)) - (payslip.totalAllowances > 0 ? Math.round(payslip.totalAllowances * 0.4) : Math.round(payslip.grossSalary * 0.2))),
-          type: "earning" as const,
-        },
-      ];
+  const earnings = getPayslipEarningsLines({
+    earnings: payslip.breakdown?.earnings,
+    basicSalary: payslip.basicSalary,
+    totalAllowances: payslip.totalAllowances,
+    grossSalary: payslip.grossSalary,
+  });
+  const deductions = getPayslipDeductionLines(payslip.breakdown?.deductions);
 
-  const earnings = rawEarnings.filter((item) => item.amount > 0);
+  const totalEarnings =
+    earnings.reduce((sum, item) => sum + Number(item.amount || 0), 0) ||
+    payslip.grossSalary;
+  const totalDeductions =
+    deductions.reduce((sum, item) => sum + Number(item.amount || 0), 0) ||
+    payslip.totalDeductions;
+  const netPay = payslip.netSalary || totalEarnings - totalDeductions;
 
-  // Standard deductions
-  const deductions = (payslip.breakdown?.deductions ?? []).filter(
-    (line) => Number(line.amount) > 0,
-  );
+  const leave = payslip.leaveBalances ?? {
+    casual: { usedInMonth: 0, balance: 0 },
+    earned: { usedInMonth: 0, balance: 0 },
+  };
 
-  const totalEarnings = earnings.reduce((sum, item) => sum + Number(item.amount || 0), 0) || payslip.grossSalary;
-  const totalDeductions = deductions.reduce((sum, item) => sum + Number(item.amount || 0), 0) || payslip.totalDeductions;
-  const netPay = payslip.netSalary || (totalEarnings - totalDeductions);
-
-  // Leave stats
-  const sickLeaveUsed = 0;
-  const casualLeaveUsed = 0;
-  const sickLeaveBal = 1;
-  const casualLeaveBal = 3;
-
-  // Maximum rows for components table to balance
-  const maxRows = Math.max(earnings.length, deductions.length, 5);
+  const maxRows = Math.max(earnings.length, deductions.length, 1);
 
   return (
     <article
@@ -118,7 +105,6 @@ export function PayslipTemplate({
       className={`mx-auto w-full max-w-[210mm] bg-white p-6 text-black font-sans shadow-md print:max-w-none print:p-0 print:shadow-none ${className}`}
       style={{ fontFamily: "'Inter', 'Segoe UI', Arial, sans-serif" }}
     >
-      {/* Header section with Logo & Centered Company Name / Title */}
       <div className="relative mb-6 flex items-center justify-center">
         {payslip.organization.logoUrl ? (
           <div className="absolute left-0 top-1/2 -translate-y-1/2">
@@ -144,133 +130,162 @@ export function PayslipTemplate({
         </div>
       </div>
 
-      {/* Main Single Boxed Table Container */}
       <div className="w-full border-2 border-black bg-white text-xs">
-        {/* Section 1: Employee & Bank Details Grid */}
         <table className="w-full table-fixed border-collapse">
           <tbody>
             <tr className="border-b border-black">
-              <td className="w-[18%] border-r border-black p-2 font-bold uppercase">EMP CODE</td>
-              <td className="w-[32%] border-r border-black p-2 font-semibold">{payslip.employee.employeeCode}</td>
-              <td className="w-[20%] border-r border-black p-2 font-bold uppercase">PAYMENT MODE</td>
-              <td className="w-[30%] p-2 font-semibold">{(payslip.paymentMode || "BANK").toUpperCase()}</td>
+              <td className="w-[22%] border-r border-black p-2.5 font-bold uppercase">
+                Employee ID
+              </td>
+              <td className="w-[28%] border-r border-black p-2.5 font-semibold">
+                {payslip.employee.employeeCode}
+              </td>
+              <td className="w-[22%] border-r border-black p-2.5 font-bold uppercase">
+                Payment Mode
+              </td>
+              <td className="w-[28%] p-2.5 font-semibold">
+                {(payslip.paymentMode || "BANK").toUpperCase()}
+              </td>
             </tr>
             <tr className="border-b border-black">
-              <td className="border-r border-black p-2 font-bold uppercase">EMP NAME</td>
-              <td className="border-r border-black p-2 font-semibold">{employeeName}</td>
-              <td className="border-r border-black p-2 font-bold uppercase">BANK NAME</td>
-              <td className="p-2 font-semibold">{fmt(payslip.bankAccount?.bankName)}</td>
+              <td className="border-r border-black p-2.5 font-bold uppercase">
+                Employee Name
+              </td>
+              <td className="border-r border-black p-2.5 font-semibold">{employeeName}</td>
+              <td className="border-r border-black p-2.5 font-bold uppercase">Bank Name</td>
+              <td className="p-2.5 font-semibold">{fmt(payslip.bankAccount?.bankName)}</td>
             </tr>
             <tr className="border-b border-black">
-              <td className="border-r border-black p-2 font-bold uppercase">JOINING DT</td>
-              <td className="border-r border-black p-2 font-semibold">{fmtDateUpper(payslip.employee.dateOfJoining)}</td>
-              <td className="border-r border-black p-2 font-bold uppercase">BANK A/C NO</td>
-              <td className="p-2 font-semibold">{fmt(payslip.bankAccount?.accountNumberMasked)}</td>
+              <td className="border-r border-black p-2.5 font-bold uppercase">Joining Dt</td>
+              <td className="border-r border-black p-2.5 font-semibold">
+                {fmtDateUpper(payslip.employee.dateOfJoining)}
+              </td>
+              <td className="border-r border-black p-2.5 font-bold uppercase">Bank A/C No</td>
+              <td className="p-2.5 font-semibold">
+                {fmt(payslip.bankAccount?.accountNumberMasked)}
+              </td>
             </tr>
             <tr className="border-b border-black">
-              <td className="border-r border-black p-2 font-bold uppercase">DESIGNATION</td>
-              <td className="border-r border-black p-2 font-semibold">{fmt(payslip.employee.designationTitle).toUpperCase()}</td>
-              <td className="border-r border-black p-2 font-bold uppercase">ESIC NO</td>
-              <td className="p-2 font-semibold">{fmt(payslip.employee.pan)}</td>
+              <td className="border-r border-black p-2.5 font-bold uppercase">Designation</td>
+              <td className="border-r border-black p-2.5 font-semibold">
+                {fmt(payslip.employee.designationTitle).toUpperCase()}
+              </td>
+              <td className="border-r border-black p-2.5 font-bold uppercase">Work Days</td>
+              <td className="p-2.5 font-semibold tabular-nums">{Number(workDays).toFixed(2)}</td>
             </tr>
             <tr className="border-b border-black">
-              <td className="border-r border-black p-2 font-bold uppercase">LOCATION</td>
-              <td className="border-r border-black p-2 font-semibold">{fmt(payslip.employee.branchName || payslip.employee.departmentName || "CHENNAI").toUpperCase()}</td>
-              <td className="border-r border-black p-2 font-bold uppercase">WORK DAYS</td>
-              <td className="p-2 font-semibold tabular-nums">{Number(workDays).toFixed(2)}</td>
+              <td className="border-r border-black p-2.5 font-bold uppercase">Location</td>
+              <td className="border-r border-black p-2.5 font-semibold">
+                {fmt(
+                  payslip.employee.branchName ||
+                    payslip.employee.departmentName ||
+                    "CHENNAI",
+                ).toUpperCase()}
+              </td>
+              <td className="border-r border-black p-2.5 font-bold uppercase">Paid Days</td>
+              <td className="p-2.5 font-semibold tabular-nums">{Number(paidDays).toFixed(2)}</td>
             </tr>
             <tr className="border-b border-black">
-              <td className="border-r border-black p-2 font-bold uppercase">UAN NO</td>
-              <td className="border-r border-black p-2 font-semibold">{fmt(payslip.employee.uan)}</td>
-              <td className="border-r border-black p-2 font-bold uppercase">PAID DAYS</td>
-              <td className="p-2 font-semibold tabular-nums">{Number(paidDays).toFixed(2)}</td>
-            </tr>
-            <tr className="border-b border-black">
-              <td className="border-r border-black p-2 font-bold uppercase">PAN NO</td>
-              <td className="border-r border-black p-2 font-semibold">{fmt(payslip.employee.pan)}</td>
-              <td className="border-r border-black p-2 font-bold uppercase">LOP DAYS</td>
-              <td className="p-2 font-semibold tabular-nums">{Number(lopDays).toFixed(2)}</td>
+              <td className="border-r border-black p-2.5 font-bold uppercase">PAN No</td>
+              <td className="border-r border-black p-2.5 font-semibold">
+                {fmt(payslip.employee.pan)}
+              </td>
+              <td className="border-r border-black p-2.5 font-bold uppercase">LOP Days</td>
+              <td className="p-2.5 font-semibold tabular-nums">{Number(lopDays).toFixed(2)}</td>
             </tr>
           </tbody>
         </table>
 
-        {/* Section 2: Leave Details Header & Grid */}
         <div className="border-b border-black bg-white py-1.5 text-center font-bold uppercase tracking-wide">
-          NO. OF AVAILABLE LEAVE DAYS:
+          No. of Available Leave Days
         </div>
         <table className="w-full table-fixed border-collapse">
           <tbody>
             <tr className="border-b border-black">
-              <td className="w-[18%] border-r border-black p-2 font-bold uppercase">SL</td>
-              <td className="w-[32%] border-r border-black p-2 font-semibold tabular-nums">{sickLeaveUsed.toFixed(2)}</td>
-              <td className="w-[20%] border-r border-black p-2 font-bold uppercase">CL</td>
-              <td className="w-[30%] p-2 font-semibold tabular-nums">{casualLeaveUsed.toFixed(2)}</td>
+              <td className="w-[22%] border-r border-black p-2.5 font-bold">Casual Leave</td>
+              <td className="w-[28%] border-r border-black p-2.5 font-semibold tabular-nums">
+                {leave.casual.usedInMonth.toFixed(2)}
+              </td>
+              <td className="w-[22%] border-r border-black p-2.5 font-bold">Earned Leave</td>
+              <td className="w-[28%] p-2.5 font-semibold tabular-nums">
+                {leave.earned.usedInMonth.toFixed(2)}
+              </td>
             </tr>
             <tr className="border-b border-black">
-              <td className="border-r border-black p-2 font-bold uppercase">BAL. SL</td>
-              <td className="border-r border-black p-2 font-semibold tabular-nums">{sickLeaveBal.toFixed(2)}</td>
-              <td className="border-r border-black p-2 font-bold uppercase">BAL. CL</td>
-              <td className="p-2 font-semibold tabular-nums">{casualLeaveBal.toFixed(2)}</td>
+              <td className="border-r border-black p-2.5 font-bold">Casual Leave Balance</td>
+              <td className="border-r border-black p-2.5 font-semibold tabular-nums">
+                {leave.casual.balance.toFixed(2)}
+              </td>
+              <td className="border-r border-black p-2.5 font-bold">Earned Leave Balance</td>
+              <td className="p-2.5 font-semibold tabular-nums">
+                {leave.earned.balance.toFixed(2)}
+              </td>
             </tr>
           </tbody>
         </table>
 
-        {/* Section 3: Salary Components Grid (Earnings & Deductions) */}
         <table className="w-full table-fixed border-collapse">
           <thead>
             <tr className="border-b border-black font-bold uppercase">
-              <th className="w-[26%] border-r border-black p-2 text-left">COMPONENTS</th>
-              <th className="w-[14%] border-r border-black p-2 text-right">FIXED SALARY</th>
-              <th className="w-[14%] border-r border-black p-2 text-right">EARNED SALARY</th>
-              <th className="w-[26%] border-r border-black p-2 text-left">COMPONENTS</th>
-              <th className="w-[20%] p-2 text-right">SALARY</th>
+              <th className="w-[30%] border-r border-black p-2.5 text-left">Earnings</th>
+              <th className="w-[20%] border-r border-black p-2.5 text-right">Amount</th>
+              <th className="w-[30%] border-r border-black p-2.5 text-left">Deductions</th>
+              <th className="w-[20%] p-2.5 text-right">Amount</th>
             </tr>
           </thead>
           <tbody>
             {Array.from({ length: maxRows }).map((_, index) => {
               const earning = earnings[index];
               const deduction = deductions[index];
+              const isLast = index === maxRows - 1;
 
               return (
-                <tr key={index} className="border-b border-black/80 last:border-b-0">
-                  <td className="border-r border-black px-2 py-1.5 font-medium">{earning?.label ?? ""}</td>
-                  <td className="border-r border-black px-2 py-1.5 text-right font-medium tabular-nums">
+                <tr
+                  key={index}
+                  className={isLast ? "border-b border-black" : "border-b border-black/70"}
+                >
+                  <td className="border-r border-black px-2.5 py-2 font-medium">
+                    {earning?.label ?? ""}
+                  </td>
+                  <td className="border-r border-black px-2.5 py-2 text-right font-medium tabular-nums">
                     {earning ? formatAmount2(earning.amount) : ""}
                   </td>
-                  <td className="border-r border-black px-2 py-1.5 text-right font-medium tabular-nums">
-                    {earning ? formatAmount2(earning.amount) : ""}
+                  <td className="border-r border-black px-2.5 py-2 font-medium">
+                    {deduction?.label ?? ""}
                   </td>
-                  <td className="border-r border-black px-2 py-1.5 font-medium">{deduction?.label ?? ""}</td>
-                  <td className="px-2 py-1.5 text-right font-medium tabular-nums">
+                  <td className="px-2.5 py-2 text-right font-medium tabular-nums">
                     {deduction ? formatAmount2(deduction.amount) : ""}
                   </td>
                 </tr>
               );
             })}
 
-            {/* Total Row */}
-            <tr className="border-t-2 border-b border-black font-bold">
-              <td className="border-r border-black p-2 text-right font-bold">Amount Total :</td>
-              <td className="border-r border-black p-2 text-right tabular-nums">{formatAmount2(totalEarnings)}</td>
-              <td className="border-r border-black p-2 text-right tabular-nums">{formatAmount2(totalEarnings)}</td>
-              <td className="border-r border-black p-2 text-right font-bold">Amount Total :</td>
-              <td className="p-2 text-right tabular-nums">{formatAmount2(totalDeductions)}</td>
+            <tr className="border-b border-black font-bold">
+              <td className="border-r border-black p-2.5 font-bold">Total Earnings</td>
+              <td className="border-r border-black p-2.5 text-right tabular-nums">
+                {formatAmount2(totalEarnings)}
+              </td>
+              <td className="border-r border-black p-2.5 font-bold">Total Deductions</td>
+              <td className="p-2.5 text-right tabular-nums">
+                {formatAmount2(totalDeductions)}
+              </td>
             </tr>
           </tbody>
         </table>
 
-        {/* Section 4: Net Pay Row */}
         <table className="w-full table-fixed border-collapse">
           <tbody>
             <tr className="border-b border-black">
-              <td className="w-[54%] border-r border-black p-2"></td>
-              <td className="w-[26%] border-r border-black p-2 text-right font-bold uppercase">Net Pay :</td>
-              <td className="w-[20%] p-2 text-right font-bold tabular-nums">
+              <td className="w-[50%] border-r border-black p-2.5" />
+              <td className="w-[30%] border-r border-black p-2.5 text-right text-sm font-bold uppercase tracking-wide">
+                Net Pay
+              </td>
+              <td className="w-[20%] p-2.5 text-right text-sm font-bold tabular-nums">
                 {formatAmountIndian(netPay)}
               </td>
             </tr>
             <tr>
-              <td colSpan={3} className="p-2 font-bold leading-relaxed">
+              <td colSpan={3} className="p-2.5 font-bold leading-relaxed">
                 Net Pay: {amountToIndianWords(netPay)}
               </td>
             </tr>
@@ -278,9 +293,9 @@ export function PayslipTemplate({
         </table>
       </div>
 
-      {/* Note footer */}
       <div className="mt-6 text-center text-[11px] font-medium text-neutral-800">
-        Note :- This is an electronically generated statement hence does not require any signature.
+        Note :- This is an electronically generated statement hence does not require any
+        signature.
       </div>
     </article>
   );
