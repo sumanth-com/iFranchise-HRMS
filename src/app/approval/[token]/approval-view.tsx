@@ -39,6 +39,7 @@ type ApprovalViewProps = {
   initialAction: "approve" | "reject";
   state: ApprovalViewState;
   initialOutcome?: ProcessOutcome;
+  initialRejectionReason?: string | null;
 };
 
 function isLeaveSummary(summary: ApprovalRequestSummary | undefined): boolean {
@@ -285,11 +286,14 @@ export function ApprovalView({
   initialAction,
   state,
   initialOutcome,
+  initialRejectionReason = null,
 }: ApprovalViewProps) {
   const [cancelled, setCancelled] = useState(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [rejectionReason, setRejectionReason] = useState<string | null>(null);
+  const [rejectionReason, setRejectionReason] = useState<string | null>(
+    initialRejectionReason,
+  );
   const [outcome, setOutcome] = useState<ProcessOutcome | null>(initialOutcome ?? null);
   const [isPending, startTransition] = useTransition();
 
@@ -300,6 +304,22 @@ export function ApprovalView({
         token,
         action: "approve",
       });
+      setOutcome(result);
+    });
+  }
+
+  function retryRejectLeave() {
+    setError(null);
+    startTransition(async () => {
+      const result = await submitEmailApprovalAction({
+        token,
+        action: "reject",
+      });
+      if (result.status === "error") {
+        setError(result.message);
+        return;
+      }
+      setRejectionReason(initialRejectionReason ?? "Rejected via email approval");
       setOutcome(result);
     });
   }
@@ -344,6 +364,9 @@ export function ApprovalView({
     if (outcome.status === "error" && initialAction === "approve") {
       return <ResultScreen outcome={outcome} onRetry={retryApprove} />;
     }
+    if (outcome.status === "error" && initialAction === "reject" && state.leaveHighlight) {
+      return <ResultScreen outcome={outcome} onRetry={retryRejectLeave} />;
+    }
     if (outcome.status !== "error") {
       return <ResultScreen outcome={outcome} rejectionReason={rejectionReason} />;
     }
@@ -359,10 +382,10 @@ export function ApprovalView({
     );
   }
 
-  // Reject path: simple confirmation only (reason required by existing workflow).
+  // Non-leave reject path (kept for future modules): confirmation + reason.
   if (initialAction === "reject") {
     return (
-      <Shell heading="Reject this leave request?" subheading={state.heading}>
+      <Shell heading="Reject this request?" subheading={state.heading}>
         <div className="space-y-4">
           <div className="rounded-2xl border border-[#e5e7eb] bg-[#f8fafc] px-4 py-3">
             <p className="text-sm font-semibold text-slate-900">{state.employeeName}</p>
@@ -382,7 +405,7 @@ export function ApprovalView({
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               rows={3}
-              placeholder="Briefly explain why this leave is being rejected…"
+              placeholder="Briefly explain why this request is being rejected…"
               disabled={isPending}
               className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
             />

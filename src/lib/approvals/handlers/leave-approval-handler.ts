@@ -196,15 +196,21 @@ export const leaveApprovalHandler: ApprovalHandler = {
       approval_status: string;
     };
 
+    // Email HR, CEO, and Co-founder (all pending steps) so each can Accept/Reject
+    // from email without waiting for portal. Deduplicate by employee.
     const rows = data as LeaveApprovalRow[];
-    const activeLevel = rows[0].approval_level;
-    return rows
-      .filter((row) => row.approval_level === activeLevel)
-      .map((row) => ({
+    const seen = new Set<string>();
+    const pending: PendingApprover[] = [];
+    for (const row of rows) {
+      if (!row.approver_employee_id || seen.has(row.approver_employee_id)) continue;
+      seen.add(row.approver_employee_id);
+      pending.push({
         employeeId: row.approver_employee_id,
         approvalRecordId: row.id,
         level: row.approval_level,
-      }));
+      });
+    }
+    return pending;
   },
 
   async approve(admin, profile: UserProfile, sourceRecordId, comments) {

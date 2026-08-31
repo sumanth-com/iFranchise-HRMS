@@ -282,7 +282,7 @@ export function EmployeeDetailView({
             ) : (
             <div className="overflow-hidden rounded-xl border bg-card">
               <OverviewSectionTitle>Employment & contact</OverviewSectionTitle>
-              <OverviewInfoRow label="Employee code" value={employee.employeeCode} />
+              <OverviewInfoRow label="Employee ID" value={employee.employeeCode} />
               <OverviewInfoRow
                 label="Company email"
                 value={employee.email}

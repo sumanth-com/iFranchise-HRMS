@@ -3,6 +3,7 @@ import { loadApproverIdentity } from "@/lib/approvals/approver-identity";
 import { approvalActionUrl, getApprovalTokenTtlHours } from "@/lib/approvals/constants";
 import {
   assertLeaveApprovalEmailHtml,
+  LEAVE_EMAIL_DEFAULT_REJECTION_REASON,
   renderApprovalRequestEmail,
   renderApproverConfirmationEmail,
   renderEmployeeDecisionEmail,
@@ -270,6 +271,24 @@ export async function processEmailApproval(params: {
   }
 
   if (action === "reject" && (!reason || reason.length < 3)) {
+    // Leave email Reject Leave is one-click (no portal / form required).
+    if (found.request_type === "leave") {
+      // fall through with default reason below
+    } else {
+      return { status: "error", message: "Please provide a reason for the rejection." };
+    }
+  }
+
+  const effectiveReason =
+    action === "reject"
+      ? reason && reason.length >= 3
+        ? reason
+        : found.request_type === "leave"
+          ? LEAVE_EMAIL_DEFAULT_REJECTION_REASON
+          : ""
+      : undefined;
+
+  if (action === "reject" && (!effectiveReason || effectiveReason.length < 3)) {
     return { status: "error", message: "Please provide a reason for the rejection." };
   }
 
@@ -321,7 +340,7 @@ export async function processEmailApproval(params: {
     if (action === "approve") {
       await handler.approve(client, identity.profile, found.source_record_id);
     } else {
-      await handler.reject(client, identity.profile, found.source_record_id, reason!);
+      await handler.reject(client, identity.profile, found.source_record_id, effectiveReason!);
     }
   } catch (error) {
     await releaseApprovalToken(client, found.id);
@@ -366,7 +385,7 @@ export async function processEmailApproval(params: {
     priority: action === "approve" ? "medium" : "high",
     ipAddress: ctx.ip ?? undefined,
     userAgent: ctx.userAgent ?? undefined,
-    reason: action === "reject" ? reason : undefined,
+    reason: action === "reject" ? effectiveReason : undefined,
     metadata: { approverEmployeeId: found.approver_employee_id, method: "email" },
   });
 
@@ -395,7 +414,7 @@ export async function processEmailApproval(params: {
         decision: action,
         employeeName: recipient.name,
         summary: afterSummary,
-        reason: action === "reject" ? reason : null,
+        reason: action === "reject" ? effectiveReason : null,
       });
       await sendApprovalMail(
         recipient.email,

@@ -25,6 +25,9 @@ const FORBIDDEN_LEAVE_EMAIL_ACTIONS = [
   "Login to HRMS",
 ] as const;
 
+/** Default rejection note when leave is rejected from the email one-click flow. */
+export const LEAVE_EMAIL_DEFAULT_REJECTION_REASON = "Rejected via email approval";
+
 /**
  * Hard guard: leave approval HTML must never include portal/third CTAs.
  * Throws so a bad template cannot be dispatched.
@@ -40,16 +43,16 @@ export function assertLeaveApprovalEmailHtml(html: string): void {
     }
   }
 
-  const hasApprove = />(?:\s|&nbsp;)*Approve(?:\s|&nbsp;)*</i.test(html);
-  const hasReject = />(?:\s|&nbsp;)*Reject(?:\s|&nbsp;)*</i.test(html);
-  if (!hasApprove || !hasReject) {
+  const hasAccept = />(?:\s|&nbsp;)*Accept Leave(?:\s|&nbsp;)*</i.test(html);
+  const hasReject = />(?:\s|&nbsp;)*Reject Leave(?:\s|&nbsp;)*</i.test(html);
+  if (!hasAccept || !hasReject) {
     const message =
-      "[leave-approval-email] Generated HTML must include both Approve and Reject action buttons";
+      "[leave-approval-email] Generated HTML must include both Accept Leave and Reject Leave action buttons";
     console.error(message);
     throw new Error(message);
   }
 
-  // Exactly two primary action buttons (approve + reject variants).
+  // Exactly two primary action buttons (accept + reject variants).
   const actionButtonCount = (html.match(/class="email-btn"/g) ?? []).length;
   if (actionButtonCount !== 2) {
     const message = `[leave-approval-email] Expected exactly 2 action buttons, found ${actionButtonCount}`;
@@ -59,14 +62,14 @@ export function assertLeaveApprovalEmailHtml(html: string): void {
 
   if (process.env.NODE_ENV === "development") {
     console.info(
-      "[leave-approval-email] OK: HTML contains Approve + Reject only (no View Details)",
+      "[leave-approval-email] OK: HTML contains Accept Leave + Reject Leave only (no View Details)",
     );
   }
 }
 
 /**
  * Leave-only approval request email.
- * Actions are hard-coded to Approve + Reject — no viewUrl / portal CTA params exist.
+ * Actions are hard-coded to Accept Leave + Reject Leave — no viewUrl / portal CTA params exist.
  */
 export function renderLeaveApprovalRequestEmail(params: {
   summary: ApprovalRequestSummary;
@@ -93,13 +96,13 @@ export function renderLeaveApprovalRequestEmail(params: {
   const content = `
     ${renderParagraph(`Hello ${approverName || "there"},`)}
     ${renderParagraph(
-      `A leave request is awaiting your approval. Review the details below, then approve or reject.`,
+      `A leave request is awaiting your decision. Review the details below, then accept or reject.`,
     )}
     ${renderDetailTable(detailRows)}
     ${reasonNote}
     ${renderEmailButtons([
-      { label: "Approve", href: approveUrl, variant: "approve" },
-      { label: "Reject", href: rejectUrl, variant: "reject" },
+      { label: "Accept Leave", href: approveUrl, variant: "approve" },
+      { label: "Reject Leave", href: rejectUrl, variant: "reject" },
     ])}
     ${renderNote(
       `This is a secure, single-use link that expires in ${expiresInHours} hours. If you did not expect this email, you can safely ignore it.`,

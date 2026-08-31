@@ -2,6 +2,7 @@ import {
   previewEmailApproval,
   processEmailApproval,
 } from "@/lib/approvals/email-approval-service";
+import { LEAVE_EMAIL_DEFAULT_REJECTION_REASON } from "@/lib/approvals/email-templates";
 import { ApprovalView, type ApprovalViewState } from "@/app/approval/[token]/approval-view";
 import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
 import type { ProcessOutcome } from "@/lib/approvals/types";
@@ -21,12 +22,28 @@ export default async function ApprovalPage({ params, searchParams }: PageProps) 
   const initialAction: "approve" | "reject" = action === "reject" ? "reject" : "approve";
   const preview = await previewEmailApproval(token);
 
+  const isLeave =
+    preview.status === "ready"
+      ? Boolean(preview.summary.leaveHighlight) ||
+        preview.summary.heading.startsWith("Leave request")
+      : preview.status === "already_processed"
+        ? Boolean(preview.summary?.leaveHighlight) ||
+          (preview.summary?.heading.startsWith("Leave request") ?? false)
+        : false;
+
   let initialOutcome: ProcessOutcome | undefined;
-  if (initialAction === "approve" && preview.status === "ready") {
+  let rejectionReason: string | null = null;
+
+  // Leave Accept/Reject is one-click from email — no portal login or extra form.
+  if (preview.status === "ready" && (initialAction === "approve" || isLeave)) {
     const ctx = await getRequestAuditContext();
+    if (initialAction === "reject" && isLeave) {
+      rejectionReason = LEAVE_EMAIL_DEFAULT_REJECTION_REASON;
+    }
     initialOutcome = await processEmailApproval({
       rawToken: token,
-      action: "approve",
+      action: initialAction,
+      reason: initialAction === "reject" ? LEAVE_EMAIL_DEFAULT_REJECTION_REASON : undefined,
       context: { ip: ctx.ipAddress, userAgent: ctx.userAgent },
     });
   }
@@ -51,9 +68,6 @@ export default async function ApprovalPage({ params, searchParams }: PageProps) 
       message: preview.message,
     };
   } else if (preview.status === "already_processed") {
-    const isLeave =
-      Boolean(preview.summary?.leaveHighlight) ||
-      (preview.summary?.heading.startsWith("Leave request") ?? false);
     state = {
       kind: "error",
       tone: "done",
@@ -75,6 +89,7 @@ export default async function ApprovalPage({ params, searchParams }: PageProps) 
       initialAction={initialAction}
       state={state}
       initialOutcome={initialOutcome}
+      initialRejectionReason={rejectionReason}
     />
   );
 }
