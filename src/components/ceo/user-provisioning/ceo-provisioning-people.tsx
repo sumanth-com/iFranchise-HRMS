@@ -231,7 +231,17 @@ function PersonCard({
               </span>
             ) : null}
           </p>
-          <p className="truncate text-xs text-muted-foreground">{user.roleLabel}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {user.roleLabel}
+            {user.employeeCode ? (
+              <>
+                <span className="mx-1 text-muted-foreground/40">·</span>
+                <span className="font-mono text-[11px] font-medium text-foreground/80">
+                  {user.employeeCode}
+                </span>
+              </>
+            ) : null}
+          </p>
           <div className="mt-1.5">
             <CeoProvisioningStatusBadge status={user.invitationStatus} />
           </div>

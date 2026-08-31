@@ -2,7 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
  * Allocates the next unused employee code for an organization.
- * Scans all active codes and increments the highest trailing numeric suffix.
+ * Format: IF{year}{3-digit sequence}, e.g. IF2026023.
  */
 export async function allocateNextEmployeeCode(
   organizationId: string,
@@ -21,23 +21,26 @@ export async function allocateNextEmployeeCode(
     (data ?? []).map((row) => String(row.employee_code).trim()),
   );
 
-  let maxSuffix = 0;
+  const year = new Date().getFullYear();
+  const prefix = `IF${year}`;
+  const yearPattern = new RegExp(`^${prefix}(\\d{3})$`);
+
+  let maxSeq = 0;
   for (const code of existingCodes) {
-    const match = code.match(/(\d+)$/);
+    const match = code.match(yearPattern);
     if (!match) continue;
     const value = Number.parseInt(match[1], 10);
     if (!Number.isNaN(value)) {
-      maxSuffix = Math.max(maxSuffix, value);
+      maxSeq = Math.max(maxSeq, value);
     }
   }
 
   for (let offset = 1; offset <= 500; offset++) {
-    const candidate = `EMP-${maxSuffix + offset}`;
+    const candidate = `${prefix}${String(maxSeq + offset).padStart(3, "0")}`;
     if (!existingCodes.has(candidate)) {
       return candidate;
     }
   }
 
-  // Last-resort unique code if the numeric range is unexpectedly dense.
-  return `EMP-${Date.now()}`;
+  return `${prefix}${String(Date.now()).slice(-3)}`;
 }

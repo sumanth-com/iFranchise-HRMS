@@ -15,10 +15,7 @@ import {
 import { EmployeeCardsGrid } from "@/components/employees/employee-cards-grid";
 import { EmployeeDeleteConfirmDialog } from "@/components/employees/employee-delete-confirm-dialog";
 import { deleteEmployeeAction, fetchEmployeesAction } from "@/lib/employees/actions";
-import {
-  EMPLOYMENT_STATUS_LABELS,
-  resolveEmployeeModuleRoutes,
-} from "@/lib/employees/constants";
+import { resolveEmployeeModuleRoutes } from "@/lib/employees/constants";
 import type {
   EmployeeListItem,
   EmployeeListParams,
@@ -132,7 +129,7 @@ export function EmployeeTable({
   }, [searchInput, filters.search, updateParams]);
 
   const { employees, total, page, pageSize } = tableState;
-  const { department, employmentStatus } = filters;
+  const { department } = filters;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const departmentItems = useMemo(
@@ -146,19 +143,6 @@ export function EmployeeTable({
         })),
     ],
     [departments],
-  );
-
-  const employmentStatusItems = useMemo(
-    () => [
-      { value: "", label: "All statuses" },
-      ...Object.entries(EMPLOYMENT_STATUS_LABELS)
-        .filter(([value]) => value !== "on_leave")
-        .map(([value, label]) => ({
-          value,
-          label,
-        })),
-    ],
-    [],
   );
 
   const handleDelete = () => {
@@ -228,27 +212,6 @@ export function EmployeeTable({
                   key={item.value || "all-departments"}
                   value={item.value}
                 >
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            items={employmentStatusItems}
-            value={employmentStatus ?? ""}
-            onValueChange={(value) =>
-              updateParams({
-                employmentStatus: value || undefined,
-                page: "1",
-              })
-            }
-          >
-            <SelectTrigger className="h-8 w-full min-w-0 sm:w-44">
-              <SelectValue placeholder="All statuses" />
-            </SelectTrigger>
-            <SelectContent align="start" alignItemWithTrigger={false}>
-              {employmentStatusItems.map((item) => (
-                <SelectItem key={item.value || "all-statuses"} value={item.value}>
                   {item.label}
                 </SelectItem>
               ))}

@@ -200,12 +200,13 @@ export function MyProfileView({
             aria-hidden
           />
 
-          <div className="relative z-[1] flex items-start justify-between gap-3 px-4 py-5 sm:px-6 sm:py-6">
-            <div className="min-w-0 flex-1 pr-2 sm:pr-4">
+          <div className="relative z-[1] grid min-h-[7.5rem] grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-5 sm:min-h-[8.25rem] sm:px-6 sm:py-6">
+            <div aria-hidden className="min-w-0" />
+            <div className="flex min-w-0 max-w-[min(100%,36rem)] flex-col items-center text-center">
               <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-white/75">
                 My profile
               </p>
-              <h1 className="mt-1.5 truncate text-2xl font-semibold tracking-tight text-white sm:text-[1.7rem]">
+              <h1 className="mt-1.5 max-w-full truncate text-2xl font-semibold tracking-tight text-white sm:text-[1.7rem]">
                 {displayName}
               </h1>
               <p className="mt-1.5 inline-flex max-w-full items-center rounded-full bg-white/15 px-2.5 py-0.5 text-sm text-white/95 ring-1 ring-white/20 backdrop-blur-sm">
@@ -213,7 +214,7 @@ export function MyProfileView({
               </p>
             </div>
 
-            <div className="shrink-0">
+            <div className="flex min-w-0 items-center justify-end">
               {isEditing ? (
                 <div className="flex items-center gap-2">
                   <Button
