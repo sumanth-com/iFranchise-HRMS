@@ -157,7 +157,7 @@ export function EmployeeDirectoryView({
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col px-4 pt-4 md:px-5 md:pt-5">
-          <div className="z-20 shrink-0 bg-background pb-5">{toolbar}</div>
+          <div className="z-20 shrink-0 pb-5">{toolbar}</div>
           <div className="min-h-0 flex-1 overflow-y-auto pb-4 md:pb-5">{results}</div>
         </div>
       </div>

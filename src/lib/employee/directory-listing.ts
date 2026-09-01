@@ -1,4 +1,8 @@
-const DIRECTORY_HIDDEN_EMPLOYEE_CODES = new Set(["IF2026000", "IF-MGR-001"]);
+const DIRECTORY_HIDDEN_EMPLOYEE_CODES = new Set([
+  "IF2026000",
+  "IF-MGR-001",
+  "IF2026016",
+]);
 
 export const DIRECTORY_INCLUDED_EMPLOYEE_CODES = ["IF2026009", "IF-PENDING-SA"] as const;
 export const DIRECTORY_INCLUDED_EMPLOYEE_EMAILS = ["sumanth.reddy@ifranchise.in"] as const;
@@ -50,8 +54,24 @@ export function normalizeEmployeeCode(code: string | null | undefined): string {
   return (code ?? "").trim().toUpperCase();
 }
 
-export function isHiddenFromEmployeeDirectory(employeeCode: string | null | undefined): boolean {
-  return DIRECTORY_HIDDEN_EMPLOYEE_CODES.has(normalizeEmployeeCode(employeeCode));
+export function isHiddenFromEmployeeDirectory(
+  employeeCode: string | null | undefined,
+  person?: DirectoryPersonName,
+): boolean {
+  if (DIRECTORY_HIDDEN_EMPLOYEE_CODES.has(normalizeEmployeeCode(employeeCode))) {
+    return true;
+  }
+
+  const fullName = directoryFullName(person);
+  if (!fullName) return false;
+
+  const isGore = fullName.includes("gore");
+  const isAbhisek =
+    fullName.includes("abhisek") ||
+    fullName.includes("abhishake") ||
+    fullName.includes("abhishek");
+
+  return isGore && isAbhisek;
 }
 
 export function directoryDesignationDisplay(

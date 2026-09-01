@@ -132,9 +132,7 @@ export async function listEmployeeDirectory(
       return !["terminated", "resigned", "suspended"].includes(status);
     });
 
-    rows = mergeDirectoryRows(rows, extraRows).filter(
-      (row) => !isHiddenFromEmployeeDirectory(row.employee_code as string),
-    );
+    rows = mergeDirectoryRows(rows, extraRows);
 
     rows.sort((a, b) => {
       const first = String(a.first_name ?? "").localeCompare(String(b.first_name ?? ""));
@@ -142,6 +140,15 @@ export async function listEmployeeDirectory(
       return String(a.last_name ?? "").localeCompare(String(b.last_name ?? ""));
     });
   }
+
+  rows = rows.filter(
+    (row) =>
+      !isHiddenFromEmployeeDirectory(row.employee_code as string, {
+        employeeCode: row.employee_code as string,
+        firstName: row.first_name as string,
+        lastName: row.last_name as string,
+      }),
+  );
 
   const imagePaths = rows.map((row) => {
     const employeeProfile = unwrapRelation(row.employee_profiles) as {

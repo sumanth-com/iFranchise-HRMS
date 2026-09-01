@@ -150,9 +150,9 @@ html:not(.dark) .app-shell-sidebar {
 }
 
 html:not(.dark) .app-shell-topnav {
-  background-color: color-mix(in oklch, var(--card) 92%, var(--background));
-  border-bottom-color: color-mix(in oklch, var(--border) 88%, transparent);
-  backdrop-filter: blur(8px);
+  background-color: color-mix(in oklch, var(--card) 62%, transparent);
+  border-bottom-color: color-mix(in oklch, var(--border) 55%, transparent);
+  backdrop-filter: blur(14px);
 }
 
 /*
