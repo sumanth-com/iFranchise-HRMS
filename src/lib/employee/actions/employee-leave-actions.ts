@@ -4,8 +4,11 @@ import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import {
   getEmployeeLeaveBalanceSnapshot,
   getEmployeeLeaveCalendarData,
+  listEmployeeOptionalHolidaySelections,
   listEmployeeOwnLeaveRequests,
+  listOrganizationOptionalHolidays,
 } from "@/lib/leave/services/leave-queries";
+import { optionalHolidaysForList } from "@/lib/leave/optional-holiday";
 import type { LeaveCalendarContext } from "@/lib/leave/services/leave-calendar-engine";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -88,4 +91,15 @@ export async function getEmployeeLeaveSelfServiceMonthAction(
     calendar: calendar.calendar,
     requests,
   };
+}
+
+export async function getEmployeeOptionalHolidayChoicesAction(year: number) {
+  const profile = await requireLeaveSelfServiceProfile();
+  parseCalendarMonthYear(1, year);
+  const supabase = await createClient();
+  const [holidays, taken] = await Promise.all([
+    listOrganizationOptionalHolidays(supabase, profile.employee.organizationId, year),
+    listEmployeeOptionalHolidaySelections(supabase, profile.employee.id, year),
+  ]);
+  return optionalHolidaysForList(holidays, taken);
 }

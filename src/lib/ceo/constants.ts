@@ -2,6 +2,7 @@ export const CEO_ROUTES = {
   home: "/ceo",
   organization: "/ceo/organization",
   organizationProfile: "/ceo/organization/profile",
+  organizationAnnouncements: "/ceo/organization/announcements",
   recruitment: "/ceo/recruitment",
   recruitmentJobs: "/ceo/recruitment/jobs",
   performance: "/ceo/performance",

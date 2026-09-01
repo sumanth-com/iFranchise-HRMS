@@ -102,12 +102,15 @@ type EmployeeDirectoryCardProps = {
   onViewProfile?: (employeeId: string) => void;
   /** When true, footer shows "View profile" instead of expand/collapse. */
   directProfileLink?: boolean;
+  /** When false, the closed card shows designation only (no employee ID). */
+  showEmployeeCodeOnFace?: boolean;
 };
 
 export function EmployeeDirectoryCard({
   person,
   onViewProfile,
   directProfileLink = false,
+  showEmployeeCodeOnFace = true,
 }: EmployeeDirectoryCardProps) {
   const [open, setOpen] = useState(false);
   const showExpand = !directProfileLink;
@@ -130,8 +133,12 @@ export function EmployeeDirectoryCard({
         </h3>
         <p className="line-clamp-2 text-xs leading-snug text-muted-foreground">
           {person.designationTitle || "Team Member"}
-          <span className="mx-1.5 text-muted-foreground/40">·</span>
-          <span className="font-mono text-[11px] font-medium">{person.employeeCode}</span>
+          {showEmployeeCodeOnFace ? (
+            <>
+              <span className="mx-1.5 text-muted-foreground/40">·</span>
+              <span className="font-mono text-[11px] font-medium">{person.employeeCode}</span>
+            </>
+          ) : null}
         </p>
       </div>
 
@@ -237,11 +244,13 @@ export function EmployeeDirectoryGrid({
   people,
   onViewProfile,
   directProfileLink = false,
+  showEmployeeCodeOnFace = true,
   className,
 }: {
   people: DirectoryCardPerson[];
   onViewProfile?: (employeeId: string) => void;
   directProfileLink?: boolean;
+  showEmployeeCodeOnFace?: boolean;
   className?: string;
 }) {
   return (
@@ -257,6 +266,7 @@ export function EmployeeDirectoryGrid({
           person={person}
           onViewProfile={onViewProfile}
           directProfileLink={directProfileLink}
+          showEmployeeCodeOnFace={showEmployeeCodeOnFace}
         />
       ))}
     </div>

@@ -15,7 +15,15 @@ async function EmployeeDashboardContent() {
   const supabase = await createClient();
   const data = await getEmployeeDashboardData(supabase, profile);
 
-  return <EmployeeDashboardView {...data} subtitle="Employee Portal" />;
+  return (
+    <EmployeeDashboardView
+      {...data}
+      canManageAnnouncements={false}
+      subtitle="Employee Portal"
+      pairHolidayBirthday
+      showImportantNotices
+    />
+  );
 }
 
 export default function EmployeeDashboardPage() {

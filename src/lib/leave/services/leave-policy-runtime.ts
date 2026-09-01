@@ -30,6 +30,13 @@ import {
   isMonthlyAccrualLeaveCode,
   MONTHLY_ACCRUAL_DAYS_PER_MONTH,
 } from "@/lib/leave/services/leave-monthly-accrual";
+import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
+import {
+  OPTIONAL_HOLIDAY_CODE,
+  OPTIONAL_HOLIDAY_YEARLY_LIMIT,
+  remainingOptionalHolidayEntitlement,
+  upcomingOptionalHolidays,
+} from "@/lib/leave/optional-holiday";
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
 
 export type LeaveTypePolicyRow = {
@@ -397,6 +404,71 @@ export async function evaluateLeaveApplication(
     );
   }
 
+  if (code === OPTIONAL_HOLIDAY_CODE) {
+    if (input.isHalfDay) {
+      throw new Error("Optional Holiday is a full day. Choose a date from the Optional Holiday list.");
+    }
+    if (input.startDate !== input.endDate) {
+      throw new Error("Select one Optional Holiday date.");
+    }
+    const today = getTodayDateString();
+    if (input.startDate < today) {
+      throw new Error("This Optional Holiday date has already passed.");
+    }
+    const year = getCurrentBalanceYear(input.startDate);
+    const { data: holidayRows, error: holidayError } = await supabase
+      .schema("hrms")
+      .from("holidays")
+      .select("holiday_date")
+      .eq("organization_id", organizationId)
+      .eq("is_optional", true)
+      .eq("status", "active")
+      .gte("holiday_date", `${year}-01-01`)
+      .lte("holiday_date", `${year}-12-31`)
+      .is("deleted_at", null);
+    if (holidayError) throw new Error(holidayError.message);
+    const configured = (holidayRows ?? []).map((row) => String(row.holiday_date).slice(0, 10));
+    if (!configured.includes(input.startDate)) {
+      throw new Error("This date is not on the company's Optional Holiday list.");
+    }
+    const { data: ohRequests, error: ohError } = await supabase
+      .schema("hrms")
+      .from("leave_requests")
+      .select("id, start_date, leave_types:leave_type_id (code)")
+      .eq("employee_id", input.employeeId)
+      .in("leave_status", ["pending", "approved"])
+      .is("deleted_at", null);
+    if (ohError) throw new Error(ohError.message);
+    const takenDates = new Set<string>();
+    for (const row of ohRequests ?? []) {
+      if (input.excludeRequestId && row.id === input.excludeRequestId) continue;
+      const leaveType = Array.isArray(row.leave_types) ? row.leave_types[0] : row.leave_types;
+      if (String(leaveType?.code ?? "").toUpperCase() !== OPTIONAL_HOLIDAY_CODE) continue;
+      const date = String(row.start_date).slice(0, 10);
+      if (date.slice(0, 4) !== String(year)) continue;
+      takenDates.add(date);
+    }
+    if (takenDates.has(input.startDate)) {
+      throw new Error("You have already applied for this Optional Holiday.");
+    }
+    const yearlyLimit = Math.max(Number(leaveType.daysPerYear ?? 0), OPTIONAL_HOLIDAY_YEARLY_LIMIT);
+    const upcomingAvailable = upcomingOptionalHolidays(
+      configured.map((date) => ({ id: date, name: date, date })),
+      today,
+    ).filter((holiday) => !takenDates.has(holiday.date)).length;
+    availableBalance = remainingOptionalHolidayEntitlement({
+      yearlyLimit,
+      usedOrPending: takenDates.size,
+      upcomingAvailableDates: upcomingAvailable,
+    });
+    if (availableBalance < 1) {
+      throw new Error("You have used your Optional Holiday entitlement for this year.");
+    }
+    if (duration.totalLeaveDays <= 0) {
+      throw new Error("This Optional Holiday falls on a weekly holiday, so it cannot be applied.");
+    }
+  }
+
   const issues = validateLeavePolicy({
     startDate: input.startDate,
     endDate: input.endDate,
@@ -411,7 +483,7 @@ export async function evaluateLeaveApplication(
     allowHalfDay: runtime.allowHalfDay,
     maxConsecutiveDays: runtime.maxConsecutiveDays,
     overlapping,
-    skipNotice: input.skipNotice,
+    skipNotice: input.skipNotice || code === OPTIONAL_HOLIDAY_CODE,
   });
 
   const blockingIssues = issues.filter(isBlockingLeaveIssue);
@@ -419,11 +491,14 @@ export async function evaluateLeaveApplication(
     throw new Error(blockingIssues[0].message);
   }
 
-  const split = splitLeaveDaysByBalance({
-    totalDays: duration.totalLeaveDays,
-    availableBalance,
-    isPaid: leaveType.isPaid,
-  });
+  const split =
+    code === OPTIONAL_HOLIDAY_CODE
+      ? { paidDays: duration.totalLeaveDays, lopDays: 0 }
+      : splitLeaveDaysByBalance({
+          totalDays: duration.totalLeaveDays,
+          availableBalance,
+          isPaid: leaveType.isPaid,
+        });
 
   return {
     runtime,

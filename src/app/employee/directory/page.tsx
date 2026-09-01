@@ -12,9 +12,11 @@ export default async function EmployeeDirectoryPage() {
   ]);
   const supabase = await createClient();
   const [people, departments] = await Promise.all([
-    listEmployeeDirectory(supabase, profile),
+    listEmployeeDirectory(supabase, profile, { employeePortalListing: true }),
     getDepartments(supabase, profile.employee.organizationId),
   ]);
 
-  return <EmployeeDirectoryView people={people} departments={departments} />;
+  return (
+    <EmployeeDirectoryView people={people} departments={departments} stickyToolbar />
+  );
 }

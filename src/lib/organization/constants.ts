@@ -14,6 +14,7 @@ export const ORGANIZATION_ROUTES = {
   employmentTypes: "/dashboard/organization/employment-types",
   workLocations: "/dashboard/organization/work-locations",
   holidays: "/dashboard/organization/holidays",
+  announcements: "/dashboard/organization/announcements",
   shifts: "/dashboard/organization/shifts",
   hierarchy: "/dashboard/organization/hierarchy",
 } as const;
@@ -27,6 +28,7 @@ export type OrganizationModuleRoutes = {
   employmentTypes: string;
   workLocations: string;
   holidays: string;
+  announcements: string;
   shifts: string;
   hierarchy: string;
 };
@@ -43,6 +45,7 @@ export function buildOrganizationRoutes(basePath: string): OrganizationModuleRou
     employmentTypes: `${base}/employment-types`,
     workLocations: `${base}/work-locations`,
     holidays: `${base}/holidays`,
+    announcements: `${base}/announcements`,
     shifts: `${base}/shifts`,
     hierarchy: `${base}/hierarchy`,
   };
@@ -54,6 +57,7 @@ export const ORGANIZATION_SUB_NAV = [
   { title: "Departments", href: ORGANIZATION_ROUTES.departments },
   { title: "Designations", href: ORGANIZATION_ROUTES.designations },
   { title: "Holidays", href: ORGANIZATION_ROUTES.holidays },
+  { title: "Announcements", href: ORGANIZATION_ROUTES.announcements },
 ] as const;
 
 /** Focused master-data nav for Super Admin — not a full HR config dump. */

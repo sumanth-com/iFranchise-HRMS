@@ -1,4 +1,4 @@
-import { OneOnOneTable } from "@/components/performance/one-on-one-management";
+import { OneOnOneForm, OneOnOneTable } from "@/components/performance/one-on-one-management";
 import { requireCeoPortal } from "@/lib/ceo/read-only-permissions";
 import {
   PERFORMANCE_CLIENT_FETCH_SIZE,
@@ -27,15 +27,16 @@ export default async function CeoOneOnOnesPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">One-on-One Meetings</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          View meeting agendas, links, and action items.
+          Schedule meetings with agenda, meeting link, and action items.
         </p>
       </div>
+      <OneOnOneForm employees={lookups.employees} />
       <OneOnOneTable
         records={result.data}
         pageSize={PERFORMANCE_TABLE_PAGE_SIZE}
         employees={lookups.employees}
-        canEdit={false}
-        canDelete={false}
+        canEdit
+        canDelete
       />
     </div>
   );

@@ -5,7 +5,6 @@ import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { canManageDashboardAnnouncements } from "@/lib/dashboard/dashboard-announcement-permissions";
 import { listPublishedDashboardAnnouncements } from "@/lib/dashboard/services/dashboard-announcement-queries";
 import { canUpdateOwnCheckout } from "@/lib/attendance/self-checkout-permissions";
-import { LEAVE_BALANCE_CARD_CODES } from "@/lib/leave/constants";
 import { ensureEmployeeMonthlyLeaveAccruals } from "@/lib/leave/services/leave-monthly-accrual";
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
 import { roundLeaveDays } from "@/lib/leave/services/leave-usage";
@@ -19,8 +18,8 @@ import type {
 } from "@/types/employee-dashboard";
 import type { ManagerTodayAttendance } from "@/types/manager-self-attendance";
 
-/** Match Leave page cards: Casual + Earned available balance only. */
-const DASHBOARD_LEAVE_BALANCE_CODES = new Set<string>(LEAVE_BALANCE_CARD_CODES);
+/** Dashboard KPI: Casual + Earned remaining only (not Optional Holiday). */
+const DASHBOARD_LEAVE_BALANCE_CODES = new Set<string>(["CL", "EL"]);
 
 /** Runs a widget query but never lets one failing panel break the whole dashboard. */
 async function safe<T>(operation: () => Promise<T>, fallback: T): Promise<T> {

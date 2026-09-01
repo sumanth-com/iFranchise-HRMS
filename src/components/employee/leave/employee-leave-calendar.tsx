@@ -43,6 +43,7 @@ export function EmployeeLeaveCalendar({
         showYearPicker
         currentMonthOnly
         compact
+        hideHalfDayMarkers
       />
     </section>
   );

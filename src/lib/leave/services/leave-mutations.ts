@@ -25,7 +25,6 @@ import {
 import { requiresCeoLeaveApproval } from "@/lib/approvals/executive-request-routing";
 import { splitLeaveDaysByBalance } from "@/lib/leave/services/leave-policy-engine";
 import { roundLeaveDays } from "@/lib/leave/services/leave-usage";
-import { NON_APPLY_LEAVE_TYPE_CODES } from "@/lib/leave/constants";
 import { isPeriodLeaveEligible } from "@/lib/leave/period-leave-eligibility";
 import { PERIOD_LEAVE_CODE } from "@/lib/leave/services/leave-policy-engine";
 import {
@@ -235,8 +234,8 @@ function resolveLeaveBalanceInitContext(
   };
 }
 
-/** Leave types tracked on the balance ledger — not OH/LOP application buckets. */
-const LEAVE_BALANCE_INIT_SKIP_CODES = new Set(["OH", "LOP"]);
+/** Leave types tracked on the balance ledger — LOP is unpaid and not allocated. */
+const LEAVE_BALANCE_INIT_SKIP_CODES = new Set(["LOP"]);
 
 /**
  * Creates annual leave ledger rows from the organization's configured leave types.
@@ -423,16 +422,6 @@ export async function createLeaveRequest(
       isHalfDay: input.isHalfDay,
     },
   );
-  const applyCode = evaluated.leaveType.code.toUpperCase();
-  if (
-    NON_APPLY_LEAVE_TYPE_CODES.includes(
-      applyCode as (typeof NON_APPLY_LEAVE_TYPE_CODES)[number],
-    )
-  ) {
-    throw new Error(
-      "Optional Holiday cannot be applied here. Use the Optional Holiday workflow instead.",
-    );
-  }
   const totalDays = evaluated.duration.totalLeaveDays;
   const balanceYear = getCurrentBalanceYear(input.startDate);
   const { paidDays, lopDays } = evaluated.split;

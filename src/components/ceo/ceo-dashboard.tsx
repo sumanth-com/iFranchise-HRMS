@@ -82,6 +82,8 @@ export function CeoDashboard({ data, error }: CeoDashboardProps) {
               events={data.upcomingHolidays ?? []}
               referenceDate={referenceDate}
               canManageAnnouncements={data.canManageAnnouncements === true}
+              pairHolidayBirthday
+              showImportantNotices
               className="min-h-0 h-full"
             />
           </div>

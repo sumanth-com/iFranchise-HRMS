@@ -1,4 +1,4 @@
-import { FeedbackTable } from "@/components/performance/feedback-management";
+import { FeedbackForm, FeedbackTable } from "@/components/performance/feedback-management";
 import { requireCeoPortal } from "@/lib/ceo/read-only-permissions";
 import {
   PERFORMANCE_CLIENT_FETCH_SIZE,
@@ -30,11 +30,12 @@ export default async function CeoFeedbackPage() {
           Appreciation, suggestions, coaching, and warnings across the organization.
         </p>
       </div>
+      <FeedbackForm employees={lookups.employees} />
       <FeedbackTable
         records={result.data}
         pageSize={PERFORMANCE_TABLE_PAGE_SIZE}
         employees={lookups.employees}
-        canDelete={false}
+        canDelete
       />
     </div>
   );

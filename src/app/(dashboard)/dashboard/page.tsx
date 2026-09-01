@@ -11,7 +11,14 @@ async function SelfServiceHomeContent() {
   const supabase = await createClient();
   const data = await getEmployeeDashboardData(supabase, profile);
 
-  return <EmployeeDashboardView {...data} subtitle="HR Portal" />;
+  return (
+    <EmployeeDashboardView
+      {...data}
+      subtitle="HR Portal"
+      pairHolidayBirthday
+      showImportantNotices
+    />
+  );
 }
 
 export default function HrSelfServiceHomePage() {

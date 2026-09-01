@@ -15,6 +15,7 @@ import {
 import { EmployeeLeaveCalendar } from "@/components/employee/leave/employee-leave-calendar";
 import { ApplyLeaveDialog } from "@/components/leave/apply-leave-dialog";
 import { LeaveBalanceSummaryCards } from "@/components/leave/leave-balance-summary-cards";
+import { OptionalHolidaysDialog } from "@/components/leave/optional-holidays-dialog";
 import { LeaveStatusBadge } from "@/components/leave/leave-status-badge";
 import { MyLeaveDetailPopup } from "@/components/leave/my-leave-detail-popup";
 import {
@@ -26,6 +27,7 @@ import {
   runServerActionSafely,
 } from "@/lib/errors/stale-server-action";
 import { LEAVE_BALANCE_DISPLAY_LABELS } from "@/lib/leave/constants";
+import { isOptionalHolidayCode } from "@/lib/leave/optional-holiday";
 import {
   DEFAULT_LEAVE_CALENDAR,
   type LeaveCalendarContext,
@@ -204,6 +206,8 @@ type Props = {
   calendarHolidays: LeaveHolidayEntry[];
   calendarContext?: LeaveCalendarContext;
   showPageHeading?: boolean;
+  /** Pin Leave Policy / Apply Leave under the portal header while the rest of the page scrolls. */
+  stickyHeader?: boolean;
 };
 
 export function MyLeaveSelfServiceView({
@@ -223,6 +227,7 @@ export function MyLeaveSelfServiceView({
   calendarHolidays,
   calendarContext,
   showPageHeading = true,
+  stickyHeader = false,
 }: Props) {
   const router = useRouter();
   const [applyOpen, setApplyOpen] = useState(false);
@@ -238,6 +243,7 @@ export function MyLeaveSelfServiceView({
   const [annualBalances, setAnnualBalances] = useState(() => normalizeBalanceSnapshots(balances));
   const [annualBalanceYear, setAnnualBalanceYear] = useState(calendarYear);
   const [selectedLeaveTypeCode, setSelectedLeaveTypeCode] = useState<string | null>(null);
+  const [optionalHolidayOpen, setOptionalHolidayOpen] = useState(false);
   const [isMonthPending, startMonthTransition] = useTransition();
   const historyRef = useRef<HTMLElement>(null);
   const canOpenApplyDialog = canApply && employeeId && applyLeaveLookups;
@@ -361,6 +367,10 @@ export function MyLeaveSelfServiceView({
   }
 
   function handleSelectLeaveType(code: string) {
+    if (isOptionalHolidayCode(code)) {
+      setOptionalHolidayOpen(true);
+      return;
+    }
     const next = code.toUpperCase();
     setSelectedLeaveTypeCode((current) =>
       current?.toUpperCase() === next ? null : next,
@@ -495,9 +505,13 @@ export function MyLeaveSelfServiceView({
     ) : null;
 
   return (
-    <div className="space-y-4">
+    <div
+      className={cn(
+        stickyHeader ? "flex min-h-0 flex-1 flex-col overflow-hidden" : "space-y-4",
+      )}
+    >
       {showPageHeading ? (
-        <div>
+        <div className={cn(stickyHeader && "z-20 shrink-0 pb-4")}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
             {headerActions}
@@ -506,6 +520,13 @@ export function MyLeaveSelfServiceView({
         </div>
       ) : null}
 
+      <div
+        className={cn(
+          stickyHeader
+            ? "min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain pb-4"
+            : "contents",
+        )}
+      >
       {annualBalances.length > 0 ? (
         <LeaveBalanceSummaryCards
           balances={annualBalances}
@@ -515,6 +536,15 @@ export function MyLeaveSelfServiceView({
           onSelectCode={handleSelectLeaveType}
         />
       ) : null}
+
+      <OptionalHolidaysDialog
+        open={optionalHolidayOpen}
+        onOpenChange={setOptionalHolidayOpen}
+        year={year}
+        remaining={
+          annualBalances.find((row) => isOptionalHolidayCode(row.leaveTypeCode))?.balanceDays ?? 0
+        }
+      />
 
       <EmployeeLeaveCalendar
         month={month}
@@ -568,10 +598,13 @@ export function MyLeaveSelfServiceView({
               ? `No ${selectedTypeLabel} history in ${monthLabel}.`
               : `No leave requests in ${monthLabel}.`
           }
-          scrollable
-          maxHeightClass={DATA_TABLE_LEAVE_REQUESTS_MAX_HEIGHT}
+          scrollable={!stickyHeader}
+          maxHeightClass={
+            stickyHeader ? undefined : DATA_TABLE_LEAVE_REQUESTS_MAX_HEIGHT
+          }
         />
       </section>
+      </div>
 
       {viewOpen && viewPreview ? (
         <MyLeaveDetailPopup

@@ -12,6 +12,7 @@ export const EMPLOYEE_ROUTES = {
   payrollPolicy: "/employee/payroll/policy",
   payrollHistory: "/employee/payroll/history",
   documents: "/employee/documents",
+  announcements: "/employee/announcements",
   profile: "/employee/profile",
   assets: "/employee/assets",
   goals: "/employee/goals",

@@ -30,9 +30,12 @@ import {
   getLeaveSummary,
   getEmployeeLeaveBalanceSnapshot,
   getEmployeeRoleCodes,
+  listEmployeeOptionalHolidaySelections,
   listLeaveBalances,
   listLeaveRequests,
+  listOrganizationOptionalHolidays,
 } from "@/lib/leave/services/leave-queries";
+import { optionalHolidaysForList } from "@/lib/leave/optional-holiday";
 import {
   leaveApprovalSchema,
   leaveFormSchema,
@@ -343,7 +346,9 @@ export async function getLeaveApplyContextAction(
     const profile = await requireServerPermission("leave.create");
     const supabase = await getAuthenticatedSupabase();
     await assertCanApplyLeaveForEmployee(supabase, profile, employeeId);
-    const [runtime, employee, balances, applicantRoleCodes] = await Promise.all([
+    const year = new Date().getFullYear();
+    const [runtime, employee, balances, applicantRoleCodes, holidaysThisYear, holidaysNextYear, takenThisYear, takenNextYear] =
+      await Promise.all([
       loadLeavePolicyRuntime(supabase, profile.employee.organizationId),
       loadLeaveEmployeePolicyState(
         supabase,
@@ -353,7 +358,16 @@ export async function getLeaveApplyContextAction(
       ),
       getEmployeeLeaveBalanceSnapshot(supabase, employeeId),
       getEmployeeRoleCodes(supabase, employeeId),
+      listOrganizationOptionalHolidays(supabase, profile.employee.organizationId, year),
+      listOrganizationOptionalHolidays(supabase, profile.employee.organizationId, year + 1),
+      listEmployeeOptionalHolidaySelections(supabase, employeeId, year),
+      listEmployeeOptionalHolidaySelections(supabase, employeeId, year + 1),
     ]);
+    const taken = new Map([...takenThisYear, ...takenNextYear]);
+    const optionalHolidays = optionalHolidaysForList(
+      [...holidaysThisYear, ...holidaysNextYear],
+      taken,
+    );
 
     return {
       success: true,
@@ -375,6 +389,7 @@ export async function getLeaveApplyContextAction(
         balances,
         policyDocument: DEFAULT_LEAVE_POLICY_DOCUMENT,
         applicantRoleCodes,
+        optionalHolidays,
       },
     };
   } catch (error) {

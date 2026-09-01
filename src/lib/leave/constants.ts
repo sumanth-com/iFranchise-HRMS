@@ -83,11 +83,11 @@ export function leaveApprovalStageLabel(
 /** iFranchise leave policy — active leave types (including LOP for payroll tracking). */
 export const ALLOWED_LEAVE_TYPE_CODES = ["CL", "SL", "EL", "OH", "PL", "LOP"] as const;
 
-/** Types available in Apply Leave — CL/EL monthly accrual; PL when eligible; LOP unpaid. SL not offered. */
-export const LEAVE_APPLY_TYPE_CODES = ["CL", "EL", "PL", "LOP"] as const;
+/** Types available in Apply Leave — CL/EL monthly accrual; OH from the company list; PL when eligible; LOP unpaid. SL not offered. */
+export const LEAVE_APPLY_TYPE_CODES = ["CL", "EL", "OH", "PL", "LOP"] as const;
 
 /** Types that cannot be applied through the normal leave form. */
-export const NON_APPLY_LEAVE_TYPE_CODES = ["OH"] as const;
+export const NON_APPLY_LEAVE_TYPE_CODES = [] as const;
 
 const LEAVE_TYPE_CODE_RANK = new Map(
   ALLOWED_LEAVE_TYPE_CODES.map((code, index) => [code, index]),
@@ -101,20 +101,20 @@ export function sortByLeaveTypeCode<T extends { code?: string | null }>(items: T
   });
 }
 
-/** Leave balance summary cards on My Leave — Casual + Earned only (monthly accrual). */
-export const LEAVE_BALANCE_CARD_CODES = ["CL", "EL"] as const;
+/** Leave balance summary cards on My Leave — Casual, Earned, Optional Holiday. */
+export const LEAVE_BALANCE_CARD_CODES = ["CL", "EL", "OH"] as const;
 
-/** Leave balance UI cards — OH is not shown here; LOP is unpaid and shown via Apply Leave / payroll. */
-export const LEAVE_BALANCE_DISPLAY_CODES = ["CL", "SL", "EL", "PL"] as const;
+/** Leave balance UI cards — SL is not offered. LOP is unpaid and shown via Apply Leave / payroll. */
+export const LEAVE_BALANCE_DISPLAY_CODES = ["CL", "EL", "PL", "OH"] as const;
 
 export const LEAVE_BALANCE_DISPLAY_LABELS: Record<
   (typeof LEAVE_BALANCE_DISPLAY_CODES)[number],
   string
 > = {
   CL: "Casual Leave",
-  SL: "Sick Leave",
   EL: "Earned Leave",
   PL: "Menstruation Leave",
+  OH: "Optional Holiday",
 };
 
 export const LEAVE_BALANCE_CARD_TONES: Record<
@@ -122,7 +122,7 @@ export const LEAVE_BALANCE_CARD_TONES: Record<
   { accent: string; iconBg: string }
 > = {
   CL: { accent: "text-indigo-600 dark:text-indigo-400", iconBg: "bg-indigo-500/10" },
-  SL: { accent: "text-sky-600 dark:text-sky-400", iconBg: "bg-sky-500/10" },
   EL: { accent: "text-emerald-600 dark:text-emerald-400", iconBg: "bg-emerald-500/10" },
   PL: { accent: "text-rose-600 dark:text-rose-400", iconBg: "bg-rose-500/10" },
+  OH: { accent: "text-violet-600 dark:text-violet-400", iconBg: "bg-violet-500/10" },
 };

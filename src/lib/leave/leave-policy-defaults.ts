@@ -43,8 +43,7 @@ Sandwich days are calculated automatically and shown before you submit.`,
     {
       id: "carry-forward",
       title: "Leave Carry Forward Policy",
-      content: `- No leave balance will be carried forward until the successful completion of the probation period.
-- Menstruation Leave (PL) is strictly non-carry-forwardable under all circumstances.`,
+      content: `- No leave balance will be carried forward until the successful completion of the probation period.`,
     },
     {
       id: "post-probation-carry-forward",

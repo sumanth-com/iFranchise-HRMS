@@ -155,11 +155,6 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
     deductions.reduce((sum, item) => sum + Number(item.amount || 0), 0) || payslip.totalDeductions;
   const netPay = payslip.netSalary || totalEarnings - totalDeductions;
 
-  const leave = payslip.leaveBalances ?? {
-    casual: { usedInMonth: 0, balance: 0 },
-    earned: { usedInMonth: 0, balance: 0 },
-  };
-
   // Header Drawing
   const logoBytes = await loadLogoBytesCached(payslip.organization.logoUrl);
   const headerTop = PAGE_HEIGHT - MARGIN;
@@ -281,68 +276,7 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
     currentY = yBot;
   }
 
-  // Section 2: Leave Days Header
-  const leaveHeaderY = currentY - rowH;
-  ctx.page.drawLine({
-    start: { x: MARGIN, y: leaveHeaderY },
-    end: { x: MARGIN + CONTENT_WIDTH, y: leaveHeaderY },
-    thickness: 0.8,
-    color: BORDER_COLOR,
-  });
-  drawCentered(ctx, "NO. OF AVAILABLE LEAVE DAYS", PAGE_WIDTH / 2, leaveHeaderY + 5, {
-    size: 8,
-    bold: true,
-  });
-  currentY = leaveHeaderY;
-
-  const leaveRows = [
-    [
-      { label: "Casual Leave", value: leave.casual.usedInMonth.toFixed(2) },
-      { label: "Earned Leave", value: leave.earned.usedInMonth.toFixed(2) },
-    ],
-    [
-      { label: "Casual Leave Balance", value: leave.casual.balance.toFixed(2) },
-      { label: "Earned Leave Balance", value: leave.earned.balance.toFixed(2) },
-    ],
-  ];
-
-  for (const row of leaveRows) {
-    const yBot = currentY - rowH;
-    ctx.page.drawLine({
-      start: { x: MARGIN, y: yBot },
-      end: { x: MARGIN + CONTENT_WIDTH, y: yBot },
-      thickness: 0.8,
-      color: BORDER_COLOR,
-    });
-    ctx.page.drawLine({
-      start: { x: col2X, y: currentY },
-      end: { x: col2X, y: yBot },
-      thickness: 0.8,
-      color: BORDER_COLOR,
-    });
-    ctx.page.drawLine({
-      start: { x: col3X, y: currentY },
-      end: { x: col3X, y: yBot },
-      thickness: 0.8,
-      color: BORDER_COLOR,
-    });
-    ctx.page.drawLine({
-      start: { x: col4X, y: currentY },
-      end: { x: col4X, y: yBot },
-      thickness: 0.8,
-      color: BORDER_COLOR,
-    });
-
-    const textY = yBot + 5;
-    drawText(ctx, row[0].label, col1X + 4, textY, { size: 7.5, bold: true });
-    drawText(ctx, row[0].value, col2X + 4, textY, { size: 7.5, bold: false });
-    drawText(ctx, row[1].label, col3X + 4, textY, { size: 7.5, bold: true });
-    drawText(ctx, row[1].value, col4X + 4, textY, { size: 7.5, bold: false });
-
-    currentY = yBot;
-  }
-
-  // Section 3: Earnings / Deductions (4 equal columns)
+  // Earnings / Deductions (4 equal columns)
   const sc1X = MARGIN;
   const sc1W = CONTENT_WIDTH * 0.3;
   const sc2X = sc1X + sc1W;

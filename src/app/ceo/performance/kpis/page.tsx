@@ -16,11 +16,10 @@ export default async function CeoKpisPage() {
   const supabase = await createClient();
 
   const [result, templates, lookups] = await Promise.all([
-    listKpis(
-      supabase,
-      { ...profile, permissionCodes: [...profile.permissionCodes, "kpi.manage"] },
-      { page: 1, pageSize: PERFORMANCE_CLIENT_FETCH_SIZE },
-    ),
+    listKpis(supabase, profile, {
+      page: 1,
+      pageSize: PERFORMANCE_CLIENT_FETCH_SIZE,
+    }),
     listKpiTemplates(supabase, profile.employee.organizationId),
     getPerformanceLookups(supabase, profile.employee.organizationId),
   ]);
@@ -30,21 +29,22 @@ export default async function CeoKpisPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">KPI Management</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Review KPI assignments and progress across the organization.
+          Assign KPI templates and track progress across the organization.
         </p>
       </div>
 
       <KpiWorkspace
-        canAssign={false}
+        canAssign
+        listBasePath="/ceo/performance/kpis"
         formProps={{
           employees: lookups.employees,
-          templates: templates,
+          templates,
         }}
         tableProps={{
           records: result.data,
           pageSize: PERFORMANCE_TABLE_PAGE_SIZE,
-          canManageKpis: false,
-          currentEmployeeId: "",
+          canManageKpis: true,
+          currentEmployeeId: profile.employee.id,
         }}
       />
     </div>

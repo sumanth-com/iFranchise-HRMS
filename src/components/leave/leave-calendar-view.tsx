@@ -51,6 +51,8 @@ type LeaveCalendarViewProps = {
   enableWeekView?: boolean;
   /** Smaller calendar for self-service layouts. */
   compact?: boolean;
+  /** Hide working-Saturday “Half” pills and the Half day legend item. */
+  hideHalfDayMarkers?: boolean;
   calendar?: LeaveCalendarContext;
 };
 
@@ -121,10 +123,12 @@ function buildCurrentMonthCalendarDays(month: number, year: number): CalendarCel
   return cells;
 }
 
-function CalendarLegend() {
+function CalendarLegend({ hideHalfDay }: { hideHalfDay?: boolean }) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-      {Object.entries(LEAVE_CALENDAR_LEGEND).map(([key, item]) => (
+      {Object.entries(LEAVE_CALENDAR_LEGEND)
+        .filter(([key]) => !(hideHalfDay && key === "halfDay"))
+        .map(([key, item]) => (
         <span key={key} className="inline-flex items-center gap-1.5">
           <span className={cn("size-2.5 rounded-full", item.className)} />
           {item.label}
@@ -149,6 +153,7 @@ export function LeaveCalendarView({
   hideLegend = false,
   enableWeekView = false,
   compact = false,
+  hideHalfDayMarkers = false,
   calendar: calendarProp = DEFAULT_LEAVE_CALENDAR,
 }: LeaveCalendarViewProps) {
   const leaves = leavesProp ?? [];
@@ -214,10 +219,10 @@ export function LeaveCalendarView({
   }, [holidays]);
 
   function leaveMarkLabel(leave: LeaveCalendarEntry) {
+    const type = leave.leaveTypeName?.trim();
+    if (type && /optional/i.test(type)) return "Optional Holiday";
     if (compact) {
-      const type = leave.leaveTypeName?.trim();
       if (type) {
-        // Prefer a short pill label (e.g. "Casual Leave" → "Casual").
         return type.split(/\s+/)[0] ?? type;
       }
     }
@@ -406,7 +411,7 @@ export function LeaveCalendarView({
               ))}
             </div>
           ) : null}
-          {!hideLegend ? <CalendarLegend /> : null}
+          {!hideLegend ? <CalendarLegend hideHalfDay={hideHalfDayMarkers} /> : null}
         </div>
       </div>
 
@@ -442,17 +447,19 @@ export function LeaveCalendarView({
             }
 
             const holiday = holidayMap.get(day.date);
+            const companyHoliday = holiday && !holiday.isOptional ? holiday : undefined;
             const dayLeaves = leavesByDate.get(day.date) ?? [];
             const dayClass = classifyCalendarDay(day.date, calendarWithHolidays);
             const isWeeklyHoliday = dayClass === "weekly_off";
             const isHalfDayCalendar = dayClass === "half_day";
+            const showHalfDayMarker = isHalfDayCalendar && !hideHalfDayMarkers;
             const sandwichOnDay = sandwichDates.has(day.date);
             const leaveHighlight =
               day.isCurrentMonth && dayLeaves.length > 0
                 ? leaveCellHighlight(dayLeaves)
                 : null;
             const holidayHighlight =
-              Boolean(holiday) && day.isCurrentMonth && !leaveHighlight
+              Boolean(companyHoliday) && day.isCurrentMonth && !leaveHighlight
                 ? "bg-violet-500/10 ring-1 ring-inset ring-violet-500/25"
                 : null;
 
@@ -469,7 +476,7 @@ export function LeaveCalendarView({
                     !leaveHighlight &&
                     !holidayHighlight &&
                     "bg-muted/30",
-                  isHalfDayCalendar &&
+                  showHalfDayMarker &&
                     day.isCurrentMonth &&
                     !leaveHighlight &&
                     !holidayHighlight &&
@@ -498,7 +505,7 @@ export function LeaveCalendarView({
                   >
                     {day.dayNumber}
                   </span>
-                  {!compact && day.isCurrentMonth && isHalfDayCalendar && !holiday ? (
+                  {!compact && day.isCurrentMonth && showHalfDayMarker && !companyHoliday ? (
                     <span className="rounded bg-orange-500/15 px-1 py-px text-[9px] font-medium text-orange-700 dark:text-orange-300">
                       Half
                     </span>
@@ -516,13 +523,13 @@ export function LeaveCalendarView({
                       : "flex flex-col gap-1",
                   )}
                 >
-                  {holiday && day.isCurrentMonth ? (
+                  {companyHoliday && day.isCurrentMonth ? (
                     <div
                       className={cn(
                         "flex min-w-0 max-w-full items-center gap-1 text-violet-700 dark:text-violet-200",
                         compact ? "justify-center text-[10px]" : "text-xs",
                       )}
-                      title={holiday.name}
+                      title={companyHoliday.name}
                     >
                       <CalendarHeart
                         className={cn(
@@ -532,15 +539,15 @@ export function LeaveCalendarView({
                         aria-hidden
                       />
                       <span className="truncate font-bold leading-tight">
-                        {holiday.name}
+                        {companyHoliday.name}
                       </span>
                     </div>
                   ) : null}
 
                   {compact &&
                   day.isCurrentMonth &&
-                  isHalfDayCalendar &&
-                  !holiday &&
+                  showHalfDayMarker &&
+                  !companyHoliday &&
                   dayLeaves.length === 0 ? (
                     <span className="inline-flex items-center justify-center rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-semibold leading-tight text-white shadow-sm">
                       Half

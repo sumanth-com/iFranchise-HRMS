@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
@@ -53,6 +54,7 @@ export function DashboardAnnouncementsManager({
   const [editing, setEditing] = useState<FormState | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   async function reload() {
     setLoading(true);
@@ -106,10 +108,11 @@ export function DashboardAnnouncementsManager({
         toast.error(result.message);
         return;
       }
-      toast.success(editing.id ? "Announcement updated." : "Announcement created.");
+      toast.success(editing.id ? "Team update saved." : "Team update created.");
       setEditing(null);
       setImageFile(null);
       await reload();
+      router.refresh();
     });
   }
 
@@ -123,8 +126,9 @@ export function DashboardAnnouncementsManager({
         toast.error(result.message);
         return;
       }
-      toast.success(item.isPublished ? "Announcement unpublished." : "Announcement published.");
+      toast.success(item.isPublished ? "Update unpublished." : "Update published.");
       await reload();
+      router.refresh();
     });
   }
 
@@ -136,8 +140,9 @@ export function DashboardAnnouncementsManager({
         toast.error(result.message);
         return;
       }
-      toast.success("Announcement removed.");
+      toast.success("Team update removed.");
       await reload();
+      router.refresh();
     });
   }
 
@@ -145,8 +150,8 @@ export function DashboardAnnouncementsManager({
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      title="Dashboard announcements"
-      description="Publish notices for the Celebrations & This Week carousel. Employees only see published items."
+      title="Team updates"
+      description="Write a short note for this dashboard card. This is separate from Organization announcements."
       contentClassName="sm:max-w-2xl"
       showCancel={false}
       footer={
@@ -167,7 +172,7 @@ export function DashboardAnnouncementsManager({
                   current ? { ...current, title: event.target.value } : current,
                 )
               }
-              placeholder="Short announcement title"
+              placeholder="Short title"
             />
           </div>
           <div className="space-y-2">
@@ -292,7 +297,7 @@ export function DashboardAnnouncementsManager({
             </Button>
             <Button type="button" disabled={isPending} onClick={submitForm}>
               {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-              {editing.id ? "Save changes" : "Create announcement"}
+              {editing.id ? "Save changes" : "Create update"}
             </Button>
           </div>
         </div>
@@ -301,7 +306,7 @@ export function DashboardAnnouncementsManager({
           <div className="flex justify-end">
             <Button type="button" size="sm" className="gap-1.5" onClick={startCreate}>
               <Plus className="size-4" />
-              New announcement
+              New update
             </Button>
           </div>
           {loading ? (
@@ -310,7 +315,7 @@ export function DashboardAnnouncementsManager({
             </div>
           ) : items.length === 0 ? (
             <p className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-              No announcements yet. Create one to show in the celebrations card.
+              No team updates yet. Create one to show in this card.
             </p>
           ) : (
             <ul className="space-y-2">

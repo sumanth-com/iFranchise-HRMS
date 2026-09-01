@@ -1,3 +1,4 @@
+import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { hasAnyPermission } from "@/lib/permissions/utils";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import type {
@@ -160,13 +161,13 @@ export const RATING_LABELS: Record<number, string> = {
   5: "Outstanding",
 };
 
-const PERF_VIEW = ["performance.view"];
-const PERF_CREATE = ["performance.create"];
-const PERF_EDIT = ["performance.edit"];
-const PERF_REVIEW = ["performance.review"];
-const PERF_APPROVE = ["performance.approve"];
-const PERF_FEEDBACK = ["performance.feedback"];
-const PERF_SETTINGS = ["performance.settings"];
+const PERF_VIEW = ["performance.view", PORTAL_PERMISSIONS.ceo];
+const PERF_CREATE = ["performance.create", PORTAL_PERMISSIONS.ceo];
+const PERF_EDIT = ["performance.edit", PORTAL_PERMISSIONS.ceo];
+const PERF_REVIEW = ["performance.review", PORTAL_PERMISSIONS.ceo];
+const PERF_APPROVE = ["performance.approve", PORTAL_PERMISSIONS.ceo];
+const PERF_FEEDBACK = ["performance.feedback", PORTAL_PERMISSIONS.ceo];
+const PERF_SETTINGS = ["performance.settings", PORTAL_PERMISSIONS.ceo];
 
 export function canViewPerformance(codes: string[]) {
   return hasAnyPermission(codes, PERF_VIEW);
@@ -192,9 +193,9 @@ export function canGiveFeedback(codes: string[]) {
   return hasAnyPermission(codes, PERF_FEEDBACK);
 }
 
-const KPI_VIEW = ["kpi.view", "performance.view"];
-const KPI_MANAGE = ["kpi.manage", "performance.create", "performance.settings"];
-const KPI_PROGRESS = ["kpi.progress", "performance.edit", "performance.review"];
+const KPI_VIEW = ["kpi.view", "performance.view", PORTAL_PERMISSIONS.ceo];
+const KPI_MANAGE = ["kpi.manage", "performance.create", "performance.settings", PORTAL_PERMISSIONS.ceo];
+const KPI_PROGRESS = ["kpi.progress", "performance.edit", "performance.review", PORTAL_PERMISSIONS.ceo];
 
 export function canViewKpis(codes: string[]) {
   return hasAnyPermission(codes, KPI_VIEW);
@@ -222,6 +223,11 @@ export function canAssignKpis(codes: string[]) {
 
 export function canManagePerformanceSettings(codes: string[]) {
   return hasAnyPermission(codes, PERF_SETTINGS);
+}
+
+/** Manager or CEO portal may mutate performance records (HR still uses module codes). */
+export function performanceMutatePermissions(...codes: string[]) {
+  return [...codes, PORTAL_PERMISSIONS.manager, PORTAL_PERMISSIONS.ceo];
 }
 
 export const PERFORMANCE_SUB_NAV = [

@@ -218,6 +218,13 @@ export type LeaveApplyContext = {
   policyDocument: import("@/types/leave-policy").LeavePolicyDocument;
   /** Role codes for the employee applying leave — drives approval copy. */
   applicantRoleCodes: string[];
+  optionalHolidays?: Array<{
+    id: string;
+    name: string;
+    date: string;
+    day: string;
+    status: "available" | "pending" | "approved" | "passed";
+  }>;
 };
 
 export type LeaveActionResult<T = void> =

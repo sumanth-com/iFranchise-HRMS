@@ -39,6 +39,7 @@ import { LeaveDurationPreview, LeavePolicyInfo } from "@/components/leave/leave-
 import { formatLeaveDayCount } from "@/lib/leave/services/leave-usage";
 import { formatLeaveBalanceUsedTotal } from "@/lib/leave/leave-balance-display";
 import { previewLeaveApplication } from "@/lib/leave/services/leave-apply-preview";
+import { isOptionalHolidayCode, optionalHolidayDisplayDate } from "@/lib/leave/optional-holiday";
 import {
   CASUAL_LEAVE_CODE,
   earliestAllowedLeaveStart,
@@ -139,6 +140,8 @@ export function LeaveForm({
   const [balancesLoading, setBalancesLoading] = useState(!initialApplyContext && initialBalances.length === 0);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  const isSelfService = variant === "self";
+
   const employeeItems = lookups.employees.map((employee) => ({
     value: employee.id,
     label: employee.code
@@ -163,8 +166,9 @@ export function LeaveForm({
     lookups.leaveTypes.filter((leaveType) => Boolean(leaveType.id)),
   )
     .filter((leaveType) => {
-      if (!leaveType.code) return true;
+      if (!leaveType.code) return !isSelfService;
       const code = leaveType.code.toUpperCase();
+      if (isSelfService) return code === "CL" || code === "EL" || code === "OH";
       if (isEdit && initialRequest?.leaveTypeId === leaveType.id) return true;
       // Menstruation Leave is offered only to employees the server would accept
       // it from, so an ineligible applicant never sees it in the list.
@@ -209,6 +213,13 @@ export function LeaveForm({
     applyContext?.leaveTypes.find((item) => item.id === selectedLeaveTypeId)?.code ??
     lookups.leaveTypes.find((item) => item.id === selectedLeaveTypeId)?.code ??
     "";
+  const isOptionalHoliday = isOptionalHolidayCode(selectedLeaveTypeCode);
+  const optionalHolidayChoices = (applyContext?.optionalHolidays ?? []).filter(
+    (item) => item.status === "available",
+  );
+  const ohRemaining =
+    balances.find((row) => isOptionalHolidayCode(row.leaveTypeCode))?.balanceDays ?? 0;
+  const selectableOptionalHolidays = ohRemaining >= 1 ? optionalHolidayChoices : [];
   const earliestStart = earliestAllowedLeaveStart(
     selectedLeaveTypeCode,
     applyContext?.notice,
@@ -221,6 +232,7 @@ export function LeaveForm({
       : earliestStart;
 
   useEffect(() => {
+    if (isOptionalHoliday) return;
     if (!startDate) return;
     // When half-day is enabled, today is allowed — do not push the user forward.
     const nextStart = startDate < startMin ? startMin : startDate;
@@ -231,7 +243,22 @@ export function LeaveForm({
     if (nextEnd !== endDate) {
       form.setValue("endDate", nextEnd, { shouldValidate: true });
     }
-  }, [endDate, form, startDate, startMin]);
+  }, [endDate, form, startDate, startMin, isOptionalHoliday]);
+
+  const optionalHolidayDateKey = selectableOptionalHolidays.map((item) => item.date).join(",");
+
+  useEffect(() => {
+    if (!isOptionalHoliday) return;
+    form.setValue("isHalfDay", false, { shouldValidate: true });
+    form.setValue("halfDayPeriod", "", { shouldValidate: true });
+    const dates = optionalHolidayDateKey ? optionalHolidayDateKey.split(",") : [];
+    const current = form.getValues("startDate");
+    const next = dates.includes(current) ? current : dates[0];
+    if (next) {
+      form.setValue("startDate", next, { shouldValidate: true });
+      form.setValue("endDate", next, { shouldValidate: true });
+    }
+  }, [form, isOptionalHoliday, optionalHolidayDateKey]);
 
   function applyHalfDayToggle(checked: boolean) {
     form.setValue("isHalfDay", checked, { shouldValidate: true });
@@ -301,7 +328,6 @@ export function LeaveForm({
     };
   }, [selectedEmployeeId, initialApplyContext, initialBalances.length]);
 
-  const isSelfService = variant === "self";
   const showErrorsInForm = isSelfService || Boolean(onCancel);
 
   useEffect(() => {
@@ -311,9 +337,10 @@ export function LeaveForm({
   const onSubmit = form.handleSubmit((values) => {
     setSubmitError(null);
     startTransition(async () => {
+      const payload = isSelfService ? { ...values, isHalfDay: false, halfDayPeriod: "" } : values;
       const result = isEdit
-        ? await updateLeaveRequestAction(initialRequest!.id, values)
-        : await createLeaveRequestAction(values);
+        ? await updateLeaveRequestAction(initialRequest!.id, payload)
+        : await createLeaveRequestAction(payload);
 
       if (!result.success) {
         // Dialog / self-service modal: keep the error inside the popup (no toast).
@@ -357,7 +384,7 @@ export function LeaveForm({
           leaveTypeId: selectedLeaveTypeId,
           startDate,
           endDate,
-          isHalfDay,
+          isHalfDay: isSelfService ? false : isHalfDay,
         })
       : null;
   // A shortfall in paid balance is not a blocker: the excess is submitted as LOP.
@@ -376,7 +403,7 @@ export function LeaveForm({
           "Employee"
         }
       />
-      <div className={cn("grid gap-3", isSelfService ? "md:grid-cols-2 lg:grid-cols-3" : "md:grid-cols-2")}>
+      <div className="grid gap-3 md:grid-cols-2">
         {!isSelfService ? (
           <div className="space-y-2">
             <Label htmlFor="employeeId">Employee</Label>
@@ -408,7 +435,7 @@ export function LeaveForm({
           </div>
         ) : null}
 
-        <div className={cn("space-y-2", isSelfService && "md:col-span-2 lg:col-span-3")}>
+        <div className={cn("space-y-2", isSelfService && "md:col-span-2")}>
           <Label htmlFor="leaveTypeId">Leave Type</Label>
           <Select
             items={leaveTypeItems}
@@ -437,26 +464,7 @@ export function LeaveForm({
           ) : null}
         </div>
 
-        {selectedEmployeeId ? (
-          isSelfService ? (
-            balancesLoading || balances.length > 0 ? (
-              <div className="flex flex-wrap items-center gap-1.5 md:col-span-2 lg:col-span-3">
-                <span className="text-xs font-medium text-muted-foreground">Balance</span>
-                {balancesLoading && balances.length === 0 ? (
-                  <span className="text-xs text-muted-foreground">Loading…</span>
-                ) : (
-                  balances.map((balance) => (
-                    <span
-                      key={balance.leaveTypeCode}
-                      className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium"
-                    >
-                      {balance.leaveTypeName}: {formatLeaveBalanceUsedTotal(balance)}
-                    </span>
-                  ))
-                )}
-              </div>
-            ) : null
-          ) : (
+        {selectedEmployeeId && !isSelfService ? (
           <div className="md:col-span-2">
             <section className="rounded-xl border bg-card p-4 shadow-sm">
               <div className="mb-3 flex items-center justify-between gap-3">
@@ -513,27 +521,66 @@ export function LeaveForm({
               ) : null}
             </section>
           </div>
-          )
         ) : null}
 
-        <div className={cn("flex flex-col justify-end gap-1", isSelfService ? "lg:col-span-1" : "md:col-span-2")}>
-          <label className="flex h-9 items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="size-4 rounded border"
-              disabled={isPending}
-              checked={isHalfDay}
-              onChange={(event) => applyHalfDayToggle(event.currentTarget.checked)}
-            />
-            Half day leave
-          </label>
-          {isHalfDay ? (
-            <p className="text-[11px] leading-snug text-muted-foreground">
-              Half day can be applied for today.
-            </p>
-          ) : null}
-        </div>
+        {!isSelfService && !isOptionalHoliday ? (
+          <div className="flex flex-col justify-end gap-1 md:col-span-2">
+            <label className="flex h-9 items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="size-4 rounded border"
+                disabled={isPending}
+                checked={isHalfDay}
+                onChange={(event) => applyHalfDayToggle(event.currentTarget.checked)}
+              />
+              Half day leave
+            </label>
+            {isHalfDay ? (
+              <p className="text-[11px] leading-snug text-muted-foreground">
+                Half day can be applied for today.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
+        {isOptionalHoliday ? (
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="optionalHolidayDate">Optional Holiday date</Label>
+            {selectableOptionalHolidays.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {ohRemaining < 1
+                  ? "You have no Optional Holiday remaining this year."
+                  : "There are no upcoming Optional Holidays you can select."}
+              </p>
+            ) : (
+              <Select
+                items={selectableOptionalHolidays.map((item) => ({
+                  value: item.date,
+                  label: `${item.name} · ${optionalHolidayDisplayDate(item.date)} · ${item.day}`,
+                }))}
+                value={startDate}
+                onValueChange={(value) => {
+                  if (!value) return;
+                  form.setValue("startDate", value, { shouldValidate: true });
+                  form.setValue("endDate", value, { shouldValidate: true });
+                }}
+                disabled={isPending}
+              >
+                <SelectTrigger id="optionalHolidayDate" className="h-8 w-full min-w-0">
+                  <SelectValue placeholder="Select an Optional Holiday" />
+                </SelectTrigger>
+                <SelectContent align="start" alignItemWithTrigger={false}>
+                  {selectableOptionalHolidays.map((item) => (
+                    <SelectItem key={item.id} value={item.date}>
+                      {item.name} · {optionalHolidayDisplayDate(item.date)} · {item.day}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+        ) : (
+          <>
         <div className="space-y-2">
           <Label htmlFor="startDate">Start Date</Label>
           <Input
@@ -557,7 +604,7 @@ export function LeaveForm({
             key={`end-${startMin}-${isHalfDay ? "half" : "full"}`}
             id="endDate"
             type="date"
-            disabled={isPending || isHalfDay}
+            disabled={isPending || (!isSelfService && isHalfDay)}
             min={startDate || startMin}
             {...form.register("endDate")}
           />
@@ -567,9 +614,63 @@ export function LeaveForm({
             </p>
           ) : null}
         </div>
+          </>
+        )}
 
-        {applyContext && selectedLeaveTypeId && startDate && endDate ? (
-          <div className={cn("md:col-span-2", isSelfService && "lg:col-span-3")}>
+        {isSelfService && applyPreview ? (
+          <div className="md:col-span-2 space-y-2">
+            <div className="rounded-xl border bg-muted/20 px-3 py-2.5">
+              <p className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground tabular-nums">
+                  {formatLeaveDays(applyPreview.duration.totalLeaveDays)} requested
+                </span>
+              </p>
+            </div>
+            {applyPreview.blockingIssues.map((issue) => {
+              const isOverlap = issue.code === "overlap";
+              const isNotice = issue.code === "notice";
+              return (
+                <div
+                  key={issue.code}
+                  className={cn(
+                    "rounded-lg border px-3 py-2.5",
+                    isOverlap || isNotice
+                      ? "border-amber-500/35 bg-amber-500/10"
+                      : "border-destructive/30 bg-destructive/10",
+                  )}
+                >
+                  <p
+                    className={cn(
+                      "text-sm font-medium",
+                      isOverlap || isNotice
+                        ? "text-amber-950 dark:text-amber-100"
+                        : "text-destructive",
+                    )}
+                  >
+                    {isOverlap
+                      ? "These dates already have leave"
+                      : isNotice
+                        ? "Advance notice required"
+                        : "Please check these dates"}
+                  </p>
+                  <p
+                    className={cn(
+                      "mt-0.5 text-xs leading-relaxed",
+                      isOverlap || isNotice
+                        ? "text-amber-900/90 dark:text-amber-100/80"
+                        : "text-destructive/90",
+                    )}
+                  >
+                    {isOverlap
+                      ? "You already have a pending or approved leave on one or more of these dates. Choose different dates, or cancel the existing request first."
+                      : issue.message}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        ) : applyContext && selectedLeaveTypeId && startDate && endDate ? (
+          <div className="md:col-span-2">
             <LeaveDurationPreview
               context={applyContext}
               leaveTypeId={selectedLeaveTypeId}
@@ -580,8 +681,8 @@ export function LeaveForm({
           </div>
         ) : null}
 
-        {isHalfDay ? (
-          <div className={cn("space-y-2 md:col-span-2", isSelfService && "lg:col-span-3")}>
+        {isHalfDay && !isSelfService ? (
+          <div className="space-y-2 md:col-span-2">
             <Label htmlFor="halfDayPeriod">Half Day Period</Label>
             <Select
               items={halfDayPeriodItems}
@@ -615,7 +716,7 @@ export function LeaveForm({
           </div>
         ) : null}
 
-        <div className={cn("space-y-2 md:col-span-2", isSelfService && "lg:col-span-3")}>
+        <div className="space-y-2 md:col-span-2">
           <Label htmlFor="reason">Reason</Label>
           <textarea
             id="reason"
@@ -662,7 +763,7 @@ export function LeaveForm({
       </div>
 
       <div className={cn("space-y-2 border-t", isSelfService ? "pt-2.5" : "pt-3")}>
-        {lopSplit ? (
+        {lopSplit && !isSelfService ? (
           <div
             role="status"
             className="flex gap-2.5 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2.5"
@@ -721,7 +822,7 @@ export function LeaveForm({
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={isPending || policyBlocksSubmit}>
+          <Button type="submit" disabled={isPending || policyBlocksSubmit || (isOptionalHoliday && selectableOptionalHolidays.length === 0)}>
             {isEdit
               ? "Save changes"
               : isSelfService

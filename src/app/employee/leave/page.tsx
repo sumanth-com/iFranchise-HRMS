@@ -86,8 +86,9 @@ export default async function EmployeeLeavePage() {
   ]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-4 md:p-5">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 pb-5 md:p-5 md:pb-6">
       <MyLeaveSelfServiceView
+        stickyHeader
         policyHref={EMPLOYEE_ROUTES.leavePolicy}
         canApply={canApply}
         canEdit={canEdit}

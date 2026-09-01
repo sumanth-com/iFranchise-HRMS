@@ -2,6 +2,7 @@ import {
   Bell,
   CalendarCheck,
   CalendarDays,
+  Megaphone,
   FileText,
   LaptopMinimal,
   LayoutDashboard,
@@ -50,6 +51,11 @@ export const employeeNavItems: NavigationItem[] = [
     href: EMPLOYEE_ROUTES.documents,
     icon: FileText,
     permissions: ["documents.view"],
+  },
+  {
+    title: "My Announcements",
+    href: EMPLOYEE_ROUTES.announcements,
+    icon: Megaphone,
   },
   {
     title: "Leave",

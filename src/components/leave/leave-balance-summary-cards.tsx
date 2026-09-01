@@ -56,7 +56,7 @@ export function LeaveBalanceSummaryCards({
 
   return (
     <div className={className}>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {cards.map((card) => {
           const isActive = selectedCode?.toUpperCase() === card.key;
           const cardClassName = cn(
@@ -92,12 +92,16 @@ export function LeaveBalanceSummaryCards({
                   {card.value}
                 </p>
                 <p className="mt-1 truncate text-[11px] leading-4 text-foreground/80 dark:text-white/90">
-                  {LEAVE_BALANCE_AVAILABLE_CAPTION}
-                  {selectable
+                  {card.key === "OH"
+                    ? "Available this year"
+                    : LEAVE_BALANCE_AVAILABLE_CAPTION}
+                  {selectable && card.key !== "OH"
                     ? isActive
                       ? " · showing this month's history"
                       : " · click for this month's history"
-                    : null}
+                    : selectable && card.key === "OH"
+                      ? " · click to view dates"
+                      : null}
                 </p>
               </div>
             </>

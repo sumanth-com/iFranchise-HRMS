@@ -4,6 +4,7 @@ import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { getEmployeeById } from "@/lib/employees/services/employee-detail";
 import { canEditLeavePolicy } from "@/lib/leave/leave-policy-permissions";
+import { hidePeriodLeaveFromPolicyDocument } from "@/lib/leave/leave-policy-employee-display";
 import { getLeavePolicyPageData } from "@/lib/leave/services/leave-policy-queries";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -33,7 +34,7 @@ export default async function EmployeeLeavePolicyPage() {
       <LeavePolicyView
         backHref={EMPLOYEE_ROUTES.leave}
         employeeName={resolveEmployeeGreetingName(employee)}
-        document={policy.document}
+        document={hidePeriodLeaveFromPolicyDocument(policy.document)}
         mandatoryHolidays={policy.mandatoryHolidays}
         optionalHolidays={policy.optionalHolidays}
         holidayYear={policy.holidayYear}

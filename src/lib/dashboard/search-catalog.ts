@@ -243,6 +243,14 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
     permission: "organization.view",
   },
   {
+    id: "company-announcements",
+    label: "Announcements",
+    description: "Company announcements and acknowledgements",
+    href: ORGANIZATION_ROUTES.announcements,
+    keywords: ["announcement", "notice", "policy", "acknowledgement"],
+    permission: "organization.view",
+  },
+  {
     id: "roles",
     label: "Roles & Access",
     description: "Access control",

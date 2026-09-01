@@ -1,4 +1,5 @@
 import { GoalsWorkspace } from "@/components/performance/goals-management";
+import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { requireCeoPortal } from "@/lib/ceo/read-only-permissions";
 import {
   PERFORMANCE_CLIENT_FETCH_SIZE,
@@ -37,13 +38,14 @@ export default async function CeoGoalsPage({ searchParams }: GoalsPageProps) {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Goals & OKRs</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          View assigned goals and progress across the organization.
+          Assign goals and track progress across the organization.
         </p>
       </div>
 
       <GoalsWorkspace
-        canCreate={false}
-        canManage={false}
+        canCreate
+        canManage
+        listBasePath={CEO_ROUTES.performanceGoals}
         formProps={{
           employees: lookups.employees,
           categories: settings.settings.goalCategories,

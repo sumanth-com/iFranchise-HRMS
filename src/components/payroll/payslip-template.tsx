@@ -92,11 +92,6 @@ export function PayslipTemplate({
     payslip.totalDeductions;
   const netPay = payslip.netSalary || totalEarnings - totalDeductions;
 
-  const leave = payslip.leaveBalances ?? {
-    casual: { usedInMonth: 0, balance: 0 },
-    earned: { usedInMonth: 0, balance: 0 },
-  };
-
   const maxRows = Math.max(earnings.length, deductions.length, 1);
 
   return (
@@ -192,34 +187,6 @@ export function PayslipTemplate({
               </td>
               <td className="border-r border-black p-2.5 font-bold uppercase">LOP Days</td>
               <td className="p-2.5 font-semibold tabular-nums">{Number(lopDays).toFixed(2)}</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <div className="border-b border-black bg-white py-1.5 text-center font-bold uppercase tracking-wide">
-          No. of Available Leave Days
-        </div>
-        <table className="w-full table-fixed border-collapse">
-          <tbody>
-            <tr className="border-b border-black">
-              <td className="w-[22%] border-r border-black p-2.5 font-bold">Casual Leave</td>
-              <td className="w-[28%] border-r border-black p-2.5 font-semibold tabular-nums">
-                {leave.casual.usedInMonth.toFixed(2)}
-              </td>
-              <td className="w-[22%] border-r border-black p-2.5 font-bold">Earned Leave</td>
-              <td className="w-[28%] p-2.5 font-semibold tabular-nums">
-                {leave.earned.usedInMonth.toFixed(2)}
-              </td>
-            </tr>
-            <tr className="border-b border-black">
-              <td className="border-r border-black p-2.5 font-bold">Casual Leave Balance</td>
-              <td className="border-r border-black p-2.5 font-semibold tabular-nums">
-                {leave.casual.balance.toFixed(2)}
-              </td>
-              <td className="border-r border-black p-2.5 font-bold">Earned Leave Balance</td>
-              <td className="p-2.5 font-semibold tabular-nums">
-                {leave.earned.balance.toFixed(2)}
-              </td>
             </tr>
           </tbody>
         </table>

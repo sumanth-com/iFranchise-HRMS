@@ -1,4 +1,4 @@
-import { PromotionsTable } from "@/components/performance/promotion-management";
+import { PromotionForm, PromotionsTable } from "@/components/performance/promotion-management";
 import { requireCeoPortal } from "@/lib/ceo/read-only-permissions";
 import {
   PERFORMANCE_CLIENT_FETCH_SIZE,
@@ -30,14 +30,18 @@ export default async function CeoPromotionsPage() {
           Promotion and salary recommendations with approval workflow.
         </p>
       </div>
+      <PromotionForm
+        employees={lookups.employees}
+        designations={lookups.designations}
+      />
       <PromotionsTable
         records={result.data}
         pageSize={PERFORMANCE_TABLE_PAGE_SIZE}
         employees={lookups.employees}
         designations={lookups.designations}
-        canApprove={false}
-        canEdit={false}
-        canDelete={false}
+        canApprove
+        canEdit
+        canDelete
       />
     </div>
   );

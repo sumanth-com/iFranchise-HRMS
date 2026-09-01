@@ -1,3 +1,4 @@
+import { isOptionalHolidayCode } from "@/lib/leave/optional-holiday";
 import { calculateLeaveDuration } from "@/lib/leave/services/leave-calendar-engine";
 import {
   buildLeavePreviewMessages,
@@ -88,11 +89,13 @@ export function previewLeaveApplication(input: {
     requiresManagerAndHr: input.context.approvalLevels >= 2,
   });
 
-  const split = splitLeaveDaysByBalance({
-    totalDays: duration.totalLeaveDays,
-    availableBalance: available,
-    isPaid: leaveType.isPaid,
-  });
+  const split = isOptionalHolidayCode(leaveType.code)
+    ? { paidDays: duration.totalLeaveDays, lopDays: 0 }
+    : splitLeaveDaysByBalance({
+        totalDays: duration.totalLeaveDays,
+        availableBalance: available,
+        isPaid: leaveType.isPaid,
+      });
 
   return {
     duration,

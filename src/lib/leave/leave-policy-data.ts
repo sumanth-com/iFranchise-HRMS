@@ -24,7 +24,6 @@ export const MANDATORY_HOLIDAYS_2026: readonly LeavePolicyHoliday[] = [
   { name: "Mahatma Gandhi Jayanthy", date: "02.10.2026", day: "Friday", isoDate: "2026-10-02" },
   { name: "Dusshera", date: "20.10.2026", day: "Tuesday", isoDate: "2026-10-20" },
   { name: "Deepavali", date: "08.11.2026", day: "Sunday", isoDate: "2026-11-08" },
-  { name: "Christmas", date: "25.12.2026", day: "Friday", isoDate: "2026-12-25" },
 ] as const;
 
 export const OPTIONAL_HOLIDAYS_2026: readonly LeavePolicyHoliday[] = [
@@ -39,4 +38,9 @@ export const OPTIONAL_HOLIDAYS_2026: readonly LeavePolicyHoliday[] = [
     isoDate: "2026-06-25",
   },
   { name: "Sri Krishnaashtami", date: "04.09.2026", day: "Friday", isoDate: "2026-09-04" },
+  { name: "Christmas", date: "25.12.2026", day: "Friday", isoDate: "2026-12-25" },
+] as const;
+
+export const OPTIONAL_HOLIDAYS_2027: readonly LeavePolicyHoliday[] = [
+  { name: "New Year", date: "01.01.2027", day: "Friday", isoDate: "2027-01-01" },
 ] as const;

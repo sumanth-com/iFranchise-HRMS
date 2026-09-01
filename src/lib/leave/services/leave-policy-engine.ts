@@ -1,6 +1,7 @@
 import { addDays, addMonths, differenceInCalendarDays, format, parseISO } from "date-fns";
 
 import type { LeaveDurationBreakdown } from "@/lib/leave/services/leave-calendar-engine";
+import { isOptionalHolidayCode } from "@/lib/leave/optional-holiday";
 import { roundLeaveDays } from "@/lib/leave/services/leave-usage";
 
 export const PERIOD_LEAVE_CODE = "PL";
@@ -61,7 +62,8 @@ export function earliestAllowedLeaveStart(
   if (
     options?.isHalfDay ||
     code === PERIOD_LEAVE_CODE ||
-    code === LOSS_OF_PAY_CODE
+    code === LOSS_OF_PAY_CODE ||
+    isOptionalHolidayCode(code)
   ) {
     return today;
   }
@@ -218,6 +220,8 @@ export function validateLeavePolicy(input: {
           message: `During probation you can take a total of ${probationRules.casualLeaveCap} Casual Leave days in the second and third months.`,
         });
       }
+    } else if (isOptionalHolidayCode(code)) {
+      /* Optional Holiday is allowed after the first probation month. */
     } else if (code !== LOSS_OF_PAY_CODE) {
       issues.push({
         code: "probation_type",
@@ -248,8 +252,7 @@ export function validateLeavePolicy(input: {
           });
         }
       }
-    } else if (code !== LOSS_OF_PAY_CODE) {
-      // Half-day leave can be applied for the present day; full-day still needs advance notice.
+    } else if (code !== LOSS_OF_PAY_CODE && !isOptionalHolidayCode(code)) {
       const earliest = earliestAllowedLeaveStart(code, notice, now, {
         isHalfDay: input.isHalfDay,
       });
@@ -264,7 +267,7 @@ export function validateLeavePolicy(input: {
     }
   }
 
-  if (input.isPaid && input.availableBalance != null) {
+  if (input.isPaid && input.availableBalance != null && !isOptionalHolidayCode(code)) {
     if (input.duration.totalLeaveDays > input.availableBalance + 1e-9) {
       issues.push({
         code: "balance",

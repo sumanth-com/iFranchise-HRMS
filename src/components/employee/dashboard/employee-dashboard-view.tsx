@@ -16,7 +16,13 @@ export function EmployeeDashboardView({
   canManageAnnouncements = false,
   canUpdateCheckout = false,
   subtitle,
-}: EmployeeDashboardData & { subtitle?: string }) {
+  pairHolidayBirthday = false,
+  showImportantNotices = false,
+}: EmployeeDashboardData & {
+  subtitle?: string;
+  pairHolidayBirthday?: boolean;
+  showImportantNotices?: boolean;
+}) {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 md:p-5">
       <div className="mx-auto flex h-full min-h-0 w-full max-w-[88rem] flex-col gap-3">
@@ -49,6 +55,8 @@ export function EmployeeDashboardView({
             events={upcomingHolidays}
             referenceDate={referenceDate}
             canManageAnnouncements={canManageAnnouncements}
+            pairHolidayBirthday={pairHolidayBirthday}
+            showImportantNotices={showImportantNotices}
             className="min-h-0 h-full"
           />
         </div>

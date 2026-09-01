@@ -1,3 +1,4 @@
+import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
 import type { GoalDetail, GoalStatus, OneOnOneDetail, ReviewDetail } from "@/types/performance";
@@ -436,7 +437,7 @@ export async function updateKpiProgress(
 
   const employee = unwrapRelation(kpi.employees as { reporting_manager_id: string | null } | null);
   const canManage = profile.permissionCodes.some((code) =>
-    ["kpi.manage", "performance.create", "performance.settings"].includes(code),
+    ["kpi.manage", "performance.create", "performance.settings", PORTAL_PERMISSIONS.ceo].includes(code),
   );
   const isManager =
     kpi.manager_employee_id === profile.employee.id ||

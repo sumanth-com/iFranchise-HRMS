@@ -40,6 +40,13 @@ import {
   roundLeaveDays,
 } from "@/lib/leave/services/leave-usage";
 import {
+  OPTIONAL_HOLIDAY_CODE,
+  OPTIONAL_HOLIDAY_YEARLY_LIMIT,
+  remainingOptionalHolidayEntitlement,
+  upcomingOptionalHolidays,
+  type OptionalHolidayRecord,
+} from "@/lib/leave/optional-holiday";
+import {
   getBranches,
   getDepartments,
   getEmploymentTypes,
@@ -750,6 +757,58 @@ async function computeOrgLeaveBalanceUtilizationPercent(
   return Math.round((usedTotal / allocatedTotal) * 100);
 }
 
+export async function listOrganizationOptionalHolidays(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  year: number,
+): Promise<OptionalHolidayRecord[]> {
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("holidays")
+    .select("id, name, holiday_date")
+    .eq("organization_id", organizationId)
+    .eq("is_optional", true)
+    .eq("status", "active")
+    .gte("holiday_date", `${year}-01-01`)
+    .lte("holiday_date", `${year}-12-31`)
+    .is("deleted_at", null)
+    .order("holiday_date");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    id: String(row.id),
+    name: String(row.name),
+    date: String(row.holiday_date).slice(0, 10),
+  }));
+}
+
+export async function listEmployeeOptionalHolidaySelections(
+  supabase: AuthSupabaseClient,
+  employeeId: string,
+  year: number,
+): Promise<Map<string, "pending" | "approved">> {
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("leave_requests")
+    .select("start_date, leave_status, leave_types:leave_type_id (code)")
+    .eq("employee_id", employeeId)
+    .in("leave_status", ["pending", "approved"])
+    .gte("start_date", `${year}-01-01`)
+    .lte("start_date", `${year}-12-31`)
+    .is("deleted_at", null);
+  if (error) throw new Error(error.message);
+
+  const taken = new Map<string, "pending" | "approved">();
+  for (const row of data ?? []) {
+    const leaveType = Array.isArray(row.leave_types) ? row.leave_types[0] : row.leave_types;
+    if (String(leaveType?.code ?? "").toUpperCase() !== OPTIONAL_HOLIDAY_CODE) continue;
+    const date = String(row.start_date).slice(0, 10);
+    const status = row.leave_status === "approved" ? "approved" : "pending";
+    if (taken.get(date) === "approved") continue;
+    taken.set(date, status);
+  }
+  return taken;
+}
+
 export async function getEmployeeLeaveBalanceSnapshot(
   supabase: AuthSupabaseClient,
   employeeId: string,
@@ -923,7 +982,7 @@ export async function getEmployeeLeaveBalanceSnapshot(
 
   // Display codes are synthesized even without a balance row, so an ineligible
   // employee would otherwise still get a Menstruation Leave card showing 0/12.
-  return LEAVE_BALANCE_DISPLAY_CODES.filter(
+  const snapshots = LEAVE_BALANCE_DISPLAY_CODES.filter(
     (code) => showPeriodLeave || !isPeriodLeaveCode(code),
   ).map((code) => {
     const balance = balanceByCode.get(code);
@@ -952,6 +1011,33 @@ export async function getEmployeeLeaveBalanceSnapshot(
       yearTakenDays: roundLeaveDays(yearTakenByCode[code] ?? 0),
     };
   });
+
+  if (organizationId) {
+    const oh = snapshots.find((row) => row.leaveTypeCode === OPTIONAL_HOLIDAY_CODE);
+    if (oh) {
+      const [holidays, taken] = await Promise.all([
+        listOrganizationOptionalHolidays(supabase, organizationId, calendarYear),
+        listEmployeeOptionalHolidaySelections(supabase, employeeId, calendarYear),
+      ]);
+      const yearlyLimit = Math.max(oh.allocatedDays || 0, OPTIONAL_HOLIDAY_YEARLY_LIMIT);
+      const usedOrPending = taken.size;
+      const upcomingAvailable = upcomingOptionalHolidays(holidays, getTodayDateString()).filter(
+        (holiday) => !taken.has(holiday.date),
+      ).length;
+      oh.allocatedDays = yearlyLimit;
+      oh.usedDays = [...taken.values()].filter((status) => status === "approved").length;
+      oh.pendingDays = [...taken.values()].filter((status) => status === "pending").length;
+      oh.yearTakenDays = usedOrPending;
+      oh.monthTotalDays = yearlyLimit;
+      oh.balanceDays = remainingOptionalHolidayEntitlement({
+        yearlyLimit,
+        usedOrPending,
+        upcomingAvailableDates: upcomingAvailable,
+      });
+    }
+  }
+
+  return snapshots;
 }
 
 export async function listLeaveBalances(

@@ -18,6 +18,7 @@ import {
   normalizeRelationshipValue,
 } from "@/lib/employee/profile-contact";
 import { updateEmployeeSelfProfileAction } from "@/lib/employees/actions";
+import { cn } from "@/lib/utils";
 import type { MyProfileBundle } from "@/types/my-profile";
 import {
   employeeSelfProfilePreferencesOnlySchema,
@@ -259,7 +260,12 @@ export function MyProfileView({
           </div>
         </div>
 
-        <div className="mt-4 grid min-h-0 gap-4 lg:grid-cols-[minmax(0,17.5rem)_minmax(0,1fr)] lg:items-start">
+        <div
+          className={cn(
+            "mt-4 grid min-h-0 gap-4 lg:grid-cols-[minmax(0,17.5rem)_minmax(0,1fr)] lg:items-start",
+            isEditing && "flex-1 overflow-y-auto overscroll-contain pb-6",
+          )}
+        >
           <div className="mx-auto flex w-full max-w-[17.5rem] flex-col lg:mx-0 lg:max-w-none">
             <EmployeeIdCard
               employeeId={data.employeeId}
