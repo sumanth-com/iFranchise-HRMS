@@ -43,6 +43,14 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
     permission: "employee.view",
   },
   {
+    id: "employee-directory",
+    label: "Employee Directory",
+    description: "Browse colleagues by department and team",
+    href: "/dashboard/directory",
+    keywords: ["employee directory", "colleagues", "people", "staff", "directory"],
+    permission: "employee.directory.view",
+  },
+  {
     id: "employees-new",
     label: "Add Employee",
     description: "Create a new employee record",

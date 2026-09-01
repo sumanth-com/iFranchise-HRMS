@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -25,29 +25,49 @@ import type { CompanyAnnouncementEmployeeView } from "@/types/company-announceme
 type Props = {
   announcement: CompanyAnnouncementEmployeeView;
   onAcknowledged: (announcementId: string) => void;
+  onAcknowledgeFailed: (
+    announcement: CompanyAnnouncementEmployeeView,
+    message: string,
+  ) => void;
+  onAcknowledgeSucceeded: () => void;
 };
 
-export function MandatoryAnnouncementDialog({ announcement, onAcknowledged }: Props) {
+export function MandatoryAnnouncementDialog({
+  announcement,
+  onAcknowledged,
+  onAcknowledgeFailed,
+  onAcknowledgeSucceeded,
+}: Props) {
   const [checked, setChecked] = useState(false);
-  const [reachedEnd, setReachedEnd] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
-  const contentRef = useRef<HTMLDivElement>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const published = announcement.publishedAt ?? announcement.publishAt;
+  const checkboxId = `acknowledge-${announcement.id}`;
 
   useEffect(() => {
     setChecked(false);
-    setReachedEnd(false);
     setError(null);
-    const node = contentRef.current;
-    if (!node) return;
-    const markIfShort = () => {
-      if (node.scrollHeight <= node.clientHeight + 8) setReachedEnd(true);
-    };
-    markIfShort();
-    const frame = requestAnimationFrame(markIfShort);
-    return () => cancelAnimationFrame(frame);
+    setIsSubmitting(false);
   }, [announcement.id, announcement.versionId]);
+
+  const handleAccept = () => {
+    if (!checked || isSubmitting) return;
+    setIsSubmitting(true);
+    setError(null);
+    onAcknowledged(announcement.id);
+
+    void acknowledgeCompanyAnnouncementAction(announcement.id, announcement.versionId).then(
+      (result) => {
+        if (!result.success) {
+          setIsSubmitting(false);
+          setError(result.message);
+          onAcknowledgeFailed(announcement, result.message);
+          return;
+        }
+        onAcknowledgeSucceeded();
+      },
+    );
+  };
 
   return (
     <Dialog
@@ -60,7 +80,7 @@ export function MandatoryAnnouncementDialog({ announcement, onAcknowledged }: Pr
     >
       <DialogContent
         showCloseButton={false}
-        className="flex max-h-[min(92vh,46rem)] w-full max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
+        className="pointer-events-auto flex max-h-[min(92vh,46rem)] w-full max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
         onKeyDown={(event) => {
           if (event.key === "Escape") event.preventDefault();
         }}
@@ -84,16 +104,7 @@ export function MandatoryAnnouncementDialog({ announcement, onAcknowledged }: Pr
           <p className="text-xs text-muted-foreground">{announcement.companyName} · Human Resources</p>
         </DialogHeader>
 
-        <div
-          ref={contentRef}
-          className="min-h-0 flex-1 overflow-y-auto px-5 py-4"
-          onScroll={(event) => {
-            const node = event.currentTarget;
-            if (node.scrollHeight - node.scrollTop - node.clientHeight < 12) {
-              setReachedEnd(true);
-            }
-          }}
-        >
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {announcement.shortDescription ? (
             <p className="mb-3 text-sm font-medium">{announcement.shortDescription}</p>
           ) : null}
@@ -103,16 +114,17 @@ export function MandatoryAnnouncementDialog({ announcement, onAcknowledged }: Pr
           <AnnouncementDocumentPreview attachments={announcement.attachments} />
         </div>
 
-        <DialogFooter className="m-0 shrink-0 flex-col items-stretch gap-3 border-t px-5 py-3 sm:flex-col sm:space-x-0">
-          {!reachedEnd ? (
-            <p className="text-xs text-muted-foreground">Scroll through the announcement to continue.</p>
-          ) : null}
-          <label className="flex items-start gap-2 text-sm">
+        <DialogFooter className="relative z-20 m-0 shrink-0 flex-col items-stretch gap-3 border-t bg-background px-5 py-3 sm:flex-col sm:space-x-0">
+          <label
+            htmlFor={checkboxId}
+            className="flex cursor-pointer items-start gap-3 rounded-lg border bg-muted/30 px-3 py-2.5 text-sm leading-snug transition-colors hover:bg-muted/50"
+          >
             <input
+              id={checkboxId}
               type="checkbox"
-              className="mt-0.5 size-4 rounded border"
+              className="mt-0.5 size-4 shrink-0 cursor-pointer rounded border accent-violet-600"
               checked={checked}
-              disabled={!reachedEnd}
+              disabled={isSubmitting}
               onChange={(event) => setChecked(event.target.checked)}
             />
             I acknowledge that I have read this announcement.
@@ -120,23 +132,11 @@ export function MandatoryAnnouncementDialog({ announcement, onAcknowledged }: Pr
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
           <Button
             type="button"
-            disabled={!checked || !reachedEnd || isPending}
-            onClick={() => {
-              startTransition(async () => {
-                setError(null);
-                const result = await acknowledgeCompanyAnnouncementAction(
-                  announcement.id,
-                  announcement.versionId,
-                );
-                if (!result.success) {
-                  setError(result.message);
-                  return;
-                }
-                onAcknowledged(announcement.id);
-              });
-            }}
+            className="w-full"
+            disabled={!checked || isSubmitting}
+            onClick={handleAccept}
           >
-            {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+            {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : null}
             Accept & Close
           </Button>
         </DialogFooter>

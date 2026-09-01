@@ -22,6 +22,8 @@ const DESIGNATION_DISPLAY_BY_EMPLOYEE_CODE: Record<string, string> = {
   "IF-PENDING-SA": "Website Development Intern",
 };
 
+const DIRECTORY_TECHNOLOGY_DEPARTMENT = "Technology";
+
 type DirectoryPersonName = {
   employeeCode?: string | null;
   firstName?: string | null;
@@ -30,6 +32,14 @@ type DirectoryPersonName = {
 
 function directoryFullName(person?: DirectoryPersonName): string {
   return `${person?.firstName ?? ""} ${person?.lastName ?? ""}`.trim().toLowerCase();
+}
+
+function isDirectorySumanth(person?: DirectoryPersonName): boolean {
+  const code = normalizeEmployeeCode(person?.employeeCode);
+  if (code === "IF2026009" || code.startsWith("IF-PENDING-SA")) return true;
+
+  const fullName = directoryFullName(person);
+  return fullName.includes("sumanth") && fullName.includes("reddy");
 }
 
 function designationForDirectoryPerson(person?: DirectoryPersonName): string | null {
@@ -92,4 +102,20 @@ export function directoryDesignationDisplay(
 
   const mapped = DESIGNATION_DISPLAY_BY_TITLE[trimmedTitle.toLowerCase()];
   return mapped ?? trimmedTitle;
+}
+
+/** Directory-only: show Sumanth under Technology. */
+export function directoryDepartmentOverride(
+  person?: DirectoryPersonName,
+): { name: string } | null {
+  if (!isDirectorySumanth(person)) return null;
+  return { name: DIRECTORY_TECHNOLOGY_DEPARTMENT };
+}
+
+/** Directory-only labels (does not rename departments in HR data). */
+export function directoryDepartmentLabel(name: string | null | undefined): string | null {
+  const trimmed = (name ?? "").trim();
+  if (!trimmed) return name ?? null;
+  if (trimmed.toLowerCase() === "administration") return "C Suite";
+  return trimmed;
 }

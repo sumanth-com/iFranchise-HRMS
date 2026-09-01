@@ -34,6 +34,7 @@ import {
   ensurePendingExecutiveLeaveAssignedToCeo,
   getEmployeeRoleCodes,
   isCeoLeaveApprover,
+  canActorDecideLeaveRequest,
   listCeoLeaveApproverEmployeeIds,
 } from "@/lib/leave/services/leave-queries";
 import {
@@ -340,7 +341,11 @@ export async function listCeoApprovalQueue(
       .filter((a) => a.approval_status === "pending")
       .sort((a, b) => a.approval_level - b.approval_level)[0]?.approval_level;
     const ceoStep = levelByRequest.get(row.id);
-    if (!ceoStep || activeLevel == null || ceoStep.level !== activeLevel) continue;
+    if (!ceoStep || activeLevel == null) continue;
+    const ceoCanActOnCurrentStep =
+      ceoStep.level === activeLevel ||
+      (activeLevel === 1 && ceoStep.level === 2);
+    if (!ceoCanActOnCurrentStep) continue;
 
     const record = mapLeaveRow(row);
     let roleCodes = roleCodesByEmployee.get(row.employee_id);
@@ -348,14 +353,16 @@ export async function listCeoApprovalQueue(
       roleCodes = await getEmployeeRoleCodes(supabase, row.employee_id);
       roleCodesByEmployee.set(row.employee_id, roleCodes);
     }
-    const requestCategory = getExecutiveRequestCategory(roleCodes) ?? "hr";
+    const requestCategory = getExecutiveRequestCategory(roleCodes);
 
     items.push({
       ...record,
       approvalRecordId: ceoStep.id,
       submittedAt: row.created_at,
-      requestCategory,
-      requestCategoryLabel: executiveRequestCategoryLabel(requestCategory),
+      requestCategory: requestCategory ?? "hr",
+      requestCategoryLabel: requestCategory
+        ? executiveRequestCategoryLabel(requestCategory)
+        : "Employee Request",
     });
   }
 
@@ -918,10 +925,14 @@ export async function getCeoLeaveDetail(
   const activeLevel = detail.approvals
     .filter((a) => a.approvalStatus === "pending")
     .sort((a, b) => a.approvalLevel - b.approvalLevel)[0];
-  const canAct =
-    detail.leaveStatus === "pending" &&
-    activeLevel != null &&
-    activeLevel.approverEmployeeId === profile.employee.id;
+  const canAct = canActorDecideLeaveRequest({
+    profile,
+    applicantEmployeeId: detail.employeeId,
+    leaveStatus: detail.leaveStatus,
+    pendingLevel: activeLevel?.approvalLevel ?? null,
+    pendingApproverEmployeeId: activeLevel?.approverEmployeeId ?? null,
+    executiveApplicant: executiveDirectToCeo,
+  });
 
   return {
     id: detail.id,

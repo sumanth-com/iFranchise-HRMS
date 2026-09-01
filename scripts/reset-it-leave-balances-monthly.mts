@@ -1,7 +1,6 @@
 /**
- * One-off: reset ONLY Casual/Earned leave_balances for it@ifranchise.in
- * to monthly-accrual starting state (CL=1, EL=1 for current month).
- * Does not touch profile, auth, payroll, attendance, or other employees.
+ * Reset Casual/Earned leave for it@ifranchise.in:
+ * CL and EL each have 1 day available for the current month (1 credit per month).
  *
  * Usage: npx tsx scripts/reset-it-leave-balances-monthly.mts
  */
@@ -12,7 +11,7 @@ config({ path: ".env.local" });
 config({ path: ".env" });
 
 const TARGET_EMAIL = "it@ifranchise.in";
-const MONTHLY_CODES = new Set(["CL", "EL"]);
+const LEDGER_CODES = new Set(["CL", "EL"]);
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,10 +21,6 @@ const admin = createClient(
 const hrms = admin.schema("hrms");
 
 function currentMonthStart() {
-  const now = new Date();
-  const y = now.getUTCFullYear();
-  const m = String(now.getUTCMonth() + 1).padStart(2, "0");
-  // Use local calendar month for leave (IST org) — mirror app getTodayDateString zone via local date.
   const local = new Date();
   const ly = local.getFullYear();
   const lm = String(local.getMonth() + 1).padStart(2, "0");
@@ -34,9 +29,10 @@ function currentMonthStart() {
 
 async function main() {
   const monthStart = currentMonthStart();
+  const year = new Date().getFullYear();
   const { data: emp, error: empErr } = await hrms
     .from("employees")
-    .select("id, email, first_name, last_name, employee_code")
+    .select("id, email, first_name, last_name, employee_code, organization_id")
     .ilike("email", TARGET_EMAIL)
     .is("deleted_at", null)
     .maybeSingle();
@@ -52,7 +48,7 @@ async function main() {
       "id, balance_year, allocated_days, used_days, pending_days, balance_days, accrued_through_month, leave_type_id, leave_types:leave_type_id(code,name)",
     )
     .eq("employee_id", emp.id)
-    .eq("balance_year", new Date().getFullYear())
+    .eq("balance_year", year)
     .is("deleted_at", null);
 
   if (balErr) throw new Error(balErr.message);
@@ -61,7 +57,7 @@ async function main() {
     const code = String(
       (Array.isArray(row.leave_types) ? row.leave_types[0]?.code : row.leave_types?.code) ?? "",
     ).toUpperCase();
-    return MONTHLY_CODES.has(code);
+    return LEDGER_CODES.has(code);
   });
 
   console.log(
@@ -76,22 +72,22 @@ async function main() {
     })),
   );
 
-  // Cancel only pending CL/EL requests so the new ledger (pending=0) stays consistent.
-  // Approved/rejected/cancelled history is left intact for the calendar.
   const typeIds = clEl.map((r) => r.leave_type_id);
   if (typeIds.length > 0) {
     const now = new Date().toISOString();
-    const { data: pending, error: pendingErr } = await hrms
+    const { data: open, error: openErr } = await hrms
       .from("leave_requests")
       .select("id, leave_status, leave_type_id")
       .eq("employee_id", emp.id)
-      .eq("leave_status", "pending")
+      .in("leave_status", ["pending", "approved"])
       .in("leave_type_id", typeIds)
+      .gte("start_date", `${year}-01-01`)
+      .lte("end_date", `${year}-12-31`)
       .is("deleted_at", null);
 
-    if (pendingErr) throw new Error(pendingErr.message);
+    if (openErr) throw new Error(openErr.message);
 
-    if (pending && pending.length > 0) {
+    if (open && open.length > 0) {
       const { error: cancelErr } = await hrms
         .from("leave_requests")
         .update({
@@ -100,15 +96,15 @@ async function main() {
         })
         .in(
           "id",
-          pending.map((p) => p.id),
+          open.map((p) => p.id),
         );
       if (cancelErr) throw new Error(cancelErr.message);
       console.log(
-        "Cancelled pending CL/EL requests (leave-balance reset only):",
-        pending.map((p) => p.id),
+        "Cancelled CL/EL requests for test reset:",
+        open.map((p) => ({ id: p.id, status: p.leave_status })),
       );
     } else {
-      console.log("No pending CL/EL requests to cancel.");
+      console.log("No pending/approved CL/EL requests to cancel.");
     }
   }
 
@@ -135,14 +131,14 @@ async function main() {
       "allocated_days, used_days, pending_days, balance_days, accrued_through_month, leave_types:leave_type_id(code)",
     )
     .eq("employee_id", emp.id)
-    .eq("balance_year", new Date().getFullYear())
+    .eq("balance_year", year)
     .in(
       "id",
       clEl.map((r) => r.id),
     );
 
   console.log("After reset:", JSON.stringify(after, null, 2));
-  console.log("Done. No other employees modified. Profile/auth/payroll untouched.");
+  console.log("Done. No other employees modified.");
 }
 
 main().catch((err) => {

@@ -56,6 +56,12 @@ export const mainNavItems: NavigationItem[] = [
     permissions: ["employee_profile.view"],
   },
   {
+    title: "Employee Directory",
+    href: HR_HUB_ROUTES.directory,
+    icon: Users,
+    section: "Self-service",
+  },
+  {
     title: "Attendance",
     href: HR_HUB_ROUTES.myAttendance,
     icon: CalendarCheck,

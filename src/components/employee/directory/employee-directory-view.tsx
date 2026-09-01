@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/common/select";
+import { directoryDepartmentLabel, directoryDepartmentOverride } from "@/lib/employee/directory-listing";
 import type { LookupOption } from "@/types/employee";
 import type { EmployeeDirectoryPerson } from "@/types/employee-directory";
 
@@ -63,22 +64,49 @@ export function EmployeeDirectoryView({
   const [query, setQuery] = useState("");
   const [departmentId, setDepartmentId] = useState(ALL_DEPARTMENTS);
 
-  const departmentItems = useMemo(
-    () => [
+  const directoryPeople = useMemo(() => {
+    const technology = departments.find(
+      (dept) => dept.label.trim().toLowerCase() === "technology",
+    );
+
+    return people.map((person) => {
+      const override = directoryDepartmentOverride(person);
+      const departmentName = directoryDepartmentLabel(override?.name ?? person.departmentName);
+
+      if (!override && departmentName === person.departmentName) return person;
+
+      return {
+        ...person,
+        departmentName,
+        departmentId: override ? (technology?.id ?? person.departmentId) : person.departmentId,
+      };
+    });
+  }, [people, departments]);
+
+  const departmentItems = useMemo(() => {
+    const usedIds = new Set(
+      directoryPeople.map((person) => person.departmentId).filter((id): id is string => Boolean(id)),
+    );
+
+    return [
       { value: ALL_DEPARTMENTS, label: ALL_DEPARTMENTS_LABEL },
-      ...departments.map((dept) => ({ value: dept.id, label: dept.label })),
-    ],
-    [departments],
-  );
+      ...departments
+        .filter((dept) => usedIds.has(dept.id))
+        .map((dept) => ({
+          value: dept.id,
+          label: directoryDepartmentLabel(dept.label) ?? dept.label,
+        })),
+    ];
+  }, [departments, directoryPeople]);
 
   const filtered = useMemo(() => {
-    return people.filter((person) => {
+    return directoryPeople.filter((person) => {
       if (departmentId !== ALL_DEPARTMENTS && person.departmentId !== departmentId) {
         return false;
       }
       return personMatchesQuery(person, query);
     });
-  }, [people, query, departmentId]);
+  }, [directoryPeople, query, departmentId]);
 
   const toolbar = (
     <div className="flex flex-col gap-4">
@@ -92,7 +120,7 @@ export function EmployeeDirectoryView({
 
         <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:min-w-0 sm:items-end">
           <div className="flex w-full items-center gap-3 sm:w-auto">
-            {departments.length > 0 ? (
+            {departmentItems.length > 1 ? (
               <Select
                 items={departmentItems}
                 value={departmentId}
@@ -150,7 +178,7 @@ export function EmployeeDirectoryView({
         </p>
       </div>
     ) : (
-      <EmployeeDirectoryGrid people={filtered} showEmployeeCodeOnFace={false} />
+      <EmployeeDirectoryGrid people={filtered} />
     );
 
   if (stickyToolbar) {

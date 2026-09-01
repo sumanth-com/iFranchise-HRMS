@@ -30,6 +30,7 @@ import {
   isMonthlyAccrualLeaveCode,
   MONTHLY_ACCRUAL_DAYS_PER_MONTH,
 } from "@/lib/leave/services/leave-monthly-accrual";
+import { reconcileEmployeePaidLeaveLedger } from "@/lib/leave/services/leave-ledger-reconcile";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import {
   OPTIONAL_HOLIDAY_CODE,
@@ -333,6 +334,9 @@ export async function evaluateLeaveApplication(
     balanceYear: getCurrentBalanceYear(input.startDate),
     asOfDate: input.startDate,
   });
+  await reconcileEmployeePaidLeaveLedger(supabase, input.employeeId, {
+    balanceYear: getCurrentBalanceYear(input.startDate),
+  });
 
   const [runtime, employee, overlapping] = await Promise.all([
     loadLeavePolicyRuntime(supabase, organizationId),
@@ -387,21 +391,22 @@ export async function evaluateLeaveApplication(
   let availableBalance = leaveType.isPaid
     ? Number(balance?.balance_days ?? fallbackAvailable)
     : null;
-  // Never allow negative available for paid monthly types.
   if (availableBalance != null) {
     availableBalance = Math.max(0, availableBalance);
   }
-  if (probation.onProbation && code === CASUAL_LEAVE_CODE) {
-    availableBalance = Math.max(
+  if (probation.onProbation && code === CASUAL_LEAVE_CODE && availableBalance != null) {
+    const probationRemaining = Math.max(
       0,
       runtime.probation.casualLeaveCap - (employee.usedAndPendingByType[CASUAL_LEAVE_CODE] ?? 0),
     );
+    availableBalance = Math.min(availableBalance, probationRemaining);
   }
-  if (probation.onProbation && code === PERIOD_LEAVE_CODE) {
-    availableBalance = Math.max(
+  if (probation.onProbation && code === PERIOD_LEAVE_CODE && availableBalance != null) {
+    const probationRemaining = Math.max(
       0,
       runtime.probation.periodLeaveCap - (employee.usedAndPendingByType[PERIOD_LEAVE_CODE] ?? 0),
     );
+    availableBalance = Math.min(availableBalance, probationRemaining);
   }
 
   if (code === OPTIONAL_HOLIDAY_CODE) {

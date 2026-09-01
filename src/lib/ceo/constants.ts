@@ -27,6 +27,7 @@ export const CEO_ROUTES = {
   notificationsHistory: "/ceo/notifications/history",
   userProvisioning: "/ceo/user-provisioning",
   profile: "/ceo/profile",
+  directory: "/ceo/directory",
   settings: "/ceo/settings",
 } as const;
 

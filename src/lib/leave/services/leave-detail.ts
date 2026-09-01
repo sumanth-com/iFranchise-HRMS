@@ -3,8 +3,8 @@ import type { UserProfile } from "@/types/auth";
 import type { LeaveDetail } from "@/types/leave";
 import { hasPermission } from "@/lib/permissions/utils";
 import {
+  canActorDecideLeaveRequest,
   getEmployeeRoleCodes,
-  isCeoLeaveApprover,
 } from "@/lib/leave/services/leave-queries";
 import { requiresCeoLeaveApproval } from "@/lib/approvals/executive-request-routing";
 
@@ -115,7 +115,6 @@ export async function getLeaveRequestById(
     })
     .sort((a, b) => a.approvalLevel - b.approvalLevel);
 
-  const isPending = data.leave_status === "pending";
   const isHrOrAdmin = profile.roles.some((r) =>
     ["hr_admin", "hr_executive", "super_admin"].includes(r.code),
   );
@@ -123,20 +122,18 @@ export async function getLeaveRequestById(
   const pendingApproval = approvals
     .filter((step) => step.approvalStatus === "pending")
     .sort((a, b) => a.approvalLevel - b.approvalLevel)[0];
-  const isAssignedApprover =
-    pendingApproval?.approverEmployeeId === profile.employee.id;
   const applicantRoles = await getEmployeeRoleCodes(supabase, data.employee_id);
   const executiveApplicant = requiresCeoLeaveApproval(applicantRoles);
 
-  const canApprove =
-    isPending &&
-    isAssignedApprover &&
-    (executiveApplicant ? isCeoLeaveApprover(profile) : true);
-
-  const canReject =
-    isPending &&
-    isAssignedApprover &&
-    (executiveApplicant ? isCeoLeaveApprover(profile) : true);
+  const canApprove = canActorDecideLeaveRequest({
+    profile,
+    applicantEmployeeId: data.employee_id,
+    leaveStatus: data.leave_status,
+    pendingLevel: pendingApproval?.approvalLevel ?? null,
+    pendingApproverEmployeeId: pendingApproval?.approverEmployeeId ?? null,
+    executiveApplicant,
+  });
+  const canReject = canApprove;
 
   const canCancel =
     ["pending", "approved"].includes(data.leave_status) &&

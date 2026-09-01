@@ -47,20 +47,31 @@ export function previewLeaveApplication(input: {
     (item) => item.leaveTypeCode === leaveType.code,
   );
   const probationCaps = input.context.probationRules;
+  const ledgerAvailable = balance?.balanceDays ?? (leaveType.isPaid ? 0 : null);
   const available =
-    leaveType.code === CASUAL_LEAVE_CODE && input.context.probation.onProbation
-      ? Math.max(
-          0,
-          probationCaps.casualLeaveCap -
-            (input.context.employee.usedAndPendingByType[CASUAL_LEAVE_CODE] ?? 0),
-        )
-      : leaveType.code === PERIOD_LEAVE_CODE && input.context.probation.onProbation
-        ? Math.max(
+    leaveType.code === CASUAL_LEAVE_CODE &&
+    input.context.probation.onProbation &&
+    ledgerAvailable != null
+      ? Math.min(
+          Math.max(0, ledgerAvailable),
+          Math.max(
             0,
-            probationCaps.periodLeaveCap -
-              (input.context.employee.usedAndPendingByType[PERIOD_LEAVE_CODE] ?? 0),
+            probationCaps.casualLeaveCap -
+              (input.context.employee.usedAndPendingByType[CASUAL_LEAVE_CODE] ?? 0),
+          ),
+        )
+      : leaveType.code === PERIOD_LEAVE_CODE &&
+          input.context.probation.onProbation &&
+          ledgerAvailable != null
+        ? Math.min(
+            Math.max(0, ledgerAvailable),
+            Math.max(
+              0,
+              probationCaps.periodLeaveCap -
+                (input.context.employee.usedAndPendingByType[PERIOD_LEAVE_CODE] ?? 0),
+            ),
           )
-        : (balance?.balanceDays ?? (leaveType.isPaid ? 0 : null));
+        : ledgerAvailable;
   const remaining =
     available == null ? null : Number((available - duration.totalLeaveDays).toFixed(2));
 

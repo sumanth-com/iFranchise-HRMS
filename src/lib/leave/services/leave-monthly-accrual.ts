@@ -3,7 +3,7 @@ import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
 import { roundLeaveDays } from "@/lib/leave/services/leave-usage";
 
-/** Leave types that accrue 1 day per calendar month with carry-forward. */
+/** Casual Leave and Earned Leave each accrue 1 day per calendar month. */
 export const MONTHLY_ACCRUAL_LEAVE_CODES = ["CL", "EL"] as const;
 
 export const MONTHLY_ACCRUAL_DAYS_PER_MONTH = 1;
@@ -47,10 +47,10 @@ function unwrapCode(
 }
 
 /**
- * Idempotently applies monthly +1 accruals for CL/EL through the current calendar month.
+ * Idempotently applies monthly +1 accruals for CL and EL through the current month.
  * - Existing rows with null accrued_through_month are baselined (no grant).
  * - Each subsequent month adds exactly MONTHLY_ACCRUAL_DAYS_PER_MONTH.
- * Refreshing the page never double-grants.
+ * Refreshing the page never double-grants. EL is not accrued here.
  */
 export async function ensureEmployeeMonthlyLeaveAccruals(
   supabase: AuthSupabaseClient,
@@ -85,12 +85,19 @@ export async function ensureEmployeeMonthlyLeaveAccruals(
       ? String(row.accrued_through_month).slice(0, 10)
       : null;
 
-    // Baseline legacy rows: mark current month as already accounted for.
+    // First time this row is on monthly accrual: keep used/pending, credit this month only.
     if (!accruedThrough) {
+      const used = Math.max(0, Number(row.used_days));
+      const pending = Math.max(0, Number(row.pending_days));
+      const allocated = roundLeaveDays(used + pending + MONTHLY_ACCRUAL_DAYS_PER_MONTH);
+      const balanceDays = roundLeaveDays(Math.max(0, allocated - used - pending));
+
       const { error: baselineError } = await supabase
         .schema("hrms")
         .from("leave_balances")
         .update({
+          allocated_days: allocated,
+          balance_days: balanceDays,
           accrued_through_month: currentMonthStart,
           updated_at: new Date().toISOString(),
           ...(options?.actorUserId ? { updated_by: options.actorUserId } : {}),
@@ -135,7 +142,7 @@ export async function ensureEmployeeMonthlyLeaveAccruals(
 }
 
 /**
- * Opening allocated days when creating a new CL/EL balance row for a year.
+ * Opening allocated days when creating a new CL/EL row for a year.
  * Carries forward previous year remaining balance when present, then adds
  * the current month's accrual (+1). Does not backfill earlier months for
  * brand-new employees (they start at 1 for the current month).

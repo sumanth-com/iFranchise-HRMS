@@ -509,6 +509,7 @@ function buildBreadcrumbItems(
     const sectionLabels: Record<string, string> = {
       overview: "Manager Overview",
       profile: "My Profile",
+      directory: "Employee Directory",
       team: "Teammates",
       attendance: "Attendance",
       leave: "Leave",
@@ -623,6 +624,7 @@ function buildBreadcrumbItems(
       reports: "Reports",
       notifications: "Notifications",
       profile: "My Profile",
+      directory: "Employee Directory",
       settings: "Settings",
       "user-provisioning": "User Provisioning",
     };

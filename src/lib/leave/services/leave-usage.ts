@@ -55,6 +55,18 @@ export function resolveLeaveDurationBreakdown(
   );
 }
 
+/** Paid portion reserved on a request. Excess beyond balance is stored as lopDays. */
+export function paidDaysFromLeaveRequest(request: {
+  total_days?: number | string | null;
+  duration_breakdown?: unknown;
+}) {
+  const breakdown = request.duration_breakdown as { paidDays?: unknown } | null;
+  if (breakdown && typeof breakdown.paidDays === "number" && Number.isFinite(breakdown.paidDays)) {
+    return roundLeaveDays(Math.max(0, breakdown.paidDays));
+  }
+  return roundLeaveDays(Math.max(0, Number(request.total_days ?? 0)));
+}
+
 export function countLeaveDaysInRange(
   request: {
     startDate: string;

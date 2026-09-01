@@ -2,9 +2,9 @@ import { EmployeeDirectoryScreen } from "@/components/employee/directory/employe
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 
-export default async function EmployeeDirectoryPage() {
+export default async function ManagerEmployeeDirectoryPage() {
   const profile = await requireServerAnyPermission([
-    PORTAL_PERMISSIONS.employee,
+    PORTAL_PERMISSIONS.manager,
     "employee.directory.view",
   ]);
 

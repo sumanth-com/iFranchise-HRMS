@@ -76,13 +76,6 @@ function explainLeaveSubmitError(message: string): {
       hint: "Choose different dates, or cancel the existing request first, then try again.",
     };
   }
-  if (normalized.includes("balance") || normalized.includes("exceed")) {
-    return {
-      title: "Not enough leave balance",
-      body: message,
-      hint: "Shorten the leave period or pick another leave type with available days.",
-    };
-  }
   if (normalized.includes("notice") || normalized.includes("tomorrow")) {
     return {
       title: "Advance notice required",
@@ -389,8 +382,7 @@ export function LeaveForm({
       : null;
   // A shortfall in paid balance is not a blocker: the excess is submitted as LOP.
   const policyBlocksSubmit = Boolean(applyPreview?.blockingIssues.length);
-  const lopSplit =
-    applyPreview && applyPreview.split.lopDays > 0 ? applyPreview.split : null;
+  const lopSplit = applyPreview?.split ?? null;
   const submitErrorCopy = submitError ? explainLeaveSubmitError(submitError) : null;
 
   return (
@@ -625,6 +617,14 @@ export function LeaveForm({
                   {formatLeaveDays(applyPreview.duration.totalLeaveDays)} requested
                 </span>
               </p>
+              {!isOptionalHoliday ? (
+                <p className="mt-1.5 text-sm tabular-nums text-foreground">
+                  {formatLeaveDays(applyPreview.split.paidDays)} paid leave
+                  {applyPreview.split.lopDays > 0
+                    ? ` · ${formatLeaveDays(applyPreview.split.lopDays)} Loss of Pay (LOP)`
+                    : " · 0 days LOP"}
+                </p>
+              ) : null}
             </div>
             {applyPreview.blockingIssues.map((issue) => {
               const isOverlap = issue.code === "overlap";
@@ -763,7 +763,7 @@ export function LeaveForm({
       </div>
 
       <div className={cn("space-y-2 border-t", isSelfService ? "pt-2.5" : "pt-3")}>
-        {lopSplit && !isSelfService ? (
+        {lopSplit && lopSplit.lopDays > 0 && !isSelfService ? (
           <div
             role="status"
             className="flex gap-2.5 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2.5"

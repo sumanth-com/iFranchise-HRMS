@@ -326,11 +326,6 @@ export function buildLeavePreviewMessages(input: {
   if (input.availableBalance != null) {
     messages.push(`${formatDays(input.availableBalance)} available`);
   }
-  if (input.duration.sandwichDays > 0) {
-    messages.push(
-      `${formatDays(input.duration.sandwichDays)} will be counted under Sandwich Leave Policy`,
-    );
-  }
   if (input.requiresManagerAndHr) {
     messages.push("Approval required from HR");
   }

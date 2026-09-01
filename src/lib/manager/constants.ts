@@ -54,6 +54,7 @@ export const MANAGER_ROUTES = {
   notificationsHistory: "/manager/notifications/history",
   documents: "/manager/documents",
   profile: "/manager/profile",
+  directory: "/manager/directory",
   assets: "/manager/assets",
   goals: "/manager/goals",
   settings: "/manager/settings",

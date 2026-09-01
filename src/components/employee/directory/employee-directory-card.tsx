@@ -6,10 +6,12 @@ import {
   Building2,
   ChevronUp,
   Hash,
-  Layers,
+  UserRound,
 } from "lucide-react";
 
 import { Button } from "@/components/common/button";
+import { getDirectoryAssetPhotoUrl } from "@/lib/employee/directory-asset-photos";
+import { directoryDepartmentLabel } from "@/lib/employee/directory-listing";
 import { getSignedUrlAction } from "@/lib/employees/actions";
 import { cn } from "@/lib/utils";
 import type { EmployeeDirectoryPerson } from "@/types/employee-directory";
@@ -17,10 +19,6 @@ import type { EmployeeDirectoryPerson } from "@/types/employee-directory";
 export type DirectoryCardPerson = EmployeeDirectoryPerson & {
   managerName?: string | null;
 };
-
-function initials(firstName: string, lastName: string) {
-  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
-}
 
 function InfoRow({
   icon: Icon,
@@ -32,12 +30,12 @@ function InfoRow({
   value: string;
 }) {
   return (
-    <div className="flex items-start gap-2 text-xs">
-      <Icon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-      <div className="min-w-0 flex-1">
-        <p className="text-muted-foreground">{label}</p>
-        <p className="font-medium leading-snug break-words text-foreground">{value}</p>
+    <div className="flex flex-col items-center gap-1 text-center text-xs">
+      <div className="flex items-center gap-1.5 text-muted-foreground">
+        <Icon className="size-3.5 shrink-0" />
+        <span>{label}</span>
       </div>
+      <p className="font-medium leading-snug break-words text-foreground">{value}</p>
     </div>
   );
 }
@@ -49,12 +47,17 @@ function CardPhoto({
   person: DirectoryCardPerson;
   className?: string;
 }) {
-  const label = initials(person.firstName, person.lastName);
+  const assetPhotoUrl = getDirectoryAssetPhotoUrl(person);
   const [resolvedAvatarUrl, setResolvedAvatarUrl] = useState<string | null>(
-    person.avatarUrl ?? null,
+    assetPhotoUrl ?? person.avatarUrl ?? null,
   );
 
   useEffect(() => {
+    if (assetPhotoUrl) {
+      setResolvedAvatarUrl(assetPhotoUrl);
+      return;
+    }
+
     if (person.avatarUrl) {
       setResolvedAvatarUrl(person.avatarUrl);
       return;
@@ -65,12 +68,17 @@ function CardPhoto({
       return;
     }
 
+    let cancelled = false;
     void getSignedUrlAction("profileImages", person.profileImagePath).then((result) => {
-      if (result.success) {
+      if (!cancelled && result.success) {
         setResolvedAvatarUrl(result.data);
       }
     });
-  }, [person.avatarUrl, person.profileImagePath]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [assetPhotoUrl, person.avatarUrl, person.profileImagePath]);
 
   if (resolvedAvatarUrl) {
     return (
@@ -86,13 +94,20 @@ function CardPhoto({
   return (
     <div
       className={cn(
-        "flex h-full w-full items-center justify-center bg-gradient-to-br from-muted to-muted-foreground/15",
+        "relative flex h-full w-full items-center justify-center overflow-hidden bg-gradient-to-br from-violet-600 via-violet-500 to-indigo-600",
         className,
       )}
     >
-      <span className="text-2xl font-semibold tracking-wide text-muted-foreground/70 sm:text-3xl">
-        {label}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.28),transparent_42%)]" />
+      <div className="pointer-events-none absolute bottom-[-18%] left-1/2 h-[55%] w-[70%] -translate-x-1/2 rounded-full bg-black/25 blur-2xl" />
+      <span className="relative flex aspect-square w-[42%] max-w-[4.75rem] items-center justify-center rounded-full bg-white/15 shadow-[0_10px_24px_rgba(46,16,101,0.45)] ring-2 ring-white/25">
+        <UserRound
+          className="size-[58%] text-white drop-shadow-[0_6px_10px_rgba(0,0,0,0.28)]"
+          strokeWidth={1.75}
+          aria-hidden
+        />
       </span>
+      <span className="sr-only">{person.fullName}</span>
     </div>
   );
 }
@@ -102,15 +117,12 @@ type EmployeeDirectoryCardProps = {
   onViewProfile?: (employeeId: string) => void;
   /** When true, footer shows "View profile" instead of expand/collapse. */
   directProfileLink?: boolean;
-  /** When false, the closed card shows designation only (no employee ID). */
-  showEmployeeCodeOnFace?: boolean;
 };
 
 export function EmployeeDirectoryCard({
   person,
   onViewProfile,
   directProfileLink = false,
-  showEmployeeCodeOnFace = true,
 }: EmployeeDirectoryCardProps) {
   const [open, setOpen] = useState(false);
   const showExpand = !directProfileLink;
@@ -118,28 +130,19 @@ export function EmployeeDirectoryCard({
   return (
     <article
       className={cn(
-        "relative flex h-full min-h-[19.5rem] flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition-shadow",
+        "relative flex flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition-shadow",
         "hover:shadow-md",
         showExpand && open && "ring-1 ring-primary/20",
       )}
     >
-      <div className="relative aspect-[4/3] w-full shrink-0 bg-muted">
+      <div className="relative aspect-[4/5] w-full shrink-0 overflow-hidden bg-muted">
         <CardPhoto person={person} />
       </div>
 
-      <div className="flex flex-1 flex-col justify-center gap-1 px-4 py-3.5 text-center">
+      <div className="flex h-14 shrink-0 items-center justify-center px-4 text-center">
         <h3 className="line-clamp-1 text-[15px] font-semibold tracking-tight">
           {person.fullName}
         </h3>
-        <p className="line-clamp-2 text-xs leading-snug text-muted-foreground">
-          {person.designationTitle || "Team Member"}
-          {showEmployeeCodeOnFace ? (
-            <>
-              <span className="mx-1.5 text-muted-foreground/40">·</span>
-              <span className="font-mono text-[11px] font-medium">{person.employeeCode}</span>
-            </>
-          ) : null}
-        </p>
       </div>
 
       {showExpand ? (
@@ -153,30 +156,19 @@ export function EmployeeDirectoryCard({
           aria-hidden={!open}
         >
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden pb-10">
-            <div className="relative h-20 w-full shrink-0 bg-muted">
-              <CardPhoto person={person} />
-              <div className="absolute inset-0 bg-gradient-to-t from-card via-card/20 to-transparent" />
-            </div>
-            <div className="border-b px-4 pb-3">
-              <p className="text-sm font-semibold leading-snug">{person.fullName}</p>
-              <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
-                <span className="break-words">{person.designationTitle || "Team Member"}</span>
-                <span className="mx-1.5 text-muted-foreground/40">·</span>
-                <span className="font-mono">{person.employeeCode}</span>
-              </p>
+            <div className="flex flex-col items-center px-4 pt-5 pb-4 text-center">
+              <div className="size-[5.25rem] overflow-hidden rounded-2xl bg-muted ring-1 ring-border/50">
+                <CardPhoto person={person} />
+              </div>
+              <p className="mt-3 text-sm font-semibold leading-snug">{person.fullName}</p>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
+            <div className="min-h-0 flex-1 space-y-3.5 overflow-y-auto px-4 py-3">
               <InfoRow icon={Hash} label="Employee ID" value={person.employeeCode} />
               <InfoRow
                 icon={Building2}
                 label="Department"
-                value={person.departmentName || "—"}
-              />
-              <InfoRow
-                icon={Layers}
-                label="Vertical / Team"
-                value={person.verticalName || "—"}
+                value={directoryDepartmentLabel(person.departmentName) || "—"}
               />
               <InfoRow
                 icon={Briefcase}
@@ -244,19 +236,17 @@ export function EmployeeDirectoryGrid({
   people,
   onViewProfile,
   directProfileLink = false,
-  showEmployeeCodeOnFace = true,
   className,
 }: {
   people: DirectoryCardPerson[];
   onViewProfile?: (employeeId: string) => void;
   directProfileLink?: boolean;
-  showEmployeeCodeOnFace?: boolean;
   className?: string;
 }) {
   return (
     <div
       className={cn(
-        "grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+        "grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
         className,
       )}
     >
@@ -266,7 +256,6 @@ export function EmployeeDirectoryGrid({
           person={person}
           onViewProfile={onViewProfile}
           directProfileLink={directProfileLink}
-          showEmployeeCodeOnFace={showEmployeeCodeOnFace}
         />
       ))}
     </div>

@@ -26,6 +26,7 @@ import {
 } from "@/lib/leave/constants";
 import { loadLeavePolicyRuntime } from "@/lib/leave/services/leave-policy-runtime";
 import { ensureEmployeeMonthlyLeaveAccruals, isMonthlyAccrualLeaveCode } from "@/lib/leave/services/leave-monthly-accrual";
+import { reconcileEmployeePaidLeaveLedger } from "@/lib/leave/services/leave-ledger-reconcile";
 import { DEFAULT_LEAVE_PROBATION_RULES } from "@/lib/leave/services/leave-policy-engine";
 import {
   isPeriodLeaveCode,
@@ -437,9 +438,17 @@ export async function listLeaveRequests(
         .sort((a, b) => a.approval_level - b.approval_level)[0];
 
       const pendingApproverEmployeeId = pendingApproval?.approver_employee_id ?? null;
-      const isAssignedApprover =
-        pendingApproverEmployeeId === profile.employee.id &&
-        row.leave_status === "pending";
+      const executiveApplicant = !approvals.some(
+        (approval) => Number(approval.approval_level ?? 0) >= 2,
+      );
+      const canAct = canActorDecideLeaveRequest({
+        profile,
+        applicantEmployeeId: row.employee_id,
+        leaveStatus: row.leave_status,
+        pendingLevel: pendingApproval?.approval_level ?? null,
+        pendingApproverEmployeeId,
+        executiveApplicant,
+      });
 
       const resolvedApprover =
         resolveApproverDisplayName(approvals, approverNameById) ||
@@ -478,8 +487,8 @@ export async function listLeaveRequests(
         approverName: resolvedApprover,
         currentApprovalLevel: pendingApproval?.approval_level ?? null,
         pendingApproverEmployeeId,
-        canActOnApproval: isAssignedApprover,
-        canActOnRejection: isAssignedApprover,
+        canActOnApproval: canAct,
+        canActOnRejection: canAct,
       };
     });
 
@@ -823,8 +832,9 @@ export async function getEmployeeLeaveBalanceSnapshot(
   const monthRange = getMonthDateRange(month, calendarYear);
   const yearRange = { start: `${calendarYear}-01-01`, end: `${calendarYear}-12-31` };
 
-  // Apply any due monthly CL/EL accruals before reading balances (idempotent).
+  // Apply due monthly CL credit, then rebuild used/pending from real requests.
   await ensureEmployeeMonthlyLeaveAccruals(supabase, employeeId, { balanceYear });
+  await reconcileEmployeePaidLeaveLedger(supabase, employeeId, { balanceYear });
 
   const balancesQuery = () =>
     supabase
@@ -994,9 +1004,7 @@ export async function getEmployeeLeaveBalanceSnapshot(
     const usedFromRequests = yearUsedByCode[code] ?? 0;
     const usedDays = Math.max(balance?.usedDays ?? 0, usedFromRequests);
     const pendingDays = balance?.pendingDays ?? 0;
-    const balanceDays =
-      balance?.balanceDays ??
-      Math.max(0, roundLeaveDays(allocatedDays - usedDays - pendingDays));
+    const balanceDays = Math.max(0, roundLeaveDays(allocatedDays - usedDays - pendingDays));
 
     return {
       leaveTypeCode: code,
@@ -1400,6 +1408,52 @@ export const HR_LEAVE_APPROVER_ROLE_CODES = [
   "hr_admin",
   "hr_executive",
 ] as const;
+
+export function isHrLeaveActor(profile: UserProfile): boolean {
+  return (
+    profile.roles.some((role) =>
+      (HR_LEAVE_APPROVER_ROLE_CODES as readonly string[]).includes(role.code),
+    ) || profile.roles.some((role) => role.code === "super_admin")
+  );
+}
+
+/**
+ * Employee leave: HR or CEO may approve; the first accept finalizes the request.
+ * HR / manager leave: CEO only.
+ */
+export function canActorDecideLeaveRequest(input: {
+  profile: UserProfile;
+  applicantEmployeeId: string;
+  leaveStatus: string;
+  pendingLevel: number | null;
+  pendingApproverEmployeeId?: string | null;
+  executiveApplicant: boolean;
+}): boolean {
+  if (input.leaveStatus !== "pending" || input.pendingLevel == null) {
+    return false;
+  }
+  if (input.applicantEmployeeId === input.profile.employee.id) {
+    return false;
+  }
+
+  const assignedToActor =
+    Boolean(input.pendingApproverEmployeeId) &&
+    input.pendingApproverEmployeeId === input.profile.employee.id;
+
+  if (input.executiveApplicant) {
+    return isCeoLeaveApprover(input.profile);
+  }
+
+  if (isCeoLeaveApprover(input.profile)) {
+    return true;
+  }
+
+  if (assignedToActor) {
+    return true;
+  }
+
+  return input.pendingLevel === 1 && isHrLeaveActor(input.profile);
+}
 
 export const NO_HR_APPROVER_CONFIGURED_MESSAGE =
   "No HR approver is configured for this employee. Please contact HR/Admin to configure the appropriate HR approver.";

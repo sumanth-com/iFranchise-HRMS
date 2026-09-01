@@ -10,6 +10,7 @@ import {
   Target,
   UserRound,
   UserRoundPlus,
+  Users,
   Wallet,
 } from "lucide-react";
 
@@ -26,6 +27,11 @@ export const ceoNavItems: NavigationItem[] = [
     title: "My Profile",
     href: CEO_ROUTES.profile,
     icon: UserRound,
+  },
+  {
+    title: "Employee Directory",
+    href: CEO_ROUTES.directory,
+    icon: Users,
   },
   {
     title: "Organization",

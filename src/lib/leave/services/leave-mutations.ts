@@ -3,6 +3,7 @@ import type { UserProfile } from "@/types/auth";
 import type { LeaveFormInput } from "@/lib/validations/leave";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
+import { reconcileEmployeePaidLeaveLedger } from "@/lib/leave/services/leave-ledger-reconcile";
 import {
   isMonthlyAccrualLeaveCode,
   resolveMonthlyAccrualOpeningAllocation,
@@ -17,6 +18,8 @@ import {
   getEmployeeRoleCodes,
   getHrApproverEmployeeId,
   isCeoLeaveApprover,
+  isHrLeaveActor,
+  canActorDecideLeaveRequest,
   LEAVE_ALREADY_APPROVED_BY_OTHER_CEO_MESSAGE,
   LEAVE_ALREADY_PROCESSED_MESSAGE,
   NO_HR_APPROVER_CONFIGURED_MESSAGE,
@@ -92,7 +95,7 @@ async function adjustLeaveBalance(
 ) {
   // A fully-LOP request reserves nothing, so there is no ledger row to touch and
   // no reason to fail an employee who has never had a balance allocated.
-  if (!delta.pending && !delta.used) return;
+  if (!delta.pending && !delta.used) return { appliedPending: 0, appliedUsed: 0 };
 
   const balance = await getLeaveBalanceRow(
     supabase,
@@ -105,21 +108,25 @@ async function adjustLeaveBalance(
     throw new Error("Leave balance not configured for this employee and leave type");
   }
 
-  const pendingDays = Number(balance.pending_days) + (delta.pending ?? 0);
-  const usedDays = Number(balance.used_days) + (delta.used ?? 0);
+  const pendingDays = Math.max(0, Number(balance.pending_days) + (delta.pending ?? 0));
+  const usedDays = Math.max(0, Number(balance.used_days) + (delta.used ?? 0));
   const allocatedDays = Number(balance.allocated_days);
-  const balanceDays = allocatedDays - usedDays - pendingDays;
-
-  if (balanceDays < 0) {
-    throw new Error("Insufficient leave balance");
+  const uncapped = allocatedDays - usedDays - pendingDays;
+  let nextPending = pendingDays;
+  let nextUsed = usedDays;
+  if (uncapped < 0 && (delta.pending ?? 0) > 0) {
+    nextPending = Math.max(0, allocatedDays - usedDays);
+  } else if (uncapped < 0 && (delta.used ?? 0) > 0) {
+    nextUsed = Math.max(0, allocatedDays - pendingDays);
   }
+  const balanceDays = roundLeaveDays(Math.max(0, allocatedDays - nextUsed - nextPending));
 
   const { error, data } = await supabase
     .schema("hrms")
     .from("leave_balances")
     .update({
-      pending_days: pendingDays,
-      used_days: usedDays,
+      pending_days: nextPending,
+      used_days: nextUsed,
       balance_days: balanceDays,
       updated_at: new Date().toISOString(),
     })
@@ -133,6 +140,11 @@ async function adjustLeaveBalance(
   if (!data) {
     throw new Error("Leave balance was updated by another request. Please try again.");
   }
+
+  return {
+    appliedPending: roundLeaveDays(nextPending - Number(balance.pending_days)),
+    appliedUsed: roundLeaveDays(nextUsed - Number(balance.used_days)),
+  };
 }
 
 /**
@@ -310,6 +322,10 @@ export async function initializeEmployeeLeaveBalances(
     balanceYear,
     actorUserId: userId,
   });
+  await reconcileEmployeePaidLeaveLedger(supabase, employeeId, {
+    balanceYear,
+    actorUserId: userId,
+  });
 }
 
 async function assertEmployeeInOrganization(
@@ -410,6 +426,10 @@ export async function createLeaveRequest(
     asOfDate: input.startDate,
     actorUserId: profile.userId,
   });
+  await reconcileEmployeePaidLeaveLedger(supabase, input.employeeId, {
+    balanceYear: getCurrentBalanceYear(input.startDate),
+    actorUserId: profile.userId,
+  });
 
   const evaluated = await evaluateLeaveApplication(
     supabase,
@@ -424,8 +444,8 @@ export async function createLeaveRequest(
   );
   const totalDays = evaluated.duration.totalLeaveDays;
   const balanceYear = getCurrentBalanceYear(input.startDate);
-  const { paidDays, lopDays } = evaluated.split;
-  const durationBreakdown = { ...evaluated.duration, paidDays, lopDays };
+  let { paidDays, lopDays } = evaluated.split;
+  let durationBreakdown = { ...evaluated.duration, paidDays, lopDays };
 
   if (evaluated.leaveType.isPaid && paidDays > 0) {
     let openingAllocated = Math.max(Number(evaluated.leaveType.daysPerYear ?? 0), 0);
@@ -450,9 +470,12 @@ export async function createLeaveRequest(
       profile.userId,
       { accruedThroughMonth },
     );
-    await adjustLeaveBalance(supabase, input.employeeId, input.leaveTypeId, balanceYear, {
+    const applied = await adjustLeaveBalance(supabase, input.employeeId, input.leaveTypeId, balanceYear, {
       pending: paidDays,
     });
+    paidDays = roundLeaveDays(Math.max(0, applied.appliedPending));
+    lopDays = roundLeaveDays(Math.max(0, totalDays - paidDays));
+    durationBreakdown = { ...evaluated.duration, paidDays, lopDays };
   }
 
   const { data, error } = await supabase
@@ -536,26 +559,62 @@ export async function createLeaveRequest(
 }
 
 function canApproveLeave(profile: UserProfile): boolean {
-  return profile.permissionCodes.includes("leave.approve");
+  return (
+    profile.permissionCodes.includes("leave.approve") ||
+    isCeoLeaveApprover(profile) ||
+    isHrLeaveActor(profile)
+  );
 }
 
 function canRejectLeave(profile: UserProfile): boolean {
-  return profile.permissionCodes.includes("leave.reject");
+  return (
+    profile.permissionCodes.includes("leave.reject") ||
+    isCeoLeaveApprover(profile) ||
+    isHrLeaveActor(profile)
+  );
 }
 
 async function getPendingLeaveApprovalForActor(
   supabase: AuthSupabaseClient,
+  profile: UserProfile,
   leaveRequestId: string,
-  actorEmployeeId: string,
+  applicantEmployeeId: string,
+  executiveApplicant: boolean,
 ) {
-  const { data, error } = await supabase
+  const pending = await getPendingLeaveApproval(supabase, leaveRequestId);
+  if (!pending) return null;
+  const allowed = canActorDecideLeaveRequest({
+    profile,
+    applicantEmployeeId,
+    leaveStatus: "pending",
+    pendingLevel: pending.approval_level,
+    pendingApproverEmployeeId: pending.approver_employee_id,
+    executiveApplicant,
+  });
+  return allowed ? pending : null;
+}
+
+async function stampLeaveApprovalDecision(
+  stepId: string,
+  status: "approved" | "rejected",
+  profile: UserProfile,
+  comments?: string | null,
+) {
+  const actedAt = new Date().toISOString();
+  const { data, error } = await createAdminClient()
     .schema("hrms")
     .from("leave_approvals")
-    .select("id, approver_employee_id, approval_level")
-    .eq("leave_request_id", leaveRequestId)
-    .eq("approver_employee_id", actorEmployeeId)
+    .update({
+      approval_status: status,
+      comments: comments && comments.trim().length > 0 ? comments.trim() : null,
+      acted_at: actedAt,
+      updated_by: profile.userId,
+      updated_at: actedAt,
+    })
+    .eq("id", stepId)
     .eq("approval_status", "pending")
     .is("deleted_at", null)
+    .select("id, approval_level")
     .maybeSingle();
 
   if (error) throw new Error(error.message);
@@ -672,39 +731,43 @@ async function assertCanActOnLeaveApproval(
   employeeId: string,
   action: "approve" | "reject",
 ): Promise<void> {
+  const executiveApplicant = requiresCeoLeaveApproval(
+    await getEmployeeRoleCodes(supabase, employeeId),
+  );
   const pendingApproval = await getPendingLeaveApprovalForActor(
     supabase,
+    profile,
     leaveRequestId,
-    profile.employee.id,
+    employeeId,
+    executiveApplicant,
   );
   if (!pendingApproval) {
     await throwIfLeaveAlreadyProcessed(
       supabase,
       leaveRequestId,
-      requiresCeoLeaveApproval(await getEmployeeRoleCodes(supabase, employeeId)),
+      executiveApplicant,
     );
-    throw new Error("You are not the assigned approver for this request");
+    throw new Error("You are not authorized to act on this leave request");
   }
 
-  const applicantRoles = await getEmployeeRoleCodes(supabase, employeeId);
-  const executiveApplicant = requiresCeoLeaveApproval(applicantRoles);
-
-  if (executiveApplicant) {
-    if (!isCeoLeaveApprover(profile)) {
-      throw new Error(
-        "Only the CEO can approve or reject HR and Manager leave requests",
-      );
-    }
-    return;
+  if (executiveApplicant && !isCeoLeaveApprover(profile)) {
+    throw new Error(
+      "Only the CEO can approve or reject HR and Manager leave requests",
+    );
   }
 
-  const isAssigned = pendingApproval.approver_employee_id === profile.employee.id;
-  if (isAssigned) return;
-
-  if (action === "approve" && !canApproveLeave(profile)) {
+  if (
+    action === "approve" &&
+    !canApproveLeave(profile) &&
+    pendingApproval.approver_employee_id !== profile.employee.id
+  ) {
     throw new Error("You are not authorized to approve this request");
   }
-  if (action === "reject" && !canRejectLeave(profile)) {
+  if (
+    action === "reject" &&
+    !canRejectLeave(profile) &&
+    pendingApproval.approver_employee_id !== profile.employee.id
+  ) {
     throw new Error("You are not authorized to reject this request");
   }
 }
@@ -854,8 +917,10 @@ export async function approveLeaveRequest(
   const actedAt = new Date().toISOString();
   const pendingStep = await getPendingLeaveApprovalForActor(
     supabase,
+    profile,
     leaveRequestId,
-    profile.employee.id,
+    request.employee_id,
+    executiveApplicant,
   );
   if (!pendingStep) {
     await throwIfLeaveAlreadyProcessed(supabase, leaveRequestId, executiveApplicant);
@@ -966,7 +1031,7 @@ export async function approveLeaveRequest(
     return;
   }
 
-  const { data: updatedStep, error: updateError } = await supabase
+  const { data: updatedStep, error: updateError } = await createAdminClient()
     .schema("hrms")
     .from("leave_approvals")
     .update({
@@ -974,9 +1039,9 @@ export async function approveLeaveRequest(
       comments: emptyToNull(comments),
       acted_at: actedAt,
       updated_by: profile.userId,
+      updated_at: actedAt,
     })
-    .eq("leave_request_id", leaveRequestId)
-    .eq("approver_employee_id", profile.employee.id)
+    .eq("id", pendingStep.id)
     .eq("approval_status", "pending")
     .is("deleted_at", null)
     .select("id, approval_level")
@@ -988,11 +1053,9 @@ export async function approveLeaveRequest(
   }
 
   const approvalActorLabel =
-    updatedStep.approval_level === 1
-      ? "HR"
-      : updatedStep.approval_level === 2
-        ? "CEO"
-        : "approver";
+    isCeoLeaveApprover(profile) || updatedStep.approval_level === 2
+      ? "CEO"
+      : "HR";
 
   await writeApplicationAudit(supabase, {
     organizationId: profile.employee.organizationId,
@@ -1003,22 +1066,9 @@ export async function approveLeaveRequest(
     metadata: { approvalLevel: updatedStep.approval_level },
   });
 
-  if (updatedStep.approval_level === 2 && isCeoLeaveApprover(profile)) {
-    await cancelSiblingPendingApprovals(
-      supabase,
-      leaveRequestId,
-      profile.employee.id,
-      profile.userId,
-      updatedStep.approval_level,
-    );
-  }
-
+  // First HR or CEO accept fully approves employee leave (no second wait).
+  await clearRemainingPendingApprovals(supabase, leaveRequestId, profile.userId);
   await finalizeApprovalIfComplete(supabase, profile, leaveRequestId);
-
-  const stillPending = await getPendingLeaveApproval(supabase, leaveRequestId);
-  if (stillPending) {
-    await dispatchLeaveApprovalEmails(leaveRequestId, profile.userId);
-  }
 }
 
 export async function rejectLeaveRequest(
@@ -1056,29 +1106,29 @@ export async function rejectLeaveRequest(
     "reject",
   );
 
-  const { data: approvalRow, error: approvalError } = await supabase
-    .schema("hrms")
-    .from("leave_approvals")
-    .update({
-      approval_status: "rejected",
-      comments,
-      acted_at: new Date().toISOString(),
-      updated_by: profile.userId,
-    })
-    .eq("leave_request_id", leaveRequestId)
-    .eq("approver_employee_id", profile.employee.id)
-    .eq("approval_status", "pending")
-    .is("deleted_at", null)
-    .select("id, approval_level")
-    .maybeSingle();
+  const executiveApplicant = requiresCeoLeaveApproval(
+    await getEmployeeRoleCodes(supabase, request.employee_id),
+  );
+  const pendingStep = await getPendingLeaveApprovalForActor(
+    supabase,
+    profile,
+    leaveRequestId,
+    request.employee_id,
+    executiveApplicant,
+  );
+  if (!pendingStep) {
+    await throwIfLeaveAlreadyProcessed(supabase, leaveRequestId, executiveApplicant);
+    throw new Error("This approval step was already processed");
+  }
 
-  if (approvalError) throw new Error(approvalError.message);
+  const approvalRow = await stampLeaveApprovalDecision(
+    pendingStep.id,
+    "rejected",
+    profile,
+    comments,
+  );
   if (!approvalRow) {
-    await throwIfLeaveAlreadyProcessed(
-      supabase,
-      leaveRequestId,
-      requiresCeoLeaveApproval(await getEmployeeRoleCodes(supabase, request.employee_id)),
-    );
+    await throwIfLeaveAlreadyProcessed(supabase, leaveRequestId, executiveApplicant);
     throw new Error("This approval step was already processed");
   }
 

@@ -5,11 +5,10 @@ import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { canManageDashboardAnnouncements } from "@/lib/dashboard/dashboard-announcement-permissions";
 import { listPublishedDashboardAnnouncements } from "@/lib/dashboard/services/dashboard-announcement-queries";
 import { canUpdateOwnCheckout } from "@/lib/attendance/self-checkout-permissions";
-import { ensureEmployeeMonthlyLeaveAccruals } from "@/lib/leave/services/leave-monthly-accrual";
+import { getEmployeeLeaveBalanceSnapshot } from "@/lib/leave/services/leave-queries";
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
 import { roundLeaveDays } from "@/lib/leave/services/leave-usage";
 import { getSelfTodayAttendance } from "@/lib/manager/services/manager-self-attendance-service";
-import { unwrapRelation } from "@/lib/reports/services/reports-utils";
 import type { UserProfile } from "@/types/auth";
 import type {
   EmployeeDashboardData,
@@ -71,17 +70,8 @@ async function loadLeaveKpis(
 ): Promise<{ totalBalanceDays: number; pendingCount: number }> {
   const balanceYear = getCurrentBalanceYear();
 
-  // Apply due monthly CL/EL accruals so the KPI matches the Leave page.
-  await ensureEmployeeMonthlyLeaveAccruals(supabase, employeeId, { balanceYear });
-
-  const [balancesResult, pendingResult] = await Promise.all([
-    supabase
-      .schema("hrms")
-      .from("leave_balances")
-      .select("balance_days, leave_types:leave_type_id (code)")
-      .eq("employee_id", employeeId)
-      .eq("balance_year", balanceYear)
-      .is("deleted_at", null),
+  const [snapshots, pendingResult] = await Promise.all([
+    getEmployeeLeaveBalanceSnapshot(supabase, employeeId, balanceYear),
     supabase
       .schema("hrms")
       .from("leave_requests")
@@ -91,17 +81,11 @@ async function loadLeaveKpis(
       .is("deleted_at", null),
   ]);
 
-  if (balancesResult.error) throw new Error(balancesResult.error.message);
   if (pendingResult.error) throw new Error(pendingResult.error.message);
 
-  // Casual + Earned remaining only (monthly accrual types — exclude SL/PL/LOP/OH).
-  const totalBalanceDays = (balancesResult.data ?? []).reduce((sum, row) => {
-    const leaveType = unwrapRelation(
-      row.leave_types as { code: string } | { code: string }[] | null,
-    );
-    const code = leaveType?.code;
-    if (!code || !DASHBOARD_LEAVE_BALANCE_CODES.has(code)) return sum;
-    return sum + Math.max(0, Number(row.balance_days ?? 0));
+  const totalBalanceDays = snapshots.reduce((sum, row) => {
+    if (!DASHBOARD_LEAVE_BALANCE_CODES.has(row.leaveTypeCode)) return sum;
+    return sum + Math.max(0, Number(row.balanceDays ?? 0));
   }, 0);
 
   return {

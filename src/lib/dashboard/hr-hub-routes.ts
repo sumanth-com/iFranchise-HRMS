@@ -17,6 +17,7 @@ export const HR_HUB_ROUTES = {
   myAssets: "/dashboard/assets",
   teamAssets: "/dashboard/assets/team",
   myGoals: "/dashboard/my-goals",
+  directory: "/dashboard/directory",
 } as const;
 
 export const HR_MY_GOALS_SUB_NAV = [

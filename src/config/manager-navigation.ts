@@ -38,6 +38,12 @@ export const managerNavItems: NavigationItem[] = [
     permissions: ["employee_profile.view"],
   },
   {
+    title: "Employee Directory",
+    href: MANAGER_ROUTES.directory,
+    icon: Users,
+    section: "Self-service",
+  },
+  {
     title: "Attendance",
     href: MANAGER_ROUTES.attendance,
     icon: CalendarCheck,
