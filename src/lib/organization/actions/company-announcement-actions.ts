@@ -53,8 +53,10 @@ function revalidateAnnouncementSurfaces() {
   revalidatePath(ORGANIZATION_ROUTES.announcements);
   revalidatePath(CEO_ROUTES.organizationAnnouncements);
   revalidatePath(EMPLOYEE_ROUTES.announcements);
-  revalidatePath(EMPLOYEE_ROUTES.home);
-  revalidatePath("/employee", "layout");
+}
+
+function revalidateEmployeeAnnouncementsList() {
+  revalidatePath(EMPLOYEE_ROUTES.announcements);
 }
 
 async function requestContext() {
@@ -300,7 +302,7 @@ export async function acknowledgeCompanyAnnouncementAction(
       ipAddress,
       userAgent,
     );
-    revalidateAnnouncementSurfaces();
+    revalidateEmployeeAnnouncementsList();
     return { success: true, data: true };
   } catch (error) {
     return { success: false, message: friendlyError(error) };

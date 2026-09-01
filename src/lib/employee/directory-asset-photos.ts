@@ -8,7 +8,7 @@ import himaniBhargava from "@/assets/Himani.jpeg";
 import omRamtekkar from "@/assets/Om.jpeg";
 import prajwalPhoto from "@/assets/Prajwal Photo.png";
 import samitAli from "@/assets/Samit Ali.jpg";
-import shakshayGupta from "@/assets/Shakshay Gupta.JPG";
+import shakshayGupta from "@/assets/Shakshay Gupta.jpg";
 import shiwaliSingh from "@/assets/Shiwali Singh.png";
 import snehaMahajan from "@/assets/Sneha Mahajan.png";
 import sumanthReddy from "@/assets/Sumanth.jpeg";

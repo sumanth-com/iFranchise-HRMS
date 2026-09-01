@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { format } from "date-fns";
 
 import { Button } from "@/components/common/button";
@@ -12,6 +12,10 @@ import {
   COMPANY_ANNOUNCEMENT_CATEGORY_LABELS,
   COMPANY_ANNOUNCEMENT_PRIORITY_LABELS,
 } from "@/lib/organization/company-announcement-constants";
+import {
+  announcementAckStorageKey,
+  readLocalAnnouncementAcks,
+} from "@/lib/organization/mandatory-announcement-ack-storage";
 import { cn } from "@/lib/utils";
 import type { CompanyAnnouncementEmployeeView } from "@/types/company-announcement";
 
@@ -21,6 +25,11 @@ type Props = {
 
 export function EmployeeAnnouncementsView({ announcements }: Props) {
   const [selected, setSelected] = useState<CompanyAnnouncementEmployeeView | null>(null);
+  const [localAcks, setLocalAcks] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setLocalAcks(readLocalAnnouncementAcks());
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -36,7 +45,10 @@ export function EmployeeAnnouncementsView({ announcements }: Props) {
       ) : (
         <div className="space-y-2">
           {announcements.map((item) => {
-            const pending = item.requiresAcknowledgement && !item.acknowledgedAt;
+            const pending =
+              item.requiresAcknowledgement &&
+              !item.acknowledgedAt &&
+              !localAcks.has(announcementAckStorageKey(item.id, item.versionId));
             return (
               <button
                 key={`${item.id}-${item.versionId}`}

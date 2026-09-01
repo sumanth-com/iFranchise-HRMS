@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
 
 import { Button } from "@/components/common/button";
@@ -24,49 +23,22 @@ import type { CompanyAnnouncementEmployeeView } from "@/types/company-announceme
 
 type Props = {
   announcement: CompanyAnnouncementEmployeeView;
-  onAcknowledged: (announcementId: string) => void;
-  onAcknowledgeFailed: (
-    announcement: CompanyAnnouncementEmployeeView,
-    message: string,
-  ) => void;
-  onAcknowledgeSucceeded: () => void;
+  onAccepted: (announcement: CompanyAnnouncementEmployeeView) => void;
 };
 
-export function MandatoryAnnouncementDialog({
-  announcement,
-  onAcknowledged,
-  onAcknowledgeFailed,
-  onAcknowledgeSucceeded,
-}: Props) {
+export function MandatoryAnnouncementDialog({ announcement, onAccepted }: Props) {
   const [checked, setChecked] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const published = announcement.publishedAt ?? announcement.publishAt;
   const checkboxId = `acknowledge-${announcement.id}`;
 
   useEffect(() => {
     setChecked(false);
-    setError(null);
-    setIsSubmitting(false);
   }, [announcement.id, announcement.versionId]);
 
   const handleAccept = () => {
-    if (!checked || isSubmitting) return;
-    setIsSubmitting(true);
-    setError(null);
-    onAcknowledged(announcement.id);
-
-    void acknowledgeCompanyAnnouncementAction(announcement.id, announcement.versionId).then(
-      (result) => {
-        if (!result.success) {
-          setIsSubmitting(false);
-          setError(result.message);
-          onAcknowledgeFailed(announcement, result.message);
-          return;
-        }
-        onAcknowledgeSucceeded();
-      },
-    );
+    if (!checked) return;
+    onAccepted(announcement);
+    void acknowledgeCompanyAnnouncementAction(announcement.id, announcement.versionId);
   };
 
   return (
@@ -124,19 +96,11 @@ export function MandatoryAnnouncementDialog({
               type="checkbox"
               className="mt-0.5 size-4 shrink-0 cursor-pointer rounded border accent-violet-600"
               checked={checked}
-              disabled={isSubmitting}
               onChange={(event) => setChecked(event.target.checked)}
             />
             I acknowledge that I have read this announcement.
           </label>
-          {error ? <p className="text-xs text-destructive">{error}</p> : null}
-          <Button
-            type="button"
-            className="w-full"
-            disabled={!checked || isSubmitting}
-            onClick={handleAccept}
-          >
-            {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : null}
+          <Button type="button" className="w-full" disabled={!checked} onClick={handleAccept}>
             Accept & Close
           </Button>
         </DialogFooter>

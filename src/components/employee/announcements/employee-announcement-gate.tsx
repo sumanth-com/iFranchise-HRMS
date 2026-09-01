@@ -1,43 +1,48 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { MandatoryAnnouncementDialog } from "@/components/employee/announcements/mandatory-announcement-dialog";
+import { listPendingMandatoryAnnouncementsAction } from "@/lib/organization/actions/company-announcement-actions";
+import {
+  rememberLocalAnnouncementAck,
+  wasAnnouncementAckedLocally,
+} from "@/lib/organization/mandatory-announcement-ack-storage";
 import type { CompanyAnnouncementEmployeeView } from "@/types/company-announcement";
 
-type Props = {
-  pending: CompanyAnnouncementEmployeeView[];
-};
-
-export function EmployeeAnnouncementGate({ pending }: Props) {
-  const router = useRouter();
-  const [remaining, setRemaining] = useState(pending);
-  const current = useMemo(() => remaining[0] ?? null, [remaining]);
+export function EmployeeAnnouncementGate() {
+  const [remaining, setRemaining] = useState<CompanyAnnouncementEmployeeView[]>([]);
+  const loaded = useRef(false);
 
   useEffect(() => {
-    setRemaining(pending);
-  }, [pending]);
+    if (loaded.current) return;
+    loaded.current = true;
+
+    void listPendingMandatoryAnnouncementsAction().then((result) => {
+      if (!result.success) return;
+      setRemaining(
+        result.data.filter(
+          (item) => !wasAnnouncementAckedLocally(item.id, item.versionId),
+        ),
+      );
+    });
+  }, []);
+
+  const current = useMemo(() => remaining[0] ?? null, [remaining]);
 
   if (!current) return null;
 
   return (
     <MandatoryAnnouncementDialog
       announcement={current}
-      onAcknowledged={(announcementId) => {
-        setRemaining((items) => items.filter((item) => item.id !== announcementId));
-      }}
-      onAcknowledgeFailed={(announcement, message) => {
-        toast.error(message);
+      onAccepted={(announcement) => {
+        rememberLocalAnnouncementAck(announcement.id, announcement.versionId);
         setRemaining((items) =>
-          items.some((item) => item.id === announcement.id)
-            ? items
-            : [announcement, ...items],
+          items.filter(
+            (item) =>
+              !(item.id === announcement.id && item.versionId === announcement.versionId),
+          ),
         );
-      }}
-      onAcknowledgeSucceeded={() => {
-        router.refresh();
       }}
     />
   );
