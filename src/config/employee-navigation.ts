@@ -29,16 +29,16 @@ export const employeeNavItems: NavigationItem[] = [
     permissions: ["employee_profile.view"],
   },
   {
-    title: "Attendance",
-    href: EMPLOYEE_ROUTES.attendance,
-    icon: CalendarCheck,
-    permissions: ["attendance.view"],
-  },
-  {
     title: "Employee Directory",
     href: EMPLOYEE_ROUTES.directory,
     icon: Users,
     permissions: ["employee.directory.view"],
+  },
+  {
+    title: "Attendance",
+    href: EMPLOYEE_ROUTES.attendance,
+    icon: CalendarCheck,
+    permissions: ["attendance.view"],
   },
   {
     title: "Payroll",
@@ -51,11 +51,6 @@ export const employeeNavItems: NavigationItem[] = [
     href: EMPLOYEE_ROUTES.documents,
     icon: FileText,
     permissions: ["documents.view"],
-  },
-  {
-    title: "My Announcements",
-    href: EMPLOYEE_ROUTES.announcements,
-    icon: Megaphone,
   },
   {
     title: "Leave",
@@ -72,6 +67,11 @@ export const employeeNavItems: NavigationItem[] = [
     title: "Assets",
     href: EMPLOYEE_ROUTES.assets,
     icon: LaptopMinimal,
+  },
+  {
+    title: "My Announcements",
+    href: EMPLOYEE_ROUTES.announcements,
+    icon: Megaphone,
   },
   {
     title: "Notifications",
