@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/common/select";
 import { LEAVE_CALENDAR_LEGEND } from "@/lib/leave/constants";
+import { calendarMarkForAllocation } from "@/lib/leave/services/leave-policy-engine";
 import { expandDateRange } from "@/lib/leave/services/leave-utils";
 import {
   calculateLeaveDuration,
@@ -218,15 +219,24 @@ export function LeaveCalendarView({
     return map;
   }, [holidays]);
 
-  function leaveMarkLabel(leave: LeaveCalendarEntry) {
+  function leaveMarkLabel(leave: LeaveCalendarEntry, date: string) {
+    const allocation = leave.dayAllocations?.find((item) => item.date === date);
+    if (allocation) {
+      const mark = calendarMarkForAllocation(allocation.kind, leave.leaveTypeCode);
+      if (mark) return mark;
+    }
     const type = leave.leaveTypeName?.trim();
     if (type && /optional/i.test(type)) return "Optional Holiday";
-    if (compact) {
-      if (type) {
-        return type.split(/\s+/)[0] ?? type;
-      }
-    }
-    return leave.employeeName;
+    if (type) return type;
+    return compact ? "Leave" : leave.employeeName;
+  }
+
+  function leavePillTone(leave: LeaveCalendarEntry, date: string) {
+    const allocation = leave.dayAllocations?.find((item) => item.date === date);
+    if (allocation?.kind === "lop") return "bg-slate-500";
+    if (allocation?.kind === "sandwich") return LEAVE_CALENDAR_LEGEND.sandwich.className;
+    if (leave.isHalfDay) return LEAVE_CALENDAR_LEGEND.halfDay.className;
+    return LEAVE_STATUS_COLORS[leave.leaveStatus];
   }
 
   function leaveCellHighlight(dayLeaves: LeaveCalendarEntry[]) {
@@ -249,7 +259,13 @@ export function LeaveCalendarView({
     const map = new Map<string, LeaveCalendarEntry[]>();
 
     leaves.forEach((leave) => {
-      expandDateRange(leave.startDate, leave.endDate).forEach((date) => {
+      const dates =
+        leave.dayAllocations && leave.dayAllocations.length > 0
+          ? leave.dayAllocations
+              .filter((item) => item.kind !== "none")
+              .map((item) => item.date)
+          : expandDateRange(leave.startDate, leave.endDate);
+      dates.forEach((date) => {
         const existing = map.get(date) ?? [];
         existing.push(leave);
         map.set(date, existing);
@@ -564,14 +580,12 @@ export function LeaveCalendarView({
                         <span
                           key={`${day.date}-${leave.id}`}
                           className={cn(
-                            "inline-flex max-w-full min-w-[2.125rem] items-center justify-center truncate rounded-full px-2 py-0.5 text-center text-[10px] font-semibold leading-tight text-white shadow-sm",
-                            leave.isHalfDay
-                              ? LEAVE_CALENDAR_LEGEND.halfDay.className
-                              : LEAVE_STATUS_COLORS[leave.leaveStatus],
+                            "inline-flex max-w-full min-w-[2.125rem] items-center justify-center rounded-full px-1.5 py-0.5 text-center text-[9px] font-semibold leading-tight text-white shadow-sm",
+                            leavePillTone(leave, day.date),
                           )}
-                          title={`${leave.leaveTypeName} · ${leave.employeeName}`}
+                          title={`${leaveMarkLabel(leave, day.date)} · ${leave.employeeName}`}
                         >
-                          {leaveMarkLabel(leave)}
+                          {leaveMarkLabel(leave, day.date)}
                         </span>
                       ))}
                       {dayLeaves.length > maxVisibleLeaves ? (
@@ -587,13 +601,11 @@ export function LeaveCalendarView({
                           key={`${day.date}-${leave.id}`}
                           className={cn(
                             "truncate rounded px-1.5 py-0.5 text-[10px] font-medium text-white",
-                            leave.isHalfDay
-                              ? LEAVE_CALENDAR_LEGEND.halfDay.className
-                              : LEAVE_STATUS_COLORS[leave.leaveStatus],
+                            leavePillTone(leave, day.date),
                           )}
-                          title={`${leave.employeeName} · ${leave.leaveTypeName}`}
+                          title={`${leave.employeeName} · ${leaveMarkLabel(leave, day.date)}`}
                         >
-                          {leave.employeeName}
+                          {leaveMarkLabel(leave, day.date)}
                         </div>
                       ))}
                       {dayLeaves.length > maxVisibleLeaves ? (

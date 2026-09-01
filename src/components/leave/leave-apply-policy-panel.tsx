@@ -164,15 +164,13 @@ export function LeaveDurationPreview({
   const hasSandwich = sandwichDays > 0;
   const balanceAfter =
     preview.available != null
-      ? Number((preview.available - charged).toFixed(2))
+      ? Number((preview.available - preview.split.paidDays).toFixed(2))
       : null;
 
   const noticeIssue = preview.issues.find((issue) =>
     ["notice", "pl_same_day", "pl_past"].includes(issue.code),
   );
-  const blockingIssues = preview.issues.filter(
-    (issue) => !["notice", "pl_same_day", "pl_past"].includes(issue.code),
-  );
+  const blockingIssues = preview.blockingIssues;
 
   return (
     <div className="space-y-2 rounded-xl border bg-muted/20 px-3 py-2.5">
@@ -233,6 +231,22 @@ export function LeaveDurationPreview({
             {formatLeaveDayCount(charged)} {formatLeaveDayUnit(charged)}
           </span>
         </div>
+        {preview.leaveType.isPaid ? (
+          <>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">Paid leave</span>
+              <span className="font-medium tabular-nums text-foreground">
+                {formatLeaveDayCount(preview.split.paidDays)} {formatLeaveDayUnit(preview.split.paidDays)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">Loss of Pay</span>
+              <span className="font-medium tabular-nums text-foreground">
+                {formatLeaveDayCount(preview.split.lopDays)} {formatLeaveDayUnit(preview.split.lopDays)}
+              </span>
+            </div>
+          </>
+        ) : null}
       </div>
 
       {preview.available != null && balanceAfter != null ? (

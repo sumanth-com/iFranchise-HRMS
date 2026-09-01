@@ -160,11 +160,17 @@ export type LeaveCalendarEntry = {
   employeeId: string;
   employeeName: string;
   leaveTypeName: string;
+  leaveTypeCode?: string | null;
   startDate: string;
   endDate: string;
   totalDays: number;
   isHalfDay: boolean;
   leaveStatus: LeaveStatus;
+  dayAllocations?: Array<{
+    date: string;
+    kind: "paid" | "lop" | "sandwich" | "none";
+    counted: number;
+  }>;
 };
 
 export type LeaveHolidayEntry = {

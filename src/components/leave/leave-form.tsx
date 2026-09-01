@@ -43,6 +43,7 @@ import { isOptionalHolidayCode, optionalHolidayDisplayDate } from "@/lib/leave/o
 import {
   CASUAL_LEAVE_CODE,
   earliestAllowedLeaveStart,
+  paidLeaveTypeDisplayName,
 } from "@/lib/leave/services/leave-policy-engine";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import {
@@ -612,18 +613,37 @@ export function LeaveForm({
         {isSelfService && applyPreview ? (
           <div className="md:col-span-2 space-y-2">
             <div className="rounded-xl border bg-muted/20 px-3 py-2.5">
-              <p className="text-sm text-muted-foreground">
-                <span className="font-medium text-foreground tabular-nums">
-                  {formatLeaveDays(applyPreview.duration.totalLeaveDays)} requested
-                </span>
-              </p>
-              {!isOptionalHoliday ? (
-                <p className="mt-1.5 text-sm tabular-nums text-foreground">
-                  {formatLeaveDays(applyPreview.split.paidDays)} paid leave
-                  {applyPreview.split.lopDays > 0
-                    ? ` · ${formatLeaveDays(applyPreview.split.lopDays)} Loss of Pay (LOP)`
-                    : " · 0 days LOP"}
-                </p>
+              <p className="text-sm font-semibold text-foreground">Leave Summary</p>
+              <dl className="mt-2 space-y-1 text-sm tabular-nums">
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">Requested</dt>
+                  <dd className="font-medium text-foreground">
+                    {formatLeaveDays(applyPreview.duration.totalLeaveDays)}
+                  </dd>
+                </div>
+                {!isOptionalHoliday ? (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-muted-foreground">
+                        {paidLeaveTypeDisplayName(applyPreview.leaveType.code)}
+                      </dt>
+                      <dd className="font-medium text-foreground">
+                        {formatLeaveDays(applyPreview.split.paidDays)}
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-muted-foreground">Loss of Pay</dt>
+                      <dd className="font-medium text-foreground">
+                        {formatLeaveDays(applyPreview.split.lopDays)}
+                      </dd>
+                    </div>
+                  </>
+                ) : null}
+              </dl>
+              {!isOptionalHoliday &&
+              applyPreview.split.paidDays === 0 &&
+              applyPreview.split.lopDays > 0 ? (
+                <p className="mt-2 text-xs text-muted-foreground">Paid balance used</p>
               ) : null}
             </div>
             {applyPreview.blockingIssues.map((issue) => {

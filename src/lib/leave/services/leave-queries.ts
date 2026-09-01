@@ -27,17 +27,19 @@ import {
 import { loadLeavePolicyRuntime } from "@/lib/leave/services/leave-policy-runtime";
 import { ensureEmployeeMonthlyLeaveAccruals, isMonthlyAccrualLeaveCode } from "@/lib/leave/services/leave-monthly-accrual";
 import { reconcileEmployeePaidLeaveLedger } from "@/lib/leave/services/leave-ledger-reconcile";
-import { DEFAULT_LEAVE_PROBATION_RULES } from "@/lib/leave/services/leave-policy-engine";
+import { DEFAULT_LEAVE_PROBATION_RULES, allocateLeaveDaysByBalance } from "@/lib/leave/services/leave-policy-engine";
 import {
   isPeriodLeaveCode,
   isPeriodLeaveEligible,
 } from "@/lib/leave/period-leave-eligibility";
 import {
   DEFAULT_LEAVE_CALENDAR,
+  calculateLeaveDuration,
   type LeaveCalendarContext,
 } from "@/lib/leave/services/leave-calendar-engine";
 import {
   countLeaveDaysInRange,
+  paidDaysFromLeaveRequest,
   roundLeaveDays,
 } from "@/lib/leave/services/leave-usage";
 import {
@@ -1116,6 +1118,43 @@ export async function listLeaveBalances(
     );
 }
 
+function calendarDayAllocationsForRequest(
+  row: {
+    start_date: string;
+    end_date: string;
+    is_half_day: boolean;
+    total_days: number | string;
+    duration_breakdown?: unknown;
+  },
+  calendar: LeaveCalendarContext,
+): NonNullable<LeaveCalendarEntry["dayAllocations"]> {
+  const stored = row.duration_breakdown as {
+    dayAllocations?: NonNullable<LeaveCalendarEntry["dayAllocations"]>;
+    days?: unknown;
+  } | null;
+  if (Array.isArray(stored?.dayAllocations) && stored.dayAllocations.length > 0) {
+    return stored.dayAllocations;
+  }
+
+  const duration =
+    stored && Array.isArray(stored.days)
+      ? (row.duration_breakdown as import("@/lib/leave/services/leave-calendar-engine").LeaveDurationBreakdown)
+      : calculateLeaveDuration({
+          startDate: row.start_date,
+          endDate: row.end_date,
+          isHalfDay: Boolean(row.is_half_day),
+          calendar,
+        });
+
+  return allocateLeaveDaysByBalance(
+    duration,
+    paidDaysFromLeaveRequest({
+      total_days: row.total_days,
+      duration_breakdown: row.duration_breakdown,
+    }),
+  );
+}
+
 export async function getLeaveCalendarData(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -1143,7 +1182,8 @@ export async function getLeaveCalendarData(
           is_half_day,
           leave_status,
           employees!inner (first_name, last_name, organization_id),
-          leave_types:leave_type_id (name)
+          leave_types:leave_type_id (name, code),
+          duration_breakdown
         `,
       )
       .eq("employees.organization_id", organizationId)
@@ -1175,11 +1215,13 @@ export async function getLeaveCalendarData(
         ? formatCleanEmployeeName(employee.first_name, employee.last_name)
         : "",
       leaveTypeName: leaveType?.name ?? "",
+      leaveTypeCode: leaveType?.code ?? null,
       startDate: row.start_date,
       endDate: row.end_date,
       totalDays: Number(row.total_days),
       isHalfDay: row.is_half_day,
       leaveStatus: row.leave_status as LeaveCalendarEntry["leaveStatus"],
+      dayAllocations: calendarDayAllocationsForRequest(row, runtime.calendar),
     };
   });
 
@@ -1217,8 +1259,8 @@ export async function getEmployeeLeaveCalendarData(
       .schema("hrms")
       .from("leave_requests")
       .select(
-        `id, start_date, end_date, total_days, is_half_day, leave_status,
-         leave_types:leave_type_id (name)`,
+        `id, start_date, end_date, total_days, is_half_day, leave_status, duration_breakdown,
+         leave_types:leave_type_id (name, code)`,
       )
       .eq("employee_id", employeeId)
       .in("leave_status", ["approved", "pending"])
@@ -1248,11 +1290,13 @@ export async function getEmployeeLeaveCalendarData(
       // On the personal calendar the chip shows the leave type (not a name).
       employeeName: typeName,
       leaveTypeName: typeName,
+      leaveTypeCode: leaveType?.code ?? null,
       startDate: row.start_date,
       endDate: row.end_date,
       totalDays: Number(row.total_days),
       isHalfDay: row.is_half_day,
       leaveStatus: row.leave_status as LeaveCalendarEntry["leaveStatus"],
+      dayAllocations: calendarDayAllocationsForRequest(row, runtime.calendar),
     };
   });
 

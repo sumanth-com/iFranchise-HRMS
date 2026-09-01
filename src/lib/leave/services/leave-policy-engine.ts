@@ -293,6 +293,14 @@ export function isBlockingLeaveIssue(issue: LeavePolicyIssue) {
 
 export type LeaveDaySplit = { paidDays: number; lopDays: number };
 
+export type LeaveDayAllocationKind = "paid" | "lop" | "sandwich" | "none";
+
+export type LeaveDayAllocation = {
+  date: string;
+  kind: LeaveDayAllocationKind;
+  counted: number;
+};
+
 /**
  * Splits a request into the portion covered by paid balance and the remainder,
  * which becomes Loss of Pay. Unpaid leave types are entirely LOP; a paid type with
@@ -312,6 +320,56 @@ export function splitLeaveDaysByBalance(input: {
     Math.min(total, Math.max(0, input.availableBalance)),
   );
   return { paidDays, lopDays: roundLeaveDays(total - paidDays) };
+}
+
+/**
+ * Walks counted leave days in date order and marks the first `paidDays` as paid
+ * (CL/EL/etc). Sandwich days stay sandwich and do not consume the paid quota,
+ * so the calendar never paints every requested day as Casual/Earned.
+ */
+export function allocateLeaveDaysByBalance(
+  duration: LeaveDurationBreakdown,
+  paidDays: number,
+): LeaveDayAllocation[] {
+  let remainingPaid = roundLeaveDays(Math.max(0, paidDays));
+  const sorted = [...duration.days].sort((left, right) =>
+    left.date.localeCompare(right.date),
+  );
+
+  return sorted.map((day) => {
+    if (day.kind === "sandwich") {
+      return { date: day.date, kind: "sandwich" as const, counted: day.counted };
+    }
+    if (day.counted <= 0) {
+      return { date: day.date, kind: "none" as const, counted: 0 };
+    }
+    if (remainingPaid > 0) {
+      remainingPaid = roundLeaveDays(Math.max(0, remainingPaid - day.counted));
+      return { date: day.date, kind: "paid" as const, counted: day.counted };
+    }
+    return { date: day.date, kind: "lop" as const, counted: day.counted };
+  });
+}
+
+export function paidLeaveTypeDisplayName(code: string | null | undefined): string {
+  const upper = String(code ?? "").toUpperCase();
+  if (upper === "CL") return "Casual Leave";
+  if (upper === "EL") return "Earned Leave";
+  if (upper === "OH") return "Optional Holiday";
+  if (upper === "PL") return "Menstruation Leave";
+  if (upper === "LOP") return "LOP";
+  if (upper === "SL") return "Sick Leave";
+  return "Leave";
+}
+
+export function calendarMarkForAllocation(
+  kind: LeaveDayAllocationKind,
+  leaveTypeCode: string | null | undefined,
+): string | null {
+  if (kind === "none") return null;
+  if (kind === "sandwich") return "Sandwich";
+  if (kind === "lop") return "LOP";
+  return paidLeaveTypeDisplayName(leaveTypeCode);
 }
 
 export function buildLeavePreviewMessages(input: {

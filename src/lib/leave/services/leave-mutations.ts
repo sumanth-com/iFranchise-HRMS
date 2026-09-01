@@ -26,10 +26,13 @@ import {
   requireActiveCeoApproverEmployeeIds,
 } from "@/lib/leave/services/leave-queries";
 import { requiresCeoLeaveApproval } from "@/lib/approvals/executive-request-routing";
-import { splitLeaveDaysByBalance } from "@/lib/leave/services/leave-policy-engine";
+import {
+  allocateLeaveDaysByBalance,
+  PERIOD_LEAVE_CODE,
+  splitLeaveDaysByBalance,
+} from "@/lib/leave/services/leave-policy-engine";
 import { roundLeaveDays } from "@/lib/leave/services/leave-usage";
 import { isPeriodLeaveEligible } from "@/lib/leave/period-leave-eligibility";
-import { PERIOD_LEAVE_CODE } from "@/lib/leave/services/leave-policy-engine";
 import {
   notifyLeaveApproved,
   notifyLeaveCancelled,
@@ -152,6 +155,19 @@ async function adjustLeaveBalance(
  * before the paid/LOP split existed reserved their full duration, so fall back to
  * total_days to keep their release amounts symmetrical.
  */
+function durationBreakdownWithSplit(
+  duration: Parameters<typeof allocateLeaveDaysByBalance>[0],
+  paidDays: number,
+  lopDays: number,
+) {
+  return {
+    ...duration,
+    paidDays,
+    lopDays,
+    dayAllocations: allocateLeaveDaysByBalance(duration, paidDays),
+  };
+}
+
 function reservedPaidDays(request: {
   total_days: number | string;
   duration_breakdown?: unknown;
@@ -445,7 +461,12 @@ export async function createLeaveRequest(
   const totalDays = evaluated.duration.totalLeaveDays;
   const balanceYear = getCurrentBalanceYear(input.startDate);
   let { paidDays, lopDays } = evaluated.split;
-  let durationBreakdown = { ...evaluated.duration, paidDays, lopDays };
+  let durationBreakdown = {
+    ...evaluated.duration,
+    paidDays,
+    lopDays,
+    dayAllocations: allocateLeaveDaysByBalance(evaluated.duration, paidDays),
+  };
 
   if (evaluated.leaveType.isPaid && paidDays > 0) {
     let openingAllocated = Math.max(Number(evaluated.leaveType.daysPerYear ?? 0), 0);
@@ -475,7 +496,12 @@ export async function createLeaveRequest(
     });
     paidDays = roundLeaveDays(Math.max(0, applied.appliedPending));
     lopDays = roundLeaveDays(Math.max(0, totalDays - paidDays));
-    durationBreakdown = { ...evaluated.duration, paidDays, lopDays };
+    durationBreakdown = {
+      ...evaluated.duration,
+      paidDays,
+      lopDays,
+      dayAllocations: allocateLeaveDaysByBalance(evaluated.duration, paidDays),
+    };
   }
 
   const { data, error } = await supabase
@@ -829,11 +855,11 @@ async function finalizeApprovalIfComplete(
     .update({
       leave_status: "approved",
       total_days: evaluated.duration.totalLeaveDays,
-      duration_breakdown: {
-        ...evaluated.duration,
-        paidDays: approved.paidDays,
-        lopDays: approved.lopDays,
-      },
+      duration_breakdown: durationBreakdownWithSplit(
+        evaluated.duration,
+        approved.paidDays,
+        approved.lopDays,
+      ),
       updated_by: profile.userId,
       updated_at: new Date().toISOString(),
     })
@@ -951,11 +977,11 @@ export async function approveLeaveRequest(
       .update({
         leave_status: "approved",
         total_days: evaluated.duration.totalLeaveDays,
-        duration_breakdown: {
-          ...evaluated.duration,
-          paidDays: approved.paidDays,
-          lopDays: approved.lopDays,
-        },
+        duration_breakdown: durationBreakdownWithSplit(
+          evaluated.duration,
+          approved.paidDays,
+          approved.lopDays,
+        ),
         updated_by: profile.userId,
         updated_at: actedAt,
       })
@@ -1479,11 +1505,11 @@ export async function updateLeaveRequest(
       emergency_contact_name: emptyToNull(input.emergencyContactName),
       emergency_contact_phone: emptyToNull(input.emergencyContactPhone),
       attachment_path: emptyToNull(input.attachmentPath),
-      duration_breakdown: {
-        ...next.duration,
-        paidDays: nextSplit.paidDays,
-        lopDays: nextSplit.lopDays,
-      },
+      duration_breakdown: durationBreakdownWithSplit(
+        next.duration,
+        nextSplit.paidDays,
+        nextSplit.lopDays,
+      ),
       updated_by: profile.userId,
       updated_at: new Date().toISOString(),
     })

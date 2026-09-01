@@ -48,9 +48,7 @@ function unwrapCode(
 
 /**
  * Idempotently applies monthly +1 accruals for CL and EL through the current month.
- * - Existing rows with null accrued_through_month are baselined (no grant).
- * - Each subsequent month adds exactly MONTHLY_ACCRUAL_DAYS_PER_MONTH.
- * Refreshing the page never double-grants. EL is not accrued here.
+ * Refreshing the page never double-grants: updates are gated on accrued_through_month.
  */
 export async function ensureEmployeeMonthlyLeaveAccruals(
   supabase: AuthSupabaseClient,

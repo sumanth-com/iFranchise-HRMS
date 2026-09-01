@@ -12,6 +12,7 @@ import {
 } from "@/lib/leave/services/leave-policy-engine";
 import type { LeaveApplyContext } from "@/types/leave";
 import type { LeaveDurationBreakdown } from "@/lib/leave/services/leave-calendar-engine";
+import { roundLeaveDays } from "@/lib/leave/services/leave-usage";
 
 export type LeaveApplyPreview = {
   duration: LeaveDurationBreakdown;
@@ -72,8 +73,15 @@ export function previewLeaveApplication(input: {
             ),
           )
         : ledgerAvailable;
+  const split = isOptionalHolidayCode(leaveType.code)
+    ? { paidDays: duration.totalLeaveDays, lopDays: 0 }
+    : splitLeaveDaysByBalance({
+        totalDays: duration.totalLeaveDays,
+        availableBalance: available,
+        isPaid: leaveType.isPaid,
+      });
   const remaining =
-    available == null ? null : Number((available - duration.totalLeaveDays).toFixed(2));
+    available == null ? null : roundLeaveDays(Math.max(0, available - split.paidDays));
 
   const issues = validateLeavePolicy({
     startDate: input.startDate,
@@ -99,14 +107,6 @@ export function previewLeaveApplication(input: {
     probation: input.context.probation,
     requiresManagerAndHr: input.context.approvalLevels >= 2,
   });
-
-  const split = isOptionalHolidayCode(leaveType.code)
-    ? { paidDays: duration.totalLeaveDays, lopDays: 0 }
-    : splitLeaveDaysByBalance({
-        totalDays: duration.totalLeaveDays,
-        availableBalance: available,
-        isPaid: leaveType.isPaid,
-      });
 
   return {
     duration,
