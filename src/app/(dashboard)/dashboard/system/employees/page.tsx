@@ -105,7 +105,7 @@ export default async function SuperAdminEmployeesPage({
       data: [],
       total: 0,
       page: params.page ?? 1,
-      pageSize: params.pageSize ?? 8,
+      pageSize: params.pageSize ?? 20,
     },
     "[system/employees] listEmployees",
   );

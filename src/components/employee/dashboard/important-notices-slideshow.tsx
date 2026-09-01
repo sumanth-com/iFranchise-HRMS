@@ -16,54 +16,52 @@ function TeamUpdateSlide({ event }: { event: EmployeeUpcomingEvent }) {
   return (
     <div
       className={cn(
-        "flex h-full min-h-0 flex-col overflow-hidden rounded-xl px-4 py-4",
+        "flex h-full min-h-0 flex-col items-center justify-center overflow-hidden rounded-xl px-5 py-5 text-center",
         isImportant
           ? "bg-gradient-to-b from-violet-500/[0.1] to-violet-500/[0.03] ring-1 ring-violet-500/25"
           : "bg-gradient-to-b from-violet-500/[0.06] to-transparent ring-1 ring-violet-500/12",
       )}
     >
-      <div className="flex min-h-0 flex-1 flex-col">
-        {hasImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={event.imageUrl!}
-            alt=""
-            className="mb-3 h-20 w-full rounded-xl object-cover shadow-sm ring-1 ring-border/60"
-            onError={(eventTarget) => {
-              eventTarget.currentTarget.style.display = "none";
-            }}
-          />
-        ) : (
-          <span
-            className={cn(
-              "mb-3 flex size-11 items-center justify-center rounded-xl shadow-sm",
-              isImportant
-                ? "bg-violet-500/15 text-violet-700 ring-1 ring-violet-500/20"
-                : "bg-violet-500/10 text-violet-600 ring-1 ring-violet-500/15",
-            )}
-          >
-            <AnnouncementIcon iconKey={event.iconKey} className="size-5" />
+      {hasImage ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={event.imageUrl!}
+          alt=""
+          className="mb-3 size-14 rounded-xl object-cover shadow-sm ring-1 ring-border/60 sm:size-16"
+          onError={(eventTarget) => {
+            eventTarget.currentTarget.style.display = "none";
+          }}
+        />
+      ) : (
+        <span
+          className={cn(
+            "mb-3 flex size-12 items-center justify-center rounded-xl shadow-sm sm:size-14",
+            isImportant
+              ? "bg-violet-500/15 text-violet-700 ring-1 ring-violet-500/20"
+              : "bg-violet-500/10 text-violet-600 ring-1 ring-violet-500/15",
+          )}
+        >
+          <AnnouncementIcon iconKey={event.iconKey} className="size-5 sm:size-6" />
+        </span>
+      )}
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
+        <span className="inline-flex items-center rounded-full bg-violet-500/12 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-violet-700 uppercase dark:bg-violet-400/20 dark:text-violet-300">
+          Team update
+        </span>
+        {isImportant ? (
+          <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-amber-800 uppercase dark:bg-amber-400/20 dark:text-amber-300">
+            Important
           </span>
-        )}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="inline-flex items-center rounded-full bg-violet-500/12 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-violet-700 uppercase dark:bg-violet-400/20 dark:text-violet-300">
-            Team update
-          </span>
-          {isImportant ? (
-            <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-amber-800 uppercase dark:bg-amber-400/20 dark:text-amber-300">
-              Important
-            </span>
-          ) : null}
-        </div>
-        <p className="mt-2.5 line-clamp-2 text-sm font-bold tracking-tight text-foreground">
-          {event.title}
-        </p>
-        {event.message ? (
-          <p className="mt-1.5 min-h-0 flex-1 overflow-y-auto text-xs leading-relaxed text-muted-foreground">
-            {event.message}
-          </p>
         ) : null}
       </div>
+      <p className="mt-2.5 line-clamp-2 max-w-[20rem] text-base font-bold tracking-tight text-foreground sm:text-lg">
+        {event.title}
+      </p>
+      {event.message ? (
+        <p className="mt-1.5 line-clamp-3 max-w-[20rem] text-xs leading-relaxed font-medium text-muted-foreground sm:text-[13px]">
+          {event.message}
+        </p>
+      ) : null}
     </div>
   );
 }

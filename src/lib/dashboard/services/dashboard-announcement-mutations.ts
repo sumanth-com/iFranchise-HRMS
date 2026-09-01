@@ -148,7 +148,9 @@ export async function softDeleteDashboardAnnouncement(
   announcementId: string,
 ): Promise<void> {
   const now = new Date().toISOString();
-  const { error } = await supabase
+  const organizationId = profile.employee.organizationId;
+
+  const { data: softDeleted, error: softDeleteError } = await supabase
     .schema("hrms")
     .from("dashboard_announcements")
     .update({
@@ -159,11 +161,30 @@ export async function softDeleteDashboardAnnouncement(
       updated_by: profile.userId,
     })
     .eq("id", announcementId)
-    .eq("organization_id", profile.employee.organizationId)
-    .is("deleted_at", null);
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
 
-  if (error) {
-    console.error("[announcements] delete failed", error.message);
+  if (!softDeleteError && softDeleted) {
+    return;
+  }
+
+  // Older SELECT RLS required deleted_at IS NULL on the updated row, which
+  // rejects soft-delete. Hard delete is still allowed by the DELETE policy.
+  const { error: hardDeleteError } = await supabase
+    .schema("hrms")
+    .from("dashboard_announcements")
+    .delete()
+    .eq("id", announcementId)
+    .eq("organization_id", organizationId);
+
+  if (hardDeleteError) {
+    console.error(
+      "[announcements] delete failed",
+      softDeleteError?.message,
+      hardDeleteError.message,
+    );
     throw new Error("Unable to remove announcement.");
   }
 }

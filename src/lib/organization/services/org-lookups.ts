@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { LookupOption } from "@/types/employee";
 
@@ -10,7 +12,7 @@ export function emptyToNull(value?: string | null) {
   return value && value.trim().length > 0 ? value.trim() : null;
 }
 
-export async function getBranches(
+export const getBranches = cache(async function getBranches(
   supabase: AuthSupabaseClient,
   organizationId: string,
 ): Promise<LookupOption[]> {
@@ -30,9 +32,9 @@ export async function getBranches(
     label: row.name,
     code: row.code,
   }));
-}
+});
 
-export async function getDepartments(
+export const getDepartments = cache(async function getDepartments(
   supabase: AuthSupabaseClient,
   organizationId: string,
 ): Promise<LookupOption[]> {
@@ -52,9 +54,9 @@ export async function getDepartments(
     label: row.name,
     code: row.code,
   }));
-}
+});
 
-export async function getDesignations(
+export const getDesignations = cache(async function getDesignations(
   supabase: AuthSupabaseClient,
   organizationId: string,
 ): Promise<LookupOption[]> {
@@ -74,9 +76,9 @@ export async function getDesignations(
     label: row.title,
     code: row.code,
   }));
-}
+});
 
-export async function getEmploymentTypes(
+export const getEmploymentTypes = cache(async function getEmploymentTypes(
   supabase: AuthSupabaseClient,
   organizationId: string,
 ): Promise<LookupOption[]> {
@@ -96,9 +98,9 @@ export async function getEmploymentTypes(
     label: row.name,
     code: row.code,
   }));
-}
+});
 
-export async function getShiftTemplates(
+export const getShiftTemplates = cache(async function getShiftTemplates(
   supabase: AuthSupabaseClient,
   organizationId: string,
 ): Promise<LookupOption[]> {
@@ -117,9 +119,9 @@ export async function getShiftTemplates(
     id: row.id,
     label: row.name,
   }));
-}
+});
 
-export async function getWorkLocations(
+export const getWorkLocations = cache(async function getWorkLocations(
   supabase: AuthSupabaseClient,
   organizationId: string,
 ): Promise<LookupOption[]> {
@@ -138,9 +140,9 @@ export async function getWorkLocations(
     id: row.id,
     label: row.name,
   }));
-}
+});
 
-export async function getEmployeeLookups(
+export const getEmployeeLookups = cache(async function getEmployeeLookups(
   supabase: AuthSupabaseClient,
   organizationId: string,
   excludeEmployeeId?: string,
@@ -167,7 +169,7 @@ export async function getEmployeeLookups(
     label: `${row.first_name} ${row.last_name}`,
     code: row.employee_code,
   }));
-}
+});
 
 export async function getOrganizationLookups(
   supabase: AuthSupabaseClient,

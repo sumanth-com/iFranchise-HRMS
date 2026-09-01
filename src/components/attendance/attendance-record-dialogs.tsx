@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Loader2 } from "lucide-react";
 
 import { AttendanceDetailView } from "@/components/attendance/attendance-detail-view";
 import { AttendanceForm } from "@/components/attendance/attendance-form";
+import { DialogBodySkeleton } from "@/components/common/dialog-body-skeleton";
 import { Modal } from "@/components/common/modal";
 import {
   getAttendanceCorrectionDetailAction,
@@ -16,6 +16,16 @@ import type {
   AttendanceDetail,
   AttendanceLookups,
 } from "@/types/attendance";
+
+function isDialogLoading(
+  open: boolean,
+  id: string | null,
+  isPending: boolean,
+  hasData: boolean,
+  error: string | null,
+) {
+  return isPending || (open && Boolean(id) && !hasData && !error);
+}
 
 type AttendanceViewDialogProps = {
   attendanceId: string | null;
@@ -64,10 +74,8 @@ export function AttendanceViewDialog({
       contentClassName="sm:max-w-3xl"
       showCancel={false}
     >
-      {isPending ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="size-5 animate-spin text-muted-foreground" />
-        </div>
+      {isDialogLoading(open, attendanceId, isPending, Boolean(detail), error) ? (
+        <DialogBodySkeleton rows={6} />
       ) : error ? (
         <p className="py-6 text-sm text-muted-foreground">{error}</p>
       ) : detail ? (
@@ -132,10 +140,8 @@ export function AttendanceRegularizationViewDialog({
       contentClassName="sm:max-w-lg"
       showCancel={false}
     >
-      {isPending ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="size-5 animate-spin text-muted-foreground" />
-        </div>
+      {isDialogLoading(open, attendanceId, isPending, Boolean(detail), error) ? (
+        <DialogBodySkeleton rows={3} />
       ) : error ? (
         <p className="py-6 text-sm text-muted-foreground">{error}</p>
       ) : detail ? (
@@ -215,10 +221,8 @@ export function AttendanceEditDialog({
       contentClassName="sm:max-w-2xl"
       showCancel={false}
     >
-      {isPending ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="size-5 animate-spin text-muted-foreground" />
-        </div>
+      {isDialogLoading(open, attendanceId, isPending, Boolean(detail), error) ? (
+        <DialogBodySkeleton rows={5} />
       ) : error ? (
         <p className="py-6 text-sm text-muted-foreground">{error}</p>
       ) : detail ? (

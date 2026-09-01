@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
 import type {
@@ -23,35 +25,39 @@ function parseListParams(params: OrgListParams) {
   return orgListParamsSchema.parse(params);
 }
 
-export async function getOrganizationProfile(
+export const getOrganizationProfile = cache(async function getOrganizationProfile(
   supabase: AuthSupabaseClient,
   organizationId: string,
 ): Promise<OrganizationProfile | null> {
-  const { data: org, error } = await supabase
-    .schema("hrms")
-    .from("organizations")
-    .select(
-      `id, name, legal_name, email, phone, website, logo_storage_path,
-       gst_number, pan_number, cin,
-       registered_address_line1, registered_address_line2, registered_city, registered_state,
-       registered_country, registered_postal_code,
-       corporate_address_line1, corporate_address_line2, corporate_city, corporate_state,
-       corporate_country, corporate_postal_code, status`,
-    )
-    .eq("id", organizationId)
-    .is("deleted_at", null)
-    .maybeSingle();
+  const [orgResult, settingsResult] = await Promise.all([
+    supabase
+      .schema("hrms")
+      .from("organizations")
+      .select(
+        `id, name, legal_name, email, phone, website, logo_storage_path,
+         gst_number, pan_number, cin,
+         registered_address_line1, registered_address_line2, registered_city, registered_state,
+         registered_country, registered_postal_code,
+         corporate_address_line1, corporate_address_line2, corporate_city, corporate_state,
+         corporate_country, corporate_postal_code, status`,
+      )
+      .eq("id", organizationId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    supabase
+      .schema("hrms")
+      .from("organization_settings")
+      .select("timezone, currency_code, date_format, fiscal_year_start_month")
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+  ]);
 
+  const { data: org, error } = orgResult;
   if (error) throw new Error(error.message);
   if (!org) return null;
 
-  const { data: settings } = await supabase
-    .schema("hrms")
-    .from("organization_settings")
-    .select("timezone, currency_code, date_format, fiscal_year_start_month")
-    .eq("organization_id", organizationId)
-    .is("deleted_at", null)
-    .maybeSingle();
+  const { data: settings } = settingsResult;
 
   return {
     id: org.id,
@@ -82,7 +88,7 @@ export async function getOrganizationProfile(
     fiscalYearStartMonth: settings?.fiscal_year_start_month ?? 4,
     status: org.status,
   };
-}
+});
 
 type EmployeeCountField = "branch_id" | "department_id" | "designation_id" | "employment_type_id";
 

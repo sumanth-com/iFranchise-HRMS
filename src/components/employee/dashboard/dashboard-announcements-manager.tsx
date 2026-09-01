@@ -52,6 +52,7 @@ export function DashboardAnnouncementsManager({
   const [items, setItems] = useState<DashboardAnnouncement[]>([]);
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState<FormState | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DashboardAnnouncement | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -132,15 +133,17 @@ export function DashboardAnnouncementsManager({
     });
   }
 
-  function removeItem(item: DashboardAnnouncement) {
-    if (!window.confirm(`Remove “${item.title}”?`)) return;
+  function removeItem() {
+    if (!deleteTarget) return;
+    const targetId = deleteTarget.id;
     startTransition(async () => {
-      const result = await deleteDashboardAnnouncementAction(item.id);
+      const result = await deleteDashboardAnnouncementAction(targetId);
       if (!result.success) {
         toast.error(result.message);
         return;
       }
       toast.success("Team update removed.");
+      setDeleteTarget(null);
       await reload();
       router.refresh();
     });
@@ -149,15 +152,25 @@ export function DashboardAnnouncementsManager({
   return (
     <Modal
       open={open}
-      onOpenChange={onOpenChange}
-      title="Team updates"
-      description="Write a short note for this dashboard card. This is separate from Organization announcements."
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && isPending) return;
+        if (!nextOpen) setDeleteTarget(null);
+        onOpenChange(nextOpen);
+      }}
+      title={deleteTarget ? "Remove this team update?" : "Team updates"}
+      description={
+        deleteTarget
+          ? `“${deleteTarget.title}” will be removed from the dashboard card.`
+          : "Write a short note for this dashboard card. This is separate from Organization announcements."
+      }
       contentClassName="sm:max-w-2xl"
       showCancel={false}
       footer={
+        deleteTarget ? undefined : (
         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
           Close
         </Button>
+        )
       }
     >
       {editing ? (
@@ -301,6 +314,35 @@ export function DashboardAnnouncementsManager({
             </Button>
           </div>
         </div>
+      ) : deleteTarget ? (
+        <div className="space-y-4">
+          <p className="text-sm text-foreground">
+            Remove “{deleteTarget.title}” from the dashboard card?
+          </p>
+          <p className="text-sm text-muted-foreground">
+            This does not affect Organization announcements. You can create a new team
+            update later if needed.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPending}
+              onClick={() => setDeleteTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isPending}
+              onClick={removeItem}
+            >
+              {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+              Remove update
+            </Button>
+          </div>
+        </div>
       ) : (
         <div className="space-y-3">
           <div className="flex justify-end">
@@ -376,7 +418,7 @@ export function DashboardAnnouncementsManager({
                       variant="ghost"
                       disabled={isPending}
                       aria-label="Remove"
-                      onClick={() => removeItem(item)}
+                      onClick={() => setDeleteTarget(item)}
                     >
                       <Trash2 className="size-3.5 text-destructive" />
                     </Button>

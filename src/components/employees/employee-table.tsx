@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import {
   Select,
@@ -14,6 +13,7 @@ import {
 } from "@/components/common/select";
 import { EmployeeCardsGrid } from "@/components/employees/employee-cards-grid";
 import { EmployeeDeleteConfirmDialog } from "@/components/employees/employee-delete-confirm-dialog";
+import { PeoplePageSizeSelect } from "@/components/common/people-page-size-select";
 import { deleteEmployeeAction, fetchEmployeesAction } from "@/lib/employees/actions";
 import { resolveEmployeeModuleRoutes } from "@/lib/employees/constants";
 import type {
@@ -88,8 +88,20 @@ export function EmployeeTable({
         page: updates.page ? Number(updates.page) : filters.page,
       };
 
+      if (updates.pageSize) {
+        nextFilters.pageSize = Number(updates.pageSize);
+        nextFilters.page = 1;
+      }
+
       Object.entries(updates).forEach(([key, value]) => {
-        if (key === "page" || key === "departmentId" || key === "branchId") return;
+        if (
+          key === "page" ||
+          key === "pageSize" ||
+          key === "departmentId" ||
+          key === "branchId"
+        ) {
+          return;
+        }
         (nextFilters as Record<string, unknown>)[key] = value || undefined;
       });
 
@@ -130,7 +142,6 @@ export function EmployeeTable({
 
   const { employees, total, page, pageSize } = tableState;
   const { department } = filters;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const departmentItems = useMemo(
     () => [
@@ -174,12 +185,12 @@ export function EmployeeTable({
 
   return (
     <div className="space-y-4">
-      <div className="relative z-10 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="relative z-10 flex flex-col gap-3 rounded-xl border border-border/70 bg-muted/55 p-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
           <Input
             placeholder="Search by name, email, or code..."
             value={searchInput}
-            className="sm:max-w-xs"
+            className="h-10 border-border/80 bg-background font-semibold sm:max-w-xs"
             onChange={(event) => setSearchInput(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") {
@@ -203,7 +214,7 @@ export function EmployeeTable({
               })
             }
           >
-            <SelectTrigger className="h-8 w-full min-w-0 sm:w-44">
+            <SelectTrigger className="h-10 w-full min-w-0 border-border/80 bg-background font-semibold sm:w-44">
               <SelectValue placeholder="All departments" />
             </SelectTrigger>
             <SelectContent align="start" alignItemWithTrigger={false}>
@@ -231,31 +242,17 @@ export function EmployeeTable({
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm font-medium text-foreground/80">
           Showing {employees.length === 0 ? 0 : (page - 1) * pageSize + 1}–
           {Math.min(page * pageSize, total)} of {total}
         </p>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1 || isPending}
-            onClick={() => updateParams({ page: String(page - 1) })}
-          >
-            Previous
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            Page {page} of {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages || isPending}
-            onClick={() => updateParams({ page: String(page + 1) })}
-          >
-            Next
-          </Button>
-        </div>
+        <PeoplePageSizeSelect
+          value={pageSize}
+          disabled={isPending}
+          onChange={(nextSize) =>
+            updateParams({ pageSize: String(nextSize), page: "1" })
+          }
+        />
       </div>
 
       <EmployeeDeleteConfirmDialog

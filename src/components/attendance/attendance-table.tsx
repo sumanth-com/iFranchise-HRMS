@@ -29,6 +29,7 @@ import { AttendanceStatusBadge } from "@/components/attendance/attendance-status
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Modal } from "@/components/common/modal";
+import { PeoplePageSizeSelect } from "@/components/common/people-page-size-select";
 import {
   Select,
   SelectContent,
@@ -137,12 +138,12 @@ const TABLE_DATA_CELL_BASE = "whitespace-nowrap px-4 py-3 align-middle";
 const TABLE_ACTIONS_CELL_CLASS = "min-w-36 px-2 py-3 text-center align-middle";
 
 const FILTER_CONTROL_CLASS =
-  "h-10 w-full min-w-0 gap-2 rounded-lg [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-muted-foreground/70";
+  "h-10 w-full min-w-0 gap-2 rounded-lg border-border/80 bg-background font-semibold text-foreground [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-muted-foreground";
 const STATUS_FILTER_CLASS = cn(FILTER_CONTROL_CLASS, "w-full");
 const DATE_RANGE_CLASS =
-  "flex h-10 min-w-[15rem] shrink-0 items-center gap-2 rounded-lg border border-input bg-background px-2.5";
+  "flex h-10 min-w-[16rem] shrink-0 items-center gap-2 rounded-lg border border-border/80 bg-background px-2.5";
 const DATE_INPUT_CLASS =
-  "h-7 min-w-0 w-full border-0 bg-transparent p-0 pr-5 text-sm shadow-none focus-visible:ring-0 data-[empty]:text-muted-foreground [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:top-1/2 [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:m-0 [&::-webkit-calendar-picker-indicator]:size-3.5 [&::-webkit-calendar-picker-indicator]:-translate-y-1/2 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0";
+  "h-7 min-w-0 w-full border-0 bg-transparent p-0 pr-5 text-sm font-semibold text-foreground shadow-none focus-visible:ring-0 data-[empty]:text-muted-foreground [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:top-1/2 [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:m-0 [&::-webkit-calendar-picker-indicator]:size-3.5 [&::-webkit-calendar-picker-indicator]:-translate-y-1/2 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0";
 
 export function AttendanceTable({
   records,
@@ -286,7 +287,6 @@ export function AttendanceTable({
   }, [employeeId, employeeItems]);
 
   const isEmployeeHistoryView = Boolean(employeeId && dateFrom && dateTo);
-  const showPagination = !isEmployeeHistoryView && totalPages > 1;
 
   const updateDateFrom = (value: string) => {
     const nextFrom = value || undefined;
@@ -542,7 +542,7 @@ export function AttendanceTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+      <div className="flex items-center gap-2.5 overflow-x-auto rounded-xl border border-border/70 bg-muted/55 p-2.5">
         <div className="w-[13.5rem] shrink-0">
           <Select
             items={employeeItems}
@@ -626,7 +626,7 @@ export function AttendanceTable({
             />
             <CalendarDays className="pointer-events-none absolute top-1/2 right-0 size-3.5 -translate-y-1/2 text-muted-foreground/70" />
           </div>
-          <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
+          <span className="shrink-0 text-[11px] font-semibold text-foreground/70">
             to
           </span>
           <div className="relative min-w-[6.75rem] flex-1">
@@ -677,8 +677,8 @@ export function AttendanceTable({
           </Select>
         </div>
 
-        <span className="inline-flex ml-auto h-10 shrink-0 items-center gap-2 whitespace-nowrap text-sm font-semibold text-foreground">
-          <CalendarDays className="size-4 shrink-0" />
+        <span className="inline-flex ml-auto h-10 shrink-0 items-center gap-2 whitespace-nowrap text-sm font-bold text-foreground">
+          <CalendarDays className="size-4 shrink-0 text-muted-foreground" />
           Summary for {summaryDate ?? dateFrom ?? today}
         </span>
       </div>
@@ -773,40 +773,22 @@ export function AttendanceTable({
         </table>
       </div>
 
-      {showPagination ? (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-muted-foreground">
-            Showing {rows.length === 0 ? 0 : (page - 1) * pageSize + 1}–
-            {Math.min(page * pageSize, rowTotal)} of {rowTotal}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page <= 1 || isPending}
-              onClick={() => updateParams({ page: String(page - 1) })}
-            >
-              Previous
-            </Button>
-            <span className="text-sm text-muted-foreground">
-              Page {page} of {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page >= totalPages || isPending}
-              onClick={() => updateParams({ page: String(page + 1) })}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          Showing {rowTotal} attendance record{rowTotal === 1 ? "" : "s"}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm font-medium text-foreground/80">
+          Showing {rows.length === 0 ? 0 : (page - 1) * pageSize + 1}–
+          {Math.min(page * pageSize, rowTotal)} of {rowTotal}
           {isEmployeeHistoryView ? " for selected employee and date range" : ""}
         </p>
-      )}
+        {!isEmployeeHistoryView ? (
+          <PeoplePageSizeSelect
+            value={pageSize}
+            disabled={isPending}
+            onChange={(nextSize) =>
+              updateParams({ pageSize: String(nextSize), page: "1" })
+            }
+          />
+        ) : null}
+      </div>
 
       {teamRegularizationMode ? (
         <AttendanceRegularizationViewDialog
