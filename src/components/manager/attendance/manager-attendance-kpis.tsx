@@ -40,11 +40,6 @@ export function ManagerAttendanceKpis({ summary }: { summary: TeamAttendanceSumm
       accent: "text-amber-600 dark:text-amber-400",
     },
     {
-      label: "Half Day",
-      value: summary.halfDayToday,
-      accent: "text-violet-600 dark:text-violet-400",
-    },
-    {
       label: "Work From Home",
       value: summary.workFromHomeToday,
       accent: "text-sky-600 dark:text-sky-400",
@@ -59,7 +54,7 @@ export function ManagerAttendanceKpis({ summary }: { summary: TeamAttendanceSumm
   return (
     <section
       aria-label="Attendance summary"
-      className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6"
+      className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-5"
     >
       {items.map((item) => (
         <KpiCard

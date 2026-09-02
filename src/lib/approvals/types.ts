@@ -159,4 +159,6 @@ export type ProcessOutcome =
   | {
       status: "already_processed" | "expired" | "invalid" | "unauthorized" | "error";
       message: string;
+      employeeName?: string;
+      summary?: ApprovalRequestSummary;
     };

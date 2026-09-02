@@ -33,6 +33,7 @@ import {
   RECOMMENDATION_LABELS,
   RECRUITMENT_ROUTES,
 } from "@/lib/recruitment/constants";
+import { getHrmsYearSelectItems } from "@/lib/date/hrms-year";
 import { interviewCompleteSchema } from "@/lib/validations/recruitment";
 import type { InterviewListItem, RecruitmentLookups } from "@/types/recruitment";
 import { cn } from "@/lib/utils";
@@ -53,12 +54,7 @@ const MONTHS = [
 ];
 
 function getYearItems() {
-  const current = new Date().getFullYear();
-  const items = [];
-  for (let y = current; y >= current - 3; y--) {
-    items.push({ value: String(y), label: String(y) });
-  }
-  return items;
+  return getHrmsYearSelectItems();
 }
 
 function Field({

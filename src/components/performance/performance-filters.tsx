@@ -15,6 +15,7 @@ import { Search } from "lucide-react";
 import { Input } from "@/components/common/input";
 import { EmployeeSelect, LabeledSelect } from "@/components/payroll/payroll-select";
 import { toSelectItems } from "@/components/payroll/select-utils";
+import { getHrmsYearSelectItems } from "@/lib/date/hrms-year";
 import { cn } from "@/lib/utils";
 import type { LookupOption } from "@/types/employee";
 
@@ -38,14 +39,7 @@ export function currentYearValue() {
 }
 
 export function buildYearItems() {
-  const currentYear = new Date().getFullYear();
-  return [
-    { value: "all", label: "All years" },
-    ...Array.from({ length: 5 }, (_, index) => ({
-      value: String(currentYear - index),
-      label: String(currentYear - index),
-    })),
-  ];
+  return getHrmsYearSelectItems({ includeAll: true });
 }
 
 export function matchesAssignedPeriod(

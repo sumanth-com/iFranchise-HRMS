@@ -1,12 +1,15 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
 import type { LeaveDetail } from "@/types/leave";
+import { requiresCeoLeaveApproval } from "@/lib/approvals/executive-request-routing";
+import { isPendingHrReview, parseHrReviewMetadata } from "@/lib/leave/hr-review";
 import { hasPermission } from "@/lib/permissions/utils";
 import {
   canActorDecideLeaveRequest,
   getEmployeeRoleCodes,
+  isCeoLeaveApprover,
+  isHrLeaveActor,
 } from "@/lib/leave/services/leave-queries";
-import { requiresCeoLeaveApproval } from "@/lib/approvals/executive-request-routing";
 
 function unwrapRelation<T>(value: T | T[] | null): T | null {
   if (!value) return null;
@@ -46,7 +49,8 @@ export async function getLeaveRequestById(
           organization_id,
           reporting_manager_id,
           departments:department_id (name),
-          branches:branch_id (name)
+          branches:branch_id (name),
+          employment_types:employment_type_id (name)
         ),
         leave_types:leave_type_id (name, code),
         leave_approvals (
@@ -124,15 +128,19 @@ export async function getLeaveRequestById(
     .sort((a, b) => a.approvalLevel - b.approvalLevel)[0];
   const applicantRoles = await getEmployeeRoleCodes(supabase, data.employee_id);
   const executiveApplicant = requiresCeoLeaveApproval(applicantRoles);
+  const hrReview = parseHrReviewMetadata(data.duration_breakdown);
+  const pendingHrReview = isPendingHrReview(data.leave_status, data.duration_breakdown);
 
-  const canApprove = canActorDecideLeaveRequest({
-    profile,
-    applicantEmployeeId: data.employee_id,
-    leaveStatus: data.leave_status,
-    pendingLevel: pendingApproval?.approvalLevel ?? null,
-    pendingApproverEmployeeId: pendingApproval?.approverEmployeeId ?? null,
-    executiveApplicant,
-  });
+  const canApprove = pendingHrReview
+    ? isHrLeaveActor(profile) || isCeoLeaveApprover(profile)
+    : canActorDecideLeaveRequest({
+        profile,
+        applicantEmployeeId: data.employee_id,
+        leaveStatus: data.leave_status,
+        pendingLevel: pendingApproval?.approvalLevel ?? null,
+        pendingApproverEmployeeId: pendingApproval?.approverEmployeeId ?? null,
+        executiveApplicant,
+      });
   const canReject = canApprove;
 
   const canCancel =
@@ -191,5 +199,14 @@ export async function getLeaveRequestById(
     canCancel,
     canEdit,
     canDelete,
+    employmentTypeName: unwrapRelation(
+      (employee as { employment_types?: { name: string } | { name: string }[] | null } | null)
+        ?.employment_types ?? null,
+    )?.name ?? null,
+    hrReviewRequired: Boolean(hrReview?.required),
+    hrReviewReason: hrReview?.reason ?? null,
+    hrDecision: hrReview?.decision ?? null,
+    hrRemarks: hrReview?.remarks ?? null,
+    availableBalanceAtSubmit: hrReview?.availableBalanceAtSubmit ?? null,
   };
 }

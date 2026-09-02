@@ -1,26 +1,13 @@
 import Image from "next/image";
-import { format, parseISO, lastDayOfMonth } from "date-fns";
+import { format } from "date-fns";
 
 import { amountToIndianWords } from "@/lib/payroll/services/amount-in-words";
+import { getPayslipInfoRows } from "@/lib/payroll/services/payslip-document-helpers";
 import {
   getPayslipDeductionLines,
   getPayslipEarningsLines,
 } from "@/lib/payroll/services/payroll-utils";
 import type { PayslipDetail } from "@/types/payroll";
-
-function fmt(value: string | null | undefined, fallback = "—"): string {
-  return value?.trim() ? value : fallback;
-}
-
-function fmtDateUpper(value: string | null | undefined): string {
-  if (!value) return "—";
-  try {
-    const d = parseISO(value.length === 10 ? value : value.slice(0, 10));
-    return format(d, "dd-MMM-yyyy").toUpperCase();
-  } catch {
-    return "—";
-  }
-}
 
 function formatMonthYearHeader(dateString: string | null | undefined): string {
   if (!dateString) return "—";
@@ -53,28 +40,9 @@ export function PayslipTemplate({
   payslip: PayslipDetail;
   className?: string;
 }) {
-  const employeeName = `${payslip.employee.firstName} ${payslip.employee.lastName}`.trim().toUpperCase();
   const organizationName = payslip.organization.name.toUpperCase();
   const monthHeader = formatMonthYearHeader(payslip.payrollMonth);
-
-  let totalDaysInMonth = 30;
-  try {
-    const monthDate = new Date(payslip.payrollMonth);
-    totalDaysInMonth = lastDayOfMonth(monthDate).getDate();
-  } catch {
-    totalDaysInMonth = 30;
-  }
-
-  const attendance = payslip.breakdown?.attendance;
-  const workDays =
-    attendance?.workingDays && attendance.workingDays > 0
-      ? attendance.workingDays
-      : totalDaysInMonth;
-  const lopDays = attendance?.lopDays ?? attendance?.leaveLopDays ?? 0;
-  const paidDays =
-    attendance?.presentDays && attendance.presentDays > 0
-      ? attendance.presentDays
-      : Math.max(0, workDays - lopDays);
+  const infoRows = getPayslipInfoRows(payslip);
 
   const earnings = getPayslipEarningsLines({
     earnings: payslip.breakdown?.earnings,
@@ -128,66 +96,20 @@ export function PayslipTemplate({
       <div className="w-full border-2 border-black bg-white text-xs">
         <table className="w-full table-fixed border-collapse">
           <tbody>
-            <tr className="border-b border-black">
-              <td className="w-[22%] border-r border-black p-2.5 font-bold uppercase">
-                Employee ID
-              </td>
-              <td className="w-[28%] border-r border-black p-2.5 font-semibold">
-                {payslip.employee.employeeCode}
-              </td>
-              <td className="w-[22%] border-r border-black p-2.5 font-bold uppercase">
-                Payment Mode
-              </td>
-              <td className="w-[28%] p-2.5 font-semibold">
-                {(payslip.paymentMode || "BANK").toUpperCase()}
-              </td>
-            </tr>
-            <tr className="border-b border-black">
-              <td className="border-r border-black p-2.5 font-bold uppercase">
-                Employee Name
-              </td>
-              <td className="border-r border-black p-2.5 font-semibold">{employeeName}</td>
-              <td className="border-r border-black p-2.5 font-bold uppercase">Bank Name</td>
-              <td className="p-2.5 font-semibold">{fmt(payslip.bankAccount?.bankName)}</td>
-            </tr>
-            <tr className="border-b border-black">
-              <td className="border-r border-black p-2.5 font-bold uppercase">Joining Dt</td>
-              <td className="border-r border-black p-2.5 font-semibold">
-                {fmtDateUpper(payslip.employee.dateOfJoining)}
-              </td>
-              <td className="border-r border-black p-2.5 font-bold uppercase">Bank A/C No</td>
-              <td className="p-2.5 font-semibold">
-                {fmt(payslip.bankAccount?.accountNumberMasked)}
-              </td>
-            </tr>
-            <tr className="border-b border-black">
-              <td className="border-r border-black p-2.5 font-bold uppercase">Designation</td>
-              <td className="border-r border-black p-2.5 font-semibold">
-                {fmt(payslip.employee.designationTitle).toUpperCase()}
-              </td>
-              <td className="border-r border-black p-2.5 font-bold uppercase">Work Days</td>
-              <td className="p-2.5 font-semibold tabular-nums">{Number(workDays).toFixed(2)}</td>
-            </tr>
-            <tr className="border-b border-black">
-              <td className="border-r border-black p-2.5 font-bold uppercase">Location</td>
-              <td className="border-r border-black p-2.5 font-semibold">
-                {fmt(
-                  payslip.employee.branchName ||
-                    payslip.employee.departmentName ||
-                    "CHENNAI",
-                ).toUpperCase()}
-              </td>
-              <td className="border-r border-black p-2.5 font-bold uppercase">Paid Days</td>
-              <td className="p-2.5 font-semibold tabular-nums">{Number(paidDays).toFixed(2)}</td>
-            </tr>
-            <tr className="border-b border-black">
-              <td className="border-r border-black p-2.5 font-bold uppercase">PAN No</td>
-              <td className="border-r border-black p-2.5 font-semibold">
-                {fmt(payslip.employee.pan)}
-              </td>
-              <td className="border-r border-black p-2.5 font-bold uppercase">LOP Days</td>
-              <td className="p-2.5 font-semibold tabular-nums">{Number(lopDays).toFixed(2)}</td>
-            </tr>
+            {infoRows.map((row) => (
+              <tr key={`${row[0].label}-${row[1].label}`} className="border-b border-black">
+                <td className="w-[22%] border-r border-black p-2.5 font-bold uppercase">
+                  {row[0].label}
+                </td>
+                <td className="w-[28%] border-r border-black p-2.5 font-semibold">
+                  {row[0].value}
+                </td>
+                <td className="w-[22%] border-r border-black p-2.5 font-bold uppercase">
+                  {row[1].label}
+                </td>
+                <td className="w-[28%] p-2.5 font-semibold">{row[1].value}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
 
@@ -243,16 +165,21 @@ export function PayslipTemplate({
         <table className="w-full table-fixed border-collapse">
           <tbody>
             <tr className="border-b border-black">
-              <td className="w-[50%] border-r border-black p-2.5" />
-              <td className="w-[30%] border-r border-black p-2.5 text-right text-sm font-bold uppercase tracking-wide">
-                Net Pay
-              </td>
-              <td className="w-[20%] p-2.5 text-right text-sm font-bold tabular-nums">
-                {formatAmountIndian(netPay)}
+              <td className="p-2.5">
+                <div className="flex flex-wrap items-baseline justify-center gap-x-2 gap-y-1 text-sm font-bold tabular-nums">
+                  <span className="uppercase tracking-wide">Gross</span>
+                  <span>₹{formatAmountIndian(totalEarnings)}</span>
+                  <span className="font-semibold text-neutral-700">−</span>
+                  <span className="uppercase tracking-wide">Deductions</span>
+                  <span>₹{formatAmountIndian(totalDeductions)}</span>
+                  <span className="font-semibold text-neutral-700">=</span>
+                  <span className="uppercase tracking-wide">Net Pay</span>
+                  <span>₹{formatAmountIndian(netPay)}</span>
+                </div>
               </td>
             </tr>
             <tr>
-              <td colSpan={3} className="p-2.5 font-bold leading-relaxed">
+              <td className="p-2.5 font-bold leading-relaxed">
                 Net Pay: {amountToIndianWords(netPay)}
               </td>
             </tr>

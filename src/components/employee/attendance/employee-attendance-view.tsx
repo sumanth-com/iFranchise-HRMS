@@ -7,6 +7,7 @@ import { useState } from "react";
 
 import { buttonVariants } from "@/components/common/button";
 import { EmployeeAttendanceHistoryTable } from "@/components/employee/attendance/employee-attendance-history-table";
+import { SelfAttendanceLiveProvider, useSelfAttendanceLive } from "@/components/attendance/self-attendance-live-context";
 import { SelfAttendanceTodayCard } from "@/components/attendance/self-attendance-today-card";
 import { ManagerAttendanceCalendar } from "@/components/manager/profile/manager-attendance-calendar";
 import { ManagerProfileSummaryCards } from "@/components/manager/profile/manager-profile-summary-cards";
@@ -69,6 +70,7 @@ export function EmployeeAttendanceView({
   }
 
   const content = (
+    <SelfAttendanceLiveProvider today={data.today} calendarDays={data.calendarDays}>
     <div className="flex flex-col gap-4">
       {showPageHeading ? (
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -98,34 +100,96 @@ export function EmployeeAttendanceView({
         </div>
       ) : null}
 
+      <AttendanceLiveBody
+        data={data}
+        selectedDate={selectedDate}
+        status={status}
+        searchDate={searchDate}
+        onMonthChange={(month, year) =>
+          pushParams({ month, year, date: selectedDate, status, searchDate })
+        }
+        onSelectDate={(date) => {
+          setSelectedDate(date);
+          pushParams({
+            month: data.month,
+            year: data.year,
+            date,
+            status,
+            searchDate,
+          });
+        }}
+        onHistoryFilterChange={(filters) =>
+          pushParams({
+            month: filters.month,
+            year: filters.year,
+            date: selectedDate,
+            status: filters.status,
+            searchDate: filters.searchDate,
+            page: filters.page,
+          })
+        }
+      />
+    </div>
+    </SelfAttendanceLiveProvider>
+  );
+
+  if (!padded) return content;
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-4 md:p-5">
+      {content}
+    </div>
+  );
+}
+
+function AttendanceLiveBody({
+  data,
+  selectedDate,
+  status,
+  searchDate,
+  onMonthChange,
+  onSelectDate,
+  onHistoryFilterChange,
+}: {
+  data: ManagerProfilePageData;
+  selectedDate: string | null;
+  status?: AttendanceStatus;
+  searchDate?: string;
+  onMonthChange: (month: number, year: number) => void;
+  onSelectDate: (date: string) => void;
+  onHistoryFilterChange: (filters: {
+    month: number;
+    year: number;
+    status?: AttendanceStatus;
+    searchDate?: string;
+    page: number;
+  }) => void;
+}) {
+  const live = useSelfAttendanceLive();
+  const summary = {
+    ...data.summary,
+    averageWorkingHours: live.averageWorkingHours,
+  };
+
+  return (
+    <>
       <SelfAttendanceTodayCard
         firstName={data.profileCard.firstName}
-        today={data.today}
+        today={live.today}
         allowUpdateCheckout={data.canUpdateCheckout}
       />
 
       <div className="grid gap-3 xl:min-h-[min(32rem,calc(100dvh-16rem))] xl:grid-cols-[minmax(0,1fr)_12.5rem] xl:items-stretch">
         <ManagerAttendanceCalendar
-          days={data.calendarDays}
+          days={live.calendarDays}
           month={data.month}
           year={data.year}
           selectedDate={selectedDate}
-          onMonthChange={(month, year) =>
-            pushParams({ month, year, date: selectedDate, status, searchDate })
-          }
-          onSelectDate={(date) => {
-            setSelectedDate(date);
-            pushParams({
-              month: data.month,
-              year: data.year,
-              date,
-              status,
-              searchDate,
-            });
-          }}
+          onMonthChange={onMonthChange}
+          onSelectDate={onSelectDate}
         />
         <div className="flex h-full min-h-[22rem] w-full justify-center xl:w-[12.5rem] xl:max-w-[12.5rem]">
-          <ManagerProfileSummaryCards summary={data.summary} layout="sidebar" className="w-full" />
+          <ManagerProfileSummaryCards summary={summary} layout="sidebar" className="w-full" />
         </div>
       </div>
 
@@ -136,26 +200,9 @@ export function EmployeeAttendanceView({
           year={data.year}
           status={status}
           searchDate={searchDate}
-          onFilterChange={(filters) =>
-            pushParams({
-              month: filters.month,
-              year: filters.year,
-              date: selectedDate,
-              status: filters.status,
-              searchDate: filters.searchDate,
-              page: filters.page,
-            })
-          }
+          onFilterChange={onHistoryFilterChange}
         />
       </div>
-    </div>
-  );
-
-  if (!padded) return content;
-
-  return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-4 md:p-5">
-      {content}
-    </div>
+    </>
   );
 }

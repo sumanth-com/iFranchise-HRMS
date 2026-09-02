@@ -55,5 +55,5 @@ export type EmployeeDashboardData = {
 };
 
 export type EmployeeAttendanceActionResult =
-  | { success: true }
+  | { success: true; today?: ManagerTodayAttendance }
   | { success: false; message: string };

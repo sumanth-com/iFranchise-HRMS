@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Info, Wallet } from "lucide-react";
+import { Loader2, Info, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
@@ -27,7 +27,6 @@ import {
 } from "@/lib/errors/stale-server-action";
 import {
   LEAVE_APPLY_TYPE_CODES,
-  HALF_DAY_PERIOD_LABELS,
   LEAVE_ROUTES,
   sortByLeaveTypeCode,
 } from "@/lib/leave/constants";
@@ -40,6 +39,14 @@ import { formatLeaveDayCount } from "@/lib/leave/services/leave-usage";
 import { formatLeaveBalanceUsedTotal } from "@/lib/leave/leave-balance-display";
 import { previewLeaveApplication } from "@/lib/leave/services/leave-apply-preview";
 import { isOptionalHolidayCode, optionalHolidayDisplayDate } from "@/lib/leave/optional-holiday";
+import {
+  HR_REVIEW_BALANCE_HINT,
+  HR_REVIEW_DURATION_HINT,
+  HR_REVIEW_INTRO,
+  HR_REVIEW_SUBMITTED_MESSAGE,
+  hrReviewReasonFromIssues,
+} from "@/lib/leave/hr-review";
+import { isLeaveTypeAllowedForBand } from "@/lib/leave/leave-eligibility";
 import {
   CASUAL_LEAVE_CODE,
   earliestAllowedLeaveStart,
@@ -162,21 +169,24 @@ export function LeaveForm({
     .filter((leaveType) => {
       if (!leaveType.code) return !isSelfService;
       const code = leaveType.code.toUpperCase();
-      if (isSelfService) return code === "CL" || code === "EL" || code === "OH";
+      if (isSelfService) {
+        const band = applyContext?.employee.leaveEligibilityBand ?? "full_time_confirmed";
+        if (code !== "CL" && code !== "EL" && code !== "OH") return false;
+        return isLeaveTypeAllowedForBand(code, band);
+      }
       if (isEdit && initialRequest?.leaveTypeId === leaveType.id) return true;
       // Menstruation Leave is offered only to employees the server would accept
       // it from, so an ineligible applicant never sees it in the list.
       if (isPeriodLeaveCode(code) && !periodLeaveAllowed) return false;
+      if (applyContext?.employee.leaveEligibilityBand) {
+        return isLeaveTypeAllowedForBand(code, applyContext.employee.leaveEligibilityBand);
+      }
       return (LEAVE_APPLY_TYPE_CODES as readonly string[]).includes(code);
     })
     .map((leaveType) => ({
       value: leaveType.id,
       label: leaveType.code ? `${leaveType.label} (${leaveType.code})` : leaveType.label,
     }));
-
-  const halfDayPeriodItems = Object.entries(HALF_DAY_PERIOD_LABELS).map(
-    ([value, label]) => ({ value, label }),
-  );
 
   const today = getTodayDateString();
   const defaultStart = earliestAllowedLeaveStart(CASUAL_LEAVE_CODE);
@@ -329,15 +339,15 @@ export function LeaveForm({
   }, [selectedLeaveTypeId, startDate, endDate, isHalfDay]);
 
   const onSubmit = form.handleSubmit((values) => {
+    if (isPending) return;
     setSubmitError(null);
     startTransition(async () => {
-      const payload = isSelfService ? { ...values, isHalfDay: false, halfDayPeriod: "" } : values;
+      const payload = { ...values, isHalfDay: false, halfDayPeriod: "" };
       const result = isEdit
         ? await updateLeaveRequestAction(initialRequest!.id, payload)
         : await createLeaveRequestAction(payload);
 
       if (!result.success) {
-        // Dialog / self-service modal: keep the error inside the popup (no toast).
         if (showErrorsInForm) {
           setSubmitError(result.message);
         } else {
@@ -346,28 +356,30 @@ export function LeaveForm({
         return;
       }
 
-      toast.success(isEdit ? "Leave request updated" : "Leave request submitted successfully");
+      toast.success(
+        hrReviewReasonFromIssues(applyPreview?.issues ?? [])
+          ? HR_REVIEW_SUBMITTED_MESSAGE
+          : isEdit
+            ? "Leave request updated"
+            : "Leave request submitted successfully",
+      );
 
       if (onSuccess) {
         onSuccess();
-        router.refresh();
         return;
       }
 
       if (redirectPath) {
         router.push(redirectPath);
-        router.refresh();
         return;
       }
 
       if (!isEdit && result.data) {
         router.push(LEAVE_ROUTES.detail(result.data));
-        router.refresh();
         return;
       }
 
       router.push(LEAVE_ROUTES.list);
-      router.refresh();
     });
   });
 
@@ -378,11 +390,17 @@ export function LeaveForm({
           leaveTypeId: selectedLeaveTypeId,
           startDate,
           endDate,
-          isHalfDay: isSelfService ? false : isHalfDay,
+          isHalfDay: false,
+          enforceSelfServiceLimits: isSelfService,
         })
       : null;
   // A shortfall in paid balance is not a blocker: the excess is submitted as LOP.
-  const policyBlocksSubmit = Boolean(applyPreview?.blockingIssues.length);
+  const policyBlocksSubmit = Boolean(
+    applyPreview?.blockingIssues.length,
+  );
+  const hrReviewReason = isSelfService
+    ? hrReviewReasonFromIssues(applyPreview?.issues ?? [])
+    : null;
   const lopSplit = applyPreview?.split ?? null;
   const submitErrorCopy = submitError ? explainLeaveSubmitError(submitError) : null;
 
@@ -516,26 +534,6 @@ export function LeaveForm({
           </div>
         ) : null}
 
-        {!isSelfService && !isOptionalHoliday ? (
-          <div className="flex flex-col justify-end gap-1 md:col-span-2">
-            <label className="flex h-9 items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="size-4 rounded border"
-                disabled={isPending}
-                checked={isHalfDay}
-                onChange={(event) => applyHalfDayToggle(event.currentTarget.checked)}
-              />
-              Half day leave
-            </label>
-            {isHalfDay ? (
-              <p className="text-[11px] leading-snug text-muted-foreground">
-                Half day can be applied for today.
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-
         {isOptionalHoliday ? (
           <div className="space-y-2 md:col-span-2">
             <Label htmlFor="optionalHolidayDate">Optional Holiday date</Label>
@@ -621,18 +619,65 @@ export function LeaveForm({
                     {formatLeaveDays(applyPreview.duration.totalLeaveDays)}
                   </dd>
                 </div>
-                {!isOptionalHoliday ? (
+                {!isOptionalHoliday && hrReviewReason === "balance_exhausted" ? (
                   <>
                     <div className="flex items-center justify-between gap-3">
                       <dt className="text-muted-foreground">
-                        {paidLeaveTypeDisplayName(applyPreview.leaveType.code)}
+                        {paidLeaveTypeDisplayName(applyPreview.leaveType.code)} Available
+                      </dt>
+                      <dd className="font-medium text-foreground">
+                        {formatLeaveDays(applyPreview.available ?? 0)}
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-muted-foreground">Additional Leave</dt>
+                      <dd className="font-medium text-foreground">Requires HR Review</dd>
+                    </div>
+                  </>
+                ) : null}
+                {!isOptionalHoliday && hrReviewReason === "over_limit" ? (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-muted-foreground">
+                        Available {paidLeaveTypeDisplayName(applyPreview.leaveType.code)}
+                      </dt>
+                      <dd className="font-medium text-foreground">
+                        {formatLeaveDays(applyPreview.available ?? 0)}
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-muted-foreground">Additional Days</dt>
+                      <dd className="font-medium text-foreground">
+                        {formatLeaveDays(
+                          Math.max(
+                            0,
+                            applyPreview.duration.totalLeaveDays - (applyPreview.available ?? 0),
+                          ),
+                        )}
+                      </dd>
+                    </div>
+                  </>
+                ) : null}
+                {!isOptionalHoliday && !hrReviewReason ? (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-muted-foreground">
+                        {paidLeaveTypeDisplayName(applyPreview.leaveType.code)} Used
                       </dt>
                       <dd className="font-medium text-foreground">
                         {formatLeaveDays(applyPreview.split.paidDays)}
                       </dd>
                     </div>
+                    {applyPreview.remaining != null ? (
+                      <div className="flex items-center justify-between gap-3">
+                        <dt className="text-muted-foreground">Remaining Balance</dt>
+                        <dd className="font-medium text-foreground">
+                          {formatLeaveDays(applyPreview.remaining)}
+                        </dd>
+                      </div>
+                    ) : null}
                     <div className="flex items-center justify-between gap-3">
-                      <dt className="text-muted-foreground">Loss of Pay</dt>
+                      <dt className="text-muted-foreground">Loss of Pay (LOP)</dt>
                       <dd className="font-medium text-foreground">
                         {formatLeaveDays(applyPreview.split.lopDays)}
                       </dd>
@@ -640,11 +685,6 @@ export function LeaveForm({
                   </>
                 ) : null}
               </dl>
-              {!isOptionalHoliday &&
-              applyPreview.split.paidDays === 0 &&
-              applyPreview.split.lopDays > 0 ? (
-                <p className="mt-2 text-xs text-muted-foreground">Paid balance used</p>
-              ) : null}
             </div>
             {applyPreview.blockingIssues.map((issue) => {
               const isOverlap = issue.code === "overlap";
@@ -696,43 +736,8 @@ export function LeaveForm({
               leaveTypeId={selectedLeaveTypeId}
               startDate={startDate}
               endDate={endDate}
-              isHalfDay={isHalfDay}
+              isHalfDay={false}
             />
-          </div>
-        ) : null}
-
-        {isHalfDay && !isSelfService ? (
-          <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="halfDayPeriod">Half Day Period</Label>
-            <Select
-              items={halfDayPeriodItems}
-              value={form.watch("halfDayPeriod") ?? ""}
-              onValueChange={(value) => {
-                if (!value) return;
-                form.setValue(
-                  "halfDayPeriod",
-                  value as LeaveFormInput["halfDayPeriod"],
-                  { shouldValidate: true },
-                );
-              }}
-              disabled={isPending}
-            >
-              <SelectTrigger id="halfDayPeriod" className="h-8 w-full min-w-0">
-                <SelectValue placeholder="Select period" />
-              </SelectTrigger>
-              <SelectContent align="start" alignItemWithTrigger={false}>
-                {halfDayPeriodItems.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {form.formState.errors.halfDayPeriod ? (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.halfDayPeriod.message}
-              </p>
-            ) : null}
           </div>
         ) : null}
 
@@ -754,6 +759,19 @@ export function LeaveForm({
             </p>
           ) : null}
         </div>
+
+        {isSelfService && hrReviewReason ? (
+          <div className="md:col-span-2 flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
+            <Info className="mt-0.5 size-3.5 shrink-0 text-orange-600 dark:text-orange-400" />
+            <p>
+              <span className="font-medium text-foreground">HR Review Required. </span>
+              {HR_REVIEW_INTRO}{" "}
+              {hrReviewReason === "over_limit"
+                ? HR_REVIEW_DURATION_HINT
+                : HR_REVIEW_BALANCE_HINT}
+            </p>
+          </div>
+        ) : null}
 
         {!isSelfService ? (
           <>
@@ -842,12 +860,22 @@ export function LeaveForm({
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={isPending || policyBlocksSubmit || (isOptionalHoliday && selectableOptionalHolidays.length === 0)}>
-            {isEdit
-              ? "Save changes"
-              : isSelfService
-                ? "Submit request"
-                : "Submit leave request"}
+          <Button
+            type="submit"
+            disabled={isPending || policyBlocksSubmit || (isOptionalHoliday && selectableOptionalHolidays.length === 0)}
+          >
+            {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+            {isPending
+              ? hrReviewReason
+                ? "Sending for HR Review..."
+                : "Submitting..."
+              : isEdit
+                ? "Save changes"
+                : hrReviewReason
+                  ? "Request HR Review"
+                  : isSelfService
+                    ? "Submit Request"
+                    : "Submit leave request"}
           </Button>
         </div>
       </div>

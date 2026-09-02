@@ -166,9 +166,9 @@ export function calculateLeaveDuration(input: {
     const days: LeaveDurationDay[] = [
       {
         date,
-        kind: "half_day",
+        kind: "working",
         class: dayClass,
-        counted: 0.5,
+        counted: 1,
         inRequestedRange: true,
       },
     ];
@@ -176,12 +176,12 @@ export function calculateLeaveDuration(input: {
       startDate: input.startDate,
       endDate: input.endDate,
       requestedDates,
-      workingDays: 0,
-      halfDays: 1,
+      workingDays: 1,
+      halfDays: 0,
       weeklyHolidays: dayClass === "weekly_off" ? 1 : 0,
       publicHolidays: dayClass === "holiday" ? 1 : 0,
       sandwichDays: 0,
-      totalLeaveDays: 0.5,
+      totalLeaveDays: 1,
       days,
       sandwichExplanations: [],
     };
@@ -246,9 +246,9 @@ export function calculateLeaveDuration(input: {
     if (dayClass === "half_day" && inRequestedRange) {
       days.push({
         date,
-        kind: "half_day",
+        kind: "working",
         class: dayClass,
-        counted: 0.5,
+        counted: 1,
         inRequestedRange,
       });
       continue;

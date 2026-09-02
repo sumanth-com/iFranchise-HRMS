@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/table";
 import { deleteSalaryStructureAction } from "@/lib/payroll/actions";
 import { formatCurrency } from "@/lib/payroll/services/payroll-utils";
+import { getHrmsYearSelectItems } from "@/lib/date/hrms-year";
 import type { LookupOption } from "@/types/employee";
 import type { SalaryStructureItem } from "@/types/payroll";
 
@@ -42,10 +43,12 @@ const STATUS_FILTER_ITEMS = [
 export function SalaryStructureTable({
   records,
   employees,
+  employmentTypes = [],
   canEdit = false,
 }: {
   records: SalaryStructureItem[];
   employees: LookupOption[];
+  employmentTypes?: LookupOption[];
   canEdit?: boolean;
 }) {
   const router = useRouter();
@@ -92,10 +95,7 @@ export function SalaryStructureTable({
       label: new Date(2000, i, 1).toLocaleString("en-IN", { month: "long" }),
     })),
   ];
-  const YEAR_OPTIONS = [
-    { value: "all", label: "All years" },
-    ...[2024, 2025, 2026, 2027, 2028].map((y) => ({ value: String(y), label: String(y) })),
-  ];
+  const YEAR_OPTIONS = getHrmsYearSelectItems({ includeAll: true });
 
   const registerAddAction = useCallback(() => {
     setDialogMode("create");
@@ -338,6 +338,7 @@ export function SalaryStructureTable({
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           employees={employees}
+          employmentTypes={employmentTypes}
           record={editingRecord}
           mode={dialogMode}
           onSaved={handleSaved}

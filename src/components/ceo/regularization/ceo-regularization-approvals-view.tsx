@@ -8,6 +8,7 @@ import { CeoRegularizationProcessedTable } from "@/components/ceo/regularization
 import { SectionHelpButton } from "@/components/common/section-help-button";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { fetchCeoRegularizationQueueAction } from "@/lib/ceo/actions/ceo-regularization-actions";
+import { getHrmsYearSelectItems } from "@/lib/date/hrms-year";
 import { CEO_SECTION_HELP_DESCRIPTION } from "@/lib/ceo/section-help";
 import { useApprovalsSync } from "@/lib/approvals/use-approvals-sync";
 import { LEAVE_MONTH_OPTIONS } from "@/lib/leave/services/leave-utils";
@@ -19,14 +20,6 @@ type CeoRegularizationApprovalsViewProps = {
   initialMonth: number;
   initialYear: number;
 };
-
-function yearOptions(centerYear: number) {
-  const years: { value: string; label: string }[] = [];
-  for (let y = centerYear + 1; y >= centerYear - 4; y -= 1) {
-    years.push({ value: String(y), label: String(y) });
-  }
-  return years;
-}
 
 export function CeoRegularizationApprovalsView({
   approvalQueue: initialQueue,
@@ -48,7 +41,7 @@ export function CeoRegularizationApprovalsView({
     () => LEAVE_MONTH_OPTIONS.map((item) => ({ value: String(item.value), label: item.label })),
     [],
   );
-  const yearItems = useMemo(() => yearOptions(initialYear), [initialYear]);
+  const yearItems = useMemo(() => getHrmsYearSelectItems(), []);
 
   const refreshQueue = useCallback(
     (nextMonth = month, nextYear = year) => {
@@ -138,7 +131,7 @@ export function CeoRegularizationApprovalsView({
             }}
             placeholder="Month"
             disabled={isPending}
-            triggerClassName="h-9 w-[9.5rem]"
+            triggerClassName="h-9 w-[9.5rem] bg-white dark:bg-input"
             alignItemWithTrigger={false}
           />
           <LabeledSelect
@@ -151,7 +144,7 @@ export function CeoRegularizationApprovalsView({
             }}
             placeholder="Year"
             disabled={isPending}
-            triggerClassName="h-9 w-[6.5rem]"
+            triggerClassName="h-9 w-[6.5rem] bg-white dark:bg-input"
             alignItemWithTrigger={false}
           />
         </div>

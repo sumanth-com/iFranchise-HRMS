@@ -22,7 +22,7 @@ import {
   type ManagerProfilePageParams,
   type ManagerUpdateCheckoutInput,
 } from "@/lib/validations/manager-self-attendance";
-import type { ManagerProfilePageData } from "@/types/manager-self-attendance";
+import type { ManagerProfilePageData, ManagerTodayAttendance } from "@/types/manager-self-attendance";
 
 function revalidateSelfAttendancePaths() {
   revalidatePath("/manager/attendance");
@@ -49,13 +49,13 @@ export async function getManagerProfilePageDataAction(
 
 export async function punchManagerAttendanceAction(
   input: ManagerAttendancePunchInput,
-): Promise<{ success: true } | { success: false; error: string }> {
+): Promise<{ success: true; today: ManagerTodayAttendance } | { success: false; error: string }> {
   try {
     const parsed = managerAttendancePunchSchema.parse(input);
     const { profile, supabase } = await getContext();
-    await punchManagerAttendance(supabase, profile, parsed);
+    const today = await punchManagerAttendance(supabase, profile, parsed);
     revalidateSelfAttendancePaths();
-    return { success: true };
+    return { success: true, today };
   } catch (error) {
     return {
       success: false,
@@ -67,13 +67,13 @@ export async function punchManagerAttendanceAction(
 
 export async function updateManagerCheckoutAction(
   input: ManagerUpdateCheckoutInput = {},
-): Promise<{ success: true } | { success: false; error: string }> {
+): Promise<{ success: true; today: ManagerTodayAttendance } | { success: false; error: string }> {
   try {
     const parsed = managerUpdateCheckoutSchema.parse(input);
     const { profile, supabase } = await getContext();
-    await updateManagerCheckout(supabase, profile, parsed);
+    const today = await updateManagerCheckout(supabase, profile, parsed);
     revalidateSelfAttendancePaths();
-    return { success: true };
+    return { success: true, today };
   } catch (error) {
     return {
       success: false,

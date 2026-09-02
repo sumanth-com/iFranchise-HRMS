@@ -18,6 +18,7 @@ import {
   MANAGER_TEAM_MEMBER_SELECT_CONTENT_CLASS,
 } from "@/lib/manager/filter-select";
 import { PAYROLL_STATUS_LABELS } from "@/lib/payroll/constants";
+import { getHrmsYears } from "@/lib/date/hrms-year";
 import type {
   CeoPayrollFilterLookups,
   CeoPayrollListParams,
@@ -64,7 +65,7 @@ export function CeoPayrollFilters({
   const departmentValue = filters.departmentId ?? FILTER_ANY_VALUE;
   const statusValue = filters.payrollStatus ?? FILTER_ANY_VALUE;
 
-  const years = Array.from({ length: 6 }, (_, index) => String(now.getFullYear() - index));
+  const years = getHrmsYears().map(String);
   const employeeOptions = (lookups.employees ?? []).map((item) => ({
     value: item.id,
     label: item.label,

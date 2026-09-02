@@ -72,7 +72,11 @@ function revalidateAfterEmailDecision(requestType: ApprovalRequestType, sourceRe
   revalidatePath(MANAGER_ROUTES.leaveTeam);
   revalidatePath(CEO_ROUTES.approvals);
   revalidatePath(CEO_ROUTES.approvalsLeave);
-  revalidatePath(SYSTEM_ADMIN_ROUTES.leave);
+  try {
+    revalidateAfterEmailDecision(requestType, sourceRecordId);
+  } catch (error) {
+    console.error("[approvals] revalidate after email decision failed", error);
+  }
 }
 
 async function fetchApproverName(
@@ -253,6 +257,7 @@ export async function processEmailApproval(params: {
   const reason = params.reason?.trim();
   const ctx = params.context ?? {};
 
+  try {
   if (!hasSupabaseServiceRoleEnv()) {
     return { status: "error", message: "Approvals are not configured on this environment." };
   }
@@ -298,6 +303,8 @@ export async function processEmailApproval(params: {
     return {
       status: "already_processed",
       message: alreadyProcessedMessage(found.request_type),
+      employeeName: summary.employeeName,
+      summary,
     };
   }
 
@@ -391,41 +398,40 @@ export async function processEmailApproval(params: {
 
   const afterSummary = (await handler.loadSummary(client, found.source_record_id)) ?? summary;
 
-  // Confirmation email to the approver.
-  if (identity.email) {
-    const confirmationHtml = renderApproverConfirmationEmail({
-      decision: action,
-      approverName: identity.name,
-      summary: afterSummary,
-    });
-    await sendApprovalMail(
-      identity.email,
-      `Request ${action === "approve" ? "approved" : "rejected"}`,
-      confirmationHtml,
-    );
-  }
-
-  // Notify the employee by email only when the request is finally decided.
-  const finallyDecided = action === "reject" || afterSummary.status === "approved";
-  if (finallyDecided) {
-    const recipient = await handler.decisionRecipient(client, found.source_record_id);
-    if (recipient?.email) {
-      const decisionHtml = renderEmployeeDecisionEmail({
+  try {
+    if (identity.email) {
+      const confirmationHtml = renderApproverConfirmationEmail({
         decision: action,
-        employeeName: recipient.name,
+        approverName: identity.name,
         summary: afterSummary,
-        reason: action === "reject" ? effectiveReason : null,
       });
       await sendApprovalMail(
-        recipient.email,
-        action === "approve" ? "Your request was approved" : "Your request was rejected",
-        decisionHtml,
+        identity.email,
+        `Request ${action === "approve" ? "approved" : "rejected"}`,
+        confirmationHtml,
       );
     }
-  }
 
-  // Note: multi-level "next approver" emails are dispatched by the module's core
-  // approval mutation itself (so portal and email approvals behave identically).
+    const finallyDecided = action === "reject" || afterSummary.status === "approved";
+    if (finallyDecided) {
+      const recipient = await handler.decisionRecipient(client, found.source_record_id);
+      if (recipient?.email) {
+        const decisionHtml = renderEmployeeDecisionEmail({
+          decision: action,
+          employeeName: recipient.name,
+          summary: afterSummary,
+          reason: action === "reject" ? effectiveReason : null,
+        });
+        await sendApprovalMail(
+          recipient.email,
+          action === "approve" ? "Your request was approved" : "Your request was rejected",
+          decisionHtml,
+        );
+      }
+    }
+  } catch (error) {
+    console.error("[approvals] post-decision email failed", error);
+  }
 
   revalidateAfterEmailDecision(found.request_type, found.source_record_id);
 
@@ -435,4 +441,8 @@ export async function processEmailApproval(params: {
     employeeName: afterSummary.employeeName,
     summary: afterSummary,
   };
+  } catch (error) {
+    console.error("[approvals] processEmailApproval failed", error);
+    return { status: "error", message: genericApprovalFailureMessage() };
+  }
 }

@@ -7,7 +7,6 @@ import {
   Award,
   Banknote,
   CalendarDays,
-  CircleDollarSign,
   Download,
   FileText,
   Gift,
@@ -32,8 +31,6 @@ import {
   BONUS_STATUS_LABELS,
   BONUS_TYPE_LABELS,
   PAYROLL_STATUS_LABELS,
-  REIMBURSEMENT_CATEGORY_LABELS,
-  REIMBURSEMENT_STATUS_LABELS,
 } from "@/lib/payroll/constants";
 import { formatCurrency } from "@/lib/payroll/services/payroll-utils";
 import { formatReviewBannerMessage } from "@/lib/payroll/services/payslip-publication";
@@ -42,7 +39,6 @@ import type {
   BonusItem,
   PayrollStatus,
   PayslipListItem,
-  ReimbursementItem,
 } from "@/types/payroll";
 import { cn } from "@/lib/utils";
 
@@ -241,7 +237,7 @@ export function EmployeePayrollView({
       ) : null}
 
       {/* KPI cards */}
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-5">
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <EmployeeStatCard
           label="Current Net Salary"
           value={data.kpis.currentNetSalary != null ? money(data.kpis.currentNetSalary) : "—"}
@@ -263,7 +259,7 @@ export function EmployeePayrollView({
         <EmployeeStatCard
           label="Last Payment"
           value={fmtDate(data.kpis.lastPaymentDate)}
-          hint="Salary credited"
+          hint="2nd of every month"
           icon={CalendarDays}
           accent="text-violet-600 dark:text-violet-400"
           iconBg="bg-violet-500/10"
@@ -282,42 +278,34 @@ export function EmployeePayrollView({
           accent="text-amber-600 dark:text-amber-400"
           iconBg="bg-amber-500/10"
         />
-        <EmployeeStatCard
-          label={`${data.ytd.financialYearLabel} Net Pay`}
-          value={money(data.ytd.net)}
-          hint={`${data.ytd.monthsCount} month${data.ytd.monthsCount === 1 ? "" : "s"} · take-home`}
-          icon={CircleDollarSign}
-          accent="text-teal-600 dark:text-teal-400"
-          iconBg="bg-teal-500/10"
-        />
       </section>
 
       <div className="grid gap-4 xl:grid-cols-3 xl:items-stretch">
-        <div className="flex flex-col gap-4 xl:col-span-2">
-          <EmployeeSectionCard
-            title={
-              extrasIncluded || !usingStructure
-                ? "Current Payroll Summary"
-                : "Salary Structure"
-            }
-            description={
-              extrasIncluded
-                ? `${fmtMonth(breakdown.periodMonth ?? "")} · Includes bonuses and expense claims`
-                : usingStructure
-                  ? "Based on your current salary structure. Payslips appear once payroll is processed."
-                  : `${fmtMonth(data.latest?.payrollMonth ?? "")} · Payslip ${
-                      data.latest?.payslipNumber ?? ""
-                    }`
-            }
-            action={
-              data.latest &&
-              breakdown.periodMonth &&
-              data.latest.payrollMonth.slice(0, 7) === breakdown.periodMonth ? (
-                <StatusPill status={data.latest.payrollStatus} />
-              ) : null
-            }
-            bodyClassName="flex flex-col gap-4"
-          >
+        <EmployeeSectionCard
+          className="h-full xl:col-span-2"
+          title={
+            extrasIncluded || !usingStructure
+              ? "Current Payroll Summary"
+              : "Salary Structure"
+          }
+          description={
+            extrasIncluded
+              ? `${fmtMonth(breakdown.periodMonth ?? "")} · Includes bonuses and expense claims`
+              : usingStructure
+                ? "Based on your current salary structure. Payslips appear once payroll is processed."
+                : `${fmtMonth(data.latest?.payrollMonth ?? "")} · Payslip ${
+                    data.latest?.payslipNumber ?? ""
+                  }`
+          }
+          action={
+            data.latest &&
+            breakdown.periodMonth &&
+            data.latest.payrollMonth.slice(0, 7) === breakdown.periodMonth ? (
+              <StatusPill status={data.latest.payrollStatus} />
+            ) : null
+          }
+          bodyClassName="flex h-full flex-col gap-4"
+        >
             <EarningsDeductionsTable
               variant="dashboard"
               earnings={earnings}
@@ -327,25 +315,34 @@ export function EmployeePayrollView({
               money={money}
             />
 
-            <div className="flex flex-col gap-3 rounded-xl border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                <span className="text-muted-foreground">Gross</span>
-                <span className="font-medium tabular-nums">{money(gross)}</span>
-                <span className="text-muted-foreground">−</span>
-                <span className="text-muted-foreground">Deductions</span>
-                <span className="font-medium tabular-nums">{money(totalDeductions)}</span>
-                <span className="text-muted-foreground">=</span>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-muted-foreground">Net Pay</p>
-                <p className="text-2xl font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
-                  {money(net)}
-                </p>
+            <div className="mt-auto rounded-xl border bg-white px-4 py-3 dark:bg-input">
+              <div className="flex flex-wrap items-baseline justify-center gap-x-2 gap-y-1 text-sm font-semibold tabular-nums">
+                <span className="uppercase tracking-wide text-muted-foreground">Gross</span>
+                <span>{money(gross)}</span>
+                <span className="font-semibold text-muted-foreground">−</span>
+                <span className="uppercase tracking-wide text-muted-foreground">Deductions</span>
+                <span>{money(totalDeductions)}</span>
+                <span className="font-semibold text-muted-foreground">=</span>
+                <span className="uppercase tracking-wide text-muted-foreground">Net Pay</span>
+                <span className="text-emerald-600 dark:text-emerald-400">{money(net)}</span>
               </div>
             </div>
-          </EmployeeSectionCard>
+        </EmployeeSectionCard>
 
-          <div className="grid flex-1 gap-4 sm:grid-cols-2">
+        {data.latestTimeline ? (
+          <EmployeeSectionCard
+            className="h-full"
+            bodyClassName="flex min-h-0 flex-1 flex-col"
+            title="Payment Timeline"
+          >
+            <PaymentTimeline stages={data.latestTimeline.stages} />
+          </EmployeeSectionCard>
+        ) : (
+          <div className="hidden xl:block" />
+        )}
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 sm:items-stretch">
             <EmployeeSectionCard
               className="h-full"
               title="My Bonuses"
@@ -383,59 +380,7 @@ export function EmployeePayrollView({
               )}
             </EmployeeSectionCard>
 
-            <EmployeeSectionCard
-              className="h-full"
-              title="My Reimbursements"
-              description="Expense claims and their status."
-            >
-              {data.reimbursements.length > 0 ? (
-                <ul className="divide-y">
-                  {data.reimbursements.map((item: ReimbursementItem) => (
-                    <li key={item.id} className="flex items-center gap-3 py-2.5">
-                      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-                        <ReceiptText className="size-4" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">
-                          {REIMBURSEMENT_CATEGORY_LABELS[item.category] ?? item.category}
-                        </p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {fmtDate(item.expenseDate)}
-                          {item.description ? ` · ${item.description}` : ""}
-                        </p>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <p className="text-sm font-semibold tabular-nums">{money(item.amount)}</p>
-                        <p className="text-[11px] capitalize text-muted-foreground">
-                          {REIMBURSEMENT_STATUS_LABELS[item.reimbursementStatus] ??
-                            item.reimbursementStatus}
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="py-6 text-center text-sm text-muted-foreground">
-                  No reimbursement claims yet.
-                </p>
-              )}
-            </EmployeeSectionCard>
-          </div>
-        </div>
-
-        {/* Right column: timeline + bank */}
-        <div className="flex flex-col gap-4">
-          {data.latestTimeline ? (
-            <EmployeeSectionCard
-              className="flex flex-1 flex-col"
-              bodyClassName="flex flex-1 flex-col justify-center"
-              title="Payment Timeline"
-            >
-              <PaymentTimeline stages={data.latestTimeline.stages} />
-            </EmployeeSectionCard>
-          ) : null}
-
-          <EmployeeSectionCard title="Bank Details">
+            <EmployeeSectionCard className="h-full" title="Bank Details">
             {data.bank ? (
               <div className="space-y-2.5">
                 <div className="flex items-center gap-2.5">
@@ -449,7 +394,7 @@ export function EmployeePayrollView({
                     </p>
                   </div>
                 </div>
-                <dl className="grid grid-cols-2 gap-2 text-xs">
+                <dl className="grid grid-cols-3 gap-2 text-xs">
                   <Detail label="Account holder" value={data.bank.accountHolderName} />
                   <Detail label="IFSC" value={data.bank.ifscCode} />
                   <Detail label="Branch" value={data.bank.branchName} />
@@ -463,8 +408,7 @@ export function EmployeePayrollView({
                 No bank account on file. Contact HR to add your salary account.
               </p>
             )}
-          </EmployeeSectionCard>
-        </div>
+            </EmployeeSectionCard>
       </div>
 
       {/* Payslip history */}
@@ -614,9 +558,11 @@ export function EmployeePayrollView({
 
 function Detail({ label, value }: { label: string; value: string | null }) {
   return (
-    <div>
+    <div className="min-w-0">
       <dt className="text-muted-foreground">{label}</dt>
-      <dd className="font-medium">{value || "—"}</dd>
+      <dd className="truncate font-medium" title={value || undefined}>
+        {value || "—"}
+      </dd>
     </div>
   );
 }

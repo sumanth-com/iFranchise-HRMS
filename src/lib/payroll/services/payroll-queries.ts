@@ -34,6 +34,7 @@ import {
 import {
   getBranches,
   getDepartments,
+  getEmploymentTypes,
 } from "@/lib/employees/services/employee-queries";
 
 function unwrapRelation<T>(value: T | T[] | null): T | null {
@@ -47,6 +48,9 @@ type SalaryStructureEmployeeRow = {
   last_name: string;
   organization_id: string;
   departments?: { name: string } | { name: string }[] | null;
+  designations?: { title: string } | { title: string }[] | null;
+  employment_type_id?: string | null;
+  employment_types?: { name: string } | { name: string }[] | null;
 };
 
 type SalaryStructureDbRow = {
@@ -80,6 +84,13 @@ function mapSalaryStructureRow(
     employeeCode: employee?.employee_code ?? "",
     employeeName: employee ? `${employee.first_name} ${employee.last_name}` : "",
     departmentName: department?.name ?? null,
+    designationTitle: employee
+      ? unwrapRelation(employee.designations)?.title ?? null
+      : null,
+    employmentTypeName: employee
+      ? unwrapRelation(employee.employment_types)?.name ?? null
+      : null,
+    employmentTypeId: employee?.employment_type_id ?? null,
     effectiveFrom: row.effective_from,
     effectiveTo: row.effective_to,
     currencyCode: row.currency_code,
@@ -137,7 +148,10 @@ export async function getSalaryStructureById(
           last_name,
           organization_id,
           deleted_at,
-          departments:department_id (name)
+          departments:department_id (name),
+          designations:designation_id (title),
+          employment_type_id,
+          employment_types:employment_type_id (name)
         )
       `,
     )
@@ -170,11 +184,13 @@ export async function getPayrollLookups(
   supabase: AuthSupabaseClient,
   organizationId: string,
 ): Promise<PayrollLookups> {
-  const [employeesResult, departments, branches] = await Promise.all([
+  const [employeesResult, departments, branches, employmentTypes] = await Promise.all([
     supabase
       .schema("hrms")
       .from("employees")
-      .select("id, first_name, last_name, employee_code")
+      .select(
+        "id, first_name, last_name, employee_code, employment_type_id, designations:designation_id (title), employment_types:employment_type_id (name)",
+      )
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
       .in("employment_status", ["active", "probation", "on_leave"])
@@ -182,6 +198,7 @@ export async function getPayrollLookups(
       .limit(250),
     getDepartments(supabase, organizationId),
     getBranches(supabase, organizationId),
+    getEmploymentTypes(supabase, organizationId),
   ]);
 
   if (employeesResult.error) throw new Error(employeesResult.error.message);
@@ -190,9 +207,16 @@ export async function getPayrollLookups(
     id: row.id,
     label: `${row.first_name} ${row.last_name}`.trim(),
     code: row.employee_code,
+    designationTitle: unwrapRelation(
+      row.designations as { title: string } | { title: string }[] | null,
+    )?.title ?? null,
+    employmentTypeName: unwrapRelation(
+      row.employment_types as { name: string } | { name: string }[] | null,
+    )?.name ?? null,
+    employmentTypeId: row.employment_type_id ?? null,
   }));
 
-  return { employees, departments, branches };
+  return { employees, departments, branches, employmentTypes };
 }
 
 export async function listPayrollRuns(
@@ -496,7 +520,10 @@ export async function listSalaryStructures(
         last_name,
         date_of_joining,
         department_id,
-        departments:department_id (name)
+        departments:department_id (name),
+        designations:designation_id (title),
+        employment_type_id,
+        employment_types:employment_type_id (name)
       `,
     )
     .eq("organization_id", organizationId)
@@ -540,7 +567,10 @@ export async function listSalaryStructures(
           last_name,
           organization_id,
           deleted_at,
-          departments:department_id (name)
+          departments:department_id (name),
+          designations:designation_id (title),
+          employment_type_id,
+          employment_types:employment_type_id (name)
         )
       `,
     )
@@ -596,6 +626,15 @@ export async function listSalaryStructures(
         employeeCode: emp.employee_code ?? "",
         employeeName: `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim(),
         departmentName: department?.name ?? null,
+        designationTitle:
+          unwrapRelation(
+            emp.designations as { title: string } | { title: string }[] | null,
+          )?.title ?? null,
+        employmentTypeName:
+          unwrapRelation(
+            emp.employment_types as { name: string } | { name: string }[] | null,
+          )?.name ?? null,
+        employmentTypeId: emp.employment_type_id ?? null,
         effectiveFrom: emp.date_of_joining ?? today,
         effectiveTo: null,
         currencyCode: "INR",

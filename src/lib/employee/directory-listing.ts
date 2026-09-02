@@ -1,4 +1,4 @@
-const DIRECTORY_HIDDEN_EMPLOYEE_CODES = new Set([
+export const DIRECTORY_HIDDEN_EMPLOYEE_CODES = new Set([
   "IF2026000",
   "IF-MGR-001",
   "IF2026016",
@@ -28,6 +28,7 @@ type DirectoryPersonName = {
   employeeCode?: string | null;
   firstName?: string | null;
   lastName?: string | null;
+  designationTitle?: string | null;
 };
 
 function directoryFullName(person?: DirectoryPersonName): string {
@@ -75,6 +76,18 @@ export function isHiddenFromEmployeeDirectory(
   const fullName = directoryFullName(person);
   if (!fullName) return false;
 
+  if (
+    fullName === "it team" ||
+    fullName === "itteam" ||
+    fullName.startsWith("it team")
+  ) {
+    return true;
+  }
+
+  if (fullName === "marketing manager") {
+    return true;
+  }
+
   const isGore = fullName.includes("gore");
   const isAbhisek =
     fullName.includes("abhisek") ||
@@ -82,6 +95,22 @@ export function isHiddenFromEmployeeDirectory(
     fullName.includes("abhishek");
 
   return isGore && isAbhisek;
+}
+
+export function isExcludedFromTeamPayslips(
+  employeeCode: string | null | undefined,
+  person?: DirectoryPersonName,
+): boolean {
+  if (isHiddenFromEmployeeDirectory(employeeCode, person)) return true;
+
+  const fullName = directoryFullName(person);
+  const designation = (person?.designationTitle ?? "").trim().toLowerCase();
+  if (designation === "marketing manager") return true;
+  if (fullName.includes("abrar")) return true;
+  if (fullName.includes("abdul") && (fullName.includes("khader") || fullName.includes("khadir"))) {
+    return true;
+  }
+  return false;
 }
 
 export function directoryDesignationDisplay(

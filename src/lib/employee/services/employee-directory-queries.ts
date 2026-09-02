@@ -23,6 +23,7 @@ const DIRECTORY_SELECT = `
   employment_status,
   departments:department_id (name),
   designations:designation_id (title, code),
+  employment_types:employment_type_id (name),
   branches:branch_id (name),
   employee_profiles (profile_image_storage_path)
 `;
@@ -45,6 +46,7 @@ function mapDirectoryRows(
       title?: string;
       code?: string;
     } | null;
+    const employmentType = unwrapRelation(row.employment_types) as { name?: string } | null;
     const branch = unwrapRelation(row.branches) as { name?: string } | null;
     const employeeProfile = unwrapRelation(row.employee_profiles) as {
       profile_image_storage_path?: string | null;
@@ -73,6 +75,7 @@ function mapDirectoryRows(
       departmentId: (row.department_id as string | null) ?? null,
       departmentName: department?.name ?? null,
       verticalName: branch?.name ?? null,
+      employmentTypeName: employmentType?.name ?? null,
       avatarUrl: imagePath ? (signedByPath.get(imagePath) ?? null) : null,
       profileImagePath: imagePath,
     };

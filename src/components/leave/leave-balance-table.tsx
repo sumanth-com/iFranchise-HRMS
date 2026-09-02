@@ -138,7 +138,7 @@ export function LeaveBalanceTable({ balances }: LeaveBalanceTableProps) {
   });
 
   return (
-    <div className="overflow-auto rounded-lg border max-h-[min(70vh,calc(100dvh-16rem))] [scrollbar-gutter:stable]">
+    <div className="max-h-[min(70vh,calc(100dvh-16rem))] overflow-auto rounded-lg border border-input bg-white [scrollbar-gutter:stable] dark:bg-input">
       <table
         data-slot="table"
         className="w-max min-w-full caption-bottom text-sm"
@@ -244,7 +244,7 @@ export function LeaveBalanceTable({ balances }: LeaveBalanceTableProps) {
             </TableRow>
           ) : (
             table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id} className="hover:bg-muted/50">
+              <TableRow key={row.id} className="hover:bg-zinc-50 dark:hover:bg-white/5">
                 {row.getVisibleCells().map((cell) => (
                   <TableCell
                     key={cell.id}

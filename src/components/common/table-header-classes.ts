@@ -8,6 +8,10 @@ export const TABLE_HEADER_ROW_CLASS =
 export const TABLE_HEADER_CELL_CLASS =
   "h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white hover:bg-transparent";
 
+/** Light-mode table body surface — same white as filter cards. */
+export const TABLE_SURFACE_CLASS =
+  "overflow-auto rounded-lg border border-input bg-white dark:bg-input";
+
 /** In-card section divider headings (employee detail, payroll blocks, etc.). */
 export const SECTION_HEADING_ROW_CLASS =
   "bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 px-5 py-2.5 text-xs font-semibold uppercase tracking-wide text-white shadow-[0_1px_0_rgba(255,255,255,0.12)]";

@@ -1,6 +1,7 @@
 import {
   CalendarClock,
   CheckCircle2,
+  ClipboardList,
   Clock3,
   XCircle,
 } from "lucide-react";
@@ -11,6 +12,7 @@ import { cn } from "@/lib/utils";
 
 export type LeaveSummaryFilterKey =
   | "pendingRequests"
+  | "pendingHrReview"
   | "approvedThisMonth"
   | "rejectedThisMonth"
   | "upcomingPlannedLeaves"
@@ -30,6 +32,13 @@ const SUMMARY_CONFIG = [
     accent: "text-amber-600 dark:text-amber-400",
     bg: "bg-amber-500/10",
     ring: "hover:border-amber-500/40 data-[active=true]:border-amber-500 data-[active=true]:bg-amber-500/10",
+  },
+  {
+    key: "pendingHrReview" as const,
+    icon: ClipboardList,
+    accent: "text-orange-600 dark:text-orange-400",
+    bg: "bg-orange-500/10",
+    ring: "hover:border-orange-500/40 data-[active=true]:border-orange-500 data-[active=true]:bg-orange-500/10",
   },
   {
     key: "approvedThisMonth" as const,
@@ -63,7 +72,7 @@ export function LeaveSummaryCards({
   const clickable = Boolean(onSelect);
 
   return (
-    <div className="grid grid-cols-4 items-stretch gap-3">
+    <div className="grid grid-cols-2 items-stretch gap-3 xl:grid-cols-5">
       {SUMMARY_CONFIG.map((item) => {
         const Icon = item.icon;
         const isActive = activeKey === item.key;
@@ -81,7 +90,7 @@ export function LeaveSummaryCards({
                 {LEAVE_SUMMARY_LABELS[item.key]}
               </p>
               <p className="mt-1 text-xl font-semibold tracking-tight tabular-nums">
-                {summary[item.key]}
+                {summary[item.key] ?? 0}
               </p>
             </div>
             <div

@@ -36,6 +36,33 @@ export const employeePayrollBreakdownSchema = monthYearSchema.extend({
   employeeId: z.string().uuid(),
 });
 
+const nullableNonNegative = z.preprocess((value) => {
+  if (value === null || value === undefined || value === "") return null;
+  return value;
+}, z.union([z.null(), z.coerce.number().min(0)]));
+
+const nullableLopDays = z.preprocess((value) => {
+  if (value === null || value === undefined || value === "") return null;
+  return value;
+}, z.union([z.null(), z.coerce.number().min(0).max(31)]));
+
+export const payrollItemAdjustmentSchema = z.object({
+  payrollItemId: z.string().uuid(),
+  additionalEarnings: z.coerce.number().min(0).default(0),
+  bonus: z.coerce.number().min(0).default(0),
+  incentive: z.coerce.number().min(0).default(0),
+  reimbursements: z.coerce.number().min(0).default(0),
+  additionalDeductions: z.coerce.number().min(0).default(0),
+  tdsOverride: nullableNonNegative,
+  otherDeductionsOverride: nullableNonNegative,
+  lopDaysOverride: nullableLopDays,
+  confirmReopen: z.boolean().optional(),
+});
+
+export const sendEmployeePayslipSchema = z.object({
+  payrollItemId: z.string().uuid(),
+});
+
 export const payrollApprovalSchema = z.object({
   payrollId: z.string().uuid(),
   comments: z.string().trim().max(500).optional(),
@@ -46,14 +73,19 @@ export const payrollRejectSchema = z.object({
   comments: z.string().trim().min(1).max(500),
 });
 
+const nonNegativeAmount = z.coerce
+  .number()
+  .refine((value) => Number.isFinite(value), "Enter a valid amount")
+  .min(0, "Amount cannot be negative");
+
 const salaryComponentSchema = z.object({
-  specialAllowance: z.coerce.number().min(0).default(0),
-  medical: z.coerce.number().min(0).default(0),
-  pf: z.coerce.number().min(0).default(0),
-  esi: z.coerce.number().min(0).default(0),
-  professionalTax: z.coerce.number().min(0).default(0),
-  incomeTax: z.coerce.number().min(0).default(0),
-  other: z.coerce.number().min(0).default(0),
+  specialAllowance: nonNegativeAmount.default(0),
+  medical: nonNegativeAmount.default(0),
+  pf: nonNegativeAmount.default(0),
+  esi: nonNegativeAmount.default(0),
+  professionalTax: nonNegativeAmount.default(0),
+  incomeTax: nonNegativeAmount.default(0),
+  other: nonNegativeAmount.default(0),
 });
 
 function resolveSalaryComponents(
@@ -75,12 +107,20 @@ export const salaryStructureFormSchema = z
     employeeId: z.string().uuid(),
     effectiveFrom: z.string().min(1),
     effectiveTo: z.string().optional(),
+    employmentTypeId: z.preprocess(
+      (value) => (value === "" || value == null ? undefined : value),
+      z.string().uuid().optional(),
+    ),
     currencyCode: z.string().length(3).default("INR"),
-    basicSalary: z.coerce.number().min(0),
-    hraAmount: z.coerce.number().min(0).default(0),
-    transportAllowance: z.coerce.number().min(0).default(0),
-    otherAllowances: z.coerce.number().min(0).default(0),
+    basicSalary: nonNegativeAmount,
+    hraAmount: nonNegativeAmount.default(0),
+    transportAllowance: nonNegativeAmount.default(0),
+    otherAllowances: nonNegativeAmount.default(0),
     components: salaryComponentSchema.optional(),
+  })
+  .refine((data) => data.basicSalary > 0, {
+    message: "Monthly gross salary must be greater than zero",
+    path: ["basicSalary"],
   })
   .transform((data) => {
     const components = resolveSalaryComponents(data.components);
@@ -104,7 +144,7 @@ export const salaryStructureFormSchema = z
 
     return {
       ...data,
-      otherAllowances: data.otherAllowances + specialAllowance + medical,
+      otherAllowances: data.otherAllowances,
       taxDeduction,
       otherDeductions: totalStatutory,
       grossSalary,
@@ -212,6 +252,7 @@ export const payslipHistoryParamsSchema = z.object({
   employeeId: z.string().uuid().optional(),
   includeArchived: z.coerce.boolean().optional().default(false),
   groupByYear: z.coerce.boolean().optional().default(true),
+  payslipStatus: z.enum(["all", "pending", "sent"]).optional().default("all"),
 });
 
 export const bonusListParamsSchema = z.object({

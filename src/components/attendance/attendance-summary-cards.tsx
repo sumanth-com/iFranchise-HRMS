@@ -1,6 +1,5 @@
 import {
   Clock3,
-  Coffee,
   UserCheck,
   UserMinus,
   Users,
@@ -45,20 +44,12 @@ const SUMMARY_CONFIG = [
     ring: "hover:border-amber-500/40 data-[active=true]:border-amber-500 data-[active=true]:bg-amber-500/10",
   },
   {
-    key: "halfDayToday" as const,
-    status: "half_day" as const,
-    icon: Coffee,
-    accent: "text-orange-600 dark:text-orange-400",
-    bg: "bg-orange-500/10",
-    ring: "hover:border-orange-500/40 data-[active=true]:border-orange-500 data-[active=true]:bg-orange-500/10",
-  },
-  {
     key: "totalEmployees" as const,
     status: undefined,
     icon: Users,
     accent: "text-foreground",
-    bg: "bg-muted",
-    ring: "hover:border-foreground/30 data-[active=true]:border-foreground data-[active=true]:bg-muted",
+    bg: "bg-violet-500/10",
+    ring: "hover:border-violet-500/40 data-[active=true]:border-violet-500 data-[active=true]:bg-violet-500/10",
   },
 ] satisfies Array<{
   key: SummaryCardKey;
@@ -78,7 +69,7 @@ export function AttendanceSummaryCards({
   const clickable = Boolean(onSelect);
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       {SUMMARY_CONFIG.map((item) => {
         const Icon = item.icon;
         const value = summary[item.key];
@@ -111,7 +102,7 @@ export function AttendanceSummaryCards({
 
         if (!clickable || item.key === "totalEmployees") {
           return (
-            <div key={item.key} className={cn("min-w-0 rounded-xl border bg-card p-3.5 text-left shadow-sm", item.key === "totalEmployees" && item.bg)}>
+            <div key={item.key} className="min-w-0 rounded-xl border bg-card p-3.5 text-left shadow-sm">
               {content}
             </div>
           );

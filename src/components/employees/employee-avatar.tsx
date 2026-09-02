@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getSignedUrlAction } from "@/lib/employees/actions";
+import { subscribeProfilePhotoChanged } from "@/lib/employees/profile-photo-events";
 
 type EmployeeAvatarProps = {
   firstName: string;
   lastName: string;
+  employeeId?: string;
   profileImagePath?: string | null;
   signedUrl?: string | null;
   className?: string;
@@ -16,6 +18,7 @@ type EmployeeAvatarProps = {
 export function EmployeeAvatar({
   firstName,
   lastName,
+  employeeId,
   profileImagePath,
   signedUrl,
   className,
@@ -39,6 +42,14 @@ export function EmployeeAvatar({
       }
     });
   }, [profileImagePath, signedUrl]);
+
+  useEffect(() => {
+    if (!employeeId) return;
+    return subscribeProfilePhotoChanged((detail) => {
+      if (detail.employeeId !== employeeId) return;
+      setImageUrl(detail.imageUrl);
+    });
+  }, [employeeId]);
 
   const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 

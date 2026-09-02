@@ -113,6 +113,10 @@ function revalidateSelfProfilePaths() {
   revalidatePath("/manager/profile");
   revalidatePath("/dashboard/profile");
   revalidatePath("/ceo/profile");
+  revalidatePath("/employee/directory");
+  revalidatePath("/manager/directory");
+  revalidatePath("/ceo/employees");
+  revalidatePath("/ceo/directory");
   revalidatePath(PORTAL_EMPLOYEE_ROUTES.leave);
   revalidatePath(MANAGER_ROUTES.leave);
   revalidatePath("/dashboard/system/leave");
@@ -219,6 +223,9 @@ export async function updateEmployeeAction(
     const employee = await getEmployeeById(supabase, employeeId);
 
     revalidatePath(EMPLOYEE_ROUTES.list);
+    revalidatePath("/dashboard/system/employees");
+    revalidatePath("/dashboard/directory");
+    revalidateSelfProfilePaths();
 
     if (employee) {
       revalidatePath(EMPLOYEE_ROUTES.detail(employee));

@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/common/select";
 import { fetchCeoAttendanceExceptionsAction } from "@/lib/ceo/actions/ceo-attendance-actions";
+import { getHrmsYears } from "@/lib/date/hrms-year";
 import type {
   CeoAttendanceExceptions,
   CeoAttendanceKpis,
@@ -49,8 +50,7 @@ function AtRiskPeriodFilters({
   disabled?: boolean;
   onChange: (month: number, year: number) => void;
 }) {
-  const now = new Date();
-  const years = [now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2];
+  const years = getHrmsYears();
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">

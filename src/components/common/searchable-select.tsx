@@ -14,9 +14,12 @@ type SearchableSelectProps = {
   options: SearchableSelectOption[];
   value: string | null | undefined;
   onValueChange: (value: string | null) => void;
+  onCreate?: (label: string) => void;
   placeholder?: string;
   noneLabel?: string;
   allowNone?: boolean;
+  allowCreate?: boolean;
+  createdLabel?: string | null;
   disabled?: boolean;
   emptyMessage?: string;
 };
@@ -26,9 +29,12 @@ export function SearchableSelect({
   options,
   value,
   onValueChange,
+  onCreate,
   placeholder = "Search or select…",
   noneLabel = "None",
   allowNone = true,
+  allowCreate = false,
+  createdLabel = null,
   disabled = false,
   emptyMessage = "No matches",
 }: SearchableSelectProps) {
@@ -38,16 +44,28 @@ export function SearchableSelect({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
-  const selected = useMemo(
-    () => options.find((option) => option.value === value) ?? null,
-    [options, value],
-  );
+  const selected = useMemo(() => {
+    const match = options.find((option) => option.value === value) ?? null;
+    if (match) return match;
+    if (createdLabel?.trim()) {
+      return { value: value ?? "", label: createdLabel.trim() };
+    }
+    return null;
+  }, [options, value, createdLabel]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return options;
     return options.filter((option) => option.label.toLowerCase().includes(q));
   }, [options, query]);
+
+  const createCandidate = query.trim();
+  const canCreate =
+    Boolean(allowCreate && onCreate && createCandidate) &&
+    !options.some(
+      (option) => option.label.trim().toLowerCase() === createCandidate.toLowerCase(),
+    ) &&
+    createCandidate.toLowerCase() !== (createdLabel ?? "").trim().toLowerCase();
 
   useEffect(() => {
     if (!open) {
@@ -69,11 +87,18 @@ export function SearchableSelect({
     setQuery("");
   }
 
+  function createFromQuery() {
+    if (!canCreate || !onCreate) return;
+    onCreate(createCandidate);
+    setOpen(false);
+    setQuery("");
+  }
+
   return (
     <div ref={containerRef} className="relative">
       <div
         className={cn(
-          "flex h-9 w-full items-center gap-1 rounded-md border border-input bg-transparent px-2 shadow-xs",
+          "flex h-9 w-full items-center gap-1 rounded-md border border-input bg-white px-2 shadow-xs dark:bg-input",
           disabled && "cursor-not-allowed opacity-60",
           open && "ring-1 ring-ring",
         )}
@@ -90,6 +115,18 @@ export function SearchableSelect({
           onChange={(event) => {
             setQuery(event.target.value);
             if (!open) setOpen(true);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              if (canCreate) {
+                createFromQuery();
+                return;
+              }
+              if (filtered[0]) {
+                selectValue(filtered[0].value);
+              }
+            }
           }}
           onFocus={() => {
             if (!disabled) setOpen(true);
@@ -147,7 +184,7 @@ export function SearchableSelect({
               </button>
             </li>
           ) : null}
-          {filtered.length === 0 ? (
+          {filtered.length === 0 && !canCreate ? (
             <li className="px-2 py-1.5 text-muted-foreground">{emptyMessage}</li>
           ) : (
             filtered.map((option) => {
@@ -171,6 +208,20 @@ export function SearchableSelect({
               );
             })
           )}
+          {canCreate ? (
+            <li>
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left hover:bg-accent"
+                onClick={createFromQuery}
+              >
+                <Check className="size-3.5 opacity-0" />
+                <span className="whitespace-normal break-words">
+                  Save “{createCandidate}”
+                </span>
+              </button>
+            </li>
+          ) : null}
         </ul>
       ) : null}
     </div>

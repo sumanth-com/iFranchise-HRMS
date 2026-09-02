@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { formatCurrency, toEmployeeFacingEarnings } from "@/lib/payroll/services/payroll-utils";
+import { formatCurrency } from "@/lib/payroll/services/payroll-utils";
 import type { EmployeePayrollRunBreakdown } from "@/types/payroll";
 import type { PayrollBreakdown } from "@/types/payroll";
 
@@ -63,36 +63,30 @@ function LineItemsSection({
   );
 }
 
+function isHrAdjustmentLine(code: string) {
+  return code.startsWith("hr_");
+}
+
 export function PayrollEmployeeBreakdownDialog({
   employee,
   open,
   onOpenChange,
 }: PayrollEmployeeBreakdownDialogProps) {
   const attendance = employee?.breakdown.attendance;
-  const earnings = employee
-    ? toEmployeeFacingEarnings(employee.breakdown.earnings ?? [])
-    : [];
+  const earnings = employee?.breakdown.earnings ?? [];
   const deductions = (employee?.breakdown.deductions ?? []).filter(
     (line) => Number(line.amount) > 0,
   );
+  const systemEarnings = earnings.filter((line) => !isHrAdjustmentLine(line.code));
+  const hrEarnings = earnings.filter((line) => isHrAdjustmentLine(line.code));
+  const systemDeductions = deductions.filter((line) => !isHrAdjustmentLine(line.code));
+  const hrDeductions = deductions.filter((line) => isHrAdjustmentLine(line.code));
   const notes = employee?.breakdown.notes ?? [];
-  const bonusTotal =
-    employee?.bonusTotal ??
-    earnings.find((line) => line.code === "bonus")?.amount ??
-    0;
-  const claimsTotal =
-    employee?.claimsTotal ??
-    earnings.find((line) => line.code === "claims")?.amount ??
-    0;
-  const salaryTotal =
-    employee?.salaryTotal ??
-    earnings.find((line) => line.code === "salary")?.amount ??
-    0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex max-h-[min(88vh,680px)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl"
+        className="flex max-h-[min(88vh,720px)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl"
         showCloseButton
       >
         <DialogHeader className="shrink-0 border-b px-5 py-4 pr-12 text-left">
@@ -112,41 +106,66 @@ export function PayrollEmployeeBreakdownDialog({
           {!employee ? null : (
             <>
               {employee.hasSalaryStructure === false ? (
-                <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-950 dark:text-amber-100">
-                  No salary structure is configured for this employee in the selected period.
+                <p className="rounded-lg border bg-muted/40 px-3 py-2.5 text-sm">
+                  No salary structure configured
                 </p>
               ) : null}
 
-              <div className="grid grid-cols-5 gap-2">
-                <StatTile label="Salary" value={formatCurrency(salaryTotal)} />
-                <StatTile label="Bonus" value={formatCurrency(bonusTotal)} />
-                <StatTile label="Claims" value={formatCurrency(claimsTotal)} />
-                <StatTile label="Gross" value={formatCurrency(employee.grossSalary)} />
-                <StatTile label="Net pay" value={formatCurrency(employee.netSalary)} />
-              </div>
+              <section>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Employee information
+                </h3>
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <StatTile label="Employee" value={employee.employeeName} />
+                  <StatTile label="Employee ID" value={employee.employeeCode} />
+                  <StatTile label="Department" value={employee.departmentName ?? "—"} />
+                  <StatTile label="Designation" value={employee.designationTitle ?? "—"} />
+                  <StatTile
+                    label="Employment type"
+                    value={employee.employmentTypeName ?? "—"}
+                  />
+                  <StatTile label="Payroll month" value={employee.periodLabel} />
+                </div>
+              </section>
 
               {attendance ? (
                 <section>
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Attendance
+                    Attendance summary
                   </h3>
-                  <div className="mt-2 grid grid-cols-5 gap-2">
+                  <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6">
                     <StatTile label="Working days" value={String(attendance.workingDays)} />
                     <StatTile label="Present" value={String(attendance.presentDays)} />
-                    <StatTile label="Absent" value={String(attendance.absentDays)} />
-                    <StatTile label="LOP days" value={String(attendance.lopDays)} />
                     <StatTile
-                      label="Overtime (hrs)"
-                      value={String(attendance.overtimeHours)}
+                      label="Paid leave"
+                      value={String(attendance.paidLeaveDays ?? attendance.leaveDays ?? 0)}
                     />
+                    <StatTile label="LOP days" value={String(attendance.lopDays)} />
+                    <StatTile label="Holidays" value={String(attendance.holidayCount ?? 0)} />
+                    <StatTile label="Weekly offs" value={String(attendance.weekOffDays ?? 0)} />
                   </div>
                 </section>
               ) : null}
 
               <div className="space-y-4">
-                <LineItemsSection title="Earnings" lines={earnings} />
-                <LineItemsSection title="Deductions" lines={deductions} />
+                <LineItemsSection title="Earnings" lines={systemEarnings} />
+                <LineItemsSection title="Deductions" lines={systemDeductions} />
+                <LineItemsSection title="HR adjustments" lines={[...hrEarnings, ...hrDeductions]} />
               </div>
+
+              <section>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Final summary
+                </h3>
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  <StatTile label="Gross salary" value={formatCurrency(employee.grossSalary)} />
+                  <StatTile
+                    label="Total deductions"
+                    value={formatCurrency(employee.totalDeductions)}
+                  />
+                  <StatTile label="Net pay" value={formatCurrency(employee.netSalary)} />
+                </div>
+              </section>
 
               {notes.length > 0 ? (
                 <section>

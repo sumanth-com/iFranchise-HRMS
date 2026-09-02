@@ -48,6 +48,7 @@ export type EmployeeListItem = {
   departmentName: string | null;
   designationId: string | null;
   designationTitle: string | null;
+  employmentTypeName: string | null;
   profileImagePath: string | null;
   /** Prefetched signed URL for list avatars (avoids per-card client N+1). */
   profileImageSignedUrl?: string | null;
@@ -112,6 +113,9 @@ export type LookupOption = {
   id: string;
   label: string;
   code?: string;
+  designationTitle?: string | null;
+  employmentTypeName?: string | null;
+  employmentTypeId?: string | null;
 };
 
 export type EmployeeRouteIdentity = {

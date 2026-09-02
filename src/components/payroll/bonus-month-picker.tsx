@@ -6,7 +6,7 @@ import { formatPayrollMonth } from "@/lib/payroll/services/payroll-utils";
 import { Label } from "@/components/ui/label";
 
 const monthItems = getMonthSelectItems();
-const yearItems = getYearSelectItems([2025, 2026, 2027, 2028]);
+const yearItems = getYearSelectItems();
 
 type BonusMonthPickerProps = {
   month: number;

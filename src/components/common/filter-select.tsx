@@ -46,7 +46,7 @@ export function FilterSelect({
         }}
         disabled={disabled}
       >
-        <SelectTrigger className={cn("h-9 w-full min-w-0", triggerClassName)}>
+        <SelectTrigger className={cn("h-9 w-full min-w-0 bg-white dark:bg-input", triggerClassName)}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent

@@ -15,6 +15,7 @@ type SalaryStructureDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   employees: LookupOption[];
+  employmentTypes?: LookupOption[];
   record?: SalaryStructureItem;
   mode: "create" | "edit";
   onSaved?: () => void;
@@ -24,6 +25,7 @@ export function SalaryStructureDialog({
   open,
   onOpenChange,
   employees,
+  employmentTypes = [],
   record,
   mode,
   onSaved,
@@ -39,17 +41,16 @@ export function SalaryStructureDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex max-h-[min(90vh,720px)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
+        className="flex max-h-[min(92vh,800px)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
         showCloseButton
       >
         <DialogHeader className="shrink-0 border-b px-5 py-4 pr-12 text-left">
           <DialogTitle className="text-lg font-semibold">
-            {isEdit ? "Edit salary structure" : "Add salary structure"}
+            {isEdit ? "Edit Salary Structure" : "Set Salary Structure"}
           </DialogTitle>
           <DialogDescription className="text-sm">
-            {isEdit
-              ? `${record.employeeName} · ${record.employeeCode}`
-              : "Set salary components and effective date for an employee."}
+            Enter monthly gross salary. Allowances calculate automatically from the employee
+            profile.
           </DialogDescription>
         </DialogHeader>
 
@@ -58,6 +59,7 @@ export function SalaryStructureDialog({
             key={formKey}
             formId={`salary-structure-form-${formKey}`}
             employees={employees}
+            employmentTypes={employmentTypes}
             record={record}
             mode={mode}
             variant="dialog"

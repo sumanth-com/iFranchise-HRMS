@@ -9,7 +9,7 @@ type Props = {
   className?: string;
 };
 
-/** Self-service digital ID card with profile photo upload. */
+/** Digital ID on the manager attendance profile — photo is HR-managed. */
 export function ManagerProfileIdCard({ profile, className }: Props) {
   return (
     <EmployeeIdCard
@@ -24,7 +24,7 @@ export function ManagerProfileIdCard({ profile, className }: Props) {
       imageUrl={profile.imageUrl}
       profileImagePath={profile.profileImagePath}
       profilePath={profile.profilePath}
-      canEdit={true}
+      canEdit={false}
       className={cn("mx-auto h-full min-h-[28rem] max-w-[18.5rem] xl:mx-0", className)}
     />
   );

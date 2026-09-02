@@ -1,7 +1,8 @@
-import { format, parseISO, lastDayOfMonth } from "date-fns";
+import { format } from "date-fns";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 
 import { amountToIndianWords } from "@/lib/payroll/services/amount-in-words";
+import { getPayslipInfoRows } from "@/lib/payroll/services/payslip-document-helpers";
 import { loadLogoBytesCached } from "@/lib/payroll/services/payslip-logo-cache";
 import {
   getPayslipDeductionLines,
@@ -22,6 +23,7 @@ type Ctx = { pdf: PDFDocument; page: PDFPage; font: PDFFont; bold: PDFFont; y: n
 function sanitizePdfText(text: string): string {
   return text
     .replace(/\u20b9/g, "Rs. ")
+    .replace(/\u2212/g, "-")
     .replace(/\u00a0/g, " ")
     .replace(/\u2014/g, "-")
     .replace(/\u2013/g, "-")
@@ -29,20 +31,6 @@ function sanitizePdfText(text: string): string {
     .replace(/\u2026/g, "...")
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[\u201c\u201d]/g, '"');
-}
-
-function fmt(value: string | null | undefined, fallback = "-"): string {
-  return value?.trim() ? sanitizePdfText(value.trim()) : fallback;
-}
-
-function fmtDateUpper(value: string | null | undefined): string {
-  if (!value) return "-";
-  try {
-    const d = parseISO(value.length === 10 ? value : value.slice(0, 10));
-    return format(d, "dd-MMM-yyyy").toUpperCase();
-  } catch {
-    return "-";
-  }
 }
 
 function formatMonthYearHeader(dateString: string | null | undefined): string {
@@ -123,23 +111,8 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
   const page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
   const ctx: Ctx = { pdf, page, font, bold, y: PAGE_HEIGHT - MARGIN };
 
-  const employeeName = `${payslip.employee.firstName} ${payslip.employee.lastName}`.trim().toUpperCase();
   const organizationName = payslip.organization.name.toUpperCase();
   const monthHeader = formatMonthYearHeader(payslip.payrollMonth);
-
-  // Compute work days & paid days
-  let totalDaysInMonth = 30;
-  try {
-    const monthDate = new Date(payslip.payrollMonth);
-    totalDaysInMonth = lastDayOfMonth(monthDate).getDate();
-  } catch {
-    totalDaysInMonth = 30;
-  }
-
-  const attendance = payslip.breakdown?.attendance;
-  const workDays = attendance?.workingDays && attendance.workingDays > 0 ? attendance.workingDays : totalDaysInMonth;
-  const lopDays = attendance?.lopDays ?? attendance?.leaveLopDays ?? 0;
-  const paidDays = attendance?.presentDays && attendance.presentDays > 0 ? attendance.presentDays : Math.max(0, workDays - lopDays);
 
   const earnings = getPayslipEarningsLines({
     earnings: payslip.breakdown?.earnings,
@@ -207,38 +180,12 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
   const col3W = CONTENT_WIDTH * 0.22;
   const col4X = col3X + col3W;
 
-  const infoRows = [
-    [
-      { label: "EMPLOYEE ID", value: payslip.employee.employeeCode, boldVal: false },
-      { label: "PAYMENT MODE", value: (payslip.paymentMode || "BANK").toUpperCase(), boldVal: false },
-    ],
-    [
-      { label: "EMPLOYEE NAME", value: employeeName, boldVal: true },
-      { label: "BANK NAME", value: fmt(payslip.bankAccount?.bankName), boldVal: false },
-    ],
-    [
-      { label: "JOINING DT", value: fmtDateUpper(payslip.employee.dateOfJoining), boldVal: false },
-      { label: "BANK A/C NO", value: fmt(payslip.bankAccount?.accountNumberMasked), boldVal: false },
-    ],
-    [
-      { label: "DESIGNATION", value: fmt(payslip.employee.designationTitle).toUpperCase(), boldVal: true },
-      { label: "WORK DAYS", value: Number(workDays).toFixed(2), boldVal: false },
-    ],
-    [
-      {
-        label: "LOCATION",
-        value: fmt(
-          payslip.employee.branchName || payslip.employee.departmentName || "CHENNAI",
-        ).toUpperCase(),
-        boldVal: false,
-      },
-      { label: "PAID DAYS", value: Number(paidDays).toFixed(2), boldVal: false },
-    ],
-    [
-      { label: "PAN NO", value: fmt(payslip.employee.pan), boldVal: false },
-      { label: "LOP DAYS", value: Number(lopDays).toFixed(2), boldVal: false },
-    ],
-  ];
+  const infoRows = getPayslipInfoRows(payslip).map((row) =>
+    row.map((cell) => ({
+      label: cell.label.toUpperCase(),
+      value: cell.value,
+    })),
+  );
 
   for (const row of infoRows) {
     const yBot = currentY - rowH;
@@ -269,9 +216,9 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
 
     const textY = yBot + 5;
     drawText(ctx, row[0].label, col1X + 4, textY, { size: 7.5, bold: true });
-    drawText(ctx, row[0].value, col2X + 4, textY, { size: 7.5, bold: row[0].boldVal });
+    drawText(ctx, row[0].value, col2X + 4, textY, { size: 7.5 });
     drawText(ctx, row[1].label, col3X + 4, textY, { size: 7.5, bold: true });
-    drawText(ctx, row[1].value, col4X + 4, textY, { size: 7.5, bold: row[1].boldVal });
+    drawText(ctx, row[1].value, col4X + 4, textY, { size: 7.5 });
 
     currentY = yBot;
   }
@@ -403,7 +350,7 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
 
   currentY = totalRowY;
 
-  // Net Pay Row
+  // Gross - Deductions = Net Pay
   const netPayY = currentY - rowH;
   ctx.page.drawLine({
     start: { x: MARGIN, y: netPayY },
@@ -411,24 +358,9 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
     thickness: 0.8,
     color: BORDER_COLOR,
   });
-  ctx.page.drawLine({
-    start: { x: sc3X, y: currentY },
-    end: { x: sc3X, y: netPayY },
-    thickness: 0.8,
-    color: BORDER_COLOR,
-  });
-  ctx.page.drawLine({
-    start: { x: sc4X, y: currentY },
-    end: { x: sc4X, y: netPayY },
-    thickness: 0.8,
-    color: BORDER_COLOR,
-  });
 
-  drawRight(ctx, "NET PAY", sc4X - 4, netPayY + 5, { size: 8.5, bold: true });
-  drawRight(ctx, formatAmountIndian(netPay), MARGIN + CONTENT_WIDTH - 4, netPayY + 5, {
-    size: 8.5,
-    bold: true,
-  });
+  const netPayLine = `GROSS  Rs. ${formatAmountIndian(totalEarnings)}  -  DEDUCTIONS  Rs. ${formatAmountIndian(totalDeductions)}  =  NET PAY  Rs. ${formatAmountIndian(netPay)}`;
+  drawCentered(ctx, netPayLine, PAGE_WIDTH / 2, netPayY + 5, { size: 8, bold: true });
 
   currentY = netPayY;
 

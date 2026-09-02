@@ -117,6 +117,24 @@ export function roundCurrency(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+export function displaySalaryBankDetails<T extends {
+  bankName: string;
+  ifscCode?: string | null;
+  branchName?: string | null;
+}>(bank: T): T {
+  const ifsc = (bank.ifscCode ?? "").trim().toUpperCase();
+  if (!ifsc.startsWith("SBIN")) return bank;
+
+  const branch = (bank.branchName ?? "").trim();
+  const useDhone = !branch || /madhapur|hyderabad/i.test(branch);
+
+  return {
+    ...bank,
+    bankName: "SBI Bank",
+    ...(bank.branchName !== undefined ? { branchName: useDhone ? "Dhone" : bank.branchName } : {}),
+  };
+}
+
 export function toEmployeeFacingEarnings(
   lines: PayrollBreakdownLine[],
 ): PayrollBreakdownLine[] {
@@ -182,9 +200,9 @@ export function toEmployeeFacingEarnings(
 const PAYSLIP_COMPONENT_LABELS: Record<string, string> = {
   basic: "Basic Salary",
   hra: "HRA",
-  transport: "Travel Allowance",
+  transport: "TA",
   medical: "Medical Allowance",
-  special_allowance: "Special Allowance",
+  special_allowance: "TDA",
   other_allowances: "Other Allowances",
   allowances: "Other Allowances",
   overtime: "Overtime",
@@ -193,11 +211,24 @@ const PAYSLIP_COMPONENT_LABELS: Record<string, string> = {
   pf: "PF",
   esi: "ESI",
   pt: "Professional Tax",
-  income_tax: "Income Tax",
+  income_tax: "Tax Deduction (TDS)",
   other_ded: "Other Deductions",
   salary: "Salary",
   gross: "Gross Salary",
 };
+
+const REQUIRED_PAYSLIP_EARNINGS = ["transport", "special_allowance"] as const;
+const REQUIRED_PAYSLIP_DEDUCTIONS = ["income_tax"] as const;
+const EARNING_LINE_ORDER = [
+  "basic",
+  "hra",
+  "transport",
+  "special_allowance",
+  "medical",
+  "other_allowances",
+  "salary",
+];
+const DEDUCTION_LINE_ORDER = ["pf", "esi", "pt", "income_tax", "other_ded", "lop"];
 
 /** Professional payslip labels — preserves real component lines (does not collapse to "Salary"). */
 export function normalizePayslipComponentLabel(line: PayrollBreakdownLine): string {
@@ -213,16 +244,63 @@ export function normalizePayslipComponentLabel(line: PayrollBreakdownLine): stri
     .replace(/\bSpecial & Other Allowances\b/i, "Other Allowances");
 }
 
+function lineCode(line: PayrollBreakdownLine): string {
+  return line.code.toLowerCase();
+}
+
+function toPayslipLine(line: PayrollBreakdownLine): PayrollBreakdownLine {
+  return {
+    ...line,
+    label: normalizePayslipComponentLabel(line),
+    amount: roundCurrency(Number(line.amount) || 0),
+  };
+}
+
+function withRequiredZeroLines(
+  lines: PayrollBreakdownLine[],
+  requiredCodes: readonly string[],
+  type: PayrollBreakdownLine["type"],
+): PayrollBreakdownLine[] {
+  const byCode = new Map(lines.map((line) => [lineCode(line), line]));
+  const merged = [...lines];
+  for (const code of requiredCodes) {
+    if (byCode.has(code)) continue;
+    merged.push({
+      code,
+      label: PAYSLIP_COMPONENT_LABELS[code] ?? code,
+      amount: 0,
+      type,
+    });
+  }
+  return merged;
+}
+
+function orderPayslipLines(
+  lines: PayrollBreakdownLine[],
+  preferred: string[],
+): PayrollBreakdownLine[] {
+  const remaining = new Map(lines.map((line) => [lineCode(line), line]));
+  const ordered: PayrollBreakdownLine[] = [];
+  for (const code of preferred) {
+    const line = remaining.get(code);
+    if (!line) continue;
+    ordered.push(line);
+    remaining.delete(code);
+  }
+  for (const line of lines) {
+    if (!remaining.has(lineCode(line))) continue;
+    ordered.push(line);
+    remaining.delete(lineCode(line));
+  }
+  return ordered;
+}
+
 export function toPayslipDisplayLines(
   lines: PayrollBreakdownLine[],
 ): PayrollBreakdownLine[] {
   return lines
     .filter((line) => Number(line.amount) > 0)
-    .map((line) => ({
-      ...line,
-      label: normalizePayslipComponentLabel(line),
-      amount: roundCurrency(Number(line.amount) || 0),
-    }));
+    .map((line) => toPayslipLine(line));
 }
 
 /**
@@ -236,7 +314,12 @@ export function getPayslipEarningsLines(input: {
   grossSalary: number;
 }): PayrollBreakdownLine[] {
   const fromBreakdown = toPayslipDisplayLines(input.earnings ?? []);
-  if (fromBreakdown.length > 0) return fromBreakdown;
+  if (fromBreakdown.length > 0) {
+    return orderPayslipLines(
+      withRequiredZeroLines(fromBreakdown, REQUIRED_PAYSLIP_EARNINGS, "earning").map(toPayslipLine),
+      EARNING_LINE_ORDER,
+    );
+  }
 
   const fallback: PayrollBreakdownLine[] = [];
   if (input.basicSalary > 0) {
@@ -263,13 +346,22 @@ export function getPayslipEarningsLines(input: {
       type: "earning",
     });
   }
-  return fallback;
+  return orderPayslipLines(
+    withRequiredZeroLines(fallback, REQUIRED_PAYSLIP_EARNINGS, "earning").map(toPayslipLine),
+    EARNING_LINE_ORDER,
+  );
 }
 
 export function getPayslipDeductionLines(
   lines: PayrollBreakdownLine[] | null | undefined,
 ): PayrollBreakdownLine[] {
-  return toPayslipDisplayLines(lines ?? []);
+  const fromBreakdown = toPayslipDisplayLines(lines ?? []);
+  return orderPayslipLines(
+    withRequiredZeroLines(fromBreakdown, REQUIRED_PAYSLIP_DEDUCTIONS, "deduction").map(
+      toPayslipLine,
+    ),
+    DEDUCTION_LINE_ORDER,
+  );
 }
 
 export function generatePayslipNumber(

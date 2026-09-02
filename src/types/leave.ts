@@ -40,6 +40,10 @@ export type LeaveListItem = {
   pendingApproverEmployeeId?: string | null;
   canActOnApproval?: boolean;
   canActOnRejection?: boolean;
+  hrReviewRequired?: boolean;
+  hrDecision?: "lop" | "special" | null;
+  hrRemarks?: string | null;
+  availableBalanceAtSubmit?: number | null;
 };
 
 export type LeaveListResult = {
@@ -65,7 +69,7 @@ export type LeaveListParams = {
   sortOrder?: "asc" | "desc";
   month?: number;
   year?: number;
-  leaveStatus?: LeaveStatus;
+  leaveStatus?: LeaveStatus | "pending_hr_review";
   leaveTypeId?: string;
   departmentId?: string;
   branchId?: string;
@@ -82,6 +86,7 @@ export type LeaveListParams = {
   excludeHrApplicants?: boolean;
   summaryFilter?:
     | "pendingRequests"
+    | "pendingHrReview"
     | "approvedThisMonth"
     | "rejectedThisMonth"
     | "employeesOnLeaveToday"
@@ -90,6 +95,7 @@ export type LeaveListParams = {
 
 export type LeaveSummary = {
   pendingRequests: number;
+  pendingHrReview?: number;
   approvedThisMonth: number;
   rejectedThisMonth: number;
   employeesOnLeaveToday: number;
@@ -153,6 +159,12 @@ export type LeaveDetail = {
   canCancel: boolean;
   canEdit: boolean;
   canDelete: boolean;
+  employmentTypeName?: string | null;
+  hrReviewRequired?: boolean;
+  hrReviewReason?: "balance_exhausted" | "over_limit" | null;
+  hrDecision?: "lop" | "special" | null;
+  hrRemarks?: string | null;
+  availableBalanceAtSubmit?: number | null;
 };
 
 export type LeaveCalendarEntry = {
@@ -166,6 +178,8 @@ export type LeaveCalendarEntry = {
   totalDays: number;
   isHalfDay: boolean;
   leaveStatus: LeaveStatus;
+  hrReviewRequired?: boolean;
+  hrDecision?: "lop" | "special" | null;
   dayAllocations?: Array<{
     date: string;
     kind: "paid" | "lop" | "sandwich" | "none";

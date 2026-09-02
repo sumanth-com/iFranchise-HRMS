@@ -61,6 +61,7 @@ import { formatCleanEmployeeName } from "@/lib/employees/parse-employee-name";
 import { FILTER_ANY_VALUE } from "@/lib/manager/filter-select";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { formatLeaveDate } from "@/lib/leave/services/leave-utils";
+import { getHrmsYearSelectItems } from "@/lib/date/hrms-year";
 import type {
   LeaveActionResult,
   LeaveListItem,
@@ -115,7 +116,7 @@ const TABLE_HEAD_CLASS =
 const TABLE_CELL_CLASS = "relative align-middle";
 
 const FILTER_CONTROL_CLASS =
-  "h-10 w-max gap-2 rounded-lg whitespace-nowrap [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-muted-foreground/70 *:data-[slot=select-value]:line-clamp-none *:data-[slot=select-value]:min-w-max *:data-[slot=select-value]:flex-none *:data-[slot=select-value]:overflow-visible *:data-[slot=select-value]:text-clip";
+  "h-10 w-max gap-2 rounded-lg bg-white whitespace-nowrap dark:bg-input [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-muted-foreground/70 *:data-[slot=select-value]:line-clamp-none *:data-[slot=select-value]:min-w-max *:data-[slot=select-value]:flex-none *:data-[slot=select-value]:overflow-visible *:data-[slot=select-value]:text-clip";
 
 const MONTH_ITEMS = [
   { value: "1", label: "January" },
@@ -176,17 +177,15 @@ function CenteredHeadLabel({
   );
 }
 
-function buildYearItems(currentYear: number) {
-  return Array.from({ length: 5 }, (_, index) => {
-    const year = currentYear - 2 + index;
-    return { value: String(year), label: String(year) };
-  });
+function buildYearItems() {
+  return getHrmsYearSelectItems();
 }
 
 function leaveStatusForSummaryFilter(
   key: LeaveSummaryFilterKey | undefined,
 ): LeaveListParams["leaveStatus"] | undefined {
   if (key === "pendingRequests") return "pending";
+  if (key === "pendingHrReview") return "pending_hr_review";
   if (key === "approvedThisMonth") return "approved";
   if (key === "rejectedThisMonth") return "rejected";
   if (key === "employeesOnLeaveToday") return "approved";
@@ -401,12 +400,13 @@ export function LeaveTable({
   const { records, total, page, pageSize } = tableState;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-  const yearItems = useMemo(() => buildYearItems(currentYear), [currentYear]);
+  const yearItems = useMemo(() => buildYearItems(), []);
 
   const statusItems = useMemo(
     () => [
       { value: FILTER_ANY_VALUE, label: "All statuses" },
       { value: UPCOMING_FILTER_VALUE, label: "Upcoming planned" },
+      { value: "pending_hr_review", label: "Pending HR Review" },
       ...Object.entries(LEAVE_STATUS_LABELS).map(([value, label]) => ({
         value,
         label,
@@ -498,13 +498,21 @@ export function LeaveTable({
       {
         id: "leaveStatus",
         header: "Status",
-        cell: ({ row }) => <LeaveStatusBadge status={row.original.leaveStatus} />,
+        cell: ({ row }) => (
+          <LeaveStatusBadge
+            status={row.original.leaveStatus}
+            durationBreakdown={row.original.durationBreakdown}
+            hrReviewRequired={row.original.hrReviewRequired}
+            hrDecision={row.original.hrDecision}
+          />
+        ),
       },
       {
         id: "actions",
         header: "",
         cell: ({ row }) => {
           const isPendingStatus = row.original.leaveStatus === "pending";
+          const isHrReviewPending = Boolean(row.original.hrReviewRequired) && !row.original.hrDecision;
           const isCancellable = ["pending", "approved"].includes(
             row.original.leaveStatus,
           );
@@ -520,7 +528,7 @@ export function LeaveTable({
               >
                 <Eye className="size-4" />
               </Button>
-              {!embedded && canApprove && isPendingStatus ? (
+              {!embedded && canApprove && isPendingStatus && !isHrReviewPending ? (
                 <Button
                   variant="ghost"
                   size="icon-sm"
@@ -531,7 +539,7 @@ export function LeaveTable({
                   <CheckCircle2 className="size-4 text-emerald-600" />
                 </Button>
               ) : null}
-              {!embedded && canReject && isPendingStatus ? (
+              {!embedded && canReject && isPendingStatus && !isHrReviewPending ? (
                 <Button
                   variant="ghost"
                   size="icon-sm"
@@ -843,10 +851,10 @@ export function LeaveTable({
         </span>
       </div>
 
-      <div className="overflow-auto rounded-lg border max-h-[min(70vh,calc(100dvh-16rem))] [scrollbar-gutter:stable]">
+      <div className="max-h-[min(70vh,calc(100dvh-16rem))] overflow-auto rounded-lg border border-input bg-white [scrollbar-gutter:stable] dark:bg-input">
         <table
           data-slot="table"
-          className="w-max min-w-full caption-bottom text-sm"
+          className="w-max min-w-full caption-bottom bg-white text-sm dark:bg-input"
         >
           <TableHeader className="sticky top-0 z-30 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600">
             <TableRow className="border-white/10 bg-transparent hover:bg-white/5">
@@ -961,7 +969,7 @@ export function LeaveTable({
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  className="cursor-pointer hover:bg-muted/50"
+                  className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-white/5"
                   onClick={() => openLeavePopup(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (

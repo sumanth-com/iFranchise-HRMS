@@ -8,6 +8,7 @@ import {
 
 import { formatCurrency } from "@/lib/payroll/services/payroll-utils";
 import type { PayslipHistoryStats } from "@/types/payroll";
+import { cn } from "@/lib/utils";
 
 type PayslipHistorySummaryCardsProps = {
   stats: PayslipHistoryStats;
@@ -42,33 +43,14 @@ export function PayslipHistorySummaryCards({ stats, mode }: PayslipHistorySummar
       bg: "bg-violet-500/10",
     },
     {
-      key: "disbursed",
-      label: "Net disbursed",
-      value: formatCurrency(stats.totalNetDisbursed),
-      icon: Wallet,
-      accent: "text-emerald-600 dark:text-emerald-400",
-      bg: "bg-emerald-500/10",
-    },
-    {
-      key: "credited",
-      label: "Credited",
-      value: String(stats.creditedCount),
-      icon: CircleDollarSign,
-      accent: "text-primary",
-      bg: "bg-primary/10",
-    },
-  ];
-
-  if (stats.underReviewCount > 0) {
-    hrCards.push({
       key: "review",
       label: "Under HR review",
       value: String(stats.underReviewCount),
       icon: AlertCircle,
       accent: "text-amber-600 dark:text-amber-400",
       bg: "bg-amber-500/10",
-    });
-  }
+    },
+  ];
 
   const employeeCards: CardConfig[] = [
     {
@@ -109,13 +91,18 @@ export function PayslipHistorySummaryCards({ stats, mode }: PayslipHistorySummar
   const cards = mode === "hr" ? hrCards : employeeCards;
 
   return (
-    <div className="grid grid-cols-2 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div
+      className={cn(
+        "grid items-stretch gap-3 sm:grid-cols-2",
+        mode === "hr" ? "grid-cols-3 lg:grid-cols-3" : "grid-cols-2 lg:grid-cols-4",
+      )}
+    >
       {cards.map((card) => {
         const Icon = card.icon;
         return (
           <div
             key={card.key}
-            className="flex min-h-[4.75rem] min-w-0 rounded-xl border bg-card p-3 shadow-sm"
+            className="flex min-h-[4.75rem] min-w-0 rounded-xl border border-input bg-white p-3 dark:bg-input"
           >
             <div className="flex w-full items-start justify-between gap-2">
               <div className="min-w-0 flex-1">

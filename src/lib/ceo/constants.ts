@@ -28,6 +28,7 @@ export const CEO_ROUTES = {
   userProvisioning: "/ceo/user-provisioning",
   profile: "/ceo/profile",
   directory: "/ceo/directory",
+  employees: "/ceo/employees",
   settings: "/ceo/settings",
 } as const;
 

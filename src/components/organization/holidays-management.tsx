@@ -55,6 +55,7 @@ import {
   canEditOrganization,
   canManageHolidays,
 } from "@/lib/organization/constants";
+import { getHrmsYears, HRMS_YEAR_MAX, HRMS_YEAR_MIN } from "@/lib/date/hrms-year";
 import {
   FISCAL_MONTH_OPTIONS,
   HOLIDAY_TYPE_LABELS,
@@ -365,6 +366,7 @@ export function HolidaysManagement({
 
   function goToPreviousMonth() {
     if (calendarMonth === 1) {
+      if (calendarYear <= HRMS_YEAR_MIN) return;
       setCalendarMonth(12);
       updateParams({ month: "12", year: String(calendarYear - 1) });
       return;
@@ -380,6 +382,7 @@ export function HolidaysManagement({
 
   function goToNextMonth() {
     if (calendarMonth === 12) {
+      if (calendarYear >= HRMS_YEAR_MAX) return;
       setCalendarMonth(1);
       updateParams({ month: "1", year: String(calendarYear + 1) });
       return;
@@ -472,11 +475,39 @@ export function HolidaysManagement({
             <h2 className="text-lg font-semibold">
               {format(new Date(calendarYear, calendarMonth - 1, 1), "MMMM yyyy")}
             </h2>
-            <div className="flex gap-2">
-              <Button variant="outline" size="icon-sm" onClick={goToPreviousMonth}>
+            <div className="flex items-center gap-2">
+              <Select
+                value={String(calendarYear)}
+                onValueChange={(value) => {
+                  if (!value) return;
+                  updateParams({ year: value, month: String(calendarMonth) });
+                }}
+              >
+                <SelectTrigger className="h-8 w-[5.5rem] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {getHrmsYears().map((year) => (
+                    <SelectItem key={year} value={String(year)}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                onClick={goToPreviousMonth}
+                disabled={calendarYear <= HRMS_YEAR_MIN && calendarMonth === 1}
+              >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="icon-sm" onClick={goToNextMonth}>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                onClick={goToNextMonth}
+                disabled={calendarYear >= HRMS_YEAR_MAX && calendarMonth === 12}
+              >
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>

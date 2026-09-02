@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { RecruitmentPipelinePanel } from "@/components/recruitment/recruitment-pipeline-panel";
 import { RECRUITMENT_ROUTES } from "@/lib/recruitment/constants";
+import { getHrmsYearSelectItems } from "@/lib/date/hrms-year";
 import { cn } from "@/lib/utils";
 import type { AnalyticsSummary } from "@/types/recruitment";
 
@@ -16,14 +17,8 @@ const MONTH_OPTIONS = Array.from({ length: 12 }, (_, index) => {
   return { value, label };
 });
 
-function buildYearOptions(selectedYear: number) {
-  const currentYear = new Date().getFullYear();
-  const start = Math.min(selectedYear, currentYear) - 3;
-  const end = currentYear;
-  return Array.from({ length: end - start + 1 }, (_, index) => {
-    const year = end - index;
-    return { value: String(year), label: String(year) };
-  });
+function buildYearOptions(_selectedYear: number) {
+  return getHrmsYearSelectItems();
 }
 
 export function HiringAnalyticsPanels({

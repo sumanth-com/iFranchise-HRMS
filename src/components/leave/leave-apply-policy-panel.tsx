@@ -11,7 +11,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  LeavePolicyContactBar,
   LeavePolicySections,
 } from "@/components/leave/leave-policy-content";
 import { DEFAULT_LEAVE_POLICY_DOCUMENT } from "@/lib/leave/leave-policy-defaults";
@@ -83,7 +82,6 @@ export function LeavePolicyInfo({
               sections={document.sections}
               employeeName={employeeName}
             />
-            <LeavePolicyContactBar contact={document.contact} />
           </div>
         </DialogContent>
       </Dialog>
@@ -98,7 +96,6 @@ export function LeaveDurationBreakdownCard({
 }) {
   const rows = [
     { label: "Working days", value: breakdown.workingDays },
-    { label: "Half day", value: breakdown.halfDays * 0.5 },
     { label: "Weekly holidays", value: breakdown.weeklyHolidays },
     { label: "Public holidays", value: breakdown.publicHolidays },
     { label: "Sandwich days", value: breakdown.sandwichDays },

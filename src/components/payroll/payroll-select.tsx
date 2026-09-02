@@ -12,7 +12,7 @@ import type { LookupOption } from "@/types/employee";
 
 import { toEmployeeSelectItems, type SelectItemOption } from "./select-utils";
 
-export const FORM_SELECT_TRIGGER = "h-10 w-full min-w-0 bg-background";
+export const FORM_SELECT_TRIGGER = "h-10 w-full min-w-0 bg-white dark:bg-input";
 export const FORM_SELECT_CONTENT =
   "min-w-[var(--anchor-width)] w-[var(--anchor-width)] max-h-60";
 

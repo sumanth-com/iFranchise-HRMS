@@ -6,6 +6,8 @@ import { CEO_ROUTES } from "@/lib/ceo/constants";
 import {
   getEmployeeReportingManagerId,
   getEmployeeRoleCodes,
+  getHrApproverEmployeeId,
+  listEligibleHrLeaveApproverOptions,
 } from "@/lib/leave/services/leave-queries";
 import { requiresCeoLeaveApproval } from "@/lib/approvals/executive-request-routing";
 import {
@@ -26,9 +28,7 @@ export async function notifyLeaveSubmitted(
     organizationId,
     employeeId,
     title: "Leave request submitted",
-    message: executiveApplicant
-      ? "Your leave request has been submitted and is pending CEO approval."
-      : "Your leave request has been submitted and is pending HR approval, then CEO approval.",
+    message: "Your leave request has been submitted and is pending HR approval.",
     notificationType: "leave_submitted",
     module: "leave",
     priority: "medium",
@@ -105,6 +105,56 @@ export async function notifyLeaveSubmitted(
   }
 }
 
+export async function notifyLeaveHrReviewSubmitted(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  leaveRequestId: string,
+  employeeId: string,
+) {
+  const organizationId = profile.employee.organizationId;
+
+  await notifyEmployee(supabase, {
+    organizationId,
+    employeeId,
+    title: "Leave request sent for HR review",
+    message: "Your leave request has been submitted to the HR team for review.",
+    notificationType: "leave_submitted",
+    module: "leave",
+    priority: "medium",
+    actionUrl: LEAVE_ROUTES.detail(leaveRequestId),
+    sourceEventKey: `leave_hr_review_submitted:${leaveRequestId}:${employeeId}`,
+    templateKey: "leave_submitted",
+    createdBy: profile.userId,
+  });
+
+  const assigned = await getHrApproverEmployeeId(supabase, organizationId, {
+    employeeId,
+    excludeEmployeeIds: [employeeId],
+  });
+  const recipients = new Set<string>();
+  if (assigned) recipients.add(assigned);
+  if (recipients.size === 0) {
+    const hrs = await listEligibleHrLeaveApproverOptions(organizationId, employeeId);
+    for (const hr of hrs.slice(0, 8)) recipients.add(hr.id);
+  }
+
+  for (const hrEmployeeId of recipients) {
+    await notifyEmployee(supabase, {
+      organizationId,
+      employeeId: hrEmployeeId,
+      title: "Leave request pending HR review",
+      message: "An employee leave request needs HR review before it can be decided.",
+      notificationType: "leave_submitted",
+      module: "leave",
+      priority: "high",
+      actionUrl: LEAVE_ROUTES.list,
+      sourceEventKey: `leave_hr_review_hr:${leaveRequestId}:${hrEmployeeId}`,
+      templateKey: "leave_submitted",
+      createdBy: profile.userId,
+    });
+  }
+}
+
 export async function notifyLeaveApproved(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -166,6 +216,42 @@ export async function notifyLeaveInfoRequested(
     actionUrl: LEAVE_ROUTES.detail(leaveRequestId),
     sourceEventKey: `leave_info_requested:${leaveRequestId}:${employeeId}`,
     templateKey: "leave_info_requested",
+    createdBy: profile.userId,
+  });
+}
+
+export async function notifyLeaveHrReviewDecided(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  leaveRequestId: string,
+  employeeId: string,
+  decision: "lop" | "special" | "reject",
+  remarks: string,
+) {
+  const title =
+    decision === "reject"
+      ? "Leave request rejected"
+      : decision === "lop"
+        ? "Leave approved as Loss of Pay"
+        : "Leave approved as Special Leave";
+  const message =
+    decision === "reject"
+      ? `Your leave request has been rejected.${remarks ? ` HR remarks: ${remarks}` : ""}`
+      : decision === "lop"
+        ? `Your leave request has been approved as Loss of Pay (LOP).${remarks ? ` HR remarks: ${remarks}` : ""}`
+        : `Your leave request has been approved as Special Leave.${remarks ? ` HR remarks: ${remarks}` : ""}`;
+
+  await notifyEmployee(supabase, {
+    organizationId: profile.employee.organizationId,
+    employeeId,
+    title,
+    message,
+    notificationType: decision === "reject" ? "leave_rejected" : "leave_approved",
+    module: "leave",
+    priority: decision === "reject" ? "high" : "medium",
+    actionUrl: LEAVE_ROUTES.detail(leaveRequestId),
+    sourceEventKey: `leave_hr_review_decided:${leaveRequestId}:${employeeId}:${decision}`,
+    templateKey: decision === "reject" ? "leave_rejected" : "leave_approved",
     createdBy: profile.userId,
   });
 }

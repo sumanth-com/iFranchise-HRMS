@@ -3,6 +3,14 @@ import { addDays, addMonths, differenceInCalendarDays, format, parseISO } from "
 import type { LeaveDurationBreakdown } from "@/lib/leave/services/leave-calendar-engine";
 import { isOptionalHolidayCode } from "@/lib/leave/optional-holiday";
 import { roundLeaveDays } from "@/lib/leave/services/leave-usage";
+import type { LeaveEligibilityBand } from "@/lib/leave/leave-eligibility";
+import {
+  LEAVE_BALANCE_EXHAUSTED_MESSAGE,
+  LEAVE_OVER_THREE_DAYS_MESSAGE,
+  LEAVE_TYPE_NOT_ELIGIBLE_MESSAGE,
+  SELF_SERVICE_MAX_LEAVE_DAYS,
+  isLeaveTypeAllowedForBand,
+} from "@/lib/leave/leave-eligibility";
 
 export const PERIOD_LEAVE_CODE = "PL";
 export const CASUAL_LEAVE_CODE = "CL";
@@ -32,6 +40,9 @@ export type LeaveEmployeePolicyState = {
   employmentStatus: string;
   gender: string | null;
   usedAndPendingByType: Record<string, number>;
+  employmentTypeCode?: string | null;
+  isFullTime?: boolean;
+  leaveEligibilityBand?: LeaveEligibilityBand;
 };
 
 export type LeavePolicyNoticeHours = {
@@ -139,6 +150,9 @@ export function validateLeavePolicy(input: {
   maxConsecutiveDays?: number;
   overlapping: boolean;
   skipNotice?: boolean;
+  /** When true, block 0-balance paid leave and requests over 3 days (self-service). */
+  enforceSelfServiceLimits?: boolean;
+  selfServiceMaxDays?: number;
 }): LeavePolicyIssue[] {
   const issues: LeavePolicyIssue[] = [];
   const now = input.asOf ?? new Date();
@@ -150,6 +164,9 @@ export function validateLeavePolicy(input: {
   const isCl = code === CASUAL_LEAVE_CODE;
   const isFemale = String(input.employee.gender ?? "").toLowerCase() === "female";
   const blockedStatus = ["terminated", "resigned", "draft", "suspended"];
+  const eligibilityBand =
+    input.employee.leaveEligibilityBand ??
+    (input.employee.employmentStatus === "probation" ? "cl_only" : "full_time_confirmed");
 
   if (blockedStatus.includes(input.employee.employmentStatus)) {
     issues.push({
@@ -167,6 +184,25 @@ export function validateLeavePolicy(input: {
       code: "duration",
       message: "This date range has no countable leave days. Choose working days or a valid half day.",
     });
+  }
+
+  if (!isLeaveTypeAllowedForBand(code, eligibilityBand)) {
+    issues.push({
+      code: "eligibility",
+      message: LEAVE_TYPE_NOT_ELIGIBLE_MESSAGE,
+    });
+  }
+
+  if (input.enforceSelfServiceLimits) {
+    const maxDays = input.selfServiceMaxDays ?? SELF_SERVICE_MAX_LEAVE_DAYS;
+    const consecutiveDays =
+      differenceInCalendarDays(parseISO(input.endDate), parseISO(input.startDate)) + 1;
+    if (input.duration.totalLeaveDays > maxDays || consecutiveDays > maxDays) {
+      issues.push({
+        code: "hr_review_over_limit",
+        message: LEAVE_OVER_THREE_DAYS_MESSAGE,
+      });
+    }
   }
 
   if (input.overlapping) {
@@ -221,11 +257,14 @@ export function validateLeavePolicy(input: {
         });
       }
     } else if (isOptionalHolidayCode(code)) {
-      /* Optional Holiday is allowed after the first probation month. */
+      issues.push({
+        code: "eligibility",
+        message: LEAVE_TYPE_NOT_ELIGIBLE_MESSAGE,
+      });
     } else if (code !== LOSS_OF_PAY_CODE) {
       issues.push({
         code: "probation_type",
-        message: "During probation you can apply Casual Leave or Menstruation Leave only.",
+        message: "During probation you can apply Casual Leave only.",
       });
     }
   } else if (isPl && probationRules.periodLeaveFemaleOnly && !isFemale) {
@@ -268,7 +307,17 @@ export function validateLeavePolicy(input: {
   }
 
   if (input.isPaid && input.availableBalance != null && !isOptionalHolidayCode(code)) {
-    if (input.duration.totalLeaveDays > input.availableBalance + 1e-9) {
+    if (
+      input.enforceSelfServiceLimits &&
+      input.availableBalance <= 1e-9 &&
+      input.duration.totalLeaveDays > 0 &&
+      (isCl || code === "EL")
+    ) {
+      issues.push({
+        code: "balance_exhausted",
+        message: LEAVE_BALANCE_EXHAUSTED_MESSAGE,
+      });
+    } else if (input.duration.totalLeaveDays > input.availableBalance + 1e-9) {
       issues.push({
         code: "balance",
         message:
@@ -285,7 +334,11 @@ export function validateLeavePolicy(input: {
  * submitted and the days beyond the paid balance are recorded as LOP. Every other
  * issue (probation caps, notice period, overlap, gender rules) remains blocking.
  */
-const NON_BLOCKING_LEAVE_ISSUE_CODES = new Set<string>(["balance"]);
+const NON_BLOCKING_LEAVE_ISSUE_CODES = new Set<string>([
+  "balance",
+  "balance_exhausted",
+  "hr_review_over_limit",
+]);
 
 export function isBlockingLeaveIssue(issue: LeavePolicyIssue) {
   return !NON_BLOCKING_LEAVE_ISSUE_CODES.has(issue.code);

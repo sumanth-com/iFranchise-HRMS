@@ -9,7 +9,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import {
-  LeavePolicyContactBar,
   LeavePolicyPageHeader,
   LeavePolicySections,
 } from "@/components/leave/leave-policy-content";
@@ -139,10 +138,6 @@ export function AttendancePolicyEditor({
         intro={formState.isDirty ? watched.intro : previewDocument.intro}
         sections={formState.isDirty ? watched.sections : previewDocument.sections}
         employeeName={employeeName}
-      />
-
-      <LeavePolicyContactBar
-        contact={formState.isDirty ? watched.contact : previewDocument.contact}
       />
     </form>
   );

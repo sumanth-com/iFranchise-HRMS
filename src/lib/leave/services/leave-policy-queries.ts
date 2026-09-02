@@ -2,6 +2,7 @@ import { format, parseISO } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { DEFAULT_LEAVE_POLICY_DOCUMENT } from "@/lib/leave/leave-policy-defaults";
+import { hidePeriodLeaveFromPolicyDocument } from "@/lib/leave/leave-policy-employee-display";
 import { listHolidays } from "@/lib/organization/services/org-queries";
 import type {
   LeavePolicyDocument,
@@ -70,8 +71,10 @@ export async function getLeavePolicyPageData(
     throw new Error(settingsResult.error.message);
   }
 
-  const document = parseLeavePolicyDocument(
-    (settingsResult.data?.settings as Record<string, unknown> | null) ?? null,
+  const document = hidePeriodLeaveFromPolicyDocument(
+    parseLeavePolicyDocument(
+      (settingsResult.data?.settings as Record<string, unknown> | null) ?? null,
+    ),
   );
 
   const mandatoryHolidays = holidaysResult.data

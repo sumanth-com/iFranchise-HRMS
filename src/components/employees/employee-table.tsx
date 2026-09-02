@@ -140,7 +140,7 @@ export function EmployeeTable({
     return () => window.clearTimeout(timer);
   }, [searchInput, filters.search, updateParams]);
 
-  const { employees, total, page, pageSize } = tableState;
+  const { employees, pageSize } = tableState;
   const { department } = filters;
 
   const departmentItems = useMemo(
@@ -185,12 +185,12 @@ export function EmployeeTable({
 
   return (
     <div className="space-y-4">
-      <div className="relative z-10 flex flex-col gap-3 rounded-xl border border-border/70 bg-muted/55 p-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="relative z-10 flex flex-col gap-3 rounded-xl border border-border/70 bg-muted/55 p-3 lg:flex-row lg:items-center">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2.5">
           <Input
             placeholder="Search by name, email, or code..."
             value={searchInput}
-            className="h-10 border-border/80 bg-background font-semibold sm:max-w-xs"
+            className="h-10 min-w-[14rem] flex-1 border-border/80 bg-white font-semibold sm:max-w-sm dark:bg-input"
             onChange={(event) => setSearchInput(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") {
@@ -214,7 +214,7 @@ export function EmployeeTable({
               })
             }
           >
-            <SelectTrigger className="h-10 w-full min-w-0 border-border/80 bg-background font-semibold sm:w-44">
+            <SelectTrigger className="h-10 w-[13.5rem] shrink-0 border-border/80 bg-white font-semibold dark:bg-input">
               <SelectValue placeholder="All departments" />
             </SelectTrigger>
             <SelectContent align="start" alignItemWithTrigger={false}>
@@ -228,6 +228,14 @@ export function EmployeeTable({
               ))}
             </SelectContent>
           </Select>
+          <PeoplePageSizeSelect
+            value={pageSize}
+            disabled={isPending}
+            className="w-[9rem] shrink-0"
+            onChange={(nextSize) =>
+              updateParams({ pageSize: String(nextSize), page: "1" })
+            }
+          />
         </div>
       </div>
 
@@ -238,20 +246,6 @@ export function EmployeeTable({
           canDelete={canDelete}
           onDelete={setDeleteTarget}
           routesBasePath={routesBasePath}
-        />
-      </div>
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm font-medium text-foreground/80">
-          Showing {employees.length === 0 ? 0 : (page - 1) * pageSize + 1}–
-          {Math.min(page * pageSize, total)} of {total}
-        </p>
-        <PeoplePageSizeSelect
-          value={pageSize}
-          disabled={isPending}
-          onChange={(nextSize) =>
-            updateParams({ pageSize: String(nextSize), page: "1" })
-          }
         />
       </div>
 

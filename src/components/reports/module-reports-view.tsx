@@ -427,10 +427,7 @@ export function ModuleReportsView({
     [],
   );
   const monthItems = useMemo(() => getMonthSelectItems(), []);
-  const yearItems = useMemo(() => {
-    const current = new Date().getFullYear();
-    return getYearSelectItems([current - 1, current, current + 1]);
-  }, []);
+  const yearItems = useMemo(() => getYearSelectItems(), []);
 
   function currentFilters() {
     const selectedMonth = month ? Number(month) : undefined;

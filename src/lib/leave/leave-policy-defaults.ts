@@ -6,25 +6,12 @@ export const DEFAULT_LEAVE_POLICY_DOCUMENT: LeavePolicyDocument = {
     "This communication outlines the policies and criteria applicable during your probation period, which covers the first three (3) months of employment. Please review the details carefully to ensure full understanding and compliance.",
   sections: [
     {
-      id: "probation-entitlement",
-      title: "Probation Menstruation Leave Entitlement",
-      content: `First Month of Probation: No leave is permitted during the first month of the probation period.
-
-Second and Third Month of Probation: A total of two (2) Casual Leaves (CL) may be availed during the remaining two months of the probation period.
-
-Additional Leave for Female Employees: Female employees are entitled to one (1) additional Menstruation Leave (PL) during the probation period.`,
-    },
-    {
       id: "communication-guidelines",
       title: "Leave Communication and Approval Guidelines",
       content: `Casual Leave (CL) and Other Leaves
 - Leave requests must be formally communicated via email at least 24 hours in advance.
 - The email must clearly mention the reason for the leave and the date(s) for which leave is requested.
 - All leave requests are subject to approval by the reporting manager and the HR department.
-
-Menstruation Leave (PL)
-- Female employees availing Menstruation Leave must inform the HR department via email on the same day, at any time before the end of the working day.
-- Prior-day intimation is not mandatory for Menstruation Leave; however, same-day communication is compulsory.
 
 Pre-Planned or Prior Commitments
 - Any previously planned or anticipated leave must be communicated to HR and the reporting manager well in advance, preferably at the time of joining or as soon as the information becomes available.

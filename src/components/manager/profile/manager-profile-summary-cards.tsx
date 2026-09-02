@@ -1,4 +1,5 @@
-import { formatHoursLabel } from "@/lib/employee/attendance-format";
+import { formatWorkingDuration } from "@/lib/employee/attendance-format";
+import { useOptionalSelfAttendanceLive } from "@/components/attendance/self-attendance-live-context";
 import type { ManagerAttendanceMonthSummary } from "@/types/manager-self-attendance";
 import { cn } from "@/lib/utils";
 
@@ -39,7 +40,7 @@ const CARDS: {
     label: "Avg Hours",
     hint: "Average working time",
     sidebarHint: "Avg work time",
-    format: (value) => formatHoursLabel(Number(value ?? 0)),
+    format: (value) => formatWorkingDuration(Math.round(Number(value ?? 0) * 3600)),
   },
 ];
 
@@ -49,6 +50,7 @@ export function ManagerProfileSummaryCards({
   layout = "grid",
 }: Props) {
   const isSidebar = layout === "sidebar";
+  const live = useOptionalSelfAttendanceLive();
 
   return (
     <section
@@ -61,7 +63,12 @@ export function ManagerProfileSummaryCards({
     >
       {CARDS.map((card) => {
         const raw = summary[card.key];
-        const display = card.format ? card.format(raw) : String(raw ?? 0);
+        const display =
+          card.key === "averageWorkingHours" && live
+            ? formatWorkingDuration(live.averageWorkingSeconds)
+            : card.format
+              ? card.format(raw)
+              : String(raw ?? 0);
 
         return (
           <div

@@ -9,6 +9,7 @@ import {
   Eye,
   Info,
   Loader2,
+  Pencil,
   Play,
   Search,
 } from "lucide-react";
@@ -26,6 +27,7 @@ import {
   type PayrollEmployeeBreakdownData,
 } from "@/components/payroll/payroll-employee-breakdown-dialog";
 import { PayrollStatusBadge } from "@/components/payroll/payroll-status-badge";
+import { PayrollEditDialog } from "@/components/payroll/payroll-run-item-dialogs";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { getMonthSelectItems, getYearSelectItems } from "@/components/payroll/select-utils";
 import {
@@ -39,13 +41,24 @@ import {
   formatPayrollMonth,
   roundCurrency,
 } from "@/lib/payroll/services/payroll-utils";
-import type { PayrollBreakdown, PayrollDetail, PayrollPreviewResult } from "@/types/payroll";
+import type {
+  HrPayrollAdjustments,
+  PayrollBreakdown,
+  PayrollDetail,
+  PayrollItemLifecycleStatus,
+  PayrollPreviewResult,
+} from "@/types/payroll";
 
 type EmployeeTableRow = {
   id: string;
+  payrollItemId?: string;
   name: string;
   code: string;
   department: string | null;
+  designationTitle?: string | null;
+  employmentTypeName?: string | null;
+  workingDays: number;
+  paidDays: number;
   gross: number;
   deductions: number;
   net: number;
@@ -55,6 +68,9 @@ type EmployeeTableRow = {
   basicSalary: number;
   totalAllowances: number;
   hasSalaryStructure?: boolean;
+  itemStatus?: PayrollItemLifecycleStatus;
+  payslipSent?: boolean;
+  adjustments?: HrPayrollAdjustments;
 };
 
 const monthItems = getMonthSelectItems();
@@ -140,6 +156,8 @@ function tableRowToBreakdown(
     employeeCode: row.code,
     employeeName: row.name,
     departmentName: row.department,
+    designationTitle: row.designationTitle,
+    employmentTypeName: row.employmentTypeName,
     basicSalary: row.basicSalary,
     totalAllowances: row.totalAllowances,
     totalDeductions: row.deductions,
@@ -166,8 +184,11 @@ export function PayrollRunForm({
   const [breakdownEmployee, setBreakdownEmployee] =
     useState<PayrollEmployeeBreakdownData | null>(null);
   const [breakdownOpen, setBreakdownOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<EmployeeTableRow | null>(null);
   const [employeeSearch, setEmployeeSearch] = useState("");
-  const [isPending, startTransition] = useTransition();
+  const [isPeriodPending, startPeriodTransition] = useTransition();
+  const [isRunPending, startRunTransition] = useTransition();
+  const isPending = isPeriodPending || isRunPending;
 
   const autoLoadStarted = useRef(false);
 
@@ -269,19 +290,6 @@ export function PayrollRunForm({
         return;
       }
 
-      if (data.totalGross === 0 && data.totalNet === 0) {
-        const missingStructures = data.items.filter((item) => !item.hasSalaryStructure).length;
-        setPanel({
-          kind: "info",
-          title: `No payable amounts for ${periodLabel}`,
-          text:
-            missingStructures === data.employeeCount
-              ? "Configure salary structures for employees, then run payroll again."
-              : "Review attendance, leave, bonuses, and reimbursements, then try again.",
-        });
-        return;
-      }
-
       setPanel({ kind: "preview", data });
     } catch (error) {
       setPanel({
@@ -295,7 +303,7 @@ export function PayrollRunForm({
   useEffect(() => {
     if (!autoLoad || !canRun || autoLoadStarted.current) return;
     autoLoadStarted.current = true;
-    startTransition(() => {
+    startPeriodTransition(() => {
       void loadPeriodSnapshot();
     });
     // Load the due period once when arriving from HR Overview.
@@ -304,7 +312,7 @@ export function PayrollRunForm({
 
   function handleRunPayroll() {
     if (panel.kind === "preview") {
-      startTransition(async () => {
+      startRunTransition(async () => {
         try {
           const result = await generatePayrollRunAction(runInput());
           if (!result.success) {
@@ -329,7 +337,7 @@ export function PayrollRunForm({
       return;
     }
 
-    startTransition(async () => {
+    startRunTransition(async () => {
       if (!hasPeriod) {
         setPanel({
           kind: "info",
@@ -383,19 +391,6 @@ export function PayrollRunForm({
           return;
         }
 
-        if (data.totalGross === 0 && data.totalNet === 0) {
-          const missingStructures = data.items.filter((item) => !item.hasSalaryStructure).length;
-          setPanel({
-            kind: "info",
-            title: `No payable amounts for ${periodLabel}`,
-            text:
-              missingStructures === data.employeeCount
-                ? "Configure salary structures for employees, then run payroll again."
-                : "Review attendance, leave, bonuses, and reimbursements, then try again.",
-          });
-          return;
-        }
-
         const result = await generatePayrollRunAction(runInput());
         if (!result.success) {
           setPanel({
@@ -430,6 +425,10 @@ export function PayrollRunForm({
       name: item.employeeName,
       code: item.employeeCode,
       department: item.departmentName,
+      designationTitle: item.designationTitle,
+      employmentTypeName: item.employmentTypeName,
+      workingDays: item.breakdown.attendance.workingDays,
+      paidDays: item.breakdown.attendance.paidDays ?? item.breakdown.attendance.presentDays,
       gross: item.grossSalary,
       deductions: item.totalDeductions,
       net: item.netSalary,
@@ -438,17 +437,23 @@ export function PayrollRunForm({
       basicSalary: item.basicSalary,
       totalAllowances: item.totalAllowances,
       hasSalaryStructure: item.hasSalaryStructure,
-      note: item.hasSalaryStructure ? undefined : "No salary structure",
+      itemStatus: "draft",
+      note: item.hasSalaryStructure ? undefined : "No salary structure configured",
     };
   }
 
   function mapRunItemToRow(item: PayrollDetail["items"][number]): EmployeeTableRow {
-    const missingPay = item.grossSalary === 0 && item.netSalary === 0;
+    const missingStructure = item.hasSalaryStructure === false;
     return {
       id: item.employeeId,
+      payrollItemId: item.id,
       name: item.employeeName,
       code: item.employeeCode,
       department: item.departmentName,
+      designationTitle: item.designationTitle,
+      employmentTypeName: item.employmentTypeName,
+      workingDays: item.breakdown.attendance.workingDays,
+      paidDays: item.breakdown.attendance.paidDays ?? item.breakdown.attendance.presentDays,
       gross: item.grossSalary,
       deductions: item.totalDeductions,
       net: item.netSalary,
@@ -456,8 +461,11 @@ export function PayrollRunForm({
       breakdown: item.breakdown,
       basicSalary: item.basicSalary,
       totalAllowances: item.totalAllowances,
-      hasSalaryStructure: !missingPay,
-      note: missingPay ? "No salary structure" : undefined,
+      hasSalaryStructure: !missingStructure,
+      itemStatus: item.itemStatus ?? "draft",
+      payslipSent: item.payslipSent,
+      adjustments: item.breakdown.hrAdjustments,
+      note: missingStructure ? "No salary structure configured" : undefined,
     };
   }
 
@@ -495,16 +503,15 @@ export function PayrollRunForm({
             onChange={(event) => setEmployeeSearch(event.target.value)}
             placeholder="Search employee..."
             className="h-9 pl-9"
-            disabled={isPending}
             aria-label="Search employee"
           />
         </div>
         <Button
           onClick={handleRunPayroll}
-          disabled={isPending || !canRun}
+          disabled={isRunPending || !canRun}
           className={`${filterControlClass} shrink-0 gap-1.5 sm:ml-auto`}
         >
-          <Play className="size-4" />
+          {isRunPending ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
           Run payroll
         </Button>
       </div>
@@ -577,6 +584,7 @@ export function PayrollRunForm({
             rows={panel.data.items.map(mapPreviewItemToRow)}
             employeeSearch={employeeSearch}
             onView={openBreakdown}
+            canMutate={false}
           />
         </div>
       ) : null}
@@ -614,6 +622,8 @@ export function PayrollRunForm({
             rows={panel.data.items.map(mapRunItemToRow)}
             employeeSearch={employeeSearch}
             onView={openBreakdown}
+            canMutate={canRun && !panel.data.isLocked}
+            onEdit={setEditTarget}
           />
         </div>
       ) : null}
@@ -622,6 +632,33 @@ export function PayrollRunForm({
         employee={breakdownEmployee}
         open={breakdownOpen}
         onOpenChange={setBreakdownOpen}
+      />
+      <PayrollEditDialog
+        key={editTarget?.payrollItemId ?? "edit"}
+        target={
+          editTarget?.payrollItemId
+            ? {
+                payrollItemId: editTarget.payrollItemId,
+                employeeName: editTarget.name,
+                employeeCode: editTarget.code,
+                netPay: editTarget.net,
+                periodLabel,
+                payslipSent: editTarget.payslipSent,
+                adjustments: editTarget.adjustments,
+                systemGross: editTarget.gross,
+                systemLop: editTarget.lopDays,
+                systemPf:
+                  editTarget.breakdown.deductions.find((line) => line.code === "pf")?.amount ?? 0,
+              }
+            : null
+        }
+        open={Boolean(editTarget)}
+        onOpenChange={(open) => {
+          if (!open) setEditTarget(null);
+        }}
+        onSaved={() => {
+          if (panel.kind === "run") void fetchRunDetail(panel.data.id, panel.mode);
+        }}
       />
     </div>
   );
@@ -669,13 +706,13 @@ function PayrollTotals({
 }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <div className="rounded-lg border bg-muted/30 px-3 py-2">
+      <div className="rounded-lg border border-input bg-white px-3 py-2 dark:bg-input">
         <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           Employees
         </p>
         <p className="mt-0.5 text-sm font-semibold tabular-nums">{employeeCount}</p>
       </div>
-      <div className="rounded-lg border bg-muted/30 px-3 py-2">
+      <div className="rounded-lg border border-input bg-white px-3 py-2 dark:bg-input">
         <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           Gross
         </p>
@@ -683,7 +720,7 @@ function PayrollTotals({
           {formatCurrency(totalGross)}
         </p>
       </div>
-      <div className="rounded-lg border bg-muted/30 px-3 py-2">
+      <div className="rounded-lg border border-input bg-white px-3 py-2 dark:bg-input">
         <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           Deductions
         </p>
@@ -691,7 +728,7 @@ function PayrollTotals({
           {formatCurrency(totalDeductions)}
         </p>
       </div>
-      <div className="rounded-lg border bg-muted/30 px-3 py-2">
+      <div className="rounded-lg border border-input bg-white px-3 py-2 dark:bg-input">
         <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           Net
         </p>
@@ -707,10 +744,14 @@ function EmployeePayrollTable({
   rows,
   employeeSearch = "",
   onView,
+  canMutate = false,
+  onEdit,
 }: {
   rows: EmployeeTableRow[];
   employeeSearch?: string;
   onView: (row: EmployeeTableRow) => void;
+  canMutate?: boolean;
+  onEdit?: (row: EmployeeTableRow) => void;
 }) {
   const filteredRows = useMemo(() => {
     const term = employeeSearch.trim().toLowerCase();
@@ -723,7 +764,7 @@ function EmployeePayrollTable({
 
   if (filteredRows.length === 0) {
     return (
-      <div className="rounded-lg border px-4 py-10 text-center text-sm text-muted-foreground">
+      <div className="rounded-lg border border-input bg-white px-4 py-10 text-center text-sm text-muted-foreground dark:bg-input">
         {rows.length === 0
           ? "No employees in this payroll run."
           : "No employees match your filter."}
@@ -732,45 +773,67 @@ function EmployeePayrollTable({
   }
 
   return (
-    <div className="overflow-auto max-h-[min(32rem,calc(100dvh-18rem))] rounded-lg border">
-      <table className="w-full text-sm">
+    <div className="max-h-[min(32rem,calc(100dvh-18rem))] overflow-auto rounded-lg border border-input bg-white dark:bg-input">
+      <table className="w-full bg-white text-sm dark:bg-input">
         <thead className="sticky top-0 z-30 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 text-left text-white shadow-[0_1px_0_rgba(255,255,255,0.12)]">
           <tr>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Employee</th>
+            <th className="h-11 min-w-[16rem] whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Employee</th>
             <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Department</th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Working days</th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Present / Paid</th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">LOP days</th>
             <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Gross</th>
             <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Deductions</th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Net</th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">LOP</th>
-            <th className={cn(TABLE_HEADER_CELL_CLASS, "text-right")}>View</th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Net pay</th>
+            <th className={cn(TABLE_HEADER_CELL_CLASS, "text-right")}>Actions</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="bg-white dark:bg-input">
           {filteredRows.map((row) => (
-            <tr key={row.id} className="border-b last:border-b-0 hover:bg-muted/30">
-              <td className="px-3 py-2.5">
-                <div className="font-medium">{row.name}</div>
-                <div className="text-xs text-muted-foreground">
+            <tr
+              key={row.payrollItemId ?? row.id}
+              className="border-b border-input/70 bg-white last:border-b-0 hover:bg-zinc-50 dark:bg-input dark:hover:bg-input/80"
+            >
+              <td className="min-w-[16rem] max-w-[22rem] px-3 py-2.5">
+                <div className="truncate whitespace-nowrap font-medium" title={row.name}>
+                  {row.name}
+                </div>
+                <div className="truncate whitespace-nowrap text-xs text-muted-foreground" title={row.code}>
                   {row.code}
-                  {row.note ? ` · ${row.note}` : ""}
                 </div>
               </td>
               <td className="px-3 py-2.5">{row.department ?? "—"}</td>
+              <td className="px-3 py-2.5 tabular-nums">{row.workingDays}</td>
+              <td className="px-3 py-2.5 tabular-nums">{row.paidDays}</td>
+              <td className="px-3 py-2.5 tabular-nums">{row.lopDays}</td>
               <td className="px-3 py-2.5 tabular-nums">{formatCurrency(row.gross)}</td>
               <td className="px-3 py-2.5 tabular-nums">{formatCurrency(row.deductions)}</td>
               <td className="px-3 py-2.5 tabular-nums">{formatCurrency(row.net)}</td>
-              <td className="px-3 py-2.5 tabular-nums">{row.lopDays}</td>
               <td className="px-3 py-2.5 text-right">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 gap-1.5 px-2.5"
-                  onClick={() => onView(row)}
-                >
-                  <Eye className="size-3.5" />
-                  View
-                </Button>
+                <div className="flex justify-end gap-1.5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1.5 px-2.5"
+                    onClick={() => onView(row)}
+                  >
+                    <Eye className="size-3.5" />
+                    View
+                  </Button>
+                  {canMutate && row.payrollItemId ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5 px-2.5"
+                      onClick={() => onEdit?.(row)}
+                    >
+                      <Pencil className="size-3.5" />
+                      Edit
+                    </Button>
+                  ) : null}
+                </div>
               </td>
             </tr>
           ))}

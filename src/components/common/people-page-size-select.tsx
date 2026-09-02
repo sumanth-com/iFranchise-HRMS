@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -30,30 +31,33 @@ export function PeoplePageSizeSelect({
     : String(PEOPLE_PAGE_SIZES[0]);
 
   return (
-    <div className={className}>
-      <Select
-        items={items}
-        value={selected}
-        onValueChange={(next) => {
-          if (!next) return;
-          const size = Number(next);
-          if (!PEOPLE_PAGE_SIZES.includes(size as (typeof PEOPLE_PAGE_SIZES)[number])) return;
-          if (size === value) return;
-          onChange(size);
-        }}
-        disabled={disabled}
+    <Select
+      items={items}
+      value={selected}
+      onValueChange={(next) => {
+        if (!next) return;
+        const size = Number(next);
+        if (!PEOPLE_PAGE_SIZES.includes(size as (typeof PEOPLE_PAGE_SIZES)[number])) return;
+        if (size === value) return;
+        onChange(size);
+      }}
+      disabled={disabled}
+    >
+      <SelectTrigger
+        className={cn(
+          "h-10 w-[9rem] shrink-0 bg-white font-semibold dark:bg-input",
+          className,
+        )}
       >
-        <SelectTrigger className="h-9 min-w-[8.5rem] font-semibold">
-          <SelectValue placeholder="People" />
-        </SelectTrigger>
-        <SelectContent align="end" alignItemWithTrigger={false}>
-          {items.map((item) => (
-            <SelectItem key={item.value} value={item.value}>
-              {item.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+        <SelectValue placeholder="People" />
+      </SelectTrigger>
+      <SelectContent align="end" alignItemWithTrigger={false}>
+        {items.map((item) => (
+          <SelectItem key={item.value} value={item.value}>
+            {item.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

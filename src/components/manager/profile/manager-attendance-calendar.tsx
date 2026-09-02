@@ -27,6 +27,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ATTENDANCE_DISPLAY_STATUS_LABELS } from "@/lib/attendance/constants";
+import { getHrmsYears, HRMS_YEAR_MAX, HRMS_YEAR_MIN } from "@/lib/date/hrms-year";
 import type { AttendanceDisplayStatus } from "@/types/attendance";
 import type { ManagerAttendanceCalendarDay } from "@/types/manager-self-attendance";
 import { cn } from "@/lib/utils";
@@ -40,8 +41,8 @@ const PILL_STYLES: Record<string, string> = {
   absent: "bg-red-500 text-white",
   half_day: "bg-emerald-200 text-emerald-800",
   on_leave: "bg-violet-400 text-white",
-  holiday: "bg-muted-foreground/20 text-muted-foreground dark:bg-white/15 dark:text-slate-200",
-  week_off: "",
+  holiday: "bg-muted/80 text-muted-foreground dark:bg-white/[0.06] dark:text-slate-200",
+  week_off: "bg-muted/80 text-muted-foreground dark:bg-white/[0.06] dark:text-slate-200",
   on_request: "bg-amber-400 text-white",
 };
 
@@ -63,8 +64,7 @@ const LEGEND = [
   { key: "absent", label: "Absent", className: "bg-red-500" },
   { key: "half_day", label: "Half Day", className: "bg-emerald-200" },
   { key: "on_leave", label: "Leave", className: "bg-violet-400" },
-  { key: "holiday", label: "Holiday", className: "bg-muted-foreground/35 dark:bg-white/30" },
-  { key: "week_off", label: "Weekend off", className: "bg-muted-foreground/25 dark:bg-white/15" },
+  { key: "holiday_weekend", label: "Holiday & Weekend Off", className: "bg-muted/80 dark:bg-white/15" },
 ];
 
 type Props = {
@@ -117,15 +117,7 @@ export function ManagerAttendanceCalendar({
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
 
-  const yearOptions = useMemo(() => {
-    const current = new Date().getFullYear();
-    const maxYear = disableFuture ? current : current + 2;
-    const startYear = current - 2;
-    return Array.from(
-      { length: maxYear - startYear + 1 },
-      (_, index) => startYear + index,
-    );
-  }, [disableFuture]);
+  const yearOptions = useMemo(() => getHrmsYears(), []);
 
   const monthLabel = format(new Date(year, month - 1, 1), "MMMM yyyy");
 
@@ -141,9 +133,11 @@ export function ManagerAttendanceCalendar({
         ? addMonths(new Date(year, month - 1, 1), 1)
         : subMonths(new Date(year, month - 1, 1), 1);
     if (
-      disableFuture &&
-      (next.getFullYear() > currentYear ||
-        (next.getFullYear() === currentYear && next.getMonth() + 1 > currentMonth))
+      next.getFullYear() < HRMS_YEAR_MIN ||
+      next.getFullYear() > HRMS_YEAR_MAX ||
+      (disableFuture &&
+        (next.getFullYear() > currentYear ||
+          (next.getFullYear() === currentYear && next.getMonth() + 1 > currentMonth)))
     ) {
       return;
     }
@@ -151,9 +145,10 @@ export function ManagerAttendanceCalendar({
   }
 
   const canGoForward =
-    !disableFuture ||
-    year < currentYear ||
-    (year === currentYear && month < currentMonth);
+    year < HRMS_YEAR_MAX &&
+    (!disableFuture ||
+      year < currentYear ||
+      (year === currentYear && month < currentMonth));
 
   const dayMap = useMemo(() => {
     const map = new Map<string, ManagerAttendanceCalendarDay>();
@@ -308,9 +303,13 @@ export function ManagerAttendanceCalendar({
           {gridDays.map((day) => {
             const live = dayMap.get(day.date) ?? day;
             const isSelected = selectedDate === live.date;
-            const isSunday = getDay(parseISO(live.date)) === 0;
+            const isHolidayOrWeekend =
+              live.status === "holiday" || live.status === "week_off";
             const pillClass =
-              !live.isToday && live.inMonth && live.status
+              !live.isToday &&
+              live.inMonth &&
+              live.status &&
+              !isHolidayOrWeekend
                 ? PILL_STYLES[live.status]
                 : null;
             const tooltip = live.inMonth ? getCalendarDayTooltip(live) : null;
@@ -327,7 +326,7 @@ export function ManagerAttendanceCalendar({
                     "attendance-day-today bg-emerald-500 text-white shadow-sm ring-2 ring-emerald-700 ring-offset-2 ring-offset-background dark:ring-offset-[#060914]",
                   !live.isToday &&
                     live.inMonth &&
-                    isSunday &&
+                    isHolidayOrWeekend &&
                     "bg-muted/80 text-muted-foreground dark:bg-white/[0.06] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]",
                   isSelected &&
                     !live.isToday &&

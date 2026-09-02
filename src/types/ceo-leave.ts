@@ -131,6 +131,7 @@ export type CeoLeaveDetail = {
   canAct: boolean;
   /** HR / Manager leave goes straight to CEO (no manager/HR stage). */
   hrDirectToCeo: boolean;
+  durationBreakdown?: unknown;
   requestCategory: "hr" | "manager" | null;
   requestCategoryLabel: string | null;
 };

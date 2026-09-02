@@ -29,7 +29,9 @@ export const leaveListParamsSchema = z.object({
   sortOrder: z.enum(["asc", "desc"]).default("desc"),
   month: z.coerce.number().int().min(1).max(12).optional(),
   year: z.coerce.number().int().min(2000).max(2100).optional(),
-  leaveStatus: leaveStatusSchema.optional(),
+  leaveStatus: z
+    .union([leaveStatusSchema, z.literal("pending_hr_review")])
+    .optional(),
   leaveTypeId: z.string().uuid().optional(),
   departmentId: z.string().uuid().optional(),
   branchId: z.string().uuid().optional(),
@@ -57,6 +59,7 @@ export const leaveListParamsSchema = z.object({
   summaryFilter: z
     .enum([
       "pendingRequests",
+      "pendingHrReview",
       "approvedThisMonth",
       "rejectedThisMonth",
       "employeesOnLeaveToday",
@@ -120,6 +123,13 @@ export const leaveRejectSchema = leaveApprovalSchema.extend({
   comments: z.string().min(3, "Rejection reason is required").max(500),
 });
 
+export const hrLeaveReviewDecisionSchema = z.object({
+  leaveRequestId: z.string().uuid(),
+  decision: z.enum(["lop", "special", "reject"]),
+  remarks: z.string().max(500).optional(),
+});
+
 export type LeaveFormInput = z.infer<typeof leaveFormSchema>;
 export type LeaveApprovalInput = z.infer<typeof leaveApprovalSchema>;
 export type LeaveRejectInput = z.infer<typeof leaveRejectSchema>;
+export type HrLeaveReviewDecisionInput = z.infer<typeof hrLeaveReviewDecisionSchema>;

@@ -7,7 +7,7 @@ import { PageScroll } from "@/components/common/sticky-layout";
 import { createClient } from "@/lib/supabase/server";
 import { requireServerPermission } from "@/lib/permissions/server";
 import {
-  getDepartments,
+  getOccupiedDepartments,
   listEmployees,
 } from "@/lib/employees/services/employee-queries";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
@@ -49,7 +49,7 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
     });
 
     const [departments, result] = await Promise.all([
-      getDepartments(supabase, profile.employee.organizationId),
+      getOccupiedDepartments(supabase, profile.employee.organizationId),
       listEmployees(supabase, profile, params),
     ]);
 
@@ -83,7 +83,7 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
     );
   }
 
-  const departments = await getDepartments(
+  const departments = await getOccupiedDepartments(
     supabase,
     profile.employee.organizationId,
   );

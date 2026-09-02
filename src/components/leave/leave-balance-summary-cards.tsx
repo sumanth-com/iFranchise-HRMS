@@ -40,7 +40,7 @@ export function LeaveBalanceSummaryCards({
   );
   const selectable = typeof onSelectCode === "function";
 
-  const cards = LEAVE_BALANCE_CARD_CODES.map((code) => {
+  const cards = LEAVE_BALANCE_CARD_CODES.filter((code) => byCode.has(code)).map((code) => {
     const row = byCode.get(code);
     const available = row ? Math.max(0, getLeaveBalanceAvailableDays(row)) : 0;
     return {
@@ -55,12 +55,21 @@ export function LeaveBalanceSummaryCards({
   });
 
   return (
-    <div className={className}>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+    <div className={cn("w-full", className)}>
+      <div
+        className={cn(
+          "grid w-full items-stretch gap-4",
+          cards.length >= 3
+            ? "grid-cols-3"
+            : cards.length === 2
+              ? "grid-cols-2"
+              : "grid-cols-1",
+        )}
+      >
         {cards.map((card) => {
           const isActive = selectedCode?.toUpperCase() === card.key;
           const cardClassName = cn(
-            "relative z-10 flex h-full min-h-[6.75rem] w-full min-w-0 flex-col rounded-xl border bg-card p-3.5 text-left shadow-sm pointer-events-auto",
+            "relative z-10 flex h-full min-h-[8.25rem] w-full min-w-0 max-w-none flex-col justify-between gap-3 overflow-hidden rounded-2xl border bg-card px-5 py-5 text-left shadow-sm pointer-events-auto",
             selectable &&
               "cursor-pointer transition-[border-color,box-shadow,background-color] duration-150 hover:border-primary/50 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 dark:hover:border-indigo-300/50 dark:hover:bg-white/5",
             isActive &&
@@ -82,7 +91,7 @@ export function LeaveBalanceSummaryCards({
                   <CalendarDays className={cn("size-4", card.tone.accent)} />
                 </span>
               </div>
-              <div className="mt-3 min-h-0">
+              <div className="min-w-0">
                 <p
                   className={cn(
                     "truncate text-xl font-semibold leading-7 tracking-tight tabular-nums",
@@ -91,7 +100,7 @@ export function LeaveBalanceSummaryCards({
                 >
                   {card.value}
                 </p>
-                <p className="mt-1 truncate text-[11px] leading-4 text-foreground/80 dark:text-white/90">
+                <p className="mt-1.5 truncate text-[11px] leading-4 text-foreground/80 dark:text-white/90">
                   {card.key === "OH"
                     ? "Available this year"
                     : LEAVE_BALANCE_AVAILABLE_CAPTION}

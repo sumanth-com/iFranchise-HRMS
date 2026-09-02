@@ -280,15 +280,12 @@ export function MyProfileView({
               profileImagePath={data.profileImagePath}
               imageUrl={data.profileImageUrl}
               profilePath={data.profilePath}
-              canEdit={true}
+              canEdit={false}
               hideHeaderLabel
               className="w-full max-w-full"
             />
             <p className="mt-3 w-full text-center text-[0.8rem] leading-snug text-muted-foreground">
-              <span className="font-semibold text-foreground/80">Note:</span> Place your cursor
-              over the photo area
-              <br />
-              on the ID card to upload your profile picture.
+              To update your profile photo, please contact the HR team.
             </p>
           </div>
 

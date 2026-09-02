@@ -39,6 +39,7 @@ import {
   REIMBURSEMENT_STATUS_LABELS,
 } from "@/lib/payroll/constants";
 import { formatCurrency } from "@/lib/payroll/services/payroll-utils";
+import { getHrmsYearSelectItems } from "@/lib/date/hrms-year";
 import { reimbursementFormSchema } from "@/lib/validations/payroll";
 import type { ReimbursementItem, ReimbursementStatus } from "@/types/payroll";
 import type { LookupOption } from "@/types/employee";
@@ -342,7 +343,7 @@ export function ReimbursementTable({
     value: String(i + 1),
     label: new Date(2000, i, 1).toLocaleString("en-IN", { month: "long" }),
   }));
-  const YEAR_OPTIONS = [2025, 2026, 2027, 2028].map((y) => ({ value: String(y), label: String(y) }));
+  const YEAR_OPTIONS = getHrmsYearSelectItems();
 
   return (
     <div className="space-y-4">

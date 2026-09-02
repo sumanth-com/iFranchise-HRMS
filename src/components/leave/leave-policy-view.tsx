@@ -3,7 +3,6 @@ import { ArrowLeft } from "lucide-react";
 
 import { Button } from "@/components/common/button";
 import {
-  LeavePolicyContactBar,
   LeavePolicyHolidayTables,
   LeavePolicyPageHeader,
   LeavePolicySections,
@@ -38,7 +37,7 @@ export function LeavePolicyView({
 
       <LeavePolicyPageHeader
         title="Leave Policy"
-        description="Probation period policies, leave entitlement, confirmation criteria, and holiday list."
+        description="Leave communication, sandwich leave, carry forward, confirmation criteria, and holiday list."
       />
 
       <LeavePolicySections
@@ -52,8 +51,6 @@ export function LeavePolicyView({
         optionalHolidays={optionalHolidays}
         holidayYear={holidayYear}
       />
-
-      <LeavePolicyContactBar contact={document.contact} />
     </div>
   );
 }

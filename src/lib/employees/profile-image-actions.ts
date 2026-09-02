@@ -19,13 +19,20 @@ async function getAuthenticatedSupabase() {
   return createClient();
 }
 
-function revalidateSelfProfilePaths() {
+function canManageEmployeeProfileImage(permissionCodes: string[]) {
+  return hasPermission(permissionCodes, "employee.edit");
+}
+
+function revalidateProfileImageSurfaces() {
+  revalidatePath(EMPLOYEE_ROUTES.list);
+  revalidatePath("/dashboard/system/employees");
+  revalidatePath("/dashboard/directory");
   revalidatePath("/employee/profile");
   revalidatePath("/manager/profile");
   revalidatePath("/dashboard/profile");
   revalidatePath("/ceo/profile");
-  // Header avatar lives in the shared portal shell.
-  revalidatePath("/dashboard");
+  revalidatePath("/ceo/employees");
+  revalidatePath("/ceo/directory");
   revalidatePath("/employee");
   revalidatePath("/manager");
   revalidatePath("/ceo");
@@ -131,22 +138,17 @@ export async function uploadProfileImageAction(
 ): Promise<EmployeeActionResult<string>> {
   try {
     const profile = await requireAuthenticatedProfile();
-    const isSelf = profile.employee.id === employeeId;
-    const canEditOthers = hasPermission(profile.permissionCodes, "employee.edit");
-
-    if (!isSelf && !canEditOthers) {
+    if (!canManageEmployeeProfileImage(profile.permissionCodes)) {
       return {
         success: false,
-        message: "You do not have permission to update this profile photo",
+        message: "Only HR can update employee profile photos",
       };
     }
 
     const supabase = await getAuthenticatedSupabase();
-    if (!isSelf) {
-      const target = await getEmployeeById(supabase, employeeId);
-      if (!target || target.organizationId !== profile.employee.organizationId) {
-        return { success: false, message: "Employee not found" };
-      }
+    const target = await getEmployeeById(supabase, employeeId);
+    if (!target || target.organizationId !== profile.employee.organizationId) {
+      return { success: false, message: "Employee not found" };
     }
 
     const file = formData.get("file");
@@ -188,13 +190,13 @@ export async function uploadProfileImageAction(
 
     if (employee) {
       revalidatePath(EMPLOYEE_ROUTES.detail(employee));
+      revalidatePath(EMPLOYEE_ROUTES.edit(employee));
     }
 
     revalidatePath("/manager/attendance");
-    revalidatePath("/manager/profile");
     revalidatePath("/employee/attendance");
     revalidatePath("/dashboard/attendance");
-    revalidateSelfProfilePaths();
+    revalidateProfileImageSurfaces();
 
     return { success: true, data: storagePath };
   } catch (error) {
@@ -211,13 +213,10 @@ export async function removeProfileImageAction(
 ): Promise<EmployeeActionResult<null>> {
   try {
     const profile = await requireAuthenticatedProfile();
-    const isSelf = profile.employee.id === employeeId;
-    const canEditOthers = hasPermission(profile.permissionCodes, "employee.edit");
-
-    if (!isSelf && !canEditOthers) {
+    if (!canManageEmployeeProfileImage(profile.permissionCodes)) {
       return {
         success: false,
-        message: "You do not have permission to remove this profile photo",
+        message: "Only HR can remove employee profile photos",
       };
     }
 
@@ -249,11 +248,11 @@ export async function removeProfileImageAction(
     }
 
     revalidatePath(EMPLOYEE_ROUTES.detail(employee));
+    revalidatePath(EMPLOYEE_ROUTES.edit(employee));
     revalidatePath("/manager/attendance");
-    revalidatePath("/manager/profile");
     revalidatePath("/employee/attendance");
     revalidatePath("/dashboard/attendance");
-    revalidateSelfProfilePaths();
+    revalidateProfileImageSurfaces();
 
     return { success: true, data: null };
   } catch (error) {

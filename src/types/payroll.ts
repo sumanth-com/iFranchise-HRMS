@@ -49,6 +49,20 @@ export type PayrollBreakdownLine = {
   type: "earning" | "deduction";
 };
 
+export type PayrollItemLifecycleStatus = "draft" | "reviewed" | "sent" | "locked";
+
+export type HrPayrollAdjustments = {
+  additionalEarnings?: number;
+  bonus?: number;
+  incentive?: number;
+  reimbursements?: number;
+  additionalDeductions?: number;
+  tdsOverride?: number | null;
+  otherDeductionsOverride?: number | null;
+  lopDaysOverride?: number | null;
+  itemStatus?: PayrollItemLifecycleStatus;
+};
+
 export type PayrollBreakdown = {
   earnings: PayrollBreakdownLine[];
   deductions: PayrollBreakdownLine[];
@@ -62,8 +76,15 @@ export type PayrollBreakdown = {
     leaveDays?: number;
     paidDays?: number;
     holidayCount?: number;
+    paidLeaveDays?: number;
+    weekOffDays?: number;
   };
   notes?: string[];
+  hrAdjustments?: HrPayrollAdjustments;
+  payrollLifecycle?: {
+    itemStatus: PayrollItemLifecycleStatus;
+    sentAt?: string | null;
+  };
   /**
    * Immutable salary-structure values captured at payroll generate time.
    * Historical payslip PDFs must prefer this over live salary_structures.
@@ -139,12 +160,18 @@ export type PayrollItemDetail = {
   employeeCode: string;
   employeeName: string;
   departmentName: string | null;
+  designationTitle?: string | null;
+  employmentTypeName?: string | null;
   basicSalary: number;
   totalAllowances: number;
   totalDeductions: number;
   grossSalary: number;
   netSalary: number;
   breakdown: PayrollBreakdown;
+  hasSalaryStructure?: boolean;
+  itemStatus?: PayrollItemLifecycleStatus;
+  payslipSent?: boolean;
+  payslipId?: string | null;
 };
 
 export type PayrollApprovalDetail = {
@@ -177,6 +204,9 @@ export type PayrollPreviewItem = {
   employeeCode: string;
   employeeName: string;
   departmentName: string | null;
+  designationTitle?: string | null;
+  employmentTypeName?: string | null;
+  salaryStructureId?: string | null;
   hasSalaryStructure: boolean;
   basicSalary: number;
   totalAllowances: number;
@@ -202,6 +232,8 @@ export type EmployeePayrollRunBreakdown = {
   employeeCode: string;
   employeeName: string;
   departmentName: string | null;
+  designationTitle?: string | null;
+  employmentTypeName?: string | null;
   basicSalary: number;
   totalAllowances: number;
   totalDeductions: number;
@@ -213,6 +245,7 @@ export type EmployeePayrollRunBreakdown = {
   breakdown: PayrollBreakdown;
   hasSalaryStructure: boolean;
   periodLabel: string;
+  itemStatus?: PayrollItemLifecycleStatus;
 };
 
 export type PayslipAvailability = "available" | "under_review";
@@ -237,6 +270,16 @@ export type PayslipListItem = {
   paymentStatus: string;
   isArchived: boolean;
   versionCount: number;
+  payrollItemId?: string;
+  payslipSent?: boolean;
+  hasPayslip?: boolean;
+  departmentName?: string | null;
+  designationTitle?: string | null;
+  employmentTypeName?: string | null;
+  basicSalary?: number;
+  totalAllowances?: number;
+  totalDeductions?: number;
+  breakdown?: PayrollBreakdown;
 };
 
 export type PayslipHistoryStats = {
@@ -354,6 +397,9 @@ export type SalaryStructureItem = {
   employeeCode: string;
   employeeName: string;
   departmentName: string | null;
+  designationTitle: string | null;
+    employmentTypeName: string | null;
+  employmentTypeId: string | null;
   effectiveFrom: string;
   effectiveTo: string | null;
   currencyCode: string;
@@ -459,6 +505,7 @@ export type PayrollLookups = {
   employees: LookupOption[];
   departments: LookupOption[];
   branches: LookupOption[];
+  employmentTypes: LookupOption[];
 };
 
 export type PayrollActionResult<T = void> =

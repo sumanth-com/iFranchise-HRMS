@@ -91,7 +91,7 @@ const SECTION_HELP: Record<
       {
         label: "Payslips",
         detail:
-          "After the run is finalized and paid, published payslips appear under the Payslips section for preview, download, and email.",
+          "After you run payroll, every employee for that month appears under Payslips. Use View to review the breakdown, then Send to release it to the employee portal.",
       },
     ],
   },
@@ -181,12 +181,12 @@ const SECTION_HELP: Record<
       {
         label: "What this page is for",
         detail:
-          "Find published payslips after payroll is processed — preview details, download PDFs, and email copies to employees.",
+          "Review every employee from the payroll run for the selected month. View the breakdown, then send the payslip to their portal.",
       },
       {
         label: "When payslips appear",
         detail:
-          "Payslips are created from completed payroll runs. Draft or in-progress runs will not show final payslips here yet.",
+          "Employees appear here as soon as payroll is run for the month. Sending a payslip makes it available in the employee portal.",
       },
       {
         label: "Filters",

@@ -37,6 +37,7 @@ import {
   canActorDecideLeaveRequest,
   listCeoLeaveApproverEmployeeIds,
 } from "@/lib/leave/services/leave-queries";
+import { isPendingHrReview } from "@/lib/leave/hr-review";
 import {
   executiveRequestCategoryLabel,
   getExecutiveRequestCategory,
@@ -64,6 +65,7 @@ const LEAVE_ROW_SELECT = `
   half_day_period,
   reason,
   leave_status,
+  duration_breakdown,
   created_at,
   employees!inner (
     employee_code,
@@ -100,6 +102,7 @@ type LeaveRow = {
   half_day_period: string | null;
   reason: string | null;
   leave_status: string;
+  duration_breakdown?: unknown;
   created_at: string;
   employees:
     | {
@@ -306,8 +309,6 @@ export async function listCeoApprovalQueue(
 
   if (pendingError) throw new Error(pendingError.message);
   const pending = pendingRows ?? [];
-  if (pending.length === 0) return [];
-
   const requestIds = Array.from(new Set(pending.map((r) => r.leave_request_id)));
   const levelByRequest = new Map<string, { id: string; level: number }>();
   pending.forEach((r) => {
@@ -320,31 +321,65 @@ export async function listCeoApprovalQueue(
     }
   });
 
-  const { data, error } = await supabase
+  let query = supabase
     .schema("hrms")
     .from("leave_requests")
     .select(LEAVE_ROW_SELECT)
-    .in("id", requestIds)
     .eq("employees.organization_id", organizationId)
     .eq("leave_status", "pending")
     .is("deleted_at", null)
     .order("created_at", { ascending: true });
 
+  if (requestIds.length > 0) {
+    query = query.in("id", requestIds);
+  }
+
+  const { data, error } =
+    requestIds.length > 0
+      ? await query
+      : { data: [] as unknown[], error: null };
+
   if (error) throw new Error(error.message);
+
+  const { data: hrReviewRows, error: hrReviewError } = await supabase
+    .schema("hrms")
+    .from("leave_requests")
+    .select(LEAVE_ROW_SELECT)
+    .eq("employees.organization_id", organizationId)
+    .eq("leave_status", "pending")
+    .is("deleted_at", null)
+    .order("created_at", { ascending: true })
+    .limit(100);
+
+  if (hrReviewError) throw new Error(hrReviewError.message);
+
+  const byId = new Map<string, LeaveRow>();
+  for (const row of (data as unknown as LeaveRow[]) ?? []) {
+    byId.set(row.id, row);
+  }
+  for (const row of (hrReviewRows as unknown as LeaveRow[]) ?? []) {
+    if (isPendingHrReview(row.leave_status, row.duration_breakdown)) {
+      byId.set(row.id, row);
+    }
+  }
+
+  if (byId.size === 0) return [];
 
   const items: CeoApprovalQueueItem[] = [];
   const roleCodesByEmployee = new Map<string, string[]>();
 
-  for (const row of (data as unknown as LeaveRow[]) ?? []) {
+  for (const row of byId.values()) {
     const approvals = row.leave_approvals ?? [];
     const activeLevel = approvals
       .filter((a) => a.approval_status === "pending")
       .sort((a, b) => a.approval_level - b.approval_level)[0]?.approval_level;
     const ceoStep = levelByRequest.get(row.id);
-    if (!ceoStep || activeLevel == null) continue;
+    const pendingHrReview = isPendingHrReview(row.leave_status, row.duration_breakdown);
     const ceoCanActOnCurrentStep =
-      ceoStep.level === activeLevel ||
-      (activeLevel === 1 && ceoStep.level === 2);
+      pendingHrReview ||
+      (Boolean(ceoStep) &&
+        activeLevel != null &&
+        (ceoStep!.level === activeLevel || (activeLevel === 1 && ceoStep!.level === 2)));
     if (!ceoCanActOnCurrentStep) continue;
 
     const record = mapLeaveRow(row);
@@ -357,12 +392,14 @@ export async function listCeoApprovalQueue(
 
     items.push({
       ...record,
-      approvalRecordId: ceoStep.id,
+      approvalRecordId: ceoStep?.id ?? row.id,
       submittedAt: row.created_at,
       requestCategory: requestCategory ?? "hr",
-      requestCategoryLabel: requestCategory
-        ? executiveRequestCategoryLabel(requestCategory)
-        : "Employee Request",
+      requestCategoryLabel: pendingHrReview
+        ? "HR Review"
+        : requestCategory
+          ? executiveRequestCategoryLabel(requestCategory)
+          : "Employee Request",
     });
   }
 
@@ -925,7 +962,10 @@ export async function getCeoLeaveDetail(
   const activeLevel = detail.approvals
     .filter((a) => a.approvalStatus === "pending")
     .sort((a, b) => a.approvalLevel - b.approvalLevel)[0];
-  const canAct = canActorDecideLeaveRequest({
+  const pendingHrReview = isPendingHrReview(detail.leaveStatus, detail.durationBreakdown);
+  const canAct = pendingHrReview
+    ? isCeoLeaveApprover(profile)
+    : canActorDecideLeaveRequest({
     profile,
     applicantEmployeeId: detail.employeeId,
     leaveStatus: detail.leaveStatus,
@@ -959,6 +999,7 @@ export async function getCeoLeaveDetail(
     balances,
     canAct,
     hrDirectToCeo: executiveDirectToCeo,
+    durationBreakdown: detail.durationBreakdown,
     requestCategory,
     requestCategoryLabel: requestCategory
       ? executiveRequestCategoryLabel(requestCategory)

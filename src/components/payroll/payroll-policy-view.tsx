@@ -3,7 +3,6 @@ import { ArrowLeft } from "lucide-react";
 
 import { Button } from "@/components/common/button";
 import {
-  LeavePolicyContactBar,
   LeavePolicyPageHeader,
   LeavePolicySections,
 } from "@/components/leave/leave-policy-content";
@@ -39,8 +38,6 @@ export function PayrollPolicyView({
         sections={document.sections}
         employeeName={employeeName}
       />
-
-      <LeavePolicyContactBar contact={document.contact} />
     </div>
   );
 }

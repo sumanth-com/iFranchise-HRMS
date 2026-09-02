@@ -11,6 +11,7 @@ import {
 } from "@/lib/leave/services/leave-monthly-accrual";
 import {
   evaluateLeaveApplication,
+  hasOverlappingLeave,
   loadLeavePolicyRuntime,
 } from "@/lib/leave/services/leave-policy-runtime";
 import {
@@ -31,11 +32,19 @@ import {
   PERIOD_LEAVE_CODE,
   splitLeaveDaysByBalance,
 } from "@/lib/leave/services/leave-policy-engine";
+import {
+  attachHrReviewToBreakdown,
+  hrReviewReasonFromIssues,
+  isPendingHrReview,
+  parseHrReviewMetadata,
+} from "@/lib/leave/hr-review";
 import { roundLeaveDays } from "@/lib/leave/services/leave-usage";
 import { isPeriodLeaveEligible } from "@/lib/leave/period-leave-eligibility";
 import {
   notifyLeaveApproved,
   notifyLeaveCancelled,
+  notifyLeaveHrReviewDecided,
+  notifyLeaveHrReviewSubmitted,
   notifyLeaveRejected,
   notifyLeaveSubmitted,
 } from "@/lib/leave/services/leave-notifications";
@@ -67,6 +76,13 @@ async function dispatchLeaveApprovalEmails(
   } catch (error) {
     console.error("[leave] approval email dispatch failed", error);
   }
+}
+
+function scheduleLeaveApprovalEmails(
+  leaveRequestId: string,
+  createdByUserId?: string | null,
+) {
+  void dispatchLeaveApprovalEmails(leaveRequestId, createdByUserId);
 }
 
 async function getLeaveBalanceRow(
@@ -456,19 +472,49 @@ export async function createLeaveRequest(
       startDate: input.startDate,
       endDate: input.endDate,
       isHalfDay: input.isHalfDay,
+      enforceSelfServiceLimits: profile.employee.id === input.employeeId,
     },
   );
   const totalDays = evaluated.duration.totalLeaveDays;
   const balanceYear = getCurrentBalanceYear(input.startDate);
+  const selfApply = profile.employee.id === input.employeeId;
+  const hrReviewReason = selfApply ? hrReviewReasonFromIssues(evaluated.issues) : null;
   let { paidDays, lopDays } = evaluated.split;
-  let durationBreakdown = {
+  let durationBreakdown: Record<string, unknown> = {
     ...evaluated.duration,
     paidDays,
     lopDays,
     dayAllocations: allocateLeaveDaysByBalance(evaluated.duration, paidDays),
   };
 
-  if (evaluated.leaveType.isPaid && paidDays > 0) {
+  if (hrReviewReason) {
+    paidDays = 0;
+    lopDays = 0;
+    durationBreakdown = attachHrReviewToBreakdown(
+      {
+        ...evaluated.duration,
+        paidDays: 0,
+        lopDays: 0,
+        dayAllocations: evaluated.duration.days.map((day) => ({
+          date: day.date,
+          kind: "none" as const,
+          counted: day.counted,
+        })),
+      },
+      {
+        required: true,
+        reason: hrReviewReason,
+        availableBalanceAtSubmit:
+          typeof evaluated.availableBalance === "number" ? evaluated.availableBalance : null,
+        employmentTypeCode: evaluated.employee.employmentTypeCode ?? null,
+        employeeName:
+          profile.employee.id === input.employeeId
+            ? `${profile.employee.firstName} ${profile.employee.lastName}`.trim()
+            : null,
+        submittedAt: new Date().toISOString(),
+      },
+    );
+  } else if (evaluated.leaveType.isPaid && paidDays > 0) {
     let openingAllocated = Math.max(Number(evaluated.leaveType.daysPerYear ?? 0), 0);
     let accruedThroughMonth: string | null = null;
     if (isMonthlyAccrualLeaveCode(evaluated.leaveType.code)) {
@@ -537,6 +583,28 @@ export async function createLeaveRequest(
     throw new Error(error?.message ?? "Failed to create leave request");
   }
 
+  const racedOverlap = await hasOverlappingLeave(
+    supabase,
+    input.employeeId,
+    input.startDate,
+    input.endDate,
+    data.id,
+  );
+  if (racedOverlap) {
+    if (evaluated.leaveType.isPaid) {
+      await adjustLeaveBalance(supabase, input.employeeId, input.leaveTypeId, balanceYear, {
+        pending: -paidDays,
+      }).catch(() => undefined);
+    }
+    await supabase.schema("hrms").from("leave_requests").update({
+      deleted_at: new Date().toISOString(),
+      leave_status: "cancelled",
+    }).eq("id", data.id);
+    throw new Error(
+      "You already have a pending or approved leave on one or more of these dates. Choose different dates, or cancel the existing request first.",
+    );
+  }
+
   try {
     await createApprovalSteps(
       supabase,
@@ -546,7 +614,7 @@ export async function createLeaveRequest(
       evaluated.runtime.approvalLevels,
     );
   } catch (approvalError) {
-    if (evaluated.leaveType.isPaid) {
+    if (evaluated.leaveType.isPaid && paidDays > 0) {
       await adjustLeaveBalance(supabase, input.employeeId, input.leaveTypeId, balanceYear, {
         pending: -paidDays,
       }).catch(() => undefined);
@@ -558,13 +626,19 @@ export async function createLeaveRequest(
     throw approvalError;
   }
 
-  await notifyLeaveSubmitted(supabase, profile, data.id, input.employeeId);
-  await dispatchLeaveApprovalEmails(data.id, profile.userId);
+  if (hrReviewReason) {
+    await notifyLeaveHrReviewSubmitted(supabase, profile, data.id, input.employeeId);
+  } else {
+    await notifyLeaveSubmitted(supabase, profile, data.id, input.employeeId);
+    scheduleLeaveApprovalEmails(data.id, profile.userId);
+  }
   await writeApplicationAudit(supabase, {
     organizationId: profile.employee.organizationId,
     module: "leave",
     action: "create",
-    description: "Leave request submitted",
+    description: hrReviewReason
+      ? "Leave request submitted for HR review"
+      : "Leave request submitted",
     recordId: data.id,
     metadata: {
       employeeId: input.employeeId,
@@ -929,6 +1003,19 @@ export async function approveLeaveRequest(
     throw new Error("Only pending requests can be approved");
   }
 
+  if (isPendingHrReview(request.leave_status, request.duration_breakdown)) {
+    const meta = parseHrReviewMetadata(request.duration_breakdown);
+    const decision = meta?.reason === "over_limit" ? "special" : "lop";
+    await decideHrLeaveReview(
+      supabase,
+      profile,
+      leaveRequestId,
+      decision,
+      comments?.trim() || "Approved",
+    );
+    return;
+  }
+
   const applicantRoles = await getEmployeeRoleCodes(supabase, request.employee_id);
   const executiveApplicant = requiresCeoLeaveApproval(applicantRoles);
 
@@ -1124,6 +1211,17 @@ export async function rejectLeaveRequest(
     throw new Error("Only pending requests can be rejected");
   }
 
+  if (isPendingHrReview(request.leave_status, request.duration_breakdown)) {
+    await decideHrLeaveReview(
+      supabase,
+      profile,
+      leaveRequestId,
+      "reject",
+      comments.trim(),
+    );
+    return;
+  }
+
   await assertCanActOnLeaveApproval(
     supabase,
     profile,
@@ -1231,6 +1329,159 @@ export async function rejectLeaveRequest(
     id: leaveRequestId,
     employeeId: request.employee_id,
   });
+}
+
+export async function decideHrLeaveReview(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  leaveRequestId: string,
+  decision: "lop" | "special" | "reject",
+  remarks: string,
+): Promise<void> {
+  if (
+    !isHrLeaveActor(profile) &&
+    !isCeoLeaveApprover(profile) &&
+    !profile.permissionCodes.includes("leave.approve")
+  ) {
+    throw new Error("You are not authorized to review this leave request");
+  }
+
+  const { data: request, error } = await supabase
+    .schema("hrms")
+    .from("leave_requests")
+    .select(
+      "id, employee_id, leave_type_id, start_date, end_date, total_days, duration_breakdown, leave_status, is_half_day",
+    )
+    .eq("id", leaveRequestId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error || !request) throw new Error(error?.message ?? "Leave request not found");
+  if (!isPendingHrReview(request.leave_status, request.duration_breakdown)) {
+    throw new Error("This request is not pending HR review");
+  }
+
+  const trimmed =
+    remarks.trim() ||
+    (decision === "lop"
+      ? "Approved as Loss of Pay"
+      : decision === "special"
+        ? "Approved as Special Leave"
+        : "");
+  if (decision === "reject" && trimmed.length < 3) {
+    throw new Error("Remarks are required");
+  }
+
+  const existing = parseHrReviewMetadata(request.duration_breakdown) ?? {
+    required: true as const,
+    reason: "balance_exhausted" as const,
+    availableBalanceAtSubmit: null,
+    employmentTypeCode: null,
+    employeeName: null,
+    submittedAt: new Date().toISOString(),
+  };
+
+  const nextStatus = decision === "reject" ? "rejected" : "approved";
+  const baseBreakdown =
+    request.duration_breakdown && typeof request.duration_breakdown === "object"
+      ? { ...(request.duration_breakdown as Record<string, unknown>) }
+      : {};
+
+  let durationBreakdown = attachHrReviewToBreakdown(baseBreakdown, {
+    ...existing,
+    decision: decision === "reject" ? null : decision,
+    remarks: trimmed,
+    decidedAt: new Date().toISOString(),
+    decidedByEmployeeId: profile.employee.id,
+    decidedByRole: isCeoLeaveApprover(profile) && !isHrLeaveActor(profile) ? "ceo" : "hr",
+  });
+
+  if (decision === "lop") {
+    const totalDays = Number(request.total_days);
+    durationBreakdown = {
+      ...durationBreakdown,
+      paidDays: 0,
+      lopDays: totalDays,
+      specialLeave: false,
+      dayAllocations: Array.isArray(durationBreakdown.dayAllocations)
+        ? (durationBreakdown.dayAllocations as Array<{ date: string; counted: number }>).map(
+            (day) => ({
+              date: day.date,
+              kind: "lop" as const,
+              counted: day.counted,
+            }),
+          )
+        : [],
+    };
+  } else if (decision === "special") {
+    durationBreakdown = {
+      ...durationBreakdown,
+      paidDays: 0,
+      lopDays: 0,
+      specialLeave: true,
+    };
+  }
+
+  const actedAt = new Date().toISOString();
+  const admin = createAdminClient();
+  const { data: updated, error: updateError } = await admin
+    .schema("hrms")
+    .from("leave_requests")
+    .update({
+      leave_status: nextStatus,
+      duration_breakdown: durationBreakdown,
+      updated_by: profile.userId,
+      updated_at: actedAt,
+    })
+    .eq("id", leaveRequestId)
+    .eq("leave_status", "pending")
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (updateError) throw new Error(updateError.message);
+  if (!updated) {
+    throw new Error("This leave request was already processed");
+  }
+
+  await clearRemainingPendingApprovals(supabase, leaveRequestId, profile.userId);
+
+  try {
+    await notifyLeaveHrReviewDecided(
+      supabase,
+      profile,
+      leaveRequestId,
+      request.employee_id,
+      decision,
+      trimmed,
+    );
+  } catch (notifyError) {
+    console.error("[leave] HR review notification failed", notifyError);
+  }
+  await writeApplicationAudit(supabase, {
+    organizationId: profile.employee.organizationId,
+    module: "leave",
+    action: decision === "reject" ? "reject" : "approve",
+    description:
+      decision === "reject"
+        ? "Leave request rejected after HR review"
+        : decision === "lop"
+          ? "Leave request approved as LOP after HR review"
+          : "Leave request approved as Special Leave after HR review",
+    recordId: leaveRequestId,
+    reason: trimmed,
+    metadata: {
+      hrReview: true,
+      decision,
+      employeeId: request.employee_id,
+      totalDays: Number(request.total_days),
+    },
+  });
+  emitHrmsWebhook(
+    profile.employee.organizationId,
+    decision === "reject" ? "leave.rejected" : "leave.approved",
+    { id: leaveRequestId, employeeId: request.employee_id },
+  );
 }
 
 export async function cancelLeaveRequest(
@@ -1420,6 +1671,7 @@ export async function updateLeaveRequest(
       endDate: input.endDate,
       isHalfDay: input.isHalfDay,
       excludeRequestId: leaveRequestId,
+      enforceSelfServiceLimits: profile.employee.id === input.employeeId,
     },
   );
   const nextTotalDays = next.duration.totalLeaveDays;

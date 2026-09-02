@@ -2,6 +2,7 @@ import { HolidaysManagement } from "@/components/organization/holidays-managemen
 import { requireCeoPortal } from "@/lib/ceo/read-only-permissions";
 import { getBranches, getDepartments } from "@/lib/organization/services/org-lookups";
 import { listHolidays } from "@/lib/organization/services/org-queries";
+import { clampHrmsYear, getDefaultHrmsYear } from "@/lib/date/hrms-year";
 import { createClient } from "@/lib/supabase/server";
 
 type PageProps = {
@@ -14,7 +15,9 @@ export default async function CeoHolidaysPage({ searchParams }: PageProps) {
   const orgId = profile.employee.organizationId;
   const raw = await searchParams;
 
-  const year = typeof raw.year === "string" ? Number(raw.year) : new Date().getFullYear();
+  const year = clampHrmsYear(
+    typeof raw.year === "string" ? Number(raw.year) : getDefaultHrmsYear(),
+  );
   const search = typeof raw.search === "string" ? raw.search : undefined;
   const viewMode = raw.view === "calendar" ? "calendar" : "list";
 

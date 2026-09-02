@@ -11,6 +11,7 @@ import {
 import { useState, useTransition } from "react";
 
 import { submitEmailApprovalAction } from "@/app/approval/[token]/actions";
+import { AUTH_ROUTES } from "@/lib/auth/constants";
 import { Button } from "@/components/common/button";
 import type { ApprovalRequestSummary, ProcessOutcome } from "@/lib/approvals/types";
 
@@ -177,6 +178,7 @@ function LeaveResultDetails({
     highlight
       ? { label: "Dates", value: `${highlight.startDate} – ${highlight.endDate}` }
       : null,
+    highlight ? { label: "Current status", value: highlight.statusLabel } : null,
   ].filter(Boolean) as DetailRow[];
 
   return (
@@ -218,13 +220,19 @@ function ResultScreen({
         heading={
           leave
             ? approved
-              ? "Leave approved successfully"
-              : "Leave rejected"
+              ? "Leave Request Approved"
+              : "Leave Request Rejected"
             : approved
               ? "Request approved"
               : "Request rejected"
         }
-        subheading="Recorded via secure email approval"
+        subheading={
+          leave
+            ? approved
+              ? "The employee's leave request has been successfully approved."
+              : "The employee's leave request has been rejected successfully."
+            : "Recorded via secure email approval"
+        }
       >
         <div className="flex flex-col items-center text-center">
           <AnimatedMark approved={approved} />
@@ -240,9 +248,36 @@ function ResultScreen({
               &apos;s request.
             </p>
           )}
+          <Button
+            type="button"
+            className="mt-6 h-11 w-full"
+            onClick={() => {
+              window.location.href = AUTH_ROUTES.dashboard;
+            }}
+          >
+            Open HRMS portal
+          </Button>
         </div>
       </Shell>
     );
+  }
+
+  if (outcome.status === "already_processed" && outcome.summary) {
+    const leave = isLeaveSummary(outcome.summary);
+    const approved = outcome.summary.status === "approved";
+    if (leave) {
+      return (
+        <ResultScreen
+          outcome={{
+            status: approved ? "approved" : "rejected",
+            decision: approved ? "approve" : "reject",
+            employeeName: outcome.employeeName ?? outcome.summary.employeeName,
+            summary: outcome.summary,
+          }}
+          rejectionReason={rejectionReason}
+        />
+      );
+    }
   }
 
   const isExpired = outcome.status === "expired";
@@ -346,6 +381,18 @@ export function ApprovalView({
     });
   }
 
+  if (outcome) {
+    if (outcome.status === "error" && initialAction === "approve") {
+      return <ResultScreen outcome={outcome} onRetry={retryApprove} />;
+    }
+    if (outcome.status === "error" && initialAction === "reject" && state.kind === "ready" && state.leaveHighlight) {
+      return <ResultScreen outcome={outcome} onRetry={retryRejectLeave} />;
+    }
+    if (outcome.status !== "error") {
+      return <ResultScreen outcome={outcome} rejectionReason={rejectionReason} />;
+    }
+  }
+
   if (state.kind === "error") {
     const Icon =
       state.tone === "expired" ? Clock : state.tone === "done" ? CheckCircle2 : AlertTriangle;
@@ -358,18 +405,6 @@ export function ApprovalView({
         </div>
       </Shell>
     );
-  }
-
-  if (outcome) {
-    if (outcome.status === "error" && initialAction === "approve") {
-      return <ResultScreen outcome={outcome} onRetry={retryApprove} />;
-    }
-    if (outcome.status === "error" && initialAction === "reject" && state.leaveHighlight) {
-      return <ResultScreen outcome={outcome} onRetry={retryRejectLeave} />;
-    }
-    if (outcome.status !== "error") {
-      return <ResultScreen outcome={outcome} rejectionReason={rejectionReason} />;
-    }
   }
 
   if (cancelled) {

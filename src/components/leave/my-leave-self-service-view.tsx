@@ -424,7 +424,14 @@ export function MyLeaveSelfServiceView({
     {
       key: "leaveStatus",
       header: "Status",
-      render: (row) => <LeaveStatusBadge status={row.leaveStatus} />,
+      render: (row) => (
+        <LeaveStatusBadge
+          status={row.leaveStatus}
+          durationBreakdown={row.durationBreakdown}
+          hrReviewRequired={row.hrReviewRequired}
+          hrDecision={row.hrDecision}
+        />
+      ),
     },
     {
       key: "appliedAt",
@@ -507,7 +514,7 @@ export function MyLeaveSelfServiceView({
   return (
     <div
       className={cn(
-        stickyHeader ? "flex min-h-0 flex-1 flex-col overflow-hidden" : "space-y-4",
+        stickyHeader ? "flex min-h-0 flex-1 flex-col overflow-hidden" : "flex flex-col gap-4",
       )}
     >
       {showPageHeading ? (
@@ -523,7 +530,7 @@ export function MyLeaveSelfServiceView({
       <div
         className={cn(
           stickyHeader
-            ? "min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain pb-4"
+            ? "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pb-4"
             : "contents",
         )}
       >
@@ -558,7 +565,7 @@ export function MyLeaveSelfServiceView({
 
       <section
         ref={historyRef}
-        className="card-surface-static rounded-xl border bg-card p-4 shadow-sm"
+        className="card-surface-static w-full shrink-0 rounded-2xl border bg-card p-4 shadow-sm"
       >
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
@@ -598,7 +605,8 @@ export function MyLeaveSelfServiceView({
               ? `No ${selectedTypeLabel} history in ${monthLabel}.`
               : `No leave requests in ${monthLabel}.`
           }
-          scrollable={!stickyHeader}
+          emptyClassName="min-h-0 py-6"
+          scrollable={!stickyHeader && historyRows.length > 8}
           maxHeightClass={
             stickyHeader ? undefined : DATA_TABLE_LEAVE_REQUESTS_MAX_HEIGHT
           }

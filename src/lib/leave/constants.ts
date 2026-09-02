@@ -37,6 +37,7 @@ export const LEAVE_STATUS_LABELS: Record<LeaveStatus, string> = {
 
 export const LEAVE_SUMMARY_LABELS = {
   pendingRequests: "Pending Requests",
+  pendingHrReview: "Pending HR Review",
   approvedThisMonth: "Approved by HR",
   rejectedThisMonth: "Rejected by HR",
   employeesOnLeaveToday: "Employees On Leave Today",

@@ -12,6 +12,7 @@ import {
   deleteLeaveRequestAction,
   getLeaveDetailAction,
 } from "@/lib/leave/actions";
+import { leaveStatusDisplayLabel } from "@/lib/leave/hr-review";
 import {
   formatHalfDayPeriod,
   formatLeaveDate,
@@ -216,7 +217,12 @@ export function MyLeaveDetailPopup({
       showCancel={false}
       headerAddon={
         detail && activeMode === "view" ? (
-          <LeaveStatusBadge status={detail.leaveStatus} />
+          <LeaveStatusBadge
+            status={detail.leaveStatus}
+            durationBreakdown={detail.durationBreakdown}
+            hrReviewRequired={detail.hrReviewRequired}
+            hrDecision={detail.hrDecision}
+          />
         ) : null
       }
       footer={
@@ -309,13 +315,7 @@ export function MyLeaveDetailPopup({
             <DetailField
               label="Status"
               value={
-                detail.leaveStatus === "pending"
-                  ? "Pending HR"
-                  : detail.leaveStatus === "approved"
-                    ? "Approved by HR"
-                    : detail.leaveStatus === "rejected"
-                      ? "Rejected by HR"
-                      : detail.leaveStatus
+                leaveStatusDisplayLabel(detail.leaveStatus, detail.durationBreakdown)
               }
             />
           </div>
@@ -325,6 +325,12 @@ export function MyLeaveDetailPopup({
               {detail.reason?.trim() || "—"}
             </p>
           </div>
+          {detail.hrRemarks ? (
+            <div className="rounded-lg border px-3 py-2.5">
+              <p className="text-xs text-muted-foreground">HR remarks</p>
+              <p className="mt-1 text-sm whitespace-pre-wrap">{detail.hrRemarks}</p>
+            </div>
+          ) : null}
         </div>
       )}
     </Modal>

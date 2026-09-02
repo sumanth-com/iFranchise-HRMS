@@ -94,7 +94,12 @@ export function HrLeaveHubView({
   const isTeamView = section === "team";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5">
+    <div
+      className={cn(
+        "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5",
+        !isTeamView && "h-auto flex-none",
+      )}
+    >
       {!isTeamView ? (
         <div>
           <div className="flex flex-wrap items-center justify-between gap-3">

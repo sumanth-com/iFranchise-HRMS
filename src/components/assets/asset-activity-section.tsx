@@ -29,6 +29,7 @@ import {
   canEditAssets,
   ASSET_ACTIVITY_FILTER_ITEMS,
 } from "@/lib/assets/constants";
+import { getHrmsYearSelectItems } from "@/lib/date/hrms-year";
 import type {
   AssetActivityItem,
   AssetItem,
@@ -61,14 +62,7 @@ const MONTH_ITEMS = [
 ];
 
 function buildYearItems() {
-  const currentYear = new Date().getFullYear();
-  return [
-    { value: "all", label: "All years" },
-    ...Array.from({ length: 5 }, (_, index) => ({
-      value: String(currentYear - index),
-      label: String(currentYear - index),
-    })),
-  ];
+  return getHrmsYearSelectItems({ includeAll: true });
 }
 
 function formatActivityWhen(value: string) {

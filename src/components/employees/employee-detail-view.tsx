@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { CalendarDays, CheckCircle2, Clock3, FileStack, Hourglass, Pencil, Wallet } from "lucide-react";
@@ -11,7 +11,6 @@ import {
   isEmployeeAccountDeactivated,
 } from "@/components/employees/employee-account-status-badge";
 import { EmployeeEditForm } from "@/components/employees/employee-edit-form";
-import { EmploymentStatusBadge } from "@/components/employees/employment-status-badge";
 import { buttonVariants } from "@/components/common/button";
 import { EmptyState } from "@/components/common/empty-state";
 import { FilterSelect } from "@/components/common/filter-select";
@@ -236,7 +235,6 @@ export function EmployeeDetailView({
   activeTab,
 }: EmployeeDetailViewProps) {
   const canEditEmployee = hasPermission(permissionCodes, "employee.edit");
-  const canEditProfile = hasPermission(permissionCodes, "employee_profile.edit");
   const statutory = salaryStructure?.components ?? {};
   const employeeFullName = `${employee.firstName} ${employee.lastName}`.trim();
   const accountDeactivated = isEmployeeAccountDeactivated(employee.accountStatus);
@@ -258,6 +256,17 @@ export function EmployeeDetailView({
   const emergencyContactEmail = primaryEmergencyContact?.email
     ? primaryEmergencyContact.email
     : "—";
+  const [previewEmploymentTypeName, setPreviewEmploymentTypeName] = useState(
+    employee.employmentTypeName,
+  );
+  const [previewDesignationTitle, setPreviewDesignationTitle] = useState(
+    employee.designationTitle,
+  );
+
+  useEffect(() => {
+    setPreviewEmploymentTypeName(employee.employmentTypeName);
+    setPreviewDesignationTitle(employee.designationTitle);
+  }, [employee.designationTitle, employee.employmentTypeName, isEditing]);
 
   return (
     <div className="space-y-0">
@@ -276,6 +285,8 @@ export function EmployeeDetailView({
                   variant="inline"
                   onCancel={onCancelEdit}
                   onSaved={onSavedEdit}
+                  onEmploymentTypeChange={setPreviewEmploymentTypeName}
+                  onDesignationChange={setPreviewDesignationTitle}
                   routesBasePath={routesBasePath}
                 />
               </div>
@@ -309,9 +320,6 @@ export function EmployeeDetailView({
                 label="Assigned HR"
                 value={employee.assignedHrName ?? "—"}
               />
-              <OverviewDetailRow label="Employment status">
-                <EmploymentStatusBadge status={employee.employmentStatus} />
-              </OverviewDetailRow>
               <OverviewInfoRow
                 label="Date of joining"
                 value={formatDisplayDate(employee.dateOfJoining)}
@@ -424,15 +432,21 @@ export function EmployeeDetailView({
               firstName={employee.firstName}
               lastName={employee.lastName}
               employeeCode={employee.employeeCode}
-              designation={employee.designationTitle}
+              designation={
+                isEditing
+                  ? previewDesignationTitle
+                  : employee.designationTitle
+              }
               departmentName={employee.departmentName}
-              employmentTypeName={formatDisplayLabel(employee.employmentTypeName)}
+              employmentTypeName={formatDisplayLabel(
+                isEditing ? previewEmploymentTypeName : employee.employmentTypeName,
+              )}
               employmentStatus={employee.employmentStatus}
               accountStatus={employee.accountStatus}
               profileImagePath={employee.profile?.profileImageStoragePath ?? null}
               imageUrl={profileImageUrl}
               profilePath={`/e/${buildEmployeeRouteRef(employee)}`}
-              canEdit={canEditProfile}
+              canEdit={canEditEmployee}
               className="w-full"
             />
           </aside>
@@ -505,19 +519,8 @@ function SimpleTable({
 
 const periodMonthItems = getMonthSelectItems();
 
-function periodYearItems(selectedYear: number | null) {
-  const current = new Date().getFullYear();
-  const years = new Set([
-    current - 2,
-    current - 1,
-    current,
-    current + 1,
-    current + 2,
-  ]);
-  if (selectedYear != null) {
-    years.add(selectedYear);
-  }
-  return getYearSelectItems([...years].sort((a, b) => a - b));
+function periodYearItems(_selectedYear: number | null) {
+  return getYearSelectItems();
 }
 
 function PeriodMonthYearFilters({

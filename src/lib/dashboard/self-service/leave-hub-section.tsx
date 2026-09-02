@@ -43,7 +43,10 @@ export async function LeaveHubSection({
   const leaveStatus = firstString(raw.leaveStatus);
   const summaryFilter = firstString(raw.summaryFilter);
   const isPendingQueue =
-    leaveStatus === "pending" || summaryFilter === "pendingRequests";
+    leaveStatus === "pending" ||
+    leaveStatus === "pending_hr_review" ||
+    summaryFilter === "pendingRequests" ||
+    summaryFilter === "pendingHrReview";
 
   const teamParams = leaveListParamsSchema.parse({
     page: section === "team" ? raw.page : undefined,
@@ -195,6 +198,7 @@ export async function LeaveHubSection({
       teamLeave={{
         summary: summary ?? {
           pendingRequests: 0,
+          pendingHrReview: 0,
           approvedThisMonth: 0,
           rejectedThisMonth: 0,
           employeesOnLeaveToday: 0,

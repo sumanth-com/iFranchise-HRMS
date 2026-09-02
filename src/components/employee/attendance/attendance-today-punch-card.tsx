@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { AttendanceStatusBadge } from "@/components/attendance/attendance-status-badge";
+import { useOptionalSelfAttendanceLive } from "@/components/attendance/self-attendance-live-context";
 import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
 import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils";
@@ -26,7 +27,9 @@ import type {
   ManagerTodayAttendance,
 } from "@/types/manager-self-attendance";
 
-type PunchResult = { success: boolean; message?: string; error?: string };
+type PunchResult =
+  | { success: true; today?: ManagerTodayAttendance; message?: string }
+  | { success: false; message?: string; error?: string };
 
 type DialogState =
   | { kind: "check_in"; title: string; body: string }
@@ -142,16 +145,20 @@ function MessageCard({
 
 export function AttendanceTodayPunchCard({
   firstName,
-  today,
+  today: todayProp,
   onCheckIn,
   onCheckOut,
   onUpdateCheckout,
   allowUpdateCheckout = false,
 }: Props) {
+  const live = useOptionalSelfAttendanceLive();
+  const today = live?.today ?? todayProp;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const elapsedSeconds = useLiveWorkingSeconds(today.checkInAt, today.checkOutAt);
+  const workingHoursLabel =
+    live?.workingHoursLabel ?? formatWorkingDuration(elapsedSeconds);
 
   useEffect(() => {
     if (dialog?.kind !== "check_in" && dialog?.kind !== "check_out") return;
@@ -163,7 +170,12 @@ export function AttendanceTodayPunchCard({
   const punchState =
     today.punchState === "locked" ? "not_checked_in" : today.punchState;
 
-  function refreshAfterSuccess() {
+  function refreshAfterSuccess(nextToday?: ManagerTodayAttendance) {
+    if (nextToday) live?.applyToday(nextToday);
+    if (live) {
+      live.refreshInBackground();
+      return;
+    }
     router.refresh();
   }
 
@@ -180,7 +192,7 @@ export function AttendanceTodayPunchCard({
         title: message.title,
         body: message.body,
       });
-      refreshAfterSuccess();
+      refreshAfterSuccess(result.today);
     });
   }
 
@@ -196,14 +208,14 @@ export function AttendanceTodayPunchCard({
       // Good-night farewell only after official end of day (7:00 PM).
       if (isBeforeOfficeEnd()) {
         toast.success("Checked out successfully");
-        refreshAfterSuccess();
+        refreshAfterSuccess(result.today);
         return;
       }
 
       const farewell = buildCheckOutFarewell(firstName);
       if (!farewell) {
         toast.success("Checked out successfully");
-        refreshAfterSuccess();
+        refreshAfterSuccess(result.today);
         return;
       }
       setDialog({
@@ -211,7 +223,7 @@ export function AttendanceTodayPunchCard({
         title: farewell.title,
         body: farewell.body,
       });
-      refreshAfterSuccess();
+      refreshAfterSuccess(result.today);
     });
   }
 
@@ -231,7 +243,7 @@ export function AttendanceTodayPunchCard({
         return;
       }
       toast.success("Checkout time updated");
-      refreshAfterSuccess();
+      refreshAfterSuccess(result.today);
     });
   }
 
@@ -249,7 +261,7 @@ export function AttendanceTodayPunchCard({
               <p className="mt-1 text-sm text-muted-foreground">
                 Today&apos;s working hours:{" "}
                 <span className="font-medium text-foreground">
-                  {formatWorkingDuration(elapsedSeconds)}
+                  {workingHoursLabel}
                 </span>
                 . {workflowHint(punchState, allowUpdateCheckout)}
               </p>

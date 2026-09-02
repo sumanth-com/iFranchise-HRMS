@@ -27,8 +27,10 @@ const SELF_ATTENDANCE_PUNCH_PERMISSIONS = [
   "attendance.view",
 ] as const;
 
+import type { ManagerTodayAttendance } from "@/types/manager-self-attendance";
+
 export type SelfAttendancePunchResult =
-  | { success: true }
+  | { success: true; today: ManagerTodayAttendance }
   | { success: false; message: string };
 
 function revalidateSelfAttendancePaths() {
@@ -53,9 +55,9 @@ export async function selfAttendancePunchAction(
     ]);
     const supabase = await createClient();
     const parsed = managerAttendancePunchSchema.parse(input);
-    await punchManagerAttendance(supabase, profile, parsed);
+    const today = await punchManagerAttendance(supabase, profile, parsed);
     revalidateSelfAttendancePaths();
-    return { success: true };
+    return { success: true, today };
   } catch (error) {
     return {
       success: false,
@@ -80,9 +82,9 @@ export async function selfAttendanceUpdateCheckoutAction(
     }
     const supabase = await createClient();
     const parsed = managerUpdateCheckoutSchema.parse(input);
-    await updateManagerCheckout(supabase, profile, parsed);
+    const today = await updateManagerCheckout(supabase, profile, parsed);
     revalidateSelfAttendancePaths();
-    return { success: true };
+    return { success: true, today };
   } catch (error) {
     return {
       success: false,

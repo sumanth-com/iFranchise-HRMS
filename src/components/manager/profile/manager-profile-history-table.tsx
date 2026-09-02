@@ -23,6 +23,7 @@ import {
   formatAttendanceTime,
 } from "@/lib/attendance/services/attendance-utils";
 import { ATTENDANCE_STATUS_LABELS } from "@/lib/attendance/constants";
+import { getHrmsYears } from "@/lib/date/hrms-year";
 import { updateManagerCheckoutAction } from "@/lib/manager/actions/manager-self-attendance-actions";
 import { formatHoursLabel } from "@/lib/employee/attendance-format";
 import type { AttendanceStatus } from "@/types/attendance";
@@ -78,10 +79,7 @@ export function ManagerProfileHistoryTable({
   const [regularizeRow, setRegularizeRow] =
     useState<ManagerAttendanceHistoryRow | null>(null);
 
-  const yearOptions = useMemo(() => {
-    const current = new Date().getFullYear();
-    return Array.from({ length: 6 }, (_, index) => current - 2 + index);
-  }, []);
+  const yearOptions = useMemo(() => getHrmsYears(), []);
 
   function updateCheckout(row: ManagerAttendanceHistoryRow) {
     startTransition(async () => {

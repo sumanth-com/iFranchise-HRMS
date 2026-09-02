@@ -1,4 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { isExcludedFromTeamPayslips } from "@/lib/employee/directory-listing";
 import { LEAVE_BALANCE_CARD_CODES } from "@/lib/leave/constants";
 import { getEmployeeLeaveBalanceSnapshot } from "@/lib/leave/services/leave-queries";
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
@@ -16,6 +17,7 @@ import {
   PAYSLIP_VERSION,
   canAccessPayslipDuringReview,
   computePayslipSchedule,
+  isPayslipPublishedToEmployee,
   resolvePayslipAvailability,
   resolvePayslipSchedule,
 } from "@/lib/payroll/services/payslip-publication";
@@ -30,6 +32,8 @@ import type {
 import {
   calculateEmployeePayroll,
   type AttendanceSummary,
+  type LeaveMonthSummary,
+  type SalaryStructureRow,
 } from "@/lib/payroll/services/payroll-calculator";
 import {
   generatePayslipNumber,
@@ -52,6 +56,40 @@ import {
 function unwrapRelation<T>(value: T | T[] | null): T | null {
   if (!value) return null;
   return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+async function syncEmployeeEmploymentType(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  employeeId: string,
+  employmentTypeId: string | undefined,
+) {
+  if (!employmentTypeId) return;
+
+  const { data: typeRow, error: typeError } = await supabase
+    .schema("hrms")
+    .from("employment_types")
+    .select("id")
+    .eq("id", employmentTypeId)
+    .eq("organization_id", profile.employee.organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (typeError) throw new Error(typeError.message);
+  if (!typeRow) throw new Error("Select a valid employment type.");
+
+  const { error } = await supabase
+    .schema("hrms")
+    .from("employees")
+    .update({
+      employment_type_id: employmentTypeId,
+      updated_by: actorUserId(profile),
+    })
+    .eq("id", employeeId)
+    .eq("organization_id", profile.employee.organizationId)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
 }
 
 /** auth.users FK — cron / system actors must use null, not a fake string. */
@@ -78,17 +116,28 @@ async function getActiveEmployees(
         employee_code,
         first_name,
         last_name,
-        departments:department_id (name)
+        departments:department_id (name),
+        designations:designation_id (title),
+        employment_types:employment_type_id (name)
       `,
     )
     .eq("organization_id", organizationId)
-    .eq("employment_status", "active")
+    .in("employment_status", ["active", "probation", "on_leave"])
     .is("deleted_at", null)
-    .is("app_hidden_at", null)
     .order("employee_code", { ascending: true });
 
   if (error) throw new Error(error.message);
-  return data ?? [];
+  return (data ?? []).filter((row) => {
+    const designation = unwrapRelation(
+      row.designations as { title: string } | { title: string }[] | null,
+    );
+    return !isExcludedFromTeamPayslips(row.employee_code, {
+      employeeCode: row.employee_code,
+      firstName: row.first_name,
+      lastName: row.last_name,
+      designationTitle: designation?.title ?? null,
+    });
+  });
 }
 
 async function resolvePayslipSalaryComponents(
@@ -208,21 +257,17 @@ async function getAttendanceSummary(
   return summary;
 }
 
-async function getLeaveLopDays(
+async function getLeaveMonthSummary(
   supabase: AuthSupabaseClient,
   employeeId: string,
   month: number,
   year: number,
-): Promise<number> {
+): Promise<LeaveMonthSummary> {
   const range = getMonthDateRange(month, year);
-
-  // Only approved leave is payable. A request is unpaid either because its leave
-  // type is unpaid (LOP), or because it exceeded the employee's paid balance, in
-  // which case the overflow was recorded on the request as `lopDays`.
   const { data, error } = await supabase
     .schema("hrms")
     .from("leave_requests")
-    .select("total_days, duration_breakdown, leave_types!inner(code, is_paid)")
+    .select("employee_id, total_days, duration_breakdown, leave_types!inner(code, is_paid)")
     .eq("employee_id", employeeId)
     .eq("leave_status", "approved")
     .lte("start_date", range.endDate)
@@ -230,14 +275,253 @@ async function getLeaveLopDays(
     .is("deleted_at", null);
 
   if (error) throw new Error(error.message);
+  return summarizeLeaveRows(data ?? []);
+}
 
-  return (data ?? []).reduce((sum, row) => {
-    const leaveType = Array.isArray(row.leave_types) ? row.leave_types[0] : row.leave_types;
-    if (leaveType?.is_paid === false) return sum + Number(row.total_days);
+function summarizeLeaveRows(
+  rows: Array<{
+    total_days?: number | string | null;
+    duration_breakdown?: { lopDays?: unknown; paidDays?: unknown } | null;
+    leave_types?: { code?: string; is_paid?: boolean } | { code?: string; is_paid?: boolean }[] | null;
+  }>,
+): LeaveMonthSummary {
+  return rows.reduce(
+    (sum, row) => {
+      const leaveType = Array.isArray(row.leave_types) ? row.leave_types[0] : row.leave_types;
+      const breakdown = row.duration_breakdown;
+      const total = Number(row.total_days) || 0;
+      if (leaveType?.is_paid === false) {
+        return { lopDays: sum.lopDays + total, paidLeaveDays: sum.paidLeaveDays };
+      }
+      const lop =
+        typeof breakdown?.lopDays === "number" ? breakdown.lopDays : 0;
+      const paid =
+        typeof breakdown?.paidDays === "number" ? breakdown.paidDays : Math.max(0, total - lop);
+      return { lopDays: sum.lopDays + lop, paidLeaveDays: sum.paidLeaveDays + paid };
+    },
+    { lopDays: 0, paidLeaveDays: 0 },
+  );
+}
 
-    const breakdown = row.duration_breakdown as { lopDays?: unknown } | null;
-    return sum + (typeof breakdown?.lopDays === "number" ? breakdown.lopDays : 0);
-  }, 0);
+function toSalaryStructureRow(row: Record<string, unknown> | null): SalaryStructureRow | null {
+  if (!row) return null;
+  return {
+    id: String(row.id),
+    employee_id: String(row.employee_id),
+    basic_salary: row.basic_salary as number | string,
+    hra_amount: row.hra_amount as number | string,
+    transport_allowance: row.transport_allowance as number | string,
+    other_allowances: row.other_allowances as number | string,
+    tax_deduction: row.tax_deduction as number | string,
+    other_deductions: row.other_deductions as number | string,
+    gross_salary: row.gross_salary as number | string,
+    net_salary: row.net_salary as number | string,
+    components: (row.components as Record<string, unknown> | null) ?? null,
+  };
+}
+
+const QUERY_IN_CHUNK = 80;
+
+function emptyAttendanceSummary(): AttendanceSummary {
+  return {
+    presentDays: 0,
+    absentDays: 0,
+    halfDays: 0,
+    onLeaveDays: 0,
+    weekOffDays: 0,
+    holidayDays: 0,
+    overtimeHours: 0,
+  };
+}
+
+function applyAttendanceStatus(
+  summary: AttendanceSummary,
+  status: string | null | undefined,
+  overtimeHours: number,
+) {
+  switch (status) {
+    case "present":
+    case "late":
+      summary.presentDays += 1;
+      break;
+    case "absent":
+      summary.absentDays += 1;
+      break;
+    case "half_day":
+      summary.halfDays += 1;
+      break;
+    case "on_leave":
+      summary.onLeaveDays += 1;
+      break;
+    case "week_off":
+      summary.weekOffDays += 1;
+      break;
+    case "holiday":
+      summary.holidayDays += 1;
+      break;
+    default:
+      break;
+  }
+  summary.overtimeHours += overtimeHours;
+}
+
+async function loadPayrollPeriodFacts(
+  supabase: AuthSupabaseClient,
+  employeeIds: string[],
+  month: number,
+  year: number,
+) {
+  const structuresByEmployee = new Map<string, SalaryStructureRow>();
+  const attendanceByEmployee = new Map<string, AttendanceSummary>();
+  const leaveByEmployee = new Map<string, LeaveMonthSummary>();
+  const bonusesByEmployee = new Map<string, Array<{ amount: number | string; bonus_type: string }>>();
+  const reimbursementsByEmployee = new Map<
+    string,
+    Array<{ amount: number | string; category: string }>
+  >();
+
+  for (const id of employeeIds) {
+    attendanceByEmployee.set(id, emptyAttendanceSummary());
+    leaveByEmployee.set(id, { lopDays: 0, paidLeaveDays: 0 });
+    bonusesByEmployee.set(id, []);
+    reimbursementsByEmployee.set(id, []);
+  }
+
+  if (employeeIds.length === 0) {
+    return {
+      structuresByEmployee,
+      attendanceByEmployee,
+      leaveByEmployee,
+      bonusesByEmployee,
+      reimbursementsByEmployee,
+    };
+  }
+
+  const range = getMonthDateRange(month, year);
+  const monthDate = getPayrollMonthDate(month, year);
+  const structureRank = new Map<string, string>();
+
+  for (let i = 0; i < employeeIds.length; i += QUERY_IN_CHUNK) {
+    const chunk = employeeIds.slice(i, i + QUERY_IN_CHUNK);
+
+    const [
+      structuresResult,
+      attendanceResult,
+      leaveResult,
+      bonusesResult,
+      reimbursementsResult,
+    ] = await Promise.all([
+      supabase
+        .schema("hrms")
+        .from("salary_structures")
+        .select("*")
+        .in("employee_id", chunk)
+        .lte("effective_from", range.endDate)
+        .is("deleted_at", null)
+        .or(`effective_to.is.null,effective_to.gte.${monthDate}`),
+      supabase
+        .schema("hrms")
+        .from("attendance")
+        .select("employee_id, attendance_status, overtime_hours")
+        .in("employee_id", chunk)
+        .gte("attendance_date", range.startDate)
+        .lte("attendance_date", range.endDate)
+        .is("deleted_at", null),
+      supabase
+        .schema("hrms")
+        .from("leave_requests")
+        .select(
+          "employee_id, total_days, duration_breakdown, leave_types!inner(code, is_paid)",
+        )
+        .in("employee_id", chunk)
+        .eq("leave_status", "approved")
+        .lte("start_date", range.endDate)
+        .gte("end_date", range.startDate)
+        .is("deleted_at", null),
+      supabase
+        .schema("hrms")
+        .from("employee_bonuses")
+        .select("employee_id, amount, bonus_type, bonus_month")
+        .in("employee_id", chunk)
+        .in("bonus_status", ["pending", "approved"])
+        .eq("bonus_month", monthDate)
+        .is("payroll_id", null)
+        .is("deleted_at", null),
+      supabase
+        .schema("hrms")
+        .from("employee_reimbursements")
+        .select("employee_id, amount, category, expense_date")
+        .in("employee_id", chunk)
+        .in("reimbursement_status", ["pending", "approved"])
+        .is("payroll_id", null)
+        .is("deleted_at", null)
+        .gte("expense_date", range.startDate)
+        .lte("expense_date", range.endDate),
+    ]);
+
+    if (structuresResult.error) throw new Error(structuresResult.error.message);
+    if (attendanceResult.error) throw new Error(attendanceResult.error.message);
+    if (leaveResult.error) throw new Error(leaveResult.error.message);
+    if (bonusesResult.error) throw new Error(bonusesResult.error.message);
+    if (reimbursementsResult.error) throw new Error(reimbursementsResult.error.message);
+
+    for (const row of structuresResult.data ?? []) {
+      const employeeId = String(row.employee_id);
+      const from = String(row.effective_from ?? "");
+      const previous = structureRank.get(employeeId);
+      if (!previous || from > previous) {
+        structureRank.set(employeeId, from);
+        const mapped = toSalaryStructureRow(row as Record<string, unknown>);
+        if (mapped) structuresByEmployee.set(employeeId, mapped);
+      }
+    }
+
+    for (const row of attendanceResult.data ?? []) {
+      const summary = attendanceByEmployee.get(row.employee_id);
+      if (!summary) continue;
+      applyAttendanceStatus(summary, row.attendance_status, Number(row.overtime_hours ?? 0));
+    }
+
+    const leaveRowsByEmployee = new Map<
+      string,
+      Array<{
+        total_days?: number | string | null;
+        duration_breakdown?: { lopDays?: unknown; paidDays?: unknown } | null;
+        leave_types?: { code?: string; is_paid?: boolean } | { code?: string; is_paid?: boolean }[] | null;
+      }>
+    >();
+    for (const row of leaveResult.data ?? []) {
+      const list = leaveRowsByEmployee.get(row.employee_id) ?? [];
+      list.push(row);
+      leaveRowsByEmployee.set(row.employee_id, list);
+    }
+    for (const [employeeId, rows] of leaveRowsByEmployee) {
+      leaveByEmployee.set(employeeId, summarizeLeaveRows(rows));
+    }
+
+    for (const row of bonusesResult.data ?? []) {
+      if (monthKey(row.bonus_month) !== monthKey(monthDate)) continue;
+      bonusesByEmployee.get(row.employee_id)?.push({
+        amount: row.amount,
+        bonus_type: row.bonus_type,
+      });
+    }
+
+    for (const row of reimbursementsResult.data ?? []) {
+      reimbursementsByEmployee.get(row.employee_id)?.push({
+        amount: row.amount,
+        category: row.category,
+      });
+    }
+  }
+
+  return {
+    structuresByEmployee,
+    attendanceByEmployee,
+    leaveByEmployee,
+    bonusesByEmployee,
+    reimbursementsByEmployee,
+  };
 }
 
 function monthKey(value: string | null | undefined): string {
@@ -317,46 +601,69 @@ export async function buildPayrollPreview(
   const { month, year } = input;
   const organizationId = profile.employee.organizationId;
   const employees = await getActiveEmployees(supabase, organizationId);
+  const payrollSettings = await getPayrollSettings(supabase, organizationId);
+  const calcSettings = {
+    workingDaysCalculation: payrollSettings.settings.workingDaysCalculation,
+    lossOfPayDeduction: payrollSettings.settings.leaveIntegration.lossOfPayDeduction,
+    halfDayDeduction: payrollSettings.settings.leaveIntegration.halfDayDeduction,
+    paidLeaveDeduction: payrollSettings.settings.leaveIntegration.paidLeaveDeduction,
+  };
 
-  const items = await Promise.all(
-    employees.map(async (employee) => {
-      const department = unwrapRelation(
-        employee.departments as { name: string } | { name: string }[] | null,
-      );
-      const [salaryStructure, attendance, leaveLopDays, bonuses, reimbursements] =
-        await Promise.all([
-          getEffectiveSalaryStructure(supabase, employee.id, month, year),
-          getAttendanceSummary(supabase, employee.id, month, year),
-          getLeaveLopDays(supabase, employee.id, month, year),
-          getPayableBonuses(supabase, employee.id, [getPayrollMonthDate(month, year)]),
-          getPayableReimbursements(supabase, employee.id, [getMonthDateRange(month, year)]),
-        ]);
-
-      const calc = calculateEmployeePayroll({
-        month,
-        year,
-        salaryStructure,
-        attendance,
-        leaveLopDays,
-        bonuses,
-        reimbursements,
-      });
-
-      return {
-        employeeId: employee.id,
-        employeeCode: employee.employee_code,
-        employeeName: `${employee.first_name} ${employee.last_name}`,
-        departmentName: department?.name ?? null,
-        hasSalaryStructure: Boolean(salaryStructure),
-        basicSalary: calc.basicSalary,
-        totalAllowances: calc.totalAllowances,
-        totalDeductions: calc.totalDeductions,
-        grossSalary: calc.grossSalary,
-        netSalary: calc.netSalary,
-        breakdown: calc.breakdown,
-      };
-    }),
+  const facts = await loadPayrollPeriodFacts(
+    supabase,
+    employees.map((employee) => employee.id),
+    month,
+    year,
   );
+
+  const items = employees.map((employee) => {
+    const department = unwrapRelation(
+      employee.departments as { name: string } | { name: string }[] | null,
+    );
+    const salaryStructure = facts.structuresByEmployee.get(employee.id) ?? null;
+    const attendance = facts.attendanceByEmployee.get(employee.id) ?? emptyAttendanceSummary();
+    const leaveSummary = facts.leaveByEmployee.get(employee.id) ?? {
+      lopDays: 0,
+      paidLeaveDays: 0,
+    };
+    const bonuses = facts.bonusesByEmployee.get(employee.id) ?? [];
+    const reimbursements = facts.reimbursementsByEmployee.get(employee.id) ?? [];
+
+    const calc = calculateEmployeePayroll({
+      month,
+      year,
+      salaryStructure,
+      attendance,
+      leaveSummary,
+      bonuses,
+      reimbursements,
+      settings: calcSettings,
+    });
+
+    const designation = unwrapRelation(
+      employee.designations as { title: string } | { title: string }[] | null,
+    );
+    const employmentType = unwrapRelation(
+      employee.employment_types as { name: string } | { name: string }[] | null,
+    );
+
+    return {
+      employeeId: employee.id,
+      employeeCode: employee.employee_code,
+      employeeName: `${employee.first_name} ${employee.last_name}`,
+      departmentName: department?.name ?? null,
+      designationTitle: designation?.title ?? null,
+      employmentTypeName: employmentType?.name ?? null,
+      salaryStructureId: salaryStructure?.id ?? null,
+      hasSalaryStructure: Boolean(salaryStructure),
+      basicSalary: calc.basicSalary,
+      totalAllowances: calc.totalAllowances,
+      totalDeductions: calc.totalDeductions,
+      grossSalary: calc.grossSalary,
+      netSalary: calc.netSalary,
+      breakdown: calc.breakdown,
+    };
+  });
 
   const totalGross = roundCurrency(items.reduce((s, i) => s + i.grossSalary, 0));
   const totalDeductions = roundCurrency(
@@ -404,7 +711,9 @@ export async function getEmployeeRunBreakdown(
         employee_code,
         first_name,
         last_name,
-        departments:department_id (name)
+        departments:department_id (name),
+        designations:designation_id (title),
+        employment_types:employment_type_id (name)
       `,
     )
     .eq("id", employeeId)
@@ -418,12 +727,20 @@ export async function getEmployeeRunBreakdown(
   const department = unwrapRelation(
     employee.departments as { name: string } | { name: string }[] | null,
   );
+  const designation = unwrapRelation(
+    employee.designations as { title: string } | { title: string }[] | null,
+  );
+  const employmentType = unwrapRelation(
+    employee.employment_types as { name: string } | { name: string }[] | null,
+  );
 
-  const [salaryStructure, attendance, leaveLopDays, bonuses, reimbursements] =
+  const payrollSettings = await getPayrollSettings(supabase, organizationId);
+
+  const [salaryStructure, attendance, leaveSummary, bonuses, reimbursements] =
     await Promise.all([
       getEffectiveSalaryStructure(supabase, employeeId, month, year),
       getAttendanceSummary(supabase, employeeId, month, year),
-      getLeaveLopDays(supabase, employeeId, month, year),
+      getLeaveMonthSummary(supabase, employeeId, month, year),
       getPayableBonuses(
         supabase,
         employeeId,
@@ -444,11 +761,17 @@ export async function getEmployeeRunBreakdown(
   const calc = calculateEmployeePayroll({
     month,
     year,
-    salaryStructure,
+    salaryStructure: toSalaryStructureRow(salaryStructure as Record<string, unknown> | null),
     attendance,
-    leaveLopDays,
+    leaveSummary,
     bonuses,
     reimbursements,
+    settings: {
+      workingDaysCalculation: payrollSettings.settings.workingDaysCalculation,
+      lossOfPayDeduction: payrollSettings.settings.leaveIntegration.lossOfPayDeduction,
+      halfDayDeduction: payrollSettings.settings.leaveIntegration.halfDayDeduction,
+      paidLeaveDeduction: payrollSettings.settings.leaveIntegration.paidLeaveDeduction,
+    },
   });
 
   const bonusTotal = roundCurrency(
@@ -463,6 +786,8 @@ export async function getEmployeeRunBreakdown(
     employeeCode: employee.employee_code,
     employeeName: `${employee.first_name} ${employee.last_name}`.trim(),
     departmentName: department?.name ?? null,
+    designationTitle: designation?.title ?? null,
+    employmentTypeName: employmentType?.name ?? null,
     basicSalary: calc.basicSalary,
     totalAllowances: calc.totalAllowances,
     totalDeductions: calc.totalDeductions,
@@ -563,28 +888,22 @@ export async function generatePayrollRun(
 
   const employees = await getActiveEmployees(supabase, organizationId);
 
-  for (const item of preview.items) {
-    const salaryStructure = await getEffectiveSalaryStructure(
-      supabase,
-      item.employeeId,
-      input.month,
-      input.year,
-    );
+  const itemRows = preview.items.map((item) => ({
+    payroll_id: payrollId,
+    employee_id: item.employeeId,
+    salary_structure_id: item.salaryStructureId ?? null,
+    basic_salary: item.basicSalary,
+    total_allowances: item.totalAllowances,
+    total_deductions: item.totalDeductions,
+    gross_salary: item.grossSalary,
+    net_salary: item.netSalary,
+    breakdown: item.breakdown,
+    created_by: actorId,
+    updated_by: actorId,
+  }));
 
-    const { error: itemError } = await supabase.schema("hrms").from("payroll_items").insert({
-      payroll_id: payrollId,
-      employee_id: item.employeeId,
-      salary_structure_id: salaryStructure?.id ?? null,
-      basic_salary: item.basicSalary,
-      total_allowances: item.totalAllowances,
-      total_deductions: item.totalDeductions,
-      gross_salary: item.grossSalary,
-      net_salary: item.netSalary,
-      breakdown: item.breakdown,
-      created_by: actorId,
-      updated_by: actorId,
-    });
-
+  if (itemRows.length > 0) {
+    const { error: itemError } = await supabase.schema("hrms").from("payroll_items").insert(itemRows);
     if (itemError) {
       if (itemError.code === "23505") {
         throw new Error(
@@ -597,27 +916,31 @@ export async function generatePayrollRun(
 
   const month = input.month;
   const year = input.year;
+  const range = getMonthDateRange(month, year);
+  const employeeIds = employees.map((employee) => employee.id);
 
-  for (const employee of employees) {
-    await supabase
+  for (let i = 0; i < employeeIds.length; i += QUERY_IN_CHUNK) {
+    const chunk = employeeIds.slice(i, i + QUERY_IN_CHUNK);
+    const { error: bonusAttachError } = await supabase
       .schema("hrms")
       .from("employee_bonuses")
       .update({ payroll_id: payrollId, updated_by: actorId })
-      .eq("employee_id", employee.id)
+      .in("employee_id", chunk)
       .eq("bonus_month", payrollMonth)
       .in("bonus_status", ["pending", "approved"])
       .is("payroll_id", null);
+    if (bonusAttachError) throw new Error(bonusAttachError.message);
 
-    const range = getMonthDateRange(month, year);
-    await supabase
+    const { error: claimAttachError } = await supabase
       .schema("hrms")
       .from("employee_reimbursements")
       .update({ payroll_id: payrollId, updated_by: actorId })
-      .eq("employee_id", employee.id)
+      .in("employee_id", chunk)
       .in("reimbursement_status", ["pending", "approved"])
       .is("payroll_id", null)
       .gte("expense_date", range.startDate)
       .lte("expense_date", range.endDate);
+    if (claimAttachError) throw new Error(claimAttachError.message);
   }
 
   return payrollId;
@@ -1010,6 +1333,381 @@ export async function archivePayslip(
   if (error) throw new Error(error.message);
 }
 
+export async function updatePayrollItemAdjustments(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: {
+    payrollItemId: string;
+    additionalEarnings: number;
+    bonus: number;
+    incentive: number;
+    reimbursements: number;
+    additionalDeductions: number;
+    tdsOverride?: number | null;
+    otherDeductionsOverride?: number | null;
+    lopDaysOverride?: number | null;
+    confirmReopen?: boolean;
+  },
+): Promise<void> {
+  const { data: item, error } = await supabase
+    .schema("hrms")
+    .from("payroll_items")
+    .select(
+      `
+        id,
+        employee_id,
+        breakdown,
+        payrolls!inner (id, organization_id, is_locked, payroll_status, payroll_month),
+        payslips (id, email_sent_at, published_at)
+      `,
+    )
+    .eq("id", input.payrollItemId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!item) throw new Error("Payroll line not found.");
+
+  const payroll = unwrapRelation(
+    item.payrolls as
+      | {
+          id: string;
+          organization_id: string;
+          is_locked: boolean;
+          payroll_status: string;
+          payroll_month: string;
+        }
+      | {
+          id: string;
+          organization_id: string;
+          is_locked: boolean;
+          payroll_status: string;
+          payroll_month: string;
+        }[]
+      | null,
+  );
+  if (!payroll || payroll.organization_id !== profile.employee.organizationId) {
+    throw new Error("Payroll line not found.");
+  }
+  if (payroll.is_locked) {
+    throw new Error("This payroll period is locked. Reopen it before editing.");
+  }
+
+  const payslip = unwrapRelation(
+    item.payslips as
+      | { id: string; email_sent_at: string | null; published_at?: string | null }
+      | { id: string; email_sent_at: string | null; published_at?: string | null }[]
+      | null,
+  );
+  if ((payslip?.email_sent_at || payslip?.published_at) && !input.confirmReopen) {
+    throw new Error(
+      "This payslip was already sent. Confirm reopen to update payroll before sending again.",
+    );
+  }
+
+  const monthDate = new Date(`${payroll.payroll_month.slice(0, 10)}T00:00:00.000Z`);
+  const month = monthDate.getUTCMonth() + 1;
+  const year = monthDate.getUTCFullYear();
+  const existingBreakdown = (item.breakdown as PayrollBreakdown) ?? null;
+  const payrollSettings = await getPayrollSettings(supabase, profile.employee.organizationId);
+
+  const [salaryStructure, attendance, leaveSummary, bonuses, reimbursements] = await Promise.all([
+    getEffectiveSalaryStructure(supabase, item.employee_id, month, year),
+    getAttendanceSummary(supabase, item.employee_id, month, year),
+    getLeaveMonthSummary(supabase, item.employee_id, month, year),
+    getPayableBonuses(supabase, item.employee_id, [getPayrollMonthDate(month, year)], {
+      includeAttached: true,
+    }),
+    getPayableReimbursements(supabase, item.employee_id, [getMonthDateRange(month, year)], {
+      includeAttached: true,
+    }),
+  ]);
+
+  const calc = calculateEmployeePayroll({
+    month,
+    year,
+    salaryStructure: toSalaryStructureRow(salaryStructure as Record<string, unknown> | null),
+    attendance,
+    leaveSummary,
+    bonuses,
+    reimbursements,
+    settings: {
+      workingDaysCalculation: payrollSettings.settings.workingDaysCalculation,
+      lossOfPayDeduction: payrollSettings.settings.leaveIntegration.lossOfPayDeduction,
+      halfDayDeduction: payrollSettings.settings.leaveIntegration.halfDayDeduction,
+      paidLeaveDeduction: payrollSettings.settings.leaveIntegration.paidLeaveDeduction,
+    },
+    adjustments: {
+      additionalEarnings: input.additionalEarnings,
+      bonus: input.bonus,
+      incentive: input.incentive,
+      reimbursements: input.reimbursements,
+      additionalDeductions: input.additionalDeductions,
+      tdsOverride: input.tdsOverride,
+      otherDeductionsOverride: input.otherDeductionsOverride,
+      lopDaysOverride: input.lopDaysOverride,
+      itemStatus: "reviewed",
+    },
+  });
+
+  const { error: updateError } = await supabase
+    .schema("hrms")
+    .from("payroll_items")
+    .update({
+      basic_salary: calc.basicSalary,
+      total_allowances: calc.totalAllowances,
+      total_deductions: calc.totalDeductions,
+      gross_salary: calc.grossSalary,
+      net_salary: calc.netSalary,
+      breakdown: {
+        ...calc.breakdown,
+        payrollLifecycle: {
+          itemStatus: "reviewed" as const,
+          sentAt: existingBreakdown?.payrollLifecycle?.sentAt ?? null,
+        },
+      },
+      updated_by: actorUserId(profile),
+    })
+    .eq("id", input.payrollItemId);
+
+  if (updateError) throw new Error(updateError.message);
+
+  if (input.confirmReopen && payslip?.id) {
+    await supabase
+      .schema("hrms")
+      .from("payslips")
+      .update({
+        published_at: null,
+        email_sent_at: null,
+        updated_by: actorUserId(profile),
+      })
+      .eq("id", payslip.id);
+  }
+
+  const { data: items } = await supabase
+    .schema("hrms")
+    .from("payroll_items")
+    .select("gross_salary, total_deductions, net_salary")
+    .eq("payroll_id", payroll.id)
+    .is("deleted_at", null);
+
+  await supabase
+    .schema("hrms")
+    .from("payrolls")
+    .update({
+      total_gross: roundCurrency(
+        (items ?? []).reduce((sum, row) => sum + Number(row.gross_salary ?? 0), 0),
+      ),
+      total_deductions: roundCurrency(
+        (items ?? []).reduce((sum, row) => sum + Number(row.total_deductions ?? 0), 0),
+      ),
+      total_net: roundCurrency(
+        (items ?? []).reduce((sum, row) => sum + Number(row.net_salary ?? 0), 0),
+      ),
+      payroll_status: payroll.payroll_status === "draft" ? "processed" : payroll.payroll_status,
+      updated_by: actorUserId(profile),
+    })
+    .eq("id", payroll.id);
+}
+
+export async function ensureUnpublishedPayslipForPayrollItem(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  payrollItemId: string,
+): Promise<string> {
+  const { data: item, error } = await supabase
+    .schema("hrms")
+    .from("payroll_items")
+    .select(
+      `
+        id,
+        employee_id,
+        payrolls!inner (id, organization_id, payroll_month),
+        employees (employee_code),
+        payslips (id)
+      `,
+    )
+    .eq("id", payrollItemId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!item) throw new Error("Payroll line not found.");
+
+  const payroll = unwrapRelation(
+    item.payrolls as
+      | { id: string; organization_id: string; payroll_month: string }
+      | { id: string; organization_id: string; payroll_month: string }[]
+      | null,
+  );
+  if (!payroll || payroll.organization_id !== profile.employee.organizationId) {
+    throw new Error("Payroll line not found.");
+  }
+
+  const existingPayslip = unwrapRelation(
+    item.payslips as { id: string } | { id: string }[] | null,
+  );
+  if (existingPayslip?.id) return existingPayslip.id;
+
+  const employee = unwrapRelation(
+    item.employees as { employee_code: string } | { employee_code: string }[] | null,
+  );
+  const actorId = actorUserId(profile);
+  const nowIso = new Date().toISOString();
+  const payslipNumber = generatePayslipNumber(
+    employee?.employee_code ?? "EMP",
+    payroll.payroll_month,
+  );
+  const { data: created, error: insertError } = await supabase
+    .schema("hrms")
+    .from("payslips")
+    .insert({
+      payroll_id: payroll.id,
+      payroll_item_id: item.id,
+      employee_id: item.employee_id,
+      payslip_number: payslipNumber,
+      salary_credit_date: nowIso.slice(0, 10),
+      published_at: null,
+      payroll_generated_at: nowIso,
+      payment_mode: "Bank Transfer",
+      payslip_version: PAYSLIP_VERSION,
+      created_by: actorId,
+      updated_by: actorId,
+    })
+    .select("id")
+    .single();
+
+  if (insertError) throw new Error(insertError.message);
+  return created.id;
+}
+
+export async function releaseEmployeePayslip(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  payrollItemId: string,
+  appOrigin: string,
+): Promise<{ emailed: boolean }> {
+  const { data: item, error } = await supabase
+    .schema("hrms")
+    .from("payroll_items")
+    .select(
+      `
+        id,
+        employee_id,
+        breakdown,
+        payroll_id,
+        payrolls!inner (id, organization_id, payroll_month),
+        employees (employee_code),
+        payslips (id, email_sent_at, published_at)
+      `,
+    )
+    .eq("id", payrollItemId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!item) throw new Error("Payroll line not found.");
+
+  const payroll = unwrapRelation(
+    item.payrolls as
+      | { id: string; organization_id: string; payroll_month: string }
+      | { id: string; organization_id: string; payroll_month: string }[]
+      | null,
+  );
+  if (!payroll || payroll.organization_id !== profile.employee.organizationId) {
+    throw new Error("Payroll line not found.");
+  }
+
+  const existingPayslip = unwrapRelation(
+    item.payslips as
+      | { id: string; email_sent_at: string | null; published_at?: string | null }
+      | { id: string; email_sent_at: string | null; published_at?: string | null }[]
+      | null,
+  );
+  if (
+    (Boolean(existingPayslip?.email_sent_at) ||
+      (existingPayslip?.published_at &&
+        isPayslipPublishedToEmployee(existingPayslip.published_at)))
+  ) {
+    throw new Error("Payslip already sent for this employee and period.");
+  }
+
+  const employee = unwrapRelation(
+    item.employees as { employee_code: string } | { employee_code: string }[] | null,
+  );
+  const actorId = actorUserId(profile);
+  const nowIso = new Date().toISOString();
+  let payslipId = existingPayslip?.id ?? null;
+
+  if (!payslipId) {
+    const payslipNumber = generatePayslipNumber(
+      employee?.employee_code ?? "EMP",
+      payroll.payroll_month,
+    );
+    const { data: created, error: insertError } = await supabase
+      .schema("hrms")
+      .from("payslips")
+      .insert({
+        payroll_id: payroll.id,
+        payroll_item_id: item.id,
+        employee_id: item.employee_id,
+        payslip_number: payslipNumber,
+        salary_credit_date: nowIso.slice(0, 10),
+        published_at: nowIso,
+        payroll_generated_at: nowIso,
+        payment_mode: "Bank Transfer",
+        payslip_version: PAYSLIP_VERSION,
+        created_by: actorId,
+        updated_by: actorId,
+      })
+      .select("id")
+      .single();
+    if (insertError) throw new Error(insertError.message);
+    payslipId = created.id;
+  } else {
+    await supabase
+      .schema("hrms")
+      .from("payslips")
+      .update({ published_at: nowIso, updated_by: actorId })
+      .eq("id", payslipId);
+  }
+
+  const breakdown = (item.breakdown as PayrollBreakdown) ?? {
+    earnings: [],
+    deductions: [],
+    attendance: {
+      workingDays: 0,
+      presentDays: 0,
+      absentDays: 0,
+      lopDays: 0,
+      leaveLopDays: 0,
+      overtimeHours: 0,
+    },
+  };
+  await supabase
+    .schema("hrms")
+    .from("payroll_items")
+    .update({
+      breakdown: {
+        ...breakdown,
+        payrollLifecycle: { itemStatus: "sent", sentAt: nowIso },
+      },
+      updated_by: actorId,
+    })
+    .eq("id", item.id);
+
+  if (!payslipId) {
+    throw new Error("Payslip could not be created.");
+  }
+
+  try {
+    await emailPayslip(supabase, profile, payslipId, appOrigin);
+    return { emailed: true };
+  } catch {
+    return { emailed: false };
+  }
+}
+
 export async function snapshotPayslipVersion(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -1127,6 +1825,13 @@ export async function createSalaryStructure(
 
   if (error) throw new Error(error.message);
 
+  await syncEmployeeEmploymentType(
+    supabase,
+    profile,
+    parsed.employeeId,
+    parsed.employmentTypeId,
+  );
+
   await refreshDraftPayrollItemsForEmployee(
     supabase,
     profile,
@@ -1195,17 +1900,25 @@ export async function refreshDraftPayrollItemsForEmployee(
   if (error) throw new Error(error.message);
   if (!draftPayrolls?.length) return;
 
+  const payrollSettings = await getPayrollSettings(supabase, organizationId);
+  const calcSettings = {
+    workingDaysCalculation: payrollSettings.settings.workingDaysCalculation,
+    lossOfPayDeduction: payrollSettings.settings.leaveIntegration.lossOfPayDeduction,
+    halfDayDeduction: payrollSettings.settings.leaveIntegration.halfDayDeduction,
+    paidLeaveDeduction: payrollSettings.settings.leaveIntegration.paidLeaveDeduction,
+  };
+
   for (const payroll of draftPayrolls) {
     const monthDate = new Date(`${payroll.payroll_month.slice(0, 10)}T00:00:00.000Z`);
     if (Number.isNaN(monthDate.getTime())) continue;
     const month = monthDate.getUTCMonth() + 1;
     const year = monthDate.getUTCFullYear();
 
-    const [salaryStructure, attendance, leaveLopDays, bonuses, reimbursements] =
+    const [salaryStructure, attendance, leaveSummary, bonuses, reimbursements] =
       await Promise.all([
         getEffectiveSalaryStructure(supabase, employeeId, month, year),
         getAttendanceSummary(supabase, employeeId, month, year),
-        getLeaveLopDays(supabase, employeeId, month, year),
+        getLeaveMonthSummary(supabase, employeeId, month, year),
         getPayableBonuses(supabase, employeeId, [getPayrollMonthDate(month, year)], {
           includeAttached: true,
         }),
@@ -1214,38 +1927,31 @@ export async function refreshDraftPayrollItemsForEmployee(
         }),
       ]);
 
-    const calc = calculateEmployeePayroll({
-      month,
-      year,
-      salaryStructure: salaryStructure
-        ? {
-            id: salaryStructure.id,
-            employee_id: salaryStructure.employee_id,
-            basic_salary: salaryStructure.basic_salary,
-            hra_amount: salaryStructure.hra_amount,
-            transport_allowance: salaryStructure.transport_allowance,
-            other_allowances: salaryStructure.other_allowances,
-            tax_deduction: salaryStructure.tax_deduction,
-            other_deductions: salaryStructure.other_deductions,
-            gross_salary: salaryStructure.gross_salary,
-            net_salary: salaryStructure.net_salary,
-            components: salaryStructure.components as Record<string, unknown> | null,
-          }
-        : null,
-      attendance,
-      leaveLopDays,
-      bonuses,
-      reimbursements,
-    });
-
     const { data: existingItem } = await supabase
       .schema("hrms")
       .from("payroll_items")
-      .select("id")
+      .select("id, breakdown")
       .eq("payroll_id", payroll.id)
       .eq("employee_id", employeeId)
       .is("deleted_at", null)
       .maybeSingle();
+
+    const existingAdjustments = (existingItem?.breakdown as PayrollBreakdown | null)?.hrAdjustments;
+    if ((existingItem?.breakdown as PayrollBreakdown | null)?.payrollLifecycle?.itemStatus === "sent") {
+      continue;
+    }
+
+    const calc = calculateEmployeePayroll({
+      month,
+      year,
+      salaryStructure: toSalaryStructureRow(salaryStructure as Record<string, unknown> | null),
+      attendance,
+      leaveSummary,
+      bonuses,
+      reimbursements,
+      settings: calcSettings,
+      adjustments: existingAdjustments,
+    });
 
     if (existingItem) {
       const { error: updateError } = await supabase
@@ -1415,6 +2121,13 @@ export async function updateSalaryStructure(
 
     if (error) throw new Error(error.message);
   }
+
+  await syncEmployeeEmploymentType(
+    supabase,
+    profile,
+    parsed.employeeId,
+    parsed.employmentTypeId,
+  );
 
   await refreshDraftPayrollItemsForEmployee(supabase, profile, parsed.employeeId);
 }
@@ -1687,6 +2400,115 @@ export async function createSalaryRevision(
   return data.id;
 }
 
+export async function syncActiveEmployeesIntoPayrollRun(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  payrollId: string,
+): Promise<void> {
+  const organizationId = profile.employee.organizationId;
+  const { data: payroll, error } = await supabase
+    .schema("hrms")
+    .from("payrolls")
+    .select("id, organization_id, payroll_month, is_locked")
+    .eq("id", payrollId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!payroll || payroll.is_locked) return;
+
+  const [{ data: existingItems, error: itemsError }, employees] = await Promise.all([
+    supabase
+      .schema("hrms")
+      .from("payroll_items")
+      .select("employee_id")
+      .eq("payroll_id", payrollId)
+      .is("deleted_at", null),
+    getActiveEmployees(supabase, organizationId),
+  ]);
+
+  if (itemsError) throw new Error(itemsError.message);
+
+  const existingIds = new Set((existingItems ?? []).map((row) => row.employee_id));
+  const missing = employees.filter((employee) => !existingIds.has(employee.id));
+  if (missing.length === 0) return;
+
+  const monthDate = new Date(`${String(payroll.payroll_month).slice(0, 10)}T00:00:00.000Z`);
+  const month = monthDate.getUTCMonth() + 1;
+  const year = monthDate.getUTCFullYear();
+  const payrollSettings = await getPayrollSettings(supabase, organizationId);
+  const facts = await loadPayrollPeriodFacts(
+    supabase,
+    missing.map((employee) => employee.id),
+    month,
+    year,
+  );
+  const actorId = actorUserId(profile);
+  const calcSettings = {
+    workingDaysCalculation: payrollSettings.settings.workingDaysCalculation,
+    lossOfPayDeduction: payrollSettings.settings.leaveIntegration.lossOfPayDeduction,
+    halfDayDeduction: payrollSettings.settings.leaveIntegration.halfDayDeduction,
+    paidLeaveDeduction: payrollSettings.settings.leaveIntegration.paidLeaveDeduction,
+  };
+
+  const rows = missing.map((employee) => {
+    const salaryStructure = facts.structuresByEmployee.get(employee.id) ?? null;
+    const calc = calculateEmployeePayroll({
+      month,
+      year,
+      salaryStructure,
+      attendance: facts.attendanceByEmployee.get(employee.id) ?? emptyAttendanceSummary(),
+      leaveSummary: facts.leaveByEmployee.get(employee.id) ?? { lopDays: 0, paidLeaveDays: 0 },
+      bonuses: facts.bonusesByEmployee.get(employee.id) ?? [],
+      reimbursements: facts.reimbursementsByEmployee.get(employee.id) ?? [],
+      settings: calcSettings,
+    });
+    return {
+      payroll_id: payrollId,
+      employee_id: employee.id,
+      salary_structure_id: salaryStructure?.id ?? null,
+      basic_salary: calc.basicSalary,
+      total_allowances: calc.totalAllowances,
+      total_deductions: calc.totalDeductions,
+      gross_salary: calc.grossSalary,
+      net_salary: calc.netSalary,
+      breakdown: calc.breakdown,
+      created_by: actorId,
+      updated_by: actorId,
+    };
+  });
+
+  const { error: insertError } = await supabase.schema("hrms").from("payroll_items").insert(rows);
+  if (insertError && insertError.code !== "23505") {
+    throw new Error(insertError.message);
+  }
+
+  const { data: totals } = await supabase
+    .schema("hrms")
+    .from("payroll_items")
+    .select("gross_salary, total_deductions, net_salary")
+    .eq("payroll_id", payrollId)
+    .is("deleted_at", null);
+
+  await supabase
+    .schema("hrms")
+    .from("payrolls")
+    .update({
+      total_gross: roundCurrency(
+        (totals ?? []).reduce((sum, row) => sum + Number(row.gross_salary ?? 0), 0),
+      ),
+      total_deductions: roundCurrency(
+        (totals ?? []).reduce((sum, row) => sum + Number(row.total_deductions ?? 0), 0),
+      ),
+      total_net: roundCurrency(
+        (totals ?? []).reduce((sum, row) => sum + Number(row.net_salary ?? 0), 0),
+      ),
+      updated_by: actorId,
+    })
+    .eq("id", payrollId);
+}
+
 export async function getPayrollRunById(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -1723,8 +2545,11 @@ export async function getPayrollRunById(
           employee_code,
           first_name,
           last_name,
-          departments:department_id (name)
-        )
+          departments:department_id (name),
+          designations:designation_id (title),
+          employment_types:employment_type_id (name)
+        ),
+        payslips (id, email_sent_at, published_at)
       `,
     )
     .eq("payroll_id", payrollId)
@@ -1753,25 +2578,62 @@ export async function getPayrollRunById(
 
   if (approvalsError) throw new Error(approvalsError.message);
 
-  return {
-    id: payroll.id,
-    payrollMonth: payroll.payroll_month,
-    payrollStatus: payroll.payroll_status,
-    totalGross: Number(payroll.total_gross),
-    totalDeductions: Number(payroll.total_deductions),
-    totalNet: Number(payroll.total_net),
-    isLocked: Boolean(payroll.is_locked),
-    notes: payroll.notes,
-    processedAt: payroll.processed_at,
-    approvedAt: payroll.approved_at,
-    items: (items ?? []).map((row) => {
+  const visibleItems = (items ?? []).flatMap((row) => {
       const employee = unwrapRelation(row.employees);
+      const designation = employee
+        ? unwrapRelation(
+            employee.designations as { title: string } | { title: string }[] | null,
+          )
+        : null;
+      if (
+        employee &&
+        isExcludedFromTeamPayslips(employee.employee_code, {
+          employeeCode: employee.employee_code,
+          firstName: employee.first_name,
+          lastName: employee.last_name,
+          designationTitle: designation?.title ?? null,
+        })
+      ) {
+        return [];
+      }
       const department = employee
         ? unwrapRelation(
             employee.departments as { name: string } | { name: string }[] | null,
           )
         : null;
-      return {
+      const employmentType = employee
+        ? unwrapRelation(
+            employee.employment_types as { name: string } | { name: string }[] | null,
+          )
+        : null;
+      const payslip = unwrapRelation(
+        row.payslips as
+          | { id: string; email_sent_at: string | null; published_at?: string | null }
+          | { id: string; email_sent_at: string | null; published_at?: string | null }[]
+          | null,
+      );
+      const breakdown = (row.breakdown as PayrollBreakdown) ?? {
+        earnings: [],
+        deductions: [],
+        attendance: {
+          workingDays: 0,
+          presentDays: 0,
+          absentDays: 0,
+          lopDays: 0,
+          leaveLopDays: 0,
+          overtimeHours: 0,
+        },
+      };
+      const payslipSent =
+        Boolean(payslip?.email_sent_at) ||
+        Boolean(
+          payslip?.published_at && isPayslipPublishedToEmployee(payslip.published_at),
+        ) ||
+        breakdown.payrollLifecycle?.itemStatus === "sent";
+      const itemStatus = payslipSent
+        ? "sent"
+        : breakdown.payrollLifecycle?.itemStatus ?? "draft";
+      return [{
         id: row.id,
         employeeId: row.employee_id,
         employeeCode: employee?.employee_code ?? "",
@@ -1779,25 +2641,36 @@ export async function getPayrollRunById(
           ? `${employee.first_name} ${employee.last_name}`
           : "",
         departmentName: department?.name ?? null,
+        designationTitle: designation?.title ?? null,
+        employmentTypeName: employmentType?.name ?? null,
         basicSalary: Number(row.basic_salary),
         totalAllowances: Number(row.total_allowances),
         totalDeductions: Number(row.total_deductions),
         grossSalary: Number(row.gross_salary),
         netSalary: Number(row.net_salary),
-        breakdown: (row.breakdown as PayrollBreakdown) ?? {
-          earnings: [],
-          deductions: [],
-          attendance: {
-            workingDays: 0,
-            presentDays: 0,
-            absentDays: 0,
-            lopDays: 0,
-            leaveLopDays: 0,
-            overtimeHours: 0,
-          },
-        },
-      };
-    }),
+        breakdown,
+        hasSalaryStructure: Boolean(
+          breakdown.salaryStructureSnapshot?.salaryStructureId ||
+            Number(row.basic_salary) > 0,
+        ),
+        itemStatus,
+        payslipSent,
+        payslipId: payslip?.id ?? null,
+      }];
+  });
+
+  return {
+    id: payroll.id,
+    payrollMonth: payroll.payroll_month,
+    payrollStatus: payroll.payroll_status,
+    totalGross: visibleItems.reduce((sum, item) => sum + item.grossSalary, 0),
+    totalDeductions: visibleItems.reduce((sum, item) => sum + item.totalDeductions, 0),
+    totalNet: visibleItems.reduce((sum, item) => sum + item.netSalary, 0),
+    isLocked: Boolean(payroll.is_locked),
+    notes: payroll.notes,
+    processedAt: payroll.processed_at,
+    approvedAt: payroll.approved_at,
+    items: visibleItems,
     approvals: (approvals ?? []).map((row) => {
       const approver = unwrapRelation(
         row.employees as

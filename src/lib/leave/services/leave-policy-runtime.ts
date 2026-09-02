@@ -24,6 +24,13 @@ import {
   type LeavePolicyNoticeHours,
   type LeaveProbationRules,
 } from "@/lib/leave/services/leave-policy-engine";
+import { isPendingHrReview, parseHrReviewMetadata } from "@/lib/leave/hr-review";
+import {
+  isLeaveTypeAllowedForBand,
+  isOptionalHolidayAllowedForBand,
+  LEAVE_TYPE_NOT_ELIGIBLE_MESSAGE,
+  resolveLeaveEligibilityBand,
+} from "@/lib/leave/leave-eligibility";
 import { ALLOWED_LEAVE_TYPE_CODES, sortByLeaveTypeCode } from "@/lib/leave/constants";
 import {
   ensureEmployeeMonthlyLeaveAccruals,
@@ -194,6 +201,22 @@ export const loadLeavePolicyRuntime = cache(async function loadLeavePolicyRuntim
   };
 });
 
+function unwrapEmploymentType(
+  value:
+    | { code?: string | null; is_full_time?: boolean | null }
+    | { code?: string | null; is_full_time?: boolean | null }[]
+    | null
+    | undefined,
+): { code: string | null; isFullTime: boolean | null } | null {
+  if (!value) return null;
+  const row = Array.isArray(value) ? value[0] : value;
+  if (!row) return null;
+  return {
+    code: row.code ?? null,
+    isFullTime: typeof row.is_full_time === "boolean" ? row.is_full_time : null,
+  };
+}
+
 export async function loadLeaveEmployeePolicyState(
   supabase: AuthSupabaseClient,
   employeeId: string,
@@ -204,7 +227,7 @@ export async function loadLeaveEmployeePolicyState(
     supabase
       .schema("hrms")
       .from("employees")
-      .select("id, date_of_joining, employment_status, organization_id")
+      .select("id, date_of_joining, employment_status, organization_id, employment_types:employment_type_id (code, is_full_time)")
       .eq("id", employeeId)
       .maybeSingle(),
     supabase
@@ -243,12 +266,16 @@ export async function loadLeaveEmployeePolicyState(
   const { data: requestRows, error: requestError } = await supabase
     .schema("hrms")
     .from("leave_requests")
-    .select("total_days, leave_types:leave_type_id (code)")
+    .select("total_days, leave_status, duration_breakdown, leave_types:leave_type_id (code)")
     .eq("employee_id", employeeId)
     .in("leave_status", ["pending", "approved"])
     .is("deleted_at", null);
   if (requestError) throw new Error(requestError.message);
   for (const row of requestRows ?? []) {
+    if (isPendingHrReview(row.leave_status, row.duration_breakdown)) continue;
+    const review = parseHrReviewMetadata(row.duration_breakdown);
+    if (row.leave_status === "approved" && review?.decision === "special") continue;
+    if (row.leave_status === "approved" && review?.decision === "lop") continue;
     const leaveType = Array.isArray(row.leave_types) ? row.leave_types[0] : row.leave_types;
     const code = String(leaveType?.code ?? "");
     if (!code || codesFromBalances.has(code)) continue;
@@ -256,12 +283,22 @@ export async function loadLeaveEmployeePolicyState(
       (usedAndPendingByType[code] ?? 0) + Number(row.total_days);
   }
 
+  const employmentType = unwrapEmploymentType(employeeResult.data.employment_types);
+  const leaveEligibilityBand = resolveLeaveEligibilityBand({
+    employmentStatus: employeeResult.data.employment_status,
+    employmentTypeCode: employmentType?.code ?? null,
+    isFullTime: employmentType?.isFullTime ?? null,
+  });
+
   return {
     employeeId,
     joiningDate: employeeResult.data.date_of_joining,
     employmentStatus: employeeResult.data.employment_status,
     gender: profileResult.data?.gender ?? null,
     usedAndPendingByType,
+    employmentTypeCode: employmentType?.code ?? null,
+    isFullTime: employmentType?.isFullTime ?? true,
+    leaveEligibilityBand,
   };
 }
 
@@ -322,6 +359,7 @@ export async function evaluateLeaveApplication(
     excludeRequestId?: string;
     pendingCredit?: { code: string; days: number };
     skipNotice?: boolean;
+    enforceSelfServiceLimits?: boolean;
   },
 ) {
   const credit =
@@ -358,6 +396,11 @@ export async function evaluateLeaveApplication(
   const leaveType = runtime.leaveTypes.find((item) => item.id === input.leaveTypeId);
   if (!leaveType) {
     throw new Error("Select a valid leave type");
+  }
+
+  const band = employee.leaveEligibilityBand ?? "full_time_confirmed";
+  if (!isLeaveTypeAllowedForBand(leaveType.code, band)) {
+    throw new Error(LEAVE_TYPE_NOT_ELIGIBLE_MESSAGE);
   }
 
   const duration = calculateLeaveDuration({
@@ -410,6 +453,9 @@ export async function evaluateLeaveApplication(
   }
 
   if (code === OPTIONAL_HOLIDAY_CODE) {
+    if (!isOptionalHolidayAllowedForBand(band)) {
+      throw new Error(LEAVE_TYPE_NOT_ELIGIBLE_MESSAGE);
+    }
     if (input.isHalfDay) {
       throw new Error("Optional Holiday is a full day. Choose a date from the Optional Holiday list.");
     }
@@ -489,6 +535,7 @@ export async function evaluateLeaveApplication(
     maxConsecutiveDays: runtime.maxConsecutiveDays,
     overlapping,
     skipNotice: input.skipNotice || code === OPTIONAL_HOLIDAY_CODE,
+    enforceSelfServiceLimits: input.enforceSelfServiceLimits === true,
   });
 
   const blockingIssues = issues.filter(isBlockingLeaveIssue);

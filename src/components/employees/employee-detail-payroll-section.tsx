@@ -77,19 +77,8 @@ function monthFromPayrollMonth(payrollMonth: string): number | null {
   return date.getUTCMonth() + 1;
 }
 
-function payrollYearItems(selectedYear: number | null) {
-  const current = new Date().getFullYear();
-  const years = new Set([
-    current - 2,
-    current - 1,
-    current,
-    current + 1,
-    current + 2,
-  ]);
-  if (selectedYear != null) {
-    years.add(selectedYear);
-  }
-  return getYearSelectItems([...years].sort((a, b) => a - b));
+function payrollYearItems(_selectedYear: number | null) {
+  return getYearSelectItems();
 }
 
 const PAYROLL_MONTH_ITEMS = [

@@ -62,7 +62,7 @@ export const employeeListParamsSchema = z.object({
       "account_status",
       "last_login_at",
     ])
-    .default("employee_code"),
+    .default("first_name"),
   sortOrder: z.enum(["asc", "desc"]).default("asc"),
   department: z
     .string()
@@ -168,17 +168,36 @@ export const employeeBasicStepSchema = z.object({
   bio: z.string().max(1000).optional(),
 });
 
-export const employeeEmploymentStepSchema = z.object({
-  branchId: z.string().uuid("Select a branch"),
-  departmentId: z.string().uuid().optional().or(z.literal("")),
-  designationId: z.string().uuid().optional().or(z.literal("")),
-  employmentTypeId: z.string().uuid().optional().or(z.literal("")),
-  reportingManagerId: z.string().uuid().optional().or(z.literal("")),
-  assignedHrEmployeeId: z.string().uuid().optional().or(z.literal("")),
-  employmentStatus: employmentStatusSchema,
-  dateOfJoining: z.string().optional(),
-  dateOfLeaving: z.string().optional(),
-});
+export const employeeEmploymentStepSchema = z
+  .object({
+    branchId: z.string().uuid("Select a branch"),
+    departmentId: z.string().uuid().optional().or(z.literal("")),
+    designationId: z
+      .string()
+      .uuid()
+      .optional()
+      .or(z.literal(""))
+      .or(z.literal(DESIGNATION_OTHER_VALUE)),
+    customDesignationTitle: z.string().max(100).optional().or(z.literal("")),
+    employmentTypeId: z.string().uuid().optional().or(z.literal("")),
+    reportingManagerId: z.string().uuid().optional().or(z.literal("")),
+    assignedHrEmployeeId: z.string().uuid().optional().or(z.literal("")),
+    employmentStatus: employmentStatusSchema,
+    dateOfJoining: z.string().optional(),
+    dateOfLeaving: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (
+      data.designationId === DESIGNATION_OTHER_VALUE &&
+      !data.customDesignationTitle?.trim()
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Enter a designation",
+        path: ["customDesignationTitle"],
+      });
+    }
+  });
 
 export const employeeAddressStepSchema = z.object({
   addressType: addressTypeSchema.default("current"),

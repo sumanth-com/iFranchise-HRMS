@@ -11,12 +11,12 @@ import { LeaveDurationBreakdownCard } from "@/components/leave/leave-apply-polic
 import { Label } from "@/components/ui/label";
 import {
   approveLeaveRequestAction,
+  decideHrLeaveReviewAction,
   deleteLeaveRequestAction,
   getLeaveDetailAction,
   rejectLeaveRequestAction,
 } from "@/lib/leave/actions";
 import {
-  formatHalfDayPeriod,
   formatLeaveDate,
 } from "@/lib/leave/services/leave-utils";
 import type { LeaveDetail, LeaveListItem, LeaveStatus } from "@/types/leave";
@@ -55,9 +55,9 @@ export function HrLeaveDetailPopup({
   const [detail, setDetail] = useState<LeaveDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isFetching, setIsFetching] = useState(false);
-  const [actionMode, setActionMode] = useState<"approve" | "reject" | "delete" | null>(
-    null,
-  );
+  const [actionMode, setActionMode] = useState<
+    "approve" | "reject" | "delete" | "lop" | "special" | "hr_reject" | null
+  >(null);
   const [comments, setComments] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
   const [isPending, startAction] = useTransition();
@@ -185,11 +185,49 @@ export function HrLeaveDetailPopup({
     });
   }
 
+  function handleHrReview(decision: "lop" | "special" | "reject") {
+    if (!detail) return;
+    if (decision === "reject" && comments.trim().length < 3) {
+      setActionError("Please add a short reason for rejection");
+      return;
+    }
+    setActionError(null);
+    startAction(async () => {
+      const result = await decideHrLeaveReviewAction({
+        leaveRequestId: detail.id,
+        decision,
+        remarks:
+          decision === "reject"
+            ? comments.trim()
+            : comments.trim() ||
+              (decision === "lop" ? "Approved as Loss of Pay" : "Approved as Special Leave"),
+      });
+      if (!result.success) {
+        setActionError(result.message);
+        toast.error(result.message);
+        return;
+      }
+      const status = decision === "reject" ? "rejected" : "approved";
+      refreshAndClose(
+        decision === "reject"
+          ? "Leave request rejected"
+          : decision === "lop"
+            ? "Leave approved as Loss of Pay"
+            : "Leave approved as Special Leave",
+        { leaveRequestId: detail.id, status },
+      );
+    });
+  }
+
   const status = detail?.leaveStatus as LeaveStatus | undefined;
+  const pendingHrReview =
+    Boolean(detail?.hrReviewRequired) && status === "pending" && !detail?.hrDecision;
   const showApprove =
-    Boolean(detail?.canApprove ?? canApprove) && status === "pending";
+    Boolean(detail?.canApprove ?? canApprove) && status === "pending" && !pendingHrReview;
   const showReject =
-    Boolean(detail?.canReject ?? canReject) && status === "pending";
+    Boolean(detail?.canReject ?? canReject) && status === "pending" && !pendingHrReview;
+  const showHrReview =
+    pendingHrReview && Boolean(detail?.canApprove ?? canApprove);
   const showDelete = Boolean(detail?.canDelete ?? canDelete);
 
   const dateRange =
@@ -220,9 +258,19 @@ export function HrLeaveDetailPopup({
             ? "Could not load this leave request"
             : "Loading leave request…"
       }
-      contentClassName="sm:max-w-xl"
+      contentClassName="sm:max-w-4xl max-h-none overflow-visible"
+      bodyClassName="overflow-visible"
       showCancel={false}
-      headerAddon={detail ? <LeaveStatusBadge status={detail.leaveStatus} /> : null}
+      headerAddon={
+        detail ? (
+          <LeaveStatusBadge
+            status={detail.leaveStatus}
+            durationBreakdown={detail.durationBreakdown}
+            hrReviewRequired={detail.hrReviewRequired}
+            hrDecision={detail.hrDecision}
+          />
+        ) : null
+      }
       footer={
         detail && !actionMode ? (
           <div className="flex w-full flex-wrap items-center justify-end gap-2">
@@ -256,6 +304,40 @@ export function HrLeaveDetailPopup({
                 Accept
               </Button>
             ) : null}
+            {showHrReview ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isPending}
+                  onClick={() => {
+                    setComments("");
+                    setActionError(null);
+                    setActionMode("hr_reject");
+                  }}
+                >
+                  <XCircle className="size-4" />
+                  Reject
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isPending}
+                  onClick={() => handleHrReview("special")}
+                >
+                  {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+                  Approve as Special Leave
+                </Button>
+                <Button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => handleHrReview("lop")}
+                >
+                  {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+                  Approve as LOP
+                </Button>
+              </>
+            ) : null}
           </div>
         ) : detail && actionMode ? (
           <div className="flex w-full flex-wrap items-center justify-end gap-2">
@@ -281,6 +363,30 @@ export function HrLeaveDetailPopup({
                 variant="destructive"
                 disabled={isPending}
                 onClick={handleReject}
+              >
+                Confirm reject
+              </Button>
+            ) : null}
+            {actionMode === "lop" ? (
+              <Button type="button" disabled={isPending} onClick={() => handleHrReview("lop")}>
+                Confirm approve as LOP
+              </Button>
+            ) : null}
+            {actionMode === "special" ? (
+              <Button
+                type="button"
+                disabled={isPending}
+                onClick={() => handleHrReview("special")}
+              >
+                Confirm special leave
+              </Button>
+            ) : null}
+            {actionMode === "hr_reject" ? (
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={isPending}
+                onClick={() => handleHrReview("reject")}
               >
                 Confirm reject
               </Button>
@@ -375,6 +481,29 @@ export function HrLeaveDetailPopup({
             />
           </div>
         </div>
+      ) : actionMode === "lop" || actionMode === "special" || actionMode === "hr_reject" ? (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            {actionMode === "lop"
+              ? `Approve ${detail.employeeName}'s request as Loss of Pay (LOP). Paid leave balance will not be used.`
+              : actionMode === "special"
+                ? `Approve ${detail.employeeName}'s request as Special Leave. This will not be treated as LOP or deducted from paid leave.`
+                : `Reject ${detail.employeeName}'s leave request.`}
+          </p>
+          {actionError ? (
+            <p className="text-sm text-destructive">{actionError}</p>
+          ) : null}
+          <div className="space-y-2">
+            <Label htmlFor="hr-leave-review-note">Remarks *</Label>
+            <textarea
+              id="hr-leave-review-note"
+              className="min-h-24 w-full rounded-md border bg-background px-3 py-2 text-sm"
+              value={comments}
+              onChange={(event) => setComments(event.currentTarget.value)}
+              placeholder="Add remarks for this decision"
+            />
+          </div>
+        </div>
       ) : actionMode === "reject" ? (
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
@@ -434,40 +563,56 @@ export function HrLeaveDetailPopup({
               {loadError}
             </p>
           ) : null}
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <DetailField
               label="Employee"
               value={`${detail.employeeName} (${detail.employeeCode})`}
             />
+            <DetailField label="Employment type" value={detail.employmentTypeName ?? "—"} />
             <DetailField label="Department" value={detail.departmentName ?? "—"} />
             <DetailField label="Leave type" value={detail.leaveTypeName} />
             <DetailField
-              label="Duration"
+              label="Available leave balance"
               value={
-                detail.isHalfDay
-                  ? `Half day (${formatHalfDayPeriod(detail.halfDayPeriod) ?? "—"})`
-                  : `${detail.totalDays} day${detail.totalDays === 1 ? "" : "s"}`
+                detail.availableBalanceAtSubmit == null
+                  ? "—"
+                  : `${detail.availableBalanceAtSubmit} day${detail.availableBalanceAtSubmit === 1 ? "" : "s"}`
               }
             />
+            <DetailField
+              label="Duration"
+              value={`${detail.totalDays} day${detail.totalDays === 1 ? "" : "s"}`}
+            />
             {detail.durationBreakdown ? (
-              <div className="sm:col-span-2 rounded-lg border bg-muted/20 px-3 py-2.5">
+              <div className="sm:col-span-3 rounded-lg border bg-muted/20 px-3 py-2.5">
                 <p className="text-xs text-muted-foreground">How this was calculated</p>
                 <div className="mt-2">
                   <LeaveDurationBreakdownCard breakdown={detail.durationBreakdown} />
                 </div>
               </div>
             ) : null}
-            <DetailField label="Start date" value={formatLeaveDate(detail.startDate)} />
-            <DetailField label="End date" value={formatLeaveDate(detail.endDate)} />
-            <DetailField label="Branch" value={detail.branchName ?? "—"} />
-            <DetailField
-              label="Applied on"
-              value={new Date(detail.appliedAt).toLocaleDateString("en-IN", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-              })}
-            />
+          </div>
+          <div className="rounded-lg border bg-muted/20 px-3 py-2.5">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Applied on</p>
+                <p className="mt-0.5 text-sm font-medium">
+                  {new Date(detail.appliedAt).toLocaleDateString("en-IN", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Start date</p>
+                <p className="mt-0.5 text-sm font-medium">{formatLeaveDate(detail.startDate)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">End date</p>
+                <p className="mt-0.5 text-sm font-medium">{formatLeaveDate(detail.endDate)}</p>
+              </div>
+            </div>
           </div>
 
           <div className="rounded-lg border px-3 py-2.5">
@@ -477,7 +622,19 @@ export function HrLeaveDetailPopup({
             </p>
           </div>
 
-          {detail.approvals.length > 0 ? (
+          {detail.hrRemarks ? (
+            <div className="rounded-lg border px-3 py-2.5">
+              <p className="text-xs text-muted-foreground">HR remarks</p>
+              <p className="mt-1 text-sm whitespace-pre-wrap">{detail.hrRemarks}</p>
+            </div>
+          ) : null}
+
+          {pendingHrReview ? (
+            <div className="rounded-lg border px-3 py-2.5">
+              <p className="text-xs text-muted-foreground">Approval trail</p>
+              <p className="mt-1 text-sm font-medium">CEO approval pending</p>
+            </div>
+          ) : detail.approvals.length > 0 ? (
             <div className="rounded-lg border px-3 py-2.5">
               <p className="text-xs text-muted-foreground">Approval trail</p>
               <ul className="mt-2 space-y-2">
@@ -497,9 +654,11 @@ export function HrLeaveDetailPopup({
             </div>
           ) : null}
 
-          {(showApprove || showReject) && (
+          {(showApprove || showReject || showHrReview) && (
             <p className="text-xs text-muted-foreground">
-              Use Accept or Reject below to take action without leaving this page.
+              {showHrReview
+                ? "Approve as LOP or Special Leave immediately. Reject asks for a short reason. Any CEO can also approve."
+                : "Use Accept or Reject below to take action without leaving this page."}
             </p>
           )}
         </div>

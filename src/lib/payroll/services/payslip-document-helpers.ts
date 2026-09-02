@@ -1,3 +1,6 @@
+import { format, lastDayOfMonth, parseISO } from "date-fns";
+
+import { displaySalaryBankDetails } from "@/lib/payroll/services/payroll-utils";
 import type { PayrollBreakdown, PayrollBreakdownLine, PayslipDetail } from "@/types/payroll";
 
 export type StatutoryIds = {
@@ -93,4 +96,97 @@ export function totalEarnings(payslip: PayslipDetail): number {
     return payslip.breakdown.earnings.reduce((sum, line) => sum + line.amount, 0);
   }
   return payslip.grossSalary;
+}
+
+function fmtPayslipDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  try {
+    const d = parseISO(value.length === 10 ? value : value.slice(0, 10));
+    return format(d, "dd-MMM-yyyy").toUpperCase();
+  } catch {
+    return "—";
+  }
+}
+
+function fmtPayslipValue(value: string | null | undefined, fallback = "—"): string {
+  return value?.trim() ? value.trim() : fallback;
+}
+
+export type PayslipInfoCell = { label: string; value: string };
+
+export function getPayslipAttendanceDisplay(payslip: PayslipDetail): {
+  workDays: number;
+  paidDays: number;
+  lopDays: number;
+} {
+  let totalDaysInMonth = 30;
+  try {
+    const monthDate = new Date(payslip.payrollMonth);
+    totalDaysInMonth = lastDayOfMonth(monthDate).getDate();
+  } catch {
+    totalDaysInMonth = 30;
+  }
+
+  const attendance = payslip.breakdown?.attendance;
+  const workDays =
+    attendance?.workingDays && attendance.workingDays > 0
+      ? attendance.workingDays
+      : totalDaysInMonth;
+  const lopDays = attendance?.lopDays ?? attendance?.leaveLopDays ?? 0;
+  const paidDays = attendance
+    ? paidDaysFromBreakdown(payslip.breakdown)
+    : Math.max(0, workDays - lopDays);
+
+  return { workDays, paidDays, lopDays };
+}
+
+export function getPayslipInfoRows(payslip: PayslipDetail): [PayslipInfoCell, PayslipInfoCell][] {
+  const employeeName = `${payslip.employee.firstName} ${payslip.employee.lastName}`.trim().toUpperCase();
+  const { workDays, paidDays, lopDays } = getPayslipAttendanceDisplay(payslip);
+  const department = fmtPayslipValue(payslip.employee.departmentName).toUpperCase();
+  const employmentType = fmtPayslipValue(payslip.employee.employmentType).toUpperCase();
+
+  const bank = payslip.bankAccount
+    ? displaySalaryBankDetails({
+        bankName: payslip.bankAccount.bankName,
+        ifscCode: payslip.bankAccount.ifscCode,
+      })
+    : null;
+
+  return [
+    [
+      { label: "Employee Name", value: employeeName },
+      { label: "Employee ID", value: payslip.employee.employeeCode },
+    ],
+    [
+      {
+        label: "Designation",
+        value: fmtPayslipValue(payslip.employee.designationTitle).toUpperCase(),
+      },
+      { label: "Date of Joining", value: fmtPayslipDate(payslip.employee.dateOfJoining) },
+    ],
+    [
+      { label: "PAN Number", value: fmtPayslipValue(payslip.employee.pan) },
+      { label: "Payment Mode", value: (payslip.paymentMode || "BANK").toUpperCase() },
+    ],
+    [
+      { label: "Bank Name", value: fmtPayslipValue(bank?.bankName) },
+      {
+        label: "Bank A/C No",
+        value: fmtPayslipValue(payslip.bankAccount?.accountNumberMasked),
+      },
+    ],
+    [
+      { label: "Location", value: "REMOTE" },
+      { label: "Department", value: department },
+    ],
+    [
+      { label: "Working Days", value: Number(workDays).toFixed(2) },
+      { label: "Paid Days", value: Number(paidDays).toFixed(2) },
+    ],
+    [
+      { label: "LOP Days", value: Number(lopDays).toFixed(2) },
+      { label: "Employment Type", value: employmentType },
+    ],
+  ];
 }

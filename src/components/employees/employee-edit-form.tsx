@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -23,10 +23,10 @@ import { toEmployeeSelectItems, toLookupSelectItems } from "@/components/payroll
 import { updateEmployeeAction } from "@/lib/employees/actions";
 import {
   DESIGNATION_OTHER_VALUE,
-  EMPLOYMENT_STATUS_LABELS,
   resolveEmployeeModuleRoutes,
   type EmployeeModuleRoutes,
 } from "@/lib/employees/constants";
+import { sortEmploymentTypeOptions } from "@/lib/employees/employment-type-display";
 import { COUNTRIES, INDIAN_STATES, STATE_DISTRICTS } from "@/lib/geo/india";
 import {
   employeeUpdateSchema,
@@ -55,6 +55,8 @@ type EmployeeEditFormProps = {
   variant?: "page" | "inline";
   onCancel?: () => void;
   onSaved?: () => void;
+  onEmploymentTypeChange?: (typeName: string | null) => void;
+  onDesignationChange?: (designationTitle: string | null) => void;
   /** Prefer this from RSC pages — route builders cannot cross the server/client boundary. */
   routesBasePath?: string;
   /** Client-to-client only. Prefer `routesBasePath` when rendering from a server page. */
@@ -69,6 +71,8 @@ export function EmployeeEditForm({
   routesBasePath,
   routes: routesProp,
   onSaved,
+  onEmploymentTypeChange,
+  onDesignationChange,
 }: EmployeeEditFormProps) {
   const routes = routesProp ?? resolveEmployeeModuleRoutes(routesBasePath);
   const router = useRouter();
@@ -89,22 +93,16 @@ export function EmployeeEditForm({
     })),
   ];
 
-  const designationItems = [
-    { value: "none", label: "None" },
-    ...lookups.designations.map((item) => ({
-      value: item.id,
-      label: item.label,
-    })),
-    { value: DESIGNATION_OTHER_VALUE, label: "Others" },
-  ];
-
-  const employmentStatusItems = Object.entries(EMPLOYMENT_STATUS_LABELS).map(
-    ([value, label]) => ({ value, label }),
-  );
+  const designationOptions = lookups.designations.map((item) => ({
+    value: item.id,
+    label: item.label,
+  }));
 
   const employmentTypeItems = [
     { value: "none", label: "None" },
-    ...toLookupSelectItems(lookups.employmentTypes, { showCode: false }),
+    ...toLookupSelectItems(sortEmploymentTypeOptions(lookups.employmentTypes), {
+      showCode: false,
+    }),
   ];
 
   const managerItems = [
@@ -162,7 +160,9 @@ export function EmployeeEditForm({
     },
   });
 
-  const designationSelectValue = form.watch("designationId") || "none";
+  const designationSelectValue = form.watch("designationId") || "";
+  const customDesignationTitle = form.watch("customDesignationTitle") ?? "";
+  const employmentTypeId = form.watch("employmentTypeId") || "none";
   const isOtherDesignation = designationSelectValue === DESIGNATION_OTHER_VALUE;
   const genderItems = [
     { value: "male", label: "Male" },
@@ -177,6 +177,73 @@ export function EmployeeEditForm({
     { value: "widowed", label: "Widowed" },
     { value: "other", label: "Other" },
   ];
+
+  useEffect(() => {
+    if (!onDesignationChange) return;
+    if (isOtherDesignation) {
+      onDesignationChange(customDesignationTitle.trim() || null);
+      return;
+    }
+    if (!designationSelectValue) {
+      onDesignationChange(null);
+      return;
+    }
+    const selected = lookups.designations.find((item) => item.id === designationSelectValue);
+    onDesignationChange(selected?.label ?? employee.designationTitle);
+  }, [
+    customDesignationTitle,
+    designationSelectValue,
+    employee.designationTitle,
+    isOtherDesignation,
+    lookups.designations,
+    onDesignationChange,
+  ]);
+
+  useEffect(() => {
+    if (!onEmploymentTypeChange) return;
+    if (employmentTypeId === "none" || !employmentTypeId) {
+      onEmploymentTypeChange(null);
+      return;
+    }
+    const selected = lookups.employmentTypes.find((item) => item.id === employmentTypeId);
+    onEmploymentTypeChange(selected?.label ?? employee.employmentTypeName);
+  }, [
+    employmentTypeId,
+    employee.employmentTypeName,
+    lookups.employmentTypes,
+    onEmploymentTypeChange,
+  ]);
+
+  function setEmploymentTypeId(value: string | null) {
+    form.setValue("employmentTypeId", value === "none" ? "" : value ?? "", {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+  }
+
+  function renderEmploymentTypeSelect() {
+    return (
+      <div className="space-y-2">
+        <Label>Employment type</Label>
+        <Select
+          items={employmentTypeItems}
+          value={employmentTypeId}
+          onValueChange={setEmploymentTypeId}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select employment type" />
+          </SelectTrigger>
+          <SelectContent align="start" alignItemWithTrigger={false}>
+            {employmentTypeItems.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    );
+  }
 
   const onSubmit = form.handleSubmit(
     (values) => {
@@ -289,65 +356,40 @@ export function EmployeeEditForm({
         </div>
         <div className="space-y-2">
           <Label>Designation</Label>
-          <Select
-            items={designationItems}
-            value={designationSelectValue}
+          <SearchableSelect
+            options={designationOptions}
+            value={isOtherDesignation ? DESIGNATION_OTHER_VALUE : designationSelectValue || null}
+            createdLabel={isOtherDesignation ? customDesignationTitle : null}
+            allowNone
+            allowCreate
+            placeholder="Search or type a designation…"
+            emptyMessage="No matching designations"
             onValueChange={(value) => {
-              if (value === "none") {
-                form.setValue("designationId", "");
-                form.setValue("customDesignationTitle", "");
-                return;
-              }
-
-              if (value === DESIGNATION_OTHER_VALUE) {
-                form.setValue("designationId", DESIGNATION_OTHER_VALUE);
-                return;
-              }
-
-              form.setValue("designationId", value ?? "");
-              form.setValue("customDesignationTitle", "");
+              form.setValue("designationId", value ?? "", { shouldValidate: true, shouldDirty: true });
+              form.setValue("customDesignationTitle", "", { shouldDirty: true });
             }}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select designation" />
-            </SelectTrigger>
-            <SelectContent side="bottom" align="start" alignItemWithTrigger={false}>
-              {designationItems.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {isOtherDesignation ? (
-            <Input
-              id="customDesignationTitle"
-              placeholder="Enter designation"
-              {...form.register("customDesignationTitle")}
-            />
-          ) : null}
+            onCreate={(label) => {
+              form.setValue("designationId", DESIGNATION_OTHER_VALUE, {
+                shouldValidate: true,
+                shouldDirty: true,
+              });
+              form.setValue("customDesignationTitle", label, {
+                shouldValidate: true,
+                shouldDirty: true,
+              });
+            }}
+          />
+          {form.formState.errors.customDesignationTitle?.message ? (
+            <p className="text-xs text-destructive">
+              {form.formState.errors.customDesignationTitle.message}
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Type to search, or enter a new designation and press Enter to save it.
+            </p>
+          )}
         </div>
-        <div className="space-y-2">
-          <Label>Employment type</Label>
-          <Select
-            items={employmentTypeItems}
-            value={form.watch("employmentTypeId") || "none"}
-            onValueChange={(value) =>
-              form.setValue("employmentTypeId", value === "none" ? "" : value ?? "")
-            }
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select employment type" />
-            </SelectTrigger>
-            <SelectContent align="start" alignItemWithTrigger={false}>
-              {employmentTypeItems.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {renderEmploymentTypeSelect()}
         <div className="space-y-2">
           <Label>Reporting manager</Label>
           <Select
@@ -392,30 +434,6 @@ export function EmployeeEditForm({
           <p className="text-xs text-muted-foreground">
             Primary HR leave approver. Falls back to organization default when empty.
           </p>
-        </div>
-        <div className="space-y-2">
-          <Label>Employment status</Label>
-          <Select
-            items={employmentStatusItems}
-            value={form.watch("employmentStatus")}
-            onValueChange={(value) =>
-              form.setValue(
-                "employmentStatus",
-                (value ?? employee.employmentStatus) as EmployeeUpdateInput["employmentStatus"],
-              )
-            }
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select status" />
-            </SelectTrigger>
-            <SelectContent align="start" alignItemWithTrigger={false}>
-              {employmentStatusItems.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
         <div className="space-y-2">
           <Label htmlFor="dateOfJoining">Date of joining</Label>
@@ -533,6 +551,7 @@ export function EmployeeEditForm({
           </p>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
+          {renderEmploymentTypeSelect()}
           <div className="space-y-2">
             <Label htmlFor="dateOfBirth">Date of birth</Label>
             <Input

@@ -48,8 +48,9 @@ export function LeavePolicyYearUsage({
 }
 
 const policyBodyClass = "text-sm leading-relaxed text-foreground/75";
-const policyHeadingClass = "text-sm font-medium text-foreground/90";
-const policyLabelClass = "font-medium text-foreground/85";
+const policyHeadingClass = "text-sm font-bold text-foreground";
+const policyLabelClass = "font-bold text-foreground";
+const policySubheadingClass = "font-bold text-foreground";
 
 export function LeavePolicyPageHeader({
   title,
@@ -66,6 +67,16 @@ export function LeavePolicyPageHeader({
       </p>
     </header>
   );
+}
+
+function isPolicySubheading(line: string) {
+  const trimmed = line.trim();
+  if (trimmed.startsWith("- ")) return false;
+  if (trimmed.endsWith(".")) return false;
+  if (/^[A-Z].*\.\s+[A-Z]/.test(trimmed)) return false;
+  const labelMatch = trimmed.match(/^([^:]+):\s*(.+)$/);
+  if (labelMatch) return false;
+  return trimmed.length > 0;
 }
 
 function PolicySectionContent({ content }: { content: string }) {
@@ -98,6 +109,13 @@ function PolicySectionContent({ content }: { content: string }) {
               </p>
             );
           }
+          if (isPolicySubheading(line)) {
+            return (
+              <p key={blockIndex} className={policySubheadingClass}>
+                {line}
+              </p>
+            );
+          }
           return <p key={blockIndex}>{line}</p>;
         }
 
@@ -113,13 +131,19 @@ function PolicySectionContent({ content }: { content: string }) {
               }
 
               const labelMatch = line.match(/^([^:]+):\s*(.*)$/);
-              if (labelMatch) {
+              if (labelMatch && labelMatch[2]) {
                 return (
                   <p key={lineIndex}>
-                    <span className={policyLabelClass}>{labelMatch[1]}</span>
-                    {labelMatch[2] ? (
-                      <span className="text-foreground/75"> {labelMatch[2]}</span>
-                    ) : null}
+                    <span className={policyLabelClass}>{labelMatch[1]}:</span>{" "}
+                    <span className="font-normal text-foreground/75">{labelMatch[2]}</span>
+                  </p>
+                );
+              }
+
+              if (isPolicySubheading(line) || (labelMatch && !labelMatch[2])) {
+                return (
+                  <p key={lineIndex} className={policySubheadingClass}>
+                    {labelMatch && !labelMatch[2] ? labelMatch[1] : line}
                   </p>
                 );
               }

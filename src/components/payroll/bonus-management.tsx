@@ -42,6 +42,7 @@ import {
   BONUS_TYPE_LABELS,
 } from "@/lib/payroll/constants";
 import { formatCurrency, formatPayrollMonthLabel } from "@/lib/payroll/services/payroll-utils";
+import { getHrmsYearSelectItems } from "@/lib/date/hrms-year";
 import { bonusFormSchema } from "@/lib/validations/payroll";
 import type { BonusItem, BonusStatus } from "@/types/payroll";
 import type { LookupOption } from "@/types/employee";
@@ -416,7 +417,7 @@ export function BonusTable({
     value: String(i + 1),
     label: new Date(2000, i, 1).toLocaleString("en-IN", { month: "long" }),
   }));
-  const YEAR_OPTIONS = [2025, 2026, 2027, 2028].map((y) => ({ value: String(y), label: String(y) }));
+  const YEAR_OPTIONS = getHrmsYearSelectItems();
 
   return (
     <div className="space-y-4">

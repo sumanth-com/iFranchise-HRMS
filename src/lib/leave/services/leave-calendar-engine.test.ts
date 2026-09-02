@@ -59,11 +59,11 @@ describe("working calendar", () => {
 });
 
 describe("explicit half-day request", () => {
-  it("charges 0.5 days for a half-day checkbox on a working day", () => {
+  it("charges a full day even if a half-day checkbox is used", () => {
     const result = duration("2026-08-24", "2026-08-24", [], true);
-    assert.equal(result.workingDays, 0);
-    assert.equal(result.halfDays, 1);
-    assert.equal(result.totalLeaveDays, 0.5);
+    assert.equal(result.workingDays, 1);
+    assert.equal(result.halfDays, 0);
+    assert.equal(result.totalLeaveDays, 1);
   });
 });
 
@@ -84,10 +84,10 @@ describe("sandwich leave", () => {
 
   it("includes Saturday and Sunday for Friday to Monday when Saturday is a half day", () => {
     const result = duration("2026-09-11", "2026-09-14");
-    assert.equal(result.workingDays, 2);
-    assert.equal(result.halfDays, 1);
+    assert.equal(result.workingDays, 3);
+    assert.equal(result.halfDays, 0);
     assert.equal(result.sandwichDays, 1);
-    assert.equal(result.totalLeaveDays, 3.5);
+    assert.equal(result.totalLeaveDays, 4);
   });
 
   it("does not sandwich Sunday across a full working Saturday", () => {
@@ -97,11 +97,11 @@ describe("sandwich leave", () => {
     assert.equal(result.totalLeaveDays, 1);
   });
 
-  it("treats 4th Saturday leave as a half day and sandwiches the following Sunday", () => {
+  it("treats 4th Saturday leave as a full day and sandwiches the following Sunday", () => {
     const result = duration("2026-09-26", "2026-09-26");
-    assert.equal(result.halfDays, 1);
+    assert.equal(result.workingDays, 1);
     assert.equal(result.sandwichDays, 1);
-    assert.equal(result.totalLeaveDays, 1.5);
+    assert.equal(result.totalLeaveDays, 2);
   });
 
   it("counts a working Saturday in range as a full working day and sandwiches the following Sunday", () => {
@@ -123,9 +123,9 @@ describe("sandwich leave", () => {
 
   it("includes Sunday when Saturday half-day leave is taken before the weekly holiday", () => {
     const result = duration("2026-09-12", "2026-09-13");
-    assert.equal(result.halfDays, 1);
+    assert.equal(result.workingDays, 1);
     assert.equal(result.sandwichDays, 1);
-    assert.equal(result.totalLeaveDays, 1.5);
+    assert.equal(result.totalLeaveDays, 2);
   });
 
   it("counts a public holiday under sandwich when connected to leave", () => {
@@ -307,5 +307,60 @@ describe("probation and notice", () => {
       overlapping: true,
     });
     assert.ok(issues.some((issue) => issue.code === "overlap"));
+  });
+
+  it("blocks self-service when paid CL balance is exhausted", () => {
+    const issues = validateLeavePolicy({
+      asOf: new Date("2026-08-01T10:00:00+05:30"),
+      startDate: "2026-08-11",
+      endDate: "2026-08-11",
+      isHalfDay: false,
+      leaveTypeCode: "CL",
+      isPaid: true,
+      duration: duration("2026-08-11", "2026-08-11"),
+      availableBalance: 0,
+      employee: { ...employee, joiningDate: "2026-01-01", employmentStatus: "active" },
+      overlapping: false,
+      enforceSelfServiceLimits: true,
+    });
+    assert.ok(issues.some((issue) => issue.code === "balance_exhausted"));
+  });
+
+  it("blocks self-service requests over 3 days", () => {
+    const issues = validateLeavePolicy({
+      asOf: new Date("2026-08-01T10:00:00+05:30"),
+      startDate: "2026-08-11",
+      endDate: "2026-08-14",
+      isHalfDay: false,
+      leaveTypeCode: "CL",
+      isPaid: true,
+      duration: duration("2026-08-11", "2026-08-14"),
+      availableBalance: 6,
+      employee: { ...employee, joiningDate: "2026-01-01", employmentStatus: "active" },
+      overlapping: false,
+      enforceSelfServiceLimits: true,
+    });
+    assert.ok(issues.some((issue) => issue.code === "hr_review_over_limit"));
+  });
+
+  it("blocks EL for intern eligibility band", () => {
+    const issues = validateLeavePolicy({
+      asOf: new Date("2026-08-01T10:00:00+05:30"),
+      startDate: "2026-08-11",
+      endDate: "2026-08-11",
+      isHalfDay: false,
+      leaveTypeCode: "EL",
+      isPaid: true,
+      duration: duration("2026-08-11", "2026-08-11"),
+      availableBalance: 1,
+      employee: {
+        ...employee,
+        joiningDate: "2026-01-01",
+        employmentStatus: "active",
+        leaveEligibilityBand: "cl_only",
+      },
+      overlapping: false,
+    });
+    assert.ok(issues.some((issue) => issue.code === "eligibility"));
   });
 });

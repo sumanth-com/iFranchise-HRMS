@@ -31,6 +31,7 @@ export function previewLeaveApplication(input: {
   startDate: string;
   endDate: string;
   isHalfDay: boolean;
+  enforceSelfServiceLimits?: boolean;
 }): LeaveApplyPreview | null {
   const leaveType = input.context.leaveTypes.find((item) => item.id === input.leaveTypeId);
   if (!leaveType || !input.startDate || !input.endDate || input.endDate < input.startDate) {
@@ -97,6 +98,7 @@ export function previewLeaveApplication(input: {
     allowHalfDay: input.context.allowHalfDay,
     maxConsecutiveDays: input.context.maxConsecutiveDays,
     overlapping: false,
+    enforceSelfServiceLimits: input.enforceSelfServiceLimits === true,
   });
 
   const messages = buildLeavePreviewMessages({

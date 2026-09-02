@@ -24,6 +24,7 @@ import {
   LEAVE_BALANCE_DISPLAY_LABELS,
   sortByLeaveTypeCode,
 } from "@/lib/leave/constants";
+import { isLeaveTypeAllowedForBand, resolveLeaveEligibilityBand } from "@/lib/leave/leave-eligibility";
 import { loadLeavePolicyRuntime } from "@/lib/leave/services/leave-policy-runtime";
 import { ensureEmployeeMonthlyLeaveAccruals, isMonthlyAccrualLeaveCode } from "@/lib/leave/services/leave-monthly-accrual";
 import { reconcileEmployeePaidLeaveLedger } from "@/lib/leave/services/leave-ledger-reconcile";
@@ -68,6 +69,7 @@ import {
   getMonthDateRange,
   sortLeaveListItemsForDisplay,
 } from "@/lib/leave/services/leave-utils";
+import { isPendingHrReview, parseHrReviewMetadata } from "@/lib/leave/hr-review";
 
 type LeaveRequestRow = {
   id: string;
@@ -80,6 +82,7 @@ type LeaveRequestRow = {
   half_day_period: string | null;
   reason: string | null;
   leave_status: string;
+  duration_breakdown?: unknown;
   created_at: string;
   employees: {
     employee_code: string;
@@ -157,6 +160,71 @@ function parseListParams(params: LeaveListParams) {
   return leaveListParamsSchema.parse(params);
 }
 
+type HrReviewIdBuckets = {
+  pending: string[];
+  approved: string[];
+  rejected: string[];
+  all: string[];
+  rows: Array<{
+    id: string;
+    leaveStatus: string;
+    startDate: string;
+    endDate: string;
+    createdAt?: string;
+  }>;
+};
+
+async function listHrReviewRequestIds(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  employeeIds?: string[],
+): Promise<HrReviewIdBuckets> {
+  let query = supabase
+    .schema("hrms")
+    .from("leave_requests")
+    .select(
+      "id, leave_status, start_date, end_date, created_at, duration_breakdown, employees!inner(organization_id)",
+    )
+    .in("leave_status", ["pending", "approved", "rejected"])
+    .eq("employees.organization_id", organizationId)
+    .is("deleted_at", null);
+
+  if (employeeIds && employeeIds.length > 0) {
+    query = query.in("employee_id", employeeIds);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  const buckets: HrReviewIdBuckets = {
+    pending: [],
+    approved: [],
+    rejected: [],
+    all: [],
+    rows: [],
+  };
+  for (const row of data ?? []) {
+    const review = parseHrReviewMetadata(row.duration_breakdown);
+    if (!review?.required) continue;
+    buckets.all.push(row.id);
+    buckets.rows.push({
+      id: row.id,
+      leaveStatus: String(row.leave_status),
+      startDate: String(row.start_date).slice(0, 10),
+      endDate: String(row.end_date).slice(0, 10),
+      createdAt: row.created_at ? String(row.created_at) : undefined,
+    });
+    if (isPendingHrReview(row.leave_status, row.duration_breakdown)) {
+      buckets.pending.push(row.id);
+    } else if (row.leave_status === "approved") {
+      buckets.approved.push(row.id);
+    } else if (row.leave_status === "rejected") {
+      buckets.rejected.push(row.id);
+    }
+  }
+  return buckets;
+}
+
 export async function listLeaveRequests(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -215,6 +283,7 @@ export async function listLeaveRequests(
         half_day_period,
         reason,
         leave_status,
+        duration_breakdown,
         created_at,
         employees!inner (
           employee_code,
@@ -240,11 +309,68 @@ export async function listLeaveRequests(
     query = query.in("employee_id", scopedIds);
   }
 
-  if (excludeHrApplicants) {
-    const hrApplicantIds = await listHrLeaveApplicantEmployeeIds(organizationId);
-    if (hrApplicantIds.length > 0) {
-      query = query.not("employee_id", "in", `(${hrApplicantIds.join(",")})`);
+  const hrApplicantIds = excludeHrApplicants
+    ? await listHrLeaveApplicantEmployeeIds(organizationId)
+    : [];
+  const hrReviewIds = await listHrReviewRequestIds(supabase, organizationId);
+  const pendingHrReviewIds = hrReviewIds.pending;
+  const pendingHrReviewIdSet = new Set(pendingHrReviewIds);
+
+  function hrReviewKeepIds(monthOverlap?: { start: string; end: string }) {
+    if (!monthOverlap) return hrReviewIds.all;
+    return hrReviewIds.rows
+      .filter((row) => {
+        if (pendingHrReviewIdSet.has(row.id)) return true;
+        return row.startDate <= monthOverlap.end && row.endDate >= monthOverlap.start;
+      })
+      .map((row) => row.id);
+  }
+
+  function applyHrApplicantExclusion(
+    nextQuery: typeof query,
+    options?: {
+      monthOverlap?: { start: string; end: string };
+      includePendingHrReview?: boolean;
+      keepIds?: string[];
+    },
+  ) {
+    const keepReviewIds =
+      options?.keepIds ??
+      (options?.includePendingHrReview === false
+        ? []
+        : hrReviewKeepIds(options?.monthOverlap));
+    const excludeIds = hrApplicantIds;
+    const monthOverlap = options?.monthOverlap;
+    if (monthOverlap && excludeIds.length > 0 && keepReviewIds.length > 0) {
+      return nextQuery.or(
+        `and(start_date.lte.${monthOverlap.end},end_date.gte.${monthOverlap.start},employee_id.not.in.(${excludeIds.join(",")})),id.in.(${keepReviewIds.join(",")})`,
+      );
     }
+    if (monthOverlap && keepReviewIds.length > 0) {
+      return nextQuery.or(
+        `and(start_date.lte.${monthOverlap.end},end_date.gte.${monthOverlap.start}),id.in.(${keepReviewIds.join(",")})`,
+      );
+    }
+    if (monthOverlap && excludeIds.length > 0) {
+      return nextQuery
+        .not("employee_id", "in", `(${excludeIds.join(",")})`)
+        .lte("start_date", monthOverlap.end)
+        .gte("end_date", monthOverlap.start);
+    }
+    if (monthOverlap) {
+      return nextQuery
+        .lte("start_date", monthOverlap.end)
+        .gte("end_date", monthOverlap.start);
+    }
+    if (excludeIds.length > 0 && keepReviewIds.length > 0) {
+      return nextQuery.or(
+        `employee_id.not.in.(${excludeIds.join(",")}),id.in.(${keepReviewIds.join(",")})`,
+      );
+    }
+    if (excludeIds.length > 0) {
+      return nextQuery.not("employee_id", "in", `(${excludeIds.join(",")})`);
+    }
+    return nextQuery;
   }
 
   // Approver filter: resolve matching leave_request ids first (bounded), avoid
@@ -273,45 +399,68 @@ export async function listLeaveRequests(
 
   const today = getTodayDateString();
   const isPendingQueue =
-    summaryFilter === "pendingRequests" || leaveStatus === "pending";
+    summaryFilter === "pendingRequests" ||
+    summaryFilter === "pendingHrReview" ||
+    leaveStatus === "pending" ||
+    leaveStatus === "pending_hr_review";
 
   if (summaryFilter === "pendingRequests") {
     query = query.eq("leave_status", "pending");
+    query = applyHrApplicantExclusion(query, { keepIds: pendingHrReviewIds });
+  } else if (summaryFilter === "pendingHrReview" || leaveStatus === "pending_hr_review") {
+    if (pendingHrReviewIds.length === 0) {
+      return { data: [], total: 0, page, pageSize };
+    }
+    query = query.in("id", pendingHrReviewIds);
   } else if (summaryFilter === "approvedThisMonth") {
     const range = getMonthDateRange(month ?? Number.parseInt(today.slice(5, 7), 10), year ?? Number.parseInt(today.slice(0, 4), 10));
     query = query
       .eq("leave_status", "approved")
       .gte("start_date", range.start)
       .lte("start_date", range.end);
+    query = applyHrApplicantExclusion(query, { keepIds: hrReviewIds.approved });
   } else if (summaryFilter === "rejectedThisMonth") {
     const range = getMonthDateRange(month ?? Number.parseInt(today.slice(5, 7), 10), year ?? Number.parseInt(today.slice(0, 4), 10));
     query = query
       .eq("leave_status", "rejected")
       .gte("created_at", `${range.start}T00:00:00`)
       .lte("created_at", `${range.end}T23:59:59`);
+    query = applyHrApplicantExclusion(query, { keepIds: hrReviewIds.rejected });
   } else if (summaryFilter === "employeesOnLeaveToday") {
     query = query
       .eq("leave_status", "approved")
       .lte("start_date", today)
       .gte("end_date", today);
+    query = applyHrApplicantExclusion(query, { keepIds: hrReviewIds.approved });
   } else if (summaryFilter === "upcomingPlannedLeaves") {
     // Applied upcoming leave: pending or approved requests that start after today.
     query = query.in("leave_status", ["pending", "approved"]).gt("start_date", today);
+    query = applyHrApplicantExclusion(query);
   } else if (dateFrom && dateTo) {
-    query = query.lte("start_date", dateTo).gte("end_date", dateFrom);
+    query = applyHrApplicantExclusion(query, {
+      monthOverlap: { start: dateFrom, end: dateTo },
+    });
   } else if (!isPendingQueue && month && year) {
-    // Pending approval queues are org-wide — do not clip them to the calendar month.
     const range = getMonthDateRange(month, year);
-    query = query
-      .gte("start_date", range.start)
-      .lte("end_date", range.end);
+    query = applyHrApplicantExclusion(query, { monthOverlap: range });
   } else if (!isPendingQueue && year) {
-    query = query
-      .gte("start_date", `${year}-01-01`)
-      .lte("end_date", `${year}-12-31`);
+    query = applyHrApplicantExclusion(query, {
+      monthOverlap: {
+        start: `${year}-01-01`,
+        end: `${year}-12-31`,
+      },
+    });
+  } else {
+    query = applyHrApplicantExclusion(query);
   }
 
-  if (!summaryFilter && leaveStatus) query = query.eq("leave_status", leaveStatus);
+  if (
+    !summaryFilter &&
+    leaveStatus &&
+    leaveStatus !== "pending_hr_review"
+  ) {
+    query = query.eq("leave_status", leaveStatus);
+  }
   if (leaveTypeId) query = query.eq("leave_type_id", leaveTypeId);
   if (!scopedIds && employeeId) query = query.eq("employee_id", employeeId);
   if (!scopedIds && createdByEmployeeId) query = query.eq("employee_id", createdByEmployeeId);
@@ -443,7 +592,11 @@ export async function listLeaveRequests(
       const executiveApplicant = !approvals.some(
         (approval) => Number(approval.approval_level ?? 0) >= 2,
       );
-      const canAct = canActorDecideLeaveRequest({
+      const hrReview = parseHrReviewMetadata(row.duration_breakdown);
+      const pendingHrReview = isPendingHrReview(row.leave_status, row.duration_breakdown);
+      const canAct = pendingHrReview
+        ? isHrLeaveActor(profile) || isCeoLeaveApprover(profile)
+        : canActorDecideLeaveRequest({
         profile,
         applicantEmployeeId: row.employee_id,
         leaveStatus: row.leave_status,
@@ -486,6 +639,11 @@ export async function listLeaveRequests(
         reason: row.reason,
         leaveStatus: row.leave_status as LeaveListResult["data"][number]["leaveStatus"],
         appliedAt: row.created_at,
+        durationBreakdown: row.duration_breakdown,
+        hrReviewRequired: Boolean(hrReview?.required),
+        hrDecision: hrReview?.decision ?? null,
+        hrRemarks: hrReview?.remarks ?? null,
+        availableBalanceAtSubmit: hrReview?.availableBalanceAtSubmit ?? null,
         approverName: resolvedApprover,
         currentApprovalLevel: pendingApproval?.approval_level ?? null,
         pendingApproverEmployeeId,
@@ -613,7 +771,15 @@ export async function getLeaveSummary(
 
   const balanceYear = getCurrentBalanceYear(today);
 
-  const [pendingResult, approvedResult, rejectedResult, onLeaveResult, upcomingResult, balanceUtilizationPercent] =
+  const emptyHrReviewBuckets: HrReviewIdBuckets = {
+    pending: [],
+    approved: [],
+    rejected: [],
+    all: [],
+    rows: [],
+  };
+
+  const [pendingResult, approvedResult, rejectedResult, onLeaveResult, upcomingResult, balanceUtilizationPercent, hrReviewBuckets, hrApplicantHrReview] =
     await Promise.all([
     applyHrExclusion(
       supabase
@@ -670,15 +836,36 @@ export async function getLeaveSummary(
     options?.skipBalanceUtilization
       ? Promise.resolve(0)
       : computeOrgLeaveBalanceUtilizationPercent(supabase, organizationId, balanceYear),
+    listHrReviewRequestIds(supabase, organizationId),
+    hrApplicantIds.length > 0
+      ? listHrReviewRequestIds(supabase, organizationId, hrApplicantIds)
+      : Promise.resolve(emptyHrReviewBuckets),
   ]);
 
+  const hrApplicantApprovedThisMonth = hrApplicantHrReview.rows.filter((row) => {
+    if (row.leaveStatus !== "approved") return false;
+    return row.startDate >= monthRange.start && row.startDate <= monthRange.end;
+  }).length;
+  const hrApplicantRejectedThisMonth = hrApplicantHrReview.rows.filter((row) => {
+    if (row.leaveStatus !== "rejected") return false;
+    const created = row.createdAt?.slice(0, 10);
+    return Boolean(created && created >= monthRange.start && created <= monthRange.end);
+  }).length;
+  const hrApplicantOnLeaveToday = hrApplicantHrReview.rows.filter((row) => {
+    return row.leaveStatus === "approved" && row.startDate <= today && row.endDate >= today;
+  }).length;
+  const hrApplicantUpcoming = hrApplicantHrReview.rows.filter((row) => {
+    return (row.leaveStatus === "pending" || row.leaveStatus === "approved") && row.startDate > today;
+  }).length;
+
   return {
-    pendingRequests: pendingResult.count ?? 0,
-    approvedThisMonth: approvedResult.count ?? 0,
-    rejectedThisMonth: rejectedResult.count ?? 0,
-    employeesOnLeaveToday: onLeaveResult.count ?? 0,
+    pendingRequests: (pendingResult.count ?? 0) + hrApplicantHrReview.pending.length,
+    pendingHrReview: hrReviewBuckets.pending.length,
+    approvedThisMonth: (approvedResult.count ?? 0) + hrApplicantApprovedThisMonth,
+    rejectedThisMonth: (rejectedResult.count ?? 0) + hrApplicantRejectedThisMonth,
+    employeesOnLeaveToday: (onLeaveResult.count ?? 0) + hrApplicantOnLeaveToday,
     balanceUtilizationPercent,
-    upcomingPlannedLeaves: upcomingResult.count ?? 0,
+    upcomingPlannedLeaves: (upcomingResult.count ?? 0) + hrApplicantUpcoming,
   };
 }
 
@@ -850,16 +1037,31 @@ export async function getEmployeeLeaveBalanceSnapshot(
       .is("deleted_at", null);
 
   let organizationId = organizationIdHint;
-  if (!organizationId) {
+  let leaveEligibilityBand: import("@/lib/leave/leave-eligibility").LeaveEligibilityBand =
+    "full_time_confirmed";
+  {
     const { data: employeeRow, error: employeeError } = await supabase
       .schema("hrms")
       .from("employees")
-      .select("organization_id")
+      .select("organization_id, employment_status, employment_types:employment_type_id (code, is_full_time)")
       .eq("id", employeeId)
       .is("deleted_at", null)
       .maybeSingle();
     if (employeeError) throw new Error(employeeError.message);
-    organizationId = employeeRow?.organization_id as string | undefined;
+    if (!organizationId) {
+      organizationId = employeeRow?.organization_id as string | undefined;
+    }
+    const typeRaw = employeeRow?.employment_types as
+      | { code?: string | null; is_full_time?: boolean | null }
+      | { code?: string | null; is_full_time?: boolean | null }[]
+      | null
+      | undefined;
+    const typeRow = Array.isArray(typeRaw) ? typeRaw[0] : typeRaw;
+    leaveEligibilityBand = resolveLeaveEligibilityBand({
+      employmentStatus: String(employeeRow?.employment_status ?? "active"),
+      employmentTypeCode: typeRow?.code ?? null,
+      isFullTime: typeof typeRow?.is_full_time === "boolean" ? typeRow.is_full_time : null,
+    });
   }
 
   const genderQuery = () =>
@@ -933,6 +1135,9 @@ export async function getEmployeeLeaveBalanceSnapshot(
   const yearTakenByCode: Record<string, number> = {};
 
   for (const row of requestRows) {
+    if (isPendingHrReview(row.leave_status, row.duration_breakdown)) continue;
+    const review = parseHrReviewMetadata(row.duration_breakdown);
+    if (review?.decision === "special") continue;
     const leaveType = unwrapRelation(
       row.leave_types as { code: string } | { code: string }[] | null,
     );
@@ -1024,7 +1229,7 @@ export async function getEmployeeLeaveBalanceSnapshot(
 
   if (organizationId) {
     const oh = snapshots.find((row) => row.leaveTypeCode === OPTIONAL_HOLIDAY_CODE);
-    if (oh) {
+    if (oh && leaveEligibilityBand === "full_time_confirmed") {
       const [holidays, taken] = await Promise.all([
         listOrganizationOptionalHolidays(supabase, organizationId, calendarYear),
         listEmployeeOptionalHolidaySelections(supabase, employeeId, calendarYear),
@@ -1047,7 +1252,9 @@ export async function getEmployeeLeaveBalanceSnapshot(
     }
   }
 
-  return snapshots;
+  return snapshots.filter((row) =>
+    isLeaveTypeAllowedForBand(row.leaveTypeCode, leaveEligibilityBand),
+  );
 }
 
 export async function listLeaveBalances(
@@ -1221,6 +1428,9 @@ export async function getLeaveCalendarData(
       totalDays: Number(row.total_days),
       isHalfDay: row.is_half_day,
       leaveStatus: row.leave_status as LeaveCalendarEntry["leaveStatus"],
+      hrReviewRequired: isPendingHrReview(row.leave_status, row.duration_breakdown) ||
+        Boolean(parseHrReviewMetadata(row.duration_breakdown)?.required),
+      hrDecision: parseHrReviewMetadata(row.duration_breakdown)?.decision ?? null,
       dayAllocations: calendarDayAllocationsForRequest(row, runtime.calendar),
     };
   });
@@ -1296,6 +1506,9 @@ export async function getEmployeeLeaveCalendarData(
       totalDays: Number(row.total_days),
       isHalfDay: row.is_half_day,
       leaveStatus: row.leave_status as LeaveCalendarEntry["leaveStatus"],
+      hrReviewRequired: isPendingHrReview(row.leave_status, row.duration_breakdown) ||
+        Boolean(parseHrReviewMetadata(row.duration_breakdown)?.required),
+      hrDecision: parseHrReviewMetadata(row.duration_breakdown)?.decision ?? null,
       dayAllocations: calendarDayAllocationsForRequest(row, runtime.calendar),
     };
   });
@@ -2013,13 +2226,15 @@ export async function ensurePendingExecutiveLeaveAssignedToCeo(
   const { data: pendingLeaves, error: leaveError } = await admin
     .schema("hrms")
     .from("leave_requests")
-    .select("id, created_by")
+    .select("id, created_by, duration_breakdown, leave_status")
     .in("employee_id", executiveApplicantIds)
     .eq("leave_status", "pending")
     .is("deleted_at", null);
 
   if (leaveError) throw new Error(leaveError.message);
-  const leaveRows = pendingLeaves ?? [];
+  const leaveRows = (pendingLeaves ?? []).filter(
+    (row) => !isPendingHrReview(row.leave_status, row.duration_breakdown),
+  );
   if (leaveRows.length === 0) return;
 
   const leaveIds = leaveRows.map((row) => row.id);

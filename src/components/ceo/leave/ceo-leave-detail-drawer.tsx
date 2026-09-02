@@ -181,7 +181,11 @@ export function CeoLeaveDetailDrawer({
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="truncate text-lg font-semibold">{detail.employeeName}</p>
-                      <LeaveStatusBadge status={detail.leaveStatus} />
+                      <LeaveStatusBadge
+                        status={detail.leaveStatus}
+                        durationBreakdown={detail.durationBreakdown}
+                        audience="ceo"
+                      />
                     </div>
                     <p className="mt-0.5 truncate text-sm text-muted-foreground">
                       {detail.employeeCode} · {detail.leaveTypeName} · {dateRangeLabel}

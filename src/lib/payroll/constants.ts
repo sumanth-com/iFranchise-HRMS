@@ -102,10 +102,20 @@ export function payrollTeamListUrl(
 export const PAYROLL_STATUS_LABELS: Record<PayrollStatus, string> = {
   draft: "Draft",
   processing: "Processing",
-  processed: "Processed",
-  approved: "Approved",
-  paid: "Paid",
+  processed: "Reviewed",
+  approved: "Reviewed",
+  paid: "Sent",
   cancelled: "Cancelled",
+};
+
+export const PAYROLL_ITEM_STATUS_LABELS: Record<
+  "draft" | "reviewed" | "sent" | "locked",
+  string
+> = {
+  draft: "Draft",
+  reviewed: "Reviewed",
+  sent: "Sent",
+  locked: "Locked",
 };
 
 export const BONUS_TYPE_LABELS: Record<BonusType, string> = {

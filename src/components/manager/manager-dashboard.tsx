@@ -15,7 +15,6 @@ const PULSE_LINKS = {
   presentToday: MANAGER_DASHBOARD_KPI_LINKS.presentToday,
   absentToday: MANAGER_DASHBOARD_KPI_LINKS.onLeaveToday,
   lateToday: MANAGER_DASHBOARD_KPI_LINKS.lateToday,
-  halfDayToday: MANAGER_DASHBOARD_KPI_LINKS.halfDayToday,
   pendingLeaveApprovals: MANAGER_DASHBOARD_KPI_LINKS.pendingLeaveApprovals,
   exitRequests: MANAGER_ROUTES.resignation,
 };

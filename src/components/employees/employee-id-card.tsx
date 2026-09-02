@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, useTransition } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
-import { EmploymentStatusBadge } from "@/components/employees/employment-status-badge";
 import {
   EmployeeDeactivatedBadge,
   isEmployeeAccountDeactivated,
 } from "@/components/employees/employee-account-status-badge";
+import { ProfilePhotoFallback } from "@/components/employees/profile-photo-fallback";
+import { getDirectoryAssetPhoto } from "@/lib/employee/directory-asset-photos";
 import { PROFILE_IMAGE_MAX_BYTES } from "@/lib/employees/constants";
 import {
   getProfileImageSignedUrlAction,
@@ -49,7 +51,7 @@ export function EmployeeIdCard({
   designation,
   departmentName: _departmentName,
   employmentTypeName,
-  employmentStatus,
+  employmentStatus: _employmentStatus,
   accountStatus,
   profileImagePath,
   imageUrl: initialUrl,
@@ -69,9 +71,14 @@ export function EmployeeIdCard({
 
   const fullName = `${firstName} ${lastName}`.trim();
   const roleTitle = designation?.trim() || "Team Member";
-  const roleAndId = `${roleTitle} · ID · ${employeeCode}`;
   const accountDeactivated =
     accountStatus != null && isEmployeeAccountDeactivated(accountStatus);
+  const assetPhoto = getDirectoryAssetPhoto({
+    employeeCode,
+    firstName,
+    lastName,
+    fullName,
+  });
 
   useEffect(() => {
     if (previewUrlRef.current) return;
@@ -253,10 +260,18 @@ export function EmployeeIdCard({
                   resolvedPathRef.current = null;
                   notifyProfilePhotoChanged({ employeeId, imageUrl: null });
                 }}
-                className="absolute inset-0 size-full object-cover object-[center_22%]"
+                className="absolute inset-0 size-full object-cover object-top"
+              />
+            ) : assetPhoto ? (
+              <Image
+                src={assetPhoto}
+                alt={fullName}
+                fill
+                sizes="304px"
+                className="object-cover object-top"
               />
             ) : (
-              <div className="absolute inset-0 bg-muted" aria-hidden />
+              <ProfilePhotoFallback label={fullName} />
             )}
 
             {canEdit ? (
@@ -341,8 +356,11 @@ export function EmployeeIdCard({
               <p className="w-full break-words text-[1.2rem] font-bold leading-snug tracking-tight text-neutral-950">
                 {fullName}
               </p>
-              <p className="mt-2 w-full line-clamp-2 break-words text-[0.82rem] leading-snug text-neutral-500">
-                {roleAndId}
+              <p className="mt-2 w-full whitespace-normal break-words text-[0.82rem] leading-snug text-neutral-500">
+                {roleTitle}
+              </p>
+              <p className="mt-1 w-full font-mono text-[0.72rem] font-medium tracking-wide text-neutral-500">
+                ID · {employeeCode}
               </p>
               <div className="mt-3.5 flex w-full flex-wrap items-center justify-center gap-2">
                 <p className="inline-flex w-fit rounded-full bg-white/70 px-2.5 py-1 text-[0.68rem] font-semibold tracking-wide text-neutral-700 shadow-sm ring-1 ring-black/5">
@@ -350,11 +368,7 @@ export function EmployeeIdCard({
                 </p>
                 {accountDeactivated ? (
                   <EmployeeDeactivatedBadge />
-                ) : (
-                  <EmploymentStatusBadge
-                    status={employmentStatus === "draft" ? "active" : employmentStatus}
-                  />
-                )}
+                ) : null}
               </div>
             </div>
           </div>
@@ -389,8 +403,11 @@ export function EmployeeIdCard({
               <p className="w-full break-words text-[1.2rem] font-bold leading-snug tracking-tight text-white">
                 {fullName}
               </p>
-              <p className="mt-2 w-full line-clamp-2 break-words text-[0.82rem] leading-snug text-slate-200">
-                {roleAndId}
+              <p className="mt-2 w-full whitespace-normal break-words text-[0.82rem] leading-snug text-slate-200">
+                {roleTitle}
+              </p>
+              <p className="mt-1 w-full font-mono text-[0.72rem] font-medium tracking-wide text-slate-300">
+                ID · {employeeCode}
               </p>
               <div className="mt-3.5 flex w-full flex-wrap items-center justify-center gap-2">
                 <p className="inline-flex w-fit rounded-full bg-white/10 px-2.5 py-1 text-[0.68rem] font-semibold tracking-wide text-slate-100 ring-1 ring-white/20">
@@ -398,12 +415,7 @@ export function EmployeeIdCard({
                 </p>
                 {accountDeactivated ? (
                   <EmployeeDeactivatedBadge className="shadow-none" />
-                ) : (
-                  <EmploymentStatusBadge
-                    status={employmentStatus === "draft" ? "active" : employmentStatus}
-                    className="shadow-none"
-                  />
-                )}
+                ) : null}
               </div>
             </div>
           </div>

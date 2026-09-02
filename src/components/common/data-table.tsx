@@ -27,6 +27,8 @@ type DataTableProps<T> = {
   data?: T[] | null;
   className?: string;
   emptyMessage?: string;
+  /** Classes for the empty-state cell. Defaults to a taller padded block. */
+  emptyClassName?: string;
   align?: "left" | "center";
   /** Enables a max-height scroll region with a sticky header (attendance-style tables). */
   scrollable?: boolean;
@@ -48,12 +50,17 @@ export function DataTable<T extends Record<string, unknown>>({
   data: dataProp,
   className,
   emptyMessage = "No records to display.",
+  emptyClassName,
   align = "left",
   scrollable = false,
   maxHeightClass = DATA_TABLE_SCROLL_MAX_HEIGHT,
 }: DataTableProps<T>) {
   const columns = Array.isArray(columnsProp) ? columnsProp : [];
   const rows = Array.isArray(dataProp) ? dataProp : [];
+  const emptyCellClassName = cn(
+    "flex min-h-[7rem] items-center justify-center px-4 py-8 text-center text-sm text-muted-foreground",
+    emptyClassName,
+  );
   const headAlign = align === "center" ? "text-center" : "text-left";
   const cellAlign = align === "center" ? "text-center" : "text-left";
 
@@ -63,12 +70,12 @@ export function DataTable<T extends Record<string, unknown>>({
     return (
       <div
         className={cn(
-          "rounded-lg border overflow-auto [scrollbar-gutter:stable]",
-          maxHeightClass,
+          "h-fit overflow-auto rounded-lg border border-input bg-white [scrollbar-gutter:stable] dark:bg-input",
+          rows.length > 0 && maxHeightClass,
           className,
         )}
       >
-        <table className="w-full caption-bottom text-sm">
+        <table className="w-full caption-bottom bg-white text-sm dark:bg-input">
           <thead className={TABLE_HEADER_STICKY_CLASS}>
             <tr className={TABLE_HEADER_ROW_CLASS}>
               {columns.map((column) => (
@@ -89,16 +96,14 @@ export function DataTable<T extends Record<string, unknown>>({
             {rows.length === 0 ? (
               <tr className="border-b">
                 <td colSpan={columns.length} className="p-0 align-middle">
-                  <div className="flex min-h-[7rem] items-center justify-center px-4 py-8 text-center text-sm text-muted-foreground">
-                    {emptyMessage}
-                  </div>
+                  <div className={emptyCellClassName}>{emptyMessage}</div>
                 </td>
               </tr>
             ) : (
               rows.map((row, rowIndex) => (
                 <tr
                   key={rowIndex}
-                  className="border-b transition-colors hover:bg-muted/50"
+                  className="border-b border-input/70 bg-white transition-colors hover:bg-zinc-50 dark:bg-input dark:hover:bg-white/5"
                 >
                   {columns.map((column) => (
                     <td
@@ -124,7 +129,7 @@ export function DataTable<T extends Record<string, unknown>>({
   }
 
   return (
-    <div className={cn("rounded-lg border overflow-x-auto", className)}>
+    <div className={cn("overflow-x-auto rounded-lg border border-input bg-white dark:bg-input", className)}>
       <Table>
         <TableHeader>
           <TableRow className={TABLE_HEADER_ROW_CLASS}>
@@ -142,9 +147,7 @@ export function DataTable<T extends Record<string, unknown>>({
           {rows.length === 0 ? (
             <TableRow>
               <TableCell colSpan={columns.length} className="p-0 align-middle">
-                <div className="flex min-h-[7rem] items-center justify-center px-4 py-8 text-center text-sm text-muted-foreground">
-                  {emptyMessage}
-                </div>
+                <div className={emptyCellClassName}>{emptyMessage}</div>
               </TableCell>
             </TableRow>
           ) : (

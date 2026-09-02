@@ -624,7 +624,8 @@ function buildBreadcrumbItems(
       reports: "Reports",
       notifications: "Notifications",
       profile: "My Profile",
-      directory: "Employee Directory",
+      directory: "Employees",
+      employees: "Employees",
       settings: "Settings",
       "user-provisioning": "User Provisioning",
     };
@@ -635,6 +636,24 @@ function buildBreadcrumbItems(
         label: sectionLabel,
         href: `/ceo/${segments[1]}`,
       });
+    }
+
+    if (segments[1] === "employees" && segments[2]) {
+      const employeeHref = `/ceo/employees/${segments[2]}`;
+      if (segments[3] === "edit") {
+        items.push({
+          label: formatEmployeeRouteRefLabel(segments[2]),
+          href: employeeHref,
+        });
+        items.push({ label: "Edit", href: pathname });
+        return items;
+      }
+
+      items.push({
+        label: formatEmployeeRouteRefLabel(segments[2]),
+        href: pathname,
+      });
+      return items;
     }
 
     if (

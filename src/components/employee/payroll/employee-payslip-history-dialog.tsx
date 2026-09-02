@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { PayslipListItem } from "@/types/payroll";
+import { getHrmsYears } from "@/lib/date/hrms-year";
 
 const FILTER_SELECT_CONTENT_CLASS =
   "z-[100] min-w-[var(--anchor-width)] w-max max-w-[min(100vw-2rem,12rem)]";
@@ -42,8 +43,6 @@ function parsePayrollMonth(value: string): { year: number; month: number } {
 
 function getYearFilterLabel(value: string): string {
   if (value === "all") return "All Years";
-  if (value === "current") return "Current Year";
-  if (value === "last") return "Last Year";
   return value;
 }
 
@@ -82,32 +81,13 @@ export function EmployeePayslipHistoryDialog({
     }
   }, [open]);
 
-  const currentYear = new Date().getFullYear();
-
-  const yearOptions = useMemo(() => {
-    const years = new Set<number>();
-    payslips.forEach((row) => {
-      const { year } = parsePayrollMonth(row.payrollMonth);
-      if (year) years.add(year);
-    });
-    if (years.size === 0) {
-      return [currentYear, currentYear - 1, currentYear - 2];
-    }
-    return Array.from(years).sort((a, b) => b - a);
-  }, [payslips, currentYear]);
+  const yearOptions = useMemo(() => getHrmsYears(), []);
 
   const filteredPayslips = useMemo(() => {
     return payslips.filter((row) => {
       const { year, month } = parsePayrollMonth(row.payrollMonth);
 
-      if (yearFilter === "current" && year !== currentYear) return false;
-      if (yearFilter === "last" && year !== currentYear - 1) return false;
-      if (
-        yearFilter !== "all" &&
-        yearFilter !== "current" &&
-        yearFilter !== "last" &&
-        year !== Number(yearFilter)
-      ) {
+      if (yearFilter !== "all" && year !== Number(yearFilter)) {
         return false;
       }
 
@@ -115,7 +95,7 @@ export function EmployeePayslipHistoryDialog({
 
       return true;
     });
-  }, [payslips, yearFilter, monthFilter, currentYear]);
+  }, [payslips, yearFilter, monthFilter]);
 
   return (
     <Modal
@@ -145,8 +125,6 @@ export function EmployeePayslipHistoryDialog({
                 className={FILTER_SELECT_CONTENT_CLASS}
               >
                 <SelectItem value="all">All Years</SelectItem>
-                <SelectItem value="current">Current Year</SelectItem>
-                <SelectItem value="last">Last Year</SelectItem>
                 {yearOptions.map((year) => (
                   <SelectItem key={year} value={String(year)}>
                     {year}

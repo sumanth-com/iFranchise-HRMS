@@ -27,7 +27,7 @@ export function PaymentTimeline({ stages }: PaymentTimelineProps) {
   const activeIndex = allDone ? -1 : lastDoneIndex + 1;
 
   return (
-    <ol className="relative" aria-label="Payment timeline">
+    <ol className="relative flex h-full min-h-[16rem] flex-col" aria-label="Payment timeline">
       {stages.map((stage, index) => {
         const isDone = stage.done;
         const isActive = !allDone && index === activeIndex;
@@ -38,7 +38,7 @@ export function PaymentTimeline({ stages }: PaymentTimelineProps) {
         const lineActive = isDone && !nextStage?.done && index + 1 === activeIndex;
 
         return (
-          <li key={stage.key} className="relative flex gap-4">
+          <li key={stage.key} className={cn("relative flex gap-4", !isLast && "min-h-0 flex-1")}>
             <div className="flex w-6 shrink-0 flex-col items-center">
               <span
                 className={cn(

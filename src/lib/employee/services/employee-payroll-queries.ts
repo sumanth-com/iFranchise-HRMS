@@ -7,13 +7,14 @@ import {
 import {
   PAYSLIP_PUBLISH_DAY,
   canAccessPayslipDuringReview,
+  computeSalaryCreditDate,
   resolvePayslipAvailability,
   resolvePayslipSchedule,
   SALARY_CREDIT_DAY,
 } from "@/lib/payroll/services/payslip-publication";
 import { listBonuses, listReimbursements } from "@/lib/payroll/services/payroll-queries";
 import { getPayrollSettings } from "@/lib/payroll/services/payroll-settings";
-import { maskAccountNumber, roundCurrency, toEmployeeFacingEarnings } from "@/lib/payroll/services/payroll-utils";
+import { maskAccountNumber, roundCurrency, getPayslipDeductionLines, getPayslipEarningsLines, displaySalaryBankDetails } from "@/lib/payroll/services/payroll-utils";
 import {
   BONUS_TYPE_LABELS,
   REIMBURSEMENT_CATEGORY_LABELS,
@@ -320,8 +321,17 @@ function buildDisplaySummary(input: {
   const netSalary = roundCurrency(baseNet + extraTotal);
 
   return {
-    earnings: toEmployeeFacingEarnings([...baseEarnings, ...extraLines]),
-    deductions: deductions.filter((line) => Number(line.amount) > 0),
+    earnings: getPayslipEarningsLines({
+      earnings: [...baseEarnings, ...extraLines],
+      basicSalary: Number(
+        input.latest?.basicSalary ?? input.salaryStructure?.basicSalary ?? 0,
+      ),
+      totalAllowances: Number(
+        input.latest?.totalAllowances ?? input.salaryStructure?.otherAllowances ?? 0,
+      ),
+      grossSalary,
+    }),
+    deductions: getPayslipDeductionLines(deductions),
     grossSalary,
     totalDeductions,
     netSalary,
@@ -809,14 +819,14 @@ export async function getEmployeePayrollData(
   }
 
   const bank = bankRow
-    ? {
+    ? displaySalaryBankDetails({
         bankName: bankRow.bank_name,
         accountHolderName: bankRow.account_holder_name,
         accountNumberMasked: maskAccountNumber(bankRow.account_number),
         ifscCode: bankRow.ifsc_code ?? null,
         branchName: bankRow.branch_name ?? null,
         accountType: bankRow.account_type,
-      }
+      })
     : null;
 
   const displaySummary = buildDisplaySummary({
@@ -863,7 +873,10 @@ export async function getEmployeePayrollData(
       currentNetSalary: currentNet,
       currentGrossSalary: currentGross,
       nextSalaryDate: computeNextSalaryDate(creditDay),
-      lastPaymentDate: latestPaid?.row.issued_at ?? null,
+      lastPaymentDate: (() => {
+        const paidMonth = latestPaid?.payroll?.payroll_month ?? latestRow?.payroll?.payroll_month;
+        return paidMonth ? computeSalaryCreditDate(paidMonth, creditDay) : null;
+      })(),
       latestStatus: latestRow?.payroll?.payroll_status ?? null,
       ytdEarnings,
       ytdTax,

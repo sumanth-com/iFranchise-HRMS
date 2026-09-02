@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { LEAVE_STATUS_LABELS } from "@/lib/leave/constants";
+import { leaveStatusDisplayLabel } from "@/lib/leave/hr-review";
 import type { LeaveStatus } from "@/types/leave";
 
 const STATUS_STYLES: Record<LeaveStatus, string> = {
@@ -13,18 +14,45 @@ const STATUS_STYLES: Record<LeaveStatus, string> = {
 type LeaveStatusBadgeProps = {
   status: LeaveStatus;
   className?: string;
+  durationBreakdown?: unknown;
+  hrReviewRequired?: boolean;
+  hrDecision?: "lop" | "special" | null;
+  audience?: "employee" | "ceo";
 };
 
-export function LeaveStatusBadge({ status, className }: LeaveStatusBadgeProps) {
+export function LeaveStatusBadge({
+  status,
+  className,
+  durationBreakdown,
+  hrReviewRequired,
+  hrDecision,
+  audience,
+}: LeaveStatusBadgeProps) {
+  const breakdown =
+    durationBreakdown ??
+    (hrReviewRequired
+      ? {
+          hrReviewRequired: true,
+          hrDecision: hrDecision ?? null,
+        }
+      : undefined);
+  const label = breakdown
+    ? leaveStatusDisplayLabel(status, breakdown, { audience })
+    : (LEAVE_STATUS_LABELS[status] ?? status);
+  const tone =
+    label.startsWith("Pending HR")
+      ? "bg-orange-500/10 text-orange-800 dark:text-orange-300"
+      : STATUS_STYLES[status];
+
   return (
     <span
       className={cn(
         "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-        STATUS_STYLES[status],
+        tone,
         className,
       )}
     >
-      {LEAVE_STATUS_LABELS[status] ?? status}
+      {label}
     </span>
   );
 }

@@ -38,6 +38,7 @@ import {
   canManageCompanyAnnouncements,
   isAllowedAnnouncementFile,
 } from "@/lib/organization/company-announcement-constants";
+import { getHrmsYearSelectItems } from "@/lib/date/hrms-year";
 import { format } from "date-fns";
 import type { LookupOption } from "@/types/employee";
 import type {
@@ -161,20 +162,10 @@ export function AnnouncementsManagement({
     return [...values];
   }, [announcements]);
 
-  const yearOptions = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    const years = new Set<number>([currentYear]);
-    for (const item of announcements) {
-      const value = announcementDate(item);
-      if (value) years.add(new Date(value).getFullYear());
-    }
-    const start = Math.min(...years);
-    const options: string[] = [];
-    for (let year = 2028; year >= start; year -= 1) {
-      options.push(String(year));
-    }
-    return options;
-  }, [announcements]);
+  const yearOptions = useMemo(
+    () => getHrmsYearSelectItems().map((item) => item.value),
+    [],
+  );
 
   const filtered = useMemo(() => {
     return announcements.filter((item) => {

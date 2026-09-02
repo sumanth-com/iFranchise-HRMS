@@ -1,6 +1,7 @@
 import { cache } from "react";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { sortEmploymentTypeOptions } from "@/lib/employees/employment-type-display";
 import type { LookupOption } from "@/types/employee";
 
 export function unwrapRelation<T>(value: T | T[] | null): T | null {
@@ -93,11 +94,13 @@ export const getEmploymentTypes = cache(async function getEmploymentTypes(
 
   if (error) throw new Error(error.message);
 
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    label: row.name,
-    code: row.code,
-  }));
+  return sortEmploymentTypeOptions(
+    (data ?? []).map((row) => ({
+      id: row.id,
+      label: row.name,
+      code: row.code,
+    })),
+  );
 });
 
 export const getShiftTemplates = cache(async function getShiftTemplates(

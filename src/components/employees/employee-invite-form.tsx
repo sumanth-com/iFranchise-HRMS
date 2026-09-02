@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { toEmployeeSelectItems, toLookupSelectItems } from "@/components/payroll/select-utils";
 import { inviteEmployeeAction } from "@/lib/employees/actions";
+import { sortEmploymentTypeOptions } from "@/lib/employees/employment-type-display";
 import {
   employeeInviteSchema,
   type EmployeeInviteInput,
@@ -204,7 +205,9 @@ export function EmployeeInviteForm({
           <Label htmlFor="employmentTypeId">Employment Type *</Label>
           <LabeledSelect
             id="employmentTypeId"
-            items={toLookupSelectItems(lookups.employmentTypes, { showCode: false })}
+            items={toLookupSelectItems(sortEmploymentTypeOptions(lookups.employmentTypes), {
+              showCode: false,
+            })}
             value={employmentTypeId}
             onValueChange={(value) =>
               setValue("employmentTypeId", value, { shouldValidate: true })

@@ -38,6 +38,7 @@ function personMatchesQuery(person: EmployeeDirectoryPerson, rawQuery: string): 
     person.designationTitle,
     person.designationSearchText,
     person.departmentName,
+    person.employmentTypeName,
     person.verticalName,
   ]
     .filter(Boolean)
@@ -128,7 +129,7 @@ export function EmployeeDirectoryView({
                   if (value) setDepartmentId(value);
                 }}
               >
-                <SelectTrigger className="h-10 w-full min-w-[11rem] rounded-lg border-muted-foreground/15 bg-background shadow-none sm:w-44">
+                <SelectTrigger className="h-10 w-full min-w-[11rem] rounded-lg border-muted-foreground/15 bg-white shadow-none sm:w-44 dark:bg-input">
                   <SelectValue placeholder={ALL_DEPARTMENTS_LABEL} />
                 </SelectTrigger>
                 <SelectContent>
@@ -146,7 +147,7 @@ export function EmployeeDirectoryView({
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search name, ID, department"
-                className="h-10 w-full rounded-lg border-muted-foreground/15 bg-background pr-10 pl-10 shadow-none"
+                className="h-10 w-full rounded-lg border-muted-foreground/15 bg-white pr-10 pl-10 shadow-none dark:bg-input"
               />
               {query ? (
                 <button

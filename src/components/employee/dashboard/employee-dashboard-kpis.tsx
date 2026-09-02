@@ -4,6 +4,7 @@ import { CalendarClock, CalendarDays, Clock, Timer } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { EmployeeStatCard } from "@/components/employee/dashboard/employee-module-primitives";
+import { useOptionalSelfAttendanceLive } from "@/components/attendance/self-attendance-live-context";
 import { useLiveWorkingSeconds } from "@/hooks/use-live-working-seconds";
 import { ATTENDANCE_STATUS_LABELS } from "@/lib/attendance/constants";
 import { formatWorkingDuration } from "@/lib/employee/attendance-format";
@@ -61,7 +62,17 @@ export function EmployeeDashboardKpiCards({
 }) {
   const pathname = usePathname();
   const links = resolveKpiLinks(pathname);
-  const workingSeconds = useLiveWorkingSeconds(today.checkInAt, today.checkOutAt);
+  const live = useOptionalSelfAttendanceLive();
+  const todayPunch = live?.today ?? today;
+  const fallbackSeconds = useLiveWorkingSeconds(todayPunch.checkInAt, todayPunch.checkOutAt);
+  const workingSeconds = live?.workingSeconds ?? fallbackSeconds;
+  const kpisForLabel = live
+    ? {
+        ...kpis,
+        attendanceStatus: live.today.attendanceStatus,
+        attendancePunchState: live.today.punchState,
+      }
+    : kpis;
 
   return (
     <section
@@ -74,7 +85,7 @@ export function EmployeeDashboardKpiCards({
     >
       <EmployeeStatCard
         label="Today's Attendance"
-        value={attendanceLabel(kpis)}
+        value={attendanceLabel(kpisForLabel)}
         hint="Status"
         icon={CalendarClock}
         accent="text-emerald-600 dark:text-emerald-400"
@@ -84,7 +95,7 @@ export function EmployeeDashboardKpiCards({
       />
       <EmployeeStatCard
         label="Working Hours Today"
-        value={formatWorkingDuration(workingSeconds)}
+        value={live?.workingHoursLabel ?? formatWorkingDuration(workingSeconds)}
         hint="Duration"
         icon={Timer}
         accent="text-sky-600 dark:text-sky-400"

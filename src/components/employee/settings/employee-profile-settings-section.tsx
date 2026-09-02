@@ -1,9 +1,9 @@
 "use client";
 
-import { Camera, Loader2, Save, Trash2 } from "lucide-react";
+import { Loader2, Save } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -18,14 +18,7 @@ import {
   SelectValue,
 } from "@/components/common/select";
 import { Label } from "@/components/ui/label";
-import { PROFILE_IMAGE_MAX_BYTES } from "@/lib/employees/constants";
 import { updateEmployeeSelfProfileAction } from "@/lib/employees/actions";
-import {
-  removeProfileImageAction,
-  uploadProfileImageAction,
-} from "@/lib/employees/profile-image-actions";
-import { notifyProfilePhotoChanged } from "@/lib/employees/profile-photo-events";
-import { optimizeProfileImageFile } from "@/lib/media/client-image-optimize";
 import type { EmployeeSelfProfileSettings } from "@/lib/employee/services/employee-self-profile";
 import { TIMEZONE_OPTIONS } from "@/lib/validations/organization";
 import {
@@ -63,7 +56,6 @@ export function EmployeeProfileSettingsSection({
   profileImageUrl: initialImageUrl,
 }: EmployeeProfileSettingsSectionProps) {
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
   const [imageUrl, setImageUrl] = useState(initialImageUrl);
 
@@ -94,63 +86,6 @@ export function EmployeeProfileSettingsSection({
     });
   }
 
-  function handlePhotoSelect(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please select an image file");
-      return;
-    }
-
-    if (file.size > PROFILE_IMAGE_MAX_BYTES) {
-      toast.error("Profile image must be 10 MB or smaller");
-      return;
-    }
-
-    startTransition(async () => {
-      const optimized = await optimizeProfileImageFile(file);
-      if (optimized.size > PROFILE_IMAGE_MAX_BYTES) {
-        toast.error("Profile image must be 10 MB or smaller");
-        return;
-      }
-
-      const formData = new FormData();
-      formData.set("file", optimized);
-
-      const result = await uploadProfileImageAction(settings.employeeId, formData);
-      if (!result.success) {
-        toast.error(result.message);
-        return;
-      }
-      const preview = URL.createObjectURL(optimized);
-      setImageUrl(preview);
-      notifyProfilePhotoChanged({
-        employeeId: settings.employeeId,
-        imageUrl: preview,
-      });
-      toast.success("Profile photo updated");
-      router.refresh();
-    });
-  }
-
-  function handleRemovePhoto() {
-    startTransition(async () => {
-      const result = await removeProfileImageAction(settings.employeeId);
-      if (!result.success) {
-        toast.error(result.message);
-        return;
-      }
-      setImageUrl(null);
-      notifyProfilePhotoChanged({
-        employeeId: settings.employeeId,
-        imageUrl: null,
-      });
-      toast.success("Profile photo removed");
-      router.refresh();
-    });
-  }
-
   const initials = `${settings.firstName.charAt(0)}${settings.lastName.charAt(0)}`.toUpperCase();
 
   return (
@@ -163,51 +98,23 @@ export function EmployeeProfileSettingsSection({
         </p>
       </div>
 
-      <div className="mb-6 flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center">
+      <div className="mb-6 flex flex-col gap-3 border-b pb-6 sm:flex-row sm:items-center">
         <div className="relative flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border bg-muted/40 text-lg font-semibold text-muted-foreground">
           {imageUrl ? (
             <Image
               src={imageUrl}
               alt={`${settings.firstName} ${settings.lastName}`}
               fill
-              className="object-cover"
+              className="object-cover object-top"
               unoptimized
             />
           ) : (
             initials
           )}
         </div>
-        <div className="flex flex-wrap gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handlePhotoSelect}
-          />
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={isPending}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            {isPending ? <Loader2 className="size-4 animate-spin" /> : <Camera className="size-4" />}
-            Upload photo
-          </Button>
-          {imageUrl ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              disabled={isPending}
-              onClick={handleRemovePhoto}
-            >
-              <Trash2 className="size-4" />
-              Remove
-            </Button>
-          ) : null}
-        </div>
+        <p className="text-sm leading-snug text-muted-foreground">
+          To update your profile photo, please contact the HR team.
+        </p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">

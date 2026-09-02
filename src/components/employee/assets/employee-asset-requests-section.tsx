@@ -19,6 +19,7 @@ import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { parseEmployeeRequestDetails } from "@/lib/assets/activity-utils";
 import { MAINTENANCE_STATUS_LABELS } from "@/lib/assets/constants";
 import { employeeDeleteAssetRequestAction } from "@/lib/employee/actions/employee-asset-actions";
+import { getHrmsYearSelectItems } from "@/lib/date/hrms-year";
 import { isOpenRepairMaintenance } from "@/lib/employee/assets/asset-display";
 import type { EmployeeAsset, EmployeeAssetRequest } from "@/types/employee-assets";
 import { cn } from "@/lib/utils";
@@ -40,14 +41,7 @@ const MONTH_ITEMS = [
 ];
 
 function buildYearItems() {
-  const currentYear = new Date().getFullYear();
-  return [
-    { value: "all", label: "All years" },
-    ...Array.from({ length: 5 }, (_, index) => ({
-      value: String(currentYear - index),
-      label: String(currentYear - index),
-    })),
-  ];
+  return getHrmsYearSelectItems({ includeAll: true });
 }
 
 function formatWhen(value: string) {

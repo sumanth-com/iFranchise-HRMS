@@ -10,6 +10,7 @@ export type EmployeeDirectoryPerson = {
   departmentId: string | null;
   departmentName: string | null;
   verticalName: string | null;
+  employmentTypeName: string | null;
   avatarUrl: string | null;
   profileImagePath: string | null;
 };

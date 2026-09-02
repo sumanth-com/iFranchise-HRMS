@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/common/button";
@@ -26,10 +26,14 @@ export function MobileSidebar() {
     setMobileOpen,
     toggleSection,
     isSectionOpen,
-    sectionsReady,
     ensureSectionOpenIfUnset,
   } = useSidebar();
   const { navigation, portalHome } = useSidebarNavigation();
+  const [navPaintReady, setNavPaintReady] = useState(false);
+
+  useEffect(() => {
+    setNavPaintReady(true);
+  }, []);
 
   const activeHref = resolveActiveNavHref(
     pathname,
@@ -44,12 +48,12 @@ export function MobileSidebar() {
   );
 
   useEffect(() => {
-    if (!sectionsReady || !activeHref) return;
+    if (!navPaintReady || !activeHref) return;
     const activeItem = navigation.find((item) => item.href === activeHref);
     if (activeItem?.section) {
       ensureSectionOpenIfUnset(activeItem.section);
     }
-  }, [activeHref, ensureSectionOpenIfUnset, navigation, sectionsReady]);
+  }, [activeHref, ensureSectionOpenIfUnset, navigation, navPaintReady]);
 
   return (
     <Sheet open={isMobileOpen} onOpenChange={setMobileOpen}>
@@ -64,7 +68,7 @@ export function MobileSidebar() {
             const prevSection = index > 0 ? navigation[index - 1]?.section : undefined;
             const showSection = item.section && item.section !== prevSection;
             const sectionOpen =
-              !sectionsReady || !item.section ? true : isSectionOpen(item.section);
+              !navPaintReady || !item.section ? true : isSectionOpen(item.section);
             const isFirstSection =
               Boolean(showSection) && item.section === firstSectionName;
 
@@ -81,6 +85,7 @@ export function MobileSidebar() {
                         : "mt-4 border-t border-border/60 pt-4 dark:border-white/15",
                     )}
                     aria-expanded={sectionOpen}
+                    suppressHydrationWarning
                   >
                     <span>{item.section}</span>
                     <ChevronDown

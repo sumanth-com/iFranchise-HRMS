@@ -29,9 +29,10 @@ export const ceoNavItems: NavigationItem[] = [
     icon: UserRound,
   },
   {
-    title: "Employee Directory",
-    href: CEO_ROUTES.directory,
+    title: "Employees",
+    href: CEO_ROUTES.employees,
     icon: Users,
+    permissions: ["employee.view", "employee.directory.view", "portal.ceo.access"],
   },
   {
     title: "Organization",

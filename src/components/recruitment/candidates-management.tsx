@@ -37,6 +37,7 @@ import {
   INTERVIEW_DURATION_OPTIONS,
   INTERVIEW_TYPE_LABELS,
 } from "@/lib/recruitment/constants";
+import { getHrmsYearSelectItems } from "@/lib/date/hrms-year";
 import { HIRING_SECTION_HELP } from "@/lib/recruitment/section-help";
 import {
   applyInterviewEmailTemplate,
@@ -61,11 +62,7 @@ const MONTH_OPTIONS = Array.from({ length: 12 }, (_, index) => ({
 }));
 
 function getYearOptions() {
-  const current = new Date().getFullYear();
-  return Array.from({ length: 4 }, (_, index) => {
-    const year = current - index;
-    return { value: String(year), label: String(year) };
-  });
+  return getHrmsYearSelectItems();
 }
 
 function candidateMatchesPeriod(createdAt: string, month?: string, year?: string) {

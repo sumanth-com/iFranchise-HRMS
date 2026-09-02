@@ -51,104 +51,17 @@ const DEFAULT_CARD_TONE: CardTone = {
   glow: "",
 };
 
-const TASK_CARD_TONES: Record<string, CardTone> = {
-  "payroll-due": {
-    iconWrap: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-    count: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-    countIdle: "bg-emerald-500/8 text-emerald-700/70 dark:text-emerald-300/70",
-    tile: "bg-gradient-to-br from-emerald-500/12 via-card to-teal-500/8 ring-1 ring-inset ring-emerald-500/12",
-    link: "text-emerald-700 dark:text-emerald-300",
-    glow: "bg-emerald-400/20",
-  },
-  "interviews-today": {
-    iconWrap: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
-    count: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
-    countIdle: "bg-sky-500/8 text-sky-700/70 dark:text-sky-300/70",
-    tile: "bg-gradient-to-br from-sky-500/12 via-card to-cyan-500/8 ring-1 ring-inset ring-sky-500/12",
-    link: "text-sky-700 dark:text-sky-300",
-    glow: "bg-sky-400/20",
-  },
-  "on-leave": {
-    iconWrap: "bg-amber-500/15 text-amber-800 dark:text-amber-300",
-    count: "bg-amber-500/15 text-amber-800 dark:text-amber-300",
-    countIdle: "bg-amber-500/8 text-amber-800/70 dark:text-amber-300/70",
-    tile: "bg-gradient-to-br from-amber-500/12 via-card to-orange-500/8 ring-1 ring-inset ring-amber-500/12",
-    link: "text-amber-800 dark:text-amber-300",
-    glow: "bg-amber-400/20",
-  },
-  "onboarding-review": {
-    iconWrap: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
-    count: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
-    countIdle: "bg-violet-500/8 text-violet-700/70 dark:text-violet-300/70",
-    tile: "bg-gradient-to-br from-violet-500/12 via-card to-fuchsia-500/8 ring-1 ring-inset ring-violet-500/12",
-    link: "text-violet-700 dark:text-violet-300",
-    glow: "bg-violet-400/20",
-  },
-  headcount: {
-    iconWrap: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300",
-    count: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300",
-    countIdle: "bg-indigo-500/8 text-indigo-700/70 dark:text-indigo-300/70",
-    tile: "bg-gradient-to-br from-indigo-500/12 via-card to-blue-500/8 ring-1 ring-inset ring-indigo-500/12",
-    link: "text-indigo-700 dark:text-indigo-300",
-    glow: "bg-indigo-400/20",
-  },
-  "team-size": {
-    iconWrap: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300",
-    count: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300",
-    countIdle: "bg-indigo-500/8 text-indigo-700/70 dark:text-indigo-300/70",
-    tile: "bg-gradient-to-br from-indigo-500/12 via-card to-blue-500/8 ring-1 ring-inset ring-indigo-500/12",
-    link: "text-indigo-700 dark:text-indigo-300",
-    glow: "bg-indigo-400/20",
-  },
-  "upcoming-birthdays": {
-    iconWrap: "bg-rose-500/15 text-rose-700 dark:text-rose-300",
-    count: "bg-rose-500/15 text-rose-700 dark:text-rose-300",
-    countIdle: "bg-rose-500/8 text-rose-700/70 dark:text-rose-300/70",
-    tile: "bg-gradient-to-br from-rose-500/12 via-card to-pink-500/8 ring-1 ring-inset ring-rose-500/12",
-    link: "text-rose-700 dark:text-rose-300",
-    glow: "bg-rose-400/20",
-  },
-  "company-assets": {
-    iconWrap: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300",
-    count: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300",
-    countIdle: "bg-cyan-500/8 text-cyan-700/70 dark:text-cyan-300/70",
-    tile: "bg-gradient-to-br from-cyan-500/12 via-card to-teal-500/8 ring-1 ring-inset ring-cyan-500/12",
-    link: "text-cyan-700 dark:text-cyan-300",
-    glow: "bg-cyan-400/20",
-  },
-  "exit-clearance": {
-    iconWrap: "bg-orange-500/15 text-orange-800 dark:text-orange-300",
-    count: "bg-orange-500/15 text-orange-800 dark:text-orange-300",
-    countIdle: "bg-orange-500/8 text-orange-800/70 dark:text-orange-300/70",
-    tile: "bg-gradient-to-br from-orange-500/12 via-card to-amber-500/8 ring-1 ring-inset ring-orange-500/12",
-    link: "text-orange-800 dark:text-orange-300",
-    glow: "bg-orange-400/20",
-  },
-  "probation-ending": {
-    iconWrap: "bg-amber-500/15 text-amber-800 dark:text-amber-300",
-    count: "bg-amber-500/15 text-amber-800 dark:text-amber-300",
-    countIdle: "bg-amber-500/8 text-amber-800/70 dark:text-amber-300/70",
-    tile: "bg-gradient-to-br from-amber-500/12 via-card to-yellow-500/8 ring-1 ring-inset ring-amber-500/12",
-    link: "text-amber-800 dark:text-amber-300",
-    glow: "bg-amber-400/20",
-  },
-  "pending-leave": {
-    iconWrap: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
-    count: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
-    countIdle: "bg-violet-500/8 text-violet-700/70 dark:text-violet-300/70",
-    tile: "bg-gradient-to-br from-violet-500/12 via-card to-indigo-500/8 ring-1 ring-inset ring-violet-500/12",
-    link: "text-violet-700 dark:text-violet-300",
-    glow: "bg-violet-400/20",
-  },
-  "performance-reviews": {
-    iconWrap: "bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300",
-    count: "bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300",
-    countIdle: "bg-fuchsia-500/8 text-fuchsia-700/70 dark:text-fuchsia-300/70",
-    tile: "bg-gradient-to-br from-fuchsia-500/12 via-card to-pink-500/8 ring-1 ring-inset ring-fuchsia-500/12",
-    link: "text-fuchsia-700 dark:text-fuchsia-300",
-    glow: "bg-fuchsia-400/20",
-  },
+const VIBRANT_CARD_TONE: CardTone = {
+  iconWrap: "bg-violet-500/12 text-violet-700 dark:text-violet-300",
+  count: "bg-violet-500/12 text-violet-700 dark:text-violet-300",
+  countIdle: "bg-muted/60 text-muted-foreground",
+  tile: "bg-white ring-1 ring-inset ring-violet-500/12 dark:bg-card",
+  link: "text-violet-700 dark:text-violet-300",
+  glow: "",
 };
+
+const VIBRANT_SECTION_CLASS = "bg-white ring-1 ring-inset ring-violet-500/10 dark:bg-card";
+const VIBRANT_HEADING_CLASS = "bg-violet-500/12 text-violet-700 dark:text-violet-300";
 
 const TASK_ICONS: Record<string, LucideIcon> = {
   "onboarding-review": UserPlus,
@@ -190,16 +103,9 @@ const TASK_HINTS: Record<string, string> = {
   "performance-reviews": "Performance reviews still open for your team",
 };
 
-function resolveCardTone(id: string, visualTone: DashboardVisualTone): CardTone {
+function resolveCardTone(_id: string, visualTone: DashboardVisualTone): CardTone {
   if (visualTone !== "vibrant") return DEFAULT_CARD_TONE;
-  return TASK_CARD_TONES[id] ?? {
-    iconWrap: "bg-primary/15 text-primary",
-    count: "bg-primary/15 text-primary",
-    countIdle: "bg-muted/70 text-muted-foreground",
-    tile: "bg-gradient-to-br from-primary/10 via-card to-sky-500/8 ring-1 ring-inset ring-primary/12",
-    link: "text-primary",
-    glow: "bg-primary/20",
-  };
+  return VIBRANT_CARD_TONE;
 }
 
 function FocusTaskCard({
@@ -218,21 +124,13 @@ function FocusTaskCard({
     <Link
       href={item.href}
       className={cn(
-        "relative flex min-h-0 flex-col justify-between overflow-hidden",
+        "relative flex h-full min-h-0 flex-col justify-between overflow-hidden",
         dashboardTileClass,
         tone.tile,
+        visualTone === "vibrant" ? "p-4" : "",
       )}
     >
-      {visualTone === "vibrant" && tone.glow ? (
-        <span
-          className={cn(
-            "pointer-events-none absolute -right-5 -top-5 size-20 rounded-full blur-2xl",
-            tone.glow,
-          )}
-          aria-hidden
-        />
-      ) : null}
-      <div className="relative z-10 flex items-start gap-2.5">
+      <div className="flex min-w-0 items-start gap-3">
         <span
           className={cn(
             "flex size-9 shrink-0 items-center justify-center rounded-lg",
@@ -242,20 +140,20 @@ function FocusTaskCard({
           <Icon className="size-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold leading-snug text-foreground">{item.label}</p>
-          <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">{hint}</p>
+          <p className="truncate text-sm font-semibold leading-snug text-foreground">{item.label}</p>
+          <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground">{hint}</p>
         </div>
       </div>
-      <div className="relative z-10 mt-2 flex items-end justify-between gap-2">
+      <div className="mt-4 flex shrink-0 items-center justify-between gap-2">
         <span
           className={cn(
-            "rounded-md px-2.5 py-0.5 text-base font-semibold tabular-nums leading-none",
+            "rounded-md px-2.5 py-1 text-base font-semibold tabular-nums leading-none",
             hasWork ? tone.count : tone.countIdle,
           )}
         >
           {item.count ?? 0}
         </span>
-        <span className={cn("inline-flex items-center gap-1 text-[11px] font-medium", tone.link)}>
+        <span className={cn("inline-flex shrink-0 items-center gap-1 text-[11px] font-medium", tone.link)}>
           Open
           <ArrowRight className="size-3.5" />
         </span>
@@ -335,8 +233,7 @@ function HrPriorityFocus({
       className={cn(
         "flex h-full min-h-0 flex-col",
         dashboardSectionClass,
-        visualTone === "vibrant" &&
-          "bg-gradient-to-br from-amber-500/[0.06] via-card to-violet-500/[0.06] ring-1 ring-inset ring-amber-500/10",
+        visualTone === "vibrant" && VIBRANT_SECTION_CLASS,
       )}
     >
       <SectionHeading
@@ -344,10 +241,17 @@ function HrPriorityFocus({
         description={description}
         icon={Sparkles}
         visualTone={visualTone}
-        toneClass="bg-amber-500/15 text-amber-700 dark:text-amber-300"
+        toneClass={VIBRANT_HEADING_CLASS}
       />
 
-      <div className="grid min-h-0 flex-1 grid-cols-2 gap-2.5">
+      <div
+        className={cn(
+          "grid flex-1 grid-cols-2 gap-3",
+          visualTone === "vibrant"
+            ? "auto-rows-[minmax(8.75rem,1fr)]"
+            : "min-h-0",
+        )}
+      >
         {cards.map((item) => (
           <FocusTaskCard key={item.id} item={item} visualTone={visualTone} />
         ))}
@@ -373,10 +277,9 @@ function PeopleFocusPanel({
   return (
     <section
       className={cn(
-        "flex h-full min-h-0 flex-col overflow-hidden",
+        "flex h-full min-h-0 flex-col",
         dashboardSectionClass,
-        visualTone === "vibrant" &&
-          "bg-gradient-to-br from-cyan-500/[0.06] via-card to-orange-500/[0.06] ring-1 ring-inset ring-cyan-500/10",
+        visualTone === "vibrant" && VIBRANT_SECTION_CLASS,
       )}
     >
       <SectionHeading
@@ -384,13 +287,14 @@ function PeopleFocusPanel({
         description={description}
         icon={Users}
         visualTone={visualTone}
-        toneClass="bg-cyan-500/15 text-cyan-700 dark:text-cyan-300"
+        toneClass={VIBRANT_HEADING_CLASS}
       />
 
       <div
         className={cn(
-          "grid min-h-0 flex-1 gap-2.5",
+          "grid flex-1 gap-3",
           cards.length <= 2 ? "grid-cols-2" : "grid-cols-2 lg:grid-cols-4",
+          visualTone === "vibrant" ? "auto-rows-[minmax(8.75rem,1fr)]" : "min-h-0",
         )}
       >
         {cards.map((item) => (
@@ -419,10 +323,9 @@ function FocusPairPanel({
   return (
     <section
       className={cn(
-        "flex h-full min-h-0 flex-col overflow-hidden",
+        "flex h-full min-h-0 flex-col",
         dashboardSectionClass,
-        visualTone === "vibrant" &&
-          "bg-gradient-to-br from-indigo-500/[0.06] via-card to-rose-500/[0.06] ring-1 ring-inset ring-indigo-500/10",
+        visualTone === "vibrant" && VIBRANT_SECTION_CLASS,
       )}
     >
       <SectionHeading
@@ -430,10 +333,17 @@ function FocusPairPanel({
         description={description}
         icon={Users}
         visualTone={visualTone}
-        toneClass="bg-indigo-500/15 text-indigo-700 dark:text-indigo-300"
+        toneClass={VIBRANT_HEADING_CLASS}
       />
 
-      <div className="grid min-h-0 flex-1 grid-rows-2 gap-2.5">
+      <div
+        className={cn(
+          "grid flex-1 gap-3",
+          visualTone === "vibrant"
+            ? "grid-rows-[repeat(2,minmax(8.75rem,1fr))]"
+            : "min-h-0 grid-rows-2",
+        )}
+      >
         {cards.map((item) => (
           <WatchFocusCard key={item.id} item={item} visualTone={visualTone} />
         ))}
@@ -472,8 +382,19 @@ export function DashboardOperationsRow({
   visualTone?: DashboardVisualTone;
 }) {
   return (
-    <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-3 overflow-hidden">
-      <div className="grid min-h-0 gap-3 overflow-hidden xl:grid-cols-2 xl:items-stretch">
+    <div
+      className={cn(
+        visualTone === "vibrant"
+          ? "flex flex-col gap-4"
+          : "grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-3 overflow-hidden",
+      )}
+    >
+      <div
+        className={cn(
+          "grid gap-4 xl:grid-cols-2 xl:items-stretch",
+          visualTone !== "vibrant" && "min-h-0 overflow-hidden",
+        )}
+      >
         <HrPriorityFocus
           items={tasks}
           description={focusDescription}
@@ -495,7 +416,7 @@ export function DashboardOperationsRow({
         )}
       </div>
 
-      <div className="min-h-0 overflow-hidden">
+      <div className="min-h-0">
         <PeopleFocusPanel
           items={watchItems}
           title={insightsTitle ?? "People Focus"}

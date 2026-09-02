@@ -15,7 +15,6 @@ import { LabeledSelect } from "@/components/payroll/payroll-select";
 import {
   toEmployeeSelectItems,
   toLookupSelectItems,
-  toSelectItems,
   withSelectOption,
 } from "@/components/payroll/select-utils";
 import {
@@ -24,10 +23,11 @@ import {
   uploadWizardDocumentAction,
 } from "@/lib/employees/actions";
 import {
+  DESIGNATION_OTHER_VALUE,
   EMPLOYEE_ROUTES,
-  EMPLOYMENT_STATUS_LABELS,
   WIZARD_STEPS,
 } from "@/lib/employees/constants";
+import { sortEmploymentTypeOptions } from "@/lib/employees/employment-type-display";
 import { COUNTRIES, INDIAN_STATES, STATE_DISTRICTS } from "@/lib/geo/india";
 import { todayIsoDateLocal } from "@/lib/validations/date";
 import {
@@ -86,10 +86,11 @@ export function EmployeeWizard({ lookups }: EmployeeWizardProps) {
       branchId: lookups.branches[0]?.id ?? "",
       departmentId: "",
       designationId: "",
+      customDesignationTitle: "",
       employmentTypeId: "",
       reportingManagerId: "",
       assignedHrEmployeeId: "",
-      employmentStatus: "draft" as const,
+      employmentStatus: "active" as const,
       dateOfJoining: "",
       dateOfLeaving: "",
     },
@@ -133,16 +134,19 @@ export function EmployeeWizard({ lookups }: EmployeeWizardProps) {
     () => withSelectOption(toLookupSelectItems(lookups.departments), { value: "none", label: "None" }),
     [lookups.departments],
   );
-  const designationItems = useMemo(
-    () => withSelectOption(toLookupSelectItems(lookups.designations), { value: "none", label: "None" }),
+  const designationOptions = useMemo(
+    () => toLookupSelectItems(lookups.designations, { showCode: false }),
     [lookups.designations],
   );
   const employmentTypeItems = useMemo(
     () =>
-      withSelectOption(toLookupSelectItems(lookups.employmentTypes, { showCode: false }), {
-        value: "none",
-        label: "None",
-      }),
+      withSelectOption(
+        toLookupSelectItems(sortEmploymentTypeOptions(lookups.employmentTypes), { showCode: false }),
+        {
+          value: "none",
+          label: "None",
+        },
+      ),
     [lookups.employmentTypes],
   );
   const managerItems = useMemo(
@@ -157,7 +161,6 @@ export function EmployeeWizard({ lookups }: EmployeeWizardProps) {
       }),
     [lookups.hrApprovers],
   );
-  const employmentStatusItems = useMemo(() => toSelectItems(EMPLOYMENT_STATUS_LABELS), []);
 
   const goNext = async () => {
     if (step === 1) {
@@ -370,13 +373,29 @@ export function EmployeeWizard({ lookups }: EmployeeWizardProps) {
           </div>
           <div className="space-y-2">
             <Label>Designation</Label>
-            <LabeledSelect
-              items={designationItems}
-              value={employmentForm.watch("designationId") || "none"}
-              onValueChange={(value) =>
-                employmentForm.setValue("designationId", value === "none" ? "" : value)
+            <SearchableSelect
+              options={designationOptions}
+              value={
+                employmentForm.watch("designationId") === DESIGNATION_OTHER_VALUE
+                  ? DESIGNATION_OTHER_VALUE
+                  : employmentForm.watch("designationId") || null
               }
-              placeholder="Select designation"
+              createdLabel={
+                employmentForm.watch("designationId") === DESIGNATION_OTHER_VALUE
+                  ? employmentForm.watch("customDesignationTitle")
+                  : null
+              }
+              allowNone
+              allowCreate
+              placeholder="Search or type a designation…"
+              onValueChange={(value) => {
+                employmentForm.setValue("designationId", value ?? "");
+                employmentForm.setValue("customDesignationTitle", "");
+              }}
+              onCreate={(label) => {
+                employmentForm.setValue("designationId", DESIGNATION_OTHER_VALUE);
+                employmentForm.setValue("customDesignationTitle", label);
+              }}
             />
           </div>
           <div className="space-y-2">
@@ -410,20 +429,6 @@ export function EmployeeWizard({ lookups }: EmployeeWizardProps) {
                 employmentForm.setValue("assignedHrEmployeeId", value === "none" ? "" : value)
               }
               placeholder="Select assigned HR"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Employment status</Label>
-            <LabeledSelect
-              items={employmentStatusItems}
-              value={employmentForm.watch("employmentStatus")}
-              onValueChange={(value) =>
-                employmentForm.setValue(
-                  "employmentStatus",
-                  (value ?? "draft") as EmployeeWizardInputValidated["employment"]["employmentStatus"],
-                )
-              }
-              placeholder="Select status"
             />
           </div>
           <div className="space-y-2">
@@ -573,7 +578,11 @@ export function EmployeeWizard({ lookups }: EmployeeWizardProps) {
               lookups.hrApprovers?.find((h) => h.id === review.employment.assignedHrEmployeeId)?.label ??
                 "Organization default",
             ],
-            ["Status", EMPLOYMENT_STATUS_LABELS[review.employment.employmentStatus]],
+            [
+              "Type",
+              lookups.employmentTypes.find((t) => t.id === review.employment.employmentTypeId)?.label ??
+                "—",
+            ],
           ]} />
           <ReviewCard title="Address" items={[
             [review.address.addressLine1, review.address.city],

@@ -34,6 +34,10 @@ import {
   previewPayrollRun,
   processPayrollRun,
   rejectPayrollRun,
+  releaseEmployeePayslip,
+  ensureUnpublishedPayslipForPayrollItem,
+  syncActiveEmployeesIntoPayrollRun,
+  updatePayrollItemAdjustments,
 } from "@/lib/payroll/services/payroll-mutations";
 import { PayslipEmailError } from "@/lib/payroll/services/payslip-email-errors";
 import {
@@ -56,6 +60,7 @@ import {
   bonusListParamsSchema,
   employeePayrollBreakdownSchema,
   payrollApprovalSchema,
+  payrollItemAdjustmentSchema,
   payrollListParamsSchema,
   payrollRejectSchema,
   payrollRunSchema,
@@ -65,6 +70,7 @@ import {
   salaryRevisionListParamsSchema,
   salaryStructureFormSchema,
   salaryStructureListParamsSchema,
+  sendEmployeePayslipSchema,
 } from "@/lib/validations/payroll";
 import { payrollSettingsSchema } from "@/lib/validations/payroll-settings";
 import type {
@@ -173,6 +179,86 @@ export async function generatePayrollRunAction(
     return {
       success: false,
       message: toUserFriendlyError(error, "Failed to generate payroll"),
+    };
+  }
+}
+
+export async function updatePayrollItemAdjustmentsAction(
+  input: unknown,
+): Promise<PayrollActionResult> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "payroll.run",
+      "payroll.process",
+      "payroll.edit",
+    ]);
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = payrollItemAdjustmentSchema.parse(input);
+    await updatePayrollItemAdjustments(supabase, profile, parsed);
+    revalidatePayrollPaths();
+    revalidateEmployeePayrollViews();
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to save payroll changes",
+    };
+  }
+}
+
+export async function ensurePayrollItemPayslipAction(
+  payrollItemId: string,
+): Promise<PayrollActionResult<string>> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "payroll.run",
+      "payroll.process",
+      "payslip.generate",
+      "payroll.view",
+      "payslip.view",
+    ]);
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = sendEmployeePayslipSchema.parse({ payrollItemId });
+    const payslipId = await ensureUnpublishedPayslipForPayrollItem(
+      supabase,
+      profile,
+      parsed.payrollItemId,
+    );
+    return { success: true, data: payslipId };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to open payslip",
+    };
+  }
+}
+
+export async function releaseEmployeePayslipAction(
+  payrollItemId: string,
+): Promise<PayrollActionResult<{ emailed: boolean }>> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "payroll.run",
+      "payroll.process",
+      "payslip.generate",
+      "payroll.download",
+    ]);
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = sendEmployeePayslipSchema.parse({ payrollItemId });
+    const data = await releaseEmployeePayslip(
+      supabase,
+      profile,
+      parsed.payrollItemId,
+      siteConfig.url,
+    );
+    revalidatePayrollPaths();
+    revalidateEmployeePayrollViews();
+    revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS.payslips));
+    return { success: true, data };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to send payslip",
     };
   }
 }
@@ -511,6 +597,7 @@ export async function fetchPayrollDetailAction(
   try {
     const profile = await requireServerAnyPermission(ceoOrViewPermission("payroll.view"));
     const supabase = await getAuthenticatedSupabase();
+    await syncActiveEmployeesIntoPayrollRun(supabase, profile, payrollId);
     return getPayrollRunById(supabase, profile, payrollId);
   } catch (error) {
     throw new Error(toUserFriendlyError(error, "Failed to load payroll details"));
@@ -526,7 +613,7 @@ export async function fetchPayslipDetailAction(
     ...ceoOrViewPermission("payroll.view"),
   ]);
   const supabase = await getAuthenticatedSupabase();
-  return getPayslipById(supabase, profile, payslipId);
+    return getPayslipById(supabase, profile, payslipId, { bypassAccessCheck: true });
 }
 
 export async function fetchPayrollLookupsAction(): Promise<PayrollLookups> {

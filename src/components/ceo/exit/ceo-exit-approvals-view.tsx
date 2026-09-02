@@ -8,6 +8,7 @@ import { CeoExitProcessedTable } from "@/components/ceo/exit/ceo-exit-processed-
 import { SectionHelpButton } from "@/components/common/section-help-button";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { fetchCeoExitApprovalQueueAction } from "@/lib/ceo/actions/ceo-exit-actions";
+import { getHrmsYearSelectItems } from "@/lib/date/hrms-year";
 import {
   CEO_APPROVALS_SECTION_HELP,
   CEO_SECTION_HELP_DESCRIPTION,
@@ -23,12 +24,8 @@ type Props = {
   initialYear: number;
 };
 
-function yearOptions(centerYear: number) {
-  const years: { value: string; label: string }[] = [];
-  for (let y = centerYear + 1; y >= centerYear - 4; y -= 1) {
-    years.push({ value: String(y), label: String(y) });
-  }
-  return years;
+function yearOptions() {
+  return getHrmsYearSelectItems();
 }
 
 export function CeoExitApprovalsView({
@@ -51,7 +48,7 @@ export function CeoExitApprovalsView({
     () => LEAVE_MONTH_OPTIONS.map((item) => ({ value: String(item.value), label: item.label })),
     [],
   );
-  const yearItems = useMemo(() => yearOptions(initialYear), [initialYear]);
+  const yearItems = useMemo(() => yearOptions(), []);
 
   const refreshQueue = useCallback(
     (nextMonth = month, nextYear = year) => {
@@ -127,7 +124,7 @@ export function CeoExitApprovalsView({
             }}
             placeholder="Month"
             disabled={isPending}
-            triggerClassName="h-9 w-[9.5rem]"
+            triggerClassName="h-9 w-[9.5rem] bg-white dark:bg-input"
             alignItemWithTrigger={false}
           />
           <LabeledSelect
@@ -140,7 +137,7 @@ export function CeoExitApprovalsView({
             }}
             placeholder="Year"
             disabled={isPending}
-            triggerClassName="h-9 w-[6.5rem]"
+            triggerClassName="h-9 w-[6.5rem] bg-white dark:bg-input"
             alignItemWithTrigger={false}
           />
         </div>

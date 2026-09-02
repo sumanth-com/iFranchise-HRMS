@@ -197,6 +197,11 @@ export function EmployeeDirectoryCard({
                 label="Designation"
                 value={person.designationTitle || "—"}
               />
+              <InfoRow
+                icon={Briefcase}
+                label="Employment type"
+                value={person.employmentTypeName || "—"}
+              />
               {person.managerName ? (
                 <InfoRow icon={Briefcase} label="Reporting to" value={person.managerName} />
               ) : null}

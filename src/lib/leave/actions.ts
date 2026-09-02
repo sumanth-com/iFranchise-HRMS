@@ -9,9 +9,8 @@ import {
   requireServerAnyPermission,
   requireServerPermission,
 } from "@/lib/permissions/server";
+import { isLeaveTypeAllowedForBand, isOptionalHolidayAllowedForBand } from "@/lib/leave/leave-eligibility";
 import { LEAVE_ROUTES, SELF_LEAVE_ROUTES } from "@/lib/leave/constants";
-import { MANAGER_ROUTES } from "@/lib/manager/constants";
-import { SYSTEM_ADMIN_ROUTES } from "@/lib/system-admin/constants";
 import { getLeaveRequestById } from "@/lib/leave/services/leave-detail";
 import { getManagerTeamScope } from "@/lib/manager/services/team-queries";
 import { hasPermission } from "@/lib/permissions/utils";
@@ -19,6 +18,7 @@ import {
   approveLeaveRequest,
   cancelLeaveRequest,
   createLeaveRequest,
+  decideHrLeaveReview,
   deleteLeaveRequest,
   rejectLeaveRequest,
   updateLeaveRequest,
@@ -37,6 +37,7 @@ import {
 } from "@/lib/leave/services/leave-queries";
 import { optionalHolidaysForList } from "@/lib/leave/optional-holiday";
 import {
+  hrLeaveReviewDecisionSchema,
   leaveApprovalSchema,
   leaveFormSchema,
   leaveListParamsSchema,
@@ -65,14 +66,9 @@ async function getAuthenticatedSupabase() {
 }
 
 function revalidateLeaveSelfServicePaths(leaveRequestId?: string) {
-  revalidatePath(LEAVE_ROUTES.list);
-  revalidatePath(LEAVE_ROUTES.balances);
-  revalidatePath(SELF_LEAVE_ROUTES.list);
-  revalidatePath(SELF_LEAVE_ROUTES.team);
   revalidatePath(EMPLOYEE_ROUTES.leave);
-  revalidatePath(MANAGER_ROUTES.leave);
-  revalidatePath(MANAGER_ROUTES.leaveTeam);
-  revalidatePath(SYSTEM_ADMIN_ROUTES.leave);
+  revalidatePath(SELF_LEAVE_ROUTES.list);
+  revalidatePath(LEAVE_ROUTES.list);
   if (leaveRequestId) {
     revalidatePath(LEAVE_ROUTES.detail(leaveRequestId));
   }
@@ -162,6 +158,35 @@ export async function rejectLeaveRequestAction(
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to reject leave request",
+    };
+  }
+}
+
+export async function decideHrLeaveReviewAction(
+  input: unknown,
+): Promise<LeaveActionResult> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "leave.approve",
+      "leave.reject",
+      PORTAL_PERMISSIONS.hr,
+      PORTAL_PERMISSIONS.ceo,
+    ]);
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = hrLeaveReviewDecisionSchema.parse(input);
+    await decideHrLeaveReview(
+      supabase,
+      profile,
+      parsed.leaveRequestId,
+      parsed.decision,
+      parsed.remarks ?? "",
+    );
+    revalidateLeaveSelfServicePaths(parsed.leaveRequestId);
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to complete HR review",
     };
   }
 }
@@ -380,7 +405,11 @@ export async function getLeaveApplyContextAction(
         allowHalfDay: runtime.allowHalfDay,
         maxConsecutiveDays: runtime.maxConsecutiveDays,
         approvalLevels: runtime.approvalLevels,
-        leaveTypes: runtime.leaveTypes.map((item) => ({
+        leaveTypes: runtime.leaveTypes
+          .filter((item) =>
+            isLeaveTypeAllowedForBand(item.code, employee.leaveEligibilityBand ?? "full_time_confirmed"),
+          )
+          .map((item) => ({
           id: item.id,
           code: item.code,
           name: item.name,
@@ -389,7 +418,11 @@ export async function getLeaveApplyContextAction(
         balances,
         policyDocument: DEFAULT_LEAVE_POLICY_DOCUMENT,
         applicantRoleCodes,
-        optionalHolidays,
+        optionalHolidays: isOptionalHolidayAllowedForBand(
+          employee.leaveEligibilityBand ?? "full_time_confirmed",
+        )
+          ? optionalHolidays
+          : [],
       },
     };
   } catch (error) {

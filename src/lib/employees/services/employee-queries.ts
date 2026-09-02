@@ -6,6 +6,11 @@ import {
   scopedEmployeeIds,
 } from "@/lib/manager/portal-scope";
 import { listEligibleHrLeaveApproverOptions } from "@/lib/leave/services/leave-queries";
+import { getDepartments } from "@/lib/organization/services/org-lookups";
+import {
+  DIRECTORY_HIDDEN_EMPLOYEE_CODES,
+  isHiddenFromEmployeeDirectory,
+} from "@/lib/employee/directory-listing";
 import type { UserProfile } from "@/types/auth";
 import type {
   EmployeeAccountProvisioningItem,
@@ -25,6 +30,7 @@ type EmployeeRow = {
   employment_status?: string | null;
   account_status: string;
   designations: { title: string } | { title: string }[] | null;
+  employment_types: { name: string } | { name: string }[] | null;
   employee_profiles:
     | { profile_image_storage_path: string | null }
     | { profile_image_storage_path: string | null }[]
@@ -115,6 +121,7 @@ export async function listEmployees(
         employment_status,
         account_status,
         designations:designation_id (title),
+        employment_types:employment_type_id (name),
         employee_profiles (profile_image_storage_path)
       `,
       { count: "estimated" },
@@ -125,6 +132,11 @@ export async function listEmployees(
 
   if (scopedIds) {
     query = query.in("id", scopedIds);
+  }
+
+  const hiddenCodes = [...DIRECTORY_HIDDEN_EMPLOYEE_CODES];
+  if (hiddenCodes.length > 0) {
+    query = query.not("employee_code", "in", `(${hiddenCodes.join(",")})`);
   }
 
   if (search) {
@@ -156,6 +168,9 @@ export async function listEmployees(
 
   const sortColumn = sortBy as EmployeeSortField;
   query = query.order(sortColumn, { ascending: sortOrder === "asc" });
+  if (sortColumn === "first_name") {
+    query = query.order("last_name", { ascending: sortOrder === "asc" });
+  }
   query = query.range(from, to);
 
   const { data, error, count } = await query;
@@ -164,13 +179,21 @@ export async function listEmployees(
     throw new Error(error.message);
   }
 
-  const rows = (data ?? []) as EmployeeRow[];
+  const rows = ((data ?? []) as EmployeeRow[]).filter(
+    (row) =>
+      !isHiddenFromEmployeeDirectory(row.employee_code, {
+        employeeCode: row.employee_code,
+        firstName: row.first_name,
+        lastName: row.last_name,
+      }),
+  );
   // Defer avatar signing to the client CardPhoto path — do not block the list
   // round-trip on storage signed-URL generation for every card.
 
   return {
     data: rows.map((row) => {
       const designation = unwrapRelation(row.designations);
+      const employmentType = unwrapRelation(row.employment_types);
       const employeeProfile = unwrapRelation(row.employee_profiles);
       const profileImagePath = employeeProfile?.profile_image_storage_path ?? null;
 
@@ -191,6 +214,7 @@ export async function listEmployees(
         departmentName: null,
         designationId: null,
         designationTitle: designation?.title ?? null,
+        employmentTypeName: employmentType?.name ?? null,
         profileImagePath,
         profileImageSignedUrl: null,
         accountStatus: row.account_status as EmployeeListResult["data"][number]["accountStatus"],
@@ -341,6 +365,34 @@ export {
   getDesignations,
   getEmploymentTypes,
 } from "@/lib/organization/services/org-lookups";
+
+/** Active org departments that currently have at least one employee assigned. */
+export async function getOccupiedDepartments(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+): Promise<LookupOption[]> {
+  const [departments, occupied] = await Promise.all([
+    getDepartments(supabase, organizationId),
+    supabase
+      .schema("hrms")
+      .from("employees")
+      .select("department_id")
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .is("app_hidden_at", null)
+      .not("department_id", "is", null),
+  ]);
+
+  if (occupied.error) throw new Error(occupied.error.message);
+
+  const usedIds = new Set(
+    (occupied.data ?? [])
+      .map((row) => row.department_id as string | null)
+      .filter((id): id is string => Boolean(id)),
+  );
+
+  return departments.filter((item) => usedIds.has(item.id) && Boolean(item.code?.trim()));
+}
 
 export async function getManagers(
   supabase: AuthSupabaseClient,

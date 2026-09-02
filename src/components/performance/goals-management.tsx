@@ -37,6 +37,7 @@ import {
 import { EmployeeSelect, LabeledSelect } from "@/components/payroll/payroll-select";
 import { toSelectItems } from "@/components/payroll/select-utils";
 import { createGoalAction, deleteGoalAction, fetchGoalsListAction } from "@/lib/performance/actions";
+import { getHrmsYearSelectItems } from "@/lib/date/hrms-year";
 import { PERFORMANCE_CLIENT_FETCH_SIZE, PERFORMANCE_ROUTES } from "@/lib/performance/constants";
 import { GOAL_PRIORITY_LABELS, GOAL_STATUS_LABELS } from "@/lib/performance/constants";
 import {
@@ -72,14 +73,7 @@ function currentYearValue() {
 }
 
 function buildYearItems() {
-  const currentYear = new Date().getFullYear();
-  return [
-    { value: "all", label: "All years" },
-    ...Array.from({ length: 5 }, (_, index) => ({
-      value: String(currentYear - index),
-      label: String(currentYear - index),
-    })),
-  ];
+  return getHrmsYearSelectItems({ includeAll: true });
 }
 
 export function GoalForm({

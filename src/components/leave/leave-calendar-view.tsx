@@ -13,6 +13,7 @@ import { CalendarHeart, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/common/button";
+import { getHrmsYears, HRMS_YEAR_MAX, HRMS_YEAR_MIN } from "@/lib/date/hrms-year";
 import {
   Select,
   SelectContent,
@@ -126,7 +127,7 @@ function buildCurrentMonthCalendarDays(month: number, year: number): CalendarCel
 
 function CalendarLegend({ hideHalfDay }: { hideHalfDay?: boolean }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
       {Object.entries(LEAVE_CALENDAR_LEGEND)
         .filter(([key]) => !(hideHalfDay && key === "halfDay"))
         .map(([key, item]) => (
@@ -206,10 +207,7 @@ export function LeaveCalendarView({
   const maxVisibleLeaves = isWeek ? (compact ? 4 : 8) : compact ? 3 : 3;
   const gridMinWidth = compact ? "w-full" : "min-w-[44rem]";
 
-  const yearOptions = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    return Array.from({ length: 11 }, (_, index) => currentYear - 5 + index);
-  }, []);
+  const yearOptions = useMemo(() => getHrmsYears(), []);
 
   const holidayMap = useMemo(() => {
     const map = new Map<string, LeaveHolidayEntry>();
@@ -222,6 +220,10 @@ export function LeaveCalendarView({
   function leaveMarkLabel(leave: LeaveCalendarEntry, date: string) {
     const allocation = leave.dayAllocations?.find((item) => item.date === date);
     if (allocation) {
+      if (leave.hrReviewRequired && leave.leaveStatus === "pending" && !leave.hrDecision) {
+        return "HR Review";
+      }
+      if (leave.hrDecision === "special") return "Special Leave";
       const mark = calendarMarkForAllocation(allocation.kind, leave.leaveTypeCode);
       if (mark) return mark;
     }
@@ -317,6 +319,7 @@ export function LeaveCalendarView({
 
   const goToPreviousMonth = () => {
     if (month === 1) {
+      if (year <= HRMS_YEAR_MIN) return;
       onMonthChange(12, year - 1);
       return;
     }
@@ -325,6 +328,7 @@ export function LeaveCalendarView({
 
   const goToNextMonth = () => {
     if (month === 12) {
+      if (year >= HRMS_YEAR_MAX) return;
       onMonthChange(1, year + 1);
       return;
     }
@@ -358,8 +362,12 @@ export function LeaveCalendarView({
     setView(nextView);
   };
 
+  const legend = !hideLegend ? (
+    <CalendarLegend hideHalfDay={hideHalfDayMarkers} />
+  ) : null;
+
   return (
-    <div className="space-y-4">
+    <div className={cn(compact ? "flex flex-col" : "space-y-4")}>
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -427,11 +435,16 @@ export function LeaveCalendarView({
               ))}
             </div>
           ) : null}
-          {!hideLegend ? <CalendarLegend hideHalfDay={hideHalfDayMarkers} /> : null}
+          {!compact ? legend : null}
         </div>
       </div>
 
-      <div className="card-surface-static overflow-hidden rounded-xl border bg-card">
+      <div
+        className={cn(
+          "overflow-hidden rounded-xl border bg-card",
+          compact ? "mt-4" : "card-surface-static",
+        )}
+      >
         <div className="overflow-x-auto">
           <div className={gridMinWidth}>
             <div className="grid grid-cols-7 border-b bg-muted/40">
@@ -623,6 +636,12 @@ export function LeaveCalendarView({
           </div>
         </div>
       </div>
+
+      {compact && legend ? (
+        <div className="mt-4 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-border/60 pt-3">
+          {legend}
+        </div>
+      ) : null}
     </div>
   );
 }

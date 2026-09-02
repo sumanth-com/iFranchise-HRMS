@@ -1,4 +1,5 @@
 import type { OnboardingCaseListItem, OnboardingStatus } from "@/types/onboarding";
+import { getHrmsYearSelectItems } from "@/lib/date/hrms-year";
 
 export const ONBOARDING_HR_STATUS_FILTER_OPTIONS = [
   { value: "all", label: "All statuses" },
@@ -112,10 +113,6 @@ export function formatOnboardingJoiningDate(value: string | null | undefined): s
   return `${day} ${JOINING_DATE_MONTHS[month - 1]} ${year}`;
 }
 
-export function buildJoiningYearOptions(anchorYear: number) {
-  const years = [{ value: "all", label: "All years" }];
-  for (let year = anchorYear + 1; year >= anchorYear - 3; year -= 1) {
-    years.push({ value: String(year), label: String(year) });
-  }
-  return years;
+export function buildJoiningYearOptions(_anchorYear: number) {
+  return getHrmsYearSelectItems({ includeAll: true });
 }

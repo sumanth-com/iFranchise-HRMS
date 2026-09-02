@@ -12,11 +12,13 @@ import {
   Loader2,
   Mail,
   Search,
+  Send,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { EmployeePayslipDrawer } from "@/components/employee/payroll/employee-payslip-drawer";
 import { EmployeeDetailPayslipDrawer } from "@/components/employees/employee-detail-payslip-drawer";
+import { PayrollSendPayslipDialog } from "@/components/payroll/payroll-run-item-dialogs";
 import { Button, buttonVariants } from "@/components/common/button";
 import {
   TABLE_HEADER_CELL_CLASS,
@@ -33,12 +35,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { emailMyPayslipAction } from "@/lib/employee/actions/employee-payroll-actions";
-import { emailPayslipAction } from "@/lib/payroll/actions";
+import { emailPayslipAction, ensurePayrollItemPayslipAction } from "@/lib/payroll/actions";
 import { formatReviewBannerMessage } from "@/lib/payroll/services/payslip-publication";
 import {
   formatCurrency,
   formatPayrollMonthLabel,
 } from "@/lib/payroll/services/payroll-utils";
+import { getHrmsYears } from "@/lib/date/hrms-year";
 import type { PayslipHistoryResult, PayslipListItem } from "@/types/payroll";
 import { cn } from "@/lib/utils";
 
@@ -86,16 +89,20 @@ function PayslipRowActions({
   row,
   mode,
   onPreview,
+  onSend,
+  viewingId,
 }: {
   row: PayslipListItem;
   mode: "employee" | "hr";
-  onPreview: (id: string) => void;
+  onPreview: (row: PayslipListItem) => void;
+  onSend?: (row: PayslipListItem) => void;
+  viewingId?: string | null;
 }) {
   const [emailPending, startEmail] = useTransition();
   const disabled = !row.canEmployeeAccess && mode === "employee";
 
   async function downloadPdf() {
-    if (disabled) return;
+    if (disabled || !row.hasPayslip) return;
     try {
       const response = await fetch(`/api/payslips/${row.id}/pdf`);
       if (!response.ok) {
@@ -133,6 +140,37 @@ function PayslipRowActions({
     });
   }
 
+  if (mode === "hr") {
+    return (
+      <div className="flex justify-end gap-1.5">
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 px-2.5"
+          title="View"
+          disabled={Boolean(viewingId)}
+          onClick={() => onPreview(row)}
+        >
+          {viewingId === row.payrollItemId ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <Eye className="size-3.5" />
+          )}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 px-2.5"
+          title="Send Payslip"
+          disabled={!row.payrollItemId || row.payslipSent}
+          onClick={() => onSend?.(row)}
+        >
+          <Send className="size-3.5" />
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex justify-end gap-1.5">
       <Button
@@ -140,7 +178,7 @@ function PayslipRowActions({
         variant="outline"
         className="h-8 gap-1 px-2.5"
         disabled={disabled}
-        onClick={() => onPreview(row.id)}
+        onClick={() => onPreview(row)}
       >
         <Eye className="size-3.5" />
         Preview
@@ -178,12 +216,76 @@ function PayslipTable({
   mode,
   showEmployee,
   onPreview,
+  onSend,
+  viewingId,
 }: {
   rows: PayslipListItem[];
   mode: "employee" | "hr";
   showEmployee?: boolean;
-  onPreview: (id: string) => void;
+  onPreview: (row: PayslipListItem) => void;
+  onSend?: (row: PayslipListItem) => void;
+  viewingId?: string | null;
 }) {
+  if (mode === "hr") {
+    return (
+      <table className="w-full min-w-[52rem] text-sm">
+        <thead className={TABLE_HEADER_STICKY_CLASS}>
+          <tr className={TABLE_HEADER_ROW_CLASS}>
+            <th className={TABLE_HEADER_CELL_CLASS}>Employee</th>
+            <th className={TABLE_HEADER_CELL_CLASS}>Department</th>
+            <th className={TABLE_HEADER_CELL_CLASS}>Gross</th>
+            <th className={TABLE_HEADER_CELL_CLASS}>Net pay</th>
+            <th className={TABLE_HEADER_CELL_CLASS}>Status</th>
+            <th className={cn(TABLE_HEADER_CELL_CLASS, "text-right")}>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.payrollItemId ?? row.id} className="border-b last:border-0">
+              <td className="min-w-[14rem] px-4 py-3">
+                <div className="truncate whitespace-nowrap font-medium" title={row.employeeName}>
+                  {row.employeeName}
+                </div>
+                <div
+                  className="truncate whitespace-nowrap text-xs text-muted-foreground"
+                  title={row.employeeCode}
+                >
+                  {row.employeeCode}
+                </div>
+              </td>
+              <td className="px-4 py-3">{row.departmentName ?? "—"}</td>
+              <td className="px-4 py-3 tabular-nums">{formatCurrency(row.grossSalary)}</td>
+              <td className="px-4 py-3 tabular-nums font-medium">
+                {formatCurrency(row.netSalary)}
+              </td>
+              <td className="px-4 py-3">
+                <span
+                  className={cn(
+                    "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                    row.payslipSent
+                      ? "bg-violet-500/15 text-violet-700 dark:text-violet-300"
+                      : "bg-muted text-muted-foreground",
+                  )}
+                >
+                  {row.payslipSent ? "Sent" : "Pending"}
+                </span>
+              </td>
+              <td className="px-4 py-3">
+                <PayslipRowActions
+                  row={row}
+                  mode={mode}
+                  onPreview={onPreview}
+                  onSend={onSend}
+                  viewingId={viewingId}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  }
+
   return (
     <table className="w-full min-w-[56rem] text-sm">
       <thead className={TABLE_HEADER_STICKY_CLASS}>
@@ -267,33 +369,27 @@ export function PayslipHistoryView({
   const [isPending, startTransition] = useTransition();
   const [activePayslipId, setActivePayslipId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [viewingId, setViewingId] = useState<string | null>(null);
+  const [sendTarget, setSendTarget] = useState<PayslipListItem | null>(null);
   const [searchInput, setSearchInput] = useState(searchParams.get("search") ?? "");
   const [monthValue, setMonthValue] = useState(String(month));
   const [yearValue, setYearValue] = useState(String(year));
+  const statusValue = searchParams.get("payslipStatus") ?? "all";
 
   useEffect(() => {
     setMonthValue(String(month));
     setYearValue(String(year));
   }, [month, year]);
 
-  const currentYear = new Date().getFullYear();
-  const yearOptions = useMemo(() => {
-    const years = new Set([
-      currentYear,
-      currentYear - 1,
-      currentYear - 2,
-      currentYear - 3,
-      year,
-      ...history.stats.yearsAvailable,
-    ]);
-    return Array.from(years).sort((a, b) => b - a);
-  }, [history.stats.yearsAvailable, currentYear, year]);
+  const yearOptions = useMemo(() => getHrmsYears(), []);
 
   const updateParams = useCallback(
     (nextMonth: string, nextYear: string, extra?: Record<string, string | undefined>) => {
       const params = new URLSearchParams(searchParams.toString());
       params.set("month", nextMonth);
       params.set("year", nextYear);
+      if (statusValue && statusValue !== "all") params.set("payslipStatus", statusValue);
+      else params.delete("payslipStatus");
       params.delete("yearFilter");
       params.delete("page");
       if (extra) {
@@ -304,14 +400,32 @@ export function PayslipHistoryView({
       }
       startTransition(() => router.push(`${basePath}?${params.toString()}`));
     },
-    [basePath, router, searchParams, startTransition],
+    [basePath, router, searchParams, startTransition, statusValue],
   );
 
-  const underReview = history.data.find((row) => row.availability === "under_review");
+  const underReview =
+    mode === "employee"
+      ? history.data.find((row) => row.availability === "under_review")
+      : undefined;
 
-  function openPreview(id: string) {
-    setActivePayslipId(id);
-    setPreviewOpen(true);
+  function openPreview(row: PayslipListItem) {
+    if (mode !== "hr") {
+      setActivePayslipId(row.id);
+      setPreviewOpen(true);
+      return;
+    }
+    if (!row.payrollItemId) return;
+    setViewingId(row.payrollItemId);
+    void (async () => {
+      const result = await ensurePayrollItemPayslipAction(row.payrollItemId!);
+      setViewingId(null);
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+      setActivePayslipId(result.data);
+      setPreviewOpen(true);
+    })();
   }
 
   return (
@@ -407,6 +521,32 @@ export function PayslipHistoryView({
                 ))}
               </SelectContent>
             </Select>
+            {mode === "hr" ? (
+              <Select
+                value={statusValue}
+                onValueChange={(value) => {
+                  if (!value) return;
+                  updateParams(monthValue, yearValue, {
+                    payslipStatus: value === "all" ? undefined : value,
+                  });
+                }}
+              >
+                <SelectTrigger className="w-full lg:w-44">
+                  <SelectValue>
+                    {statusValue === "sent"
+                      ? "Sent"
+                      : statusValue === "pending"
+                        ? "Pending"
+                        : "All statuses"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="sent">Sent</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : null}
           </div>
         </div>
       </div>
@@ -430,10 +570,14 @@ export function PayslipHistoryView({
               mode={mode}
               showEmployee={mode === "hr"}
               onPreview={openPreview}
+              onSend={mode === "hr" ? setSendTarget : undefined}
+              viewingId={viewingId}
             />
           ) : (
             <p className="py-16 text-center text-sm text-muted-foreground">
-              No payslips found for {getMonthFilterLabel(monthValue)} {yearValue}.
+              {mode === "hr"
+                ? `No payroll run found for ${getMonthFilterLabel(monthValue)} ${yearValue}. Run payroll first, then send payslips here.`
+                : `No payslips found for ${getMonthFilterLabel(monthValue)} ${yearValue}.`}
             </p>
           )}
         </div>
@@ -473,12 +617,36 @@ export function PayslipHistoryView({
       ) : null}
 
       {mode === "hr" ? (
-        <EmployeeDetailPayslipDrawer
-          payslipId={activePayslipId}
-          open={previewOpen}
-          onOpenChange={setPreviewOpen}
-          canEmail
-        />
+        <>
+          <EmployeeDetailPayslipDrawer
+            payslipId={activePayslipId}
+            open={previewOpen}
+            onOpenChange={setPreviewOpen}
+            canEmail
+          />
+          <PayrollSendPayslipDialog
+            target={
+              sendTarget?.payrollItemId
+                ? {
+                    payrollItemId: sendTarget.payrollItemId,
+                    employeeName: sendTarget.employeeName,
+                    employeeCode: sendTarget.employeeCode,
+                    netPay: sendTarget.netSalary,
+                    periodLabel: formatPayrollMonthLabel(sendTarget.payrollMonth),
+                    payslipSent: sendTarget.payslipSent,
+                  }
+                : null
+            }
+            open={Boolean(sendTarget)}
+            onOpenChange={(open) => {
+              if (!open) setSendTarget(null);
+            }}
+            onSent={() => {
+              setSendTarget(null);
+              router.refresh();
+            }}
+          />
+        </>
       ) : (
         <EmployeePayslipDrawer
           payslipId={activePayslipId}

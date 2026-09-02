@@ -40,14 +40,18 @@ export function getMonthSelectItems(): SelectItemOption[] {
   }));
 }
 
+import { getHrmsYears, getHrmsYearSelectItems } from "@/lib/date/hrms-year";
+
 export function getYearSelectItems(
-  years: number[] = [2025, 2026, 2027, 2028],
+  years: number[] = getHrmsYears(),
 ): SelectItemOption[] {
   return years.map((year) => ({
     value: String(year),
     label: String(year),
   }));
 }
+
+export { getHrmsYearSelectItems };
 
 export function toSelectItems(
   entries: Record<string, string> | Array<{ value: string; label: string }>,

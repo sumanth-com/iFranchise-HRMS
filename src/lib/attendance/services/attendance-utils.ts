@@ -1,5 +1,7 @@
 import { differenceInMinutes, parseISO } from "date-fns";
 
+import { workHoursFromCheckInOut } from "@/lib/employee/attendance-format";
+
 export const OFFICE_TIMEZONE = "Asia/Kolkata";
 export const OFFICE_CHECK_IN_TIME = "10:00";
 /** Official start time — check-in after this is marked late. */
@@ -105,12 +107,7 @@ export function computeWorkHours(
   checkInAt?: string | null,
   checkOutAt?: string | null,
 ): number {
-  if (!checkInAt || !checkOutAt) return 0;
-
-  const minutes = differenceInMinutes(parseISO(checkOutAt), parseISO(checkInAt));
-  if (minutes <= 0) return 0;
-
-  return Math.round((minutes / 60) * 100) / 100;
+  return workHoursFromCheckInOut(checkInAt, checkOutAt);
 }
 
 export function computeLateMinutes(

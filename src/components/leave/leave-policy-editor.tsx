@@ -10,7 +10,6 @@ import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { PhoneInput } from "@/components/common/phone-input";
 import {
-  LeavePolicyContactBar,
   LeavePolicyHolidayTables,
   LeavePolicyPageHeader,
   LeavePolicySections,
@@ -165,10 +164,6 @@ export function LeavePolicyEditor({
         mandatoryHolidays={mandatoryHolidays}
         optionalHolidays={optionalHolidays}
         holidayYear={holidayYear}
-      />
-
-      <LeavePolicyContactBar
-        contact={formState.isDirty ? watched.contact : previewDocument.contact}
       />
     </form>
   );

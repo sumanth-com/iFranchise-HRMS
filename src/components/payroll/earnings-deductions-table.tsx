@@ -125,7 +125,7 @@ export function EarningsDeductionsTable({
             styles.footerCell,
           )}
         >
-          <span className={styles.footerLabel}>Gross Earnings</span>
+          <span className={styles.footerLabel}>Total Earnings</span>
           <span className={cn("tabular-nums", styles.footerAmount)}>{money(grossSalary)}</span>
         </div>
         <div

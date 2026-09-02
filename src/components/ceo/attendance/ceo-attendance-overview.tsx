@@ -25,6 +25,7 @@ import type {
   CeoAttendanceListParams,
   CeoAttendanceOverview,
 } from "@/types/ceo-attendance";
+import { getHrmsYears } from "@/lib/date/hrms-year";
 import { cn } from "@/lib/utils";
 
 const MONTH_LABELS: Record<string, string> = {
@@ -84,8 +85,7 @@ function PeriodFilters({
   onChange: (month: number, year: number) => void;
   trailing?: React.ReactNode;
 }) {
-  const now = new Date();
-  const years = [now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2];
+  const years = getHrmsYears();
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -475,7 +475,7 @@ export function CeoAttendanceOverviewPanel({
 
       <div className="grid lg:grid-cols-2 lg:items-stretch">
         <div className="flex h-[28rem] flex-col border-b p-3 lg:border-r lg:border-b-0">
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-background/80">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-input bg-white dark:bg-input">
             <div className="shrink-0 border-b bg-card/95 p-2 backdrop-blur supports-[backdrop-filter]:bg-card/80">
               <CompanyOverviewRosterItem
                 selected={!selectedEmployeeId}

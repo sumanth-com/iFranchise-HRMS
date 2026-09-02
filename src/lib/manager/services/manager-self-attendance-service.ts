@@ -1,6 +1,6 @@
+import { averageApplicableWorkingHours, elapsedWorkingSeconds, formatWorkingDuration } from "@/lib/employee/attendance-format";
 import {
   addDays,
-  differenceInMinutes,
   eachDayOfInterval,
   endOfMonth,
   format,
@@ -85,27 +85,11 @@ function unwrap<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
-export function formatHoursLabel(hours: number) {
-  const wholeHours = Math.floor(hours);
-  const minutes = Math.round((hours - wholeHours) * 60);
-  return `${wholeHours}h ${minutes}m`;
-}
-
-export function formatWorkingDuration(seconds: number) {
-  const safe = Math.max(0, Math.floor(seconds));
-  const hours = Math.floor(safe / 3600);
-  const minutes = Math.floor((safe % 3600) / 60);
-  return `${hours}h ${String(minutes).padStart(2, "0")}m`;
-}
-
-export function getElapsedWorkingSeconds(
-  checkInAt: string | null,
-  checkOutAt: string | null,
-) {
-  if (!checkInAt) return 0;
-  const end = checkOutAt ? parseISO(checkOutAt) : new Date();
-  return Math.max(0, differenceInMinutes(end, parseISO(checkInAt)) * 60);
-}
+export {
+  elapsedWorkingSeconds as getElapsedWorkingSeconds,
+  formatHoursLabel,
+  formatWorkingDuration,
+} from "@/lib/employee/attendance-format";
 
 function getOfficeNowParts() {
   const parts = new Intl.DateTimeFormat("en-GB", {
@@ -278,7 +262,7 @@ function buildTodayPanel(
     isLocked: false,
     lockMessage: null,
     workingDurationLabel: formatWorkingDuration(
-      getElapsedWorkingSeconds(checkInAt, checkOutAt),
+      elapsedWorkingSeconds(checkInAt, checkOutAt),
     ),
   };
 }
@@ -609,10 +593,6 @@ function buildMonthSummary(
   const worked = attendanceRows.filter((row) =>
     ["present", "late", "half_day"].includes(row.attendance_status),
   );
-  const totalHours = worked.reduce(
-    (sum, row) => sum + Number(row.work_hours ?? 0),
-    0,
-  );
   const overtimeHours = worked.reduce(
     (sum, row) => sum + Number(row.overtime_hours ?? 0),
     0,
@@ -639,10 +619,7 @@ function buildMonthSummary(
     halfDay: counts.halfDay,
     weekend: counts.weekend,
     holiday: counts.holiday,
-    averageWorkingHours:
-      worked.length > 0
-        ? Math.round((totalHours / worked.length) * 100) / 100
-        : 0,
+    averageWorkingHours: averageApplicableWorkingHours(inMonth),
     averageCheckIn: averageTimeLabel(
       worked.map((row) => row.check_in_at).filter(Boolean) as string[],
     ),
@@ -1049,7 +1026,7 @@ export async function punchManagerAttendance(
   if (input.type === "in") {
     if (result.action === "already_checked_in") {
       // Concurrent / double-submit on the same personal row — treat as success.
-      return;
+      return getSelfTodayAttendance(supabase, profile);
     }
 
     await writeApplicationAudit(supabase, {
@@ -1062,7 +1039,7 @@ export async function punchManagerAttendance(
     });
 
     await notifyAttendanceCheckedIn(supabase, profile, today);
-    return;
+    return getSelfTodayAttendance(supabase, profile);
   }
 
   const punchedWorkHours = Number(result.work_hours ?? workHours);
@@ -1131,6 +1108,8 @@ export async function punchManagerAttendance(
       punchedWorkHours || workHours,
     );
   }
+
+  return getSelfTodayAttendance(supabase, profile);
 }
 
 export async function updateManagerCheckout(
@@ -1227,6 +1206,7 @@ export async function updateManagerCheckout(
   });
 
   await notifyAttendanceCheckoutUpdated(supabase, profile, today, workHours);
+  return getSelfTodayAttendance(supabase, profile);
 }
 
 export async function requestManagerAttendanceRegularization(

@@ -31,42 +31,18 @@ type PulseTone = {
   glow: string;
 };
 
+const PULSE_BRAND = {
+  accent: "text-violet-700 dark:text-violet-300",
+  iconWrap: "bg-violet-500/12 text-violet-600 dark:text-violet-300",
+  tile: "bg-white ring-1 ring-inset ring-violet-500/12 dark:bg-card",
+  glow: "bg-violet-400/20",
+} as const;
+
 const PULSE_TONES: Record<string, PulseTone> = {
-  present: {
-    accent: "text-emerald-700 dark:text-emerald-300",
-    icon: UserCheck,
-    iconWrap: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300",
-    tile: "bg-gradient-to-br from-emerald-500/14 via-emerald-500/6 to-card ring-1 ring-inset ring-emerald-500/15",
-    glow: "bg-emerald-400/25",
-  },
-  absent: {
-    accent: "text-rose-700 dark:text-rose-300",
-    icon: CircleAlert,
-    iconWrap: "bg-rose-500/15 text-rose-600 dark:text-rose-300",
-    tile: "bg-gradient-to-br from-rose-500/14 via-rose-500/6 to-card ring-1 ring-inset ring-rose-500/15",
-    glow: "bg-rose-400/25",
-  },
-  late: {
-    accent: "text-fuchsia-700 dark:text-fuchsia-300",
-    icon: Clock3,
-    iconWrap: "bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-300",
-    tile: "bg-gradient-to-br from-fuchsia-500/14 via-fuchsia-500/6 to-card ring-1 ring-inset ring-fuchsia-500/15",
-    glow: "bg-fuchsia-400/25",
-  },
-  half: {
-    accent: "text-sky-700 dark:text-sky-300",
-    icon: Clock3,
-    iconWrap: "bg-sky-500/15 text-sky-600 dark:text-sky-300",
-    tile: "bg-gradient-to-br from-sky-500/14 via-sky-500/6 to-card ring-1 ring-inset ring-sky-500/15",
-    glow: "bg-sky-400/25",
-  },
-  pending: {
-    accent: "text-violet-700 dark:text-violet-300",
-    icon: Sparkles,
-    iconWrap: "bg-violet-500/15 text-violet-600 dark:text-violet-300",
-    tile: "bg-gradient-to-br from-violet-500/14 via-violet-500/6 to-card ring-1 ring-inset ring-violet-500/15",
-    glow: "bg-violet-400/25",
-  },
+  present: { ...PULSE_BRAND, icon: UserCheck },
+  absent: { ...PULSE_BRAND, icon: CircleAlert },
+  late: { ...PULSE_BRAND, icon: Clock3 },
+  pending: { ...PULSE_BRAND, icon: Sparkles },
 };
 
 function PulseMetric({
@@ -90,37 +66,28 @@ function PulseMetric({
     <div
       className={cn(
         dashboardMetricClass,
-        "relative overflow-hidden",
+        "relative h-full min-h-[5.5rem] w-full px-3.5 py-3",
         visualTone === "vibrant" && tone?.tile,
       )}
     >
-      {visualTone === "vibrant" && tone ? (
-        <span
-          className={cn(
-            "pointer-events-none absolute -right-4 -top-4 size-16 rounded-full blur-2xl",
-            tone.glow,
-          )}
-          aria-hidden
-        />
-      ) : null}
-      <div className="relative z-10 flex items-start justify-between gap-2">
-        <p className="text-[10px] font-medium leading-tight tracking-wide text-muted-foreground uppercase">
+      <div className="relative z-10 flex items-start justify-between gap-3">
+        <p className="min-w-0 pr-1 text-[11px] font-medium leading-snug tracking-wide text-muted-foreground uppercase">
           {label}
         </p>
         {visualTone === "vibrant" && Icon ? (
           <span
             className={cn(
-              "flex size-7 shrink-0 items-center justify-center rounded-lg",
+              "flex size-8 shrink-0 items-center justify-center rounded-lg",
               tone.iconWrap,
             )}
           >
-            <Icon className="size-3.5" />
+            <Icon className="size-4" />
           </span>
         ) : null}
       </div>
       <p
         className={cn(
-          "relative z-10 text-2xl font-semibold tracking-tight tabular-nums",
+          "relative z-10 mt-2 text-2xl font-semibold tracking-tight tabular-nums",
           visualTone === "vibrant" && tone ? tone.accent : accent,
         )}
       >
@@ -131,24 +98,18 @@ function PulseMetric({
 
   if (href) {
     return (
-      <Link href={href} className="min-w-0 flex-1">
+      <Link href={href} className="flex h-full min-w-0">
         {content}
       </Link>
     );
   }
-  return <div className="min-w-0 flex-1">{content}</div>;
+  return <div className="flex h-full min-w-0">{content}</div>;
 }
 
 function parseHolidayDate(meta: string | undefined) {
   if (!meta) return null;
   return meta.length >= 10 ? meta.slice(0, 10) : meta;
 }
-
-const CELEBRATION_CARD_THEMES = [
-  "from-violet-500/15 via-indigo-500/10 to-sky-500/10",
-  "from-rose-500/15 via-pink-500/10 to-amber-500/10",
-  "from-sky-500/15 via-cyan-500/10 to-emerald-500/10",
-] as const;
 
 type UnifiedCelebrationItem = {
   id: string;
@@ -164,58 +125,23 @@ type UnifiedCelebrationItem = {
 
 function CelebrationFeaturedCard({
   item,
-  themeIndex = 0,
 }: {
   item: UnifiedCelebrationItem;
-  themeIndex?: number;
 }) {
   const isBirthday = item.kind === "birthday";
   const isAnniversary = item.kind === "anniversary";
-  const themeClass = isBirthday
-    ? "from-rose-500/15 via-pink-500/10 to-amber-500/10"
-    : isAnniversary
-      ? "from-amber-500/15 via-orange-500/10 to-yellow-500/10"
-      : CELEBRATION_CARD_THEMES[themeIndex % CELEBRATION_CARD_THEMES.length];
 
   const content = (
     <div
       className={cn(
-        "group relative flex min-h-0 flex-1 flex-col p-2.5 dark:hover:bg-muted/20",
+        "group relative flex min-h-0 flex-1 flex-col bg-white p-3 ring-1 ring-inset ring-violet-500/12 dark:bg-card dark:hover:bg-muted/20",
         dashboardGradientTileClass,
-        themeClass,
-        item.isToday &&
-          (isBirthday
-            ? "ring-1 ring-rose-500/30"
-            : isAnniversary
-              ? "ring-1 ring-amber-500/30"
-              : "ring-1 ring-violet-500/30"),
+        "from-violet-500/8 via-white to-violet-500/5",
+        item.isToday && "ring-violet-500/30",
       )}
     >
-      <div
-        className={cn(
-          "pointer-events-none absolute -right-8 -top-8 size-32 rounded-full blur-2xl",
-          isBirthday
-            ? "bg-rose-400/20"
-            : isAnniversary
-              ? "bg-amber-400/20"
-              : themeIndex === 0
-                ? "bg-violet-400/20"
-                : "bg-sky-400/20",
-        )}
-      />
       <div className="flex items-start gap-3">
-        <span
-          className={cn(
-            "flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-background/90 shadow-sm dark:bg-background/80",
-            isBirthday
-              ? "ring-1 ring-rose-500/20 text-rose-600 dark:text-rose-400"
-              : isAnniversary
-                ? "ring-1 ring-amber-500/20 text-amber-600 dark:text-amber-400"
-                : themeIndex === 0
-                  ? "ring-1 ring-violet-500/15"
-                  : "ring-1 ring-sky-500/15",
-          )}
-        >
+        <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-violet-500/10 text-violet-700 ring-1 ring-violet-500/15 dark:bg-background/80 dark:text-violet-300">
           {isBirthday ? (
             <Cake className="size-5" />
           ) : isAnniversary ? (
@@ -226,18 +152,7 @@ function CelebrationFeaturedCard({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <p
-              className={cn(
-                "text-[10px] font-semibold uppercase tracking-wide",
-                isBirthday
-                  ? "text-rose-600 dark:text-rose-400"
-                  : isAnniversary
-                    ? "text-amber-600 dark:text-amber-400"
-                    : themeIndex === 0
-                      ? "text-violet-600 dark:text-violet-400"
-                      : "text-sky-600 dark:text-sky-400",
-              )}
-            >
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-400">
               {item.badgeLabel}
             </p>
             {item.relativeLabel && !item.isToday ? (
@@ -259,19 +174,8 @@ function CelebrationFeaturedCard({
               : `${item.subtitle} · ${format(parseISO(item.dateStr), "EEEE, d MMM")}`}
           </p>
         </div>
-        <div className="shrink-0 rounded-lg bg-background/90 px-2.5 py-1.5 text-center shadow-sm dark:bg-background/80">
-          <p
-            className={cn(
-              "text-xl font-bold tabular-nums leading-none",
-              isBirthday
-                ? "text-rose-600 dark:text-rose-400"
-                : isAnniversary
-                  ? "text-amber-600 dark:text-amber-400"
-                  : themeIndex === 0
-                    ? "text-violet-600 dark:text-violet-400"
-                    : "text-sky-600 dark:text-sky-400",
-            )}
-          >
+        <div className="shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-center ring-1 ring-violet-500/10 dark:bg-background/80">
+          <p className="text-xl font-bold tabular-nums leading-none text-violet-700 dark:text-violet-400">
             {format(parseISO(item.dateStr), "d")}
           </p>
           <p className="mt-0.5 text-[10px] font-medium uppercase text-muted-foreground">
@@ -420,12 +324,8 @@ export function HrUpcomingHolidaysPanel({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-2.5">
-        {displayItems.map((item, index) => (
-          <CelebrationFeaturedCard
-            key={item.id}
-            item={item}
-            themeIndex={index}
-          />
+        {displayItems.map((item) => (
+          <CelebrationFeaturedCard key={item.id} item={item} />
         ))}
       </div>
     </section>
@@ -444,7 +344,6 @@ export function HrTodayPulseSection({
     presentToday: string;
     absentToday: string;
     lateToday: string;
-    halfDayToday: string;
     pendingLeaveApprovals: string;
     exitRequests: string;
   };
@@ -454,8 +353,7 @@ export function HrTodayPulseSection({
     <section
       className={cn(
         dashboardSectionClass,
-        visualTone === "vibrant" &&
-          "bg-gradient-to-br from-violet-500/[0.07] via-card to-sky-500/[0.06] ring-1 ring-inset ring-violet-500/10",
+        visualTone === "vibrant" && "bg-white ring-1 ring-inset ring-violet-500/10 dark:bg-card",
       )}
       aria-label="Today's Pulse"
     >
@@ -476,7 +374,7 @@ export function HrTodayPulseSection({
         </div>
       </div>
 
-      <div className="flex flex-nowrap gap-2">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <PulseMetric
           label="Present Today"
           value={pulse.presentToday}
@@ -499,14 +397,6 @@ export function HrTodayPulseSection({
           href={links.lateToday}
           accent="text-rose-600 dark:text-rose-400"
           toneKey="late"
-          visualTone={visualTone}
-        />
-        <PulseMetric
-          label="Half Day"
-          value={pulse.halfDayToday ?? 0}
-          href={links.halfDayToday}
-          accent="text-sky-600 dark:text-sky-400"
-          toneKey="half"
           visualTone={visualTone}
         />
         <PulseMetric

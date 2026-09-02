@@ -88,6 +88,16 @@ export async function createEmployeeFromWizard(
   const organizationId = profile.employee.organizationId;
   const { basic, employment, address, emergencyContact, documents } = input;
 
+  let designationId = emptyToNull(employment.designationId);
+  if (employment.designationId === DESIGNATION_OTHER_VALUE) {
+    designationId = await resolveOrCreateDesignation(
+      supabase,
+      organizationId,
+      userId,
+      employment.customDesignationTitle ?? "",
+    );
+  }
+
   const assignedHrId = emptyToNull(employment.assignedHrEmployeeId);
   if (assignedHrId) {
     await assertEligibleHrLeaveApprover(organizationId, assignedHrId, {
@@ -102,7 +112,7 @@ export async function createEmployeeFromWizard(
       organization_id: organizationId,
       branch_id: employment.branchId,
       department_id: emptyToNull(employment.departmentId),
-      designation_id: emptyToNull(employment.designationId),
+      designation_id: designationId,
       employment_type_id: emptyToNull(employment.employmentTypeId),
       reporting_manager_id: emptyToNull(employment.reportingManagerId),
       assigned_hr_employee_id: assignedHrId,

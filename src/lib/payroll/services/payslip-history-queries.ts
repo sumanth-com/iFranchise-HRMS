@@ -1,10 +1,13 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { isExcludedFromTeamPayslips } from "@/lib/employee/directory-listing";
 import { canViewPayroll } from "@/lib/payroll/constants";
 import {
+  isPayslipPublishedToEmployee,
   resolvePayslipAvailability,
   resolvePayslipSchedule,
 } from "@/lib/payroll/services/payslip-publication";
 import { getPayrollMonthDate, parsePayrollMonthSearch, formatPayrollMonthLabel } from "@/lib/payroll/services/payroll-utils";
+import { syncActiveEmployeesIntoPayrollRun } from "@/lib/payroll/services/payroll-mutations";
 import { payslipHistoryParamsSchema } from "@/lib/validations/payroll";
 import type { UserProfile } from "@/types/auth";
 import type {
@@ -13,6 +16,7 @@ import type {
   PayslipHistoryYearGroup,
   PayslipListItem,
   PayslipVersionItem,
+  PayrollBreakdown,
   PayrollStatus,
 } from "@/types/payroll";
 
@@ -128,6 +132,7 @@ export type PayslipHistoryParams = {
   employeeId?: string;
   includeArchived?: boolean;
   groupByYear?: boolean;
+  payslipStatus?: "all" | "pending" | "sent";
 };
 
 export async function listPayslipHistory(
@@ -136,6 +141,257 @@ export async function listPayslipHistory(
   params: PayslipHistoryParams,
 ): Promise<PayslipHistoryResult> {
   const parsed = payslipHistoryParamsSchema.parse(params);
+  const isHr = canViewPayroll(profile.permissionCodes);
+  const yearResolved = resolveYearFilter(parsed.yearFilter, parsed.year);
+  const filterMonth = parsed.month;
+  const filterYear = yearResolved.year ?? (parsed.month ? new Date().getFullYear() : undefined);
+
+  if (isHr && filterMonth && filterYear) {
+    return listHrPayslipsFromPayrollRun(supabase, profile, {
+      month: filterMonth,
+      year: filterYear,
+      search: parsed.search,
+      employeeId: parsed.employeeId,
+      page: parsed.page,
+      pageSize: parsed.pageSize,
+      payslipStatus: parsed.payslipStatus ?? "all",
+    });
+  }
+
+  return listStoredPayslipHistory(supabase, profile, parsed);
+}
+
+async function listHrPayslipsFromPayrollRun(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: {
+    month: number;
+    year: number;
+    search?: string;
+    employeeId?: string;
+    page: number;
+    pageSize: number;
+    payslipStatus?: "all" | "pending" | "sent";
+  },
+): Promise<PayslipHistoryResult> {
+  const payrollMonth = getPayrollMonthDate(input.month, input.year);
+  const { data: payroll, error: payrollError } = await supabase
+    .schema("hrms")
+    .from("payrolls")
+    .select("id, payroll_month, payroll_status")
+    .eq("organization_id", profile.employee.organizationId)
+    .eq("payroll_month", payrollMonth)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (payrollError) throw new Error(payrollError.message);
+  if (!payroll) {
+    return {
+      data: [],
+      groups: [],
+      stats: buildStats([]),
+      total: 0,
+      page: input.page,
+      pageSize: input.pageSize,
+    };
+  }
+
+  await syncActiveEmployeesIntoPayrollRun(supabase, profile, payroll.id);
+
+  let itemsQuery = supabase
+    .schema("hrms")
+    .from("payroll_items")
+    .select(
+      `
+        id,
+        employee_id,
+        basic_salary,
+        total_allowances,
+        total_deductions,
+        gross_salary,
+        net_salary,
+        breakdown,
+        employees (
+          employee_code,
+          first_name,
+          last_name,
+          app_hidden_at,
+          departments:department_id (name),
+          designations:designation_id (title),
+          employment_types:employment_type_id (name)
+        ),
+        payslips (id, payslip_number, issued_at, salary_credit_date, published_at, email_sent_at, archived_at, payslip_version)
+      `,
+    )
+    .eq("payroll_id", payroll.id)
+    .is("deleted_at", null);
+
+  if (input.employeeId) {
+    itemsQuery = itemsQuery.eq("employee_id", input.employeeId);
+  }
+
+  const { data: items, error: itemsError } = await itemsQuery;
+  if (itemsError) throw new Error(itemsError.message);
+
+  const now = new Date();
+  let rows: PayslipListItem[] = [];
+  for (const row of items ?? []) {
+    const employee = unwrapRelation(row.employees) as
+      | {
+          employee_code?: string;
+          first_name?: string;
+          last_name?: string;
+          app_hidden_at?: string | null;
+          departments?: { name: string } | { name: string }[] | null;
+          designations?: { title: string } | { title: string }[] | null;
+          employment_types?: { name: string } | { name: string }[] | null;
+        }
+      | null;
+    if (!employee) continue;
+    const designation = unwrapRelation(
+      employee.designations as { title: string } | { title: string }[] | null,
+    );
+    if (
+      isExcludedFromTeamPayslips(employee.employee_code, {
+        employeeCode: employee.employee_code,
+        firstName: employee.first_name,
+        lastName: employee.last_name,
+        designationTitle: designation?.title ?? null,
+      })
+    ) {
+      continue;
+    }
+
+    const breakdown = (row.breakdown as PayrollBreakdown | null) ?? {
+      earnings: [],
+      deductions: [],
+      attendance: {
+        workingDays: 0,
+        presentDays: 0,
+        absentDays: 0,
+        lopDays: 0,
+        leaveLopDays: 0,
+        overtimeHours: 0,
+      },
+    };
+
+    const department = unwrapRelation(
+      employee.departments as { name: string } | { name: string }[] | null,
+    );
+    const employmentType = employee
+      ? unwrapRelation(
+          employee.employment_types as { name: string } | { name: string }[] | null,
+        )
+      : null;
+    const payslip = unwrapRelation(
+      row.payslips as
+        | {
+            id: string;
+            payslip_number: string;
+            issued_at: string;
+            salary_credit_date: string | null;
+            published_at: string | null;
+            email_sent_at: string | null;
+            archived_at: string | null;
+            payslip_version: string | null;
+          }
+        | {
+            id: string;
+            payslip_number: string;
+            issued_at: string;
+            salary_credit_date: string | null;
+            published_at: string | null;
+            email_sent_at: string | null;
+            archived_at: string | null;
+            payslip_version: string | null;
+          }[]
+        | null,
+    );
+    const sent =
+      Boolean(payslip?.email_sent_at) ||
+      Boolean(payslip?.published_at && isPayslipPublishedToEmployee(payslip.published_at, now));
+
+    rows.push({
+      id: payslip?.id ?? "",
+      payslipNumber: payslip?.payslip_number ?? "Pending",
+      employeeId: row.employee_id,
+      employeeCode: employee?.employee_code ?? "",
+      employeeName: employee
+        ? `${employee.first_name} ${employee.last_name}`.trim()
+        : "",
+      payrollMonth,
+      grossSalary: Number(row.gross_salary ?? 0),
+      netSalary: Number(row.net_salary ?? 0),
+      payrollStatus: payroll.payroll_status,
+      issuedAt: payslip?.issued_at ?? "",
+      salaryCreditDate: payslip?.salary_credit_date ?? "",
+      publishedAt: payslip?.published_at ?? "",
+      availability: sent ? "available" : "under_review",
+      canEmployeeAccess: sent,
+      reviewMessage: sent ? null : "Payslip not sent yet",
+      payslipVersion: payslip?.payslip_version ?? "—",
+      paymentStatus: sent ? "Sent" : "Pending",
+      isArchived: Boolean(payslip?.archived_at),
+      versionCount: 1,
+      payrollItemId: row.id,
+      payslipSent: sent,
+      hasPayslip: Boolean(payslip?.id),
+      departmentName: department?.name ?? null,
+      designationTitle: designation?.title ?? null,
+      employmentTypeName: employmentType?.name ?? null,
+      basicSalary: Number(row.basic_salary ?? 0),
+      totalAllowances: Number(row.total_allowances ?? 0),
+      totalDeductions: Number(row.total_deductions ?? 0),
+      breakdown,
+    });
+  }
+
+  const term = input.search?.trim().toLowerCase();
+  if (term) {
+    rows = rows.filter((row) => {
+      const haystack =
+        `${row.employeeName} ${row.employeeCode} ${row.payslipNumber} ${row.departmentName ?? ""}`.toLowerCase();
+      return haystack.includes(term);
+    });
+  }
+
+  rows.sort((a, b) => a.employeeCode.localeCompare(b.employeeCode));
+
+  const sentRows = rows.filter((row) => row.payslipSent);
+  const stats: PayslipHistoryStats = {
+    totalPayslips: rows.length,
+    yearsAvailable: [input.year],
+    latestSalary: rows[0]?.netSalary ?? null,
+    highestSalary: rows.length ? Math.max(...rows.map((row) => row.netSalary)) : null,
+    latestPublished: sentRows[0]?.publishedAt || null,
+    creditedCount: sentRows.length,
+    underReviewCount: rows.length - sentRows.length,
+    totalNetDisbursed: sentRows.reduce((sum, row) => sum + row.netSalary, 0),
+    uniqueEmployees: rows.length,
+    latestMonthLabel: formatPayrollMonthLabel(payrollMonth),
+  };
+
+  if (input.payslipStatus === "pending") {
+    rows = rows.filter((row) => !row.payslipSent);
+  } else if (input.payslipStatus === "sent") {
+    rows = rows.filter((row) => row.payslipSent);
+  }
+
+  return {
+    data: rows,
+    groups: [],
+    stats,
+    total: rows.length,
+    page: input.page,
+    pageSize: input.pageSize,
+  };
+}
+
+async function listStoredPayslipHistory(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  parsed: ReturnType<typeof payslipHistoryParamsSchema.parse>,
+): Promise<PayslipHistoryResult> {
   const { page, pageSize, search, month, includeArchived, groupByYear } = parsed;
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;

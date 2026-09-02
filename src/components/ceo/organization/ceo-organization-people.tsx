@@ -30,6 +30,7 @@ function toDirectoryCardPerson(person: CeoOrgDirectoryItem): DirectoryCardPerson
     departmentId: person.departmentId,
     departmentName: person.departmentName,
     verticalName: person.branchName,
+    employmentTypeName: person.employmentTypeName,
     avatarUrl: null,
     profileImagePath: person.profileImagePath,
     managerName: person.managerName,

@@ -138,10 +138,10 @@ const TABLE_DATA_CELL_BASE = "whitespace-nowrap px-4 py-3 align-middle";
 const TABLE_ACTIONS_CELL_CLASS = "min-w-36 px-2 py-3 text-center align-middle";
 
 const FILTER_CONTROL_CLASS =
-  "h-10 w-full min-w-0 gap-2 rounded-lg border-border/80 bg-background font-semibold text-foreground [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-muted-foreground";
+  "h-10 w-full min-w-0 gap-2 rounded-lg border-border/80 bg-white font-semibold text-foreground dark:bg-input [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-muted-foreground";
 const STATUS_FILTER_CLASS = cn(FILTER_CONTROL_CLASS, "w-full");
 const DATE_RANGE_CLASS =
-  "flex h-10 min-w-[16rem] shrink-0 items-center gap-2 rounded-lg border border-border/80 bg-background px-2.5";
+  "flex h-10 min-w-[16rem] shrink-0 items-center gap-2 rounded-lg border border-border/80 bg-white px-2.5 dark:bg-input";
 const DATE_INPUT_CLASS =
   "h-7 min-w-0 w-full border-0 bg-transparent p-0 pr-5 text-sm font-semibold text-foreground shadow-none focus-visible:ring-0 data-[empty]:text-muted-foreground [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:top-1/2 [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:m-0 [&::-webkit-calendar-picker-indicator]:size-3.5 [&::-webkit-calendar-picker-indicator]:-translate-y-1/2 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0";
 
@@ -542,7 +542,7 @@ export function AttendanceTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2.5 overflow-x-auto rounded-xl border border-border/70 bg-muted/55 p-2.5">
+      <div className="flex items-center gap-2.5 overflow-x-auto rounded-xl border border-input bg-white p-2.5 dark:bg-input">
         <div className="w-[13.5rem] shrink-0">
           <Select
             items={employeeItems}
@@ -696,10 +696,10 @@ export function AttendanceTable({
         </p>
       ) : null}
 
-      <div className="overflow-auto rounded-lg border max-h-[min(70vh,calc(100dvh-16rem))] [scrollbar-gutter:stable]">
+      <div className="max-h-[min(70vh,calc(100dvh-16rem))] overflow-auto rounded-lg border border-input bg-white [scrollbar-gutter:stable] dark:bg-input">
         <table
           data-slot="table"
-          className="w-full min-w-[72rem] caption-bottom text-sm"
+        className="w-full min-w-[72rem] caption-bottom bg-white text-sm dark:bg-input"
         >
           <TableHeader className="sticky top-0 z-30 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 shadow-[0_1px_0_rgba(255,255,255,0.12)]">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -743,7 +743,7 @@ export function AttendanceTable({
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  className="cursor-pointer hover:bg-muted/50"
+                  className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-white/5"
                   onClick={() => openRecord(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => {

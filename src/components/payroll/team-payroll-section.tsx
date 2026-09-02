@@ -92,6 +92,7 @@ export async function TeamPayrollSection({
       <SalaryStructureTable
         records={result.data}
         employees={lookups.employees}
+        employmentTypes={lookups.employmentTypes}
         canEdit={canEditSalary(profile.permissionCodes)}
       />
     );
@@ -165,13 +166,14 @@ export async function TeamPayrollSection({
   if (section === TEAM_PAYROLL_SECTIONS.payslips) {
     const params = payslipHistoryParamsSchema.parse({
       page: rawSearchParams.page,
-      pageSize: rawSearchParams.pageSize,
+      pageSize: firstString(rawSearchParams.pageSize) ?? 100,
       search: firstString(rawSearchParams.search),
       month: firstString(rawSearchParams.month) ?? now.getMonth() + 1,
       year: firstString(rawSearchParams.year) ?? now.getFullYear(),
       employeeId: firstString(rawSearchParams.employeeId),
       includeArchived: rawSearchParams.includeArchived === "true",
       groupByYear: false,
+      payslipStatus: firstString(rawSearchParams.payslipStatus) ?? "all",
     });
     const history = await listPayslipHistory(supabase, profile, params);
 
