@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CalendarPlus, FileText } from "lucide-react";
 
-import { Button, buttonVariants } from "@/components/common/button";
+import { Button, buttonVariants, POLICY_HEADER_BUTTON_CLASS } from "@/components/common/button";
 import { ApplyLeaveDialog } from "@/components/leave/apply-leave-dialog";
 import { HrTeamLeaveView } from "@/components/leave/hr-team-leave-view";
 import { MyLeaveSelfServiceView } from "@/components/leave/my-leave-self-service-view";
@@ -107,7 +107,11 @@ export function HrLeaveHubView({
             <div className="flex shrink-0 items-center gap-2">
               <Link
                 href={SELF_LEAVE_ROUTES.policy}
-                className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}
+                className={cn(
+                  buttonVariants({ variant: "outline" }),
+                  POLICY_HEADER_BUTTON_CLASS,
+                  "gap-1.5",
+                )}
               >
                 <FileText className="size-4" />
                 Leave Policy

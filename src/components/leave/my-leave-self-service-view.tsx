@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { CalendarPlus, Eye, FileText, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button, buttonVariants } from "@/components/common/button";
+import { Button, buttonVariants, POLICY_HEADER_BUTTON_CLASS } from "@/components/common/button";
 import {
   DataTable,
   DATA_TABLE_LEAVE_REQUESTS_MAX_HEIGHT,
@@ -494,7 +494,11 @@ export function MyLeaveSelfServiceView({
         {policyHref ? (
           <Link
             href={policyHref}
-            className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              POLICY_HEADER_BUTTON_CLASS,
+              "gap-1.5",
+            )}
           >
             <FileText className="size-4" />
             Leave Policy

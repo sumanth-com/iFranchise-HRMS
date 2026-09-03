@@ -43,3 +43,7 @@ export const buttonVariants = cva(
 );
 
 export type ButtonVariantProps = VariantProps<typeof buttonVariants>;
+
+/** Solid white header action (policy links) on the lavender page background. */
+export const POLICY_HEADER_BUTTON_CLASS =
+  "border-border bg-white text-foreground shadow-sm hover:bg-white hover:text-foreground dark:border-white/20 dark:bg-white dark:text-slate-900 dark:hover:bg-white";

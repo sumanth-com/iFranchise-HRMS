@@ -25,7 +25,7 @@ import { EmployeePayslipHistoryDialog } from "@/components/employee/payroll/empl
 import { EmployeePayslipDrawer } from "@/components/employee/payroll/employee-payslip-drawer";
 import { PaymentTimeline } from "@/components/employee/payroll/payment-timeline";
 import { EarningsDeductionsTable } from "@/components/payroll/earnings-deductions-table";
-import { Button } from "@/components/common/button";
+import { Button, POLICY_HEADER_BUTTON_CLASS } from "@/components/common/button";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import {
   BONUS_STATUS_LABELS,
@@ -134,7 +134,7 @@ export function EmployeePayrollView({
           {showPolicyLink ? (
             <Button
               variant="outline"
-              className="gap-1.5"
+              className={cn("gap-1.5", POLICY_HEADER_BUTTON_CLASS)}
               nativeButton={false}
               render={<Link href={policyHref} />}
             >
@@ -159,7 +159,7 @@ export function EmployeePayrollView({
       {showPolicyLink ? (
         <Button
           variant="outline"
-          className="gap-1.5"
+          className={cn("gap-1.5", POLICY_HEADER_BUTTON_CLASS)}
           nativeButton={false}
           render={<Link href={policyHref} />}
         >

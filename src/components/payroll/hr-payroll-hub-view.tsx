@@ -7,7 +7,8 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { CircleHelp, FileText, Download } from "lucide-react";
 
-import { Button } from "@/components/common/button";
+import { Button, POLICY_HEADER_BUTTON_CLASS } from "@/components/common/button";
+import { cn } from "@/lib/utils";
 import { Modal } from "@/components/common/modal";
 import { PayrollSubNav } from "@/components/payroll/payroll-sub-nav";
 import { TeamPayrollContentSkeleton } from "@/components/payroll/team-payroll-content-skeleton";
@@ -286,7 +287,7 @@ export function HrPayrollHubView({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="gap-1.5"
+                className={cn("gap-1.5", POLICY_HEADER_BUTTON_CLASS)}
                 nativeButton={false}
                 render={<Link href={PAYROLL_ROUTES.policy} />}
               >
@@ -312,7 +313,7 @@ export function HrPayrollHubView({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="gap-1.5"
+                className={cn("gap-1.5", POLICY_HEADER_BUTTON_CLASS)}
                 nativeButton={false}
                 render={<Link href={SELF_PAYROLL_ROUTES.policy} />}
               >

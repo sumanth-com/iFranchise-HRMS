@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FileText } from "lucide-react";
 
-import { buttonVariants } from "@/components/common/button";
+import { buttonVariants, POLICY_HEADER_BUTTON_CLASS } from "@/components/common/button";
 import { HrTeamAttendanceView } from "@/components/attendance/hr-team-attendance-view";
 import { EmployeeAttendanceView } from "@/components/employee/attendance/employee-attendance-view";
 import { SELF_ATTENDANCE_ROUTES, ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
@@ -72,7 +72,11 @@ export function HrAttendanceHubView({
         </div>
         <Link
           href={isTeamView ? ATTENDANCE_ROUTES.policy : SELF_ATTENDANCE_ROUTES.policy}
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
+          className={cn(
+            buttonVariants({ variant: "outline", size: "sm" }),
+            POLICY_HEADER_BUTTON_CLASS,
+            "gap-1.5",
+          )}
         >
           <FileText className="size-4" />
           Attendance Policy

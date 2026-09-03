@@ -1,2 +1,2 @@
 export { Button } from "@/components/ui/button";
-export { buttonVariants } from "@/components/ui/button-variants";
+export { buttonVariants, POLICY_HEADER_BUTTON_CLASS } from "@/components/ui/button-variants";

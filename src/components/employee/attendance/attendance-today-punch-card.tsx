@@ -313,7 +313,6 @@ export function AttendanceTodayPunchCard({
               <PunchActionButton
                 onClick={handleUpdateCheckout}
                 disabled={isPending}
-                variant="outline"
               >
                 {isPending ? (
                   <Loader2 className="size-4 animate-spin" />

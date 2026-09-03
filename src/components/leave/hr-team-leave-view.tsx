@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { FileText } from "lucide-react";
 
-import { buttonVariants } from "@/components/common/button";
+import { buttonVariants, POLICY_HEADER_BUTTON_CLASS } from "@/components/common/button";
 import {
   LeaveSummaryCards,
   type LeaveSummaryFilterKey,
@@ -120,7 +120,11 @@ export function HrTeamLeaveView({
           {policyHref ? (
             <Link
               href={policyHref}
-              className={cn(buttonVariants({ variant: "outline" }), "shrink-0 gap-1.5")}
+              className={cn(
+                buttonVariants({ variant: "outline" }),
+                POLICY_HEADER_BUTTON_CLASS,
+                "shrink-0 gap-1.5",
+              )}
             >
               <FileText className="size-4" />
               Leave Policy

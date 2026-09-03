@@ -5,7 +5,7 @@ import { FileText } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { buttonVariants } from "@/components/common/button";
+import { buttonVariants, POLICY_HEADER_BUTTON_CLASS } from "@/components/common/button";
 import { EmployeeAttendanceHistoryTable } from "@/components/employee/attendance/employee-attendance-history-table";
 import { SelfAttendanceLiveProvider, useSelfAttendanceLive } from "@/components/attendance/self-attendance-live-context";
 import { SelfAttendanceTodayCard } from "@/components/attendance/self-attendance-today-card";
@@ -81,7 +81,11 @@ export function EmployeeAttendanceView({
           {policyHref && showPolicyLink ? (
             <Link
               href={policyHref}
-              className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}
+              className={cn(
+                buttonVariants({ variant: "outline" }),
+                POLICY_HEADER_BUTTON_CLASS,
+                "gap-1.5",
+              )}
             >
               <FileText className="size-4" />
               Attendance Policy
@@ -92,7 +96,11 @@ export function EmployeeAttendanceView({
         <div className="flex justify-end">
           <Link
             href={policyHref}
-            className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              POLICY_HEADER_BUTTON_CLASS,
+              "gap-1.5",
+            )}
           >
             <FileText className="size-4" />
             Attendance Policy
@@ -168,7 +176,9 @@ function AttendanceLiveBody({
   const live = useSelfAttendanceLive();
   const summary = {
     ...data.summary,
-    averageWorkingHours: live.averageWorkingHours,
+    leave: live.calendarDays.filter(
+      (day) => day.inMonth && day.status === "on_leave",
+    ).length,
   };
 
   return (
