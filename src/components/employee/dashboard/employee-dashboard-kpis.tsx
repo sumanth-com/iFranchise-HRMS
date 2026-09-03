@@ -79,8 +79,8 @@ export function EmployeeDashboardKpiCards({
       aria-label="Your day at a glance"
       className={
         hideLeaveBalance
-          ? "grid grid-cols-2 gap-3 xl:grid-cols-3"
-          : "grid grid-cols-2 gap-3 xl:grid-cols-4"
+          ? "grid w-full min-w-0 grid-cols-2 gap-3 xl:grid-cols-3"
+          : "grid w-full min-w-0 grid-cols-2 gap-3 xl:grid-cols-4"
       }
     >
       <EmployeeStatCard

@@ -100,6 +100,7 @@ export function LandingPeopleBento() {
           className={cn(
             "landing-people-bento-card landing-animate-up",
             card.span === "double" && "landing-people-bento-card--span",
+            card.key === "platform" && "landing-people-bento-card--platform",
           )}
           style={{ animationDelay: `${0.06 + index * 0.07}s` }}
         >

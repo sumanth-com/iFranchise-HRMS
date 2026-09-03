@@ -129,7 +129,7 @@ export function LandingFinalCta() {
 
   return (
     <section
-      className="relative overflow-hidden py-14 sm:py-20"
+      className="landing-final-cta-section relative overflow-hidden py-14 sm:py-20"
       aria-labelledby="landing-final-heading"
     >
       <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
@@ -179,21 +179,21 @@ export function LandingFinalCta() {
             </defs>
           </svg>
 
-          <div className="relative z-10 grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-8">
+          <div className="landing-final-cta-grid relative z-10 grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-8">
             {/* Left Column: Heading, Subtitle & Button */}
-            <div className="lg:col-span-7">
+            <div className="landing-final-cta-copy-block lg:col-span-7">
               <h2
                 id="landing-final-heading"
                 className="text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-[2.65rem] lg:leading-tight"
               >
                 Your workplace starts here.
               </h2>
-              <p className="mt-3 text-sm text-slate-300 sm:text-base">
+              <p className="landing-final-cta-copy-text mt-3 max-w-md text-sm text-slate-300 sm:text-base lg:max-w-none">
                 {isMobileOrTablet
                   ? "Explore the platform, then continue on desktop for the full HRMS experience."
                   : "Everything you need is just one sign-in away."}
               </p>
-              <div className="mt-7 sm:mt-8">
+              <div className="landing-final-cta-actions mt-7 flex sm:mt-8">
                 <button
                   type="button"
                   onClick={handleLandingCta}

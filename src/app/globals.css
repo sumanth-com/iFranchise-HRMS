@@ -4614,6 +4614,18 @@ html[data-landing-light="true"] .landing-page--light-locked .landing-nav-brand-t
   }
 }
 
+/* iPad portrait: HR + One connected workspace share a row; CEO stays full-width below. */
+@media (min-width: 768px) and (max-width: 1023.98px) {
+  .landing-people-bento-card--platform {
+    order: 4;
+  }
+
+  .landing-people-bento-card--span {
+    order: 5;
+    grid-column: 1 / -1;
+  }
+}
+
 @media (min-width: 1024px) {
   .landing-people-bento {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -5745,6 +5757,37 @@ html.dark [data-slot="dialog-content"].landing-desktop-experience .desktop-previ
   }
 }
 
+.landing-final-cta-copy-block {
+  min-width: 0;
+}
+
+.landing-final-cta-actions {
+  justify-content: flex-start;
+}
+
+@media (max-width: 1023.98px) {
+  .landing-final-cta-section {
+    padding-top: 2.25rem;
+    padding-bottom: 1.5rem;
+  }
+
+  .landing-final-cta-copy-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .landing-final-cta-copy-text {
+    margin-inline: auto;
+  }
+
+  .landing-final-cta-actions {
+    justify-content: center;
+    width: 100%;
+  }
+}
+
 .landing-final-cta {
   padding-top: 3.25rem;
   padding-bottom: 2.75rem;
@@ -5907,6 +5950,28 @@ html.dark [data-slot="dialog-content"].landing-desktop-experience .desktop-previ
   justify-items: center;
   align-items: center;
   text-align: center;
+}
+
+@media (min-width: 768px) and (max-width: 1023.98px) {
+  .landing-footer .landing-footer-links,
+  .landing-footer-links {
+    display: flex;
+    flex-wrap: nowrap;
+    grid-template-columns: none;
+    width: max-content;
+    max-width: 100%;
+    margin-inline: auto;
+    justify-content: center;
+    align-items: center;
+    gap: 0.45rem 0.85rem;
+    padding-inline: 0.25rem;
+  }
+
+  .landing-footer .landing-footer-link,
+  .landing-footer-link {
+    font-size: 0.72rem;
+    white-space: nowrap;
+  }
 }
 
 @media (min-width: 1024px) {
@@ -6679,6 +6744,11 @@ html.dark [data-slot="dialog-content"].landing-desktop-experience .desktop-previ
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .app-shell-main .xl\:grid-cols-4,
+  .app-shell-main .xl\:grid-cols-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .app-shell-main .lg\:grid-cols-\[3fr_2fr\] {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -6690,10 +6760,6 @@ html.dark [data-slot="dialog-content"].landing-desktop-experience .desktop-previ
   [data-slot="dialog-content"] {
     max-height: min(90dvh, 880px);
     overflow-y: auto;
-  }
-
-  .app-shell-main .attendance-wave-surface {
-    min-height: 22rem;
   }
 }
 

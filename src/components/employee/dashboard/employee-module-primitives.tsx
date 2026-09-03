@@ -137,6 +137,7 @@ export function EmployeeStatCard({
 
   const className = cn(
     employeeStatCardClass,
+    "w-full min-w-0 max-w-full",
     (href || onClick) &&
       "cursor-pointer transition-[box-shadow,background-color] duration-150 dark:hover:bg-transparent",
     active && "bg-accent/25 ring-1 ring-primary/30 dark:border-indigo-300/45",

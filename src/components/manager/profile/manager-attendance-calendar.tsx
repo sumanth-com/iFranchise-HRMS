@@ -182,7 +182,7 @@ export function ManagerAttendanceCalendar({
   return (
     <section
       className={cn(
-        "attendance-wave-surface card-surface-static flex h-full min-h-[28rem] flex-col rounded-2xl border bg-card p-4 shadow-sm",
+        "attendance-wave-surface card-surface-static flex h-full min-h-[28rem] flex-col rounded-2xl border bg-card p-4 shadow-sm max-xl:h-auto max-xl:min-h-0",
         className,
       )}
     >

@@ -26,8 +26,8 @@ export function EmployeeDashboardView({
 }) {
   return (
     <SelfAttendanceLiveProvider today={today}>
-      <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto p-4 md:p-5 xl:overflow-hidden">
-        <div className="mx-auto flex w-full max-w-[88rem] flex-col gap-3 max-xl:min-h-0 xl:h-full xl:min-h-0">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-5 max-xl:overflow-x-visible xl:overflow-hidden">
+        <div className="mx-auto flex w-full min-w-0 max-w-[88rem] flex-col gap-3 max-xl:min-h-0 xl:h-full xl:min-h-0">
           <div className="shrink-0">
             <EmployeeDashboardHeader greeting={greeting} subtitle={subtitle} />
           </div>
@@ -50,7 +50,7 @@ export function EmployeeDashboardView({
                 lastName={greeting.lastName}
                 personKey={greeting.employeeId}
                 referenceDate={referenceDate}
-                className="min-h-[11.5rem] flex-[1.15]"
+                className="min-h-[11.5rem] flex-[1.15] max-xl:min-h-0 max-xl:flex-none"
               />
             </div>
             <EmployeeUpcomingEvents
@@ -59,7 +59,7 @@ export function EmployeeDashboardView({
               canManageAnnouncements={canManageAnnouncements}
               pairHolidayBirthday={pairHolidayBirthday}
               showImportantNotices={showImportantNotices}
-              className="min-h-0 h-full"
+              className="min-h-0 h-full max-xl:h-auto max-xl:min-h-[16rem]"
             />
           </div>
         </div>
