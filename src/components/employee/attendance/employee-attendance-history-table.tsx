@@ -89,7 +89,7 @@ export function EmployeeAttendanceHistoryTable({
 
   return (
     <section className="rounded-2xl border bg-card shadow-sm">
-      <div className="flex flex-col gap-4 border-b px-5 py-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="flex flex-col gap-4 border-b px-5 py-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
           <h2 className="text-base font-semibold tracking-tight">
             Attendance History
@@ -99,7 +99,7 @@ export function EmployeeAttendanceHistoryTable({
             monthly summary and regularization requests.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto">
           <Select
             value={String(month)}
             onValueChange={(value) => {

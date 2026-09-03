@@ -9,7 +9,7 @@ export function DashboardShellFallback() {
   return (
     <div className="app-shell-canvas flex h-screen overflow-hidden bg-background" aria-busy="true" aria-live="polite">
       <span className="sr-only">Loading workspace</span>
-      <aside className="app-shell-sidebar hidden h-full w-64 shrink-0 flex-col border-r bg-transparent md:flex">
+      <aside className="app-shell-sidebar hidden h-full w-64 shrink-0 flex-col border-r bg-transparent xl:flex">
         <div className="flex h-14 items-center gap-3 border-b px-4">
           <Skeleton className="size-8 rounded-lg" />
           <Skeleton className="h-4 w-28" />

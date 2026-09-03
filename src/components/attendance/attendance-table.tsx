@@ -260,10 +260,12 @@ export function AttendanceTable({
   const statusItems = useMemo(
     () => [
       { value: FILTER_ANY_VALUE, label: "All statuses" },
-      ...Object.entries(ATTENDANCE_STATUS_LABELS).map(([value, label]) => ({
-        value,
-        label,
-      })),
+      ...Object.entries(ATTENDANCE_STATUS_LABELS)
+        .filter(([value]) => value !== "half_day")
+        .map(([value, label]) => ({
+          value,
+          label,
+        })),
     ],
     [],
   );

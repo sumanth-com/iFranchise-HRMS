@@ -1,4 +1,3 @@
-import { formatWorkingDuration } from "@/lib/employee/attendance-format";
 import { useOptionalSelfAttendanceLive } from "@/components/attendance/self-attendance-live-context";
 import type { ManagerAttendanceMonthSummary } from "@/types/manager-self-attendance";
 import { cn } from "@/lib/utils";
@@ -15,7 +14,6 @@ const CARDS: {
   label: string;
   hint: string;
   sidebarHint: string;
-  format?: (value: number | string | null) => string;
 }[] = [
   {
     key: "present",
@@ -36,11 +34,10 @@ const CARDS: {
     sidebarHint: "Late check-ins",
   },
   {
-    key: "averageWorkingHours",
-    label: "Avg Hours",
-    hint: "Average working time",
-    sidebarHint: "Avg work time",
-    format: (value) => formatWorkingDuration(Math.round(Number(value ?? 0) * 3600)),
+    key: "leave",
+    label: "On Leave",
+    hint: "Leave days this month",
+    sidebarHint: "Leave days",
   },
 ];
 
@@ -56,19 +53,19 @@ export function ManagerProfileSummaryCards({
     <section
       className={cn(
         isSidebar
-          ? "flex h-full min-h-0 w-full flex-col gap-2"
-          : "grid grid-cols-2 gap-3 lg:grid-cols-4",
+          ? "flex h-full min-h-0 w-full flex-col gap-2 max-xl:grid max-xl:h-auto max-xl:min-h-0 max-xl:grid-cols-2"
+          : "grid grid-cols-2 gap-3 xl:grid-cols-4",
         className,
       )}
     >
       {CARDS.map((card) => {
-        const raw = summary[card.key];
-        const display =
-          card.key === "averageWorkingHours" && live
-            ? formatWorkingDuration(live.averageWorkingSeconds)
-            : card.format
-              ? card.format(raw)
-              : String(raw ?? 0);
+        const raw =
+          card.key === "leave" && live
+            ? live.calendarDays.filter(
+                (day) => day.inMonth && day.status === "on_leave",
+              ).length
+            : summary[card.key];
+        const display = String(raw ?? 0);
 
         return (
           <div
@@ -93,6 +90,8 @@ export function ManagerProfileSummaryCards({
                 "font-bold tracking-tight tabular-nums",
                 isSidebar ? "mt-1 text-2xl leading-tight" : "mt-2 text-2xl font-semibold",
                 card.key === "absent" && Number(raw) > 0 && "text-red-600 dark:text-red-400",
+                card.key === "late" && Number(raw) > 0 && "text-orange-600 dark:text-orange-400",
+                card.key === "leave" && Number(raw) > 0 && "text-violet-600 dark:text-violet-400",
               )}
             >
               {display}

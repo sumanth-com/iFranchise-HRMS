@@ -30,11 +30,6 @@ const TOGGLES: { key: keyof FormInput; label: string; description: string }[] = 
     description: "Show notifications in the notification center and bell.",
   },
   {
-    key: "receiveEmail",
-    label: "Receive Email",
-    description: "Send email copies for enabled notification types.",
-  },
-  {
     key: "muteNotifications",
     label: "Mute Notifications",
     description: "Pause all notifications and sounds temporarily.",

@@ -41,10 +41,10 @@ function toAttendanceSummary(
 ): AttendanceSummary {
   return {
     date: summary.dateLabel,
-    presentToday: summary.presentToday,
+    presentToday: summary.presentToday + summary.halfDayToday,
     absentToday: summary.absentToday,
     lateToday: summary.lateToday,
-    halfDayToday: summary.halfDayToday,
+    halfDayToday: 0,
     onLeaveToday: 0,
     totalEmployees: teamSize,
   };

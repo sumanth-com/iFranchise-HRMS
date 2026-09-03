@@ -440,7 +440,7 @@ function TeamMemberAttendancePanel({ detail }: { detail: TeamMemberDetailBundle 
       >
         <AttendanceSummaryCard
           label="Present days"
-          value={summary.presentDays}
+          value={summary.presentDays + halfDays}
           accent="text-emerald-600 dark:text-emerald-400"
         />
         <AttendanceSummaryCard
@@ -452,11 +452,6 @@ function TeamMemberAttendancePanel({ detail }: { detail: TeamMemberDetailBundle 
           label="Late arrivals"
           value={lateDays}
           accent="text-amber-600 dark:text-amber-400"
-        />
-        <AttendanceSummaryCard
-          label="Half days"
-          value={halfDays}
-          accent="text-violet-600 dark:text-violet-400"
         />
         <AttendanceSummaryCard
           label="Total hours"

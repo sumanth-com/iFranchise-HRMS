@@ -96,23 +96,15 @@ export function EmployeeAttendanceScanCard({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl border bg-muted/30 px-3 py-3">
-              <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-                Half days
-              </p>
-              <p className="mt-1 text-base font-semibold tabular-nums">{snapshot.halfDay}</p>
-            </div>
-            <div className="rounded-xl border bg-muted/30 px-3 py-3">
-              <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-                Avg hours
-              </p>
-              <p className="mt-1 text-base font-semibold tabular-nums">
-                {snapshot.averageWorkingHours > 0
-                  ? `${snapshot.averageWorkingHours}h`
-                  : "—"}
-              </p>
-            </div>
+          <div className="rounded-xl border bg-muted/30 px-3 py-3">
+            <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+              Avg hours
+            </p>
+            <p className="mt-1 text-base font-semibold tabular-nums">
+              {snapshot.averageWorkingHours > 0
+                ? `${snapshot.averageWorkingHours}h`
+                : "—"}
+            </p>
           </div>
 
           <div className="flex items-center gap-3 rounded-xl border bg-gradient-to-r from-amber-500/10 to-orange-500/5 px-4 py-3">

@@ -155,7 +155,7 @@ export function LeaveCalendarView({
   hideLegend = false,
   enableWeekView = false,
   compact = false,
-  hideHalfDayMarkers = false,
+  hideHalfDayMarkers = true,
   calendar: calendarProp = DEFAULT_LEAVE_CALENDAR,
 }: LeaveCalendarViewProps) {
   const leaves = leavesProp ?? [];
@@ -237,7 +237,7 @@ export function LeaveCalendarView({
     const allocation = leave.dayAllocations?.find((item) => item.date === date);
     if (allocation?.kind === "lop") return "bg-slate-500";
     if (allocation?.kind === "sandwich") return LEAVE_CALENDAR_LEGEND.sandwich.className;
-    if (leave.isHalfDay) return LEAVE_CALENDAR_LEGEND.halfDay.className;
+    if (leave.isHalfDay) return LEAVE_STATUS_COLORS[leave.leaveStatus];
     return LEAVE_STATUS_COLORS[leave.leaveStatus];
   }
 

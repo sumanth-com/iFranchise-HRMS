@@ -40,6 +40,7 @@ type EmployeeRow = {
   status: Employee["status"];
   deleted_at: string | null;
   app_hidden_at: string | null;
+  tablet_access_enabled?: boolean | null;
 };
 
 type OrganizationRow = {
@@ -78,6 +79,7 @@ function mapEmployee(row: EmployeeRow): Employee {
     employmentStatus: row.employment_status,
     accountStatus: row.account_status,
     status: row.status,
+    tabletAccessEnabled: row.tablet_access_enabled === true,
   };
 }
 
@@ -136,14 +138,32 @@ export const loadUserProfile = cache(async function loadUserProfile(
     mark("getUser");
   }
 
-  const { data: employeeRow, error: employeeError } = await supabase
+  const EMPLOYEE_PROFILE_SELECT =
+    "id, organization_id, branch_id, employee_code, first_name, last_name, email, employment_status, account_status, status, deleted_at, app_hidden_at, tablet_access_enabled";
+  const EMPLOYEE_PROFILE_SELECT_LEGACY =
+    "id, organization_id, branch_id, employee_code, first_name, last_name, email, employment_status, account_status, status, deleted_at, app_hidden_at";
+
+  let employeeQuery = await supabase
     .schema("hrms")
     .from("employees")
-    .select(
-      "id, organization_id, branch_id, employee_code, first_name, last_name, email, employment_status, account_status, status, deleted_at, app_hidden_at",
-    )
+    .select(EMPLOYEE_PROFILE_SELECT)
     .eq("user_id", userId)
     .maybeSingle();
+
+  if (
+    employeeQuery.error &&
+    (employeeQuery.error.code === "42703" ||
+      /tablet_access_enabled/i.test(employeeQuery.error.message))
+  ) {
+    employeeQuery = await supabase
+      .schema("hrms")
+      .from("employees")
+      .select(EMPLOYEE_PROFILE_SELECT_LEGACY)
+      .eq("user_id", userId)
+      .maybeSingle();
+  }
+
+  const { data: employeeRow, error: employeeError } = employeeQuery;
   mark("employee");
 
   if (employeeError) {

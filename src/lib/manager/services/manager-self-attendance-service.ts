@@ -150,18 +150,11 @@ function resolvePunchStatus(
     options?.finalizeHours ?? (Boolean(checkOutAt) || attendanceDate < today);
 
   // Until checkout is recorded, status follows check-in only (present / late).
-  // Hours-based half-day applies once checkout is recorded for a short day.
-  // Checked-in + checked-out with real work time is never "absent" — that label
-  // is reserved for no-show / negligible presence.
-  if (
-    finalizeHours &&
-    checkOutAt &&
-    workHours > 0 &&
-    workHours < rules.fullDayMinimumHours
-  ) {
-    const negligibleHours = 0.25; // under 15 minutes
+  // After checkout, under 15 minutes is absent (including same-minute punch-out).
+  // Completed days with real hours stay present or late — Half Day is not used.
+  if (finalizeHours && checkOutAt) {
+    const negligibleHours = 0.25;
     if (workHours < negligibleHours) return "absent";
-    return "half_day";
   }
 
   if (lateMinutes > 0) return "late";
@@ -427,7 +420,6 @@ function weekendStatusForDate(
     sandwich: { enabled: false, includeWeekends: false, includeHolidays: false },
   });
   if (dayClass === "weekly_off") return "week_off";
-  if (dayClass === "half_day") return "half_day";
   return null;
 }
 
@@ -577,7 +569,7 @@ function buildMonthSummary(
         counts.leave += 1;
         break;
       case "half_day":
-        counts.halfDay += 1;
+        counts.present += 1;
         break;
       case "week_off":
         counts.weekend += 1;

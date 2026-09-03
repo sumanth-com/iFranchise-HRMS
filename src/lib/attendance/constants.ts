@@ -29,7 +29,7 @@ export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatus, string> = {
   present: "Present",
   absent: "Absent",
   late: "Late",
-  half_day: "Half Day",
+  half_day: "Present",
   on_leave: "On Leave",
   holiday: "Holiday",
   week_off: "Weekend",
@@ -53,6 +53,6 @@ export const ATTENDANCE_SUMMARY_LABELS = {
   presentToday: "Present",
   absentToday: "Absent",
   lateToday: "Late",
-  halfDayToday: "Half Day",
+  halfDayToday: "Present",
   totalEmployees: "Total Employees",
 } as const;

@@ -149,7 +149,6 @@ export function ManagerLeaveCalendar({
                 holidays: holidays.filter((item) => !item.isOptional).map((item) => item.holidayDate),
               });
               const weekend = dayClass === "weekly_off";
-              const halfDay = dayClass === "half_day";
 
               return (
                 <div
@@ -157,7 +156,6 @@ export function ManagerLeaveCalendar({
                   className={cn(
                     "min-h-36 rounded-lg border p-2",
                     weekend && "bg-muted/30",
-                    halfDay && "bg-orange-500/10",
                     holiday && "border-violet-300 bg-violet-500/5",
                   )}
                 >
@@ -166,10 +164,6 @@ export function ManagerLeaveCalendar({
                     {holiday ? (
                       <p className="truncate text-[10px] text-violet-700 dark:text-violet-300">
                         {holiday.name}
-                      </p>
-                    ) : halfDay ? (
-                      <p className="text-[10px] font-medium text-orange-700 dark:text-orange-300">
-                        Half day
                       </p>
                     ) : weekend ? (
                       <p className="text-[10px] text-muted-foreground">Weekly holiday</p>

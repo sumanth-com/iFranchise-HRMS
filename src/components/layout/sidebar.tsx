@@ -65,7 +65,7 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "app-shell-sidebar hidden h-full shrink-0 flex-col border-r bg-transparent text-sidebar-foreground transition-[width] duration-200 md:flex",
+        "app-shell-sidebar hidden h-full shrink-0 flex-col border-r bg-transparent text-sidebar-foreground transition-[width] duration-200 xl:flex",
         isCollapsed ? "w-16" : "w-64",
       )}
     >

@@ -9,7 +9,7 @@ import brandLogo from "@/assets/Logo.png";
 const RESET_DELAY_MS = 2600;
 
 /**
- * Shown instead of the portal on phones and tablets.
+ * Shown instead of the portal on phones.
  *
  * Visibility is decided purely in CSS (see `.desktop-notice` in globals.css) so this
  * renders identically on the server and the client — no viewport probing, no layout

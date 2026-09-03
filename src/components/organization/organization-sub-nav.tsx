@@ -24,7 +24,7 @@ export function OrganizationSubNav({
   return (
     <div className="flex justify-center">
       <nav
-        className="inline-flex flex-wrap items-center gap-1 rounded-lg border bg-card p-1 shadow-sm"
+        className="inline-flex max-w-full flex-wrap items-center gap-1 rounded-lg border bg-card p-1 shadow-sm"
         aria-label="Organization sections"
       >
         {navItems.map((item) => {

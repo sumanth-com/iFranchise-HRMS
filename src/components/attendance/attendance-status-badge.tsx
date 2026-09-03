@@ -11,7 +11,7 @@ const STATUS_STYLES: Record<AttendanceDisplayStatus, string> = {
   late:
     "bg-orange-500/15 text-orange-800 ring-1 ring-inset ring-orange-500/25 dark:bg-orange-500/20 dark:text-orange-200 dark:ring-orange-400/35",
   half_day:
-    "bg-teal-500/15 text-teal-800 ring-1 ring-inset ring-teal-500/25 dark:bg-teal-500/20 dark:text-teal-200 dark:ring-teal-400/35",
+    "bg-emerald-500/15 text-emerald-800 ring-1 ring-inset ring-emerald-500/25 dark:bg-emerald-500/20 dark:text-emerald-200 dark:ring-emerald-400/35",
   on_leave:
     "bg-violet-500/15 text-violet-800 ring-1 ring-inset ring-violet-500/25 dark:bg-violet-500/20 dark:text-violet-200 dark:ring-violet-400/35",
   holiday:

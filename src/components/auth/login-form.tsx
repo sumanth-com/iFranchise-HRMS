@@ -14,6 +14,8 @@ import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
 import { loginAction } from "@/lib/auth/actions";
 import { AUTH_ROUTES, IDLE_ACTIVITY_STORAGE_KEY } from "@/lib/auth/constants";
+import { DeviceKindReporter } from "@/components/layout/device-kind-reporter";
+import { detectClientDeviceKind } from "@/lib/device-access/tablet-device";
 import {
   getAuthErrorMessage,
   resolveUserFacingAuthMessage,
@@ -36,6 +38,7 @@ const PROFILE_ERROR_CODES: AuthErrorCode[] = [
   "NO_ROLES",
   "ORGANIZATION_NOT_FOUND",
   "PORTAL_ACCESS_DENIED",
+  "TABLET_ACCESS_DENIED",
   "SESSION_EXPIRED",
   "RESET_LINK_INVALID",
   "EMAIL_NOT_CONFIRMED",
@@ -188,6 +191,7 @@ export function LoginForm() {
     if (data.rememberMe) {
       formData.set("rememberMe", "on");
     }
+    formData.set("clientDevice", detectClientDeviceKind());
 
     try {
       const result = await loginAction(formData);
@@ -254,6 +258,7 @@ export function LoginForm() {
 
   return (
     <div className="flex flex-col gap-6">
+      <DeviceKindReporter />
       <div className="space-y-1.5 text-center">
         <h1 className="text-[1.75rem] font-semibold tracking-tight text-foreground">
           Welcome Back

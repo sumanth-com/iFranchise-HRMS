@@ -11,6 +11,8 @@ const AUTH_ERROR_MESSAGES: Record<AuthErrorCode, string> = {
     "Your account is currently inactive. Please contact HR for assistance.",
   PORTAL_ACCESS_DENIED:
     "Your account does not currently have access to this portal.",
+  TABLET_ACCESS_DENIED:
+    "Tablet access is not enabled for your account. Sign in on a desktop computer, or ask HR to enable Device Access.",
   NO_ROLES:
     "Your account does not currently have access to this portal.",
   ORGANIZATION_NOT_FOUND:

@@ -32,6 +32,8 @@ import {
 } from "@/lib/auth/permission-cache";
 import { writeApplicationAudit } from "@/lib/audit/services/audit-service";
 import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
+import { isTabletHrmsAllowed } from "@/lib/device-access/access";
+import { isTabletClientRequest } from "@/lib/device-access/request";
 import { assertRateLimit } from "@/lib/security/rate-limit";
 import { hashPasswordResetToken } from "@/lib/security/signed-flow-tokens";
 import { recordEmployeeSuccessfulLogin, acceptInvitationOnPasswordSet } from "@/lib/employees/services/employee-account";
@@ -228,6 +230,20 @@ export async function loginAction(
         success: false,
         error: profileResult.error,
         message: getAuthErrorMessage(profileResult.error),
+      };
+    }
+
+    const tabletClient = await isTabletClientRequest(
+      typeof formData.get("clientDevice") === "string"
+        ? String(formData.get("clientDevice"))
+        : null,
+    );
+    if (!isTabletHrmsAllowed(profileResult.profile, tabletClient)) {
+      await supabase.auth.signOut();
+      return {
+        success: false,
+        error: "TABLET_ACCESS_DENIED",
+        message: getAuthErrorMessage("TABLET_ACCESS_DENIED"),
       };
     }
 

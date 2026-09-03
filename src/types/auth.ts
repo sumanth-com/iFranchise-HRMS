@@ -28,6 +28,8 @@ export type Employee = {
     | "suspended"
     | "archived";
   status: RecordStatus;
+  /** Explicit grant required to use the HRMS on a tablet. Desktop is always allowed. */
+  tabletAccessEnabled?: boolean;
 };
 
 export type Organization = {
@@ -76,6 +78,7 @@ export type AuthErrorCode =
   | "ORGANIZATION_NOT_FOUND"
   | "PROFILE_LOOKUP_FAILED"
   | "PORTAL_ACCESS_DENIED"
+  | "TABLET_ACCESS_DENIED"
   | "SESSION_EXPIRED"
   | "NETWORK_ERROR"
   | "EMAIL_NOT_CONFIRMED"

@@ -83,7 +83,6 @@ const MODULE_STATUS_OPTIONS: Partial<
     { value: "present", label: "Present" },
     { value: "absent", label: "Absent" },
     { value: "late", label: "Late" },
-    { value: "half_day", label: "Half Day" },
     { value: "holiday", label: "Holiday" },
     { value: "week_off", label: "Week Off" },
   ],

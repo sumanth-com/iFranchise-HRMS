@@ -4,10 +4,14 @@ import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { DashboardShellFallback } from "@/components/layout/dashboard-shell-fallback";
 import { DesktopOnlyGate } from "@/components/layout/desktop-only-gate";
+import { DeviceKindReporter } from "@/components/layout/device-kind-reporter";
 import { ModulePageSkeleton } from "@/components/layout/module-page-skeleton";
+import { TabletAccessDenied } from "@/components/layout/tablet-access-denied";
 import { AUTH_ROUTES } from "@/lib/auth/constants";
 import { getLayoutUserProfile } from "@/lib/auth/layout-profile";
 import { PORTAL_PERMISSIONS, type PortalKey } from "@/lib/auth/portals";
+import { isTabletHrmsAllowed } from "@/lib/device-access/access";
+import { isTabletClientRequest } from "@/lib/device-access/request";
 import { hasPermission } from "@/lib/permissions/utils";
 import { AuthProvider, type PortalVariant } from "@/providers/auth-provider";
 import { getServerSession } from "@/lib/supabase/server";
@@ -84,18 +88,26 @@ async function ResolvedPortalShell({
 
   logLayout("layout:total_before_children", layoutStartedAt);
 
+  const tabletClient = await isTabletClientRequest();
+  const tabletAllowed = isTabletHrmsAllowed(profileResult.profile, tabletClient);
+
   return (
     <AuthProvider
       initialProfile={profileResult.profile}
       portalVariant={portalVariant}
       portalLabel={portalLabel}
     >
-      {/* Phones and tablets get the desktop notice instead of the portal. */}
+      <DeviceKindReporter />
+      {/* Phones get the desktop notice. Tablets render the portal (or a grant notice). */}
       <DesktopOnlyGate>
-        <DashboardShell>
-          {/* Stream page RSC after shell chrome so soft-nav is not blank while module data loads. */}
-          <Suspense fallback={<ModulePageSkeleton />}>{children}</Suspense>
-        </DashboardShell>
+        {tabletAllowed ? (
+          <DashboardShell>
+            {/* Stream page RSC after shell chrome so soft-nav is not blank while module data loads. */}
+            <Suspense fallback={<ModulePageSkeleton />}>{children}</Suspense>
+          </DashboardShell>
+        ) : (
+          <TabletAccessDenied />
+        )}
       </DesktopOnlyGate>
     </AuthProvider>
   );

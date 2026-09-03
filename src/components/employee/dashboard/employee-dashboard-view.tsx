@@ -26,8 +26,8 @@ export function EmployeeDashboardView({
 }) {
   return (
     <SelfAttendanceLiveProvider today={today}>
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 md:p-5">
-        <div className="mx-auto flex h-full min-h-0 w-full max-w-[88rem] flex-col gap-3">
+      <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto p-4 md:p-5 xl:overflow-hidden">
+        <div className="mx-auto flex w-full max-w-[88rem] flex-col gap-3 max-xl:min-h-0 xl:h-full xl:min-h-0">
           <div className="shrink-0">
             <EmployeeDashboardHeader greeting={greeting} subtitle={subtitle} />
           </div>
@@ -36,7 +36,7 @@ export function EmployeeDashboardView({
             <EmployeeDashboardKpiCards kpis={kpis} today={today} />
           </div>
 
-          <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[3fr_2fr] lg:items-stretch">
+          <div className="grid min-h-0 flex-1 gap-3 max-xl:flex-none xl:grid-cols-[3fr_2fr] xl:items-stretch">
             <div className="flex min-h-0 flex-col gap-3">
               <div className="shrink-0">
                 <SelfAttendanceTodayCard

@@ -6610,13 +6610,12 @@ html.dark [data-slot="dialog-content"].landing-desktop-experience .desktop-previ
 }
 
 /* ==========================================================================
-   Desktop-only notice (phones + tablets)
+   Phone-only notice
 
-   The portal is untouched on desktop: `.portal-desktop-only` uses
-   `display: contents`, so above the breakpoint the wrapper generates no box at
-   all and the shell lays out exactly as it did before. Below the breakpoint the
-   wrapper is hidden and this notice takes over. Pure CSS, so there is no
-   viewport probing, no hydration mismatch and no layout flash.
+   Tablets (768px–1023px) and desktop render the portal. Desktop (≥1024px) is
+   untouched: `.portal-desktop-only` uses `display: contents`, so the wrapper
+   generates no box and the shell lays out exactly as approved.
+   Below 768px the wrapper is hidden and this notice takes over.
    ========================================================================== */
 
 .portal-desktop-only {
@@ -6627,7 +6626,7 @@ html.dark [data-slot="dialog-content"].landing-desktop-experience .desktop-previ
   display: none;
 }
 
-@media (max-width: 1023.98px) {
+@media (max-width: 767.98px) {
   .portal-desktop-only {
     display: none;
   }
@@ -6644,6 +6643,161 @@ html.dark [data-slot="dialog-content"].landing-desktop-experience .desktop-previ
     background:
       radial-gradient(ellipse 90% 60% at 50% 0%, #eceafd 0%, transparent 60%),
       linear-gradient(180deg, #f7f7fe 0%, #ffffff 55%, #f6f5fd 100%);
+  }
+}
+
+/* Tablet layout (iPad Mini 1024px included). Desktop ≥1280px is unchanged. */
+@media (min-width: 768px) and (max-width: 1279.98px) {
+  .app-shell-canvas,
+  .app-shell-main {
+    min-width: 0;
+  }
+
+  .app-shell-main {
+    overflow-x: hidden;
+  }
+
+  .app-shell-main > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .app-shell-main [data-slot="table-container"],
+  .app-shell-main table {
+    max-width: 100%;
+  }
+
+  .app-shell-main .grid-cols-4,
+  .app-shell-main .sm\:grid-cols-4,
+  .app-shell-main .md\:grid-cols-4,
+  .app-shell-main .lg\:grid-cols-4,
+  .app-shell-main .lg\:grid-cols-3,
+  .app-shell-main .grid-cols-5,
+  .app-shell-main .md\:grid-cols-5,
+  .app-shell-main .grid-cols-6,
+  .app-shell-main .md\:grid-cols-6 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-shell-main .lg\:grid-cols-\[3fr_2fr\] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-shell-main .lg\:grid-cols-\[minmax\(0\,17\.5rem\)_minmax\(0\,1fr\)\] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  [data-slot="dialog-content"] {
+    max-height: min(90dvh, 880px);
+    overflow-y: auto;
+  }
+
+  .app-shell-main .attendance-wave-surface {
+    min-height: 22rem;
+  }
+}
+
+/* Device Access header — front-facing landscape tablet */
+.device-access-scan {
+  pointer-events: none;
+  display: flex;
+  height: 6.5rem;
+  width: 10.25rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.device-access-tablet {
+  position: relative;
+  height: 5.85rem;
+  width: 8.75rem;
+}
+
+.device-access-tablet-body {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  border-radius: 0.95rem;
+  background: linear-gradient(180deg, #f4f6f8 0%, #e8ecf1 100%);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.95) inset,
+    0 0 0 1px rgb(148 163 184 / 0.38),
+    0 10px 22px -12px rgb(15 23 42 / 0.28);
+}
+
+.device-access-tablet-camera {
+  position: absolute;
+  top: 0.32rem;
+  left: 50%;
+  z-index: 2;
+  height: 0.26rem;
+  width: 0.26rem;
+  transform: translateX(-50%);
+  border-radius: 9999px;
+  background: radial-gradient(circle at 35% 30%, #64748b 0%, #1e293b 75%);
+}
+
+.device-access-scan-screen {
+  position: absolute;
+  inset: 0.58rem 0.42rem 0.42rem;
+  overflow: hidden;
+  border-radius: 0.38rem;
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+  box-shadow: inset 0 0 0 1px rgb(226 232 240 / 0.9);
+}
+
+.device-access-scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1.15rem;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgb(99 102 241 / 0.12) 40%,
+    rgb(99 102 241 / 0.55) 50%,
+    rgb(99 102 241 / 0.12) 60%,
+    transparent 100%
+  );
+  animation: device-access-scan-sweep 2.6s ease-in-out infinite;
+}
+
+.dark .device-access-tablet-body {
+  background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.1) inset,
+    0 0 0 1px rgb(148 163 184 / 0.22),
+    0 10px 22px -12px rgb(0 0 0 / 0.5);
+}
+
+.dark .device-access-scan-screen {
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  box-shadow: inset 0 0 0 1px rgb(51 65 85 / 0.8);
+}
+
+@keyframes device-access-scan-sweep {
+  0% {
+    top: -22%;
+    opacity: 0;
+  }
+  14% {
+    opacity: 1;
+  }
+  86% {
+    opacity: 1;
+  }
+  100% {
+    top: 86%;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .device-access-scan-line {
+    animation: none;
+    top: 36%;
+    opacity: 0.7;
   }
 }
 

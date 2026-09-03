@@ -239,7 +239,15 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
     label: "Organization",
     description: "Branches, departments, holidays",
     href: ORGANIZATION_ROUTES.profile,
-    keywords: ["organization", "department", "branch", "holiday"],
+    keywords: ["organization", "department", "branch", "holiday", "device access", "tablet"],
+    permission: "organization.view",
+  },
+  {
+    id: "device-access",
+    label: "Device Access",
+    description: "Allow employees to use the HRMS from a tablet",
+    href: ORGANIZATION_ROUTES.deviceAccess,
+    keywords: ["tablet", "device access", "ipad", "mobile access"],
     permission: "organization.view",
   },
   {

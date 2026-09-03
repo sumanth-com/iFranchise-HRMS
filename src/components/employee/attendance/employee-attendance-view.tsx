@@ -198,9 +198,11 @@ function AttendanceLiveBody({
           onMonthChange={onMonthChange}
           onSelectDate={onSelectDate}
         />
-        <div className="flex h-full min-h-[22rem] w-full justify-center xl:w-[12.5rem] xl:max-w-[12.5rem]">
-          <ManagerProfileSummaryCards summary={summary} layout="sidebar" className="w-full" />
-        </div>
+        <ManagerProfileSummaryCards
+          summary={summary}
+          layout="sidebar"
+          className="w-full"
+        />
       </div>
 
       <div id="attendance-history">

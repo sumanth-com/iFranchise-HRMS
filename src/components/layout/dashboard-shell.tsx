@@ -26,7 +26,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
         <InstantNavPrefetch />
         <ServerActionStaleRecovery />
         <div className="app-shell-canvas flex h-screen overflow-hidden bg-background">
-          <Suspense fallback={<div className="hidden w-16 shrink-0 lg:block lg:w-[4.5rem]" aria-hidden />}>
+            <Suspense fallback={<div className="hidden w-16 shrink-0 xl:block xl:w-[4.5rem]" aria-hidden />}>
             <Sidebar />
           </Suspense>
           <Suspense fallback={null}>

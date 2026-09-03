@@ -178,10 +178,10 @@ export function MyProfileView({
         .join(" · ") || "—";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
       <form
         onSubmit={handleSubmit(onSubmit)}
-        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        className="flex min-h-0 flex-1 flex-col"
       >
         <div className="relative shrink-0 overflow-hidden rounded-2xl border border-primary/15 bg-[#5f55ee] shadow-sm dark:border-primary/25">
           <div
@@ -262,11 +262,11 @@ export function MyProfileView({
 
         <div
           className={cn(
-            "mt-4 grid min-h-0 gap-4 lg:grid-cols-[minmax(0,17.5rem)_minmax(0,1fr)] lg:items-start",
+            "mt-4 grid min-h-0 gap-4 pb-6 xl:grid-cols-[minmax(0,17.5rem)_minmax(0,1fr)] xl:items-start",
             isEditing && "flex-1 overflow-y-auto overscroll-contain pb-6",
           )}
         >
-          <div className="mx-auto flex w-full max-w-[17.5rem] flex-col lg:mx-0 lg:max-w-none">
+          <div className="mx-auto flex w-full max-w-[17.5rem] flex-col xl:mx-0 xl:max-w-none">
             <EmployeeIdCard
               employeeId={data.employeeId}
               firstName={data.firstName}

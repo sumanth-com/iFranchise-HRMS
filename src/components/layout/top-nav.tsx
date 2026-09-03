@@ -36,7 +36,7 @@ export function TopNav() {
         <Button
           variant="ghost"
           size="icon"
-          className="md:hidden"
+          className="xl:hidden"
           onClick={() => setMobileOpen(true)}
           aria-label="Open navigation menu"
         >
@@ -45,7 +45,7 @@ export function TopNav() {
         <Button
           variant="ghost"
           size="icon"
-          className="hidden md:inline-flex"
+          className="hidden xl:inline-flex"
           onClick={toggleCollapsed}
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
