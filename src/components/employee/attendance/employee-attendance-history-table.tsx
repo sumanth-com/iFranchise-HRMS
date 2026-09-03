@@ -51,7 +51,6 @@ const STATUS_OPTIONS: AttendanceStatus[] = [
   "present",
   "absent",
   "late",
-  "half_day",
   "on_leave",
   "holiday",
   "week_off",
@@ -197,7 +196,6 @@ export function EmployeeAttendanceHistoryTable({
               <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Check Out</th>
               <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Working Hours</th>
               <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Late</th>
-              <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Overtime</th>
               <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Remarks</th>
               <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Actions</th>
             </tr>
@@ -222,11 +220,6 @@ export function EmployeeAttendanceHistoryTable({
                 </td>
                 <td className="px-4 py-3">
                   {row.lateMinutes > 0 ? formatLateByLabel(row.lateMinutes) : "—"}
-                </td>
-                <td className="px-4 py-3">
-                  {row.overtimeHours > 0
-                    ? formatHoursLabel(row.overtimeHours)
-                    : "—"}
                 </td>
                 <td className="max-w-[12rem] truncate px-4 py-3 text-muted-foreground">
                   {row.remarks ?? "—"}
@@ -383,21 +376,13 @@ function DayReportCard({ row }: { row: ManagerAttendanceHistoryRow }) {
         </div>
       </div>
 
-      {(row.lateMinutes > 0 || row.overtimeHours > 0 || row.remarks) && (
+      {(row.lateMinutes > 0 || row.remarks) && (
         <div className="space-y-2 text-sm">
           {row.lateMinutes > 0 ? (
             <p className="text-muted-foreground">
               Late:{" "}
               <span className="font-medium text-foreground">
                 {formatLateByLabel(row.lateMinutes)}
-              </span>
-            </p>
-          ) : null}
-          {row.overtimeHours > 0 ? (
-            <p className="text-muted-foreground">
-              Overtime:{" "}
-              <span className="font-medium text-foreground">
-                {formatHoursLabel(row.overtimeHours)}
               </span>
             </p>
           ) : null}
