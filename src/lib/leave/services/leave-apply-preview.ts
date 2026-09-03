@@ -31,6 +31,7 @@ export function previewLeaveApplication(input: {
   startDate: string;
   endDate: string;
   isHalfDay: boolean;
+  halfDayPeriod?: "morning" | "afternoon" | "" | null;
   enforceSelfServiceLimits?: boolean;
 }): LeaveApplyPreview | null {
   const leaveType = input.context.leaveTypes.find((item) => item.id === input.leaveTypeId);
@@ -88,6 +89,7 @@ export function previewLeaveApplication(input: {
     startDate: input.startDate,
     endDate: input.endDate,
     isHalfDay: input.isHalfDay,
+    halfDayPeriod: input.halfDayPeriod,
     leaveTypeCode: leaveType.code,
     isPaid: leaveType.isPaid,
     duration,

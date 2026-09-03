@@ -25,6 +25,10 @@ import {
   getPayrollMonthDate,
 } from "@/lib/payroll/services/payroll-utils";
 import {
+  evaluatePayrollIntegrity,
+  type PayrollIntegrityEmployee,
+} from "@/lib/payroll/payroll-integrity";
+import {
   paymentStatusLabel,
 } from "@/lib/payroll/services/payslip-history-queries";
 import {
@@ -33,20 +37,97 @@ import {
 } from "@/lib/payroll/services/payslip-publication";
 import {
   getBranches,
-  getDepartments,
+  getOccupiedDepartments,
   getEmploymentTypes,
 } from "@/lib/employees/services/employee-queries";
+import { isHiddenFromPeopleFilters } from "@/lib/employee/directory-listing";
+
+function isHiddenPayrollDirectoryPerson(
+  employeeCode: string | null | undefined,
+  firstName: string | null | undefined,
+  lastName: string | null | undefined,
+  designationTitle: string | null | undefined,
+) {
+  return isHiddenFromPeopleFilters(employeeCode, {
+    employeeCode,
+    firstName,
+    lastName,
+    designationTitle,
+  });
+}
 
 function unwrapRelation<T>(value: T | T[] | null): T | null {
   if (!value) return null;
   return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
+function payrollIntegrityEmployeeFromJoin(
+  employees:
+    | {
+        id?: string | null;
+        employee_code?: string | null;
+        first_name?: string | null;
+        last_name?: string | null;
+        email?: string | null;
+        date_of_joining?: string | null;
+        app_hidden_at?: string | null;
+        deleted_at?: string | null;
+        designations?: { title: string } | { title: string }[] | null;
+      }
+    | {
+        id?: string | null;
+        employee_code?: string | null;
+        first_name?: string | null;
+        last_name?: string | null;
+        email?: string | null;
+        date_of_joining?: string | null;
+        app_hidden_at?: string | null;
+        deleted_at?: string | null;
+        designations?: { title: string } | { title: string }[] | null;
+      }[]
+    | null,
+): PayrollIntegrityEmployee | null {
+  const row = unwrapRelation(employees);
+  if (!row) return null;
+  const designation = unwrapRelation(row.designations ?? null);
+  return {
+    id: row.id,
+    employee_code: row.employee_code,
+    first_name: row.first_name,
+    last_name: row.last_name,
+    email: row.email,
+    date_of_joining: row.date_of_joining,
+    app_hidden_at: row.app_hidden_at,
+    deleted_at: row.deleted_at,
+    designationTitle: designation?.title ?? null,
+  };
+}
+
+const PAYROLL_ITEM_INTEGRITY_SELECT = `
+  payroll_id,
+  employee_id,
+  gross_salary,
+  total_deductions,
+  net_salary,
+  employees (
+    id,
+    employee_code,
+    first_name,
+    last_name,
+    email,
+    date_of_joining,
+    app_hidden_at,
+    deleted_at,
+    designations:designation_id (title)
+  )
+`;
+
 type SalaryStructureEmployeeRow = {
   employee_code: string;
   first_name: string;
   last_name: string;
   organization_id: string;
+  date_of_joining?: string | null;
   departments?: { name: string } | { name: string }[] | null;
   designations?: { title: string } | { title: string }[] | null;
   employment_type_id?: string | null;
@@ -91,6 +172,7 @@ function mapSalaryStructureRow(
       ? unwrapRelation(employee.employment_types)?.name ?? null
       : null,
     employmentTypeId: employee?.employment_type_id ?? null,
+    joiningDate: employee?.date_of_joining ?? null,
     effectiveFrom: row.effective_from,
     effectiveTo: row.effective_to,
     currencyCode: row.currency_code,
@@ -147,6 +229,7 @@ export async function getSalaryStructureById(
           first_name,
           last_name,
           organization_id,
+          date_of_joining,
           deleted_at,
           departments:department_id (name),
           designations:designation_id (title),
@@ -196,25 +279,37 @@ export async function getPayrollLookups(
       .in("employment_status", ["active", "probation", "on_leave"])
       .order("first_name")
       .limit(250),
-    getDepartments(supabase, organizationId),
+    getOccupiedDepartments(supabase, organizationId),
     getBranches(supabase, organizationId),
     getEmploymentTypes(supabase, organizationId),
   ]);
 
   if (employeesResult.error) throw new Error(employeesResult.error.message);
 
-  const employees = (employeesResult.data ?? []).map((row) => ({
-    id: row.id,
-    label: `${row.first_name} ${row.last_name}`.trim(),
-    code: row.employee_code,
-    designationTitle: unwrapRelation(
-      row.designations as { title: string } | { title: string }[] | null,
-    )?.title ?? null,
-    employmentTypeName: unwrapRelation(
-      row.employment_types as { name: string } | { name: string }[] | null,
-    )?.name ?? null,
-    employmentTypeId: row.employment_type_id ?? null,
-  }));
+  const employees = (employeesResult.data ?? [])
+    .filter((row) => {
+      const designation = unwrapRelation(
+        row.designations as { title: string } | { title: string }[] | null,
+      );
+      return !isHiddenFromPeopleFilters(row.employee_code, {
+        employeeCode: row.employee_code,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        designationTitle: designation?.title ?? null,
+      });
+    })
+    .map((row) => ({
+      id: row.id,
+      label: `${row.first_name} ${row.last_name}`.trim(),
+      code: row.employee_code,
+      designationTitle: unwrapRelation(
+        row.designations as { title: string } | { title: string }[] | null,
+      )?.title ?? null,
+      employmentTypeName: unwrapRelation(
+        row.employment_types as { name: string } | { name: string }[] | null,
+      )?.name ?? null,
+      employmentTypeId: row.employment_type_id ?? null,
+    }));
 
   return { employees, departments, branches, employmentTypes };
 }
@@ -263,22 +358,55 @@ export async function listPayrollRuns(
   if (error) throw new Error(error.message);
 
   const payrollIds = (data ?? []).map((row) => row.id);
-  let itemCounts: Record<string, number> = {};
+  const totalsByPayroll: Record<
+    string,
+    { totalGross: number; totalDeductions: number; totalNet: number; employeeCount: number }
+  > = {};
 
   if (payrollIds.length > 0) {
     const { data: items, error: itemsError } = await supabase
       .schema("hrms")
       .from("payroll_items")
-      .select("payroll_id")
+      .select(PAYROLL_ITEM_INTEGRITY_SELECT)
       .in("payroll_id", payrollIds)
       .is("deleted_at", null);
 
     if (itemsError) throw new Error(itemsError.message);
 
-    itemCounts = (items ?? []).reduce<Record<string, number>>((acc, row) => {
-      acc[row.payroll_id] = (acc[row.payroll_id] ?? 0) + 1;
-      return acc;
-    }, {});
+    const itemsByPayroll = new Map<string, NonNullable<typeof items>>();
+    for (const item of items ?? []) {
+      const list = itemsByPayroll.get(item.payroll_id) ?? [];
+      itemsByPayroll.set(item.payroll_id, [...list, item]);
+    }
+
+    for (const row of data ?? []) {
+      const monthDate = new Date(`${String(row.payroll_month).slice(0, 10)}T00:00:00.000Z`);
+      const periodEnd = getMonthDateRange(
+        monthDate.getUTCMonth() + 1,
+        monthDate.getUTCFullYear(),
+      ).endDate;
+      const report = evaluatePayrollIntegrity({
+        items: (itemsByPayroll.get(row.id) ?? []).map((item) => ({
+          employeeId: String(item.employee_id),
+          grossSalary: Number(item.gross_salary ?? 0),
+          totalDeductions: Number(item.total_deductions ?? 0),
+          netSalary: Number(item.net_salary ?? 0),
+          employee: payrollIntegrityEmployeeFromJoin(
+            item.employees as Parameters<typeof payrollIntegrityEmployeeFromJoin>[0],
+          ),
+        })),
+        headerGross: Number(row.total_gross),
+        headerDeductions: Number(row.total_deductions),
+        headerNet: Number(row.total_net),
+        periodEnd,
+      });
+      totalsByPayroll[row.id] = {
+        totalGross: report.totals.totalGross,
+        totalDeductions: report.totals.totalDeductions,
+        totalNet: report.totals.totalNet,
+        employeeCount: report.eligibleItems.length,
+      };
+    }
   }
 
   return {
@@ -286,10 +414,10 @@ export async function listPayrollRuns(
       id: row.id,
       payrollMonth: row.payroll_month,
       payrollStatus: row.payroll_status,
-      totalGross: Number(row.total_gross),
-      totalDeductions: Number(row.total_deductions),
-      totalNet: Number(row.total_net),
-      employeeCount: itemCounts[row.id] ?? 0,
+      totalGross: totalsByPayroll[row.id]?.totalGross ?? Number(row.total_gross),
+      totalDeductions: totalsByPayroll[row.id]?.totalDeductions ?? Number(row.total_deductions),
+      totalNet: totalsByPayroll[row.id]?.totalNet ?? Number(row.total_net),
+      employeeCount: totalsByPayroll[row.id]?.employeeCount ?? 0,
       isLocked: Boolean(row.is_locked),
       processedAt: row.processed_at,
       approvedAt: row.approved_at,
@@ -323,14 +451,37 @@ export async function getPayrollSummary(
     .maybeSingle();
 
   let employeesProcessed = 0;
+  let grossPayroll = currentPayroll ? Number(currentPayroll.total_gross) : 0;
+  let totalDeductions = currentPayroll ? Number(currentPayroll.total_deductions) : 0;
+  let netPayroll = currentPayroll ? Number(currentPayroll.total_net) : 0;
   if (currentPayroll?.id) {
-    const { count } = await supabase
+    const { data: items, error: itemsError } = await supabase
       .schema("hrms")
       .from("payroll_items")
-      .select("id", { count: "exact", head: true })
+      .select(PAYROLL_ITEM_INTEGRITY_SELECT)
       .eq("payroll_id", currentPayroll.id)
       .is("deleted_at", null);
-    employeesProcessed = count ?? 0;
+    if (itemsError) throw new Error(itemsError.message);
+    const periodEnd = getMonthDateRange(targetMonth, targetYear).endDate;
+    const report = evaluatePayrollIntegrity({
+      items: (items ?? []).map((item) => ({
+        employeeId: String(item.employee_id),
+        grossSalary: Number(item.gross_salary ?? 0),
+        totalDeductions: Number(item.total_deductions ?? 0),
+        netSalary: Number(item.net_salary ?? 0),
+        employee: payrollIntegrityEmployeeFromJoin(
+          item.employees as Parameters<typeof payrollIntegrityEmployeeFromJoin>[0],
+        ),
+      })),
+      headerGross: Number(currentPayroll.total_gross),
+      headerDeductions: Number(currentPayroll.total_deductions),
+      headerNet: Number(currentPayroll.total_net),
+      periodEnd,
+    });
+    employeesProcessed = report.eligibleItems.length;
+    grossPayroll = report.totals.totalGross;
+    totalDeductions = report.totals.totalDeductions;
+    netPayroll = report.totals.totalNet;
   }
 
   const { count: pendingCount } = await supabase
@@ -379,9 +530,9 @@ export async function getPayrollSummary(
     totalPayroll,
     employeesProcessed,
     pendingPayroll: pendingCount ?? 0,
-    grossPayroll: currentPayroll ? Number(currentPayroll.total_gross) : 0,
-    totalDeductions: currentPayroll ? Number(currentPayroll.total_deductions) : 0,
-    netPayroll: currentPayroll ? Number(currentPayroll.total_net) : 0,
+    grossPayroll,
+    totalDeductions,
+    netPayroll,
     monthlyOverview,
   };
 }
@@ -566,6 +717,7 @@ export async function listSalaryStructures(
           first_name,
           last_name,
           organization_id,
+          date_of_joining,
           deleted_at,
           departments:department_id (name),
           designations:designation_id (title),
@@ -595,7 +747,20 @@ export async function listSalaryStructures(
   if (salaryRes.error) throw new Error(salaryRes.error.message);
 
   const today = new Date().toISOString().slice(0, 10);
-  const existingRows = (salaryRes.data ?? []) as SalaryStructureDbRow[];
+  const existingRows = ((salaryRes.data ?? []) as SalaryStructureDbRow[]).filter((row) => {
+    const employee = unwrapRelation(
+      row.employees as SalaryStructureEmployeeRow | SalaryStructureEmployeeRow[] | null,
+    );
+    const designation = employee
+      ? unwrapRelation(employee.designations as { title: string } | { title: string }[] | null)
+      : null;
+    return !isHiddenPayrollDirectoryPerson(
+      employee?.employee_code,
+      employee?.first_name,
+      employee?.last_name,
+      designation?.title,
+    );
+  });
   const existingEmployeeIds = new Set(existingRows.map((r) => r.employee_id));
 
   const items: SalaryStructureItem[] = existingRows.map((row) => {
@@ -616,6 +781,19 @@ export async function listSalaryStructures(
 
   // For active employees without any configured salary structure, include them so all persons are displayed
   for (const emp of empRes.data ?? []) {
+    const designation = unwrapRelation(
+      emp.designations as { title: string } | { title: string }[] | null,
+    );
+    if (
+      isHiddenPayrollDirectoryPerson(
+        emp.employee_code,
+        emp.first_name,
+        emp.last_name,
+        designation?.title,
+      )
+    ) {
+      continue;
+    }
     if (!existingEmployeeIds.has(emp.id)) {
       const department = unwrapRelation(
         emp.departments as { name: string } | { name: string }[] | null,
@@ -635,6 +813,7 @@ export async function listSalaryStructures(
             emp.employment_types as { name: string } | { name: string }[] | null,
           )?.name ?? null,
         employmentTypeId: emp.employment_type_id ?? null,
+        joiningDate: emp.date_of_joining ?? null,
         effectiveFrom: emp.date_of_joining ?? today,
         effectiveTo: null,
         currencyCode: "INR",
@@ -756,8 +935,18 @@ export async function listBonuses(
   if (error) throw new Error(error.message);
 
   return {
-    data: (data ?? []).map((row) => {
+    data: (data ?? []).flatMap((row) => {
       const employee = unwrapRelation(row.employees);
+      if (
+        isHiddenPayrollDirectoryPerson(
+          employee?.employee_code,
+          employee?.first_name,
+          employee?.last_name,
+          null,
+        )
+      ) {
+        return [];
+      }
       const department = employee
         ? unwrapRelation(
             employee.departments as { name: string } | { name: string }[] | null,
@@ -775,7 +964,7 @@ export async function listBonuses(
       }>;
       const pendingApproval = approvals.find((item) => item.approval_status === "pending");
 
-      return {
+      return [{
         id: row.id,
         employeeId: row.employee_id,
         employeeCode: employee?.employee_code ?? "",
@@ -795,7 +984,7 @@ export async function listBonuses(
           : null,
         approvalLevel: pendingApproval?.approval_level ?? null,
         createdAt: row.created_at,
-      };
+      }];
     }),
     total: count ?? 0,
     page,
@@ -881,22 +1070,34 @@ export async function listReimbursements(
   if (error) throw new Error(error.message);
 
   return {
-    data: (data ?? []).map((row) => {
+    data: (data ?? []).flatMap((row) => {
       const employee = unwrapRelation(row.employees);
-      return {
-        id: row.id,
-        employeeId: row.employee_id,
-        employeeCode: employee?.employee_code ?? "",
-        employeeName: employee
-          ? `${employee.first_name} ${employee.last_name}`
-          : "",
-        category: row.category,
-        amount: Number(row.amount),
-        expenseDate: row.expense_date,
-        reimbursementStatus: row.reimbursement_status,
-        description: row.description,
-        createdAt: row.created_at,
-      };
+      if (
+        isHiddenPayrollDirectoryPerson(
+          employee?.employee_code,
+          employee?.first_name,
+          employee?.last_name,
+          null,
+        )
+      ) {
+        return [];
+      }
+      return [
+        {
+          id: row.id,
+          employeeId: row.employee_id,
+          employeeCode: employee?.employee_code ?? "",
+          employeeName: employee
+            ? `${employee.first_name} ${employee.last_name}`
+            : "",
+          category: row.category,
+          amount: Number(row.amount),
+          expenseDate: row.expense_date,
+          reimbursementStatus: row.reimbursement_status,
+          description: row.description,
+          createdAt: row.created_at,
+        },
+      ];
     }),
     total: count ?? 0,
     page,

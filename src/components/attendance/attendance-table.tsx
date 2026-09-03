@@ -21,10 +21,10 @@ import {
 import { toast } from "sonner";
 
 import {
-  AttendanceEditDialog,
   AttendanceRegularizationViewDialog,
   AttendanceViewDialog,
 } from "@/components/attendance/attendance-record-dialogs";
+import { ManualAttendanceStatusDialog } from "@/components/attendance/manual-attendance-status-dialog";
 import { AttendanceStatusBadge } from "@/components/attendance/attendance-status-badge";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
@@ -55,7 +55,11 @@ import {
 } from "@/lib/attendance/constants";
 import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils";
 import { FILTER_ANY_VALUE } from "@/lib/manager/filter-select";
-import type { AttendanceListItem, AttendanceLookups } from "@/types/attendance";
+import type {
+  AttendanceListItem,
+  AttendanceLookups,
+  AttendanceHistoryCounts,
+} from "@/types/attendance";
 import type { LookupOption } from "@/types/employee";
 import { cn } from "@/lib/utils";
 
@@ -97,6 +101,7 @@ type AttendanceTableProps = {
   summaryDate?: string;
   teamRegularizationMode?: boolean;
   canApproveCorrections?: boolean;
+  historyCounts?: AttendanceHistoryCounts;
 };
 
 function formatDateTime(value?: string | null) {
@@ -145,6 +150,10 @@ const DATE_RANGE_CLASS =
 const DATE_INPUT_CLASS =
   "h-7 min-w-0 w-full border-0 bg-transparent p-0 pr-5 text-sm font-semibold text-foreground shadow-none focus-visible:ring-0 data-[empty]:text-muted-foreground [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:top-1/2 [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:m-0 [&::-webkit-calendar-picker-indicator]:size-3.5 [&::-webkit-calendar-picker-indicator]:-translate-y-1/2 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0";
 
+function isVirtualAttendanceId(id: string) {
+  return id.startsWith("virtual-");
+}
+
 export function AttendanceTable({
   records,
   total,
@@ -159,16 +168,15 @@ export function AttendanceTable({
   employeeId,
   departments,
   employees,
-  canCreate: _canCreate,
+  canCreate,
   canEdit,
   canDelete,
   listBasePath,
   fixedQuery,
-  attendanceLookups,
   onViewRecord,
-  summaryDate,
   teamRegularizationMode = false,
   canApproveCorrections = false,
+  historyCounts,
 }: AttendanceTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -178,7 +186,7 @@ export function AttendanceTable({
   const [rowTotal, setRowTotal] = useState(total);
   const [deleteTarget, setDeleteTarget] = useState<AttendanceListItem | null>(null);
   const [viewId, setViewId] = useState<string | null>(null);
-  const [editId, setEditId] = useState<string | null>(null);
+  const [manualTarget, setManualTarget] = useState<AttendanceListItem | null>(null);
   const [isReviewing, setIsReviewing] = useState(false);
   const lastNavigatedQueryRef = useRef<string | null>(null);
   const navigationLockRef = useRef(false);
@@ -324,7 +332,26 @@ export function AttendanceTable({
     updateParams(updates);
   };
 
-  const showEditAction = canEdit && attendanceLookups && !teamRegularizationMode;
+  const showManualStatusAction = canCreate || canEdit;
+
+  const openAttendanceRecord = useCallback(
+    (record: AttendanceListItem) => {
+      if (isVirtualAttendanceId(record.id)) {
+        if (showManualStatusAction) {
+          setManualTarget(record);
+          return;
+        }
+        toast.message("No attendance recorded for this date yet.");
+        return;
+      }
+      if (onViewRecord) {
+        onViewRecord(record);
+        return;
+      }
+      setViewId(record.id);
+    },
+    [onViewRecord, showManualStatusAction],
+  );
 
   const handleCorrectionReview = useCallback(
     async (correctionId: string, approve: boolean) => {
@@ -430,16 +457,21 @@ export function AttendanceTable({
                 size="icon-sm"
                 aria-label="View attendance"
                 title="View"
-                onClick={() => {
-                  if (onViewRecord) {
-                    onViewRecord(row.original);
-                    return;
-                  }
-                  setViewId(row.original.id);
-                }}
+                onClick={() => openAttendanceRecord(row.original)}
               >
                 <Eye className="size-4" />
               </Button>
+              {showManualStatusAction ? (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Update attendance"
+                  title="Update attendance"
+                  onClick={() => setManualTarget(row.original)}
+                >
+                  <Pencil className="size-4 text-violet-600" />
+                </Button>
+              ) : null}
               {teamRegularizationMode && canApproveCorrections && pending ? (
                 <>
                   <Button
@@ -468,25 +500,20 @@ export function AttendanceTable({
                   </Button>
                 </>
               ) : null}
-              {showEditAction ? (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Edit attendance"
-                  title="Edit"
-                  onClick={() => setEditId(row.original.id)}
-                >
-                  <Pencil className="size-4" />
-                </Button>
-              ) : null}
               {canDelete ? (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Delete attendance"
-                  title="Delete"
-                  onClick={() => setDeleteTarget(row.original)}
-                >
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Delete attendance"
+                    title="Delete"
+                    onClick={() => {
+                      if (isVirtualAttendanceId(row.original.id)) {
+                        toast.message("No attendance record to delete yet.");
+                        return;
+                      }
+                      setDeleteTarget(row.original);
+                    }}
+                  >
                   <Trash2 className="size-4 text-red-500" />
                 </Button>
               ) : null}
@@ -496,12 +523,12 @@ export function AttendanceTable({
       },
     ],
     [
-      attendanceLookups,
       canApproveCorrections,
+      canCreate,
       canDelete,
       isReviewing,
-      onViewRecord,
-      showEditAction,
+      openAttendanceRecord,
+      showManualStatusAction,
       teamRegularizationMode,
       handleCorrectionReview,
     ],
@@ -527,25 +554,36 @@ export function AttendanceTable({
       return;
     }
 
-    setRows((current) => current.filter((row) => row.id !== targetId));
-    setRowTotal((current) => Math.max(0, current - 1));
+    setRows((current) =>
+      current.map((row) =>
+        row.id === targetId
+          ? {
+              ...row,
+              id: `virtual-${row.employeeId}-${row.attendanceDate}`,
+              checkInAt: null,
+              checkOutAt: null,
+              workHours: 0,
+              overtimeHours: 0,
+              attendanceStatus: "upcoming",
+              correctionId: null,
+              correctionStatus: null,
+            }
+          : row,
+      ),
+    );
     setDeleteTarget(null);
     toast.success("Attendance deleted");
     router.refresh();
   };
 
   function openRecord(record: AttendanceListItem) {
-    if (onViewRecord) {
-      onViewRecord(record);
-      return;
-    }
-    setViewId(record.id);
+    openAttendanceRecord(record);
   }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2.5 overflow-x-auto rounded-xl border border-input bg-white p-2.5 dark:bg-input">
-        <div className="w-[13.5rem] shrink-0">
+        <div className="min-w-[20rem] w-[22rem] max-w-[24rem] shrink-0">
           <Select
             items={employeeItems}
             value={employeeId ?? FILTER_ANY_VALUE}
@@ -564,7 +602,10 @@ export function AttendanceTable({
               });
             }}
           >
-            <SelectTrigger className={FILTER_CONTROL_CLASS}>
+            <SelectTrigger
+              className={cn(FILTER_CONTROL_CLASS, "[&>span]:block [&>span]:truncate")}
+              title={selectedEmployeeLabel ?? "All employees"}
+            >
               <SelectValue placeholder="All employees" />
             </SelectTrigger>
             <SelectContent
@@ -679,22 +720,28 @@ export function AttendanceTable({
           </Select>
         </div>
 
-        <span className="inline-flex ml-auto h-10 shrink-0 items-center gap-2 whitespace-nowrap text-sm font-bold text-foreground">
-          <CalendarDays className="size-4 shrink-0 text-muted-foreground" />
-          Summary for {summaryDate ?? dateFrom ?? today}
-        </span>
+        <PeoplePageSizeSelect
+          value={pageSize}
+          totalRecords={rowTotal}
+          disabled={isPending}
+          valueLabel="number"
+          className="ml-auto"
+          onChange={(nextSize) =>
+            updateParams({ pageSize: String(nextSize), page: "1" })
+          }
+        />
       </div>
 
       {selectedEmployeeLabel ? (
-        <p className="text-sm text-muted-foreground">
-          Showing attendance history for{" "}
-          <span className="font-medium text-foreground">
-            {selectedEmployeeLabel}
-          </span>
+        <p className="text-sm font-bold text-foreground">
+          Showing attendance history for {selectedEmployeeLabel}
           {attendanceStatus
             ? ` · ${ATTENDANCE_STATUS_LABELS[attendanceStatus as keyof typeof ATTENDANCE_STATUS_LABELS]}`
             : " · All statuses"}
           {formatDateRangeLabel(dateFrom, dateTo, today)}
+          {historyCounts && dateFrom && dateTo
+            ? ` · Days Present: ${historyCounts.presentDays} · Days absent: ${historyCounts.absentDays}`
+            : ""}
         </p>
       ) : null}
 
@@ -781,15 +828,6 @@ export function AttendanceTable({
           {Math.min(page * pageSize, rowTotal)} of {rowTotal}
           {isEmployeeHistoryView ? " for selected employee and date range" : ""}
         </p>
-        {!isEmployeeHistoryView ? (
-          <PeoplePageSizeSelect
-            value={pageSize}
-            disabled={isPending}
-            onChange={(nextSize) =>
-              updateParams({ pageSize: String(nextSize), page: "1" })
-            }
-          />
-        ) : null}
       </div>
 
       {teamRegularizationMode ? (
@@ -810,16 +848,30 @@ export function AttendanceTable({
         />
       )}
 
-      {attendanceLookups ? (
-        <AttendanceEditDialog
-          attendanceId={editId}
-          open={Boolean(editId)}
-          onOpenChange={(open) => {
-            if (!open) setEditId(null);
-          }}
-          lookups={attendanceLookups}
-        />
-      ) : null}
+      <ManualAttendanceStatusDialog
+        record={manualTarget}
+        open={Boolean(manualTarget)}
+        onOpenChange={(open) => {
+          if (!open) setManualTarget(null);
+        }}
+        onSaved={(next) => {
+          setRows((current) =>
+            current.map((row) =>
+              row.id === next.previousId
+                ? {
+                    ...row,
+                    id: next.id,
+                    attendanceStatus: next.attendanceStatus,
+                    checkInAt: next.checkInAt,
+                    checkOutAt: next.checkOutAt,
+                    workHours: next.workHours,
+                  }
+                : row,
+            ),
+          );
+          router.refresh();
+        }}
+      />
 
       <Modal
         open={Boolean(deleteTarget)}

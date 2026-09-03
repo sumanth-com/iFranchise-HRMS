@@ -89,7 +89,9 @@ async function ResolvedPortalShell({
   logLayout("layout:total_before_children", layoutStartedAt);
 
   const tabletClient = await isTabletClientRequest();
-  const tabletAllowed = isTabletHrmsAllowed(profileResult.profile, tabletClient);
+  const tabletAllowed =
+    portalVariant !== "employee" ||
+    isTabletHrmsAllowed(profileResult.profile, tabletClient);
 
   return (
     <AuthProvider

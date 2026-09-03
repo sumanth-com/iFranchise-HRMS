@@ -29,6 +29,7 @@ import {
   updateSalaryStructure,
   emailPayslip,
   generatePayrollRun,
+  ensureCompanyPayrollRun,
   getEmployeeRunBreakdown,
   markPayrollPaid,
   previewPayrollRun,
@@ -131,7 +132,7 @@ export async function previewPayrollRunAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to preview payroll",
+      message: toUserFriendlyError(error, "Failed to preview payroll"),
     };
   }
 }
@@ -154,7 +155,31 @@ export async function fetchEmployeePayrollBreakdownAction(
     return {
       success: false,
       message:
-        error instanceof Error ? error.message : "Failed to load employee payroll breakdown",
+        toUserFriendlyError(error, "Failed to load employee payroll breakdown"),
+    };
+  }
+}
+
+export async function ensureCompanyPayrollRunAction(
+  input: unknown,
+): Promise<PayrollActionResult<string>> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "payroll.run",
+      "payroll.process",
+      "payroll.generate",
+      "payroll.create",
+      PORTAL_PERMISSIONS.ceo,
+    ]);
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = payrollRunSchema.parse(input);
+    const id = await ensureCompanyPayrollRun(supabase, profile, parsed);
+    revalidatePayrollPaths();
+    return { success: true, data: id };
+  } catch (error) {
+    return {
+      success: false,
+      message: toUserFriendlyError(error, "Failed to calculate payroll"),
     };
   }
 }
@@ -201,7 +226,7 @@ export async function updatePayrollItemAdjustmentsAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to save payroll changes",
+      message: toUserFriendlyError(error, "Failed to save payroll changes"),
     };
   }
 }
@@ -228,7 +253,7 @@ export async function ensurePayrollItemPayslipAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to open payslip",
+      message: toUserFriendlyError(error, "Failed to open payslip"),
     };
   }
 }
@@ -258,7 +283,7 @@ export async function releaseEmployeePayslipAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to send payslip",
+      message: toUserFriendlyError(error, "Failed to send payslip"),
     };
   }
 }
@@ -280,7 +305,7 @@ export async function processPayrollRunAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to process payroll",
+      message: toUserFriendlyError(error, "Failed to process payroll"),
     };
   }
 }
@@ -304,7 +329,7 @@ export async function approvePayrollStepAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to approve payroll",
+      message: toUserFriendlyError(error, "Failed to approve payroll"),
     };
   }
 }
@@ -328,7 +353,7 @@ export async function rejectPayrollRunAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to reject payroll",
+      message: toUserFriendlyError(error, "Failed to reject payroll"),
     };
   }
 }
@@ -346,7 +371,7 @@ export async function markPayrollPaidAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to mark payroll as paid",
+      message: toUserFriendlyError(error, "Failed to mark payroll as paid"),
     };
   }
 }
@@ -371,7 +396,7 @@ export async function createSalaryStructureAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to create salary structure",
+      message: toUserFriendlyError(error, "Failed to create salary structure"),
     };
   }
 }
@@ -397,7 +422,7 @@ export async function updateSalaryStructureAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to update salary structure",
+      message: toUserFriendlyError(error, "Failed to update salary structure"),
     };
   }
 }
@@ -416,11 +441,13 @@ export async function deleteSalaryStructureAction(
     await deleteSalaryStructure(supabase, profile, structureId);
     revalidatePath(PAYROLL_ROUTES.salaryStructures);
     revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS["salary-structures"]));
+    revalidatePath(PAYROLL_ROUTES.run);
+    revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS.run));
     return { success: true, data: structureId };
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to delete salary structure",
+      message: toUserFriendlyError(error, "Failed to delete salary structure"),
     };
   }
 }
@@ -453,7 +480,7 @@ export async function createSalaryRevisionAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to create salary revision",
+      message: toUserFriendlyError(error, "Failed to create salary revision"),
     };
   }
 }
@@ -476,7 +503,7 @@ export async function createBonusAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to create bonus",
+      message: toUserFriendlyError(error, "Failed to create bonus"),
     };
   }
 }
@@ -495,7 +522,7 @@ export async function approveBonusAction(bonusId: string): Promise<PayrollAction
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to approve bonus",
+      message: toUserFriendlyError(error, "Failed to approve bonus"),
     };
   }
 }
@@ -517,7 +544,7 @@ export async function createReimbursementAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to create reimbursement",
+      message: toUserFriendlyError(error, "Failed to create reimbursement"),
     };
   }
 }
@@ -539,7 +566,7 @@ export async function approveReimbursementAction(
     return {
       success: false,
       message:
-        error instanceof Error ? error.message : "Failed to approve reimbursement",
+        toUserFriendlyError(error, "Failed to approve reimbursement"),
     };
   }
 }
@@ -558,7 +585,7 @@ export async function emailPayslipAction(payslipId: string): Promise<PayrollActi
     console.error("[payroll] payslip email failed", {
       payslipId,
       name: error instanceof Error ? error.name : "unknown",
-      message: error instanceof Error ? error.message : "unknown",
+      message: toUserFriendlyError(error, "unknown"),
     });
     return {
       success: false,
@@ -718,7 +745,7 @@ export async function savePayrollSettingsAction(
     return {
       success: false,
       message:
-        error instanceof Error ? error.message : "Failed to save payroll settings",
+        toUserFriendlyError(error, "Failed to save payroll settings"),
     };
   }
 }
@@ -753,7 +780,7 @@ export async function uploadBonusAttachmentAction(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to upload attachment",
+      message: toUserFriendlyError(error, "Failed to upload attachment"),
     };
   }
 }

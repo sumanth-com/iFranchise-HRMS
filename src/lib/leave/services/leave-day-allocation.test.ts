@@ -105,13 +105,13 @@ describe("calendar day allocation", () => {
     );
   });
 
-  it("does not consume paid quota on sandwich days", () => {
+  it("counts sandwich weekly offs toward paid quota then LOP", () => {
     const result = allocateLeaveDaysByBalance(
       duration([
         {
           date: "2026-09-14",
           kind: "sandwich",
-          class: "holiday",
+          class: "weekly_off",
           counted: 1,
           inRequestedRange: false,
         },
@@ -134,7 +134,7 @@ describe("calendar day allocation", () => {
     );
 
     assert.equal(calendarMarkForAllocation(result[0]!.kind, "CL"), "Sandwich");
-    assert.equal(calendarMarkForAllocation(result[1]!.kind, "CL"), "Casual Leave");
+    assert.equal(calendarMarkForAllocation(result[1]!.kind, "CL"), "LOP");
     assert.equal(calendarMarkForAllocation(result[2]!.kind, "CL"), "LOP");
   });
 

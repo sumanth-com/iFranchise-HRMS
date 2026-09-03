@@ -107,7 +107,14 @@ export const leaveFormSchema = z
       if (!value.halfDayPeriod) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Select half day period",
+          message: "Half-day leave is the second half of the working day only.",
+          path: ["halfDayPeriod"],
+        });
+      } else if (value.halfDayPeriod === "morning") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "First-half leave is not allowed. Apply for a full day, or take second-half leave after completing the morning.",
           path: ["halfDayPeriod"],
         });
       }

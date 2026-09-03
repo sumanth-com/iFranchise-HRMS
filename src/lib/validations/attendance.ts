@@ -14,7 +14,7 @@ export const attendanceStatusSchema = z.enum([
 
 export const attendanceListParamsSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  pageSize: z.coerce.number().int().min(1).max(500).default(20),
   search: z.string().trim().optional(),
   sortBy: z
     .enum([
@@ -76,6 +76,16 @@ export const attendanceListParamsSchema = z.object({
 });
 
 const attendanceTimeSchema = z.string().optional().or(z.literal(""));
+
+export const manualAttendanceStatusSchema = z.object({
+  employeeId: z.string().uuid("Select an employee"),
+  attendanceDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date"),
+  attendanceStatus: z.enum(["present", "absent", "on_leave"]),
+});
+
+export type ManualAttendanceStatusInput = z.infer<typeof manualAttendanceStatusSchema>;
 
 export const attendanceFormSchema = z
   .object({

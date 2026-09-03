@@ -9,7 +9,7 @@ import { listEligibleHrLeaveApproverOptions } from "@/lib/leave/services/leave-q
 import { getDepartments } from "@/lib/organization/services/org-lookups";
 import {
   DIRECTORY_HIDDEN_EMPLOYEE_CODES,
-  isHiddenFromEmployeeDirectory,
+  isHiddenFromPeopleFilters,
 } from "@/lib/employee/directory-listing";
 import type { UserProfile } from "@/types/auth";
 import type {
@@ -181,10 +181,11 @@ export async function listEmployees(
 
   const rows = ((data ?? []) as EmployeeRow[]).filter(
     (row) =>
-      !isHiddenFromEmployeeDirectory(row.employee_code, {
+      !isHiddenFromPeopleFilters(row.employee_code, {
         employeeCode: row.employee_code,
         firstName: row.first_name,
         lastName: row.last_name,
+        designationTitle: unwrapRelation(row.designations)?.title,
       }),
   );
   // Defer avatar signing to the client CardPhoto path — do not block the list
@@ -376,7 +377,9 @@ export async function getOccupiedDepartments(
     supabase
       .schema("hrms")
       .from("employees")
-      .select("department_id")
+      .select(
+        "department_id, employee_code, first_name, last_name, designations:designation_id (title)",
+      )
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
       .is("app_hidden_at", null)
@@ -387,6 +390,17 @@ export async function getOccupiedDepartments(
 
   const usedIds = new Set(
     (occupied.data ?? [])
+      .filter((row) => {
+        const designation = unwrapRelation(
+          row.designations as { title: string } | { title: string }[] | null,
+        );
+        return !isHiddenFromPeopleFilters(row.employee_code, {
+          employeeCode: row.employee_code,
+          firstName: row.first_name,
+          lastName: row.last_name,
+          designationTitle: designation?.title ?? null,
+        });
+      })
       .map((row) => row.department_id as string | null)
       .filter((id): id is string => Boolean(id)),
   );
@@ -417,11 +431,20 @@ export async function getManagers(
 
   if (error) throw new Error(error.message);
 
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    label: `${row.first_name} ${row.last_name}`,
-    code: row.employee_code,
-  }));
+  return (data ?? [])
+    .filter(
+      (row) =>
+        !isHiddenFromPeopleFilters(row.employee_code, {
+          employeeCode: row.employee_code,
+          firstName: row.first_name,
+          lastName: row.last_name,
+        }),
+    )
+    .map((row) => ({
+      id: row.id,
+      label: `${row.first_name} ${row.last_name}`,
+      code: row.employee_code,
+    }));
 }
 
 export async function getDocumentTypes(

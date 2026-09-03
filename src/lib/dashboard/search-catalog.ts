@@ -124,10 +124,10 @@ export const DASHBOARD_SEARCH_CATALOG: DashboardSearchItem[] = [
   },
   {
     id: "payroll-run",
-    label: "Run Payroll",
-    description: "Start this month’s payroll run",
+    label: "Company Payroll",
+    description: "This month’s payroll amounts",
     href: PAYROLL_ROUTES.run,
-    keywords: ["run payroll", "process payroll", "generate"],
+    keywords: ["company payroll", "run payroll", "process payroll", "generate"],
     permission: "payroll.generate",
   },
   {

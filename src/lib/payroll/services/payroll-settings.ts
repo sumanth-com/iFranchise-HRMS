@@ -18,8 +18,8 @@ export const DEFAULT_PAYROLL_SETTINGS: PayrollSettingsData = {
   attendanceRules: {
     minimumWorkingHours: 8,
     halfDayThreshold: 4,
-    lateMarkThreshold: "10:15",
-    overtimeCalculation: true,
+    lateMarkThreshold: "10:05",
+    overtimeCalculation: false,
     autoCalculateAttendance: true,
     ignoreWeekends: true,
     ignoreCompanyHolidays: true,
@@ -28,7 +28,7 @@ export const DEFAULT_PAYROLL_SETTINGS: PayrollSettingsData = {
     paidLeaveDeduction: false,
     lossOfPayDeduction: true,
     halfDayDeduction: true,
-    sandwichLeavePolicy: false,
+    sandwichLeavePolicy: true,
     includeHolidaysInLeave: false,
   },
   salaryComponents: {

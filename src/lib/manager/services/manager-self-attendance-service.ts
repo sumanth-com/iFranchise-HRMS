@@ -128,11 +128,8 @@ export function isAttendanceLockedNow(attendanceDate: string) {
   return isCheckInLockedNow(attendanceDate);
 }
 
-function computeOvertimeHours(workHours: number, rules: AttendanceRules) {
-  return Math.max(
-    0,
-    Math.round((workHours - rules.fullDayMinimumHours) * 100) / 100,
-  );
+function computeOvertimeHours(_workHours: number, _rules: AttendanceRules) {
+  return 0;
 }
 
 function resolvePunchStatus(

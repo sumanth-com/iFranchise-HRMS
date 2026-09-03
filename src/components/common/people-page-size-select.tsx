@@ -11,24 +11,53 @@ import {
 
 export const PEOPLE_PAGE_SIZES = [10, 15, 20, 25, 30] as const;
 
+/** Page sizes in steps of 20, scaled to how many rows are available. */
+export function buildSteppedPeoplePageSizes(totalRecords: number, step = 20): number[] {
+  const available = Math.max(1, totalRecords);
+  if (available <= step) return [step];
+
+  const sizes: number[] = [];
+  for (let size = step; size <= 100; size += step) {
+    sizes.push(size);
+    if (size >= available) return sizes;
+  }
+
+  const cover = Math.ceil(available / step) * step;
+  for (let size = 200; size < cover; size += 100) {
+    sizes.push(size);
+  }
+  if (!sizes.includes(cover)) sizes.push(cover);
+  return sizes;
+}
+
 export function PeoplePageSizeSelect({
   value,
   disabled,
   onChange,
   className,
+  totalRecords,
+  valueLabel = "people",
 }: {
   value: number;
   disabled?: boolean;
   onChange: (pageSize: number) => void;
   className?: string;
+  /** When set, options are 20, 40, 60… based on this count. */
+  totalRecords?: number;
+  /** `number` shows only 20, 40… without the “people” suffix. */
+  valueLabel?: "people" | "number";
 }) {
-  const items = PEOPLE_PAGE_SIZES.map((size) => ({
+  const sizes =
+    typeof totalRecords === "number"
+      ? buildSteppedPeoplePageSizes(totalRecords)
+      : [...PEOPLE_PAGE_SIZES];
+
+  const options = sizes.includes(value) ? sizes : [...sizes, value].sort((a, b) => a - b);
+  const items = options.map((size) => ({
     value: String(size),
-    label: `${size} people`,
+    label: valueLabel === "number" ? String(size) : `${size} people`,
   }));
-  const selected = PEOPLE_PAGE_SIZES.includes(value as (typeof PEOPLE_PAGE_SIZES)[number])
-    ? String(value)
-    : String(PEOPLE_PAGE_SIZES[0]);
+  const selected = String(value);
 
   return (
     <Select
@@ -37,7 +66,7 @@ export function PeoplePageSizeSelect({
       onValueChange={(next) => {
         if (!next) return;
         const size = Number(next);
-        if (!PEOPLE_PAGE_SIZES.includes(size as (typeof PEOPLE_PAGE_SIZES)[number])) return;
+        if (!options.includes(size)) return;
         if (size === value) return;
         onChange(size);
       }}
@@ -45,11 +74,15 @@ export function PeoplePageSizeSelect({
     >
       <SelectTrigger
         className={cn(
-          "h-10 w-[9rem] shrink-0 bg-white font-semibold dark:bg-input",
+          "h-10 shrink-0 bg-white font-semibold dark:bg-input",
+          valueLabel === "number"
+            ? "w-[4.25rem] gap-1 px-2.5 [&_[data-slot=select-value]]:flex-none [&_[data-slot=select-value]]:grow-0"
+            : "w-[9rem]",
           className,
         )}
+        aria-label={valueLabel === "number" ? "Rows per page" : "People per page"}
       >
-        <SelectValue placeholder="People" />
+        <SelectValue placeholder={valueLabel === "number" ? "20" : "People"} />
       </SelectTrigger>
       <SelectContent align="end" alignItemWithTrigger={false}>
         {items.map((item) => (

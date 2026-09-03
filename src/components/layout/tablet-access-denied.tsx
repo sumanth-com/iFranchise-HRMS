@@ -14,8 +14,8 @@ export function TabletAccessDenied() {
         </div>
         <h1 className="text-lg font-semibold tracking-tight">Tablet access is not enabled</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Your account is not allowed to use the HRMS from a tablet. Sign in on a
-          desktop computer, or ask HR to enable Device Access for you.
+          Tablet access is not enabled for Employee Self-Service. You can still
+          sign in on a desktop computer, or ask HR to enable tablet access.
         </p>
         <form action={logoutAction} className="mt-6">
           <Button type="submit" variant="outline">

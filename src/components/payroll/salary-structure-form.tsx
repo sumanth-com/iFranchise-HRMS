@@ -6,6 +6,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+
+import { toUserFriendlyError } from "@/lib/errors/user-messages";
 import type { z } from "zod";
 
 import { Button } from "@/components/common/button";
@@ -31,6 +33,10 @@ import {
   statutoryPf,
   totalStatutoryDeductions,
 } from "@/lib/payroll/salary-structure-breakdown";
+import {
+  monthDateBounds,
+  monthlyGrossPerDay,
+} from "@/lib/payroll/salary-structure-period";
 import { formatCurrency } from "@/lib/payroll/services/payroll-utils";
 import { salaryStructureFormSchema } from "@/lib/validations/payroll";
 import type { LookupOption } from "@/types/employee";
@@ -167,6 +173,7 @@ export function SalaryStructureForm({
   });
 
   const selectedEmployeeId = form.watch("employeeId");
+  const watchedEffectiveFrom = form.watch("effectiveFrom");
   const watchedEmploymentTypeId = form.watch("employmentTypeId");
   const employmentTypeId =
     typeof watchedEmploymentTypeId === "string" ? watchedEmploymentTypeId : "";
@@ -188,6 +195,17 @@ export function SalaryStructureForm({
   const breakdown = useMemo(
     () => splitMonthlyGross(Number.isFinite(monthlyGross) ? monthlyGross : 0),
     [monthlyGross],
+  );
+  const effectiveMonth = useMemo(() => {
+    const iso = localIsoDate(
+      typeof watchedEffectiveFrom === "string" ? watchedEffectiveFrom : undefined,
+    );
+    const [year, month] = iso.split("-").map(Number);
+    return monthDateBounds(month, year);
+  }, [watchedEffectiveFrom]);
+  const perDayAmount = monthlyGrossPerDay(
+    Number.isFinite(monthlyGross) ? monthlyGross : 0,
+    effectiveMonth.calendarDays,
   );
 
   const liveDeductions = {
@@ -332,7 +350,7 @@ export function SalaryStructureForm({
         : await createSalaryStructureAction(payload);
 
       if (!result.success) {
-        toast.error(result.message);
+        toast.error(toUserFriendlyError(result.message, "Failed to save salary structure"));
         return;
       }
 
@@ -462,26 +480,54 @@ export function SalaryStructureForm({
       </section>
 
       <section className="space-y-2">
-        <Label htmlFor={`${formId}-gross`}>Monthly Gross Salary</Label>
-        <div className="relative max-w-xs">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-            ₹
-          </span>
-          <Input
-            id={`${formId}-gross`}
-            inputMode="decimal"
-            placeholder="50,000"
-            className="h-10 pl-7 text-base font-semibold"
-            disabled={isPending}
-            value={grossInput}
-            onChange={(event) => handleGrossChange(event.target.value)}
-          />
+        <div className="grid max-w-2xl gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor={`${formId}-gross`}>Monthly Gross Salary</Label>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                ₹
+              </span>
+              <Input
+                id={`${formId}-gross`}
+                inputMode="decimal"
+                placeholder="50,000"
+                className="h-10 pl-7 text-base font-semibold"
+                disabled={isPending}
+                value={grossInput}
+                onChange={(event) => handleGrossChange(event.target.value)}
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`${formId}-per-day`}>Per Day Amount</Label>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                ₹
+              </span>
+              <Input
+                id={`${formId}-per-day`}
+                readOnly
+                tabIndex={-1}
+                className="h-10 bg-muted/50 pl-7 text-base font-semibold tabular-nums"
+                value={
+                  perDayAmount > 0
+                    ? perDayAmount.toLocaleString("en-IN", {
+                        maximumFractionDigits: 2,
+                        minimumFractionDigits: 0,
+                      })
+                    : ""
+                }
+                placeholder="—"
+              />
+            </div>
+          </div>
         </div>
         {form.formState.isSubmitted && form.formState.errors.basicSalary?.message ? (
           <p className="text-xs text-destructive">{form.formState.errors.basicSalary.message}</p>
         ) : (
           <p className="text-xs text-muted-foreground">
-            Components update instantly from this amount. Nothing is saved until you click Save
+            Per-day amount is monthly gross ÷ {effectiveMonth.calendarDays} calendar days in the
+            effective month. Components update instantly. Nothing is saved until you click Save
             Structure.
           </p>
         )}
@@ -569,6 +615,10 @@ export function SalaryStructureForm({
             <dd className="font-medium">
               {formatCurrency(Number.isFinite(monthlyGross) ? Math.max(0, monthlyGross) : 0)}
             </dd>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <dt className="text-muted-foreground">Per Day Amount</dt>
+            <dd className="font-medium">{formatCurrency(perDayAmount)}</dd>
           </div>
           <div className="flex items-center justify-between gap-4">
             <dt className="text-muted-foreground">Total Deductions</dt>

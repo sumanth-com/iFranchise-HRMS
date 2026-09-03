@@ -97,6 +97,16 @@ export function isHiddenFromEmployeeDirectory(
   return isGore && isAbhisek;
 }
 
+/** Hidden from employee/department filter dropdowns across HRMS modules. */
+export function isHiddenFromPeopleFilters(
+  employeeCode: string | null | undefined,
+  person?: DirectoryPersonName,
+): boolean {
+  if (isHiddenFromEmployeeDirectory(employeeCode, person)) return true;
+  const designation = (person?.designationTitle ?? "").trim().toLowerCase();
+  return designation === "marketing manager";
+}
+
 export function isExcludedFromTeamPayslips(
   employeeCode: string | null | undefined,
   person?: DirectoryPersonName,

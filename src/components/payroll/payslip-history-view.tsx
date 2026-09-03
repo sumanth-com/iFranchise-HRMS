@@ -576,7 +576,7 @@ export function PayslipHistoryView({
           ) : (
             <p className="py-16 text-center text-sm text-muted-foreground">
               {mode === "hr"
-                ? `No payroll run found for ${getMonthFilterLabel(monthValue)} ${yearValue}. Run payroll first, then send payslips here.`
+                ? `No payroll found for ${getMonthFilterLabel(monthValue)} ${yearValue}. Open Company Payroll for this month to calculate amounts, then send payslips here.`
                 : `No payslips found for ${getMonthFilterLabel(monthValue)} ${yearValue}.`}
             </p>
           )}

@@ -31,7 +31,14 @@ export type LeaveSandwichRules = {
 };
 
 export type LeaveCalendarContext = {
+  /** Official National / Festival holidays — never sandwich or LOP. */
   holidays: string[];
+  /**
+   * Dates that are non-working only for this employee (approved Optional Holiday).
+   * Treated like official holidays for sandwich: never deducted, skipped when
+   * finding adjacent working days.
+   */
+  employeeNonWorkingDates?: string[];
   weekendRules: LeaveWeekendRules;
   sandwich: LeaveSandwichRules;
 };
@@ -68,7 +75,7 @@ export const DEFAULT_LEAVE_WEEKEND_RULES: LeaveWeekendRules = {
 export const DEFAULT_LEAVE_SANDWICH_RULES: LeaveSandwichRules = {
   enabled: true,
   includeWeekends: true,
-  includeHolidays: true,
+  includeHolidays: false,
 };
 
 export const DEFAULT_LEAVE_CALENDAR: LeaveCalendarContext = {
@@ -78,7 +85,18 @@ export const DEFAULT_LEAVE_CALENDAR: LeaveCalendarContext = {
 };
 
 function holidaySet(calendar: LeaveCalendarContext): Set<string> {
-  return new Set(calendar.holidays);
+  const dates = [...calendar.holidays, ...(calendar.employeeNonWorkingDates ?? [])];
+  return new Set(dates.map((date) => date.slice(0, 10)));
+}
+
+export function calendarWithEmployeeNonWorkingDates(
+  calendar: LeaveCalendarContext,
+  dates: string[],
+): LeaveCalendarContext {
+  return {
+    ...calendar,
+    employeeNonWorkingDates: dates.map((date) => date.slice(0, 10)),
+  };
 }
 
 /** 1-based Saturday ordinal in the month (1st, 2nd, … Saturday). */
@@ -131,17 +149,81 @@ export function isHalfDayCalendarDate(
   return classifyCalendarDay(date, calendar) === "half_day";
 }
 
-function isSandwichBridge(dayClass: LeaveDayClass, sandwich: LeaveSandwichRules): boolean {
-  if (dayClass === "half_day") return true;
-  if (dayClass === "weekly_off") return sandwich.includeWeekends;
-  if (dayClass === "holiday") return sandwich.includeHolidays;
-  return false;
+function isAbsenceWorkingClass(dayClass: LeaveDayClass): boolean {
+  return dayClass === "working" || dayClass === "half_day";
 }
 
-function isSandwichCountable(dayClass: LeaveDayClass, sandwich: LeaveSandwichRules): boolean {
-  if (dayClass === "weekly_off") return sandwich.includeWeekends;
-  if (dayClass === "holiday") return sandwich.includeHolidays;
-  return false;
+/**
+ * Weekly offs inside a continuous absence period are sandwiched.
+ *
+ * A period is a run of absent working days connected across weekly offs.
+ * Unoccupied working days (including 2nd/4th Saturdays) close the period.
+ * Official holidays and approved optional holidays are skipped: they never
+ * become sandwich/LOP and they do not by themselves close the period.
+ * Leading/trailing weekly offs with absence on only one side are ignored.
+ */
+export function sandwichWeeklyOffDates(
+  absenceWorkingDates: Iterable<string>,
+  calendar: LeaveCalendarContext = DEFAULT_LEAVE_CALENDAR,
+): Set<string> {
+  const sandwichDates = new Set<string>();
+  if (!calendar.sandwich.enabled || !calendar.sandwich.includeWeekends) {
+    return sandwichDates;
+  }
+
+  const occupied = [...new Set([...absenceWorkingDates].map((date) => date.slice(0, 10)))].sort();
+  if (occupied.length === 0) return sandwichDates;
+
+  const window = eachDayOfInterval({
+    start: addDays(parseISO(occupied[0]!), -1),
+    end: addDays(parseISO(occupied[occupied.length - 1]!), 8),
+  }).map((day) => format(day, "yyyy-MM-dd"));
+
+  const occupiedSet = new Set(occupied);
+  let occupiedInPeriod = 0;
+  let pendingWeeklyOffs: string[] = [];
+
+  for (const date of window) {
+    const dayClass = classifyCalendarDay(date, calendar);
+
+    if (dayClass === "holiday") {
+      continue;
+    }
+
+    if (isAbsenceWorkingClass(dayClass)) {
+      if (occupiedSet.has(date)) {
+        for (const weeklyOff of pendingWeeklyOffs) sandwichDates.add(weeklyOff);
+        pendingWeeklyOffs = [];
+        occupiedInPeriod += 1;
+      } else {
+        pendingWeeklyOffs = [];
+        occupiedInPeriod = 0;
+      }
+      continue;
+    }
+
+    if (dayClass === "weekly_off" && occupiedInPeriod > 0) {
+      pendingWeeklyOffs.push(date);
+    }
+  }
+
+  return sandwichDates;
+}
+
+/** Weekly offs in a continuous absence that leave duration has not already counted. */
+export function extraSandwichLopDays(
+  occupiedWorkingDates: Iterable<string>,
+  alreadyCountedSandwichDates: Iterable<string> = [],
+  calendar: LeaveCalendarContext = DEFAULT_LEAVE_CALENDAR,
+): number {
+  const counted = new Set(
+    [...alreadyCountedSandwichDates].map((date) => date.slice(0, 10)),
+  );
+  let extra = 0;
+  for (const date of sandwichWeeklyOffDates(occupiedWorkingDates, calendar)) {
+    if (!counted.has(date)) extra += 1;
+  }
+  return extra;
 }
 
 function formatDayLabel(date: string): string {
@@ -163,12 +245,13 @@ export function calculateLeaveDuration(input: {
   if (input.isHalfDay) {
     const date = input.startDate;
     const dayClass = classifyCalendarDay(date, calendar);
+    const countable = isAbsenceWorkingClass(dayClass);
     const days: LeaveDurationDay[] = [
       {
         date,
-        kind: "working",
+        kind: countable ? "half_day" : dayClass === "holiday" ? "public_holiday" : "weekly_holiday",
         class: dayClass,
-        counted: 1,
+        counted: countable ? 0.5 : 0,
         inRequestedRange: true,
       },
     ];
@@ -176,51 +259,22 @@ export function calculateLeaveDuration(input: {
       startDate: input.startDate,
       endDate: input.endDate,
       requestedDates,
-      workingDays: 1,
-      halfDays: 0,
+      workingDays: 0,
+      halfDays: countable ? 1 : 0,
       weeklyHolidays: dayClass === "weekly_off" ? 1 : 0,
       publicHolidays: dayClass === "holiday" ? 1 : 0,
       sandwichDays: 0,
-      totalLeaveDays: 1,
+      totalLeaveDays: countable ? 0.5 : 0,
       days,
       sandwichExplanations: [],
     };
   }
 
   const leaveTouching = new Set(
-    requestedDates.filter((date) => {
-      const dayClass = classifyCalendarDay(date, calendar);
-      return dayClass === "working" || dayClass === "half_day";
-    }),
+    requestedDates.filter((date) => isAbsenceWorkingClass(classifyCalendarDay(date, calendar))),
   );
 
-  const sandwichDates = new Set<string>();
-  if (calendar.sandwich.enabled && leaveTouching.size > 0) {
-    const visit = (seed: string, direction: 1 | -1) => {
-      let current = addDays(parseISO(seed), direction);
-      for (let i = 0; i < 14; i += 1) {
-        const date = format(current, "yyyy-MM-dd");
-        const dayClass = classifyCalendarDay(date, calendar);
-        if (!isSandwichBridge(dayClass, calendar.sandwich)) break;
-        if (isSandwichCountable(dayClass, calendar.sandwich)) {
-          sandwichDates.add(date);
-        }
-        current = addDays(current, direction);
-      }
-    };
-
-    for (const date of leaveTouching) {
-      visit(date, -1);
-      visit(date, 1);
-    }
-
-    for (const date of requestedDates) {
-      const dayClass = classifyCalendarDay(date, calendar);
-      if (isSandwichCountable(dayClass, calendar.sandwich)) {
-        sandwichDates.add(date);
-      }
-    }
-  }
+  const sandwichDates = sandwichWeeklyOffDates(leaveTouching, calendar);
 
   const days: LeaveDurationDay[] = [];
   const seen = new Set<string>();
@@ -254,14 +308,14 @@ export function calculateLeaveDuration(input: {
       continue;
     }
 
-    if (sandwichDates.has(date) && isSandwichCountable(dayClass, calendar.sandwich)) {
+    if (sandwichDates.has(date) && dayClass === "weekly_off") {
       days.push({
         date,
         kind: "sandwich",
         class: dayClass,
         counted: 1,
         inRequestedRange,
-        note: `${formatDayLabel(date)} is added under Sandwich Leave Policy because it sits between your leave and a working day.`,
+        note: `${formatDayLabel(date)} is counted under the sandwich rule because you were absent or on leave on both adjacent working days. Official holidays are not deducted.`,
       });
       continue;
     }

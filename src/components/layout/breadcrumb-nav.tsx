@@ -301,7 +301,7 @@ function buildBreadcrumbItems(
       const section = parseTeamPayrollSection(segments[3]);
 
       const sectionLabels: Record<TeamPayrollSection, string> = {
-        run: "Run Payroll",
+        run: "Company Payroll",
         "salary-structures": "Salary Structure",
         bonuses: "Bonuses",
         reimbursements: "Expense claims",
@@ -386,7 +386,7 @@ function buildBreadcrumbItems(
     ];
 
     const sectionLabels: Record<string, string> = {
-      run: "Run Payroll",
+      run: "Company Payroll",
       history: "Payroll History",
       "salary-structures": "Salary Structure",
       revisions: "Salary Revisions",
@@ -668,7 +668,7 @@ function buildBreadcrumbItems(
       const nestedLabels: Record<string, string> = {
         leave: "Leave",
         exit: "Exit",
-        run: "Run Payroll",
+        run: "Company Payroll",
         "salary-structures": "Salary Structure",
         bonuses: "Bonuses",
         reimbursements: "Expense claims",

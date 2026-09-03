@@ -11,6 +11,7 @@ const emptyAttendance = {
   weekOffDays: 4,
   holidayDays: 1,
   overtimeHours: 0,
+  lateDays: 0,
 };
 
 describe("payroll calculator", () => {
@@ -133,5 +134,33 @@ describe("payroll calculator", () => {
     assert.equal(lop, undefined);
     assert.equal(result.grossSalary, 20000);
     assert.equal(result.netSalary, 20000);
+  });
+
+  it("adds half-day LOP after three late entries in the month", () => {
+    const result = calculateEmployeePayroll({
+      month: 9,
+      year: 2026,
+      salaryStructure: {
+        id: "struct-4",
+        employee_id: "emp-4",
+        basic_salary: 15000,
+        hra_amount: 7500,
+        transport_allowance: 3000,
+        other_allowances: 4500,
+        tax_deduction: 0,
+        other_deductions: 0,
+        gross_salary: 30000,
+        net_salary: 30000,
+        components: {},
+      },
+      attendance: { ...emptyAttendance, lateDays: 3 },
+      leaveSummary: { lopDays: 0, paidLeaveDays: 0 },
+      bonuses: [],
+      reimbursements: [],
+    });
+
+    const lop = result.breakdown.deductions.find((line) => line.code === "lop");
+    assert.equal(lop?.amount, 500);
+    assert.equal(result.breakdown.attendance.lopDays, 0.5);
   });
 });

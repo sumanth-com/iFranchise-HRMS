@@ -9,6 +9,9 @@ import { toUserFriendlyError } from "@/lib/errors/user-messages";
 import { reviewOrganizationAttendanceCorrection } from "@/lib/manager/services/attendance-correction-service";
 import { requireServerAnyPermission, requireServerPermission } from "@/lib/permissions/server";
 import { ATTENDANCE_ROUTES, SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
+import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
+import { PAYROLL_ROUTES, SELF_PAYROLL_ROUTES } from "@/lib/payroll/constants";
+import { refreshDraftPayrollItemsForEmployee } from "@/lib/payroll/services/payroll-mutations";
 import {
   getAttendanceById,
   getAttendanceCorrectionByAttendanceId,
@@ -19,6 +22,7 @@ import {
   createAttendance,
   softDeleteAttendance,
   updateAttendance,
+  upsertManualAttendanceStatus,
 } from "@/lib/attendance/services/attendance-mutations";
 import {
   getAttendanceLookups,
@@ -29,6 +33,7 @@ import {
 import {
   attendanceFormSchema,
   attendanceListParamsSchema,
+  manualAttendanceStatusSchema,
 } from "@/lib/validations/attendance";
 import { teamCorrectionReviewSchema } from "@/lib/validations/manager-team";
 import type {
@@ -172,6 +177,58 @@ export async function updateAttendanceAction(
     revalidatePath(SELF_ATTENDANCE_ROUTES.list);
     revalidatePath(SELF_ATTENDANCE_ROUTES.team);
     return { success: true, data: null };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "Failed to update attendance",
+    };
+  }
+}
+
+export async function setManualAttendanceStatusAction(
+  input: unknown,
+): Promise<
+  AttendanceActionResult<{
+    id: string;
+    checkInAt: string | null;
+    checkOutAt: string | null;
+    workHours: number;
+    attendanceStatus: "present" | "absent" | "on_leave";
+  }>
+> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "attendance.create",
+      "attendance.edit",
+    ]);
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = manualAttendanceStatusSchema.parse(input);
+    const saved = await upsertManualAttendanceStatus(supabase, profile, parsed);
+
+    try {
+      await refreshDraftPayrollItemsForEmployee(supabase, profile, parsed.employeeId);
+    } catch (payrollError) {
+      console.error("[setManualAttendanceStatusAction] payroll refresh failed", payrollError);
+    }
+
+    revalidatePath(ATTENDANCE_ROUTES.list);
+    revalidatePath(SELF_ATTENDANCE_ROUTES.list);
+    revalidatePath(SELF_ATTENDANCE_ROUTES.team);
+    revalidateSelfAttendancePaths();
+    revalidatePath(EMPLOYEE_ROUTES.payroll);
+    revalidatePath(PAYROLL_ROUTES.run);
+    revalidatePath(PAYROLL_ROUTES.payslips);
+    revalidatePath(SELF_PAYROLL_ROUTES.list);
+    revalidatePath(SELF_PAYROLL_ROUTES.team);
+
+    return {
+      success: true,
+      data: {
+        ...saved,
+        attendanceStatus: parsed.attendanceStatus,
+      },
+    };
   } catch (error) {
     return {
       success: false,

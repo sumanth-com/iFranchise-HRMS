@@ -1,5 +1,6 @@
 import { BonusTable } from "@/components/payroll/bonus-management";
 import { PayrollRunForm } from "@/components/payroll/payroll-run-form";
+import type { CompanyPayrollInitialPanel } from "@/components/payroll/payroll-run-form";
 import { PayrollSettingsForm } from "@/components/payroll/payroll-settings-form";
 import { PayslipHistoryView } from "@/components/payroll/payslip-history-view";
 import { ReimbursementTable } from "@/components/payroll/reimbursement-management";
@@ -22,9 +23,16 @@ import { createClient } from "@/lib/supabase/server";
 import {
   getPayrollLookups,
   listBonuses,
+  listPayrollRuns,
   listReimbursements,
   listSalaryStructures,
 } from "@/lib/payroll/services/payroll-queries";
+import {
+  ensureCompanyPayrollRun,
+  getPayrollRunById,
+  previewPayrollRun,
+} from "@/lib/payroll/services/payroll-mutations";
+import { formatPayrollMonth } from "@/lib/payroll/services/payroll-utils";
 import { listPayslipHistory } from "@/lib/payroll/services/payslip-history-queries";
 import {
   bonusListParamsSchema,
@@ -35,6 +43,68 @@ import {
 
 function firstString(value: string | string[] | undefined) {
   return typeof value === "string" ? value : undefined;
+}
+
+function isFuturePayrollPeriod(month: number, year: number) {
+  const now = new Date();
+  if (year > now.getFullYear()) return true;
+  if (year === now.getFullYear() && month > now.getMonth() + 1) return true;
+  return false;
+}
+
+async function loadCompanyPayrollInitialPanel(params: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  profile: Awaited<ReturnType<typeof requireServerAnyPermission>>;
+  month: number;
+  year: number;
+  canRun: boolean;
+}): Promise<CompanyPayrollInitialPanel> {
+  const { supabase, profile, month, year, canRun } = params;
+  const periodLabel = formatPayrollMonth(month, year);
+
+  if (isFuturePayrollPeriod(month, year)) {
+    return {
+      kind: "info",
+      title: `${periodLabel} is an upcoming period`,
+      text: "Payroll is calculated for the current month and completed past months.",
+      tone: "warning",
+    };
+  }
+
+  try {
+    if (canRun) {
+      const payrollId = await ensureCompanyPayrollRun(supabase, profile, { month, year });
+      const detail = await getPayrollRunById(supabase, profile, payrollId);
+      if (detail) return { kind: "run", data: detail, mode: "existing" };
+    }
+
+    const runs = await listPayrollRuns(supabase, profile, {
+      month,
+      year,
+      page: 1,
+      pageSize: 1,
+    });
+    if (runs.data[0]) {
+      const detail = await getPayrollRunById(supabase, profile, runs.data[0].id);
+      if (detail) return { kind: "run", data: detail, mode: "existing" };
+    }
+
+    const preview = await previewPayrollRun(supabase, profile, { month, year });
+    if (preview.employeeCount === 0) {
+      return {
+        kind: "info",
+        title: `No employees for ${periodLabel}`,
+        text: "Add active employees before viewing payroll for this period.",
+      };
+    }
+    return { kind: "preview", data: preview };
+  } catch (error) {
+    return {
+      kind: "info",
+      title: "Unable to load payroll",
+      text: error instanceof Error ? error.message : "Failed to load Company Payroll.",
+    };
+  }
 }
 
 type TeamPayrollSectionProps = {
@@ -58,20 +128,28 @@ export async function TeamPayrollSection({
   if (section === TEAM_PAYROLL_SECTIONS.run) {
     const requestedMonth = Number(firstString(rawSearchParams.month));
     const requestedYear = Number(firstString(rawSearchParams.year));
+    const month =
+      Number.isInteger(requestedMonth) && requestedMonth >= 1 && requestedMonth <= 12
+        ? requestedMonth
+        : now.getMonth() + 1;
+    const year =
+      Number.isInteger(requestedYear) && requestedYear >= 2000
+        ? requestedYear
+        : now.getFullYear();
+    const canRun = canRunPayrollOverride ?? canRunPayroll(profile.permissionCodes);
+    const initialPanel = await loadCompanyPayrollInitialPanel({
+      supabase,
+      profile,
+      month,
+      year,
+      canRun,
+    });
     return (
       <PayrollRunForm
-        defaultMonth={
-          Number.isInteger(requestedMonth) && requestedMonth >= 1 && requestedMonth <= 12
-            ? requestedMonth
-            : now.getMonth() + 1
-        }
-        defaultYear={
-          Number.isInteger(requestedYear) && requestedYear >= 2000
-            ? requestedYear
-            : now.getFullYear()
-        }
-        autoLoad={firstString(rawSearchParams.autoload) === "1"}
-        canRun={canRunPayrollOverride ?? canRunPayroll(profile.permissionCodes)}
+        defaultMonth={month}
+        defaultYear={year}
+        canRun={canRun}
+        initialPanel={initialPanel}
       />
     );
   }

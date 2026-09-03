@@ -49,6 +49,7 @@ async function CeoAttendanceContent({ searchParams }: CeoAttendancePageProps) {
         departments={data.lookups.departments}
         employees={data.lookups.employees}
         attendanceLookups={data.lookups}
+        historyCounts={data.records.historyCounts}
       />
     </div>
   );

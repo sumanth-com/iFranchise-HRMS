@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { CalendarDays } from "lucide-react";
 
 import { AttendanceSummaryCards } from "@/components/attendance/attendance-summary-cards";
 import { AttendanceTable } from "@/components/attendance/attendance-table";
@@ -11,6 +12,7 @@ import type {
   AttendanceLookups,
   AttendanceStatus,
   AttendanceSummary,
+  AttendanceHistoryCounts,
 } from "@/types/attendance";
 import type { LookupOption } from "@/types/employee";
 
@@ -46,6 +48,7 @@ type HrTeamAttendanceViewProps = {
   description?: string;
   listBasePath?: string;
   onViewRecord?: (record: AttendanceListItem) => void;
+  historyCounts?: AttendanceHistoryCounts;
 };
 
 export function HrTeamAttendanceView({
@@ -74,6 +77,7 @@ export function HrTeamAttendanceView({
   description = "Track daily attendance records, manual entries, and workforce presence across the organization.",
   listBasePath = SELF_ATTENDANCE_ROUTES.team,
   onViewRecord,
+  historyCounts,
 }: HrTeamAttendanceViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -92,6 +96,10 @@ export function HrTeamAttendanceView({
 
       if (nextStatus) {
         params.set("attendanceStatus", nextStatus);
+        if (!employeeId) {
+          params.delete("employeeId");
+          params.delete("search");
+        }
       } else {
         params.delete("attendanceStatus");
       }
@@ -111,15 +119,21 @@ export function HrTeamAttendanceView({
         });
       });
     },
-    [attendanceStatus, dateFrom, dateTo, listBasePath, router, searchParams],
+    [attendanceStatus, dateFrom, dateTo, employeeId, listBasePath, router, searchParams],
   );
 
   return (
     <div className="space-y-4">
       {!embedded ? (
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          </div>
+          <span className="inline-flex h-9 items-center gap-2 whitespace-nowrap text-sm font-semibold text-foreground">
+            <CalendarDays className="size-4 shrink-0 text-muted-foreground" />
+            Summary for {summary.date}
+          </span>
         </div>
       ) : null}
 
@@ -153,6 +167,7 @@ export function HrTeamAttendanceView({
         listBasePath={listBasePath}
         onViewRecord={onViewRecord}
         summaryDate={summary.date}
+        historyCounts={historyCounts}
       />
     </div>
   );

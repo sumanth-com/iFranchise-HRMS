@@ -11,6 +11,7 @@ import {
   computeMonitoringFlags,
   isWorkFromHomeBranch,
 } from "@/lib/manager/services/attendance-correction-service";
+import { isHiddenFromPeopleFilters } from "@/lib/employee/directory-listing";
 import {
   formatEmployeeName,
   fromHrms,
@@ -191,7 +192,16 @@ function isExecutiveLeadershipEmployee(row: LooseRow) {
 }
 
 function filterAttendanceWorkforce(employees: LooseRow[]) {
-  return employees.filter((row) => !isExecutiveLeadershipEmployee(row));
+  return employees.filter((row) => {
+    if (isExecutiveLeadershipEmployee(row)) return false;
+    const designation = unwrap(row.designations);
+    return !isHiddenFromPeopleFilters(row.employee_code, {
+      employeeCode: row.employee_code,
+      firstName: row.first_name,
+      lastName: row.last_name,
+      designationTitle: designation?.title ?? null,
+    });
+  });
 }
 
 export async function getCeoAttendanceFilterLookups(

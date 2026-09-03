@@ -272,7 +272,7 @@ export function canApproveReimbursement(codes: string[]) {
 }
 
 export const TEAM_PAYROLL_SECTION_DESCRIPTIONS: Record<TeamPayrollSection, string> = {
-  run: "Process monthly payroll — review attendance, finalize amounts, and release payslips for the selected period.",
+  run: "Monthly payroll calculated from salary structures, attendance, and leave — review amounts and release payslips for the selected period.",
   "salary-structures":
     "Set up and update employee salary structures, components, and effective dates across the organization.",
   bonuses:
@@ -286,7 +286,7 @@ export const TEAM_PAYROLL_SECTION_DESCRIPTIONS: Record<TeamPayrollSection, strin
 };
 
 export const TEAM_PAYROLL_SECTION_TITLES: Record<TeamPayrollSection, string> = {
-  run: "Run Payroll",
+  run: "Company Payroll",
   "salary-structures": "Salary Structure",
   bonuses: "Bonuses",
   reimbursements: "Expense claims",

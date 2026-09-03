@@ -11,6 +11,14 @@ export const ATTENDANCE_STATUS_MAP = {
   CL: "on_leave",
   PL: "on_leave",
   EL: "on_leave",
+  SL: "on_leave",
+  ML: "on_leave",
+  CO: "on_leave",
+  WO: "week_off",
+  WOFF: "week_off",
+  HD: "holiday",
+  NH: "holiday",
+  HO: "holiday",
   H: "week_off",
 };
 
@@ -91,6 +99,54 @@ function normalizeSummaryKey(label) {
   return map[raw] ?? null;
 }
 
+function weekdayFromIso(iso) {
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+}
+
+export function mapAttendanceCode(raw, isoDate) {
+  const sourceCode = cellToString(raw).toUpperCase().replace(/\s+/g, "");
+  if (!sourceCode) return { sourceCode: "", mappedStatus: null, unknown: false, skip: true };
+  if (/^\d+(\.\d+)?$/.test(sourceCode)) {
+    return { sourceCode, mappedStatus: null, unknown: false, skip: true };
+  }
+  if (sourceCode === "H") {
+    const mappedStatus = weekdayFromIso(isoDate) === 0 ? "week_off" : "holiday";
+    return { sourceCode, mappedStatus, unknown: false, skip: false };
+  }
+  const mappedStatus = ATTENDANCE_STATUS_MAP[sourceCode] ?? null;
+  return {
+    sourceCode,
+    mappedStatus,
+    unknown: !mappedStatus,
+    skip: false,
+  };
+}
+
+function canonicalMonthSheetName(sheetName) {
+  const normalized = cellToString(sheetName).toUpperCase().replace(/\s+/g, "");
+  const aliases = {
+    "APR-2026": "APR-2026",
+    "APRIL-2026": "APR-2026",
+    "MAY-2026": "MAY-2026",
+    "JUN-2026": "JUNE-2026",
+    "JUNE-2026": "JUNE-2026",
+    "JUL-2026": "JULY-2026",
+    "JULY-2026": "JULY-2026",
+    "AUG-2026": "AUG-2026",
+    "AUGUST-2026": "AUG-2026",
+    "SEP-2026": "SEPT-2026",
+    "SEPT-2026": "SEPT-2026",
+    "SEPTEMBER-2026": "SEPT-2026",
+  };
+  return aliases[normalized] ?? null;
+}
+
+function parseSerial(value) {
+  const n = typeof value === "number" ? value : Number(cellToString(value));
+  return Number.isFinite(n) ? n : NaN;
+}
+
 function parseEmployeeRows(sheetName, rows) {
   const headerIndex = findHeaderRow(rows);
   if (headerIndex < 0) {
@@ -134,10 +190,10 @@ function parseEmployeeRows(sheetName, rows) {
     const row = rows[rowIndex];
     if (!Array.isArray(row)) continue;
 
-    const serial = row[0];
+    const serial = parseSerial(row[0]);
     const nameText = cellToString(row[1]);
     if (nameText.toUpperCase().includes("PAY ROLL")) break;
-    if (typeof serial !== "number" || serial < 1 || serial > 100) continue;
+    if (!Number.isFinite(serial) || serial < 1 || serial > 100) continue;
     if (!nameText || /^\d+(\.\d+)?$/.test(nameText)) continue;
 
     const designation = cellToString(row[2]);
@@ -152,14 +208,14 @@ function parseEmployeeRows(sheetName, rows) {
         blankCells += 1;
         continue;
       }
-      const sourceCode = cellToString(raw).toUpperCase();
-      statusCounts[sourceCode] = (statusCounts[sourceCode] ?? 0) + 1;
-      const mapped = ATTENDANCE_STATUS_MAP[sourceCode] ?? null;
+      const mapped = mapAttendanceCode(raw, date);
+      if (mapped.skip) continue;
+      statusCounts[mapped.sourceCode] = (statusCounts[mapped.sourceCode] ?? 0) + 1;
       dayStatuses.push({
         date,
-        sourceCode,
-        mappedStatus: mapped,
-        unknown: !mapped,
+        sourceCode: mapped.sourceCode,
+        mappedStatus: mapped.mappedStatus,
+        unknown: mapped.unknown,
       });
       attendanceRecords.push({
         sheetName,
@@ -167,10 +223,12 @@ function parseEmployeeRows(sheetName, rows) {
         normalizedName: normalized,
         designation,
         date,
-        sourceCode,
-        mappedStatus: mapped,
-        notes: mapped ? `src:${sourceCode}` : `src:UNKNOWN:${sourceCode}`,
-        unknown: !mapped,
+        sourceCode: mapped.sourceCode,
+        mappedStatus: mapped.mappedStatus,
+        notes: mapped.mappedStatus
+          ? `src:${mapped.sourceCode}`
+          : `src:UNKNOWN:${mapped.sourceCode}`,
+        unknown: mapped.unknown,
       });
     }
 
@@ -302,8 +360,15 @@ export function parseAttendanceWorkbook(filePath) {
   const allPayroll = [];
   const allEmployeesByMonth = {};
 
+  const sheetNameByCanonical = new Map();
+  for (const actualName of workbook.SheetNames) {
+    const canonical = canonicalMonthSheetName(actualName);
+    if (canonical) sheetNameByCanonical.set(canonical, actualName);
+  }
+
   for (const sheetName of MONTH_SHEETS) {
-    const sheet = workbook.Sheets[sheetName];
+    const actualName = sheetNameByCanonical.get(sheetName) ?? sheetName;
+    const sheet = workbook.Sheets[actualName];
     if (!sheet) {
       sheets[sheetName] = { sheetName, empty: true, missing: true };
       continue;

@@ -7,6 +7,7 @@ import {
 } from "@/lib/company-settings/services/company-settings-parsers";
 import {
   calculateLeaveDuration,
+  calendarWithEmployeeNonWorkingDates,
   DEFAULT_LEAVE_CALENDAR,
   type LeaveCalendarContext,
   type LeaveWeekendRule,
@@ -347,6 +348,33 @@ async function pendingCreditForRequest(
   return { code, days: Number(data.total_days) };
 }
 
+async function loadApprovedOptionalHolidayDates(
+  supabase: AuthSupabaseClient,
+  employeeId: string,
+  year: number,
+  excludeRequestId?: string,
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("leave_requests")
+    .select("id, start_date, leave_types:leave_type_id (code)")
+    .eq("employee_id", employeeId)
+    .eq("leave_status", "approved")
+    .gte("start_date", `${year}-01-01`)
+    .lte("start_date", `${year}-12-31`)
+    .is("deleted_at", null);
+  if (error) throw new Error(error.message);
+
+  const dates: string[] = [];
+  for (const row of data ?? []) {
+    if (excludeRequestId && row.id === excludeRequestId) continue;
+    const leaveType = Array.isArray(row.leave_types) ? row.leave_types[0] : row.leave_types;
+    if (String(leaveType?.code ?? "").toUpperCase() !== OPTIONAL_HOLIDAY_CODE) continue;
+    dates.push(String(row.start_date).slice(0, 10));
+  }
+  return dates;
+}
+
 export async function evaluateLeaveApplication(
   supabase: AuthSupabaseClient,
   organizationId: string,
@@ -356,6 +384,7 @@ export async function evaluateLeaveApplication(
     startDate: string;
     endDate: string;
     isHalfDay: boolean;
+    halfDayPeriod?: "morning" | "afternoon" | "" | null;
     excludeRequestId?: string;
     pendingCredit?: { code: string; days: number };
     skipNotice?: boolean;
@@ -403,11 +432,21 @@ export async function evaluateLeaveApplication(
     throw new Error(LEAVE_TYPE_NOT_ELIGIBLE_MESSAGE);
   }
 
+  const durationCalendar = calendarWithEmployeeNonWorkingDates(
+    runtime.calendar,
+    await loadApprovedOptionalHolidayDates(
+      supabase,
+      input.employeeId,
+      getCurrentBalanceYear(input.startDate),
+      input.excludeRequestId,
+    ),
+  );
+
   const duration = calculateLeaveDuration({
     startDate: input.startDate,
     endDate: input.endDate,
     isHalfDay: input.isHalfDay,
-    calendar: runtime.calendar,
+    calendar: durationCalendar,
   });
 
   const { data: balance } = await supabase
@@ -524,6 +563,7 @@ export async function evaluateLeaveApplication(
     startDate: input.startDate,
     endDate: input.endDate,
     isHalfDay: input.isHalfDay,
+    halfDayPeriod: input.halfDayPeriod,
     leaveTypeCode: leaveType.code,
     isPaid: leaveType.isPaid,
     duration,
@@ -553,7 +593,7 @@ export async function evaluateLeaveApplication(
         });
 
   return {
-    runtime,
+    runtime: { ...runtime, calendar: durationCalendar },
     employee,
     leaveType,
     duration,

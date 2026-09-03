@@ -5,7 +5,7 @@ import { useState } from "react";
 import { HrTeamAttendanceView } from "@/components/attendance/hr-team-attendance-view";
 import { CeoAttendanceRecordDrawer } from "@/components/ceo/attendance/ceo-attendance-record-drawer";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
-import type { AttendanceListItem, AttendanceLookups, AttendanceSummary } from "@/types/attendance";
+import type { AttendanceListItem, AttendanceLookups, AttendanceSummary, AttendanceHistoryCounts } from "@/types/attendance";
 import type { LookupOption } from "@/types/employee";
 
 type CeoTeamAttendanceViewProps = {
@@ -24,6 +24,7 @@ type CeoTeamAttendanceViewProps = {
   departments: LookupOption[];
   employees: LookupOption[];
   attendanceLookups?: AttendanceLookups;
+  historyCounts?: AttendanceHistoryCounts;
 };
 
 export function CeoTeamAttendanceView({
@@ -42,6 +43,7 @@ export function CeoTeamAttendanceView({
   departments,
   employees,
   attendanceLookups,
+  historyCounts,
 }: CeoTeamAttendanceViewProps) {
   const [viewAttendanceId, setViewAttendanceId] = useState<string | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
@@ -70,6 +72,7 @@ export function CeoTeamAttendanceView({
         listBasePath={CEO_ROUTES.attendance}
         title="Attendance"
         description="Monitor company-wide attendance records and workforce presence. This page is read-only."
+        historyCounts={historyCounts}
         onViewRecord={(row) => {
           setViewAttendanceId(row.id);
           setViewOpen(true);

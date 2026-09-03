@@ -267,6 +267,7 @@ export function LeaveForm({
   function applyHalfDayToggle(checked: boolean) {
     form.setValue("isHalfDay", checked, { shouldValidate: true });
     if (checked) {
+      form.setValue("halfDayPeriod", "afternoon", { shouldValidate: true });
       // Half-day leave may start today (no advance-notice lock).
       const sameDayStart = earliestAllowedLeaveStart(
         selectedLeaveTypeCode || CASUAL_LEAVE_CODE,
@@ -342,7 +343,11 @@ export function LeaveForm({
     if (isPending) return;
     setSubmitError(null);
     startTransition(async () => {
-      const payload = { ...values, isHalfDay: false, halfDayPeriod: "" };
+      const payload = {
+        ...values,
+        isHalfDay: values.isHalfDay,
+        halfDayPeriod: values.isHalfDay ? "afternoon" : "",
+      };
       const result = isEdit
         ? await updateLeaveRequestAction(initialRequest!.id, payload)
         : await createLeaveRequestAction(payload);
@@ -390,7 +395,8 @@ export function LeaveForm({
           leaveTypeId: selectedLeaveTypeId,
           startDate,
           endDate,
-          isHalfDay: false,
+          isHalfDay,
+          halfDayPeriod: isHalfDay ? "afternoon" : "",
           enforceSelfServiceLimits: isSelfService,
         })
       : null;
@@ -608,6 +614,23 @@ export function LeaveForm({
           </>
         )}
 
+        {!isOptionalHoliday ? (
+          <div className="md:col-span-2">
+            <label className="flex items-start gap-2 text-sm text-foreground">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4 rounded border-input"
+                checked={isHalfDay}
+                disabled={isPending}
+                onChange={(event) => applyHalfDayToggle(event.target.checked)}
+              />
+              <span>
+                Second-half leave only (3:00 p.m. to 7:00 p.m.). Morning off requires a full-day leave.
+              </span>
+            </label>
+          </div>
+        ) : null}
+
         {isSelfService && applyPreview ? (
           <div className="md:col-span-2 space-y-2">
             <div className="rounded-xl border bg-muted/20 px-3 py-2.5">
@@ -736,7 +759,7 @@ export function LeaveForm({
               leaveTypeId={selectedLeaveTypeId}
               startDate={startDate}
               endDate={endDate}
-              isHalfDay={false}
+              isHalfDay={isHalfDay}
             />
           </div>
         ) : null}

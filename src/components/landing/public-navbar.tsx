@@ -38,10 +38,7 @@ function NavbarChrome({ compact = false }: PublicNavbarProps) {
   const pathname = usePathname();
   const isLandingRoute = pathname === PUBLIC_LANDING_ROUTE;
   const landingCta = useContext(LandingCtaContext);
-  const isMobileOrTablet = landingCta?.isMobileOrTablet ?? false;
   const handleCta = landingCta?.handleLandingCta ?? navigateToLogin;
-  /** Mobile/tablet landing: no Get Started in the navbar. Desktop keeps Sign In. */
-  const showDesktopSignIn = compact || !isMobileOrTablet;
 
   useEffect(() => {
     const onScroll = () => {
@@ -125,21 +122,19 @@ function NavbarChrome({ compact = false }: PublicNavbarProps) {
         )}
 
         <div className="landing-nav-actions">
-          {showDesktopSignIn ? (
-            <button
-              type="button"
-              onClick={handleCta}
-              className={cn(
-                "landing-nav-signin",
-                compact
-                  ? "landing-nav-signin--outline"
-                  : "landing-nav-cta landing-nav-cta--desktop-only",
-              )}
-            >
-              Sign In
-              {!compact ? <ArrowRight className="size-3.5" aria-hidden /> : null}
-            </button>
-          ) : null}
+          <button
+            type="button"
+            onClick={handleCta}
+            className={cn(
+              "landing-nav-signin",
+              compact
+                ? "landing-nav-signin--outline"
+                : "landing-nav-cta landing-nav-cta--from-tablet",
+            )}
+          >
+            Sign In
+            {!compact ? <ArrowRight className="size-3.5" aria-hidden /> : null}
+          </button>
 
           {!compact ? (
             <button

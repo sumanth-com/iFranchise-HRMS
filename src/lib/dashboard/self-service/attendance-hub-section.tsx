@@ -82,7 +82,11 @@ export async function AttendanceHubSection({
       ? getAttendanceLookups(supabase, profile.employee.organizationId)
       : Promise.resolve(null),
     loadTeamSection
-      ? getAttendanceSummary(supabase, profile, teamParams.dateFrom, teamParams.dateTo)
+      ? getAttendanceSummary(supabase, profile, teamParams.dateFrom, teamParams.dateTo, {
+          departmentId: teamParams.departmentId,
+          branchId: teamParams.branchId,
+          employeeId: teamParams.employeeId,
+        })
       : Promise.resolve(null),
   ]);
 
@@ -188,6 +192,7 @@ export async function AttendanceHubSection({
         canEdit: hasPermission(profile.permissionCodes, "attendance.edit"),
         canDelete: hasPermission(profile.permissionCodes, "attendance.delete"),
         canApproveCorrections: hasPermission(profile.permissionCodes, "attendance.approve"),
+        historyCounts: teamResult?.historyCounts,
       }}
     />
   );

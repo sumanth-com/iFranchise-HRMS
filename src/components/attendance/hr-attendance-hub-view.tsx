@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FileText } from "lucide-react";
+import { FileText, CalendarDays } from "lucide-react";
 
 import { buttonVariants, POLICY_HEADER_BUTTON_CLASS } from "@/components/common/button";
 import { HrTeamAttendanceView } from "@/components/attendance/hr-team-attendance-view";
@@ -9,7 +9,7 @@ import { EmployeeAttendanceView } from "@/components/employee/attendance/employe
 import { SELF_ATTENDANCE_ROUTES, ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
 import { cn } from "@/lib/utils";
 import type { AttendanceStatus } from "@/types/attendance";
-import type { AttendanceListItem, AttendanceLookups, AttendanceSummary } from "@/types/attendance";
+import type { AttendanceListItem, AttendanceLookups, AttendanceSummary, AttendanceHistoryCounts } from "@/types/attendance";
 import type { LookupOption } from "@/types/employee";
 import type { ManagerProfilePageData } from "@/types/manager-self-attendance";
 
@@ -35,6 +35,7 @@ type TeamAttendanceData = {
   canEdit: boolean;
   canDelete: boolean;
   canApproveCorrections: boolean;
+  historyCounts?: AttendanceHistoryCounts;
 };
 
 type Props = {
@@ -70,17 +71,25 @@ export function HrAttendanceHubView({
               : "Mark attendance, view your calendar, and track your working hours."}
           </p>
         </div>
-        <Link
-          href={isTeamView ? ATTENDANCE_ROUTES.policy : SELF_ATTENDANCE_ROUTES.policy}
-          className={cn(
-            buttonVariants({ variant: "outline", size: "sm" }),
-            POLICY_HEADER_BUTTON_CLASS,
-            "gap-1.5",
-          )}
-        >
-          <FileText className="size-4" />
-          Attendance Policy
-        </Link>
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {isTeamView ? (
+            <span className="inline-flex h-9 items-center gap-2 whitespace-nowrap text-sm font-semibold text-foreground">
+              <CalendarDays className="size-4 shrink-0 text-muted-foreground" />
+              Summary for {teamAttendance.summary.date}
+            </span>
+          ) : null}
+          <Link
+            href={isTeamView ? ATTENDANCE_ROUTES.policy : SELF_ATTENDANCE_ROUTES.policy}
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              POLICY_HEADER_BUTTON_CLASS,
+              "gap-1.5",
+            )}
+          >
+            <FileText className="size-4" />
+            Attendance Policy
+          </Link>
+        </div>
       </div>
 
       {isTeamView ? (

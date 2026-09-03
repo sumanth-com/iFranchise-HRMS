@@ -18,6 +18,7 @@ import type {
 } from "@/types/leave";
 import { leaveListParamsSchema } from "@/lib/validations/leave";
 import { formatCleanEmployeeName } from "@/lib/employees/parse-employee-name";
+import { isHiddenFromPeopleFilters } from "@/lib/employee/directory-listing";
 import {
   ALLOWED_LEAVE_TYPE_CODES,
   LEAVE_BALANCE_DISPLAY_CODES,
@@ -52,7 +53,7 @@ import {
 } from "@/lib/leave/optional-holiday";
 import {
   getBranches,
-  getDepartments,
+  getOccupiedDepartments,
   getEmploymentTypes,
 } from "@/lib/employees/services/employee-queries";
 import {
@@ -1542,16 +1543,25 @@ export async function getLeaveLookups(
         .in("code", [...ALLOWED_LEAVE_TYPE_CODES]),
       selfApplicant
         ? Promise.resolve([] as LookupOption[])
-        : getDepartments(supabase, organizationId),
+        : getOccupiedDepartments(supabase, organizationId),
       selfApplicant
         ? Promise.resolve([] as LookupOption[])
         : getBranches(supabase, organizationId),
       selfApplicant
-        ? Promise.resolve({ data: [] as { id: string; first_name: string; last_name: string; employee_code: string }[], error: null })
+        ? Promise.resolve({
+            data: [] as {
+              id: string;
+              first_name: string;
+              last_name: string;
+              employee_code: string;
+              designations?: { title: string } | { title: string }[] | null;
+            }[],
+            error: null,
+          })
         : supabase
             .schema("hrms")
             .from("employees")
-            .select("id, first_name, last_name, employee_code")
+            .select("id, first_name, last_name, employee_code, designations:designation_id (title)")
             .eq("organization_id", organizationId)
             .is("deleted_at", null)
             .in("employment_status", ["active", "probation", "on_leave"])
@@ -1581,11 +1591,26 @@ export async function getLeaveLookups(
 
   const employees = selfApplicant
     ? [selfApplicant]
-    : (employeesResult.data ?? []).map((row) => ({
-        id: row.id,
-        label: `${row.first_name} ${row.last_name}`.trim(),
-        code: row.employee_code,
-      }));
+    : (employeesResult.data ?? [])
+        .filter((row) => {
+          const designation = Array.isArray(row.designations)
+            ? row.designations[0]
+            : row.designations;
+          return !isHiddenFromPeopleFilters(row.employee_code, {
+            employeeCode: row.employee_code,
+            firstName: row.first_name,
+            lastName: row.last_name,
+            designationTitle:
+              designation && typeof designation === "object" && "title" in designation
+                ? designation.title
+                : null,
+          });
+        })
+        .map((row) => ({
+          id: row.id,
+          label: `${row.first_name} ${row.last_name}`.trim(),
+          code: row.employee_code,
+        }));
 
   // Reuse the same bounded employee list for manager/approver filters (avoids a
   // second full-org employees scan that previously mirrored getManagers()).

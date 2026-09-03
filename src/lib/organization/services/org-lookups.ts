@@ -1,6 +1,7 @@
 import { cache } from "react";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { isHiddenFromPeopleFilters } from "@/lib/employee/directory-listing";
 import { sortEmploymentTypeOptions } from "@/lib/employees/employment-type-display";
 import type { LookupOption } from "@/types/employee";
 
@@ -167,11 +168,19 @@ export const getEmployeeLookups = cache(async function getEmployeeLookups(
   const { data, error } = await query;
   if (error) throw new Error(error.message);
 
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    label: `${row.first_name} ${row.last_name}`,
-    code: row.employee_code,
-  }));
+  return (data ?? [])
+    .filter((row) =>
+      !isHiddenFromPeopleFilters(row.employee_code, {
+        employeeCode: row.employee_code,
+        firstName: row.first_name,
+        lastName: row.last_name,
+      }),
+    )
+    .map((row) => ({
+      id: row.id,
+      label: `${row.first_name} ${row.last_name}`,
+      code: row.employee_code,
+    }));
 });
 
 export async function getOrganizationLookups(

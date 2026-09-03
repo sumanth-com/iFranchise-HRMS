@@ -10,16 +10,11 @@ import {
 import { format, parseISO } from "date-fns";
 import {
   AlertCircle,
-  BadgeCheck,
   Ban,
-  Briefcase,
   CalendarDays,
   CheckCircle2,
   Eye,
-  Layers,
   Trash2,
-  User,
-  UserCheck,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -31,6 +26,11 @@ import {
 } from "@/components/leave/leave-summary-cards";
 import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
+import {
+  TABLE_HEADER_CELL_CLASS,
+  TABLE_HEADER_ROW_CLASS,
+  TABLE_HEADER_STICKY_CLASS,
+} from "@/components/common/table-header-classes";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -69,7 +69,6 @@ import type {
   LeaveListResult,
 } from "@/types/leave";
 import type { LookupOption } from "@/types/employee";
-import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type LeaveTableProps = {
@@ -107,12 +106,9 @@ type LeaveTableProps = {
   onMutated?: () => void;
 };
 
-const TABLE_HEAD_CELL_CLASS = "h-11 whitespace-nowrap py-3.5 pl-10 pr-4";
-const TABLE_DATA_CELL_CLASS = "whitespace-nowrap py-3.5 pl-10 pr-4";
-const TABLE_ACTIONS_CELL_CLASS = "w-12 px-2 py-3.5";
+const TABLE_DATA_CELL_CLASS = "whitespace-nowrap px-4 py-3";
+const TABLE_ACTIONS_CELL_CLASS = "w-12 px-2 py-3 text-center";
 
-const TABLE_HEAD_CLASS =
-  "sticky top-0 z-20 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-[0_1px_0_rgba(255,255,255,0.12)]";
 const TABLE_CELL_CLASS = "relative align-middle";
 
 const FILTER_CONTROL_CLASS =
@@ -132,50 +128,6 @@ const MONTH_ITEMS = [
   { value: "11", label: "November" },
   { value: "12", label: "December" },
 ];
-
-function HeadLabel({
-  label,
-  icon: Icon,
-  iconClassName,
-}: {
-  label: string;
-  icon: LucideIcon;
-  iconClassName?: string;
-}) {
-  return (
-    <>
-      <Icon
-        className={cn(
-          "pointer-events-none absolute top-1/2 left-4 size-3.5 -translate-y-1/2 text-white",
-          iconClassName,
-        )}
-      />
-      <span className="font-medium whitespace-nowrap text-white">{label}</span>
-    </>
-  );
-}
-
-function CenteredHeadLabel({
-  label,
-  icon: Icon,
-  className,
-}: {
-  label: string;
-  icon: LucideIcon;
-  className?: string;
-}) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-2 font-medium text-white",
-        className,
-      )}
-    >
-      <Icon className="size-3.5 shrink-0 text-white" />
-      <span className="whitespace-nowrap">{label}</span>
-    </span>
-  );
-}
 
 function buildYearItems() {
   return getHrmsYearSelectItems();
@@ -856,103 +808,38 @@ export function LeaveTable({
           data-slot="table"
           className="w-max min-w-full caption-bottom bg-white text-sm dark:bg-input"
         >
-          <TableHeader className="sticky top-0 z-30 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600">
-            <TableRow className="border-white/10 bg-transparent hover:bg-white/5">
-              <TableHead
-                className={cn(
-                  "min-w-[14rem]",
-                  TABLE_HEAD_CLASS,
-                  TABLE_CELL_CLASS,
-                  TABLE_HEAD_CELL_CLASS,
-                )}
-              >
-                <HeadLabel label="Employee" icon={User} />
+          <TableHeader className={TABLE_HEADER_STICKY_CLASS}>
+            <TableRow className={TABLE_HEADER_ROW_CLASS}>
+              <TableHead className={cn(TABLE_HEADER_CELL_CLASS, "min-w-[14rem]")}>
+                Employee
               </TableHead>
-              <TableHead
-                className={cn(
-                  "min-w-[9.5rem]",
-                  TABLE_HEAD_CLASS,
-                  TABLE_CELL_CLASS,
-                  TABLE_HEAD_CELL_CLASS,
-                )}
-              >
-                <HeadLabel label="Designation" icon={Briefcase} />
+              <TableHead className={cn(TABLE_HEADER_CELL_CLASS, "min-w-[9.5rem]")}>
+                Designation
               </TableHead>
-              <TableHead
-                className={cn(
-                  "min-w-[10rem]",
-                  TABLE_HEAD_CLASS,
-                  TABLE_CELL_CLASS,
-                  TABLE_HEAD_CELL_CLASS,
-                )}
-              >
-                <HeadLabel label="Leave Type" icon={Layers} />
+              <TableHead className={cn(TABLE_HEADER_CELL_CLASS, "min-w-[10rem]")}>
+                Leave Type
               </TableHead>
-              <TableHead
-                className={cn(
-                  "h-11 min-w-[7rem] whitespace-nowrap px-4 py-3.5 text-center",
-                  TABLE_HEAD_CLASS,
-                  TABLE_CELL_CLASS,
-                )}
-              >
-                <CenteredHeadLabel label="Duration" icon={CalendarDays} />
+              <TableHead className={cn(TABLE_HEADER_CELL_CLASS, "min-w-[7rem] text-center")}>
+                Duration
               </TableHead>
-              <TableHead
-                className={cn(
-                  "min-w-[10.5rem]",
-                  TABLE_HEAD_CLASS,
-                  TABLE_CELL_CLASS,
-                  TABLE_HEAD_CELL_CLASS,
-                )}
-              >
-                <HeadLabel label="Start Date" icon={CalendarDays} />
+              <TableHead className={cn(TABLE_HEADER_CELL_CLASS, "min-w-[10.5rem]")}>
+                Start Date
               </TableHead>
-              <TableHead
-                className={cn(
-                  "min-w-[10.5rem]",
-                  TABLE_HEAD_CLASS,
-                  TABLE_CELL_CLASS,
-                  TABLE_HEAD_CELL_CLASS,
-                )}
-              >
-                <HeadLabel label="End Date" icon={CalendarDays} />
+              <TableHead className={cn(TABLE_HEADER_CELL_CLASS, "min-w-[10.5rem]")}>
+                End Date
               </TableHead>
-              <TableHead
-                className={cn(
-                  "min-w-[10.5rem]",
-                  TABLE_HEAD_CLASS,
-                  TABLE_CELL_CLASS,
-                  TABLE_HEAD_CELL_CLASS,
-                )}
-              >
-                <HeadLabel label="Applied On" icon={CalendarDays} />
+              <TableHead className={cn(TABLE_HEADER_CELL_CLASS, "min-w-[10.5rem]")}>
+                Applied On
               </TableHead>
               {!embedded ? (
-                <TableHead
-                  className={cn(
-                    "min-w-[10rem]",
-                    TABLE_HEAD_CLASS,
-                    TABLE_CELL_CLASS,
-                    TABLE_HEAD_CELL_CLASS,
-                  )}
-                >
-                  <HeadLabel label="Approver" icon={UserCheck} />
+                <TableHead className={cn(TABLE_HEADER_CELL_CLASS, "min-w-[10rem]")}>
+                  Approver
                 </TableHead>
               ) : null}
-              <TableHead
-                className={cn(
-                  "h-11 min-w-[8.5rem] whitespace-nowrap px-4 py-3.5 text-center",
-                  TABLE_HEAD_CLASS,
-                  TABLE_CELL_CLASS,
-                )}
-              >
-                <CenteredHeadLabel
-                  label="Status"
-                  icon={BadgeCheck}
-                  className="-translate-x-2"
-                />
+              <TableHead className={cn(TABLE_HEADER_CELL_CLASS, "min-w-[8.5rem] text-center")}>
+                Status
               </TableHead>
-              <TableHead className={cn(TABLE_HEAD_CLASS, TABLE_ACTIONS_CELL_CLASS)} />
+              <TableHead className={cn(TABLE_HEADER_CELL_CLASS, TABLE_ACTIONS_CELL_CLASS)} />
             </TableRow>
           </TableHeader>
           <TableBody>

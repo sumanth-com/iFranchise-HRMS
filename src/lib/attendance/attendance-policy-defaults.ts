@@ -46,11 +46,11 @@ The Result: Because duty was not officially resumed, the succeeding Sunday will 
       title: "The Sandwich Leave Policy",
       content: `To prevent the fragmentation of the workweek, the company follows a strict Sandwich Leave Policy for intervening weekends and holidays.
 
-What is it? If an employee takes leave on the working day(s) immediately before and immediately after a Sunday or public holiday, that Sunday/holiday is considered "sandwiched."
+What is it? A sandwich applies only when you are absent or on LOP on both scheduled working days beside a weekly off (Sunday). Official National and Festival holidays are never sandwiched or deducted as LOP. Second and fourth Saturdays remain working days. An Optional Holiday is non-working only if you selected it and it was approved.
 
-Impact on Paid Leave: If you take approved paid leaves (e.g., CL/EL) on both Saturday and Monday, the intervening Sunday will be deducted from your available leave balance.
+Impact on Paid Leave: If approved paid leave (CL/EL) covers both adjacent working days, the intervening Sunday is counted against leave or LOP according to remaining balance.
 
-Impact on Unpaid Leave (LOP): If the leave on either side of the Sunday is marked as LOP, the sandwiched Sunday will automatically be processed as LOP (Unpaid).`,
+Impact on Unpaid Leave (LOP): If both adjacent working days are LOP or unauthorised absence, the sandwiched Sunday is LOP. HR can correct genuine errors before payroll is finalised.`,
     },
     {
       id: "examples",

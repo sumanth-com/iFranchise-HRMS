@@ -34,11 +34,17 @@ export type AttendanceListItem = {
   correctionStatus: CorrectionStatus | null;
 };
 
+export type AttendanceHistoryCounts = {
+  presentDays: number;
+  absentDays: number;
+};
+
 export type AttendanceListResult = {
   data: AttendanceListItem[];
   total: number;
   page: number;
   pageSize: number;
+  historyCounts?: AttendanceHistoryCounts;
 };
 
 export type AttendanceSortField =

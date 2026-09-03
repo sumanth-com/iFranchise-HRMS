@@ -39,6 +39,11 @@ import {
   parseHrReviewMetadata,
 } from "@/lib/leave/hr-review";
 import { roundLeaveDays } from "@/lib/leave/services/leave-usage";
+import type { LeaveDurationBreakdown } from "@/lib/leave/services/leave-calendar-engine";
+import {
+  clearAttendanceForLeaveRequest,
+  syncAttendanceForApprovedLeave,
+} from "@/lib/leave/services/leave-attendance-sync";
 import { isPeriodLeaveEligible } from "@/lib/leave/period-leave-eligibility";
 import {
   notifyLeaveApproved,
@@ -53,6 +58,21 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 function emptyToNull(value?: string | null) {
   return value && value.trim().length > 0 ? value.trim() : null;
+}
+
+async function refreshDraftPayrollAfterLeaveChange(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  employeeId: string,
+) {
+  try {
+    const { refreshDraftPayrollItemsForEmployee } = await import(
+      "@/lib/payroll/services/payroll-mutations"
+    );
+    await refreshDraftPayrollItemsForEmployee(supabase, profile, employeeId);
+  } catch (error) {
+    console.error("[leave] payroll refresh failed", error);
+  }
 }
 
 /**
@@ -472,6 +492,7 @@ export async function createLeaveRequest(
       startDate: input.startDate,
       endDate: input.endDate,
       isHalfDay: input.isHalfDay,
+      halfDayPeriod: input.isHalfDay ? input.halfDayPeriod || "afternoon" : null,
       enforceSelfServiceLimits: profile.employee.id === input.employeeId,
     },
   );
@@ -881,7 +902,7 @@ async function finalizeApprovalIfComplete(
     .schema("hrms")
     .from("leave_requests")
     .select(
-      "employee_id, leave_type_id, start_date, end_date, total_days, duration_breakdown, is_half_day, leave_status",
+      "employee_id, leave_type_id, start_date, end_date, total_days, duration_breakdown, is_half_day, half_day_period, leave_status",
     )
     .eq("id", leaveRequestId)
     .single();
@@ -915,6 +936,7 @@ async function finalizeApprovalIfComplete(
       startDate: request.start_date,
       endDate: request.end_date,
       isHalfDay: Boolean(request.is_half_day),
+      halfDayPeriod: request.half_day_period,
       excludeRequestId: leaveRequestId,
       skipNotice: true,
     },
@@ -973,6 +995,12 @@ async function finalizeApprovalIfComplete(
     id: leaveRequestId,
     employeeId: request.employee_id,
   });
+  await syncAttendanceForApprovedLeave(supabase, profile, {
+    employeeId: request.employee_id,
+    leaveRequestId,
+    duration: evaluated.duration,
+  });
+  await refreshDraftPayrollAfterLeaveChange(supabase, profile, request.employee_id);
 }
 
 export async function approveLeaveRequest(
@@ -985,7 +1013,7 @@ export async function approveLeaveRequest(
     .schema("hrms")
     .from("leave_requests")
     .select(
-      "id, employee_id, leave_status, leave_type_id, start_date, end_date, total_days, duration_breakdown, is_half_day",
+      "id, employee_id, leave_status, leave_type_id, start_date, end_date, total_days, duration_breakdown, is_half_day, half_day_period",
     )
     .eq("id", leaveRequestId)
     .single();
@@ -1050,6 +1078,7 @@ export async function approveLeaveRequest(
         startDate: request.start_date,
         endDate: request.end_date,
         isHalfDay: Boolean(request.is_half_day),
+        halfDayPeriod: request.half_day_period,
         excludeRequestId: leaveRequestId,
         skipNotice: true,
       },
@@ -1141,6 +1170,12 @@ export async function approveLeaveRequest(
       id: leaveRequestId,
       employeeId: request.employee_id,
     });
+    await syncAttendanceForApprovedLeave(supabase, profile, {
+      employeeId: request.employee_id,
+      leaveRequestId,
+      duration: evaluated.duration,
+    });
+    await refreshDraftPayrollAfterLeaveChange(supabase, profile, request.employee_id);
     return;
   }
 
@@ -1482,6 +1517,17 @@ export async function decideHrLeaveReview(
     decision === "reject" ? "leave.rejected" : "leave.approved",
     { id: leaveRequestId, employeeId: request.employee_id },
   );
+  if (decision !== "reject") {
+    const duration = request.duration_breakdown as LeaveDurationBreakdown | null;
+    if (duration?.days?.length) {
+      await syncAttendanceForApprovedLeave(supabase, profile, {
+        employeeId: request.employee_id,
+        leaveRequestId,
+        duration,
+      });
+    }
+    await refreshDraftPayrollAfterLeaveChange(supabase, profile, request.employee_id);
+  }
 }
 
 export async function cancelLeaveRequest(
@@ -1572,6 +1618,15 @@ export async function cancelLeaveRequest(
     recordId: leaveRequestId,
     metadata: { previousStatus, totalDays, balanceRestored: leaveType?.is_paid !== false },
   });
+  if (previousStatus === "approved") {
+    const duration = request.duration_breakdown as LeaveDurationBreakdown | null;
+    await clearAttendanceForLeaveRequest(supabase, profile, {
+      employeeId: request.employee_id,
+      leaveRequestId,
+      duration,
+    });
+    await refreshDraftPayrollAfterLeaveChange(supabase, profile, request.employee_id);
+  }
 }
 
 export async function deleteLeaveRequest(
@@ -1670,6 +1725,7 @@ export async function updateLeaveRequest(
       startDate: input.startDate,
       endDate: input.endDate,
       isHalfDay: input.isHalfDay,
+      halfDayPeriod: input.isHalfDay ? input.halfDayPeriod || "afternoon" : null,
       excludeRequestId: leaveRequestId,
       enforceSelfServiceLimits: profile.employee.id === input.employeeId,
     },

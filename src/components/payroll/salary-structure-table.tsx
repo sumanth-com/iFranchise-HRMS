@@ -12,6 +12,8 @@ import {
 import { format } from "date-fns";
 import { toast } from "sonner";
 
+import { toUserFriendlyError } from "@/lib/errors/user-messages";
+
 import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
@@ -26,6 +28,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { deleteSalaryStructureAction } from "@/lib/payroll/actions";
+import {
+  filterSalaryStructuresForPeriod,
+  isUnsetSalaryStructure,
+} from "@/lib/payroll/salary-structure-period";
 import { formatCurrency } from "@/lib/payroll/services/payroll-utils";
 import { getHrmsYearSelectItems } from "@/lib/date/hrms-year";
 import type { LookupOption } from "@/types/employee";
@@ -70,21 +76,15 @@ export function SalaryStructureTable({
   );
 
   const filteredRecords = useMemo(() => {
-    return records.filter((r) => {
-      const isUnset = r.id.startsWith("not_set_");
-      if (monthFilter && monthFilter !== "all" && !isUnset) {
-        const d = new Date(r.effectiveFrom);
-        if (d.getMonth() + 1 !== Number(monthFilter)) return false;
-      }
-      if (yearFilter && yearFilter !== "all" && !isUnset) {
-        const d = new Date(r.effectiveFrom);
-        if (d.getFullYear() !== Number(yearFilter)) return false;
-      }
-      if (employeeFilter !== "all" && r.employeeId !== employeeFilter) return false;
-      if (statusFilter === "current" && (isUnset || !r.isCurrent)) return false;
-      if (statusFilter === "historical" && (isUnset || r.isCurrent)) return false;
-      if (statusFilter === "not_configured" && !isUnset) return false;
-      return true;
+    return filterSalaryStructuresForPeriod(records, {
+      month: monthFilter === "all" ? "all" : Number(monthFilter),
+      year: yearFilter === "all" ? "all" : Number(yearFilter),
+      employeeId: employeeFilter,
+      status: statusFilter as
+        | "all"
+        | "current"
+        | "historical"
+        | "not_configured",
     });
   }, [records, monthFilter, yearFilter, employeeFilter, statusFilter]);
 
@@ -104,7 +104,7 @@ export function SalaryStructureTable({
   }, []);
 
   function openEditDialog(record: SalaryStructureItem) {
-    const isUnset = record.id.startsWith("not_set_");
+    const isUnset = isUnsetSalaryStructure(record.id);
     setDialogMode(isUnset ? "create" : "edit");
     setEditingRecord(record);
     setDialogOpen(true);
@@ -119,7 +119,7 @@ export function SalaryStructureTable({
     startDeleteTransition(async () => {
       const result = await deleteSalaryStructureAction(deleting.id);
       if (!result.success) {
-        toast.error(result.message);
+        toast.error(toUserFriendlyError(result.message, "Failed to delete salary structure"));
         return;
       }
       toast.success("Salary structure deleted");
@@ -161,7 +161,7 @@ export function SalaryStructureTable({
       accessorKey: "effectiveFrom",
       header: "Effective from",
       cell: ({ row }) => {
-        if (row.original.id.startsWith("not_set_")) {
+        if (isUnsetSalaryStructure(row.original.id)) {
           return <span className="text-muted-foreground">—</span>;
         }
         return format(new Date(row.original.effectiveFrom), "MMM d, yyyy");
@@ -171,7 +171,7 @@ export function SalaryStructureTable({
       accessorKey: "grossSalary",
       header: "Gross",
       cell: ({ row }) => {
-        if (row.original.id.startsWith("not_set_")) {
+        if (isUnsetSalaryStructure(row.original.id)) {
           return <span className="text-muted-foreground">—</span>;
         }
         return formatCurrency(row.original.grossSalary);
@@ -181,7 +181,7 @@ export function SalaryStructureTable({
       accessorKey: "netSalary",
       header: "Net",
       cell: ({ row }) => {
-        if (row.original.id.startsWith("not_set_")) {
+        if (isUnsetSalaryStructure(row.original.id)) {
           return <span className="text-muted-foreground">—</span>;
         }
         return formatCurrency(row.original.netSalary);
@@ -191,7 +191,7 @@ export function SalaryStructureTable({
       id: "status",
       header: "Status",
       cell: ({ row }) => {
-        if (row.original.id.startsWith("not_set_")) {
+        if (isUnsetSalaryStructure(row.original.id)) {
           return (
             <span className="inline-flex rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
               Not configured
@@ -215,7 +215,7 @@ export function SalaryStructureTable({
             id: "actions",
             header: () => "Actions",
             cell: ({ row }: { row: { original: SalaryStructureItem } }) => {
-              const isUnset = row.original.id.startsWith("not_set_");
+              const isUnset = isUnsetSalaryStructure(row.original.id);
               return (
                 <div className="flex justify-end gap-2">
                   <Button

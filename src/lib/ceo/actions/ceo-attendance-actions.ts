@@ -170,7 +170,11 @@ export async function getCeoTeamAttendancePageData(params: AttendanceListParams)
   const [records, lookups, summary] = await Promise.all([
     listAttendance(supabase, viewProfile, parsed),
     getAttendanceLookups(supabase, viewProfile.employee.organizationId),
-    getAttendanceSummary(supabase, viewProfile, parsed.dateFrom, parsed.dateTo),
+    getAttendanceSummary(supabase, viewProfile, parsed.dateFrom, parsed.dateTo, {
+      departmentId: parsed.departmentId,
+      branchId: parsed.branchId,
+      employeeId: parsed.employeeId,
+    }),
   ]);
 
   return {

@@ -11,6 +11,7 @@ import {
   EMPLOYEE_STORAGE_BUCKETS,
   EMPLOYMENT_STATUS_LABELS,
 } from "@/lib/employees/constants";
+import { isHiddenFromPeopleFilters } from "@/lib/employee/directory-listing";
 import { getManagerTeamContext } from "@/lib/manager/services/team-hierarchy";
 import { buildHierarchyTree } from "@/lib/organization/services/org-queries";
 import { fromHrms, unwrapRelation } from "@/lib/reports/services/reports-utils";
@@ -264,6 +265,9 @@ export async function getTeamFilterLookups(
         department_id,
         designation_id,
         employment_type_id,
+        employee_code,
+        first_name,
+        last_name,
         departments:department_id (id, name, code),
         designations:designation_id (id, title),
         employment_types:employment_type_id (id, name)
@@ -280,8 +284,19 @@ export async function getTeamFilterLookups(
   const employmentTypes = new Map<string, { id: string; label: string }>();
 
   for (const row of data ?? []) {
-    const department = unwrap(row.departments);
     const designation = unwrap(row.designations);
+    if (
+      isHiddenFromPeopleFilters(row.employee_code, {
+        employeeCode: row.employee_code,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        designationTitle: designation?.title ?? null,
+      })
+    ) {
+      continue;
+    }
+
+    const department = unwrap(row.departments);
     const employmentType = unwrap(row.employment_types);
 
     if (department?.id) {
@@ -518,11 +533,19 @@ export async function getTeamMemberOptions(
 
   if (error) throw new Error(error.message);
 
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    label: `${row.first_name} ${row.last_name}`,
-    code: row.employee_code,
-  }));
+  return (data ?? [])
+    .filter((row) =>
+      !isHiddenFromPeopleFilters(row.employee_code, {
+        employeeCode: row.employee_code,
+        firstName: row.first_name,
+        lastName: row.last_name,
+      }),
+    )
+    .map((row) => ({
+      id: row.id,
+      label: `${row.first_name} ${row.last_name}`,
+      code: row.employee_code,
+    }));
 }
 
 export async function getTeamDesignationOptions(

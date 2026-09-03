@@ -67,12 +67,12 @@ const SECTION_HELP: Record<
   }
 > = {
   run: {
-    title: "About Run Payroll",
+    title: "About Company Payroll",
     points: [
       {
         label: "What this page is for",
         detail:
-          "Generate and process the monthly payroll for active employees — review attendance impact, finalize amounts, and move the run through draft → processed → approved → paid.",
+          "Company Payroll is calculated automatically from salary structures, per-day amounts, attendance, and approved leave/LOP. Review amounts and move the period through draft → processed → approved → paid.",
       },
       {
         label: "Status pills",
@@ -82,17 +82,17 @@ const SECTION_HELP: Record<
       {
         label: "Employee filter",
         detail:
-          "Use Search employee next to month and year to find someone by name or employee code in the payroll list after you run or open a period.",
+          "Use Search employee next to month and year to find someone by name or employee code in the payroll list for the selected period.",
       },
       {
-        label: "Before you run",
+        label: "Salary and attendance",
         detail:
-          "Confirm salary structures are Current for everyone in the cycle, and that bonuses or expense claims meant for this month are already approved.",
+          "Keep salary structures Current. Attendance, absences, approved leave, and LOP update payable salary automatically for unlocked periods.",
       },
       {
         label: "Payslips",
         detail:
-          "After you run payroll, every employee for that month appears under Payslips. Use View to review the breakdown, then Send to release it to the employee portal.",
+          "Payslips use the calculated Company Payroll amounts for that month. Use View to review the breakdown, then Send to release it to the employee portal.",
       },
     ],
   },

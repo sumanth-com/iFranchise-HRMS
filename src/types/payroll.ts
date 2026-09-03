@@ -400,6 +400,7 @@ export type SalaryStructureItem = {
   designationTitle: string | null;
     employmentTypeName: string | null;
   employmentTypeId: string | null;
+  joiningDate?: string | null;
   effectiveFrom: string;
   effectiveTo: string | null;
   currencyCode: string;

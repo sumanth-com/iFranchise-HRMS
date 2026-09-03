@@ -6,13 +6,30 @@ type PostgresErrorShape = {
 
 const DUPLICATE_PAYROLL_ITEM =
   /payroll_items_unique_per_employee|duplicate key value violates unique constraint/i;
-const RLS_VIOLATION = /row-level security policy/i;
+const RLS_VIOLATION =
+  /row-level security policy|new row violates|violat(es|ing) row-level|42501/i;
 const DUPLICATE_KEY = /duplicate key value violates unique constraint/i;
+
+export function isRowLevelSecurityError(error: unknown): boolean {
+  const code = (error as { code?: string } | null)?.code;
+  if (code === "42501") return true;
+  const raw =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : String((error as { message?: string } | null)?.message ?? "");
+  return RLS_VIOLATION.test(raw);
+}
 
 export function toUserFriendlyError(
   error: unknown,
   fallback = "Something went wrong. Please try again or contact support if the issue persists.",
 ): string {
+  if (typeof error === "string") {
+    error = new Error(error);
+  }
+
   if (!(error instanceof Error)) {
     return fallback;
   }
@@ -36,17 +53,21 @@ export function toUserFriendlyError(
 
   if (pg.code === "23505" || DUPLICATE_PAYROLL_ITEM.test(raw)) {
     if (DUPLICATE_PAYROLL_ITEM.test(raw)) {
-      return "Payroll for the selected period has already been generated. Open Run Payroll to review the existing run.";
+      return "Payroll for the selected period has already been generated. Open Company Payroll to review the existing run.";
     }
     return "This record already exists. Please review the existing entry before saving again.";
   }
 
-  if (pg.code === "42501" || RLS_VIOLATION.test(raw) || /violat(es|ing) row/i.test(raw)) {
+  if (pg.code === "42501" || isRowLevelSecurityError(error)) {
     return "You do not have permission to perform this action. Contact your administrator if you need access.";
   }
 
   if (DUPLICATE_KEY.test(raw)) {
     return "This record already exists. Please review the existing entry before saving again.";
+  }
+
+  if (error.name === "PayrollIntegrityError") {
+    return raw;
   }
 
   if (/not authenticated/i.test(raw)) {

@@ -139,6 +139,7 @@ export function validateLeavePolicy(input: {
   startDate: string;
   endDate: string;
   isHalfDay: boolean;
+  halfDayPeriod?: "morning" | "afternoon" | "" | null;
   leaveTypeCode: string;
   isPaid: boolean;
   duration: LeaveDurationBreakdown;
@@ -215,6 +216,21 @@ export function validateLeavePolicy(input: {
 
   if (input.isHalfDay && input.allowHalfDay === false) {
     issues.push({ code: "half_day", message: "Half-day leave is not enabled for this organization." });
+  }
+
+  if (input.isHalfDay) {
+    if (input.halfDayPeriod === "morning") {
+      issues.push({
+        code: "half_day_morning",
+        message:
+          "Half-day leave is allowed only for the second half (3:00 p.m. to 7:00 p.m.). Take a full day if you need the morning off.",
+      });
+    } else if (input.halfDayPeriod && input.halfDayPeriod !== "afternoon") {
+      issues.push({
+        code: "half_day",
+        message: "Select second-half leave, or apply for a full day.",
+      });
+    }
   }
 
   if (
@@ -390,15 +406,16 @@ export function allocateLeaveDaysByBalance(
   );
 
   return sorted.map((day) => {
-    if (day.kind === "sandwich") {
-      return { date: day.date, kind: "sandwich" as const, counted: day.counted };
-    }
     if (day.counted <= 0) {
       return { date: day.date, kind: "none" as const, counted: 0 };
     }
     if (remainingPaid > 0) {
       remainingPaid = roundLeaveDays(Math.max(0, remainingPaid - day.counted));
-      return { date: day.date, kind: "paid" as const, counted: day.counted };
+      return {
+        date: day.date,
+        kind: day.kind === "sandwich" ? ("sandwich" as const) : ("paid" as const),
+        counted: day.counted,
+      };
     }
     return { date: day.date, kind: "lop" as const, counted: day.counted };
   });

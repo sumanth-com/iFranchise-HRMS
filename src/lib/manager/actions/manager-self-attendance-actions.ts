@@ -1,9 +1,7 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-
+import { revalidateSelfAttendancePaths } from "@/lib/attendance/actions/self-attendance-punch-actions";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
-import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import {
   getManagerProfilePageData,
   punchManagerAttendance,
@@ -23,15 +21,6 @@ import {
   type ManagerUpdateCheckoutInput,
 } from "@/lib/validations/manager-self-attendance";
 import type { ManagerProfilePageData, ManagerTodayAttendance } from "@/types/manager-self-attendance";
-
-function revalidateSelfAttendancePaths() {
-  revalidatePath("/manager/attendance");
-  revalidatePath("/manager/profile");
-  revalidatePath(MANAGER_ROUTES.home);
-  revalidatePath(MANAGER_ROUTES.attendance);
-  revalidatePath(MANAGER_ROUTES.reports);
-  revalidatePath(MANAGER_ROUTES.notificationsCenter);
-}
 
 async function getContext() {
   const profile = await requireServerPermission(PORTAL_PERMISSIONS.manager);

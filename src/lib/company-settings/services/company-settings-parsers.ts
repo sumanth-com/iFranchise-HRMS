@@ -31,13 +31,13 @@ export const DEFAULT_LEAVE_POLICIES: LeavePoliciesConfiguration = {
   defaultHrApproverEmployeeId: null,
   halfDayRules: {
     enabled: true,
-    morningEnd: "13:00",
-    afternoonStart: "14:00",
+    morningEnd: "14:00",
+    afternoonStart: "15:00",
   },
   sandwichLeave: {
     enabled: true,
     includeWeekends: true,
-    includeHolidays: true,
+    includeHolidays: false,
   },
   probation: {
     durationMonths: 3,

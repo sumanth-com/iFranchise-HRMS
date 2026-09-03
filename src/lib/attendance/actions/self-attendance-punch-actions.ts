@@ -2,10 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
-import { SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
+import { ATTENDANCE_ROUTES, SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
 import { canUpdateOwnCheckout } from "@/lib/attendance/self-checkout-permissions";
 import { HR_PORTAL_HOME } from "@/lib/auth/portal-paths";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import {
@@ -35,11 +36,18 @@ export type SelfAttendancePunchResult =
 
 function revalidateSelfAttendancePaths() {
   revalidatePath(HR_PORTAL_HOME);
+  revalidatePath(ATTENDANCE_ROUTES.list);
   revalidatePath(SELF_ATTENDANCE_ROUTES.list);
+  revalidatePath(SELF_ATTENDANCE_ROUTES.team);
   revalidatePath(EMPLOYEE_ROUTES.home);
   revalidatePath(EMPLOYEE_ROUTES.attendance);
   revalidatePath(MANAGER_ROUTES.home);
   revalidatePath(MANAGER_ROUTES.attendance);
+  revalidatePath(MANAGER_ROUTES.attendanceTeam);
+  revalidatePath(MANAGER_ROUTES.reports);
+  revalidatePath(MANAGER_ROUTES.notificationsCenter);
+  revalidatePath("/manager/profile");
+  revalidatePath(CEO_ROUTES.attendance);
   revalidatePath(SYSTEM_ADMIN_ROUTES.home);
   revalidatePath(SYSTEM_ADMIN_ROUTES.attendance);
 }
@@ -56,6 +64,14 @@ export async function selfAttendancePunchAction(
     const supabase = await createClient();
     const parsed = managerAttendancePunchSchema.parse(input);
     const today = await punchManagerAttendance(supabase, profile, parsed);
+    try {
+      const { refreshDraftPayrollItemsForEmployee } = await import(
+        "@/lib/payroll/services/payroll-mutations"
+      );
+      await refreshDraftPayrollItemsForEmployee(supabase, profile, profile.employee.id);
+    } catch (payrollError) {
+      console.error("[selfAttendancePunchAction] payroll refresh failed", payrollError);
+    }
     revalidateSelfAttendancePaths();
     return { success: true, today };
   } catch (error) {
@@ -83,6 +99,14 @@ export async function selfAttendanceUpdateCheckoutAction(
     const supabase = await createClient();
     const parsed = managerUpdateCheckoutSchema.parse(input);
     const today = await updateManagerCheckout(supabase, profile, parsed);
+    try {
+      const { refreshDraftPayrollItemsForEmployee } = await import(
+        "@/lib/payroll/services/payroll-mutations"
+      );
+      await refreshDraftPayrollItemsForEmployee(supabase, profile, profile.employee.id);
+    } catch (payrollError) {
+      console.error("[selfAttendanceUpdateCheckoutAction] payroll refresh failed", payrollError);
+    }
     revalidateSelfAttendancePaths();
     return { success: true, today };
   } catch (error) {

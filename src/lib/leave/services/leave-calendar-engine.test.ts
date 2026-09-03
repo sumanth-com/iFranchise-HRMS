@@ -59,53 +59,51 @@ describe("working calendar", () => {
 });
 
 describe("explicit half-day request", () => {
-  it("charges a full day even if a half-day checkbox is used", () => {
+  it("charges 0.5 day for second-half leave on a working day", () => {
     const result = duration("2026-08-24", "2026-08-24", [], true);
-    assert.equal(result.workingDays, 1);
-    assert.equal(result.halfDays, 0);
-    assert.equal(result.totalLeaveDays, 1);
+    assert.equal(result.halfDays, 1);
+    assert.equal(result.totalLeaveDays, 0.5);
   });
 });
 
 describe("sandwich leave", () => {
-  it("includes Sunday when Friday leave connects through a 2nd Saturday half day", () => {
+  it("does not sandwich Sunday from Friday-only leave across a 2nd Saturday working half-day", () => {
     const result = duration("2026-09-11", "2026-09-11");
     assert.equal(result.workingDays, 1);
-    assert.equal(result.sandwichDays, 1);
-    assert.ok(result.days.some((day) => day.date === "2026-09-13" && day.kind === "sandwich"));
-    assert.equal(result.totalLeaveDays, 2);
+    assert.equal(result.sandwichDays, 0);
+    assert.equal(result.totalLeaveDays, 1);
   });
 
-  it("includes Sunday when Monday leave follows a weekly holiday", () => {
+  it("does not sandwich Sunday from Monday-only leave", () => {
     const result = duration("2026-09-14", "2026-09-14");
-    assert.ok(result.days.some((day) => day.date === "2026-09-13" && day.kind === "sandwich"));
-    assert.equal(result.totalLeaveDays, 2);
+    assert.equal(result.sandwichDays, 0);
+    assert.equal(result.totalLeaveDays, 1);
   });
 
-  it("includes Saturday and Sunday for Friday to Monday when Saturday is a half day", () => {
+  it("sandwiches Sunday when Friday through Monday includes both adjacent working days", () => {
     const result = duration("2026-09-11", "2026-09-14");
     assert.equal(result.workingDays, 3);
-    assert.equal(result.halfDays, 0);
     assert.equal(result.sandwichDays, 1);
+    assert.ok(result.days.some((day) => day.date === "2026-09-13" && day.kind === "sandwich"));
     assert.equal(result.totalLeaveDays, 4);
   });
 
-  it("does not sandwich Sunday across a full working Saturday", () => {
+  it("does not sandwich Sunday across a full working Saturday from Friday-only leave", () => {
     const result = duration("2026-09-18", "2026-09-18");
     assert.equal(classifyCalendarDay("2026-09-19", calendar()), "working");
     assert.equal(result.sandwichDays, 0);
     assert.equal(result.totalLeaveDays, 1);
   });
 
-  it("treats 4th Saturday leave as a full day and sandwiches the following Sunday", () => {
+  it("treats 4th Saturday leave as a full working day without one-sided Sunday sandwich", () => {
     const result = duration("2026-09-26", "2026-09-26");
     assert.equal(result.workingDays, 1);
-    assert.equal(result.sandwichDays, 1);
-    assert.equal(result.totalLeaveDays, 2);
+    assert.equal(result.sandwichDays, 0);
+    assert.equal(result.totalLeaveDays, 1);
   });
 
-  it("counts a working Saturday in range as a full working day and sandwiches the following Sunday", () => {
-    const result = duration("2026-09-18", "2026-09-19");
+  it("sandwiches Sunday when Saturday and Monday are both absent", () => {
+    const result = duration("2026-09-19", "2026-09-21");
     assert.equal(classifyCalendarDay("2026-09-19", calendar()), "working");
     assert.equal(result.workingDays, 2);
     assert.equal(result.sandwichDays, 1);
@@ -121,16 +119,57 @@ describe("sandwich leave", () => {
     assert.equal(result.totalLeaveDays, 4);
   });
 
-  it("includes Sunday when Saturday half-day leave is taken before the weekly holiday", () => {
+  it("does not sandwich Sunday when only the Saturday half-day is taken", () => {
     const result = duration("2026-09-12", "2026-09-13");
     assert.equal(result.workingDays, 1);
-    assert.equal(result.sandwichDays, 1);
-    assert.equal(result.totalLeaveDays, 2);
+    assert.equal(result.sandwichDays, 0);
+    assert.equal(result.totalLeaveDays, 1);
   });
 
-  it("counts a public holiday under sandwich when connected to leave", () => {
+  it("never sandwiches an official public holiday", () => {
     const result = duration("2026-08-14", "2026-08-14", ["2026-08-15"]);
-    assert.ok(result.days.some((day) => day.date === "2026-08-15" && day.kind === "sandwich"));
+    assert.equal(
+      result.days.some((day) => day.date === "2026-08-15" && day.kind === "sandwich"),
+      false,
+    );
+    assert.equal(result.sandwichDays, 0);
+  });
+
+  it("does not count an official holiday between two absences as sandwich LOP", () => {
+    const result = duration("2026-08-24", "2026-08-27", ["2026-08-25"]);
+    assert.equal(
+      result.days.some((day) => day.date === "2026-08-25" && day.kind === "sandwich"),
+      false,
+    );
+  });
+
+  it("sandwiches Sunday in a continuous Fri–Mon absence while protecting an official Saturday holiday", () => {
+    const result = duration("2026-09-11", "2026-09-14", ["2026-09-12"]);
+    assert.ok(result.days.some((day) => day.date === "2026-09-13" && day.kind === "sandwich"));
+    assert.equal(
+      result.days.some((day) => day.date === "2026-09-12" && day.kind === "sandwich"),
+      false,
+    );
+    assert.equal(
+      result.days.some((day) => day.date === "2026-09-12" && day.counted > 0),
+      false,
+    );
+  });
+
+  it("sandwiches the full weekend inside a continuous Fri–Mon period when Saturday is a weekly off", () => {
+    const weekendOff: LeaveCalendarContext = {
+      ...DEFAULT_LEAVE_CALENDAR,
+      weekendRules: { saturday: "off", sunday: "off", saturdayHalfDayWeeks: [] },
+    };
+    const result = calculateLeaveDuration({
+      startDate: "2026-09-18",
+      endDate: "2026-09-21",
+      isHalfDay: false,
+      calendar: weekendOff,
+    });
+    assert.ok(result.days.some((day) => day.date === "2026-09-19" && day.kind === "sandwich"));
+    assert.ok(result.days.some((day) => day.date === "2026-09-20" && day.kind === "sandwich"));
+    assert.equal(result.sandwichDays, 2);
   });
 });
 

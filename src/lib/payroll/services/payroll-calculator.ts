@@ -5,7 +5,11 @@ import type {
   SalaryComponents,
 } from "@/types/payroll";
 import type { WorkingDaysCalculation } from "@/types/payroll-settings";
-import { getMonthDateRange, roundCurrency } from "@/lib/payroll/services/payroll-utils";
+import {
+  calendarDaysInYearMonth,
+  monthlyGrossPerDay,
+} from "@/lib/payroll/salary-structure-period";
+import { roundCurrency } from "@/lib/payroll/services/payroll-utils";
 
 export type SalaryStructureRow = {
   id: string;
@@ -29,11 +33,14 @@ export type AttendanceSummary = {
   weekOffDays: number;
   holidayDays: number;
   overtimeHours: number;
+  lateDays: number;
+  sandwichLopDays?: number;
 };
 
 export type LeaveMonthSummary = {
   lopDays: number;
   paidLeaveDays: number;
+  sandwichDates?: string[];
 };
 
 export type BonusRow = { amount: number | string; bonus_type: string };
@@ -44,6 +51,12 @@ export type PayrollCalcSettings = {
   lossOfPayDeduction?: boolean;
   halfDayDeduction?: boolean;
   paidLeaveDeduction?: boolean;
+  salaryComponents?: {
+    pf?: boolean;
+    esi?: boolean;
+    professionalTax?: boolean;
+    incomeTax?: boolean;
+  };
 };
 
 export type PayrollCalculationInput = {
@@ -86,7 +99,14 @@ function parseComponents(raw: Record<string, unknown> | null): SalaryComponents 
 }
 
 export function calendarDaysInMonth(month: number, year: number): number {
-  return getMonthDateRange(month, year).workingDays;
+  return calendarDaysInYearMonth(month, year);
+}
+
+export const LATE_ENTRIES_PER_HALF_DAY_LOP = 3;
+
+export function lateEntryPenaltyDays(lateDays: number): number {
+  if (!(lateDays > 0)) return 0;
+  return Math.floor(lateDays / LATE_ENTRIES_PER_HALF_DAY_LOP) * 0.5;
 }
 
 export function resolvePayrollWorkingDays(
@@ -120,7 +140,12 @@ export function resolveLopDays(input: {
   const unpaidAbsence =
     input.attendance.absentDays +
     (input.settings?.halfDayDeduction === false ? 0 : input.attendance.halfDays * 0.5);
-  let lop = input.leaveLopDays + unpaidAbsence;
+  const latePenalty = lateEntryPenaltyDays(input.attendance.lateDays ?? 0);
+  let lop =
+    input.leaveLopDays +
+    unpaidAbsence +
+    latePenalty +
+    (input.attendance.sandwichLopDays ?? 0);
   if (input.settings?.paidLeaveDeduction) {
     lop += input.paidLeaveDays;
   }
@@ -142,7 +167,7 @@ function emptyAttendanceBreakdown(
     absentDays: attendance.absentDays,
     lopDays,
     leaveLopDays: leave.lopDays,
-    overtimeHours: attendance.overtimeHours,
+    overtimeHours: 0,
     leaveDays: attendance.onLeaveDays,
     paidDays: Math.max(0, workingDays - lopDays),
     paidLeaveDays: leave.paidLeaveDays,
@@ -221,16 +246,19 @@ export function calculateEmployeePayroll(
   const medical = components.medical ?? 0;
   const leftoverOther = Math.max(0, roundCurrency(storedOther - specialAllowance - medical));
 
-  const pf = components.pf ?? 0;
-  const esi = components.esi ?? 0;
-  const professionalTax = components.professionalTax ?? 0;
-  const structureTds = components.incomeTax ?? 0;
+  const statutory = input.settings?.salaryComponents;
+  const pf = statutory?.pf === false ? 0 : (components.pf ?? 0);
+  const esi = statutory?.esi === false ? 0 : (components.esi ?? 0);
+  const professionalTax =
+    statutory?.professionalTax === false ? 0 : (components.professionalTax ?? 0);
+  const structureTds =
+    statutory?.incomeTax === false ? 0 : (components.incomeTax ?? 0);
   const structureOtherDeduction = components.other ?? 0;
 
   const salaryGross = roundCurrency(
     basic + hra + lta + specialAllowance + medical + leftoverOther,
   );
-  const perDay = workingDays > 0 ? salaryGross / workingDays : 0;
+  const perDay = monthlyGrossPerDay(salaryGross, workingDays);
   const lopDeduction = roundCurrency(perDay * lopDays);
 
   const tds =

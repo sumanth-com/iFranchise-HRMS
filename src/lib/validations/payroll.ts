@@ -88,6 +88,10 @@ const salaryComponentSchema = z.object({
   other: nonNegativeAmount.default(0),
 });
 
+function roundMoney(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
 function resolveSalaryComponents(
   components?: z.infer<typeof salaryComponentSchema>,
 ) {
@@ -99,6 +103,47 @@ function resolveSalaryComponents(
     professionalTax: components?.professionalTax ?? 0,
     incomeTax: components?.incomeTax ?? 0,
     other: components?.other ?? 0,
+  };
+}
+
+function settleSalaryTotals(data: {
+  basicSalary: number;
+  hraAmount: number;
+  transportAllowance: number;
+  otherAllowances: number;
+  components?: z.infer<typeof salaryComponentSchema>;
+}) {
+  const components = resolveSalaryComponents(data.components);
+  const specialAllowance = components.specialAllowance;
+  const medical = components.medical;
+  const otherAllowances = roundMoney(data.otherAllowances + specialAllowance + medical);
+  const grossSalary = roundMoney(
+    data.basicSalary + data.hraAmount + data.transportAllowance + otherAllowances,
+  );
+  const pf = components.pf;
+  const esi = components.esi;
+  const professionalTax = components.professionalTax;
+  const incomeTax = components.incomeTax;
+  const otherDeductions = components.other;
+  const taxDeduction = incomeTax;
+  const totalStatutory = roundMoney(pf + esi + professionalTax + otherDeductions);
+  const netSalary = roundMoney(grossSalary - taxDeduction - totalStatutory);
+
+  return {
+    otherAllowances,
+    taxDeduction,
+    otherDeductions: totalStatutory,
+    grossSalary,
+    netSalary,
+    components: {
+      specialAllowance,
+      medical,
+      pf,
+      esi,
+      professionalTax,
+      incomeTax,
+      other: otherDeductions,
+    },
   };
 }
 
@@ -123,41 +168,10 @@ export const salaryStructureFormSchema = z
     path: ["basicSalary"],
   })
   .transform((data) => {
-    const components = resolveSalaryComponents(data.components);
-    const specialAllowance = components.specialAllowance;
-    const medical = components.medical;
-    const grossSalary =
-      data.basicSalary +
-      data.hraAmount +
-      data.transportAllowance +
-      data.otherAllowances +
-      specialAllowance +
-      medical;
-    const pf = components.pf;
-    const esi = components.esi;
-    const professionalTax = components.professionalTax;
-    const incomeTax = components.incomeTax;
-    const otherDeductions = components.other;
-    const taxDeduction = incomeTax;
-    const totalStatutory = pf + esi + professionalTax + otherDeductions;
-    const netSalary = grossSalary - taxDeduction - totalStatutory;
-
+    const settled = settleSalaryTotals(data);
     return {
       ...data,
-      otherAllowances: data.otherAllowances,
-      taxDeduction,
-      otherDeductions: totalStatutory,
-      grossSalary,
-      netSalary,
-      components: {
-        specialAllowance,
-        medical,
-        pf,
-        esi,
-        professionalTax,
-        incomeTax,
-        other: otherDeductions,
-      },
+      ...settled,
     };
   });
 
@@ -202,41 +216,10 @@ export const salaryRevisionFormSchema = z
     components: salaryComponentSchema.optional(),
   })
   .transform((data) => {
-    const components = resolveSalaryComponents(data.components);
-    const specialAllowance = components.specialAllowance;
-    const medical = components.medical;
-    const grossSalary =
-      data.basicSalary +
-      data.hraAmount +
-      data.transportAllowance +
-      data.otherAllowances +
-      specialAllowance +
-      medical;
-    const pf = components.pf;
-    const esi = components.esi;
-    const professionalTax = components.professionalTax;
-    const incomeTax = components.incomeTax;
-    const otherDeductions = components.other;
-    const taxDeduction = incomeTax;
-    const totalStatutory = pf + esi + professionalTax + otherDeductions;
-    const netSalary = grossSalary - taxDeduction - totalStatutory;
-
+    const settled = settleSalaryTotals(data);
     return {
       ...data,
-      otherAllowances: data.otherAllowances + specialAllowance + medical,
-      taxDeduction,
-      otherDeductions: totalStatutory,
-      grossSalary,
-      netSalary,
-      components: {
-        specialAllowance,
-        medical,
-        pf,
-        esi,
-        professionalTax,
-        incomeTax,
-        other: otherDeductions,
-      },
+      ...settled,
     };
   });
 

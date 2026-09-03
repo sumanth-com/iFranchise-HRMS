@@ -54,6 +54,7 @@ import type {
   LeaveSummary,
 } from "@/types/leave";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
+import { calendarWithEmployeeNonWorkingDates } from "@/lib/leave/services/leave-calendar-engine";
 import { DEFAULT_LEAVE_POLICY_DOCUMENT } from "@/lib/leave/leave-policy-defaults";
 import { getProbationSnapshot } from "@/lib/leave/services/leave-policy-engine";
 import {
@@ -397,7 +398,12 @@ export async function getLeaveApplyContextAction(
     return {
       success: true,
       data: {
-        calendar: runtime.calendar,
+        calendar: calendarWithEmployeeNonWorkingDates(
+          runtime.calendar,
+          [...taken.entries()]
+            .filter(([, status]) => status === "approved")
+            .map(([date]) => date),
+        ),
         employee,
         probation: getProbationSnapshot(employee, getTodayDateString(), runtime.probation),
         probationRules: runtime.probation,
