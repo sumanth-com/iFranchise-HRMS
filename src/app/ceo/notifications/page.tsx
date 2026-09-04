@@ -1,41 +1,58 @@
-import { Suspense } from "react";
-
-import { PageSkeleton } from "@/components/common/page-skeleton";
-import { CeoNotificationsView } from "@/components/ceo/notifications/ceo-notifications-view";
-import { getCeoNotificationsModuleData } from "@/lib/ceo/actions/ceo-notifications-actions";
+import { NotificationCenterSplitView } from "@/components/notifications/notification-center-split-view";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import { CEO_ROUTES } from "@/lib/ceo/constants";
+import type { NotificationCenterTab } from "@/lib/notifications/constants";
+import {
+  getNotificationById,
+  listNotifications,
+} from "@/lib/notifications/services/notification-queries";
 import { requireServerPermission } from "@/lib/permissions/server";
-import { ceoNotificationsListParamsSchema } from "@/lib/validations/ceo-notifications";
+import { createClient } from "@/lib/supabase/server";
 
 type Props = {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+  searchParams: Promise<{
+    tab?: string;
+    page?: string;
+    pageSize?: string;
+    search?: string;
+    id?: string;
+  }>;
 };
 
-function firstString(value: string | string[] | undefined) {
-  return typeof value === "string" ? value : undefined;
-}
-
 export default async function CeoNotificationsPage({ searchParams }: Props) {
-  await requireServerPermission(PORTAL_PERMISSIONS.ceo);
-  const rawParams = await searchParams;
+  const profile = await requireServerPermission(PORTAL_PERMISSIONS.ceo);
+  const supabase = await createClient();
+  const params = await searchParams;
 
-  const parsed = ceoNotificationsListParamsSchema.parse({
-    page: firstString(rawParams.page),
-    pageSize: firstString(rawParams.pageSize),
-    category: firstString(rawParams.category),
-    priority: firstString(rawParams.priority),
-    status: firstString(rawParams.status),
-    departmentId: firstString(rawParams.departmentId),
-    dateFrom: firstString(rawParams.dateFrom),
-    dateTo: firstString(rawParams.dateTo),
-    search: firstString(rawParams.search),
+  const tab = (params.tab as NotificationCenterTab) ?? "all";
+  const result = await listNotifications(supabase, profile, {
+    tab,
+    page: params.page ? Number(params.page) : 1,
+    pageSize: params.pageSize ? Number(params.pageSize) : 20,
+    search: params.search,
   });
 
-  const data = await getCeoNotificationsModuleData(parsed);
+  let items = result.items;
+  if (params.id && !items.some((item) => item.id === params.id)) {
+    const selected = await getNotificationById(supabase, profile, params.id);
+    if (selected) items = [selected, ...items];
+  }
 
   return (
-    <Suspense fallback={<PageSkeleton />}>
-      <CeoNotificationsView {...data} initialFilters={parsed} />
-    </Suspense>
+    <div className="flex min-h-0 flex-1 flex-col gap-4 p-4 md:p-5">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Notifications</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Your personal alerts for attendance, leave, payroll, and other updates.
+        </p>
+      </div>
+      <NotificationCenterSplitView
+        result={{ ...result, items }}
+        tab={tab}
+        search={params.search ?? ""}
+        selectedId={params.id}
+        centerPath={CEO_ROUTES.notifications}
+      />
+    </div>
   );
 }

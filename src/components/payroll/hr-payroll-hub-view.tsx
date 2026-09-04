@@ -22,7 +22,7 @@ import {
   PAYROLL_ROUTES,
   SELF_PAYROLL_ROUTES,
   teamPayrollSectionDescription,
-  teamPayrollSectionTitle,
+  teamPayrollSectionTitleForPortal,
   TEAM_PAYROLL_SECTIONS,
   type TeamPayrollSection,
 } from "@/lib/payroll/constants";
@@ -232,6 +232,7 @@ export function HrPayrollHubView({
   hiddenSections = [],
 }: Props) {
   const pathname = usePathname();
+  const isCeoPortal = pathname.startsWith("/ceo");
   const activeSection =
     initialSection === "team" && canViewTeam ? "team" : "my";
   const isTeamView = activeSection === "team";
@@ -248,6 +249,19 @@ export function HrPayrollHubView({
   const [helpOpen, setHelpOpen] = useState(false);
 
   const sectionHelp = isTeamView ? SECTION_HELP[teamPayrollSection] : undefined;
+  const sectionTitle = isTeamView
+    ? teamPayrollSectionTitleForPortal(teamPayrollSection, { ceoPortal: isCeoPortal })
+    : "Payroll";
+  const localizedSectionHelp = sectionHelp && isCeoPortal
+    ? {
+        ...sectionHelp,
+        title: sectionHelp.title.replace(/Company Payroll/g, "Team Payroll"),
+        points: sectionHelp.points.map((point) => ({
+          ...point,
+          detail: point.detail.replace(/Company Payroll/g, "Team Payroll"),
+        })),
+      }
+    : sectionHelp;
 
   function openLatestPayslip() {
     const latestId = selfPayroll.payslips.find((row) => row.canEmployeeAccess)?.id;
@@ -266,15 +280,15 @@ export function HrPayrollHubView({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
             <h1 className="text-2xl font-semibold tracking-tight">
-              {isTeamView ? teamPayrollSectionTitle(teamPayrollSection) : "Payroll"}
+              {sectionTitle}
             </h1>
-            {sectionHelp ? (
+            {localizedSectionHelp ? (
               <Button
                 type="button"
                 variant="ghost"
                 size="icon-sm"
                 className="size-8 text-muted-foreground hover:text-foreground"
-                aria-label={`About ${teamPayrollSectionTitle(teamPayrollSection)}`}
+                aria-label={`About ${sectionTitle}`}
                 onClick={() => setHelpOpen(true)}
               >
                 <CircleHelp className="size-4" />
@@ -349,11 +363,11 @@ export function HrPayrollHubView({
         </>
       )}
 
-      {sectionHelp ? (
+      {localizedSectionHelp ? (
         <Modal
           open={helpOpen}
           onOpenChange={setHelpOpen}
-          title={sectionHelp.title}
+          title={localizedSectionHelp.title}
           description="Quick reference for HR using this section."
           contentClassName="sm:max-w-lg"
           showCancel={false}
@@ -364,7 +378,7 @@ export function HrPayrollHubView({
           }
         >
           <div className="space-y-4">
-            {sectionHelp.points.map((point) => (
+            {localizedSectionHelp.points.map((point) => (
               <div key={point.label} className="space-y-1">
                 <p className="text-sm font-medium">{point.label}</p>
                 <p className="text-sm text-muted-foreground">{point.detail}</p>

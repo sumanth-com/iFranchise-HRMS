@@ -349,31 +349,36 @@ export function NotificationCenterSplitView({
       {showTabs || showToolbarSearch || showMarkAllRead ? (
         <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           {showTabs ? (
-            <div className="flex flex-wrap items-center gap-1">
-              {NOTIFICATION_CENTER_TABS.map((item) => (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => {
-                    exitBulkSelectMode();
-                    localSelectionIdRef.current = null;
-                    setActiveNotification(null);
-                    setParams({
-                      [filterParamKey]: item.value,
-                      page: "1",
-                      id: undefined,
-                    });
-                  }}
-                  className={cn(
-                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                    tab === item.value
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  )}
-                >
-                  {item.label}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-2">
+              <nav
+                className="inline-flex flex-wrap items-center gap-1 rounded-lg border bg-card p-1 shadow-sm"
+                aria-label="Notification filters"
+              >
+                {NOTIFICATION_CENTER_TABS.map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => {
+                      exitBulkSelectMode();
+                      localSelectionIdRef.current = null;
+                      setActiveNotification(null);
+                      setParams({
+                        [filterParamKey]: item.value,
+                        page: "1",
+                        id: undefined,
+                      });
+                    }}
+                    className={cn(
+                      "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                      tab === item.value
+                        ? "bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-sm font-semibold"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </nav>
               {bulkSelectMode ? (
                 <>
                   <Button
@@ -453,9 +458,8 @@ export function NotificationCenterSplitView({
               ) : null}
               {showMarkAllRead ? (
                 <Button
-                  variant="outline"
                   size="sm"
-                  className="h-9 shrink-0"
+                  className="h-9 shrink-0 border-0 bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-sm hover:from-blue-700 hover:to-violet-700"
                   disabled={isMarkingAllRead}
                   onClick={() => {
                     if (isMarkingAllRead) return;

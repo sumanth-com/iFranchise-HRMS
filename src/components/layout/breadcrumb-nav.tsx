@@ -630,6 +630,30 @@ function buildBreadcrumbItems(
       "user-provisioning": "User Provisioning",
     };
 
+    if (segments[1] === "payroll") {
+      const section = parseTeamPayrollSection(segments[2]);
+      const subsectionLabels: Record<TeamPayrollSection, string> = {
+        run: "Team Payroll",
+        "salary-structures": "Salary Structure",
+        bonuses: "Bonuses",
+        reimbursements: "Expense claims",
+        payslips: "Payslips",
+        settings: "Settings",
+      };
+
+      items.push({
+        label: "Team Payroll",
+        href: "/ceo/payroll/run",
+      });
+      if (segments[2] && section !== TEAM_PAYROLL_SECTIONS.run) {
+        items.push({
+          label: subsectionLabels[section],
+          href: pathname,
+        });
+      }
+      return items;
+    }
+
     if (segments[1]) {
       const sectionLabel = sectionLabels[segments[1]] ?? formatSegment(segments[1]);
       items.push({
@@ -662,7 +686,6 @@ function buildBreadcrumbItems(
         segments[1] === "recruitment" ||
         segments[1] === "performance" ||
         segments[1] === "approvals" ||
-        segments[1] === "payroll" ||
         segments[1] === "reports")
     ) {
       const nestedLabels: Record<string, string> = {

@@ -59,8 +59,12 @@ async function loadCompanyPayrollInitialPanel(params: {
   month: number;
   year: number;
   canRun: boolean;
+  teamBasePath?: string;
 }): Promise<CompanyPayrollInitialPanel> {
-  const { supabase, profile, month, year, canRun } = params;
+  const { supabase, profile, month, year, canRun, teamBasePath } = params;
+  const runSectionLabel = teamBasePath?.startsWith("/ceo/payroll")
+    ? "Team Payroll"
+    : "Company Payroll";
   const periodLabel = formatPayrollMonth(month, year);
 
   if (isFuturePayrollPeriod(month, year)) {
@@ -103,7 +107,7 @@ async function loadCompanyPayrollInitialPanel(params: {
     return {
       kind: "info",
       title: "Unable to load payroll",
-      text: toUserFriendlyError(error, "Failed to load Company Payroll."),
+      text: toUserFriendlyError(error, `Failed to load ${runSectionLabel}.`),
     };
   }
 }
@@ -144,6 +148,7 @@ export async function TeamPayrollSection({
       month,
       year,
       canRun,
+      teamBasePath,
     });
     return (
       <PayrollRunForm

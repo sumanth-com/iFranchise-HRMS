@@ -87,6 +87,10 @@ function getMonthFilterLabel(value: string): string {
   return MONTHS[index] ?? "this month";
 }
 
+function getRunSectionLabel(basePath: string): string {
+  return basePath.startsWith("/ceo/payroll") ? "Team Payroll" : "Company Payroll";
+}
+
 function PayslipRowActions({
   row,
   mode,
@@ -630,7 +634,7 @@ export function PayslipHistoryView({
           ) : (
             <p className="py-16 text-center text-sm text-muted-foreground">
               {mode === "hr"
-                ? `No payroll found for ${getMonthFilterLabel(monthValue)} ${yearValue}. Open Company Payroll for this month to calculate amounts, then send payslips here.`
+                ? `No payroll found for ${getMonthFilterLabel(monthValue)} ${yearValue}. Open ${getRunSectionLabel(basePath)} for this month to calculate amounts, then send payslips here.`
                 : `No payslips found for ${getMonthFilterLabel(monthValue)} ${yearValue}.`}
             </p>
           )}

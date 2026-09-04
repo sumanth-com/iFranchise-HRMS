@@ -186,16 +186,16 @@ export const CEO_PORTAL_MANUAL: ManualSection[] = [
     ],
   },
   {
-    id: "company-payroll",
+    id: "team-payroll",
     group: "Oversight",
-    title: "Company Payroll",
+    title: "Team Payroll",
     icon: "wallet",
     summary:
-      "Leadership view of company payroll — not your personal payslip editor.",
+      "Leadership view of team payroll — not your personal payslip editor.",
     useful:
       "Lets you review payroll health and published runs at company level.",
     howTo:
-      "Open Company Payroll. Review published or in-progress runs at executive scope. HR operates the payroll run; this portal is for oversight.",
+      "Open Team Payroll. Review published or in-progress runs at executive scope. HR operates the payroll run; this portal is for oversight.",
     features: [
       {
         name: "Payroll overview",
@@ -247,22 +247,22 @@ export const CEO_PORTAL_MANUAL: ManualSection[] = [
     group: "Personal",
     title: "Notifications",
     icon: "bell",
-    summary: "Alerts for approvals, provisioning, and other executive updates.",
-    useful: "Tells you when something is waiting without opening every module.",
+    summary: "Your personal alerts for attendance, leave, payroll, and other updates.",
+    useful: "Keeps you informed about your own activity without opening every module.",
     howTo:
-      "Open Notifications. Read the center for unread items, then History for older alerts.",
+      "Open Notifications. Select an item on the left to read details. Use All or Unread to filter your inbox.",
     features: [
       {
-        name: "Notification center",
+        name: "Notification inbox",
         icon: "bell",
-        detail: "Current alerts, including approval and provisioning messages.",
-        tip: "Unread approval alerts usually mean work in Approvals.",
+        detail: "Check-in, leave, payroll, and other alerts sent to you personally.",
+        tip: "Use Mark all read after you have reviewed the list.",
       },
       {
-        name: "History",
+        name: "Unread filter",
         icon: "clock",
-        detail: "Older notifications you already read.",
-        tip: "Use history if you missed an earlier decision request.",
+        detail: "Switch to Unread to see only items you have not opened yet.",
+        tip: "Selecting a notification marks it as read automatically.",
       },
     ],
   },

@@ -298,6 +298,21 @@ export function teamPayrollSectionTitle(section: TeamPayrollSection): string {
   return TEAM_PAYROLL_SECTION_TITLES[section];
 }
 
+export function isCeoTeamPayrollBasePath(basePath: string): boolean {
+  return basePath.startsWith("/ceo/payroll");
+}
+
+/** CEO portal uses "Team Payroll" for the run section; HR keeps "Company Payroll". */
+export function teamPayrollSectionTitleForPortal(
+  section: TeamPayrollSection,
+  options?: { ceoPortal?: boolean },
+): string {
+  if (section === TEAM_PAYROLL_SECTIONS.run && options?.ceoPortal) {
+    return "Team Payroll";
+  }
+  return TEAM_PAYROLL_SECTION_TITLES[section];
+}
+
 export function teamPayrollSectionDescription(section: TeamPayrollSection): string {
   return TEAM_PAYROLL_SECTION_DESCRIPTIONS[section];
 }

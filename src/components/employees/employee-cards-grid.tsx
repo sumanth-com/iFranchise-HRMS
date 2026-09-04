@@ -6,7 +6,6 @@ import Image from "next/image";
 import { Eye, MoreHorizontal, Pencil, Trash2, UserCog } from "lucide-react";
 
 import { Button } from "@/components/common/button";
-import { EmploymentTypeBadge } from "@/components/employees/employment-type-badge";
 import { ProfilePhotoFallback } from "@/components/employees/profile-photo-fallback";
 import {
   DropdownMenu,
@@ -15,9 +14,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getDirectoryAssetPhoto } from "@/lib/employee/directory-asset-photos";
+import { formatDesignationDisplay } from "@/lib/employees/designation-display";
 import { getSignedUrlAction } from "@/lib/employees/actions";
 import { resolveEmployeeModuleRoutes } from "@/lib/employees/constants";
 import { subscribeProfilePhotoChanged } from "@/lib/employees/profile-photo-events";
+import { cn } from "@/lib/utils";
 import type { EmployeeListItem } from "@/types/employee";
 
 function CardPhoto({ employee }: { employee: EmployeeListItem }) {
@@ -132,6 +133,13 @@ export function EmployeeCardsGrid({
         };
         const detailHref = routes.detail(routeIdentity);
         const editHref = routes.edit(routeIdentity);
+        const designationLabel = formatDesignationDisplay(employee.designationTitle, {
+          person: {
+            employeeCode: employee.employeeCode,
+            firstName: employee.firstName,
+            lastName: employee.lastName,
+          },
+        });
 
         return (
           <article
@@ -151,8 +159,16 @@ export function EmployeeCardsGrid({
                 <h3 className="w-full text-[15px] font-semibold leading-snug tracking-tight">
                   {employee.fullName}
                 </h3>
-                <div className="mt-1.5 flex w-full items-center justify-center">
-                  <EmploymentTypeBadge typeName={employee.employmentTypeName} />
+                <div className="mt-1.5 flex w-full items-center justify-center px-1">
+                  <span
+                    className={cn(
+                      "inline-flex max-w-full items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground ring-1 ring-border/60",
+                      "line-clamp-2 whitespace-normal text-center leading-snug",
+                    )}
+                    title={designationLabel}
+                  >
+                    {designationLabel}
+                  </span>
                 </div>
               </div>
             </button>

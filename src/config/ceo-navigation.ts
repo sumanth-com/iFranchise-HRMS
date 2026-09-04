@@ -64,7 +64,7 @@ export const ceoNavItems: NavigationItem[] = [
     icon: CheckSquare,
   },
   {
-    title: "Company Payroll",
+    title: "Team Payroll",
     href: CEO_ROUTES.payrollRun,
     icon: Wallet,
   },
