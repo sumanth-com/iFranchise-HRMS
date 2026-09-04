@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/common/button";
+import { ProfilePhotoFallback } from "@/components/employees/profile-photo-fallback";
 import { getDirectoryAssetPhoto } from "@/lib/employee/directory-asset-photos";
 import { directoryDepartmentLabel } from "@/lib/employee/directory-listing";
 import { getSignedUrlAction } from "@/lib/employees/actions";
@@ -134,18 +135,115 @@ function CardPhoto({
   );
 }
 
+function ReadOnlyCardPhoto({ person }: { person: DirectoryCardPerson }) {
+  const assetPhoto = getDirectoryAssetPhoto(person);
+  const [resolvedAvatarUrl, setResolvedAvatarUrl] = useState<string | null>(
+    person.avatarUrl ?? null,
+  );
+  const [assetFailed, setAssetFailed] = useState(false);
+  const [remoteFailed, setRemoteFailed] = useState(false);
+
+  useEffect(() => {
+    setAssetFailed(false);
+    setRemoteFailed(false);
+
+    if (person.avatarUrl) {
+      setResolvedAvatarUrl(person.avatarUrl);
+      return;
+    }
+
+    if (!person.profileImagePath) {
+      setResolvedAvatarUrl(null);
+      return;
+    }
+
+    let cancelled = false;
+    void getSignedUrlAction("profileImages", person.profileImagePath).then((result) => {
+      if (!cancelled && result.success) {
+        setResolvedAvatarUrl(result.data);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [person.avatarUrl, person.profileImagePath]);
+
+  const photoClass = "absolute inset-0 h-full w-full object-cover object-top";
+  const showUpload = Boolean(resolvedAvatarUrl) && !remoteFailed;
+  const showAsset = Boolean(assetPhoto) && !assetFailed && !showUpload;
+
+  if (showUpload && resolvedAvatarUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={resolvedAvatarUrl}
+        alt={person.fullName}
+        className={photoClass}
+        onError={() => setRemoteFailed(true)}
+      />
+    );
+  }
+
+  if (showAsset && assetPhoto) {
+    return (
+      <Image
+        src={assetPhoto}
+        alt={person.fullName}
+        fill
+        sizes="(max-width: 640px) 100vw, (max-width: 1280px) 40vw, 280px"
+        className={photoClass}
+        onError={() => setAssetFailed(true)}
+      />
+    );
+  }
+
+  return <ProfilePhotoFallback label={person.fullName} />;
+}
+
+function EmployeeDirectoryReadOnlyCard({ person }: { person: DirectoryCardPerson }) {
+  const designationLabel = person.designationTitle?.trim() || "Team Member";
+
+  return (
+    <article className="relative flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition-shadow hover:shadow-md">
+      <div className="relative isolate aspect-[4/5] w-full shrink-0 overflow-hidden bg-muted">
+        <ReadOnlyCardPhoto person={person} />
+      </div>
+
+      <div className="flex flex-col items-center justify-center px-4 py-3 text-center">
+        <h3 className="w-full text-[15px] font-semibold leading-snug tracking-tight">
+          {person.fullName}
+        </h3>
+        <div className="mt-1.5 flex w-full items-center justify-center px-1">
+          <span
+            className={cn(
+              "inline-flex max-w-full items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground ring-1 ring-border/60",
+              "line-clamp-2 whitespace-normal text-center leading-snug",
+            )}
+            title={designationLabel}
+          >
+            {designationLabel}
+          </span>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 type EmployeeDirectoryCardProps = {
   person: DirectoryCardPerson;
   onViewProfile?: (employeeId: string) => void;
   /** When true, footer shows "View profile" instead of expand/collapse. */
   directProfileLink?: boolean;
+  /** HR-style read-only card for Employee Portal directory (no expand, click, or profile access). */
+  readOnlyHrStyle?: boolean;
 };
 
-export function EmployeeDirectoryCard({
+function EmployeeDirectoryInteractiveCard({
   person,
   onViewProfile,
   directProfileLink = false,
-}: EmployeeDirectoryCardProps) {
+}: Omit<EmployeeDirectoryCardProps, "readOnlyHrStyle">) {
   const [open, setOpen] = useState(false);
   const showExpand = !directProfileLink;
 
@@ -259,15 +357,36 @@ export function EmployeeDirectoryCard({
   );
 }
 
+export function EmployeeDirectoryCard({
+  person,
+  onViewProfile,
+  directProfileLink = false,
+  readOnlyHrStyle = false,
+}: EmployeeDirectoryCardProps) {
+  if (readOnlyHrStyle) {
+    return <EmployeeDirectoryReadOnlyCard person={person} />;
+  }
+
+  return (
+    <EmployeeDirectoryInteractiveCard
+      person={person}
+      onViewProfile={onViewProfile}
+      directProfileLink={directProfileLink}
+    />
+  );
+}
+
 export function EmployeeDirectoryGrid({
   people,
   onViewProfile,
   directProfileLink = false,
+  readOnlyHrStyle = false,
   className,
 }: {
   people: DirectoryCardPerson[];
   onViewProfile?: (employeeId: string) => void;
   directProfileLink?: boolean;
+  readOnlyHrStyle?: boolean;
   className?: string;
 }) {
   return (
@@ -283,6 +402,7 @@ export function EmployeeDirectoryGrid({
           person={person}
           onViewProfile={onViewProfile}
           directProfileLink={directProfileLink}
+          readOnlyHrStyle={readOnlyHrStyle}
         />
       ))}
     </div>

@@ -179,7 +179,7 @@ export function EmployeeDirectoryView({
         </p>
       </div>
     ) : (
-      <EmployeeDirectoryGrid people={filtered} />
+      <EmployeeDirectoryGrid people={filtered} readOnlyHrStyle />
     );
 
   if (stickyToolbar) {

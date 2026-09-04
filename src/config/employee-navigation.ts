@@ -32,7 +32,6 @@ export const employeeNavItems: NavigationItem[] = [
     title: "Employee Directory",
     href: EMPLOYEE_ROUTES.directory,
     icon: Users,
-    permissions: ["employee.directory.view"],
   },
   {
     title: "Attendance",
