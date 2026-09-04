@@ -28,6 +28,7 @@ export type LeavePolicyHolidayRow = {
 
 export type LeavePolicyPageData = {
   document: LeavePolicyDocument;
+  internProbationDocument: LeavePolicyDocument;
   mandatoryHolidays: LeavePolicyHolidayRow[];
   optionalHolidays: LeavePolicyHolidayRow[];
   holidayYear: number;

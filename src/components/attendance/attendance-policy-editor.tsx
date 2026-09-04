@@ -77,7 +77,7 @@ export function AttendancePolicyEditor({
 
       <LeavePolicyPageHeader
         title="Edit Attendance Policy"
-        description="Update the employee-facing attendance policy. Changes apply immediately after you click Update policy."
+        description="Update the full-time employee attendance policy. Intern and probation policy content is managed centrally. Changes apply immediately after you click Update policy."
       />
 
       <section className="space-y-4 rounded-xl border bg-card p-6 shadow-sm md:p-8">

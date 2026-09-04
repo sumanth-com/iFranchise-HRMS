@@ -1,7 +1,7 @@
 import { format, parseISO } from "date-fns";
 
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
-import { DEFAULT_LEAVE_POLICY_DOCUMENT } from "@/lib/leave/leave-policy-defaults";
+import { DEFAULT_LEAVE_POLICY_DOCUMENT, DEFAULT_INTERN_PROBATION_LEAVE_POLICY } from "@/lib/leave/leave-policy-defaults";
 import { hidePeriodLeaveFromPolicyDocument } from "@/lib/leave/leave-policy-employee-display";
 import { listHolidays } from "@/lib/organization/services/org-queries";
 import type {
@@ -9,6 +9,15 @@ import type {
   LeavePolicyHolidayRow,
   LeavePolicyPageData,
 } from "@/types/leave-policy";
+
+function isLegacyLeavePolicyDocument(value: Partial<LeavePolicyDocument>): boolean {
+  const sectionIds = value.sections?.map((section) => section.id) ?? [];
+  return (
+    sectionIds.includes("communication-guidelines") ||
+    sectionIds.includes("sales-confirmation") ||
+    sectionIds.includes("post-probation-carry-forward")
+  );
+}
 
 function parseLeavePolicyDocument(settings: Record<string, unknown> | null): LeavePolicyDocument {
   const raw = settings?.leave_policy_document;
@@ -18,6 +27,10 @@ function parseLeavePolicyDocument(settings: Record<string, unknown> | null): Lea
 
   const value = raw as Partial<LeavePolicyDocument>;
   if (!value.intro || !Array.isArray(value.sections) || value.sections.length === 0) {
+    return DEFAULT_LEAVE_POLICY_DOCUMENT;
+  }
+
+  if (isLegacyLeavePolicyDocument(value)) {
     return DEFAULT_LEAVE_POLICY_DOCUMENT;
   }
 
@@ -86,6 +99,7 @@ export async function getLeavePolicyPageData(
 
   return {
     document,
+    internProbationDocument: DEFAULT_INTERN_PROBATION_LEAVE_POLICY,
     mandatoryHolidays,
     optionalHolidays,
     holidayYear: holidaysResult.year,

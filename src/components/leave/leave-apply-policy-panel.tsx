@@ -13,7 +13,7 @@ import {
 import {
   LeavePolicySections,
 } from "@/components/leave/leave-policy-content";
-import { DEFAULT_LEAVE_POLICY_DOCUMENT } from "@/lib/leave/leave-policy-defaults";
+import { DEFAULT_LEAVE_POLICY_DOCUMENT, DEFAULT_INTERN_PROBATION_LEAVE_POLICY } from "@/lib/leave/leave-policy-defaults";
 import { getLeaveSubmissionApprovalMessage } from "@/lib/leave/leave-approval-copy";
 import { previewLeaveApplication } from "@/lib/leave/services/leave-apply-preview";
 import { formatLeaveDate } from "@/lib/leave/services/leave-utils";
@@ -36,7 +36,13 @@ export function LeavePolicyInfo({
 }) {
   const [open, setOpen] = useState(false);
   const approvalLevels = context?.approvalLevels ?? 2;
-  const document = context?.policyDocument ?? DEFAULT_LEAVE_POLICY_DOCUMENT;
+  const hasFullTimeLeaveTypes =
+    context?.leaveTypes.some((leaveType) => leaveType.code === "EL") ?? true;
+  const document =
+    context?.policyDocument ??
+    (hasFullTimeLeaveTypes
+      ? DEFAULT_LEAVE_POLICY_DOCUMENT
+      : DEFAULT_INTERN_PROBATION_LEAVE_POLICY);
   const approvalLine = getLeaveSubmissionApprovalMessage(
     context?.applicantRoleCodes ?? [],
     approvalLevels,
@@ -56,9 +62,10 @@ export function LeavePolicyInfo({
           <div>
             <p className="text-sm font-semibold">Leave Policy</p>
             <ul className="mt-1.5 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
-              <li>Check your available balance before applying.</li>
-              <li>Leave requests may require prior intimation depending on leave type.</li>
-              <li>Weekly holidays may be counted under the Sandwich Leave Policy.</li>
+              <li>Check your available CL/EL balance in HRMS before applying.</li>
+              <li>Planned leave requires email, manager approval, and HRMS submission before you leave.</li>
+              <li>Half-day leave is allowed only for the second half (3:00 p.m. onwards).</li>
+              <li>Weekly offs and non-working days may count under the sandwich rule.</li>
               <li>{approvalLine}</li>
             </ul>
           </div>

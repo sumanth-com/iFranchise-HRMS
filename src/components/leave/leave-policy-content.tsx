@@ -228,18 +228,28 @@ export function LeavePolicyHolidayTables({
   mandatoryHolidays,
   optionalHolidays,
   holidayYear,
+  showOptionalHolidays = true,
 }: {
   mandatoryHolidays: ReadonlyArray<{ id: string; name: string; date: string; day: string }>;
   optionalHolidays: ReadonlyArray<{ id: string; name: string; date: string; day: string }>;
   holidayYear: number;
+  showOptionalHolidays?: boolean;
 }) {
   return (
-    <div className="grid w-full grid-cols-1 gap-5 lg:grid-cols-2">
+    <div
+      className={
+        showOptionalHolidays
+          ? "grid w-full grid-cols-1 gap-5 lg:grid-cols-2"
+          : "grid w-full grid-cols-1 gap-5"
+      }
+    >
       <LeavePolicyHolidayTable title={`Holiday List ${holidayYear}`} rows={mandatoryHolidays} />
-      <LeavePolicyHolidayTable
-        title={`Optional Holidays List ${holidayYear}`}
-        rows={optionalHolidays}
-      />
+      {showOptionalHolidays ? (
+        <LeavePolicyHolidayTable
+          title={`Optional Holidays List ${holidayYear}`}
+          rows={optionalHolidays}
+        />
+      ) : null}
     </div>
   );
 }

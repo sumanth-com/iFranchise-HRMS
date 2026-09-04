@@ -3,6 +3,7 @@ import { LeavePolicyView } from "@/components/leave/leave-policy-view";
 import { getEmployeeById } from "@/lib/employees/services/employee-detail";
 import { SELF_LEAVE_ROUTES } from "@/lib/leave/constants";
 import { canEditLeavePolicy } from "@/lib/leave/leave-policy-permissions";
+import { getPolicyCategoryForEmployee } from "@/lib/leave/leave-policy-category";
 import { getLeavePolicyPageData } from "@/lib/leave/services/leave-policy-queries";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
@@ -24,9 +25,10 @@ export default async function HrLeavePolicyPage() {
   const supabase = await createClient();
   const canEdit = canEditLeavePolicy(profile);
 
-  const [employee, policy] = await Promise.all([
+  const [employee, policy, defaultCategory] = await Promise.all([
     getEmployeeById(supabase, profile.employee.id),
     getLeavePolicyPageData(supabase, profile.employee.organizationId),
+    getPolicyCategoryForEmployee(supabase, profile.employee.id),
   ]);
 
   const employeeName = resolveEmployeeGreetingName(employee);
@@ -48,7 +50,9 @@ export default async function HrLeavePolicyPage() {
           backHref={SELF_LEAVE_ROUTES.team}
           backLabel="Back to Team Leave"
           employeeName={employeeName}
-          document={policy.document}
+          fullTimeDocument={policy.document}
+          internProbationDocument={policy.internProbationDocument}
+          defaultCategory={defaultCategory}
           mandatoryHolidays={policy.mandatoryHolidays}
           optionalHolidays={policy.optionalHolidays}
           holidayYear={policy.holidayYear}

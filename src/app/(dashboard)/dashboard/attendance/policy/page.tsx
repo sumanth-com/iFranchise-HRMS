@@ -2,6 +2,7 @@ import { AttendancePolicyView } from "@/components/attendance/attendance-policy-
 import { SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
 import { getAttendancePolicyDocument } from "@/lib/attendance/services/attendance-policy-queries";
 import { getEmployeeById } from "@/lib/employees/services/employee-detail";
+import { getPolicyCategoryForEmployee } from "@/lib/leave/leave-policy-category";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -20,9 +21,10 @@ function resolveEmployeeGreetingName(
 export default async function SelfAttendancePolicyPage() {
   const profile = await requireServerAnyPermission(["attendance.view"]);
   const supabase = await createClient();
-  const [employee, document] = await Promise.all([
+  const [employee, policy, defaultCategory] = await Promise.all([
     getEmployeeById(supabase, profile.employee.id),
     getAttendancePolicyDocument(supabase, profile.employee.organizationId),
+    getPolicyCategoryForEmployee(supabase, profile.employee.id),
   ]);
 
   return (
@@ -31,7 +33,9 @@ export default async function SelfAttendancePolicyPage() {
         backHref={SELF_ATTENDANCE_ROUTES.list}
         backLabel="Back to Attendance"
         employeeName={resolveEmployeeGreetingName(employee)}
-        document={document}
+        fullTimeDocument={policy.document}
+        internProbationDocument={policy.internProbationDocument}
+        defaultCategory={defaultCategory}
       />
     </div>
   );

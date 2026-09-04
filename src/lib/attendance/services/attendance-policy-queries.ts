@@ -1,6 +1,21 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { DEFAULT_ATTENDANCE_POLICY_DOCUMENT } from "@/lib/attendance/attendance-policy-defaults";
+import { DEFAULT_INTERN_PROBATION_ATTENDANCE_POLICY } from "@/lib/leave/leave-attendance-absence-policy-content";
 import type { AttendancePolicyDocument } from "@/types/attendance-policy";
+
+export type AttendancePolicyPageData = {
+  document: AttendancePolicyDocument;
+  internProbationDocument: AttendancePolicyDocument;
+};
+
+function isLegacyAttendancePolicyDocument(value: Partial<AttendancePolicyDocument>): boolean {
+  const sectionIds = value.sections?.map((section) => section.id) ?? [];
+  return (
+    sectionIds.includes("payroll-attendance-update") ||
+    sectionIds.includes("weekly-offs") ||
+    sectionIds.includes("resumption-rule")
+  );
+}
 
 function parseAttendancePolicyDocument(
   settings: Record<string, unknown> | null,
@@ -12,6 +27,10 @@ function parseAttendancePolicyDocument(
 
   const value = raw as Partial<AttendancePolicyDocument>;
   if (!value.intro || !Array.isArray(value.sections) || value.sections.length === 0) {
+    return DEFAULT_ATTENDANCE_POLICY_DOCUMENT;
+  }
+
+  if (isLegacyAttendancePolicyDocument(value)) {
     return DEFAULT_ATTENDANCE_POLICY_DOCUMENT;
   }
 
@@ -34,7 +53,7 @@ function parseAttendancePolicyDocument(
 export async function getAttendancePolicyDocument(
   supabase: AuthSupabaseClient,
   organizationId: string,
-): Promise<AttendancePolicyDocument> {
+): Promise<AttendancePolicyPageData> {
   const { data, error } = await supabase
     .schema("hrms")
     .from("organization_settings")
@@ -45,7 +64,10 @@ export async function getAttendancePolicyDocument(
 
   if (error) throw new Error(error.message);
 
-  return parseAttendancePolicyDocument(
-    (data?.settings as Record<string, unknown> | null) ?? null,
-  );
+  return {
+    document: parseAttendancePolicyDocument(
+      (data?.settings as Record<string, unknown> | null) ?? null,
+    ),
+    internProbationDocument: DEFAULT_INTERN_PROBATION_ATTENDANCE_POLICY,
+  };
 }

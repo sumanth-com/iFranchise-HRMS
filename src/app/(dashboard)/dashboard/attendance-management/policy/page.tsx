@@ -4,6 +4,7 @@ import { SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
 import { canEditAttendancePolicy } from "@/lib/attendance/attendance-policy-permissions";
 import { getAttendancePolicyDocument } from "@/lib/attendance/services/attendance-policy-queries";
 import { getEmployeeById } from "@/lib/employees/services/employee-detail";
+import { getPolicyCategoryForEmployee } from "@/lib/leave/leave-policy-category";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -24,9 +25,10 @@ export default async function HrAttendancePolicyPage() {
   const supabase = await createClient();
   const canEdit = canEditAttendancePolicy(profile);
 
-  const [employee, document] = await Promise.all([
+  const [employee, policy, defaultCategory] = await Promise.all([
     getEmployeeById(supabase, profile.employee.id),
     getAttendancePolicyDocument(supabase, profile.employee.organizationId),
+    getPolicyCategoryForEmployee(supabase, profile.employee.id),
   ]);
 
   const employeeName = resolveEmployeeGreetingName(employee);
@@ -37,14 +39,16 @@ export default async function HrAttendancePolicyPage() {
         <AttendancePolicyEditor
           backHref={SELF_ATTENDANCE_ROUTES.team}
           employeeName={employeeName}
-          initialDocument={document}
+          initialDocument={policy.document}
         />
       ) : (
         <AttendancePolicyView
           backHref={SELF_ATTENDANCE_ROUTES.team}
           backLabel="Back to Team Attendance"
           employeeName={employeeName}
-          document={document}
+          fullTimeDocument={policy.document}
+          internProbationDocument={policy.internProbationDocument}
+          defaultCategory={defaultCategory}
         />
       )}
     </div>

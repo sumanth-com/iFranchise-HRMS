@@ -2,18 +2,18 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { Button } from "@/components/common/button";
-import {
-  LeavePolicyHolidayTables,
-  LeavePolicyPageHeader,
-  LeavePolicySections,
-} from "@/components/leave/leave-policy-content";
+import { LeavePolicyPageHeader } from "@/components/leave/leave-policy-content";
+import { PolicyCatalogLeaveView } from "@/components/policy/policy-catalog-leave-view";
+import type { PolicyEmployeeCategory } from "@/lib/leave/leave-attendance-absence-policy-content";
 import type { LeavePolicyDocument, LeavePolicyHolidayRow } from "@/types/leave-policy";
 
 export function LeavePolicyView({
   backHref,
   backLabel = "Back to My Leave",
   employeeName,
-  document,
+  fullTimeDocument,
+  internProbationDocument,
+  defaultCategory = "full_time",
   mandatoryHolidays,
   optionalHolidays,
   holidayYear,
@@ -21,7 +21,9 @@ export function LeavePolicyView({
   backHref: string;
   backLabel?: string;
   employeeName: string;
-  document: LeavePolicyDocument;
+  fullTimeDocument: LeavePolicyDocument;
+  internProbationDocument: LeavePolicyDocument;
+  defaultCategory?: PolicyEmployeeCategory;
   mandatoryHolidays: LeavePolicyHolidayRow[];
   optionalHolidays: LeavePolicyHolidayRow[];
   holidayYear: number;
@@ -36,17 +38,15 @@ export function LeavePolicyView({
       </div>
 
       <LeavePolicyPageHeader
-        title="Leave Policy"
-        description="Leave communication, sandwich leave, carry forward, confirmation criteria, and holiday list."
+        title="Leave, Attendance and Absence Policy"
+        description="Leave eligibility, application rules, absence guidelines, sandwich rule, and holiday information. Select the policy for your employment category."
       />
 
-      <LeavePolicySections
-        intro={document.intro}
-        sections={document.sections}
+      <PolicyCatalogLeaveView
         employeeName={employeeName}
-      />
-
-      <LeavePolicyHolidayTables
+        fullTimeDocument={fullTimeDocument}
+        internProbationDocument={internProbationDocument}
+        defaultCategory={defaultCategory}
         mandatoryHolidays={mandatoryHolidays}
         optionalHolidays={optionalHolidays}
         holidayYear={holidayYear}
