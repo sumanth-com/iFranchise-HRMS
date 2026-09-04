@@ -5,10 +5,13 @@ import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { canManageDashboardAnnouncements } from "@/lib/dashboard/dashboard-announcement-permissions";
 import { listPublishedDashboardAnnouncements } from "@/lib/dashboard/services/dashboard-announcement-queries";
 import { canUpdateOwnCheckout } from "@/lib/attendance/self-checkout-permissions";
+import { getDirectoryAssetPhotoUrl } from "@/lib/employee/directory-asset-photos";
+import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
 import { getEmployeeLeaveBalanceSnapshot } from "@/lib/leave/services/leave-queries";
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
 import { roundLeaveDays } from "@/lib/leave/services/leave-usage";
 import { getSelfTodayAttendance } from "@/lib/manager/services/manager-self-attendance-service";
+import { createSignedStorageUrls } from "@/lib/storage/signed-url";
 import type { UserProfile } from "@/types/auth";
 import type {
   EmployeeDashboardData,
@@ -194,6 +197,16 @@ export async function loadUpcomingCelebrations(
 
       if (profilesResult.error) throw new Error(profilesResult.error.message);
 
+      const birthdayCandidates: Array<{
+        employeeId: string;
+        employeeCode: string;
+        firstName: string;
+        lastName: string;
+        fullName: string;
+        bday: Date;
+        profileImagePath: string | null;
+      }> = [];
+
       for (const row of profilesResult.data ?? []) {
         const employeeId = row.employee_id as string;
         const employee = employeeById.get(employeeId);
@@ -207,15 +220,45 @@ export async function loadUpcomingCelebrations(
         const lastName = (employee.last_name as string | null) ?? "";
         const fullName = `${firstName} ${lastName}`.trim() || "Team member";
 
-        events.push({
-          id: `birthday-${employeeId}`,
-          type: "birthday",
-          title: fullName,
-          subtitle: "Birthday",
-          date: format(bday, "yyyy-MM-dd"),
-          profileImagePath: (row.profile_image_storage_path as string | null) ?? null,
+        birthdayCandidates.push({
+          employeeId,
+          employeeCode: (employee.employee_code as string | null) ?? "",
           firstName,
           lastName,
+          fullName,
+          bday,
+          profileImagePath: (row.profile_image_storage_path as string | null) ?? null,
+        });
+      }
+
+      const signedByPath = await createSignedStorageUrls(
+        supabase,
+        EMPLOYEE_STORAGE_BUCKETS.profileImages,
+        birthdayCandidates.map((candidate) => candidate.profileImagePath),
+      );
+
+      for (const candidate of birthdayCandidates) {
+        const avatarUrl =
+          (candidate.profileImagePath
+            ? signedByPath.get(candidate.profileImagePath)
+            : null) ??
+          getDirectoryAssetPhotoUrl({
+            employeeCode: candidate.employeeCode,
+            firstName: candidate.firstName,
+            lastName: candidate.lastName,
+            fullName: candidate.fullName,
+          });
+
+        events.push({
+          id: `birthday-${candidate.employeeId}`,
+          type: "birthday",
+          title: candidate.fullName,
+          subtitle: "Birthday",
+          date: format(candidate.bday, "yyyy-MM-dd"),
+          profileImagePath: candidate.profileImagePath,
+          avatarUrl,
+          firstName: candidate.firstName,
+          lastName: candidate.lastName,
         });
       }
     }

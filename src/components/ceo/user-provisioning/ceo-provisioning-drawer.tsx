@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { fetchCeoProvisioningUserDetailAction } from "@/lib/ceo/actions/ceo-user-provisioning-actions";
+import { provisioningContactFieldVisibility } from "@/lib/ceo/provisioning-contact-fields";
 import {
   canCancelProvisioningInvitation,
   canResendProvisioningInvitation,
@@ -91,6 +92,9 @@ export function CeoProvisioningDrawer({
   const showReactivate = accountStatus === "suspended" || accountStatus === "inactive";
   const hasQuickActions =
     showSend || showResend || showCancel || showDelete || showDeactivate || showReactivate;
+  const { showReportingManager, showAssignedHr } = user
+    ? provisioningContactFieldVisibility(user)
+    : { showReportingManager: false, showAssignedHr: false };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -124,8 +128,12 @@ export function CeoProvisioningDrawer({
               <Field label="Department" value={user.departmentName} />
               <Field label="Designation" value={user.designationTitle} />
               <Field label="Branch" value={user.branchName} />
-              <Field label="Reporting Manager" value={user.reportingManagerName} />
-              <Field label="HR Contact" value={user.assignedHrEmployeeName} />
+              {showReportingManager ? (
+                <Field label="Reporting Manager" value={user.reportingManagerName} />
+              ) : null}
+              {showAssignedHr ? (
+                <Field label="HR Contact" value={user.assignedHrEmployeeName} />
+              ) : null}
               <Field label="Employment Type" value={detail.employmentTypeName} />
               <Field label="Account Status" value={user.accountStatus} />
               <Field label="Invited By" value={user.sentByName} />

@@ -16,7 +16,6 @@ import {
   Shield,
   ShieldX,
   Trash2,
-  UserRound,
   Users,
   UserCheck,
 } from "lucide-react";
@@ -172,7 +171,7 @@ function PersonCard({
     ? fmtInviteDate(user.invitationSentAt)
     : "Not invited";
 
-  const { showReportingManager, showAssignedHr } = provisioningContactFieldVisibility(user);
+  const { showAssignedHr } = provisioningContactFieldVisibility(user);
 
   return (
     <article className="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-white shadow-sm transition-shadow hover:shadow-md">
@@ -217,7 +216,7 @@ function PersonCard({
             {showReportingContacts ? (
               <DropdownMenuItem onClick={() => onAction("changeReportingContacts", user)}>
                 <UserCheck className="mr-2 size-4" />
-                <span className="whitespace-nowrap">Update reporting &amp; HR</span>
+                <span className="whitespace-nowrap">Update HR contact</span>
               </DropdownMenuItem>
             ) : null}
             {showSend ? (
@@ -305,13 +304,6 @@ function PersonCard({
           label="Department"
           value={user.departmentName ?? "—"}
         />
-        {showReportingManager ? (
-          <MetaRow
-            icon={<UserRound className="size-3.5" />}
-            label="Reporting To"
-            value={user.reportingManagerName ?? "—"}
-          />
-        ) : null}
         {showAssignedHr ? (
           <MetaRow
             icon={<UserCheck className="size-3.5" />}

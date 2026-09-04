@@ -403,9 +403,9 @@ export function CeoProvisioningReportingContactsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Update reporting &amp; HR</DialogTitle>
+          <DialogTitle>Update HR contact</DialogTitle>
           <DialogDescription>
-            Set the reporting manager and HR contact for {user?.fullName ?? "this user"}.
+            Set the HR contact for {user?.fullName ?? "this user"}.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-4">

@@ -12,7 +12,15 @@ async function ManagerSelfServiceHomeContent() {
   const supabase = await createClient();
   const data = await getEmployeeDashboardData(supabase, profile);
 
-  return <EmployeeDashboardView {...data} subtitle="Manager Portal" />;
+  return (
+    <EmployeeDashboardView
+      {...data}
+      canManageAnnouncements={false}
+      subtitle="Manager Portal"
+      pairHolidayBirthday
+      showImportantNotices
+    />
+  );
 }
 
 export default function ManagerPortalPage() {

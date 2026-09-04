@@ -299,7 +299,7 @@ export function CeoUserProvisioningView({
           if (!open) setReportingContactsUser(null);
         }}
         onSaved={() => {
-          toast.success("Reporting manager and HR contact updated.");
+          toast.success("HR contact updated.");
           void refreshList(pageParams);
         }}
       />

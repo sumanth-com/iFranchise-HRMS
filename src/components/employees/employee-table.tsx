@@ -15,8 +15,8 @@ import { EmployeeCardsGrid } from "@/components/employees/employee-cards-grid";
 import { ChangeEmploymentTypeDialog } from "@/components/employees/change-employment-type-dialog";
 import { EmployeeDeleteConfirmDialog } from "@/components/employees/employee-delete-confirm-dialog";
 import { EmploymentCategoryFilters } from "@/components/employees/employment-category-filters";
-import { PeoplePageSizeSelect } from "@/components/common/people-page-size-select";
 import { deleteEmployeeAction, fetchEmployeesAction } from "@/lib/employees/actions";
+import { directoryDepartmentLabel } from "@/lib/employee/directory-listing";
 import { resolveEmployeeModuleRoutes } from "@/lib/employees/constants";
 import {
   DEFAULT_EMPLOYMENT_CATEGORY_FILTER,
@@ -152,7 +152,7 @@ export function EmployeeTable({
     return () => window.clearTimeout(timer);
   }, [searchInput, filters.search, updateParams]);
 
-  const { employees, pageSize } = tableState;
+  const { employees } = tableState;
   const { department, employmentCategory = DEFAULT_EMPLOYMENT_CATEGORY_FILTER } = filters;
 
   const refreshEmployees = useCallback(async () => {
@@ -174,7 +174,7 @@ export function EmployeeTable({
         .filter((item) => Boolean(item.code))
         .map((item) => ({
           value: item.code as string,
-          label: item.label,
+          label: directoryDepartmentLabel(item.label) ?? item.label,
         })),
     ],
     [departments],
@@ -253,14 +253,6 @@ export function EmployeeTable({
               ))}
             </SelectContent>
           </Select>
-          <PeoplePageSizeSelect
-            value={pageSize}
-            disabled={isPending}
-            className="w-[9rem] shrink-0"
-            onChange={(nextSize) =>
-              updateParams({ pageSize: String(nextSize), page: "1" })
-            }
-          />
           <span className="inline-flex h-10 shrink-0 items-center rounded-md border border-border/80 bg-white px-3 text-sm font-semibold dark:bg-input">
             {tableState.total} people
           </span>

@@ -101,6 +101,136 @@ async function applyEmploymentCategoryFilter(
   return { mode: "probation" as const, typeIds: [...new Set(matchingTypeIds)] };
 }
 
+type EmployeeListCountRow = {
+  employee_code: string;
+  first_name: string;
+  last_name: string;
+  designations: { title: string } | { title: string }[] | null;
+};
+
+function countVisibleEmployeeRows(rows: EmployeeListCountRow[]): number {
+  return rows.filter(
+    (row) =>
+      !isHiddenFromPeopleFilters(row.employee_code, {
+        employeeCode: row.employee_code,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        designationTitle: unwrapRelation(row.designations)?.title ?? null,
+      }),
+  ).length;
+}
+
+/** Matches the Employees module default list total (visibility + scope rules). */
+export async function countEmployeeModuleListTotal(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  params: Pick<
+    EmployeeListParams,
+    "department" | "employmentStatus" | "accountStatus" | "employmentCategory" | "search"
+  > = {},
+): Promise<number> {
+  const {
+    search,
+    department,
+    employmentStatus,
+    accountStatus,
+    employmentCategory,
+  } = parseListParams({ page: 1, pageSize: 1, ...params });
+
+  const categoryFilter = await applyEmploymentCategoryFilter(
+    supabase,
+    profile.employee.organizationId,
+    employmentCategory,
+  );
+
+  if (categoryFilter && categoryFilter.typeIds.length === 0) {
+    return 0;
+  }
+
+  const employeeScope = await resolveOrgDataEmployeeScope(supabase, profile);
+  const scopedIds = scopedEmployeeIds(employeeScope);
+  if (scopedIds && scopedIds.length === 0) {
+    return 0;
+  }
+
+  let departmentId: string | undefined;
+  if (department) {
+    const { data: departmentRow, error: departmentError } = await supabase
+      .schema("hrms")
+      .from("departments")
+      .select("id")
+      .eq("organization_id", profile.employee.organizationId)
+      .ilike("code", department)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (departmentError) {
+      throw new Error(departmentError.message);
+    }
+
+    if (!departmentRow?.id) {
+      return 0;
+    }
+
+    departmentId = departmentRow.id;
+  }
+
+  let query = supabase
+    .schema("hrms")
+    .from("employees")
+    .select("employee_code, first_name, last_name, designations:designation_id (title)")
+    .eq("organization_id", profile.employee.organizationId)
+    .is("deleted_at", null)
+    .is("app_hidden_at", null);
+
+  if (scopedIds) {
+    query = query.in("id", scopedIds);
+  }
+
+  const hiddenCodes = [...DIRECTORY_HIDDEN_EMPLOYEE_CODES];
+  if (hiddenCodes.length > 0) {
+    query = query.not("employee_code", "in", `(${hiddenCodes.join(",")})`);
+  }
+
+  if (search) {
+    const escaped = search.replace(/[%_,.()\"\\]/g, " ").trim();
+    if (escaped) {
+      const term = `%${escaped}%`;
+      query = query.or(
+        [
+          `first_name.ilike."${term}"`,
+          `last_name.ilike."${term}"`,
+          `email.ilike."${term}"`,
+          `employee_code.ilike."${term}"`,
+        ].join(","),
+      );
+    }
+  }
+
+  if (departmentId) {
+    query = query.eq("department_id", departmentId);
+  }
+
+  if (employmentStatus) {
+    query = query.eq("employment_status", employmentStatus);
+  }
+
+  if (accountStatus) {
+    query = query.eq("account_status", accountStatus);
+  }
+
+  if (categoryFilter && categoryFilter.typeIds.length > 0) {
+    query = query.in("employment_type_id", categoryFilter.typeIds);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return countVisibleEmployeeRows((data ?? []) as EmployeeListCountRow[]);
+}
+
 export async function listEmployees(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -180,7 +310,6 @@ export async function listEmployees(
         employment_types:employment_type_id (name, code),
         employee_profiles (profile_image_storage_path)
       `,
-      { count: "estimated" },
     )
     .eq("organization_id", profile.employee.organizationId)
     .is("deleted_at", null)
@@ -233,11 +362,57 @@ export async function listEmployees(
   }
   query = query.range(from, to);
 
-  const { data, error, count } = await query;
+  let countQuery = supabase
+    .schema("hrms")
+    .from("employees")
+    .select("employee_code, first_name, last_name, designations:designation_id (title)")
+    .eq("organization_id", profile.employee.organizationId)
+    .is("deleted_at", null)
+    .is("app_hidden_at", null);
+
+  if (scopedIds) {
+    countQuery = countQuery.in("id", scopedIds);
+  }
+  if (hiddenCodes.length > 0) {
+    countQuery = countQuery.not("employee_code", "in", `(${hiddenCodes.join(",")})`);
+  }
+  if (search) {
+    const escaped = search.replace(/[%_,.()\"\\]/g, " ").trim();
+    if (escaped) {
+      const term = `%${escaped}%`;
+      countQuery = countQuery.or(
+        [
+          `first_name.ilike."${term}"`,
+          `last_name.ilike."${term}"`,
+          `email.ilike."${term}"`,
+          `employee_code.ilike."${term}"`,
+        ].join(","),
+      );
+    }
+  }
+  if (departmentId) {
+    countQuery = countQuery.eq("department_id", departmentId);
+  }
+  if (employmentStatus) {
+    countQuery = countQuery.eq("employment_status", employmentStatus);
+  }
+  if (accountStatus) {
+    countQuery = countQuery.eq("account_status", accountStatus);
+  }
+  if (categoryFilter && categoryFilter.typeIds.length > 0) {
+    countQuery = countQuery.in("employment_type_id", categoryFilter.typeIds);
+  }
+
+  const [{ data, error }, countResult] = await Promise.all([query, countQuery]);
 
   if (error) {
     throw new Error(error.message);
   }
+  if (countResult.error) {
+    throw new Error(countResult.error.message);
+  }
+
+  const total = countVisibleEmployeeRows((countResult.data ?? []) as EmployeeListCountRow[]);
 
   const rows = ((data ?? []) as EmployeeRow[]).filter(
     (row) =>
@@ -285,7 +460,7 @@ export async function listEmployees(
         lastLoginAt: null,
       };
     }),
-    total: count ?? 0,
+    total,
     page,
     pageSize,
   };

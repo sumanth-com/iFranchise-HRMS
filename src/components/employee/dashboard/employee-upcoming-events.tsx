@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { Cake, Newspaper, Pencil, Settings2, Sparkles, UserRound } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/common/button";
@@ -19,7 +20,7 @@ import {
   employeeSectionClass,
 } from "@/components/employee/dashboard/employee-module-primitives";
 import { HolidayGlyph } from "@/components/employee/dashboard/holiday-glyph";
-import { EmployeeAvatar } from "@/components/employees/employee-avatar";
+import { getDirectoryAssetPhoto } from "@/lib/employee/directory-asset-photos";
 import { getSignedUrlAction } from "@/lib/employees/actions";
 import { cn } from "@/lib/utils";
 import type { EmployeeUpcomingEvent } from "@/types/employee-dashboard";
@@ -53,15 +54,31 @@ function CelebrationBirthdayPhoto({
   lastName,
   profileImagePath,
   signedUrl,
+  className = "size-[4.5rem] rounded-2xl object-cover",
 }: {
   firstName: string;
   lastName: string;
   profileImagePath?: string | null;
   signedUrl?: string | null;
+  className?: string;
 }) {
+  const person = useMemo(
+    () => ({
+      firstName,
+      lastName,
+      fullName: `${firstName} ${lastName}`.trim(),
+    }),
+    [firstName, lastName],
+  );
+  const assetPhoto = useMemo(() => getDirectoryAssetPhoto(person), [person]);
   const [imageUrl, setImageUrl] = useState<string | null>(signedUrl ?? null);
+  const [assetFailed, setAssetFailed] = useState(false);
+  const [remoteFailed, setRemoteFailed] = useState(false);
 
   useEffect(() => {
+    setAssetFailed(false);
+    setRemoteFailed(false);
+
     if (signedUrl) {
       setImageUrl(signedUrl);
       return;
@@ -79,13 +96,30 @@ function CelebrationBirthdayPhoto({
     });
   }, [profileImagePath, signedUrl]);
 
-  if (imageUrl) {
+  const showUpload = Boolean(imageUrl) && !remoteFailed;
+  const showAsset = Boolean(assetPhoto) && !assetFailed && !showUpload;
+
+  if (showUpload && imageUrl) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={imageUrl}
-        alt={`${firstName} ${lastName}`.trim()}
-        className="size-[4.5rem] rounded-2xl object-cover"
+        alt={person.fullName || firstName}
+        className={className}
+        onError={() => setRemoteFailed(true)}
+      />
+    );
+  }
+
+  if (showAsset && assetPhoto) {
+    return (
+      <Image
+        src={assetPhoto}
+        alt={person.fullName || firstName}
+        width={72}
+        height={72}
+        className={className}
+        onError={() => setAssetFailed(true)}
       />
     );
   }
@@ -194,7 +228,7 @@ function BirthdaySlide({
       <BirthdayCelebrationBurst active={active} />
 
       <div className="relative shrink-0">
-        <EmployeeAvatar
+        <CelebrationBirthdayPhoto
           firstName={event.firstName || event.title}
           lastName={event.lastName || ""}
           profileImagePath={event.profileImagePath}

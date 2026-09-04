@@ -7,6 +7,7 @@ import { absentTodayIncludingLeave } from "@/lib/attendance/attendance-presence"
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { DASHBOARD_ACTION_LINKS } from "@/lib/dashboard/constants";
 import { EMPLOYEE_ROUTES } from "@/lib/employees/constants";
+import { countEmployeeModuleListTotal } from "@/lib/employees/services/employee-queries";
 import { getLeaveSummary } from "@/lib/leave/services/leave-queries";
 import { ORGANIZATION_ROUTES } from "@/lib/organization/constants";
 import { listHolidays } from "@/lib/organization/services/org-queries";
@@ -90,7 +91,7 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
     attendance,
     leave,
     holidays,
-    headcountRes,
+    moduleEmployeeTotal,
     probationCountRes,
     anniversaryEmployeesRes,
     birthdayProfilesRes,
@@ -105,11 +106,7 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
       skipBalanceUtilization: true,
     }),
     listHolidays(supabase, organizationId, { year: todayDate.getFullYear() }),
-    fromHrms(supabase, "employees")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .in("employment_status", ACTIVE_EMPLOYMENT_STATUSES)
-      .is("deleted_at", null),
+    countEmployeeModuleListTotal(supabase, profile),
     fromHrms(supabase, "employees")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
@@ -151,14 +148,13 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
       .is("deleted_at", null),
   ]);
 
-  if (headcountRes.error) throw new Error(headcountRes.error.message);
   if (probationCountRes.error) throw new Error(probationCountRes.error.message);
   if (anniversaryEmployeesRes.error) throw new Error(anniversaryEmployeesRes.error.message);
   if (birthdayProfilesRes.error) throw new Error(birthdayProfilesRes.error.message);
   if (payrollRes.error) throw new Error(payrollRes.error.message);
   if (interviewsTodayRes.error) throw new Error(interviewsTodayRes.error.message);
 
-  const totalEmployees = headcountRes.count ?? 0;
+  const totalEmployees = moduleEmployeeTotal;
   const probationEndingSoon = probationCountRes.count ?? 0;
 
   const upcomingBirthdays = [];

@@ -2,6 +2,7 @@
 
 import {
   ArrowRight,
+  BarChart3,
   BriefcaseBusiness,
   CalendarClock,
   Cake,
@@ -11,6 +12,7 @@ import {
   Package,
   Palmtree,
   Sparkles,
+  Target,
   UserPlus,
   Users,
   Wallet,
@@ -82,6 +84,8 @@ const TASK_ICONS: Record<string, LucideIcon> = {
   "assets-return": ClipboardList,
   "pending-leave": Palmtree,
   "performance-reviews": ClipboardList,
+  "team-attendance-report": BarChart3,
+  "performance-team-reports": Target,
 };
 
 const TASK_HINTS: Record<string, string> = {
@@ -101,6 +105,8 @@ const TASK_HINTS: Record<string, string> = {
   "assets-return": "Assets still pending return",
   "pending-leave": "Leave requests waiting for your decision",
   "performance-reviews": "Performance reviews still open for your team",
+  "team-attendance-report": "Attendance trends and team presence reports",
+  "performance-team-reports": "Goals, KPIs, and performance insights for your team",
 };
 
 function resolveCardTone(_id: string, visualTone: DashboardVisualTone): CardTone {
@@ -220,12 +226,14 @@ function HrPriorityFocus({
   items,
   description = "Payroll, interviews, leave, and onboarding",
   visualTone = "default",
+  maxItems = 4,
 }: {
   items: DashboardTaskItem[];
   description?: string;
   visualTone?: DashboardVisualTone;
+  maxItems?: number;
 }) {
-  const cards = items.slice(0, 4);
+  const cards = items.slice(0, maxItems);
   if (cards.length === 0) return null;
 
   return (
@@ -246,9 +254,12 @@ function HrPriorityFocus({
 
       <div
         className={cn(
-          "grid flex-1 grid-cols-2 gap-3",
+          "grid flex-1 gap-3",
+          cards.length <= 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-2",
           visualTone === "vibrant"
-            ? "auto-rows-[minmax(8.75rem,1fr)]"
+            ? cards.length <= 2
+              ? "auto-rows-[minmax(8.75rem,1fr)]"
+              : "auto-rows-[minmax(8.75rem,1fr)]"
             : "min-h-0",
         )}
       >
@@ -294,6 +305,50 @@ function PeopleFocusPanel({
         className={cn(
           "grid flex-1 gap-3",
           cards.length <= 2 ? "grid-cols-2" : "grid-cols-2 lg:grid-cols-4",
+          visualTone === "vibrant" ? "auto-rows-[minmax(8.75rem,1fr)]" : "min-h-0",
+        )}
+      >
+        {cards.map((item) => (
+          <WatchFocusCard key={item.id} item={item} visualTone={visualTone} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ReportsFocusPanel({
+  items,
+  title = "Reports",
+  description = "Team insights and operational reports",
+  visualTone = "default",
+}: {
+  items: DashboardWatchItem[];
+  title?: string;
+  description?: string;
+  visualTone?: DashboardVisualTone;
+}) {
+  const cards = items.slice(0, 2);
+  if (cards.length === 0) return null;
+
+  return (
+    <section
+      className={cn(
+        "flex h-full min-h-0 flex-col",
+        dashboardSectionClass,
+        visualTone === "vibrant" && VIBRANT_SECTION_CLASS,
+      )}
+    >
+      <SectionHeading
+        title={title}
+        description={description}
+        icon={BarChart3}
+        visualTone={visualTone}
+        toneClass={VIBRANT_HEADING_CLASS}
+      />
+
+      <div
+        className={cn(
+          "grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2",
           visualTone === "vibrant" ? "auto-rows-[minmax(8.75rem,1fr)]" : "min-h-0",
         )}
       >
@@ -361,11 +416,18 @@ export function DashboardOperationsRow({
   insightsTitle,
   insightsDescription,
   focusDescription,
+  focusItems,
+  focusMaxItems = 4,
   rightPanel = "holidays",
   rightFocusItems,
   rightFocusTitle,
   rightFocusDescription,
+  bottomSection = "insights",
+  reportItems,
+  reportsTitle,
+  reportsDescription,
   visualTone = "default",
+  layout = "default",
 }: {
   tasks: DashboardTaskItem[];
   watchItems: DashboardWatchItem[];
@@ -375,12 +437,57 @@ export function DashboardOperationsRow({
   insightsTitle?: string;
   insightsDescription?: string;
   focusDescription?: string;
-  rightPanel?: "holidays" | "focus-pair";
+  focusItems?: DashboardTaskItem[];
+  focusMaxItems?: number;
+  rightPanel?: "holidays" | "focus-pair" | "none";
   rightFocusItems?: DashboardWatchItem[];
   rightFocusTitle?: string;
   rightFocusDescription?: string;
+  bottomSection?: "insights" | "reports" | "none";
+  reportItems?: DashboardWatchItem[];
+  reportsTitle?: string;
+  reportsDescription?: string;
   visualTone?: DashboardVisualTone;
+  layout?: "default" | "split";
 }) {
+  const priorityItems = focusItems ?? tasks;
+
+  if (layout === "split") {
+    return (
+      <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[3fr_2fr] xl:items-stretch">
+        <div className="flex min-h-0 flex-col gap-4">
+          <HrPriorityFocus
+            items={priorityItems}
+            description={focusDescription}
+            visualTone={visualTone}
+            maxItems={focusMaxItems}
+          />
+          {bottomSection === "insights" ? (
+            <PeopleFocusPanel
+              items={watchItems}
+              title={insightsTitle ?? "People Focus"}
+              description={insightsDescription ?? "Workforce signals worth a quick look"}
+              visualTone={visualTone}
+            />
+          ) : null}
+          {bottomSection === "reports" ? (
+            <ReportsFocusPanel
+              items={reportItems ?? []}
+              title={reportsTitle}
+              description={reportsDescription}
+              visualTone={visualTone}
+            />
+          ) : null}
+        </div>
+        <HrUpcomingHolidaysPanel
+          holidays={upcomingHolidays}
+          birthdays={upcomingBirthdays}
+          anniversaries={upcomingAnniversaries}
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -391,14 +498,16 @@ export function DashboardOperationsRow({
     >
       <div
         className={cn(
-          "grid gap-4 xl:grid-cols-2 xl:items-stretch",
+          "grid gap-4 xl:items-stretch",
+          rightPanel === "none" ? "grid-cols-1" : "xl:grid-cols-2",
           visualTone !== "vibrant" && "min-h-0 overflow-hidden",
         )}
       >
         <HrPriorityFocus
-          items={tasks}
+          items={priorityItems}
           description={focusDescription}
           visualTone={visualTone}
+          maxItems={focusMaxItems}
         />
         {rightPanel === "focus-pair" ? (
           <FocusPairPanel
@@ -407,23 +516,35 @@ export function DashboardOperationsRow({
             description={rightFocusDescription}
             visualTone={visualTone}
           />
-        ) : (
+        ) : rightPanel === "holidays" ? (
           <HrUpcomingHolidaysPanel
             holidays={upcomingHolidays}
             birthdays={upcomingBirthdays}
             anniversaries={upcomingAnniversaries}
           />
-        )}
+        ) : null}
       </div>
 
-      <div className="min-h-0">
-        <PeopleFocusPanel
-          items={watchItems}
-          title={insightsTitle ?? "People Focus"}
-          description={insightsDescription ?? "Workforce signals worth a quick look"}
-          visualTone={visualTone}
-        />
-      </div>
+      {bottomSection === "insights" ? (
+        <div className="min-h-0">
+          <PeopleFocusPanel
+            items={watchItems}
+            title={insightsTitle ?? "People Focus"}
+            description={insightsDescription ?? "Workforce signals worth a quick look"}
+            visualTone={visualTone}
+          />
+        </div>
+      ) : null}
+      {bottomSection === "reports" ? (
+        <div className="min-h-0">
+          <ReportsFocusPanel
+            items={reportItems ?? []}
+            title={reportsTitle}
+            description={reportsDescription}
+            visualTone={visualTone}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

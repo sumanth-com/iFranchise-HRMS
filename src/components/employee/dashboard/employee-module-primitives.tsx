@@ -22,7 +22,7 @@ export const employeeEmptyClass =
 export const employeeDateBadgeClass =
   "flex w-11 shrink-0 flex-col overflow-hidden rounded-lg bg-card text-center shadow-[0_1px_3px_oklch(0.45_0.02_265/6%)] dark:border dark:border-border/60 dark:shadow-none";
 
-export type EmployeeStatCardTone = "emerald" | "sky" | "violet" | "amber";
+export type EmployeeStatCardTone = "emerald" | "sky" | "violet" | "amber" | "rose";
 
 const STAT_CARD_WAVE: Record<
   EmployeeStatCardTone,
@@ -32,6 +32,7 @@ const STAT_CARD_WAVE: Record<
   sky: { soft: "fill-sky-400/20", strong: "fill-sky-500/25" },
   violet: { soft: "fill-violet-400/20", strong: "fill-violet-500/25" },
   amber: { soft: "fill-amber-400/20", strong: "fill-amber-500/25" },
+  rose: { soft: "fill-rose-400/20", strong: "fill-rose-500/25" },
 };
 
 const STAT_CARD_HINT: Record<EmployeeStatCardTone, string> = {
@@ -42,6 +43,7 @@ const STAT_CARD_HINT: Record<EmployeeStatCardTone, string> = {
     "bg-violet-500/12 text-violet-700 ring-violet-500/15 dark:bg-violet-400/15 dark:text-violet-300 dark:ring-violet-400/20",
   amber:
     "bg-amber-500/12 text-amber-800 ring-amber-500/15 dark:bg-amber-400/15 dark:text-amber-300 dark:ring-amber-400/20",
+  rose: "bg-rose-500/12 text-rose-700 ring-rose-500/15 dark:bg-rose-400/15 dark:text-rose-300 dark:ring-rose-400/20",
 };
 
 function StatCardWave({ tone }: { tone: EmployeeStatCardTone }) {
@@ -76,6 +78,9 @@ export function EmployeeStatCard({
   href,
   onClick,
   active = false,
+  compact = false,
+  tall = false,
+  showWave = true,
 }: {
   label: string;
   value: string;
@@ -87,6 +92,9 @@ export function EmployeeStatCard({
   href?: string;
   onClick?: () => void;
   active?: boolean;
+  compact?: boolean;
+  tall?: boolean;
+  showWave?: boolean;
 }) {
   const content = (
     <>
@@ -104,7 +112,7 @@ export function EmployeeStatCard({
             <Icon className={cn("size-4", accent)} />
           </span>
         </div>
-        <div className="mt-3 flex min-w-0 flex-1 flex-col justify-end gap-2.5 pb-0.5">
+        <div className={cn("mt-3 flex min-w-0 flex-1 flex-col justify-end gap-2.5 pb-0.5", compact && "mt-2 gap-2")}>
           <p
             className={cn(
               "truncate text-2xl font-semibold leading-7 tracking-tight tabular-nums",
@@ -131,12 +139,14 @@ export function EmployeeStatCard({
           )}
         </div>
       </div>
-      {tone ? <StatCardWave tone={tone} /> : null}
+      {tone && showWave ? <StatCardWave tone={tone} /> : null}
     </>
   );
 
   const className = cn(
     employeeStatCardClass,
+    compact && !tall && "min-h-[6.25rem] p-3",
+    tall && "min-h-[9.5rem] h-full p-4",
     "w-full min-w-0 max-w-full",
     (href || onClick) &&
       "cursor-pointer transition-[box-shadow,background-color] duration-150 dark:hover:bg-transparent",
@@ -169,6 +179,7 @@ export function EmployeeSectionCard({
   children,
   className,
   bodyClassName,
+  compact = false,
 }: {
   title: string;
   description?: string;
@@ -176,14 +187,19 @@ export function EmployeeSectionCard({
   children: ReactNode;
   className?: string;
   bodyClassName?: string;
+  compact?: boolean;
 }) {
   return (
     <section className={cn(employeeSectionClass, className)}>
-      <div className="mb-3 flex items-start justify-between gap-3">
+      <div className={cn("flex items-start justify-between gap-3", compact ? "mb-2" : "mb-3")}>
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold tracking-tight">{title}</h2>
+          <h2 className={cn("font-semibold tracking-tight", compact ? "text-[13px]" : "text-sm")}>
+            {title}
+          </h2>
           {description ? (
-            <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+            <p className={cn("text-muted-foreground", compact ? "mt-0.5 text-[11px]" : "mt-0.5 text-xs")}>
+              {description}
+            </p>
           ) : null}
         </div>
         {action ? <div className="shrink-0">{action}</div> : null}
