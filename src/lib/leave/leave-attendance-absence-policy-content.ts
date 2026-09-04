@@ -30,12 +30,14 @@ Illustration: If you have permission to start at 11:00 a.m., you must work until
   },
   {
     id: "half-day",
-    title: "Attendance Policy — Half-day leave rules",
-    content: `Second-Half Utilization Only: A half-day leave is permissible only for the second half of the working day (3:00 p.m. to 7:00 p.m.). To avail of a half-day leave, you must report to work on time, complete your scheduled duties during the first half of the day, and formally request a second-half departure via the HRMS portal with prior managerial approval.
+    title: "Attendance Policy — Half-day leave and second-half absence",
+    content: `iFranchise permits the utilization of approved leave in half-day increments, subject to strict operational and scheduling guidelines.
 
-No First-Half Leaves: iFranchise does not permit or approve half-day leaves for the first half of the day (10:00 a.m. to 2:00 p.m.). If you are unable to report to work at the start of your scheduled shift and wish to take the morning off, you must apply for a full-day leave. If no leave balance is available, the entire day will be processed as a full-day Loss of Pay (LOP).
+Second-Half Utilization Only: A half-day leave is permissible only for the second half of the working day (3:00 p.m. to 7:00 p.m.). To avail of a half-day leave, the employee must report to work on time, complete their scheduled duties during the first half of the day, and formally request a second-half departure via the HRMS portal with prior managerial approval.
 
-Unplanned Early Departure Safeguard: If you complete the first half of your shift but must leave early due to an unforeseen personal emergency, a half-day will be deducted from your leave balance (or marked as half-day LOP if no balance remains).
+No First-Half Leaves: iFranchise does not permit or approve half-day leaves for the first half of the day (10:00 a.m. to 2:00 p.m.). If an employee is unable to report to work at the start of their scheduled shift and wishes to take the morning off, they must apply for a full-day leave. If no leave balance is available, the entire day will be processed as a full-day Loss of Pay (LOP).
+
+Unplanned Early Departure Safeguard: If an employee completes the first half of their shift but must leave early due to an unforeseen personal emergency, a half-day will be deducted from their leave balance (or marked as half-day LOP if no balance remains). This ensures employees are accurately compensated for the hours they actually worked, protecting both the employee and the company from non-compliant full-day wage deductions.
 
 Illustration: You report to work at 10:00 a.m. but need to leave at 2:30 p.m. for an urgent personal reason. Because you completed the first half of your shift, this will be recorded as a half-day leave deduction. However, if you need to take the morning off for a doctor's appointment and plan to come in at 3:00 p.m., you cannot file a half-day; you must apply for a full day of leave.`,
   },
@@ -51,19 +53,21 @@ Disciplinary Tracking: Leaving the office after negligible morning attendance (e
   {
     id: "no-ot-comp-off",
     title: "Special Rules — No overtime or compensatory off",
-    content: `No Overtime (OT) Allocation or Compensation: iFranchise does not recognize, permit, or compensate for "Overtime" hours. The standard shift timings (10:00 a.m. to 7:00 p.m. Monday to Saturday, and half-days on designated Saturdays) represent the absolute maximum operational boundary required for your position.
+    content: `To maintain absolute operational consistency and predictable scheduling parameters, iFranchise operates strictly under a fixed-hours model. Employees must familiarize themselves with the explicit exclusions below:
+
+No Overtime (OT) Allocation or Compensation: iFranchise does not recognize, permit, or compensate for "Overtime" hours. The standard shift timings outlined in Section 3 (10:00 a.m. to 7:00 p.m. Monday to Saturday, and half-days on designated Saturdays) represent the absolute maximum operational boundary required for your position.
 
 Prioritization of Standard Shifts: Staying back past 7:00 p.m. on regular working days, or past 2:00 p.m. on half-day Saturdays, is strictly a matter of individual time management or voluntary workload self-pacing. It does not create any right to additional monetary pay, bonuses, or payroll adjustments.
 
-No Compensatory Off (Comp-Off) Provision: This organization does not offer a Comp-Off framework under any circumstances. Working past standard hours will not result in the accrual of alternative rest days or "substituted" leaves.
+No Compensatory Off (Comp-Off) Provision: This organization does not offer a Comp-Off framework under any circumstances. Working past standard hours to finish a task, meeting an urgent project delivery timeline, or logging in outside standard shifts will not result in the accrual of alternative rest days or "substituted" leaves.
 
-Unauthorized Holiday Work Forbidden: Employees are strictly prohibited from reporting to the office premises or accessing company networks on standard weekly offs (Sundays) or officially declared National and Festival Holidays without explicit, written, and pre-approved instructions from Executive Management.`,
+Unauthorized Holiday Work Forbidden: Employees are strictly prohibited from reporting to the office premises or accessing company networks on standard weekly offs (Sundays) or officially declared National and Festival Holidays without explicit, written, and pre-approved instructions from Executive Management. If an unauthorized log-in occurs, it will be treated as a voluntary action and will not generate a Comp-Off credit or salary adjustment.`,
   },
 ];
 
 const HOW_TO_APPLY_LEAVE: LeavePolicySection = {
   id: "how-to-apply",
-  title: "Leave Policy — Leave application and approval process",
+  title: "Leave Policy — How to apply for leave",
   content: `For planned leave, complete all three steps before your leave begins. A leave request is not approved just because it is entered into the HRMS portal.
 
 Email Notification: Send a formal email request to your Reporting Manager and HR. Clearly mention the requested date(s), reason for absence, intended return date, and emergency handover/contact details.
@@ -72,25 +76,21 @@ Management Approval: Secure explicit written or system approval from your Report
 
 HRMS Submission: Log the identical request within the HRMS portal and ensure it moves to an "Approved" status.
 
-Good practice: Retain a copy of your email or HRMS approval confirmation. While your manager determines operational and team coverage, HR and payroll confirm final leave balance tracking and any LOP calculations.`,
-};
+Good practice: Retain a copy of your email or HRMS approval confirmation. While your manager determines operational and team coverage, HR and payroll confirm final leave balance tracking and any LOP calculations.
 
-const PLANNED_LEAVE_TIMELINES: LeavePolicySection = {
-  id: "planned-leave-timelines",
-  title: "Leave Policy — Planned leave timelines",
-  content: `You must adhere to the minimum planning timelines below when requesting planned time off:
+Planned leave: when to apply
+
+You must adhere to the minimum planning timelines below when requesting planned time off:
 
 - 1–2 days: At least 24–48 hours earlier
 - 3–5 days: At least 2–3 weeks earlier
 - More than 5 days / long vacation: Normally 1–3 months earlier; major travel may need 4–6 months
 
-These parameters serve as a minimum planning framework and do not guarantee automatic approval. Do not lock in non-refundable travel or personal plans until your leave status is formally confirmed in HRMS.`,
-};
+These parameters serve as a minimum planning framework and do not guarantee automatic approval. Do not lock in non-refundable travel or personal plans until your leave status is formally confirmed in HRMS.
 
-const EMERGENCY_LEAVE: LeavePolicySection = {
-  id: "emergency-leave",
-  title: "Leave Policy — Emergency leave rules",
-  content: `Emergency leave is reserved strictly for unexpected, urgent situations that prevent you from reporting to work. Examples include personal accidents, sudden illness, sudden hospitalisation of yourself or an immediate family member, a death in the family, or a major natural disaster making transit impossible.
+Emergency leave
+
+Emergency leave is reserved strictly for unexpected, urgent situations that prevent you from reporting to work. Examples include personal accidents, sudden illness, sudden hospitalisation of yourself or an immediate family member, a death in the family, or a major natural disaster making transit impossible.
 
 Immediate Notice: Notify your Reporting Manager and HR via phone or email as soon as you realize you cannot attend your shift, ideally within 30 to 60 minutes of your scheduled start time.
 
@@ -117,10 +117,10 @@ HR first finds the beginning and end of one continuous absence. It then includes
 Common illustrations:
 
 - Holiday – leave – Sunday: Dasara is a declared company festival holiday on the 14th. You take leave on the 15th. The 16th is Sunday. The 14th is a paid statutory holiday and remains untouched. The absence span strictly begins on the 15th. If you return on the 17th, the leave span is 15th to 16th (two days).
-- Leave on both sides of a holiday: You take leave on the 24th and 27th, with Diwali on the 25th (declared holiday) and a scheduled workday on the 26th. The statutory holiday on the 25th cannot be sandwiched. Only the 24th and 27th are deducted as individual leave days.
-- Leave starts after a holiday block: Sunday is the 24th and Diwali is the 25th. You take leave on the 26th without resuming work. The leave span starts strictly on the 26th.
+- Leave on both sides of a holiday: You take leave on the 24th and 27th, with Diwali on the 25th (declared holiday) and a scheduled workday on the 26th. The statutory holiday on the 25th cannot be sandwiched. The sandwich rule is broken. Only the 24th and 27th are deducted as individual leave days.
+- Leave starts after a holiday block: Sunday is the 24th and Diwali is the 25th. You take leave on the 26th without resuming work. The leave span starts strictly on the 26th. An employee cannot be retroactively penalized or charged leaves for standard calendar non-working days or statutory holidays that occurred prior to the start of their leave period.
 - Mixed holiday block: You are absent on the 9th, Sunday is the 10th, you are absent on the 11th, and Ramadan is a declared holiday on the 12th. The sandwich rule applies strictly to the weekly off (Sunday 10th). The continuous absence span counts as 3 days (9th, 10th, and 11th). The statutory holiday on the 12th is excluded from the block and paid out normally.
-- Saturday and Monday: You are absent on a Saturday and do not report on Monday. Sunday is between them. All three days can be counted.
+- Saturday and Monday: You are absent on a Saturday and do not report on Monday. Sunday is between them. All three days can be counted. This is contractually permissible because it involves regular weekly non-working days, not statutory public or festival holidays.
 - Actual resumption matters: You are away Thursday and Friday, do not attend the scheduled Saturday, and return Monday. Monday does not prove that you resumed duty on Saturday. Saturday is part of the absence; Sunday may also be included under the standard weekend sandwich rule.
 
 For a full-time employee, an Optional Holiday is part of the non-working block only if that employee actually selected and received approval for that OH. If they did not select it, it is a normal workday.`,
@@ -140,10 +140,10 @@ HR first finds the beginning and end of one continuous absence. It then includes
 Common illustrations:
 
 - Holiday – leave – Sunday: Dasara is a declared company festival holiday on the 14th. You take leave on the 15th. The 16th is Sunday. The 14th is a paid statutory holiday and remains untouched. The absence span strictly begins on the 15th. If you return on the 17th, the leave span is 15th to 16th (two days).
-- Leave on both sides of a holiday: You take leave on the 24th and 27th, with Diwali on the 25th (declared holiday) and a scheduled workday on the 26th. The statutory holiday on the 25th cannot be sandwiched. Only the 24th and 27th are deducted as individual leave days.
-- Leave starts after a holiday block: Sunday is the 24th and Diwali is the 25th. You take leave on the 26th without resuming work. The leave span starts strictly on the 26th.
+- Leave on both sides of a holiday: You take leave on the 24th and 27th, with Diwali on the 25th (declared holiday) and a scheduled workday on the 26th. The statutory holiday on the 25th cannot be sandwiched. The sandwich rule is broken. Only the 24th and 27th are deducted as individual leave days.
+- Leave starts after a holiday block: Sunday is the 24th and Diwali is the 25th. You take leave on the 26th without resuming work. The leave span starts strictly on the 26th. An employee cannot be retroactively penalized or charged leaves for standard calendar non-working days or statutory holidays that occurred prior to the start of their leave period.
 - Mixed holiday block: You are absent on the 9th, Sunday is the 10th, you are absent on the 11th, and Ramadan is a declared holiday on the 12th. The sandwich rule applies strictly to the weekly off (Sunday 10th). The continuous absence span counts as 3 days (9th, 10th, and 11th). The statutory holiday on the 12th is excluded from the block and paid out normally.
-- Saturday and Monday: You are absent on a Saturday and do not report on Monday. Sunday is between them. All three days can be counted.
+- Saturday and Monday: You are absent on a Saturday and do not report on Monday. Sunday is between them. All three days can be counted. This is contractually permissible because it involves regular weekly non-working days, not statutory public or festival holidays.
 - Actual resumption matters: You are away Thursday and Friday, do not attend the scheduled Saturday, and return Monday. Monday does not prove that you resumed duty on Saturday. Saturday is part of the absence; Sunday may also be included under the standard weekend sandwich rule.`,
 };
 
@@ -176,29 +176,31 @@ const MATERNITY: LeavePolicySection = {
   title: "Leave Policy — Maternity and related statutory leave",
   content: `This policy ensures that iFranchise operates in strict accordance with the Maternity Benefit Act, 1961 (and its amendments) and The Employees' State Insurance (ESI) Act, 1948. Statutory maternity benefits apply absolutely to all eligible female employees, overriding any internal rules regarding paid leave balances.
 
-Statutory Eligibility Criteria: To be eligible for fully paid maternity leave benefits, a female employee must have been employed at iFranchise for a minimum of 80 days within the 12 months immediately preceding her expected date of delivery. This baseline includes all days worked, scheduled weekly holidays, and approved paid leaves.
+1. Statutory Eligibility Criteria
 
-Core Leave Entitlements:
+To be eligible for fully paid maternity leave benefits under this policy, a female employee must have been employed at iFranchise for a minimum of 80 days within the 12 months immediately preceding her expected date of delivery. This baseline includes all days worked, scheduled weekly holidays, and approved paid leaves.
+
+2. Core Leave Entitlements
 
 - Standard Benefit: A woman employee with fewer than two surviving children is entitled to a maximum of 26 weeks of fully paid maternity leave, of which up to 8 weeks can precede the expected date of delivery.
 - Two or More Children: A woman employee with two or more surviving children is entitled to 12 weeks of fully paid maternity leave, of which up to 6 weeks can precede the expected date of delivery.
 - Adoption and Commissioning Mothers: A female employee who legally adopts a child under three months of age, or a commissioning mother in a surrogacy arrangement, is entitled to 12 weeks of paid leave starting from the date the child is handed over.
 
-Related Statutory Protections:
+3. Related Statutory Protections
 
-- Miscarriage / Medical Termination of Pregnancy (MTP): 6 weeks of fully paid leave immediately following the day of the incident, subject to producing prescribed medical proof. No 80-day previous work minimum is required.
-- Tubectomy Operation: 2 weeks of paid leave immediately following the day of the operation.
+- Miscarriage / Medical Termination of Pregnancy (MTP): In the event of a miscarriage or medical termination of pregnancy, the employee is entitled to 6 weeks of fully paid leave immediately following the day of the incident, subject to producing prescribed medical proof. No 80-day previous work minimum is required to claim this specific benefit.
+- Tubectomy Operation: An employee undergoing a tubectomy operation is entitled to 2 weeks of paid leave immediately following the day of her operation.
 - Illness Arising out of Pregnancy: An additional leave period of up to 1 month with full wages is permissible for illness arising out of pregnancy, delivery, premature birth, or miscarriage.
-- Nursing Breaks: Upon returning to duty, mothers are legally entitled to two designated nursing breaks during their daily shift until the child reaches the age of 15 months.
-- Crèche Facilities: In compliance with statutory thresholds, any iFranchise office employing 50 or more employees will provide access to a crèche facility within a prescribed distance.
-- Work From Home: If the nature of the work assigned permits, iFranchise may allow work from home after the expiry of statutory maternity leave, under mutually agreed terms.
+- Nursing Breaks: Upon returning to duty, mothers are legally entitled to two designated nursing breaks during their daily shift to nurse the child until the child reaches the age of 15 months, in addition to standard rest intervals.
+- Crèche Facilities: In compliance with statutory thresholds, any iFranchise office employing 50 or more employees will provide access to a crèche facility within a prescribed distance. Eligible employees are allowed four visits daily to the crèche, inclusive of standard rest intervals.
+- Work From Home: If the nature of the work assigned to an employee is such that she may perform it from home, iFranchise may allow her to do so after the expiry of her statutory maternity leave period, under mutually agreed terms.
 
-What you should do:
+What you should do
 
-- Prior Intimation: Notify HR privately and in writing as early as practicable.
+- Prior Intimation: Notify HR privately and in writing as early as practicable. Per the law, you must be informed of your available maternity entitlements both in writing and electronically upon your date of appointment.
 - Medical Certification: Submit a formal medical certificate/notice specifying the expected delivery date if requested by HR.
-- HRMS Workflow: Log the statutory request via HRMS. HR will verify dates and eligibility thresholds.
-- ESI Integration: Employees whose monthly wages fall within the statutory threshold for the ESI scheme will receive financial cash benefits through ESIC rather than corporate payroll.
+- HRMS Workflow: Log the statutory request via HRMS. HR will verify the dates, eligibility thresholds (completion of at least 80 days of work with iFranchise in the 12 months preceding delivery), and route the payment track.
+- ESI Integration: Employees whose monthly wages fall within the statutory threshold for the ESI scheme will receive their financial cash benefits directly through the Employees' State Insurance Corporation (ESIC) framework rather than corporate payroll.
 - Updates: Notify HR immediately if medical guidance shifts your intended return or extension timeline.`,
 };
 
@@ -231,7 +233,7 @@ const FULL_TIME_LEAVE_SECTIONS: LeavePolicySection[] = [
 - CL can be carried forward only within the same calendar year.
 - Any CL left on 31 December expires. It is not encashed.
 - A fresh monthly CL credit starts again from January.
-- Half-Day Utilization: CL can be split into half-day blocks, subject to the second-half operational guidelines in the Attendance Policy.
+- Half-Day Utilization: CL can be split into half-day blocks, subject to the second-half operational guidelines detailed in Section 3 of this policy.
 
 Earned Leave (EL)
 
@@ -249,11 +251,11 @@ HRMS normally uses the leave type you requested and approved. If a day cannot be
   {
     id: "holidays",
     title: "Holidays — Official and optional holidays",
-    content: `You receive the company's paid holidays: Sundays and the other holidays in the annual company holiday calendar (see the holiday tables below).
+    content: `You receive the company's paid holidays: Sundays and the other holidays in the annual company holiday calendar (Refer to Annexure).
 
 Optional Holidays (OH)
 
-- You may take up to two paid Optional Holidays in each calendar year. You may choose only from the company's published OH list (see the optional holidays table below).
+- You may take up to two paid Optional Holidays in each calendar year. You may choose only from the company's published OH list (Refer to Annexure).
 - An OH is a normal working day unless you choose it and it is approved.
 - Apply for OH in advance by email and HRMS. It is subject to staffing needs.
 - Unused OH expires on 31 December. It does not carry forward or get encashed.
@@ -262,8 +264,6 @@ Optional Holidays (OH)
 Illustration: You choose and receive approval for Christmas as your first OH. It is a paid day off. If you do not choose Holi, Holi is a normal workday for you.`,
   },
   HOW_TO_APPLY_LEAVE,
-  PLANNED_LEAVE_TIMELINES,
-  EMERGENCY_LEAVE,
   SANDWICH_FULL_TIME,
   RETURN_AND_EXTEND,
   UNAUTHORISED_ABSENCE,
@@ -306,7 +306,7 @@ From your second month
 - Balance Enforcement: You may only utilize the exact CL balance that is displayed as available and approved within the HRMS portal.
 - Monthly Expiration: Unused CL balances expire automatically at the end of each calendar month. Leave balances do not carry forward or accumulate into the following month.
 - Loss of Pay (LOP): If you are absent for more days than your available monthly CL balance, the extra days are automatically processed as LOP. LOP days will not create a negative leave balance in the system and cannot be retroactively replaced or cleared by CL credits received in future months.
-- Half-Day Utilization: CL can be split into half-day blocks, subject strictly to the second-half operational guidelines in the Attendance Policy.
+- Half-Day Utilization: CL can be split into half-day blocks, subject strictly to the second-half operational guidelines detailed in Section 3 of this policy.
 
 Illustration: In July, you have a credit of one approved CL day. If you face an emergency and are away for two days, one day will consume your available CL. The second day will be processed as an unpaid LOP day.
 
@@ -317,11 +317,9 @@ The HRMS portal processes absences based on the specific leave type you requeste
   {
     id: "holidays",
     title: "Holidays — Official holidays",
-    content: `You receive the company's paid holidays: Sundays and the other holidays in the annual company holiday calendar (see the holiday table below).`,
+    content: `You receive the company's paid holidays: Sundays and the other holidays in the annual company holiday calendar (Refer to Annexure).`,
   },
   HOW_TO_APPLY_LEAVE,
-  PLANNED_LEAVE_TIMELINES,
-  EMERGENCY_LEAVE,
   SANDWICH_INTERN_PROBATION,
   RETURN_AND_EXTEND,
   UNAUTHORISED_ABSENCE,
@@ -359,9 +357,7 @@ function attendanceWhoSection(category: PolicyEmployeeCategory): LeavePolicySect
 export function buildLeavePolicyDocument(category: PolicyEmployeeCategory): LeavePolicyDocument {
   const isFullTime = category === "full_time";
   return {
-    intro: isFullTime
-      ? "Please read this Leave, Attendance and Absence Policy guide before applying for leave. It explains what you need to do in simple words. This version applies to full-time employees."
-      : "Please read this Leave, Attendance and Absence Policy guide before applying for leave. It explains what you need to do in simple words. This version applies to interns and employees on probation.",
+    intro: "Please read this guide before applying for leave. It explains what you need to do in simple words.",
     sections: isFullTime ? FULL_TIME_LEAVE_SECTIONS : INTERN_PROBATION_LEAVE_SECTIONS,
     contact: { ...LEAVE_POLICY_CONTACT },
     updatedAt: null,

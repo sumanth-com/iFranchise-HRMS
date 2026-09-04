@@ -15,7 +15,9 @@ function isLegacyLeavePolicyDocument(value: Partial<LeavePolicyDocument>): boole
   return (
     sectionIds.includes("communication-guidelines") ||
     sectionIds.includes("sales-confirmation") ||
-    sectionIds.includes("post-probation-carry-forward")
+    sectionIds.includes("post-probation-carry-forward") ||
+    sectionIds.includes("planned-leave-timelines") ||
+    sectionIds.includes("emergency-leave")
   );
 }
 
