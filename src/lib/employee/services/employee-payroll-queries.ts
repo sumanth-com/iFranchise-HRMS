@@ -19,7 +19,7 @@ import {
 } from "@/lib/payroll/salary-structure-breakdown";
 import { listBonuses, listReimbursements } from "@/lib/payroll/services/payroll-queries";
 import { getPayrollSettings } from "@/lib/payroll/services/payroll-settings";
-import { maskAccountNumber, getPayslipDeductionLines, getPayslipEarningsLines, displaySalaryBankDetails } from "@/lib/payroll/services/payroll-utils";
+import { maskAccountNumber, getPayslipDeductionLines, getPayslipEarningsLines, displaySalaryBankDetails, parsePayrollMonthFromPayslipNumber, payrollMonthSortKey, comparePayrollMonthsDesc } from "@/lib/payroll/services/payroll-utils";
 import type { UserProfile } from "@/types/auth";
 import type {
   EmployeePayrollData,
@@ -182,6 +182,43 @@ function effectivePayslipReleaseAt(
   });
 }
 
+function resolveRowPayrollMonth(
+  payrollMonth: string | null | undefined,
+  payslipNumber: string,
+): string {
+  const trimmed = payrollMonth?.trim();
+  if (trimmed) return trimmed;
+  return parsePayrollMonthFromPayslipNumber(payslipNumber) ?? "";
+}
+
+/** One released payslip per payroll month — prefer HR-sent over draft duplicates. */
+function dedupePayslipsByMonth(items: PayslipListItem[]): PayslipListItem[] {
+  const byMonth = new Map<string, PayslipListItem>();
+  for (const item of items) {
+    const key =
+      payrollMonthSortKey(item.payrollMonth) ||
+      parsePayrollMonthFromPayslipNumber(item.payslipNumber) ||
+      item.id;
+    const existing = byMonth.get(key);
+    if (!existing) {
+      byMonth.set(key, item);
+      continue;
+    }
+    const itemReleased = item.canEmployeeAccess ? 1 : 0;
+    const existingReleased = existing.canEmployeeAccess ? 1 : 0;
+    if (itemReleased > existingReleased) {
+      byMonth.set(key, item);
+      continue;
+    }
+    if (itemReleased === existingReleased && item.issuedAt > existing.issuedAt) {
+      byMonth.set(key, item);
+    }
+  }
+  return [...byMonth.values()].sort((a, b) =>
+    comparePayrollMonthsDesc(a.payrollMonth, b.payrollMonth),
+  );
+}
+
 function buildTimeline(input: {
   payroll: {
     payroll_status: PayrollStatus;
@@ -292,6 +329,7 @@ export async function getEmployeePayrollData(
             id,
             payslip_number,
             employee_id,
+            payroll_id,
             issued_at,
             salary_credit_date,
             published_at,
@@ -319,10 +357,24 @@ export async function getEmployeePayrollData(
         .eq("is_current", true)
         .is("archived_at", null)
         .is("deleted_at", null)
-        .order("issued_at", { ascending: false })
         .limit(500);
       if (error) throw new Error(error.message);
-      return data ?? [];
+      const sorted = (data ?? []).sort((a, b) => {
+        const aPayroll = Array.isArray(a.payrolls) ? a.payrolls[0] : a.payrolls;
+        const bPayroll = Array.isArray(b.payrolls) ? b.payrolls[0] : b.payrolls;
+        const aMonth =
+          resolveRowPayrollMonth(
+            (aPayroll as { payroll_month?: string } | null)?.payroll_month,
+            String(a.payslip_number),
+          );
+        const bMonth =
+          resolveRowPayrollMonth(
+            (bPayroll as { payroll_month?: string } | null)?.payroll_month,
+            String(b.payslip_number),
+          );
+        return comparePayrollMonthsDesc(aMonth, bMonth);
+      });
+      return sorted;
     }, [] as unknown[]),
     safe(async () => {
       const today = format(new Date(), "yyyy-MM-dd");
@@ -478,7 +530,7 @@ export async function getEmployeePayrollData(
       employeeId,
       employeeCode: employeeMeta.employeeCode,
       employeeName: `${employeeMeta.firstName} ${employeeMeta.lastName}`.trim(),
-      payrollMonth: payroll?.payroll_month ?? "",
+      payrollMonth: resolveRowPayrollMonth(payroll?.payroll_month, row.payslip_number),
       grossSalary: Number(item?.gross_salary ?? 0),
       netSalary: Number(item?.net_salary ?? 0),
       payrollStatus: payroll?.payroll_status ?? "draft",
@@ -499,6 +551,11 @@ export async function getEmployeePayrollData(
     };
   });
 
+  const mappedPayslips = payslips;
+  const payslipsForEmployee = viewingOwnPayroll
+    ? dedupePayslipsByMonth(mappedPayslips.filter((row) => row.canEmployeeAccess))
+    : dedupePayslipsByMonth(mappedPayslips);
+
   // Financial year window that contains today.
   const now = new Date();
   const fyStartYear =
@@ -518,9 +575,10 @@ export async function getEmployeePayrollData(
   const trend: EmployeePayrollData["trend"] = [];
 
   for (const { row, item, payroll } of rows) {
-    if (!payroll?.payroll_month) continue;
+    const payrollMonth = resolveRowPayrollMonth(payroll?.payroll_month, row.payslip_number);
+    if (!payrollMonth) continue;
     const schedule = resolvePayslipSchedule(
-      payroll.payroll_month,
+      payrollMonth,
       {
         salaryCreditDate: row.salary_credit_date ?? undefined,
         publishedAt: row.published_at ?? undefined,
@@ -534,7 +592,7 @@ export async function getEmployeePayrollData(
       : true;
     if (!released && !hrPayslipAccess) continue;
 
-    const monthDate = new Date(payroll.payroll_month);
+    const monthDate = new Date(payrollMonth);
     if (monthDate >= fyStart && monthDate < fyEnd) {
       ytdEarnings += Number(item?.gross_salary ?? 0);
       ytdDeductions += Number(item?.total_deductions ?? 0);
@@ -543,7 +601,7 @@ export async function getEmployeePayrollData(
       ytdMonths += 1;
     }
     trend.push({
-      month: payroll.payroll_month,
+      month: payrollMonth,
       label: format(monthDate, "MMM"),
       gross: Number(item?.gross_salary ?? 0),
       net: Number(item?.net_salary ?? 0),
@@ -551,9 +609,17 @@ export async function getEmployeePayrollData(
   }
   trend.reverse();
 
-  const latestAccessible = rows.find(({ row, item, payroll }) => {
+  const latestAccessible = [...rows]
+    .sort(({ row: rowA, payroll: payrollA }, { row: rowB, payroll: payrollB }) =>
+      comparePayrollMonthsDesc(
+        resolveRowPayrollMonth(payrollA?.payroll_month, rowA.payslip_number),
+        resolveRowPayrollMonth(payrollB?.payroll_month, rowB.payslip_number),
+      ),
+    )
+    .find(({ row, item, payroll }) => {
+    const payrollMonth = resolveRowPayrollMonth(payroll?.payroll_month, row.payslip_number);
     const schedule = resolvePayslipSchedule(
-      payroll?.payroll_month ?? "",
+      payrollMonth,
       {
         salaryCreditDate: row.salary_credit_date ?? undefined,
         publishedAt: row.published_at ?? undefined,
@@ -572,7 +638,14 @@ export async function getEmployeePayrollData(
     return access.canEmployeeAccess || hrPayslipAccess;
   });
 
-  const publishedMonthKey = latestAccessible?.payroll?.payroll_month?.slice(0, 7) ?? null;
+  const publishedMonthKey = latestAccessible
+    ? payrollMonthSortKey(
+        resolveRowPayrollMonth(
+          latestAccessible.payroll?.payroll_month,
+          latestAccessible.row.payslip_number,
+        ),
+      ) || null
+    : null;
   const scopedBonuses =
     viewingOwnPayroll && publishedMonthKey
       ? bonuses.filter((bonus) => bonus.bonusMonth.slice(0, 7) === publishedMonthKey)
@@ -594,8 +667,9 @@ export async function getEmployeePayrollData(
   const latest = (() => {
     if (!latestAccessible) return null;
     const { row, item, payroll } = latestAccessible;
+    const payrollMonth = resolveRowPayrollMonth(payroll?.payroll_month, row.payslip_number);
     const schedule = resolvePayslipSchedule(
-      payroll?.payroll_month ?? "",
+      payrollMonth,
       {
         salaryCreditDate: row.salary_credit_date ?? undefined,
         publishedAt: row.published_at ?? undefined,
@@ -628,7 +702,7 @@ export async function getEmployeePayrollData(
       id: row.id,
       payslipNumber: row.payslip_number,
       issuedAt: row.issued_at,
-      payrollMonth: payroll?.payroll_month ?? "",
+      payrollMonth,
       payrollStatus: payroll?.payroll_status ?? "draft",
       salaryCreditDate: schedule.salaryCreditDate,
       publishedAt: schedule.publishedAt,
@@ -791,7 +865,7 @@ export async function getEmployeePayrollData(
   return {
     currencyCode,
     hasAnyData:
-      payslips.some((row) => row.canEmployeeAccess) ||
+      payslipsForEmployee.length > 0 ||
       scopedBonuses.length > 0 ||
       bank !== null,
     kpis: {
@@ -805,7 +879,7 @@ export async function getEmployeePayrollData(
     },
     latest,
     latestTimeline,
-    payslips,
+    payslips: payslipsForEmployee,
     salaryStructure,
     bank,
     bonuses: scopedBonuses,

@@ -635,6 +635,35 @@ export function generatePayslipNumber(
   return `PS-${monthPart}-${codePart}`;
 }
 
+/** Fallback when payroll join is unavailable — PS-202608-EMP001 → 2026-08-01 */
+export function parsePayrollMonthFromPayslipNumber(
+  payslipNumber: string | null | undefined,
+): string | null {
+  const match = payslipNumber?.match(/^PS-(\d{6})-/i);
+  if (!match) return null;
+  const raw = match[1];
+  const year = Number.parseInt(raw.slice(0, 4), 10);
+  const month = Number.parseInt(raw.slice(4, 6), 10);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    return null;
+  }
+  return `${year}-${String(month).padStart(2, "0")}-01`;
+}
+
+export function payrollMonthSortKey(dateString: string | null | undefined): string {
+  const value = dateString?.trim();
+  if (!value) return "";
+  if (value.length >= 7) return value.slice(0, 7);
+  return value;
+}
+
+export function comparePayrollMonthsDesc(
+  a: string | null | undefined,
+  b: string | null | undefined,
+): number {
+  return payrollMonthSortKey(b).localeCompare(payrollMonthSortKey(a));
+}
+
 export function maskAccountNumber(accountNumber: string): string {
   return accountNumber;
 }

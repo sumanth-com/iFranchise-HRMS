@@ -90,9 +90,9 @@ export function EmployeePayrollView({
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const money = (value: number) => formatCurrency(value, data.currencyCode);
-  const publishedPayslips = data.payslips.filter((row) => row.canEmployeeAccess);
-  const latestPayslip = publishedPayslips[0] ?? null;
-  const hasPublishedPayroll = Boolean(latestPayslip && data.latest);
+  const releasedPayslips = data.payslips;
+  const latestPayslip = releasedPayslips[0] ?? null;
+  const hasPublishedPayroll = Boolean(latestPayslip && data.latest?.canEmployeeAccess);
 
   function openPayslip(id: string) {
     setActivePayslipId(id);
@@ -402,7 +402,7 @@ export function EmployeePayrollView({
         description="Your salary statements and their delivery status."
         bodyClassName="overflow-x-auto"
       >
-        {data.payslips.length > 0 ? (
+        {releasedPayslips.length > 0 ? (
           <table className="w-full min-w-[44rem] text-sm">
             <thead>
               <tr className="bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600">
@@ -416,7 +416,7 @@ export function EmployeePayrollView({
               </tr>
             </thead>
             <tbody>
-              {data.payslips.map((row: PayslipListItem) => (
+              {releasedPayslips.map((row: PayslipListItem) => (
                 <tr key={row.id} className="border-b last:border-0">
                   <td className="py-2.5 pr-3 font-medium">{fmtMonth(row.payrollMonth)}</td>
                   <td className="py-2.5 pr-3 text-muted-foreground">{row.payslipNumber}</td>
@@ -475,7 +475,7 @@ export function EmployeePayrollView({
           </table>
         ) : (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            No payslip records yet. They will appear here once HR generates payroll for you.
+            No payslips have been sent to you yet. They will appear here once HR publishes them.
           </p>
         )}
       </EmployeeSectionCard>

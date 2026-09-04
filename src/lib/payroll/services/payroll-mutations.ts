@@ -46,6 +46,7 @@ import type {
   PayrollBreakdownLine,
   PayrollDetail,
   PayrollPreviewResult,
+  PayrollStatus,
   PayslipDetail,
   EmployeePayrollRunBreakdown,
 } from "@/types/payroll";
@@ -64,6 +65,7 @@ import {
   getMonthDateRange,
   getPayrollMonthDate,
   maskAccountNumber,
+  parsePayrollMonthFromPayslipNumber,
   roundCurrency,
   resolvePayrollReimbursement,
 } from "@/lib/payroll/services/payroll-utils";
@@ -2413,6 +2415,48 @@ export async function ensureUnpublishedPayslipForPayrollItem(
   return created.id;
 }
 
+async function archiveDuplicateEmployeePayslipsForMonth(
+  supabase: AuthSupabaseClient,
+  employeeId: string,
+  payrollMonth: string,
+  keepPayslipId: string,
+  actorId: string | null,
+) {
+  const monthKey = payrollMonth.slice(0, 7);
+  const { data: siblings, error } = await supabase
+    .schema("hrms")
+    .from("payslips")
+    .select("id, payrolls!inner (payroll_month)")
+    .eq("employee_id", employeeId)
+    .eq("is_current", true)
+    .is("archived_at", null)
+    .is("deleted_at", null)
+    .neq("id", keepPayslipId);
+
+  if (error || !siblings?.length) return;
+
+  const duplicateIds = siblings
+    .filter((row) => {
+      const payroll = unwrapRelation(
+        row.payrolls as { payroll_month: string } | { payroll_month: string }[] | null,
+      );
+      return payroll?.payroll_month?.slice(0, 7) === monthKey;
+    })
+    .map((row) => row.id);
+
+  if (duplicateIds.length === 0) return;
+
+  await supabase
+    .schema("hrms")
+    .from("payslips")
+    .update({
+      is_current: false,
+      archived_at: new Date().toISOString(),
+      updated_by: actorId,
+    })
+    .in("id", duplicateIds);
+}
+
 export async function releaseEmployeePayslip(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -2548,6 +2592,14 @@ export async function releaseEmployeePayslip(
   if (!payslipId) {
     throw new Error("Payslip could not be created.");
   }
+
+  await archiveDuplicateEmployeePayslipsForMonth(
+    supabase,
+    item.employee_id as string,
+    payroll.payroll_month,
+    payslipId,
+    actorId,
+  );
 
   const monthLabel = formatPayrollMonthLabel(payroll.payroll_month);
   try {
@@ -3595,6 +3647,7 @@ export async function getPayslipById(
         payslip_number,
         issued_at,
         employee_id,
+        payroll_id,
         storage_path,
         salary_credit_date,
         published_at,
@@ -3641,12 +3694,59 @@ export async function getPayslipById(
   if (!payslip) return null;
 
   const employee = unwrapRelation(payslip.employees);
-  const payroll = unwrapRelation(payslip.payrolls);
+  const joinedPayroll = unwrapRelation(payslip.payrolls);
   const payrollItem = unwrapRelation(payslip.payroll_items);
 
-  if (!employee || !payroll || employee.organization_id !== organizationId) {
+  type PayslipPayrollContext = {
+    payroll_month: string;
+    payroll_status: PayrollStatus;
+    organization_id: string;
+    processed_at: string | null;
+  };
+
+  let resolvedPayroll: PayslipPayrollContext | null = joinedPayroll
+    ? {
+        payroll_month: joinedPayroll.payroll_month,
+        payroll_status: joinedPayroll.payroll_status as PayrollStatus,
+        organization_id: joinedPayroll.organization_id,
+        processed_at: joinedPayroll.processed_at ?? null,
+      }
+    : null;
+
+  if (!resolvedPayroll && payslip.payroll_id) {
+    const { data: payrollRow } = await supabase
+      .schema("hrms")
+      .from("payrolls")
+      .select("payroll_month, payroll_status, organization_id, processed_at")
+      .eq("id", payslip.payroll_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (payrollRow) {
+      resolvedPayroll = {
+        payroll_month: payrollRow.payroll_month,
+        payroll_status: payrollRow.payroll_status as PayrollStatus,
+        organization_id: payrollRow.organization_id,
+        processed_at: payrollRow.processed_at ?? null,
+      };
+    }
+  }
+
+  if (!employee || employee.organization_id !== organizationId) {
     return null;
   }
+
+  const payrollMonthFallback = parsePayrollMonthFromPayslipNumber(payslip.payslip_number);
+  if (!resolvedPayroll) {
+    if (!payrollMonthFallback) return null;
+    resolvedPayroll = {
+      payroll_month: payrollMonthFallback,
+      payroll_status: "processed",
+      organization_id: organizationId,
+      processed_at: null,
+    };
+  }
+
+  const payroll = resolvedPayroll;
 
   const payrollSettings = await getPayrollSettings(supabase, organizationId);
   const schedule = resolvePayslipSchedule(
