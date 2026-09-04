@@ -38,7 +38,7 @@ export type NavItem = {
 /**
  * HR portal sidebar.
  * Self-service (personal workspace) is listed first.
- * C Suite (org-wide HR) follows — Employees sits directly after HR Overview.
+ * Administration (org-wide HR) follows — Employees sits directly after HR Overview.
  */
 export const mainNavItems: NavigationItem[] = [
   // ── Self-service (personal workspace) ────────────────────────────
@@ -111,75 +111,75 @@ export const mainNavItems: NavigationItem[] = [
     section: "Self-service",
   },
 
-  // ── C Suite (org-wide) ───────────────────────────────────────────
+  // ── Administration (org-wide) ───────────────────────────────────────────
   {
     title: "HR Overview",
     href: HR_OVERVIEW_ROUTES.overview,
     icon: LayoutDashboard,
-    section: "C Suite",
+    section: "Administration",
     permissions: ["employee.view"],
   },
   {
     title: "Employees",
     href: "/dashboard/employees",
     icon: Users,
-    section: "C Suite",
+    section: "Administration",
     permissions: ["employee.view"],
   },
   {
     title: "Recruitment",
     href: "/dashboard/recruitment/jobs",
     icon: BriefcaseBusiness,
-    section: "C Suite",
+    section: "Administration",
     permissions: ["recruitment.view"],
   },
   {
     title: "Team Attendance",
     href: HR_HUB_ROUTES.teamAttendance,
     icon: CalendarCheck,
-    section: "C Suite",
+    section: "Administration",
     permissions: ["attendance.view"],
   },
   {
     title: "Team Leave",
     href: HR_HUB_ROUTES.teamLeave,
     icon: CalendarDays,
-    section: "C Suite",
+    section: "Administration",
     permissions: ["leave.view"],
   },
   {
     title: "Team Payroll",
     href: HR_HUB_ROUTES.teamPayroll,
     icon: Wallet,
-    section: "C Suite",
+    section: "Administration",
     permissions: ["payroll.view", "payslip.view"],
   },
   {
     title: "Company Assets",
     href: HR_HUB_ROUTES.teamAssets,
     icon: LaptopMinimal,
-    section: "C Suite",
+    section: "Administration",
     permissions: ["asset.view"],
   },
   {
     title: "Performance",
     href: "/dashboard/performance",
     icon: Target,
-    section: "C Suite",
+    section: "Administration",
     permissions: ["performance.view"],
   },
   {
     title: "Reports",
     href: "/dashboard/reports/attendance",
     icon: BarChart3,
-    section: "C Suite",
+    section: "Administration",
     permissions: ["reports.view"],
   },
   {
     title: "Organization",
     href: "/dashboard/organization",
     icon: Building2,
-    section: "C Suite",
+    section: "Administration",
     permissions: [
       "organization.view",
       "branch.view",
@@ -195,14 +195,14 @@ export const mainNavItems: NavigationItem[] = [
     title: "User Provisioning",
     href: USER_PROVISIONING_ROUTES.hr,
     icon: UserRoundPlus,
-    section: "C Suite",
+    section: "Administration",
     permissions: ["user_provisioning.view", "user_provisioning.manage"],
   },
   {
     title: "Roles & Access",
     href: "/dashboard/roles",
     icon: Shield,
-    section: "C Suite",
+    section: "Administration",
     permissions: ["role.view", "permission.view", "user_role.view"],
   },
 ];
