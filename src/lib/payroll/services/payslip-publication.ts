@@ -141,11 +141,34 @@ export function isPayslipPublishedToEmployee(
   return new Date(publishedAt).getTime() <= now.getTime();
 }
 
+type PayslipReleaseInput = {
+  publishedAt?: string | null;
+  emailSentAt?: string | null;
+  payrollLifecycle?: {
+    itemStatus?: string;
+    sentAt?: string | null;
+  };
+};
+
+/** When HR sent before email bookkeeping was fixed, lifecycle.sentAt is the fallback. */
+export function resolveEmployeePayslipReleaseAt(
+  input: PayslipReleaseInput,
+): string | null {
+  if (input.emailSentAt) return input.emailSentAt;
+  if (
+    input.payrollLifecycle?.itemStatus === "sent" &&
+    input.payrollLifecycle.sentAt
+  ) {
+    return input.payrollLifecycle.sentAt;
+  }
+  return null;
+}
+
 /** Employee portal visibility — only after HR explicitly sends/publishes. */
 export function isPayslipOfficiallyReleasedToEmployee(
-  input: { publishedAt?: string | null; emailSentAt?: string | null },
+  input: PayslipReleaseInput,
 ): boolean {
-  return Boolean(input.emailSentAt);
+  return Boolean(resolveEmployeePayslipReleaseAt(input));
 }
 
 /** HR payslip list "Sent" badge — matches explicit HR send only. */
@@ -182,11 +205,19 @@ export function resolvePayslipAvailability(
   return {
     availability: "under_review",
     canEmployeeAccess: false,
-    reviewMessage: `Payslip will be available on ${publishDate}`,
+    reviewMessage: options?.employeeFacing
+      ? "Your payslip has not been released by HR yet."
+      : `Payslip will be available on ${publishDate}`,
   };
 }
 
-export function formatReviewBannerMessage(publishedAt: string): string {
+export function formatReviewBannerMessage(
+  publishedAt: string,
+  options?: { employeeFacing?: boolean },
+): string {
+  if (options?.employeeFacing) {
+    return "Your payslip has not been released by HR yet. It will appear here once HR sends it.";
+  }
   const publishDate = formatPublishDate(publishedAt);
   return `Payslip will be available on ${publishDate}. You can download it once it is released.`;
 }

@@ -47,10 +47,8 @@ export function LeavePolicyYearUsage({
   );
 }
 
-const policyBodyClass = "text-sm leading-relaxed text-foreground/75";
+const policyBodyClass = "text-sm font-normal leading-relaxed text-foreground/75";
 const policyHeadingClass = "text-sm font-bold text-foreground";
-const policyLabelClass = "font-bold text-foreground";
-const policySubheadingClass = "font-bold text-foreground";
 
 export function LeavePolicyPageHeader({
   title,
@@ -67,16 +65,6 @@ export function LeavePolicyPageHeader({
       </p>
     </header>
   );
-}
-
-function isPolicySubheading(line: string) {
-  const trimmed = line.trim();
-  if (trimmed.startsWith("- ")) return false;
-  if (trimmed.endsWith(".")) return false;
-  if (/^[A-Z].*\.\s+[A-Z]/.test(trimmed)) return false;
-  const labelMatch = trimmed.match(/^([^:]+):\s*(.+)$/);
-  if (labelMatch) return false;
-  return trimmed.length > 0;
 }
 
 function PolicySectionContent({ content }: { content: string }) {
@@ -100,23 +88,7 @@ function PolicySectionContent({ content }: { content: string }) {
         }
 
         if (lines.length === 1) {
-          const line = lines[0];
-          const labelMatch = line.match(/^([^:]+):\s*(.*)$/);
-          if (labelMatch && labelMatch[2]) {
-            return (
-              <p key={blockIndex}>
-                <span className={policyLabelClass}>{labelMatch[1]}:</span> {labelMatch[2]}
-              </p>
-            );
-          }
-          if (isPolicySubheading(line)) {
-            return (
-              <p key={blockIndex} className={policySubheadingClass}>
-                {line}
-              </p>
-            );
-          }
-          return <p key={blockIndex}>{line}</p>;
+          return <p key={blockIndex}>{lines[0]}</p>;
         }
 
         return (
@@ -127,24 +99,6 @@ function PolicySectionContent({ content }: { content: string }) {
                   <ul key={lineIndex} className="list-disc space-y-1.5 pl-5 marker:text-foreground/40">
                     <li>{line.slice(2)}</li>
                   </ul>
-                );
-              }
-
-              const labelMatch = line.match(/^([^:]+):\s*(.*)$/);
-              if (labelMatch && labelMatch[2]) {
-                return (
-                  <p key={lineIndex}>
-                    <span className={policyLabelClass}>{labelMatch[1]}:</span>{" "}
-                    <span className="font-normal text-foreground/75">{labelMatch[2]}</span>
-                  </p>
-                );
-              }
-
-              if (isPolicySubheading(line) || (labelMatch && !labelMatch[2])) {
-                return (
-                  <p key={lineIndex} className={policySubheadingClass}>
-                    {labelMatch && !labelMatch[2] ? labelMatch[1] : line}
-                  </p>
                 );
               }
 

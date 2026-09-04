@@ -6,6 +6,7 @@ import {
   computeSalaryCreditDate,
   getPreviousPayrollMonthParts,
   isPayslipPublishedToEmployee,
+  resolveEmployeePayslipReleaseAt,
   resolvePayslipAvailability,
 } from "@/lib/payroll/services/payslip-publication";
 
@@ -38,7 +39,7 @@ describe("payslip publication schedule (IST)", () => {
     );
     assert.equal(access.availability, "under_review");
     assert.equal(access.canEmployeeAccess, false);
-    assert.match(access.reviewMessage ?? "", /Payslip will be available on/);
+    assert.match(access.reviewMessage ?? "", /not been released by HR/);
   });
 
   it("allows HR preview before publish date when not employee-facing", () => {
@@ -77,6 +78,27 @@ describe("payslip publication schedule (IST)", () => {
       },
     );
     assert.equal(access.availability, "available");
+    assert.equal(access.canEmployeeAccess, true);
+  });
+
+  it("allows employee access from payroll lifecycle when email bookkeeping is missing", () => {
+    const sentAt = "2026-09-01T00:00:00.000Z";
+    assert.equal(
+      resolveEmployeePayslipReleaseAt({
+        emailSentAt: null,
+        payrollLifecycle: { itemStatus: "sent", sentAt },
+      }),
+      sentAt,
+    );
+    const access = resolvePayslipAvailability(
+      computePublishedAt("2026-08-01", 5),
+      [],
+      new Date("2026-09-01T00:00:00.000Z"),
+      {
+        employeeFacing: true,
+        emailSentAt: sentAt,
+      },
+    );
     assert.equal(access.canEmployeeAccess, true);
   });
 });

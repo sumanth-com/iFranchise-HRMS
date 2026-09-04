@@ -8,7 +8,7 @@ import {
   PAYSLIP_PUBLISH_DAY,
   canAccessPayslipDuringReview,
   computeSalaryCreditDate,
-  isPayslipOfficiallyReleasedToEmployee,
+  resolveEmployeePayslipReleaseAt,
   resolvePayslipAvailability,
   resolvePayslipSchedule,
   SALARY_CREDIT_DAY,
@@ -172,6 +172,16 @@ const TIMELINE_STATUS_ORDER: PayrollStatus[] = [
   "paid",
 ];
 
+function effectivePayslipReleaseAt(
+  emailSentAt: string | null,
+  breakdown: PayrollBreakdown | null | undefined,
+): string | null {
+  return resolveEmployeePayslipReleaseAt({
+    emailSentAt,
+    payrollLifecycle: breakdown?.payrollLifecycle,
+  });
+}
+
 function buildTimeline(input: {
   payroll: {
     payroll_status: PayrollStatus;
@@ -182,13 +192,15 @@ function buildTimeline(input: {
   emailSentAt: string | null;
   publishedAt: string;
   salaryCreditDate: string;
+  payrollLifecycle?: PayrollBreakdown["payrollLifecycle"];
 }): EmployeePayrollTimeline {
   const status = input.payroll.payroll_status;
   const rank = TIMELINE_STATUS_ORDER.indexOf(status);
-  const payslipReleased = isPayslipOfficiallyReleasedToEmployee({
-    publishedAt: input.publishedAt,
+  const releaseAt = resolveEmployeePayslipReleaseAt({
     emailSentAt: input.emailSentAt,
+    payrollLifecycle: input.payrollLifecycle,
   });
+  const payslipReleased = Boolean(releaseAt);
 
   return {
     status,
@@ -196,24 +208,28 @@ function buildTimeline(input: {
       {
         key: "generated",
         label: "Payroll Generated",
+        description: "Payroll calculation created by HR.",
         at: input.payroll.processed_at ?? input.payroll.created_at,
         done: rank >= TIMELINE_STATUS_ORDER.indexOf("processed"),
       },
       {
         key: "hr_approved",
-        label: "Approved",
+        label: "Payroll Reviewed",
+        description: "Payroll reviewed and approved.",
         at: input.payroll.approved_at,
         done: rank >= TIMELINE_STATUS_ORDER.indexOf("approved"),
       },
       {
         key: "released",
-        label: "Payslip Published / Sent",
-        at: input.emailSentAt ?? (payslipReleased ? input.publishedAt : null),
+        label: "Payslip Sent",
+        description: "Payslip successfully published/sent to the employee.",
+        at: releaseAt ?? (payslipReleased ? input.publishedAt : null),
         done: payslipReleased,
       },
       {
         key: "credited",
-        label: "Salary Released / Credited",
+        label: "Salary Credited",
+        description: "Salary payment marked as credited.",
         at: status === "paid" ? input.salaryCreditDate : null,
         done: status === "paid",
       },
@@ -304,8 +320,7 @@ export async function getEmployeePayrollData(
         .is("archived_at", null)
         .is("deleted_at", null)
         .order("issued_at", { ascending: false })
-        // Hub only needs recent slips for KPIs/list; full history loads via dialog action.
-        .limit(24);
+        .limit(500);
       if (error) throw new Error(error.message);
       return data ?? [];
     }, [] as unknown[]),
@@ -336,6 +351,7 @@ export async function getEmployeePayrollData(
         .eq("employee_id", employeeId)
         .is("deleted_at", null)
         .order("is_primary", { ascending: false })
+        .order("updated_at", { ascending: false })
         .limit(1)
         .maybeSingle();
       if (error) throw new Error(error.message);
@@ -446,13 +462,14 @@ export async function getEmployeePayrollData(
       },
       scheduleOptions,
     );
+    const releaseAt = effectivePayslipReleaseAt(row.email_sent_at, item?.breakdown ?? null);
     const access = resolvePayslipAvailability(
       schedule.publishedAt,
       profile.permissionCodes,
       new Date(),
       {
         employeeFacing: viewingOwnPayroll,
-        emailSentAt: row.email_sent_at,
+        emailSentAt: releaseAt,
       },
     );
     return {
@@ -466,6 +483,7 @@ export async function getEmployeePayrollData(
       netSalary: Number(item?.net_salary ?? 0),
       payrollStatus: payroll?.payroll_status ?? "draft",
       issuedAt: row.issued_at,
+      emailSentAt: releaseAt,
       salaryCreditDate: schedule.salaryCreditDate,
       publishedAt: schedule.publishedAt,
       availability: access.availability,
@@ -510,10 +528,9 @@ export async function getEmployeePayrollData(
       scheduleOptions,
     );
     const released = viewingOwnPayroll
-      ? isPayslipOfficiallyReleasedToEmployee({
-          publishedAt: schedule.publishedAt,
-          emailSentAt: row.email_sent_at,
-        })
+      ? Boolean(
+          effectivePayslipReleaseAt(row.email_sent_at, item?.breakdown ?? null),
+        )
       : true;
     if (!released && !hrPayslipAccess) continue;
 
@@ -534,7 +551,7 @@ export async function getEmployeePayrollData(
   }
   trend.reverse();
 
-  const latestAccessible = rows.find(({ row, payroll }) => {
+  const latestAccessible = rows.find(({ row, item, payroll }) => {
     const schedule = resolvePayslipSchedule(
       payroll?.payroll_month ?? "",
       {
@@ -549,7 +566,7 @@ export async function getEmployeePayrollData(
       new Date(),
       {
         employeeFacing: viewingOwnPayroll,
-        emailSentAt: row.email_sent_at,
+        emailSentAt: effectivePayslipReleaseAt(row.email_sent_at, item?.breakdown ?? null),
       },
     );
     return access.canEmployeeAccess || hrPayslipAccess;
@@ -585,15 +602,6 @@ export async function getEmployeePayrollData(
       },
       scheduleOptions,
     );
-    const access = resolvePayslipAvailability(
-      schedule.publishedAt,
-      profile.permissionCodes,
-      new Date(),
-      {
-        employeeFacing: viewingOwnPayroll,
-        emailSentAt: row.email_sent_at,
-      },
-    );
     const breakdown = (item?.breakdown ?? {
       earnings: [],
       deductions: [],
@@ -606,6 +614,16 @@ export async function getEmployeePayrollData(
         overtimeHours: 0,
       },
     }) as PayrollBreakdown;
+    const releaseAt = effectivePayslipReleaseAt(row.email_sent_at, breakdown);
+    const access = resolvePayslipAvailability(
+      schedule.publishedAt,
+      profile.permissionCodes,
+      new Date(),
+      {
+        employeeFacing: viewingOwnPayroll,
+        emailSentAt: releaseAt,
+      },
+    );
     return {
       id: row.id,
       payslipNumber: row.payslip_number,
@@ -680,6 +698,9 @@ export async function getEmployeePayrollData(
       emailSentAt: latestAccessible.row.email_sent_at,
       publishedAt: schedule.publishedAt,
       salaryCreditDate: schedule.salaryCreditDate,
+      payrollLifecycle: (
+        latestAccessible.item?.breakdown as PayrollBreakdown | null | undefined
+      )?.payrollLifecycle,
     });
   })();
 

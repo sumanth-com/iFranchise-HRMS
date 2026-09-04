@@ -119,6 +119,7 @@ export function EmployeePayslipDrawer({
           canDownload={displayDetail.canEmployeeAccess}
           canEmail={false}
           hideActions
+          employeeFacing
         />
       ) : (
         <div className="flex min-h-48 items-center justify-center text-sm text-muted-foreground">

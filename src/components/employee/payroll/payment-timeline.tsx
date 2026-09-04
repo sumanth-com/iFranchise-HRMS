@@ -10,14 +10,15 @@ type PaymentTimelineProps = {
   stages: EmployeePayrollTimelineStage[];
 };
 
-function fmtStageTime(value: string | null, done: boolean): string {
+function fmtStageTime(value: string | null, done: boolean, active: boolean): string {
   if (value) {
     try {
-      return format(parseISO(value), "dd MMM yyyy, h:mm a");
+      return format(parseISO(value.length === 10 ? `${value}T12:00:00.000Z` : value), "dd MMM yyyy, h:mm a");
     } catch {
-      return "Completed";
+      return done ? "Completed" : "Pending";
     }
   }
+  if (active) return "In progress";
   return done ? "Completed" : "Pending";
 }
 
@@ -91,15 +92,16 @@ export function PaymentTimeline({ stages }: PaymentTimelineProps) {
               >
                 {stage.label}
               </p>
+              <p className="mt-1 text-xs leading-snug text-muted-foreground">{stage.description}</p>
               <p
                 className={cn(
-                  "mt-1 text-xs",
+                  "mt-1.5 text-xs",
                   isActive
                     ? "text-emerald-600/80 dark:text-emerald-400/80"
                     : "text-muted-foreground",
                 )}
               >
-                {isActive ? "In progress…" : fmtStageTime(stage.at, stage.done)}
+                {fmtStageTime(stage.at, stage.done, isActive)}
               </p>
             </div>
           </li>

@@ -14,6 +14,8 @@ type PayslipViewProps = {
   canEmail: boolean;
   /** Hide inline action buttons (e.g. when actions render in a modal footer). */
   hideActions?: boolean;
+  /** Use employee-facing copy instead of HR calendar messaging. */
+  employeeFacing?: boolean;
 };
 
 export function PayslipView({
@@ -21,6 +23,7 @@ export function PayslipView({
   canDownload,
   canEmail,
   hideActions = false,
+  employeeFacing = false,
 }: PayslipViewProps) {
   const { handleDownload, handleEmail, isPending, isDownloading, underReview, showDownload, showEmail } =
     usePayslipActions(payslip, { canDownload, canEmail });
@@ -30,7 +33,7 @@ export function PayslipView({
       {underReview ? (
         <div className="flex gap-3 rounded-lg border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm text-amber-950 print:hidden">
           <ShieldAlert className="mt-0.5 size-4 shrink-0" />
-          <p>{formatReviewBannerMessage(payslip.publishedAt)}</p>
+          <p>{formatReviewBannerMessage(payslip.publishedAt, { employeeFacing })}</p>
         </div>
       ) : null}
 

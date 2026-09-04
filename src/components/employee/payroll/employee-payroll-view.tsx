@@ -7,10 +7,10 @@ import {
   Award,
   Banknote,
   CalendarDays,
+  Check,
   Download,
   FileText,
   Gift,
-  History,
   IndianRupee,
   Landmark,
   ReceiptText,
@@ -21,7 +21,6 @@ import {
   EmployeeSectionCard,
   EmployeeStatCard,
 } from "@/components/employee/dashboard/employee-module-primitives";
-import { EmployeePayslipHistoryDialog } from "@/components/employee/payroll/employee-payslip-history-dialog";
 import { EmployeePayslipDrawer } from "@/components/employee/payroll/employee-payslip-drawer";
 import { PaymentTimeline } from "@/components/employee/payroll/payment-timeline";
 import { EarningsDeductionsTable } from "@/components/payroll/earnings-deductions-table";
@@ -30,38 +29,31 @@ import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import {
   BONUS_STATUS_LABELS,
   BONUS_TYPE_LABELS,
-  PAYROLL_STATUS_LABELS,
 } from "@/lib/payroll/constants";
-import { formatCurrency } from "@/lib/payroll/services/payroll-utils";
-import { formatReviewBannerMessage } from "@/lib/payroll/services/payslip-publication";
+import { formatCurrency, formatPayrollMonthLabel } from "@/lib/payroll/services/payroll-utils";
 import type { EmployeePayrollData } from "@/types/employee-payroll";
 import type {
   BonusItem,
-  PayrollStatus,
   PayslipListItem,
 } from "@/types/payroll";
 import { cn } from "@/lib/utils";
 
-const STATUS_STYLES: Record<PayrollStatus, string> = {
-  draft: "bg-muted text-muted-foreground",
-  processing: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
-  processed: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300",
-  approved: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  paid: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  cancelled: "bg-destructive/10 text-destructive",
-};
+const RECEIVED_PILL_CLASS =
+  "inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-500/20 dark:bg-emerald-400/12 dark:text-emerald-300 dark:ring-emerald-400/25";
 
-function StatusPill({ status }: { status: PayrollStatus }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-        STATUS_STYLES[status],
-      )}
-    >
-      {PAYROLL_STATUS_LABELS[status] ?? status}
-    </span>
-  );
+const PROCESSING_PILL_CLASS =
+  "inline-flex items-center gap-1 rounded-full bg-sky-500/10 px-2.5 py-0.5 text-xs font-medium text-sky-700 ring-1 ring-sky-500/20 dark:bg-sky-400/12 dark:text-sky-300 dark:ring-sky-400/25";
+
+function EmployeePayslipStatusPill({ row }: { row: PayslipListItem }) {
+  if (row.canEmployeeAccess) {
+    return (
+      <span className={RECEIVED_PILL_CLASS}>
+        <Check className="size-3" aria-hidden />
+        Received
+      </span>
+    );
+  }
+  return <span className={PROCESSING_PILL_CLASS}>Processing</span>;
 }
 
 function fmtDate(value: string | null): string {
@@ -74,12 +66,11 @@ function fmtDate(value: string | null): string {
 }
 
 function fmtMonth(value: string): string {
-  if (!value) return "—";
-  try {
-    return format(parseISO(value.length === 7 ? `${value}-01` : value), "MMMM yyyy");
-  } catch {
-    return value;
-  }
+  return formatPayrollMonthLabel(value);
+}
+
+function fmtSentDate(row: PayslipListItem): string {
+  return fmtDate(row.emailSentAt ?? row.issuedAt);
 }
 
 export function EmployeePayrollView({
@@ -97,7 +88,6 @@ export function EmployeePayrollView({
 }) {
   const [activePayslipId, setActivePayslipId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
 
   const money = (value: number) => formatCurrency(value, data.currencyCode);
   const publishedPayslips = data.payslips.filter((row) => row.canEmployeeAccess);
@@ -107,11 +97,6 @@ export function EmployeePayrollView({
   function openPayslip(id: string) {
     setActivePayslipId(id);
     setDrawerOpen(true);
-  }
-
-  function openPayslipFromHistory(id: string) {
-    setHistoryOpen(false);
-    openPayslip(id);
   }
 
   const header = showPageHeading ? (
@@ -279,13 +264,18 @@ export function EmployeePayrollView({
           className="h-full xl:col-span-2"
           title="Current Payroll Summary"
           description={
-            hasPublishedPayroll
-              ? `${fmtMonth(data.latest?.payrollMonth ?? "")} · Payslip ${data.latest?.payslipNumber ?? ""}`
-              : "Your latest published payslip will appear here once HR releases it."
+            hasPublishedPayroll && data.latest
+              ? `${fmtMonth(data.latest.payrollMonth)} · Payslip ${data.latest.payslipNumber}`
+              : "Your latest payslip will appear here once HR sends it."
           }
           action={
-            hasPublishedPayroll && data.latest ? (
-              <StatusPill status={data.latest.payrollStatus} />
+            hasPublishedPayroll && data.latest?.canEmployeeAccess ? (
+              <span className={RECEIVED_PILL_CLASS}>
+                <Check className="size-3" aria-hidden />
+                Received
+              </span>
+            ) : hasPublishedPayroll ? (
+              <span className={PROCESSING_PILL_CLASS}>Processing</span>
             ) : null
           }
           bodyClassName="flex h-full flex-col gap-4"
@@ -399,8 +389,8 @@ export function EmployeePayrollView({
                 </p>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                No bank account on file. Contact HR to add your salary account.
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                No bank account details on file. Contact HR to update your salary account.
               </p>
             )}
             </EmployeeSectionCard>
@@ -409,31 +399,10 @@ export function EmployeePayrollView({
       {/* Payslip history */}
       <EmployeeSectionCard
         title="Payslip History"
-        description="All published salary statements during your employment."
+        description="Your salary statements and their delivery status."
         bodyClassName="overflow-x-auto"
-        action={
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => setHistoryOpen(true)}
-          >
-            <History className="size-4" />
-            View full history
-          </Button>
-        }
       >
-        {data.payslips.some((row) => row.availability === "under_review") ? (
-          <div className="mb-4 rounded-lg border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm text-amber-900">
-            {formatReviewBannerMessage(
-              data.payslips.find((row) => row.availability === "under_review")?.publishedAt ??
-                new Date().toISOString(),
-            )}
-          </div>
-        ) : null}
-        {publishedPayslips.length > 0 ? (
-          <>
+        {data.payslips.length > 0 ? (
           <table className="w-full min-w-[44rem] text-sm">
             <thead>
               <tr className="bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600">
@@ -441,13 +410,13 @@ export function EmployeePayrollView({
                 <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Payslip #</th>
                 <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Attendance earnings</th>
                 <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Net salary</th>
-                <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Credit Date</th>
+                <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Sent date</th>
                 <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Status</th>
                 <th className="h-11 whitespace-nowrap px-4 py-3 text-right align-middle text-xs font-semibold uppercase tracking-wide text-white">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {publishedPayslips.slice(0, 3).map((row: PayslipListItem) => (
+              {data.payslips.map((row: PayslipListItem) => (
                 <tr key={row.id} className="border-b last:border-0">
                   <td className="py-2.5 pr-3 font-medium">{fmtMonth(row.payrollMonth)}</td>
                   <td className="py-2.5 pr-3 text-muted-foreground">{row.payslipNumber}</td>
@@ -456,10 +425,10 @@ export function EmployeePayrollView({
                     {money(row.netSalary)}
                   </td>
                   <td className="py-2.5 pr-3 text-muted-foreground">
-                    {fmtDate(row.salaryCreditDate)}
+                    {fmtSentDate(row)}
                   </td>
                   <td className="py-2.5 pr-3">
-                    <StatusPill status={row.payrollStatus} />
+                    <EmployeePayslipStatusPill row={row} />
                   </td>
                   <td className="py-2.5 text-right">
                     <div className="flex justify-end gap-2">
@@ -504,35 +473,12 @@ export function EmployeePayrollView({
               ))}
             </tbody>
           </table>
-          {publishedPayslips.length > 3 ? (
-            <p className="mt-3 text-center text-xs text-muted-foreground">
-              Showing 3 most recent ·{" "}
-              <button
-                type="button"
-                className="font-medium text-primary underline-offset-2 hover:underline"
-                onClick={() => setHistoryOpen(true)}
-              >
-                View all {publishedPayslips.length} payslips
-              </button>
-            </p>
-          ) : null}
-          </>
         ) : (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            No published payslips yet.
+            No payslip records yet. They will appear here once HR generates payroll for you.
           </p>
         )}
       </EmployeeSectionCard>
-
-      <EmployeePayslipHistoryDialog
-        open={historyOpen}
-        onOpenChange={setHistoryOpen}
-        payslips={publishedPayslips}
-        money={money}
-        fmtDate={fmtDate}
-        fmtMonth={fmtMonth}
-        onViewPayslip={openPayslipFromHistory}
-      />
 
       <EmployeePayslipDrawer
         payslipId={activePayslipId}

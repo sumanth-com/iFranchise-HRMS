@@ -27,7 +27,9 @@ export function formatPayrollMonth(month: number, year: number): string {
 export function formatPayrollMonthLabel(dateString: string | null | undefined): string {
   const value = dateString?.trim();
   if (!value) return "—";
-  const d = new Date(value);
+  const normalized =
+    value.length === 7 ? `${value}-01` : value.length >= 10 ? value.slice(0, 10) : value;
+  const d = new Date(`${normalized}T12:00:00.000Z`);
   if (Number.isNaN(d.getTime())) return "—";
   return format(d, "MMMM yyyy");
 }

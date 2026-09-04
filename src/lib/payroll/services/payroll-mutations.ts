@@ -31,6 +31,7 @@ import {
   computePayslipSchedule,
   isPayslipHrSent,
   isPayslipPublishedToEmployee,
+  resolveEmployeePayslipReleaseAt,
   resolvePayslipAvailability,
   resolvePayslipSchedule,
 } from "@/lib/payroll/services/payslip-publication";
@@ -2472,9 +2473,10 @@ export async function releaseEmployeePayslip(
     publishDay: payrollSettings.settings.payslipAvailableDay,
   });
   let payslipId = existingPayslip?.id ?? null;
+  let payslipNumber = "";
 
   if (!payslipId) {
-    const payslipNumber = generatePayslipNumber(
+    payslipNumber = generatePayslipNumber(
       employee?.employee_code ?? "EMP",
       payroll.payroll_month,
     );
@@ -2488,6 +2490,7 @@ export async function releaseEmployeePayslip(
         payslip_number: payslipNumber,
         salary_credit_date: schedule.salaryCreditDate,
         published_at: nowIso,
+        email_sent_at: nowIso,
         payroll_generated_at: nowIso,
         payment_mode: "Bank Transfer",
         payslip_version: PAYSLIP_VERSION,
@@ -2499,11 +2502,19 @@ export async function releaseEmployeePayslip(
     if (insertError) throw new Error(insertError.message);
     payslipId = created.id;
   } else {
+    const { data: existingRow } = await supabase
+      .schema("hrms")
+      .from("payslips")
+      .select("payslip_number")
+      .eq("id", payslipId)
+      .maybeSingle();
+    payslipNumber = String(existingRow?.payslip_number ?? "");
     await supabase
       .schema("hrms")
       .from("payslips")
       .update({
         published_at: nowIso,
+        email_sent_at: nowIso,
         salary_credit_date: schedule.salaryCreditDate,
         updated_by: actorId,
       })
@@ -2536,6 +2547,29 @@ export async function releaseEmployeePayslip(
 
   if (!payslipId) {
     throw new Error("Payslip could not be created.");
+  }
+
+  const monthLabel = formatPayrollMonthLabel(payroll.payroll_month);
+  try {
+    await notifyEmployee(supabase, {
+      organizationId: profile.employee.organizationId,
+      employeeId: item.employee_id as string,
+      title: "Payslip available",
+      message: `Your payslip for ${monthLabel}${payslipNumber ? ` (${payslipNumber})` : ""} is ready to view.`,
+      notificationType: "payslip_available",
+      module: "payroll",
+      priority: "medium",
+      actionUrl: `/employee/payroll?id=${payslipId}`,
+      sourceEventKey: `payslip_available:${payslipId}`,
+      templateKey: "payslip_available",
+      templateVariables: { month: monthLabel, payslipNumber },
+      createdBy: profile.userId,
+    });
+  } catch (error) {
+    console.error("[payroll] payslip portal release notification failed", {
+      payslipId,
+      message: error instanceof Error ? error.message : "unknown",
+    });
   }
 
   try {
@@ -3628,13 +3662,18 @@ export async function getPayslipById(
   );
 
   const isOwnPayslip = payslip.employee_id === profile.employee.id;
+  const payrollItemBreakdown = (payrollItem?.breakdown as PayrollBreakdown | null) ?? null;
+  const effectiveEmailSentAt = resolveEmployeePayslipReleaseAt({
+    emailSentAt: payslip.email_sent_at,
+    payrollLifecycle: payrollItemBreakdown?.payrollLifecycle,
+  });
   const access = resolvePayslipAvailability(
     schedule.publishedAt,
     profile.permissionCodes,
     new Date(),
     {
       employeeFacing: isOwnPayslip,
-      emailSentAt: payslip.email_sent_at,
+      emailSentAt: effectiveEmailSentAt,
     },
   );
 

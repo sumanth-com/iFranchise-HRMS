@@ -34,6 +34,7 @@ export type EmployeeSalaryStructure = {
 export type EmployeePayrollTimelineStage = {
   key: "generated" | "hr_approved" | "released" | "credited";
   label: string;
+  description: string;
   at: string | null;
   done: boolean;
 };

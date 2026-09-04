@@ -290,6 +290,7 @@ export type PayslipListItem = {
   payrollItemId?: string;
   payslipSent?: boolean;
   hasPayslip?: boolean;
+  emailSentAt?: string | null;
   departmentName?: string | null;
   designationTitle?: string | null;
   employmentTypeName?: string | null;
