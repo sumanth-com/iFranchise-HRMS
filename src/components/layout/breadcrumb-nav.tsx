@@ -306,6 +306,7 @@ function buildBreadcrumbItems(
         bonuses: "Bonuses",
         reimbursements: "Expense claims",
         payslips: "Payslips",
+        "employee-accounts": "Employee Accounts",
         settings: "Settings",
       };
 
@@ -638,6 +639,7 @@ function buildBreadcrumbItems(
         bonuses: "Bonuses",
         reimbursements: "Expense claims",
         payslips: "Payslips",
+        "employee-accounts": "Employee Accounts",
         settings: "Settings",
       };
 
@@ -696,6 +698,7 @@ function buildBreadcrumbItems(
         bonuses: "Bonuses",
         reimbursements: "Expense claims",
         payslips: "Payslips",
+        "employee-accounts": "Employee Accounts",
         settings: "Settings",
         attendance: "Attendance",
         payroll: "Payroll",

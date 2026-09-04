@@ -1,4 +1,5 @@
 import { BonusTable } from "@/components/payroll/bonus-management";
+import { EmployeeAccountsTable } from "@/components/payroll/employee-accounts-table";
 import { PayrollRunForm } from "@/components/payroll/payroll-run-form";
 import type { CompanyPayrollInitialPanel } from "@/components/payroll/payroll-run-form";
 import { PayrollSettingsForm } from "@/components/payroll/payroll-settings-form";
@@ -11,6 +12,7 @@ import {
   canApproveReimbursement,
   canCreateBonus,
   canCreateReimbursement,
+  canEditBankAccounts,
   canEditSalary,
   canRunPayroll,
   payrollTeamSectionPath,
@@ -35,8 +37,10 @@ import {
 import { formatPayrollMonth } from "@/lib/payroll/services/payroll-utils";
 import { toUserFriendlyError } from "@/lib/errors/user-messages";
 import { listPayslipHistory } from "@/lib/payroll/services/payslip-history-queries";
+import { listEmployeeAccounts } from "@/lib/payroll/services/employee-accounts-queries";
 import {
   bonusListParamsSchema,
+  employeeAccountListParamsSchema,
   payslipHistoryParamsSchema,
   reimbursementListParamsSchema,
   salaryStructureListParamsSchema,
@@ -278,6 +282,33 @@ export async function TeamPayrollSection({
             ? `${teamBasePath}/${TEAM_PAYROLL_SECTIONS.payslips}`
             : payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS.payslips)
         }
+      />
+    );
+  }
+
+  if (section === TEAM_PAYROLL_SECTIONS["employee-accounts"]) {
+    const params = employeeAccountListParamsSchema.parse({
+      page: rawSearchParams.page,
+      pageSize: rawSearchParams.pageSize,
+      search: firstString(rawSearchParams.search),
+      department: firstString(rawSearchParams.department),
+    });
+    const [result, lookups] = await Promise.all([
+      listEmployeeAccounts(supabase, profile, params),
+      getPayrollLookups(supabase, profile.employee.organizationId),
+    ]);
+
+    return (
+      <EmployeeAccountsTable
+        records={result.data}
+        total={result.total}
+        page={result.page}
+        pageSize={result.pageSize}
+        search={params.search}
+        department={params.department}
+        employees={lookups.employees}
+        departments={lookups.departments}
+        canEdit={canEditBankAccounts(profile.permissionCodes)}
       />
     );
   }

@@ -196,6 +196,31 @@ const SECTION_HELP: Record<
       },
     ],
   },
+  "employee-accounts": {
+    title: "About Employee Accounts",
+    points: [
+      {
+        label: "What this page is for",
+        detail:
+          "Maintain employee identity details and salary bank accounts used for payroll processing and payslip display.",
+      },
+      {
+        label: "All employees",
+        detail:
+          "Every active employee appears here. Add or update account details when onboarding completes or when bank information changes.",
+      },
+      {
+        label: "Payroll connection",
+        detail:
+          "Updates here flow to employee payroll bank cards and future payroll runs. Released payslips keep the bank details captured at send time.",
+      },
+      {
+        label: "Search and filters",
+        detail:
+          "Use search and department filters to find employees quickly before editing their account information.",
+      },
+    ],
+  },
   settings: {
     title: "About Payroll Settings",
     points: [

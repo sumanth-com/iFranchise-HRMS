@@ -4,6 +4,7 @@ import {
   buildStandardEarningsLines,
   splitMonthlyGross,
 } from "@/lib/payroll/salary-structure-breakdown";
+import { resolveEmployeeBankName } from "@/lib/payroll/services/ifsc-bank-names";
 import type { PayrollBreakdownLine, PayrollBreakdown } from "@/types/payroll";
 
 export function getPayrollMonthDate(month: number, year: number): string {
@@ -129,14 +130,18 @@ export function displaySalaryBankDetails<T extends {
   branchName?: string | null;
 }>(bank: T): T {
   const ifsc = (bank.ifscCode ?? "").trim().toUpperCase();
-  if (!ifsc.startsWith("SBIN")) return bank;
+  const resolvedName = resolveEmployeeBankName(bank.bankName, ifsc);
+
+  if (!ifsc.startsWith("SBIN")) {
+    return { ...bank, bankName: resolvedName };
+  }
 
   const branch = (bank.branchName ?? "").trim();
   const useDhone = !branch || /madhapur|hyderabad/i.test(branch);
 
   return {
     ...bank,
-    bankName: "SBI Bank",
+    bankName: resolvedName === bank.bankName ? "State Bank of India" : resolvedName,
     ...(bank.branchName !== undefined ? { branchName: useDhone ? "Dhone" : bank.branchName } : {}),
   };
 }
@@ -664,6 +669,10 @@ export function comparePayrollMonthsDesc(
   return payrollMonthSortKey(b).localeCompare(payrollMonthSortKey(a));
 }
 
-export function maskAccountNumber(accountNumber: string): string {
-  return accountNumber;
+export function maskAccountNumber(accountNumber: string, options?: { reveal?: boolean }): string {
+  const digits = accountNumber.replace(/\D/g, "");
+  if (!digits) return accountNumber;
+  if (options?.reveal) return digits;
+  if (digits.length <= 4) return digits;
+  return `${"•".repeat(Math.min(8, digits.length - 4))}${digits.slice(-4)}`;
 }

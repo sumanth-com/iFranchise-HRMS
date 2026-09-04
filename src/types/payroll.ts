@@ -103,6 +103,8 @@ export type PayrollBreakdown = {
     otherAllowances: number;
     components: Record<string, unknown>;
   };
+  /** Bank details captured when the payslip is released — immutable for audit. */
+  bankAccountSnapshot?: import("@/types/employee-accounts").PayslipBankAccountSnapshot;
   /** Excel import metadata — authoritative for locked historical months. */
   source?: string;
   excel?: {

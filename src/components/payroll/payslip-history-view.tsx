@@ -25,6 +25,12 @@ import {
   TABLE_HEADER_CELL_CLASS,
   TABLE_HEADER_ROW_CLASS,
   TABLE_HEADER_STICKY_CLASS,
+  PAYROLL_TABLE_SCROLL_CLASS,
+  payrollStickyActionsBodyClass,
+  payrollStickyActionsHeaderClass,
+  payrollStickyEmployeeBodyClass,
+  payrollStickyEmployeeHeaderClass,
+  payrollStickyHeaderCellClass,
 } from "@/components/common/table-header-classes";
 import { Input } from "@/components/common/input";
 import { PayslipHistorySummaryCards } from "@/components/payroll/payslip-history-summary-cards";
@@ -278,27 +284,27 @@ function PayslipTable({
 }) {
   if (mode === "hr") {
     return (
-      <table className="w-full min-w-[72rem] text-sm">
+      <table className="w-full min-w-[72rem] bg-white text-sm dark:bg-input">
         <thead className={TABLE_HEADER_STICKY_CLASS}>
           <tr className={TABLE_HEADER_ROW_CLASS}>
-            <th className={TABLE_HEADER_CELL_CLASS}>Employee</th>
-            <th className={TABLE_HEADER_CELL_CLASS}>Department</th>
-            <th className={TABLE_HEADER_CELL_CLASS}>Monthly salary</th>
-            <th className={TABLE_HEADER_CELL_CLASS}>Attendance earnings</th>
-            <th className={TABLE_HEADER_CELL_CLASS}>Deductions</th>
-            <th className={TABLE_HEADER_CELL_CLASS}>Net salary</th>
-            <th className={TABLE_HEADER_CELL_CLASS}>Reimb.</th>
-            <th className={TABLE_HEADER_CELL_CLASS}>Final payable</th>
-            <th className={TABLE_HEADER_CELL_CLASS}>Status</th>
-            <th className={cn(TABLE_HEADER_CELL_CLASS, "text-right")}>Actions</th>
+            <th className={payrollStickyEmployeeHeaderClass("min-w-[14rem]")}>Employee</th>
+            <th className={payrollStickyHeaderCellClass()}>Department</th>
+            <th className={payrollStickyHeaderCellClass()}>Monthly salary</th>
+            <th className={payrollStickyHeaderCellClass()}>Attendance earnings</th>
+            <th className={payrollStickyHeaderCellClass()}>Deductions</th>
+            <th className={payrollStickyHeaderCellClass()}>Net salary</th>
+            <th className={payrollStickyHeaderCellClass()}>Reimb.</th>
+            <th className={payrollStickyHeaderCellClass()}>Final payable</th>
+            <th className={payrollStickyHeaderCellClass()}>Status</th>
+            <th className={payrollStickyActionsHeaderClass()}>Actions</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="bg-white dark:bg-input">
           {rows.map((row) => {
             const amounts = payslipAmounts(row);
             return (
-            <tr key={row.payrollItemId ?? row.id} className="border-b last:border-0">
-              <td className="min-w-[14rem] px-4 py-3">
+            <tr key={row.payrollItemId ?? row.id} className="group border-b last:border-b-0 hover:bg-zinc-50 dark:hover:bg-input/80">
+              <td className={payrollStickyEmployeeBodyClass("min-w-[14rem]")}>
                 <div className="truncate whitespace-nowrap font-medium" title={row.employeeName}>
                   {row.employeeName}
                 </div>
@@ -327,7 +333,7 @@ function PayslipTable({
               <td className="px-4 py-3">
                 <PayslipStatusIndicator row={row} />
               </td>
-              <td className="px-4 py-3">
+              <td className={payrollStickyActionsBodyClass()}>
                 <PayslipRowActions
                   row={row}
                   mode={mode}
@@ -616,7 +622,7 @@ export function PayslipHistoryView({
       ) : null}
 
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-        <div className="max-h-[calc(100vh-22rem)] overflow-auto">
+        <div className={PAYROLL_TABLE_SCROLL_CLASS}>
           {isPending ? (
             <div className="flex items-center justify-center gap-2 px-4 py-16 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" />

@@ -26,6 +26,7 @@ import { PayrollStatusBadge } from "@/components/payroll/payroll-status-badge";
 import { PayrollEditDialog } from "@/components/payroll/payroll-run-item-dialogs";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { getMonthSelectItems, getYearSelectItems } from "@/components/payroll/select-utils";
+import { directoryDepartmentLabel } from "@/lib/employee/directory-listing";
 import { fetchPayrollDetailAction } from "@/lib/payroll/actions";
 import { toUserFriendlyError } from "@/lib/errors/user-messages";
 import {
@@ -191,6 +192,7 @@ export function PayrollRunForm({
   const [breakdownOpen, setBreakdownOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<EmployeeTableRow | null>(null);
   const [employeeSearch, setEmployeeSearch] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("");
   const loadSeq = useRef(0);
   const panel = panelOverride ?? initialPanel;
 
@@ -198,6 +200,8 @@ export function PayrollRunForm({
     setMonth(String(defaultMonth ?? new Date().getMonth() + 1));
     setYear(String(defaultYear));
     setPanelOverride(null);
+    setDepartmentFilter("");
+    setEmployeeSearch("");
   }, [defaultMonth, defaultYear, initialPanel]);
 
   const hasPeriod = month.length > 0 && year.length > 0;
@@ -340,14 +344,39 @@ export function PayrollRunForm({
     };
   }
 
+  const tableRows = useMemo(() => {
+    if (panel.kind === "preview") {
+      return (panel.data.items ?? []).map(mapPreviewItemToRow);
+    }
+    if (panel.kind === "run") {
+      return (panel.data.items ?? []).map(mapRunItemToRow);
+    }
+    return [];
+  }, [panel]);
+
+  const departmentItems = useMemo(() => {
+    const names = new Set<string>();
+    for (const row of tableRows) {
+      const label = directoryDepartmentLabel(row.department) ?? row.department;
+      if (label?.trim()) names.add(label.trim());
+    }
+    return [
+      { value: "", label: "All departments" },
+      ...[...names].sort((a, b) => a.localeCompare(b)).map((name) => ({
+        value: name,
+        label: name,
+      })),
+    ];
+  }, [tableRows]);
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-3 rounded-xl border border-border/70 bg-muted/55 p-3 lg:flex-row lg:items-center">
         <LabeledSelect
           items={monthItems}
           value={month}
-          placeholder="Select month"
-          triggerClassName="h-9 w-[140px]"
+          placeholder="Month"
+          triggerClassName="h-10 w-[9.5rem] shrink-0 border-border/80 bg-white font-semibold dark:bg-input"
           onValueChange={(value) => {
             if (!value) return;
             setMonth(value);
@@ -357,24 +386,36 @@ export function PayrollRunForm({
         <LabeledSelect
           items={yearItems}
           value={year}
-          placeholder="Select year"
-          triggerClassName="h-9 w-[100px]"
+          placeholder="Year"
+          triggerClassName="h-10 w-[7.5rem] shrink-0 border-border/80 bg-white font-semibold dark:bg-input"
           onValueChange={(value) => {
             if (!value) return;
             setYear(value);
             updatePeriod(month, value);
           }}
         />
-        <div className="relative min-w-[12rem] flex-1">
+        <LabeledSelect
+          items={departmentItems}
+          value={departmentFilter}
+          placeholder="All departments"
+          triggerClassName="h-10 w-[13.5rem] shrink-0 border-border/80 bg-white font-semibold dark:bg-input"
+          onValueChange={(value) => setDepartmentFilter(value ?? "")}
+        />
+        <div className="relative min-w-[14rem] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={employeeSearch}
             onChange={(event) => setEmployeeSearch(event.target.value)}
-            placeholder="Search employee..."
-            className="h-9 w-full pl-9"
+            placeholder="Search by name, email, or code..."
+            className="h-10 w-full border-border/80 bg-white pl-9 font-semibold dark:bg-input"
             aria-label="Search employee"
           />
         </div>
+        {tableRows.length > 0 ? (
+          <span className="inline-flex h-10 shrink-0 items-center rounded-md border border-border/80 bg-white px-3 text-sm font-semibold dark:bg-input">
+            {tableRows.length} employees
+          </span>
+        ) : null}
       </div>
 
       {isPending ? <TeamPayrollDataSkeleton /> : null}
@@ -406,8 +447,9 @@ export function PayrollRunForm({
           />
 
           <EmployeePayrollTable
-            rows={(panel.data.items ?? []).map(mapPreviewItemToRow)}
+            rows={tableRows}
             employeeSearch={employeeSearch}
+            departmentFilter={departmentFilter}
             onView={openBreakdown}
             canMutate={false}
           />
@@ -437,8 +479,9 @@ export function PayrollRunForm({
           />
 
           <EmployeePayrollTable
-            rows={(panel.data.items ?? []).map(mapRunItemToRow)}
+            rows={tableRows}
             employeeSearch={employeeSearch}
+            departmentFilter={departmentFilter}
             onView={openBreakdown}
             canMutate={canRun && !panel.data.isLocked}
             onEdit={setEditTarget}
@@ -589,24 +632,32 @@ function PayrollTotals({
 function EmployeePayrollTable({
   rows,
   employeeSearch = "",
+  departmentFilter = "",
   onView,
   canMutate = false,
   onEdit,
 }: {
   rows: EmployeeTableRow[];
   employeeSearch?: string;
+  departmentFilter?: string;
   onView: (row: EmployeeTableRow) => void;
   canMutate?: boolean;
   onEdit?: (row: EmployeeTableRow) => void;
 }) {
   const filteredRows = useMemo(() => {
     const term = employeeSearch.trim().toLowerCase();
-    if (!term) return rows;
+    const department = departmentFilter.trim();
     return rows.filter((row) => {
-      const haystack = `${row.name} ${row.code} ${row.department ?? ""}`.toLowerCase();
+      const departmentLabel =
+        directoryDepartmentLabel(row.department) ?? row.department ?? "";
+      if (department && departmentLabel !== department) {
+        return false;
+      }
+      if (!term) return true;
+      const haystack = `${row.name} ${row.code} ${departmentLabel}`.toLowerCase();
       return haystack.includes(term);
     });
-  }, [employeeSearch, rows]);
+  }, [departmentFilter, employeeSearch, rows]);
 
   if (filteredRows.length === 0) {
     return (

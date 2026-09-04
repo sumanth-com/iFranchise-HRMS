@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+
 /** Attendance-style highlighted table header row (CTA gradient bar, white labels). */
 export const TABLE_HEADER_STICKY_CLASS =
   "sticky top-0 z-30 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 text-left text-white shadow-[0_1px_0_rgba(255,255,255,0.12)]";
@@ -7,6 +9,45 @@ export const TABLE_HEADER_ROW_CLASS =
 
 export const TABLE_HEADER_CELL_CLASS =
   "h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white hover:bg-transparent";
+
+/** Scrollable payroll table body — sticky header/columns apply inside this container. */
+export const PAYROLL_TABLE_SCROLL_CLASS =
+  "max-h-[min(32rem,calc(100dvh-18rem))] overflow-auto";
+
+export function payrollStickyEmployeeHeaderClass(width = "min-w-[14rem]") {
+  return cn(
+    TABLE_HEADER_CELL_CLASS,
+    "sticky left-0 top-0 z-40 bg-blue-600",
+    width,
+    "border-r border-white/15 shadow-[1px_0_0_rgba(255,255,255,0.12)]",
+  );
+}
+
+export function payrollStickyHeaderCellClass(extra?: string) {
+  return cn(TABLE_HEADER_CELL_CLASS, "sticky top-0 z-30 bg-blue-600", extra);
+}
+
+export function payrollStickyEmployeeBodyClass(width = "min-w-[14rem]") {
+  return cn(
+    "sticky left-0 z-20 border-r border-input/40 bg-white px-4 py-3 align-middle shadow-[1px_0_0_rgba(0,0,0,0.04)] dark:bg-input",
+    "group-hover:bg-zinc-50 dark:group-hover:bg-input/80",
+    width,
+  );
+}
+
+export function payrollStickyActionsHeaderClass() {
+  return cn(
+    TABLE_HEADER_CELL_CLASS,
+    "sticky right-0 top-0 z-40 bg-blue-600 text-right shadow-[-1px_0_0_rgba(255,255,255,0.12)]",
+  );
+}
+
+export function payrollStickyActionsBodyClass() {
+  return cn(
+    "sticky right-0 z-20 bg-white px-4 py-3 text-right align-middle shadow-[-1px_0_0_rgba(0,0,0,0.04)] dark:bg-input",
+    "group-hover:bg-zinc-50 dark:group-hover:bg-input/80",
+  );
+}
 
 /** Light-mode table body surface — same white as filter cards. */
 export const TABLE_SURFACE_CLASS =

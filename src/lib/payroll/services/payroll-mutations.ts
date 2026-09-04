@@ -15,6 +15,10 @@ import { getEmployeeLeaveBalanceSnapshot } from "@/lib/leave/services/leave-quer
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
 import { LEAVE_BALANCE_CARD_CODES } from "@/lib/leave/constants";
 import { emitHrmsWebhook } from "@/lib/public-api/emit";
+import {
+  loadPrimaryBankSnapshot,
+  resolvePayslipBankAccount,
+} from "@/lib/payroll/services/employee-accounts-mutations";
 import { getPayslipBranding } from "@/lib/payroll/services/payslip-branding";
 import { PayslipEmailError } from "@/lib/payroll/services/payslip-email-errors";
 import { sendPayslipReadyEmail } from "@/lib/payroll/services/payslip-email-service";
@@ -64,7 +68,6 @@ import {
   formatPayrollMonthLabel,
   getMonthDateRange,
   getPayrollMonthDate,
-  maskAccountNumber,
   parsePayrollMonthFromPayslipNumber,
   roundCurrency,
   resolvePayrollReimbursement,
@@ -2577,12 +2580,19 @@ export async function releaseEmployeePayslip(
       overtimeHours: 0,
     },
   };
+
+  const bankSnapshot = await loadPrimaryBankSnapshot(
+    supabase,
+    item.employee_id as string,
+  );
+
   await supabase
     .schema("hrms")
     .from("payroll_items")
     .update({
       breakdown: {
         ...breakdown,
+        ...(bankSnapshot ? { bankAccountSnapshot: bankSnapshot } : {}),
         payrollLifecycle: { itemStatus: "sent", sentAt: nowIso },
       },
       updated_by: actorId,
@@ -3803,7 +3813,7 @@ export async function getPayslipById(
   const { data: bankAccount } = await supabase
     .schema("hrms")
     .from("bank_accounts")
-    .select("bank_name, account_number, ifsc_code, account_holder_name")
+    .select("bank_name, account_number, ifsc_code, account_holder_name, branch_name")
     .eq("employee_id", payslip.employee_id)
     .eq("is_primary", true)
     .is("deleted_at", null)
@@ -3925,14 +3935,18 @@ export async function getPayslipById(
     employerContributionTotal,
     breakdown,
     employerContributions,
-    bankAccount: bankAccount
-      ? {
-          bankName: bankAccount.bank_name,
-          accountNumberMasked: maskAccountNumber(bankAccount.account_number),
-          ifscCode: bankAccount.ifsc_code ?? null,
-          accountHolderName: bankAccount.account_holder_name ?? null,
-        }
-      : null,
+    bankAccount: (() => {
+      const isReleased = Boolean(payslip.published_at || payslip.email_sent_at);
+      const resolved = resolvePayslipBankAccount(breakdown, bankAccount, isReleased);
+      if (!resolved) return null;
+      return {
+        bankName: resolved.bankName,
+        accountNumberMasked: resolved.accountNumber,
+        ifscCode: resolved.ifscCode,
+        accountHolderName: resolved.accountHolderName,
+        branchName: resolved.branchName,
+      };
+    })(),
     leaveBalances,
     storagePath: payslip.storage_path ?? null,
   };

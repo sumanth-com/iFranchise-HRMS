@@ -13,6 +13,17 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 
 import { toUserFriendlyError } from "@/lib/errors/user-messages";
+import {
+  PAYROLL_TABLE_SCROLL_CLASS,
+  TABLE_HEADER_ROW_CLASS,
+  TABLE_HEADER_STICKY_CLASS,
+  payrollStickyActionsBodyClass,
+  payrollStickyActionsHeaderClass,
+  payrollStickyEmployeeBodyClass,
+  payrollStickyEmployeeHeaderClass,
+  payrollStickyHeaderCellClass,
+} from "@/components/common/table-header-classes";
+import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
@@ -285,37 +296,58 @@ export function SalaryStructureTable({
         />
       </div>
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-        <div className="max-h-[calc(100vh-19rem)] overflow-auto">
-          <table className="w-full text-sm">
-            <TableHeader className="bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 shadow-[0_1px_0_rgba(255,255,255,0.12)] hover:bg-transparent">
+        <div className={PAYROLL_TABLE_SCROLL_CLASS}>
+          <table className="w-full min-w-[56rem] bg-white text-sm dark:bg-input">
+            <thead className={TABLE_HEADER_STICKY_CLASS}>
               {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow
-                  key={headerGroup.id}
-                  className="border-white/10 bg-transparent hover:bg-transparent"
-                >
-                  {headerGroup.headers.map((header) => (
-                    <TableHead
-                      key={header.id}
-                      className={`h-11 whitespace-nowrap bg-transparent px-4 py-3 text-xs font-semibold tracking-wide uppercase text-white hover:bg-transparent ${header.id === "actions" ? "text-right" : ""}`}
-                    >
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                    </TableHead>
-                  ))}
-                </TableRow>
+                <tr key={headerGroup.id} className={TABLE_HEADER_ROW_CLASS}>
+                  {headerGroup.headers.map((header) => {
+                    const columnId = header.column.id;
+                    const isEmployee = columnId === "employeeName";
+                    const isActions = columnId === "actions";
+                    return (
+                      <th
+                        key={header.id}
+                        className={
+                          isEmployee
+                            ? payrollStickyEmployeeHeaderClass("min-w-[14rem]")
+                            : isActions
+                              ? payrollStickyActionsHeaderClass()
+                              : payrollStickyHeaderCellClass(
+                                  columnId === "actions" ? "text-right" : undefined,
+                                )
+                        }
+                      >
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                      </th>
+                    );
+                  })}
+                </tr>
               ))}
-            </TableHeader>
+            </thead>
             <TableBody>
               {table.getRowModel().rows.length ? (
                 table.getRowModel().rows.map((row) => (
-                  <TableRow key={row.id}>
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell
-                        key={cell.id}
-                        className={`px-4 py-3 ${cell.column.id === "actions" ? "text-right" : ""}`}
-                      >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
-                    ))}
+                  <TableRow key={row.id} className="group">
+                    {row.getVisibleCells().map((cell) => {
+                      const columnId = cell.column.id;
+                      const isEmployee = columnId === "employeeName";
+                      const isActions = columnId === "actions";
+                      return (
+                        <TableCell
+                          key={cell.id}
+                          className={
+                            isEmployee
+                              ? payrollStickyEmployeeBodyClass("min-w-[14rem]")
+                              : isActions
+                                ? payrollStickyActionsBodyClass()
+                                : cn("px-4 py-3", isActions ? "text-right" : "")
+                          }
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TableCell>
+                      );
+                    })}
                   </TableRow>
                 ))
               ) : (

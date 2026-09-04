@@ -56,6 +56,8 @@ import {
   listSalaryStructures,
   getSalaryStructureById,
 } from "@/lib/payroll/services/payroll-queries";
+import { listEmployeeAccounts } from "@/lib/payroll/services/employee-accounts-queries";
+import { upsertEmployeeAccount } from "@/lib/payroll/services/employee-accounts-mutations";
 import {
   bonusFormSchema,
   bonusListParamsSchema,
@@ -71,6 +73,8 @@ import {
   salaryRevisionListParamsSchema,
   salaryStructureFormSchema,
   salaryStructureListParamsSchema,
+  employeeAccountFormSchema,
+  employeeAccountListParamsSchema,
   sendEmployeePayslipSchema,
 } from "@/lib/validations/payroll";
 import { payrollSettingsSchema } from "@/lib/validations/payroll-settings";
@@ -91,10 +95,17 @@ import type {
   SalaryStructureItem,
   SalaryStructureListResult,
 } from "@/types/payroll";
+import type { EmployeeAccountListResult } from "@/types/employee-accounts";
 import type { PayrollSettingsRecord } from "@/types/payroll-settings";
 
 async function getAuthenticatedSupabase() {
   return createClient();
+}
+
+function revalidateEmployeeAccountViews() {
+  revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS["employee-accounts"]));
+  revalidatePath("/dashboard/employees");
+  revalidatePath("/employee/payroll");
 }
 
 function revalidateEmployeePayrollViews() {
@@ -781,6 +792,44 @@ export async function uploadBonusAttachmentAction(
     return {
       success: false,
       message: toUserFriendlyError(error, "Failed to upload attachment"),
+    };
+  }
+}
+
+export async function fetchEmployeeAccountsAction(
+  params: Record<string, unknown>,
+): Promise<EmployeeAccountListResult> {
+  const profile = await requireServerAnyPermission([
+    "bank_account.view",
+    "payroll.view",
+    ...ceoOrViewPermission("payroll.view"),
+  ]);
+  const supabase = await getAuthenticatedSupabase();
+  return listEmployeeAccounts(
+    supabase,
+    profile,
+    employeeAccountListParamsSchema.parse(params),
+  );
+}
+
+export async function upsertEmployeeAccountAction(
+  input: unknown,
+): Promise<PayrollActionResult<{ employeeId: string }>> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "bank_account.edit",
+      "bank_account.create",
+    ]);
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = employeeAccountFormSchema.parse(input);
+    const data = await upsertEmployeeAccount(supabase, profile, parsed);
+    revalidateEmployeeAccountViews();
+    revalidateEmployeePayrollViews();
+    return { success: true, data };
+  } catch (error) {
+    return {
+      success: false,
+      message: toUserFriendlyError(error, "Failed to save employee account details"),
     };
   }
 }

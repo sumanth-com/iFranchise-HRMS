@@ -304,6 +304,27 @@ export const salaryStructureListParamsSchema = z.object({
   employeeId: z.string().uuid().optional(),
 });
 
+export const employeeAccountListParamsSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(200).default(50),
+  search: z.string().trim().optional(),
+  department: z.string().trim().optional(),
+});
+
+export const employeeAccountFormSchema = z.object({
+  employeeId: z.string().uuid(),
+  dateOfBirth: z.string().trim().optional().nullable(),
+  aadhaarNumber: z.string().trim().optional().nullable(),
+  panNumber: z.string().trim().optional().nullable(),
+  bankName: z.string().trim().optional().nullable(),
+  accountHolderName: z.string().trim().optional().nullable(),
+  accountNumber: z.string().trim().optional().nullable(),
+  ifscCode: z.string().trim().optional().nullable(),
+  branchName: z.string().trim().optional().nullable(),
+  accountType: z.enum(["savings", "current", "salary"]).optional(),
+});
+
+export type EmployeeAccountFormSchemaInput = z.infer<typeof employeeAccountFormSchema>;
 export type PayrollRunInput = z.infer<typeof payrollRunSchema>;
 export type SalaryStructureFormInput = z.input<typeof salaryStructureFormSchema>;
 export type BonusFormInput = z.infer<typeof bonusFormSchema>;

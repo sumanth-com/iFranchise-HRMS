@@ -43,6 +43,7 @@ export const TEAM_PAYROLL_SECTIONS = {
   reimbursements: "reimbursements",
   payslips: "payslips",
   settings: "settings",
+  "employee-accounts": "employee-accounts",
 } as const;
 
 export type TeamPayrollSection = keyof typeof TEAM_PAYROLL_SECTIONS;
@@ -271,6 +272,17 @@ export function canApproveReimbursement(codes: string[]) {
   return hasAnyPermission(codes, REIMBURSEMENT_APPROVE);
 }
 
+const BANK_ACCOUNT_VIEW = ["bank_account.view", "payroll.view"];
+const BANK_ACCOUNT_EDIT = ["bank_account.edit", "bank_account.create"];
+
+export function canViewBankAccounts(codes: string[]) {
+  return hasAnyPermission(codes, BANK_ACCOUNT_VIEW);
+}
+
+export function canEditBankAccounts(codes: string[]) {
+  return hasAnyPermission(codes, BANK_ACCOUNT_EDIT);
+}
+
 export const TEAM_PAYROLL_SECTION_DESCRIPTIONS: Record<TeamPayrollSection, string> = {
   run: "Monthly payroll calculated from salary structures, attendance, and leave — review amounts and release payslips for the selected period.",
   "salary-structures":
@@ -281,6 +293,8 @@ export const TEAM_PAYROLL_SECTION_DESCRIPTIONS: Record<TeamPayrollSection, strin
     "Review employee expense claims and approve payouts to be settled through payroll.",
   payslips:
     "Access published payslips — preview, download PDFs, and email copies to employees.",
+  "employee-accounts":
+    "Maintain employee identity and salary bank account details used for payroll and payslips.",
   settings:
     "Payroll cycle, processing schedule, salary credit day, and payslip availability for your organization.",
 };
@@ -291,6 +305,7 @@ export const TEAM_PAYROLL_SECTION_TITLES: Record<TeamPayrollSection, string> = {
   bonuses: "Bonuses",
   reimbursements: "Expense claims",
   payslips: "Payslips",
+  "employee-accounts": "Employee Accounts",
   settings: "Settings",
 };
 
@@ -324,6 +339,10 @@ export const PAYROLL_SUB_NAV = [
     section: TEAM_PAYROLL_SECTIONS["salary-structures"],
   },
   { title: TEAM_PAYROLL_SECTION_TITLES.payslips, section: TEAM_PAYROLL_SECTIONS.payslips },
+  {
+    title: TEAM_PAYROLL_SECTION_TITLES["employee-accounts"],
+    section: TEAM_PAYROLL_SECTIONS["employee-accounts"],
+  },
   { title: TEAM_PAYROLL_SECTION_TITLES.settings, section: TEAM_PAYROLL_SECTIONS.settings },
 ].map((item) => ({
   title: item.title,

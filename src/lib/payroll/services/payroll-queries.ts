@@ -43,7 +43,10 @@ import {
   getOccupiedDepartments,
   getEmploymentTypes,
 } from "@/lib/employees/services/employee-queries";
-import { isHiddenFromPeopleFilters } from "@/lib/employee/directory-listing";
+import {
+  isExcludedFromTeamPayslips,
+  isHiddenFromPeopleFilters,
+} from "@/lib/employee/directory-listing";
 
 function isHiddenPayrollDirectoryPerson(
   employeeCode: string | null | undefined,
@@ -51,7 +54,7 @@ function isHiddenPayrollDirectoryPerson(
   lastName: string | null | undefined,
   designationTitle: string | null | undefined,
 ) {
-  return isHiddenFromPeopleFilters(employeeCode, {
+  return isExcludedFromTeamPayslips(employeeCode, {
     employeeCode,
     firstName,
     lastName,

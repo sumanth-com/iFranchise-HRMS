@@ -19,7 +19,7 @@ import {
 } from "@/lib/payroll/salary-structure-breakdown";
 import { listBonuses, listReimbursements } from "@/lib/payroll/services/payroll-queries";
 import { getPayrollSettings } from "@/lib/payroll/services/payroll-settings";
-import { maskAccountNumber, getPayslipDeductionLines, getPayslipEarningsLines, displaySalaryBankDetails, parsePayrollMonthFromPayslipNumber, payrollMonthSortKey, comparePayrollMonthsDesc } from "@/lib/payroll/services/payroll-utils";
+import { getPayslipDeductionLines, getPayslipEarningsLines, displaySalaryBankDetails, parsePayrollMonthFromPayslipNumber, payrollMonthSortKey, comparePayrollMonthsDesc } from "@/lib/payroll/services/payroll-utils";
 import type { UserProfile } from "@/types/auth";
 import type {
   EmployeePayrollData,
@@ -819,7 +819,7 @@ export async function getEmployeePayrollData(
     ? displaySalaryBankDetails({
         bankName: bankRow.bank_name,
         accountHolderName: bankRow.account_holder_name,
-        accountNumberMasked: maskAccountNumber(bankRow.account_number),
+        accountNumberMasked: bankRow.account_number,
         ifscCode: bankRow.ifsc_code ?? null,
         branchName: bankRow.branch_name ?? null,
         accountType: bankRow.account_type,
