@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { format, parseISO } from "date-fns";
 import {
+  Check,
   ChevronRight,
   Download,
   Eye,
@@ -40,6 +41,7 @@ import { formatReviewBannerMessage } from "@/lib/payroll/services/payslip-public
 import {
   formatCurrency,
   formatPayrollMonthLabel,
+  mapPayrollDisplayAmounts,
 } from "@/lib/payroll/services/payroll-utils";
 import { getHrmsYears } from "@/lib/date/hrms-year";
 import type { PayslipHistoryResult, PayslipListItem } from "@/types/payroll";
@@ -211,6 +213,50 @@ function PayslipRowActions({
   );
 }
 
+function payslipAmounts(row: PayslipListItem) {
+  return mapPayrollDisplayAmounts({
+    basicSalary: row.basicSalary ?? 0,
+    grossSalary: row.grossSalary,
+    netSalary: row.netSalary,
+    totalDeductions: row.totalDeductions ?? 0,
+    totalAllowances: row.totalAllowances ?? 0,
+    breakdown: row.breakdown,
+  });
+}
+
+function PayslipStatusIndicator({ row }: { row: PayslipListItem }) {
+  if (row.payslipSent) {
+    return (
+      <span
+        className="inline-flex size-7 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+        title="Sent"
+        aria-label="Sent"
+      >
+        <Check className="size-4 stroke-[2.5]" aria-hidden />
+      </span>
+    );
+  }
+
+  const readyToSend = row.paymentStatus === "Ready to Send" || row.hasPayslip;
+  if (readyToSend) {
+    return (
+      <span
+        className="inline-flex size-7 items-center justify-center rounded-full bg-amber-400 shadow-sm ring-1 ring-amber-500/30"
+        title="Ready to send"
+        aria-label="Ready to send"
+      />
+    );
+  }
+
+  return (
+    <span
+      className="inline-flex size-7 items-center justify-center rounded-full bg-muted ring-1 ring-border"
+      title="Pending"
+      aria-label="Pending"
+    />
+  );
+}
+
 function PayslipTable({
   rows,
   mode,
@@ -228,19 +274,25 @@ function PayslipTable({
 }) {
   if (mode === "hr") {
     return (
-      <table className="w-full min-w-[52rem] text-sm">
+      <table className="w-full min-w-[72rem] text-sm">
         <thead className={TABLE_HEADER_STICKY_CLASS}>
           <tr className={TABLE_HEADER_ROW_CLASS}>
             <th className={TABLE_HEADER_CELL_CLASS}>Employee</th>
             <th className={TABLE_HEADER_CELL_CLASS}>Department</th>
-            <th className={TABLE_HEADER_CELL_CLASS}>Gross</th>
-            <th className={TABLE_HEADER_CELL_CLASS}>Net pay</th>
+            <th className={TABLE_HEADER_CELL_CLASS}>Monthly salary</th>
+            <th className={TABLE_HEADER_CELL_CLASS}>Attendance earnings</th>
+            <th className={TABLE_HEADER_CELL_CLASS}>Deductions</th>
+            <th className={TABLE_HEADER_CELL_CLASS}>Net salary</th>
+            <th className={TABLE_HEADER_CELL_CLASS}>Reimb.</th>
+            <th className={TABLE_HEADER_CELL_CLASS}>Final payable</th>
             <th className={TABLE_HEADER_CELL_CLASS}>Status</th>
             <th className={cn(TABLE_HEADER_CELL_CLASS, "text-right")}>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {rows.map((row) => {
+            const amounts = payslipAmounts(row);
+            return (
             <tr key={row.payrollItemId ?? row.id} className="border-b last:border-0">
               <td className="min-w-[14rem] px-4 py-3">
                 <div className="truncate whitespace-nowrap font-medium" title={row.employeeName}>
@@ -254,21 +306,22 @@ function PayslipTable({
                 </div>
               </td>
               <td className="px-4 py-3">{row.departmentName ?? "—"}</td>
-              <td className="px-4 py-3 tabular-nums">{formatCurrency(row.grossSalary)}</td>
+              <td className="px-4 py-3 tabular-nums">{formatCurrency(amounts.monthlySalary)}</td>
+              <td className="px-4 py-3 tabular-nums">
+                {formatCurrency(amounts.attendanceEarnings)}
+              </td>
+              <td className="px-4 py-3 tabular-nums">{formatCurrency(amounts.deductions)}</td>
               <td className="px-4 py-3 tabular-nums font-medium">
-                {formatCurrency(row.netSalary)}
+                {formatCurrency(amounts.netSalary)}
+              </td>
+              <td className="px-4 py-3 tabular-nums">
+                {amounts.reimbursement > 0 ? formatCurrency(amounts.reimbursement) : "—"}
+              </td>
+              <td className="px-4 py-3 tabular-nums font-medium">
+                {formatCurrency(amounts.finalPayable)}
               </td>
               <td className="px-4 py-3">
-                <span
-                  className={cn(
-                    "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-                    row.payslipSent
-                      ? "bg-violet-500/15 text-violet-700 dark:text-violet-300"
-                      : "bg-muted text-muted-foreground",
-                  )}
-                >
-                  {row.payslipSent ? "Sent" : "Pending"}
-                </span>
+                <PayslipStatusIndicator row={row} />
               </td>
               <td className="px-4 py-3">
                 <PayslipRowActions
@@ -280,7 +333,8 @@ function PayslipTable({
                 />
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     );

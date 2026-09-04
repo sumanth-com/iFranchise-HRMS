@@ -11,6 +11,8 @@ import {
 
 export const PEOPLE_PAGE_SIZES = [10, 15, 20, 25, 30] as const;
 
+export const PROVISIONING_PEOPLE_PAGE_SIZES = [10, 20, 50, 100] as const;
+
 /** Page sizes in steps of 20, scaled to how many rows are available. */
 export function buildSteppedPeoplePageSizes(totalRecords: number, step = 20): number[] {
   const available = Math.max(1, totalRecords);
@@ -83,6 +85,62 @@ export function PeoplePageSizeSelect({
         aria-label={valueLabel === "number" ? "Rows per page" : "People per page"}
       >
         <SelectValue placeholder={valueLabel === "number" ? "20" : "People"} />
+      </SelectTrigger>
+      <SelectContent align="end" alignItemWithTrigger={false}>
+        {items.map((item) => (
+          <SelectItem key={item.value} value={item.value}>
+            {item.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+export function ProvisioningPeoplePageSizeSelect({
+  value,
+  totalRecords,
+  disabled,
+  onChange,
+  className,
+}: {
+  value: number;
+  totalRecords: number;
+  disabled?: boolean;
+  onChange: (pageSize: number) => void;
+  className?: string;
+}) {
+  const showingAll = totalRecords > 0 && value >= totalRecords;
+  const selected = showingAll ? "all" : String(value);
+  const items = [
+    ...PROVISIONING_PEOPLE_PAGE_SIZES.map((size) => ({
+      value: String(size),
+      label: `${size} people`,
+    })),
+    { value: "all", label: "All" },
+  ];
+
+  return (
+    <Select
+      items={items}
+      value={selected}
+      onValueChange={(next) => {
+        if (!next) return;
+        if (next === "all") {
+          onChange(Math.max(totalRecords, 1));
+          return;
+        }
+        const size = Number(next);
+        if (!Number.isFinite(size) || size <= 0) return;
+        onChange(size);
+      }}
+      disabled={disabled}
+    >
+      <SelectTrigger
+        className={cn("h-10 w-[9rem] shrink-0 bg-white font-semibold dark:bg-input", className)}
+        aria-label="People per page"
+      >
+        <SelectValue placeholder="20 people" />
       </SelectTrigger>
       <SelectContent align="end" alignItemWithTrigger={false}>
         {items.map((item) => (

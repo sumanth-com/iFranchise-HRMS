@@ -13,7 +13,7 @@ import {
   LeavePolicySections,
 } from "@/components/leave/leave-policy-content";
 import { SettingsFormActions } from "@/components/company-settings/settings-form-actions";
-import { savePayrollPolicyDocumentAction } from "@/lib/payroll/actions/payroll-policy-actions";
+import { savePayrollPolicyDocumentAction } from "@/lib/payroll/payroll-policy-actions";
 import { cn } from "@/lib/utils";
 import type { PayrollPolicyDocument } from "@/types/payroll-policy";
 

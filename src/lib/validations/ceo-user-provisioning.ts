@@ -4,7 +4,8 @@ import { paginationSchema } from "@/lib/validations/common";
 
 export const invitationStatusSchema = z.enum([
   "pending",
-  "accepted",
+  "opened",
+  "active",
   "expired",
   "cancelled",
   "revoked",
@@ -13,7 +14,7 @@ export const invitationStatusSchema = z.enum([
 ]);
 
 export const ceoProvisioningListParamsSchema = paginationSchema.extend({
-  pageSize: z.coerce.number().int().min(1).max(100).default(9),
+  pageSize: z.coerce.number().int().min(1).max(10000).default(20),
   search: z.string().trim().max(200).optional(),
   roleCode: z.string().trim().optional(),
   departmentId: z.string().uuid().optional(),
@@ -57,6 +58,12 @@ export const inviteExistingEmployeeSchema = z.object({
   otherAllowances: z.coerce.number().min(0).default(0),
 });
 
+export const updateProvisioningReportingContactsSchema = z.object({
+  employeeId: z.string().uuid(),
+  reportingManagerId: z.string().uuid().nullable().optional(),
+  assignedHrEmployeeId: z.string().uuid().nullable().optional(),
+});
+
 export const updatePendingProvisioningUserSchema = z.object({
   employeeId: z.string().uuid(),
   firstName: z
@@ -97,6 +104,9 @@ export type UpdatePendingProvisioningUserInput = z.infer<
   typeof updatePendingProvisioningUserSchema
 >;
 export type ChangeProvisioningRoleInput = z.infer<typeof changeProvisioningRoleSchema>;
+export type UpdateProvisioningReportingContactsInput = z.infer<
+  typeof updateProvisioningReportingContactsSchema
+>;
 export type CeoProvisioningListParamsInput = z.infer<
   typeof ceoProvisioningListParamsSchema
 >;

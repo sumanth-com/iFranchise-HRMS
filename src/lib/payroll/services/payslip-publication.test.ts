@@ -52,6 +52,33 @@ describe("payslip publication schedule (IST)", () => {
     assert.equal(access.availability, "available");
     assert.equal(access.canEmployeeAccess, false);
   });
+
+  it("does not treat scheduled publish date alone as employee access", () => {
+    const publishedAt = computePublishedAt("2026-08-01", 5);
+    const access = resolvePayslipAvailability(
+      publishedAt,
+      [],
+      new Date("2026-09-15T06:30:00.000Z"),
+      { employeeFacing: true },
+    );
+    assert.equal(access.canEmployeeAccess, false);
+    assert.equal(access.availability, "under_review");
+  });
+
+  it("allows employee access when HR has sent the payslip early", () => {
+    const publishedAt = computePublishedAt("2026-08-01", 5);
+    const access = resolvePayslipAvailability(
+      publishedAt,
+      [],
+      new Date("2026-09-01T00:00:00.000Z"),
+      {
+        employeeFacing: true,
+        emailSentAt: "2026-09-01T00:00:00.000Z",
+      },
+    );
+    assert.equal(access.availability, "available");
+    assert.equal(access.canEmployeeAccess, true);
+  });
 });
 
 describe("monthly payroll previous month (IST)", () => {

@@ -8,17 +8,18 @@ import {
   PAYSLIP_PUBLISH_DAY,
   canAccessPayslipDuringReview,
   computeSalaryCreditDate,
+  isPayslipOfficiallyReleasedToEmployee,
   resolvePayslipAvailability,
   resolvePayslipSchedule,
   SALARY_CREDIT_DAY,
 } from "@/lib/payroll/services/payslip-publication";
+import {
+  buildStandardEarningsLines,
+  resolveSalaryBreakdownFromStructure,
+} from "@/lib/payroll/salary-structure-breakdown";
 import { listBonuses, listReimbursements } from "@/lib/payroll/services/payroll-queries";
 import { getPayrollSettings } from "@/lib/payroll/services/payroll-settings";
-import { maskAccountNumber, roundCurrency, getPayslipDeductionLines, getPayslipEarningsLines, displaySalaryBankDetails } from "@/lib/payroll/services/payroll-utils";
-import {
-  BONUS_TYPE_LABELS,
-  REIMBURSEMENT_CATEGORY_LABELS,
-} from "@/lib/payroll/constants";
+import { maskAccountNumber, getPayslipDeductionLines, getPayslipEarningsLines, displaySalaryBankDetails } from "@/lib/payroll/services/payroll-utils";
 import type { UserProfile } from "@/types/auth";
 import type {
   EmployeePayrollData,
@@ -76,39 +77,21 @@ function buildStructureLines(row: {
   hra_amount: number;
   transport_allowance: number;
   other_allowances: number;
+  gross_salary?: number;
   tax_deduction: number;
   other_deductions: number;
   components: Record<string, number> | null;
 }): { earnings: PayrollBreakdownLine[]; deductions: PayrollBreakdownLine[] } {
   const components = row.components ?? {};
-  const earningCandidates: PayrollBreakdownLine[] = [
-    { code: "basic", label: "Basic Salary", amount: Number(row.basic_salary), type: "earning" },
-    { code: "hra", label: "HRA", amount: Number(row.hra_amount), type: "earning" },
-    {
-      code: "transport",
-      label: "Transport Allowance",
-      amount: Number(row.transport_allowance),
-      type: "earning",
-    },
-    {
-      code: "special",
-      label: "Special Allowance",
-      amount: Number(components.specialAllowance ?? 0),
-      type: "earning",
-    },
-    {
-      code: "medical",
-      label: "Medical Allowance",
-      amount: Number(components.medical ?? 0),
-      type: "earning",
-    },
-    {
-      code: "other_allowances",
-      label: "Other Allowances",
-      amount: Number(row.other_allowances),
-      type: "earning",
-    },
-  ];
+  const split = resolveSalaryBreakdownFromStructure({
+    gross_salary: row.gross_salary,
+    basic_salary: row.basic_salary,
+    hra_amount: row.hra_amount,
+    transport_allowance: row.transport_allowance,
+    other_allowances: row.other_allowances,
+    components,
+  });
+  const earningCandidates = buildStandardEarningsLines(split);
 
   const deductionCandidates: PayrollBreakdownLine[] = [
     {
@@ -156,188 +139,28 @@ function buildStructureLines(row: {
   };
 }
 
-const PAYABLE_EXTRA_STATUSES = new Set(["pending", "approved", "paid"]);
-
-function monthKey(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-  if (trimmed.length >= 7) return trimmed.slice(0, 7);
-  return null;
-}
-
-function extraLineKey(code: string, amount: number) {
-  return `${code}:${amount.toFixed(2)}`;
-}
-
-function countExtraKeys(lines: PayrollBreakdownLine[]) {
-  const counts = new Map<string, number>();
-  for (const line of lines) {
-    if (!line.code.startsWith("bonus_") && !line.code.startsWith("reimb_")) continue;
-    const key = extraLineKey(line.code, Number(line.amount));
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  return counts;
-}
-
-function consumeExtraKey(counts: Map<string, number>, code: string, amount: number) {
-  const key = extraLineKey(code, amount);
-  const remaining = counts.get(key) ?? 0;
-  if (remaining <= 0) return false;
-  counts.set(key, remaining - 1);
-  return true;
-}
-
-function extrasForMonth(
-  bonuses: BonusItem[],
-  reimbursements: ReimbursementItem[],
-  period: string,
-) {
-  return {
-    bonuses: bonuses.filter(
-      (item) =>
-        PAYABLE_EXTRA_STATUSES.has(item.bonusStatus) &&
-        monthKey(item.bonusMonth) === period,
-    ),
-    reimbursements: reimbursements.filter(
-      (item) =>
-        PAYABLE_EXTRA_STATUSES.has(item.reimbursementStatus) &&
-        monthKey(item.expenseDate) === period,
-    ),
-  };
-}
-
-function buildDisplaySummary(input: {
-  latest: EmployeePayrollData["latest"];
-  salaryStructure: EmployeeSalaryStructure | null;
-  bonuses: BonusItem[];
-  reimbursements: ReimbursementItem[];
-}): EmployeePayrollDisplaySummary {
-  const currentMonth = format(new Date(), "yyyy-MM");
-  const latestMonth = monthKey(input.latest?.payrollMonth);
-  const extraMonths = [
-    ...input.bonuses
-      .filter((item) => PAYABLE_EXTRA_STATUSES.has(item.bonusStatus))
-      .map((item) => monthKey(item.bonusMonth)),
-    ...input.reimbursements
-      .filter((item) => PAYABLE_EXTRA_STATUSES.has(item.reimbursementStatus))
-      .map((item) => monthKey(item.expenseDate)),
-  ].filter((value): value is string => Boolean(value));
-
-  const newestExtraMonth = extraMonths.sort().at(-1) ?? null;
-  const periodMonth =
-    extraMonths.includes(currentMonth)
-      ? currentMonth
-      : (newestExtraMonth ?? latestMonth ?? currentMonth);
-  const useProjectedCurrent = Boolean(periodMonth && periodMonth !== latestMonth);
-  const extras = extrasForMonth(input.bonuses, input.reimbursements, periodMonth);
-
-  const structureAvailable = Boolean(input.salaryStructure);
-  const usingStructure = useProjectedCurrent ? structureAvailable : !input.latest;
-
-  const latestEarnings = input.latest?.breakdown?.earnings ?? [];
-  const latestDeductions = input.latest?.breakdown?.deductions ?? [];
-  const recurringEarnings = (useProjectedCurrent
-    ? structureAvailable
-      ? input.salaryStructure?.earnings ?? []
-      : latestEarnings.filter(
-          (line) =>
-            !line.code.startsWith("bonus_") && !line.code.startsWith("reimb_"),
-        )
-    : usingStructure
-      ? input.salaryStructure?.earnings ?? []
-      : latestEarnings.length
-        ? latestEarnings
-        : (input.salaryStructure?.earnings ?? [])
-  );
-
-  const baseEarnings: PayrollBreakdownLine[] = [...recurringEarnings];
-  const baseDeductions: PayrollBreakdownLine[] = [
-    ...(useProjectedCurrent
-      ? structureAvailable
-        ? input.salaryStructure?.deductions ?? []
-        : latestDeductions
-      : usingStructure
-        ? input.salaryStructure?.deductions ?? []
-        : latestDeductions.length
-          ? latestDeductions
-          : (input.salaryStructure?.deductions ?? [])),
-  ];
-
-  const alreadyIncluded = usingStructure
-    ? new Map<string, number>()
-    : countExtraKeys(baseEarnings);
-
-  const extraLines: PayrollBreakdownLine[] = [];
-
-  for (const bonus of extras.bonuses) {
-    const code = `bonus_${bonus.bonusType}`;
-    const amount = roundCurrency(Number(bonus.amount));
-    if (consumeExtraKey(alreadyIncluded, code, amount)) continue;
-    extraLines.push({
-      code,
-      label: BONUS_TYPE_LABELS[bonus.bonusType] ?? `Bonus (${bonus.bonusType})`,
-      amount,
-      type: "earning",
-    });
-  }
-
-  for (const claim of extras.reimbursements) {
-    const code = `reimb_${claim.category}`;
-    const amount = roundCurrency(Number(claim.amount));
-    if (consumeExtraKey(alreadyIncluded, code, amount)) continue;
-    extraLines.push({
-      code,
-      label: `${REIMBURSEMENT_CATEGORY_LABELS[claim.category] ?? claim.category} reimbursement`,
-      amount,
-      type: "earning",
-    });
-  }
-
-  const earnings = [...baseEarnings, ...extraLines];
-  const deductions = baseDeductions;
-  const extraTotal = roundCurrency(
-    extraLines.reduce((sum, line) => sum + line.amount, 0),
-  );
-  const baseGross = usingStructure
-    ? Number(input.salaryStructure?.grossSalary ?? 0)
-    : Number(input.latest?.grossSalary ?? input.salaryStructure?.grossSalary ?? 0);
-  const baseDeductionsTotal = usingStructure
-    ? roundCurrency(
-        Number(input.salaryStructure?.grossSalary ?? 0) -
-          Number(input.salaryStructure?.netSalary ?? 0),
-      )
-    : Number(
-        input.latest?.totalDeductions ??
-          (input.salaryStructure
-            ? input.salaryStructure.grossSalary - input.salaryStructure.netSalary
-            : 0),
-      );
-  const baseNet = usingStructure
-    ? Number(input.salaryStructure?.netSalary ?? 0)
-    : Number(input.latest?.netSalary ?? input.salaryStructure?.netSalary ?? 0);
-
-  const grossSalary = roundCurrency(baseGross + extraTotal);
-  const totalDeductions = roundCurrency(baseDeductionsTotal);
-  const netSalary = roundCurrency(baseNet + extraTotal);
+function buildPublishedPayslipDisplaySummary(
+  latest: NonNullable<EmployeePayrollData["latest"]>,
+): EmployeePayrollDisplaySummary {
+  const breakdown = latest.breakdown;
+  const grossSalary = latest.grossSalary;
+  const totalDeductions = latest.totalDeductions;
+  const netSalary = latest.netSalary;
 
   return {
     earnings: getPayslipEarningsLines({
-      earnings: [...baseEarnings, ...extraLines],
-      basicSalary: Number(
-        input.latest?.basicSalary ?? input.salaryStructure?.basicSalary ?? 0,
-      ),
-      totalAllowances: Number(
-        input.latest?.totalAllowances ?? input.salaryStructure?.otherAllowances ?? 0,
-      ),
+      earnings: breakdown.earnings,
+      basicSalary: latest.basicSalary,
+      totalAllowances: latest.totalAllowances,
       grossSalary,
     }),
-    deductions: getPayslipDeductionLines(deductions),
+    deductions: getPayslipDeductionLines(breakdown.deductions),
     grossSalary,
     totalDeductions,
     netSalary,
-    periodMonth,
-    usingStructure,
-    extrasIncluded: extraLines.length > 0,
+    periodMonth: latest.payrollMonth.slice(0, 7),
+    usingStructure: false,
+    extrasIncluded: false,
   };
 }
 
@@ -349,39 +172,49 @@ const TIMELINE_STATUS_ORDER: PayrollStatus[] = [
   "paid",
 ];
 
-function buildTimeline(payroll: {
-  payroll_status: PayrollStatus;
-  created_at: string | null;
-  processed_at: string | null;
-  approved_at: string | null;
+function buildTimeline(input: {
+  payroll: {
+    payroll_status: PayrollStatus;
+    created_at: string | null;
+    processed_at: string | null;
+    approved_at: string | null;
+  };
+  emailSentAt: string | null;
+  publishedAt: string;
+  salaryCreditDate: string;
 }): EmployeePayrollTimeline {
-  const status = payroll.payroll_status;
+  const status = input.payroll.payroll_status;
   const rank = TIMELINE_STATUS_ORDER.indexOf(status);
+  const payslipReleased = isPayslipOfficiallyReleasedToEmployee({
+    publishedAt: input.publishedAt,
+    emailSentAt: input.emailSentAt,
+  });
+
   return {
     status,
     stages: [
       {
         key: "generated",
         label: "Payroll Generated",
-        at: payroll.processed_at ?? payroll.created_at,
+        at: input.payroll.processed_at ?? input.payroll.created_at,
         done: rank >= TIMELINE_STATUS_ORDER.indexOf("processed"),
       },
       {
         key: "hr_approved",
         label: "Approved",
-        at: payroll.approved_at,
+        at: input.payroll.approved_at,
         done: rank >= TIMELINE_STATUS_ORDER.indexOf("approved"),
       },
       {
         key: "released",
-        label: "Salary Released",
-        at: status === "paid" ? payroll.approved_at : null,
-        done: status === "paid",
+        label: "Payslip Published / Sent",
+        at: input.emailSentAt ?? (payslipReleased ? input.publishedAt : null),
+        done: payslipReleased,
       },
       {
         key: "credited",
-        label: "Credited to Bank",
-        at: null,
+        label: "Salary Released / Credited",
+        at: status === "paid" ? input.salaryCreditDate : null,
         done: status === "paid",
       },
     ],
@@ -446,12 +279,15 @@ export async function getEmployeePayrollData(
             issued_at,
             salary_credit_date,
             published_at,
+            email_sent_at,
             payslip_version,
             archived_at,
             payroll_items:payroll_item_id (
               gross_salary,
               net_salary,
               total_deductions,
+              basic_salary,
+              total_allowances,
               breakdown
             ),
             payrolls:payroll_id (
@@ -544,6 +380,7 @@ export async function getEmployeePayrollData(
     issued_at: string;
     salary_credit_date: string | null;
     published_at: string | null;
+    email_sent_at: string | null;
     payslip_version: string | null;
     archived_at: string | null;
     payroll_items:
@@ -551,12 +388,16 @@ export async function getEmployeePayrollData(
           gross_salary: number;
           net_salary: number;
           total_deductions: number;
+          basic_salary: number;
+          total_allowances: number;
           breakdown: PayrollBreakdown | null;
         }
       | Array<{
           gross_salary: number;
           net_salary: number;
           total_deductions: number;
+          basic_salary: number;
+          total_allowances: number;
           breakdown: PayrollBreakdown | null;
         }>
       | null;
@@ -609,7 +450,10 @@ export async function getEmployeePayrollData(
       schedule.publishedAt,
       profile.permissionCodes,
       new Date(),
-      { employeeFacing: viewingOwnPayroll },
+      {
+        employeeFacing: viewingOwnPayroll,
+        emailSentAt: row.email_sent_at,
+      },
     );
     return {
       id: row.id,
@@ -655,8 +499,24 @@ export async function getEmployeePayrollData(
   let ytdMonths = 0;
   const trend: EmployeePayrollData["trend"] = [];
 
-  for (const { item, payroll } of rows) {
+  for (const { row, item, payroll } of rows) {
     if (!payroll?.payroll_month) continue;
+    const schedule = resolvePayslipSchedule(
+      payroll.payroll_month,
+      {
+        salaryCreditDate: row.salary_credit_date ?? undefined,
+        publishedAt: row.published_at ?? undefined,
+      },
+      scheduleOptions,
+    );
+    const released = viewingOwnPayroll
+      ? isPayslipOfficiallyReleasedToEmployee({
+          publishedAt: schedule.publishedAt,
+          emailSentAt: row.email_sent_at,
+        })
+      : true;
+    if (!released && !hrPayslipAccess) continue;
+
     const monthDate = new Date(payroll.payroll_month);
     if (monthDate >= fyStart && monthDate < fyEnd) {
       ytdEarnings += Number(item?.gross_salary ?? 0);
@@ -674,9 +534,6 @@ export async function getEmployeePayrollData(
   }
   trend.reverse();
 
-  const latestPaid = rows.find(({ payroll }) => payroll?.payroll_status === "paid");
-  const latestRow = rows[0] ?? null;
-
   const latestAccessible = rows.find(({ row, payroll }) => {
     const schedule = resolvePayslipSchedule(
       payroll?.payroll_month ?? "",
@@ -690,10 +547,29 @@ export async function getEmployeePayrollData(
       schedule.publishedAt,
       profile.permissionCodes,
       new Date(),
-      { employeeFacing: viewingOwnPayroll },
+      {
+        employeeFacing: viewingOwnPayroll,
+        emailSentAt: row.email_sent_at,
+      },
     );
     return access.canEmployeeAccess || hrPayslipAccess;
   });
+
+  const publishedMonthKey = latestAccessible?.payroll?.payroll_month?.slice(0, 7) ?? null;
+  const scopedBonuses =
+    viewingOwnPayroll && publishedMonthKey
+      ? bonuses.filter((bonus) => bonus.bonusMonth.slice(0, 7) === publishedMonthKey)
+      : viewingOwnPayroll
+        ? []
+        : bonuses;
+  const scopedReimbursements =
+    viewingOwnPayroll && publishedMonthKey
+      ? reimbursements.filter(
+          (claim) => claim.expenseDate.slice(0, 7) === publishedMonthKey,
+        )
+      : viewingOwnPayroll
+        ? []
+        : reimbursements;
 
   // Build latest detail from the already-fetched list row (includes breakdown).
   // Avoids a sequential getPayslipById + logo signing on first paint; PDF download
@@ -713,7 +589,10 @@ export async function getEmployeePayrollData(
       schedule.publishedAt,
       profile.permissionCodes,
       new Date(),
-      { employeeFacing: viewingOwnPayroll },
+      {
+        employeeFacing: viewingOwnPayroll,
+        emailSentAt: row.email_sent_at,
+      },
     );
     const breakdown = (item?.breakdown ?? {
       earnings: [],
@@ -768,8 +647,8 @@ export async function getEmployeePayrollData(
         cin: null,
       },
       currencyCode,
-      basicSalary: 0,
-      totalAllowances: 0,
+      basicSalary: Number(item?.basic_salary ?? 0),
+      totalAllowances: Number(item?.total_allowances ?? 0),
       totalDeductions: Number(item?.total_deductions ?? 0),
       grossSalary: Number(item?.gross_salary ?? 0),
       netSalary: Number(item?.net_salary ?? 0),
@@ -786,9 +665,23 @@ export async function getEmployeePayrollData(
     } satisfies NonNullable<EmployeePayrollData["latest"]>;
   })();
 
-  const latestTimeline = latestRow?.payroll
-    ? buildTimeline(latestRow.payroll)
-    : null;
+  const latestTimeline = (() => {
+    if (!latestAccessible?.payroll || !latestAccessible.row) return null;
+    const schedule = resolvePayslipSchedule(
+      latestAccessible.payroll.payroll_month,
+      {
+        salaryCreditDate: latestAccessible.row.salary_credit_date ?? undefined,
+        publishedAt: latestAccessible.row.published_at ?? undefined,
+      },
+      scheduleOptions,
+    );
+    return buildTimeline({
+      payroll: latestAccessible.payroll,
+      emailSentAt: latestAccessible.row.email_sent_at,
+      publishedAt: schedule.publishedAt,
+      salaryCreditDate: schedule.salaryCreditDate,
+    });
+  })();
 
   let salaryStructure: EmployeeSalaryStructure | null = null;
   if (structureRow) {
@@ -798,17 +691,26 @@ export async function getEmployeePayrollData(
       hra_amount: structureRow.hra_amount,
       transport_allowance: structureRow.transport_allowance,
       other_allowances: structureRow.other_allowances,
+      gross_salary: structureRow.gross_salary,
       tax_deduction: structureRow.tax_deduction,
       other_deductions: structureRow.other_deductions,
+      components,
+    });
+    const split = resolveSalaryBreakdownFromStructure({
+      gross_salary: structureRow.gross_salary,
+      basic_salary: structureRow.basic_salary,
+      hra_amount: structureRow.hra_amount,
+      transport_allowance: structureRow.transport_allowance,
+      other_allowances: structureRow.other_allowances,
       components,
     });
     salaryStructure = {
       effectiveFrom: structureRow.effective_from,
       currencyCode: structureRow.currency_code,
-      basicSalary: Number(structureRow.basic_salary),
-      hraAmount: Number(structureRow.hra_amount),
-      transportAllowance: Number(structureRow.transport_allowance),
-      otherAllowances: Number(structureRow.other_allowances),
+      basicSalary: split.basic,
+      hraAmount: split.hra,
+      transportAllowance: split.lta,
+      otherAllowances: 0,
       taxDeduction: Number(structureRow.tax_deduction),
       otherDeductions: Number(structureRow.other_deductions),
       grossSalary: Number(structureRow.gross_salary),
@@ -829,15 +731,18 @@ export async function getEmployeePayrollData(
       })
     : null;
 
-  const displaySummary = buildDisplaySummary({
-    latest,
-    salaryStructure,
-    bonuses,
-    reimbursements,
-  });
-
-  const currentNet = displaySummary.netSalary;
-  const currentGross = displaySummary.grossSalary;
+  const displaySummary = latest
+    ? buildPublishedPayslipDisplaySummary(latest)
+    : {
+        earnings: [],
+        deductions: [],
+        grossSalary: 0,
+        totalDeductions: 0,
+        netSalary: 0,
+        periodMonth: null,
+        usingStructure: false,
+        extrasIncluded: false,
+      };
 
   const recommendedDesignation = pendingPromotionRow?.recommended_designation as
     | { title: string }
@@ -865,19 +770,15 @@ export async function getEmployeePayrollData(
   return {
     currencyCode,
     hasAnyData:
-      payslips.length > 0 ||
-      salaryStructure !== null ||
-      bonuses.length > 0 ||
-      reimbursements.length > 0,
+      payslips.some((row) => row.canEmployeeAccess) ||
+      scopedBonuses.length > 0 ||
+      bank !== null,
     kpis: {
-      currentNetSalary: currentNet,
-      currentGrossSalary: currentGross,
+      currentNetSalary: latest?.netSalary ?? null,
+      currentGrossSalary: latest?.grossSalary ?? null,
       nextSalaryDate: computeNextSalaryDate(creditDay),
-      lastPaymentDate: (() => {
-        const paidMonth = latestPaid?.payroll?.payroll_month ?? latestRow?.payroll?.payroll_month;
-        return paidMonth ? computeSalaryCreditDate(paidMonth, creditDay) : null;
-      })(),
-      latestStatus: latestRow?.payroll?.payroll_status ?? null,
+      lastPaymentDate: latest?.salaryCreditDate ?? null,
+      latestStatus: latest?.payrollStatus ?? null,
       ytdEarnings,
       ytdTax,
     },
@@ -886,8 +787,8 @@ export async function getEmployeePayrollData(
     payslips,
     salaryStructure,
     bank,
-    bonuses,
-    reimbursements,
+    bonuses: scopedBonuses,
+    reimbursements: scopedReimbursements,
     displaySummary,
     trend,
     pendingPromotion,

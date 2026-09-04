@@ -1,6 +1,10 @@
 import { format, lastDayOfMonth } from "date-fns";
 
-import type { PayrollBreakdownLine } from "@/types/payroll";
+import {
+  buildStandardEarningsLines,
+  splitMonthlyGross,
+} from "@/lib/payroll/salary-structure-breakdown";
+import type { PayrollBreakdownLine, PayrollBreakdown } from "@/types/payroll";
 
 export function getPayrollMonthDate(month: number, year: number): string {
   return format(new Date(year, month - 1, 1), "yyyy-MM-dd");
@@ -197,36 +201,135 @@ export function toEmployeeFacingEarnings(
   return earnings;
 }
 
+const STANDARD_EARNING_CODES = new Set([
+  "basic",
+  "hra",
+  "transport",
+  "special_allowance",
+  "special",
+]);
+
+function isStandardEarningCode(code: string): boolean {
+  return STANDARD_EARNING_CODES.has(code.toLowerCase());
+}
+
+function isExtraEarningLine(line: PayrollBreakdownLine): boolean {
+  const code = lineCode(line);
+  const label = (line.label ?? "").toLowerCase();
+  return (
+    code.startsWith("bonus") ||
+    code.startsWith("reimb") ||
+    code.startsWith("hr_") ||
+    code === "overtime" ||
+    code === "claims" ||
+    label.includes("bonus") ||
+    label.includes("overtime") ||
+    label.includes("reimburs") ||
+    label.includes("claim") ||
+    label.includes("incentive")
+  );
+}
+
+/** Legacy payslip rows that collapse the full structural gross into one line. */
+function isLegacyLumpEarningLine(line: PayrollBreakdownLine): boolean {
+  if (isStandardEarningCode(lineCode(line))) return false;
+  if (isExtraEarningLine(line)) return false;
+
+  const code = lineCode(line);
+  const label = (line.label ?? "").toLowerCase();
+  if (code === "salary" || code === "gross" || code === "allowances" || code === "other_allowances") {
+    return true;
+  }
+  if (label.includes("working day") && label.includes("salary")) return true;
+  if (label.includes("working day salary")) return true;
+  return false;
+}
+
+function sumLineAmounts(lines: PayrollBreakdownLine[]): number {
+  return roundCurrency(lines.reduce((total, line) => total + Number(line.amount || 0), 0));
+}
+
+function resolveStructuralGrossForDisplay(input: {
+  earnings: PayrollBreakdownLine[];
+  grossSalary: number;
+}): number {
+  const positive = (input.earnings ?? []).filter((line) => Number(line.amount) > 0);
+  const extras = positive.filter(isExtraEarningLine);
+  const extrasTotal = sumLineAmounts(extras);
+  const legacyLumpTotal = sumLineAmounts(positive.filter(isLegacyLumpEarningLine));
+  const standardTotal = sumLineAmounts(positive.filter((line) => isStandardEarningCode(lineCode(line))));
+
+  if (standardTotal > 0) {
+    return roundCurrency(Math.max(standardTotal, input.grossSalary - extrasTotal));
+  }
+  if (legacyLumpTotal > 0) {
+    return roundCurrency(legacyLumpTotal);
+  }
+  return roundCurrency(Math.max(0, input.grossSalary - extrasTotal));
+}
+
+function deriveStandardEarningsForDisplay(input: {
+  earnings: PayrollBreakdownLine[] | null | undefined;
+  grossSalary: number;
+}): PayrollBreakdownLine[] {
+  const positive = (input.earnings ?? []).filter((line) => Number(line.amount) > 0);
+  const extras = positive.filter(isExtraEarningLine).map(toPayslipLine);
+  const structuralGross = resolveStructuralGrossForDisplay({
+    earnings: positive,
+    grossSalary: input.grossSalary,
+  });
+
+  if (structuralGross <= 0) {
+    return extras;
+  }
+
+  const standardFromBreakdown = positive.filter((line) => isStandardEarningCode(lineCode(line)));
+  const standardSum = sumLineAmounts(standardFromBreakdown);
+  const needsDerivedSplit = standardSum + 0.01 < structuralGross;
+
+  const base = needsDerivedSplit
+    ? buildStandardEarningsLines(splitMonthlyGross(structuralGross)).map(toPayslipLine)
+    : standardFromBreakdown.map(toPayslipLine);
+
+  return orderPayslipLines([...base, ...extras], EARNING_LINE_ORDER).filter(
+    (line) => line.amount > 0,
+  );
+}
+
 const PAYSLIP_COMPONENT_LABELS: Record<string, string> = {
   basic: "Basic Salary",
-  hra: "HRA",
-  transport: "TA",
+  hra: "House Rent Allowance (HRA)",
+  transport: "Leave Travel Allowance (LTA)",
   medical: "Medical Allowance",
-  special_allowance: "TDA",
+  special_allowance: "Special Allowance",
   other_allowances: "Other Allowances",
   allowances: "Other Allowances",
   overtime: "Overtime",
   bonus: "Bonus",
   claims: "Claims",
-  pf: "PF",
-  esi: "ESI",
+  pf: "Provident Fund (PF)",
+  esi: "Employee State Insurance (ESI)",
   pt: "Professional Tax",
-  income_tax: "Tax Deduction (TDS)",
-  other_ded: "Other Deductions",
+  income_tax: "Tax Deducted at Source (TDS)",
+  other_ded: "Other Applicable Deductions",
+  lop: "Loss of Pay (LOP)",
   salary: "Salary",
   gross: "Gross Salary",
 };
 
-const REQUIRED_PAYSLIP_EARNINGS = ["transport", "special_allowance"] as const;
+const REQUIRED_PAYSLIP_EARNINGS = ["basic", "hra", "transport", "special_allowance"] as const;
 const REQUIRED_PAYSLIP_DEDUCTIONS = ["income_tax"] as const;
 const EARNING_LINE_ORDER = [
   "basic",
   "hra",
   "transport",
   "special_allowance",
-  "medical",
+  "bonus",
+  "overtime",
+  "claims",
   "other_allowances",
   "salary",
+  "gross",
 ];
 const DEDUCTION_LINE_ORDER = ["pf", "esi", "pt", "income_tax", "other_ded", "lop"];
 
@@ -303,9 +406,169 @@ export function toPayslipDisplayLines(
     .map((line) => toPayslipLine(line));
 }
 
+function isReimbursementEarningLine(line: PayrollBreakdownLine): boolean {
+  const code = line.code.toLowerCase();
+  const label = line.label.toLowerCase();
+  return (
+    code === "reimbursement" ||
+    code.startsWith("reimb_") ||
+    code === "hr_reimbursement" ||
+    label.includes("reimbursement")
+  );
+}
+
+/** Full monthly salary from structure or Excel — not attendance-adjusted. */
+export function resolveMonthlySalary(
+  breakdown: PayrollBreakdown | null | undefined,
+  basicSalary = 0,
+  grossSalary = 0,
+): number {
+  if (breakdown?.excel?.salary != null) {
+    return roundCurrency(Number(breakdown.excel.salary));
+  }
+  if (breakdown?.attendance?.monthlyGrossSalary != null) {
+    return roundCurrency(Number(breakdown.attendance.monthlyGrossSalary));
+  }
+  if (breakdown?.source === "excel_historical_option_1" && basicSalary > 0) {
+    return roundCurrency(basicSalary);
+  }
+  if (basicSalary > 0) {
+    return roundCurrency(basicSalary);
+  }
+  return roundCurrency(grossSalary);
+}
+
+/** Salary earned for the period after attendance / LOP (stored as gross_salary). */
+export function resolveAttendanceEarnings(
+  breakdown: PayrollBreakdown | null | undefined,
+  grossSalary: number,
+): number {
+  if (breakdown?.excel?.workingDaySalary != null) {
+    return roundCurrency(Number(breakdown.excel.workingDaySalary));
+  }
+  const attendanceLine = (breakdown?.earnings ?? []).find((line) => {
+    const code = line.code.toLowerCase();
+    return (
+      code === "attendance_earnings" ||
+      code === "working_day_salary" ||
+      code === "salary"
+    );
+  });
+  if (attendanceLine && Number(attendanceLine.amount) > 0) {
+    return roundCurrency(Number(attendanceLine.amount));
+  }
+  return roundCurrency(grossSalary);
+}
+
+/** Non-salary reimbursement from breakdown / allowances (Excel import or claims). */
+export function resolvePayrollReimbursement(
+  breakdown: PayrollBreakdown | null | undefined,
+  totalAllowances = 0,
+): number {
+  if (breakdown?.excel?.reimbursement != null) {
+    return roundCurrency(Number(breakdown.excel.reimbursement));
+  }
+
+  let fromLines = 0;
+  for (const line of breakdown?.earnings ?? []) {
+    if (isReimbursementEarningLine(line)) {
+      fromLines += Number(line.amount) || 0;
+    }
+  }
+  if (fromLines > 0) return roundCurrency(fromLines);
+
+  if (breakdown?.source === "excel_historical_option_1" && totalAllowances > 0) {
+    return roundCurrency(totalAllowances);
+  }
+
+  const hrReimb = breakdown?.hrAdjustments?.reimbursements;
+  if (hrReimb != null && hrReimb > 0) return roundCurrency(hrReimb);
+
+  return 0;
+}
+
+/** Manual HR bonus from payroll item adjustments. */
+export function resolveHrPayrollBonus(
+  breakdown: PayrollBreakdown | null | undefined,
+): number {
+  return roundCurrency(Number(breakdown?.hrAdjustments?.bonus ?? 0));
+}
+
+/** Manual HR incentive from payroll item adjustments. */
+export function resolveHrPayrollIncentive(
+  breakdown: PayrollBreakdown | null | undefined,
+): number {
+  return roundCurrency(Number(breakdown?.hrAdjustments?.incentive ?? 0));
+}
+
+function hasManualHrPayrollExtras(
+  breakdown: PayrollBreakdown | null | undefined,
+): boolean {
+  const adj = breakdown?.hrAdjustments;
+  if (!adj) return false;
+  return (
+    (adj.bonus ?? 0) > 0 ||
+    (adj.incentive ?? 0) > 0 ||
+    (adj.reimbursements ?? 0) > 0
+  );
+}
+
+/** Amount credited = net salary + manual bonus + incentive + reimbursement. */
+export function resolveFinalPayableAmount(
+  netSalary: number,
+  breakdown?: PayrollBreakdown | null,
+  totalAllowances = 0,
+): number {
+  const bonus = resolveHrPayrollBonus(breakdown);
+  const incentive = resolveHrPayrollIncentive(breakdown);
+  const reimbursement = resolvePayrollReimbursement(breakdown, totalAllowances);
+
+  if (breakdown?.excel?.finalPayout != null && !hasManualHrPayrollExtras(breakdown)) {
+    return roundCurrency(Number(breakdown.excel.finalPayout));
+  }
+
+  return roundCurrency(netSalary + bonus + incentive + reimbursement);
+}
+
+/** Shared Company Payroll / Payslips row amounts from a payroll item. */
+export function mapPayrollDisplayAmounts(input: {
+  basicSalary: number;
+  grossSalary: number;
+  netSalary: number;
+  totalDeductions: number;
+  totalAllowances: number;
+  breakdown?: PayrollBreakdown | null;
+}) {
+  const breakdown = input.breakdown ?? null;
+  const bonus = resolveHrPayrollBonus(breakdown);
+  const incentive = resolveHrPayrollIncentive(breakdown);
+  const reimbursement = resolvePayrollReimbursement(breakdown, input.totalAllowances);
+  return {
+    monthlySalary: resolveMonthlySalary(breakdown, input.basicSalary, input.grossSalary),
+    attendanceEarnings: resolveAttendanceEarnings(breakdown, input.grossSalary),
+    deductions: roundCurrency(input.totalDeductions),
+    netSalary: roundCurrency(input.netSalary),
+    bonus,
+    incentive,
+    reimbursement,
+    finalPayable: resolveFinalPayableAmount(
+      input.netSalary,
+      breakdown,
+      input.totalAllowances,
+    ),
+  };
+}
+
+export function salaryEarningsOnly(
+  earnings: PayrollBreakdownLine[] | null | undefined,
+): PayrollBreakdownLine[] {
+  return (earnings ?? []).filter((line) => !isReimbursementEarningLine(line));
+}
+
 /**
- * Payslip earnings from stored payroll breakdown only.
- * Falls back to payroll item totals (never invents HRA/Basic ratios).
+ * Payslip earnings for display (employee portal, payslip view/PDF).
+ * Uses stored breakdown when standard components are present; otherwise derives
+ * the 50/25/10/15 split from gross without mutating persisted payroll data.
  */
 export function getPayslipEarningsLines(input: {
   earnings: PayrollBreakdownLine[] | null | undefined;
@@ -313,12 +576,14 @@ export function getPayslipEarningsLines(input: {
   totalAllowances: number;
   grossSalary: number;
 }): PayrollBreakdownLine[] {
-  const fromBreakdown = toPayslipDisplayLines(input.earnings ?? []);
-  if (fromBreakdown.length > 0) {
-    return orderPayslipLines(
-      withRequiredZeroLines(fromBreakdown, REQUIRED_PAYSLIP_EARNINGS, "earning").map(toPayslipLine),
-      EARNING_LINE_ORDER,
-    );
+  const salaryEarnings = salaryEarningsOnly(input.earnings);
+  const positiveBreakdown = salaryEarnings.filter((line) => Number(line.amount) > 0);
+
+  if (input.grossSalary > 0 || positiveBreakdown.length > 0) {
+    return deriveStandardEarningsForDisplay({
+      earnings: salaryEarnings,
+      grossSalary: input.grossSalary,
+    });
   }
 
   const fallback: PayrollBreakdownLine[] = [];
@@ -339,17 +604,12 @@ export function getPayslipEarningsLines(input: {
     });
   }
   if (fallback.length === 0 && input.grossSalary > 0) {
-    fallback.push({
-      code: "gross",
-      label: "Gross Salary",
-      amount: roundCurrency(input.grossSalary),
-      type: "earning",
+    return deriveStandardEarningsForDisplay({
+      earnings: [],
+      grossSalary: input.grossSalary,
     });
   }
-  return orderPayslipLines(
-    withRequiredZeroLines(fallback, REQUIRED_PAYSLIP_EARNINGS, "earning").map(toPayslipLine),
-    EARNING_LINE_ORDER,
-  );
+  return fallback.map(toPayslipLine).filter((line) => line.amount > 0);
 }
 
 export function getPayslipDeductionLines(

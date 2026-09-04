@@ -16,6 +16,7 @@ import { fetchCeoProvisioningUserDetailAction } from "@/lib/ceo/actions/ceo-user
 import {
   canCancelProvisioningInvitation,
   canResendProvisioningInvitation,
+  canSendProvisioningInvitation,
 } from "@/lib/ceo/provisioning-user-permissions";
 import type {
   CeoProvisioningUserDetail,
@@ -74,6 +75,7 @@ export function CeoProvisioningDrawer({
 
   const user = detail?.user;
   const accountStatus = user?.accountStatus;
+  const showSend = user != null && canSendProvisioningInvitation(user);
   const showResend = user != null && canResendProvisioningInvitation(user);
   const showCancel = user != null && canCancelProvisioningInvitation(user);
   const showDelete =
@@ -85,10 +87,10 @@ export function CeoProvisioningDrawer({
       user.invitationStatus === "cancelled" ||
       user.invitationStatus === "pending" ||
       user.invitationStatus === "expired");
-  const showDeactivate = accountStatus === "active" && !user?.isSelf;
+  const showDeactivate = user?.invitationStatus === "active" && !user?.isSelf;
   const showReactivate = accountStatus === "suspended" || accountStatus === "inactive";
   const hasQuickActions =
-    showResend || showCancel || showDelete || showDeactivate || showReactivate;
+    showSend || showResend || showCancel || showDelete || showDeactivate || showReactivate;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -123,6 +125,7 @@ export function CeoProvisioningDrawer({
               <Field label="Designation" value={user.designationTitle} />
               <Field label="Branch" value={user.branchName} />
               <Field label="Reporting Manager" value={user.reportingManagerName} />
+              <Field label="HR Contact" value={user.assignedHrEmployeeName} />
               <Field label="Employment Type" value={detail.employmentTypeName} />
               <Field label="Account Status" value={user.accountStatus} />
               <Field label="Invited By" value={user.sentByName} />
@@ -189,6 +192,18 @@ export function CeoProvisioningDrawer({
               <section className="rounded-xl border p-4">
                 <h3 className="text-sm font-semibold">Quick Actions</h3>
                 <div className="mt-3 flex flex-wrap gap-2">
+                  {showSend ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => onAction("resend", detail)}
+                    >
+                      <RotateCw className="size-3.5" />
+                      Send Invite
+                    </Button>
+                  ) : null}
                   {showResend ? (
                     <Button
                       type="button"
@@ -198,7 +213,7 @@ export function CeoProvisioningDrawer({
                       onClick={() => onAction("resend", detail)}
                     >
                       <RotateCw className="size-3.5" />
-                      Resend invitation
+                      Resend Invite
                     </Button>
                   ) : null}
                   {showReactivate ? (

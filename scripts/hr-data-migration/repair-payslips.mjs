@@ -7,6 +7,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 import { loadEnv, requireSupabaseEnv } from "./lib/env.mjs";
+import {
+  buildExcelPayrollBreakdown,
+  buildExcelPayrollItemPayload,
+  computeExcelPayrollAmounts,
+} from "./lib/excel-payroll-amounts.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "../..");
@@ -50,42 +55,24 @@ async function main() {
       .is("deleted_at", null)
       .maybeSingle();
     if (!existing) {
-      const net = 25010;
-      const professionalTax = 200;
-      const reimbursement = 210;
-      const workingDaySalary = 25000;
-      const gross = workingDaySalary + reimbursement; // 25210
-      const deductions = professionalTax; // 200
-      // net = 25010 = 25210 - 200
+      const rec = {
+        salary: 25000,
+        workingDaySalary: 25000,
+        professionalTax: 200,
+        reimbursement: 210,
+        amountAfterPt: 24800,
+        finalPayout: 25010,
+      };
+      const amounts = computeExcelPayrollAmounts(rec);
+      const breakdown = buildExcelPayrollBreakdown(rec, amounts, batchId);
+      const payload = buildExcelPayrollItemPayload(amounts, breakdown);
       const { data: item, error } = await sb
         .schema("hrms")
         .from("payroll_items")
         .insert({
           payroll_id: mayPay.id,
           employee_id: himani.id,
-          basic_salary: workingDaySalary,
-          total_allowances: reimbursement,
-          total_deductions: deductions,
-          gross_salary: gross,
-          net_salary: net,
-          breakdown: {
-            source: "excel_historical_option_1",
-            importBatchId: batchId,
-            earnings: [
-              { code: "working_day_salary", label: "Working Day Salary", amount: workingDaySalary, type: "earning" },
-              { code: "reimbursement", label: "Reimbursement", amount: reimbursement, type: "earning" },
-            ],
-            deductions: [{ code: "pt", label: "Professional Tax", amount: professionalTax, type: "deduction" }],
-            excel: {
-              salary: 25000,
-              workingDaySalary,
-              professionalTax,
-              reimbursement,
-              finalPayout: net,
-            },
-            notes: ["Imported from Attendance Sheet 2026 — historical truth"],
-          },
-          status: "active",
+          ...payload,
         })
         .select("id")
         .single();

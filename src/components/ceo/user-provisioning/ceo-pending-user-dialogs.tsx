@@ -20,12 +20,16 @@ import {
   changePendingProvisioningRoleAction,
   fetchUserProvisioningInviteRolesAction,
   updatePendingProvisioningUserAction,
+  updateProvisioningReportingContactsAction,
 } from "@/lib/ceo/actions/ceo-user-provisioning-actions";
+import { provisioningContactFieldVisibility } from "@/lib/ceo/provisioning-contact-fields";
 import {
   changeProvisioningRoleSchema,
   updatePendingProvisioningUserSchema,
+  updateProvisioningReportingContactsSchema,
   type ChangeProvisioningRoleInput,
   type UpdatePendingProvisioningUserInput,
+  type UpdateProvisioningReportingContactsInput,
 } from "@/lib/validations/ceo-user-provisioning";
 import type {
   CeoProvisioningLookups,
@@ -42,6 +46,14 @@ type PendingEditDialogProps = {
 };
 
 type PendingRoleDialogProps = {
+  open: boolean;
+  user: CeoProvisioningUser | null;
+  lookups: CeoProvisioningLookups;
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
+};
+
+type ReportingContactsDialogProps = {
   open: boolean;
   user: CeoProvisioningUser | null;
   lookups: CeoProvisioningLookups;
@@ -88,20 +100,9 @@ export function CeoPendingEditDialog({
     setSubmitError(null);
   }, [open, user, form]);
 
-  const roleCode = (user?.roleCode ?? "").toLowerCase();
-  const isManagerRole = roleCode === "manager";
-  const isHrRole =
-    roleCode === "hr_admin" ||
-    roleCode === "hr_executive" ||
-    roleCode === "super_admin";
-  const isExecutiveRole =
-    roleCode === "ceo" ||
-    roleCode === "co_founder" ||
-    roleCode === "founder";
-
-  /** Manager → HR only. HR / CEO / exec → neither. Employee (default) → both. */
-  const showManagerField = !isManagerRole && !isHrRole && !isExecutiveRole;
-  const showHrField = !isHrRole && !isExecutiveRole;
+  const { showReportingManager: showManagerField, showAssignedHr: showHrField } = user
+    ? provisioningContactFieldVisibility(user)
+    : { showReportingManager: false, showAssignedHr: false };
 
   const managerItems = useMemo(
     () =>
@@ -323,6 +324,143 @@ export function CeoPendingRoleDialog({
             <Button type="submit" disabled={isPending}>
               {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
               Save role
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function CeoProvisioningReportingContactsDialog({
+  open,
+  user,
+  lookups,
+  onOpenChange,
+  onSaved,
+}: ReportingContactsDialogProps) {
+  const [isPending, startTransition] = useTransition();
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const { showReportingManager, showAssignedHr } = user
+    ? provisioningContactFieldVisibility(user)
+    : { showReportingManager: false, showAssignedHr: false };
+
+  const form = useForm<UpdateProvisioningReportingContactsInput>({
+    resolver: zodResolver(updateProvisioningReportingContactsSchema),
+    defaultValues: {
+      employeeId: "",
+      reportingManagerId: null,
+      assignedHrEmployeeId: null,
+    },
+  });
+
+  useEffect(() => {
+    if (!open || !user) return;
+    form.reset({
+      employeeId: user.employeeId,
+      reportingManagerId: user.reportingManagerId,
+      assignedHrEmployeeId: user.assignedHrEmployeeId,
+    });
+    setSubmitError(null);
+  }, [open, user, form]);
+
+  const managerItems = useMemo(
+    () =>
+      lookups.managers
+        .filter((item) => item.id !== user?.employeeId)
+        .map((item) => ({ value: item.id, label: item.label })),
+    [lookups.managers, user?.employeeId],
+  );
+
+  const hrItems = useMemo(
+    () =>
+      (lookups.hrApprovers ?? [])
+        .filter((item) => item.id !== user?.employeeId)
+        .map((item) => ({ value: item.id, label: item.label })),
+    [lookups.hrApprovers, user?.employeeId],
+  );
+
+  const onSubmit = form.handleSubmit((data) => {
+    setSubmitError(null);
+    startTransition(async () => {
+      const payload: UpdateProvisioningReportingContactsInput = {
+        employeeId: data.employeeId,
+        reportingManagerId: showReportingManager ? data.reportingManagerId ?? null : null,
+        assignedHrEmployeeId: showAssignedHr ? data.assignedHrEmployeeId ?? null : null,
+      };
+      const result = await updateProvisioningReportingContactsAction(payload);
+      if (!result.success) {
+        setSubmitError(result.message);
+        return;
+      }
+      onOpenChange(false);
+      onSaved();
+    });
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Update reporting &amp; HR</DialogTitle>
+          <DialogDescription>
+            Set the reporting manager and HR contact for {user?.fullName ?? "this user"}.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={onSubmit} className="space-y-4">
+          {submitError ? (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+              {submitError}
+            </p>
+          ) : null}
+          {showReportingManager || showAssignedHr ? (
+            <div
+              className={
+                showReportingManager && showAssignedHr
+                  ? "grid gap-3 sm:grid-cols-2"
+                  : "grid gap-3"
+              }
+            >
+              {showReportingManager ? (
+                <div className="space-y-2">
+                  <Label>Reporting manager</Label>
+                  <LabeledSelect
+                    value={form.watch("reportingManagerId") ?? ""}
+                    placeholder="Select reporting manager"
+                    items={managerItems}
+                    onValueChange={(value) =>
+                      form.setValue("reportingManagerId", value || null, {
+                        shouldValidate: true,
+                      })
+                    }
+                  />
+                </div>
+              ) : null}
+              {showAssignedHr ? (
+                <div className="space-y-2">
+                  <Label>HR contact</Label>
+                  <LabeledSelect
+                    value={form.watch("assignedHrEmployeeId") ?? ""}
+                    placeholder="Select HR contact"
+                    items={hrItems}
+                    onValueChange={(value) =>
+                      form.setValue("assignedHrEmployeeId", value || null, {
+                        shouldValidate: true,
+                      })
+                    }
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+              Save changes
             </Button>
           </div>
         </form>

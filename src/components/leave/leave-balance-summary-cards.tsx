@@ -69,11 +69,11 @@ export function LeaveBalanceSummaryCards({
         {cards.map((card) => {
           const isActive = selectedCode?.toUpperCase() === card.key;
           const cardClassName = cn(
-            "relative z-10 flex h-full min-h-[8.25rem] w-full min-w-0 max-w-none flex-col justify-between gap-3 overflow-hidden rounded-2xl border bg-card px-5 py-5 text-left shadow-sm pointer-events-auto",
+            "relative z-10 flex h-full min-h-[8.25rem] w-full min-w-0 max-w-none flex-col justify-between gap-3 overflow-hidden rounded-2xl border border-border/60 bg-card px-5 py-5 text-left shadow-sm outline-none pointer-events-auto",
             selectable &&
-              "cursor-pointer transition-[border-color,box-shadow,background-color] duration-150 hover:border-primary/50 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 dark:hover:border-indigo-300/50 dark:hover:bg-white/5",
+              "cursor-pointer transition-all duration-200 ease-out hover:border-violet-300/80 hover:bg-violet-50/40 hover:shadow-md hover:shadow-violet-500/10 focus-visible:ring-2 focus-visible:ring-violet-400/35 focus-visible:ring-offset-0 dark:border-border/50 dark:hover:border-violet-400/45 dark:hover:bg-violet-500/5",
             isActive &&
-              "border-primary/60 bg-accent/30 ring-2 ring-primary/35 dark:border-indigo-300/55 dark:bg-indigo-500/10",
+              "border-violet-400/70 bg-violet-50/50 shadow-md shadow-violet-500/10 ring-2 ring-violet-400/30 dark:border-violet-400/50 dark:bg-violet-500/10",
           );
 
           const content = (

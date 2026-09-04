@@ -14,6 +14,8 @@ import {
 import { monthlyGrossPerDay } from "@/lib/payroll/salary-structure-period";
 import { calculateEmployeePayroll } from "@/lib/payroll/services/payroll-calculator";
 
+const closedSeptember2026 = new Date("2026-10-15");
+
 const september = {
   holidays: [] as string[],
   weekendRules: DEFAULT_LEAVE_CALENDAR.weekendRules,
@@ -64,6 +66,7 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
     const payroll = calculateEmployeePayroll({
       month: 9,
       year: 2026,
+      asOfDate: closedSeptember2026,
       salaryStructure: structure,
       attendance: { ...presentMonth, onLeaveDays: 1 },
       leaveSummary: { lopDays: 0, paidLeaveDays: split.paidDays },
@@ -71,8 +74,8 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
       reimbursements: [],
     });
     assert.equal(payroll.breakdown.deductions.some((line) => line.code === "lop"), false);
-    assert.equal(payroll.grossSalary, 30_000);
-    assert.equal(payroll.netSalary, 30_000);
+    assert.equal(payroll.grossSalary, 27_000);
+    assert.equal(payroll.netSalary, 27_000);
   });
 
   it("deducts LOP using salary-structure per-day (monthly gross ÷ calendar days)", () => {
@@ -82,6 +85,7 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
     const payroll = calculateEmployeePayroll({
       month: 9,
       year: 2026,
+      asOfDate: closedSeptember2026,
       salaryStructure: structure,
       attendance: presentMonth,
       leaveSummary: { lopDays: 2, paidLeaveDays: 0 },
@@ -91,7 +95,8 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
     });
     const lop = payroll.breakdown.deductions.find((line) => line.code === "lop");
     assert.equal(lop?.amount, 2_000);
-    assert.equal(payroll.netSalary, 28_000);
+    assert.equal(payroll.grossSalary, 26_000);
+    assert.equal(payroll.netSalary, 26_000);
   });
 
   it("deducts exactly half the per-day amount for half-day LOP", () => {
@@ -111,6 +116,7 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
     const payroll = calculateEmployeePayroll({
       month: 9,
       year: 2026,
+      asOfDate: closedSeptember2026,
       salaryStructure: structure,
       attendance: presentMonth,
       leaveSummary: { lopDays: split.lopDays, paidLeaveDays: 0 },
@@ -126,6 +132,7 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
     const payroll = calculateEmployeePayroll({
       month: 9,
       year: 2026,
+      asOfDate: closedSeptember2026,
       salaryStructure: structure,
       attendance: { ...presentMonth, lateDays: 3 },
       leaveSummary: { lopDays: 0, paidLeaveDays: 0 },
@@ -152,6 +159,7 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
     const payroll = calculateEmployeePayroll({
       month: 9,
       year: 2026,
+      asOfDate: closedSeptember2026,
       salaryStructure: structure,
       attendance: {
         ...presentMonth,
@@ -166,7 +174,7 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
     const lop = payroll.breakdown.deductions.find((line) => line.code === "lop");
     assert.equal(payroll.breakdown.attendance.lopDays, 3);
     assert.equal(lop?.amount, 3_000);
-    assert.equal(payroll.grossSalary, 30_000);
+    assert.equal(payroll.grossSalary, 26_000);
   });
 
   it("does not double-count sandwich days already included in leave LOP", () => {
@@ -183,6 +191,7 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
     const payroll = calculateEmployeePayroll({
       month: 9,
       year: 2026,
+      asOfDate: closedSeptember2026,
       salaryStructure: {
         ...structure,
         basic_salary: 6_750,
@@ -200,5 +209,6 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
     });
     const lop = payroll.breakdown.deductions.find((line) => line.code === "lop");
     assert.equal(lop?.amount, 450);
+    assert.equal(payroll.grossSalary, 11_700);
   });
 });

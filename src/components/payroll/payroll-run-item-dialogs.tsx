@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -18,7 +18,7 @@ import {
   releaseEmployeePayslipAction,
   updatePayrollItemAdjustmentsAction,
 } from "@/lib/payroll/actions";
-import { formatCurrency } from "@/lib/payroll/services/payroll-utils";
+import { formatCurrency, roundCurrency } from "@/lib/payroll/services/payroll-utils";
 import type { HrPayrollAdjustments } from "@/types/payroll";
 
 type PayrollLineTarget = {
@@ -29,9 +29,9 @@ type PayrollLineTarget = {
   periodLabel: string;
   payslipSent?: boolean;
   adjustments?: HrPayrollAdjustments;
-  systemGross?: number;
-  systemLop?: number;
-  systemPf?: number;
+  currentBonus?: number;
+  currentIncentive?: number;
+  currentReimbursement?: number;
 };
 
 export function PayrollEditDialog({
@@ -43,30 +43,32 @@ export function PayrollEditDialog({
   target: PayrollLineTarget | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSaved: () => void;
+  onSaved: (saved: {
+    bonus: number;
+    incentive: number;
+    reimbursement: number;
+  }) => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const [confirmReopen, setConfirmReopen] = useState(false);
-  const existing = target?.adjustments;
-  const [bonus, setBonus] = useState(String(existing?.bonus ?? 0));
-  const [incentive, setIncentive] = useState(String(existing?.incentive ?? 0));
-  const [additionalEarnings, setAdditionalEarnings] = useState(
-    String(existing?.additionalEarnings ?? 0),
-  );
-  const [reimbursements, setReimbursements] = useState(String(existing?.reimbursements ?? 0));
-  const [additionalDeductions, setAdditionalDeductions] = useState(
-    String(existing?.additionalDeductions ?? 0),
-  );
-  const [tds, setTds] = useState(
-    existing?.tdsOverride != null ? String(existing.tdsOverride) : "",
-  );
-  const [otherDeduction, setOtherDeduction] = useState(
-    existing?.otherDeductionsOverride != null
-      ? String(existing.otherDeductionsOverride)
-      : "",
-  );
-  const [lopDays, setLopDays] = useState(
-    existing?.lopDaysOverride != null ? String(existing.lopDaysOverride) : "",
+  const [bonus, setBonus] = useState("0");
+  const [incentive, setIncentive] = useState("0");
+  const [reimbursements, setReimbursements] = useState("0");
+
+  useEffect(() => {
+    if (!open || !target) return;
+    const adj = target.adjustments;
+    setBonus(String(target.currentBonus ?? adj?.bonus ?? 0));
+    setIncentive(String(target.currentIncentive ?? adj?.incentive ?? 0));
+    setReimbursements(String(target.currentReimbursement ?? adj?.reimbursements ?? 0));
+    setConfirmReopen(false);
+  }, [open, target]);
+
+  const bonusPreview = Math.max(0, Number(bonus) || 0);
+  const incentivePreview = Math.max(0, Number(incentive) || 0);
+  const reimbursementPreview = Math.max(0, Number(reimbursements) || 0);
+  const finalPayablePreview = roundCurrency(
+    (target?.netPay ?? 0) + bonusPreview + incentivePreview + reimbursementPreview,
   );
 
   function handleSave() {
@@ -74,14 +76,14 @@ export function PayrollEditDialog({
     startTransition(async () => {
       const result = await updatePayrollItemAdjustmentsAction({
         payrollItemId: target.payrollItemId,
-        additionalEarnings: Number(additionalEarnings) || 0,
-        bonus: Number(bonus) || 0,
-        incentive: Number(incentive) || 0,
-        reimbursements: Number(reimbursements) || 0,
-        additionalDeductions: Number(additionalDeductions) || 0,
-        tdsOverride: tds === "" ? null : Number(tds),
-        otherDeductionsOverride: otherDeduction === "" ? null : Number(otherDeduction),
-        lopDaysOverride: lopDays === "" ? null : Number(lopDays),
+        bonus: bonusPreview,
+        incentive: incentivePreview,
+        reimbursements: reimbursementPreview,
+        additionalEarnings: 0,
+        additionalDeductions: 0,
+        tdsOverride: null,
+        otherDeductionsOverride: null,
+        lopDaysOverride: null,
         confirmReopen: target.payslipSent ? confirmReopen : false,
       });
       if (!result.success) {
@@ -90,77 +92,58 @@ export function PayrollEditDialog({
       }
       toast.success("Payroll changes saved");
       onOpenChange(false);
-      onSaved();
+      onSaved({
+        bonus: bonusPreview,
+        incentive: incentivePreview,
+        reimbursement: reimbursementPreview,
+      });
     });
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[min(88vh,640px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
+      <DialogContent className="flex max-h-[min(88vh,520px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
         <DialogHeader className="border-b px-5 py-4 pr-12 text-left">
           <DialogTitle>Edit payroll</DialogTitle>
           <DialogDescription>
-            {target ? `${target.employeeName} · ${target.employeeCode}` : "Adjustments"}
+            {target
+              ? `${target.employeeName} · ${target.employeeCode} · ${target.periodLabel}`
+              : "Manual adjustments"}
           </DialogDescription>
         </DialogHeader>
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
           <p className="text-xs text-muted-foreground">
-            Salary structure amounts stay as calculated. Add HR adjustments only.
+            Add manual bonus, incentive, or reimbursement. Attendance-based salary and deductions
+            are not changed.
           </p>
-          {target ? (
-            <div className="rounded-lg border bg-muted/30 px-3 py-2 text-xs">
-              <p className="font-medium uppercase tracking-wide text-muted-foreground">
-                System calculated
-              </p>
-              <p className="mt-1 tabular-nums">
-                Gross {formatCurrency(target.systemGross ?? target.netPay)} · LOP days{" "}
-                {target.systemLop ?? 0} · PF {formatCurrency(target.systemPf ?? 0)}
-              </p>
-            </div>
-          ) : null}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3">
             <Field label="Bonus" value={bonus} onChange={setBonus} disabled={isPending} />
             <Field label="Incentive" value={incentive} onChange={setIncentive} disabled={isPending} />
             <Field
-              label="Additional earnings"
-              value={additionalEarnings}
-              onChange={setAdditionalEarnings}
-              disabled={isPending}
-            />
-            <Field
-              label="Reimbursements"
+              label="Reimbursement"
               value={reimbursements}
               onChange={setReimbursements}
               disabled={isPending}
             />
-            <Field
-              label="TDS override"
-              value={tds}
-              onChange={setTds}
-              disabled={isPending}
-              placeholder="Keep calculated"
-            />
-            <Field
-              label="Other deduction override"
-              value={otherDeduction}
-              onChange={setOtherDeduction}
-              disabled={isPending}
-              placeholder="Keep calculated"
-            />
-            <Field
-              label="Additional deductions"
-              value={additionalDeductions}
-              onChange={setAdditionalDeductions}
-              disabled={isPending}
-            />
-            <Field
-              label="LOP days override"
-              value={lopDays}
-              onChange={setLopDays}
-              disabled={isPending}
-              placeholder="Keep calculated"
-            />
           </div>
+          {target ? (
+            <div className="rounded-lg border bg-muted/20 px-3 py-2.5 text-sm">
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 tabular-nums">
+                <span className="text-muted-foreground">Net salary</span>
+                <span className="font-semibold">{formatCurrency(target.netPay)}</span>
+                <span className="text-muted-foreground">+ Bonus</span>
+                <span className="font-semibold">{formatCurrency(bonusPreview)}</span>
+                <span className="text-muted-foreground">+ Incentive</span>
+                <span className="font-semibold">{formatCurrency(incentivePreview)}</span>
+                <span className="text-muted-foreground">+ Reimbursement</span>
+                <span className="font-semibold">{formatCurrency(reimbursementPreview)}</span>
+                <span className="text-muted-foreground">= Final payable</span>
+                <span className="font-semibold text-primary">
+                  {formatCurrency(finalPayablePreview)}
+                </span>
+              </div>
+            </div>
+          ) : null}
           {target?.payslipSent ? (
             <label className="flex items-start gap-2 text-sm">
               <input
@@ -169,7 +152,7 @@ export function PayrollEditDialog({
                 checked={confirmReopen}
                 onChange={(event) => setConfirmReopen(event.target.checked)}
               />
-              Reopen this sent payslip and overwrite the payroll line.
+              Reopen this sent payslip and update the payroll line.
             </label>
           ) : null}
         </div>
@@ -254,13 +237,11 @@ function Field({
   value,
   onChange,
   disabled,
-  placeholder,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
-  placeholder?: string;
 }) {
   return (
     <div className="space-y-1.5">
@@ -268,7 +249,6 @@ function Field({
       <Input
         inputMode="decimal"
         value={value}
-        placeholder={placeholder}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
       />

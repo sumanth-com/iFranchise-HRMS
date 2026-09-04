@@ -12,6 +12,7 @@ import { CeoInviteUserDialog } from "@/components/ceo/user-provisioning/ceo-invi
 import {
   CeoPendingEditDialog,
   CeoPendingRoleDialog,
+  CeoProvisioningReportingContactsDialog,
 } from "@/components/ceo/user-provisioning/ceo-pending-user-dialogs";
 import {
   CeoProvisioningConfirmDialog,
@@ -35,7 +36,6 @@ import type {
   CeoProvisioningListParams,
   CeoProvisioningUser,
   CeoUserProvisioningPageData,
-  ProvisioningInvitationStatus,
   ProvisioningRowAction,
 } from "@/types/ceo-user-provisioning";
 
@@ -45,7 +45,7 @@ type CeoUserProvisioningViewProps = CeoUserProvisioningPageData & {
 };
 
 const MUTATION_ACTIONS: Record<
-  Exclude<ProvisioningRowAction, "view" | "edit" | "changeRole">,
+  Exclude<ProvisioningRowAction, "view" | "edit" | "changeRole" | "changeReportingContacts">,
   (employeeId: string) => Promise<{ success: boolean; message: string }>
 > = {
   resend: resendProvisioningInvitationAction,
@@ -72,7 +72,7 @@ export function CeoUserProvisioningView({
   );
   const [pageParams, setPageParams] = useState<CeoProvisioningListParams>({
     page: initialFilters.page ?? 1,
-    pageSize: initialFilters.pageSize ?? 9,
+    pageSize: initialFilters.pageSize ?? 20,
     search: initialFilters.search,
     roleCode: initialFilters.roleCode,
     departmentId: initialFilters.departmentId,
@@ -93,6 +93,8 @@ export function CeoUserProvisioningView({
   const [isConfirmPending, setIsConfirmPending] = useState(false);
   const [editUser, setEditUser] = useState<CeoProvisioningUser | null>(null);
   const [roleUser, setRoleUser] = useState<CeoProvisioningUser | null>(null);
+  const [reportingContactsUser, setReportingContactsUser] =
+    useState<CeoProvisioningUser | null>(null);
 
   const refreshModuleData = useCallback(
     async (next: CeoProvisioningListParams, options?: { showRefreshing?: boolean }) => {
@@ -123,28 +125,9 @@ export function CeoUserProvisioningView({
     [],
   );
 
-  const fetchSearchSuggestions = useCallback(
-    async (query: string) => {
-      const result = await fetchCeoProvisioningUsersAction({
-        ...pageParams,
-        search: query,
-        page: 1,
-        pageSize: 8,
-      });
-      return result.data;
-    },
-    [pageParams],
-  );
-
   function applyFilters(next: CeoProvisioningListParams) {
     setPageParams(next);
-    void refreshList(next, { showRefreshing: true });
-  }
-
-  function changePage(page: number) {
-    const next = { ...pageParams, page };
-    setPageParams(next);
-    void refreshList(next, { showRefreshing: true });
+    void refreshList(next);
   }
 
   function requestAction(action: ProvisioningRowAction, user: CeoProvisioningUser) {
@@ -164,6 +147,11 @@ export function CeoUserProvisioningView({
       return;
     }
 
+    if (action === "changeReportingContacts") {
+      setReportingContactsUser(user);
+      return;
+    }
+
     if (action === "resend" || action === "reactivate") {
       void runAction(action, user);
       return;
@@ -175,7 +163,10 @@ export function CeoUserProvisioningView({
   }
 
   async function runAction(
-    action: Exclude<ProvisioningRowAction, "view" | "edit" | "changeRole">,
+    action: Exclude<
+      ProvisioningRowAction,
+      "view" | "edit" | "changeRole" | "changeReportingContacts"
+    >,
     user: CeoProvisioningUser,
   ) {
     const runner = MUTATION_ACTIONS[action];
@@ -259,33 +250,9 @@ export function CeoUserProvisioningView({
 
       <CeoProvisioningPeople
         users={users?.data ?? []}
-        total={users?.total ?? 0}
-        page={users?.page ?? 1}
-        pageSize={users?.pageSize ?? pageParams.pageSize ?? 9}
         isRefreshing={isRefreshing}
         busyEmployeeId={busyEmployeeId}
-        statusFilter={pageParams.invitationStatus ?? "all"}
-        onStatusFilterChange={(status) => {
-          const next = {
-            ...pageParams,
-            page: 1,
-            invitationStatus:
-              status === "all"
-                ? undefined
-                : (status as ProvisioningInvitationStatus),
-          };
-          applyFilters(next);
-        }}
-        searchQuery={variant === "hr" ? pageParams.search ?? "" : undefined}
-        onSearchChange={
-          variant === "hr"
-            ? (search) => {
-                applyFilters({ ...pageParams, page: 1, search });
-              }
-            : undefined
-        }
-        onFetchSearchSuggestions={variant === "hr" ? fetchSearchSuggestions : undefined}
-        onPageChange={changePage}
+        showFilters={variant === "hr"}
         onAction={requestAction}
       />
 
@@ -321,6 +288,19 @@ export function CeoUserProvisioningView({
         onSaved={() => {
           toast.success("Role updated for this pending invitation.");
           void refreshModuleData(pageParams);
+        }}
+      />
+
+      <CeoProvisioningReportingContactsDialog
+        open={Boolean(reportingContactsUser)}
+        user={reportingContactsUser}
+        lookups={lookups}
+        onOpenChange={(open) => {
+          if (!open) setReportingContactsUser(null);
+        }}
+        onSaved={() => {
+          toast.success("Reporting manager and HR contact updated.");
+          void refreshList(pageParams);
         }}
       />
 

@@ -6,6 +6,10 @@ import { getPayslipInfoRows } from "@/lib/payroll/services/payslip-document-help
 import {
   getPayslipDeductionLines,
   getPayslipEarningsLines,
+  resolveAttendanceEarnings,
+  resolveFinalPayableAmount,
+  resolveMonthlySalary,
+  resolvePayrollReimbursement,
 } from "@/lib/payroll/services/payroll-utils";
 import type { PayslipDetail } from "@/types/payroll";
 
@@ -51,14 +55,32 @@ export function PayslipTemplate({
     grossSalary: payslip.grossSalary,
   });
   const deductions = getPayslipDeductionLines(payslip.breakdown?.deductions);
+  const monthlySalary = resolveMonthlySalary(
+    payslip.breakdown ?? null,
+    payslip.basicSalary,
+    payslip.grossSalary,
+  );
+  const attendanceEarnings = resolveAttendanceEarnings(
+    payslip.breakdown ?? null,
+    payslip.grossSalary,
+  );
+  const reimbursement = resolvePayrollReimbursement(
+    payslip.breakdown ?? null,
+    payslip.totalAllowances,
+  );
 
   const totalEarnings =
     earnings.reduce((sum, item) => sum + Number(item.amount || 0), 0) ||
-    payslip.grossSalary;
+    attendanceEarnings;
   const totalDeductions =
     deductions.reduce((sum, item) => sum + Number(item.amount || 0), 0) ||
     payslip.totalDeductions;
   const netPay = payslip.netSalary || totalEarnings - totalDeductions;
+  const amountCredited = resolveFinalPayableAmount(
+    netPay,
+    payslip.breakdown ?? null,
+    payslip.totalAllowances,
+  );
 
   const maxRows = Math.max(earnings.length, deductions.length, 1);
 
@@ -150,7 +172,7 @@ export function PayslipTemplate({
             })}
 
             <tr className="border-b border-black font-bold">
-              <td className="border-r border-black p-2.5 font-bold">Total Earnings</td>
+              <td className="border-r border-black p-2.5 font-bold">Total Attendance Earnings</td>
               <td className="border-r border-black p-2.5 text-right tabular-nums">
                 {formatAmount2(totalEarnings)}
               </td>
@@ -166,21 +188,47 @@ export function PayslipTemplate({
           <tbody>
             <tr className="border-b border-black">
               <td className="p-2.5">
+                <div className="flex flex-wrap items-baseline justify-center gap-x-2 gap-y-1 text-sm font-semibold tabular-nums">
+                  <span className="uppercase tracking-wide">Monthly Salary</span>
+                  <span>₹{formatAmountIndian(monthlySalary)}</span>
+                  <span className="font-semibold text-neutral-700">→</span>
+                  <span className="uppercase tracking-wide">Attendance Earnings</span>
+                  <span>₹{formatAmountIndian(attendanceEarnings)}</span>
+                </div>
+              </td>
+            </tr>
+            <tr className="border-b border-black">
+              <td className="p-2.5">
                 <div className="flex flex-wrap items-baseline justify-center gap-x-2 gap-y-1 text-sm font-bold tabular-nums">
-                  <span className="uppercase tracking-wide">Gross</span>
-                  <span>₹{formatAmountIndian(totalEarnings)}</span>
+                  <span className="uppercase tracking-wide">Attendance Earnings</span>
+                  <span>₹{formatAmountIndian(attendanceEarnings)}</span>
                   <span className="font-semibold text-neutral-700">−</span>
                   <span className="uppercase tracking-wide">Deductions</span>
                   <span>₹{formatAmountIndian(totalDeductions)}</span>
                   <span className="font-semibold text-neutral-700">=</span>
-                  <span className="uppercase tracking-wide">Net Pay</span>
+                  <span className="uppercase tracking-wide">Net Salary</span>
                   <span>₹{formatAmountIndian(netPay)}</span>
                 </div>
               </td>
             </tr>
+            {reimbursement > 0 ? (
+              <tr className="border-b border-black">
+                <td className="p-2.5">
+                  <div className="flex flex-wrap items-baseline justify-center gap-x-2 gap-y-1 text-sm font-semibold tabular-nums">
+                    <span className="uppercase tracking-wide">Reimbursement</span>
+                    <span>₹{formatAmountIndian(reimbursement)}</span>
+                    <span className="font-semibold text-neutral-700">→</span>
+                    <span className="uppercase tracking-wide font-bold">Amount Credited</span>
+                    <span className="font-bold">₹{formatAmountIndian(amountCredited)}</span>
+                  </div>
+                </td>
+              </tr>
+            ) : null}
             <tr>
               <td className="p-2.5 font-bold leading-relaxed">
-                Net Pay: {amountToIndianWords(netPay)}
+                {reimbursement > 0
+                  ? `Amount Credited: ${amountToIndianWords(amountCredited)}`
+                  : `Net Pay: ${amountToIndianWords(netPay)}`}
               </td>
             </tr>
           </tbody>

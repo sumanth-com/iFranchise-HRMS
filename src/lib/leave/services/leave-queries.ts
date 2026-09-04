@@ -25,6 +25,7 @@ import {
   LEAVE_BALANCE_DISPLAY_LABELS,
   sortByLeaveTypeCode,
 } from "@/lib/leave/constants";
+import { applyLeavePolicyToBalanceSnapshot } from "@/lib/leave/leave-entitlement";
 import { isLeaveTypeAllowedForBand, resolveLeaveEligibilityBand } from "@/lib/leave/leave-eligibility";
 import { loadLeavePolicyRuntime } from "@/lib/leave/services/leave-policy-runtime";
 import { ensureEmployeeMonthlyLeaveAccruals, isMonthlyAccrualLeaveCode } from "@/lib/leave/services/leave-monthly-accrual";
@@ -1040,11 +1041,15 @@ export async function getEmployeeLeaveBalanceSnapshot(
   let organizationId = organizationIdHint;
   let leaveEligibilityBand: import("@/lib/leave/leave-eligibility").LeaveEligibilityBand =
     "full_time_confirmed";
+  let employeeJoiningDate: string | null = null;
+  let employeeEmploymentStatus = "active";
   {
     const { data: employeeRow, error: employeeError } = await supabase
       .schema("hrms")
       .from("employees")
-      .select("organization_id, employment_status, employment_types:employment_type_id (code, is_full_time)")
+      .select(
+        "organization_id, employment_status, date_of_joining, employment_types:employment_type_id (code, is_full_time)",
+      )
       .eq("id", employeeId)
       .is("deleted_at", null)
       .maybeSingle();
@@ -1052,6 +1057,8 @@ export async function getEmployeeLeaveBalanceSnapshot(
     if (!organizationId) {
       organizationId = employeeRow?.organization_id as string | undefined;
     }
+    employeeJoiningDate = (employeeRow?.date_of_joining as string | null) ?? null;
+    employeeEmploymentStatus = String(employeeRow?.employment_status ?? "active");
     const typeRaw = employeeRow?.employment_types as
       | { code?: string | null; is_full_time?: boolean | null }
       | { code?: string | null; is_full_time?: boolean | null }[]
@@ -1059,7 +1066,7 @@ export async function getEmployeeLeaveBalanceSnapshot(
       | undefined;
     const typeRow = Array.isArray(typeRaw) ? typeRaw[0] : typeRaw;
     leaveEligibilityBand = resolveLeaveEligibilityBand({
-      employmentStatus: String(employeeRow?.employment_status ?? "active"),
+      employmentStatus: employeeEmploymentStatus,
       employmentTypeCode: typeRow?.code ?? null,
       isFullTime: typeof typeRow?.is_full_time === "boolean" ? typeRow.is_full_time : null,
     });
@@ -1075,6 +1082,7 @@ export async function getEmployeeLeaveBalanceSnapshot(
 
   let gender: string | null = null;
   let periodLeaveFemaleOnly = DEFAULT_LEAVE_PROBATION_RULES.periodLeaveFemaleOnly;
+  let probationRules = DEFAULT_LEAVE_PROBATION_RULES;
   let typeRows: Array<{ code: string; name: string; days_per_year: number | string | null }> = [];
   let requestRows: Array<{
     start_date: string;
@@ -1122,6 +1130,7 @@ export async function getEmployeeLeaveBalanceSnapshot(
     calendar = runtime.calendar;
     gender = (genderResult.data?.gender as string | null) ?? null;
     periodLeaveFemaleOnly = runtime.probation.periodLeaveFemaleOnly;
+    probationRules = runtime.probation;
   } else {
     const [balances, genderResult] = await Promise.all([balancesQuery(), genderQuery()]);
     balancesResult = balances;
@@ -1132,8 +1141,10 @@ export async function getEmployeeLeaveBalanceSnapshot(
 
   if (balancesResult.error) throw new Error(balancesResult.error.message);
   const monthUsedByCode: Record<string, number> = {};
+  const monthPendingByCode: Record<string, number> = {};
   const yearUsedByCode: Record<string, number> = {};
   const yearTakenByCode: Record<string, number> = {};
+  const probationUsedAndPendingClByCode = { cl: 0 };
 
   for (const row of requestRows) {
     if (isPendingHrReview(row.leave_status, row.duration_breakdown)) continue;
@@ -1152,11 +1163,17 @@ export async function getEmployeeLeaveBalanceSnapshot(
       durationBreakdown: row.duration_breakdown,
     };
     const takenInYear = countLeaveDaysInRange(request, yearRange, calendar);
-    monthUsedByCode[code] =
-      (monthUsedByCode[code] ?? 0) + countLeaveDaysInRange(request, monthRange, calendar);
+    const takenInMonth = countLeaveDaysInRange(request, monthRange, calendar);
+    monthUsedByCode[code] = (monthUsedByCode[code] ?? 0) + takenInMonth;
+    if (row.leave_status === "pending") {
+      monthPendingByCode[code] = (monthPendingByCode[code] ?? 0) + takenInMonth;
+    }
     yearTakenByCode[code] = (yearTakenByCode[code] ?? 0) + takenInYear;
     if (row.leave_status === "approved") {
       yearUsedByCode[code] = (yearUsedByCode[code] ?? 0) + takenInYear;
+    }
+    if (code.toUpperCase() === "CL" && row.leave_status !== "rejected") {
+      probationUsedAndPendingClByCode.cl += takenInYear;
     }
   }
 
@@ -1253,7 +1270,20 @@ export async function getEmployeeLeaveBalanceSnapshot(
     }
   }
 
-  return snapshots.filter((row) =>
+  const asOfDate = monthRange.end;
+  const policyAdjusted = snapshots.map((row) =>
+    applyLeavePolicyToBalanceSnapshot(row, {
+      joiningDate: employeeJoiningDate,
+      employmentStatus: employeeEmploymentStatus,
+      leaveEligibilityBand,
+      asOfDate,
+      monthPendingDays: monthPendingByCode[row.leaveTypeCode] ?? 0,
+      probationUsedAndPendingCl: probationUsedAndPendingClByCode.cl,
+      probation: probationRules,
+    }),
+  );
+
+  return policyAdjusted.filter((row) =>
     isLeaveTypeAllowedForBand(row.leaveTypeCode, leaveEligibilityBand),
   );
 }

@@ -21,6 +21,11 @@ import {
   ifscEqual,
   isPlaceholderAccount,
 } from "./lib/mapping.mjs";
+import {
+  buildExcelPayrollBreakdown,
+  buildExcelPayrollItemPayload,
+  computeExcelPayrollAmounts,
+} from "./lib/excel-payroll-amounts.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "../..");
@@ -664,30 +669,8 @@ async function main() {
       continue;
     }
 
-    const finalPayout = money(rec.finalPayout);
-    const salary = money(rec.salary);
-    const workingDaySalary = money(rec.workingDaySalary);
-    const professionalTax = money(rec.professionalTax) ?? 0;
-    const reimbursement = money(rec.reimbursement) ?? 0;
-    const amountAfterPt = money(rec.amountAfterPt);
-
-    if (finalPayout == null && salary == null && workingDaySalary == null) {
-      continue;
-    }
-
-    // Preserve Excel final payout; satisfy net = gross - deductions
-    const net = finalPayout ?? amountAfterPt ?? workingDaySalary ?? salary ?? 0;
-    const baseEarn = workingDaySalary ?? salary ?? net;
-    const gross = Math.round((baseEarn + reimbursement) * 100) / 100;
-    const deductions = Math.round((gross - net) * 100) / 100;
-    if (deductions < 0) {
-      summary.errors.push({
-        entity: "payroll_item",
-        code: `${code}|${month}`,
-        error: `Inconsistent excel amounts gross=${gross} net=${net}`,
-      });
-      continue;
-    }
+    const amounts = computeExcelPayrollAmounts(rec);
+    if (!amounts) continue;
 
     let payroll = payrollByMonth.get(month);
     if (!payroll) {
@@ -697,7 +680,7 @@ async function main() {
     const existingItem = itemByPayEmp.get(`${payroll.id}|${emp.id}`);
     if (existingItem) {
       const existingNet = money(existingItem.net_salary);
-      if (existingNet != null && net != null && existingNet === net) {
+      if (existingNet != null && amounts.netSalary != null && existingNet === amounts.netSalary) {
         summary.payrollSkipped += 1;
         audit({
           entity: "payroll_item",
@@ -713,7 +696,7 @@ async function main() {
       const conflict = {
         employeeCode: code,
         month,
-        excelFinalPayout: net,
+        excelFinalPayout: amounts.finalPayable,
         existingNetSalary: existingNet,
         payrollStatus: payroll.payroll_status,
         action: "KEPT_EXISTING",
@@ -730,64 +713,14 @@ async function main() {
         action: "CONFLICT",
         sourceIdentity: `${code}|${month}`,
         targetIdentity: existingItem.id,
-        reason: `excel_net=${net} db_net=${existingNet}; kept DB`,
+        reason: `excel_net=${amounts.netSalary} db_net=${existingNet}; kept DB`,
       });
       continue;
     }
 
     // No existing item — insert even into processed/paid runs (additive historical)
-    const breakdown = {
-      source: "excel_historical_option_1",
-      importBatchId: batchId,
-      earnings: [
-        {
-          code: "working_day_salary",
-          label: "Working Day Salary",
-          amount: workingDaySalary ?? gross,
-          type: "earning",
-        },
-      ],
-      deductions: professionalTax
-        ? [{ code: "pt", label: "Professional Tax", amount: professionalTax, type: "deduction" }]
-        : [],
-      attendance: {
-        workingDays: rec.totalWorkingDays ?? 0,
-        presentDays: rec.present ?? 0,
-        absentDays: rec.absent ?? 0,
-        lopDays: rec.lop ?? 0,
-        leaveLopDays: 0,
-        overtimeHours: 0,
-        leaveDays: (Number(rec.cl) || 0) + (Number(rec.pl) || 0) + (Number(rec.el) || 0),
-        holidayCount: rec.holiday ?? 0,
-        paidDays: rec.totalWorkingDays ?? null,
-      },
-      excel: {
-        salary,
-        workingDaySalary,
-        present: rec.present,
-        absent: rec.absent,
-        holiday: rec.holiday,
-        cl: rec.cl,
-        pl: rec.pl,
-        el: rec.el,
-        lop: rec.lop,
-        totalWorkingDays: rec.totalWorkingDays,
-        professionalTax,
-        amountAfterPt,
-        reimbursement,
-        finalPayout: net,
-      },
-      notes: ["Imported from Attendance Sheet 2026 — historical truth; not recalculated"],
-    };
-
-    if (reimbursement > 0) {
-      breakdown.earnings.push({
-        code: "reimbursement",
-        label: "Reimbursement",
-        amount: reimbursement,
-        type: "earning",
-      });
-    }
+    const breakdown = buildExcelPayrollBreakdown(rec, amounts, batchId);
+    const payload = buildExcelPayrollItemPayload(amounts, breakdown);
 
     const { data: item, error } = await sb
       .schema("hrms")
@@ -795,13 +728,7 @@ async function main() {
       .insert({
         payroll_id: payroll.id,
         employee_id: emp.id,
-        basic_salary: workingDaySalary ?? salary ?? gross,
-        total_allowances: reimbursement,
-        total_deductions: deductions,
-        gross_salary: gross,
-        net_salary: net,
-        breakdown,
-        status: "active",
+        ...payload,
       })
       .select("id")
       .single();
@@ -812,8 +739,20 @@ async function main() {
       continue;
     }
 
-    itemByPayEmp.set(`${payroll.id}|${emp.id}`, { id: item.id, payroll_id: payroll.id, employee_id: emp.id, net_salary: net });
-    newPayrollItemIds.push({ itemId: item.id, payrollId: payroll.id, employeeId: emp.id, code, month, net });
+    itemByPayEmp.set(`${payroll.id}|${emp.id}`, {
+      id: item.id,
+      payroll_id: payroll.id,
+      employee_id: emp.id,
+      net_salary: amounts.netSalary,
+    });
+    newPayrollItemIds.push({
+      itemId: item.id,
+      payrollId: payroll.id,
+      employeeId: emp.id,
+      code,
+      month,
+      net: amounts.netSalary,
+    });
     summary.payrollImported += 1;
     audit({ entity: "payroll_item", action: "INSERT", sourceIdentity: `${code}|${month}`, targetIdentity: item.id });
     await bumpPayrollTotals(payroll.id);

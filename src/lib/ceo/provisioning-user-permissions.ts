@@ -1,11 +1,9 @@
+import { provisioningContactFieldVisibility } from "@/lib/ceo/provisioning-contact-fields";
 import type { CeoProvisioningUser } from "@/types/ceo-user-provisioning";
 
-/** True when the person already has a usable portal login. */
+/** True when the person has activated portal access. */
 function hasPortalAccess(user: CeoProvisioningUser) {
-  return Boolean(user.userId) && (
-    user.invitationStatus === "accepted" ||
-    user.accountStatus === "active"
-  );
+  return user.invitationStatus === "active";
 }
 
 function isActiveProvisioningUser(user: CeoProvisioningUser) {
@@ -22,15 +20,26 @@ function isPendingPortalInviteTarget(user: CeoProvisioningUser) {
     user.accountStatus === "invitation_pending" ||
     user.accountStatus === "draft" ||
     user.accountStatus === "invited" ||
-    // Existing employee record with no portal user yet
+    user.accountStatus === "invitation_accepted" ||
     (user.accountStatus === "active" && !user.userId) ||
     user.invitationStatus === "pending" ||
+    user.invitationStatus === "opened" ||
     user.invitationStatus === "expired"
   );
 }
 
+export function canSendProvisioningInvitation(user: CeoProvisioningUser) {
+  return isPendingPortalInviteTarget(user) && !user.invitationSentAt;
+}
+
 export function canResendProvisioningInvitation(user: CeoProvisioningUser) {
-  return isPendingPortalInviteTarget(user);
+  if (!isPendingPortalInviteTarget(user)) return false;
+  if (!user.invitationSentAt) return false;
+  return (
+    user.invitationStatus === "pending" ||
+    user.invitationStatus === "opened" ||
+    user.invitationStatus === "expired"
+  );
 }
 
 export function canCancelProvisioningInvitation(user: CeoProvisioningUser) {
@@ -43,4 +52,10 @@ export function canEditPendingProvisioningUser(user: CeoProvisioningUser) {
 
 export function canChangePendingProvisioningRole(user: CeoProvisioningUser) {
   return canEditPendingProvisioningUser(user);
+}
+
+export function canChangeProvisioningReportingContacts(user: CeoProvisioningUser) {
+  if (user.isSelf) return false;
+  const { showReportingManager, showAssignedHr } = provisioningContactFieldVisibility(user);
+  return showReportingManager || showAssignedHr;
 }

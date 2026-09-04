@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   CalendarClock,
   CircleDollarSign,
@@ -11,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/common/button";
+import { TeamPayrollDataSkeleton } from "@/components/payroll/team-payroll-content-skeleton";
 import {
   TABLE_HEADER_CELL_CLASS,
 } from "@/components/common/table-header-classes";
@@ -24,15 +26,12 @@ import { PayrollStatusBadge } from "@/components/payroll/payroll-status-badge";
 import { PayrollEditDialog } from "@/components/payroll/payroll-run-item-dialogs";
 import { LabeledSelect } from "@/components/payroll/payroll-select";
 import { getMonthSelectItems, getYearSelectItems } from "@/components/payroll/select-utils";
-import {
-  fetchPayrollDetailAction,
-  fetchPayrollRunsAction,
-  ensureCompanyPayrollRunAction,
-  previewPayrollRunAction,
-} from "@/lib/payroll/actions";
+import { fetchPayrollDetailAction } from "@/lib/payroll/actions";
+import { toUserFriendlyError } from "@/lib/errors/user-messages";
 import {
   formatCurrency,
   formatPayrollMonth,
+  mapPayrollDisplayAmounts,
   roundCurrency,
 } from "@/lib/payroll/services/payroll-utils";
 import type {
@@ -53,9 +52,14 @@ type EmployeeTableRow = {
   employmentTypeName?: string | null;
   workingDays: number;
   paidDays: number;
-  gross: number;
+  monthlySalary: number;
+  attendanceEarnings: number;
   deductions: number;
   net: number;
+  bonus: number;
+  incentive: number;
+  reimbursement: number;
+  finalPayable: number;
   lopDays: number;
   note?: string;
   breakdown: PayrollBreakdown;
@@ -74,11 +78,11 @@ type PayrollRunFormProps = {
   defaultMonth?: number;
   defaultYear: number;
   canRun: boolean;
-  initialPanel?: CompanyPayrollInitialPanel;
+  initialPanel: CompanyPayrollInitialPanel;
+  basePath: string;
 };
 
 type PanelState =
-  | { kind: "idle" }
   | { kind: "info"; title: string; text: string; tone?: "default" | "warning" }
   | { kind: "preview"; data: PayrollPreviewResult }
   | { kind: "run"; data: PayrollDetail; mode: "existing" | "created" };
@@ -89,26 +93,25 @@ export type CompanyPayrollInitialPanel = Extract<
 >;
 
 function formatPayrollRunError(error: unknown): string {
-  if (error instanceof Error) {
-    if (/network error|failed to fetch|load failed/i.test(error.message)) {
-      return "Connection lost. Refresh the page and try again.";
-    }
-    return error.message;
-  }
-  return "Something went wrong. Please try again.";
+  return toUserFriendlyError(
+    error,
+    "Something went wrong while loading payroll. Please try again.",
+  );
 }
 
-function isFuturePayrollPeriod(month: number, year: number) {
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
-
-  if (year > currentYear) return true;
-  if (year === currentYear && month > currentMonth) return true;
-  return false;
+function formatOptionalPayrollAmount(value: number): string {
+  return value > 0 ? formatCurrency(value) : "—";
 }
 
-function deriveBreakdownTotals(breakdown: PayrollBreakdown, grossSalary: number) {
+function stickyCellClass(isHeader = false) {
+  return cn(
+    isHeader ? "bg-blue-600" : "bg-white dark:bg-input",
+    "sticky z-20",
+  );
+}
+
+
+function deriveBreakdownTotals(breakdown: PayrollBreakdown, attendanceEarnings: number) {
   let bonusTotal = 0;
   let claimsTotal = 0;
   let salaryTotal = 0;
@@ -139,7 +142,7 @@ function deriveBreakdownTotals(breakdown: PayrollBreakdown, grossSalary: number)
     salaryTotal:
       salaryTotal > 0
         ? roundCurrency(salaryTotal)
-        : roundCurrency(grossSalary - bonusTotal - claimsTotal),
+        : roundCurrency(attendanceEarnings - bonusTotal - claimsTotal),
   };
 }
 
@@ -147,7 +150,7 @@ function tableRowToBreakdown(
   row: EmployeeTableRow,
   periodLabel: string,
 ): PayrollEmployeeBreakdownData {
-  const totals = deriveBreakdownTotals(row.breakdown, row.gross);
+  const totals = deriveBreakdownTotals(row.breakdown, row.attendanceEarnings);
 
   return {
     employeeId: row.id,
@@ -159,13 +162,13 @@ function tableRowToBreakdown(
     basicSalary: row.basicSalary,
     totalAllowances: row.totalAllowances,
     totalDeductions: row.deductions,
-    grossSalary: row.gross,
+    grossSalary: row.attendanceEarnings,
     netSalary: row.net,
     bonusTotal: totals.bonusTotal,
     claimsTotal: totals.claimsTotal,
     salaryTotal: totals.salaryTotal,
     breakdown: row.breakdown,
-    hasSalaryStructure: row.hasSalaryStructure ?? (row.gross > 0 || row.net > 0),
+    hasSalaryStructure: row.hasSalaryStructure ?? (row.attendanceEarnings > 0 || row.net > 0),
     periodLabel,
   };
 }
@@ -175,32 +178,38 @@ export function PayrollRunForm({
   defaultYear,
   canRun,
   initialPanel,
+  basePath,
 }: PayrollRunFormProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
   const [month, setMonth] = useState(String(defaultMonth ?? new Date().getMonth() + 1));
   const [year, setYear] = useState(String(defaultYear));
-  const [panel, setPanel] = useState<PanelState>(initialPanel ?? { kind: "idle" });
+  const [panelOverride, setPanelOverride] = useState<PanelState | null>(null);
   const [breakdownEmployee, setBreakdownEmployee] =
     useState<PayrollEmployeeBreakdownData | null>(null);
   const [breakdownOpen, setBreakdownOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<EmployeeTableRow | null>(null);
   const [employeeSearch, setEmployeeSearch] = useState("");
   const loadSeq = useRef(0);
+  const panel = panelOverride ?? initialPanel;
+
+  useEffect(() => {
+    setMonth(String(defaultMonth ?? new Date().getMonth() + 1));
+    setYear(String(defaultYear));
+    setPanelOverride(null);
+  }, [defaultMonth, defaultYear, initialPanel]);
 
   const hasPeriod = month.length > 0 && year.length > 0;
   const monthNumber = hasPeriod ? Number(month) : 0;
   const yearNumber = hasPeriod ? Number(year) : 0;
   const periodLabel = hasPeriod ? formatPayrollMonth(monthNumber, yearNumber) : "";
-  const isFuturePeriod =
-    hasPeriod && isFuturePayrollPeriod(monthNumber, yearNumber);
-  const periodLoadKey = `${monthNumber}-${yearNumber}-${canRun}`;
-  const initialPeriodKey = `${defaultMonth ?? new Date().getMonth() + 1}-${defaultYear}-${canRun}`;
-  const skipInitialClientLoad = useRef(Boolean(initialPanel));
 
-  function runInput() {
-    return {
-      month: monthNumber,
-      year: yearNumber,
-    };
+  function updatePeriod(nextMonth: string, nextYear: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("month", nextMonth);
+    params.set("year", nextYear);
+    startTransition(() => router.push(`${basePath}?${params.toString()}`));
   }
 
   async function fetchRunDetail(
@@ -213,17 +222,17 @@ export function PayrollRunForm({
       const detail = await fetchPayrollDetailAction(payrollId);
       if (seq !== loadSeq.current) return;
       if (!detail) {
-        setPanel({
+        setPanelOverride({
           kind: "info",
           title: "Unable to load payroll",
           text: `Payroll for ${label} could not be loaded. Select the period again to refresh.`,
         });
         return;
       }
-      setPanel({ kind: "run", data: detail, mode });
+      setPanelOverride({ kind: "run", data: detail, mode });
     } catch (error) {
       if (seq !== loadSeq.current) return;
-      setPanel({
+      setPanelOverride({
         kind: "info",
         title: "Unable to load payroll details",
         text: formatPayrollRunError(error),
@@ -231,93 +240,23 @@ export function PayrollRunForm({
     }
   }
 
-  async function loadPeriodSnapshot() {
-    const seq = ++loadSeq.current;
-    if (!hasPeriod) {
-      setPanel({
-        kind: "info",
-        title: "Select a payroll period",
-        text: "Choose a month and year to view Company Payroll.",
-      });
-      return;
-    }
-
-    if (isFuturePeriod) {
-      setPanel({
-        kind: "info",
-        title: `${periodLabel} is an upcoming period`,
-        text: "Payroll is calculated for the current month and completed past months.",
-        tone: "warning",
-      });
-      return;
-    }
-
-    try {
-      if (canRun) {
-        const generated = await ensureCompanyPayrollRunAction(runInput());
-        if (seq !== loadSeq.current) return;
-        if (generated.success) {
-          await fetchRunDetail(generated.data, "existing", seq, periodLabel);
-          return;
-        }
-      }
-
-      const runs = await fetchPayrollRunsAction({
-        month: monthNumber,
-        year: yearNumber,
-        page: 1,
-        pageSize: 1,
-      });
-      if (seq !== loadSeq.current) return;
-
-      if (runs.data[0]) {
-        await fetchRunDetail(runs.data[0].id, "existing", seq, periodLabel);
-        return;
-      }
-
-      const previewResult = await previewPayrollRunAction(runInput());
-      if (seq !== loadSeq.current) return;
-      if (!previewResult.success) {
-        setPanel({
-          kind: "info",
-          title: "Unable to load payroll",
-          text: previewResult.message,
-        });
-        return;
-      }
-
-      const data = previewResult.data;
-
-      if (data.employeeCount === 0) {
-        setPanel({
-          kind: "info",
-          title: `No employees for ${periodLabel}`,
-          text: "Add active employees before viewing payroll for this period.",
-        });
-        return;
-      }
-
-      setPanel({ kind: "preview", data });
-    } catch (error) {
-      if (seq !== loadSeq.current) return;
-      setPanel({
-        kind: "info",
-        title: "Unable to load payroll",
-        text: formatPayrollRunError(error),
-      });
-    }
+  function mapPayrollAmounts(
+    breakdown: PayrollBreakdown,
+    grossSalary: number,
+    netSalary: number,
+    totalAllowances: number,
+    basicSalary: number,
+    totalDeductions: number,
+  ) {
+    return mapPayrollDisplayAmounts({
+      basicSalary,
+      grossSalary,
+      netSalary,
+      totalDeductions,
+      totalAllowances,
+      breakdown,
+    });
   }
-
-  useEffect(() => {
-    if (!hasPeriod) return;
-    if (skipInitialClientLoad.current && periodLoadKey === initialPeriodKey) {
-      skipInitialClientLoad.current = false;
-      return;
-    }
-    void loadPeriodSnapshot();
-    // Recalculate when HR changes month or year.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodLoadKey]);
 
   function openBreakdown(row: EmployeeTableRow) {
     if (!hasPeriod) return;
@@ -326,6 +265,14 @@ export function PayrollRunForm({
   }
 
   function mapPreviewItemToRow(item: PayrollPreviewResult["items"][number]): EmployeeTableRow {
+    const amounts = mapPayrollAmounts(
+      item.breakdown,
+      item.grossSalary,
+      item.netSalary,
+      item.totalAllowances,
+      item.basicSalary,
+      item.totalDeductions,
+    );
     return {
       id: item.employeeId,
       name: item.employeeName,
@@ -335,9 +282,14 @@ export function PayrollRunForm({
       employmentTypeName: item.employmentTypeName,
       workingDays: item.breakdown.attendance.workingDays,
       paidDays: item.breakdown.attendance.paidDays ?? item.breakdown.attendance.presentDays,
-      gross: item.grossSalary,
-      deductions: item.totalDeductions,
-      net: item.netSalary,
+      monthlySalary: amounts.monthlySalary,
+      attendanceEarnings: amounts.attendanceEarnings,
+      deductions: amounts.deductions,
+      net: amounts.netSalary,
+      bonus: amounts.bonus,
+      incentive: amounts.incentive,
+      reimbursement: amounts.reimbursement,
+      finalPayable: amounts.finalPayable,
       lopDays: item.breakdown.attendance.lopDays,
       breakdown: item.breakdown,
       basicSalary: item.basicSalary,
@@ -350,6 +302,14 @@ export function PayrollRunForm({
 
   function mapRunItemToRow(item: PayrollDetail["items"][number]): EmployeeTableRow {
     const missingStructure = item.hasSalaryStructure === false;
+    const amounts = mapPayrollAmounts(
+      item.breakdown,
+      item.grossSalary,
+      item.netSalary,
+      item.totalAllowances,
+      item.basicSalary,
+      item.totalDeductions,
+    );
     return {
       id: item.employeeId,
       payrollItemId: item.id,
@@ -360,9 +320,14 @@ export function PayrollRunForm({
       employmentTypeName: item.employmentTypeName,
       workingDays: item.breakdown.attendance.workingDays,
       paidDays: item.breakdown.attendance.paidDays ?? item.breakdown.attendance.presentDays,
-      gross: item.grossSalary,
-      deductions: item.totalDeductions,
-      net: item.netSalary,
+      monthlySalary: amounts.monthlySalary,
+      attendanceEarnings: amounts.attendanceEarnings,
+      deductions: amounts.deductions,
+      net: amounts.netSalary,
+      bonus: amounts.bonus,
+      incentive: amounts.incentive,
+      reimbursement: amounts.reimbursement,
+      finalPayable: amounts.finalPayable,
       lopDays: item.breakdown.attendance.lopDays,
       breakdown: item.breakdown,
       basicSalary: item.basicSalary,
@@ -386,6 +351,7 @@ export function PayrollRunForm({
           onValueChange={(value) => {
             if (!value) return;
             setMonth(value);
+            updatePeriod(value, year);
           }}
         />
         <LabeledSelect
@@ -396,6 +362,7 @@ export function PayrollRunForm({
           onValueChange={(value) => {
             if (!value) return;
             setYear(value);
+            updatePeriod(month, value);
           }}
         />
         <div className="relative min-w-[12rem] flex-1">
@@ -410,28 +377,9 @@ export function PayrollRunForm({
         </div>
       </div>
 
-      {!canRun ? (
-        <p className="text-sm text-muted-foreground">
-          You do not have permission to view Company Payroll for this organization.
-        </p>
-      ) : null}
+      {isPending ? <TeamPayrollDataSkeleton /> : null}
 
-      {panel.kind === "idle" ? (
-        <PayrollRunStatusMessage
-          icon={isFuturePeriod ? CalendarClock : CircleDollarSign}
-          title={
-            isFuturePeriod ? `${periodLabel} is an upcoming period` : "Company Payroll"
-          }
-          text={
-            isFuturePeriod
-              ? "Payroll is calculated for the current month and completed past months. Choose a completed month above."
-              : "Select a month and year above to view payroll for that period."
-          }
-          tone={isFuturePeriod ? "warning" : "default"}
-        />
-      ) : null}
-
-      {panel.kind === "info" ? (
+      {!isPending && panel.kind === "info" ? (
         <PayrollRunStatusMessage
           icon={panel.tone === "warning" ? CalendarClock : Info}
           title={panel.title}
@@ -440,7 +388,7 @@ export function PayrollRunForm({
         />
       ) : null}
 
-      {panel.kind === "preview" ? (
+      {!isPending && panel.kind === "preview" ? (
         <div className="space-y-4">
           <div>
             <h3 className="text-sm font-semibold">Payroll for {periodLabel}</h3>
@@ -451,14 +399,14 @@ export function PayrollRunForm({
           </div>
 
           <PayrollTotals
-            employeeCount={panel.data.items.length}
+            employeeCount={panel.data.items?.length ?? panel.data.employeeCount ?? 0}
             totalGross={panel.data.totalGross}
             totalDeductions={panel.data.totalDeductions}
             totalNet={panel.data.totalNet}
           />
 
           <EmployeePayrollTable
-            rows={panel.data.items.map(mapPreviewItemToRow)}
+            rows={(panel.data.items ?? []).map(mapPreviewItemToRow)}
             employeeSearch={employeeSearch}
             onView={openBreakdown}
             canMutate={false}
@@ -466,7 +414,7 @@ export function PayrollRunForm({
         </div>
       ) : null}
 
-      {panel.kind === "run" ? (
+      {!isPending && panel.kind === "run" ? (
         <div className="space-y-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -482,14 +430,14 @@ export function PayrollRunForm({
           </div>
 
           <PayrollTotals
-            employeeCount={panel.data.items.length}
+            employeeCount={panel.data.items?.length ?? 0}
             totalGross={panel.data.totalGross}
             totalDeductions={panel.data.totalDeductions}
             totalNet={panel.data.totalNet}
           />
 
           <EmployeePayrollTable
-            rows={panel.data.items.map(mapRunItemToRow)}
+            rows={(panel.data.items ?? []).map(mapRunItemToRow)}
             employeeSearch={employeeSearch}
             onView={openBreakdown}
             canMutate={canRun && !panel.data.isLocked}
@@ -511,14 +459,13 @@ export function PayrollRunForm({
                 payrollItemId: editTarget.payrollItemId,
                 employeeName: editTarget.name,
                 employeeCode: editTarget.code,
+                currentBonus: editTarget.bonus,
+                currentIncentive: editTarget.incentive,
+                currentReimbursement: editTarget.reimbursement,
                 netPay: editTarget.net,
                 periodLabel,
                 payslipSent: editTarget.payslipSent,
                 adjustments: editTarget.adjustments,
-                systemGross: editTarget.gross,
-                systemLop: editTarget.lopDays,
-                systemPf:
-                  editTarget.breakdown.deductions.find((line) => line.code === "pf")?.amount ?? 0,
               }
             : null
         }
@@ -526,8 +473,35 @@ export function PayrollRunForm({
         onOpenChange={(open) => {
           if (!open) setEditTarget(null);
         }}
-        onSaved={() => {
-          if (panel.kind === "run") {
+        onSaved={(saved) => {
+          if (panel.kind === "run" && editTarget?.payrollItemId) {
+            const payrollItemId = editTarget.payrollItemId;
+            setPanelOverride({
+              kind: "run",
+              mode: panel.mode,
+              data: {
+                ...panel.data,
+                items: panel.data.items.map((item) => {
+                  if (item.id !== payrollItemId) return item;
+                  const previousReimb = editTarget.reimbursement ?? 0;
+                  const structuralAllowances = Math.max(0, item.totalAllowances - previousReimb);
+                  return {
+                    ...item,
+                    totalAllowances: roundCurrency(structuralAllowances + saved.reimbursement),
+                    breakdown: {
+                      ...item.breakdown,
+                      hrAdjustments: {
+                        ...item.breakdown.hrAdjustments,
+                        bonus: saved.bonus,
+                        incentive: saved.incentive,
+                        reimbursements: saved.reimbursement,
+                        itemStatus: "reviewed" as const,
+                      },
+                    },
+                  };
+                }),
+              },
+            });
             void fetchRunDetail(panel.data.id, panel.mode, ++loadSeq.current, periodLabel);
           }
         }}
@@ -586,7 +560,7 @@ function PayrollTotals({
       </div>
       <div className="rounded-lg border border-input bg-white px-3 py-2 dark:bg-input">
         <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-          Gross
+          Attendance earnings
         </p>
         <p className="mt-0.5 text-sm font-semibold tabular-nums">
           {formatCurrency(totalGross)}
@@ -602,7 +576,7 @@ function PayrollTotals({
       </div>
       <div className="rounded-lg border border-input bg-white px-3 py-2 dark:bg-input">
         <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-          Net
+          Net salary
         </p>
         <p className="mt-0.5 text-sm font-semibold tabular-nums">
           {formatCurrency(totalNet)}
@@ -646,27 +620,31 @@ function EmployeePayrollTable({
 
   return (
     <div className="max-h-[min(32rem,calc(100dvh-18rem))] overflow-auto rounded-lg border border-input bg-white dark:bg-input">
-      <table className="w-full bg-white text-sm dark:bg-input">
+      <table className="w-full min-w-[72rem] bg-white text-sm dark:bg-input">
         <thead className="sticky top-0 z-30 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 text-left text-white shadow-[0_1px_0_rgba(255,255,255,0.12)]">
           <tr>
-            <th className="h-11 min-w-[16rem] whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Employee</th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Department</th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Working days</th>
+            <th className={cn("left-0 z-40 h-11 min-w-[16rem] whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white", stickyCellClass(true))}>Employee</th>
+            <th className={cn("left-[16rem] z-40 h-11 min-w-[10rem] whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white", stickyCellClass(true))}>Department</th>
             <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Present / Paid</th>
             <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">LOP days</th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Gross</th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Monthly salary</th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Attendance earnings</th>
             <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Deductions</th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Net pay</th>
-            <th className={cn(TABLE_HEADER_CELL_CLASS, "text-right")}>Actions</th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Net salary</th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Bonus</th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Incentive</th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Reimb.</th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Final payable</th>
+            <th className={cn(TABLE_HEADER_CELL_CLASS, "sticky right-0 z-40 bg-blue-600 text-right")}>Actions</th>
           </tr>
         </thead>
         <tbody className="bg-white dark:bg-input">
           {filteredRows.map((row) => (
             <tr
               key={row.payrollItemId ?? row.id}
-              className="border-b border-input/70 bg-white last:border-b-0 hover:bg-zinc-50 dark:bg-input dark:hover:bg-input/80"
+              className="group border-b border-input/70 bg-white last:border-b-0 hover:bg-zinc-50 dark:bg-input dark:hover:bg-input/80"
             >
-              <td className="min-w-[16rem] max-w-[22rem] px-3 py-2.5">
+              <td className={cn("left-0 min-w-[16rem] max-w-[22rem] border-r border-input/40 px-3 py-2.5 shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:group-hover:bg-input/80", stickyCellClass())}>
                 <div className="truncate whitespace-nowrap font-medium" title={row.name}>
                   {row.name}
                 </div>
@@ -674,14 +652,18 @@ function EmployeePayrollTable({
                   {row.code}
                 </div>
               </td>
-              <td className="px-3 py-2.5">{row.department ?? "—"}</td>
-              <td className="px-3 py-2.5 tabular-nums">{row.workingDays}</td>
+              <td className={cn("left-[16rem] min-w-[10rem] border-r border-input/40 px-3 py-2.5 shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:group-hover:bg-input/80", stickyCellClass())}>{row.department ?? "—"}</td>
               <td className="px-3 py-2.5 tabular-nums">{row.paidDays}</td>
               <td className="px-3 py-2.5 tabular-nums">{row.lopDays}</td>
-              <td className="px-3 py-2.5 tabular-nums">{formatCurrency(row.gross)}</td>
+              <td className="px-3 py-2.5 tabular-nums">{formatCurrency(row.monthlySalary)}</td>
+              <td className="px-3 py-2.5 tabular-nums">{formatCurrency(row.attendanceEarnings)}</td>
               <td className="px-3 py-2.5 tabular-nums">{formatCurrency(row.deductions)}</td>
               <td className="px-3 py-2.5 tabular-nums">{formatCurrency(row.net)}</td>
-              <td className="px-3 py-2.5 text-right">
+              <td className="px-3 py-2.5 tabular-nums">{formatOptionalPayrollAmount(row.bonus)}</td>
+              <td className="px-3 py-2.5 tabular-nums">{formatOptionalPayrollAmount(row.incentive)}</td>
+              <td className="px-3 py-2.5 tabular-nums">{formatOptionalPayrollAmount(row.reimbursement)}</td>
+              <td className="px-3 py-2.5 tabular-nums font-medium">{formatCurrency(row.finalPayable)}</td>
+              <td className="sticky right-0 z-20 bg-white px-3 py-2.5 text-right shadow-[-1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:bg-input dark:group-hover:bg-input/80">
                 <div className="flex justify-end gap-1.5">
                   <Button
                     type="button"

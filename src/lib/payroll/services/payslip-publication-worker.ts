@@ -4,7 +4,7 @@ import { PAYROLL_ROUTES } from "@/lib/payroll/constants";
 import { getPayslipById } from "@/lib/payroll/services/payroll-mutations";
 import { sendPayslipReadyEmail } from "@/lib/payroll/services/payslip-email-service";
 import { storePayslipPdf } from "@/lib/payroll/services/payslip-storage";
-import { computePublishedAt, isPayslipPublishedToEmployee } from "@/lib/payroll/services/payslip-publication";
+import { isPayslipPublishedToEmployee } from "@/lib/payroll/services/payslip-publication";
 import { formatPayrollMonthLabel } from "@/lib/payroll/services/payroll-utils";
 import type { UserProfile } from "@/types/auth";
 
@@ -47,11 +47,8 @@ export async function processDuePayslipPublications(
   let skipped = 0;
 
   for (const row of dueRows ?? []) {
-    const payroll = Array.isArray(row.payrolls) ? row.payrolls[0] : row.payrolls;
-    const payrollMonth = payroll?.payroll_month as string | undefined;
-    const publishedAt =
-      row.published_at ??
-      (payrollMonth ? computePublishedAt(payrollMonth) : null);
+    // Only retry HR-initiated sends — never auto-publish from the calendar schedule.
+    const publishedAt = row.published_at;
     if (!publishedAt || !isPayslipPublishedToEmployee(publishedAt)) {
       skipped += 1;
       continue;

@@ -18,6 +18,16 @@ describe("salary structure breakdown", () => {
     assert.equal(split.basic + split.hra + split.special + split.lta, 50_000);
   });
 
+  for (const gross of [10_000, 12_000, 25_000, 50_000, 54_166.67]) {
+    it(`reconciles ${gross} exactly across all four earning components`, () => {
+      const split = splitMonthlyGross(gross);
+      assert.equal(split.basic + split.hra + split.special + split.lta, gross);
+      assert.equal(split.basic, Math.round(gross * 0.5 * 100) / 100);
+      assert.equal(split.hra, Math.round(gross * 0.25 * 100) / 100);
+      assert.equal(split.special, Math.round(gross * 0.15 * 100) / 100);
+    });
+  }
+
   it("adjusts LTA so rounded parts still equal gross", () => {
     const gross = 33_333;
     const split = splitMonthlyGross(gross);

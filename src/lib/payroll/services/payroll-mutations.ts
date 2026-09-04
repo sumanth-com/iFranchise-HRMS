@@ -9,7 +9,8 @@ import {
   type PayrollIntegrityEmployee,
   type PayrollIntegrityItem,
 } from "@/lib/payroll/payroll-integrity";
-import { LEAVE_BALANCE_CARD_CODES } from "@/lib/leave/constants";
+import { loadLeavePolicyRuntime } from "@/lib/leave/services/leave-policy-runtime";
+import { resolvePayrollApplicablePeriod } from "@/lib/payroll/payroll-period";
 import { getEmployeeLeaveBalanceSnapshot } from "@/lib/leave/services/leave-queries";
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
 import { emitHrmsWebhook } from "@/lib/public-api/emit";
@@ -24,12 +25,15 @@ import {
 } from "@/lib/payroll/services/payslip-document-helpers";
 import {
   PAYSLIP_VERSION,
+  PAYROLL_BUSINESS_TIMEZONE,
   canAccessPayslipDuringReview,
   computePayslipSchedule,
+  isPayslipHrSent,
   isPayslipPublishedToEmployee,
   resolvePayslipAvailability,
   resolvePayslipSchedule,
 } from "@/lib/payroll/services/payslip-publication";
+import type { LeaveCalendarContext } from "@/lib/leave/services/leave-calendar-engine";
 import {
   DEFAULT_LEAVE_CALENDAR,
   extraSandwichLopDays,
@@ -37,6 +41,7 @@ import {
 import type { UserProfile } from "@/types/auth";
 import type {
   PayrollBreakdown,
+  PayrollBreakdownLine,
   PayrollDetail,
   PayrollPreviewResult,
   PayslipDetail,
@@ -44,8 +49,10 @@ import type {
 } from "@/types/payroll";
 import {
   calculateEmployeePayroll,
+  normalizePayrollCalculationResult,
   type AttendanceSummary,
   type LeaveMonthSummary,
+  type PayrollCalculationResult,
   type SalaryStructureRow,
 } from "@/lib/payroll/services/payroll-calculator";
 import {
@@ -56,6 +63,7 @@ import {
   getPayrollMonthDate,
   maskAccountNumber,
   roundCurrency,
+  resolvePayrollReimbursement,
 } from "@/lib/payroll/services/payroll-utils";
 import { isRowLevelSecurityError } from "@/lib/errors/user-messages";
 import { PAYROLL_ROUTES } from "@/lib/payroll/constants";
@@ -70,6 +78,32 @@ import {
 function unwrapRelation<T>(value: T | T[] | null): T | null {
   if (!value) return null;
   return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+function payrollItemAmountFields(calc: PayrollCalculationResult) {
+  const normalized = normalizePayrollCalculationResult(calc);
+  return {
+    basic_salary: normalized.basicSalary,
+    total_allowances: normalized.totalAllowances,
+    total_deductions: normalized.totalDeductions,
+    gross_salary: normalized.grossSalary,
+    net_salary: normalized.netSalary,
+    breakdown: normalized.breakdown,
+  };
+}
+
+function throwPayrollItemPersistenceError(error: { message?: string; code?: string }): never {
+  const raw = error.message ?? "Failed to save payroll item.";
+  if (
+    /payroll_items_net_salary_check|payroll_items_net_consistency|violates check constraint/i.test(
+      raw,
+    )
+  ) {
+    throw new Error(
+      "Payroll could not be saved because calculated amounts were invalid. Refresh Company Payroll to recalculate.",
+    );
+  }
+  throw new Error(raw);
 }
 
 async function syncEmployeeEmploymentType(
@@ -221,6 +255,34 @@ function calcSettingsFromPayroll(payrollSettings: Awaited<ReturnType<typeof getP
       professionalTax: settings.salaryComponents.professionalTax,
       incomeTax: settings.salaryComponents.incomeTax,
     },
+  };
+}
+
+async function loadPayrollCalendarContext(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  month: number,
+  year: number,
+  asOfDate?: Date,
+): Promise<LeaveCalendarContext> {
+  const monthRange = getMonthDateRange(month, year);
+  const applicable = resolvePayrollApplicablePeriod(month, year, { today: asOfDate });
+  const holidayQueryEnd =
+    applicable.kind === "future" ? monthRange.startDate : monthRange.endDate;
+
+  const [leaveRuntime, officialHolidays] = await Promise.all([
+    loadLeavePolicyRuntime(supabase, organizationId),
+    loadOfficialHolidayDates(
+      supabase,
+      organizationId,
+      monthRange.startDate,
+      holidayQueryEnd,
+    ),
+  ]);
+
+  return {
+    ...leaveRuntime.calendar,
+    holidays: officialHolidays,
   };
 }
 
@@ -488,15 +550,23 @@ async function getAttendanceSummary(
   employeeId: string,
   month: number,
   year: number,
+  options?: { asOfDate?: Date },
 ): Promise<AttendanceSummary> {
-  const range = getMonthDateRange(month, year);
+  const monthRange = getMonthDateRange(month, year);
+  const applicable = resolvePayrollApplicablePeriod(month, year, { today: options?.asOfDate });
+  const queryEnd =
+    applicable.kind === "future"
+      ? (options?.asOfDate ?? new Date()).toLocaleDateString("en-CA", {
+          timeZone: PAYROLL_BUSINESS_TIMEZONE,
+        })
+      : applicable.periodEnd;
   const { data, error } = await supabase
     .schema("hrms")
     .from("attendance")
     .select("attendance_status, overtime_hours, attendance_date, organization_id")
     .eq("employee_id", employeeId)
-    .gte("attendance_date", range.startDate)
-    .lte("attendance_date", range.endDate)
+    .gte("attendance_date", monthRange.startDate)
+    .lte("attendance_date", queryEnd)
     .is("deleted_at", null);
 
   if (error) throw new Error(error.message);
@@ -526,8 +596,8 @@ async function getAttendanceSummary(
   }
 
   const [leaveSummary, officialHolidays] = await Promise.all([
-    getLeaveMonthSummary(supabase, employeeId, month, year),
-    loadOfficialHolidayDates(supabase, organizationId, range.startDate, range.endDate),
+    getLeaveMonthSummary(supabase, employeeId, month, year, { asOfDate: options?.asOfDate }),
+    loadOfficialHolidayDates(supabase, organizationId, monthRange.startDate, queryEnd),
   ]);
   applyPeriodSandwichLop(
     summary,
@@ -544,38 +614,143 @@ async function getLeaveMonthSummary(
   employeeId: string,
   month: number,
   year: number,
+  options?: { asOfDate?: Date },
 ): Promise<LeaveMonthSummary> {
-  const range = getMonthDateRange(month, year);
+  const monthRange = getMonthDateRange(month, year);
+  const applicable = resolvePayrollApplicablePeriod(month, year, { today: options?.asOfDate });
+  const queryEnd =
+    applicable.kind === "future"
+      ? (options?.asOfDate ?? new Date()).toLocaleDateString("en-CA", {
+          timeZone: PAYROLL_BUSINESS_TIMEZONE,
+        })
+      : applicable.periodEnd;
   const { data, error } = await supabase
     .schema("hrms")
     .from("leave_requests")
-    .select("employee_id, total_days, duration_breakdown, leave_types!inner(code, is_paid)")
+    .select(
+      "employee_id, start_date, end_date, total_days, duration_breakdown, leave_types!inner(code, is_paid)",
+    )
     .eq("employee_id", employeeId)
     .eq("leave_status", "approved")
-    .lte("start_date", range.endDate)
-    .gte("end_date", range.startDate)
+    .lte("start_date", queryEnd)
+    .gte("end_date", monthRange.startDate)
     .is("deleted_at", null);
 
   if (error) throw new Error(error.message);
-  return summarizeLeaveRows(data ?? []);
+  return summarizeLeaveRows(data ?? [], {
+    periodStart: monthRange.startDate,
+    periodEnd: queryEnd,
+  });
 }
+
+type LeavePeriodBounds = { periodStart: string; periodEnd: string };
 
 function summarizeLeaveRows(
   rows: Array<{
+    start_date?: string | null;
+    end_date?: string | null;
     total_days?: number | string | null;
-    duration_breakdown?: { lopDays?: unknown; paidDays?: unknown; days?: unknown } | null;
+    duration_breakdown?: {
+      lopDays?: unknown;
+      paidDays?: unknown;
+      days?: unknown;
+      startDate?: string;
+      endDate?: string;
+      totalLeaveDays?: number;
+      dayAllocations?: Array<{ date: string; kind: string; counted: number }>;
+    } | null;
     leave_types?: { code?: string; is_paid?: boolean } | { code?: string; is_paid?: boolean }[] | null;
   }>,
+  period?: LeavePeriodBounds,
 ): LeaveMonthSummary {
   return rows.reduce(
     (sum, row) => {
       const leaveType = Array.isArray(row.leave_types) ? row.leave_types[0] : row.leave_types;
       const breakdown = row.duration_breakdown;
       const total = Number(row.total_days) || 0;
-      const sandwichDates = [
+      let sandwichDates = [
         ...(sum.sandwichDates ?? []),
         ...sandwichDatesFromBreakdown(breakdown),
       ];
+
+      if (period) {
+        const leaveStart = String(
+          row.start_date ?? breakdown?.startDate ?? "",
+        ).slice(0, 10);
+        const leaveEnd = String(row.end_date ?? breakdown?.endDate ?? "").slice(0, 10);
+        if (
+          (leaveEnd && leaveEnd < period.periodStart) ||
+          (leaveStart && leaveStart > period.periodEnd)
+        ) {
+          return sum;
+        }
+      }
+
+      if (period && breakdown?.dayAllocations?.length) {
+        let lop = 0;
+        let paid = 0;
+        for (const day of breakdown.dayAllocations) {
+          if (day.date < period.periodStart || day.date > period.periodEnd) continue;
+          if (day.counted <= 0) continue;
+          if (day.kind === "paid") paid += day.counted;
+          else if (day.kind === "lop") lop += day.counted;
+        }
+        return {
+          lopDays: sum.lopDays + lop,
+          paidLeaveDays: sum.paidLeaveDays + paid,
+          sandwichDates,
+        };
+      }
+
+      if (period && Array.isArray(breakdown?.days) && breakdown.days.length > 0) {
+        const inPeriodDays = (
+          breakdown.days as Array<{
+            date: string;
+            counted: number;
+            inRequestedRange?: boolean;
+          }>
+        ).filter(
+          (day) =>
+            day.date >= period.periodStart &&
+            day.date <= period.periodEnd &&
+            day.inRequestedRange !== false &&
+            day.counted > 0,
+        );
+        const periodTotal = inPeriodDays.reduce((acc, day) => acc + day.counted, 0);
+        if (periodTotal <= 0) {
+          return sum;
+        }
+        const fullTotal =
+          Number(row.total_days) ||
+          (typeof breakdown.totalLeaveDays === "number" ? breakdown.totalLeaveDays : 0);
+        if (fullTotal > 0 && periodTotal < fullTotal) {
+          const fullLop = typeof breakdown.lopDays === "number" ? breakdown.lopDays : 0;
+          const fullPaid =
+            typeof breakdown.paidDays === "number"
+              ? breakdown.paidDays
+              : Math.max(0, fullTotal - fullLop);
+          const scale = periodTotal / fullTotal;
+          sandwichDates = [
+            ...sandwichDates,
+            ...sandwichDatesFromBreakdown(breakdown).filter(
+              (date) => date >= period.periodStart && date <= period.periodEnd,
+            ),
+          ];
+          if (leaveType?.is_paid === false) {
+            return {
+              lopDays: sum.lopDays + periodTotal,
+              paidLeaveDays: sum.paidLeaveDays,
+              sandwichDates,
+            };
+          }
+          return {
+            lopDays: sum.lopDays + fullLop * scale,
+            paidLeaveDays: sum.paidLeaveDays + fullPaid * scale,
+            sandwichDates,
+          };
+        }
+      }
+
       if (leaveType?.is_paid === false) {
         return {
           lopDays: sum.lopDays + total,
@@ -583,8 +758,7 @@ function summarizeLeaveRows(
           sandwichDates,
         };
       }
-      const lop =
-        typeof breakdown?.lopDays === "number" ? breakdown.lopDays : 0;
+      const lop = typeof breakdown?.lopDays === "number" ? breakdown.lopDays : 0;
       const paid =
         typeof breakdown?.paidDays === "number" ? breakdown.paidDays : Math.max(0, total - lop);
       return {
@@ -668,6 +842,7 @@ async function loadPayrollPeriodFacts(
   employeeIds: string[],
   month: number,
   year: number,
+  options?: { asOfDate?: Date },
 ) {
   const structuresByEmployee = new Map<string, SalaryStructureRow>();
   const attendanceByEmployee = new Map<string, AttendanceSummary>();
@@ -695,7 +870,15 @@ async function loadPayrollPeriodFacts(
     };
   }
 
-  const range = getMonthDateRange(month, year);
+  const monthRange = getMonthDateRange(month, year);
+  const applicable = resolvePayrollApplicablePeriod(month, year, { today: options?.asOfDate });
+  const queryStart = monthRange.startDate;
+  const queryEnd =
+    applicable.kind === "future"
+      ? (options?.asOfDate ?? new Date()).toLocaleDateString("en-CA", {
+          timeZone: PAYROLL_BUSINESS_TIMEZONE,
+        })
+      : applicable.periodEnd;
   const monthDate = getPayrollMonthDate(month, year);
   const structureRank = new Map<string, string>();
   const occupiedByEmployee = new Map<string, string[]>();
@@ -716,7 +899,7 @@ async function loadPayrollPeriodFacts(
         .from("salary_structures")
         .select("*")
         .in("employee_id", chunk)
-        .lte("effective_from", range.endDate)
+        .lte("effective_from", monthRange.endDate)
         .is("deleted_at", null)
         .or(`effective_to.is.null,effective_to.gte.${monthDate}`),
       supabase
@@ -724,8 +907,8 @@ async function loadPayrollPeriodFacts(
         .from("attendance")
         .select("employee_id, organization_id, attendance_date, attendance_status, overtime_hours")
         .in("employee_id", chunk)
-        .gte("attendance_date", range.startDate)
-        .lte("attendance_date", range.endDate)
+        .gte("attendance_date", queryStart)
+        .lte("attendance_date", queryEnd)
         .is("deleted_at", null),
       supabase
         .schema("hrms")
@@ -735,8 +918,8 @@ async function loadPayrollPeriodFacts(
         )
         .in("employee_id", chunk)
         .eq("leave_status", "approved")
-        .lte("start_date", range.endDate)
-        .gte("end_date", range.startDate)
+        .lte("start_date", queryEnd)
+        .gte("end_date", queryStart)
         .is("deleted_at", null),
       supabase
         .schema("hrms")
@@ -755,8 +938,8 @@ async function loadPayrollPeriodFacts(
         .in("reimbursement_status", ["pending", "approved"])
         .is("payroll_id", null)
         .is("deleted_at", null)
-        .gte("expense_date", range.startDate)
-        .lte("expense_date", range.endDate),
+        .gte("expense_date", queryStart)
+        .lte("expense_date", queryEnd),
     ]);
 
     if (structuresResult.error) throw new Error(structuresResult.error.message);
@@ -804,7 +987,10 @@ async function loadPayrollPeriodFacts(
       leaveRowsByEmployee.set(row.employee_id, list);
     }
     for (const [employeeId, rows] of leaveRowsByEmployee) {
-      leaveByEmployee.set(employeeId, summarizeLeaveRows(rows));
+      leaveByEmployee.set(
+        employeeId,
+        summarizeLeaveRows(rows, { periodStart: queryStart, periodEnd: queryEnd }),
+      );
     }
 
     for (const row of bonusesResult.data ?? []) {
@@ -829,7 +1015,7 @@ async function loadPayrollPeriodFacts(
     organizationIds.map(async (organizationId) => {
       holidayDatesByOrg.set(
         organizationId,
-        await loadOfficialHolidayDates(supabase, organizationId, range.startDate, range.endDate),
+        await loadOfficialHolidayDates(supabase, organizationId, queryStart, queryEnd),
       );
     }),
   );
@@ -931,12 +1117,14 @@ export async function buildPayrollPreview(
 ): Promise<PayrollPreviewResult> {
   const { month, year } = input;
   const organizationId = profile.employee.organizationId;
-  const employees = await getActiveEmployees(
-    supabase,
-    organizationId,
-    getMonthDateRange(month, year).endDate,
-  );
-  const payrollSettings = await getPayrollSettings(supabase, organizationId);
+  const asOfDate = new Date();
+  const monthRange = getMonthDateRange(month, year);
+
+  const [employees, payrollSettings, calendar] = await Promise.all([
+    getActiveEmployees(supabase, organizationId, monthRange.endDate),
+    getPayrollSettings(supabase, organizationId),
+    loadPayrollCalendarContext(supabase, organizationId, month, year, asOfDate),
+  ]);
   const calcSettings = calcSettingsFromPayroll(payrollSettings);
 
   const facts = await loadPayrollPeriodFacts(
@@ -944,6 +1132,7 @@ export async function buildPayrollPreview(
     employees.map((employee) => employee.id),
     month,
     year,
+    { asOfDate },
   );
 
   const items = employees.map((employee) => {
@@ -968,6 +1157,9 @@ export async function buildPayrollPreview(
       bonuses,
       reimbursements,
       settings: calcSettings,
+      asOfDate,
+      joiningDate: employee.date_of_joining ?? null,
+      calendar,
     });
 
     const designation = unwrapRelation(
@@ -1041,6 +1233,7 @@ export async function getEmployeeRunBreakdown(
         employee_code,
         first_name,
         last_name,
+        date_of_joining,
         departments:department_id (name),
         designations:designation_id (title),
         employment_types:employment_type_id (name)
@@ -1065,12 +1258,20 @@ export async function getEmployeeRunBreakdown(
   );
 
   const payrollSettings = await getPayrollSettings(supabase, organizationId);
+  const asOfDate = new Date();
+  const calendar = await loadPayrollCalendarContext(
+    supabase,
+    organizationId,
+    month,
+    year,
+    asOfDate,
+  );
 
   const [salaryStructure, attendance, leaveSummary, bonuses, reimbursements] =
     await Promise.all([
       getEffectiveSalaryStructure(supabase, employeeId, month, year),
-      getAttendanceSummary(supabase, employeeId, month, year),
-      getLeaveMonthSummary(supabase, employeeId, month, year),
+      getAttendanceSummary(supabase, employeeId, month, year, { asOfDate }),
+      getLeaveMonthSummary(supabase, employeeId, month, year, { asOfDate }),
       getPayableBonuses(
         supabase,
         employeeId,
@@ -1102,6 +1303,9 @@ export async function getEmployeeRunBreakdown(
       halfDayDeduction: payrollSettings.settings.leaveIntegration.halfDayDeduction,
       paidLeaveDeduction: payrollSettings.settings.leaveIntegration.paidLeaveDeduction,
     },
+    asOfDate,
+    joiningDate: (employee.date_of_joining as string | null) ?? null,
+    calendar,
   });
 
   const bonusTotal = roundCurrency(
@@ -1226,12 +1430,14 @@ export async function generatePayrollRun(
     payroll_id: payrollId,
     employee_id: item.employeeId,
     salary_structure_id: item.salaryStructureId ?? null,
-    basic_salary: item.basicSalary,
-    total_allowances: item.totalAllowances,
-    total_deductions: item.totalDeductions,
-    gross_salary: item.grossSalary,
-    net_salary: item.netSalary,
-    breakdown: item.breakdown,
+    ...payrollItemAmountFields({
+      basicSalary: item.basicSalary,
+      totalAllowances: item.totalAllowances,
+      totalDeductions: item.totalDeductions,
+      grossSalary: item.grossSalary,
+      netSalary: item.netSalary,
+      breakdown: item.breakdown,
+    }),
     created_by: actorId,
     updated_by: actorId,
   }));
@@ -1249,7 +1455,7 @@ export async function generatePayrollRun(
           "Payroll lines could not be saved for this run. Open Company Payroll and try again.",
         );
       }
-      throw new Error(itemError.message);
+      throwPayrollItemPersistenceError(itemError);
     }
   }
 
@@ -1309,6 +1515,111 @@ function canRecalculatePayrollRun(payroll: {
   );
 }
 
+function isImmutablePayrollItem(breakdown: PayrollBreakdown | null | undefined): boolean {
+  const status = breakdown?.payrollLifecycle?.itemStatus;
+  return status === "sent" || status === "locked";
+}
+
+/** Single-pass recalc for one payroll run — replaces per-employee draft refresh on page open. */
+async function refreshPayrollRunCalculations(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  payrollId: string,
+  input: PayrollRunInput,
+  payroll: { payroll_status: string; is_locked?: boolean | null },
+): Promise<void> {
+  const preview = await buildPayrollPreview(supabase, profile, input);
+  const actorId = actorUserId(profile);
+
+  const { data: existingItems, error: itemsError } = await supabase
+    .schema("hrms")
+    .from("payroll_items")
+    .select("id, employee_id, breakdown")
+    .eq("payroll_id", payrollId)
+    .is("deleted_at", null);
+
+  if (itemsError) throw new Error(itemsError.message);
+
+  const existingByEmployee = new Map(
+    (existingItems ?? []).map((row) => [String(row.employee_id), row]),
+  );
+
+  const { error: headerError } = await supabase
+    .schema("hrms")
+    .from("payrolls")
+    .update({
+      total_gross: preview.totalGross,
+      total_deductions: preview.totalDeductions,
+      total_net: preview.totalNet,
+      updated_by: actorId,
+    })
+    .eq("id", payrollId);
+
+  if (headerError) throw new Error(headerError.message);
+
+  for (const item of preview.items) {
+    const existing = existingByEmployee.get(item.employeeId);
+    const existingBreakdown = existing?.breakdown as PayrollBreakdown | null | undefined;
+    if (isImmutablePayrollItem(existingBreakdown)) continue;
+
+    const amounts = payrollItemAmountFields({
+      basicSalary: item.basicSalary,
+      totalAllowances: item.totalAllowances,
+      totalDeductions: item.totalDeductions,
+      grossSalary: item.grossSalary,
+      netSalary: item.netSalary,
+      breakdown: item.breakdown,
+    });
+    const merged = applyPreservedHrAdjustmentsToItem(amounts, existingBreakdown);
+
+    if (existing) {
+      const { error: updateError } = await supabase
+        .schema("hrms")
+        .from("payroll_items")
+        .update({
+          salary_structure_id: item.salaryStructureId ?? null,
+          basic_salary: amounts.basic_salary,
+          total_deductions: amounts.total_deductions,
+          gross_salary: amounts.gross_salary,
+          net_salary: amounts.net_salary,
+          total_allowances: merged.total_allowances,
+          breakdown: merged.breakdown,
+          updated_by: actorId,
+        })
+        .eq("id", existing.id);
+      if (updateError && !isRowLevelSecurityError(updateError)) {
+        throwPayrollItemPersistenceError(updateError);
+      }
+      continue;
+    }
+
+    if (!item.hasSalaryStructure && item.grossSalary <= 0) continue;
+
+    const { error: insertError } = await supabase.schema("hrms").from("payroll_items").insert({
+      payroll_id: payrollId,
+      employee_id: item.employeeId,
+      salary_structure_id: item.salaryStructureId ?? null,
+      ...amounts,
+      created_by: actorId,
+      updated_by: actorId,
+    });
+    if (insertError && insertError.code !== "23505" && !isRowLevelSecurityError(insertError)) {
+      throwPayrollItemPersistenceError(insertError);
+    }
+  }
+
+  await persistPayrollHeaderFromValidItems(supabase, profile, {
+    id: payrollId,
+    payroll_month: preview.payrollMonth,
+    payroll_status: payroll.payroll_status,
+    is_locked: payroll.is_locked ?? false,
+    total_gross: preview.totalGross,
+    total_deductions: preview.totalDeductions,
+    total_net: preview.totalNet,
+    notes: null,
+  });
+}
+
 export async function ensureCompanyPayrollRun(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -1337,15 +1648,7 @@ export async function ensureCompanyPayrollRun(
     return existing.id;
   }
 
-  const employees = await getActiveEmployees(
-    supabase,
-    organizationId,
-    getMonthDateRange(month, year).endDate,
-  );
-  for (const employee of employees) {
-    await refreshDraftPayrollItemsForEmployee(supabase, profile, employee.id);
-  }
-  await syncActiveEmployeesIntoPayrollRun(supabase, profile, existing.id);
+  await refreshPayrollRunCalculations(supabase, profile, existing.id, input, existing);
   return existing.id;
 }
 
@@ -1393,6 +1696,8 @@ export async function processPayrollRun(
   emitHrmsWebhook(profile.employee.organizationId, "payroll.processed", {
     id: payrollId,
   });
+
+  await generatePayslips(supabase, profile, payrollId);
 }
 
 async function initializePayrollApprovals(
@@ -1673,7 +1978,7 @@ export async function generatePayslips(
       employee_id: item.employee_id,
       payslip_number: payslipNumber,
       salary_credit_date: schedule.salaryCreditDate,
-      published_at: schedule.publishedAt,
+      published_at: null,
       payroll_generated_at: new Date().toISOString(),
       payment_mode: "Bank Transfer",
       payslip_version: PAYSLIP_VERSION,
@@ -1774,6 +2079,100 @@ export async function archivePayslip(
   if (error) throw new Error(error.message);
 }
 
+const MANUAL_HR_EARNING_CODES = new Set(["hr_bonus", "hr_incentive", "hr_reimbursement"]);
+
+function syncManualHrEarningLines(
+  earnings: PayrollBreakdownLine[] | undefined,
+  bonus: number,
+  incentive: number,
+  reimbursement: number,
+): PayrollBreakdownLine[] {
+  const base = (earnings ?? []).filter((line) => !MANUAL_HR_EARNING_CODES.has(line.code));
+  const next = [...base];
+  if (bonus > 0) {
+    next.push({
+      code: "hr_bonus",
+      label: "Bonus (HR adjustment)",
+      amount: bonus,
+      type: "earning",
+    });
+  }
+  if (incentive > 0) {
+    next.push({
+      code: "hr_incentive",
+      label: "Incentive",
+      amount: incentive,
+      type: "earning",
+    });
+  }
+  if (reimbursement > 0) {
+    next.push({
+      code: "hr_reimbursement",
+      label: "Reimbursement (HR adjustment)",
+      amount: reimbursement,
+      type: "earning",
+    });
+  }
+  return next;
+}
+
+/** Re-apply saved manual HR bonus/incentive/reimbursement after attendance recalc. */
+function applyPreservedHrAdjustmentsToItem(
+  amounts: {
+    basic_salary: number;
+    total_allowances: number;
+    total_deductions: number;
+    gross_salary: number;
+    net_salary: number;
+    breakdown: PayrollBreakdown;
+  },
+  existingBreakdown: PayrollBreakdown | null | undefined,
+): {
+  total_allowances: number;
+  breakdown: PayrollBreakdown;
+} {
+  const adj = existingBreakdown?.hrAdjustments;
+  const lifecycle =
+    existingBreakdown?.payrollLifecycle ?? amounts.breakdown.payrollLifecycle;
+
+  if (!adj) {
+    return {
+      total_allowances: amounts.total_allowances,
+      breakdown: {
+        ...amounts.breakdown,
+        payrollLifecycle: lifecycle,
+      },
+    };
+  }
+
+  const bonus = roundCurrency(Math.max(0, adj.bonus ?? 0));
+  const incentive = roundCurrency(Math.max(0, adj.incentive ?? 0));
+  const reimbursements = roundCurrency(Math.max(0, adj.reimbursements ?? 0));
+  const previousReimb = resolvePayrollReimbursement(
+    amounts.breakdown,
+    amounts.total_allowances,
+  );
+  const structuralAllowances = roundCurrency(
+    Math.max(0, amounts.total_allowances - previousReimb),
+  );
+  const nextTotalAllowances = roundCurrency(structuralAllowances + reimbursements);
+
+  return {
+    total_allowances: nextTotalAllowances,
+    breakdown: {
+      ...amounts.breakdown,
+      earnings: syncManualHrEarningLines(
+        amounts.breakdown.earnings,
+        bonus,
+        incentive,
+        reimbursements,
+      ),
+      hrAdjustments: adj,
+      payrollLifecycle: lifecycle,
+    },
+  };
+}
+
 export async function updatePayrollItemAdjustments(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -1797,6 +2196,8 @@ export async function updatePayrollItemAdjustments(
       `
         id,
         employee_id,
+        net_salary,
+        total_allowances,
         breakdown,
         payrolls!inner (id, organization_id, is_locked, payroll_status, payroll_month, total_gross, total_deductions, total_net, notes),
         payslips (id, email_sent_at, published_at)
@@ -1846,72 +2247,66 @@ export async function updatePayrollItemAdjustments(
     );
   }
 
-  const monthDate = new Date(`${payroll.payroll_month.slice(0, 10)}T00:00:00.000Z`);
-  const month = monthDate.getUTCMonth() + 1;
-  const year = monthDate.getUTCFullYear();
-  const existingBreakdown = (item.breakdown as PayrollBreakdown) ?? null;
-  const payrollSettings = await getPayrollSettings(supabase, profile.employee.organizationId);
-
-  const [salaryStructure, attendance, leaveSummary, bonuses, reimbursements] = await Promise.all([
-    getEffectiveSalaryStructure(supabase, item.employee_id, month, year),
-    getAttendanceSummary(supabase, item.employee_id, month, year),
-    getLeaveMonthSummary(supabase, item.employee_id, month, year),
-    getPayableBonuses(supabase, item.employee_id, [getPayrollMonthDate(month, year)], {
-      includeAttached: true,
-    }),
-    getPayableReimbursements(supabase, item.employee_id, [getMonthDateRange(month, year)], {
-      includeAttached: true,
-    }),
-  ]);
-
-  const calc = calculateEmployeePayroll({
-    month,
-    year,
-    salaryStructure: toSalaryStructureRow(salaryStructure as Record<string, unknown> | null),
-    attendance,
-    leaveSummary,
-    bonuses,
-    reimbursements,
-    settings: {
-      workingDaysCalculation: payrollSettings.settings.workingDaysCalculation,
-      lossOfPayDeduction: payrollSettings.settings.leaveIntegration.lossOfPayDeduction,
-      halfDayDeduction: payrollSettings.settings.leaveIntegration.halfDayDeduction,
-      paidLeaveDeduction: payrollSettings.settings.leaveIntegration.paidLeaveDeduction,
+  const existingBreakdown = (item.breakdown as PayrollBreakdown) ?? {
+    earnings: [],
+    deductions: [],
+    attendance: {
+      workingDays: 0,
+      presentDays: 0,
+      absentDays: 0,
+      lopDays: 0,
+      leaveLopDays: 0,
+      overtimeHours: 0,
     },
-    adjustments: {
-      additionalEarnings: input.additionalEarnings,
-      bonus: input.bonus,
-      incentive: input.incentive,
-      reimbursements: input.reimbursements,
-      additionalDeductions: input.additionalDeductions,
-      tdsOverride: input.tdsOverride,
-      otherDeductionsOverride: input.otherDeductionsOverride,
-      lopDaysOverride: input.lopDaysOverride,
+  };
+
+  const bonus = roundCurrency(Math.max(0, input.bonus));
+  const incentive = roundCurrency(Math.max(0, input.incentive));
+  const reimbursements = roundCurrency(Math.max(0, input.reimbursements));
+  const previousAllowances = roundCurrency(Number(item.total_allowances ?? 0));
+  const previousReimbursement = resolvePayrollReimbursement(existingBreakdown, previousAllowances);
+  const structuralAllowances = roundCurrency(
+    Math.max(0, previousAllowances - previousReimbursement),
+  );
+  const nextTotalAllowances = roundCurrency(structuralAllowances + reimbursements);
+
+  const nextBreakdown: PayrollBreakdown = {
+    ...existingBreakdown,
+    earnings: syncManualHrEarningLines(
+      existingBreakdown.earnings,
+      bonus,
+      incentive,
+      reimbursements,
+    ),
+    hrAdjustments: {
+      ...existingBreakdown.hrAdjustments,
+      bonus,
+      incentive,
+      reimbursements,
+      additionalEarnings: 0,
+      additionalDeductions: 0,
+      tdsOverride: null,
+      otherDeductionsOverride: null,
+      lopDaysOverride: null,
       itemStatus: "reviewed",
     },
-  });
+    payrollLifecycle: {
+      itemStatus: "reviewed",
+      sentAt: existingBreakdown.payrollLifecycle?.sentAt ?? null,
+    },
+  };
 
   const { error: updateError } = await supabase
     .schema("hrms")
     .from("payroll_items")
     .update({
-      basic_salary: calc.basicSalary,
-      total_allowances: calc.totalAllowances,
-      total_deductions: calc.totalDeductions,
-      gross_salary: calc.grossSalary,
-      net_salary: calc.netSalary,
-      breakdown: {
-        ...calc.breakdown,
-        payrollLifecycle: {
-          itemStatus: "reviewed" as const,
-          sentAt: existingBreakdown?.payrollLifecycle?.sentAt ?? null,
-        },
-      },
+      breakdown: nextBreakdown,
+      total_allowances: nextTotalAllowances,
       updated_by: actorUserId(profile),
     })
     .eq("id", input.payrollItemId);
 
-  if (updateError) throw new Error(updateError.message);
+  if (updateError) throwPayrollItemPersistenceError(updateError);
 
   if (input.confirmReopen && payslip?.id) {
     await supabase
@@ -1984,6 +2379,11 @@ export async function ensureUnpublishedPayslipForPayrollItem(
   );
   const actorId = actorUserId(profile);
   const nowIso = new Date().toISOString();
+  const payrollSettings = await getPayrollSettings(supabase, profile.employee.organizationId);
+  const schedule = computePayslipSchedule(payroll.payroll_month, {
+    salaryCreditDay: payrollSettings.settings.salaryCreditDate,
+    publishDay: payrollSettings.settings.payslipAvailableDay,
+  });
   const payslipNumber = generatePayslipNumber(
     employee?.employee_code ?? "EMP",
     payroll.payroll_month,
@@ -1996,7 +2396,7 @@ export async function ensureUnpublishedPayslipForPayrollItem(
       payroll_item_id: item.id,
       employee_id: item.employee_id,
       payslip_number: payslipNumber,
-      salary_credit_date: nowIso.slice(0, 10),
+      salary_credit_date: schedule.salaryCreditDate,
       published_at: null,
       payroll_generated_at: nowIso,
       payment_mode: "Bank Transfer",
@@ -2055,9 +2455,7 @@ export async function releaseEmployeePayslip(
       | null,
   );
   if (
-    (Boolean(existingPayslip?.email_sent_at) ||
-      (existingPayslip?.published_at &&
-        isPayslipPublishedToEmployee(existingPayslip.published_at)))
+    Boolean(existingPayslip?.email_sent_at)
   ) {
     throw new Error("Payslip already sent for this employee and period.");
   }
@@ -2067,6 +2465,11 @@ export async function releaseEmployeePayslip(
   );
   const actorId = actorUserId(profile);
   const nowIso = new Date().toISOString();
+  const payrollSettings = await getPayrollSettings(supabase, profile.employee.organizationId);
+  const schedule = computePayslipSchedule(payroll.payroll_month, {
+    salaryCreditDay: payrollSettings.settings.salaryCreditDate,
+    publishDay: payrollSettings.settings.payslipAvailableDay,
+  });
   let payslipId = existingPayslip?.id ?? null;
 
   if (!payslipId) {
@@ -2082,7 +2485,7 @@ export async function releaseEmployeePayslip(
         payroll_item_id: item.id,
         employee_id: item.employee_id,
         payslip_number: payslipNumber,
-        salary_credit_date: nowIso.slice(0, 10),
+        salary_credit_date: schedule.salaryCreditDate,
         published_at: nowIso,
         payroll_generated_at: nowIso,
         payment_mode: "Bank Transfer",
@@ -2098,7 +2501,11 @@ export async function releaseEmployeePayslip(
     await supabase
       .schema("hrms")
       .from("payslips")
-      .update({ published_at: nowIso, updated_by: actorId })
+      .update({
+        published_at: nowIso,
+        salary_credit_date: schedule.salaryCreditDate,
+        updated_by: actorId,
+      })
       .eq("id", payslipId);
   }
 
@@ -2346,12 +2753,15 @@ export async function refreshDraftPayrollItemsForEmployee(
 
   const payrollSettings = await getPayrollSettings(supabase, organizationId);
   const calcSettings = calcSettingsFromPayroll(payrollSettings);
+  const asOfDate = new Date();
 
   for (const payroll of draftPayrolls) {
     const monthDate = new Date(`${payroll.payroll_month.slice(0, 10)}T00:00:00.000Z`);
     if (Number.isNaN(monthDate.getTime())) continue;
     const month = monthDate.getUTCMonth() + 1;
     const year = monthDate.getUTCFullYear();
+    const period = resolvePayrollApplicablePeriod(month, year, { today: asOfDate });
+    if (period.kind !== "current") continue;
 
     const periodEnd = getMonthDateRange(month, year).endDate;
     if (!isPayrollEligibleEmployee(mappedTarget, periodEnd)) continue;
@@ -2365,11 +2775,19 @@ export async function refreshDraftPayrollItemsForEmployee(
       continue;
     }
 
+    const calendar = await loadPayrollCalendarContext(
+      supabase,
+      organizationId,
+      month,
+      year,
+      asOfDate,
+    );
+
     const [salaryStructure, attendance, leaveSummary, bonuses, reimbursements] =
       await Promise.all([
         getEffectiveSalaryStructure(supabase, employeeId, month, year),
-        getAttendanceSummary(supabase, employeeId, month, year),
-        getLeaveMonthSummary(supabase, employeeId, month, year),
+        getAttendanceSummary(supabase, employeeId, month, year, { asOfDate }),
+        getLeaveMonthSummary(supabase, employeeId, month, year, { asOfDate }),
         getPayableBonuses(supabase, employeeId, [getPayrollMonthDate(month, year)], {
           includeAttached: true,
         }),
@@ -2404,6 +2822,9 @@ export async function refreshDraftPayrollItemsForEmployee(
       reimbursements,
       settings: calcSettings,
       adjustments: existingAdjustments,
+      asOfDate,
+      joiningDate: mappedTarget?.date_of_joining ?? null,
+      calendar,
     });
 
     if (existingItem) {
@@ -2412,11 +2833,7 @@ export async function refreshDraftPayrollItemsForEmployee(
         .from("payroll_items")
         .update({
           salary_structure_id: salaryStructure?.id ?? null,
-          basic_salary: calc.basicSalary,
-          total_allowances: calc.totalAllowances,
-          total_deductions: calc.totalDeductions,
-          gross_salary: calc.grossSalary,
-          net_salary: calc.netSalary,
+          ...payrollItemAmountFields(calc),
           breakdown: {
             ...calc.breakdown,
             payrollLifecycle: existingLifecycle ?? calc.breakdown.payrollLifecycle,
@@ -2425,7 +2842,7 @@ export async function refreshDraftPayrollItemsForEmployee(
         })
         .eq("id", existingItem.id);
       if (updateError && !isRowLevelSecurityError(updateError)) {
-        throw new Error(updateError.message);
+        throwPayrollItemPersistenceError(updateError);
       }
     } else if (mayCreateItems && (salaryStructure || calc.grossSalary > 0)) {
       const actorId = actorUserId(profile);
@@ -2433,12 +2850,7 @@ export async function refreshDraftPayrollItemsForEmployee(
         payroll_id: payroll.id,
         employee_id: employeeId,
         salary_structure_id: salaryStructure?.id ?? null,
-        basic_salary: calc.basicSalary,
-        total_allowances: calc.totalAllowances,
-        total_deductions: calc.totalDeductions,
-        gross_salary: calc.grossSalary,
-        net_salary: calc.netSalary,
-        breakdown: calc.breakdown,
+        ...payrollItemAmountFields(calc),
         created_by: actorId,
         updated_by: actorId,
       });
@@ -2447,7 +2859,7 @@ export async function refreshDraftPayrollItemsForEmployee(
         insertError.code !== "23505" &&
         !isRowLevelSecurityError(insertError)
       ) {
-        throw new Error(insertError.message);
+        throwPayrollItemPersistenceError(insertError);
       }
     }
 
@@ -2890,11 +3302,20 @@ export async function syncActiveEmployeesIntoPayrollRun(
   if (missing.length === 0) return;
 
   const payrollSettings = await getPayrollSettings(supabase, organizationId);
+  const asOfDate = new Date();
+  const calendar = await loadPayrollCalendarContext(
+    supabase,
+    organizationId,
+    month,
+    year,
+    asOfDate,
+  );
   const facts = await loadPayrollPeriodFacts(
     supabase,
     missing.map((employee) => employee.id),
     month,
     year,
+    { asOfDate },
   );
   const actorId = actorUserId(profile);
   const calcSettings = calcSettingsFromPayroll(payrollSettings);
@@ -2910,17 +3331,15 @@ export async function syncActiveEmployeesIntoPayrollRun(
       bonuses: facts.bonusesByEmployee.get(employee.id) ?? [],
       reimbursements: facts.reimbursementsByEmployee.get(employee.id) ?? [],
       settings: calcSettings,
+      asOfDate,
+      joiningDate: (employee.date_of_joining as string | null) ?? null,
+      calendar,
     });
     return {
       payroll_id: payrollId,
       employee_id: employee.id,
       salary_structure_id: salaryStructure?.id ?? null,
-      basic_salary: calc.basicSalary,
-      total_allowances: calc.totalAllowances,
-      total_deductions: calc.totalDeductions,
-      gross_salary: calc.grossSalary,
-      net_salary: calc.netSalary,
-      breakdown: calc.breakdown,
+      ...payrollItemAmountFields(calc),
       created_by: actorId,
       updated_by: actorId,
     };
@@ -2932,10 +3351,11 @@ export async function syncActiveEmployeesIntoPayrollRun(
     insertError.code !== "23505" &&
     !isRowLevelSecurityError(insertError)
   ) {
-    throw new Error(insertError.message);
+    throwPayrollItemPersistenceError(insertError);
   }
 
   await persistPayrollHeaderFromValidItems(supabase, profile, payroll);
+  await generatePayslips(supabase, profile, payrollId);
 }
 
 export async function getPayrollRunById(
@@ -2957,11 +3377,13 @@ export async function getPayrollRunById(
   if (error) throw new Error(error.message);
   if (!payroll) return null;
 
-  const { data: items, error: itemsError } = await supabase
-    .schema("hrms")
-    .from("payroll_items")
-    .select(
-      `
+  const [{ data: items, error: itemsError }, { data: approvals, error: approvalsError }] =
+    await Promise.all([
+      supabase
+        .schema("hrms")
+        .from("payroll_items")
+        .select(
+          `
         id,
         employee_id,
         basic_salary,
@@ -2985,18 +3407,15 @@ export async function getPayrollRunById(
         ),
         payslips (id, email_sent_at, published_at)
       `,
-    )
-    .eq("payroll_id", payrollId)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: true });
-
-  if (itemsError) throw new Error(itemsError.message);
-
-  const { data: approvals, error: approvalsError } = await supabase
-    .schema("hrms")
-    .from("payroll_approvals")
-    .select(
-      `
+        )
+        .eq("payroll_id", payrollId)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: true }),
+      supabase
+        .schema("hrms")
+        .from("payroll_approvals")
+        .select(
+          `
         id,
         approval_level,
         approval_status,
@@ -3005,11 +3424,13 @@ export async function getPayrollRunById(
         acted_at,
         employees:approver_employee_id (first_name, last_name)
       `,
-    )
-    .eq("payroll_id", payrollId)
-    .is("deleted_at", null)
-    .order("approval_level", { ascending: true });
+        )
+        .eq("payroll_id", payrollId)
+        .is("deleted_at", null)
+        .order("approval_level", { ascending: true }),
+    ]);
 
+  if (itemsError) throw new Error(itemsError.message);
   if (approvalsError) throw new Error(approvalsError.message);
 
   const monthDate = new Date(`${String(payroll.payroll_month).slice(0, 10)}T00:00:00.000Z`);
@@ -3055,10 +3476,7 @@ export async function getPayrollRunById(
         },
       };
       const payslipSent =
-        Boolean(payslip?.email_sent_at) ||
-        Boolean(
-          payslip?.published_at && isPayslipPublishedToEmployee(payslip.published_at),
-        ) ||
+        isPayslipHrSent({ emailSentAt: payslip?.email_sent_at ?? null }) ||
         breakdown.payrollLifecycle?.itemStatus === "sent";
       const itemStatus = payslipSent
         ? "sent"
@@ -3145,6 +3563,7 @@ export async function getPayslipById(
         storage_path,
         salary_credit_date,
         published_at,
+        email_sent_at,
         payroll_generated_at,
         payment_mode,
         transaction_reference,
@@ -3212,7 +3631,10 @@ export async function getPayslipById(
     schedule.publishedAt,
     profile.permissionCodes,
     new Date(),
-    { employeeFacing: isOwnPayslip },
+    {
+      employeeFacing: isOwnPayslip,
+      emailSentAt: payslip.email_sent_at,
+    },
   );
 
   if (

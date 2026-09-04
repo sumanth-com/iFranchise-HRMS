@@ -2,12 +2,13 @@ import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { isExcludedFromTeamPayslips } from "@/lib/employee/directory-listing";
 import { canViewPayroll } from "@/lib/payroll/constants";
 import {
+  isPayslipHrSent,
   isPayslipPublishedToEmployee,
   resolvePayslipAvailability,
   resolvePayslipSchedule,
 } from "@/lib/payroll/services/payslip-publication";
 import { getPayrollMonthDate, parsePayrollMonthSearch, formatPayrollMonthLabel } from "@/lib/payroll/services/payroll-utils";
-import { syncActiveEmployeesIntoPayrollRun } from "@/lib/payroll/services/payroll-mutations";
+import { syncActiveEmployeesIntoPayrollRun, ensureCompanyPayrollRun, generatePayslips } from "@/lib/payroll/services/payroll-mutations";
 import { payslipHistoryParamsSchema } from "@/lib/validations/payroll";
 import type { UserProfile } from "@/types/auth";
 import type {
@@ -84,14 +85,10 @@ function groupPayslipsByYear(payslips: PayslipListItem[]): PayslipHistoryYearGro
 }
 
 function buildStats(rows: PayslipListItem[]): PayslipHistoryStats {
-  const published = rows.filter((row) => row.availability === "available");
-  const credited = rows.filter(
-    (row) =>
-      row.payrollStatus === "paid" ||
-      row.paymentStatus === "Credited" ||
-      row.paymentStatus === "Approved",
+  const sentRows = rows.filter((row) => row.payslipSent);
+  const readyRows = rows.filter(
+    (row) => !row.payslipSent && row.id.length > 0,
   );
-  const underReview = rows.filter((row) => row.availability === "under_review");
   const employeeIds = new Set(rows.map((row) => row.employeeId).filter(Boolean));
   const years = Array.from(
     new Set(
@@ -102,18 +99,18 @@ function buildStats(rows: PayslipListItem[]): PayslipHistoryStats {
     ),
   ).sort((a, b) => b - a);
 
-  const nets = published.map((row) => row.netSalary);
-  const latest = published[0] ?? rows[0];
-  const totalNetDisbursed = credited.reduce((sum, row) => sum + row.netSalary, 0);
+  const sentNets = sentRows.map((row) => row.netSalary);
+  const latest = sentRows[0] ?? rows[0];
+  const totalNetDisbursed = sentRows.reduce((sum, row) => sum + row.netSalary, 0);
 
   return {
-    totalPayslips: rows.length,
+    totalPayslips: sentRows.length,
     yearsAvailable: years,
     latestSalary: latest?.netSalary ?? null,
-    highestSalary: nets.length ? Math.max(...nets) : null,
+    highestSalary: sentNets.length ? Math.max(...sentNets) : null,
     latestPublished: latest?.publishedAt ?? null,
-    creditedCount: credited.length,
-    underReviewCount: underReview.length,
+    creditedCount: sentRows.length,
+    underReviewCount: readyRows.length,
     totalNetDisbursed,
     uniqueEmployees: employeeIds.size,
     latestMonthLabel: latest?.payrollMonth
@@ -175,16 +172,26 @@ async function listHrPayslipsFromPayrollRun(
   },
 ): Promise<PayslipHistoryResult> {
   const payrollMonth = getPayrollMonthDate(input.month, input.year);
-  const { data: payroll, error: payrollError } = await supabase
-    .schema("hrms")
-    .from("payrolls")
-    .select("id, payroll_month, payroll_status")
-    .eq("organization_id", profile.employee.organizationId)
-    .eq("payroll_month", payrollMonth)
-    .is("deleted_at", null)
-    .maybeSingle();
 
-  if (payrollError) throw new Error(payrollError.message);
+  let payroll: { id: string; payroll_month: string; payroll_status: string } | null = null;
+  try {
+    const payrollId = await ensureCompanyPayrollRun(supabase, profile, {
+      month: input.month,
+      year: input.year,
+    });
+    const { data, error: payrollError } = await supabase
+      .schema("hrms")
+      .from("payrolls")
+      .select("id, payroll_month, payroll_status")
+      .eq("id", payrollId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (payrollError) throw new Error(payrollError.message);
+    payroll = data;
+  } catch {
+    payroll = null;
+  }
+
   if (!payroll) {
     return {
       data: [],
@@ -197,6 +204,7 @@ async function listHrPayslipsFromPayrollRun(
   }
 
   await syncActiveEmployeesIntoPayrollRun(supabase, profile, payroll.id);
+  await generatePayslips(supabase, profile, payroll.id);
 
   let itemsQuery = supabase
     .schema("hrms")
@@ -307,9 +315,8 @@ async function listHrPayslipsFromPayrollRun(
           }[]
         | null,
     );
-    const sent =
-      Boolean(payslip?.email_sent_at) ||
-      Boolean(payslip?.published_at && isPayslipPublishedToEmployee(payslip.published_at, now));
+    const sent = isPayslipHrSent({ emailSentAt: payslip?.email_sent_at ?? null });
+    const payslipReady = Boolean(payslip?.id);
 
     rows.push({
       id: payslip?.id ?? "",
@@ -330,7 +337,7 @@ async function listHrPayslipsFromPayrollRun(
       canEmployeeAccess: sent,
       reviewMessage: sent ? null : "Payslip not sent yet",
       payslipVersion: payslip?.payslip_version ?? "—",
-      paymentStatus: sent ? "Sent" : "Pending",
+      paymentStatus: sent ? "Sent" : payslipReady ? "Ready to Send" : "Pending",
       isArchived: Boolean(payslip?.archived_at),
       versionCount: 1,
       payrollItemId: row.id,
@@ -358,14 +365,17 @@ async function listHrPayslipsFromPayrollRun(
   rows.sort((a, b) => a.employeeCode.localeCompare(b.employeeCode));
 
   const sentRows = rows.filter((row) => row.payslipSent);
+  const readyRows = rows.filter(
+    (row) => !row.payslipSent && row.id.length > 0,
+  );
   const stats: PayslipHistoryStats = {
-    totalPayslips: rows.length,
+    totalPayslips: sentRows.length,
     yearsAvailable: [input.year],
     latestSalary: rows[0]?.netSalary ?? null,
     highestSalary: rows.length ? Math.max(...rows.map((row) => row.netSalary)) : null,
     latestPublished: sentRows[0]?.publishedAt || null,
     creditedCount: sentRows.length,
-    underReviewCount: rows.length - sentRows.length,
+    underReviewCount: readyRows.length + rows.filter((row) => !row.id).length,
     totalNetDisbursed: sentRows.reduce((sum, row) => sum + row.netSalary, 0),
     uniqueEmployees: rows.length,
     latestMonthLabel: formatPayrollMonthLabel(payrollMonth),
@@ -411,6 +421,7 @@ async function listStoredPayslipHistory(
         issued_at,
         salary_credit_date,
         published_at,
+        email_sent_at,
         payslip_version,
         archived_at,
         is_current,
@@ -535,7 +546,10 @@ async function listStoredPayslipHistory(
       schedule.publishedAt,
       profile.permissionCodes,
       new Date(),
-      { employeeFacing: row.employee_id === profile.employee.id },
+      {
+        employeeFacing: row.employee_id === profile.employee.id,
+        emailSentAt: row.email_sent_at,
+      },
     );
     const versionCount = (versionCounts.get(row.id) ?? 0) + 1;
 
@@ -562,10 +576,10 @@ async function listStoredPayslipHistory(
       canEmployeeAccess: access.canEmployeeAccess,
       reviewMessage: access.reviewMessage,
       payslipVersion: row.payslip_version ?? "1.0",
-      paymentStatus: paymentStatusLabel(
-        payroll?.payroll_status ?? "draft",
-        access.availability,
-      ),
+      payslipSent: isPayslipHrSent({ emailSentAt: row.email_sent_at }),
+      paymentStatus: isPayslipHrSent({ emailSentAt: row.email_sent_at })
+        ? "Sent"
+        : "Ready to Send",
       isArchived: Boolean(row.archived_at),
       versionCount,
     };
@@ -583,6 +597,7 @@ async function listStoredPayslipHistory(
           id,
           employee_id,
           published_at,
+          email_sent_at,
           employees!inner (organization_id),
           payroll_items:payroll_item_id (net_salary),
           payrolls:payroll_id (payroll_month, payroll_status)
@@ -619,7 +634,10 @@ async function listStoredPayslipHistory(
         schedule.publishedAt,
         profile.permissionCodes,
         new Date(),
-        { employeeFacing: row.employee_id === profile.employee.id },
+        {
+          employeeFacing: row.employee_id === profile.employee.id,
+          emailSentAt: row.email_sent_at,
+        },
       );
 
       const payrollMonthValue =
@@ -643,23 +661,30 @@ async function listStoredPayslipHistory(
         canEmployeeAccess: access.canEmployeeAccess,
         reviewMessage: null,
         payslipVersion: "1.0",
-        paymentStatus: paymentStatusLabel(
-          payroll?.payroll_status ?? "draft",
-          access.availability,
-        ),
+        payslipSent: isPayslipHrSent({ emailSentAt: row.email_sent_at }),
+        paymentStatus: isPayslipHrSent({ emailSentAt: row.email_sent_at })
+          ? "Sent"
+          : "Ready to Send",
         isArchived: false,
         versionCount: 1,
       };
     });
     stats = buildStats(statItems);
-    stats.totalPayslips = count ?? statItems.length;
+  }
+
+  let resultRows = rows;
+  let resultGroups = groups;
+  if (!isHr) {
+    resultRows = rows.filter((row) => row.canEmployeeAccess);
+    resultGroups = groupByYear ? groupPayslipsByYear(resultRows) : [];
+    stats = buildStats(resultRows);
   }
 
   return {
-    data: rows,
-    groups,
+    data: resultRows,
+    groups: resultGroups,
     stats,
-    total: count ?? 0,
+    total: isHr ? (count ?? 0) : resultRows.length,
     page,
     pageSize,
   };

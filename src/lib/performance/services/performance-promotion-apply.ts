@@ -2,6 +2,7 @@ import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import type { UserProfile } from "@/types/auth";
 import { getEmployeeSalaryStructure } from "@/lib/employees/services/employee-detail";
 import { createSalaryRevision } from "@/lib/payroll/services/payroll-mutations";
+import { splitMonthlyGross } from "@/lib/payroll/salary-structure-breakdown";
 import { fromHrms } from "@/lib/performance/services/performance-utils";
 
 type SalaryComponents = {
@@ -25,56 +26,44 @@ function buildRevisionInputFromGross(
   currentStructure: Awaited<ReturnType<typeof getEmployeeSalaryStructure>> | null,
 ) {
   const effectiveFrom = new Date().toISOString().slice(0, 10);
+  const split = splitMonthlyGross(newGross);
 
   if (!currentStructure || currentStructure.grossSalary <= 0) {
     return {
       employeeId,
       effectiveFrom,
       reason,
-      basicSalary: newGross,
-      hraAmount: 0,
-      transportAllowance: 0,
+      basicSalary: split.basic,
+      hraAmount: split.hra,
+      transportAllowance: split.lta,
       otherAllowances: 0,
+      components: {
+        specialAllowance: split.special,
+        medical: 0,
+      },
     };
   }
 
   const ratio = newGross / currentStructure.grossSalary;
   const comps = currentStructure.components as SalaryComponents;
-  const special = Number(comps.specialAllowance ?? 0);
-  const medical = Number(comps.medical ?? 0);
-  const baseOther = currentStructure.otherAllowances - special - medical;
-
-  const scaled = {
-    basicSalary: roundMoney(currentStructure.basicSalary * ratio),
-    hraAmount: roundMoney(currentStructure.hraAmount * ratio),
-    transportAllowance: roundMoney(currentStructure.transportAllowance * ratio),
-    otherAllowances: roundMoney(baseOther * ratio),
-    specialAllowance: roundMoney(special * ratio),
-    medical: roundMoney(medical * ratio),
-    pf: roundMoney(Number(comps.pf ?? 0) * ratio),
-    esi: roundMoney(Number(comps.esi ?? 0) * ratio),
-    professionalTax: roundMoney(Number(comps.professionalTax ?? 0) * ratio),
-    incomeTax: roundMoney(Number(comps.incomeTax ?? 0) * ratio),
-    other: roundMoney(Number(comps.other ?? 0) * ratio),
-  };
 
   return {
     employeeId,
     effectiveFrom,
     reason,
     currencyCode: currentStructure.currencyCode,
-    basicSalary: scaled.basicSalary,
-    hraAmount: scaled.hraAmount,
-    transportAllowance: scaled.transportAllowance,
-    otherAllowances: scaled.otherAllowances,
+    basicSalary: split.basic,
+    hraAmount: split.hra,
+    transportAllowance: split.lta,
+    otherAllowances: 0,
     components: {
-      specialAllowance: scaled.specialAllowance,
-      medical: scaled.medical,
-      pf: scaled.pf,
-      esi: scaled.esi,
-      professionalTax: scaled.professionalTax,
-      incomeTax: scaled.incomeTax,
-      other: scaled.other,
+      specialAllowance: split.special,
+      medical: 0,
+      pf: roundMoney(Number(comps.pf ?? 0) * ratio),
+      esi: roundMoney(Number(comps.esi ?? 0) * ratio),
+      professionalTax: roundMoney(Number(comps.professionalTax ?? 0) * ratio),
+      incomeTax: roundMoney(Number(comps.incomeTax ?? 0) * ratio),
+      other: roundMoney(Number(comps.other ?? 0) * ratio),
     },
   };
 }

@@ -1,14 +1,27 @@
 import type {
   HrPayrollAdjustments,
   PayrollBreakdown,
+  PayrollBreakdownLine,
   PayrollItemLifecycleStatus,
   SalaryComponents,
 } from "@/types/payroll";
 import type { WorkingDaysCalculation } from "@/types/payroll-settings";
+import type { LeaveCalendarContext } from "@/lib/leave/services/leave-calendar-engine";
 import {
   calendarDaysInYearMonth,
   monthlyGrossPerDay,
 } from "@/lib/payroll/salary-structure-period";
+import {
+  countPayrollEligibleWorkingDays,
+  resolveFullMonthPayrollWorkingDays,
+  resolvePayrollApplicablePeriod,
+  type PayrollApplicablePeriod,
+} from "@/lib/payroll/payroll-period";
+import { getMonthDateRange } from "@/lib/payroll/services/payroll-utils";
+import {
+  buildStandardEarningsLines,
+  resolveSalaryBreakdownFromStructure,
+} from "@/lib/payroll/salary-structure-breakdown";
 import { roundCurrency } from "@/lib/payroll/services/payroll-utils";
 
 export type SalaryStructureRow = {
@@ -70,6 +83,10 @@ export type PayrollCalculationInput = {
   reimbursements: ReimbursementRow[];
   adjustments?: HrPayrollAdjustments | null;
   settings?: PayrollCalcSettings;
+  /** Payroll preview boundary (defaults to today in business timezone). */
+  asOfDate?: Date;
+  joiningDate?: string | null;
+  calendar?: LeaveCalendarContext;
 };
 
 export type PayrollCalculationResult = {
@@ -82,7 +99,131 @@ export type PayrollCalculationResult = {
 };
 
 function num(value: number | string | null | undefined): number {
-  return Number(value) || 0;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/** Deductions reduced first when gross cannot cover the calculated total (attendance LOP is most variable). */
+const DEDUCTION_REDUCE_ORDER = [
+  "lop",
+  "hr_additional_deduction",
+  "other_ded",
+  "income_tax",
+  "pt",
+  "esi",
+  "pf",
+] as const;
+
+function sanitizeCurrencyAmount(value: number | string | null | undefined): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return parsed;
+}
+
+function normalizeBreakdownLines(lines: PayrollBreakdownLine[]): PayrollBreakdownLine[] {
+  return lines
+    .map((line) => ({
+      ...line,
+      amount: roundCurrency(Math.max(0, sanitizeCurrencyAmount(line.amount))),
+    }))
+    .filter((line) => line.amount > 0);
+}
+
+function reduceDeductionsToFitGross(
+  deductions: PayrollBreakdownLine[],
+  grossSalary: number,
+): PayrollBreakdownLine[] {
+  let lines = normalizeBreakdownLines(deductions);
+  let total = roundCurrency(lines.reduce((sum, line) => sum + line.amount, 0));
+  if (total <= grossSalary) return lines;
+
+  let excess = roundCurrency(total - grossSalary);
+  for (const code of DEDUCTION_REDUCE_ORDER) {
+    if (excess <= 0) break;
+    const index = lines.findIndex((line) => line.code === code);
+    if (index < 0) continue;
+    const reduceBy = Math.min(lines[index].amount, excess);
+    lines[index] = {
+      ...lines[index],
+      amount: roundCurrency(lines[index].amount - reduceBy),
+    };
+    excess = roundCurrency(excess - reduceBy);
+  }
+
+  lines = lines.filter((line) => line.amount > 0);
+  total = roundCurrency(lines.reduce((sum, line) => sum + line.amount, 0));
+  if (total <= grossSalary) return lines;
+
+  let remaining = roundCurrency(total - grossSalary);
+  const largestFirst = [...lines].sort((a, b) => b.amount - a.amount);
+  for (const line of largestFirst) {
+    if (remaining <= 0) break;
+    const index = lines.findIndex((entry) => entry.code === line.code);
+    if (index < 0) continue;
+    const reduceBy = Math.min(lines[index].amount, remaining);
+    lines[index] = {
+      ...lines[index],
+      amount: roundCurrency(lines[index].amount - reduceBy),
+    };
+    remaining = roundCurrency(remaining - reduceBy);
+  }
+
+  return lines.filter((line) => line.amount > 0);
+}
+
+/** LOP is reflected in prorated payable gross; the LOP line is shown on payslips but does not reduce net again. */
+function deductionsForNetPay(lines: PayrollBreakdownLine[]): PayrollBreakdownLine[] {
+  return lines.filter((line) => line.code !== "lop");
+}
+
+/**
+ * Ensures payroll item amounts satisfy payroll_items DB checks:
+ * - all amounts >= 0
+ * - net_salary = gross_salary - total_deductions
+ */
+export function normalizePayrollCalculationResult(
+  result: PayrollCalculationResult,
+): PayrollCalculationResult {
+  const grossSalary = roundCurrency(Math.max(0, sanitizeCurrencyAmount(result.grossSalary)));
+  const basicSalary = roundCurrency(Math.max(0, sanitizeCurrencyAmount(result.basicSalary)));
+  const earnings = normalizeBreakdownLines(result.breakdown.earnings ?? []);
+  const allDeductionLines = normalizeBreakdownLines(result.breakdown.deductions ?? []);
+  const lopLines = allDeductionLines.filter((line) => line.code === "lop");
+  const netDeductions = reduceDeductionsToFitGross(
+    deductionsForNetPay(allDeductionLines),
+    grossSalary,
+  );
+
+  let totalDeductions = roundCurrency(
+    netDeductions.reduce((sum, line) => sum + line.amount, 0),
+  );
+  totalDeductions = roundCurrency(Math.min(totalDeductions, grossSalary));
+  let netSalary = roundCurrency(grossSalary - totalDeductions);
+
+  if (netSalary < 0) {
+    totalDeductions = grossSalary;
+    netSalary = 0;
+  }
+
+  // Reconcile any rounding drift so net_salary = gross_salary - total_deductions exactly.
+  if (roundCurrency(grossSalary - totalDeductions) !== netSalary) {
+    totalDeductions = roundCurrency(grossSalary - netSalary);
+  }
+
+  const totalAllowances = roundCurrency(Math.max(0, sanitizeCurrencyAmount(result.totalAllowances)));
+
+  return {
+    basicSalary,
+    totalAllowances,
+    totalDeductions,
+    grossSalary,
+    netSalary,
+    breakdown: {
+      ...result.breakdown,
+      earnings,
+      deductions: [...netDeductions, ...lopLines].filter((line) => line.amount > 0),
+    },
+  };
 }
 
 function parseComponents(raw: Record<string, unknown> | null): SalaryComponents {
@@ -109,7 +250,7 @@ export function lateEntryPenaltyDays(lateDays: number): number {
   return Math.floor(lateDays / LATE_ENTRIES_PER_HALF_DAY_LOP) * 0.5;
 }
 
-export function resolvePayrollWorkingDays(
+function resolveClosedPayrollWorkingDays(
   month: number,
   year: number,
   attendance: AttendanceSummary,
@@ -124,6 +265,122 @@ export function resolvePayrollWorkingDays(
     );
   }
   return calendarDays;
+}
+
+export function resolvePayrollWorkingDays(
+  month: number,
+  year: number,
+  attendance: AttendanceSummary,
+  calculation: WorkingDaysCalculation | undefined,
+  options?: {
+    period?: PayrollApplicablePeriod;
+    calendar?: LeaveCalendarContext;
+    asOfDate?: Date;
+    joiningDate?: string | null;
+  },
+): number {
+  const period =
+    options?.period ??
+    resolvePayrollApplicablePeriod(month, year, {
+      today: options?.asOfDate,
+      joiningDate: options?.joiningDate,
+    });
+
+  if (period.kind === "future" || period.periodStart > period.periodEnd) {
+    return 0;
+  }
+
+  if (!period.isClosed) {
+    if (options?.calendar) {
+      return countPayrollEligibleWorkingDays(
+        period.periodStart,
+        period.periodEnd,
+        options.calendar,
+      );
+    }
+    return Math.max(0, period.periodEnd >= period.periodStart ? 
+      // Fallback without calendar: elapsed calendar days in the applicable window.
+      Math.ceil(
+        (new Date(`${period.periodEnd}T00:00:00.000Z`).getTime() -
+          new Date(`${period.periodStart}T00:00:00.000Z`).getTime()) /
+          86400000,
+      ) + 1 : 0);
+  }
+
+  return resolveClosedPayrollWorkingDays(month, year, attendance, calculation);
+}
+
+/** Denominator for daily rate — full month when the period is still open. */
+function resolveDailyRateWorkingDays(
+  month: number,
+  year: number,
+  attendance: AttendanceSummary,
+  calculation: WorkingDaysCalculation | undefined,
+  options?: {
+    period?: PayrollApplicablePeriod;
+    calendar?: LeaveCalendarContext;
+    asOfDate?: Date;
+    joiningDate?: string | null;
+  },
+): number {
+  const period =
+    options?.period ??
+    resolvePayrollApplicablePeriod(month, year, {
+      today: options?.asOfDate,
+      joiningDate: options?.joiningDate,
+    });
+
+  if (period.kind === "future" || period.periodStart > period.periodEnd) {
+    return 0;
+  }
+
+  if (period.isClosed) {
+    return Math.max(
+      1,
+      resolvePayrollWorkingDays(month, year, attendance, calculation, options),
+    );
+  }
+
+  if (options?.calendar) {
+    return Math.max(
+      1,
+      resolveFullMonthPayrollWorkingDays(month, year, options.calendar, {
+        joiningDate: options.joiningDate,
+      }),
+    );
+  }
+
+  return Math.max(1, resolveClosedPayrollWorkingDays(month, year, attendance, calculation));
+}
+
+function computePresentPaidDays(
+  attendance: AttendanceSummary,
+  leave: LeaveMonthSummary,
+  period: PayrollApplicablePeriod,
+): number {
+  if (period.kind === "future" || period.periodStart > period.periodEnd) {
+    return 0;
+  }
+  return roundCurrency(
+    attendance.presentDays + attendance.halfDays * 0.5 + leave.paidLeaveDays,
+  );
+}
+
+function proratePayrollComponentAmount(amount: number, factor: number): number {
+  if (!(amount > 0) || !(factor > 0)) return 0;
+  return roundCurrency(amount * factor);
+}
+
+function prorateEarningsLines(
+  lines: PayrollBreakdownLine[],
+  factor: number,
+): PayrollBreakdownLine[] {
+  return lines
+    .map((line) => ({
+      ...line,
+      amount: proratePayrollComponentAmount(line.amount, factor),
+    }))
+    .filter((line) => line.amount > 0);
 }
 
 export function resolveLopDays(input: {
@@ -160,6 +417,12 @@ function emptyAttendanceBreakdown(
   attendance: AttendanceSummary,
   leave: LeaveMonthSummary,
   lopDays: number,
+  period: PayrollApplicablePeriod,
+  options?: {
+    dailyRate?: number;
+    monthlyGrossSalary?: number;
+    lopDeductionAmount?: number;
+  },
 ) {
   return {
     workingDays,
@@ -169,11 +432,43 @@ function emptyAttendanceBreakdown(
     leaveLopDays: leave.lopDays,
     overtimeHours: 0,
     leaveDays: attendance.onLeaveDays,
-    paidDays: Math.max(0, workingDays - lopDays),
+    paidDays: computePresentPaidDays(attendance, leave, period),
     paidLeaveDays: leave.paidLeaveDays,
     holidayCount: attendance.holidayDays,
     weekOffDays: attendance.weekOffDays,
+    dailyRate: options?.dailyRate,
+    monthlyGrossSalary: options?.monthlyGrossSalary,
+    lopDeductionAmount: options?.lopDeductionAmount,
   };
+}
+
+function isPayrollReimbursementLineCode(code: string): boolean {
+  const normalized = code.toLowerCase();
+  return (
+    normalized.startsWith("reimb_") ||
+    normalized === "hr_reimbursement" ||
+    normalized === "reimbursement"
+  );
+}
+
+function sumReimbursementLines(
+  lines: Array<{ code: string; amount: number }>,
+): number {
+  return roundCurrency(
+    lines
+      .filter((line) => isPayrollReimbursementLineCode(line.code))
+      .reduce((sum, line) => sum + line.amount, 0),
+  );
+}
+
+function sumNonReimbursementLines(
+  lines: Array<{ code: string; amount: number }>,
+): number {
+  return roundCurrency(
+    lines
+      .filter((line) => !isPayrollReimbursementLineCode(line.code))
+      .reduce((sum, line) => sum + line.amount, 0),
+  );
 }
 
 export function calculateEmployeePayroll(
@@ -185,11 +480,21 @@ export function calculateEmployeePayroll(
     paidLeaveDays: attendance.onLeaveDays,
   };
   const adjustments = input.adjustments ?? {};
-  const workingDays = resolvePayrollWorkingDays(
+  const period = resolvePayrollApplicablePeriod(month, year, {
+    today: input.asOfDate,
+    joiningDate: input.joiningDate,
+  });
+  const displayWorkingDays = resolvePayrollWorkingDays(
     month,
     year,
     attendance,
     input.settings?.workingDaysCalculation,
+    {
+      period,
+      calendar: input.calendar,
+      asOfDate: input.asOfDate,
+      joiningDate: input.joiningDate,
+    },
   );
   const lopDays = resolveLopDays({
     attendance,
@@ -198,6 +503,19 @@ export function calculateEmployeePayroll(
     settings: input.settings,
     lopDaysOverride: adjustments.lopDaysOverride,
   });
+  const payableDays = computePresentPaidDays(attendance, leave, period);
+  const workingDaysForRate = resolveDailyRateWorkingDays(
+    month,
+    year,
+    attendance,
+    input.settings?.workingDaysCalculation,
+    {
+      period,
+      calendar: input.calendar,
+      asOfDate: input.asOfDate,
+      joiningDate: input.joiningDate,
+    },
+  );
 
   const extraEarnings = [
     ...bonuses.map((bonus) => ({
@@ -215,36 +533,41 @@ export function calculateEmployeePayroll(
   ].filter((line) => line.amount > 0);
 
   if (!salaryStructure) {
-    const extraTotal = roundCurrency(
-      extraEarnings.reduce((sum, line) => sum + line.amount, 0),
-    );
-    return {
+    const reimbTotal = sumReimbursementLines(extraEarnings);
+    const salaryExtras = sumNonReimbursementLines(extraEarnings);
+    const extraReimb = Math.max(0, roundCurrency(adjustments.reimbursements ?? 0));
+    const totalReimbursement = roundCurrency(reimbTotal + extraReimb);
+    return normalizePayrollCalculationResult({
       basicSalary: 0,
-      totalAllowances: extraTotal,
+      totalAllowances: totalReimbursement,
       totalDeductions: 0,
-      grossSalary: extraTotal,
-      netSalary: extraTotal,
+      grossSalary: salaryExtras,
+      netSalary: salaryExtras,
       breakdown: {
         earnings: extraEarnings,
         deductions: [],
-        attendance: emptyAttendanceBreakdown(workingDays, attendance, leave, lopDays),
+        attendance: emptyAttendanceBreakdown(
+          displayWorkingDays,
+          attendance,
+          leave,
+          lopDays,
+          period,
+        ),
         notes: extraEarnings.length
           ? ["No salary structure configured. Totals include bonuses and expense claims."]
           : ["No salary structure configured"],
         hrAdjustments: adjustments,
         payrollLifecycle: { itemStatus: "draft" },
       },
-    };
+    });
   }
 
   const components = parseComponents(salaryStructure.components);
-  const basic = num(salaryStructure.basic_salary);
-  const hra = num(salaryStructure.hra_amount);
-  const lta = num(salaryStructure.transport_allowance);
-  const storedOther = num(salaryStructure.other_allowances);
-  const specialAllowance = components.specialAllowance ?? 0;
-  const medical = components.medical ?? 0;
-  const leftoverOther = Math.max(0, roundCurrency(storedOther - specialAllowance - medical));
+  const split = resolveSalaryBreakdownFromStructure(salaryStructure);
+  const basic = split.basic;
+  const hra = split.hra;
+  const lta = split.lta;
+  const specialAllowance = split.special;
 
   const statutory = input.settings?.salaryComponents;
   const pf = statutory?.pf === false ? 0 : (components.pf ?? 0);
@@ -255,11 +578,16 @@ export function calculateEmployeePayroll(
     statutory?.incomeTax === false ? 0 : (components.incomeTax ?? 0);
   const structureOtherDeduction = components.other ?? 0;
 
-  const salaryGross = roundCurrency(
-    basic + hra + lta + specialAllowance + medical + leftoverOther,
-  );
-  const perDay = monthlyGrossPerDay(salaryGross, workingDays);
-  const lopDeduction = roundCurrency(perDay * lopDays);
+  const salaryGross = roundCurrency(basic + hra + lta + specialAllowance);
+  const rawPerDay = workingDaysForRate > 0 ? salaryGross / workingDaysForRate : 0;
+  const perDay = roundCurrency(rawPerDay);
+  const payableGross = roundCurrency(rawPerDay * payableDays);
+  const lopDeduction = roundCurrency(rawPerDay * lopDays);
+  const prorateFactor = salaryGross > 0 ? payableGross / salaryGross : 0;
+  const proratedBasic = proratePayrollComponentAmount(basic, prorateFactor);
+  const proratedHra = proratePayrollComponentAmount(hra, prorateFactor);
+  const proratedLta = proratePayrollComponentAmount(lta, prorateFactor);
+  const proratedSpecial = proratePayrollComponentAmount(specialAllowance, prorateFactor);
 
   const tds =
     adjustments.tdsOverride != null && Number.isFinite(adjustments.tdsOverride)
@@ -277,34 +605,7 @@ export function calculateEmployeePayroll(
   const additionalEarnings = Math.max(0, roundCurrency(adjustments.additionalEarnings ?? 0));
   const additionalDeductions = Math.max(0, roundCurrency(adjustments.additionalDeductions ?? 0));
 
-  const earnings = [
-    { code: "basic", label: "Basic Salary", amount: basic, type: "earning" as const },
-    { code: "hra", label: "House Rent Allowance (HRA)", amount: hra, type: "earning" as const },
-    {
-      code: "special_allowance",
-      label: "Special Allowance",
-      amount: specialAllowance,
-      type: "earning" as const,
-    },
-    {
-      code: "transport",
-      label: "Leave Travel Allowance (LTA)",
-      amount: lta,
-      type: "earning" as const,
-    },
-    {
-      code: "medical",
-      label: "Medical Allowance",
-      amount: medical,
-      type: "earning" as const,
-    },
-    {
-      code: "other_allowances",
-      label: "Other Allowances",
-      amount: leftoverOther,
-      type: "earning" as const,
-    },
-  ];
+  const earnings = prorateEarningsLines(buildStandardEarningsLines(split), prorateFactor);
 
   earnings.push(...extraEarnings);
 
@@ -358,7 +659,7 @@ export function calculateEmployeePayroll(
     },
     {
       code: "other_ded",
-      label: "Other Deductions",
+      label: "Other Applicable Deductions",
       amount: otherDeduction,
       type: "deduction" as const,
     },
@@ -379,19 +680,27 @@ export function calculateEmployeePayroll(
     });
   }
 
-  const grossSalary = roundCurrency(
-    earnings.filter((line) => line.amount > 0).reduce((sum, line) => sum + line.amount, 0),
+  const reimbFromClaims = sumReimbursementLines(extraEarnings);
+  const salaryExtrasFromClaims = sumNonReimbursementLines(extraEarnings);
+
+  const extraTotals = roundCurrency(
+    salaryExtrasFromClaims + additionalEarnings,
   );
+  const grossSalary = roundCurrency(payableGross + extraTotals);
   const totalDeductions = roundCurrency(
-    deductions.filter((line) => line.amount > 0).reduce((sum, line) => sum + line.amount, 0),
+    deductions
+      .filter((line) => line.amount > 0 && line.code !== "lop")
+      .reduce((sum, line) => sum + line.amount, 0),
   );
   const netSalary = roundCurrency(grossSalary - totalDeductions);
-  const totalAllowances = roundCurrency(Math.max(0, salaryGross - basic));
+  const totalAllowances = roundCurrency(
+    Math.max(0, proratedHra + proratedLta + proratedSpecial) + extraReimb + reimbFromClaims,
+  );
 
   const lifecycleStatus: PayrollItemLifecycleStatus = adjustments.itemStatus ?? "draft";
 
-  return {
-    basicSalary: basic,
+  return normalizePayrollCalculationResult({
+    basicSalary: proratedBasic,
     totalAllowances,
     totalDeductions,
     grossSalary,
@@ -399,16 +708,27 @@ export function calculateEmployeePayroll(
     breakdown: {
       earnings: earnings.filter((line) => line.amount > 0),
       deductions: deductions.filter((line) => line.amount > 0),
-      attendance: emptyAttendanceBreakdown(workingDays, attendance, leave, lopDays),
+      attendance: emptyAttendanceBreakdown(
+        displayWorkingDays,
+        attendance,
+        leave,
+        lopDays,
+        period,
+        {
+          dailyRate: perDay,
+          monthlyGrossSalary: salaryGross,
+          lopDeductionAmount: lopDeduction,
+        },
+      ),
       salaryStructureSnapshot: {
         salaryStructureId: salaryStructure.id,
         basicSalary: basic,
         hraAmount: hra,
         transportAllowance: lta,
-        otherAllowances: leftoverOther + specialAllowance + medical,
+        otherAllowances: 0,
         components: {
           specialAllowance,
-          medical,
+          medical: 0,
           pf,
           esi,
           professionalTax,
@@ -420,8 +740,11 @@ export function calculateEmployeePayroll(
       hrAdjustments: adjustments,
       payrollLifecycle: { itemStatus: lifecycleStatus },
       notes: [
-        `Per-day salary ₹${roundCurrency(perDay).toLocaleString("en-IN")} × ${lopDays} LOP day(s).`,
-      ],
+        `Daily rate ₹${roundCurrency(perDay).toLocaleString("en-IN")} × ${payableDays} payable day(s).`,
+        lopDays > 0
+          ? `LOP deduction ₹${roundCurrency(lopDeduction).toLocaleString("en-IN")} (${lopDays} day(s) at daily rate).`
+          : null,
+      ].filter(Boolean) as string[],
     },
-  };
+  });
 }

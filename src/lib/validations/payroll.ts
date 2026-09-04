@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { salaryBreakdownToStructureFields } from "@/lib/payroll/salary-structure-breakdown";
+
 const monthYearSchema = z.object({
   month: z.coerce.number().int().min(1).max(12),
   year: z.coerce.number().int().min(2000).max(2100),
@@ -114,12 +116,15 @@ function settleSalaryTotals(data: {
   components?: z.infer<typeof salaryComponentSchema>;
 }) {
   const components = resolveSalaryComponents(data.components);
-  const specialAllowance = components.specialAllowance;
-  const medical = components.medical;
-  const otherAllowances = roundMoney(data.otherAllowances + specialAllowance + medical);
-  const grossSalary = roundMoney(
-    data.basicSalary + data.hraAmount + data.transportAllowance + otherAllowances,
+  const rawGross = roundMoney(
+    data.basicSalary +
+      data.hraAmount +
+      data.transportAllowance +
+      data.otherAllowances +
+      components.specialAllowance +
+      components.medical,
   );
+  const normalized = salaryBreakdownToStructureFields(rawGross);
   const pf = components.pf;
   const esi = components.esi;
   const professionalTax = components.professionalTax;
@@ -127,17 +132,21 @@ function settleSalaryTotals(data: {
   const otherDeductions = components.other;
   const taxDeduction = incomeTax;
   const totalStatutory = roundMoney(pf + esi + professionalTax + otherDeductions);
+  const grossSalary = normalized.grossSalary;
   const netSalary = roundMoney(grossSalary - taxDeduction - totalStatutory);
 
   return {
-    otherAllowances,
+    basicSalary: normalized.basicSalary,
+    hraAmount: normalized.hraAmount,
+    transportAllowance: normalized.transportAllowance,
+    otherAllowances: 0,
     taxDeduction,
     otherDeductions: totalStatutory,
     grossSalary,
     netSalary,
     components: {
-      specialAllowance,
-      medical,
+      specialAllowance: normalized.specialAllowance,
+      medical: 0,
       pf,
       esi,
       professionalTax,

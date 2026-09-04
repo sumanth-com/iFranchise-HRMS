@@ -33,6 +33,7 @@ import {
   previewPayrollRun,
 } from "@/lib/payroll/services/payroll-mutations";
 import { formatPayrollMonth } from "@/lib/payroll/services/payroll-utils";
+import { toUserFriendlyError } from "@/lib/errors/user-messages";
 import { listPayslipHistory } from "@/lib/payroll/services/payslip-history-queries";
 import {
   bonusListParamsSchema,
@@ -102,7 +103,7 @@ async function loadCompanyPayrollInitialPanel(params: {
     return {
       kind: "info",
       title: "Unable to load payroll",
-      text: error instanceof Error ? error.message : "Failed to load Company Payroll.",
+      text: toUserFriendlyError(error, "Failed to load Company Payroll."),
     };
   }
 }
@@ -150,6 +151,11 @@ export async function TeamPayrollSection({
         defaultYear={year}
         canRun={canRun}
         initialPanel={initialPanel}
+        basePath={
+          teamBasePath
+            ? `${teamBasePath}/${TEAM_PAYROLL_SECTIONS.run}`
+            : payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS.run)
+        }
       />
     );
   }

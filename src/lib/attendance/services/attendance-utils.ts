@@ -210,22 +210,34 @@ export function validateAttendanceStatusConsistency(input: {
 }
 
 /**
+ * Internal attendance note segments (imports, provenance tags) — never show in UI.
+ */
+function isInternalAttendanceNoteSegment(part: string): boolean {
+  const normalized = part.trim();
+  if (!normalized) return true;
+  if (/^src:/i.test(normalized)) return true;
+  if (/^import:/i.test(normalized)) return true;
+  if (/^historical_import:/i.test(normalized)) return true;
+  if (/^excel[\s_-]*import/i.test(normalized)) return true;
+  if (/^import[\s_-]*\d{4}/i.test(normalized)) return true;
+  if (/^(excel[\s_-]*)?import[\w-]*$/i.test(normalized)) return true;
+  return false;
+}
+
+/**
  * Strip internal import/provenance tags from attendance notes for UI display.
- * Historical imports store notes like `src:P|import:<batchId>`.
+ * Historical imports store notes like `src:P|import:<batchId>` or `excel-import-2026-09`.
  */
 export function toDisplayAttendanceNotes(notes?: string | null): string | null {
   if (!notes?.trim()) return null;
 
-  const cleaned = notes
+  const trimmed = notes.trim();
+  if (isInternalAttendanceNoteSegment(trimmed)) return null;
+
+  const cleaned = trimmed
     .split("|")
     .map((part) => part.trim())
-    .filter((part) => {
-      if (!part) return false;
-      if (/^src:/i.test(part)) return false;
-      if (/^import:/i.test(part)) return false;
-      if (/^historical_import:/i.test(part)) return false;
-      return true;
-    })
+    .filter((part) => part && !isInternalAttendanceNoteSegment(part))
     .join(" | ")
     .trim();
 

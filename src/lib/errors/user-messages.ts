@@ -48,6 +48,9 @@ export function toUserFriendlyError(
   }
 
   if (/violates check constraint/i.test(raw)) {
+    if (/payroll_items_net_salary_check|payroll_items_net_consistency/i.test(raw)) {
+      return "Payroll could not be calculated for one or more employees. Refresh Company Payroll to recalculate.";
+    }
     return "Some of the entered values are not allowed. Please review the form and try again.";
   }
 

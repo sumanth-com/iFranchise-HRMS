@@ -186,7 +186,7 @@ export const PAYROLL_SUMMARY_LABELS = {
   totalPayroll: "Total Payroll (YTD)",
   employeesProcessed: "Employees Processed",
   pendingPayroll: "Pending Payroll",
-  grossPayroll: "Gross Payroll",
+  grossPayroll: "Attendance Earnings",
   totalDeductions: "Total Deductions",
   netPayroll: "Net Payroll",
 } as const;
@@ -307,11 +307,6 @@ export const PAYROLL_SUB_NAV = [
   {
     title: TEAM_PAYROLL_SECTION_TITLES["salary-structures"],
     section: TEAM_PAYROLL_SECTIONS["salary-structures"],
-  },
-  { title: TEAM_PAYROLL_SECTION_TITLES.bonuses, section: TEAM_PAYROLL_SECTIONS.bonuses },
-  {
-    title: TEAM_PAYROLL_SECTION_TITLES.reimbursements,
-    section: TEAM_PAYROLL_SECTIONS.reimbursements,
   },
   { title: TEAM_PAYROLL_SECTION_TITLES.payslips, section: TEAM_PAYROLL_SECTIONS.payslips },
   { title: TEAM_PAYROLL_SECTION_TITLES.settings, section: TEAM_PAYROLL_SECTIONS.settings },

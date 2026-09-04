@@ -7,7 +7,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { formatCurrency } from "@/lib/payroll/services/payroll-utils";
+import {
+  formatCurrency,
+  mapPayrollDisplayAmounts,
+} from "@/lib/payroll/services/payroll-utils";
 import type { EmployeePayrollRunBreakdown } from "@/types/payroll";
 import type { PayrollBreakdown } from "@/types/payroll";
 
@@ -67,6 +70,10 @@ function isHrAdjustmentLine(code: string) {
   return code.startsWith("hr_");
 }
 
+function formatOptionalAmount(value: number): string {
+  return value > 0 ? formatCurrency(value) : formatCurrency(0);
+}
+
 export function PayrollEmployeeBreakdownDialog({
   employee,
   open,
@@ -78,10 +85,18 @@ export function PayrollEmployeeBreakdownDialog({
     (line) => Number(line.amount) > 0,
   );
   const systemEarnings = earnings.filter((line) => !isHrAdjustmentLine(line.code));
-  const hrEarnings = earnings.filter((line) => isHrAdjustmentLine(line.code));
   const systemDeductions = deductions.filter((line) => !isHrAdjustmentLine(line.code));
-  const hrDeductions = deductions.filter((line) => isHrAdjustmentLine(line.code));
-  const notes = employee?.breakdown.notes ?? [];
+
+  const amounts = employee
+    ? mapPayrollDisplayAmounts({
+        basicSalary: employee.basicSalary,
+        grossSalary: employee.grossSalary,
+        netSalary: employee.netSalary,
+        totalDeductions: employee.totalDeductions,
+        totalAllowances: employee.totalAllowances,
+        breakdown: employee.breakdown,
+      })
+    : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -103,7 +118,7 @@ export function PayrollEmployeeBreakdownDialog({
         </DialogHeader>
 
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
-          {!employee ? null : (
+          {!employee || !amounts ? null : (
             <>
               {employee.hasSalaryStructure === false ? (
                 <p className="rounded-lg border bg-muted/40 px-3 py-2.5 text-sm">
@@ -150,37 +165,37 @@ export function PayrollEmployeeBreakdownDialog({
               <div className="space-y-4">
                 <LineItemsSection title="Earnings" lines={systemEarnings} />
                 <LineItemsSection title="Deductions" lines={systemDeductions} />
-                <LineItemsSection title="HR adjustments" lines={[...hrEarnings, ...hrDeductions]} />
               </div>
 
-              <section>
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Final summary
-                </h3>
-                <div className="mt-2 grid grid-cols-3 gap-2">
-                  <StatTile label="Gross salary" value={formatCurrency(employee.grossSalary)} />
-                  <StatTile
-                    label="Total deductions"
-                    value={formatCurrency(employee.totalDeductions)}
-                  />
-                  <StatTile label="Net pay" value={formatCurrency(employee.netSalary)} />
+              <section className="mt-auto rounded-lg border bg-muted/20 px-4 py-3">
+                <div className="flex flex-wrap items-baseline justify-center gap-x-2 gap-y-1 text-sm font-medium tabular-nums">
+                  <span className="text-muted-foreground">Monthly Salary</span>
+                  <span>{formatCurrency(amounts.monthlySalary)}</span>
+                  <span className="text-muted-foreground">→</span>
+                  <span className="text-muted-foreground">Attendance Earnings</span>
+                  <span>{formatCurrency(amounts.attendanceEarnings)}</span>
+                  <span className="text-muted-foreground">→</span>
+                  <span className="text-muted-foreground">Deductions</span>
+                  <span>{formatCurrency(amounts.deductions)}</span>
+                  <span className="text-muted-foreground">→</span>
+                  <span className="text-muted-foreground">Net Salary</span>
+                  <span>{formatCurrency(amounts.netSalary)}</span>
+                  <span className="text-muted-foreground">→</span>
+                  <span className="text-muted-foreground">Bonus</span>
+                  <span>{formatOptionalAmount(amounts.bonus)}</span>
+                  <span className="text-muted-foreground">→</span>
+                  <span className="text-muted-foreground">Incentive</span>
+                  <span>{formatOptionalAmount(amounts.incentive)}</span>
+                  <span className="text-muted-foreground">→</span>
+                  <span className="text-muted-foreground">Reimbursement</span>
+                  <span>{formatOptionalAmount(amounts.reimbursement)}</span>
+                  <span className="text-muted-foreground">=</span>
+                  <span className="font-semibold text-primary">Final Payable</span>
+                  <span className="font-semibold text-primary">
+                    {formatCurrency(amounts.finalPayable)}
+                  </span>
                 </div>
               </section>
-
-              {notes.length > 0 ? (
-                <section>
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Notes
-                  </h3>
-                  <ul className="mt-2 space-y-2 text-sm text-muted-foreground">
-                    {notes.map((note, index) => (
-                      <li key={index} className="rounded-lg border bg-muted/20 px-3 py-2">
-                        {note}
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ) : null}
             </>
           )}
         </div>

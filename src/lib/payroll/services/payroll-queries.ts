@@ -21,6 +21,9 @@ import {
   salaryStructureListParamsSchema,
 } from "@/lib/validations/payroll";
 import {
+  resolveSalaryBreakdownFromStructure,
+} from "@/lib/payroll/salary-structure-breakdown";
+import {
   getMonthDateRange,
   getPayrollMonthDate,
 } from "@/lib/payroll/services/payroll-utils";
@@ -159,6 +162,15 @@ function mapSalaryStructureRow(
   components: Record<string, number>,
   isCurrent: boolean,
 ): SalaryStructureItem {
+  const split = resolveSalaryBreakdownFromStructure({
+    gross_salary: row.gross_salary,
+    basic_salary: row.basic_salary,
+    hra_amount: row.hra_amount,
+    transport_allowance: row.transport_allowance,
+    other_allowances: row.other_allowances,
+    components,
+  });
+
   return {
     id: row.id,
     employeeId: row.employee_id,
@@ -176,17 +188,17 @@ function mapSalaryStructureRow(
     effectiveFrom: row.effective_from,
     effectiveTo: row.effective_to,
     currencyCode: row.currency_code,
-    basicSalary: Number(row.basic_salary),
-    hraAmount: Number(row.hra_amount),
-    transportAllowance: Number(row.transport_allowance),
-    otherAllowances: Number(row.other_allowances),
-    grossSalary: Number(row.gross_salary),
+    basicSalary: split.basic,
+    hraAmount: split.hra,
+    transportAllowance: split.lta,
+    otherAllowances: 0,
+    grossSalary: split.basic + split.hra + split.special + split.lta,
     netSalary: Number(row.net_salary),
     taxDeduction: Number(row.tax_deduction),
     otherDeductions: Number(row.other_deductions),
     components: {
-      specialAllowance: components.specialAllowance ?? 0,
-      medical: components.medical ?? 0,
+      specialAllowance: split.special,
+      medical: 0,
       pf: components.pf ?? 0,
       esi: components.esi ?? 0,
       professionalTax: components.professionalTax ?? 0,

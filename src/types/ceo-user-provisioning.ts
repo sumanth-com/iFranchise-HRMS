@@ -40,6 +40,7 @@ export type ProvisioningRowAction =
   | "view"
   | "edit"
   | "changeRole"
+  | "changeReportingContacts"
   | "resend"
   | "cancel"
   | "delete"
@@ -62,7 +63,8 @@ export type PortalInviteEligibleEmployee = {
 
 export type ProvisioningInvitationStatus =
   | "pending"
-  | "accepted"
+  | "opened"
+  | "active"
   | "expired"
   | "cancelled"
   | "revoked"
@@ -88,12 +90,14 @@ export type CeoProvisioningUser = {
   reportingManagerId: string | null;
   reportingManagerName: string | null;
   assignedHrEmployeeId: string | null;
+  assignedHrEmployeeName: string | null;
   invitationStatus: ProvisioningInvitationStatus;
   accountStatus: string;
   sentByName: string | null;
   invitationSentAt: string | null;
   acceptedAt: string | null;
   lastActivityAt: string | null;
+  profileImagePath: string | null;
   isSelf: boolean;
 };
 

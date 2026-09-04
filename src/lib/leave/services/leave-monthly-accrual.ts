@@ -1,5 +1,6 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
+import { resolveLeaveEligibilityBand } from "@/lib/leave/leave-eligibility";
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
 import { roundLeaveDays } from "@/lib/leave/services/leave-usage";
 
@@ -59,6 +60,26 @@ export async function ensureEmployeeMonthlyLeaveAccruals(
   const balanceYear = options?.balanceYear ?? getCurrentBalanceYear(asOf);
   const currentMonthStart = monthStartDate(asOf);
 
+  const { data: employeeRow } = await supabase
+    .schema("hrms")
+    .from("employees")
+    .select("employment_status, date_of_joining, employment_types:employment_type_id (code, is_full_time)")
+    .eq("id", employeeId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  const typeRaw = employeeRow?.employment_types as
+    | { code?: string | null; is_full_time?: boolean | null }
+    | { code?: string | null; is_full_time?: boolean | null }[]
+    | null
+    | undefined;
+  const typeRow = Array.isArray(typeRaw) ? typeRaw[0] : typeRaw;
+  const leaveEligibilityBand = resolveLeaveEligibilityBand({
+    employmentStatus: String(employeeRow?.employment_status ?? "active"),
+    employmentTypeCode: typeRow?.code ?? null,
+    isFullTime: typeof typeRow?.is_full_time === "boolean" ? typeRow.is_full_time : null,
+  });
+
   const { data, error } = await supabase
     .schema("hrms")
     .from("leave_balances")
@@ -78,6 +99,9 @@ export async function ensureEmployeeMonthlyLeaveAccruals(
   for (const row of (data ?? []) as BalanceAccrualRow[]) {
     const code = unwrapCode(row.leave_types);
     if (!isMonthlyAccrualLeaveCode(code)) continue;
+
+    // Intern / probation employees do not accrue Earned Leave.
+    if (leaveEligibilityBand === "cl_only" && code === "EL") continue;
 
     const accruedThrough = row.accrued_through_month
       ? String(row.accrued_through_month).slice(0, 10)

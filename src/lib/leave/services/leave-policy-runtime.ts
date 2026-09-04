@@ -32,6 +32,7 @@ import {
   LEAVE_TYPE_NOT_ELIGIBLE_MESSAGE,
   resolveLeaveEligibilityBand,
 } from "@/lib/leave/leave-eligibility";
+import { resolvePolicyAvailableLeaveBalance } from "@/lib/leave/leave-entitlement";
 import { ALLOWED_LEAVE_TYPE_CODES, sortByLeaveTypeCode } from "@/lib/leave/constants";
 import {
   ensureEmployeeMonthlyLeaveAccruals,
@@ -46,7 +47,8 @@ import {
   remainingOptionalHolidayEntitlement,
   upcomingOptionalHolidays,
 } from "@/lib/leave/optional-holiday";
-import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
+import { getCurrentBalanceYear, getMonthDateRange } from "@/lib/leave/services/leave-utils";
+import { countLeaveDaysInRange } from "@/lib/leave/services/leave-usage";
 
 export type LeaveTypePolicyRow = {
   id: string;
@@ -465,28 +467,72 @@ export async function evaluateLeaveApplication(
     runtime.probation,
   );
   const code = leaveType.code.toUpperCase();
-  // Ledger may be missing for a brand-new type. Monthly CL/EL start at 1 for the
-  // current month; other paid types fall back to configured days_per_year.
   const fallbackAvailable = isMonthlyAccrualLeaveCode(code)
     ? MONTHLY_ACCRUAL_DAYS_PER_MONTH
     : Number(leaveType.daysPerYear ?? 0);
-  let availableBalance = leaveType.isPaid
+  const ledgerBalance = leaveType.isPaid
     ? Number(balance?.balance_days ?? fallbackAvailable)
     : null;
-  if (availableBalance != null) {
-    availableBalance = Math.max(0, availableBalance);
+
+  const startMonth = Number(input.startDate.slice(5, 7));
+  const startYear = Number(input.startDate.slice(0, 4));
+  const monthRange = getMonthDateRange(startMonth, startYear);
+  let monthUsedCl = 0;
+  let monthPendingCl = 0;
+  if (code === CASUAL_LEAVE_CODE) {
+    const { data: monthRequests } = await supabase
+      .schema("hrms")
+      .from("leave_requests")
+      .select(
+        "id, start_date, end_date, is_half_day, leave_status, duration_breakdown, leave_types:leave_type_id (code)",
+      )
+      .eq("employee_id", input.employeeId)
+      .in("leave_status", ["approved", "pending"])
+      .lte("start_date", monthRange.end)
+      .gte("end_date", monthRange.start)
+      .is("deleted_at", null);
+    for (const row of monthRequests ?? []) {
+      if (input.excludeRequestId && row.id === input.excludeRequestId) continue;
+      const leaveTypeRow = Array.isArray(row.leave_types)
+        ? row.leave_types[0]
+        : row.leave_types;
+      if (String(leaveTypeRow?.code ?? "").toUpperCase() !== CASUAL_LEAVE_CODE) continue;
+      const days = countLeaveDaysInRange(
+        {
+          startDate: row.start_date,
+          endDate: row.end_date,
+          isHalfDay: Boolean(row.is_half_day),
+          durationBreakdown: row.duration_breakdown,
+        },
+        monthRange,
+        durationCalendar,
+      );
+      monthUsedCl += days;
+      if (row.leave_status === "pending") {
+        monthPendingCl += days;
+      }
+    }
   }
-  if (probation.onProbation && code === CASUAL_LEAVE_CODE && availableBalance != null) {
-    const probationRemaining = Math.max(
-      0,
-      runtime.probation.casualLeaveCap - (employee.usedAndPendingByType[CASUAL_LEAVE_CODE] ?? 0),
-    );
-    availableBalance = Math.min(availableBalance, probationRemaining);
-  }
+
+  let availableBalance = resolvePolicyAvailableLeaveBalance({
+    leaveTypeCode: code,
+    ledgerBalance,
+    joiningDate: employee.joiningDate,
+    employmentStatus: employee.employmentStatus,
+    leaveEligibilityBand: band,
+    asOfDate: input.startDate,
+    monthUsedDays: monthUsedCl,
+    monthPendingDays: monthPendingCl,
+    probationUsedAndPendingCl: employee.usedAndPendingByType[CASUAL_LEAVE_CODE] ?? 0,
+    usedAndPendingByType: employee.usedAndPendingByType,
+    probation: runtime.probation,
+  });
+
   if (probation.onProbation && code === PERIOD_LEAVE_CODE && availableBalance != null) {
     const probationRemaining = Math.max(
       0,
-      runtime.probation.periodLeaveCap - (employee.usedAndPendingByType[PERIOD_LEAVE_CODE] ?? 0),
+      runtime.probation.periodLeaveCap -
+        (employee.usedAndPendingByType[PERIOD_LEAVE_CODE] ?? 0),
     );
     availableBalance = Math.min(availableBalance, probationRemaining);
   }

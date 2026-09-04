@@ -27,6 +27,7 @@ import type {
   InviteExecutiveUserInput,
   InviteExistingEmployeeInput,
   UpdatePendingProvisioningUserInput,
+  UpdateProvisioningReportingContactsInput,
 } from "@/lib/validations/ceo-user-provisioning";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -300,6 +301,59 @@ export async function updatePendingProvisioningUser(
     `Updated pending invite details for ${input.firstName} ${input.lastName}`,
     input.employeeId,
     { employeeId: input.employeeId },
+  );
+}
+
+export async function updateProvisioningReportingContacts(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: UpdateProvisioningReportingContactsInput,
+): Promise<void> {
+  const admin = createAdminClient();
+  const { data: employee, error } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select("id, employee_code, first_name, last_name")
+    .eq("id", input.employeeId)
+    .eq("organization_id", profile.employee.organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!employee) throw new Error("Employee not found.");
+
+  const updates: Record<string, unknown> = {
+    updated_by: profile.userId,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (input.reportingManagerId !== undefined) {
+    updates.reporting_manager_id = input.reportingManagerId;
+  }
+  if (input.assignedHrEmployeeId !== undefined) {
+    updates.assigned_hr_employee_id = input.assignedHrEmployeeId;
+  }
+
+  const { error: updateError } = await admin
+    .schema("hrms")
+    .from("employees")
+    .update(updates)
+    .eq("id", input.employeeId)
+    .eq("organization_id", profile.employee.organizationId);
+
+  if (updateError) throw new Error(updateError.message);
+
+  await audit(
+    supabase,
+    profile,
+    "employee.updated",
+    `Updated reporting contacts for ${employee.first_name} ${employee.last_name}`,
+    input.employeeId,
+    {
+      employeeId: input.employeeId,
+      reportingManagerId: input.reportingManagerId ?? null,
+      assignedHrEmployeeId: input.assignedHrEmployeeId ?? null,
+    },
   );
 }
 

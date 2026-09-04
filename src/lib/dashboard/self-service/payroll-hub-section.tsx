@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
 import { HrPayrollHubView } from "@/components/payroll/hr-payroll-hub-view";
-import { TeamPayrollContentSkeleton } from "@/components/payroll/team-payroll-content-skeleton";
+import { TeamPayrollDataSkeleton } from "@/components/payroll/team-payroll-content-skeleton";
 import { TeamPayrollSection } from "@/components/payroll/team-payroll-section";
 import { legacyHubTabRedirectUrl } from "@/lib/dashboard/hub-paths";
 import { getEmployeePayrollData } from "@/lib/employee/services/employee-payroll-queries";
@@ -89,6 +89,19 @@ type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
+async function TeamPayrollSectionGate({
+  searchParams,
+  teamSection,
+}: {
+  searchParams: Record<string, string | string[] | undefined>;
+  teamSection: TeamPayrollSectionKey;
+}) {
+  const profile = await requireServerAnyPermission(["payroll.view", "payslip.view"]);
+  return (
+    <TeamPayrollSection section={teamSection} rawSearchParams={searchParams} profile={profile} />
+  );
+}
+
 export async function PayrollTeamPage({
   searchParams,
   teamSection,
@@ -100,21 +113,15 @@ export async function PayrollTeamPage({
   if (legacy) redirect(legacy);
 
   const resolvedSection = teamSection ?? TEAM_PAYROLL_SECTIONS.run;
-  const profile = await requireServerAnyPermission(["payroll.view", "payslip.view"]);
-  const canViewTeam = hasAnyPermission(profile.permissionCodes, [...TEAM_PAYROLL_PERMISSIONS]);
 
   return (
     <HrPayrollHubView
       initialSection="team"
-      canViewTeam={canViewTeam}
+      canViewTeam
       selfPayroll={EMPTY_TEAM_SELF_PAYROLL}
     >
-      <Suspense fallback={<TeamPayrollContentSkeleton />}>
-        <TeamPayrollSection
-          section={resolvedSection}
-          rawSearchParams={raw}
-          profile={profile}
-        />
+      <Suspense fallback={<TeamPayrollDataSkeleton />}>
+        <TeamPayrollSectionGate searchParams={raw} teamSection={resolvedSection} />
       </Suspense>
     </HrPayrollHubView>
   );

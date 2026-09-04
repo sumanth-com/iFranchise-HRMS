@@ -353,6 +353,42 @@ function parseAprilPayrollBlock(rows) {
   return records;
 }
 
+function mergeAprilPayrollRecords(sheetParsed, blockRecords) {
+  const payoutByName = new Map(
+    blockRecords.map((rec) => [rec.normalizedName, rec.finalPayout]),
+  );
+
+  for (const employee of sheetParsed.employees ?? []) {
+    const payout = payoutByName.get(employee.normalizedName);
+    if (payout == null) continue;
+
+    const summary = employee.summary ?? {};
+    sheetParsed.payrollRecords.push({
+      sheetName: "APR-2026",
+      payrollMonth: "2026-04-01",
+      sourceName: employee.sourceName,
+      normalizedName: employee.normalizedName,
+      designation: employee.designation,
+      present: summary.present ?? null,
+      absent: summary.absent ?? null,
+      holiday: summary.holiday ?? null,
+      cl: summary.cl ?? summary.cl_pl ?? null,
+      pl: summary.pl ?? null,
+      el: summary.el ?? null,
+      lop: summary.lop ?? null,
+      totalWorkingDays: summary.totalWorkingDays ?? null,
+      salary: null,
+      workingDaySalary: payout,
+      professionalTax: 200,
+      amountAfterPt: typeof payout === "number" ? payout : null,
+      reimbursement: 0,
+      finalPayout: payout,
+      perDay: null,
+      source: "april_merged",
+    });
+  }
+}
+
 export function parseAttendanceWorkbook(filePath) {
   const workbook = XLSX.readFile(filePath, { cellDates: true });
   const sheets = {};
@@ -384,6 +420,10 @@ export function parseAttendanceWorkbook(filePath) {
       const aprilBlock = parseAprilPayrollBlock(rows);
       allPayroll.push(...aprilBlock);
       sheets[sheetName].aprilPayrollBlock = aprilBlock;
+      mergeAprilPayrollRecords(parsed, aprilBlock);
+      for (const rec of parsed.payrollRecords) {
+        if (rec.source === "april_merged") allPayroll.push(rec);
+      }
     }
   }
 

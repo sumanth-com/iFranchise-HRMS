@@ -78,6 +78,12 @@ export type PayrollBreakdown = {
     holidayCount?: number;
     paidLeaveDays?: number;
     weekOffDays?: number;
+    /** Daily rate = monthly structure gross ÷ payroll working days. */
+    dailyRate?: number;
+    /** Full monthly gross from salary structure (reference only). */
+    monthlyGrossSalary?: number;
+    /** LOP amount at daily rate (informational; net pay uses prorated gross). */
+    lopDeductionAmount?: number;
   };
   notes?: string[];
   hrAdjustments?: HrPayrollAdjustments;
@@ -96,6 +102,17 @@ export type PayrollBreakdown = {
     transportAllowance: number;
     otherAllowances: number;
     components: Record<string, unknown>;
+  };
+  /** Excel import metadata — authoritative for locked historical months. */
+  source?: string;
+  excel?: {
+    salary?: number | null;
+    workingDaySalary?: number | null;
+    professionalTax?: number | null;
+    amountAfterPt?: number | null;
+    reimbursement?: number | null;
+    finalPayout?: number | null;
+    perDay?: number | null;
   };
 };
 

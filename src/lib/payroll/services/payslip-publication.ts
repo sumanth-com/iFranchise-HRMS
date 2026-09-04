@@ -141,22 +141,41 @@ export function isPayslipPublishedToEmployee(
   return new Date(publishedAt).getTime() <= now.getTime();
 }
 
+/** Employee portal visibility — only after HR explicitly sends/publishes. */
+export function isPayslipOfficiallyReleasedToEmployee(
+  input: { publishedAt?: string | null; emailSentAt?: string | null },
+): boolean {
+  return Boolean(input.emailSentAt);
+}
+
+/** HR payslip list "Sent" badge — matches explicit HR send only. */
+export function isPayslipHrSent(
+  input: { emailSentAt?: string | null },
+): boolean {
+  return Boolean(input.emailSentAt);
+}
+
 export function resolvePayslipAvailability(
   publishedAt: string,
   permissionCodes: string[],
   now: Date = new Date(),
-  options?: { employeeFacing?: boolean },
+  options?: { employeeFacing?: boolean; emailSentAt?: string | null },
 ): {
   availability: PayslipAvailability;
   canEmployeeAccess: boolean;
   reviewMessage: string | null;
 } {
-  const published = isPayslipPublishedToEmployee(publishedAt, now);
+  const released = options?.employeeFacing
+    ? isPayslipOfficiallyReleasedToEmployee({
+        publishedAt,
+        emailSentAt: options.emailSentAt,
+      })
+    : isPayslipHrSent({ emailSentAt: options.emailSentAt });
   const hrAccess =
     !options?.employeeFacing && canAccessPayslipDuringReview(permissionCodes);
 
-  if (published || hrAccess) {
-    return { availability: "available", canEmployeeAccess: published, reviewMessage: null };
+  if (released || hrAccess) {
+    return { availability: "available", canEmployeeAccess: released, reviewMessage: null };
   }
 
   const publishDate = formatPublishDate(publishedAt);

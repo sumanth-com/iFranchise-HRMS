@@ -100,7 +100,9 @@ export function EmployeePayrollView({
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const money = (value: number) => formatCurrency(value, data.currencyCode);
-  const latestPayslip = data.payslips.find((row) => row.canEmployeeAccess) ?? null;
+  const publishedPayslips = data.payslips.filter((row) => row.canEmployeeAccess);
+  const latestPayslip = publishedPayslips[0] ?? null;
+  const hasPublishedPayroll = Boolean(latestPayslip && data.latest);
 
   function openPayslip(id: string) {
     setActivePayslipId(id);
@@ -197,8 +199,6 @@ export function EmployeePayrollView({
   const gross = breakdown.grossSalary;
   const totalDeductions = breakdown.totalDeductions;
   const net = breakdown.netSalary;
-  const usingStructure = breakdown.usingStructure;
-  const extrasIncluded = breakdown.extrasIncluded;
   return (
     <>
       {header}
@@ -247,11 +247,11 @@ export function EmployeePayrollView({
           iconBg="bg-emerald-500/10"
         />
         <EmployeeStatCard
-          label="Gross Salary"
+          label="Attendance Earnings"
           value={
             data.kpis.currentGrossSalary != null ? money(data.kpis.currentGrossSalary) : "—"
           }
-          hint="Before deductions"
+          hint="Salary earned this period"
           icon={Banknote}
           accent="text-sky-600 dark:text-sky-400"
           iconBg="bg-sky-500/10"
@@ -266,14 +266,8 @@ export function EmployeePayrollView({
         />
         <EmployeeStatCard
           label="Total Deductions"
-          value={money(totalDeductions)}
-          hint={
-            extrasIncluded
-              ? "Includes bonuses and claims"
-              : usingStructure
-                ? "From salary structure"
-                : "Latest payslip"
-          }
+          value={hasPublishedPayroll ? money(totalDeductions) : "—"}
+          hint="From latest published payslip"
           icon={ReceiptText}
           accent="text-amber-600 dark:text-amber-400"
           iconBg="bg-amber-500/10"
@@ -283,29 +277,21 @@ export function EmployeePayrollView({
       <div className="grid gap-4 xl:grid-cols-3 xl:items-stretch">
         <EmployeeSectionCard
           className="h-full xl:col-span-2"
-          title={
-            extrasIncluded || !usingStructure
-              ? "Current Payroll Summary"
-              : "Salary Structure"
-          }
+          title="Current Payroll Summary"
           description={
-            extrasIncluded
-              ? `${fmtMonth(breakdown.periodMonth ?? "")} · Includes bonuses and expense claims`
-              : usingStructure
-                ? "Based on your current salary structure. Payslips appear once payroll is processed."
-                : `${fmtMonth(data.latest?.payrollMonth ?? "")} · Payslip ${
-                    data.latest?.payslipNumber ?? ""
-                  }`
+            hasPublishedPayroll
+              ? `${fmtMonth(data.latest?.payrollMonth ?? "")} · Payslip ${data.latest?.payslipNumber ?? ""}`
+              : "Your latest published payslip will appear here once HR releases it."
           }
           action={
-            data.latest &&
-            breakdown.periodMonth &&
-            data.latest.payrollMonth.slice(0, 7) === breakdown.periodMonth ? (
+            hasPublishedPayroll && data.latest ? (
               <StatusPill status={data.latest.payrollStatus} />
             ) : null
           }
           bodyClassName="flex h-full flex-col gap-4"
         >
+          {hasPublishedPayroll ? (
+            <>
             <EarningsDeductionsTable
               variant="dashboard"
               earnings={earnings}
@@ -317,16 +303,23 @@ export function EmployeePayrollView({
 
             <div className="mt-auto rounded-xl border bg-white px-4 py-3 dark:bg-input">
               <div className="flex flex-wrap items-baseline justify-center gap-x-2 gap-y-1 text-sm font-semibold tabular-nums">
-                <span className="uppercase tracking-wide text-muted-foreground">Gross</span>
+                <span className="uppercase tracking-wide text-muted-foreground">Attendance earnings</span>
                 <span>{money(gross)}</span>
                 <span className="font-semibold text-muted-foreground">−</span>
                 <span className="uppercase tracking-wide text-muted-foreground">Deductions</span>
                 <span>{money(totalDeductions)}</span>
                 <span className="font-semibold text-muted-foreground">=</span>
-                <span className="uppercase tracking-wide text-muted-foreground">Net Pay</span>
+                <span className="uppercase tracking-wide text-muted-foreground">Net salary</span>
                 <span className="text-emerald-600 dark:text-emerald-400">{money(net)}</span>
               </div>
             </div>
+            </>
+          ) : (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              No published payslip is available yet. You will continue seeing your last
+              officially released payroll until HR publishes the next one.
+            </p>
+          )}
         </EmployeeSectionCard>
 
         {data.latestTimeline ? (
@@ -394,9 +387,11 @@ export function EmployeePayrollView({
                     </p>
                   </div>
                 </div>
-                <dl className="grid grid-cols-3 gap-2 text-xs">
-                  <Detail label="Account holder" value={data.bank.accountHolderName} />
-                  <Detail label="IFSC" value={data.bank.ifscCode} />
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-3">
+                  <Detail label="Bank Name" value={data.bank.bankName} />
+                  <Detail label="Account Holder Name" value={data.bank.accountHolderName} />
+                  <Detail label="Account Number" value={data.bank.accountNumberMasked} />
+                  <Detail label="IFSC Code" value={data.bank.ifscCode} />
                   <Detail label="Branch" value={data.bank.branchName} />
                 </dl>
                 <p className="pt-1 text-[11px] text-muted-foreground">
@@ -437,22 +432,22 @@ export function EmployeePayrollView({
             )}
           </div>
         ) : null}
-        {data.payslips.length > 0 ? (
+        {publishedPayslips.length > 0 ? (
           <>
           <table className="w-full min-w-[44rem] text-sm">
             <thead>
               <tr className="bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600">
                 <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Month</th>
                 <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Payslip #</th>
-                <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Gross</th>
-                <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Net</th>
+                <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Attendance earnings</th>
+                <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Net salary</th>
                 <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Credit Date</th>
                 <th className="h-11 whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Status</th>
                 <th className="h-11 whitespace-nowrap px-4 py-3 text-right align-middle text-xs font-semibold uppercase tracking-wide text-white">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {data.payslips.slice(0, 3).map((row: PayslipListItem) => (
+              {publishedPayslips.slice(0, 3).map((row: PayslipListItem) => (
                 <tr key={row.id} className="border-b last:border-0">
                   <td className="py-2.5 pr-3 font-medium">{fmtMonth(row.payrollMonth)}</td>
                   <td className="py-2.5 pr-3 text-muted-foreground">{row.payslipNumber}</td>
@@ -464,13 +459,7 @@ export function EmployeePayrollView({
                     {fmtDate(row.salaryCreditDate)}
                   </td>
                   <td className="py-2.5 pr-3">
-                    {row.availability === "under_review" ? (
-                      <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-800">
-                        {row.reviewMessage ?? "Pending release"}
-                      </span>
-                    ) : (
-                      <StatusPill status={row.payrollStatus} />
-                    )}
+                    <StatusPill status={row.payrollStatus} />
                   </td>
                   <td className="py-2.5 text-right">
                     <div className="flex justify-end gap-2">
@@ -515,7 +504,7 @@ export function EmployeePayrollView({
               ))}
             </tbody>
           </table>
-          {data.payslips.length > 3 ? (
+          {publishedPayslips.length > 3 ? (
             <p className="mt-3 text-center text-xs text-muted-foreground">
               Showing 3 most recent ·{" "}
               <button
@@ -523,14 +512,14 @@ export function EmployeePayrollView({
                 className="font-medium text-primary underline-offset-2 hover:underline"
                 onClick={() => setHistoryOpen(true)}
               >
-                View all {data.payslips.length} payslips
+                View all {publishedPayslips.length} payslips
               </button>
             </p>
           ) : null}
           </>
         ) : (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            No payslips issued yet.
+            No published payslips yet.
           </p>
         )}
       </EmployeeSectionCard>
@@ -538,7 +527,7 @@ export function EmployeePayrollView({
       <EmployeePayslipHistoryDialog
         open={historyOpen}
         onOpenChange={setHistoryOpen}
-        payslips={data.payslips}
+        payslips={publishedPayslips}
         money={money}
         fmtDate={fmtDate}
         fmtMonth={fmtMonth}
@@ -549,8 +538,6 @@ export function EmployeePayrollView({
         payslipId={activePayslipId}
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
-        overlaySummary={data.displaySummary}
-        overlayPayslipId={data.latest?.id ?? null}
       />
     </>
   );

@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import {
   Ban,
   Building2,
+  CalendarDays,
   Eye,
   Loader2,
   Mail,
@@ -11,19 +12,21 @@ import {
   Pencil,
   Power,
   RotateCw,
+  Send,
   Shield,
   ShieldX,
   Trash2,
   UserRound,
   Users,
+  UserCheck,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { CeoProvisioningStatusBadge } from "@/components/ceo/user-provisioning/ceo-provisioning-status-badge";
 import { CeoProvisioningUserSearch } from "@/components/ceo/user-provisioning/ceo-provisioning-user-search";
 import { Button } from "@/components/common/button";
 import { FilterSelect } from "@/components/common/filter-select";
-import { EmployeeAvatar } from "@/components/employees/employee-avatar";
+import { ProvisioningCardAvatar } from "@/components/ceo/user-provisioning/provisioning-card-avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +34,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { provisioningContactFieldVisibility } from "@/lib/ceo/provisioning-contact-fields";
 import type {
   CeoProvisioningUser,
   ProvisioningRowAction,
@@ -38,45 +42,68 @@ import type {
 import {
   canCancelProvisioningInvitation,
   canChangePendingProvisioningRole,
+  canChangeProvisioningReportingContacts,
   canEditPendingProvisioningUser,
   canResendProvisioningInvitation,
+  canSendProvisioningInvitation,
 } from "@/lib/ceo/provisioning-user-permissions";
 
 type CeoProvisioningPeopleProps = {
   users: CeoProvisioningUser[];
-  total: number;
-  page: number;
-  pageSize: number;
   isRefreshing?: boolean;
   busyEmployeeId?: string | null;
-  statusFilter?: string;
-  onStatusFilterChange?: (status: string) => void;
-  searchQuery?: string;
-  onSearchChange?: (search: string | undefined) => void;
-  onFetchSearchSuggestions?: (query: string) => Promise<CeoProvisioningUser[]>;
-  onPageChange: (page: number) => void;
+  showFilters?: boolean;
   onAction: (action: ProvisioningRowAction, user: CeoProvisioningUser) => void;
 };
 
-function fmtDate(value: string | null) {
-  return value ? format(new Date(value), "d MMM yyyy") : "—";
+function matchesSearch(user: CeoProvisioningUser, query: string) {
+  const term = query.trim().toLowerCase();
+  if (!term) return true;
+  return [
+    user.fullName,
+    user.email,
+    user.employeeCode,
+    user.departmentName ?? "",
+    user.roleLabel,
+  ]
+    .join(" ")
+    .toLowerCase()
+    .includes(term);
 }
 
-function canResend(user: CeoProvisioningUser) {
-  return canResendProvisioningInvitation(user);
+function isDeactivatedUser(user: CeoProvisioningUser) {
+  return (
+    user.invitationStatus === "inactive" ||
+    user.invitationStatus === "revoked" ||
+    user.invitationStatus === "deactivated" ||
+    user.accountStatus === "inactive" ||
+    user.accountStatus === "suspended"
+  );
 }
-function canCancel(user: CeoProvisioningUser) {
-  return canCancelProvisioningInvitation(user);
+
+function matchesStatusFilter(user: CeoProvisioningUser, statusFilter: string) {
+  if (statusFilter === "all") return true;
+  if (statusFilter === "deactivated") return isDeactivatedUser(user);
+  if (statusFilter === "pending") {
+    return (
+      user.invitationStatus === "pending" ||
+      user.invitationStatus === "expired" ||
+      user.invitationStatus === "cancelled"
+    );
+  }
+  if (statusFilter === "opened") return user.invitationStatus === "opened";
+  if (statusFilter === "active") return user.invitationStatus === "active";
+  return user.invitationStatus === statusFilter;
 }
-function canEdit(user: CeoProvisioningUser) {
-  return canEditPendingProvisioningUser(user);
+
+function fmtInviteDate(value: string | null) {
+  return value ? format(new Date(value), "d MMM yyyy") : null;
 }
-function canChangeRole(user: CeoProvisioningUser) {
-  return canChangePendingProvisioningRole(user);
-}
+
 function canDeactivate(user: CeoProvisioningUser) {
-  return user.accountStatus === "active" && !user.isSelf;
+  return user.invitationStatus === "active" && !user.isSelf;
 }
+
 function canReactivate(user: CeoProvisioningUser) {
   return user.accountStatus === "suspended" || user.accountStatus === "inactive";
 }
@@ -89,21 +116,29 @@ function canDelete(user: CeoProvisioningUser) {
     user.accountStatus === "invited" ||
     user.invitationStatus === "cancelled" ||
     user.invitationStatus === "pending" ||
+    user.invitationStatus === "opened" ||
     user.invitationStatus === "expired"
   );
 }
 
 function MetaRow({
   icon,
+  label,
   value,
 }: {
   icon: React.ReactNode;
+  label: string;
   value: string;
 }) {
   return (
-    <div className="flex items-center gap-2">
-      <span className="shrink-0 text-muted-foreground">{icon}</span>
-      <span className="min-w-0 truncate">{value}</span>
+    <div className="flex items-start gap-2.5 text-sm">
+      <span className="mt-0.5 shrink-0 text-muted-foreground">{icon}</span>
+      <div className="min-w-0">
+        <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+          {label}
+        </p>
+        <p className="truncate font-medium text-foreground">{value}</p>
+      </div>
     </div>
   );
 }
@@ -117,16 +152,30 @@ function PersonCard({
   busy: boolean;
   onAction: (action: ProvisioningRowAction, user: CeoProvisioningUser) => void;
 }) {
-  const pendingActions = canEdit(user) || canChangeRole(user) || canResend(user);
+  const showSend = canSendProvisioningInvitation(user);
+  const showResend = canResendProvisioningInvitation(user);
+  const showReportingContacts = canChangeProvisioningReportingContacts(user);
+  const pendingActions =
+    canEditPendingProvisioningUser(user) ||
+    canChangePendingProvisioningRole(user) ||
+    showReportingContacts ||
+    showSend ||
+    showResend;
   const hasActions =
     pendingActions ||
-    canCancel(user) ||
+    canCancelProvisioningInvitation(user) ||
     canDelete(user) ||
     canDeactivate(user) ||
     canReactivate(user);
 
+  const inviteLabel = user.invitationSentAt
+    ? fmtInviteDate(user.invitationSentAt)
+    : "Not invited";
+
+  const { showReportingManager, showAssignedHr } = provisioningContactFieldVisibility(user);
+
   return (
-    <article className="group relative flex flex-col overflow-hidden rounded-xl border border-border/80 bg-card shadow-md transition-all hover:border-primary/50 hover:shadow-lg">
+    <article className="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-white shadow-sm transition-shadow hover:shadow-md">
       <div className="absolute top-2 right-2 z-10">
         <DropdownMenu>
           <DropdownMenuTrigger
@@ -135,7 +184,7 @@ function PersonCard({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="size-8 text-muted-foreground"
+                className="size-8 text-muted-foreground hover:bg-muted/80"
                 aria-label={`Actions for ${user.fullName}`}
                 disabled={busy}
               >
@@ -147,34 +196,50 @@ function PersonCard({
               </Button>
             }
           />
-          <DropdownMenuContent align="end" className="min-w-[12.5rem]">
+          <DropdownMenuContent align="end" className="w-auto min-w-[12.5rem]">
             <DropdownMenuItem onClick={() => onAction("view", user)}>
               <Eye className="mr-2 size-4" />
-              View details
+              <span className="whitespace-nowrap">View User Details</span>
             </DropdownMenuItem>
             {pendingActions ? <DropdownMenuSeparator /> : null}
-            {canEdit(user) ? (
+            {canEditPendingProvisioningUser(user) ? (
               <DropdownMenuItem onClick={() => onAction("edit", user)}>
                 <Pencil className="mr-2 size-4" />
                 Edit
               </DropdownMenuItem>
             ) : null}
-            {canChangeRole(user) ? (
+            {canChangePendingProvisioningRole(user) ? (
               <DropdownMenuItem onClick={() => onAction("changeRole", user)}>
                 <Shield className="mr-2 size-4" />
                 Change role
               </DropdownMenuItem>
             ) : null}
-            {canResend(user) ? (
-              <DropdownMenuItem onClick={() => onAction("resend", user)}>
-                <RotateCw className="mr-2 size-4" />
-                Resend invitation
+            {showReportingContacts ? (
+              <DropdownMenuItem onClick={() => onAction("changeReportingContacts", user)}>
+                <UserCheck className="mr-2 size-4" />
+                <span className="whitespace-nowrap">Update reporting &amp; HR</span>
               </DropdownMenuItem>
             ) : null}
-            {hasActions && (canCancel(user) || canDelete(user) || canDeactivate(user) || canReactivate(user)) ? (
+            {showSend ? (
+              <DropdownMenuItem onClick={() => onAction("resend", user)}>
+                <Send className="mr-2 size-4" />
+                <span className="whitespace-nowrap">Send Invite</span>
+              </DropdownMenuItem>
+            ) : null}
+            {showResend ? (
+              <DropdownMenuItem onClick={() => onAction("resend", user)}>
+                <RotateCw className="mr-2 size-4" />
+                <span className="whitespace-nowrap">Resend Invite</span>
+              </DropdownMenuItem>
+            ) : null}
+            {hasActions &&
+            (canCancelProvisioningInvitation(user) ||
+              canDelete(user) ||
+              canDeactivate(user) ||
+              canReactivate(user)) ? (
               <DropdownMenuSeparator />
             ) : null}
-            {canCancel(user) ? (
+            {canCancelProvisioningInvitation(user) ? (
               <DropdownMenuItem
                 variant="destructive"
                 onClick={() => onAction("cancel", user)}
@@ -198,7 +263,7 @@ function PersonCard({
                 onClick={() => onAction("deactivate", user)}
               >
                 <Ban className="mr-2 size-4" />
-                Deactivate user
+                <span className="whitespace-nowrap">Deactivate Access</span>
               </DropdownMenuItem>
             ) : null}
             {canReactivate(user) ? (
@@ -216,14 +281,9 @@ function PersonCard({
         onClick={() => onAction("view", user)}
         className="flex items-start gap-3 p-4 pr-10 text-left"
       >
-        <EmployeeAvatar
-          firstName={user.firstName}
-          lastName={user.lastName}
-          profileImagePath={null}
-          className="size-12 shrink-0"
-        />
+        <ProvisioningCardAvatar user={user} className="size-12 shrink-0" />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold group-hover:text-primary">
+          <p className="truncate text-[15px] font-semibold text-foreground group-hover:text-primary">
             {user.fullName}
             {user.isSelf ? (
               <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">
@@ -231,48 +291,39 @@ function PersonCard({
               </span>
             ) : null}
           </p>
-          <p className="truncate text-xs text-muted-foreground">
-            {user.roleLabel}
-            {user.employeeCode ? (
-              <>
-                <span className="mx-1 text-muted-foreground/40">·</span>
-                <span className="font-mono text-[11px] font-medium text-foreground/80">
-                  {user.employeeCode}
-                </span>
-              </>
-            ) : null}
-          </p>
-          <div className="mt-1.5">
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">{user.roleLabel}</p>
+          <div className="mt-2">
             <CeoProvisioningStatusBadge status={user.invitationStatus} />
           </div>
         </div>
       </button>
 
-      <div className="space-y-1.5 border-t border-border/60 px-4 py-3 text-xs text-foreground/90">
-        <MetaRow icon={<Mail className="size-3.5" />} value={user.email} />
+      <div className="space-y-3 border-t border-border/70 px-4 py-3.5">
+        <MetaRow icon={<Mail className="size-3.5" />} label="Email" value={user.email} />
         <MetaRow
           icon={<Building2 className="size-3.5" />}
+          label="Department"
           value={user.departmentName ?? "—"}
         />
+        {showReportingManager ? (
+          <MetaRow
+            icon={<UserRound className="size-3.5" />}
+            label="Reporting To"
+            value={user.reportingManagerName ?? "—"}
+          />
+        ) : null}
+        {showAssignedHr ? (
+          <MetaRow
+            icon={<UserCheck className="size-3.5" />}
+            label="HR Contact"
+            value={user.assignedHrEmployeeName ?? "—"}
+          />
+        ) : null}
         <MetaRow
-          icon={<UserRound className="size-3.5" />}
-          value={
-            user.reportingManagerName
-              ? `Reports to ${user.reportingManagerName}`
-              : "No reporting manager"
-          }
+          icon={<CalendarDays className="size-3.5" />}
+          label="Invited"
+          value={inviteLabel ?? "Not invited"}
         />
-      </div>
-
-      <div className="flex items-center justify-between gap-2 border-t border-border/60 bg-muted/40 px-4 py-2 text-[11px] text-muted-foreground">
-        <span className="truncate">Invited {fmtDate(user.invitationSentAt)}</span>
-        <span className="truncate">
-          {user.invitationStatus === "accepted"
-            ? `Accepted ${fmtDate(user.acceptedAt)}`
-            : user.sentByName
-              ? `by ${user.sentByName}`
-              : ""}
-        </span>
       </div>
     </article>
   );
@@ -280,111 +331,77 @@ function PersonCard({
 
 export function CeoProvisioningPeople({
   users,
-  total,
-  page,
-  pageSize,
   isRefreshing,
   busyEmployeeId,
-  statusFilter: controlledStatusFilter,
-  onStatusFilterChange,
-  searchQuery,
-  onSearchChange,
-  onFetchSearchSuggestions,
-  onPageChange,
+  showFilters = false,
   onAction,
 }: CeoProvisioningPeopleProps) {
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const [internalStatusFilter, setInternalStatusFilter] = useState("all");
-  const statusFilter = controlledStatusFilter ?? internalStatusFilter;
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
-  const handleFilterChange = (nextStatus: string) => {
-    if (onStatusFilterChange) {
-      onStatusFilterChange(nextStatus);
-    } else {
-      setInternalStatusFilter(nextStatus);
-    }
-  };
-
-  const isDeactivated = (u: CeoProvisioningUser) =>
-    u.invitationStatus === "inactive" ||
-    u.invitationStatus === "revoked" ||
-    (u.invitationStatus as string) === "deactivated" ||
-    u.accountStatus === "inactive" ||
-    u.accountStatus === "suspended";
-
-  const isPending = (u: CeoProvisioningUser) =>
-    u.invitationStatus === "pending" ||
-    u.invitationStatus === "expired" ||
-    u.invitationStatus === "cancelled" ||
-    u.accountStatus === "invitation_pending" ||
-    u.accountStatus === "draft" ||
-    u.accountStatus === "invited";
-
-  const isAccepted = (u: CeoProvisioningUser) =>
-    u.invitationStatus === "accepted" || u.accountStatus === "active";
+  const fetchSearchSuggestions = useCallback(
+    async (query: string) =>
+      users.filter((user) => matchesSearch(user, query)).slice(0, 8),
+    [users],
+  );
 
   const filteredUsers = useMemo(() => {
-    if (onStatusFilterChange) return users;
-    if (statusFilter === "all") return users;
-    if (statusFilter === "deactivated") return users.filter(isDeactivated);
-    if (statusFilter === "pending") return users.filter(isPending);
-    if (statusFilter === "accepted") return users.filter(isAccepted);
-    return users.filter((u) => u.invitationStatus === statusFilter);
-  }, [users, statusFilter, onStatusFilterChange]);
+    if (!showFilters) return users;
+    return users.filter(
+      (user) =>
+        matchesSearch(user, searchQuery) && matchesStatusFilter(user, statusFilter),
+    );
+  }, [users, showFilters, searchQuery, statusFilter]);
 
   return (
-    <section className="rounded-xl border border-border/80 bg-card p-4 shadow-md">
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+    <section className="rounded-xl border border-border/80 bg-card p-4 shadow-sm">
+      <div className="mb-4 flex flex-wrap items-center gap-2.5">
         <Users className="size-4 shrink-0 text-muted-foreground" />
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold">Portal Users</h2>
           <p className="text-xs text-muted-foreground">
-            Invited and active portal users, including pending invitations.
+            All employees with portal access status and provisioning details.
           </p>
         </div>
-        {onSearchChange && onFetchSearchSuggestions ? (
-          <CeoProvisioningUserSearch
-            value={searchQuery ?? ""}
-            className="w-full min-w-[12rem] sm:w-[min(100%,16rem)]"
-            onChange={onSearchChange}
-            onFetchSuggestions={onFetchSearchSuggestions}
-          />
+        {showFilters ? (
+          <>
+            <CeoProvisioningUserSearch
+              value={searchQuery}
+              className="w-full min-w-[12rem] sm:w-[min(100%,16rem)]"
+              onChange={(search) => setSearchQuery(search ?? "")}
+              onFetchSuggestions={fetchSearchSuggestions}
+            />
+            <FilterSelect
+              className="w-full min-w-[10rem] shrink-0 sm:w-[140px]"
+              items={[
+                { value: "all", label: "All statuses" },
+                { value: "pending", label: "Pending" },
+                { value: "opened", label: "Opened" },
+                { value: "active", label: "Active" },
+                { value: "deactivated", label: "Deactivated" },
+              ]}
+              value={statusFilter}
+              placeholder="All statuses"
+              onValueChange={setStatusFilter}
+            />
+            <span className="inline-flex h-10 shrink-0 items-center rounded-md border border-border bg-white px-3 text-sm font-semibold dark:bg-input">
+              {filteredUsers.length} people
+            </span>
+          </>
         ) : null}
-        <FilterSelect
-          className="w-full min-w-[10rem] shrink-0 sm:w-[140px]"
-          items={[
-            { value: "all", label: "All statuses" },
-            { value: "pending", label: "Pending" },
-            { value: "accepted", label: "Accepted" },
-            { value: "deactivated", label: "Deactivated" },
-          ]}
-          value={statusFilter}
-          placeholder="All statuses"
-          onValueChange={handleFilterChange}
-        />
-        {isRefreshing && users.length > 0 ? (
+        {isRefreshing ? (
           <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
         ) : null}
       </div>
 
       {filteredUsers.length === 0 ? (
         <p className="py-12 text-center text-sm text-muted-foreground">
-          {statusFilter === "deactivated"
-            ? "No deactivated users found."
-            : statusFilter === "pending"
-              ? "No pending invitations found."
-              : statusFilter === "accepted"
-                ? "No active users found."
-                : "No users found. Use “Invite User” to get started."}
+          {showFilters && (searchQuery || statusFilter !== "all")
+            ? "No employees match your search or filters."
+            : "No employees found. Use “Invite User” to get started."}
         </p>
       ) : (
-        <div
-          className={
-            isRefreshing
-              ? "grid gap-4 opacity-80 transition-opacity grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
-              : "grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
-          }
-        >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredUsers.map((user) => (
             <PersonCard
               key={user.employeeId}
@@ -395,37 +412,6 @@ export function CeoProvisioningPeople({
           ))}
         </div>
       )}
-
-      {total > pageSize ? (
-        <div className="mt-4 flex items-center justify-between gap-3 border-t pt-3">
-          <p className="text-xs text-muted-foreground">
-            Showing {filteredUsers.length} of {total} user{total === 1 ? "" : "s"}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={page <= 1 || isRefreshing}
-              onClick={() => onPageChange(page - 1)}
-            >
-              Previous
-            </Button>
-            <span className="text-xs text-muted-foreground">
-              Page {page} of {totalPages}
-            </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={page >= totalPages || isRefreshing}
-              onClick={() => onPageChange(page + 1)}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      ) : null}
     </section>
   );
 }

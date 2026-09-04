@@ -16,6 +16,7 @@ import {
   reactivateExecutiveUser,
   resendExecutiveInvitation,
   updatePendingProvisioningUser,
+  updateProvisioningReportingContacts,
 } from "@/lib/ceo/services/ceo-user-provisioning-mutations";
 import {
   getCeoProvisioningLookups,
@@ -45,6 +46,7 @@ import {
   inviteExecutiveUserSchema,
   inviteExistingEmployeeSchema,
   updatePendingProvisioningUserSchema,
+  updateProvisioningReportingContactsSchema,
 } from "@/lib/validations/ceo-user-provisioning";
 import { provisionOnboardingCandidateSchema } from "@/lib/validations/onboarding-provisioning";
 import type { ProvisioningEligibleCandidate } from "@/lib/onboarding/provisioning-eligibility";
@@ -322,6 +324,27 @@ export async function updatePendingProvisioningUserAction(
     return {
       success: false,
       message: toProvisioningErrorMessage(error, "Unable to update user. Please try again."),
+    };
+  }
+}
+
+export async function updateProvisioningReportingContactsAction(
+  input: unknown,
+): Promise<ActionResult> {
+  try {
+    const profile = await requireServerAnyPermission(MANAGE_PERMISSIONS);
+    const supabase = await createClient();
+    const parsed = updateProvisioningReportingContactsSchema.parse(input);
+    await updateProvisioningReportingContacts(supabase, profile, parsed);
+    revalidateUserProvisioning();
+    return { success: true, message: "Reporting contacts updated." };
+  } catch (error) {
+    return {
+      success: false,
+      message: toProvisioningErrorMessage(
+        error,
+        "Unable to update reporting contacts. Please try again.",
+      ),
     };
   }
 }

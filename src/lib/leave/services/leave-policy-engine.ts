@@ -11,6 +11,7 @@ import {
   SELF_SERVICE_MAX_LEAVE_DAYS,
   isLeaveTypeAllowedForBand,
 } from "@/lib/leave/leave-eligibility";
+import { shouldBlockInternProbationFirstMonthLeave } from "@/lib/leave/leave-entitlement";
 
 export const PERIOD_LEAVE_CODE = "PL";
 export const CASUAL_LEAVE_CODE = "CL";
@@ -191,6 +192,21 @@ export function validateLeavePolicy(input: {
     issues.push({
       code: "eligibility",
       message: LEAVE_TYPE_NOT_ELIGIBLE_MESSAGE,
+    });
+  }
+
+  if (
+    shouldBlockInternProbationFirstMonthLeave({
+      leaveEligibilityBand: eligibilityBand,
+      joiningDate: input.employee.joiningDate,
+      asOfDate: input.startDate,
+      firstMonthLeaveAllowed: probationRules.firstMonthLeaveAllowed,
+    }) &&
+    code !== LOSS_OF_PAY_CODE
+  ) {
+    issues.push({
+      code: "probation_month_1",
+      message: "Leave is not permitted during your first month of employment.",
     });
   }
 
