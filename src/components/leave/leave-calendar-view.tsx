@@ -68,7 +68,15 @@ type DayCell = {
 
 type CalendarCell = DayCell | null;
 
-const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const WEEKDAY_LABELS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
 
 const LEAVE_STATUS_COLORS: Record<LeaveStatus, string> = {
   approved: LEAVE_CALENDAR_LEGEND.approved.className,
@@ -424,9 +432,9 @@ export function LeaveCalendarView({
                   type="button"
                   onClick={() => handleViewChange(mode)}
                   className={cn(
-                    "rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors",
+                    "rounded-md px-3 py-1 text-xs font-semibold capitalize transition-colors",
                     view === mode
-                      ? "bg-background text-foreground shadow-sm"
+                      ? "bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-sm"
                       : "text-muted-foreground hover:text-foreground",
                   )}
                 >
@@ -447,16 +455,16 @@ export function LeaveCalendarView({
       >
         <div className="overflow-x-auto">
           <div className={gridMinWidth}>
-            <div className="grid grid-cols-7 border-b bg-muted/40">
+            <div className="grid grid-cols-7 border-b bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600">
               {WEEKDAY_LABELS.map((label) => (
                 <div
                   key={label}
                   className={cn(
-                    "px-1.5 py-1.5 text-center font-medium text-muted-foreground",
-                    compact ? "text-[10px]" : "text-xs",
+                    "px-1.5 py-2 text-center font-bold text-white",
+                    compact ? "text-[10px] leading-tight" : "text-xs",
                   )}
                 >
-                  {compact ? label.slice(0, 3) : label}
+                  {label}
                 </div>
               ))}
             </div>
