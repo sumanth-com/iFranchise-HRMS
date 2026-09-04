@@ -97,10 +97,10 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
     lateTodayRes,
     halfDayTodayRes,
     onLeaveTodayRes,
-    openJobsRes,
     payrollRes,
     pendingApprovalsRes,
     holidaysResult,
+    recruitmentSummary,
   ] = await Promise.all([
     fromHrms(supabase, "leave_requests")
       .select("id", { count: "exact", head: true })
@@ -124,11 +124,6 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
     attendanceStatusCount("late"),
     attendanceStatusCount("half_day"),
     attendanceStatusCount("on_leave"),
-    fromHrms(supabase, "recruitment_jobs")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", organizationId)
-      .eq("job_status", "open")
-      .is("deleted_at", null),
     fromHrms(supabase, "payrolls")
       .select("total_net, total_gross")
       .eq("organization_id", organizationId)
@@ -143,6 +138,10 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
     loadUpcomingCelebrations(supabase, organizationId, today).catch((error) => {
       console.error("[ceo-dashboard] upcoming celebrations query failed", error);
       return [] as Awaited<ReturnType<typeof loadUpcomingCelebrations>>;
+    }),
+    getRecruitmentSummary(supabase, profile).catch((error) => {
+      console.error("[ceo-dashboard] recruitment summary failed", error);
+      return null;
     }),
   ]);
 
@@ -161,9 +160,6 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
       console.error(`[ceo-dashboard] attendance ${label} count failed`, result.error.message);
     }
   }
-  if (openJobsRes.error) {
-    console.error("[ceo-dashboard] open jobs failed", openJobsRes.error.message);
-  }
   if (payrollRes.error) {
     console.error("[ceo-dashboard] payroll failed", payrollRes.error.message);
   }
@@ -173,11 +169,11 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
 
   const totalEmployees = activeEmployeesRes.count ?? 0;
   const employeesExiting = exitingRes.count ?? 0;
-  const openPositions = openJobsRes.count ?? 0;
+  const openPositions = recruitmentSummary?.openPositions ?? 0;
   const payrollCost = Number(payrollRes.data?.total_net ?? payrollRes.data?.total_gross ?? 0);
   const pendingApprovals = pendingApprovalsRes.count ?? 0;
 
-  const attendance = {
+  const attendanceRaw = {
     presentToday: presentTodayRes.count ?? 0,
     absentToday: absentTodayRes.count ?? 0,
     lateToday: lateTodayRes.count ?? 0,
@@ -185,8 +181,19 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
     onLeaveToday: onLeaveTodayRes.count ?? 0,
   };
 
-  const presentCount =
-    attendance.presentToday + attendance.lateToday + attendance.halfDayToday;
+  const onSiteToday =
+    attendanceRaw.presentToday + attendanceRaw.lateToday + attendanceRaw.halfDayToday;
+  const absentDerived = Math.max(
+    attendanceRaw.absentToday,
+    Math.max(0, totalEmployees - onSiteToday - attendanceRaw.onLeaveToday),
+  );
+
+  const attendance = {
+    ...attendanceRaw,
+    absentToday: absentDerived,
+  };
+
+  const presentCount = onSiteToday;
   const attendancePercent =
     totalEmployees > 0 ? Math.round((presentCount / totalEmployees) * 1000) / 10 : 0;
   const attritionBase = totalEmployees + employeesExiting;
@@ -216,7 +223,7 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
       departments: 0,
       managers: 0,
       openPositions,
-      recruitmentPipeline: 0,
+      recruitmentPipeline: recruitmentSummary?.activeCandidates ?? 0,
       pendingApprovals,
       pendingLeaveApprovals: pendingLeaveRes.count ?? 0,
       attendancePercent,
@@ -239,12 +246,15 @@ export const getCeoDashboardData = cache(async function getCeoDashboardData(
     },
     recruitment: {
       openJobs: openPositions,
-      candidates: 0,
-      interviewsToday: 0,
-      offersPending: 0,
-      hiringThisMonth: 0,
-      timeToHireDays: 0,
-      funnel: [],
+      candidates: recruitmentSummary?.activeCandidates ?? 0,
+      interviewsToday: recruitmentSummary?.interviewsToday ?? 0,
+      offersPending: recruitmentSummary?.offersPending ?? 0,
+      hiringThisMonth: recruitmentSummary?.hiresThisMonth ?? 0,
+      timeToHireDays: recruitmentSummary?.averageHiringTimeDays ?? 0,
+      funnel: (recruitmentSummary?.candidatesByStage ?? []).map((row) => ({
+        label: row.stage,
+        value: row.count,
+      })),
     },
     performance: {
       companyAverageRating: 0,

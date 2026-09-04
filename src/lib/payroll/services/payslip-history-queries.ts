@@ -329,7 +329,7 @@ async function listHrPayslipsFromPayrollRun(
       payrollMonth,
       grossSalary: Number(row.gross_salary ?? 0),
       netSalary: Number(row.net_salary ?? 0),
-      payrollStatus: payroll.payroll_status,
+      payrollStatus: payroll.payroll_status as PayrollStatus,
       issuedAt: payslip?.issued_at ?? "",
       salaryCreditDate: payslip?.salary_credit_date ?? "",
       publishedAt: payslip?.published_at ?? "",

@@ -170,7 +170,7 @@ export function resolvePayslipAvailability(
         publishedAt,
         emailSentAt: options.emailSentAt,
       })
-    : isPayslipHrSent({ emailSentAt: options.emailSentAt });
+    : isPayslipHrSent({ emailSentAt: options?.emailSentAt });
   const hrAccess =
     !options?.employeeFacing && canAccessPayslipDuringReview(permissionCodes);
 

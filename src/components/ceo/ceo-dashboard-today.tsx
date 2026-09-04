@@ -23,7 +23,7 @@ function Stat({
       <p
         className={
           highlight
-            ? "mt-1 text-lg font-semibold tabular-nums"
+            ? "mt-1 text-lg font-semibold tabular-nums text-emerald-700 dark:text-emerald-300"
             : "mt-1 text-sm font-semibold tabular-nums"
         }
       >
@@ -55,14 +55,14 @@ export function CeoDashboardToday({
       action={
         <Link
           href={CEO_ROUTES.attendance}
-          className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/15"
+          className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-500/20 transition-colors hover:bg-emerald-500/25 dark:bg-emerald-400/15 dark:text-emerald-300 dark:ring-emerald-400/25 dark:hover:bg-emerald-400/25"
         >
           <CalendarCheck className="size-3" />
           Attendance
         </Link>
       }
     >
-      <div className="grid grid-cols-3 divide-x rounded-xl border bg-gradient-to-br from-primary/5 via-card to-card">
+      <div className="grid grid-cols-3 divide-x divide-emerald-500/10 rounded-xl border border-emerald-500/15 bg-gradient-to-br from-emerald-500/10 via-card to-card">
         <Stat label="Present" value={String(onSite)} highlight />
         <Stat label="Absent" value={String(absentToday)} />
         <Stat label="On leave" value={String(onLeaveToday)} />

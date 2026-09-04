@@ -12,6 +12,7 @@ import {
 } from "@/components/employees/employee-account-status-badge";
 import { ProfilePhotoFallback } from "@/components/employees/profile-photo-fallback";
 import { getDirectoryAssetPhoto } from "@/lib/employee/directory-asset-photos";
+import { formatDesignationDisplay } from "@/lib/employees/designation-display";
 import { PROFILE_IMAGE_MAX_BYTES } from "@/lib/employees/constants";
 import {
   getProfileImageSignedUrlAction,
@@ -70,7 +71,13 @@ export function EmployeeIdCard({
   const [isPending, startTransition] = useTransition();
 
   const fullName = `${firstName} ${lastName}`.trim();
-  const roleTitle = designation?.trim() || "Team Member";
+  const roleTitle = formatDesignationDisplay(designation, {
+    person: { employeeCode, firstName, lastName },
+  });
+  const roleTitleClass =
+    roleTitle.length > 28
+      ? "text-[0.72rem] leading-snug"
+      : "text-[0.82rem] leading-snug";
   const accountDeactivated =
     accountStatus != null && isEmployeeAccountDeactivated(accountStatus);
   const assetPhoto = getDirectoryAssetPhoto({
@@ -356,7 +363,7 @@ export function EmployeeIdCard({
               <p className="w-full break-words text-[1.2rem] font-bold leading-snug tracking-tight text-neutral-950">
                 {fullName}
               </p>
-              <p className="mt-2 w-full whitespace-normal break-words text-[0.82rem] leading-snug text-neutral-500">
+              <p className={cn("mt-2 w-full whitespace-normal break-words text-neutral-500", roleTitleClass)}>
                 {roleTitle}
               </p>
               <p className="mt-1 w-full font-mono text-[0.72rem] font-medium tracking-wide text-neutral-500">
@@ -403,7 +410,7 @@ export function EmployeeIdCard({
               <p className="w-full break-words text-[1.2rem] font-bold leading-snug tracking-tight text-white">
                 {fullName}
               </p>
-              <p className="mt-2 w-full whitespace-normal break-words text-[0.82rem] leading-snug text-slate-200">
+              <p className={cn("mt-2 w-full whitespace-normal break-words text-slate-200", roleTitleClass)}>
                 {roleTitle}
               </p>
               <p className="mt-1 w-full font-mono text-[0.72rem] font-medium tracking-wide text-slate-300">

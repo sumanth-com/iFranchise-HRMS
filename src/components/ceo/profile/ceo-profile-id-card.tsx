@@ -30,7 +30,7 @@ export function CeoProfileIdCard({ profile, className }: Props) {
       firstName={firstName}
       lastName={lastName}
       employeeCode={profile.employeeCode}
-      designation="CEO"
+      designation={profile.roleName}
       departmentName={profile.departmentName}
       employmentTypeName={profile.employmentTypeName ?? "Full Time"}
       employmentStatus="active"

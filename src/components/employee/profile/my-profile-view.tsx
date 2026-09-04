@@ -18,6 +18,7 @@ import {
   normalizeRelationshipValue,
 } from "@/lib/employee/profile-contact";
 import { updateEmployeeSelfProfileAction } from "@/lib/employees/actions";
+import { formatDesignationDisplay } from "@/lib/employees/designation-display";
 import { cn } from "@/lib/utils";
 import type { MyProfileBundle } from "@/types/my-profile";
 import {
@@ -168,10 +169,17 @@ export function MyProfileView({
   const isEmployee = pathname.startsWith("/employee");
   const isHrPortal = pathname.startsWith("/dashboard");
   const displayName = `${data.firstName} ${data.lastName}`.trim() || data.firstName;
+  const designationDisplay = formatDesignationDisplay(data.designationTitle, {
+    person: {
+      employeeCode: data.employeeCode,
+      firstName: data.firstName,
+      lastName: data.lastName,
+    },
+  });
   const roleLine = isCeo
-    ? "CEO"
+    ? designationDisplay
     : [
-        data.designationTitle,
+        designationDisplay,
         isHrPortal ? "HR" : data.departmentName,
       ]
         .filter(Boolean)
@@ -272,7 +280,7 @@ export function MyProfileView({
               firstName={data.firstName}
               lastName={data.lastName}
               employeeCode={data.employeeCode}
-              designation={isCeo ? "CEO" : data.designationTitle}
+              designation={data.designationTitle}
               departmentName={data.departmentName}
               employmentTypeName={formatDisplayLabel(data.employmentTypeName)}
               employmentStatus={data.employmentStatus}
