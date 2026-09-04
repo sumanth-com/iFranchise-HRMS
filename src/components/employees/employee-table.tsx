@@ -12,10 +12,16 @@ import {
   SelectValue,
 } from "@/components/common/select";
 import { EmployeeCardsGrid } from "@/components/employees/employee-cards-grid";
+import { ChangeEmploymentTypeDialog } from "@/components/employees/change-employment-type-dialog";
 import { EmployeeDeleteConfirmDialog } from "@/components/employees/employee-delete-confirm-dialog";
+import { EmploymentCategoryFilters } from "@/components/employees/employment-category-filters";
 import { PeoplePageSizeSelect } from "@/components/common/people-page-size-select";
 import { deleteEmployeeAction, fetchEmployeesAction } from "@/lib/employees/actions";
 import { resolveEmployeeModuleRoutes } from "@/lib/employees/constants";
+import {
+  DEFAULT_EMPLOYMENT_CATEGORY_FILTER,
+  type EmploymentCategoryFilter,
+} from "@/lib/employees/employment-category";
 import type {
   EmployeeListItem,
   EmployeeListParams,
@@ -33,7 +39,9 @@ type EmployeeTableProps = {
   sortOrder: "asc" | "desc";
   department?: string;
   employmentStatus?: string;
+  employmentCategory?: EmploymentCategoryFilter;
   departments: LookupOption[];
+  employmentTypes: LookupOption[];
   canEdit: boolean;
   canDelete: boolean;
   /** Serializable portal base (e.g. `/dashboard/system/employees`). Never pass route builders from RSC. */
@@ -50,7 +58,9 @@ export function EmployeeTable({
   sortOrder: initialSortOrder,
   department: initialDepartment,
   employmentStatus: initialEmploymentStatus,
+  employmentCategory: initialEmploymentCategory = DEFAULT_EMPLOYMENT_CATEGORY_FILTER,
   departments,
+  employmentTypes,
   canEdit,
   canDelete,
   routesBasePath,
@@ -58,6 +68,7 @@ export function EmployeeTable({
   const routes = resolveEmployeeModuleRoutes(routesBasePath);
   const [isPending, startTransition] = useTransition();
   const [deleteTarget, setDeleteTarget] = useState<EmployeeListItem | null>(null);
+  const [employmentTypeTarget, setEmploymentTypeTarget] = useState<EmployeeListItem | null>(null);
   const [tableState, setTableState] = useState({
     employees: initialEmployees,
     total: initialTotal,
@@ -72,6 +83,7 @@ export function EmployeeTable({
     sortOrder: initialSortOrder,
     department: initialDepartment,
     employmentStatus: initialEmploymentStatus as EmployeeListParams["employmentStatus"],
+    employmentCategory: initialEmploymentCategory,
   });
   const [searchInput, setSearchInput] = useState(initialSearch ?? "");
 
@@ -141,7 +153,19 @@ export function EmployeeTable({
   }, [searchInput, filters.search, updateParams]);
 
   const { employees, pageSize } = tableState;
-  const { department } = filters;
+  const { department, employmentCategory = DEFAULT_EMPLOYMENT_CATEGORY_FILTER } = filters;
+
+  const refreshEmployees = useCallback(async () => {
+    const refreshResult = await fetchEmployeesAction(filters);
+    if (refreshResult.success) {
+      setTableState({
+        employees: refreshResult.data.data,
+        total: refreshResult.data.total,
+        page: refreshResult.data.page,
+        pageSize: refreshResult.data.pageSize,
+      });
+    }
+  }, [filters]);
 
   const departmentItems = useMemo(
     () => [
@@ -170,23 +194,24 @@ export function EmployeeTable({
         `${result.data.fullName} (${result.data.employeeCode}) was permanently removed.`,
       );
       setDeleteTarget(null);
-
-      const refreshResult = await fetchEmployeesAction(filters);
-      if (refreshResult.success) {
-        setTableState({
-          employees: refreshResult.data.data,
-          total: refreshResult.data.total,
-          page: refreshResult.data.page,
-          pageSize: refreshResult.data.pageSize,
-        });
-      }
+      await refreshEmployees();
     });
   };
 
   return (
     <div className="space-y-4">
-      <div className="relative z-10 flex flex-col gap-3 rounded-xl border border-border/70 bg-muted/55 p-3 lg:flex-row lg:items-center">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2.5">
+      <div className="relative z-10 flex flex-col gap-3 rounded-xl border border-border/70 bg-muted/55 p-3">
+        <EmploymentCategoryFilters
+          value={employmentCategory ?? DEFAULT_EMPLOYMENT_CATEGORY_FILTER}
+          disabled={isPending}
+          onChange={(value) =>
+            updateParams({
+              employmentCategory: value === "all" ? undefined : value,
+              page: "1",
+            })
+          }
+        />
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2.5 lg:flex-row lg:items-center">
           <Input
             placeholder="Search by name, email, or code..."
             value={searchInput}
@@ -245,9 +270,20 @@ export function EmployeeTable({
           canEdit={canEdit}
           canDelete={canDelete}
           onDelete={setDeleteTarget}
+          onChangeEmploymentType={canEdit ? setEmploymentTypeTarget : undefined}
           routesBasePath={routesBasePath}
         />
       </div>
+
+      <ChangeEmploymentTypeDialog
+        employee={employmentTypeTarget}
+        employmentTypes={employmentTypes}
+        open={Boolean(employmentTypeTarget)}
+        onOpenChange={(open) => !open && setEmploymentTypeTarget(null)}
+        onSuccess={() => {
+          void refreshEmployees();
+        }}
+      />
 
       <EmployeeDeleteConfirmDialog
         employee={deleteTarget}

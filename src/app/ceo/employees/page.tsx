@@ -8,8 +8,13 @@ import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { requireServerAnyPermission, requireServerPermission } from "@/lib/permissions/server";
 import {
   getOccupiedDepartments,
+  getEmployeeLookups,
   listEmployees,
 } from "@/lib/employees/services/employee-queries";
+import {
+  DEFAULT_EMPLOYMENT_CATEGORY_FILTER,
+  type EmploymentCategoryFilter,
+} from "@/lib/employees/employment-category";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { employeeListParamsSchema } from "@/lib/validations/employee";
 import { hasPermission } from "@/lib/permissions/utils";
@@ -22,6 +27,15 @@ function firstString(
   value: string | string[] | undefined,
 ): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+function parseEmploymentCategory(
+  value: string | undefined,
+): EmploymentCategoryFilter {
+  if (value === "all" || value === "probation" || value === "full_time") {
+    return value;
+  }
+  return DEFAULT_EMPLOYMENT_CATEGORY_FILTER;
 }
 
 export default async function CeoEmployeesPage({ searchParams }: EmployeesPageProps) {
@@ -39,10 +53,12 @@ export default async function CeoEmployeesPage({ searchParams }: EmployeesPagePr
     department: firstString(rawParams.department),
     employmentStatus: firstString(rawParams.employmentStatus),
     accountStatus: firstString(rawParams.accountStatus),
+    employmentCategory: parseEmploymentCategory(firstString(rawParams.employmentCategory)),
   });
 
-  const [departments, result] = await Promise.all([
+  const [departments, lookups, result] = await Promise.all([
     getOccupiedDepartments(supabase, profile.employee.organizationId),
+    getEmployeeLookups(supabase, profile.employee.organizationId),
     listEmployees(supabase, profile, params),
   ]);
 
@@ -66,7 +82,9 @@ export default async function CeoEmployeesPage({ searchParams }: EmployeesPagePr
             sortOrder={params.sortOrder}
             department={params.department}
             employmentStatus={params.employmentStatus}
+            employmentCategory={params.employmentCategory}
             departments={departments}
+            employmentTypes={lookups.employmentTypes}
             canEdit={hasPermission(profile.permissionCodes, "employee.edit")}
             canDelete={hasPermission(profile.permissionCodes, "employee.delete")}
             routesBasePath={CEO_ROUTES.employees}

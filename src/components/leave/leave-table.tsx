@@ -136,8 +136,7 @@ function buildYearItems() {
 function leaveStatusForSummaryFilter(
   key: LeaveSummaryFilterKey | undefined,
 ): LeaveListParams["leaveStatus"] | undefined {
-  if (key === "pendingRequests") return "pending";
-  if (key === "pendingHrReview") return "pending_hr_review";
+  if (key === "pendingRequests" || key === "pendingHrReview") return "pending";
   if (key === "approvedThisMonth") return "approved";
   if (key === "rejectedThisMonth") return "rejected";
   if (key === "employeesOnLeaveToday") return "approved";

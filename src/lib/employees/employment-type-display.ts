@@ -16,8 +16,6 @@ const PREFERRED_EMPLOYMENT_TYPE_ORDER = [
   "FULL_TIME",
   "PROBATION",
   "INTERN",
-  "PART_TIME",
-  "CONTRACT",
 ] as const;
 
 function employmentTypeRank(code: string | null | undefined, label: string) {

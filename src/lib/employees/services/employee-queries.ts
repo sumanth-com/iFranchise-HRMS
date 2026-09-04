@@ -11,6 +11,14 @@ import {
   DIRECTORY_HIDDEN_EMPLOYEE_CODES,
   isHiddenFromPeopleFilters,
 } from "@/lib/employee/directory-listing";
+import {
+  employmentCategoryTypeCodes,
+  type EmploymentCategoryFilter,
+} from "@/lib/employees/employment-category";
+import {
+  filterStandardEmploymentTypes,
+  normalizeStandardEmploymentTypeCode,
+} from "@/lib/employees/standard-employment-types";
 import type { UserProfile } from "@/types/auth";
 import type {
   EmployeeAccountProvisioningItem,
@@ -27,10 +35,11 @@ type EmployeeRow = {
   employee_code: string;
   first_name: string;
   last_name: string;
+  employment_type_id?: string | null;
   employment_status?: string | null;
   account_status: string;
   designations: { title: string } | { title: string }[] | null;
-  employment_types: { name: string } | { name: string }[] | null;
+  employment_types: { name: string; code: string } | { name: string; code: string }[] | null;
   employee_profiles:
     | { profile_image_storage_path: string | null }
     | { profile_image_storage_path: string | null }[]
@@ -57,6 +66,41 @@ function parseListParams(params: EmployeeListParams) {
   return employeeListParamsSchema.parse(params);
 }
 
+async function applyEmploymentCategoryFilter(
+  supabase: AuthSupabaseClient,
+  organizationId: string,
+  category: EmploymentCategoryFilter | undefined,
+) {
+  if (!category || category === "all") {
+    return null;
+  }
+
+  const { data: types, error } = await supabase
+    .schema("hrms")
+    .from("employment_types")
+    .select("id, code")
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .eq("status", "active");
+
+  if (error) throw new Error(error.message);
+
+  const activeTypes = types ?? [];
+  const allowedCodes = new Set(employmentCategoryTypeCodes(category));
+  const matchingTypeIds = activeTypes
+    .filter((type) => {
+      const normalized = normalizeStandardEmploymentTypeCode(type.code);
+      return normalized !== null && allowedCodes.has(normalized);
+    })
+    .map((type) => type.id);
+
+  if (category === "full_time") {
+    return { mode: "full_time" as const, typeIds: [...new Set(matchingTypeIds)] };
+  }
+
+  return { mode: "probation" as const, typeIds: [...new Set(matchingTypeIds)] };
+}
+
 export async function listEmployees(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
@@ -71,10 +115,21 @@ export async function listEmployees(
     department,
     employmentStatus,
     accountStatus,
+    employmentCategory,
   } = parseListParams(params);
 
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
+
+  const categoryFilter = await applyEmploymentCategoryFilter(
+    supabase,
+    profile.employee.organizationId,
+    employmentCategory,
+  );
+
+  if (categoryFilter && categoryFilter.typeIds.length === 0) {
+    return { data: [], total: 0, page, pageSize };
+  }
 
   const employeeScope = await resolveOrgDataEmployeeScope(supabase, profile);
   const scopedIds = scopedEmployeeIds(employeeScope);
@@ -118,10 +173,11 @@ export async function listEmployees(
         employee_code,
         first_name,
         last_name,
+        employment_type_id,
         employment_status,
         account_status,
         designations:designation_id (title),
-        employment_types:employment_type_id (name),
+        employment_types:employment_type_id (name, code),
         employee_profiles (profile_image_storage_path)
       `,
       { count: "estimated" },
@@ -164,6 +220,10 @@ export async function listEmployees(
 
   if (accountStatus) {
     query = query.eq("account_status", accountStatus);
+  }
+
+  if (categoryFilter && categoryFilter.typeIds.length > 0) {
+    query = query.in("employment_type_id", categoryFilter.typeIds);
   }
 
   const sortColumn = sortBy as EmployeeSortField;
@@ -216,6 +276,8 @@ export async function listEmployees(
         designationId: null,
         designationTitle: designation?.title ?? null,
         employmentTypeName: employmentType?.name ?? null,
+        employmentTypeId: row.employment_type_id ?? null,
+        employmentTypeCode: employmentType?.code ?? null,
         profileImagePath,
         profileImageSignedUrl: null,
         accountStatus: row.account_status as EmployeeListResult["data"][number]["accountStatus"],
@@ -486,7 +548,7 @@ export async function getEmployeeLookups(
     branches: orgLookups.branches,
     departments: orgLookups.departments,
     designations: orgLookups.designations,
-    employmentTypes: orgLookups.employmentTypes,
+    employmentTypes: filterStandardEmploymentTypes(orgLookups.employmentTypes),
     managers,
     hrApprovers,
     documentTypes,

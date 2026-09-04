@@ -1,7 +1,6 @@
 import {
   CalendarClock,
   CheckCircle2,
-  ClipboardList,
   Clock3,
   XCircle,
 } from "lucide-react";
@@ -34,13 +33,6 @@ const SUMMARY_CONFIG = [
     ring: "hover:border-amber-500/40 data-[active=true]:border-amber-500 data-[active=true]:bg-amber-500/10",
   },
   {
-    key: "pendingHrReview" as const,
-    icon: ClipboardList,
-    accent: "text-orange-600 dark:text-orange-400",
-    bg: "bg-orange-500/10",
-    ring: "hover:border-orange-500/40 data-[active=true]:border-orange-500 data-[active=true]:bg-orange-500/10",
-  },
-  {
     key: "approvedThisMonth" as const,
     icon: CheckCircle2,
     accent: "text-emerald-600 dark:text-emerald-400",
@@ -70,12 +62,18 @@ export function LeaveSummaryCards({
   disabled = false,
 }: LeaveSummaryCardsProps) {
   const clickable = Boolean(onSelect);
+  const normalizedActiveKey =
+    activeKey === "pendingHrReview" ? "pendingRequests" : activeKey;
 
   return (
-    <div className="grid grid-cols-2 items-stretch gap-3 xl:grid-cols-5">
+    <div className="grid grid-cols-2 items-stretch gap-3 xl:grid-cols-4">
       {SUMMARY_CONFIG.map((item) => {
         const Icon = item.icon;
-        const isActive = activeKey === item.key;
+        const isActive = normalizedActiveKey === item.key;
+        const count =
+          item.key === "pendingRequests"
+            ? Math.max(summary.pendingRequests ?? 0, summary.pendingHrReview ?? 0)
+            : (summary[item.key] ?? 0);
         const className = cn(
           "h-full min-w-0 rounded-xl border bg-card px-3 py-3.5 text-left shadow-sm transition-colors",
           clickable &&
@@ -90,7 +88,7 @@ export function LeaveSummaryCards({
                 {LEAVE_SUMMARY_LABELS[item.key]}
               </p>
               <p className="mt-1 text-xl font-semibold tracking-tight tabular-nums">
-                {summary[item.key] ?? 0}
+                {count}
               </p>
             </div>
             <div

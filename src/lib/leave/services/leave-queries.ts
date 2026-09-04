@@ -405,10 +405,10 @@ export async function listLeaveRequests(
     leaveStatus === "pending" ||
     leaveStatus === "pending_hr_review";
 
-  if (summaryFilter === "pendingRequests") {
+  if (summaryFilter === "pendingRequests" || summaryFilter === "pendingHrReview") {
     query = query.eq("leave_status", "pending");
     query = applyHrApplicantExclusion(query, { keepIds: pendingHrReviewIds });
-  } else if (summaryFilter === "pendingHrReview" || leaveStatus === "pending_hr_review") {
+  } else if (leaveStatus === "pending_hr_review") {
     if (pendingHrReviewIds.length === 0) {
       return { data: [], total: 0, page, pageSize };
     }

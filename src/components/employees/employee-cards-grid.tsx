@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { Eye, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Eye, MoreHorizontal, Pencil, Trash2, UserCog } from "lucide-react";
 
 import { Button } from "@/components/common/button";
 import { EmploymentTypeBadge } from "@/components/employees/employment-type-badge";
@@ -99,6 +99,7 @@ type EmployeeCardsGridProps = {
   canEdit: boolean;
   canDelete: boolean;
   onDelete: (employee: EmployeeListItem) => void;
+  onChangeEmploymentType?: (employee: EmployeeListItem) => void;
   routesBasePath?: string;
 };
 
@@ -107,6 +108,7 @@ export function EmployeeCardsGrid({
   canEdit,
   canDelete,
   onDelete,
+  onChangeEmploymentType,
   routesBasePath,
 }: EmployeeCardsGridProps) {
   const routes = resolveEmployeeModuleRoutes(routesBasePath);
@@ -149,11 +151,8 @@ export function EmployeeCardsGrid({
                 <h3 className="w-full text-[15px] font-semibold leading-snug tracking-tight">
                   {employee.fullName}
                 </h3>
-                <div className="mt-1.5 flex w-full flex-wrap items-center justify-center gap-x-2 gap-y-1">
+                <div className="mt-1.5 flex w-full items-center justify-center">
                   <EmploymentTypeBadge typeName={employee.employmentTypeName} />
-                  <span className="font-mono text-[11px] font-medium text-muted-foreground">
-                    {employee.employeeCode}
-                  </span>
                 </div>
               </div>
             </button>
@@ -176,7 +175,7 @@ export function EmployeeCardsGrid({
                     </Button>
                   }
                 />
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="w-auto min-w-[12.5rem]">
                   <DropdownMenuItem onClick={() => router.push(detailHref)}>
                     <Eye className="size-4" />
                     View
@@ -185,6 +184,12 @@ export function EmployeeCardsGrid({
                     <DropdownMenuItem onClick={() => router.push(editHref)}>
                       <Pencil className="size-4" />
                       Edit
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canEdit && onChangeEmploymentType ? (
+                    <DropdownMenuItem onClick={() => onChangeEmploymentType(employee)}>
+                      <UserCog className="size-4" />
+                      <span className="whitespace-nowrap">Change Employment Type</span>
                     </DropdownMenuItem>
                   ) : null}
                   {canDelete ? (

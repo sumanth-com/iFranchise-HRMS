@@ -386,6 +386,97 @@ export async function updateEmployee(
   await initializeEmployeeLeaveBalances(supabase, profile, employeeId);
 }
 
+export async function changeEmployeeEmploymentType(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  employeeId: string,
+  employmentTypeId: string,
+) {
+  const organizationId = profile.employee.organizationId;
+  const userId = profile.userId;
+
+  const [employeeResult, typeResult] = await Promise.all([
+    supabase
+      .schema("hrms")
+      .from("employees")
+      .select("employment_status, employment_type_id, employee_code, first_name, last_name")
+      .eq("id", employeeId)
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    supabase
+      .schema("hrms")
+      .from("employment_types")
+      .select("id, code, is_full_time, name")
+      .eq("id", employmentTypeId)
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+  ]);
+
+  if (employeeResult.error) throw new Error(employeeResult.error.message);
+  if (typeResult.error) throw new Error(typeResult.error.message);
+  if (!employeeResult.data) throw new Error("Employee not found");
+  if (!typeResult.data) throw new Error("Employment type not found");
+
+  const employee = employeeResult.data;
+  const nextType = typeResult.data;
+
+  if (employee.employment_type_id === employmentTypeId) {
+    return {
+      employeeCode: employee.employee_code,
+      fullName: `${employee.first_name} ${employee.last_name}`.trim(),
+      employmentTypeName: nextType.name,
+      employmentStatus: employee.employment_status,
+    };
+  }
+
+  const typeCode = String(nextType.code ?? "").trim().toUpperCase();
+  let nextStatus = employee.employment_status;
+
+  if (typeCode === "FULL_TIME" && employee.employment_status === "probation") {
+    nextStatus = "active";
+  } else if (typeCode === "PROBATION" && employee.employment_status === "active") {
+    nextStatus = "probation";
+  }
+
+  const { error } = await supabase
+    .schema("hrms")
+    .from("employees")
+    .update({
+      employment_type_id: employmentTypeId,
+      employment_status: nextStatus,
+      updated_by: userId,
+    })
+    .eq("id", employeeId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(error.message);
+
+  emitHrmsWebhook(organizationId, "employee.updated", {
+    id: employeeId,
+    employeeCode: employee.employee_code,
+    employmentStatus: nextStatus,
+    employmentTypeId,
+  });
+
+  if (employee.employment_status !== nextStatus) {
+    emitHrmsWebhook(organizationId, "employee.status_changed", {
+      id: employeeId,
+      from: employee.employment_status,
+      to: nextStatus,
+    });
+  }
+
+  return {
+    employeeCode: employee.employee_code,
+    fullName: `${employee.first_name} ${employee.last_name}`.trim(),
+    employmentTypeName: nextType.name,
+    employmentStatus: nextStatus,
+  };
+}
+
 async function upsertEmployeeAddressForUpdate(
   supabase: AuthSupabaseClient,
   employeeId: string,

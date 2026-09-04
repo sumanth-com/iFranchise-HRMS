@@ -42,6 +42,7 @@ import {
   createSignedStorageUrl,
   ensureDefaultDocumentTypes,
   resolveOrCreateDesignation,
+  changeEmployeeEmploymentType,
   updateEmployee,
   uploadEmployeeDocument,
 } from "@/lib/employees/services/employee-mutations";
@@ -64,6 +65,7 @@ import {
   employeeListParamsSchema,
   employeeUpdateSchema,
   employeeWizardSchema,
+  changeEmploymentTypeSchema,
 } from "@/lib/validations/employee";
 import type {
   EmployeeActionResult,
@@ -138,6 +140,46 @@ export async function fetchEmployeesAction(
       success: false,
       message:
         error instanceof Error ? error.message : "Failed to load employees",
+    };
+  }
+}
+
+export async function changeEmployeeEmploymentTypeAction(
+  input: unknown,
+): Promise<
+  EmployeeActionResult<{
+    employeeCode: string;
+    fullName: string;
+    employmentTypeName: string;
+    employmentStatus: string;
+  }>
+> {
+  try {
+    const profile = await requireServerPermission("employee.edit");
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = changeEmploymentTypeSchema.parse(input);
+    const data = await changeEmployeeEmploymentType(
+      supabase,
+      profile,
+      parsed.employeeId,
+      parsed.employmentTypeId,
+    );
+
+    revalidatePath(EMPLOYEE_ROUTES.list);
+    revalidatePath("/dashboard/employees");
+    revalidatePath("/dashboard/system/employees");
+    revalidatePath("/dashboard/attendance");
+    revalidatePath("/dashboard/leave");
+    revalidatePath("/dashboard/payroll");
+
+    return { success: true, data };
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to change employment type",
     };
   }
 }

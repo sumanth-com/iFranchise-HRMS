@@ -8,8 +8,13 @@ import { createClient } from "@/lib/supabase/server";
 import { requireServerPermission } from "@/lib/permissions/server";
 import {
   getDepartments,
+  getEmployeeLookups,
   listEmployees,
 } from "@/lib/employees/services/employee-queries";
+import {
+  DEFAULT_EMPLOYMENT_CATEGORY_FILTER,
+  type EmploymentCategoryFilter,
+} from "@/lib/employees/employment-category";
 import { employeeListParamsSchema } from "@/lib/validations/employee";
 import { hasPermission } from "@/lib/permissions/utils";
 import { requireSuperAdminProfile } from "@/lib/system-admin/guards";
@@ -27,6 +32,15 @@ function firstString(
   value: string | string[] | undefined,
 ): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+function parseEmploymentCategory(
+  value: string | undefined,
+): EmploymentCategoryFilter {
+  if (value === "all" || value === "probation" || value === "full_time") {
+    return value;
+  }
+  return DEFAULT_EMPLOYMENT_CATEGORY_FILTER;
 }
 
 export default async function SuperAdminEmployeesPage({
@@ -97,18 +111,24 @@ export default async function SuperAdminEmployeesPage({
     department: departmentCode,
     employmentStatus: firstString(rawParams.employmentStatus),
     accountStatus: firstString(rawParams.accountStatus),
+    employmentCategory: parseEmploymentCategory(firstString(rawParams.employmentCategory)),
   });
 
-  const { data: result, error: listError } = await safeServerCallWithError(
-    () => listEmployees(supabase, profile, params),
-    {
-      data: [],
-      total: 0,
-      page: params.page ?? 1,
-      pageSize: params.pageSize ?? 20,
-    },
-    "[system/employees] listEmployees",
-  );
+  const [lookups, listResult] = await Promise.all([
+    getEmployeeLookups(supabase, profile.employee.organizationId),
+    safeServerCallWithError(
+      () => listEmployees(supabase, profile, params),
+      {
+        data: [],
+        total: 0,
+        page: params.page ?? 1,
+        pageSize: params.pageSize ?? 20,
+      },
+      "[system/employees] listEmployees",
+    ),
+  ]);
+
+  const { data: result, error: listError } = listResult;
 
   return (
     <PageScroll>
@@ -138,7 +158,9 @@ export default async function SuperAdminEmployeesPage({
               sortOrder={params.sortOrder}
               department={departmentCode}
               employmentStatus={params.employmentStatus}
+              employmentCategory={params.employmentCategory}
               departments={departments}
+              employmentTypes={lookups.employmentTypes}
               canEdit={hasPermission(profile.permissionCodes, "employee.edit")}
               canDelete={false}
               routesBasePath={SYSTEM_EMPLOYEE_LIST}

@@ -49,6 +49,8 @@ export type EmployeeListItem = {
   designationId: string | null;
   designationTitle: string | null;
   employmentTypeName: string | null;
+  employmentTypeId: string | null;
+  employmentTypeCode: string | null;
   profileImagePath: string | null;
   /** Prefetched signed URL for list avatars (avoids per-card client N+1). */
   profileImageSignedUrl?: string | null;
@@ -97,6 +99,7 @@ export type EmployeeListParams = {
   department?: string;
   employmentStatus?: EmploymentStatus;
   accountStatus?: EmployeeAccountStatus;
+  employmentCategory?: "all" | "probation" | "full_time";
 };
 
 export type EmployeeSortField =
