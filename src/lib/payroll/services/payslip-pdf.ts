@@ -4,14 +4,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf
 import { amountToIndianWords } from "@/lib/payroll/services/amount-in-words";
 import { getPayslipInfoRows } from "@/lib/payroll/services/payslip-document-helpers";
 import { loadLogoBytesCached } from "@/lib/payroll/services/payslip-logo-cache";
-import {
-  getPayslipDeductionLines,
-  getPayslipEarningsLines,
-  resolveAttendanceEarnings,
-  resolveFinalPayableAmount,
-  resolveMonthlySalary,
-  resolvePayrollReimbursement,
-} from "@/lib/payroll/services/payroll-utils";
+import { resolvePayslipDisplayTotals } from "@/lib/payroll/services/payroll-utils";
 import type { PayslipDetail } from "@/types/payroll";
 
 const PAGE_WIDTH = 595.28;
@@ -118,39 +111,15 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
   const organizationName = payslip.organization.name.toUpperCase();
   const monthHeader = formatMonthYearHeader(payslip.payrollMonth);
 
-  const earnings = getPayslipEarningsLines({
-    earnings: payslip.breakdown?.earnings,
-    basicSalary: payslip.basicSalary,
-    totalAllowances: payslip.totalAllowances,
-    grossSalary: payslip.grossSalary,
-  });
-  const deductions = getPayslipDeductionLines(payslip.breakdown?.deductions);
-  const monthlySalary = resolveMonthlySalary(
-    payslip.breakdown ?? null,
-    payslip.basicSalary,
-    payslip.grossSalary,
-  );
-  const attendanceEarnings = resolveAttendanceEarnings(
-    payslip.breakdown ?? null,
-    payslip.grossSalary,
-  );
-  const reimbursement = resolvePayrollReimbursement(
-    payslip.breakdown ?? null,
-    payslip.totalAllowances,
-  );
-
-  const totalEarnings =
-    earnings.reduce((sum, item) => sum + Number(item.amount || 0), 0) ||
-    attendanceEarnings;
-  const totalDeductions =
-    deductions.reduce((sum, item) => sum + Number(item.amount || 0), 0) ||
-    payslip.totalDeductions;
-  const netPay = payslip.netSalary || totalEarnings - totalDeductions;
-  const amountCredited = resolveFinalPayableAmount(
-    netPay,
-    payslip.breakdown ?? null,
-    payslip.totalAllowances,
-  );
+  const { earnings, deductions, grossEarnings, totalDeductions, netPay } =
+    resolvePayslipDisplayTotals({
+      breakdown: payslip.breakdown,
+      basicSalary: payslip.basicSalary,
+      totalAllowances: payslip.totalAllowances,
+      grossSalary: payslip.grossSalary,
+      totalDeductions: payslip.totalDeductions,
+      employmentType: payslip.employee.employmentType,
+    });
 
   // Header Drawing
   const logoBytes = await loadLogoBytesCached(payslip.organization.logoUrl);
@@ -364,8 +333,8 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
     color: BORDER_COLOR,
   });
 
-  drawText(ctx, "Total Attendance Earnings", sc1X + 4, totalRowY + 5, { size: 8, bold: true });
-  drawRight(ctx, formatAmount2(totalEarnings), sc3X - 4, totalRowY + 5, { size: 8, bold: true });
+  drawText(ctx, "Gross Earnings", sc1X + 4, totalRowY + 5, { size: 8, bold: true });
+  drawRight(ctx, formatAmount2(grossEarnings), sc3X - 4, totalRowY + 5, { size: 8, bold: true });
   drawText(ctx, "Total Deductions", sc3X + 4, totalRowY + 5, { size: 8, bold: true });
   drawRight(ctx, formatAmount2(totalDeductions), MARGIN + CONTENT_WIDTH - 4, totalRowY + 5, {
     size: 8,
@@ -374,19 +343,6 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
 
   currentY = totalRowY;
 
-  const monthlyLine = `MONTHLY SALARY  Rs. ${formatAmountIndian(monthlySalary)}  ->  ATTENDANCE EARNINGS  Rs. ${formatAmountIndian(attendanceEarnings)}`;
-  const monthlyRowY = currentY - rowH;
-  ctx.page.drawLine({
-    start: { x: MARGIN, y: monthlyRowY },
-    end: { x: MARGIN + CONTENT_WIDTH, y: monthlyRowY },
-    thickness: 0.8,
-    color: BORDER_COLOR,
-  });
-  drawCentered(ctx, monthlyLine, PAGE_WIDTH / 2, monthlyRowY + 5, { size: 7.5, bold: false });
-
-  currentY = monthlyRowY;
-
-  // Attendance earnings - Deductions = Net Salary
   const netPayY = currentY - rowH;
   ctx.page.drawLine({
     start: { x: MARGIN, y: netPayY },
@@ -395,25 +351,11 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
     color: BORDER_COLOR,
   });
 
-  const netPayLine = `ATTENDANCE EARNINGS  Rs. ${formatAmountIndian(attendanceEarnings)}  -  DEDUCTIONS  Rs. ${formatAmountIndian(totalDeductions)}  =  NET SALARY  Rs. ${formatAmountIndian(netPay)}`;
+  const netPayLine = `GROSS EARNINGS  Rs. ${formatAmountIndian(grossEarnings)}  -  DEDUCTIONS  Rs. ${formatAmountIndian(totalDeductions)}  =  NET PAY  Rs. ${formatAmountIndian(netPay)}`;
   drawCentered(ctx, netPayLine, PAGE_WIDTH / 2, netPayY + 5, { size: 8, bold: true });
 
   currentY = netPayY;
 
-  if (reimbursement > 0) {
-    const reimbRowY = currentY - rowH;
-    ctx.page.drawLine({
-      start: { x: MARGIN, y: reimbRowY },
-      end: { x: MARGIN + CONTENT_WIDTH, y: reimbRowY },
-      thickness: 0.8,
-      color: BORDER_COLOR,
-    });
-    const reimbLine = `REIMBURSEMENT  Rs. ${formatAmountIndian(reimbursement)}  ->  AMOUNT CREDITED  Rs. ${formatAmountIndian(amountCredited)}`;
-    drawCentered(ctx, reimbLine, PAGE_WIDTH / 2, reimbRowY + 5, { size: 8, bold: true });
-    currentY = reimbRowY;
-  }
-
-  // Amount credited / Net pay in words
   const inWordsRowH = 22;
   const inWordsY = currentY - inWordsRowH;
   ctx.page.drawLine({
@@ -425,9 +367,7 @@ export async function generatePayslipPdfBytes(payslip: PayslipDetail): Promise<U
 
   drawText(
     ctx,
-    reimbursement > 0
-      ? `Amount Credited: ${amountToIndianWords(amountCredited)}`
-      : `Net Salary: ${amountToIndianWords(netPay)}`,
+    `Net Pay: ${amountToIndianWords(netPay)}`,
     MARGIN + 4,
     inWordsY + 7,
     {

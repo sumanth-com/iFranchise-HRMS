@@ -19,7 +19,7 @@ import {
 } from "@/lib/payroll/salary-structure-breakdown";
 import { listBonuses, listReimbursements } from "@/lib/payroll/services/payroll-queries";
 import { getPayrollSettings } from "@/lib/payroll/services/payroll-settings";
-import { getPayslipDeductionLines, getPayslipEarningsLines, displaySalaryBankDetails, parsePayrollMonthFromPayslipNumber, payrollMonthSortKey, comparePayrollMonthsDesc } from "@/lib/payroll/services/payroll-utils";
+import { resolvePayslipDisplayTotals, displaySalaryBankDetails, parsePayrollMonthFromPayslipNumber, payrollMonthSortKey, comparePayrollMonthsDesc } from "@/lib/payroll/services/payroll-utils";
 import type { UserProfile } from "@/types/auth";
 import type {
   EmployeePayrollData,
@@ -143,24 +143,28 @@ function buildPublishedPayslipDisplaySummary(
   latest: NonNullable<EmployeePayrollData["latest"]>,
 ): EmployeePayrollDisplaySummary {
   const breakdown = latest.breakdown;
-  const grossSalary = latest.grossSalary;
-  const totalDeductions = latest.totalDeductions;
-  const netSalary = latest.netSalary;
+  const totals = resolvePayslipDisplayTotals({
+    breakdown,
+    basicSalary: latest.basicSalary,
+    totalAllowances: latest.totalAllowances,
+    grossSalary: latest.grossSalary,
+    totalDeductions: latest.totalDeductions,
+    employmentType: latest.employee.employmentType,
+  });
 
   return {
-    earnings: getPayslipEarningsLines({
-      earnings: breakdown.earnings,
-      basicSalary: latest.basicSalary,
-      totalAllowances: latest.totalAllowances,
-      grossSalary,
-    }),
-    deductions: getPayslipDeductionLines(breakdown.deductions),
-    grossSalary,
-    totalDeductions,
-    netSalary,
+    earnings: totals.earnings,
+    deductions: totals.deductions,
+    grossSalary: totals.grossEarnings,
+    totalDeductions: totals.totalDeductions,
+    netSalary: totals.netPay,
     periodMonth: latest.payrollMonth.slice(0, 7),
     usingStructure: false,
-    extrasIncluded: false,
+    extrasIncluded: totals.earnings.some((line) =>
+      line.code.startsWith("bonus") ||
+      line.code.startsWith("hr_") ||
+      line.code.startsWith("reimb"),
+    ),
   };
 }
 

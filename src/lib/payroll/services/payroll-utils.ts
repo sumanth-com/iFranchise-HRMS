@@ -220,31 +220,53 @@ function isStandardEarningCode(code: string): boolean {
   return STANDARD_EARNING_CODES.has(code.toLowerCase());
 }
 
-function isExtraEarningLine(line: PayrollBreakdownLine): boolean {
+function isPayslipStructuralSummaryLine(line: PayrollBreakdownLine): boolean {
+  const code = lineCode(line);
+  return code === "attendance_earnings" || code === "working_day_salary";
+}
+
+function isMonthlyExtraEarningLine(line: PayrollBreakdownLine): boolean {
+  if (Number(line.amount) <= 0) return false;
+
   const code = lineCode(line);
   const label = (line.label ?? "").toLowerCase();
-  return (
-    code.startsWith("bonus") ||
-    code.startsWith("reimb") ||
+
+  if (
+    code.startsWith("bonus_") ||
+    code === "bonus" ||
     code.startsWith("hr_") ||
+    code.startsWith("reimb_") ||
     code === "overtime" ||
     code === "claims" ||
-    label.includes("bonus") ||
-    label.includes("overtime") ||
-    label.includes("reimburs") ||
-    label.includes("claim") ||
-    label.includes("incentive")
-  );
+    code === "hr_additional_earning"
+  ) {
+    return true;
+  }
+
+  if (isReimbursementEarningLine(line)) return true;
+
+  if (label.includes("incentive")) return true;
+  if (label.includes("bonus")) return true;
+
+  return false;
+}
+
+function isStructuralSalaryLine(line: PayrollBreakdownLine): boolean {
+  if (Number(line.amount) <= 0) return false;
+  if (isPayslipStructuralSummaryLine(line)) return false;
+  if (isMonthlyExtraEarningLine(line)) return false;
+  if (isLegacyLumpEarningLine(line)) return false;
+  return true;
 }
 
 /** Legacy payslip rows that collapse the full structural gross into one line. */
 function isLegacyLumpEarningLine(line: PayrollBreakdownLine): boolean {
   if (isStandardEarningCode(lineCode(line))) return false;
-  if (isExtraEarningLine(line)) return false;
+  if (isMonthlyExtraEarningLine(line)) return false;
 
   const code = lineCode(line);
   const label = (line.label ?? "").toLowerCase();
-  if (code === "salary" || code === "gross" || code === "allowances" || code === "other_allowances") {
+  if (code === "salary" || code === "gross" || code === "allowances") {
     return true;
   }
   if (label.includes("working day") && label.includes("salary")) return true;
@@ -256,49 +278,49 @@ function sumLineAmounts(lines: PayrollBreakdownLine[]): number {
   return roundCurrency(lines.reduce((total, line) => total + Number(line.amount || 0), 0));
 }
 
-function resolveStructuralGrossForDisplay(input: {
-  earnings: PayrollBreakdownLine[];
-  grossSalary: number;
-}): number {
-  const positive = (input.earnings ?? []).filter((line) => Number(line.amount) > 0);
-  const extras = positive.filter(isExtraEarningLine);
-  const extrasTotal = sumLineAmounts(extras);
-  const legacyLumpTotal = sumLineAmounts(positive.filter(isLegacyLumpEarningLine));
-  const standardTotal = sumLineAmounts(positive.filter((line) => isStandardEarningCode(lineCode(line))));
-
-  if (standardTotal > 0) {
-    return roundCurrency(Math.max(standardTotal, input.grossSalary - extrasTotal));
-  }
-  if (legacyLumpTotal > 0) {
-    return roundCurrency(legacyLumpTotal);
-  }
-  return roundCurrency(Math.max(0, input.grossSalary - extrasTotal));
+function isStipendEmploymentType(employmentType: string | null | undefined): boolean {
+  const normalized = (employmentType ?? "").toLowerCase();
+  return (
+    normalized.includes("intern") ||
+    normalized.includes("probation") ||
+    normalized.includes("trainee")
+  );
 }
 
 function deriveStandardEarningsForDisplay(input: {
   earnings: PayrollBreakdownLine[] | null | undefined;
   grossSalary: number;
+  employmentType?: string | null;
 }): PayrollBreakdownLine[] {
   const positive = (input.earnings ?? []).filter((line) => Number(line.amount) > 0);
-  const extras = positive.filter(isExtraEarningLine).map(toPayslipLine);
-  const structuralGross = resolveStructuralGrossForDisplay({
-    earnings: positive,
-    grossSalary: input.grossSalary,
-  });
+  const structuralLines = positive.filter(isStructuralSalaryLine).map(toPayslipLine);
+  const monthlyExtras = positive.filter(isMonthlyExtraEarningLine).map(toPayslipLine);
+  const legacyLumps = positive.filter(isLegacyLumpEarningLine);
 
-  if (structuralGross <= 0) {
-    return extras;
+  let base: PayrollBreakdownLine[];
+
+  if (structuralLines.length > 0) {
+    const stipendOnly =
+      structuralLines.length === 1 && lineCode(structuralLines[0]) === "stipend";
+    if (
+      stipendOnly &&
+      input.grossSalary > 0 &&
+      !isStipendEmploymentType(input.employmentType)
+    ) {
+      base = buildStandardEarningsLines(splitMonthlyGross(input.grossSalary)).map(toPayslipLine);
+    } else {
+      base = structuralLines;
+    }
+  } else if (legacyLumps.length > 0) {
+    const lumpTotal = sumLineAmounts(legacyLumps);
+    base = buildStandardEarningsLines(splitMonthlyGross(lumpTotal)).map(toPayslipLine);
+  } else if (input.grossSalary > 0) {
+    base = buildStandardEarningsLines(splitMonthlyGross(input.grossSalary)).map(toPayslipLine);
+  } else {
+    base = [];
   }
 
-  const standardFromBreakdown = positive.filter((line) => isStandardEarningCode(lineCode(line)));
-  const standardSum = sumLineAmounts(standardFromBreakdown);
-  const needsDerivedSplit = standardSum + 0.01 < structuralGross;
-
-  const base = needsDerivedSplit
-    ? buildStandardEarningsLines(splitMonthlyGross(structuralGross)).map(toPayslipLine)
-    : standardFromBreakdown.map(toPayslipLine);
-
-  return orderPayslipLines([...base, ...extras], EARNING_LINE_ORDER).filter(
+  return orderPayslipLines([...base, ...monthlyExtras], EARNING_LINE_ORDER).filter(
     (line) => line.amount > 0,
   );
 }
@@ -309,6 +331,7 @@ const PAYSLIP_COMPONENT_LABELS: Record<string, string> = {
   transport: "Leave Travel Allowance (LTA)",
   medical: "Medical Allowance",
   special_allowance: "Special Allowance",
+  stipend: "Stipend",
   other_allowances: "Other Allowances",
   allowances: "Other Allowances",
   overtime: "Overtime",
@@ -331,10 +354,16 @@ const EARNING_LINE_ORDER = [
   "hra",
   "transport",
   "special_allowance",
+  "stipend",
+  "medical",
   "bonus",
+  "hr_bonus",
+  "hr_incentive",
   "overtime",
   "claims",
+  "hr_reimbursement",
   "other_allowances",
+  "hr_additional_earning",
   "salary",
   "gross",
 ];
@@ -572,24 +601,92 @@ export function salaryEarningsOnly(
   return (earnings ?? []).filter((line) => !isReimbursementEarningLine(line));
 }
 
+function appendMissingHrAdjustmentEarnings(
+  lines: PayrollBreakdownLine[],
+  hrAdjustments?: PayrollBreakdown["hrAdjustments"],
+): PayrollBreakdownLine[] {
+  if (!hrAdjustments) return lines;
+
+  const hasBonus = () =>
+    lines.some(
+      (line) =>
+        lineCode(line).startsWith("bonus") ||
+        lineCode(line) === "hr_bonus" ||
+        (line.label ?? "").toLowerCase().includes("bonus"),
+    );
+  const hasIncentive = () =>
+    lines.some(
+      (line) =>
+        lineCode(line).includes("incentive") ||
+        (line.label ?? "").toLowerCase().includes("incentive"),
+    );
+  const hasReimbursement = () =>
+    lines.some((line) => isReimbursementEarningLine(line) || lineCode(line) === "hr_reimbursement");
+
+  const next = [...lines];
+  const bonus = roundCurrency(Number(hrAdjustments.bonus ?? 0));
+  const incentive = roundCurrency(Number(hrAdjustments.incentive ?? 0));
+  const reimbursement = roundCurrency(Number(hrAdjustments.reimbursements ?? 0));
+
+  if (bonus > 0 && !hasBonus()) {
+    next.push({
+      code: "hr_bonus",
+      label: "Bonus (HR adjustment)",
+      amount: bonus,
+      type: "earning",
+    });
+  }
+  if (incentive > 0 && !hasIncentive()) {
+    next.push({
+      code: "hr_incentive",
+      label: "Incentive",
+      amount: incentive,
+      type: "earning",
+    });
+  }
+  if (reimbursement > 0 && !hasReimbursement()) {
+    next.push({
+      code: "hr_reimbursement",
+      label: "Reimbursement (HR adjustment)",
+      amount: reimbursement,
+      type: "earning",
+    });
+  }
+
+  return next;
+}
+
+function payslipEarningsSource(
+  earnings: PayrollBreakdownLine[] | null | undefined,
+  hrAdjustments?: PayrollBreakdown["hrAdjustments"],
+): PayrollBreakdownLine[] {
+  const positive = (earnings ?? []).filter(
+    (line) => Number(line.amount) > 0 && !isPayslipStructuralSummaryLine(line),
+  );
+  return appendMissingHrAdjustmentEarnings(positive, hrAdjustments);
+}
+
 /**
  * Payslip earnings for display (employee portal, payslip view/PDF).
- * Uses stored breakdown when standard components are present; otherwise derives
- * the 50/25/10/15 split from gross without mutating persisted payroll data.
+ * Preserves configured salary structure lines from the stored payroll breakdown.
+ * Appends month-specific bonus, incentive, reimbursement, and other extra earnings
+ * only when they exist on that payroll item's breakdown.
  */
 export function getPayslipEarningsLines(input: {
   earnings: PayrollBreakdownLine[] | null | undefined;
   basicSalary: number;
   totalAllowances: number;
   grossSalary: number;
+  hrAdjustments?: PayrollBreakdown["hrAdjustments"];
+  employmentType?: string | null;
 }): PayrollBreakdownLine[] {
-  const salaryEarnings = salaryEarningsOnly(input.earnings);
-  const positiveBreakdown = salaryEarnings.filter((line) => Number(line.amount) > 0);
+  const sourceEarnings = payslipEarningsSource(input.earnings, input.hrAdjustments);
 
-  if (input.grossSalary > 0 || positiveBreakdown.length > 0) {
+  if (input.grossSalary > 0 || sourceEarnings.length > 0) {
     return deriveStandardEarningsForDisplay({
-      earnings: salaryEarnings,
+      earnings: sourceEarnings,
       grossSalary: input.grossSalary,
+      employmentType: input.employmentType,
     });
   }
 
@@ -614,9 +711,52 @@ export function getPayslipEarningsLines(input: {
     return deriveStandardEarningsForDisplay({
       earnings: [],
       grossSalary: input.grossSalary,
+      employmentType: input.employmentType,
     });
   }
   return fallback.map(toPayslipLine).filter((line) => line.amount > 0);
+}
+
+export function resolvePayslipDisplayTotals(input: {
+  breakdown?: PayrollBreakdown | null;
+  basicSalary: number;
+  totalAllowances: number;
+  grossSalary: number;
+  totalDeductions: number;
+  employmentType?: string | null;
+}): {
+  earnings: PayrollBreakdownLine[];
+  deductions: PayrollBreakdownLine[];
+  grossEarnings: number;
+  totalDeductions: number;
+  netPay: number;
+} {
+  const breakdown = input.breakdown ?? null;
+  const earnings = getPayslipEarningsLines({
+    earnings: breakdown?.earnings,
+    basicSalary: input.basicSalary,
+    totalAllowances: input.totalAllowances,
+    grossSalary: input.grossSalary,
+    hrAdjustments: breakdown?.hrAdjustments,
+    employmentType: input.employmentType,
+  });
+  const deductions = getPayslipDeductionLines(breakdown?.deductions);
+  const grossEarnings = roundCurrency(
+    earnings.reduce((sum, line) => sum + Number(line.amount || 0), 0),
+  );
+  const totalDeductions = roundCurrency(
+    deductions.reduce((sum, line) => sum + Number(line.amount || 0), 0) ||
+      input.totalDeductions,
+  );
+  const netPay = roundCurrency(grossEarnings - totalDeductions);
+
+  return {
+    earnings,
+    deductions,
+    grossEarnings,
+    totalDeductions,
+    netPay,
+  };
 }
 
 export function getPayslipDeductionLines(

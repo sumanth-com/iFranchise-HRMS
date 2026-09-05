@@ -155,38 +155,38 @@ export function getPayslipInfoRows(payslip: PayslipDetail): [PayslipInfoCell, Pa
 
   return [
     [
-      { label: "Employee Name", value: employeeName },
       { label: "Employee ID", value: payslip.employee.employeeCode },
+      { label: "Employee Name", value: employeeName },
     ],
     [
       {
         label: "Designation",
         value: fmtPayslipValue(payslip.employee.designationTitle).toUpperCase(),
       },
+      { label: "Department", value: department },
+    ],
+    [
       { label: "Date of Joining", value: fmtPayslipDate(payslip.employee.dateOfJoining) },
-    ],
-    [
       { label: "PAN Number", value: fmtPayslipValue(payslip.employee.pan) },
-      { label: "Payment Mode", value: (payslip.paymentMode || "BANK").toUpperCase() },
     ],
     [
-      { label: "Bank Name", value: fmtPayslipValue(bank?.bankName) },
+      { label: "Employment Type", value: employmentType },
+      { label: "Location", value: "REMOTE" },
+    ],
+    [
       {
         label: "Bank A/C No",
         value: fmtPayslipValue(payslip.bankAccount?.accountNumberMasked),
       },
-    ],
-    [
-      { label: "Location", value: "REMOTE" },
-      { label: "Department", value: department },
+      { label: "Bank Name", value: fmtPayslipValue(bank?.bankName) },
     ],
     [
       { label: "Working Days", value: Number(workDays).toFixed(2) },
-      { label: "Paid Days", value: Number(paidDays).toFixed(2) },
+      { label: "Payment Mode", value: (payslip.paymentMode || "BANK").toUpperCase() },
     ],
     [
+      { label: "Paid Days", value: Number(paidDays).toFixed(2) },
       { label: "LOP Days", value: Number(lopDays).toFixed(2) },
-      { label: "Employment Type", value: employmentType },
     ],
   ];
 }
