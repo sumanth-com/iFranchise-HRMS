@@ -19,7 +19,9 @@ import {
   getProbationSnapshot,
   isBlockingLeaveIssue,
   PERIOD_LEAVE_CODE,
+  allocateLeaveDaysByBalance,
   splitLeaveDaysByBalance,
+  splitLeaveDaysFromAllocations,
   validateLeavePolicy,
   type LeaveEmployeePolicyState,
   type LeavePolicyNoticeHours,
@@ -629,7 +631,7 @@ export async function evaluateLeaveApplication(
     throw new Error(blockingIssues[0].message);
   }
 
-  const split =
+  const provisionalSplit =
     code === OPTIONAL_HOLIDAY_CODE
       ? { paidDays: duration.totalLeaveDays, lopDays: 0 }
       : splitLeaveDaysByBalance({
@@ -637,6 +639,18 @@ export async function evaluateLeaveApplication(
           availableBalance,
           isPaid: leaveType.isPaid,
         });
+  const paidQuota =
+    code === OPTIONAL_HOLIDAY_CODE || !leaveType.isPaid || availableBalance == null
+      ? provisionalSplit.paidDays
+      : Math.min(provisionalSplit.paidDays, Math.max(0, availableBalance));
+  const dayAllocations = allocateLeaveDaysByBalance(duration, paidQuota, {
+    isPaidLeaveType: leaveType.isPaid,
+    calendar: durationCalendar,
+  });
+  const split =
+    code === OPTIONAL_HOLIDAY_CODE
+      ? { paidDays: duration.totalLeaveDays, lopDays: 0 }
+      : splitLeaveDaysFromAllocations(dayAllocations, leaveType.isPaid);
 
   return {
     runtime: { ...runtime, calendar: durationCalendar },
@@ -647,6 +661,7 @@ export async function evaluateLeaveApplication(
     probation,
     split,
     issues,
+    dayAllocations,
   };
 }
 

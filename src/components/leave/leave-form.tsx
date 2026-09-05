@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -34,7 +34,12 @@ import {
   isPeriodLeaveCode,
   isPeriodLeaveEligible,
 } from "@/lib/leave/period-leave-eligibility";
-import { LeaveDurationPreview, LeavePolicyInfo } from "@/components/leave/leave-apply-policy-panel";
+import {
+  LeaveApplicationSummary,
+  LeaveDurationPreview,
+  LeaveIssueAlertList,
+  LeavePolicyInfo,
+} from "@/components/leave/leave-apply-policy-panel";
 import { formatLeaveDayCount } from "@/lib/leave/services/leave-usage";
 import { formatLeaveBalanceUsedTotal } from "@/lib/leave/leave-balance-display";
 import { previewLeaveApplication } from "@/lib/leave/services/leave-apply-preview";
@@ -136,6 +141,7 @@ export function LeaveForm({
 }: LeaveFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const submitLockRef = useRef(false);
 
   const [applyContext, setApplyContext] = useState<LeaveApplyContext | null>(initialApplyContext);
   const [balancesLoading, setBalancesLoading] = useState(!initialApplyContext && initialBalances.length === 0);
@@ -340,51 +346,68 @@ export function LeaveForm({
   }, [selectedLeaveTypeId, startDate, endDate, isHalfDay]);
 
   const onSubmit = form.handleSubmit((values) => {
-    if (isPending) return;
+    if (isPending || submitLockRef.current) return;
+    submitLockRef.current = true;
     setSubmitError(null);
     startTransition(async () => {
-      const payload = {
-        ...values,
-        isHalfDay: values.isHalfDay,
-        halfDayPeriod: values.isHalfDay ? "afternoon" : "",
-      };
-      const result = isEdit
-        ? await updateLeaveRequestAction(initialRequest!.id, payload)
-        : await createLeaveRequestAction(payload);
+      try {
+        const payload = {
+          ...values,
+          isHalfDay: values.isHalfDay,
+          halfDayPeriod: values.isHalfDay ? "afternoon" : "",
+        };
+        const result = isEdit
+          ? await updateLeaveRequestAction(initialRequest!.id, payload)
+          : await createLeaveRequestAction(payload);
 
-      if (!result.success) {
-        if (showErrorsInForm) {
-          setSubmitError(result.message);
-        } else {
-          toast.error(result.message);
+        if (!result.success) {
+          submitLockRef.current = false;
+          if (showErrorsInForm) {
+            setSubmitError(result.message);
+          } else {
+            toast.error(result.message);
+          }
+          return;
         }
-        return;
+
+        toast.success(
+          hrReviewReasonFromIssues(applyPreview?.issues ?? [])
+            ? HR_REVIEW_SUBMITTED_MESSAGE
+            : isEdit
+              ? "Leave request updated"
+              : "Leave request submitted successfully",
+        );
+
+        if (onSuccess) {
+          onSuccess();
+          return;
+        }
+
+        if (redirectPath) {
+          router.push(redirectPath);
+          return;
+        }
+
+        if (!isEdit && result.data) {
+          router.push(LEAVE_ROUTES.detail(result.data));
+          return;
+        }
+
+        router.push(LEAVE_ROUTES.list);
+      } catch (error) {
+        submitLockRef.current = false;
+        if (isStaleServerActionError(error)) {
+          reloadForStaleServerAction();
+          return;
+        }
+        const message =
+          error instanceof Error ? error.message : "Failed to submit leave request";
+        if (showErrorsInForm) {
+          setSubmitError(message);
+        } else {
+          toast.error(message);
+        }
       }
-
-      toast.success(
-        hrReviewReasonFromIssues(applyPreview?.issues ?? [])
-          ? HR_REVIEW_SUBMITTED_MESSAGE
-          : isEdit
-            ? "Leave request updated"
-            : "Leave request submitted successfully",
-      );
-
-      if (onSuccess) {
-        onSuccess();
-        return;
-      }
-
-      if (redirectPath) {
-        router.push(redirectPath);
-        return;
-      }
-
-      if (!isEdit && result.data) {
-        router.push(LEAVE_ROUTES.detail(result.data));
-        return;
-      }
-
-      router.push(LEAVE_ROUTES.list);
     });
   });
 
@@ -633,124 +656,17 @@ export function LeaveForm({
 
         {isSelfService && applyPreview ? (
           <div className="md:col-span-2 space-y-2">
-            <div className="rounded-xl border bg-muted/20 px-3 py-2.5">
-              <p className="text-sm font-semibold text-foreground">Leave Summary</p>
-              <dl className="mt-2 space-y-1 text-sm tabular-nums">
-                <div className="flex items-center justify-between gap-3">
-                  <dt className="text-muted-foreground">Requested</dt>
-                  <dd className="font-medium text-foreground">
-                    {formatLeaveDays(applyPreview.duration.totalLeaveDays)}
-                  </dd>
-                </div>
-                {!isOptionalHoliday && hrReviewReason === "balance_exhausted" ? (
-                  <>
-                    <div className="flex items-center justify-between gap-3">
-                      <dt className="text-muted-foreground">
-                        {paidLeaveTypeDisplayName(applyPreview.leaveType.code)} Available
-                      </dt>
-                      <dd className="font-medium text-foreground">
-                        {formatLeaveDays(applyPreview.available ?? 0)}
-                      </dd>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <dt className="text-muted-foreground">Additional Leave</dt>
-                      <dd className="font-medium text-foreground">Requires HR Review</dd>
-                    </div>
-                  </>
-                ) : null}
-                {!isOptionalHoliday && hrReviewReason === "over_limit" ? (
-                  <>
-                    <div className="flex items-center justify-between gap-3">
-                      <dt className="text-muted-foreground">
-                        Available {paidLeaveTypeDisplayName(applyPreview.leaveType.code)}
-                      </dt>
-                      <dd className="font-medium text-foreground">
-                        {formatLeaveDays(applyPreview.available ?? 0)}
-                      </dd>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <dt className="text-muted-foreground">Additional Days</dt>
-                      <dd className="font-medium text-foreground">
-                        {formatLeaveDays(
-                          Math.max(
-                            0,
-                            applyPreview.duration.totalLeaveDays - (applyPreview.available ?? 0),
-                          ),
-                        )}
-                      </dd>
-                    </div>
-                  </>
-                ) : null}
-                {!isOptionalHoliday && !hrReviewReason ? (
-                  <>
-                    <div className="flex items-center justify-between gap-3">
-                      <dt className="text-muted-foreground">
-                        {paidLeaveTypeDisplayName(applyPreview.leaveType.code)} Used
-                      </dt>
-                      <dd className="font-medium text-foreground">
-                        {formatLeaveDays(applyPreview.split.paidDays)}
-                      </dd>
-                    </div>
-                    {applyPreview.remaining != null ? (
-                      <div className="flex items-center justify-between gap-3">
-                        <dt className="text-muted-foreground">Remaining Balance</dt>
-                        <dd className="font-medium text-foreground">
-                          {formatLeaveDays(applyPreview.remaining)}
-                        </dd>
-                      </div>
-                    ) : null}
-                    <div className="flex items-center justify-between gap-3">
-                      <dt className="text-muted-foreground">Loss of Pay (LOP)</dt>
-                      <dd className="font-medium text-foreground">
-                        {formatLeaveDays(applyPreview.split.lopDays)}
-                      </dd>
-                    </div>
-                  </>
-                ) : null}
-              </dl>
-            </div>
-            {applyPreview.blockingIssues.map((issue) => {
-              const isOverlap = issue.code === "overlap";
-              const isNotice = issue.code === "notice";
-              return (
-                <div
-                  key={issue.code}
-                  className={cn(
-                    "rounded-lg border px-3 py-2.5",
-                    isOverlap || isNotice
-                      ? "border-amber-500/35 bg-amber-500/10"
-                      : "border-destructive/30 bg-destructive/10",
-                  )}
-                >
-                  <p
-                    className={cn(
-                      "text-sm font-medium",
-                      isOverlap || isNotice
-                        ? "text-amber-950 dark:text-amber-100"
-                        : "text-destructive",
-                    )}
-                  >
-                    {isOverlap
-                      ? "These dates already have leave"
-                      : isNotice
-                        ? "Advance notice required"
-                        : "Please check these dates"}
-                  </p>
-                  <p
-                    className={cn(
-                      "mt-0.5 text-xs leading-relaxed",
-                      isOverlap || isNotice
-                        ? "text-amber-900/90 dark:text-amber-100/80"
-                        : "text-destructive/90",
-                    )}
-                  >
-                    {isOverlap
-                      ? "You already have a pending or approved leave on one or more of these dates. Choose different dates, or cancel the existing request first."
-                      : issue.message}
-                  </p>
-                </div>
-              );
-            })}
+            <LeaveApplicationSummary
+              preview={applyPreview}
+              hrReviewReason={hrReviewReason}
+              isOptionalHoliday={isOptionalHoliday}
+            />
+            <LeaveIssueAlertList
+              issues={[
+                ...applyPreview.blockingIssues,
+                ...applyPreview.issues.filter((issue) => issue.code === "balance"),
+              ]}
+            />
           </div>
         ) : applyContext && selectedLeaveTypeId && startDate && endDate ? (
           <div className="md:col-span-2">

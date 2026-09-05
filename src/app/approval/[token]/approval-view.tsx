@@ -8,10 +8,11 @@ import {
   ShieldX,
   XCircle,
 } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 
 import { submitEmailApprovalAction } from "@/app/approval/[token]/actions";
 import { AUTH_ROUTES } from "@/lib/auth/constants";
+import { LEAVE_EMAIL_DEFAULT_REJECTION_REASON } from "@/lib/approvals/email-templates";
 import { Button } from "@/components/common/button";
 import type { ApprovalRequestSummary, ProcessOutcome } from "@/lib/approvals/types";
 
@@ -164,6 +165,50 @@ function AnimatedMark({ approved }: { approved: boolean }) {
   );
 }
 
+function LeaveRequestDetails({
+  employeeName,
+  leaveHighlight,
+  detailRows,
+  reason,
+}: {
+  employeeName: string;
+  leaveHighlight?: ApprovalRequestSummary["leaveHighlight"];
+  detailRows: DetailRow[];
+  reason: string | null;
+}) {
+  const rows: DetailRow[] = [
+    { label: "Employee", value: employeeName },
+    leaveHighlight ? { label: "Leave type", value: leaveHighlight.leaveType } : null,
+    leaveHighlight
+      ? { label: "Start date", value: leaveHighlight.startDate }
+      : null,
+    leaveHighlight ? { label: "End date", value: leaveHighlight.endDate } : null,
+    leaveHighlight ? { label: "Requested days", value: leaveHighlight.duration } : null,
+    leaveHighlight ? { label: "Current status", value: leaveHighlight.statusLabel } : null,
+    ...(!leaveHighlight ? detailRows : []),
+  ].filter(Boolean) as DetailRow[];
+
+  return (
+    <div className="rounded-2xl border border-[#e5e7eb] bg-[#f8fafc] text-left">
+      <dl className="divide-y divide-[#e5e7eb]">
+        {rows.map((row) => (
+          <div key={row.label} className="flex items-start justify-between gap-4 px-4 py-2.5">
+            <dt className="text-xs text-slate-500">{row.label}</dt>
+            <dd className="text-right text-xs font-semibold text-slate-900">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+      {reason ? (
+        <div className="border-t border-[#e5e7eb] px-4 py-3">
+          <p className="text-xs text-slate-500">
+            <span className="font-semibold text-slate-700">Reason:</span> {reason}
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function LeaveResultDetails({
   outcome,
   rejectionReason,
@@ -220,7 +265,7 @@ function ResultScreen({
         heading={
           leave
             ? approved
-              ? "Leave Request Approved"
+              ? "Leave Request Approved Successfully"
               : "Leave Request Rejected"
             : approved
               ? "Request approved"
@@ -228,9 +273,7 @@ function ResultScreen({
         }
         subheading={
           leave
-            ? approved
-              ? "The employee's leave request has been successfully approved."
-              : "The employee's leave request has been rejected successfully."
+            ? "The employee and HRMS portal have been updated."
             : "Recorded via secure email approval"
         }
       >
@@ -296,7 +339,7 @@ function ResultScreen({
   const title = isDone
     ? "Already processed"
     : isExpired
-      ? "Link expired"
+      ? "This approval link has expired."
       : isUnauthorized
         ? "Not authorized"
         : "Something went wrong";
@@ -331,66 +374,70 @@ export function ApprovalView({
   );
   const [outcome, setOutcome] = useState<ProcessOutcome | null>(initialOutcome ?? null);
   const [isPending, startTransition] = useTransition();
+  const submitLockRef = useRef(false);
 
-  function retryApprove() {
+  function runDecision(action: "approve" | "reject", rejectionText?: string) {
+    if (submitLockRef.current || isPending) return;
+    submitLockRef.current = true;
     setError(null);
     startTransition(async () => {
-      const result = await submitEmailApprovalAction({
-        token,
-        action: "approve",
-      });
-      setOutcome(result);
-    });
-  }
-
-  function retryRejectLeave() {
-    setError(null);
-    startTransition(async () => {
-      const result = await submitEmailApprovalAction({
-        token,
-        action: "reject",
-      });
-      if (result.status === "error") {
-        setError(result.message);
-        return;
+      try {
+        const result = await submitEmailApprovalAction({
+          token,
+          action,
+          reason: action === "reject" ? rejectionText : undefined,
+        });
+        if (result.status === "error") {
+          setError(result.message);
+          submitLockRef.current = false;
+          return;
+        }
+        if (action === "reject") {
+          setRejectionReason(
+            rejectionText?.trim() || LEAVE_EMAIL_DEFAULT_REJECTION_REASON,
+          );
+        }
+        setOutcome(result);
+      } catch {
+        setError("We could not complete this action. Please try again.");
+        submitLockRef.current = false;
       }
-      setRejectionReason(initialRejectionReason ?? "Rejected via email approval");
-      setOutcome(result);
     });
   }
 
-  function confirmReject() {
+  function confirmApprove() {
+    runDecision("approve");
+  }
+
+  function confirmRejectLeave() {
+    const trimmed = reason.trim();
+    runDecision("reject", trimmed.length >= 3 ? trimmed : LEAVE_EMAIL_DEFAULT_REJECTION_REASON);
+  }
+
+  function confirmRejectWithRequiredReason() {
     setError(null);
     if (reason.trim().length < 3) {
       setError("Please provide a reason for the rejection.");
       return;
     }
-    const trimmed = reason.trim();
-    startTransition(async () => {
-      const result = await submitEmailApprovalAction({
-        token,
-        action: "reject",
-        reason: trimmed,
-      });
-      if (result.status === "error") {
-        setError(result.message);
-        return;
-      }
-      setRejectionReason(trimmed);
-      setOutcome(result);
-    });
+    runDecision("reject", reason.trim());
   }
 
   if (outcome) {
-    if (outcome.status === "error" && initialAction === "approve") {
-      return <ResultScreen outcome={outcome} onRetry={retryApprove} />;
+    if (outcome.status === "error") {
+      return (
+        <ResultScreen
+          outcome={outcome}
+          onRetry={() => {
+            submitLockRef.current = false;
+            if (initialAction === "approve") confirmApprove();
+            else if (state.kind === "ready" && state.leaveHighlight) confirmRejectLeave();
+            else confirmRejectWithRequiredReason();
+          }}
+        />
+      );
     }
-    if (outcome.status === "error" && initialAction === "reject" && state.kind === "ready" && state.leaveHighlight) {
-      return <ResultScreen outcome={outcome} onRetry={retryRejectLeave} />;
-    }
-    if (outcome.status !== "error") {
-      return <ResultScreen outcome={outcome} rejectionReason={rejectionReason} />;
-    }
+    return <ResultScreen outcome={outcome} rejectionReason={rejectionReason} />;
   }
 
   if (state.kind === "error") {
@@ -411,25 +458,115 @@ export function ApprovalView({
     return (
       <Shell heading="No action taken" subheading="You can close this window">
         <p className="text-center text-sm text-slate-600">
-          The leave request was not rejected. You may close this page.
+          No decision was recorded. You may close this page or return to the email link later.
         </p>
       </Shell>
     );
   }
 
-  // Non-leave reject path (kept for future modules): confirmation + reason.
+  const isLeave = Boolean(state.leaveHighlight) || state.heading.startsWith("Leave request");
+
+  // Leave approve — confirm before committing.
+  if (initialAction === "approve" && isLeave) {
+    return (
+      <Shell heading="Approve Leave Request" subheading={state.heading}>
+        <div className="space-y-4">
+          <LeaveRequestDetails
+            employeeName={state.employeeName}
+            leaveHighlight={state.leaveHighlight}
+            detailRows={state.detailRows}
+            reason={state.reason}
+          />
+          <p className="text-sm text-slate-600">
+            You are about to approve this leave request.
+          </p>
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPending}
+              className="h-11 w-full"
+              onClick={() => setCancelled(true)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={isPending}
+              className="h-11 w-full gap-2 bg-emerald-600 hover:bg-emerald-700"
+              onClick={confirmApprove}
+            >
+              {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+              Confirm Approval
+            </Button>
+          </div>
+        </div>
+      </Shell>
+    );
+  }
+
+  // Leave reject — confirm + optional reason (defaults applied server-side).
+  if (initialAction === "reject" && isLeave) {
+    return (
+      <Shell heading="Reject Leave Request" subheading={state.heading}>
+        <div className="space-y-4">
+          <LeaveRequestDetails
+            employeeName={state.employeeName}
+            leaveHighlight={state.leaveHighlight}
+            detailRows={state.detailRows}
+            reason={state.reason}
+          />
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-slate-500">
+              Rejection reason <span className="font-normal text-slate-400">(optional)</span>
+            </label>
+            <textarea
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              rows={3}
+              placeholder="Briefly explain why this request is being rejected…"
+              disabled={isPending}
+              className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+            />
+          </div>
+          <p className="text-sm text-slate-600">
+            You are about to reject this leave request.
+          </p>
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPending}
+              className="h-11 w-full"
+              onClick={() => setCancelled(true)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isPending}
+              className="h-11 w-full gap-2"
+              onClick={confirmRejectLeave}
+            >
+              {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+              Confirm Rejection
+            </Button>
+          </div>
+        </div>
+      </Shell>
+    );
+  }
+
+  // Non-leave reject path: confirmation + required reason.
   if (initialAction === "reject") {
     return (
       <Shell heading="Reject this request?" subheading={state.heading}>
         <div className="space-y-4">
           <div className="rounded-2xl border border-[#e5e7eb] bg-[#f8fafc] px-4 py-3">
             <p className="text-sm font-semibold text-slate-900">{state.employeeName}</p>
-            {state.leaveHighlight ? (
-              <p className="mt-1 text-xs text-slate-500">
-                {state.leaveHighlight.leaveType} · {state.leaveHighlight.startDate} –{" "}
-                {state.leaveHighlight.endDate}
-              </p>
-            ) : null}
           </div>
 
           <div>
@@ -454,7 +591,7 @@ export function ApprovalView({
               variant="destructive"
               disabled={isPending}
               className="h-11 w-full gap-2"
-              onClick={confirmReject}
+              onClick={confirmRejectWithRequiredReason}
             >
               {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
               Confirm Rejection
@@ -474,23 +611,35 @@ export function ApprovalView({
     );
   }
 
-  // Approve path without a processed outcome yet (rare) — offer Retry.
+  // Non-leave approve confirm.
   return (
-    <Shell heading="Leave approval" subheading={state.heading}>
-      <div className="flex flex-col items-center text-center">
-        <p className="text-sm text-slate-600">
-          We could not finish approving this leave request. Please try again.
-        </p>
-        {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
-        <Button
-          type="button"
-          className="mt-6 h-11 gap-2 bg-emerald-600 hover:bg-emerald-700"
-          disabled={isPending}
-          onClick={retryApprove}
-        >
-          {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-          Retry
-        </Button>
+    <Shell heading="Approve this request?" subheading={state.heading}>
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-[#e5e7eb] bg-[#f8fafc] px-4 py-3">
+          <p className="text-sm font-semibold text-slate-900">{state.employeeName}</p>
+        </div>
+        <p className="text-sm text-slate-600">You are about to approve this request.</p>
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isPending}
+            className="h-11 w-full"
+            onClick={() => setCancelled(true)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            disabled={isPending}
+            className="h-11 w-full gap-2 bg-emerald-600 hover:bg-emerald-700"
+            onClick={confirmApprove}
+          >
+            {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+            Confirm Approval
+          </Button>
+        </div>
       </div>
     </Shell>
   );

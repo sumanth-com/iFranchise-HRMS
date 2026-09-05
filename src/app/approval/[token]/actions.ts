@@ -9,11 +9,33 @@ export async function submitEmailApprovalAction(input: {
   action: ApprovalDecision;
   reason?: string;
 }): Promise<ProcessOutcome> {
-  const ctx = await getRequestAuditContext();
-  return processEmailApproval({
-    rawToken: input.token,
-    action: input.action,
-    reason: input.reason,
-    context: { ip: ctx.ipAddress, userAgent: ctx.userAgent },
-  });
+  try {
+    const token = String(input.token ?? "").trim();
+    if (!token || token.length < 16) {
+      return {
+        status: "invalid",
+        message: "This approval link is invalid or no longer available.",
+      };
+    }
+    if (input.action !== "approve" && input.action !== "reject") {
+      return {
+        status: "invalid",
+        message: "This approval link is invalid or no longer available.",
+      };
+    }
+
+    const ctx = await getRequestAuditContext();
+    return await processEmailApproval({
+      rawToken: token,
+      action: input.action,
+      reason: input.reason,
+      context: { ip: ctx.ipAddress, userAgent: ctx.userAgent },
+    });
+  } catch (error) {
+    console.error("[approval-action]", error);
+    return {
+      status: "error",
+      message: "We could not complete this action. Please try again.",
+    };
+  }
 }

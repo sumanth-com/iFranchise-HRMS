@@ -15,7 +15,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/common/button";
+import { Button, POLICY_HEADER_BUTTON_CLASS } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
 import { EmployeeStatCard } from "@/components/employee/dashboard/employee-module-primitives";
 import { CATEGORY_META } from "@/components/employee/documents/document-icons";
@@ -24,11 +24,17 @@ import { DocumentMissingSlotCard } from "@/components/employee/documents/documen
 import { DocumentPreviewDialog } from "@/components/employee/documents/document-preview-dialog";
 import { DocumentUploadDialog } from "@/components/employee/documents/document-upload-dialog";
 import { useEmployeeDocumentFile } from "@/components/employee/documents/use-employee-document-file";
-import type { EmployeeDocCategoryKey } from "@/lib/employee/documents/categories";
+import {
+  isMultiFileDocumentCode,
+  PAYROLL_NESTED_FOLDERS,
+  type EmployeeDocCategoryKey,
+  type PayrollNestedCode,
+} from "@/lib/employee/documents/categories";
 import { employeeDeleteDocumentAction } from "@/lib/employee/actions/employee-documents-actions";
 import type {
   EmployeeDocFile,
   EmployeeDocFolder,
+  EmployeeDocumentTypeOption,
   EmployeeDocumentsExplorerData,
 } from "@/types/employee-documents-explorer";
 import { cn } from "@/lib/utils";
@@ -39,6 +45,13 @@ function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+function displayNameForDelete(file: EmployeeDocFile) {
+  if (isMultiFileDocumentCode(file.documentTypeCode) || file.title?.trim()) {
+    return file.title?.trim() || file.documentTypeName;
+  }
+  return file.documentTypeName;
 }
 
 function FolderCard({
@@ -54,27 +67,63 @@ function FolderCard({
     <button
       type="button"
       onClick={() => onOpen(folder.key)}
-      className="group flex flex-col gap-3 rounded-2xl border bg-card p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+      className="group flex h-full min-h-[148px] flex-col gap-3 rounded-2xl border bg-card p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
     >
-      <div className="flex items-start justify-between">
-        <span className={cn("flex size-12 items-center justify-center rounded-xl", meta.bg)}>
-          <Icon className={cn("size-6", meta.text)} />
+      <div className="flex items-start justify-between gap-2">
+        <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-xl", meta.bg)}>
+          <Icon className={cn("size-5", meta.text)} />
         </span>
         <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums text-muted-foreground">
           {folder.count}
         </span>
       </div>
       <div className="min-w-0">
-        <p className="truncate text-sm font-semibold tracking-tight">{folder.name}</p>
-        <p className="truncate text-xs text-muted-foreground">{folder.description}</p>
+        <p className="text-sm font-semibold leading-snug tracking-tight">{folder.name}</p>
+        <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{folder.description}</p>
       </div>
-      <div className="flex items-center justify-between border-t pt-2 text-[11px] text-muted-foreground">
+      <div className="mt-auto flex items-center justify-between border-t pt-2 text-[11px] text-muted-foreground">
         <span>{formatBytes(folder.storageBytes)}</span>
         <span>
           {folder.lastUpdated
             ? `Updated ${formatDocumentDate(folder.lastUpdated, "dd MMM")}`
             : "Empty"}
         </span>
+      </div>
+    </button>
+  );
+}
+
+function PayrollSubFolderCard({
+  name,
+  description,
+  count,
+  onOpen,
+}: {
+  name: string;
+  description: string;
+  count: number;
+  onOpen: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group flex flex-col gap-3 rounded-2xl border bg-card p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/10">
+          <FileStack className="size-5 text-violet-600" />
+        </span>
+        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums text-muted-foreground">
+          {count}
+        </span>
+      </div>
+      <div className="min-w-0">
+        <p className="text-sm font-semibold leading-snug tracking-tight">{name}</p>
+        <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{description}</p>
+      </div>
+      <div className="mt-auto border-t pt-2 text-[11px] font-medium text-violet-600">
+        Open folder →
       </div>
     </button>
   );
@@ -92,17 +141,13 @@ export function DocumentsExplorer({
   const fileActions = useEmployeeDocumentFile();
 
   const [openFolder, setOpenFolder] = useState<EmployeeDocCategoryKey | null>(null);
+  const [payrollSub, setPayrollSub] = useState<PayrollNestedCode | null>(null);
 
   const [uploadOpen, setUploadOpen] = useState(false);
   const [replaceTarget, setReplaceTarget] = useState<EmployeeDocFile | null>(null);
   const [uploadTypeId, setUploadTypeId] = useState<string | undefined>();
 
   const [deleteFile, setDeleteFile] = useState<EmployeeDocFile | null>(null);
-
-  const filteredFiles = useMemo(() => {
-    if (!openFolder) return data.files;
-    return data.files.filter((file) => file.categoryKey === openFolder);
-  }, [data.files, openFolder]);
 
   const storagePct =
     data.storage.softLimitBytes > 0
@@ -113,50 +158,121 @@ export function DocumentsExplorer({
       : 0;
   const remainingBytes = Math.max(0, data.storage.softLimitBytes - data.storage.usedBytes);
 
-  /** When inside a folder, only offer document types that belong to that category. */
-  const uploadDocumentTypes = useMemo(() => {
+  const categoryTypes = useMemo(() => {
     if (!openFolder) return data.documentTypes;
-    const filtered = data.documentTypes.filter((type) => type.categoryKey === openFolder);
-    if (filtered.length > 0) return filtered;
-    // Folders without dedicated types (e.g. education / payroll) fall back to "Other"
-    return data.documentTypes.filter(
-      (type) => type.code.toUpperCase() === "OTHER" || type.categoryKey === "other",
-    );
+    return data.documentTypes.filter((type) => type.categoryKey === openFolder);
   }, [data.documentTypes, openFolder]);
 
-  const folderDefaultType = uploadDocumentTypes[0]?.id;
+  const activeType: EmployeeDocumentTypeOption | null = useMemo(() => {
+    if (!openFolder) return null;
+    if (openFolder === "payroll" && payrollSub) {
+      return categoryTypes.find((type) => type.code.toUpperCase() === payrollSub) ?? null;
+    }
+    return null;
+  }, [openFolder, payrollSub, categoryTypes]);
+
+  const filteredFiles = useMemo(() => {
+    if (!openFolder) return [];
+    const inCategory = data.files.filter((file) => file.categoryKey === openFolder);
+    if (openFolder === "payroll") {
+      if (!payrollSub) return [];
+      return inCategory.filter(
+        (file) => file.documentTypeCode.toUpperCase() === payrollSub,
+      );
+    }
+    return inCategory;
+  }, [data.files, openFolder, payrollSub]);
 
   const missingTypes = useMemo(() => {
-    if (!openFolder) return [];
+    if (!openFolder || openFolder === "payroll") return [];
     const uploadedTypeIds = new Set(filteredFiles.map((file) => file.documentTypeId));
-    return uploadDocumentTypes.filter((type) => !uploadedTypeIds.has(type.id));
-  }, [openFolder, filteredFiles, uploadDocumentTypes]);
+    return categoryTypes.filter((type) => {
+      if (isMultiFileDocumentCode(type.code)) return true;
+      return !uploadedTypeIds.has(type.id);
+    });
+  }, [openFolder, filteredFiles, categoryTypes]);
+
+  const pendingSlotCount = useMemo(() => {
+    if (!openFolder || openFolder === "payroll") return 0;
+    const uploadedTypeIds = new Set(
+      data.files
+        .filter((file) => file.categoryKey === openFolder)
+        .map((file) => file.documentTypeId),
+    );
+    return categoryTypes.filter((type) => {
+      if (isMultiFileDocumentCode(type.code)) return false;
+      return !uploadedTypeIds.has(type.id);
+    }).length;
+  }, [openFolder, data.files, categoryTypes]);
+
+  const payrollCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const folder of PAYROLL_NESTED_FOLDERS) {
+      map[folder.code] = data.files.filter(
+        (file) =>
+          file.categoryKey === "payroll" &&
+          file.documentTypeCode.toUpperCase() === folder.code,
+      ).length;
+    }
+    return map;
+  }, [data.files]);
+
+  const uploadDocumentTypes = useMemo(() => {
+    if (openFolder === "payroll" && activeType) return [activeType];
+    if (openFolder) return categoryTypes;
+    return data.documentTypes;
+  }, [openFolder, activeType, categoryTypes, data.documentTypes]);
+
+  const folderDefaultType = uploadDocumentTypes[0]?.id;
+  const openFolderMeta = openFolder ? data.folders.find((f) => f.key === openFolder) : null;
+  const payrollSubMeta = payrollSub
+    ? PAYROLL_NESTED_FOLDERS.find((item) => item.code === payrollSub)
+    : null;
+
+  function openCategory(key: EmployeeDocCategoryKey) {
+    setOpenFolder(key);
+    setPayrollSub(null);
+  }
+
+  function backFromFolder() {
+    if (openFolder === "payroll" && payrollSub) {
+      setPayrollSub(null);
+      return;
+    }
+    setOpenFolder(null);
+    setPayrollSub(null);
+  }
 
   function openUpload(typeId?: string) {
     setReplaceTarget(null);
-    setUploadTypeId(typeId ?? folderDefaultType);
+    setUploadTypeId(typeId ?? activeType?.id ?? folderDefaultType);
     setUploadOpen(true);
   }
 
   function handleDelete() {
-    if (!deleteFile) return;
+    if (!deleteFile || isPending) return;
     startTransition(async () => {
-      const result = await employeeDeleteDocumentAction(deleteFile.id);
-      if (!result.success) {
-        toast.error(result.message);
-        return;
+      try {
+        const result = await employeeDeleteDocumentAction(deleteFile.id);
+        if (!result.success) {
+          toast.error(result.message || "Unable to delete the document. Please try again.");
+          return;
+        }
+        toast.success("Document deleted");
+        setDeleteFile(null);
+        router.refresh();
+      } catch {
+        toast.error("Unable to delete the document. Please try again.");
       }
-      toast.success("Document deleted");
-      setDeleteFile(null);
-      router.refresh();
     });
   }
 
-  const openFolderMeta = openFolder ? data.folders.find((f) => f.key === openFolder) : null;
+  const showingPayrollHub = openFolder === "payroll" && !payrollSub;
+  const showingNestedList =
+    Boolean(openFolder) && (openFolder !== "payroll" || Boolean(payrollSub));
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Storage overview */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <EmployeeStatCard
           label="Documents Uploaded"
@@ -204,91 +320,133 @@ export function DocumentsExplorer({
         />
       </div>
 
-      {/* Breadcrumb when inside a folder */}
       {openFolder ? (
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
-            className="h-7 gap-1 px-2"
-            onClick={() => setOpenFolder(null)}
+            className={cn(POLICY_HEADER_BUTTON_CLASS, "h-7 gap-1 px-2 text-black hover:text-black")}
+            onClick={backFromFolder}
           >
-            <ArrowLeft className="size-4" />
-            Folders
+            <ArrowLeft className="size-4 text-black" />
+            {payrollSub ? "Payroll & Tax" : "Folders"}
           </Button>
           <ChevronRight className="size-4 text-muted-foreground" />
-          <span className="font-medium">{openFolderMeta?.name}</span>
-          <span className="text-xs text-muted-foreground">
-            ({filteredFiles.length} uploaded
-            {missingTypes.length > 0 ? ` · ${missingTypes.length} pending` : ""})
-          </span>
+          {payrollSub ? (
+            <>
+              <button
+                type="button"
+                className="font-medium text-foreground hover:underline"
+                onClick={() => setPayrollSub(null)}
+              >
+                {openFolderMeta?.name}
+              </button>
+              <ChevronRight className="size-4 text-muted-foreground" />
+              <span className="font-medium">{payrollSubMeta?.name}</span>
+              <span className="text-xs text-muted-foreground">
+                ({filteredFiles.length} uploaded)
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="font-medium">{openFolderMeta?.name}</span>
+              <span className="text-xs text-muted-foreground">
+                {showingPayrollHub
+                  ? `(${data.folders.find((f) => f.key === "payroll")?.count ?? 0} uploaded)`
+                  : `(${filteredFiles.length} uploaded${
+                      pendingSlotCount > 0 ? ` · ${pendingSlotCount} pending` : ""
+                    })`}
+              </span>
+            </>
+          )}
         </div>
       ) : null}
 
-      {/* Content */}
-      {openFolder ? (
-        filteredFiles.length > 0 || (!readOnly && missingTypes.length > 0) ? (
-          <div className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {filteredFiles.map((file) => (
-              <DocumentFileCard
-                key={file.id}
-                file={file}
-                fileActions={fileActions}
-                readOnly={readOnly}
-                onReplace={(target) => {
-                  setReplaceTarget(target);
-                  setUploadTypeId(target.documentTypeId);
-                  setUploadOpen(true);
-                }}
-                onDelete={(target) => setDeleteFile(target)}
-              />
-            ))}
-            {!readOnly
-              ? missingTypes.map((type) => (
-              <DocumentMissingSlotCard
-                key={type.id}
-                typeName={type.name}
-                onUpload={() => openUpload(type.id)}
-              />
-            ))
-              : null}
-          </div>
-        ) : readOnly ? (
-          <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed bg-muted/20 px-6 py-14 text-center">
-            <span className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <FileStack className="size-7" />
-            </span>
-            <div>
-              <p className="text-sm font-medium">This folder is empty</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                No documents in this category yet.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed bg-muted/20 px-6 py-14 text-center">
-            <span className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <FileStack className="size-7" />
-            </span>
-            <div>
-              <p className="text-sm font-medium">This folder is empty</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Upload a file to get started.
-              </p>
-            </div>
-            <Button className="gap-1.5" onClick={() => openUpload()}>
-              <UploadCloud className="size-4" />
-              Upload document
-            </Button>
-          </div>
-        )
-      ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      {!openFolder ? (
+        <div className="grid auto-rows-fr grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {data.folders.map((folder) => (
-            <FolderCard key={folder.key} folder={folder} onOpen={setOpenFolder} />
+            <FolderCard key={folder.key} folder={folder} onOpen={openCategory} />
           ))}
         </div>
-      )}
+      ) : null}
+
+      {showingPayrollHub ? (
+        <div className="grid auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-3">
+          {PAYROLL_NESTED_FOLDERS.map((folder) => (
+            <PayrollSubFolderCard
+              key={folder.code}
+              name={folder.name}
+              description={folder.description}
+              count={payrollCounts[folder.code] ?? 0}
+              onOpen={() => setPayrollSub(folder.code)}
+            />
+          ))}
+        </div>
+      ) : null}
+
+      {showingNestedList ? (
+        <>
+          {!readOnly && openFolder === "payroll" && activeType ? (
+            <div className="flex justify-end">
+              <Button className="gap-1.5" onClick={() => openUpload(activeType.id)}>
+                <UploadCloud className="size-4" />
+                Upload {payrollSubMeta?.name === "Payslips" ? "Payslip" : payrollSubMeta?.name?.replace(/s$/, "") ?? "document"}
+              </Button>
+            </div>
+          ) : null}
+
+          {filteredFiles.length > 0 || (!readOnly && missingTypes.length > 0) ? (
+            <div className="grid auto-rows-fr grid-cols-1 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+              {filteredFiles.map((file) => (
+                <DocumentFileCard
+                  key={file.id}
+                  file={file}
+                  fileActions={fileActions}
+                  readOnly={readOnly}
+                  onReplace={(target) => {
+                    setReplaceTarget(target);
+                    setUploadTypeId(target.documentTypeId);
+                    setUploadOpen(true);
+                  }}
+                  onDelete={(target) => setDeleteFile(target)}
+                />
+              ))}
+              {!readOnly
+                ? missingTypes.map((type) => (
+                    <DocumentMissingSlotCard
+                      key={type.id}
+                      typeName={type.name}
+                      allowMultiple={isMultiFileDocumentCode(type.code)}
+                      onUpload={() => openUpload(type.id)}
+                    />
+                  ))
+                : null}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed bg-muted/20 px-6 py-10 text-center">
+              <span className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <FileStack className="size-6" />
+              </span>
+              <div>
+                <p className="text-sm font-medium">
+                  {openFolder === "payroll" ? `No ${payrollSubMeta?.name?.toLowerCase() ?? "documents"} yet` : "This folder is empty"}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {readOnly
+                    ? "No documents in this category yet."
+                    : "Upload a file to get started."}
+                </p>
+              </div>
+              {!readOnly ? (
+                <Button className="gap-1.5" onClick={() => openUpload()}>
+                  <UploadCloud className="size-4" />
+                  Upload
+                </Button>
+              ) : null}
+            </div>
+          )}
+        </>
+      ) : null}
 
       {!readOnly ? (
         <DocumentUploadDialog
@@ -298,12 +456,13 @@ export function DocumentsExplorer({
           maxUploadSizeMb={data.maxUploadSizeMb}
           allowedFileTypes={data.allowedFileTypes}
           defaultDocumentTypeId={uploadTypeId ?? folderDefaultType}
+          lockSlotFields
           replaceTarget={
             replaceTarget
               ? {
                   documentId: replaceTarget.id,
                   documentTypeId: replaceTarget.documentTypeId,
-                  title: replaceTarget.documentTypeName,
+                  title: replaceTarget.title || replaceTarget.documentTypeName,
                 }
               : null
           }
@@ -322,7 +481,7 @@ export function DocumentsExplorer({
           title="Delete Document"
           description={
             deleteFile
-              ? `"${deleteFile.documentTypeName}" will be removed from your documents.`
+              ? `Are you sure you want to delete "${displayNameForDelete(deleteFile)}"?`
               : undefined
           }
           contentClassName="sm:max-w-md"
@@ -333,7 +492,7 @@ export function DocumentsExplorer({
               ) : (
                 <Trash2 className="mr-2 size-4" />
               )}
-              Delete
+              Delete Document
             </Button>
           }
         >

@@ -145,7 +145,7 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
     assert.equal(lop?.amount, 500);
   });
 
-  it("sandwiches Sunday inside a continuous Sat–Mon absence and never holidays", () => {
+  it("sandwiches Sunday inside a continuous Sat–Mon absence and public holidays between leave days", () => {
     const sunday = sandwichWeeklyOffDates(["2026-09-19", "2026-09-21"], september);
     assert.equal(sunday.has("2026-09-20"), true);
 
@@ -154,7 +154,7 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
       holidays: ["2026-09-12"],
     });
     assert.equal(withHoliday.has("2026-09-13"), true);
-    assert.equal(withHoliday.has("2026-09-12"), false);
+    assert.equal(withHoliday.has("2026-09-12"), true);
 
     const payroll = calculateEmployeePayroll({
       month: 9,

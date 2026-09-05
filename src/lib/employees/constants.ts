@@ -49,7 +49,7 @@ export const EMPLOYEE_STORAGE_BUCKETS = {
 export const PROFILE_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 
 /** Max non-profile document upload size (must match storage bucket limit). */
-export const DOCUMENT_MAX_BYTES = 30 * 1024 * 1024;
+export const DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
 export const DOCUMENT_MAX_MB = 30;
 
 export const DESIGNATION_OTHER_VALUE = "others" as const;

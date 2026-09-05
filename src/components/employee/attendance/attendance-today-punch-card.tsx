@@ -10,6 +10,7 @@ import { AttendanceStatusBadge } from "@/components/attendance/attendance-status
 import { useOptionalSelfAttendanceLive } from "@/components/attendance/self-attendance-live-context";
 import { Button } from "@/components/common/button";
 import { Modal } from "@/components/common/modal";
+import { BirthdayCheckInCelebration } from "@/components/employee/attendance/birthday-check-in-celebration";
 import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils";
 import {
   buildCheckInMessage,
@@ -17,6 +18,10 @@ import {
   buildEarlyCheckOutConfirm,
   isBeforeOfficeEnd,
 } from "@/lib/employee/attendance-punch-messages";
+import {
+  hasShownBirthdayCheckInCelebration,
+  markBirthdayCheckInCelebrationShown,
+} from "@/lib/employee/birthday-utils";
 import { useLiveWorkingSeconds } from "@/hooks/use-live-working-seconds";
 import {
   formatWorkingDuration,
@@ -28,7 +33,16 @@ import type {
 } from "@/types/manager-self-attendance";
 
 type PunchResult =
-  | { success: true; today?: ManagerTodayAttendance; message?: string }
+  | {
+      success: true;
+      today?: ManagerTodayAttendance;
+      message?: string;
+      birthdayCelebration?: {
+        employeeId: string;
+        firstName: string;
+        date: string;
+      } | null;
+    }
   | { success: false; message?: string; error?: string };
 
 type DialogState =
@@ -156,6 +170,9 @@ export function AttendanceTodayPunchCard({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [dialog, setDialog] = useState<DialogState | null>(null);
+  const [birthdayCelebration, setBirthdayCelebration] = useState<{
+    firstName: string;
+  } | null>(null);
   const elapsedSeconds = useLiveWorkingSeconds(today.checkInAt, today.checkOutAt);
   const workingHoursLabel =
     live?.workingHoursLabel ?? formatWorkingDuration(elapsedSeconds);
@@ -179,6 +196,25 @@ export function AttendanceTodayPunchCard({
     router.refresh();
   }
 
+  function maybeTriggerBirthdayCelebration(
+    payload:
+      | {
+          employeeId: string;
+          firstName: string;
+          date: string;
+        }
+      | null
+      | undefined,
+  ): boolean {
+    if (!payload?.employeeId || !payload.date) return false;
+    if (hasShownBirthdayCheckInCelebration(payload.employeeId, payload.date)) {
+      return false;
+    }
+    markBirthdayCheckInCelebrationShown(payload.employeeId, payload.date);
+    setBirthdayCelebration({ firstName: payload.firstName || firstName });
+    return true;
+  }
+
   function handleCheckIn() {
     startTransition(async () => {
       const result = await onCheckIn();
@@ -186,13 +222,17 @@ export function AttendanceTodayPunchCard({
         toast.error(result.message ?? result.error ?? "Unable to check in");
         return;
       }
+      refreshAfterSuccess(result.today);
+
+      const celebrated = maybeTriggerBirthdayCelebration(result.birthdayCelebration);
+      if (celebrated) return;
+
       const message = buildCheckInMessage(firstName);
       setDialog({
         kind: "check_in",
         title: message.title,
         body: message.body,
       });
-      refreshAfterSuccess(result.today);
     });
   }
 
@@ -399,6 +439,12 @@ export function AttendanceTodayPunchCard({
       >
         <MessageCard title="Before you leave" body={earlyConfirm.body} tone="amber" />
       </Modal>
+
+      <BirthdayCheckInCelebration
+        open={Boolean(birthdayCelebration)}
+        firstName={birthdayCelebration?.firstName || firstName}
+        onClose={() => setBirthdayCelebration(null)}
+      />
     </>
   );
 }

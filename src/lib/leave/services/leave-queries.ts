@@ -1390,6 +1390,7 @@ function calendarDayAllocationsForRequest(
       total_days: row.total_days,
       duration_breakdown: row.duration_breakdown,
     }),
+    { calendar },
   );
 }
 

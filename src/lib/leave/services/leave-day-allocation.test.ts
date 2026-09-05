@@ -109,21 +109,21 @@ describe("calendar day allocation", () => {
     const result = allocateLeaveDaysByBalance(
       duration([
         {
-          date: "2026-09-14",
-          kind: "sandwich",
-          class: "weekly_off",
-          counted: 1,
-          inRequestedRange: false,
-        },
-        {
-          date: "2026-09-15",
+          date: "2026-09-19",
           kind: "working",
           class: "working",
           counted: 1,
           inRequestedRange: true,
         },
         {
-          date: "2026-09-16",
+          date: "2026-09-20",
+          kind: "sandwich",
+          class: "weekly_off",
+          counted: 1,
+          inRequestedRange: false,
+        },
+        {
+          date: "2026-09-21",
           kind: "working",
           class: "working",
           counted: 1,
@@ -133,9 +133,9 @@ describe("calendar day allocation", () => {
       1,
     );
 
-    assert.equal(calendarMarkForAllocation(result[0]!.kind, "CL"), "Sandwich");
-    assert.equal(calendarMarkForAllocation(result[1]!.kind, "CL"), "LOP");
-    assert.equal(calendarMarkForAllocation(result[2]!.kind, "CL"), "LOP");
+    assert.equal(calendarMarkForAllocation(result.find((day) => day.date === "2026-09-19")!.kind, "CL"), "Casual Leave");
+    assert.equal(calendarMarkForAllocation(result.find((day) => day.date === "2026-09-20")!.kind, "CL"), "LOP");
+    assert.equal(calendarMarkForAllocation(result.find((day) => day.date === "2026-09-21")!.kind, "CL"), "LOP");
   });
 
   it("labels earned leave paid days with the full name", () => {

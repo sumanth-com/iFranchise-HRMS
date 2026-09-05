@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
-import { Cake, Newspaper, Pencil, Settings2, Sparkles, UserRound } from "lucide-react";
+import { Cake, CalendarDays, Newspaper, Pencil, Settings2, Sparkles } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
@@ -20,6 +20,7 @@ import {
   employeeSectionClass,
 } from "@/components/employee/dashboard/employee-module-primitives";
 import { HolidayGlyph } from "@/components/employee/dashboard/holiday-glyph";
+import { birthdayCardMessage } from "@/lib/employee/birthday-utils";
 import { getDirectoryAssetPhoto } from "@/lib/employee/directory-asset-photos";
 import { getSignedUrlAction } from "@/lib/employees/actions";
 import { cn } from "@/lib/utils";
@@ -38,29 +39,30 @@ function countdownLabel(date: string, referenceDate: string): string {
   }
 }
 
-function birthdayGreeting(firstName?: string) {
-  const name = firstName?.trim();
-  if (name) {
-    return `Happy Birthday, ${name} — wishing you a year of success and joy.`;
-  }
-  return "Happy Birthday — wishing you a year of success and joy.";
-}
-
 const combinedIconSlotClass =
-  "flex size-[4.5rem] shrink-0 items-center justify-center";
+  "flex size-14 shrink-0 items-center justify-center";
+
+function birthdayInitials(firstName: string, lastName: string) {
+  const first = firstName.trim().charAt(0);
+  const last = lastName.trim().charAt(0);
+  const initials = `${first}${last}`.toUpperCase();
+  return initials || first.toUpperCase() || "?";
+}
 
 function CelebrationBirthdayPhoto({
   firstName,
   lastName,
   profileImagePath,
   signedUrl,
-  className = "size-[4.5rem] rounded-2xl object-cover",
+  size = "md",
+  isToday = false,
 }: {
   firstName: string;
   lastName: string;
   profileImagePath?: string | null;
   signedUrl?: string | null;
-  className?: string;
+  size?: "md" | "lg";
+  isToday?: boolean;
 }) {
   const person = useMemo(
     () => ({
@@ -98,38 +100,53 @@ function CelebrationBirthdayPhoto({
 
   const showUpload = Boolean(imageUrl) && !remoteFailed;
   const showAsset = Boolean(assetPhoto) && !assetFailed && !showUpload;
+  const dimension = size === "lg" ? "size-[4.75rem]" : "size-14";
+  const shellClass = cn(
+    "relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-violet-500/15 to-rose-500/15 shadow-sm ring-2 ring-background",
+    dimension,
+    isToday ? "ring-rose-300/70" : "ring-violet-200/60",
+  );
+  const imageClass = cn(dimension, "rounded-full object-cover object-top");
 
   if (showUpload && imageUrl) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={imageUrl}
-        alt={person.fullName || firstName}
-        className={className}
-        onError={() => setRemoteFailed(true)}
-      />
+      <span className={shellClass}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imageUrl}
+          alt={person.fullName || firstName}
+          className={imageClass}
+          onError={() => setRemoteFailed(true)}
+        />
+      </span>
     );
   }
 
   if (showAsset && assetPhoto) {
     return (
-      <Image
-        src={assetPhoto}
-        alt={person.fullName || firstName}
-        width={72}
-        height={72}
-        className={className}
-        onError={() => setAssetFailed(true)}
-      />
+      <span className={shellClass}>
+        <Image
+          src={assetPhoto}
+          alt={person.fullName || firstName}
+          width={size === "lg" ? 76 : 56}
+          height={size === "lg" ? 76 : 56}
+          className={imageClass}
+          onError={() => setAssetFailed(true)}
+        />
+      </span>
     );
   }
 
   return (
     <span
-      className="flex size-[4.5rem] items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-violet-600 text-white"
+      className={cn(
+        shellClass,
+        "bg-gradient-to-br from-blue-600 to-violet-600 text-sm font-semibold tracking-wide text-white",
+        size === "lg" && "text-base",
+      )}
       aria-hidden
     >
-      <UserRound className="size-8" strokeWidth={2.25} />
+      {birthdayInitials(firstName, lastName)}
     </span>
   );
 }
@@ -224,8 +241,13 @@ function BirthdaySlide({
   const isToday = timing === "Today";
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col items-center justify-center overflow-hidden rounded-xl bg-gradient-to-b from-rose-500/[0.07] to-rose-500/[0.02] px-5 py-5 text-center ring-1 ring-rose-500/15">
-      <BirthdayCelebrationBurst active={active} />
+    <div
+      className={cn(
+        "relative flex h-full min-h-0 flex-col items-center justify-center overflow-hidden rounded-xl bg-gradient-to-b from-rose-500/[0.07] to-rose-500/[0.02] px-5 py-5 text-center ring-1 ring-rose-500/15",
+        isToday && "from-rose-500/[0.12] ring-rose-500/25",
+      )}
+    >
+      <BirthdayCelebrationBurst active={active && isToday} />
 
       <div className="relative shrink-0">
         <CelebrationBirthdayPhoto
@@ -233,17 +255,18 @@ function BirthdaySlide({
           lastName={event.lastName || ""}
           profileImagePath={event.profileImagePath}
           signedUrl={event.avatarUrl}
-          className="size-16 rounded-2xl ring-2 ring-rose-500/25 sm:size-[4.75rem]"
+          size="lg"
+          isToday={isToday}
         />
         {isToday ? (
-          <span className="absolute -right-1.5 -bottom-1.5 flex size-6 items-center justify-center rounded-full bg-rose-500 text-white shadow-sm">
+          <span className="absolute -right-0.5 -bottom-0.5 flex size-6 items-center justify-center rounded-full bg-rose-500 text-white shadow-md ring-2 ring-background">
             <Cake className="size-3.5" />
           </span>
         ) : null}
       </div>
 
       <span className="mt-3.5 inline-flex items-center rounded-full bg-rose-500/15 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-rose-700 uppercase dark:bg-rose-400/20 dark:text-rose-300">
-        {isToday ? "Today" : "Birthday"}
+        {isToday ? "Happy Birthday" : "Coming up"}
       </span>
 
       <p className="mt-2.5 line-clamp-1 text-base font-semibold tracking-tight text-foreground sm:text-lg">
@@ -251,7 +274,11 @@ function BirthdaySlide({
       </p>
 
       <p className="mt-1 line-clamp-2 max-w-[18rem] text-xs text-muted-foreground">
-        {birthdayGreeting(event.firstName)}
+        {birthdayCardMessage({
+          firstName: event.firstName,
+          title: event.title,
+          isToday,
+        })}
       </p>
 
       <p className="mt-3 text-[11px] font-medium tracking-wide text-muted-foreground/75 tabular-nums uppercase">
@@ -344,17 +371,9 @@ function CombinedHolidayPanel({
   event,
   referenceDate,
 }: {
-  event: EmployeeUpcomingEvent | null;
+  event: EmployeeUpcomingEvent;
   referenceDate: string;
 }) {
-  if (!event) {
-    return (
-      <div className="flex min-h-0 flex-1 items-center rounded-xl bg-gradient-to-b from-violet-500/[0.05] to-violet-500/[0.02] px-4 py-3.5 ring-1 ring-violet-500/12">
-        <p className="text-sm text-muted-foreground">No holiday this week</p>
-      </div>
-    );
-  }
-
   const timing = countdownLabel(event.date, referenceDate);
 
   return (
@@ -388,34 +407,33 @@ function CombinedBirthdayPanel({
   referenceDate,
   active,
 }: {
-  event: EmployeeUpcomingEvent | null;
+  event: EmployeeUpcomingEvent;
   referenceDate: string;
   active: boolean;
 }) {
-  if (!event) {
-    return (
-      <div className="flex min-h-0 flex-1 items-center rounded-xl bg-gradient-to-b from-rose-500/[0.05] to-rose-500/[0.02] px-4 py-3.5 ring-1 ring-rose-500/12">
-        <p className="text-sm text-muted-foreground">No birthday this week</p>
-      </div>
-    );
-  }
-
   const timing = countdownLabel(event.date, referenceDate);
   const isToday = timing === "Today";
 
   return (
-    <div className="relative flex min-h-0 flex-1 items-center gap-4 overflow-hidden rounded-xl bg-gradient-to-b from-rose-500/[0.07] to-rose-500/[0.02] px-4 py-3.5 ring-1 ring-rose-500/15">
-      <BirthdayCelebrationBurst active={active} />
+    <div
+      className={cn(
+        "relative flex min-h-0 flex-1 items-center gap-4 overflow-hidden rounded-xl bg-gradient-to-b from-rose-500/[0.07] to-rose-500/[0.02] px-4 py-3.5 ring-1 ring-rose-500/15",
+        isToday && "from-rose-500/[0.12] ring-rose-500/25",
+      )}
+    >
+      <BirthdayCelebrationBurst active={active && isToday} />
       <div className={cn("relative", combinedIconSlotClass)}>
         <CelebrationBirthdayPhoto
           firstName={event.firstName || event.title}
           lastName={event.lastName || ""}
           profileImagePath={event.profileImagePath}
           signedUrl={event.avatarUrl}
+          size="md"
+          isToday={isToday}
         />
         {isToday ? (
-          <span className="absolute -right-0.5 -bottom-0.5 flex size-6 items-center justify-center rounded-full bg-rose-500 text-white shadow-sm">
-            <Cake className="size-3.5" />
+          <span className="absolute -right-0.5 -bottom-0.5 flex size-5 items-center justify-center rounded-full bg-rose-500 text-white shadow-md ring-2 ring-background">
+            <Cake className="size-3" />
           </span>
         ) : null}
       </div>
@@ -426,8 +444,12 @@ function CombinedBirthdayPanel({
         <p className="mt-1 line-clamp-1 text-base font-bold tracking-tight text-foreground">
           {event.title}
         </p>
-        <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-          {isToday ? "Happy Birthday" : "Advanced Birthday"}
+        <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+          {birthdayCardMessage({
+            firstName: event.firstName,
+            title: event.title,
+            isToday,
+          })}
         </p>
       </div>
       <DateWidget date={event.date} />
@@ -444,12 +466,32 @@ function CombinedCelebrationSlide({
   referenceDate: string;
   active: boolean;
 }) {
-  return (
-    <div className="flex h-full min-h-0 flex-col gap-2">
-      <CombinedHolidayPanel event={pair.holiday} referenceDate={referenceDate} />
-      <CombinedBirthdayPanel event={pair.birthday} referenceDate={referenceDate} active={active} />
-    </div>
-  );
+  const { holiday, birthday } = pair;
+
+  if (holiday && birthday) {
+    return (
+      <div className="flex h-full min-h-0 flex-col gap-2">
+        <CombinedHolidayPanel event={holiday} referenceDate={referenceDate} />
+        <CombinedBirthdayPanel
+          event={birthday}
+          referenceDate={referenceDate}
+          active={active}
+        />
+      </div>
+    );
+  }
+
+  if (holiday) {
+    return <HolidaySlide event={holiday} referenceDate={referenceDate} />;
+  }
+
+  if (birthday) {
+    return (
+      <BirthdaySlide event={birthday} referenceDate={referenceDate} active={active} />
+    );
+  }
+
+  return null;
 }
 
 export function EmployeeUpcomingEvents({
@@ -567,17 +609,15 @@ export function EmployeeUpcomingEvents({
         ) : null}
       </div>
     ) : (
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center rounded-lg border border-dashed border-border/60 bg-muted/15 p-5 text-center dark:bg-white/[0.02]">
-        <span className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-          <Sparkles className="size-4" />
+      <div className="flex h-full min-h-0 flex-col items-center justify-center rounded-xl bg-violet-500/[0.04] px-5 text-center ring-1 ring-violet-500/12">
+        <span className="flex size-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600">
+          <CalendarDays className="size-5" />
         </span>
-        <p className="mt-2 text-xs font-semibold text-foreground">
+        <p className="mt-3 text-sm font-semibold text-foreground">
           Nothing to celebrate this week
         </p>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">
-          {pairHolidayBirthday
-            ? "We'll highlight birthdays and holidays here when they come up."
-            : "We'll highlight birthdays, holidays, and notices here when they come up."}
+        <p className="mt-1 max-w-[16rem] text-xs leading-relaxed text-muted-foreground">
+          No holidays or birthdays coming up. Enjoy a productive week!
         </p>
       </div>
     );

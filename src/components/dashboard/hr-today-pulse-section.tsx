@@ -2,6 +2,7 @@ import Link from "next/link";
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
 import {
   Cake,
+  CalendarDays,
   CircleAlert,
   Clock3,
   Medal,
@@ -17,6 +18,7 @@ import {
   dashboardSectionClass,
 } from "@/components/dashboard/dashboard-surface-classes";
 import { HolidayGlyph } from "@/components/employee/dashboard/holiday-glyph";
+import { birthdayCardMessage, birthdayDisplayFirstName } from "@/lib/employee/birthday-utils";
 import { DASHBOARD_KPI_LINKS } from "@/lib/dashboard/constants";
 import type { DashboardListItem, DashboardPersonEvent, HrTodayPulse } from "@/types/dashboard";
 import { cn } from "@/lib/utils";
@@ -125,34 +127,57 @@ type UnifiedCelebrationItem = {
 
 function CelebrationFeaturedCard({
   item,
+  fill = false,
 }: {
   item: UnifiedCelebrationItem;
+  /** Stretch to fill available panel height when this is the only card. */
+  fill?: boolean;
 }) {
   const isBirthday = item.kind === "birthday";
   const isAnniversary = item.kind === "anniversary";
+  const firstName = birthdayDisplayFirstName(undefined, item.title);
 
   const content = (
     <div
       className={cn(
-        "group relative flex min-h-0 flex-1 flex-col bg-white p-3 ring-1 ring-inset ring-violet-500/12 dark:bg-card dark:hover:bg-muted/20",
+        "group relative flex min-h-0 flex-col bg-white p-3 ring-1 ring-inset ring-violet-500/12 dark:bg-card dark:hover:bg-muted/20",
         dashboardGradientTileClass,
         "from-violet-500/8 via-white to-violet-500/5",
         item.isToday && "ring-violet-500/30",
+        isBirthday && "from-rose-500/10 via-white to-violet-500/5",
+        isBirthday && item.isToday && "ring-rose-500/30",
+        fill ? "h-full flex-1 items-center justify-center text-center" : "flex-1",
       )}
     >
-      <div className="flex items-start gap-3">
-        <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-violet-500/10 text-violet-700 ring-1 ring-violet-500/15 dark:bg-background/80 dark:text-violet-300">
+      <div className={cn("flex gap-3", fill ? "w-full max-w-sm flex-col items-center" : "items-start")}>
+        <span
+          className={cn(
+            "flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-violet-500/10 text-violet-700 ring-1 ring-violet-500/15 dark:bg-background/80 dark:text-violet-300",
+            fill ? "size-14" : "size-11",
+            isBirthday && "bg-rose-500/10 text-rose-700 ring-rose-500/15 dark:text-rose-300",
+          )}
+        >
           {isBirthday ? (
-            <Cake className="size-5" />
+            <Cake className={fill ? "size-6" : "size-5"} />
           ) : isAnniversary ? (
-            <Medal className="size-5" />
+            <Medal className={fill ? "size-6" : "size-5"} />
           ) : (
-            <HolidayGlyph name={item.title} className="size-8 text-3xl leading-none" />
+            <HolidayGlyph
+              name={item.title}
+              className={cn("leading-none", fill ? "size-10 text-4xl" : "size-8 text-3xl")}
+            />
           )}
         </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-400">
+        <div className={cn("min-w-0", fill ? "w-full" : "flex-1")}>
+          <div className={cn("flex items-center gap-1.5", fill && "justify-center")}>
+            <p
+              className={cn(
+                "text-[10px] font-semibold uppercase tracking-wide",
+                isBirthday
+                  ? "text-rose-700 dark:text-rose-400"
+                  : "text-violet-700 dark:text-violet-400",
+              )}
+            >
               {item.badgeLabel}
             </p>
             {item.relativeLabel && !item.isToday ? (
@@ -161,34 +186,48 @@ function CelebrationFeaturedCard({
               </span>
             ) : null}
           </div>
-          <p className="mt-0.5 truncate text-sm font-semibold tracking-tight group-hover:text-primary">
+          <p
+            className={cn(
+              "mt-0.5 text-sm font-semibold tracking-tight group-hover:text-primary",
+              fill ? "line-clamp-2" : "truncate",
+            )}
+          >
             {item.title}
           </p>
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">
-            {item.isToday
-              ? isBirthday
-                ? "Celebrating birthday today!"
-                : isAnniversary
-                  ? `${item.subtitle} · Today`
-                  : `${item.subtitle} · Today`
-              : `${item.subtitle} · ${format(parseISO(item.dateStr), "EEEE, d MMM")}`}
+          <p
+            className={cn(
+              "mt-0.5 text-xs text-muted-foreground",
+              fill ? "line-clamp-3" : "truncate",
+            )}
+          >
+            {isBirthday
+              ? birthdayCardMessage({ firstName, title: item.title, isToday: item.isToday })
+              : item.isToday
+                ? `${item.subtitle} · Today`
+                : `${item.subtitle} · ${format(parseISO(item.dateStr), "EEEE, d MMM")}`}
           </p>
         </div>
-        <div className="shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-center ring-1 ring-violet-500/10 dark:bg-background/80">
-          <p className="text-xl font-bold tabular-nums leading-none text-violet-700 dark:text-violet-400">
-            {format(parseISO(item.dateStr), "d")}
+        {!fill ? (
+          <div className="shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-center ring-1 ring-violet-500/10 dark:bg-background/80">
+            <p className="text-xl font-bold tabular-nums leading-none text-violet-700 dark:text-violet-400">
+              {format(parseISO(item.dateStr), "d")}
+            </p>
+            <p className="mt-0.5 text-[10px] font-medium uppercase text-muted-foreground">
+              {format(parseISO(item.dateStr), "MMM")}
+            </p>
+          </div>
+        ) : (
+          <p className="mt-2 text-[11px] font-medium tracking-wide text-muted-foreground/80 tabular-nums uppercase">
+            {format(parseISO(item.dateStr), "EEEE, d MMM yyyy")}
           </p>
-          <p className="mt-0.5 text-[10px] font-medium uppercase text-muted-foreground">
-            {format(parseISO(item.dateStr), "MMM")}
-          </p>
-        </div>
+        )}
       </div>
     </div>
   );
 
   if (item.href) {
     return (
-      <Link href={item.href} className="flex min-h-0 flex-1 flex-col">
+      <Link href={item.href} className={cn("flex min-h-0 flex-col", fill && "h-full flex-1")}>
         {content}
       </Link>
     );
@@ -296,18 +335,22 @@ export function HrUpcomingHolidaysPanel({
             <p className="text-[11px] text-muted-foreground">Today & this week&apos;s highlights</p>
           </div>
         </div>
-        <div className="mt-2 flex flex-1 flex-col items-center justify-center rounded-lg border border-dashed border-border/60 bg-muted/15 p-4 text-center dark:bg-white/[0.02]">
-          <Sparkles className="size-4 text-muted-foreground/60" />
-          <p className="mt-1.5 text-xs font-semibold text-foreground">
+        <div className="mt-2 flex flex-1 flex-col items-center justify-center rounded-xl bg-violet-500/[0.04] px-5 text-center ring-1 ring-violet-500/12">
+          <span className="flex size-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600">
+            <CalendarDays className="size-5" />
+          </span>
+          <p className="mt-3 text-sm font-semibold text-foreground">
             Nothing to celebrate this week
           </p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
-            We&apos;ll highlight birthdays and holidays here when they come up.
+          <p className="mt-1 max-w-[16rem] text-xs leading-relaxed text-muted-foreground">
+            No holidays or birthdays coming up. Enjoy a productive week!
           </p>
         </div>
       </section>
     );
   }
+
+  const single = displayItems.length === 1;
 
   return (
     <section className={cn("flex h-full min-h-0 flex-col", dashboardSectionClass)}>
@@ -325,7 +368,7 @@ export function HrUpcomingHolidaysPanel({
 
       <div className="flex min-h-0 flex-1 flex-col gap-2.5">
         {displayItems.map((item) => (
-          <CelebrationFeaturedCard key={item.id} item={item} />
+          <CelebrationFeaturedCard key={item.id} item={item} fill={single} />
         ))}
       </div>
     </section>

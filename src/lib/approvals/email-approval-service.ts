@@ -16,6 +16,8 @@ import {
   lookupApprovalToken,
   peekApprovalToken,
   releaseApprovalToken,
+  revokeActiveTokensForRecord,
+  revokeSiblingApprovalTokens,
 } from "@/lib/approvals/token-service";
 import type {
   ApprovalDecision,
@@ -48,10 +50,18 @@ function absoluteUrl(path: string): string {
   return absoluteAppUrl(path);
 }
 
-function alreadyProcessedMessage(requestType: ApprovalRequestType): string {
-  return requestType === "leave"
-    ? "This leave request has already been processed."
-    : "This request has already been completed.";
+function alreadyProcessedMessage(requestType: ApprovalRequestType, statusLabel?: string): string {
+  if (requestType === "leave") {
+    const normalized = String(statusLabel ?? "").trim().toLowerCase();
+    if (normalized === "approved") {
+      return "This leave request has already been Approved.";
+    }
+    if (normalized === "rejected") {
+      return "This leave request has already been Rejected.";
+    }
+    return "This leave request has already been Approved/Rejected.";
+  }
+  return "This request has already been completed.";
 }
 
 function genericApprovalFailureMessage(): string {
@@ -62,18 +72,18 @@ function genericApprovalFailureMessage(): string {
 function revalidateAfterEmailDecision(requestType: ApprovalRequestType, sourceRecordId: string) {
   if (requestType !== "leave") return;
 
-  revalidatePath(LEAVE_ROUTES.list);
-  revalidatePath(LEAVE_ROUTES.balances);
-  revalidatePath(LEAVE_ROUTES.detail(sourceRecordId));
-  revalidatePath(SELF_LEAVE_ROUTES.list);
-  revalidatePath(SELF_LEAVE_ROUTES.team);
-  revalidatePath(PORTAL_EMPLOYEE_ROUTES.leave);
-  revalidatePath(MANAGER_ROUTES.leave);
-  revalidatePath(MANAGER_ROUTES.leaveTeam);
-  revalidatePath(CEO_ROUTES.approvals);
-  revalidatePath(CEO_ROUTES.approvalsLeave);
   try {
-    revalidateAfterEmailDecision(requestType, sourceRecordId);
+    revalidatePath(LEAVE_ROUTES.list);
+    revalidatePath(LEAVE_ROUTES.balances);
+    revalidatePath(LEAVE_ROUTES.detail(sourceRecordId));
+    revalidatePath(SELF_LEAVE_ROUTES.list);
+    revalidatePath(SELF_LEAVE_ROUTES.team);
+    revalidatePath(PORTAL_EMPLOYEE_ROUTES.leave);
+    revalidatePath(MANAGER_ROUTES.leave);
+    revalidatePath(MANAGER_ROUTES.leaveTeam);
+    revalidatePath(CEO_ROUTES.approvals);
+    revalidatePath(CEO_ROUTES.approvalsLeave);
+    revalidatePath(SYSTEM_ADMIN_ROUTES.leave);
   } catch (error) {
     console.error("[approvals] revalidate after email decision failed", error);
   }
@@ -132,6 +142,15 @@ export async function dispatchApprovalEmails(params: {
       createdBy: params.createdByUserId ?? null,
     });
     if (!token) continue;
+
+    // Invalidate prior unused tokens for this approver+request so only the
+    // latest email link can act (prevents reuse of older forwarded mails).
+    await revokeSiblingApprovalTokens(client, {
+      requestType: handler.type,
+      sourceRecordId: params.sourceRecordId,
+      approverEmployeeId: approver.employeeId,
+      keepTokenId: token.tokenId,
+    });
 
     const html =
       handler.type === "leave"
@@ -200,18 +219,35 @@ export async function previewEmailApproval(rawToken: string): Promise<PreviewOut
     }
     if (peek.reason === "consumed") {
       const row = await lookupApprovalToken(client, rawToken);
+      if (row) {
+        const handler = getApprovalHandler(row.request_type);
+        const summary = handler
+          ? await handler.loadSummary(client, row.source_record_id)
+          : null;
+        return {
+          status: "already_processed",
+          message: alreadyProcessedMessage(
+            row.request_type,
+            summary?.leaveHighlight?.statusLabel ?? summary?.status,
+          ),
+          summary: summary ?? undefined,
+        };
+      }
       return {
         status: "already_processed",
-        message: row
-          ? alreadyProcessedMessage(row.request_type)
-          : "This request has already been completed.",
+        message: "This leave request has already been Approved/Rejected.",
       };
     }
-    return { status: "invalid", message: "This approval link is invalid." };
+    return {
+      status: "invalid",
+      message: "This approval link is invalid or no longer available.",
+    };
   }
 
   const handler = getApprovalHandler(peek.row.request_type);
-  if (!handler) return { status: "invalid", message: "This approval link is invalid." };
+  if (!handler) {
+    return { status: "invalid", message: "This approval link is invalid or no longer available." };
+  }
 
   const summary = await handler.loadSummary(client, peek.row.source_record_id);
   if (!summary) return { status: "invalid", message: "The request could not be found." };
@@ -219,7 +255,10 @@ export async function previewEmailApproval(rawToken: string): Promise<PreviewOut
   if (!summary.isPending) {
     return {
       status: "already_processed",
-      message: alreadyProcessedMessage(peek.row.request_type),
+      message: alreadyProcessedMessage(
+        peek.row.request_type,
+        summary.leaveHighlight?.statusLabel ?? summary.status,
+      ),
       summary,
     };
   }
@@ -265,11 +304,19 @@ export async function processEmailApproval(params: {
   const client = admin();
   const found = await lookupApprovalToken(client, rawToken);
   if (!found || found.status !== "active") {
-    return { status: "invalid", message: "This approval link is invalid." };
+    return {
+      status: "invalid",
+      message: "This approval link is invalid or no longer available.",
+    };
   }
 
   const handler = getApprovalHandler(found.request_type);
-  if (!handler) return { status: "invalid", message: "This approval link is invalid." };
+  if (!handler) {
+    return {
+      status: "invalid",
+      message: "This approval link is invalid or no longer available.",
+    };
+  }
 
   if (new Date(found.expires_at).getTime() <= Date.now()) {
     return { status: "expired", message: "This approval link has expired." };
@@ -302,7 +349,10 @@ export async function processEmailApproval(params: {
   if (!summary.isPending) {
     return {
       status: "already_processed",
-      message: alreadyProcessedMessage(found.request_type),
+      message: alreadyProcessedMessage(
+        found.request_type,
+        summary.leaveHighlight?.statusLabel ?? summary.status,
+      ),
       employeeName: summary.employeeName,
       summary,
     };
@@ -383,6 +433,17 @@ export async function processEmailApproval(params: {
 
   await handler.markActedViaEmail(client, found.source_record_id, found.approver_employee_id);
 
+  const afterSummary = (await handler.loadSummary(client, found.source_record_id)) ?? summary;
+
+  // If the leave is finally decided (or rejected), kill leftover email links.
+  if (!afterSummary.isPending) {
+    await revokeActiveTokensForRecord(client, {
+      requestType: found.request_type,
+      sourceRecordId: found.source_record_id,
+      exceptTokenId: found.id,
+    });
+  }
+
   await writeApplicationAudit(client, {
     organizationId: found.organization_id,
     module: handler.sourceModule,
@@ -395,8 +456,6 @@ export async function processEmailApproval(params: {
     reason: action === "reject" ? effectiveReason : undefined,
     metadata: { approverEmployeeId: found.approver_employee_id, method: "email" },
   });
-
-  const afterSummary = (await handler.loadSummary(client, found.source_record_id)) ?? summary;
 
   try {
     if (identity.email) {

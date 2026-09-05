@@ -29,14 +29,14 @@ import {
   saveCompanyAnnouncementAction,
 } from "@/lib/organization/actions/company-announcement-actions";
 import {
-  COMPANY_ANNOUNCEMENT_ALLOWED_EXTENSIONS,
+  COMPANY_ANNOUNCEMENT_ACCEPT_ATTR,
   COMPANY_ANNOUNCEMENT_AUDIENCE_LABELS,
   COMPANY_ANNOUNCEMENT_CATEGORY_LABELS,
-  COMPANY_ANNOUNCEMENT_MAX_BYTES,
+  COMPANY_ANNOUNCEMENT_FILE_HINT,
   COMPANY_ANNOUNCEMENT_PRIORITY_LABELS,
   COMPANY_ANNOUNCEMENT_STATUS_LABELS,
+  announcementFileValidationError,
   canManageCompanyAnnouncements,
-  isAllowedAnnouncementFile,
 } from "@/lib/organization/company-announcement-constants";
 import { getHrmsYearSelectItems } from "@/lib/date/hrms-year";
 import { format } from "date-fns";
@@ -702,25 +702,22 @@ export function AnnouncementsManagement({
             <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-dashed bg-muted/20 px-4 py-3">
               <span className="flex items-center gap-2 text-sm font-medium">
                 <Upload className="size-4 text-muted-foreground" />
-                Upload PDF or document
+                Upload PDF or image
               </span>
-              <span className="text-xs text-muted-foreground">PDF, Word, or image · 10 MB max</span>
+              <span className="text-xs text-muted-foreground">{COMPANY_ANNOUNCEMENT_FILE_HINT}</span>
               <input
                 type="file"
                 multiple
-                accept={COMPANY_ANNOUNCEMENT_ALLOWED_EXTENSIONS.join(",")}
+                accept={COMPANY_ANNOUNCEMENT_ACCEPT_ATTR}
                 className="sr-only"
                 onChange={(event) => {
                   const incoming = Array.from(event.target.files ?? []);
                   setFiles((current) => {
                     const next = [...current];
                     for (const file of incoming) {
-                      if (!isAllowedAnnouncementFile(file)) {
-                        toast.error(`${file.name} is not a supported file type.`);
-                        continue;
-                      }
-                      if (file.size > COMPANY_ANNOUNCEMENT_MAX_BYTES) {
-                        toast.error(`${file.name} exceeds the 10 MB limit.`);
+                      const error = announcementFileValidationError(file);
+                      if (error) {
+                        toast.error(error);
                         continue;
                       }
                       if (!next.some((item) => item.name === file.name && item.size === file.size)) {

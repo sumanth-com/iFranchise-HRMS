@@ -195,12 +195,13 @@ function durationBreakdownWithSplit(
   duration: Parameters<typeof allocateLeaveDaysByBalance>[0],
   paidDays: number,
   lopDays: number,
+  calendar?: import("@/lib/leave/services/leave-calendar-engine").LeaveCalendarContext,
 ) {
   return {
     ...duration,
     paidDays,
     lopDays,
-    dayAllocations: allocateLeaveDaysByBalance(duration, paidDays),
+    dayAllocations: allocateLeaveDaysByBalance(duration, paidDays, { calendar }),
   };
 }
 
@@ -505,7 +506,12 @@ export async function createLeaveRequest(
     ...evaluated.duration,
     paidDays,
     lopDays,
-    dayAllocations: allocateLeaveDaysByBalance(evaluated.duration, paidDays),
+    dayAllocations:
+      evaluated.dayAllocations ??
+      allocateLeaveDaysByBalance(evaluated.duration, paidDays, {
+        calendar: evaluated.runtime.calendar,
+        isPaidLeaveType: evaluated.leaveType.isPaid,
+      }),
   };
 
   if (hrReviewReason) {
@@ -567,7 +573,10 @@ export async function createLeaveRequest(
       ...evaluated.duration,
       paidDays,
       lopDays,
-      dayAllocations: allocateLeaveDaysByBalance(evaluated.duration, paidDays),
+      dayAllocations: allocateLeaveDaysByBalance(evaluated.duration, paidDays, {
+        calendar: evaluated.runtime.calendar,
+        isPaidLeaveType: evaluated.leaveType.isPaid,
+      }),
     };
   }
 

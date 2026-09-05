@@ -4,9 +4,15 @@ import {
   EMPLOYEE_DOC_CATEGORY_DESCRIPTIONS,
   EMPLOYEE_DOC_CATEGORY_LABELS,
   EMPLOYEE_DOC_CATEGORY_ORDER,
+  slotCodesForCategory,
 } from "@/lib/employee/documents/categories";
+import { ensureExplorerDocumentTypes } from "@/lib/employee/services/ensure-explorer-document-types";
 import { getDocumentSettings } from "@/lib/documents/services/document-settings";
 import { DEFAULT_DOCUMENT_SETTINGS } from "@/lib/documents/constants";
+import {
+  EMPLOYEE_DOCUMENT_MAX_MB,
+  EMPLOYEE_DOCUMENT_STORAGE_LIMIT_BYTES,
+} from "@/lib/documents/storage-paths";
 import { DocRow, fromHrms, unwrapRelation } from "@/lib/documents/services/documents-utils";
 import type { UserProfile } from "@/types/auth";
 import type { DocumentSource, DocumentStatus } from "@/types/documents";
@@ -18,7 +24,7 @@ import type {
 } from "@/types/employee-documents-explorer";
 
 /** Soft per-employee storage budget used for the "remaining storage" indicator. */
-const SOFT_STORAGE_LIMIT_BYTES = 500 * 1024 * 1024;
+export const SOFT_STORAGE_LIMIT_BYTES = EMPLOYEE_DOCUMENT_STORAGE_LIMIT_BYTES;
 
 const EXPLORER_SELECT = `
   id, document_type_id, title, storage_path, file_name, mime_type, file_size_bytes,
@@ -59,6 +65,8 @@ async function buildEmployeeDocumentsExplorer(
   employeeId: string,
 ): Promise<EmployeeDocumentsExplorerData> {
   const explorerStartedAt = performance.now();
+
+  await ensureExplorerDocumentTypes(supabase, organizationId);
 
   // Current docs + settings/types only on first paint. Archived rows (version
   // chains) are not required to render folders/files; omit that second query.
@@ -172,14 +180,33 @@ async function buildEmployeeDocumentsExplorer(
     null,
   );
 
-  const documentTypes = ((typesResult.data ?? []) as DocRow[])
-    .map((type) => ({
-      id: type.id as string,
-      name: type.name as string,
-      code: type.code as string,
-      categoryKey: categoryForCode(type.code as string),
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const allTypes = ((typesResult.data ?? []) as DocRow[]).map((type) => ({
+    id: type.id as string,
+    name: type.name as string,
+    code: type.code as string,
+    categoryKey: categoryForCode(type.code as string),
+  }));
+
+  // Prefer the ordered explorer slot catalogue; include any uploaded types not in slots.
+  const documentTypes = EMPLOYEE_DOC_CATEGORY_ORDER.flatMap((key) => {
+    const slotOrder = slotCodesForCategory(key).map((code) => code.toUpperCase());
+    const slotSet = new Set(slotOrder);
+    const byCode = new Map(
+      allTypes
+        .filter((type) => type.categoryKey === key)
+        .map((type) => [type.code.toUpperCase(), type]),
+    );
+    const ordered = slotOrder
+      .map((code) => byCode.get(code))
+      .filter((type): type is (typeof allTypes)[number] => Boolean(type));
+    const extras = allTypes.filter(
+      (type) =>
+        type.categoryKey === key &&
+        !slotSet.has(type.code.toUpperCase()) &&
+        files.some((file) => file.documentTypeId === type.id),
+    );
+    return [...ordered, ...extras];
+  });
 
   if (process.env.NODE_ENV === "development") {
     console.info("[perf]", {
@@ -203,7 +230,7 @@ async function buildEmployeeDocumentsExplorer(
         ? { name: largest.documentTypeName, sizeBytes: largest.fileSizeBytes }
         : null,
     },
-    maxUploadSizeMb: settings.maxUploadSizeMb,
+    maxUploadSizeMb: Math.min(settings.maxUploadSizeMb, EMPLOYEE_DOCUMENT_MAX_MB),
     allowedFileTypes: settings.allowedFileTypes,
   };
 }

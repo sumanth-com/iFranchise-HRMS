@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/common/button";
+import { Button, POLICY_HEADER_BUTTON_CLASS } from "@/components/common/button";
 import type { PolicyEmployeeCategory } from "@/lib/leave/leave-attendance-absence-policy-content";
 import { cn } from "@/lib/utils";
 
@@ -34,7 +34,12 @@ export function PolicyVariantSwitcher({
             type="button"
             size="sm"
             variant={value === category ? "default" : "outline"}
-            className={cn("h-8 text-xs", value === category && "pointer-events-none")}
+            className={cn(
+              "h-8 text-xs",
+              value === category
+                ? "pointer-events-none"
+                : cn(POLICY_HEADER_BUTTON_CLASS, "text-black hover:text-black"),
+            )}
             onClick={() => onChange(category)}
           >
             {VARIANT_LABELS[category]}

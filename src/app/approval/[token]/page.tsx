@@ -1,11 +1,5 @@
-import {
-  previewEmailApproval,
-  processEmailApproval,
-} from "@/lib/approvals/email-approval-service";
-import { LEAVE_EMAIL_DEFAULT_REJECTION_REASON } from "@/lib/approvals/email-templates";
+import { previewEmailApproval } from "@/lib/approvals/email-approval-service";
 import { ApprovalView, type ApprovalViewState } from "@/app/approval/[token]/approval-view";
-import { getRequestAuditContext } from "@/lib/audit/services/audit-utils";
-import type { ProcessOutcome } from "@/lib/approvals/types";
 
 export const dynamic = "force-dynamic";
 
@@ -32,29 +26,6 @@ export default async function ApprovalPage({ params, searchParams }: PageProps) 
             (preview.summary?.heading.startsWith("Leave request") ?? false)
           : false;
 
-    let initialOutcome: ProcessOutcome | undefined;
-    let rejectionReason: string | null = null;
-
-    if (preview.status === "ready" && (initialAction === "approve" || isLeave)) {
-      const ctx = await getRequestAuditContext();
-      if (initialAction === "reject" && isLeave) {
-        rejectionReason = LEAVE_EMAIL_DEFAULT_REJECTION_REASON;
-      }
-      initialOutcome = await processEmailApproval({
-        rawToken: token,
-        action: initialAction,
-        reason: initialAction === "reject" ? LEAVE_EMAIL_DEFAULT_REJECTION_REASON : undefined,
-        context: { ip: ctx.ipAddress, userAgent: ctx.userAgent },
-      });
-    } else if (preview.status === "already_processed" && preview.summary) {
-      initialOutcome = {
-        status: "already_processed",
-        message: preview.message,
-        employeeName: preview.summary.employeeName,
-        summary: preview.summary,
-      };
-    }
-
     let state: ApprovalViewState;
     if (preview.status === "ready") {
       state = {
@@ -71,10 +42,32 @@ export default async function ApprovalPage({ params, searchParams }: PageProps) 
       state = {
         kind: "error",
         tone: "expired",
-        title: "This approval link has expired",
+        title: "This approval link has expired.",
         message: preview.message,
       };
     } else if (preview.status === "already_processed") {
+      // Show the final leave result screen when we still have summary data.
+      if (isLeave && preview.summary) {
+        const approved = preview.summary.status === "approved";
+        return (
+          <ApprovalView
+            token={token}
+            initialAction={initialAction}
+            state={{
+              kind: "error",
+              tone: "done",
+              title: approved ? "Leave Request Approved Successfully" : "Leave Request Rejected",
+              message: preview.message,
+            }}
+            initialOutcome={{
+              status: approved ? "approved" : "rejected",
+              decision: approved ? "approve" : "reject",
+              employeeName: preview.summary.employeeName,
+              summary: preview.summary,
+            }}
+          />
+        );
+      }
       state = {
         kind: "error",
         tone: "done",
@@ -85,7 +78,7 @@ export default async function ApprovalPage({ params, searchParams }: PageProps) 
       state = {
         kind: "error",
         tone: "invalid",
-        title: "Invalid link",
+        title: "This approval link is invalid or no longer available.",
         message: preview.message,
       };
     }
@@ -95,8 +88,6 @@ export default async function ApprovalPage({ params, searchParams }: PageProps) 
         token={token}
         initialAction={initialAction}
         state={state}
-        initialOutcome={initialOutcome}
-        initialRejectionReason={rejectionReason}
       />
     );
   } catch (error) {

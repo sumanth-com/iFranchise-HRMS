@@ -183,3 +183,61 @@ export async function releaseApprovalToken(
     })
     .eq("id", tokenId);
 }
+
+/**
+ * Invalidates unused tokens for the same request + approver, keeping the
+ * newly minted token. Prevents older emailed links from remaining actionable.
+ */
+export async function revokeSiblingApprovalTokens(
+  admin: AuthSupabaseClient,
+  params: {
+    requestType: ApprovalRequestType;
+    sourceRecordId: string;
+    approverEmployeeId: string;
+    keepTokenId: string;
+  },
+): Promise<void> {
+  await admin
+    .schema("hrms")
+    .from("email_approval_tokens")
+    .update({
+      status: "inactive",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("request_type", params.requestType)
+    .eq("source_record_id", params.sourceRecordId)
+    .eq("approver_employee_id", params.approverEmployeeId)
+    .eq("status", "active")
+    .is("consumed_at", null)
+    .is("deleted_at", null)
+    .neq("id", params.keepTokenId);
+}
+
+/** After a final decision, invalidate every remaining unused token for the request. */
+export async function revokeActiveTokensForRecord(
+  admin: AuthSupabaseClient,
+  params: {
+    requestType: ApprovalRequestType;
+    sourceRecordId: string;
+    exceptTokenId?: string;
+  },
+): Promise<void> {
+  let query = admin
+    .schema("hrms")
+    .from("email_approval_tokens")
+    .update({
+      status: "inactive",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("request_type", params.requestType)
+    .eq("source_record_id", params.sourceRecordId)
+    .eq("status", "active")
+    .is("consumed_at", null)
+    .is("deleted_at", null);
+
+  if (params.exceptTokenId) {
+    query = query.neq("id", params.exceptTokenId);
+  }
+
+  await query;
+}

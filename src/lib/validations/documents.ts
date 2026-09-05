@@ -63,7 +63,7 @@ export const generateLetterSchema = z.object({
 export const documentSettingsSchema = z.object({
   documentCategories: z.array(z.string().trim().min(1)).min(1),
   allowedFileTypes: z.array(z.string().trim().min(1)).min(1),
-  maxUploadSizeMb: z.coerce.number().int().min(1).max(50),
+  maxUploadSizeMb: z.coerce.number().int().min(1).max(10),
   documentNumberPrefix: z.string().trim().min(1).max(20),
   autoVerification: z.boolean(),
   requireHrApprovalForLetters: z.boolean(),

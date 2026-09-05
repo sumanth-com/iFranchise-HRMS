@@ -6,11 +6,17 @@ import {
   Eye,
   Lock,
   MoreVertical,
+  Pencil,
   Trash2,
   Upload,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
+import { Input } from "@/components/common/input";
+import { Modal } from "@/components/common/modal";
 import {
   canPreviewInline,
   FileThumbnail,
@@ -22,6 +28,11 @@ import {
   getEmployeeDocumentStatusClass,
   getEmployeeDocumentStatusLabel,
 } from "@/lib/employee/documents/document-status";
+import {
+  isMultiFileDocumentCode,
+  isRenameableDocumentCode,
+} from "@/lib/employee/documents/categories";
+import { employeeRenameDocumentAction } from "@/lib/employee/actions/employee-documents-actions";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,6 +46,16 @@ function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Prefer HRMS document type name; only multi-file / renameable slots use custom titles. */
+function displayDocumentName(file: EmployeeDocFile): string {
+  const code = file.documentTypeCode;
+  if (isMultiFileDocumentCode(code) || isRenameableDocumentCode(code)) {
+    const custom = file.title?.trim();
+    if (custom) return custom;
+  }
+  return file.documentTypeName;
 }
 
 type Props = {
@@ -52,11 +73,34 @@ export function DocumentFileCard({
   onDelete,
   readOnly = false,
 }: Props) {
+  const router = useRouter();
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState(file.title || file.documentTypeName);
+  const [isRenaming, startRename] = useTransition();
   const { isBusy, preview, download } = fileActions;
   const kind = getFileKind(file.mimeType, file.fileName);
   const previewable = canPreviewInline(kind);
-  const displayName = file.documentTypeName;
+  const displayName = displayDocumentName(file);
   const previewTitle = displayName;
+  const canRename = isRenameableDocumentCode(file.documentTypeCode);
+
+  function submitRename() {
+    const next = renameValue.trim();
+    if (next.length < 1) {
+      toast.error("Enter a document name");
+      return;
+    }
+    startRename(async () => {
+      const result = await employeeRenameDocumentAction(file.id, next);
+      if (!result.success) {
+        toast.error(result.message);
+        return;
+      }
+      toast.success("Document renamed");
+      setRenameOpen(false);
+      router.refresh();
+    });
+  }
 
   return (
     <div className="group flex h-full flex-col gap-3 rounded-xl border bg-card p-3 shadow-sm transition-shadow hover:shadow-md">
@@ -68,7 +112,10 @@ export function DocumentFileCard({
           iconClassName="size-5"
         />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium" title={displayName}>
+          <p
+            className="text-sm font-medium leading-snug [overflow-wrap:anywhere]"
+            title={displayName}
+          >
             {displayName}
           </p>
         </div>
@@ -88,6 +135,17 @@ export function DocumentFileCard({
               }
             />
             <DropdownMenuContent align="end" className="w-44">
+              {canRename ? (
+                <DropdownMenuItem
+                  onClick={() => {
+                    setRenameValue(displayName);
+                    setRenameOpen(true);
+                  }}
+                >
+                  <Pencil className="size-4" />
+                  Rename
+                </DropdownMenuItem>
+              ) : null}
               <DropdownMenuItem onClick={() => onReplace(file)}>
                 <Upload className="size-4" />
                 Reupload
@@ -159,6 +217,26 @@ export function DocumentFileCard({
           </Button>
         </div>
       </div>
+
+      <Modal
+        open={renameOpen}
+        onOpenChange={setRenameOpen}
+        title="Rename Document"
+        description="This name is shown on your document card."
+        contentClassName="sm:max-w-md"
+        footer={
+          <Button onClick={submitRename} disabled={isRenaming}>
+            Save name
+          </Button>
+        }
+      >
+        <Input
+          value={renameValue}
+          onChange={(event) => setRenameValue(event.target.value)}
+          placeholder="Document name"
+          disabled={isRenaming}
+        />
+      </Modal>
     </div>
   );
 }

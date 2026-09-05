@@ -37,7 +37,7 @@ export const DEFAULT_LEAVE_POLICIES: LeavePoliciesConfiguration = {
   sandwichLeave: {
     enabled: true,
     includeWeekends: true,
-    includeHolidays: false,
+    includeHolidays: true,
   },
   probation: {
     durationMonths: 3,

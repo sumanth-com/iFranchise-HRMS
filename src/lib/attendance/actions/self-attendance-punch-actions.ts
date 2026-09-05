@@ -7,6 +7,7 @@ import { canUpdateOwnCheckout } from "@/lib/attendance/self-checkout-permissions
 import { HR_PORTAL_HOME } from "@/lib/auth/portal-paths";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
+import { isBirthdayOnDate } from "@/lib/employee/birthday-utils";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
 import {
@@ -31,8 +32,48 @@ const SELF_ATTENDANCE_PUNCH_PERMISSIONS = [
 import type { ManagerTodayAttendance } from "@/types/manager-self-attendance";
 
 export type SelfAttendancePunchResult =
-  | { success: true; today: ManagerTodayAttendance }
+  | {
+      success: true;
+      today: ManagerTodayAttendance;
+      birthdayCelebration?: {
+        employeeId: string;
+        firstName: string;
+        date: string;
+      } | null;
+    }
   | { success: false; message: string };
+
+async function loadBirthdayCelebrationPayload(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  employeeId: string,
+  firstName: string,
+  attendanceDate: string,
+): Promise<{
+  employeeId: string;
+  firstName: string;
+  date: string;
+} | null> {
+  try {
+    const { data, error } = await supabase
+      .schema("hrms")
+      .from("employee_profiles")
+      .select("date_of_birth")
+      .eq("employee_id", employeeId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error || !data?.date_of_birth) return null;
+    if (!isBirthdayOnDate(String(data.date_of_birth), attendanceDate)) return null;
+
+    return {
+      employeeId,
+      firstName: firstName.trim() || "there",
+      date: attendanceDate.slice(0, 10),
+    };
+  } catch {
+    return null;
+  }
+}
 
 function revalidateSelfAttendancePaths() {
   revalidatePath(HR_PORTAL_HOME);
@@ -73,7 +114,18 @@ export async function selfAttendancePunchAction(
       console.error("[selfAttendancePunchAction] payroll refresh failed", payrollError);
     }
     revalidateSelfAttendancePaths();
-    return { success: true, today };
+
+    const birthdayCelebration =
+      parsed.type === "in"
+        ? await loadBirthdayCelebrationPayload(
+            supabase,
+            profile.employee.id,
+            profile.employee.firstName || "there",
+            today.attendanceDate,
+          )
+        : null;
+
+    return { success: true, today, birthdayCelebration };
   } catch (error) {
     return {
       success: false,

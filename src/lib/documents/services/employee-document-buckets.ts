@@ -3,6 +3,8 @@ import {
   EMPLOYEE_DOC_CATEGORY_LABELS,
   EMPLOYEE_DOC_CATEGORY_ORDER,
   categoryForCode,
+  isMultiFileDocumentCode,
+  slotCodesForCategory,
   type EmployeeDocCategoryKey,
 } from "@/lib/employee/documents/categories";
 import type { EmployeeDocumentItem, EmployeeDocumentProfile, DocumentTypeItem } from "@/types/documents";
@@ -125,8 +127,13 @@ export function remainingDocumentTypesForBucket(
   allTypes: DocumentTypeItem[],
 ): DocumentTypeItem[] {
   const uploadedTypeIds = new Set(documents.map((document) => document.documentTypeId));
+  const slotCodes = bucketKey
+    ? new Set(slotCodesForCategory(bucketKey).map((code) => code.toUpperCase()))
+    : null;
 
   return allTypes.filter((type) => {
+    if (slotCodes && !slotCodes.has(type.code.toUpperCase())) return false;
+    if (isMultiFileDocumentCode(type.code)) return true;
     if (uploadedTypeIds.has(type.id)) return false;
     if (!bucketKey) return true;
     return categoryForCode(type.code) === bucketKey;

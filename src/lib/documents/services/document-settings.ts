@@ -30,8 +30,8 @@ export function mergeDocumentSettings(
         ? stored.allowedFileTypes.map((t) => String(t).toLowerCase())
         : [...DEFAULT_DOCUMENTS_SETTINGS.allowedFileTypes],
     maxUploadSizeMb:
-      Number.isFinite(maxSize) && maxSize >= 1 && maxSize <= 50
-        ? maxSize
+      Number.isFinite(maxSize) && maxSize >= 1 && maxSize <= 10
+        ? Math.min(10, maxSize)
         : DEFAULT_DOCUMENTS_SETTINGS.maxUploadSizeMb,
     documentNumberPrefix:
       stored?.documentNumberPrefix?.trim() ||

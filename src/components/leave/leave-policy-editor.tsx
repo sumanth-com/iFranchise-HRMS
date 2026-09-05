@@ -6,7 +6,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
-import { Button } from "@/components/common/button";
+import { Button, POLICY_HEADER_BUTTON_CLASS } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { PhoneInput } from "@/components/common/phone-input";
 import {
@@ -80,12 +80,24 @@ export function LeavePolicyEditor({
   return (
     <form onSubmit={onSubmit} className="flex w-full flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Button variant="outline" size="sm" nativeButton={false} render={<Link href={backHref} />}>
-          <ArrowLeft className="size-4" />
+        <Button
+          variant="outline"
+          size="sm"
+          nativeButton={false}
+          render={<Link href={backHref} />}
+          className={cn(POLICY_HEADER_BUTTON_CLASS, "text-black hover:text-black")}
+        >
+          <ArrowLeft className="size-4 text-black" />
           {backLabel}
         </Button>
-        <Button variant="outline" size="sm" nativeButton={false} render={<Link href={ORGANIZATION_ROUTES.holidays} />}>
-          <ExternalLink className="size-4" />
+        <Button
+          variant="outline"
+          size="sm"
+          nativeButton={false}
+          render={<Link href={ORGANIZATION_ROUTES.holidays} />}
+          className={cn(POLICY_HEADER_BUTTON_CLASS, "text-black hover:text-black")}
+        >
+          <ExternalLink className="size-4 text-black" />
           Manage holidays
         </Button>
       </div>

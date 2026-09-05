@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { format } from "date-fns";
 
 import { Button } from "@/components/common/button";
 import {
@@ -12,13 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { acknowledgeCompanyAnnouncementAction } from "@/lib/organization/actions/company-announcement-actions";
-import { AnnouncementDocumentPreview } from "@/components/organization/announcement-document-preview";
 import { CompanyAnnouncementIcon } from "@/components/organization/company-announcement-icon";
-import {
-  COMPANY_ANNOUNCEMENT_CATEGORY_LABELS,
-  COMPANY_ANNOUNCEMENT_PRIORITY_LABELS,
-} from "@/lib/organization/company-announcement-constants";
+import { acknowledgeCompanyAnnouncementAction } from "@/lib/organization/actions/company-announcement-actions";
 import type { CompanyAnnouncementEmployeeView } from "@/types/company-announcement";
 
 type Props = {
@@ -26,17 +20,26 @@ type Props = {
   onAccepted: (announcement: CompanyAnnouncementEmployeeView) => void;
 };
 
+/**
+ * Entry-gate acknowledgement: title + short description + checkbox only.
+ * Full content and attachments stay on My Announcements.
+ */
 export function MandatoryAnnouncementDialog({ announcement, onAccepted }: Props) {
   const [checked, setChecked] = useState(false);
-  const published = announcement.publishedAt ?? announcement.publishAt;
+  const [submitting, setSubmitting] = useState(false);
   const checkboxId = `acknowledge-${announcement.id}`;
+  const summary =
+    announcement.shortDescription?.trim() ||
+    "Please review this company announcement and confirm you have read it.";
 
   useEffect(() => {
     setChecked(false);
+    setSubmitting(false);
   }, [announcement.id, announcement.versionId]);
 
   const handleAccept = () => {
-    if (!checked) return;
+    if (!checked || submitting) return;
+    setSubmitting(true);
     onAccepted(announcement);
     void acknowledgeCompanyAnnouncementAction(announcement.id, announcement.versionId);
   };
@@ -47,46 +50,29 @@ export function MandatoryAnnouncementDialog({ announcement, onAccepted }: Props)
       modal
       disablePointerDismissal
       onOpenChange={() => {
-        /* Mandatory notices cannot be dismissed. */
+        /* Mandatory notices cannot be dismissed without acknowledgement. */
       }}
     >
       <DialogContent
         showCloseButton={false}
-        className="pointer-events-auto flex max-h-[min(92vh,46rem)] w-full max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
+        className="pointer-events-auto flex max-h-[min(88vh,32rem)] w-full max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg"
         onKeyDown={(event) => {
           if (event.key === "Escape") event.preventDefault();
         }}
       >
         <DialogHeader className="shrink-0 space-y-2 border-b px-5 py-4">
-          <DialogTitle className="flex items-center gap-2.5">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-r from-blue-600 to-violet-600 text-white">
+          <DialogTitle className="flex items-start gap-2.5 text-left">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-r from-blue-600 to-violet-600 text-white">
               <CompanyAnnouncementIcon iconKey={announcement.iconKey} className="size-4" />
             </span>
-            {announcement.title}
+            <span className="min-w-0 leading-snug">{announcement.title}</span>
           </DialogTitle>
-          <DialogDescription className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
-              {COMPANY_ANNOUNCEMENT_CATEGORY_LABELS[announcement.category]}
-            </span>
-            <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-xs font-medium text-violet-700">
-              {COMPANY_ANNOUNCEMENT_PRIORITY_LABELS[announcement.priority]}
-            </span>
-            {published ? <span>Published {format(new Date(published), "d MMM yyyy")}</span> : null}
+          <DialogDescription className="text-left text-sm leading-relaxed text-muted-foreground">
+            {summary}
           </DialogDescription>
-          <p className="text-xs text-muted-foreground">{announcement.companyName} · Human Resources</p>
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          {announcement.shortDescription ? (
-            <p className="mb-3 text-sm font-medium">{announcement.shortDescription}</p>
-          ) : null}
-          <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-            {announcement.content}
-          </div>
-          <AnnouncementDocumentPreview attachments={announcement.attachments} />
-        </div>
-
-        <DialogFooter className="relative z-20 m-0 shrink-0 flex-col items-stretch gap-3 border-t bg-background px-5 py-3 sm:flex-col sm:space-x-0">
+        <DialogFooter className="relative z-20 m-0 shrink-0 flex-col items-stretch gap-3 border-t bg-background px-5 py-4 sm:flex-col sm:space-x-0">
           <label
             htmlFor={checkboxId}
             className="flex cursor-pointer items-start gap-3 rounded-lg border bg-muted/30 px-3 py-2.5 text-sm leading-snug transition-colors hover:bg-muted/50"
@@ -96,13 +82,22 @@ export function MandatoryAnnouncementDialog({ announcement, onAccepted }: Props)
               type="checkbox"
               className="mt-0.5 size-4 shrink-0 cursor-pointer rounded border accent-violet-600"
               checked={checked}
+              disabled={submitting}
               onChange={(event) => setChecked(event.target.checked)}
             />
-            I acknowledge that I have read this announcement.
+            I have read and understood this announcement.
           </label>
-          <Button type="button" className="w-full" disabled={!checked} onClick={handleAccept}>
-            Accept & Close
+          <Button
+            type="button"
+            className="w-full"
+            disabled={!checked || submitting}
+            onClick={handleAccept}
+          >
+            Acknowledge &amp; Close
           </Button>
+          <p className="text-center text-[11px] text-muted-foreground">
+            You can open the full notice anytime from My Announcements.
+          </p>
         </DialogFooter>
       </DialogContent>
     </Dialog>

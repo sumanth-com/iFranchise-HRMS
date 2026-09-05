@@ -1,9 +1,9 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import {
   COMPANY_ANNOUNCEMENT_BUCKET,
-  COMPANY_ANNOUNCEMENT_MAX_BYTES,
+  announcementFileValidationError,
   companyAnnouncementStorageFolder,
-  isAllowedAnnouncementFile,
+  resolveAnnouncementContentType,
 } from "@/lib/organization/company-announcement-constants";
 import { fromHrms } from "@/lib/reports/services/reports-utils";
 import type { UserProfile } from "@/types/auth";
@@ -63,17 +63,16 @@ async function uploadAttachments(
   const rows: Array<Record<string, unknown>> = [];
 
   for (const file of files) {
-    if (!isAllowedAnnouncementFile(file)) {
-      throw new Error(`Unsupported file type: ${file.name}`);
+    const validationError = announcementFileValidationError(file);
+    if (validationError) {
+      throw new Error(validationError);
     }
-    if (file.size > COMPANY_ANNOUNCEMENT_MAX_BYTES) {
-      throw new Error(`${file.name} exceeds the 10 MB limit.`);
-    }
+    const contentType = resolveAnnouncementContentType(file);
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
     const path = `${folder}/${crypto.randomUUID()}-${safeName}`;
     const { error: uploadError } = await supabase.storage
       .from(COMPANY_ANNOUNCEMENT_BUCKET)
-      .upload(path, file, { contentType: file.type, upsert: false });
+      .upload(path, file, { contentType, upsert: false });
     if (uploadError) throw new Error(uploadError.message);
     rows.push({
       organization_id: organizationId,
@@ -81,7 +80,7 @@ async function uploadAttachments(
       version_id: versionId,
       storage_path: path,
       file_name: file.name,
-      mime_type: file.type,
+      mime_type: contentType,
       file_size: file.size,
       created_by: profile.userId,
     });

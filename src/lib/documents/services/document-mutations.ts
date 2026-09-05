@@ -4,7 +4,13 @@ import {
   DOCUMENTS_STORAGE_BUCKET,
   LETTER_TYPE_OPTIONS,
 } from "@/lib/documents/constants";
-import { DOCUMENT_MAX_BYTES } from "@/lib/employees/constants";
+import {
+  buildEmployeeDocumentStoragePath,
+  EMPLOYEE_DOCUMENT_MAX_BYTES,
+  HRMS_DOCUMENTS_BUCKET,
+  parsePeriodFromNotes,
+  resolveDocumentsBucket,
+} from "@/lib/documents/storage-paths";
 import {
   getDocumentSettings,
   nextDocumentNumber,
@@ -61,25 +67,46 @@ export async function uploadAndCreateDocument(
   if (!settings.allowedFileTypes.includes(ext)) {
     throw new Error(`File type .${ext} is not allowed`);
   }
-  const maxBytes = Math.min(settings.maxUploadSizeMb * 1024 * 1024, DOCUMENT_MAX_BYTES);
+  const maxBytes = Math.min(
+    settings.maxUploadSizeMb * 1024 * 1024,
+    EMPLOYEE_DOCUMENT_MAX_BYTES,
+  );
   if (file.size > maxBytes) {
-    const limitMb = Math.floor(maxBytes / (1024 * 1024));
-    throw new Error(`File exceeds maximum size of ${limitMb} MB`);
+    throw new Error(
+      `File exceeds the maximum size of 10 MB. Please choose a smaller file.`,
+    );
   }
 
   const organizationId = profile.employee.organizationId;
-  const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const storagePath = `${organizationId}/${meta.employeeId}/${crypto.randomUUID()}-${sanitizedName}`;
+  const { data: typeRow } = await fromHrms(supabase, "document_types")
+    .select("code")
+    .eq("id", meta.documentTypeId)
+    .maybeSingle();
+  const typeCode = String((typeRow as { code?: string } | null)?.code ?? "OTHER");
+  const period = parsePeriodFromNotes(meta.notes);
+  const storagePath = buildEmployeeDocumentStoragePath({
+    employeeId: meta.employeeId,
+    documentTypeCode: typeCode,
+    fileName: file.name,
+    year: period.year,
+    month: period.month,
+  });
 
   const { error: uploadError } = await supabase.storage
-    .from(DOCUMENTS_STORAGE_BUCKET)
+    .from(HRMS_DOCUMENTS_BUCKET)
     .upload(storagePath, file, {
       cacheControl: "3600",
       upsert: false,
       contentType: file.type || "application/octet-stream",
     });
 
-  if (uploadError) throw new Error(uploadError.message);
+  if (uploadError) {
+    const message = uploadError.message.toLowerCase();
+    if (message.includes("maximum") || message.includes("size") || message.includes("payload")) {
+      throw new Error("File exceeds the maximum size of 10 MB. Please choose a smaller file.");
+    }
+    throw new Error(uploadError.message);
+  }
 
   const documentNumber = await nextDocumentNumber(
     supabase,
@@ -88,6 +115,8 @@ export async function uploadAndCreateDocument(
   );
 
   const documentStatus = settings.autoVerification ? "verified" : "pending";
+  const documentYear = period.year ? Number(period.year) : null;
+  const documentMonth = period.month ? Number(period.month) : null;
 
   const { data, error } = await fromHrms(supabase, "employee_documents")
     .insert({
@@ -106,6 +135,8 @@ export async function uploadAndCreateDocument(
       issued_date: emptyToNull(meta.issuedDate),
       expiry_date: emptyToNull(meta.expiryDate),
       notes: emptyToNull(meta.notes),
+      document_year: documentYear,
+      document_month: documentMonth,
       verified_at: settings.autoVerification ? new Date().toISOString() : null,
       verified_by: settings.autoVerification ? profile.userId : null,
       status: "active",
@@ -116,7 +147,7 @@ export async function uploadAndCreateDocument(
     .single();
 
   if (error || !data) {
-    await supabase.storage.from(DOCUMENTS_STORAGE_BUCKET).remove([storagePath]);
+    await supabase.storage.from(HRMS_DOCUMENTS_BUCKET).remove([storagePath]);
     throw new Error(error?.message ?? "Failed to save document");
   }
 
@@ -572,11 +603,25 @@ export async function createSignedDocumentUrl(
   storagePath: string,
   options?: { download?: string },
 ): Promise<string | null> {
+  const bucket = resolveDocumentsBucket(storagePath);
   const { data, error } = await supabase.storage
-    .from(DOCUMENTS_STORAGE_BUCKET)
+    .from(bucket)
     .createSignedUrl(storagePath, 60 * 60, options?.download ? { download: options.download } : undefined);
 
-  if (error || !data?.signedUrl) return null;
+  if (error || !data?.signedUrl) {
+    // Fallback for mis-tagged legacy paths still living in the other bucket.
+    const fallback =
+      bucket === HRMS_DOCUMENTS_BUCKET ? DOCUMENTS_STORAGE_BUCKET : HRMS_DOCUMENTS_BUCKET;
+    const retry = await supabase.storage
+      .from(fallback)
+      .createSignedUrl(
+        storagePath,
+        60 * 60,
+        options?.download ? { download: options.download } : undefined,
+      );
+    if (retry.error || !retry.data?.signedUrl) return null;
+    return retry.data.signedUrl;
+  }
   return data.signedUrl;
 }
 

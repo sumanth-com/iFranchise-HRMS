@@ -146,7 +146,7 @@ export function DocumentsSettingsForm({ settings, canEdit, embedded = false }: P
             <Input
               type="number"
               min={1}
-              max={50}
+              max={10}
               disabled={!canEdit || isPending}
               {...form.register("maxUploadSizeMb")}
             />

@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
-import { Button } from "@/components/common/button";
+import { Button, POLICY_HEADER_BUTTON_CLASS } from "@/components/common/button";
 import { LeavePolicyPageHeader } from "@/components/leave/leave-policy-content";
 import { PolicyCatalogLeaveView } from "@/components/policy/policy-catalog-leave-view";
 import type { PolicyEmployeeCategory } from "@/lib/leave/leave-attendance-absence-policy-content";
+import { cn } from "@/lib/utils";
 import type { LeavePolicyDocument, LeavePolicyHolidayRow } from "@/types/leave-policy";
 
 export function LeavePolicyView({
@@ -31,8 +32,14 @@ export function LeavePolicyView({
   return (
     <div className="flex w-full flex-col gap-6">
       <div className="flex justify-start">
-        <Button variant="outline" size="sm" nativeButton={false} render={<Link href={backHref} />}>
-          <ArrowLeft className="size-4" />
+        <Button
+          variant="outline"
+          size="sm"
+          nativeButton={false}
+          render={<Link href={backHref} />}
+          className={cn(POLICY_HEADER_BUTTON_CLASS, "text-black hover:text-black")}
+        >
+          <ArrowLeft className="size-4 text-black" />
           {backLabel}
         </Button>
       </div>

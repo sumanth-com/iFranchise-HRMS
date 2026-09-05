@@ -15,8 +15,18 @@ import {
 } from "@/components/leave/leave-policy-content";
 import { DEFAULT_LEAVE_POLICY_DOCUMENT, DEFAULT_INTERN_PROBATION_LEAVE_POLICY } from "@/lib/leave/leave-policy-defaults";
 import { getLeaveSubmissionApprovalMessage } from "@/lib/leave/leave-approval-copy";
-import { previewLeaveApplication } from "@/lib/leave/services/leave-apply-preview";
+import type { HrReviewReason } from "@/lib/leave/hr-review";
+import {
+  LEAVE_ISSUE_ALERT_STYLES,
+  getLeaveIssueUiVariant,
+  leaveIssueAlertTitle,
+} from "@/lib/leave/leave-issue-ui";
+import {
+  previewLeaveApplication,
+  type LeaveApplyPreview,
+} from "@/lib/leave/services/leave-apply-preview";
 import { formatLeaveDate } from "@/lib/leave/services/leave-utils";
+import type { LeavePolicyIssue } from "@/lib/leave/services/leave-policy-engine";
 import {
   formatLeaveDayCount,
   formatLeaveDayUnit,
@@ -96,6 +106,134 @@ export function LeavePolicyInfo({
   );
 }
 
+function formatSummaryDays(value: number): string {
+  const count = formatLeaveDayCount(value);
+  const unit = Math.abs(Number(count)) === 1 ? "Day" : "Days";
+  return `${count} ${unit}`;
+}
+
+function formatBalanceDays(value: number): string {
+  const rounded = Math.max(0, Number(formatLeaveDayCount(value)));
+  return `${String(rounded).padStart(2, "0")} ${rounded === 1 ? "Day" : "Days"}`;
+}
+
+function SummaryMetric({
+  label,
+  value,
+  bold = false,
+}: {
+  label: string;
+  value: string;
+  bold?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <dt className={cn("text-sm text-muted-foreground", bold && "font-semibold text-foreground")}>
+        {label}
+      </dt>
+      <dd
+        className={cn(
+          "shrink-0 text-right text-sm tabular-nums text-foreground",
+          bold ? "font-bold" : "font-medium",
+        )}
+      >
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+export function LeaveApplicationSummary({
+  preview,
+  hrReviewReason: _hrReviewReason = null,
+  isOptionalHoliday: _isOptionalHoliday = false,
+}: {
+  preview: LeaveApplyPreview;
+  hrReviewReason?: HrReviewReason | null;
+  isOptionalHoliday?: boolean;
+}) {
+  const { summary } = preview;
+  const remainingDisplay =
+    summary.remainingBalance != null ? formatBalanceDays(summary.remainingBalance) : "—";
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-col gap-1 rounded-xl border bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+        <p className="text-sm">
+          <span className="font-semibold text-foreground">Leave Balance Used:</span>{" "}
+          <span className="font-bold tabular-nums text-foreground">
+            {formatBalanceDays(summary.paidLeaveDays)}
+          </span>
+        </p>
+        <p className="text-sm">
+          <span className="font-semibold text-foreground">Remaining Balance:</span>{" "}
+          <span className="font-bold tabular-nums text-foreground">{remainingDisplay}</span>
+        </p>
+      </div>
+
+      <div className="rounded-xl border bg-white px-3 py-2.5">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Leave Summary
+        </p>
+        <dl className="mt-2.5 space-y-2">
+          <SummaryMetric
+            label="Requested Leave Days"
+            value={formatSummaryDays(summary.requestedLeaveDays)}
+          />
+          <SummaryMetric
+            label="Sandwich Days"
+            value={formatSummaryDays(summary.sandwichLeaveDays)}
+          />
+          <SummaryMetric label="Loss of Pay (LOP)" value={formatSummaryDays(summary.lopDays)} />
+          <div className="border-t border-border/80 pt-2">
+            <div className="flex items-center justify-between gap-4 rounded-lg border border-violet-200/80 bg-violet-50/50 px-2.5 py-2">
+              <dt className="text-sm font-semibold text-foreground">Total Leave Days Counted</dt>
+              <dd className="shrink-0 text-right text-sm font-bold tabular-nums text-foreground">
+                {formatSummaryDays(summary.totalLeaveDaysCounted)}
+              </dd>
+            </div>
+          </div>
+        </dl>
+      </div>
+    </div>
+  );
+}
+
+export function LeaveIssueAlertList({
+  issues,
+  className,
+}: {
+  issues: LeavePolicyIssue[];
+  className?: string;
+}) {
+  if (issues.length === 0) return null;
+
+  return (
+    <div className={cn("space-y-2", className)}>
+      {issues.map((issue) => {
+        const variant = getLeaveIssueUiVariant(issue);
+        const styles = LEAVE_ISSUE_ALERT_STYLES[variant];
+        const isOverlap = issue.code === "overlap";
+        return (
+          <div
+            key={issue.code}
+            className={cn("rounded-lg border px-3 py-2.5", styles.container)}
+          >
+            <p className={cn("text-sm font-medium", styles.title)}>
+              {leaveIssueAlertTitle(issue)}
+            </p>
+            <p className={cn("mt-0.5 text-xs leading-relaxed", styles.body)}>
+              {isOverlap
+                ? "You already have a pending or approved leave on one or more of these dates. Choose different dates, or cancel the existing request first."
+                : issue.message}
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function LeaveDurationBreakdownCard({
   breakdown,
 }: {
@@ -171,9 +309,6 @@ export function LeaveDurationPreview({
       ? Number((preview.available - preview.split.paidDays).toFixed(2))
       : null;
 
-  const noticeIssue = preview.issues.find((issue) =>
-    ["notice", "pl_same_day", "pl_past"].includes(issue.code),
-  );
   const blockingIssues = preview.blockingIssues;
 
   return (
@@ -278,54 +413,7 @@ export function LeaveDurationPreview({
         </p>
       ))}
 
-      {noticeIssue ? (
-        <div className="rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2.5">
-          <p className="text-sm font-medium text-amber-950 dark:text-amber-100">
-            Advance notice required
-          </p>
-          <p className="mt-0.5 text-xs leading-relaxed text-amber-900/90 dark:text-amber-100/80">
-            {noticeIssue.message}
-          </p>
-        </div>
-      ) : null}
-
-      {blockingIssues.map((issue) => {
-        const isOverlap = issue.code === "overlap";
-        return (
-          <div
-            key={issue.code}
-            className={cn(
-              "rounded-lg border px-3 py-2.5",
-              isOverlap
-                ? "border-amber-500/35 bg-amber-500/10"
-                : "border-destructive/30 bg-destructive/10",
-            )}
-          >
-            <p
-              className={cn(
-                "text-sm font-medium",
-                isOverlap
-                  ? "text-amber-950 dark:text-amber-100"
-                  : "text-destructive",
-              )}
-            >
-              {isOverlap ? "These dates already have leave" : "Cannot submit this request"}
-            </p>
-            <p
-              className={cn(
-                "mt-0.5 text-xs leading-relaxed",
-                isOverlap
-                  ? "text-amber-900/90 dark:text-amber-100/80"
-                  : "text-destructive/90",
-              )}
-            >
-              {isOverlap
-                ? "You already have a pending or approved leave on one or more of these dates. Choose different dates, or cancel the existing request first."
-                : issue.message}
-            </p>
-          </div>
-        );
-      })}
+      <LeaveIssueAlertList issues={blockingIssues} />
     </div>
   );
 }

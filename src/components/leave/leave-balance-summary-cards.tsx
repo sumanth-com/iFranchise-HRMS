@@ -69,11 +69,11 @@ export function LeaveBalanceSummaryCards({
         {cards.map((card) => {
           const isActive = selectedCode?.toUpperCase() === card.key;
           const cardClassName = cn(
-            "relative z-10 flex h-full min-h-[8.25rem] w-full min-w-0 max-w-none flex-col justify-between gap-3 overflow-hidden rounded-2xl border border-border/60 bg-card px-5 py-5 text-left shadow-sm outline-none pointer-events-auto",
+            "relative z-10 flex h-full min-h-[8.25rem] w-full min-w-0 max-w-none flex-col justify-between gap-3 overflow-hidden rounded-2xl border bg-white px-5 py-5 text-left shadow-sm outline-none pointer-events-auto",
+            "border-border/70",
             selectable &&
-              "cursor-pointer transition-all duration-200 ease-out hover:border-violet-300/80 hover:bg-violet-50/40 hover:shadow-md hover:shadow-violet-500/10 focus-visible:ring-2 focus-visible:ring-violet-400/35 focus-visible:ring-offset-0 dark:border-border/50 dark:hover:border-violet-400/45 dark:hover:bg-violet-500/5",
-            isActive &&
-              "border-violet-400/70 bg-violet-50/50 shadow-md shadow-violet-500/10 ring-2 ring-violet-400/30 dark:border-violet-400/50 dark:bg-violet-500/10",
+              "cursor-pointer transition-[border-color,box-shadow] duration-200 ease-out hover:border-violet-300/70 hover:shadow-sm focus-visible:border-violet-400/60 focus-visible:ring-2 focus-visible:ring-violet-400/20 focus-visible:ring-offset-0",
+            isActive && "border-violet-400/70 shadow-sm",
           );
 
           const content = (

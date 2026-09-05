@@ -111,7 +111,11 @@ export const TEAM_DOCUMENTS_SUB_NAV = [
 /** @deprecated Use TEAM_DOCUMENTS_SUB_NAV in the team documents hub. */
 export const DOCUMENTS_SUB_NAV = TEAM_DOCUMENTS_SUB_NAV;
 
+/** Legacy bucket — still used for generated letters and older paths. */
 export const DOCUMENTS_STORAGE_BUCKET = "employee-documents";
+
+/** Primary bucket for new employee document uploads. */
+export const HRMS_DOCUMENTS_STORAGE_BUCKET = "hrms-documents";
 
 export const LETTER_TYPE_OPTIONS: { value: LetterType; label: string; documentTypeCode: string }[] = [
   { value: "offer_letter", label: "Offer Letter", documentTypeCode: "OFFER_LETTER" },
@@ -179,7 +183,7 @@ export const DEFAULT_DOCUMENT_SETTINGS = {
     "xlsx",
     "zip",
   ],
-  maxUploadSizeMb: 30,
+  maxUploadSizeMb: 10,
   documentNumberPrefix: "DOC",
   autoVerification: false,
   requireHrApprovalForLetters: true,

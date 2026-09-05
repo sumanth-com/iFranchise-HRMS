@@ -1,6 +1,7 @@
 import { addDays, addMonths, differenceInCalendarDays, format, parseISO } from "date-fns";
 
 import type { LeaveDurationBreakdown } from "@/lib/leave/services/leave-calendar-engine";
+import type { LeaveCalendarContext } from "@/lib/leave/services/leave-calendar-engine";
 import { isOptionalHolidayCode } from "@/lib/leave/optional-holiday";
 import { roundLeaveDays } from "@/lib/leave/services/leave-usage";
 import type { LeaveEligibilityBand } from "@/lib/leave/leave-eligibility";
@@ -408,33 +409,106 @@ export function splitLeaveDaysByBalance(input: {
 }
 
 /**
- * Walks counted leave days in date order and marks the first `paidDays` as paid
- * (CL/EL/etc). Sandwich days stay sandwich and do not consume the paid quota,
- * so the calendar never paints every requested day as Casual/Earned.
+ * Walks counted leave days in date order. Working days consume paid balance first;
+ * sandwich days consume paid balance only when both adjacent working days are paid.
+ * If either adjacent working day is LOP (or the leave type is unpaid), the sandwich
+ * day is processed as LOP.
  */
 export function allocateLeaveDaysByBalance(
   duration: LeaveDurationBreakdown,
   paidDays: number,
+  options?: {
+    isPaidLeaveType?: boolean;
+    calendar?: LeaveCalendarContext;
+  },
 ): LeaveDayAllocation[] {
+  const isPaidLeaveType = options?.isPaidLeaveType !== false;
   let remainingPaid = roundLeaveDays(Math.max(0, paidDays));
   const sorted = [...duration.days].sort((left, right) =>
     left.date.localeCompare(right.date),
   );
+  const allocationByDate = new Map<string, LeaveDayAllocationKind>();
+
+  for (const day of sorted) {
+    if (day.counted <= 0) continue;
+    if (day.kind === "sandwich") continue;
+
+    if (!isPaidLeaveType) {
+      allocationByDate.set(day.date, "lop");
+      continue;
+    }
+
+    if (remainingPaid > 0) {
+      remainingPaid = roundLeaveDays(Math.max(0, remainingPaid - day.counted));
+      allocationByDate.set(day.date, "paid");
+    } else {
+      allocationByDate.set(day.date, "lop");
+    }
+  }
+
+  for (const day of sorted) {
+    if (day.counted <= 0 || day.kind !== "sandwich") continue;
+
+    const workingLeaveDays = sorted.filter(
+      (entry) => entry.counted > 0 && entry.kind !== "sandwich",
+    );
+    const before = [...workingLeaveDays].reverse().find((entry) => entry.date < day.date);
+    const after = workingLeaveDays.find((entry) => entry.date > day.date);
+    const beforeKind = before ? allocationByDate.get(before.date) : undefined;
+    const afterKind = after ? allocationByDate.get(after.date) : undefined;
+    const adjacentLop =
+      beforeKind === "lop" ||
+      afterKind === "lop" ||
+      beforeKind == null ||
+      afterKind == null;
+
+    if (!isPaidLeaveType || adjacentLop) {
+      allocationByDate.set(day.date, "lop");
+      continue;
+    }
+
+    if (remainingPaid > 0) {
+      remainingPaid = roundLeaveDays(Math.max(0, remainingPaid - day.counted));
+      allocationByDate.set(day.date, "sandwich");
+    } else {
+      allocationByDate.set(day.date, "lop");
+    }
+  }
 
   return sorted.map((day) => {
     if (day.counted <= 0) {
       return { date: day.date, kind: "none" as const, counted: 0 };
     }
-    if (remainingPaid > 0) {
-      remainingPaid = roundLeaveDays(Math.max(0, remainingPaid - day.counted));
-      return {
-        date: day.date,
-        kind: day.kind === "sandwich" ? ("sandwich" as const) : ("paid" as const),
-        counted: day.counted,
-      };
-    }
-    return { date: day.date, kind: "lop" as const, counted: day.counted };
+    return {
+      date: day.date,
+      kind: allocationByDate.get(day.date) ?? ("lop" as const),
+      counted: day.counted,
+    };
   });
+}
+
+export function splitLeaveDaysFromAllocations(
+  allocations: LeaveDayAllocation[],
+  isPaidLeaveType = true,
+): LeaveDaySplit {
+  if (!isPaidLeaveType) {
+    const total = roundLeaveDays(
+      allocations.reduce((sum, day) => sum + (day.kind === "none" ? 0 : day.counted), 0),
+    );
+    return { paidDays: 0, lopDays: total };
+  }
+
+  let paidDays = 0;
+  let lopDays = 0;
+  for (const day of allocations) {
+    if (day.kind === "none" || day.counted <= 0) continue;
+    if (day.kind === "paid" || day.kind === "sandwich") {
+      paidDays = roundLeaveDays(paidDays + day.counted);
+    } else if (day.kind === "lop") {
+      lopDays = roundLeaveDays(lopDays + day.counted);
+    }
+  }
+  return { paidDays, lopDays };
 }
 
 export function paidLeaveTypeDisplayName(code: string | null | undefined): string {
