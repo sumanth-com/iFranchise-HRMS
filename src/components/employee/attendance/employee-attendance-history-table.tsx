@@ -486,7 +486,7 @@ function AttendancePunchTimeCell({
           render={
             <span
               className="inline-flex cursor-not-allowed items-center gap-1.5 px-1.5 py-0.5 text-sm text-muted-foreground"
-              aria-label="Location not recorded for this attendance record"
+              aria-label="No GPS was saved for this punch"
             >
               <MapPin className="size-3.5 shrink-0 opacity-35" aria-hidden />
               <span className="tabular-nums text-foreground">{label}</span>
@@ -494,7 +494,7 @@ function AttendancePunchTimeCell({
           }
         />
         <TooltipContent>
-          Location not recorded for this attendance record.
+          No GPS was saved for this punch.
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

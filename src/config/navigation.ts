@@ -10,6 +10,7 @@ import {
   LaptopMinimal,
   LayoutDashboard,
   Package,
+  Receipt,
   Settings,
   Shield,
   Target,
@@ -68,6 +69,13 @@ export const mainNavItems: NavigationItem[] = [
     icon: Wallet,
     section: "Self-service",
     permissions: ["payroll.view", "payslip.view"],
+  },
+  {
+    title: "Reimbursements",
+    href: HR_HUB_ROUTES.myReimbursements,
+    icon: Receipt,
+    section: "Self-service",
+    permissions: ["reimbursement.view", "reimbursement.create"],
   },
   {
     title: "Documents",

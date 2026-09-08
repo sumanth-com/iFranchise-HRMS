@@ -50,6 +50,9 @@ export default async function CeoPayrollSectionPage({
           profile={viewProfile}
           teamBasePath={CEO_ROUTES.payroll}
           canRunPayrollOverride
+          canApproveReimbursementOverride={
+            teamSection === TEAM_PAYROLL_SECTIONS.reimbursements ? true : undefined
+          }
         />
       </Suspense>
     </HrPayrollHubView>

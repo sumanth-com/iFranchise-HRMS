@@ -31,7 +31,20 @@ function preferFresherToday(
   local: ManagerTodayAttendance,
   server: ManagerTodayAttendance,
 ) {
-  if (punchRank(server) >= punchRank(local)) return server;
+  // Prefer whichever side has the more advanced punch lifecycle.
+  if (punchRank(server) > punchRank(local)) return server;
+  if (punchRank(local) > punchRank(server)) return local;
+
+  // Same punch rank: prefer the side that already has location flags / attendance id.
+  const serverScore =
+    (server.attendanceId ? 1 : 0) +
+    (server.hasCheckInLocation ? 1 : 0) +
+    (server.hasCheckOutLocation ? 1 : 0);
+  const localScore =
+    (local.attendanceId ? 1 : 0) +
+    (local.hasCheckInLocation ? 1 : 0) +
+    (local.hasCheckOutLocation ? 1 : 0);
+  if (serverScore >= localScore) return server;
   return local;
 }
 

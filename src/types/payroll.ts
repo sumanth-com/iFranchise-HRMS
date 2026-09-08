@@ -25,6 +25,9 @@ export type ReimbursementCategory =
   | "travel"
   | "food"
   | "fuel"
+  | "hotel_accommodation"
+  | "medical"
+  | "telephone"
   | "internet"
   | "laptop"
   | "other";
@@ -483,12 +486,29 @@ export type ReimbursementItem = {
   employeeId: string;
   employeeCode: string;
   employeeName: string;
+  departmentName: string | null;
   category: ReimbursementCategory;
   amount: number;
   expenseDate: string;
   reimbursementStatus: ReimbursementStatus;
   description: string | null;
+  receiptPath: string | null;
+  receiptPaths: string[];
+  reviewRemarks: string | null;
+  rejectionReason: string | null;
+  approvedAt: string | null;
+  payrollId: string | null;
   createdAt: string;
+};
+
+export type ReimbursementSummaryCard = {
+  status: Extract<ReimbursementStatus, "pending" | "approved" | "paid" | "rejected">;
+  count: number;
+  totalAmount: number;
+};
+
+export type ReimbursementSummary = {
+  cards: ReimbursementSummaryCard[];
 };
 
 export type ReimbursementListResult = {

@@ -153,13 +153,116 @@ export const BONUS_STATUS_LABELS: Record<BonusStatus, string> = {
 };
 
 export const REIMBURSEMENT_CATEGORY_LABELS: Record<ReimbursementCategory, string> = {
-  travel: "Travel",
   food: "Food",
   fuel: "Fuel",
+  hotel_accommodation: "Hotel & Accommodation",
+  medical: "Medical",
+  telephone: "Telephone",
+  travel: "Travel",
+  other: "Other",
   internet: "Internet",
   laptop: "Laptop",
-  other: "Other",
 };
+
+/** Categories shown on the employee claim form (legacy internet/laptop kept in DB labels). */
+export const EMPLOYEE_REIMBURSEMENT_CATEGORIES: ReimbursementCategory[] = [
+  "food",
+  "fuel",
+  "hotel_accommodation",
+  "medical",
+  "telephone",
+  "travel",
+  "other",
+];
+
+export const REIMBURSEMENT_STORAGE_BUCKET = "employee-documents";
+export const REIMBURSEMENT_MAX_FILE_BYTES = 5 * 1024 * 1024;
+export const REIMBURSEMENT_MAX_FILES = 5;
+
+/** MIME types accepted for reimbursement receipts (PDF + common images). */
+export const REIMBURSEMENT_ALLOWED_MIME_TYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/jpg",
+  "image/pjpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/bmp",
+  "image/x-ms-bmp",
+  "image/tiff",
+  "image/tif",
+  "image/heic",
+  "image/heif",
+  "image/avif",
+  "image/x-png",
+] as const;
+
+/**
+ * Extensions without leading dots — matches `validateUploadFile` / `extensionFromFileName`.
+ */
+export const REIMBURSEMENT_ALLOWED_EXTENSIONS = [
+  "pdf",
+  "jpg",
+  "jpeg",
+  "jpe",
+  "png",
+  "webp",
+  "gif",
+  "bmp",
+  "tif",
+  "tiff",
+  "heic",
+  "heif",
+  "avif",
+] as const;
+
+export const REIMBURSEMENT_ACCEPT_ATTR = [
+  "image/*",
+  "application/pdf",
+  ...REIMBURSEMENT_ALLOWED_EXTENSIONS.map((ext) => `.${ext}`),
+].join(",");
+
+export const REIMBURSEMENT_FILE_HINT =
+  "Images (JPG, PNG, WebP, GIF, …) or PDF · up to 5 MB each · max 5 files";
+
+export function isAllowedReimbursementMimeType(mimeType?: string | null): boolean {
+  const mime = (mimeType ?? "").trim().toLowerCase();
+  if (!mime) return true;
+  if (mime === "application/octet-stream") return true;
+  if (mime === "application/pdf") return true;
+  if (mime.startsWith("image/")) return true;
+  return (REIMBURSEMENT_ALLOWED_MIME_TYPES as readonly string[]).includes(mime);
+}
+
+export function isAllowedReimbursementExtension(fileName: string): boolean {
+  const parts = fileName.toLowerCase().split(".");
+  if (parts.length < 2) return false;
+  const ext = parts.pop() ?? "";
+  return (REIMBURSEMENT_ALLOWED_EXTENSIONS as readonly string[]).includes(ext);
+}
+
+/** Shared client/server check for reimbursement receipt uploads. */
+export function validateReimbursementAttachmentFile(input: {
+  fileName: string;
+  fileSize: number;
+  mimeType?: string | null;
+}): void {
+  if (input.fileSize <= 0) {
+    throw new Error("File is empty");
+  }
+  if (input.fileSize > REIMBURSEMENT_MAX_FILE_BYTES) {
+    throw new Error("File exceeds maximum size of 5 MB");
+  }
+  if (!isAllowedReimbursementExtension(input.fileName)) {
+    const parts = input.fileName.toLowerCase().split(".");
+    const ext = parts.length >= 2 ? parts.pop() : "";
+    throw new Error(`File type .${ext || "unknown"} is not allowed`);
+  }
+  if (!isAllowedReimbursementMimeType(input.mimeType)) {
+    throw new Error("File MIME type is not allowed");
+  }
+}
 
 export const REIMBURSEMENT_STATUS_LABELS: Record<ReimbursementStatus, string> = {
   pending: "Pending",
@@ -303,7 +406,7 @@ export const TEAM_PAYROLL_SECTION_TITLES: Record<TeamPayrollSection, string> = {
   run: "Company Payroll",
   "salary-structures": "Salary Structure",
   bonuses: "Bonuses",
-  reimbursements: "Expense claims",
+  reimbursements: "Reimbursements",
   payslips: "Payslips",
   "employee-accounts": "Employee Accounts",
   settings: "Settings",
@@ -337,6 +440,10 @@ export const PAYROLL_SUB_NAV = [
   {
     title: TEAM_PAYROLL_SECTION_TITLES["salary-structures"],
     section: TEAM_PAYROLL_SECTIONS["salary-structures"],
+  },
+  {
+    title: TEAM_PAYROLL_SECTION_TITLES.reimbursements,
+    section: TEAM_PAYROLL_SECTIONS.reimbursements,
   },
   { title: TEAM_PAYROLL_SECTION_TITLES.payslips, section: TEAM_PAYROLL_SECTIONS.payslips },
   {

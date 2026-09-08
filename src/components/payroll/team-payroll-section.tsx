@@ -122,6 +122,7 @@ type TeamPayrollSectionProps = {
   profile: Awaited<ReturnType<typeof requireServerAnyPermission>>;
   teamBasePath?: string;
   canRunPayrollOverride?: boolean;
+  canApproveReimbursementOverride?: boolean;
 };
 
 export async function TeamPayrollSection({
@@ -130,6 +131,7 @@ export async function TeamPayrollSection({
   profile,
   teamBasePath,
   canRunPayrollOverride,
+  canApproveReimbursementOverride,
 }: TeamPayrollSectionProps) {
   const supabase = await createClient();
   const now = new Date();
@@ -230,16 +232,23 @@ export async function TeamPayrollSection({
   }
 
   if (section === TEAM_PAYROLL_SECTIONS.reimbursements) {
+    // Do not force current month/year — the table filters client-side (incl. "All months").
+    // Server month defaults previously hid valid claims from the approval queue.
     const params = reimbursementListParamsSchema.parse({
       page: rawSearchParams.page,
-      pageSize: rawSearchParams.pageSize,
-      month: rawSearchParams.month ?? now.getMonth() + 1,
-      year: rawSearchParams.year ?? now.getFullYear(),
+      pageSize: firstString(rawSearchParams.pageSize) ?? 100,
+      month: firstString(rawSearchParams.month),
+      year: firstString(rawSearchParams.year),
       reimbursementStatus: firstString(rawSearchParams.reimbursementStatus),
       category: firstString(rawSearchParams.category),
     });
+    const isCeoPortal = Boolean(teamBasePath?.startsWith("/ceo"));
     const [result, lookups] = await Promise.all([
-      listReimbursements(supabase, profile, params),
+      listReimbursements(supabase, profile, {
+        ...params,
+        // HR Team Payroll: workforce only. CEO Team Payroll: HR claimants only.
+        approvalQueue: isCeoPortal ? "executive" : "workforce",
+      }),
       getPayrollLookups(supabase, profile.employee.organizationId),
     ]);
 
@@ -250,8 +259,15 @@ export async function TeamPayrollSection({
         page={result.page}
         pageSize={result.pageSize}
         employees={lookups.employees}
-        canApprove={canApproveReimbursement(profile.permissionCodes)}
-        canCreate={canCreateReimbursement(profile.permissionCodes)}
+        canApprove={
+          canApproveReimbursementOverride ??
+          canApproveReimbursement(profile.permissionCodes)
+        }
+        canCreate={
+          isCeoPortal
+            ? false
+            : canCreateReimbursement(profile.permissionCodes)
+        }
       />
     );
   }

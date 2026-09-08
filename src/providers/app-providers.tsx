@@ -19,7 +19,23 @@ export function AppProviders({ children }: AppProvidersProps) {
         <TooltipProvider>
           <ChunkLoadRecovery />
           {children}
-          <Toaster richColors closeButton position="top-right" />
+          <Toaster
+            richColors
+            closeButton
+            position="top-right"
+            offset={12}
+            gap={8}
+            visibleToasts={3}
+            toastOptions={{
+              duration: 2800,
+              classNames: {
+                toast: "group toast !max-w-[22rem] !px-3.5 !py-2.5 !text-sm !shadow-md",
+                title: "!text-sm !font-medium !leading-snug",
+                description: "!text-xs !leading-snug",
+                closeButton: "!left-auto !right-1 !top-1",
+              },
+            }}
+          />
         </TooltipProvider>
       </QueryProvider>
     </ThemeProvider>

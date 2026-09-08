@@ -8,6 +8,7 @@ import type {
   PayrollSummary,
   PayslipListResult,
   ReimbursementListResult,
+  ReimbursementSummary,
   SalaryRevisionListResult,
   SalaryStructureItem,
   SalaryStructureListResult,
@@ -27,6 +28,10 @@ import {
   getMonthDateRange,
   getPayrollMonthDate,
 } from "@/lib/payroll/services/payroll-utils";
+import {
+  listHrReimbursementApplicantEmployeeIds,
+  type ReimbursementApprovalQueue,
+} from "@/lib/payroll/reimbursement-approval-routing";
 import {
   evaluatePayrollIntegrity,
   type PayrollIntegrityEmployee,
@@ -1019,6 +1024,8 @@ export async function listReimbursements(
     reimbursementStatus?: string;
     category?: string;
     employeeId?: string;
+    /** workforce = non-HR claimants (HR queue); executive = HR claimants (CEO queue). */
+    approvalQueue?: ReimbursementApprovalQueue;
   },
 ): Promise<ReimbursementListResult> {
   const parsed = reimbursementListParamsSchema.parse(params);
@@ -1032,6 +1039,7 @@ export async function listReimbursements(
     category,
     employeeId,
   } = parsed;
+  const approvalQueue = params.approvalQueue;
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
   const organizationId = profile.employee.organizationId;
@@ -1048,12 +1056,19 @@ export async function listReimbursements(
         expense_date,
         reimbursement_status,
         description,
+        receipt_path,
+        receipt_paths,
+        review_remarks,
+        rejection_reason,
+        approved_at,
+        payroll_id,
         created_at,
         employees:employee_id!inner (
           employee_code,
           first_name,
           last_name,
-          deleted_at
+          deleted_at,
+          departments:department_id (name)
         )
       `,
       { count: "exact" },
@@ -1063,6 +1078,22 @@ export async function listReimbursements(
     .is("deleted_at", null);
 
   if (employeeId) query = query.eq("employee_id", employeeId);
+
+  // Self-service (employeeId scoped) must never apply queue filters.
+  if (!employeeId && approvalQueue) {
+    const hrApplicantIds = await listHrReimbursementApplicantEmployeeIds(organizationId);
+    if (approvalQueue === "workforce") {
+      if (hrApplicantIds.length > 0) {
+        query = query.not("employee_id", "in", `(${hrApplicantIds.join(",")})`);
+      }
+    } else if (approvalQueue === "executive") {
+      if (hrApplicantIds.length === 0) {
+        return { data: [], total: 0, page, pageSize };
+      }
+      query = query.in("employee_id", hrApplicantIds);
+    }
+  }
+
   if (reimbursementStatus) query = query.eq("reimbursement_status", reimbursementStatus);
   if (category) query = query.eq("category", category);
 
@@ -1084,39 +1115,94 @@ export async function listReimbursements(
   const { data, error, count } = await query;
   if (error) throw new Error(error.message);
 
+  // Do not apply directory/payslip hide filters here. Reimbursement history and
+  // approval queues must include all org claimants (including IT/Technology).
   return {
-    data: (data ?? []).flatMap((row) => {
+    data: (data ?? []).map((row) => {
       const employee = unwrapRelation(row.employees);
-      if (
-        isHiddenPayrollDirectoryPerson(
-          employee?.employee_code,
-          employee?.first_name,
-          employee?.last_name,
-          null,
-        )
-      ) {
-        return [];
-      }
-      return [
-        {
-          id: row.id,
-          employeeId: row.employee_id,
-          employeeCode: employee?.employee_code ?? "",
-          employeeName: employee
-            ? `${employee.first_name} ${employee.last_name}`
-            : "",
-          category: row.category,
-          amount: Number(row.amount),
-          expenseDate: row.expense_date,
-          reimbursementStatus: row.reimbursement_status,
-          description: row.description,
-          createdAt: row.created_at,
-        },
-      ];
+      return {
+        id: row.id,
+        employeeId: row.employee_id,
+        employeeCode: employee?.employee_code ?? "",
+        employeeName: employee
+          ? `${employee.first_name} ${employee.last_name}`
+          : "",
+        departmentName: unwrapRelation(employee?.departments)?.name ?? null,
+        category: row.category,
+        amount: Number(row.amount),
+        expenseDate: row.expense_date,
+        reimbursementStatus: row.reimbursement_status,
+        description: row.description,
+        receiptPath: row.receipt_path ?? null,
+        receiptPaths: normalizeReceiptPaths(row.receipt_paths, row.receipt_path),
+        reviewRemarks: row.review_remarks ?? null,
+        rejectionReason: row.rejection_reason ?? null,
+        approvedAt: row.approved_at ?? null,
+        payrollId: row.payroll_id ?? null,
+        createdAt: row.created_at,
+      };
     }),
     total: count ?? 0,
     page,
     pageSize,
+  };
+}
+
+function normalizeReceiptPaths(
+  paths: unknown,
+  legacyPath?: string | null,
+): string[] {
+  const fromJson = Array.isArray(paths)
+    ? paths.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : [];
+  if (fromJson.length > 0) return fromJson;
+  if (legacyPath?.trim()) return [legacyPath.trim()];
+  return [];
+}
+
+export async function getReimbursementSummary(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  options?: { employeeId?: string },
+): Promise<ReimbursementSummary> {
+  let query = supabase
+    .schema("hrms")
+    .from("employee_reimbursements")
+    .select("reimbursement_status, amount")
+    .eq("organization_id", profile.employee.organizationId)
+    .is("deleted_at", null)
+    .in("reimbursement_status", ["pending", "approved", "paid", "rejected"]);
+
+  if (options?.employeeId) {
+    query = query.eq("employee_id", options.employeeId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  const buckets: Record<
+    "pending" | "approved" | "paid" | "rejected",
+    { count: number; totalAmount: number }
+  > = {
+    pending: { count: 0, totalAmount: 0 },
+    approved: { count: 0, totalAmount: 0 },
+    paid: { count: 0, totalAmount: 0 },
+    rejected: { count: 0, totalAmount: 0 },
+  };
+
+  for (const row of data ?? []) {
+    const status = row.reimbursement_status as keyof typeof buckets;
+    if (!(status in buckets)) continue;
+    buckets[status].count += 1;
+    buckets[status].totalAmount += Number(row.amount ?? 0);
+  }
+
+  return {
+    cards: (["pending", "approved", "paid", "rejected"] as const).map((status) => ({
+      status,
+      count: buckets[status].count,
+      totalAmount: buckets[status].totalAmount,
+    })),
   };
 }
 

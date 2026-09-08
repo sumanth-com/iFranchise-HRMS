@@ -11,6 +11,7 @@ export const HR_HUB_ROUTES = {
   myLeave: "/dashboard/leave",
   teamLeave: "/dashboard/leave/team",
   myPayroll: SELF_PAYROLL_ROUTES.list,
+  myReimbursements: "/dashboard/reimbursements",
   teamPayroll: payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS.run),
   myDocuments: "/dashboard/documents",
   teamDocuments: "/dashboard/documents/team",

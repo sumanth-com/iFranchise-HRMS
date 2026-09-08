@@ -206,10 +206,67 @@ export const bonusFormSchema = z.object({
 
 export const reimbursementFormSchema = z.object({
   employeeId: z.string().uuid(),
-  category: z.enum(["travel", "food", "fuel", "internet", "laptop", "other"]),
-  amount: z.coerce.number().positive(),
+  category: z.enum([
+    "travel",
+    "food",
+    "fuel",
+    "hotel_accommodation",
+    "medical",
+    "telephone",
+    "internet",
+    "laptop",
+    "other",
+  ]),
+  amount: z.coerce.number().positive().max(10_000_000),
   expenseDate: z.string().min(1),
-  description: z.string().trim().max(500).optional(),
+  description: z
+    .string()
+    .trim()
+    .min(3, "Please add a short description")
+    .max(1000),
+  receiptPaths: z.array(z.string().trim().min(1).max(500)).max(5).optional().default([]),
+});
+
+export const employeeReimbursementClaimSchema = z.object({
+  category: z.enum([
+    "food",
+    "fuel",
+    "hotel_accommodation",
+    "medical",
+    "telephone",
+    "travel",
+    "other",
+  ]),
+  amount: z.coerce.number().positive().max(10_000_000),
+  expenseDate: z.string().min(1),
+  description: z
+    .string()
+    .trim()
+    .min(3, "Please add a short description")
+    .max(1000),
+  receiptPaths: z.array(z.string().trim().min(1).max(500)).max(5).default([]),
+});
+
+export const reimbursementDecisionSchema = z.object({
+  reimbursementId: z.string().uuid(),
+  remarks: z.string().trim().max(1000).optional().nullable(),
+});
+
+export const reimbursementUpdatePendingSchema = z.object({
+  reimbursementId: z.string().uuid(),
+  category: z.enum([
+    "food",
+    "fuel",
+    "hotel_accommodation",
+    "medical",
+    "telephone",
+    "travel",
+    "other",
+  ]),
+  amount: z.coerce.number().positive().max(10_000_000),
+  expenseDate: z.string().min(1),
+  description: z.string().trim().min(3).max(1000),
+  receiptPaths: z.array(z.string().trim().min(1).max(500)).max(5).default([]),
 });
 
 export const salaryRevisionFormSchema = z
@@ -282,7 +339,17 @@ export const reimbursementListParamsSchema = z.object({
     .enum(["pending", "approved", "rejected", "paid", "cancelled"])
     .optional(),
   category: z
-    .enum(["travel", "food", "fuel", "internet", "laptop", "other"])
+    .enum([
+      "travel",
+      "food",
+      "fuel",
+      "hotel_accommodation",
+      "medical",
+      "telephone",
+      "internet",
+      "laptop",
+      "other",
+    ])
     .optional(),
   employeeId: z.string().uuid().optional(),
 });

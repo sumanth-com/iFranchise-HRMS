@@ -969,7 +969,80 @@ type SelfPunchRpcResult = {
   work_hours: number | string;
   overtime_hours: number | string;
   action: string;
+  location_saved?: boolean;
 };
+
+async function persistAttendanceLocationColumns(
+  supabase: AuthSupabaseClient,
+  input: {
+    attendanceId: string;
+    employeeId: string;
+    type: "in" | "out";
+    latitude: number;
+    longitude: number;
+    accuracy?: number | null;
+    userId: string;
+  },
+): Promise<boolean> {
+  const nowIso = new Date().toISOString();
+  const payload =
+    input.type === "in"
+      ? {
+          check_in_latitude: input.latitude,
+          check_in_longitude: input.longitude,
+          check_in_accuracy_m: input.accuracy ?? null,
+          check_in_location_at: nowIso,
+          check_in_address: null,
+          updated_by: input.userId,
+        }
+      : {
+          check_out_latitude: input.latitude,
+          check_out_longitude: input.longitude,
+          check_out_accuracy_m: input.accuracy ?? null,
+          check_out_location_at: nowIso,
+          check_out_address: null,
+          updated_by: input.userId,
+        };
+
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("attendance")
+    .update(payload)
+    .eq("id", input.attendanceId)
+    .eq("employee_id", input.employeeId)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (!error && data?.id) return true;
+
+  const { data: rpcData, error: rpcError } = await supabase.schema("hrms").rpc(
+    "self_service_attendance_save_location",
+    {
+      p_attendance_id: input.attendanceId,
+      p_type: input.type,
+      p_latitude: input.latitude,
+      p_longitude: input.longitude,
+      p_accuracy_m: input.accuracy ?? null,
+      p_expected_employee_id: input.employeeId,
+    },
+  );
+
+  if (rpcError) {
+    console.error(
+      "[persistAttendanceLocationColumns] failed",
+      error?.message ?? rpcError.message,
+    );
+    return false;
+  }
+
+  return Boolean(
+    rpcData &&
+      typeof rpcData === "object" &&
+      "ok" in (rpcData as Record<string, unknown>) &&
+      (rpcData as { ok?: boolean }).ok === true,
+  );
+}
 
 /**
  * Self check-in / check-out for the signed-in employee only.
@@ -1032,6 +1105,10 @@ export async function punchManagerAttendance(
       p_work_hours: workHours,
       p_overtime_hours: overtimeHours,
       p_notes: geoNote,
+      p_expected_employee_id: employeeId,
+      p_latitude: hasGeo ? input.latitude : null,
+      p_longitude: hasGeo ? input.longitude : null,
+      p_accuracy_m: hasGeo ? (input.accuracy ?? null) : null,
     },
   );
 
@@ -1051,34 +1128,22 @@ export async function punchManagerAttendance(
 
   // Idempotent double-submit must not overwrite an earlier GPS fix.
   const shouldPersistGeo =
-    hasGeo && result.action !== "already_checked_in";
+    hasGeo && result.action !== "already_checked_in" && result.location_saved !== true;
 
-  if (shouldPersistGeo) {
-    const { data: locationResult, error: locationError } = await supabase
-      .schema("hrms")
-      .rpc("self_service_attendance_save_location", {
-        p_attendance_id: result.id,
-        p_type: input.type,
-        p_latitude: input.latitude,
-        p_longitude: input.longitude,
-        p_accuracy_m: input.accuracy ?? null,
-      });
-
-    if (locationError) {
-      // Location is additive — never fail the punch if GPS persistence fails.
+  if (shouldPersistGeo && input.latitude != null && input.longitude != null) {
+    const locationSaved = await persistAttendanceLocationColumns(supabase, {
+      attendanceId: result.id,
+      employeeId,
+      type: input.type,
+      latitude: input.latitude,
+      longitude: input.longitude,
+      accuracy: input.accuracy,
+      userId: profile.userId,
+    });
+    if (!locationSaved) {
       console.error(
-        "[punchManagerAttendance] failed to persist GPS location",
-        locationError.message,
-      );
-    } else if (
-      !locationResult ||
-      (typeof locationResult === "object" &&
-        "ok" in (locationResult as Record<string, unknown>) &&
-        (locationResult as { ok?: boolean }).ok === false)
-    ) {
-      console.error(
-        "[punchManagerAttendance] GPS location save returned not ok",
-        { attendanceId: result.id },
+        "[punchManagerAttendance] GPS coordinates were captured but not saved",
+        { attendanceId: result.id, type: input.type },
       );
     }
   }
@@ -1255,6 +1320,28 @@ export async function updateManagerCheckout(
     .is("deleted_at", null);
 
   if (error) throw new Error(error.message);
+
+  const hasGeo =
+    input.latitude != null &&
+    input.longitude != null &&
+    isValidLatLng(input.latitude, input.longitude);
+  if (hasGeo && input.latitude != null && input.longitude != null) {
+    const locationSaved = await persistAttendanceLocationColumns(supabase, {
+      attendanceId: existing.id,
+      employeeId,
+      type: "out",
+      latitude: input.latitude,
+      longitude: input.longitude,
+      accuracy: input.accuracy,
+      userId: profile.userId,
+    });
+    if (!locationSaved) {
+      console.error(
+        "[updateManagerCheckout] GPS coordinates were captured but not saved",
+        { attendanceId: existing.id },
+      );
+    }
+  }
 
   await writeApplicationAudit(supabase, {
     organizationId: profile.employee.organizationId,

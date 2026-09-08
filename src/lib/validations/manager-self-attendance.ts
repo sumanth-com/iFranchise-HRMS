@@ -11,6 +11,9 @@ export const managerAttendancePunchSchema = z.object({
 export const managerUpdateCheckoutSchema = z.object({
   attendanceId: z.string().uuid().optional(),
   checkOutAt: z.string().optional(),
+  latitude: z.number().finite().optional(),
+  longitude: z.number().finite().optional(),
+  accuracy: z.number().finite().nonnegative().optional(),
 });
 
 export const managerProfilePageParamsSchema = z.object({

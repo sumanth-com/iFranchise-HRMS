@@ -12,7 +12,6 @@ import {
   requireServerAnyPermission,
   requireServerPermission,
 } from "@/lib/permissions/server";
-import { PAYROLL_ROUTES, payrollTeamSectionPath, SELF_PAYROLL_ROUTES, TEAM_PAYROLL_SECTIONS } from "@/lib/payroll/constants";
 import {
   getPayrollRunById,
   getPayslipById,
@@ -21,6 +20,7 @@ import {
   approveBonus,
   approvePayrollStep,
   approveReimbursement,
+  cancelPendingReimbursement,
   createBonus,
   createReimbursement,
   createSalaryRevision,
@@ -35,9 +35,11 @@ import {
   previewPayrollRun,
   processPayrollRun,
   rejectPayrollRun,
+  rejectReimbursement,
   releaseEmployeePayslip,
   ensureUnpublishedPayslipForPayrollItem,
   syncActiveEmployeesIntoPayrollRun,
+  updatePendingReimbursement,
   updatePayrollItemAdjustments,
 } from "@/lib/payroll/services/payroll-mutations";
 import { PayslipEmailError } from "@/lib/payroll/services/payslip-email-errors";
@@ -48,6 +50,7 @@ import {
 import {
   getPayrollLookups,
   getPayrollSummary,
+  getReimbursementSummary,
   listBonuses,
   listPayrollRuns,
   listPayslips,
@@ -62,13 +65,16 @@ import {
   bonusFormSchema,
   bonusListParamsSchema,
   employeePayrollBreakdownSchema,
+  employeeReimbursementClaimSchema,
   payrollApprovalSchema,
   payrollItemAdjustmentSchema,
   payrollListParamsSchema,
   payrollRejectSchema,
   payrollRunSchema,
+  reimbursementDecisionSchema,
   reimbursementFormSchema,
   reimbursementListParamsSchema,
+  reimbursementUpdatePendingSchema,
   salaryRevisionFormSchema,
   salaryRevisionListParamsSchema,
   salaryStructureFormSchema,
@@ -77,6 +83,28 @@ import {
   employeeAccountListParamsSchema,
   sendEmployeePayslipSchema,
 } from "@/lib/validations/payroll";
+import {
+  REIMBURSEMENT_STORAGE_BUCKET,
+  payrollTeamSectionPath,
+  PAYROLL_ROUTES,
+  SELF_PAYROLL_ROUTES,
+  TEAM_PAYROLL_SECTIONS,
+  validateReimbursementAttachmentFile,
+} from "@/lib/payroll/constants";
+import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
+import { HR_HUB_ROUTES } from "@/lib/dashboard/hr-hub-routes";
+import { MANAGER_ROUTES } from "@/lib/manager/constants";
+import { createSignedStorageUrl } from "@/lib/storage/signed-url";
+import { assertOrganizationStoragePath } from "@/lib/security/storage-path";
+
+function revalidateReimbursementViews() {
+  revalidatePath(EMPLOYEE_ROUTES.reimbursements);
+  revalidatePath(HR_HUB_ROUTES.myReimbursements);
+  revalidatePath(MANAGER_ROUTES.reimbursements);
+  revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS.reimbursements));
+  revalidatePath(`${CEO_ROUTES.payroll}/${TEAM_PAYROLL_SECTIONS.reimbursements}`);
+  revalidatePath(PAYROLL_ROUTES.reimbursements);
+}
 import { payrollSettingsSchema } from "@/lib/validations/payroll-settings";
 import type {
   BonusListResult,
@@ -548,8 +576,11 @@ export async function createReimbursementAction(
     ]);
     const supabase = await getAuthenticatedSupabase();
     const parsed = reimbursementFormSchema.parse(input);
-    const id = await createReimbursement(supabase, profile, parsed);
-    revalidatePath(PAYROLL_ROUTES.reimbursements);
+    const id = await createReimbursement(supabase, profile, {
+      ...parsed,
+      receiptPaths: parsed.receiptPaths ?? [],
+    });
+    revalidateReimbursementViews();
     revalidateEmployeePayrollViews();
     return { success: true, data: id };
   } catch (error) {
@@ -560,24 +591,237 @@ export async function createReimbursementAction(
   }
 }
 
+export async function submitOwnReimbursementClaimAction(
+  input: unknown,
+): Promise<PayrollActionResult<string>> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "reimbursement.create",
+      PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.manager,
+      PORTAL_PERMISSIONS.hr,
+    ]);
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = employeeReimbursementClaimSchema.parse(input);
+    const id = await createReimbursement(supabase, profile, {
+      employeeId: profile.employee.id,
+      category: parsed.category,
+      amount: parsed.amount,
+      expenseDate: parsed.expenseDate,
+      description: parsed.description,
+      receiptPaths: parsed.receiptPaths,
+    });
+    revalidateReimbursementViews();
+    revalidateEmployeePayrollViews();
+    return { success: true, data: id };
+  } catch (error) {
+    return {
+      success: false,
+      message: toUserFriendlyError(error, "Failed to submit reimbursement claim"),
+    };
+  }
+}
+
 export async function approveReimbursementAction(
-  reimbursementId: string,
+  input: unknown,
 ): Promise<PayrollActionResult> {
   try {
     const profile = await requireServerAnyPermission([
       "reimbursement.approve",
       "payroll.approve",
+      PORTAL_PERMISSIONS.ceo,
     ]);
     const supabase = await getAuthenticatedSupabase();
-    await approveReimbursement(supabase, profile, reimbursementId);
-    revalidatePath(PAYROLL_ROUTES.reimbursements);
+    const parsed =
+      typeof input === "string"
+        ? { reimbursementId: input, remarks: null }
+        : reimbursementDecisionSchema.parse(input);
+    await approveReimbursement(
+      supabase,
+      profile,
+      parsed.reimbursementId,
+      parsed.remarks,
+    );
+    revalidateReimbursementViews();
     revalidateEmployeePayrollViews();
     return { success: true, data: undefined };
   } catch (error) {
     return {
       success: false,
-      message:
-        toUserFriendlyError(error, "Failed to approve reimbursement"),
+      message: toUserFriendlyError(error, "Failed to approve reimbursement"),
+    };
+  }
+}
+
+export async function rejectReimbursementAction(
+  input: unknown,
+): Promise<PayrollActionResult> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "reimbursement.approve",
+      "payroll.approve",
+      PORTAL_PERMISSIONS.ceo,
+    ]);
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = reimbursementDecisionSchema.parse(input);
+    await rejectReimbursement(
+      supabase,
+      profile,
+      parsed.reimbursementId,
+      parsed.remarks,
+    );
+    revalidateReimbursementViews();
+    revalidateEmployeePayrollViews();
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: toUserFriendlyError(error, "Failed to reject reimbursement"),
+    };
+  }
+}
+
+export async function updateOwnPendingReimbursementAction(
+  input: unknown,
+): Promise<PayrollActionResult> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "reimbursement.create",
+      PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.manager,
+      PORTAL_PERMISSIONS.hr,
+    ]);
+    const supabase = await getAuthenticatedSupabase();
+    const parsed = reimbursementUpdatePendingSchema.parse(input);
+    await updatePendingReimbursement(supabase, profile, parsed, {
+      employeeId: profile.employee.id,
+    });
+    revalidateReimbursementViews();
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: toUserFriendlyError(error, "Failed to update reimbursement"),
+    };
+  }
+}
+
+export async function cancelOwnPendingReimbursementAction(
+  reimbursementId: string,
+): Promise<PayrollActionResult> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "reimbursement.create",
+      PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.manager,
+      PORTAL_PERMISSIONS.hr,
+    ]);
+    const supabase = await getAuthenticatedSupabase();
+    await cancelPendingReimbursement(supabase, profile, reimbursementId, {
+      employeeId: profile.employee.id,
+    });
+    revalidateReimbursementViews();
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: toUserFriendlyError(error, "Failed to cancel reimbursement"),
+    };
+  }
+}
+
+export async function uploadReimbursementAttachmentAction(
+  formData: FormData,
+): Promise<PayrollActionResult<string>> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "reimbursement.create",
+      "payroll.create",
+      PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.manager,
+      PORTAL_PERMISSIONS.hr,
+    ]);
+    const file = formData.get("file");
+    if (!(file instanceof File)) {
+      return { success: false, message: "No file provided" };
+    }
+
+    try {
+      validateReimbursementAttachmentFile({
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type,
+      });
+    } catch (validationError) {
+      return {
+        success: false,
+        message:
+          validationError instanceof Error
+            ? validationError.message
+            : "Unsupported file. Upload an image or PDF up to 5 MB.",
+      };
+    }
+
+    const supabase = await getAuthenticatedSupabase();
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const storagePath = `${profile.employee.organizationId}/reimbursements/${profile.employee.id}/${crypto.randomUUID()}-${sanitizedName}`;
+    assertOrganizationStoragePath(storagePath, profile.employee.organizationId);
+
+    const { error } = await supabase.storage
+      .from(REIMBURSEMENT_STORAGE_BUCKET)
+      .upload(storagePath, file, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: file.type || undefined,
+      });
+
+    if (error) throw new Error(error.message);
+    return { success: true, data: storagePath };
+  } catch (error) {
+    return {
+      success: false,
+      message: toUserFriendlyError(error, "Failed to upload attachment"),
+    };
+  }
+}
+
+export async function getReimbursementAttachmentUrlAction(
+  path: string,
+): Promise<PayrollActionResult<string>> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "reimbursement.view",
+      "payroll.view",
+      PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.ceo,
+      ...ceoOrViewPermission("payroll.view"),
+    ]);
+    assertOrganizationStoragePath(path, profile.employee.organizationId);
+    // Employees may only open attachments under their own folder.
+    const isOrgApprover =
+      profile.permissionCodes.includes("reimbursement.approve") ||
+      profile.permissionCodes.includes("payroll.approve") ||
+      profile.permissionCodes.includes(PORTAL_PERMISSIONS.ceo) ||
+      profile.permissionCodes.includes(PORTAL_PERMISSIONS.hr);
+    if (!isOrgApprover) {
+      const ownPrefix = `${profile.employee.organizationId}/reimbursements/${profile.employee.id}/`;
+      if (!path.startsWith(ownPrefix)) {
+        return { success: false, message: "You do not have access to this attachment." };
+      }
+    }
+
+    const supabase = await getAuthenticatedSupabase();
+    const url = await createSignedStorageUrl(
+      supabase,
+      REIMBURSEMENT_STORAGE_BUCKET,
+      path,
+    );
+    if (!url) return { success: false, message: "Attachment not found." };
+    return { success: true, data: url };
+  } catch (error) {
+    return {
+      success: false,
+      message: toUserFriendlyError(error, "Failed to open attachment"),
     };
   }
 }

@@ -17,27 +17,60 @@ type Props = {
   allowUpdateCheckout?: boolean;
 };
 
-async function punchWithOptionalGeo(type: "in" | "out") {
-  const loadingId = toast.loading("Requesting location…");
-  const geo = await getOptionalPunchGeolocation();
-  toast.dismiss(loadingId);
+function geoUserMessage(status: string): string {
+  switch (status) {
+    case "denied":
+      return "Location permission is blocked. Enable location for this site in your browser settings.";
+    case "timeout":
+      return "Could not get your location in time. Check GPS signal and try again.";
+    case "unsupported":
+      return "This browser does not support location. Attendance time will still be saved.";
+    default:
+      return "Could not capture your current location. Attendance time will still be saved.";
+  }
+}
 
-  if (geo.status === "denied") {
-    toast.message("Location permission denied", {
-      description:
-        "Attendance will continue without GPS. You can enable location in browser settings for future punches.",
-    });
-  } else if (geo.status === "captured") {
-    // Keep quiet on success — history pin becomes the confirmation.
-  } else if (geo.status !== "unsupported") {
-    toast.message("Location not recorded", {
-      description:
-        "Could not capture GPS for this punch. Attendance will still be saved normally.",
-    });
+async function punchWithGeo(type: "in" | "out") {
+  const loadingId = toast.loading(
+    type === "in" ? "Getting check-in location…" : "Getting check-out location…",
+  );
+
+  let geo;
+  try {
+    geo = await getOptionalPunchGeolocation();
+  } finally {
+    toast.dismiss(loadingId);
+  }
+
+  if (geo.status === "captured") {
+    // Quiet success — history pin confirms GPS later.
+  } else {
+    toast.error(geoUserMessage(geo.status), { duration: 4200 });
   }
 
   return selfAttendancePunchAction({
     type,
+    latitude: geo.latitude,
+    longitude: geo.longitude,
+    accuracy: geo.accuracy,
+  });
+}
+
+async function updateCheckoutWithGeo(attendanceId: string | null) {
+  const loadingId = toast.loading("Getting check-out location…");
+  let geo;
+  try {
+    geo = await getOptionalPunchGeolocation();
+  } finally {
+    toast.dismiss(loadingId);
+  }
+
+  if (geo.status !== "captured") {
+    toast.error(geoUserMessage(geo.status), { duration: 4200 });
+  }
+
+  return selfAttendanceUpdateCheckoutAction({
+    attendanceId: attendanceId ?? undefined,
     latitude: geo.latitude,
     longitude: geo.longitude,
     accuracy: geo.accuracy,
@@ -55,13 +88,9 @@ export function SelfAttendanceTodayCard({
       firstName={firstName}
       today={today}
       allowUpdateCheckout={allowUpdateCheckout}
-      onCheckIn={() => punchWithOptionalGeo("in")}
-      onCheckOut={() => punchWithOptionalGeo("out")}
-      onUpdateCheckout={() =>
-        selfAttendanceUpdateCheckoutAction({
-          attendanceId: today.attendanceId ?? undefined,
-        })
-      }
+      onCheckIn={() => punchWithGeo("in")}
+      onCheckOut={() => punchWithGeo("out")}
+      onUpdateCheckout={() => updateCheckoutWithGeo(null)}
     />
   );
 }

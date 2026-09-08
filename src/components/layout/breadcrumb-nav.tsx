@@ -295,6 +295,13 @@ function buildBreadcrumbItems(
     return items;
   }
 
+  if (segments[0] === "dashboard" && segments[1] === "reimbursements") {
+    return [
+      { label: "Dashboard", href: HR_PORTAL_HOME },
+      { label: "Reimbursements", href: "/dashboard/reimbursements" },
+    ];
+  }
+
   if (segments[0] === "dashboard" && segments[1] === "payroll") {
     const items: BreadcrumbItemConfig[] = [
       { label: "Dashboard", href: HR_PORTAL_HOME },
@@ -313,7 +320,7 @@ function buildBreadcrumbItems(
         run: "Company Payroll",
         "salary-structures": "Salary Structure",
         bonuses: "Bonuses",
-        reimbursements: "Expense claims",
+        reimbursements: "Reimbursements",
         payslips: "Payslips",
         "employee-accounts": "Employee Accounts",
         settings: "Settings",
@@ -524,6 +531,7 @@ function buildBreadcrumbItems(
       attendance: "Attendance",
       leave: "Leave",
       payroll: "Payroll",
+      reimbursements: "Reimbursements",
       documents: "Documents",
       goals: "My Goals",
       assets: "Assets",
@@ -652,7 +660,7 @@ function buildBreadcrumbItems(
         run: "Team Payroll",
         "salary-structures": "Salary Structure",
         bonuses: "Bonuses",
-        reimbursements: "Expense claims",
+        reimbursements: "Reimbursements",
         payslips: "Payslips",
         "employee-accounts": "Employee Accounts",
         settings: "Settings",
@@ -711,7 +719,7 @@ function buildBreadcrumbItems(
         run: "Company Payroll",
         "salary-structures": "Salary Structure",
         bonuses: "Bonuses",
-        reimbursements: "Expense claims",
+        reimbursements: "Reimbursements",
         payslips: "Payslips",
         "employee-accounts": "Employee Accounts",
         settings: "Settings",

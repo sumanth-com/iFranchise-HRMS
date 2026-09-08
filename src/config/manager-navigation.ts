@@ -7,6 +7,7 @@ import {
   FileText,
   LaptopMinimal,
   LayoutDashboard,
+  Receipt,
   Wallet,
   Settings,
   Target,
@@ -56,6 +57,13 @@ export const managerNavItems: NavigationItem[] = [
     icon: Wallet,
     section: "Self-service",
     permissions: ["payroll.view", "payslip.view"],
+  },
+  {
+    title: "Reimbursements",
+    href: MANAGER_ROUTES.reimbursements,
+    icon: Receipt,
+    section: "Self-service",
+    permissions: ["reimbursement.view", "reimbursement.create"],
   },
   {
     title: "Documents",

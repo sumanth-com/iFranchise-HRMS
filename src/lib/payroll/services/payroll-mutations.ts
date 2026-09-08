@@ -11,6 +11,11 @@ import {
 } from "@/lib/payroll/payroll-integrity";
 import { loadLeavePolicyRuntime } from "@/lib/leave/services/leave-policy-runtime";
 import { resolvePayrollApplicablePeriod } from "@/lib/payroll/payroll-period";
+import {
+  isCeoReimbursementApprover,
+  isHrReimbursementActor,
+  listHrReimbursementApplicantEmployeeIds,
+} from "@/lib/payroll/reimbursement-approval-routing";
 import { getEmployeeLeaveBalanceSnapshot } from "@/lib/leave/services/leave-queries";
 import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
 import { LEAVE_BALANCE_CARD_CODES } from "@/lib/leave/constants";
@@ -942,7 +947,7 @@ async function loadPayrollPeriodFacts(
         .from("employee_reimbursements")
         .select("employee_id, amount, category, expense_date")
         .in("employee_id", chunk)
-        .in("reimbursement_status", ["pending", "approved"])
+        .in("reimbursement_status", ["approved"])
         .is("payroll_id", null)
         .is("deleted_at", null)
         .gte("expense_date", queryStart)
@@ -1100,7 +1105,7 @@ async function getPayableReimbursements(
     .from("employee_reimbursements")
     .select("amount, category, expense_date")
     .eq("employee_id", employeeId)
-    .in("reimbursement_status", ["pending", "approved"])
+    .in("reimbursement_status", ["approved"])
     .is("deleted_at", null);
 
   if (!options?.includeAttached) {
@@ -1488,7 +1493,7 @@ export async function generatePayrollRun(
       .from("employee_reimbursements")
       .update({ payroll_id: payrollId, updated_by: actorId })
       .in("employee_id", chunk)
-      .in("reimbursement_status", ["pending", "approved"])
+      .in("reimbursement_status", ["approved"])
       .is("payroll_id", null)
       .gte("expense_date", range.startDate)
       .lte("expense_date", range.endDate);
@@ -1888,7 +1893,8 @@ export async function markPayrollPaid(
     .schema("hrms")
     .from("employee_reimbursements")
     .update({ reimbursement_status: "paid", updated_by: profile.userId })
-    .eq("payroll_id", payrollId);
+    .eq("payroll_id", payrollId)
+    .eq("reimbursement_status", "approved");
 }
 
 export async function generatePayslips(
@@ -3253,8 +3259,10 @@ export async function createReimbursement(
     amount: number;
     expenseDate: string;
     description?: string;
+    receiptPaths?: string[];
   },
 ): Promise<string> {
+  const receiptPaths = (input.receiptPaths ?? []).filter(Boolean).slice(0, 5);
   const { data, error } = await supabase
     .schema("hrms")
     .from("employee_reimbursements")
@@ -3265,6 +3273,9 @@ export async function createReimbursement(
       amount: input.amount,
       expense_date: input.expenseDate,
       description: input.description ?? null,
+      receipt_path: receiptPaths[0] ?? null,
+      receipt_paths: receiptPaths,
+      reimbursement_status: "pending",
       created_by: profile.userId,
       updated_by: profile.userId,
     })
@@ -3279,7 +3290,28 @@ export async function approveReimbursement(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   reimbursementId: string,
+  remarks?: string | null,
 ): Promise<void> {
+  const { data: existing, error: loadError } = await supabase
+    .schema("hrms")
+    .from("employee_reimbursements")
+    .select("id, employee_id, reimbursement_status, payroll_id, organization_id")
+    .eq("id", reimbursementId)
+    .eq("organization_id", profile.employee.organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (loadError) throw new Error(loadError.message);
+  if (!existing) throw new Error("Reimbursement request not found.");
+  if (existing.reimbursement_status !== "pending") {
+    throw new Error("Only pending reimbursement requests can be approved.");
+  }
+  if (existing.payroll_id) {
+    throw new Error("This reimbursement is already linked to a payroll run.");
+  }
+
+  await assertReimbursementDecisionAccess(profile, existing.employee_id);
+
   const { error } = await supabase
     .schema("hrms")
     .from("employee_reimbursements")
@@ -3287,12 +3319,152 @@ export async function approveReimbursement(
       reimbursement_status: "approved",
       approver_employee_id: profile.employee.id,
       approved_at: new Date().toISOString(),
+      review_remarks: remarks?.trim() || null,
+      rejection_reason: null,
       updated_by: profile.userId,
     })
     .eq("id", reimbursementId)
-    .eq("organization_id", profile.employee.organizationId);
+    .eq("organization_id", profile.employee.organizationId)
+    .eq("reimbursement_status", "pending");
 
   if (error) throw new Error(error.message);
+}
+
+export async function rejectReimbursement(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  reimbursementId: string,
+  remarks?: string | null,
+): Promise<void> {
+  const { data: existing, error: loadError } = await supabase
+    .schema("hrms")
+    .from("employee_reimbursements")
+    .select("id, employee_id, reimbursement_status, payroll_id, organization_id")
+    .eq("id", reimbursementId)
+    .eq("organization_id", profile.employee.organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (loadError) throw new Error(loadError.message);
+  if (!existing) throw new Error("Reimbursement request not found.");
+  if (existing.reimbursement_status !== "pending") {
+    throw new Error("Only pending reimbursement requests can be rejected.");
+  }
+  if (existing.payroll_id) {
+    throw new Error("This reimbursement is already linked to a payroll run.");
+  }
+
+  await assertReimbursementDecisionAccess(profile, existing.employee_id);
+
+  const trimmed = remarks?.trim() || null;
+  const { error } = await supabase
+    .schema("hrms")
+    .from("employee_reimbursements")
+    .update({
+      reimbursement_status: "rejected",
+      approver_employee_id: profile.employee.id,
+      approved_at: new Date().toISOString(),
+      rejection_reason: trimmed,
+      review_remarks: trimmed,
+      updated_by: profile.userId,
+    })
+    .eq("id", reimbursementId)
+    .eq("organization_id", profile.employee.organizationId)
+    .eq("reimbursement_status", "pending");
+
+  if (error) throw new Error(error.message);
+}
+
+async function assertReimbursementDecisionAccess(
+  profile: UserProfile,
+  claimantEmployeeId: string,
+): Promise<void> {
+  const hrApplicantIds = await listHrReimbursementApplicantEmployeeIds(
+    profile.employee.organizationId,
+  );
+  const isExecutiveClaim = hrApplicantIds.includes(claimantEmployeeId);
+  const ceoApprover = isCeoReimbursementApprover(profile);
+  const hrActor = isHrReimbursementActor(profile);
+
+  if (isExecutiveClaim) {
+    if (!ceoApprover) {
+      throw new Error("HR reimbursement claims must be approved by the CEO.");
+    }
+    return;
+  }
+
+  if (ceoApprover && !hrActor) {
+    throw new Error("Workforce reimbursement claims are reviewed in HR Team Payroll.");
+  }
+}
+
+export async function updatePendingReimbursement(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: {
+    reimbursementId: string;
+    category: string;
+    amount: number;
+    expenseDate: string;
+    description: string;
+    receiptPaths: string[];
+  },
+  options?: { employeeId?: string },
+): Promise<void> {
+  const receiptPaths = (input.receiptPaths ?? []).filter(Boolean).slice(0, 5);
+  let query = supabase
+    .schema("hrms")
+    .from("employee_reimbursements")
+    .update({
+      category: input.category,
+      amount: input.amount,
+      expense_date: input.expenseDate,
+      description: input.description,
+      receipt_path: receiptPaths[0] ?? null,
+      receipt_paths: receiptPaths,
+      updated_by: profile.userId,
+    })
+    .eq("id", input.reimbursementId)
+    .eq("organization_id", profile.employee.organizationId)
+    .eq("reimbursement_status", "pending")
+    .is("payroll_id", null)
+    .is("deleted_at", null);
+
+  if (options?.employeeId) {
+    query = query.eq("employee_id", options.employeeId);
+  }
+
+  const { data, error } = await query.select("id").maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Pending reimbursement not found or cannot be edited.");
+}
+
+export async function cancelPendingReimbursement(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  reimbursementId: string,
+  options?: { employeeId?: string },
+): Promise<void> {
+  let query = supabase
+    .schema("hrms")
+    .from("employee_reimbursements")
+    .update({
+      reimbursement_status: "cancelled",
+      updated_by: profile.userId,
+    })
+    .eq("id", reimbursementId)
+    .eq("organization_id", profile.employee.organizationId)
+    .eq("reimbursement_status", "pending")
+    .is("payroll_id", null)
+    .is("deleted_at", null);
+
+  if (options?.employeeId) {
+    query = query.eq("employee_id", options.employeeId);
+  }
+
+  const { data, error } = await query.select("id").maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Pending reimbursement not found or cannot be cancelled.");
 }
 
 export async function createSalaryRevision(

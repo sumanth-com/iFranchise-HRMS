@@ -184,8 +184,12 @@ export function AttendanceTodayPunchCard({
   }, [dialog]);
 
   const dateLabel = format(parseISO(today.attendanceDate), "do MMM yyyy");
-  const punchState =
-    today.punchState === "locked" ? "not_checked_in" : today.punchState;
+  // Always derive from stored times so Check Out never disappears after a real check-in.
+  const punchState: ManagerAttendancePunchState = today.checkInAt
+    ? today.checkOutAt
+      ? "checked_out"
+      : "checked_in"
+    : "not_checked_in";
 
   function refreshAfterSuccess(nextToday?: ManagerTodayAttendance) {
     if (nextToday) live?.applyToday(nextToday);

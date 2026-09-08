@@ -11,7 +11,7 @@ import {
   useReactTable,
   type ColumnDef,
 } from "@tanstack/react-table";
-import { CheckCircle2, Loader2, Plus } from "lucide-react";
+import { CheckCircle2, Eye, Loader2, Paperclip, Plus, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import type { z } from "zod";
 
@@ -19,9 +19,17 @@ import { EmptyState } from "@/components/common/empty-state";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ReimbursementDialog } from "@/components/payroll/reimbursement-dialog";
 import { EmployeeSelect, LabeledSelect } from "@/components/payroll/payroll-select";
-import { toEmployeeSelectItems, toSelectItems } from "@/components/payroll/select-utils";
+import { ReimbursementStatusBadge } from "@/components/payroll/reimbursement-status-badge";
+import { toEmployeeSelectItems } from "@/components/payroll/select-utils";
 import { useTeamPayrollHeaderActions } from "@/components/payroll/team-payroll-header-actions";
 import {
   TableBody,
@@ -33,18 +41,36 @@ import {
 import {
   approveReimbursementAction,
   createReimbursementAction,
+  getReimbursementAttachmentUrlAction,
+  rejectReimbursementAction,
 } from "@/lib/payroll/actions";
 import {
+  EMPLOYEE_REIMBURSEMENT_CATEGORIES,
   REIMBURSEMENT_CATEGORY_LABELS,
   REIMBURSEMENT_STATUS_LABELS,
 } from "@/lib/payroll/constants";
 import { formatCurrency } from "@/lib/payroll/services/payroll-utils";
 import { getHrmsYearSelectItems } from "@/lib/date/hrms-year";
 import { reimbursementFormSchema } from "@/lib/validations/payroll";
-import type { ReimbursementItem, ReimbursementStatus } from "@/types/payroll";
+import type { ReimbursementItem } from "@/types/payroll";
 import type { LookupOption } from "@/types/employee";
 
-const categoryItems = toSelectItems(REIMBURSEMENT_CATEGORY_LABELS);
+type DecisionMode = "approve" | "reject" | "view";
+
+function attachmentPathsFor(item: ReimbursementItem): string[] {
+  if (item.receiptPaths?.length) return item.receiptPaths;
+  if (item.receiptPath) return [item.receiptPath];
+  return [];
+}
+
+function fileNameFromPath(path: string) {
+  return path.split("/").pop() || path;
+}
+
+const categoryItems = EMPLOYEE_REIMBURSEMENT_CATEGORIES.map((value) => ({
+  value,
+  label: REIMBURSEMENT_CATEGORY_LABELS[value],
+}));
 
 const EMPTY_REIMBURSEMENT_VALUES: z.input<typeof reimbursementFormSchema> = {
   category: "travel",
@@ -52,6 +78,7 @@ const EMPTY_REIMBURSEMENT_VALUES: z.input<typeof reimbursementFormSchema> = {
   employeeId: "",
   expenseDate: "",
   description: "",
+  receiptPaths: [],
 };
 
 type ReimbursementFormProps = {
@@ -81,11 +108,11 @@ export function ReimbursementForm({
     startTransition(async () => {
       const result = await createReimbursementAction(values);
       if (!result.success) {
-        toast.error(result.message);
+        toast.error(result.message || "Submit failed");
         return;
       }
 
-      toast.success("Expense claim submitted");
+      toast.success("Claim submitted");
       form.reset(EMPTY_REIMBURSEMENT_VALUES);
       onSuccess?.();
     });
@@ -192,6 +219,10 @@ export function ReimbursementTable({
   const { setHeaderActions } = useTeamPayrollHeaderActions();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [decisionRow, setDecisionRow] = useState<ReimbursementItem | null>(null);
+  const [decisionMode, setDecisionMode] = useState<DecisionMode>("view");
+  const [remarks, setRemarks] = useState("");
+  const [openingPath, setOpeningPath] = useState<string | null>(null);
 
   const now = new Date();
   const [monthFilter, setMonthFilter] = useState(String(now.getMonth() + 1));
@@ -242,6 +273,59 @@ export function ReimbursementTable({
     setDialogOpen(true);
   }, []);
 
+  const openDecision = useCallback((row: ReimbursementItem, mode: DecisionMode) => {
+    setDecisionRow(row);
+    setDecisionMode(mode);
+    setRemarks("");
+  }, []);
+
+  const closeDecision = useCallback(() => {
+    setDecisionRow(null);
+    setDecisionMode("view");
+    setRemarks("");
+  }, []);
+
+  async function openAttachment(path: string) {
+    setOpeningPath(path);
+    try {
+      const result = await getReimbursementAttachmentUrlAction(path);
+      if (!result.success) {
+        toast.error(result.message || "Could not open file");
+        return;
+      }
+      if (!result.data) {
+        toast.error("Could not open file");
+        return;
+      }
+      window.open(result.data, "_blank", "noopener,noreferrer");
+    } finally {
+      setOpeningPath(null);
+    }
+  }
+
+  function confirmDecision() {
+    if (!decisionRow || decisionMode === "view") return;
+    const payload = {
+      reimbursementId: decisionRow.id,
+      remarks: remarks.trim() || null,
+    };
+    startTransition(async () => {
+      const result =
+        decisionMode === "approve"
+          ? await approveReimbursementAction(payload)
+          : await rejectReimbursementAction(payload);
+      if (!result.success) {
+        toast.error(result.message || "Action failed");
+        return;
+      }
+      toast.success(
+        decisionMode === "approve" ? "Claim approved" : "Claim rejected",
+      );
+      closeDecision();
+      router.refresh();
+    });
+  }
+
   useEffect(() => {
     if (!canCreate) {
       setHeaderActions(null);
@@ -271,8 +355,17 @@ export function ReimbursementTable({
         ),
       },
       {
+        id: "department",
+        header: "Department",
+        cell: ({ row }) => (
+          <span className="text-muted-foreground">
+            {row.original.departmentName?.trim() || "—"}
+          </span>
+        ),
+      },
+      {
         accessorKey: "category",
-        header: "Category",
+        header: "Type",
         cell: ({ row }) => REIMBURSEMENT_CATEGORY_LABELS[row.original.category],
       },
       {
@@ -288,6 +381,24 @@ export function ReimbursementTable({
         ),
       },
       {
+        id: "attachments",
+        header: "Attachments",
+        cell: ({ row }) => {
+          const count = attachmentPathsFor(row.original).length;
+          return (
+            <span className="inline-flex items-center gap-1.5 tabular-nums text-muted-foreground">
+              <Paperclip className="size-3.5" />
+              {count}
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: "createdAt",
+        header: "Submitted",
+        cell: ({ row }) => format(new Date(row.original.createdAt), "MMM d, yyyy"),
+      },
+      {
         accessorKey: "reimbursementStatus",
         header: "Status",
         cell: ({ row }) => (
@@ -295,49 +406,59 @@ export function ReimbursementTable({
         ),
       },
       {
-        accessorKey: "description",
-        header: "Description",
-        cell: ({ row }) => (
-          <span className="max-w-[14rem] truncate text-muted-foreground">
-            {row.original.description ?? "—"}
-          </span>
-        ),
-      },
-      {
         id: "actions",
         header: () => <span className="sr-only">Actions</span>,
-        cell: ({ row }) => (
-          <div className="flex items-center justify-end gap-2">
-            {canApprove && row.original.reimbursementStatus === "pending" ? (
+        cell: ({ row }) => {
+          const pending = row.original.reimbursementStatus === "pending";
+          return (
+            <div className="flex items-center justify-end gap-1.5">
               <Button
+                type="button"
                 size="sm"
-                variant="outline"
-                className="h-8 gap-1.5"
-                disabled={isPending}
-                onClick={() =>
-                  startTransition(async () => {
-                    const result = await approveReimbursementAction(row.original.id);
-                    if (!result.success) toast.error(result.message);
-                    else {
-                      toast.success("Expense claim approved");
-                      router.refresh();
-                    }
-                  })
-                }
+                variant="ghost"
+                className="h-8 gap-1.5 px-2"
+                onClick={() => openDecision(row.original, "view")}
               >
-                <CheckCircle2 className="size-3.5" />
-                Approve
+                <Eye className="size-3.5" />
+                View
               </Button>
-            ) : null}
-          </div>
-        ),
+              {canApprove && pending ? (
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1.5"
+                    disabled={isPending}
+                    onClick={() => openDecision(row.original, "approve")}
+                  >
+                    <CheckCircle2 className="size-3.5" />
+                    Approve
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1.5 text-destructive hover:text-destructive"
+                    disabled={isPending}
+                    onClick={() => openDecision(row.original, "reject")}
+                  >
+                    <XCircle className="size-3.5" />
+                    Reject
+                  </Button>
+                </>
+              ) : null}
+            </div>
+          );
+        },
       },
     ],
-    [canApprove, isPending, router, startTransition],
+    [canApprove, isPending, openDecision],
   );
 
   const table = useReactTable({ data: filteredRecords, columns, getCoreRowModel: getCoreRowModel() });
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / pageSize));
+  const decisionAttachments = decisionRow ? attachmentPathsFor(decisionRow) : [];
 
   const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => ({
     value: String(i + 1),
@@ -448,6 +569,163 @@ export function ReimbursementTable({
         </div>
       ) : null}
 
+      <Dialog
+        open={Boolean(decisionRow)}
+        onOpenChange={(open) => {
+          if (!open) closeDecision();
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {decisionMode === "approve"
+                ? "Approve expense claim"
+                : decisionMode === "reject"
+                  ? "Reject expense claim"
+                  : "Expense claim details"}
+            </DialogTitle>
+          </DialogHeader>
+
+          {decisionRow ? (
+            <div className="space-y-4 text-sm">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Employee</p>
+                  <p className="font-medium">{decisionRow.employeeName}</p>
+                  <p className="text-xs text-muted-foreground">{decisionRow.employeeCode}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Department</p>
+                  <p>{decisionRow.departmentName?.trim() || "—"}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Type</p>
+                  <p>{REIMBURSEMENT_CATEGORY_LABELS[decisionRow.category]}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Status</p>
+                  <ReimbursementStatusBadge status={decisionRow.reimbursementStatus} />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Expense date</p>
+                  <p>{format(new Date(decisionRow.expenseDate), "MMM d, yyyy")}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Amount</p>
+                  <p className="font-semibold tabular-nums">
+                    {formatCurrency(decisionRow.amount)}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Submitted</p>
+                  <p>{format(new Date(decisionRow.createdAt), "MMM d, yyyy")}</p>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Description</p>
+                <p className="whitespace-pre-wrap">
+                  {decisionRow.description?.trim() || "—"}
+                </p>
+              </div>
+
+              {(decisionRow.reviewRemarks?.trim() ||
+                decisionRow.rejectionReason?.trim()) &&
+              decisionMode === "view" ? (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Remarks</p>
+                  <p className="whitespace-pre-wrap">
+                    {decisionRow.reviewRemarks?.trim() ||
+                      decisionRow.rejectionReason?.trim()}
+                  </p>
+                </div>
+              ) : null}
+
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">Attachments</p>
+                {decisionAttachments.length === 0 ? (
+                  <p className="text-muted-foreground">No attachments</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {decisionAttachments.map((path) => (
+                      <li key={path}>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 max-w-full gap-1.5"
+                          disabled={openingPath === path}
+                          onClick={() => openAttachment(path)}
+                        >
+                          {openingPath === path ? (
+                            <Loader2 className="size-3.5 shrink-0 animate-spin" />
+                          ) : (
+                            <Paperclip className="size-3.5 shrink-0" />
+                          )}
+                          <span className="truncate">{fileNameFromPath(path)}</span>
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {decisionMode === "approve" || decisionMode === "reject" ? (
+                <div className="space-y-2">
+                  <Label htmlFor="reimbursement-decision-remarks">
+                    Remarks (optional)
+                  </Label>
+                  <textarea
+                    id="reimbursement-decision-remarks"
+                    value={remarks}
+                    onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) =>
+                      setRemarks(event.target.value)
+                    }
+                    placeholder={
+                      decisionMode === "approve"
+                        ? "Optional approval notes"
+                        : "Optional rejection reason"
+                    }
+                    rows={3}
+                    disabled={isPending}
+                    className="min-h-[80px] w-full rounded-lg border border-input bg-white px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            {decisionMode === "view" ? (
+              <Button type="button" variant="secondary" onClick={closeDecision}>
+                Close
+              </Button>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isPending}
+                  onClick={closeDecision}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant={decisionMode === "reject" ? "destructive" : "default"}
+                  disabled={isPending}
+                  className="gap-1.5"
+                  onClick={confirmDecision}
+                >
+                  {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+                  {decisionMode === "approve" ? "Confirm approve" : "Confirm reject"}
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {canCreate ? (
         <ReimbursementDialog
           open={dialogOpen}
@@ -457,24 +735,6 @@ export function ReimbursementTable({
         />
       ) : null}
     </div>
-  );
-}
-
-function ReimbursementStatusBadge({ status }: { status: ReimbursementStatus }) {
-  const styles: Record<ReimbursementStatus, string> = {
-    pending: "bg-amber-500/15 text-amber-800 dark:text-amber-200",
-    approved: "bg-emerald-500/15 text-emerald-800 dark:text-emerald-200",
-    rejected: "bg-red-500/15 text-red-800 dark:text-red-200",
-    paid: "bg-primary/10 text-primary",
-    cancelled: "border text-muted-foreground",
-  };
-
-  return (
-    <span
-      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${styles[status]}`}
-    >
-      {REIMBURSEMENT_STATUS_LABELS[status]}
-    </span>
   );
 }
 

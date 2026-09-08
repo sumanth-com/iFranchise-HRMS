@@ -6,6 +6,7 @@ import {
   FileText,
   LaptopMinimal,
   LayoutDashboard,
+  Receipt,
   Settings,
   Target,
   UserRound,
@@ -44,6 +45,12 @@ export const employeeNavItems: NavigationItem[] = [
     href: EMPLOYEE_ROUTES.payroll,
     icon: Wallet,
     permissions: ["payslip.view"],
+  },
+  {
+    title: "Reimbursements",
+    href: EMPLOYEE_ROUTES.reimbursements,
+    icon: Receipt,
+    permissions: ["reimbursement.view", "reimbursement.create"],
   },
   {
     title: "Documents",
