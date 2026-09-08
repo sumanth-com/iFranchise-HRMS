@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { SelfAttendanceLiveProvider } from "@/components/attendance/self-attendance-live-context";
 import { ManagerAttendanceCalendar } from "@/components/manager/profile/manager-attendance-calendar";
 import { ManagerProfileHistoryTable } from "@/components/manager/profile/manager-profile-history-table";
 import { ManagerProfileIdCard } from "@/components/manager/profile/manager-profile-id-card";
@@ -42,6 +43,7 @@ export function ManagerProfileView({ data, status, searchDate }: Props) {
   }
 
   return (
+    <SelfAttendanceLiveProvider today={data.today} calendarDays={data.calendarDays}>
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-4 md:p-5">
       <div className="flex flex-col gap-4">
         <div>
@@ -54,6 +56,7 @@ export function ManagerProfileView({ data, status, searchDate }: Props) {
         <ManagerProfileTodayCard
           firstName={data.profileCard.firstName}
           today={data.today}
+          allowUpdateCheckout={data.canUpdateCheckout}
         />
 
         <div className="grid gap-4 xl:min-h-[min(32rem,calc(100dvh-16rem))] xl:grid-cols-[minmax(0,1.4fr)_minmax(16rem,18.5rem)] xl:items-stretch">
@@ -111,5 +114,6 @@ export function ManagerProfileView({ data, status, searchDate }: Props) {
         />
       </div>
     </div>
+    </SelfAttendanceLiveProvider>
   );
 }

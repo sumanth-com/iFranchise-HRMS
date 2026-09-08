@@ -1004,18 +1004,7 @@ async function persistAttendanceLocationColumns(
           updated_by: input.userId,
         };
 
-  const { data, error } = await supabase
-    .schema("hrms")
-    .from("attendance")
-    .update(payload)
-    .eq("id", input.attendanceId)
-    .eq("employee_id", input.employeeId)
-    .is("deleted_at", null)
-    .select("id")
-    .maybeSingle();
-
-  if (!error && data?.id) return true;
-
+  // Prefer SECURITY DEFINER RPC so RLS / column grants cannot drop GPS silently.
   const { data: rpcData, error: rpcError } = await supabase.schema("hrms").rpc(
     "self_service_attendance_save_location",
     {
@@ -1028,20 +1017,97 @@ async function persistAttendanceLocationColumns(
     },
   );
 
-  if (rpcError) {
-    console.error(
-      "[persistAttendanceLocationColumns] failed",
-      error?.message ?? rpcError.message,
-    );
-    return false;
-  }
-
-  return Boolean(
-    rpcData &&
+  const rpcOk = Boolean(
+    !rpcError &&
+      rpcData &&
       typeof rpcData === "object" &&
       "ok" in (rpcData as Record<string, unknown>) &&
       (rpcData as { ok?: boolean }).ok === true,
   );
+  if (rpcOk) return true;
+
+  const { data, error } = await supabase
+    .schema("hrms")
+    .from("attendance")
+    .update(payload)
+    .eq("id", input.attendanceId)
+    .eq("employee_id", input.employeeId)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (!error && data?.id) return true;
+
+  console.error(
+    "[persistAttendanceLocationColumns] failed",
+    rpcError?.message ?? error?.message ?? "unknown",
+  );
+  return false;
+}
+
+async function loadTodayAfterPunch(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  result: SelfPunchRpcResult,
+  rules: AttendanceRules,
+  geo: {
+    type: "in" | "out";
+    latitude?: number;
+    longitude?: number;
+    accuracy?: number | null;
+    expectedSaved: boolean;
+  },
+): Promise<ManagerTodayAttendance> {
+  // Always re-read the employee+day row that the UI uses (profile.employee.id).
+  try {
+    const today = await getSelfTodayAttendance(supabase, profile);
+    if (geo.type === "in" && result.check_in_at && !today.checkInAt) {
+      // Defensive: never return a panel that hides Check Out after a successful in punch.
+      return buildTodayPanel(
+        {
+          id: result.id,
+          attendance_date: String(result.attendance_date),
+          check_in_at: result.check_in_at,
+          check_out_at: result.check_out_at,
+          attendance_status: result.attendance_status,
+          work_hours: result.work_hours,
+          overtime_hours: result.overtime_hours,
+          notes: null,
+          check_in_latitude: geo.expectedSaved ? geo.latitude : null,
+          check_in_longitude: geo.expectedSaved ? geo.longitude : null,
+          check_out_latitude: null,
+          check_out_longitude: null,
+        },
+        getTodayDateString(),
+        rules,
+      );
+    }
+    return today;
+  } catch (error) {
+    console.error("[loadTodayAfterPunch] fallback to RPC payload", error);
+    return buildTodayPanel(
+      {
+        id: result.id,
+        attendance_date: String(result.attendance_date),
+        check_in_at: result.check_in_at,
+        check_out_at: result.check_out_at,
+        attendance_status: result.attendance_status,
+        work_hours: result.work_hours,
+        overtime_hours: result.overtime_hours,
+        notes: null,
+        check_in_latitude:
+          geo.type === "in" && geo.expectedSaved ? geo.latitude : null,
+        check_in_longitude:
+          geo.type === "in" && geo.expectedSaved ? geo.longitude : null,
+        check_out_latitude:
+          geo.type === "out" && geo.expectedSaved ? geo.latitude : null,
+        check_out_longitude:
+          geo.type === "out" && geo.expectedSaved ? geo.longitude : null,
+      },
+      getTodayDateString(),
+      rules,
+    );
+  }
 }
 
 /**
@@ -1127,31 +1193,65 @@ export async function punchManagerAttendance(
   }
 
   // Idempotent double-submit must not overwrite an earlier GPS fix.
-  const shouldPersistGeo =
-    hasGeo && result.action !== "already_checked_in" && result.location_saved !== true;
+  let locationSaved = Boolean(result.location_saved);
+  if (
+    hasGeo &&
+    result.action !== "already_checked_in" &&
+    input.latitude != null &&
+    input.longitude != null
+  ) {
+    if (!locationSaved) {
+      locationSaved = await persistAttendanceLocationColumns(supabase, {
+        attendanceId: result.id,
+        employeeId,
+        type: input.type,
+        latitude: input.latitude,
+        longitude: input.longitude,
+        accuracy: input.accuracy,
+        userId: profile.userId,
+      });
+    }
 
-  if (shouldPersistGeo && input.latitude != null && input.longitude != null) {
-    const locationSaved = await persistAttendanceLocationColumns(supabase, {
-      attendanceId: result.id,
-      employeeId,
-      type: input.type,
-      latitude: input.latitude,
-      longitude: input.longitude,
-      accuracy: input.accuracy,
-      userId: profile.userId,
-    });
+    // Verify columns actually landed; retry once if the first write was a false positive.
+    if (locationSaved) {
+      const verified = await getAttendanceForDate(supabase, employeeId, today);
+      const ok =
+        input.type === "in"
+          ? isValidLatLng(verified?.check_in_latitude, verified?.check_in_longitude)
+          : isValidLatLng(verified?.check_out_latitude, verified?.check_out_longitude);
+      if (!ok) {
+        locationSaved = await persistAttendanceLocationColumns(supabase, {
+          attendanceId: result.id,
+          employeeId,
+          type: input.type,
+          latitude: input.latitude,
+          longitude: input.longitude,
+          accuracy: input.accuracy,
+          userId: profile.userId,
+        });
+      }
+    }
+
     if (!locationSaved) {
       console.error(
         "[punchManagerAttendance] GPS coordinates were captured but not saved",
-        { attendanceId: result.id, type: input.type },
+        { attendanceId: result.id, type: input.type, employeeId },
       );
     }
   }
 
+  const geoMeta = {
+    type: input.type,
+    latitude: input.latitude,
+    longitude: input.longitude,
+    accuracy: input.accuracy,
+    expectedSaved: Boolean(hasGeo && locationSaved && result.action !== "already_checked_in"),
+  } as const;
+
   if (input.type === "in") {
     if (result.action === "already_checked_in") {
       // Concurrent / double-submit on the same personal row — treat as success.
-      return getSelfTodayAttendance(supabase, profile);
+      return loadTodayAfterPunch(supabase, profile, result, rules, geoMeta);
     }
 
     await writeApplicationAudit(supabase, {
@@ -1164,7 +1264,7 @@ export async function punchManagerAttendance(
     });
 
     await notifyAttendanceCheckedIn(supabase, profile, today);
-    return getSelfTodayAttendance(supabase, profile);
+    return loadTodayAfterPunch(supabase, profile, result, rules, geoMeta);
   }
 
   const punchedWorkHours = Number(result.work_hours ?? workHours);
@@ -1234,7 +1334,7 @@ export async function punchManagerAttendance(
     );
   }
 
-  return getSelfTodayAttendance(supabase, profile);
+  return loadTodayAfterPunch(supabase, profile, result, rules, geoMeta);
 }
 
 export async function updateManagerCheckout(

@@ -31,11 +31,16 @@ function preferFresherToday(
   local: ManagerTodayAttendance,
   server: ManagerTodayAttendance,
 ) {
-  // Prefer whichever side has the more advanced punch lifecycle.
+  // Never demote a successful check-in back to "not checked in" on RSC refresh.
+  if (
+    punchRank(local) > punchRank(server) &&
+    local.attendanceDate === server.attendanceDate
+  ) {
+    return local;
+  }
   if (punchRank(server) > punchRank(local)) return server;
   if (punchRank(local) > punchRank(server)) return local;
 
-  // Same punch rank: prefer the side that already has location flags / attendance id.
   const serverScore =
     (server.attendanceId ? 1 : 0) +
     (server.hasCheckInLocation ? 1 : 0) +

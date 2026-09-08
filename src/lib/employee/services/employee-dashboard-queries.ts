@@ -329,7 +329,12 @@ export async function getEmployeeDashboardData(
   const greeting = greetingFromProfile(profile);
 
   const [todayPanel, leave, upcomingHolidays] = await Promise.all([
-    safe(() => getSelfTodayAttendance(supabase, profile), buildFallbackToday(today)),
+    getSelfTodayAttendance(supabase, profile).catch((error) => {
+      console.error("[employee-dashboard] today attendance failed", error);
+      // Do not invent a fake "not checked in" state — empty panel without times
+      // still shows Check In, but we log the failure for production debugging.
+      return buildFallbackToday(today);
+    }),
     safe(() => loadLeaveKpis(supabase, employeeId), {
       totalBalanceDays: 0,
       pendingCount: 0,

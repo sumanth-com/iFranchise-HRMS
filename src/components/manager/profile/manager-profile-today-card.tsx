@@ -6,6 +6,7 @@ import type { ManagerTodayAttendance } from "@/types/manager-self-attendance";
 type Props = {
   firstName: string;
   today: ManagerTodayAttendance;
+  allowUpdateCheckout?: boolean;
 };
 
 /** @deprecated Use SelfAttendanceTodayCard — kept as alias for existing imports. */

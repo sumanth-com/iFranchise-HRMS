@@ -42,18 +42,34 @@ async function punchWithGeo(type: "in" | "out") {
     toast.dismiss(loadingId);
   }
 
-  if (geo.status === "captured") {
-    // Quiet success — history pin confirms GPS later.
-  } else {
-    toast.error(geoUserMessage(geo.status), { duration: 4200 });
+  const captured = geo.status === "captured";
+  if (!captured) {
+    toast.error(geoUserMessage(geo.status), { duration: 4500 });
   }
 
-  return selfAttendancePunchAction({
+  const result = await selfAttendancePunchAction({
     type,
     latitude: geo.latitude,
     longitude: geo.longitude,
     accuracy: geo.accuracy,
   });
+
+  if (result.success && captured) {
+    const saved =
+      type === "in"
+        ? Boolean(result.today?.hasCheckInLocation)
+        : Boolean(result.today?.hasCheckOutLocation);
+    if (!saved) {
+      toast.error(
+        type === "in"
+          ? "Checked in, but GPS was not saved. Try Check Out later with location enabled."
+          : "Checked out, but GPS was not saved. Enable location and use Update Check Out if available.",
+        { duration: 5000 },
+      );
+    }
+  }
+
+  return result;
 }
 
 async function updateCheckoutWithGeo(attendanceId: string | null) {
@@ -65,16 +81,23 @@ async function updateCheckoutWithGeo(attendanceId: string | null) {
     toast.dismiss(loadingId);
   }
 
-  if (geo.status !== "captured") {
-    toast.error(geoUserMessage(geo.status), { duration: 4200 });
+  const captured = geo.status === "captured";
+  if (!captured) {
+    toast.error(geoUserMessage(geo.status), { duration: 4500 });
   }
 
-  return selfAttendanceUpdateCheckoutAction({
+  const result = await selfAttendanceUpdateCheckoutAction({
     attendanceId: attendanceId ?? undefined,
     latitude: geo.latitude,
     longitude: geo.longitude,
     accuracy: geo.accuracy,
   });
+
+  if (result.success && captured && !result.today?.hasCheckOutLocation) {
+    toast.error("Checkout updated, but GPS was not saved.", { duration: 4500 });
+  }
+
+  return result;
 }
 
 /** Shared check-in/out card for every self-service portal (HR, employee, manager, system). */

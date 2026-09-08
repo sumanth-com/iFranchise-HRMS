@@ -56,6 +56,30 @@ const PUNCH_MESSAGE_DISMISS_MS = 3500;
 const PUNCH_BUTTON_CLASS =
   "h-11 min-w-[11.5rem] gap-2.5 rounded-lg px-6 text-sm font-semibold transition-all active:scale-[0.98]";
 
+function punchRank(today: ManagerTodayAttendance) {
+  if (today.checkOutAt) return 2;
+  if (today.checkInAt) return 1;
+  return 0;
+}
+
+function preferToday(
+  primary: ManagerTodayAttendance,
+  secondary: ManagerTodayAttendance | null,
+): ManagerTodayAttendance {
+  if (!secondary) return primary;
+  if (punchRank(primary) > punchRank(secondary)) return primary;
+  if (punchRank(secondary) > punchRank(primary)) return secondary;
+  const primaryScore =
+    (primary.attendanceId ? 1 : 0) +
+    (primary.hasCheckInLocation ? 1 : 0) +
+    (primary.hasCheckOutLocation ? 1 : 0);
+  const secondaryScore =
+    (secondary.attendanceId ? 1 : 0) +
+    (secondary.hasCheckInLocation ? 1 : 0) +
+    (secondary.hasCheckOutLocation ? 1 : 0);
+  return primaryScore >= secondaryScore ? primary : secondary;
+}
+
 type Props = {
   firstName: string;
   today: ManagerTodayAttendance;
@@ -166,13 +190,30 @@ export function AttendanceTodayPunchCard({
   allowUpdateCheckout = false,
 }: Props) {
   const live = useOptionalSelfAttendanceLive();
-  const today = live?.today ?? todayProp;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [dialog, setDialog] = useState<DialogState | null>(null);
+  const [optimisticToday, setOptimisticToday] = useState<ManagerTodayAttendance | null>(
+    null,
+  );
   const [birthdayCelebration, setBirthdayCelebration] = useState<{
     firstName: string;
   } | null>(null);
+
+  const baseToday = live?.today ?? todayProp;
+  // Optimistic punch result wins until the server reflects the same punch lifecycle.
+  const today = optimisticToday
+    ? preferToday(optimisticToday, baseToday)
+    : baseToday;
+
+  useEffect(() => {
+    if (!optimisticToday) return;
+    // Clear optimistic overlay once the server reflects the same or newer punch state.
+    if (punchRank(baseToday) >= punchRank(optimisticToday)) {
+      setOptimisticToday(null);
+    }
+  }, [baseToday, optimisticToday]);
+
   const elapsedSeconds = useLiveWorkingSeconds(today.checkInAt, today.checkOutAt);
   const workingHoursLabel =
     live?.workingHoursLabel ?? formatWorkingDuration(elapsedSeconds);
@@ -192,12 +233,15 @@ export function AttendanceTodayPunchCard({
     : "not_checked_in";
 
   function refreshAfterSuccess(nextToday?: ManagerTodayAttendance) {
-    if (nextToday) live?.applyToday(nextToday);
-    if (live) {
-      live.refreshInBackground();
-      return;
+    if (nextToday) {
+      setOptimisticToday(nextToday);
+      live?.applyToday(nextToday);
     }
-    router.refresh();
+    // Defer RSC refresh so Check Out is visible immediately from optimistic state.
+    window.setTimeout(() => {
+      if (live) live.refreshInBackground();
+      else router.refresh();
+    }, 750);
   }
 
   function maybeTriggerBirthdayCelebration(
