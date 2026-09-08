@@ -98,9 +98,9 @@ function workflowHint(
     case "checked_in":
       return "You're checked in. Tap Check Out when you finish for the day.";
     case "checked_out":
-      return "Checked out for today. Use Update Check Out if you left later than recorded.";
+      return "Checked out for today. Update Check Out stays available for every employee until the day ends.";
     default:
-      return "Tap Check In when you start work. Check Out stays available after you punch in.";
+      return "Tap Check In when you start work. After check-in, Check Out stays available all day.";
   }
 }
 

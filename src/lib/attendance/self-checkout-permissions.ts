@@ -1,9 +1,9 @@
 import type { UserProfile } from "@/types/auth";
 
 /**
- * Every self-service user may update their own checkout after punching out
- * (employee, manager, HR, IT, executives). Keeps the Update Check Out action
- * visible so punch controls do not disappear after checkout.
+ * Every employee (regular, manager, HR, IT, admin) may update their own
+ * checkout any time after punching out, until the calendar day ends
+ * (Asia/Kolkata). This keeps Update Check Out visible for everyone.
  */
 export function canUpdateOwnCheckout(
   _profile?: Pick<UserProfile, "roles" | "permissionCodes">,
