@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "leaflet/dist/leaflet.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -7253,4 +7254,50 @@ html.dark [data-slot="dialog-content"].landing-desktop-experience .desktop-previ
   .desktop-preview-sheen {
     display: none;
   }
+}
+/* Leaflet + Tailwind: Preflight sets img { max-width:100% }, which collapses OSM tiles.
+   Do NOT force width/height:auto — that overrides Leaflet's 256px tile sizing. */
+.leaflet-container,
+.attendance-location-leaflet.leaflet-container {
+  width: 100% !important;
+  background: #e2e8f0;
+  font: inherit;
+  z-index: 0;
+}
+
+.leaflet-container .leaflet-tile,
+.leaflet-container img.leaflet-tile,
+.leaflet-tile-container img {
+  max-width: none !important;
+  max-height: none !important;
+}
+
+.leaflet-pane,
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow,
+.leaflet-tile-container,
+.leaflet-pane > svg,
+.leaflet-pane > canvas,
+.leaflet-zoom-box,
+.leaflet-image-layer,
+.leaflet-layer {
+  max-width: none !important;
+}
+
+.leaflet-control-attribution {
+  font-size: 10px !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+}
+
+.leaflet-control-attribution a {
+  pointer-events: none;
+  cursor: default;
+  color: inherit !important;
+  text-decoration: none !important;
+}
+
+.attendance-location-marker {
+  background: transparent !important;
+  border: none !important;
 }

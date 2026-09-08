@@ -47,6 +47,8 @@ function buildFallbackToday(today: string): ManagerTodayAttendance {
     isLocked: false,
     lockMessage: null,
     workingDurationLabel: "0h 00m",
+    hasCheckInLocation: false,
+    hasCheckOutLocation: false,
   };
 }
 

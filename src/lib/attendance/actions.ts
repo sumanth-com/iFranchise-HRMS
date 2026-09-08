@@ -74,6 +74,7 @@ export async function getAttendanceDetailAction(
   try {
     const profile = await requireServerAnyPermission([
       "attendance.view",
+      PORTAL_PERMISSIONS.hr,
       PORTAL_PERMISSIONS.manager,
       PORTAL_PERMISSIONS.ceo,
     ]);

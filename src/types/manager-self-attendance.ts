@@ -22,6 +22,8 @@ export type ManagerTodayAttendance = {
   isLocked: boolean;
   lockMessage: string | null;
   workingDurationLabel: string;
+  hasCheckInLocation: boolean;
+  hasCheckOutLocation: boolean;
 };
 
 export type ManagerAttendanceCalendarDay = {
@@ -89,6 +91,10 @@ export type ManagerAttendanceHistoryRow = {
   correctionId: string | null;
   canUpdateCheckout: boolean;
   canRequestRegularization: boolean;
+  /** True when GPS coords exist for check-in (columns or legacy geo notes). */
+  hasCheckInLocation: boolean;
+  /** True when GPS coords exist for check-out. */
+  hasCheckOutLocation: boolean;
 };
 
 export type ManagerAttendanceHistoryResult = {

@@ -32,6 +32,8 @@ export type AttendanceListItem = {
   attendanceStatus: AttendanceDisplayStatus;
   correctionId: string | null;
   correctionStatus: CorrectionStatus | null;
+  hasCheckInLocation: boolean;
+  hasCheckOutLocation: boolean;
 };
 
 export type AttendanceHistoryCounts = {
@@ -115,6 +117,8 @@ export type AttendanceDetail = {
   overtimeHours: number;
   lateMinutes: number;
   notes: string | null;
+  hasCheckInLocation: boolean;
+  hasCheckOutLocation: boolean;
   createdAt: string;
   updatedAt: string;
   createdBy: AttendanceAuditActor | null;

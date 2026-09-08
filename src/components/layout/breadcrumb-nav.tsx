@@ -119,6 +119,11 @@ function buildBreadcrumbItems(
         return items;
       }
 
+      if (segments[2] === "attendance" && segments[3] === "location") {
+        items.push({ label: "Location", href: pathname });
+        return items;
+      }
+
       const deepLabels: Record<string, string> = {
         kpis: "KPIs",
         feedback: "Feedback",
@@ -243,6 +248,10 @@ function buildBreadcrumbItems(
 
     if (segments[2] === "policy") {
       items.push({ label: "Attendance Policy", href: pathname });
+    }
+
+    if (segments[2] === "location") {
+      items.push({ label: "Location", href: pathname });
     }
 
     return items;
@@ -531,6 +540,12 @@ function buildBreadcrumbItems(
       return items;
     }
 
+    if (segments[1] === "attendance" && segments[2] === "location") {
+      items.push({ label: "Attendance", href: MANAGER_ROUTES.attendance });
+      items.push({ label: "Location", href: pathname });
+      return items;
+    }
+
     if (segments[1] === "leave" && segments[2] === "team") {
       items.push({ label: "Team Leave", href: MANAGER_ROUTES.leaveTeam });
       return items;
@@ -741,7 +756,8 @@ function buildBreadcrumbItems(
 
     if (segments[1]) {
       const sectionHref =
-        segments[1] === "attendance" && segments[2] === "policy"
+        segments[1] === "attendance" &&
+        (segments[2] === "policy" || segments[2] === "location")
           ? "/employee/attendance"
           : pathname;
 
@@ -752,6 +768,10 @@ function buildBreadcrumbItems(
 
       if (segments[1] === "attendance" && segments[2] === "policy") {
         items.push({ label: "Attendance Policy", href: pathname });
+      }
+
+      if (segments[1] === "attendance" && segments[2] === "location") {
+        items.push({ label: "Location", href: pathname });
       }
     }
 

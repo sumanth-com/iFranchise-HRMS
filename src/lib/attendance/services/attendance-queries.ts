@@ -18,7 +18,7 @@ import {
 } from "@/lib/attendance/services/attendance-utils";
 import {
   DIRECTORY_HIDDEN_EMPLOYEE_CODES,
-  isHiddenFromPeopleFilters,
+  isExcludedFromAttendanceWorkforce,
 } from "@/lib/employee/directory-listing";
 import { formatCleanEmployeeName, cleanDisplayText } from "@/lib/employees/parse-employee-name";
 import { getBranches, getOccupiedDepartments } from "@/lib/employees/services/employee-queries";
@@ -26,6 +26,7 @@ import {
   resolveOrgDataEmployeeScope,
   scopedEmployeeIds,
 } from "@/lib/manager/portal-scope";
+import { resolveAttendanceLocationFlags } from "@/lib/attendance/services/attendance-location";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LooseRow = Record<string, any>;
@@ -37,13 +38,17 @@ function unwrapRelation<T>(value: T | T[] | null): T | null {
 
 function isHiddenAttendancePerson(row: LooseRow): boolean {
   const designation = unwrapRelation(
-    row.designations as { title: string } | { title: string }[] | null,
+    row.designations as
+      | { title: string; code?: string | null }
+      | { title: string; code?: string | null }[]
+      | null,
   );
-  return isHiddenFromPeopleFilters(row.employee_code as string | null, {
+  return isExcludedFromAttendanceWorkforce(row.employee_code as string | null, {
     employeeCode: row.employee_code as string | null,
     firstName: row.first_name as string | null,
     lastName: row.last_name as string | null,
     designationTitle: designation?.title ?? null,
+    designationCode: designation?.code ?? null,
   });
 }
 
@@ -139,7 +144,7 @@ async function loadAttendanceRoster(
           branch_id,
           branches:branch_id (name),
           departments:department_id (name),
-          designations:designation_id (title)
+          designations:designation_id (title, code)
         `,
     )
     .eq("organization_id", organizationId)
@@ -182,7 +187,12 @@ async function loadAttendanceRoster(
             check_out_at,
             work_hours,
             overtime_hours,
-            attendance_status
+            attendance_status,
+            check_in_latitude,
+            check_in_longitude,
+            check_out_latitude,
+            check_out_longitude,
+            notes
           `,
     )
     .eq("organization_id", organizationId)
@@ -325,6 +335,13 @@ async function loadAttendanceRoster(
       }
 
       const correction = att ? correctionByAttendance.get(att.id) : undefined;
+      const locationFlags = resolveAttendanceLocationFlags({
+        checkInLatitude: att?.check_in_latitude,
+        checkInLongitude: att?.check_in_longitude,
+        checkOutLatitude: att?.check_out_latitude,
+        checkOutLongitude: att?.check_out_longitude,
+        notes: att?.notes ?? null,
+      });
 
       records.push({
         id: att?.id ?? `virtual-${emp.id}-${rosterDate}`,
@@ -347,6 +364,8 @@ async function loadAttendanceRoster(
         correctionStatus:
           (correction?.status as AttendanceListResult["data"][number]["correctionStatus"]) ??
           null,
+        hasCheckInLocation: locationFlags.hasCheckInLocation,
+        hasCheckOutLocation: locationFlags.hasCheckOutLocation,
       });
     }
   }
@@ -542,7 +561,9 @@ export async function getAttendanceLookups(
   let employeesQuery = supabase
     .schema("hrms")
     .from("employees")
-    .select("id, first_name, last_name, employee_code, designations:designation_id (title)")
+    .select(
+      "id, first_name, last_name, employee_code, designations:designation_id (title, code)",
+    )
     .eq("organization_id", organizationId)
     .is("deleted_at", null)
     .in("employment_status", ["active", "probation", "on_leave"])

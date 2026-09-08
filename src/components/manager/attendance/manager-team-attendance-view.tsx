@@ -32,6 +32,9 @@ function toAttendanceListItem(row: TeamAttendanceListItem): AttendanceListItem {
     attendanceStatus: row.attendanceStatus,
     correctionId: row.correctionId,
     correctionStatus: row.correctionStatus,
+    // Manager team list does not load GPS flags here; location stays on self-history / detail paths.
+    hasCheckInLocation: false,
+    hasCheckOutLocation: false,
   };
 }
 
@@ -107,6 +110,7 @@ export function ManagerTeamAttendanceView({
         canEdit={false}
         canDelete={false}
         listBasePath={MANAGER_ROUTES.attendanceTeam}
+        locationBasePath={MANAGER_ROUTES.attendance}
         title="Team Attendance"
         description="View daily attendance for people in your reporting hierarchy. This page is read-only."
         onViewRecord={(row) => {

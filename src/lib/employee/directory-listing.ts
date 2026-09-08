@@ -77,6 +77,59 @@ export function isHiddenFromPeopleFilters(
   return designation === "marketing manager";
 }
 
+const ATTENDANCE_EXCLUDED_DESIGNATION_CODES = new Set([
+  "CEO",
+  "CO_FOUNDER",
+  "COFOUNDER",
+  "CHIEF_EXECUTIVE_OFFICER",
+  "FOUNDER",
+]);
+
+type AttendanceWorkforcePerson = DirectoryPersonName & {
+  designationCode?: string | null;
+};
+
+/**
+ * Exclude CEO / Founder / Co-Founder (and known executive identities) from
+ * normal attendance workforce lists only. Does not affect accounts or permissions.
+ */
+export function isExcludedFromAttendanceWorkforce(
+  employeeCode: string | null | undefined,
+  person?: AttendanceWorkforcePerson,
+): boolean {
+  if (isHiddenFromPeopleFilters(employeeCode, person)) return true;
+
+  const fullName = directoryFullName(person);
+  if (fullName.includes("abrar")) return true;
+  if (
+    fullName.includes("abdul") &&
+    (fullName.includes("khader") || fullName.includes("khadir"))
+  ) {
+    return true;
+  }
+
+  const designationCode = (person?.designationCode ?? "")
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+  if (designationCode && ATTENDANCE_EXCLUDED_DESIGNATION_CODES.has(designationCode)) {
+    return true;
+  }
+
+  const title = (person?.designationTitle ?? "")
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .trim();
+  if (!title) return false;
+
+  return (
+    title === "ceo" ||
+    title.includes("chief executive") ||
+    title.includes("co founder") ||
+    title.includes("cofounder") ||
+    title.includes("founder")
+  );
+}
+
 export function isExcludedFromTeamPayslips(
   employeeCode: string | null | undefined,
   person?: DirectoryPersonName,

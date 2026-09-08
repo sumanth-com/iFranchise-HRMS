@@ -221,20 +221,24 @@ function isInternalAttendanceNoteSegment(part: string): boolean {
   if (/^excel[\s_-]*import/i.test(normalized)) return true;
   if (/^import[\s_-]*\d{4}/i.test(normalized)) return true;
   if (/^(excel[\s_-]*)?import[\w-]*$/i.test(normalized)) return true;
+  if (/^geo:/i.test(normalized)) return true;
+  if (/^sheet[\s_-]*(screenshot[\s_-]*)?sync/i.test(normalized)) return true;
+  if (/screenshot[\s_-]*sync/i.test(normalized)) return true;
+  if (/kept[\s_-]*real[\s_-]*punch/i.test(normalized)) return true;
+  if (/^migration[\s_-]/i.test(normalized)) return true;
   return false;
 }
 
 /**
  * Strip internal import/provenance tags from attendance notes for UI display.
  * Historical imports store notes like `src:P|import:<batchId>` or `excel-import-2026-09`.
+ * Meaningful trailing remarks (e.g. late reason) after `|` are preserved.
  */
 export function toDisplayAttendanceNotes(notes?: string | null): string | null {
   if (!notes?.trim()) return null;
 
-  const trimmed = notes.trim();
-  if (isInternalAttendanceNoteSegment(trimmed)) return null;
-
-  const cleaned = trimmed
+  const cleaned = notes
+    .trim()
     .split("|")
     .map((part) => part.trim())
     .filter((part) => part && !isInternalAttendanceNoteSegment(part))

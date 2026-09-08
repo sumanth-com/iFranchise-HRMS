@@ -12,6 +12,10 @@ import {
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { getOrganizationAttendanceRules } from "@/lib/attendance/services/attendance-detail";
 import {
+  isValidLatLng,
+  resolveAttendanceLocationFlags,
+} from "@/lib/attendance/services/attendance-location";
+import {
   notifyAttendanceCheckedIn,
   notifyAttendanceCheckedOut,
   notifyAttendanceCheckoutUpdated,
@@ -72,7 +76,15 @@ type AttendanceRow = {
   work_hours: number | string;
   overtime_hours: number | string;
   notes: string | null;
+  check_in_latitude?: number | string | null;
+  check_in_longitude?: number | string | null;
+  check_out_latitude?: number | string | null;
+  check_out_longitude?: number | string | null;
 };
+
+const ATTENDANCE_SELF_SELECT =
+  "id, attendance_date, check_in_at, check_out_at, attendance_status, work_hours, overtime_hours, notes, check_in_latitude, check_in_longitude, check_out_latitude, check_out_longitude";
+
 
 type CorrectionRow = {
   id: string;
@@ -239,6 +251,14 @@ function buildTodayPanel(
       ? null
       : row?.attendance_status ?? null;
 
+  const locationFlags = resolveAttendanceLocationFlags({
+    checkInLatitude: row?.check_in_latitude,
+    checkInLongitude: row?.check_in_longitude,
+    checkOutLatitude: row?.check_out_latitude,
+    checkOutLongitude: row?.check_out_longitude,
+    notes: row?.notes,
+  });
+
   return {
     attendanceId: row?.id ?? null,
     attendanceDate,
@@ -254,6 +274,8 @@ function buildTodayPanel(
     workingDurationLabel: formatWorkingDuration(
       elapsedWorkingSeconds(checkInAt, checkOutAt),
     ),
+    hasCheckInLocation: locationFlags.hasCheckInLocation,
+    hasCheckOutLocation: locationFlags.hasCheckOutLocation,
   };
 }
 
@@ -266,7 +288,7 @@ async function getAttendanceForDate(
     .schema("hrms")
     .from("attendance")
     .select(
-      "id, attendance_date, check_in_at, check_out_at, attendance_status, work_hours, overtime_hours, notes",
+      ATTENDANCE_SELF_SELECT,
     )
     .eq("employee_id", employeeId)
     .eq("attendance_date", attendanceDate)
@@ -301,7 +323,7 @@ async function loadMonthAttendance(
     .schema("hrms")
     .from("attendance")
     .select(
-      "id, attendance_date, check_in_at, check_out_at, attendance_status, work_hours, overtime_hours, notes",
+      ATTENDANCE_SELF_SELECT,
     )
     .eq("employee_id", employeeId)
     .gte("attendance_date", start)
@@ -682,11 +704,19 @@ function buildHistoryRows(input: {
     if (!remarks && holidayName) remarks = holidayName;
     if (!remarks && leaveTypeName) remarks = leaveTypeName;
     if (!remarks && weekendStatus === "week_off") {
-      remarks = getDay(day) === 0 ? "Sunday" : "Saturday";
+      remarks = "Weekend";
     }
     if (!remarks && correction?.correction_status === "pending") {
       remarks = "Regularization pending review";
     }
+
+    const locationFlags = resolveAttendanceLocationFlags({
+      checkInLatitude: attendance?.check_in_latitude,
+      checkInLongitude: attendance?.check_in_longitude,
+      checkOutLatitude: attendance?.check_out_latitude,
+      checkOutLongitude: attendance?.check_out_longitude,
+      notes: attendance?.notes,
+    });
 
     return {
       id: attendance?.id ?? null,
@@ -702,6 +732,8 @@ function buildHistoryRows(input: {
       correctionId: correction?.id ?? null,
       canUpdateCheckout,
       canRequestRegularization,
+      hasCheckInLocation: locationFlags.hasCheckInLocation,
+      hasCheckOutLocation: locationFlags.hasCheckOutLocation,
     };
   });
 
@@ -853,7 +885,10 @@ export async function getManagerProfilePageData(
   ]);
 
   const attendanceByDate = new Map(
-    monthRows.map((row) => [row.attendance_date, row]),
+    monthRows.map((row) => [
+      String(row.attendance_date).slice(0, 10),
+      row,
+    ]),
   );
   const holidayByDate = new Map(
     holidays.map((row) => [row.holiday_date as string, row.name as string]),
@@ -955,10 +990,12 @@ export async function punchManagerAttendance(
 
   const existing = await getAttendanceForDate(supabase, employeeId, today);
   const nowIso = new Date().toISOString();
-  const geoNote =
-    input.latitude != null && input.longitude != null
-      ? `geo:${input.latitude},${input.longitude}`
-      : null;
+  const hasGeo =
+    input.latitude != null &&
+    input.longitude != null &&
+    isValidLatLng(input.latitude, input.longitude);
+  // Prefer dedicated GPS columns; keep notes free of geo payloads.
+  const geoNote = null;
 
   let status: AttendanceStatus;
   let workHours = 0;
@@ -1010,6 +1047,40 @@ export async function punchManagerAttendance(
   // RPC always resolves the employee from auth.uid() — reject mismatches.
   if (result.employee_id && result.employee_id !== employeeId) {
     throw new Error("Attendance could not be saved for your employee profile.");
+  }
+
+  // Idempotent double-submit must not overwrite an earlier GPS fix.
+  const shouldPersistGeo =
+    hasGeo && result.action !== "already_checked_in";
+
+  if (shouldPersistGeo) {
+    const { data: locationResult, error: locationError } = await supabase
+      .schema("hrms")
+      .rpc("self_service_attendance_save_location", {
+        p_attendance_id: result.id,
+        p_type: input.type,
+        p_latitude: input.latitude,
+        p_longitude: input.longitude,
+        p_accuracy_m: input.accuracy ?? null,
+      });
+
+    if (locationError) {
+      // Location is additive — never fail the punch if GPS persistence fails.
+      console.error(
+        "[punchManagerAttendance] failed to persist GPS location",
+        locationError.message,
+      );
+    } else if (
+      !locationResult ||
+      (typeof locationResult === "object" &&
+        "ok" in (locationResult as Record<string, unknown>) &&
+        (locationResult as { ok?: boolean }).ok === false)
+    ) {
+      console.error(
+        "[punchManagerAttendance] GPS location save returned not ok",
+        { attendanceId: result.id },
+      );
+    }
   }
 
   if (input.type === "in") {
@@ -1122,7 +1193,7 @@ export async function updateManagerCheckout(
           .schema("hrms")
           .from("attendance")
           .select(
-            "id, attendance_date, check_in_at, check_out_at, attendance_status, work_hours, overtime_hours, notes",
+            ATTENDANCE_SELF_SELECT,
           )
           .eq("id", input.attendanceId)
           .eq("employee_id", employeeId)

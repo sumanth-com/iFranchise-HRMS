@@ -33,6 +33,8 @@ type AttendanceViewDialogProps = {
   onOpenChange: (open: boolean) => void;
   canEdit?: boolean;
   onEdit?: (attendance: AttendanceDetail) => void;
+  /** Portal path for GPS location links (e.g. /dashboard/attendance or /ceo/attendance). */
+  locationBasePath?: string;
 };
 
 export function AttendanceViewDialog({
@@ -41,6 +43,7 @@ export function AttendanceViewDialog({
   onOpenChange,
   canEdit = false,
   onEdit,
+  locationBasePath,
 }: AttendanceViewDialogProps) {
   const [detail, setDetail] = useState<AttendanceDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +86,7 @@ export function AttendanceViewDialog({
           attendance={detail}
           canEdit={canEdit}
           compact
+          locationBasePath={locationBasePath}
           onEdit={
             onEdit
               ? () => {

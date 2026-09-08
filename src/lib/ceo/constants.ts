@@ -13,6 +13,8 @@ export const CEO_ROUTES = {
   /** Default payroll landing — use for links/nav (avoid bare `/ceo/payroll` soft-nav redirect). */
   payrollRun: "/ceo/payroll/run",
   attendance: "/ceo/attendance",
+  attendanceLocation: (attendanceId: string) =>
+    `/ceo/attendance/location/${attendanceId}`,
   /** @deprecated Prefer `approvalsLeave` for links; kept as alias for revalidate/bookmarks. */
   leave: "/ceo/approvals/leave",
   /** @deprecated Prefer `approvalsExit` for links; kept as alias for revalidate/bookmarks. */

@@ -70,6 +70,7 @@ export function CeoTeamAttendanceView({
         canEdit={false}
         canDelete={false}
         listBasePath={CEO_ROUTES.attendance}
+        locationBasePath={CEO_ROUTES.attendance}
         title="Attendance"
         description="Monitor company-wide attendance records and workforce presence. This page is read-only."
         historyCounts={historyCounts}

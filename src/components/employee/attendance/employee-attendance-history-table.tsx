@@ -1,7 +1,8 @@
 "use client";
 
 import { format, parseISO } from "date-fns";
-import { Check, Eye, FilePlus2, RefreshCw } from "lucide-react";
+import { Check, Eye, FilePlus2, MapPin, RefreshCw } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -18,19 +19,29 @@ import {
 } from "@/components/common/select";
 import { EmployeeRegularizationDialog } from "@/components/employee/attendance/employee-regularization-dialog";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   DEFAULT_ATTENDANCE_RULES,
   formatAttendanceTime,
 } from "@/lib/attendance/services/attendance-utils";
+import { attendanceLocationHref } from "@/lib/attendance/services/attendance-location";
 import { getHrmsYears } from "@/lib/date/hrms-year";
 import { ATTENDANCE_STATUS_LABELS } from "@/lib/attendance/constants";
 import { selfAttendanceUpdateCheckoutAction } from "@/lib/attendance/actions/self-attendance-punch-actions";
+import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { formatHoursLabel, formatLateByLabel } from "@/lib/employee/attendance-format";
 import type { AttendanceStatus } from "@/types/attendance";
 import type {
   ManagerAttendanceHistoryResult,
   ManagerAttendanceHistoryRow,
+  ManagerTodayAttendance,
 } from "@/types/manager-self-attendance";
 import { cn } from "@/lib/utils";
+import { useOptionalSelfAttendanceLive } from "@/components/attendance/self-attendance-live-context";
 
 type Props = {
   history: ManagerAttendanceHistoryResult;
@@ -38,6 +49,8 @@ type Props = {
   year: number;
   status?: AttendanceStatus;
   searchDate?: string;
+  /** Portal attendance base path used for location deep-links. */
+  attendanceBasePath?: string;
   onFilterChange: (filters: {
     month: number;
     year: number;
@@ -62,9 +75,11 @@ export function EmployeeAttendanceHistoryTable({
   year,
   status,
   searchDate,
+  attendanceBasePath = EMPLOYEE_ROUTES.attendance,
   onFilterChange,
 }: Props) {
   const router = useRouter();
+  const live = useOptionalSelfAttendanceLive();
   const [isPending, startTransition] = useTransition();
   const [selectedRow, setSelectedRow] =
     useState<ManagerAttendanceHistoryRow | null>(null);
@@ -72,6 +87,11 @@ export function EmployeeAttendanceHistoryTable({
     useState<ManagerAttendanceHistoryRow | null>(null);
 
   const yearOptions = useMemo(() => getHrmsYears(), []);
+
+  const historyRows = useMemo(
+    () => mergeLiveLocationFlags(history.data, live?.today ?? null),
+    [history.data, live?.today],
+  );
 
   function updateCheckout(row: ManagerAttendanceHistoryRow) {
     startTransition(async () => {
@@ -201,7 +221,7 @@ export function EmployeeAttendanceHistoryTable({
             </tr>
           </thead>
           <tbody>
-            {history.data.map((row) => (
+            {historyRows.map((row) => (
               <tr key={row.attendanceDate} className="border-t">
                 <td className="px-4 py-3 whitespace-nowrap">
                   {format(parseISO(row.attendanceDate), "dd MMM yyyy")}
@@ -210,10 +230,22 @@ export function EmployeeAttendanceHistoryTable({
                   <AttendanceHistoryStatusCell status={row.attendanceStatus} />
                 </td>
                 <td className="px-4 py-3">
-                  {formatAttendanceTime(row.checkInAt)}
+                  <AttendancePunchTimeCell
+                    attendanceId={row.id}
+                    time={row.checkInAt}
+                    hasLocation={row.hasCheckInLocation}
+                    attendanceBasePath={attendanceBasePath}
+                    point="check_in"
+                  />
                 </td>
                 <td className="px-4 py-3">
-                  {formatAttendanceTime(row.checkOutAt)}
+                  <AttendancePunchTimeCell
+                    attendanceId={row.id}
+                    time={row.checkOutAt}
+                    hasLocation={row.hasCheckOutLocation}
+                    attendanceBasePath={attendanceBasePath}
+                    point="check_out"
+                  />
                 </td>
                 <td className="px-4 py-3">
                   {row.workHours > 0 ? formatHoursLabel(row.workHours) : "—"}
@@ -268,7 +300,7 @@ export function EmployeeAttendanceHistoryTable({
 
       <div className="border-t px-5 py-3 text-sm text-muted-foreground">
         <p>
-          Showing {history.data.length} day(s) for{" "}
+          Showing {historyRows.length} day(s) for{" "}
           {format(new Date(year, month - 1, 1), "MMMM yyyy")}
         </p>
       </div>
@@ -395,5 +427,76 @@ function DayReportCard({ row }: { row: ManagerAttendanceHistoryRow }) {
         </div>
       )}
     </div>
+  );
+}
+
+function mergeLiveLocationFlags(
+  rows: ManagerAttendanceHistoryRow[],
+  today: ManagerTodayAttendance | null,
+): ManagerAttendanceHistoryRow[] {
+  if (!today?.attendanceId) return rows;
+  return rows.map((row) => {
+    if (row.attendanceDate !== today.attendanceDate && row.id !== today.attendanceId) {
+      return row;
+    }
+    return {
+      ...row,
+      id: row.id ?? today.attendanceId,
+      hasCheckInLocation: row.hasCheckInLocation || today.hasCheckInLocation,
+      hasCheckOutLocation: row.hasCheckOutLocation || today.hasCheckOutLocation,
+    };
+  });
+}
+
+function AttendancePunchTimeCell({
+  attendanceId,
+  time,
+  hasLocation,
+  attendanceBasePath,
+  point,
+}: {
+  attendanceId: string | null;
+  time: string | null;
+  hasLocation: boolean;
+  attendanceBasePath: string;
+  point: "check_in" | "check_out";
+}) {
+  const label = formatAttendanceTime(time);
+  if (!time) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+
+  if (hasLocation && attendanceId) {
+    return (
+      <Link
+        href={attendanceLocationHref(attendanceBasePath, attendanceId, point)}
+        className="inline-flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-0.5 text-sm font-semibold text-violet-700 underline-offset-2 transition-colors hover:bg-violet-50 hover:text-violet-900 hover:underline"
+        aria-label={`View ${point === "check_in" ? "check-in" : "check-out"} location`}
+      >
+        <MapPin className="size-3.5 shrink-0 fill-violet-600/20" aria-hidden />
+        <span className="tabular-nums">{label}</span>
+      </Link>
+    );
+  }
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <span
+              className="inline-flex cursor-not-allowed items-center gap-1.5 px-1.5 py-0.5 text-sm text-muted-foreground"
+              aria-label="Location not recorded for this attendance record"
+            >
+              <MapPin className="size-3.5 shrink-0 opacity-35" aria-hidden />
+              <span className="tabular-nums text-foreground">{label}</span>
+            </span>
+          }
+        />
+        <TooltipContent>
+          Location not recorded for this attendance record.
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }

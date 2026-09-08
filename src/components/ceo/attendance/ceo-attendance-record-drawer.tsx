@@ -11,6 +11,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { getAttendanceDetailAction } from "@/lib/attendance/actions";
+import { CEO_ROUTES } from "@/lib/ceo/constants";
 import type { AttendanceDetail } from "@/types/attendance";
 
 type CeoAttendanceRecordDrawerProps = {
@@ -61,7 +62,11 @@ export function CeoAttendanceRecordDrawer({
         ) : error ? (
           <p className="px-1 py-6 text-sm text-muted-foreground">{error}</p>
         ) : detail ? (
-          <AttendanceDetailView attendance={detail} canEdit={false} />
+          <AttendanceDetailView
+            attendance={detail}
+            canEdit={false}
+            locationBasePath={CEO_ROUTES.attendance}
+          />
         ) : null}
       </SheetContent>
     </Sheet>

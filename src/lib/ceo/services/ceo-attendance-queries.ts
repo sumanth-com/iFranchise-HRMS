@@ -11,7 +11,7 @@ import {
   computeMonitoringFlags,
   isWorkFromHomeBranch,
 } from "@/lib/manager/services/attendance-correction-service";
-import { isHiddenFromPeopleFilters } from "@/lib/employee/directory-listing";
+import { isExcludedFromAttendanceWorkforce } from "@/lib/employee/directory-listing";
 import {
   formatEmployeeName,
   fromHrms,
@@ -169,37 +169,15 @@ function isWorking(status: AttendanceStatus) {
   return WORKING_STATUSES.includes(status);
 }
 
-const EXECUTIVE_DESIGNATION_CODES = new Set([
-  "CEO",
-  "CO_FOUNDER",
-  "COFOUNDER",
-  "CHIEF_EXECUTIVE_OFFICER",
-]);
-
-function isExecutiveLeadershipEmployee(row: LooseRow) {
-  const designation = unwrap(row.designations);
-  const title = String(designation?.title ?? "").toLowerCase();
-  const code = String(designation?.code ?? "").toUpperCase();
-
-  if (EXECUTIVE_DESIGNATION_CODES.has(code)) return true;
-
-  return (
-    title.includes("chief executive") ||
-    title.includes("co-founder") ||
-    title.includes("co founder") ||
-    title.includes("cofounder")
-  );
-}
-
 function filterAttendanceWorkforce(employees: LooseRow[]) {
   return employees.filter((row) => {
-    if (isExecutiveLeadershipEmployee(row)) return false;
     const designation = unwrap(row.designations);
-    return !isHiddenFromPeopleFilters(row.employee_code, {
+    return !isExcludedFromAttendanceWorkforce(row.employee_code, {
       employeeCode: row.employee_code,
       firstName: row.first_name,
       lastName: row.last_name,
       designationTitle: designation?.title ?? null,
+      designationCode: designation?.code ?? null,
     });
   });
 }

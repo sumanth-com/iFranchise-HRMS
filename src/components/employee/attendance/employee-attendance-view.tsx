@@ -110,6 +110,7 @@ export function EmployeeAttendanceView({
 
       <AttendanceLiveBody
         data={data}
+        basePath={basePath}
         selectedDate={selectedDate}
         status={status}
         searchDate={searchDate}
@@ -152,6 +153,7 @@ export function EmployeeAttendanceView({
 
 function AttendanceLiveBody({
   data,
+  basePath,
   selectedDate,
   status,
   searchDate,
@@ -160,6 +162,7 @@ function AttendanceLiveBody({
   onHistoryFilterChange,
 }: {
   data: ManagerProfilePageData;
+  basePath: string;
   selectedDate: string | null;
   status?: AttendanceStatus;
   searchDate?: string;
@@ -212,6 +215,7 @@ function AttendanceLiveBody({
           year={data.year}
           status={status}
           searchDate={searchDate}
+          attendanceBasePath={basePath}
           onFilterChange={onHistoryFilterChange}
         />
       </div>

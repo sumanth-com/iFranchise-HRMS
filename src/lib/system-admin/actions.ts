@@ -58,7 +58,9 @@ import { createClient } from "@/lib/supabase/server";
 
 function revalidateSystemAdmin() {
   for (const route of Object.values(SYSTEM_ADMIN_ROUTES)) {
-    revalidatePath(route);
+    if (typeof route === "string") {
+      revalidatePath(route);
+    }
   }
 }
 

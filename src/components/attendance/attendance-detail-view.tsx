@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
-import { Pencil } from "lucide-react";
+import { MapPin, Pencil } from "lucide-react";
 
 import { AttendanceStatusBadge } from "@/components/attendance/attendance-status-badge";
 import { Button, buttonVariants } from "@/components/common/button";
-import { ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
+import { ATTENDANCE_ROUTES, SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
+import { attendanceLocationHref } from "@/lib/attendance/services/attendance-location";
 import { formatAttendanceTime, toDisplayAttendanceNotes } from "@/lib/attendance/services/attendance-utils";
 import type { AttendanceDetail } from "@/types/attendance";
 import { cn } from "@/lib/utils";
@@ -16,6 +17,8 @@ type AttendanceDetailViewProps = {
   canEdit: boolean;
   compact?: boolean;
   onEdit?: () => void;
+  /** Portal-specific base path for GPS location links (defaults to HR self attendance). */
+  locationBasePath?: string;
 };
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -44,6 +47,7 @@ export function AttendanceDetailView({
   canEdit,
   compact = false,
   onEdit,
+  locationBasePath = SELF_ATTENDANCE_ROUTES.list,
 }: AttendanceDetailViewProps) {
   const heading = compact ? (
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -152,6 +156,41 @@ export function AttendanceDetailView({
               label="Remarks"
               value={toDisplayAttendanceNotes(attendance.notes) ?? "—"}
             />
+            {attendance.hasCheckInLocation || attendance.hasCheckOutLocation ? (
+              <DetailRow
+                label="GPS Location"
+                value={
+                  <div className="flex flex-col items-end gap-1.5">
+                    {attendance.hasCheckInLocation ? (
+                      <Link
+                        href={attendanceLocationHref(
+                          locationBasePath,
+                          attendance.id,
+                          "check_in",
+                        )}
+                        className="inline-flex items-center gap-1.5 text-violet-700 hover:underline"
+                      >
+                        <MapPin className="size-3.5" />
+                        Check-in location
+                      </Link>
+                    ) : null}
+                    {attendance.hasCheckOutLocation ? (
+                      <Link
+                        href={attendanceLocationHref(
+                          locationBasePath,
+                          attendance.id,
+                          "check_out",
+                        )}
+                        className="inline-flex items-center gap-1.5 text-violet-700 hover:underline"
+                      >
+                        <MapPin className="size-3.5" />
+                        Check-out location
+                      </Link>
+                    ) : null}
+                  </div>
+                }
+              />
+            ) : null}
           </section>
         </div>
 

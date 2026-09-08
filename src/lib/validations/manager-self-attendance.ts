@@ -2,8 +2,10 @@ import { z } from "zod";
 
 export const managerAttendancePunchSchema = z.object({
   type: z.enum(["in", "out"]),
-  latitude: z.number().optional(),
-  longitude: z.number().optional(),
+  latitude: z.number().finite().optional(),
+  longitude: z.number().finite().optional(),
+  /** Browser Geolocation accuracy in meters (optional, additive). */
+  accuracy: z.number().finite().nonnegative().optional(),
 });
 
 export const managerUpdateCheckoutSchema = z.object({

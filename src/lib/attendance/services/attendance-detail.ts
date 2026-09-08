@@ -6,6 +6,7 @@ import {
   computeLateMinutes,
   parseAttendanceRules,
 } from "@/lib/attendance/services/attendance-utils";
+import { resolveAttendanceLocationFlags } from "@/lib/attendance/services/attendance-location";
 import { formatCleanEmployeeName } from "@/lib/employees/parse-employee-name";
 
 type AttendanceDetailRow = {
@@ -20,6 +21,10 @@ type AttendanceDetailRow = {
   work_hours: number | string;
   overtime_hours: number | string;
   notes: string | null;
+  check_in_latitude: number | string | null;
+  check_in_longitude: number | string | null;
+  check_out_latitude: number | string | null;
+  check_out_longitude: number | string | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;
@@ -125,6 +130,10 @@ export async function getAttendanceById(
         work_hours,
         overtime_hours,
         notes,
+        check_in_latitude,
+        check_in_longitude,
+        check_out_latitude,
+        check_out_longitude,
         created_at,
         updated_at,
         created_by,
@@ -165,6 +174,14 @@ export async function getAttendanceById(
     resolveAuditActor(supabase, organizationId, row.updated_by),
   ]);
 
+  const locationFlags = resolveAttendanceLocationFlags({
+    checkInLatitude: row.check_in_latitude,
+    checkInLongitude: row.check_in_longitude,
+    checkOutLatitude: row.check_out_latitude,
+    checkOutLongitude: row.check_out_longitude,
+    notes: row.notes,
+  });
+
   return {
     id: row.id,
     organizationId: row.organization_id,
@@ -192,6 +209,8 @@ export async function getAttendanceById(
       rules.lateAfter,
     ),
     notes: row.notes,
+    hasCheckInLocation: locationFlags.hasCheckInLocation,
+    hasCheckOutLocation: locationFlags.hasCheckOutLocation,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     createdBy,

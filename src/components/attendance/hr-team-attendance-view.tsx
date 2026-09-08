@@ -47,6 +47,8 @@ type HrTeamAttendanceViewProps = {
   title?: string;
   description?: string;
   listBasePath?: string;
+  /** GPS location page base path (portal attendance root — not /team). */
+  locationBasePath?: string;
   onViewRecord?: (record: AttendanceListItem) => void;
   historyCounts?: AttendanceHistoryCounts;
 };
@@ -76,6 +78,7 @@ export function HrTeamAttendanceView({
   title = "Team Attendance",
   description = "Track daily attendance records, manual entries, and workforce presence across the organization.",
   listBasePath = SELF_ATTENDANCE_ROUTES.team,
+  locationBasePath = SELF_ATTENDANCE_ROUTES.list,
   onViewRecord,
   historyCounts,
 }: HrTeamAttendanceViewProps) {
@@ -165,6 +168,7 @@ export function HrTeamAttendanceView({
         teamRegularizationMode={teamRegularizationMode}
         canApproveCorrections={canApproveCorrections}
         listBasePath={listBasePath}
+        locationBasePath={locationBasePath}
         onViewRecord={onViewRecord}
         summaryDate={summary.date}
         historyCounts={historyCounts}

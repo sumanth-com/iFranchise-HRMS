@@ -91,6 +91,11 @@ function revalidateSelfAttendancePaths() {
   revalidatePath(CEO_ROUTES.attendance);
   revalidatePath(SYSTEM_ADMIN_ROUTES.home);
   revalidatePath(SYSTEM_ADMIN_ROUTES.attendance);
+  // Location pages (dynamic) — refresh GPS views after punch.
+  revalidatePath("/employee/attendance/location", "layout");
+  revalidatePath("/manager/attendance/location", "layout");
+  revalidatePath("/dashboard/attendance/location", "layout");
+  revalidatePath("/ceo/attendance/location", "layout");
 }
 
 export { revalidateSelfAttendancePaths };

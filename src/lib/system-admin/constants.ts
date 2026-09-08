@@ -4,6 +4,8 @@ export const SYSTEM_ADMIN_ROUTES = {
   overview: "/dashboard/system/overview",
   profile: "/dashboard/system/profile",
   attendance: "/dashboard/system/attendance",
+  attendanceLocation: (attendanceId: string) =>
+    `/dashboard/system/attendance/location/${attendanceId}`,
   payroll: "/dashboard/system/payroll",
   documents: "/dashboard/system/documents",
   leave: "/dashboard/system/leave",

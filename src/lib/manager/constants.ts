@@ -10,6 +10,8 @@ export const MANAGER_ROUTES = {
   attendance: "/manager/attendance",
   attendanceMy: "/manager/attendance",
   attendanceTeam: "/manager/attendance/team",
+  attendanceLocation: (attendanceId: string) =>
+    `/manager/attendance/location/${attendanceId}`,
   leave: "/manager/leave",
   leaveTeam: "/manager/leave/team",
   leaveNew: "/manager/leave/new",

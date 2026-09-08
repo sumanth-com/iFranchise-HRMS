@@ -7,6 +7,7 @@ import {
   getTodayDateString,
   isAfterOfficeCheckoutTime,
 } from "@/lib/attendance/services/attendance-utils";
+import { isExcludedFromAttendanceWorkforce } from "@/lib/employee/directory-listing";
 import {
   computeMonitoringFlags,
   getDefaultBreakMinutes,
@@ -162,7 +163,7 @@ export async function listTeamAttendance(
           branch_id,
           branches:branch_id (name),
           departments:department_id (name),
-          designations:designation_id (title),
+          designations:designation_id (title, code),
           employment_types:employment_type_id (name)
         `,
       )
@@ -233,7 +234,16 @@ export async function listTeamAttendance(
       throw new Error("Unable to load team attendance records. Please try again.");
     }
 
-    const employees = (empRes.data ?? []) as LooseRow[];
+    const employees = ((empRes.data ?? []) as LooseRow[]).filter((row) => {
+      const designation = unwrap(row.designations);
+      return !isExcludedFromAttendanceWorkforce(row.employee_code, {
+        employeeCode: row.employee_code,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        designationTitle: designation?.title ?? null,
+        designationCode: designation?.code ?? null,
+      });
+    });
     const attendanceMap = new Map<string, LooseRow>();
     for (const a of attRes.data ?? []) {
       attendanceMap.set(a.employee_id, a);
@@ -402,7 +412,7 @@ export async function listTeamAttendance(
           designation_id,
           employment_type_id,
           departments:department_id (name),
-          designations:designation_id (title),
+          designations:designation_id (title, code),
           employment_types:employment_type_id (name)
         )
       `,
@@ -447,7 +457,17 @@ export async function listTeamAttendance(
   const { data, error, count } = await query;
   if (error) throw new Error(error.message);
 
-  const rows = (data ?? []) as LooseRow[];
+  const rows = ((data ?? []) as LooseRow[]).filter((row) => {
+    const employee = unwrap(row.employees);
+    const designation = unwrap(employee?.designations ?? null);
+    return !isExcludedFromAttendanceWorkforce(employee?.employee_code ?? null, {
+      employeeCode: employee?.employee_code ?? null,
+      firstName: employee?.first_name ?? null,
+      lastName: employee?.last_name ?? null,
+      designationTitle: designation?.title ?? null,
+      designationCode: designation?.code ?? null,
+    });
+  });
   const attendanceIds = rows.map((row) => row.id as string);
 
   const correctionsResult = attendanceIds.length

@@ -13,11 +13,13 @@ import {
   Eye,
   CheckCircle2,
   Loader2,
+  MapPin,
   Pencil,
   Trash2,
   CalendarDays,
   XCircle,
 } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 
 import {
@@ -52,7 +54,9 @@ import {
 import {
   ATTENDANCE_ROUTES,
   ATTENDANCE_STATUS_LABELS,
+  SELF_ATTENDANCE_ROUTES,
 } from "@/lib/attendance/constants";
+import { attendanceLocationHref } from "@/lib/attendance/services/attendance-location";
 import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils";
 import { FILTER_ANY_VALUE } from "@/lib/manager/filter-select";
 import type {
@@ -98,6 +102,8 @@ type AttendanceTableProps = {
   fixedQuery?: Record<string, string>;
   attendanceLookups?: AttendanceLookups;
   onViewRecord?: (record: AttendanceListItem) => void;
+  /** Portal attendance base path used for GPS location links (not the /team list path). */
+  locationBasePath?: string;
   summaryDate?: string;
   teamRegularizationMode?: boolean;
   canApproveCorrections?: boolean;
@@ -174,6 +180,7 @@ export function AttendanceTable({
   listBasePath,
   fixedQuery,
   onViewRecord,
+  locationBasePath = SELF_ATTENDANCE_ROUTES.list,
   teamRegularizationMode = false,
   canApproveCorrections = false,
   historyCounts,
@@ -449,6 +456,20 @@ export function AttendanceTable({
         cell: ({ row }) => {
           const pending =
             row.original.correctionStatus === "pending" && row.original.correctionId;
+          const hasCheckInLocation =
+            !isVirtualAttendanceId(row.original.id) &&
+            Boolean(row.original.hasCheckInLocation);
+          const hasCheckOutLocation =
+            !isVirtualAttendanceId(row.original.id) &&
+            Boolean(row.original.hasCheckOutLocation);
+          const hasLocation = hasCheckInLocation || hasCheckOutLocation;
+          // Prefer check-in when both exist; location page can switch to check-out.
+          const locationPoint = hasCheckInLocation ? "check_in" : "check_out";
+          const locationTitle = hasCheckInLocation && hasCheckOutLocation
+            ? "View location (opens check-in; switch to check-out on the page)"
+            : hasCheckOutLocation
+              ? "View check-out location"
+              : "View check-in location";
 
           return (
             <div className="flex items-center justify-center gap-0.5">
@@ -461,6 +482,23 @@ export function AttendanceTable({
               >
                 <Eye className="size-4" />
               </Button>
+              {hasLocation ? (
+                <Link
+                  href={attendanceLocationHref(
+                    locationBasePath,
+                    row.original.id,
+                    locationPoint,
+                  )}
+                  className={cn(
+                    "inline-flex size-8 items-center justify-center rounded-lg text-violet-700 hover:bg-muted",
+                  )}
+                  aria-label={locationTitle}
+                  title={locationTitle}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <MapPin className="size-4" />
+                </Link>
+              ) : null}
               {showManualStatusAction ? (
                 <Button
                   variant="ghost"
@@ -527,6 +565,7 @@ export function AttendanceTable({
       canCreate,
       canDelete,
       isReviewing,
+      locationBasePath,
       openAttendanceRecord,
       showManualStatusAction,
       teamRegularizationMode,
@@ -567,6 +606,8 @@ export function AttendanceTable({
               attendanceStatus: "upcoming",
               correctionId: null,
               correctionStatus: null,
+              hasCheckInLocation: false,
+              hasCheckOutLocation: false,
             }
           : row,
       ),
@@ -845,6 +886,7 @@ export function AttendanceTable({
           onOpenChange={(open) => {
             if (!open) setViewId(null);
           }}
+          locationBasePath={locationBasePath}
         />
       )}
 

@@ -4,6 +4,8 @@ export const EMPLOYEE_ROUTES = {
   home: "/employee",
   attendance: "/employee/attendance",
   attendancePolicy: "/employee/attendance/policy",
+  attendanceLocation: (attendanceId: string) =>
+    `/employee/attendance/location/${attendanceId}`,
   directory: "/employee/directory",
   leave: "/employee/leave",
   leavePolicy: "/employee/leave/policy",

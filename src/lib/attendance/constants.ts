@@ -17,6 +17,8 @@ export const SELF_ATTENDANCE_ROUTES = {
   list: "/dashboard/attendance",
   team: "/dashboard/attendance/team",
   policy: "/dashboard/attendance/policy",
+  location: (attendanceId: string) =>
+    `/dashboard/attendance/location/${attendanceId}`,
 } as const;
 
 export function attendanceTeamListUrl(

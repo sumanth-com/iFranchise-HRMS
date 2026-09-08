@@ -104,6 +104,8 @@ export async function AttendanceHubSection({
       isLocked: false,
       lockMessage: null,
       workingDurationLabel: "0h 00m",
+      hasCheckInLocation: false,
+      hasCheckOutLocation: false,
     },
     calendarDays: [],
     profileCard: {

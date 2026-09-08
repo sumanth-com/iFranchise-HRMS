@@ -5,13 +5,13 @@ const contentSecurityPolicy = [
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
-  "frame-src 'self' blob: data: https://*.supabase.co",
+  "frame-src 'self' blob: data: https://*.supabase.co https://www.openstreetmap.org",
   "object-src 'self' blob: data: https://*.supabase.co",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https:",
+  "img-src 'self' data: blob: https: https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://a.tile.openstreetmap.org https://b.tile.openstreetmap.org https://c.tile.openstreetmap.org",
   "font-src 'self' data:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co blob: data:",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://a.tile.openstreetmap.org https://b.tile.openstreetmap.org https://c.tile.openstreetmap.org https://nominatim.openstreetmap.org blob: data:",
   "worker-src 'self' blob:",
 ].join("; ");
 
@@ -21,7 +21,9 @@ const securityHeaders = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=(), payment=()",
+    // Allow this origin to request GPS for attendance punch capture.
+    // Empty geolocation=() silently blocks navigator.geolocation.
+    value: "camera=(), microphone=(), geolocation=(self), payment=()",
   },
   { key: "Content-Security-Policy", value: contentSecurityPolicy },
   {
