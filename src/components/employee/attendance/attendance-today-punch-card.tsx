@@ -92,17 +92,15 @@ type Props = {
 
 function workflowHint(
   punchState: ManagerAttendancePunchState,
-  allowUpdateCheckout: boolean,
+  _allowUpdateCheckout: boolean,
 ) {
   switch (punchState) {
     case "checked_in":
       return "You're checked in. Tap Check Out when you finish for the day.";
     case "checked_out":
-      return allowUpdateCheckout
-        ? "Checked out for today. Update Check Out if you left later than recorded."
-        : "Checked out for today. Your attendance for today is complete.";
+      return "Checked out for today. Use Update Check Out if you left later than recorded.";
     default:
-      return "Tap Check In when you start work. Check-out stays available all day.";
+      return "Tap Check In when you start work. Check Out stays available after you punch in.";
   }
 }
 
@@ -397,7 +395,7 @@ export function AttendanceTodayPunchCard({
               </PunchActionButton>
             ) : null}
 
-            {punchState === "checked_out" && allowUpdateCheckout ? (
+            {punchState === "checked_out" ? (
               <PunchActionButton
                 onClick={handleUpdateCheckout}
                 disabled={isPending}

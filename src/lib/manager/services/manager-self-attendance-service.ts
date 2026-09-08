@@ -1342,12 +1342,6 @@ export async function updateManagerCheckout(
   profile: UserProfile,
   input: ManagerUpdateCheckoutInput,
 ) {
-  if (!canUpdateOwnCheckout(profile)) {
-    throw new Error(
-      "Only HR and executive users can update checkout after punching out.",
-    );
-  }
-
   const today = getTodayDateString();
   // Checkout is never auto-locked by time — only today can be updated.
   const employeeId = profile.employee.id;
