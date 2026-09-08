@@ -24,6 +24,8 @@ export function EmployeeDashboardView({
   pairHolidayBirthday?: boolean;
   showImportantNotices?: boolean;
 }) {
+  // Always allow self checkout updates for every employee portal user.
+  const allowCheckoutUpdate = true;
   return (
     <SelfAttendanceLiveProvider today={today}>
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-5 max-xl:overflow-x-visible xl:overflow-hidden">
@@ -42,7 +44,7 @@ export function EmployeeDashboardView({
                 <SelfAttendanceTodayCard
                   firstName={greeting.firstName}
                   today={today}
-                  allowUpdateCheckout={canUpdateCheckout}
+                  allowUpdateCheckout={allowCheckoutUpdate}
                 />
               </div>
               <DailyBoostCard

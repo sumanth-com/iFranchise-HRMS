@@ -104,7 +104,7 @@ async function updateCheckoutWithGeo(attendanceId: string | null) {
 export function SelfAttendanceTodayCard({
   firstName,
   today,
-  allowUpdateCheckout = false,
+  allowUpdateCheckout = true,
 }: Props) {
   return (
     <AttendanceTodayPunchCard

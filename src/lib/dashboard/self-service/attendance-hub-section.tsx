@@ -154,7 +154,7 @@ export async function AttendanceHubSection({
     year: selfParams.year ?? new Date().getFullYear(),
     selectedDate: null,
     selectedDay: null,
-    canUpdateCheckout: false,
+    canUpdateCheckout: true,
   };
 
   return (

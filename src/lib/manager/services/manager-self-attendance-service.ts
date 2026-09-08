@@ -692,9 +692,7 @@ function buildHistoryRows(input: {
       input.rules.lateAfter,
     );
     const canUpdateCheckout = Boolean(
-      input.allowUpdateCheckout &&
-        attendance?.check_in_at &&
-        date === input.today,
+      attendance?.check_in_at && date === input.today,
     );
     const canRequestRegularization =
       isWithinRegularizationWindow(date, input.today) &&

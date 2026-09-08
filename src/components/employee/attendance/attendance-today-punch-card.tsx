@@ -187,6 +187,8 @@ export function AttendanceTodayPunchCard({
   onUpdateCheckout,
   allowUpdateCheckout = false,
 }: Props) {
+  // Every employee can update their own checkout after punching out.
+  const canUpdateCheckout = true;
   const live = useOptionalSelfAttendanceLive();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -349,7 +351,7 @@ export function AttendanceTodayPunchCard({
                 <span className="font-medium text-foreground">
                   {workingHoursLabel}
                 </span>
-                . {workflowHint(punchState, allowUpdateCheckout)}
+                . {workflowHint(punchState, canUpdateCheckout)}
               </p>
             </div>
 

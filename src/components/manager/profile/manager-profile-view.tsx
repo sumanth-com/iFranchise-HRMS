@@ -56,7 +56,7 @@ export function ManagerProfileView({ data, status, searchDate }: Props) {
         <ManagerProfileTodayCard
           firstName={data.profileCard.firstName}
           today={data.today}
-          allowUpdateCheckout={data.canUpdateCheckout}
+          allowUpdateCheckout
         />
 
         <div className="grid gap-4 xl:min-h-[min(32rem,calc(100dvh-16rem))] xl:grid-cols-[minmax(0,1.4fr)_minmax(16rem,18.5rem)] xl:items-stretch">
