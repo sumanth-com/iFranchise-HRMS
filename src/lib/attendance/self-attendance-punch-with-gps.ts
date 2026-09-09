@@ -12,20 +12,16 @@ import {
   type PunchGeolocationResult,
 } from "@/lib/attendance/punch-geolocation";
 
-function geoUserMessage(geo: PunchGeolocationResult): string {
+function geoUnavailableMessage(geo: PunchGeolocationResult): string {
   switch (geo.status) {
     case "denied":
-      return "Location permission is blocked. Enable precise location for this site, then try again.";
+      return "Location permission is blocked. Your attendance time was still saved — enable location in browser settings for next time.";
     case "timeout":
-      return "Could not get a fresh GPS fix in time. Move near a window or outdoors and try again.";
+      return "Could not get your location in time. Your attendance time was still saved.";
     case "unsupported":
-      return "This browser does not support GPS. Attendance time will still be saved without location.";
-    case "poor_accuracy":
-      return geo.accuracy != null
-        ? `GPS accuracy is too low (±${Math.round(geo.accuracy)} m). Move for a clearer signal and try again — inaccurate location was not saved.`
-        : "GPS accuracy is too low. Move for a clearer signal and try again — inaccurate location was not saved.";
+      return "This browser cannot share location. Your attendance time was still saved.";
     default:
-      return "Could not capture your exact GPS location. Attendance time will still be saved without location.";
+      return "Location unavailable right now. Your attendance time was still saved.";
   }
 }
 
@@ -34,8 +30,8 @@ function geoPayload(geo: PunchGeolocationResult): {
   longitude?: number;
   accuracy?: number;
 } {
-  // Never forward approximate/poor fixes — only a verified high-accuracy capture.
   if (geo.status !== "captured") return {};
+  if (geo.latitude == null || geo.longitude == null) return {};
   return {
     latitude: geo.latitude,
     longitude: geo.longitude,
@@ -43,13 +39,8 @@ function geoPayload(geo: PunchGeolocationResult): {
   };
 }
 
-async function captureFreshPunchGps(label: "check-in" | "check-out") {
-  const loadingId = toast.loading(
-    label === "check-in"
-      ? "Capturing high-accuracy check-in GPS…"
-      : "Capturing high-accuracy check-out GPS…",
-  );
-
+async function captureFreshPunchGps() {
+  const loadingId = toast.loading("Capturing your location…");
   try {
     return await getOptionalPunchGeolocation();
   } finally {
@@ -60,12 +51,11 @@ async function captureFreshPunchGps(label: "check-in" | "check-out") {
 export async function punchSelfAttendanceWithFreshGps(
   type: "in" | "out",
 ): Promise<SelfAttendancePunchResult> {
-  const geo = await captureFreshPunchGps(type === "in" ? "check-in" : "check-out");
+  // Always attempt a fresh fix; never reuse a previous punch's coordinates.
+  const geo = await captureFreshPunchGps();
   const captured = geo.status === "captured";
 
-  if (!captured) {
-    toast.error(geoUserMessage(geo), { duration: 5500 });
-  } else {
+  if (captured) {
     console.info("[self-attendance] punch GPS ready", {
       type,
       latitude: geo.latitude,
@@ -74,24 +64,33 @@ export async function punchSelfAttendanceWithFreshGps(
     });
   }
 
+  // Punch must succeed even when GPS is unavailable — never block attendance.
   const result = await selfAttendancePunchAction({
     type,
     ...geoPayload(geo),
   });
 
-  if (result.success && captured) {
+  if (!result.success) {
+    return result;
+  }
+
+  if (captured) {
     const saved =
       type === "in"
         ? Boolean(result.today?.hasCheckInLocation)
         : Boolean(result.today?.hasCheckOutLocation);
-    if (!saved) {
-      toast.error(
+    if (saved) {
+      toast.success("Location captured successfully", { duration: 2500 });
+    } else {
+      toast.message(
         type === "in"
-          ? "Checked in, but exact GPS was not saved. Enable precise location and try Update Check Out later if needed."
-          : "Checked out, but exact GPS was not saved. Enable precise location and use Update Check Out.",
-        { duration: 5000 },
+          ? "Checked in. Location could not be stored this time."
+          : "Checked out. Location could not be stored this time.",
+        { duration: 4000 },
       );
     }
+  } else {
+    toast.message(geoUnavailableMessage(geo), { duration: 4500 });
   }
 
   return result;
@@ -100,12 +99,10 @@ export async function punchSelfAttendanceWithFreshGps(
 export async function updateCheckoutWithFreshGps(
   attendanceId?: string | null,
 ): Promise<SelfAttendancePunchResult> {
-  const geo = await captureFreshPunchGps("check-out");
+  const geo = await captureFreshPunchGps();
   const captured = geo.status === "captured";
 
-  if (!captured) {
-    toast.error(geoUserMessage(geo), { duration: 5500 });
-  } else {
+  if (captured) {
     console.info("[self-attendance] update-checkout GPS ready", {
       latitude: geo.latitude,
       longitude: geo.longitude,
@@ -118,10 +115,20 @@ export async function updateCheckoutWithFreshGps(
     ...geoPayload(geo),
   });
 
-  if (result.success && captured && !result.today?.hasCheckOutLocation) {
-    toast.error("Checkout updated, but exact GPS was not saved.", {
-      duration: 4500,
-    });
+  if (!result.success) {
+    return result;
+  }
+
+  if (captured) {
+    if (result.today?.hasCheckOutLocation) {
+      toast.success("Location captured successfully", { duration: 2500 });
+    } else {
+      toast.message("Checkout updated. Location could not be stored this time.", {
+        duration: 4000,
+      });
+    }
+  } else {
+    toast.message(geoUnavailableMessage(geo), { duration: 4500 });
   }
 
   return result;

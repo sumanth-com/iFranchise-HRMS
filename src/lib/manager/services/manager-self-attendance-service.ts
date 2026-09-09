@@ -982,14 +982,14 @@ async function persistAttendanceLocationColumns(
     userId: string;
   },
 ): Promise<boolean> {
-  // Defense-in-depth: never persist obvious network/cell approximations.
+  // Reject only absurd browser junk (e.g. ±200000 m), not normal indoor GPS.
   if (
     input.accuracy != null &&
     Number.isFinite(input.accuracy) &&
-    input.accuracy > 250
+    input.accuracy > 50_000
   ) {
     console.warn(
-      "[persistAttendanceLocationColumns] rejecting poor GPS accuracy",
+      "[persistAttendanceLocationColumns] rejecting absurd GPS accuracy",
       {
         attendanceId: input.attendanceId,
         type: input.type,
@@ -1208,7 +1208,7 @@ export async function punchManagerAttendance(
     !(
       input.accuracy != null &&
       Number.isFinite(input.accuracy) &&
-      input.accuracy > 250
+      input.accuracy > 50_000
     );
   // Prefer dedicated GPS columns; keep notes free of geo payloads.
   const geoNote = null;
@@ -1220,7 +1220,7 @@ export async function punchManagerAttendance(
     !hasGeo
   ) {
     console.warn(
-      "[punchManagerAttendance] dropping poor-accuracy GPS before punch",
+      "[punchManagerAttendance] dropping absurd GPS before punch",
       { type: input.type, accuracyM: input.accuracy },
     );
   }
@@ -1511,7 +1511,7 @@ export async function updateManagerCheckout(
     !(
       input.accuracy != null &&
       Number.isFinite(input.accuracy) &&
-      input.accuracy > 250
+      input.accuracy > 50_000
     );
   if (hasGeo && input.latitude != null && input.longitude != null) {
     const locationSaved = await persistAttendanceLocationColumns(supabase, {
@@ -1535,7 +1535,7 @@ export async function updateManagerCheckout(
     isValidLatLng(input.latitude, input.longitude)
   ) {
     console.warn(
-      "[updateManagerCheckout] dropping poor-accuracy GPS",
+      "[updateManagerCheckout] dropping absurd GPS",
       { accuracyM: input.accuracy },
     );
   }

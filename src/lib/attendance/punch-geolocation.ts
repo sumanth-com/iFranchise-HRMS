@@ -3,8 +3,7 @@ export type PunchGeolocationStatus =
   | "denied"
   | "unavailable"
   | "timeout"
-  | "unsupported"
-  | "poor_accuracy";
+  | "unsupported";
 
 export type PunchGeolocationResult = {
   latitude?: number;
@@ -12,35 +11,36 @@ export type PunchGeolocationResult = {
   /** Horizontal accuracy radius in meters from the Geolocation API. */
   accuracy?: number;
   status: PunchGeolocationStatus;
-  /** Samples considered while refining accuracy (debug). */
   sampleCount?: number;
 };
 
-/** Stop immediately once GPS is this accurate (meters). */
-const TARGET_ACCURACY_M = 50;
+/** Stop early once GPS is this accurate (meters). */
+const EXCELLENT_ACCURACY_M = 50;
+/** Prefer finishing once we have a solid indoor/outdoor fix. */
+const GOOD_ACCURACY_M = 100;
 /**
- * Reject fixes worse than this — cell/Wi‑Fi approximations are often
- * hundreds–thousands of meters off.
+ * Still save real-world indoor / laptop / weak-GPS fixes up to this radius.
+ * Far larger values (e.g. 200000 m) are treated as broken and discarded.
  */
-const MAX_ACCEPTABLE_ACCURACY_M = 120;
-/** Brief refine window after the first usable fix, then take the best. */
-const REFINE_WINDOW_MS = 2_000;
-/** Hard cap when permission is already granted (keep punch feeling fast). */
-const MAX_WAIT_GRANTED_MS = 7_000;
-/** Allow time for the browser permission prompt only. */
+const MAX_USABLE_ACCURACY_M = 10_000;
+/** Hard reject — browser junk / IP-level nonsense. */
+const ABSURD_ACCURACY_M = 50_000;
+/** Brief refine after first usable sample. */
+const REFINE_WINDOW_MS = 2_500;
+/** Keep punch snappy when permission is already granted. */
+const MAX_WAIT_GRANTED_MS = 12_000;
+/** Allow time for the browser permission prompt. */
 const MAX_WAIT_PROMPT_MS = 90_000;
-/** Short high-accuracy retry only when the first pass got no usable fix. */
-const RETRY_TIMEOUT_MS = 3_500;
+/** Short retry when the first pass produced nothing usable. */
+const RETRY_TIMEOUT_MS = 4_000;
 
 /**
- * Fresh high-accuracy browser GPS for Check In / Check Out / Update Check Out.
+ * Fresh browser geolocation for Check In / Check Out / Update Check Out.
  * Must be called from a user gesture.
  *
- * - enableHighAccuracy: true always
- * - maximumAge: 0 (never reuse cached/stale fixes)
- * - never falls back to low-accuracy / network-only location
- * - samples briefly and keeps the best (lowest) accuracy reading
- * - does not return coordinates when accuracy stays poor
+ * Strategy: sample high-accuracy fixes, keep the best (lowest) accuracy,
+ * accept normal real-world indoor accuracy, and only discard broken data.
+ * Callers must still allow the punch when location is unavailable.
  */
 export async function getOptionalPunchGeolocation(): Promise<PunchGeolocationResult> {
   if (typeof window === "undefined" || !navigator?.geolocation) {
@@ -66,123 +66,193 @@ export async function getOptionalPunchGeolocation(): Promise<PunchGeolocationRes
   const maxWaitMs =
     permissionState === "granted" ? MAX_WAIT_GRANTED_MS : MAX_WAIT_PROMPT_MS;
 
-  const sampled = await sampleHighAccuracyPosition(maxWaitMs);
+  const sampled = await samplePositions({
+    maxWaitMs,
+    enableHighAccuracy: true,
+  });
 
-  if (sampled.status === "captured" && sampled.latitude != null && sampled.longitude != null) {
-    console.info("[punch-geolocation] captured", {
-      latitude: sampled.latitude,
-      longitude: sampled.longitude,
-      accuracyM: sampled.accuracy,
-      sampleCount: sampled.sampleCount,
-    });
+  if (isCapturedFix(sampled)) {
+    logCapture("captured", sampled);
     return sampled;
   }
 
-  // One short high-accuracy retry only when we still have nothing usable.
-  if (
-    sampled.status === "timeout" ||
-    sampled.status === "poor_accuracy" ||
-    sampled.status === "unavailable"
-  ) {
-    const retry = await requestSingleHighAccuracyPosition(RETRY_TIMEOUT_MS);
-    if (
-      retry.status === "captured" &&
-      retry.latitude != null &&
-      retry.longitude != null &&
-      isAcceptableAccuracy(retry.accuracy)
-    ) {
-      console.info("[punch-geolocation] captured after retry", {
-        latitude: retry.latitude,
-        longitude: retry.longitude,
-        accuracyM: retry.accuracy,
-      });
-      return {
-        ...retry,
-        sampleCount: (sampled.sampleCount ?? 0) + 1,
-      };
-    }
-
-    if (retry.status === "denied") return { status: "denied" };
-
-    const bestAccuracy = pickBetterAccuracy(sampled.accuracy, retry.accuracy);
-    if (bestAccuracy != null && !isAcceptableAccuracy(bestAccuracy)) {
-      console.warn("[punch-geolocation] rejecting poor accuracy", {
-        accuracyM: bestAccuracy,
-        maxAcceptableM: MAX_ACCEPTABLE_ACCURACY_M,
-        sampleCount: (sampled.sampleCount ?? 0) + (retry.sampleCount ?? 0),
-      });
-      return {
-        status: "poor_accuracy",
-        accuracy: bestAccuracy,
-        sampleCount: (sampled.sampleCount ?? 0) + (retry.sampleCount ?? 0),
-      };
-    }
-
-    if (sampled.status === "poor_accuracy") {
-      console.warn("[punch-geolocation] rejecting poor accuracy", {
-        accuracyM: sampled.accuracy,
-        maxAcceptableM: MAX_ACCEPTABLE_ACCURACY_M,
-        sampleCount: sampled.sampleCount,
-      });
-      return sampled;
-    }
-
-    return retry.status !== "captured" ? retry : sampled;
+  // Brief high-accuracy retry.
+  const retry = await requestSinglePosition({
+    timeoutMs: RETRY_TIMEOUT_MS,
+    enableHighAccuracy: true,
+  });
+  if (retry.status === "denied") return { status: "denied" };
+  if (isCapturedFix(retry)) {
+    logCapture("captured after retry", retry);
+    return {
+      ...retry,
+      sampleCount: (sampled.sampleCount ?? 0) + (retry.sampleCount ?? 0),
+    };
   }
 
-  return sampled;
+  // Desktop / indoor fallback: still fresh (maximumAge 0), best valid browser fix.
+  const soft = await requestSinglePosition({
+    timeoutMs: RETRY_TIMEOUT_MS,
+    enableHighAccuracy: false,
+  });
+  if (soft.status === "denied") return { status: "denied" };
+  if (isCapturedFix(soft)) {
+    logCapture("captured soft fallback", soft);
+    return {
+      ...soft,
+      sampleCount:
+        (sampled.sampleCount ?? 0) +
+        (retry.sampleCount ?? 0) +
+        (soft.sampleCount ?? 0),
+    };
+  }
+
+  // Prefer any non-absurd sample we already saw over returning empty.
+  const bestCandidate = pickBestCandidate(sampled, retry, soft);
+  if (bestCandidate && isCapturedFix(bestCandidate)) {
+    logCapture("captured best candidate", bestCandidate);
+    return bestCandidate;
+  }
+
+  if (bestCandidate?.accuracy != null && bestCandidate.accuracy > ABSURD_ACCURACY_M) {
+    console.warn("[punch-geolocation] discarded absurd accuracy", {
+      accuracyM: bestCandidate.accuracy,
+    });
+  }
+
+  return {
+    status:
+      sampled.status === "timeout" ||
+      retry.status === "timeout" ||
+      soft.status === "timeout"
+        ? "timeout"
+        : "unavailable",
+    sampleCount:
+      (sampled.sampleCount ?? 0) +
+      (retry.sampleCount ?? 0) +
+      (soft.sampleCount ?? 0),
+  };
 }
 
-function isAcceptableAccuracy(accuracy: number | undefined): boolean {
-  if (accuracy == null || !Number.isFinite(accuracy)) return true;
-  return accuracy >= 0 && accuracy <= MAX_ACCEPTABLE_ACCURACY_M;
+function logCapture(label: string, geo: PunchGeolocationResult) {
+  console.info(`[punch-geolocation] ${label}`, {
+    latitude: geo.latitude,
+    longitude: geo.longitude,
+    accuracyM: geo.accuracy,
+    sampleCount: geo.sampleCount,
+  });
 }
 
-function isTargetAccuracy(accuracy: number | undefined): boolean {
+function isCapturedFix(geo: PunchGeolocationResult | null | undefined): boolean {
+  if (!geo || geo.status !== "captured") return false;
+  if (geo.latitude == null || geo.longitude == null) return false;
+  if (!isValidLatLng(geo.latitude, geo.longitude)) return false;
+  if (geo.accuracy != null && !Number.isFinite(geo.accuracy)) return false;
+  if (geo.accuracy != null && geo.accuracy > MAX_USABLE_ACCURACY_M) return false;
+  return true;
+}
+
+function isValidLatLng(latitude: number, longitude: number): boolean {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return false;
+  if (latitude < -90 || latitude > 90) return false;
+  if (longitude < -180 || longitude > 180) return false;
+  if (latitude === 0 && longitude === 0) return false;
+  return true;
+}
+
+function isExcellent(accuracy: number | undefined): boolean {
   return (
     typeof accuracy === "number" &&
     Number.isFinite(accuracy) &&
     accuracy >= 0 &&
-    accuracy <= TARGET_ACCURACY_M
+    accuracy <= EXCELLENT_ACCURACY_M
   );
 }
 
-function pickBetterAccuracy(
-  a: number | undefined,
-  b: number | undefined,
-): number | undefined {
-  if (a == null) return b;
-  if (b == null) return a;
-  return a <= b ? a : b;
+function isGood(accuracy: number | undefined): boolean {
+  return (
+    typeof accuracy === "number" &&
+    Number.isFinite(accuracy) &&
+    accuracy >= 0 &&
+    accuracy <= GOOD_ACCURACY_M
+  );
 }
 
-function normalizeCoords(position: GeolocationPosition): PunchGeolocationResult | null {
+function isUsableAccuracy(accuracy: number | undefined): boolean {
+  // Missing accuracy: still allow if coords validated (some browsers omit it).
+  if (accuracy == null || !Number.isFinite(accuracy)) return true;
+  return accuracy >= 0 && accuracy <= MAX_USABLE_ACCURACY_M;
+}
+
+function pickBetter(
+  a: PunchGeolocationResult | null,
+  b: PunchGeolocationResult | null,
+): PunchGeolocationResult | null {
+  if (!a) return b;
+  if (!b) return a;
+  const aAcc = a.accuracy;
+  const bAcc = b.accuracy;
+  if (aAcc == null) return bAcc == null ? a : b;
+  if (bAcc == null) return a;
+  return aAcc <= bAcc ? a : b;
+}
+
+function pickBestCandidate(
+  ...candidates: PunchGeolocationResult[]
+): PunchGeolocationResult | null {
+  let best: PunchGeolocationResult | null = null;
+  for (const candidate of candidates) {
+    if (
+      candidate.latitude == null ||
+      candidate.longitude == null ||
+      !isValidLatLng(candidate.latitude, candidate.longitude)
+    ) {
+      continue;
+    }
+    if (candidate.accuracy != null && candidate.accuracy > ABSURD_ACCURACY_M) {
+      continue;
+    }
+    const asCaptured: PunchGeolocationResult = {
+      ...candidate,
+      status: "captured",
+    };
+    best = pickBetter(best, asCaptured);
+  }
+  return best;
+}
+
+function normalizeCoords(
+  position: GeolocationPosition,
+): PunchGeolocationResult | null {
   const { latitude, longitude, accuracy } = position.coords;
-  if (
-    typeof latitude !== "number" ||
-    typeof longitude !== "number" ||
-    !Number.isFinite(latitude) ||
-    !Number.isFinite(longitude) ||
-    (latitude === 0 && longitude === 0)
-  ) {
-    return null;
+  if (!isValidLatLng(latitude, longitude)) return null;
+
+  const accuracyM =
+    typeof accuracy === "number" && Number.isFinite(accuracy) && accuracy >= 0
+      ? accuracy
+      : undefined;
+
+  // Drop broken browser junk immediately (e.g. ±200000 m).
+  if (accuracyM != null && accuracyM > ABSURD_ACCURACY_M) {
+    return {
+      status: "unavailable",
+      accuracy: accuracyM,
+    };
   }
 
   return {
     status: "captured",
-    // Keep full floating-point precision — never round/truncate before save.
+    // Full floating-point precision — never round/truncate before save.
     latitude,
     longitude,
-    accuracy:
-      typeof accuracy === "number" && Number.isFinite(accuracy) && accuracy >= 0
-        ? accuracy
-        : undefined,
+    accuracy: accuracyM,
   };
 }
 
-function sampleHighAccuracyPosition(
-  maxWaitMs: number,
-): Promise<PunchGeolocationResult> {
+function samplePositions(options: {
+  maxWaitMs: number;
+  enableHighAccuracy: boolean;
+}): Promise<PunchGeolocationResult> {
   return new Promise((resolve) => {
     let settled = false;
     let best: PunchGeolocationResult | null = null;
@@ -210,61 +280,58 @@ function sampleHighAccuracyPosition(
       const next = normalizeCoords(position);
       if (!next) return;
       sampleCount += 1;
-      if (
-        !best ||
-        (next.accuracy != null &&
-          (best.accuracy == null || next.accuracy < best.accuracy))
-      ) {
-        best = next;
+
+      if (next.status === "captured") {
+        best = pickBetter(best, next);
+      } else if (next.accuracy != null) {
+        // Keep absurd accuracy for diagnostics only; never treat as captured.
+        best = best ?? { status: "unavailable", accuracy: next.accuracy };
       }
 
-      if (isTargetAccuracy(best.accuracy)) {
+      if (best?.status === "captured" && isExcellent(best.accuracy)) {
         finish(best);
         return;
       }
 
-      if (firstFixAt == null) {
+      if (best?.status === "captured" && firstFixAt == null) {
         firstFixAt = Date.now();
         refineTimer = window.setTimeout(() => {
-          if (!best) return;
-          if (isAcceptableAccuracy(best.accuracy)) {
+          if (best?.status === "captured" && isGood(best.accuracy)) {
             finish(best);
           }
         }, REFINE_WINDOW_MS);
       } else if (
+        best?.status === "captured" &&
+        firstFixAt != null &&
         Date.now() - firstFixAt >= REFINE_WINDOW_MS &&
-        isAcceptableAccuracy(best.accuracy)
+        isGood(best.accuracy)
       ) {
         finish(best);
       }
     };
 
     const hardTimer = window.setTimeout(() => {
-      if (best && isAcceptableAccuracy(best.accuracy)) {
+      if (best?.status === "captured" && isUsableAccuracy(best.accuracy)) {
         finish(best);
         return;
       }
-      if (best && best.accuracy != null && !isAcceptableAccuracy(best.accuracy)) {
-        finish({
-          status: "poor_accuracy",
-          accuracy: best.accuracy,
-        });
+      if (best?.accuracy != null && best.accuracy > ABSURD_ACCURACY_M) {
+        finish({ status: "unavailable", accuracy: best.accuracy });
         return;
       }
-      finish(best ? { status: "unavailable" } : { status: "timeout" });
-    }, maxWaitMs);
+      finish(best?.status === "captured" ? best : { status: "timeout" });
+    }, options.maxWaitMs);
 
     try {
-      // Warm the GPS radio immediately while watchPosition continues refining.
       navigator.geolocation.getCurrentPosition(
         consider,
         () => {
-          // Watch may still succeed; ignore this probe's failure.
+          // Watch may still succeed.
         },
         {
-          enableHighAccuracy: true,
+          enableHighAccuracy: options.enableHighAccuracy,
           maximumAge: 0,
-          timeout: Math.min(5_000, maxWaitMs),
+          timeout: Math.min(8_000, options.maxWaitMs),
         },
       );
 
@@ -276,9 +343,9 @@ function sampleHighAccuracyPosition(
           }
         },
         {
-          enableHighAccuracy: true,
+          enableHighAccuracy: options.enableHighAccuracy,
           maximumAge: 0,
-          timeout: maxWaitMs,
+          timeout: options.maxWaitMs,
         },
       );
     } catch {
@@ -287,9 +354,10 @@ function sampleHighAccuracyPosition(
   });
 }
 
-function requestSingleHighAccuracyPosition(
-  timeoutMs: number,
-): Promise<PunchGeolocationResult> {
+function requestSinglePosition(options: {
+  timeoutMs: number;
+  enableHighAccuracy: boolean;
+}): Promise<PunchGeolocationResult> {
   return new Promise((resolve) => {
     let settled = false;
     const finish = (value: PunchGeolocationResult) => {
@@ -301,7 +369,7 @@ function requestSingleHighAccuracyPosition(
 
     const safetyTimer = window.setTimeout(
       () => finish({ status: "timeout" }),
-      timeoutMs + 1_500,
+      options.timeoutMs + 1_500,
     );
 
     try {
@@ -312,9 +380,9 @@ function requestSingleHighAccuracyPosition(
             finish({ status: "unavailable" });
             return;
           }
-          if (!isAcceptableAccuracy(next.accuracy)) {
+          if (next.status !== "captured" || !isUsableAccuracy(next.accuracy)) {
             finish({
-              status: "poor_accuracy",
+              status: "unavailable",
               accuracy: next.accuracy,
               sampleCount: 1,
             });
@@ -334,8 +402,8 @@ function requestSingleHighAccuracyPosition(
           finish({ status: "unavailable" });
         },
         {
-          enableHighAccuracy: true,
-          timeout: timeoutMs,
+          enableHighAccuracy: options.enableHighAccuracy,
+          timeout: options.timeoutMs,
           maximumAge: 0,
         },
       );
