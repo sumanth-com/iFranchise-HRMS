@@ -1,37 +1,13 @@
 import { cn } from "@/lib/utils";
 
-function VinayakaElephantIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden
-      className={cn("size-5 text-amber-600", className)}
-      fill="currentColor"
-    >
-      {/* ears */}
-      <ellipse cx="5.5" cy="11" rx="3.2" ry="4.2" opacity="0.9" />
-      <ellipse cx="18.5" cy="11" rx="3.2" ry="4.2" opacity="0.9" />
-      {/* head */}
-      <circle cx="12" cy="11.5" r="5.8" />
-      {/* crown / tika */}
-      <path d="M9.2 6.8 10.4 8.6 12 7.4l1.6 1.2 1.2-1.8" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-      {/* eyes */}
-      <circle cx="9.6" cy="10.8" r="0.9" fill="#fff" />
-      <circle cx="14.4" cy="10.8" r="0.9" fill="#fff" />
-      <circle cx="9.8" cy="10.9" r="0.35" fill="#78350f" />
-      <circle cx="14.6" cy="10.9" r="0.35" fill="#78350f" />
-      {/* trunk */}
-      <path d="M12 13.2c-.4 0-.8.3-.8.8 0 1.2.3 2.4.8 3.5.2.4.6.7 1 .7s.8-.3 1-.7c.5-1.1.8-2.3.8-3.5 0-.5-.4-.8-.8-.8h-1.2Z" />
-    </svg>
-  );
-}
+const BALA_GANESH_IMAGE = "/images/holidays/bala-ganesh.png";
 
 function DussheraBowIcon({ className }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
       aria-hidden
-      className={cn("size-5 text-orange-600", className)}
+      className={cn("size-full text-orange-600", className)}
       fill="none"
       stroke="currentColor"
       strokeWidth="1.6"
@@ -77,6 +53,26 @@ export function holidayEmoji(name: string): string {
   return "📅";
 }
 
+function BalaGaneshImage({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "relative block aspect-square size-full overflow-hidden rounded-2xl bg-amber-50 shadow-sm ring-1 ring-black/5",
+        className,
+      )}
+      aria-hidden
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element -- static public holiday asset */}
+      <img
+        src={BALA_GANESH_IMAGE}
+        alt=""
+        className="size-full object-cover object-center"
+        draggable={false}
+      />
+    </span>
+  );
+}
+
 export function HolidayGlyph({
   name,
   className,
@@ -85,7 +81,7 @@ export function HolidayGlyph({
   className?: string;
 }) {
   if (matchesHoliday(name, "ganesh", "vinayaka", "chavithi", "ganapati")) {
-    return <VinayakaElephantIcon className={className} />;
+    return <BalaGaneshImage className={className} />;
   }
 
   if (matchesHoliday(name, "dusshera", "dussehra", "vijayadashami", "dasara")) {

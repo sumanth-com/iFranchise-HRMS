@@ -164,7 +164,7 @@ function CelebrationFeaturedCard({
           ) : (
             <HolidayGlyph
               name={item.title}
-              className={cn("leading-none", fill ? "size-10 text-4xl" : "size-8 text-3xl")}
+              className={cn(fill ? "size-10" : "size-8")}
             />
           )}
         </span>

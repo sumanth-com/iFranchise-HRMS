@@ -153,9 +153,9 @@ export const WORKING_DAYS = [
 ] as const;
 
 export const HOLIDAY_TYPE_LABELS = {
-  national: "National",
-  state: "State",
-  company: "Company",
+  national: "National Holiday",
+  state: "State Holiday",
+  company: "Company Holiday",
 } as const;
 
 export const TIMEZONE_OPTIONS = [

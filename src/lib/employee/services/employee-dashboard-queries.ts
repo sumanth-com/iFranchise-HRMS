@@ -12,6 +12,7 @@ import { getCurrentBalanceYear } from "@/lib/leave/services/leave-utils";
 import { roundLeaveDays } from "@/lib/leave/services/leave-usage";
 import { getSelfTodayAttendance } from "@/lib/manager/services/manager-self-attendance-service";
 import { createSignedStorageUrls } from "@/lib/storage/signed-url";
+import { HOLIDAY_TYPE_LABELS } from "@/lib/validations/organization";
 import type { UserProfile } from "@/types/auth";
 import type {
   EmployeeDashboardData,
@@ -154,12 +155,13 @@ export async function loadUpcomingCelebrations(
   } else {
     for (const holiday of holidaysResult.data ?? []) {
       const rawType = (holiday as { holiday_type?: string | null }).holiday_type;
-      const formattedType = rawType
-        ? rawType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-        : null;
+      const typedLabel =
+        rawType && rawType in HOLIDAY_TYPE_LABELS
+          ? HOLIDAY_TYPE_LABELS[rawType as keyof typeof HOLIDAY_TYPE_LABELS]
+          : null;
       const subtitle = holiday.is_optional
         ? "Optional Holiday"
-        : formattedType || "Company Holiday";
+        : typedLabel || "Company Holiday";
 
       events.push({
         id: `holiday-${holiday.id}`,

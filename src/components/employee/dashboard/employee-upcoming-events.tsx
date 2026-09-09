@@ -204,8 +204,8 @@ function HolidaySlide({
 
   return (
     <div className="flex h-full min-h-0 flex-col items-center justify-center overflow-hidden rounded-xl bg-gradient-to-b from-violet-500/[0.07] to-violet-500/[0.02] px-5 py-5 text-center ring-1 ring-violet-500/15">
-      <span className="celebration-glyph flex size-[7.5rem] shrink-0 items-center justify-center text-[5rem] leading-none sm:size-[9rem] sm:text-[6rem]">
-        <HolidayGlyph name={event.title} className="text-[inherit] leading-none" />
+      <span className="flex size-[8.5rem] shrink-0 items-center justify-center sm:size-[10.5rem]">
+        <HolidayGlyph name={event.title} className="size-full" />
       </span>
 
       <span className="mt-3.5 inline-flex items-center rounded-full bg-violet-500/12 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-violet-700 uppercase dark:bg-violet-400/20 dark:text-violet-300">
@@ -217,7 +217,7 @@ function HolidaySlide({
       </p>
 
       {event.subtitle ? (
-        <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{event.subtitle}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{event.subtitle}</p>
       ) : null}
 
       <p className="mt-3 text-[11px] font-medium tracking-wide text-muted-foreground/75 tabular-nums uppercase">
@@ -378,13 +378,8 @@ function CombinedHolidayPanel({
 
   return (
     <div className="flex min-h-0 flex-1 items-center gap-4 overflow-hidden rounded-xl bg-gradient-to-b from-violet-500/[0.07] to-violet-500/[0.02] px-4 py-3.5 ring-1 ring-violet-500/15">
-      <span
-        className={cn(
-          combinedIconSlotClass,
-          "celebration-glyph text-[3.75rem] leading-none",
-        )}
-      >
-        <HolidayGlyph name={event.title} className="text-[inherit] leading-none" />
+      <span className={cn(combinedIconSlotClass)}>
+        <HolidayGlyph name={event.title} className="size-full" />
       </span>
       <div className="min-w-0 flex-1">
         <span className="inline-flex items-center rounded-full bg-violet-500/12 px-2 py-0.5 text-[10px] font-bold tracking-wide text-violet-700 uppercase dark:bg-violet-400/20 dark:text-violet-300">
@@ -393,7 +388,7 @@ function CombinedHolidayPanel({
         <p className="mt-1 line-clamp-1 text-base font-bold tracking-tight text-foreground">
           {event.title}
         </p>
-        <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+        <p className="mt-0.5 text-xs text-muted-foreground">
           {event.subtitle || "Company Holiday"}
         </p>
       </div>

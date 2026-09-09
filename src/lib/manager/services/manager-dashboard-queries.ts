@@ -12,6 +12,7 @@ import { getTodayDateString } from "@/lib/attendance/services/attendance-utils";
 import { MANAGER_DASHBOARD_KPI_LINKS, MANAGER_ROUTES } from "@/lib/manager/constants";
 import { getManagerTeamContext } from "@/lib/manager/services/team-hierarchy";
 import { listHolidays } from "@/lib/organization/services/org-queries";
+import { HOLIDAY_TYPE_LABELS } from "@/lib/validations/organization";
 import {
   formatEmployeeName,
   fromHrms,
@@ -393,7 +394,9 @@ export async function getManagerDashboardData(
       .map((holiday) => ({
         id: holiday.id,
         primary: holiday.name,
-        secondary: holiday.holidayType.replaceAll("_", " "),
+        secondary:
+          HOLIDAY_TYPE_LABELS[holiday.holidayType as keyof typeof HOLIDAY_TYPE_LABELS] ??
+          "Company Holiday",
         meta: holiday.holidayDate,
         href: MANAGER_ROUTES.leaveTeam,
       }));
@@ -950,7 +953,9 @@ export async function getManagerDashboardData(
     .map((holiday) => ({
       id: holiday.id,
       primary: holiday.name,
-      secondary: holiday.holidayType.replaceAll("_", " "),
+      secondary:
+        HOLIDAY_TYPE_LABELS[holiday.holidayType as keyof typeof HOLIDAY_TYPE_LABELS] ??
+        "Company Holiday",
       meta: holiday.holidayDate,
       href: MANAGER_ROUTES.leaveTeam,
     }));

@@ -11,6 +11,7 @@ import { countEmployeeModuleListTotal } from "@/lib/employees/services/employee-
 import { getLeaveSummary } from "@/lib/leave/services/leave-queries";
 import { ORGANIZATION_ROUTES } from "@/lib/organization/constants";
 import { listHolidays } from "@/lib/organization/services/org-queries";
+import { HOLIDAY_TYPE_LABELS } from "@/lib/validations/organization";
 import { getPayrollMonthDate } from "@/lib/payroll/services/payroll-utils";
 import { getOnboardingDashboardStats } from "@/lib/onboarding/services/onboarding-queries";
 import { formatEmployeeName, fromHrms } from "@/lib/reports/services/reports-utils";
@@ -208,7 +209,9 @@ export const getHrDashboardData = cache(async function getHrDashboardData(
     .map((h) => ({
       id: h.id,
       primary: h.name,
-      secondary: h.holidayType.replaceAll("_", " "),
+      secondary:
+        HOLIDAY_TYPE_LABELS[h.holidayType as keyof typeof HOLIDAY_TYPE_LABELS] ??
+        "Company Holiday",
       meta: h.holidayDate,
       href: ORGANIZATION_ROUTES.holidays,
     }));
