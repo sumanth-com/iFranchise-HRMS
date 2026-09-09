@@ -15,7 +15,6 @@ const PORTAL_LABELS: Record<PortalKey, string> = {
 };
 
 const ROLE_PORTAL_HINTS: Record<string, PortalKey> = {
-  super_admin: "hr",
   hr_admin: "hr",
   hr_executive: "hr",
   founder: "ceo",
@@ -81,13 +80,15 @@ export function buildRoleAccessPreview(input: {
   if (input.roleCode === "super_admin" || codes.has(SYSTEM_ADMIN_PERMISSION)) {
     portals.push({
       key: "super_admin",
-      label: "Super Admin Portal (administration + self-service)",
+      label: "Super Admin Portal",
       route: SYSTEM_ADMIN_ROUTES.home,
     });
   }
 
   const hinted =
-    portalFromKey(input.portalKey) ?? ROLE_PORTAL_HINTS[input.roleCode] ?? null;
+    input.roleCode === "super_admin"
+      ? null
+      : portalFromKey(input.portalKey) ?? ROLE_PORTAL_HINTS[input.roleCode] ?? null;
 
   if (hinted) {
     portals.push({

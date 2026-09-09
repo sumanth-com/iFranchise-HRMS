@@ -31,16 +31,20 @@ const PORTAL_PERMISSION_MAP: Record<string, string> = {
 /** Client-only portal switcher — loaded without SSR to avoid hydration mismatches. */
 export function PortalSwitcher() {
   const router = useRouter();
-  const { permissionCodes, roles } = useAuth();
+  const { permissionCodes } = useAuth();
   const { activePortal, setActivePortal } = useActivePortal();
   const pathname = usePathname();
 
-  const isSuperAdmin = roles.some((role) => role.code === "super_admin");
-  if (!isSuperAdmin) return null;
-
+  // Portal list is permission-driven (not "every employee gets Employee Portal").
+  // Super Admin without explicit portal.*.access only sees Super Admin Portal.
   const availablePortals = PORTAL_SWITCH_LINKS.filter((portal) =>
     hasPermission(permissionCodes, PORTAL_PERMISSION_MAP[portal.portal]),
   );
+
+  // Hide completely when there is nothing to switch between.
+  if (availablePortals.length <= 1) {
+    return null;
+  }
 
   const activePortalLink = resolveActivePortalSwitchLink(
     pathname,

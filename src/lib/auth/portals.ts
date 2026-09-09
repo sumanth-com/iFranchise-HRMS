@@ -1,6 +1,8 @@
 import type { Role } from "@/types/auth";
 
 import { HR_PORTAL_HOME } from "@/lib/auth/portal-paths";
+import { SYSTEM_ADMIN_PERMISSION, SYSTEM_ADMIN_ROUTES } from "@/lib/system-admin/constants";
+import { isSystemAdminPath } from "@/lib/system-admin/paths";
 
 export type PortalKey = "hr" | "ceo" | "manager" | "employee";
 
@@ -36,8 +38,8 @@ export const ROLE_CODE_PORTAL_PRIORITY = [
   "employee",
 ] as const;
 
+/** Business portals only — Super Admin uses the system portal, not HR by default. */
 const FALLBACK_ROLE_PORTALS: Record<string, PortalKey> = {
-  super_admin: "hr",
   hr_admin: "hr",
   hr_executive: "hr",
   founder: "ceo",
@@ -47,9 +49,41 @@ const FALLBACK_ROLE_PORTALS: Record<string, PortalKey> = {
   employee: "employee",
 };
 
+function permissionCodeSet(permissionCodes: Iterable<string>) {
+  return permissionCodes instanceof Set
+    ? permissionCodes
+    : new Set(permissionCodes);
+}
+
 function hasPortalPermission(permissionCodes: Iterable<string>, portal: PortalKey) {
-  const codes = new Set(permissionCodes);
-  return codes.has(PORTAL_PERMISSIONS[portal]);
+  return permissionCodeSet(permissionCodes).has(PORTAL_PERMISSIONS[portal]);
+}
+
+function hasAnyBusinessPortalPermission(permissionCodes: Iterable<string>) {
+  const codes = permissionCodeSet(permissionCodes);
+  return PORTAL_PRIORITY.some((portal) => codes.has(PORTAL_PERMISSIONS[portal]));
+}
+
+function isSuperAdminRole(roleCodes: Iterable<string>) {
+  return Array.from(roleCodes).includes("super_admin");
+}
+
+/** Super Admin home when no explicit business portal.*.access is granted. */
+export function resolveSystemAdminHomePath(
+  permissionCodes: Iterable<string>,
+  roleCodes: Iterable<string> = [],
+): string | null {
+  const codes = permissionCodeSet(permissionCodes);
+  const hasSystem =
+    isSuperAdminRole(roleCodes) || codes.has(SYSTEM_ADMIN_PERMISSION);
+  if (!hasSystem) return null;
+  if (hasAnyBusinessPortalPermission(codes)) {
+    // Explicit portal grants may be added later; login still prefers Super Admin home
+    // when the user is a Super Admin.
+    if (isSuperAdminRole(roleCodes)) return SYSTEM_ADMIN_ROUTES.home;
+    return null;
+  }
+  return SYSTEM_ADMIN_ROUTES.home;
 }
 
 export function normalizePortalRoute(route: string | null | undefined): string | null {
@@ -61,6 +95,7 @@ export function normalizePortalRoute(route: string | null | undefined): string |
 export function portalKeyFromRoute(route: string): PortalKey | null {
   const normalized = normalizePortalRoute(route);
   if (!normalized) return null;
+  if (isSystemAdminPath(normalized)) return null;
 
   for (const [portal, portalRoute] of Object.entries(PORTAL_ROUTES) as [PortalKey, string][]) {
     if (portalRoute === normalized) return portal;
@@ -72,6 +107,7 @@ export function portalKeyFromRoute(route: string): PortalKey | null {
 export function getPortalForRoleCodes(roleCodes: Iterable<string>): PortalKey | null {
   const codes = new Set(roleCodes);
   for (const code of ROLE_CODE_PORTAL_PRIORITY) {
+    if (code === "super_admin") continue;
     const portal = FALLBACK_ROLE_PORTALS[code];
     if (portal && codes.has(code)) return portal;
   }
@@ -79,6 +115,10 @@ export function getPortalForRoleCodes(roleCodes: Iterable<string>): PortalKey | 
 }
 
 export function getPortalRouteForRoleCodes(roleCodes: Iterable<string>): string | null {
+  const codes = new Set(roleCodes);
+  if (codes.has("super_admin")) {
+    return SYSTEM_ADMIN_ROUTES.home;
+  }
   const portal = getPortalForRoleCodes(roleCodes);
   return portal ? PORTAL_ROUTES[portal] : null;
 }
@@ -104,6 +144,7 @@ export function resolvePrimaryPortal(
 
 /**
  * Post-login route: assigned role wins over inherited permissions and DB fallbacks.
+ * Super Admin without explicit business portal grants lands on the system portal.
  */
 export function getPortalRedirectPath(
   permissionCodes: Iterable<string>,
@@ -111,15 +152,29 @@ export function getPortalRedirectPath(
   portalRouteFromDb?: string | null,
 ) {
   const roleCodes = roles.map((role) => role.code);
+  const systemHome = resolveSystemAdminHomePath(permissionCodes, roleCodes);
+  if (systemHome && isSuperAdminRole(roleCodes)) {
+    return systemHome;
+  }
+
   const fromRoles = getPortalRouteForRoleCodes(roleCodes);
   const primaryPortal = resolvePrimaryPortal(permissionCodes, roleCodes);
   const fromPermissions = primaryPortal ? PORTAL_ROUTES[primaryPortal] : null;
   const fromDb = normalizePortalRoute(portalRouteFromDb);
 
-  return fromRoles ?? fromPermissions ?? fromDb ?? "/403";
+  if (systemHome && !fromRoles && !fromPermissions) {
+    return systemHome;
+  }
+
+  return fromRoles ?? fromPermissions ?? fromDb ?? systemHome ?? "/403";
 }
 
 export function getRequiredPortalForPath(pathname: string): PortalKey | null {
+  // System admin lives under /dashboard/system — not the HR portal.
+  if (isSystemAdminPath(pathname)) {
+    return null;
+  }
+
   if (pathname === HR_PORTAL_HOME || pathname.startsWith(`${HR_PORTAL_HOME}/`)) {
     return "hr";
   }
@@ -137,28 +192,33 @@ export function getRequiredPortalForPath(pathname: string): PortalKey | null {
   return null;
 }
 
-/** Keep users on their provisioned portal; block downgrades (e.g. manager → employee). */
+/**
+ * Keep users on portals they are entitled to.
+ * Portal access is permission-based — Super Admin is not exempt from portal.*.access checks.
+ */
 export function getPrimaryPortalRedirectForPath(
   pathname: string,
   permissionCodes: Iterable<string>,
   roleCodes: Iterable<string> = [],
 ): string | null {
-  const codes = Array.from(roleCodes);
-  if (codes.includes("super_admin")) return null;
+  // System paths are authorized via system.admin.access in middleware, not portal.*.access.
+  if (isSystemAdminPath(pathname)) {
+    return null;
+  }
 
   const pathPortal = getRequiredPortalForPath(pathname);
   if (!pathPortal) return null;
 
-  const primaryPortal = resolvePrimaryPortal(permissionCodes, roleCodes);
-  if (!primaryPortal || primaryPortal === pathPortal) return null;
-
-  const primaryRank = PORTAL_PRIORITY.indexOf(primaryPortal);
-  const pathRank = PORTAL_PRIORITY.indexOf(pathPortal);
-  if (pathRank > primaryRank) {
-    return PORTAL_ROUTES[primaryPortal];
+  if (hasPortalPermission(permissionCodes, pathPortal)) {
+    return null;
   }
 
-  return null;
+  const primaryPortal = resolvePrimaryPortal(permissionCodes, roleCodes);
+  return (
+    resolveSystemAdminHomePath(permissionCodes, roleCodes) ??
+    (primaryPortal ? PORTAL_ROUTES[primaryPortal] : null) ??
+    getPortalRouteForRoleCodes(roleCodes)
+  );
 }
 
 export function canAccessPortalPath(
@@ -166,6 +226,13 @@ export function canAccessPortalPath(
   permissionCodes: Iterable<string>,
   roleCodes: Iterable<string> = [],
 ) {
+  if (isSystemAdminPath(pathname)) {
+    return (
+      isSuperAdminRole(roleCodes) ||
+      permissionCodeSet(permissionCodes).has(SYSTEM_ADMIN_PERMISSION)
+    );
+  }
+
   const enforced = getPrimaryPortalRedirectForPath(pathname, permissionCodes, roleCodes);
   if (enforced) return false;
 

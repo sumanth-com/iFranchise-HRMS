@@ -13,6 +13,7 @@ import { PORTAL_PERMISSIONS, type PortalKey } from "@/lib/auth/portals";
 import { isTabletHrmsAllowed } from "@/lib/device-access/access";
 import { isTabletClientRequest } from "@/lib/device-access/request";
 import { hasPermission } from "@/lib/permissions/utils";
+import { SYSTEM_ADMIN_PERMISSION } from "@/lib/system-admin/constants";
 import { AuthProvider, type PortalVariant } from "@/providers/auth-provider";
 import { getServerSession } from "@/lib/supabase/server";
 
@@ -82,7 +83,14 @@ async function ResolvedPortalShell({
 
   const requiredPortalPermission =
     PORTAL_PERMISSIONS[portalVariant as PortalKey] ?? PORTAL_PERMISSIONS.hr;
-  if (!hasPermission(profileResult.profile.permissionCodes, requiredPortalPermission)) {
+  const codes = profileResult.profile.permissionCodes;
+  const hasRequiredPortal = hasPermission(codes, requiredPortalPermission);
+  // HR shell is shared with /dashboard/system. System-only Super Admins may load
+  // the shell without portal.hr.access; nested layout + middleware still block HR routes.
+  const canUseSharedHrShell =
+    portalVariant === "hr" && hasPermission(codes, SYSTEM_ADMIN_PERMISSION);
+
+  if (!hasRequiredPortal && !canUseSharedHrShell) {
     redirect(AUTH_ROUTES.unauthorized);
   }
 
