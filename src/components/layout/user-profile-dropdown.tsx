@@ -26,6 +26,7 @@ import {
 import { getPortalHelpHref } from "@/lib/auth/portal-account-menu";
 import { getMyProfileImageUrlAction } from "@/lib/employees/profile-image-actions";
 import { subscribeProfilePhotoChanged } from "@/lib/employees/profile-photo-events";
+import { useSidebarNavigation } from "@/hooks/use-sidebar-navigation";
 import { useAuth } from "@/providers/auth-provider";
 
 function getInitials(firstName: string, lastName: string): string {
@@ -44,7 +45,8 @@ function canDisplayImageUrl(url: string): Promise<boolean> {
 export function UserProfileDropdown() {
   const router = useRouter();
   const { setTheme, resolvedTheme } = useTheme();
-  const { profile, isLoading, signOut, portalHome } = useAuth();
+  const { profile, isLoading, signOut } = useAuth();
+  const { portalHome } = useSidebarNavigation();
   const [signOutOpen, setSignOutOpen] = useState(false);
   const [themeReady, setThemeReady] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);

@@ -89,14 +89,17 @@ export function resolveActivePortalSwitchLink(
   available: ReadonlyArray<{ label: string; href: string; portal: string }>,
   preferredPortal?: string | null,
 ) {
+  // Path wins so Super Admin routes never display an HR portal label from stale preference.
+  const byPath =
+    [...available]
+      .sort((left, right) => right.href.length - left.href.length)
+      .find((portal) => portalPathMatches(pathname, portal.href)) ?? null;
+  if (byPath) return byPath;
+
   if (preferredPortal) {
     const preferred = available.find((portal) => portal.portal === preferredPortal);
     if (preferred) return preferred;
   }
 
-  return (
-    [...available]
-      .sort((left, right) => right.href.length - left.href.length)
-      .find((portal) => portalPathMatches(pathname, portal.href)) ?? available[0]
-  );
+  return available[0];
 }

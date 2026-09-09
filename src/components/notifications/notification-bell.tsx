@@ -43,7 +43,7 @@ import {
   attachNotificationSoundUnlock,
   playNotificationSound,
 } from "@/lib/notifications/play-notification-sound";
-import { useAuth } from "@/providers/auth-provider";
+import { useSidebarNavigation } from "@/hooks/use-sidebar-navigation";
 import { cn } from "@/lib/utils";
 import type {
   NotificationBellData,
@@ -55,7 +55,7 @@ const POLL_INTERVAL_MS = 30_000;
 export function NotificationBell() {
   const router = useRouter();
   const pathname = usePathname();
-  const { portalHome } = useAuth();
+  const { portalHome } = useSidebarNavigation();
   const routes = useMemo(
     () => getNotificationsRoutesForPath(pathname, portalHome),
     [pathname, portalHome],

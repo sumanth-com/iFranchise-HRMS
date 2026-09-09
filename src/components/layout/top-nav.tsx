@@ -11,7 +11,7 @@ import { NotificationBell } from "@/components/notifications/notification-bell";
 import { UserProfileDropdown } from "@/components/layout/user-profile-dropdown";
 import { PortalSwitcherSkeleton } from "@/components/system-admin/portal-switcher";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { useAuth } from "@/providers/auth-provider";
+import { useSidebarNavigation } from "@/hooks/use-sidebar-navigation";
 
 const PortalSwitcher = dynamic(
   () =>
@@ -27,7 +27,7 @@ const PortalSwitcher = dynamic(
 export function TopNav() {
   const pathname = usePathname();
   const { toggleCollapsed, isCollapsed, setMobileOpen } = useSidebar();
-  const { portalHome } = useAuth();
+  const { portalHome } = useSidebarNavigation();
   const isPortalHome = pathname === portalHome;
 
   return (
