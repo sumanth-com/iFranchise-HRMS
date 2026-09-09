@@ -5,7 +5,7 @@ const STATUS_STYLES: Record<ProvisioningInvitationStatus, string> = {
   pending:
     "bg-amber-50 text-amber-800 ring-1 ring-amber-200/80",
   opened:
-    "bg-violet-50 text-violet-800 ring-1 ring-violet-200/80",
+    "bg-amber-50 text-amber-800 ring-1 ring-amber-200/80",
   active:
     "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200/80",
   expired:
@@ -22,7 +22,8 @@ const STATUS_STYLES: Record<ProvisioningInvitationStatus, string> = {
 
 const STATUS_LABELS: Record<ProvisioningInvitationStatus, string> = {
   pending: "Pending",
-  opened: "Opened",
+  // Legacy value — never show "Opened" in provisioning UI.
+  opened: "Pending",
   active: "Active",
   expired: "Expired",
   cancelled: "Cancelled",

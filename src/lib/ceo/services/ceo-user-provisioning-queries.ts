@@ -89,23 +89,26 @@ function deriveInvitationStatus(row: LooseRow): ProvisioningInvitationStatus {
     return row.invitation_cancelled_at ? "cancelled" : "pending";
   }
 
+  // Fully provisioned only after successful portal login.
   if (status === "active" && hasPortalUser && hasLoggedIn) {
     return "active";
   }
 
-  if (status === "invitation_accepted") {
-    return "opened";
-  }
-
-  if (status === "active" && !hasPortalUser && !hasLoggedIn) {
-    return "pending";
-  }
-
-  if (status === "invitation_pending" || status === "invited") {
-    if (row.invitation_sent_at) {
+  // Password set / link opened is still PENDING until first portal access.
+  // Do not surface "opened" in the provisioning workflow.
+  if (
+    status === "invitation_accepted" ||
+    status === "invitation_pending" ||
+    status === "invited"
+  ) {
+    if (row.invitation_sent_at && !hasLoggedIn) {
       const ageMs = Date.now() - new Date(row.invitation_sent_at).getTime();
       if (ageMs > INVITATION_EXPIRY_HOURS * 60 * 60 * 1000) return "expired";
     }
+    return "pending";
+  }
+
+  if (status === "active" && !hasLoggedIn) {
     return "pending";
   }
 
@@ -758,7 +761,6 @@ export async function getCeoProvisioningLookups(
 
   const statusOptions: LookupOption[] = [
     { id: "pending", label: "Pending" },
-    { id: "opened", label: "Opened" },
     { id: "active", label: "Active" },
     { id: "expired", label: "Expired" },
     { id: "cancelled", label: "Cancelled" },

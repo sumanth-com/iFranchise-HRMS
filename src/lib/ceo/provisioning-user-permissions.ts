@@ -23,7 +23,6 @@ function isPendingPortalInviteTarget(user: CeoProvisioningUser) {
     user.accountStatus === "invitation_accepted" ||
     (user.accountStatus === "active" && !user.userId) ||
     user.invitationStatus === "pending" ||
-    user.invitationStatus === "opened" ||
     user.invitationStatus === "expired"
   );
 }
@@ -35,15 +34,19 @@ export function canSendProvisioningInvitation(user: CeoProvisioningUser) {
 export function canResendProvisioningInvitation(user: CeoProvisioningUser) {
   if (!isPendingPortalInviteTarget(user)) return false;
   if (!user.invitationSentAt) return false;
+  // Resend while still PENDING (including after link open / password set, before portal login).
   return (
     user.invitationStatus === "pending" ||
-    user.invitationStatus === "opened" ||
     user.invitationStatus === "expired"
   );
 }
 
 export function canCancelProvisioningInvitation(user: CeoProvisioningUser) {
-  return user.accountStatus === "invitation_pending";
+  if (user.invitationStatus === "active") return false;
+  return (
+    user.accountStatus === "invitation_pending" ||
+    (user.accountStatus === "invitation_accepted" && user.invitationStatus === "pending")
+  );
 }
 
 export function canEditPendingProvisioningUser(user: CeoProvisioningUser) {

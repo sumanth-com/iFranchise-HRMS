@@ -423,6 +423,12 @@ export async function resendExecutiveInvitation(
 
   if (employee.account_status === "invitation_pending") {
     await resendEmployeeInvitation(supabase, profile, employeeId, roleId);
+  } else if (
+    employee.account_status === "invitation_accepted" &&
+    !employee.first_login_at
+  ) {
+    // Password may have been set, but portal activation is incomplete — still PENDING.
+    await resendEmployeeInvitation(supabase, profile, employeeId, roleId);
   } else if (awaitingFirstInvite) {
     if (!roleId) {
       const fallbackRole = await getInviteableRoleByCode(

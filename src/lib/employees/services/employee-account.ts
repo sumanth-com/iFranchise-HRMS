@@ -1133,7 +1133,11 @@ export async function resendEmployeeInvitation(
   roleId?: string,
 ) {
   const employee = await getEmployeeAccountRow(employeeId, profile.employee.organizationId);
-  if (employee.account_status !== "invitation_pending") {
+  const canResendPending =
+    employee.account_status === "invitation_pending" ||
+    (employee.account_status === "invitation_accepted" && !employee.first_login_at);
+
+  if (!canResendPending) {
     throw new Error("Only pending invitations can be resent");
   }
 
@@ -1164,6 +1168,7 @@ export async function resendEmployeeInvitation(
   const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
   await updateEmployeeAccount(employee.id, {
     user_id: authUserId,
+    account_status: "invitation_pending",
     invitation_sent_at: now,
     invitation_token: invitationToken,
     invitation_expires_at: expiresAt,
@@ -1206,7 +1211,11 @@ export async function cancelEmployeeInvitation(
   employeeId: string,
 ) {
   const employee = await getEmployeeAccountRow(employeeId, profile.employee.organizationId);
-  if (employee.account_status !== "invitation_pending") {
+  const canCancelPending =
+    employee.account_status === "invitation_pending" ||
+    (employee.account_status === "invitation_accepted" && !employee.first_login_at);
+
+  if (!canCancelPending) {
     throw new Error("Only pending invitations can be cancelled");
   }
 
@@ -1477,6 +1486,18 @@ export async function recordEmployeeSuccessfulLogin(
   }
 
   if (shouldActivate) {
+    await createAdminClient()
+      .schema("hrms")
+      .from("employee_invitations")
+      .update({
+        status: "accepted",
+        accepted_at: now,
+        updated_at: now,
+      })
+      .eq("employee_id", employeeRow.id)
+      .in("status", ["pending", "expired"])
+      .is("deleted_at", null);
+
     await notifyEmployeeAccount(
       { ...employeeRow, account_status: "active" },
       "employee_invitation_accepted",
@@ -1728,12 +1749,15 @@ export async function acceptInvitationOnPasswordSet(
     employee = byEmail;
   }
 
-  // Password was already verified for this Auth user. Link + accept with the
-  // admin client so RLS cannot silently skip the status update.
+  // Password verified for this Auth user. Link the employee and keep status
+  // PENDING until successful portal login (NOT INVITED → PENDING → ACTIVE).
   // Never promote a deliberately deactivated account via forgot-password alone.
-  let shouldAcceptInvite = ["invitation_pending", "invited", "draft"].includes(
-    String(employee.account_status ?? ""),
-  );
+  let shouldKeepPendingInvite = [
+    "invitation_pending",
+    "invited",
+    "draft",
+    "invitation_accepted",
+  ].includes(String(employee.account_status ?? ""));
 
   if (employee.account_status === "inactive") {
     const { data: inviteRow } = await admin
@@ -1745,13 +1769,13 @@ export async function acceptInvitationOnPasswordSet(
       .is("deleted_at", null)
       .limit(1)
       .maybeSingle();
-    shouldAcceptInvite = Boolean(inviteRow);
+    shouldKeepPendingInvite = Boolean(inviteRow);
   }
 
-  const employeeUpdate = shouldAcceptInvite
+  const employeeUpdate = shouldKeepPendingInvite
     ? {
         user_id: userId,
-        account_status: "invitation_accepted" as const,
+        account_status: "invitation_pending" as const,
         updated_at: now,
       }
     : {
@@ -1774,24 +1798,13 @@ export async function acceptInvitationOnPasswordSet(
     throw new Error(statusError.message);
   }
 
-  if (shouldAcceptInvite) {
-    await admin
-      .schema("hrms")
-      .from("employee_invitations")
-      .update({
-        status: "accepted",
-        accepted_at: now,
-        updated_at: now,
-      })
-      .eq("employee_id", employee.id)
-      .in("status", ["pending", "expired"])
-      .is("deleted_at", null);
-
+  // Invitation row stays pending until first successful portal login.
+  if (shouldKeepPendingInvite) {
     await writeApplicationAudit(supabase, {
       organizationId: employee.organization_id,
       module: "employees",
-      action: "invitation_accepted",
-      description: `Invitation accepted by ${normalizedEmail}`,
+      action: "password_set",
+      description: `Password set for ${normalizedEmail}; account remains pending until first portal login`,
       recordId: employee.id,
       priority: "medium",
       metadata: {

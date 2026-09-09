@@ -83,14 +83,14 @@ function isDeactivatedUser(user: CeoProvisioningUser) {
 function matchesStatusFilter(user: CeoProvisioningUser, statusFilter: string) {
   if (statusFilter === "all") return true;
   if (statusFilter === "deactivated") return isDeactivatedUser(user);
-  if (statusFilter === "pending") {
+  if (statusFilter === "pending" || statusFilter === "opened") {
+    // "opened" kept only for legacy filter URLs — maps to PENDING.
     return (
       user.invitationStatus === "pending" ||
       user.invitationStatus === "expired" ||
       user.invitationStatus === "cancelled"
     );
   }
-  if (statusFilter === "opened") return user.invitationStatus === "opened";
   if (statusFilter === "active") return user.invitationStatus === "active";
   return user.invitationStatus === statusFilter;
 }
@@ -115,7 +115,6 @@ function canDelete(user: CeoProvisioningUser) {
     user.accountStatus === "invited" ||
     user.invitationStatus === "cancelled" ||
     user.invitationStatus === "pending" ||
-    user.invitationStatus === "opened" ||
     user.invitationStatus === "expired"
   );
 }
@@ -368,7 +367,6 @@ export function CeoProvisioningPeople({
               items={[
                 { value: "all", label: "All statuses" },
                 { value: "pending", label: "Pending" },
-                { value: "opened", label: "Opened" },
                 { value: "active", label: "Active" },
                 { value: "deactivated", label: "Deactivated" },
               ]}
