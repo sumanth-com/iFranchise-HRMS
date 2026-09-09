@@ -280,6 +280,8 @@ export function AttendanceLocationDetailsView({
             longitudeLabel: formatGpsCoordinate(activePoint.longitude),
             accuracyMeters: activePoint.accuracyMeters,
             recordedAtLabel,
+            employeeName: data.employeeName,
+            punchLabel,
           }}
         />
       )}

@@ -15,6 +15,8 @@ export type AttendanceLocationMapOverlay = {
   longitudeLabel?: string;
   accuracyMeters?: number | null;
   recordedAtLabel?: string | null;
+  employeeName?: string | null;
+  punchLabel?: string | null;
 };
 
 type Props = {
@@ -184,7 +186,26 @@ export function AttendanceLocationMap({
     marker.setLatLng([latitude, longitude]);
     map.setView([latitude, longitude], 17, { animate: false });
     map.invalidateSize({ animate: false });
-  }, [latitude, longitude]);
+
+    const popupLines = [
+      overlay?.employeeName?.trim()
+        ? `<strong>${escapeHtml(overlay.employeeName.trim())}</strong>`
+        : null,
+      overlay?.punchLabel?.trim()
+        ? escapeHtml(overlay.punchLabel.trim())
+        : null,
+      `<span>Lat ${escapeHtml(overlay?.latitudeLabel ?? String(latitude))}</span>`,
+      `<span>Lng ${escapeHtml(overlay?.longitudeLabel ?? String(longitude))}</span>`,
+      overlay?.accuracyMeters != null
+        ? `<span>Accuracy ±${Math.round(overlay.accuracyMeters)} m</span>`
+        : null,
+    ].filter(Boolean);
+
+    marker.bindPopup(
+      `<div style="font:12px/1.45 system-ui,sans-serif;min-width:10rem">${popupLines.join("<br/>")}</div>`,
+      { closeButton: true, maxWidth: 260 },
+    );
+  }, [latitude, longitude, overlay]);
 
   async function toggleFullscreen() {
     const node = shellRef.current;
@@ -325,4 +346,13 @@ export function AttendanceLocationMap({
       </div>
     </div>
   );
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }

@@ -8,16 +8,16 @@ import {
   type SelfAttendancePunchResult,
 } from "@/lib/attendance/actions/self-attendance-punch-actions";
 import {
-  getOptionalPunchGeolocation,
+  fetchEmployeeLocation,
   type PunchGeolocationResult,
 } from "@/lib/attendance/punch-geolocation";
 
 function geoUnavailableMessage(geo: PunchGeolocationResult): string {
   switch (geo.status) {
     case "denied":
-      return "Location permission is blocked. Your attendance time was still saved — enable location in browser settings for next time.";
+      return "Location permission is blocked. Your attendance time was still saved — enable location for this site in browser settings for next time.";
     case "timeout":
-      return "Could not get your location in time. Your attendance time was still saved.";
+      return "Could not get your location in time. Your attendance time was still saved. Try near a window or with Wi‑Fi on next time.";
     case "unsupported":
       return "This browser cannot share location. Your attendance time was still saved.";
     default:
@@ -42,7 +42,7 @@ function geoPayload(geo: PunchGeolocationResult): {
 async function captureFreshPunchGps() {
   const loadingId = toast.loading("Capturing your location…");
   try {
-    return await getOptionalPunchGeolocation();
+    return await fetchEmployeeLocation();
   } finally {
     toast.dismiss(loadingId);
   }
@@ -51,7 +51,7 @@ async function captureFreshPunchGps() {
 export async function punchSelfAttendanceWithFreshGps(
   type: "in" | "out",
 ): Promise<SelfAttendancePunchResult> {
-  // Always attempt a fresh fix; never reuse a previous punch's coordinates.
+  // Fresh capture every punch — never reuse prior check-in/out coordinates.
   const geo = await captureFreshPunchGps();
   const captured = geo.status === "captured";
 
@@ -61,10 +61,11 @@ export async function punchSelfAttendanceWithFreshGps(
       latitude: geo.latitude,
       longitude: geo.longitude,
       accuracyM: geo.accuracy,
+      source: geo.source,
     });
   }
 
-  // Punch must succeed even when GPS is unavailable — never block attendance.
+  // Attendance time must succeed even when GPS is unavailable.
   const result = await selfAttendancePunchAction({
     type,
     ...geoPayload(geo),
@@ -82,11 +83,12 @@ export async function punchSelfAttendanceWithFreshGps(
     if (saved) {
       toast.success("Location captured successfully", { duration: 2500 });
     } else {
+      // Do not claim success if DB verification failed.
       toast.message(
         type === "in"
           ? "Checked in. Location could not be stored this time."
           : "Checked out. Location could not be stored this time.",
-        { duration: 4000 },
+        { duration: 4500 },
       );
     }
   } else {
@@ -107,6 +109,7 @@ export async function updateCheckoutWithFreshGps(
       latitude: geo.latitude,
       longitude: geo.longitude,
       accuracyM: geo.accuracy,
+      source: geo.source,
     });
   }
 
@@ -124,7 +127,7 @@ export async function updateCheckoutWithFreshGps(
       toast.success("Location captured successfully", { duration: 2500 });
     } else {
       toast.message("Checkout updated. Location could not be stored this time.", {
-        duration: 4000,
+        duration: 4500,
       });
     }
   } else {

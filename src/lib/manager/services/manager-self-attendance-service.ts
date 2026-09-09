@@ -986,7 +986,7 @@ async function persistAttendanceLocationColumns(
   if (
     input.accuracy != null &&
     Number.isFinite(input.accuracy) &&
-    input.accuracy > 50_000
+    input.accuracy > 100_000
   ) {
     console.warn(
       "[persistAttendanceLocationColumns] rejecting absurd GPS accuracy",
@@ -999,52 +999,42 @@ async function persistAttendanceLocationColumns(
     return false;
   }
 
-  // Never overwrite a valid stored fix with a poorer-accuracy reading.
-  const { data: existingRow } = await supabase
-    .schema("hrms")
-    .from("attendance")
-    .select(
-      "check_in_latitude, check_in_longitude, check_in_accuracy_m, check_out_latitude, check_out_longitude, check_out_accuracy_m",
-    )
-    .eq("id", input.attendanceId)
-    .eq("employee_id", input.employeeId)
-    .is("deleted_at", null)
-    .maybeSingle();
+  // For check-in only: do not clobber an existing better fix on idempotent retries.
+  // Check-out / Update Check Out always writes the fresh capture.
+  if (input.type === "in") {
+    const { data: existingRow } = await supabase
+      .schema("hrms")
+      .from("attendance")
+      .select("check_in_latitude, check_in_longitude, check_in_accuracy_m")
+      .eq("id", input.attendanceId)
+      .eq("employee_id", input.employeeId)
+      .is("deleted_at", null)
+      .maybeSingle();
 
-  if (existingRow) {
-    const existingLat =
-      input.type === "in"
-        ? existingRow.check_in_latitude
-        : existingRow.check_out_latitude;
-    const existingLng =
-      input.type === "in"
-        ? existingRow.check_in_longitude
-        : existingRow.check_out_longitude;
-    const existingAccuracyRaw =
-      input.type === "in"
-        ? existingRow.check_in_accuracy_m
-        : existingRow.check_out_accuracy_m;
-    const existingAccuracy =
-      existingAccuracyRaw == null ? null : Number(existingAccuracyRaw);
+    if (existingRow) {
+      const existingAccuracy =
+        existingRow.check_in_accuracy_m == null
+          ? null
+          : Number(existingRow.check_in_accuracy_m);
 
-    if (
-      isValidLatLng(existingLat, existingLng) &&
-      existingAccuracy != null &&
-      Number.isFinite(existingAccuracy) &&
-      input.accuracy != null &&
-      Number.isFinite(input.accuracy) &&
-      input.accuracy > existingAccuracy
-    ) {
-      console.info(
-        "[persistAttendanceLocationColumns] keeping better existing GPS",
-        {
-          attendanceId: input.attendanceId,
-          type: input.type,
-          existingAccuracyM: existingAccuracy,
-          incomingAccuracyM: input.accuracy,
-        },
-      );
-      return true;
+      if (
+        isValidLatLng(existingRow.check_in_latitude, existingRow.check_in_longitude) &&
+        existingAccuracy != null &&
+        Number.isFinite(existingAccuracy) &&
+        input.accuracy != null &&
+        Number.isFinite(input.accuracy) &&
+        input.accuracy > existingAccuracy
+      ) {
+        console.info(
+          "[persistAttendanceLocationColumns] keeping better existing check-in GPS",
+          {
+            attendanceId: input.attendanceId,
+            existingAccuracyM: existingAccuracy,
+            incomingAccuracyM: input.accuracy,
+          },
+        );
+        return true;
+      }
     }
   }
 
@@ -1208,7 +1198,7 @@ export async function punchManagerAttendance(
     !(
       input.accuracy != null &&
       Number.isFinite(input.accuracy) &&
-      input.accuracy > 50_000
+      input.accuracy > 100_000
     );
   // Prefer dedicated GPS columns; keep notes free of geo payloads.
   const geoNote = null;
@@ -1511,7 +1501,7 @@ export async function updateManagerCheckout(
     !(
       input.accuracy != null &&
       Number.isFinite(input.accuracy) &&
-      input.accuracy > 50_000
+      input.accuracy > 100_000
     );
   if (hasGeo && input.latitude != null && input.longitude != null) {
     const locationSaved = await persistAttendanceLocationColumns(supabase, {
