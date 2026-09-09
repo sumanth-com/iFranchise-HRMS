@@ -8,9 +8,10 @@ SET
   status = 'inactive',
   deleted_at = public.utc_now(),
   updated_at = public.utc_now()
-FROM hrms.roles r
-JOIN hrms.permissions p ON p.id = rp.permission_id
+FROM hrms.roles r,
+     hrms.permissions p
 WHERE rp.role_id = r.id
+  AND rp.permission_id = p.id
   AND r.code = 'super_admin'
   AND r.deleted_at IS NULL
   AND p.deleted_at IS NULL
