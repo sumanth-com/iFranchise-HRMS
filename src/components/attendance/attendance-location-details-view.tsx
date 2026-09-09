@@ -10,9 +10,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AttendanceStatusBadge } from "@/components/attendance/attendance-status-badge";
 import { buttonVariants, POLICY_HEADER_BUTTON_CLASS } from "@/components/common/button";
 import { SectionHelpButton } from "@/components/common/section-help-button";
+import { formatGpsCoordinate } from "@/lib/attendance/gps-format";
 import {
   attendanceLocationHref,
-  formatGpsCoordinate,
   type AttendanceLocationDetails,
   type AttendanceLocationPointKind,
 } from "@/lib/attendance/services/attendance-location";
@@ -276,8 +276,8 @@ export function AttendanceLocationDetailsView({
             address: activePoint.address,
             latitude: activePoint.latitude,
             longitude: activePoint.longitude,
-            latitudeLabel: formatGpsCoordinate(activePoint.latitude),
-            longitudeLabel: formatGpsCoordinate(activePoint.longitude),
+            latitudeLabel: formatGpsCoordinate(Number(activePoint.latitude)),
+            longitudeLabel: formatGpsCoordinate(Number(activePoint.longitude)),
             accuracyMeters: activePoint.accuracyMeters,
             recordedAtLabel,
             employeeName: data.employeeName,

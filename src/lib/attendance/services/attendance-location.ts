@@ -30,17 +30,7 @@ export type AttendanceLocationFlags = {
 };
 
 /** Format stored GPS for display without truncating meaningful digits. */
-export function formatGpsCoordinate(value: number): string {
-  if (!Number.isFinite(value)) return "—";
-  // GPS in this app is stored to ~6–8 decimal places; keep all significant digits.
-  const asFixed = value.toFixed(8);
-  const trimmed = asFixed.replace(/0+$/, "").replace(/\.$/, "");
-  // Always show at least 6 decimals when the value has a fractional part.
-  const [, fraction = ""] = trimmed.split(".");
-  if (fraction.length >= 6) return trimmed;
-  if (!trimmed.includes(".")) return value.toFixed(6);
-  return value.toFixed(6);
-}
+export { formatGpsCoordinate } from "@/lib/attendance/gps-format";
 
 /** Valid WGS84 coordinates suitable for map display. */
 export function isValidLatLng(latitude: unknown, longitude: unknown): boolean {
