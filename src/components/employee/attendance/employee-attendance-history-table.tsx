@@ -31,7 +31,7 @@ import {
 import { attendanceLocationHref } from "@/lib/attendance/services/attendance-location";
 import { getHrmsYears } from "@/lib/date/hrms-year";
 import { ATTENDANCE_STATUS_LABELS } from "@/lib/attendance/constants";
-import { selfAttendanceUpdateCheckoutAction } from "@/lib/attendance/actions/self-attendance-punch-actions";
+import { updateCheckoutWithFreshGps } from "@/lib/attendance/self-attendance-punch-with-gps";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { formatHoursLabel, formatLateByLabel } from "@/lib/employee/attendance-format";
 import type { AttendanceStatus } from "@/types/attendance";
@@ -95,9 +95,8 @@ export function EmployeeAttendanceHistoryTable({
 
   function updateCheckout(row: ManagerAttendanceHistoryRow) {
     startTransition(async () => {
-      const result = await selfAttendanceUpdateCheckoutAction({
-        attendanceId: row.id ?? undefined,
-      });
+      // Always capture a fresh high-accuracy GPS fix — never reuse prior coords.
+      const result = await updateCheckoutWithFreshGps(row.id ?? null);
       if (!result.success) {
         toast.error(result.message);
         return;

@@ -982,6 +982,80 @@ async function persistAttendanceLocationColumns(
     userId: string;
   },
 ): Promise<boolean> {
+  // Defense-in-depth: never persist obvious network/cell approximations.
+  if (
+    input.accuracy != null &&
+    Number.isFinite(input.accuracy) &&
+    input.accuracy > 250
+  ) {
+    console.warn(
+      "[persistAttendanceLocationColumns] rejecting poor GPS accuracy",
+      {
+        attendanceId: input.attendanceId,
+        type: input.type,
+        accuracyM: input.accuracy,
+      },
+    );
+    return false;
+  }
+
+  // Never overwrite a valid stored fix with a poorer-accuracy reading.
+  const { data: existingRow } = await supabase
+    .schema("hrms")
+    .from("attendance")
+    .select(
+      "check_in_latitude, check_in_longitude, check_in_accuracy_m, check_out_latitude, check_out_longitude, check_out_accuracy_m",
+    )
+    .eq("id", input.attendanceId)
+    .eq("employee_id", input.employeeId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (existingRow) {
+    const existingLat =
+      input.type === "in"
+        ? existingRow.check_in_latitude
+        : existingRow.check_out_latitude;
+    const existingLng =
+      input.type === "in"
+        ? existingRow.check_in_longitude
+        : existingRow.check_out_longitude;
+    const existingAccuracyRaw =
+      input.type === "in"
+        ? existingRow.check_in_accuracy_m
+        : existingRow.check_out_accuracy_m;
+    const existingAccuracy =
+      existingAccuracyRaw == null ? null : Number(existingAccuracyRaw);
+
+    if (
+      isValidLatLng(existingLat, existingLng) &&
+      existingAccuracy != null &&
+      Number.isFinite(existingAccuracy) &&
+      input.accuracy != null &&
+      Number.isFinite(input.accuracy) &&
+      input.accuracy > existingAccuracy
+    ) {
+      console.info(
+        "[persistAttendanceLocationColumns] keeping better existing GPS",
+        {
+          attendanceId: input.attendanceId,
+          type: input.type,
+          existingAccuracyM: existingAccuracy,
+          incomingAccuracyM: input.accuracy,
+        },
+      );
+      return true;
+    }
+  }
+
+  console.info("[persistAttendanceLocationColumns] saving GPS", {
+    attendanceId: input.attendanceId,
+    type: input.type,
+    latitude: input.latitude,
+    longitude: input.longitude,
+    accuracyM: input.accuracy ?? null,
+  });
+
   const nowIso = new Date().toISOString();
   const payload =
     input.type === "in"
@@ -1130,9 +1204,26 @@ export async function punchManagerAttendance(
   const hasGeo =
     input.latitude != null &&
     input.longitude != null &&
-    isValidLatLng(input.latitude, input.longitude);
+    isValidLatLng(input.latitude, input.longitude) &&
+    !(
+      input.accuracy != null &&
+      Number.isFinite(input.accuracy) &&
+      input.accuracy > 250
+    );
   // Prefer dedicated GPS columns; keep notes free of geo payloads.
   const geoNote = null;
+
+  if (
+    input.latitude != null &&
+    input.longitude != null &&
+    isValidLatLng(input.latitude, input.longitude) &&
+    !hasGeo
+  ) {
+    console.warn(
+      "[punchManagerAttendance] dropping poor-accuracy GPS before punch",
+      { type: input.type, accuracyM: input.accuracy },
+    );
+  }
 
   let status: AttendanceStatus;
   let workHours = 0;
@@ -1416,7 +1507,12 @@ export async function updateManagerCheckout(
   const hasGeo =
     input.latitude != null &&
     input.longitude != null &&
-    isValidLatLng(input.latitude, input.longitude);
+    isValidLatLng(input.latitude, input.longitude) &&
+    !(
+      input.accuracy != null &&
+      Number.isFinite(input.accuracy) &&
+      input.accuracy > 250
+    );
   if (hasGeo && input.latitude != null && input.longitude != null) {
     const locationSaved = await persistAttendanceLocationColumns(supabase, {
       attendanceId: existing.id,
@@ -1430,9 +1526,18 @@ export async function updateManagerCheckout(
     if (!locationSaved) {
       console.error(
         "[updateManagerCheckout] GPS coordinates were captured but not saved",
-        { attendanceId: existing.id },
+        { attendanceId: existing.id, accuracyM: input.accuracy },
       );
     }
+  } else if (
+    input.latitude != null &&
+    input.longitude != null &&
+    isValidLatLng(input.latitude, input.longitude)
+  ) {
+    console.warn(
+      "[updateManagerCheckout] dropping poor-accuracy GPS",
+      { accuracyM: input.accuracy },
+    );
   }
 
   await writeApplicationAudit(supabase, {
