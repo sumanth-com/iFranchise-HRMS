@@ -8,6 +8,7 @@ const ELIGIBLE_ACCOUNT_STATUSES = new Set([
   "draft",
   "invited",
   "invitation_pending",
+  "invitation_accepted",
   "active",
 ]);
 

@@ -36,7 +36,11 @@ import { isTabletHrmsAllowed } from "@/lib/device-access/access";
 import { isTabletClientRequest } from "@/lib/device-access/request";
 import { assertRateLimit } from "@/lib/security/rate-limit";
 import { hashPasswordResetToken } from "@/lib/security/signed-flow-tokens";
-import { recordEmployeeSuccessfulLogin, acceptInvitationOnPasswordSet } from "@/lib/employees/services/employee-account";
+import {
+  recordEmployeeSuccessfulLogin,
+  acceptInvitationOnPasswordSet,
+  validateInvitationForUser,
+} from "@/lib/employees/services/employee-account";
 import { sendBirthdayRemindersOnLogin } from "@/lib/employee/services/birthday-reminder-notifications";
 import { resolveUserPortalRoute } from "@/lib/auth/permission-resolver";
 import { recordUserLoginSession } from "@/lib/ceo/services/ceo-profile-queries";
@@ -564,6 +568,12 @@ export async function resetPasswordAction(
     };
   }
 
+  const expectedEmailRaw =
+    typeof formData.get("email") === "string"
+      ? String(formData.get("email")).trim().toLowerCase()
+      : "";
+  const isInviteSetup = formData.get("invite") === "1";
+
   const supabase = await createClient();
 
   const {
@@ -571,12 +581,45 @@ export async function resetPasswordAction(
     error: userError,
   } = await supabase.auth.getUser();
 
-  if (userError || !user) {
+  if (userError || !user?.email) {
     return {
       success: false,
       error: "RESET_LINK_INVALID",
       message: getAuthErrorMessage("RESET_LINK_INVALID"),
     };
+  }
+
+  const sessionEmail = user.email.trim().toLowerCase();
+  if (expectedEmailRaw && expectedEmailRaw !== sessionEmail) {
+    console.error("[resetPasswordAction] session email mismatch", {
+      userId: user.id,
+      sessionEmail,
+      expectedEmail: expectedEmailRaw,
+    });
+    await supabase.auth.signOut();
+    return {
+      success: false,
+      error: "RESET_LINK_INVALID",
+      message: getAuthErrorMessage("RESET_LINK_INVALID"),
+    };
+  }
+
+  // Soft pre-check for invite flow (do not deactivate on expiry here).
+  if (isInviteSetup) {
+    const validation = await validateInvitationForUser(
+      supabase,
+      user.id,
+      sessionEmail,
+      { deactivateOnExpiry: false },
+    );
+    if (!validation.valid && validation.reason === "invalid") {
+      await supabase.auth.signOut();
+      return {
+        success: false,
+        error: "RESET_LINK_INVALID",
+        message: getAuthErrorMessage("RESET_LINK_INVALID"),
+      };
+    }
   }
 
   const { error } = await supabase.auth.updateUser({
@@ -587,6 +630,7 @@ export async function resetPasswordAction(
     const errorCode = mapSupabaseAuthError(error.message);
     console.error("[resetPasswordAction] updateUser failed", {
       userId: user.id,
+      email: sessionEmail,
       code: errorCode,
       message: error.message,
     });
@@ -597,22 +641,35 @@ export async function resetPasswordAction(
     };
   }
 
-  const email = user.email ?? "";
-
-  try {
-    await acceptInvitationOnPasswordSet(supabase, user.id, email);
-  } catch (inviteError) {
-    console.error("[auth] invitation acceptance failed", {
+  // Verify the new password works for THIS email before claiming success.
+  await supabase.auth.signOut();
+  const { error: verifyError } = await supabase.auth.signInWithPassword({
+    email: sessionEmail,
+    password: parsed.data.password,
+  });
+  if (verifyError) {
+    console.error("[resetPasswordAction] credential verify failed", {
       userId: user.id,
-      name: inviteError instanceof Error ? inviteError.name : "unknown",
-      message: inviteError instanceof Error ? inviteError.message : "unknown",
+      email: sessionEmail,
+      message: verifyError.message,
     });
-    await supabase.auth.signOut();
     return {
       success: false,
-      error: "RESET_LINK_INVALID",
-      message: getAuthErrorMessage("RESET_LINK_INVALID"),
+      error: "SERVER_ERROR",
+      message:
+        "Password could not be verified after saving. Please request a new invitation link and try again.",
     };
+  }
+  await supabase.auth.signOut();
+
+  try {
+    await acceptInvitationOnPasswordSet(supabase, user.id, sessionEmail);
+  } catch (inviteError) {
+    // Password is already verified on Auth — first login can finish activation.
+    console.error("[auth] invitation acceptance failed after password verify", {
+      userId: user.id,
+      message: inviteError instanceof Error ? inviteError.message : "unknown",
+    });
   }
 
   const now = new Date().toISOString();
@@ -634,10 +691,8 @@ export async function resetPasswordAction(
     });
   }
 
-  await supabase.auth.signOut();
-
   return {
     success: true,
-    redirectTo: `${AUTH_ROUTES.login}?passwordUpdated=1${email ? `&email=${encodeURIComponent(email)}` : ""}`,
+    redirectTo: `${AUTH_ROUTES.login}?passwordUpdated=1&email=${encodeURIComponent(sessionEmail)}`,
   };
 }

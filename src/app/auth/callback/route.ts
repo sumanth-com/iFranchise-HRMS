@@ -53,7 +53,10 @@ export async function GET(request: NextRequest) {
     email = user?.email ?? null;
 
     if (user && type === "invite" && email) {
-      const validation = await validateInvitationForUser(supabase, user.id, email);
+      // Do not deactivate on expiry here — password setup still validates softly.
+      const validation = await validateInvitationForUser(supabase, user.id, email, {
+        deactivateOnExpiry: false,
+      });
       if (!validation.valid) {
         return buildAuthErrorRedirect(origin, next, validation.reason);
       }
@@ -71,7 +74,9 @@ export async function GET(request: NextRequest) {
     email = user?.email ?? null;
 
     if (user && type === "invite" && email) {
-      const validation = await validateInvitationForUser(supabase, user.id, email);
+      const validation = await validateInvitationForUser(supabase, user.id, email, {
+        deactivateOnExpiry: false,
+      });
       if (!validation.valid) {
         return buildAuthErrorRedirect(origin, next, validation.reason);
       }

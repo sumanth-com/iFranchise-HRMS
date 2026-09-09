@@ -28,6 +28,35 @@ function cleanUrl(pathname: string, searchParams: URLSearchParams) {
   window.history.replaceState(null, "", query ? `${pathname}?${query}` : pathname);
 }
 
+function normalizeEmail(value: string | null | undefined): string {
+  return (value ?? "").trim().toLowerCase();
+}
+
+function hasInviteOrRecoveryMaterial(searchParams: URLSearchParams): {
+  hashAccessToken: string | null;
+  hashRefreshToken: string | null;
+  code: string | null;
+  tokenHash: string | null;
+  type: string | null;
+} {
+  const hash = window.location.hash.startsWith("#")
+    ? window.location.hash.slice(1)
+    : "";
+  const hashParams = hash ? new URLSearchParams(hash) : null;
+
+  return {
+    hashAccessToken: hashParams?.get("access_token") ?? null,
+    hashRefreshToken: hashParams?.get("refresh_token") ?? null,
+    code: searchParams.get("code"),
+    tokenHash: searchParams.get("token_hash"),
+    type: searchParams.get("type"),
+  };
+}
+
+/**
+ * Ensures the reset/activate page is bound to the invite/recovery session —
+ * never an unrelated browser session that would update the wrong password.
+ */
 export function ResetPasswordSessionGate({
   children,
 }: ResetPasswordSessionGateProps) {
@@ -44,54 +73,64 @@ export function ResetPasswordSessionGate({
     }
 
     let cancelled = false;
+    const expectedEmail = normalizeEmail(searchParams.get("email"));
 
     async function establishSession() {
       const supabase = createClient();
+      const material = hasInviteOrRecoveryMaterial(searchParams);
+      const hasLinkMaterial = Boolean(
+        (material.hashAccessToken && material.hashRefreshToken) ||
+          material.code ||
+          (material.tokenHash && material.type),
+      );
 
       const {
-        data: { user },
+        data: { user: existingUser },
       } = await supabase.auth.getUser();
 
-      if (user) {
-        if (!cancelled) setStatus("ready");
-        return;
+      // Invite/recovery links must always be consumed. An existing HR/admin
+      // (or stale) session must not short-circuit and steal the password update.
+      if (hasLinkMaterial && existingUser) {
+        await supabase.auth.signOut({ scope: "local" });
       }
 
-      const hash = window.location.hash.startsWith("#")
-        ? window.location.hash.slice(1)
-        : "";
-      if (hash) {
-        const hashParams = new URLSearchParams(hash);
-        const accessToken = hashParams.get("access_token");
-        const refreshToken = hashParams.get("refresh_token");
+      if (material.hashAccessToken && material.hashRefreshToken) {
+        const { error } = await supabase.auth.setSession({
+          access_token: material.hashAccessToken,
+          refresh_token: material.hashRefreshToken,
+        });
 
-        if (accessToken && refreshToken) {
-          const { error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
+        window.history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${window.location.search}`,
+        );
 
-          window.history.replaceState(
-            null,
-            "",
-            `${window.location.pathname}${window.location.search}`,
-          );
-
-          if (!error) {
-            const {
-              data: { user: sessionUser },
-            } = await supabase.auth.getUser();
-            if (sessionUser) {
-              if (!cancelled) setStatus("ready");
+        if (!error) {
+          const {
+            data: { user: sessionUser },
+          } = await supabase.auth.getUser();
+          if (sessionUser) {
+            if (
+              expectedEmail &&
+              normalizeEmail(sessionUser.email) &&
+              normalizeEmail(sessionUser.email) !== expectedEmail
+            ) {
+              await supabase.auth.signOut({ scope: "local" });
+              if (!cancelled) {
+                setErrorMessage(getAuthErrorMessage("RESET_LINK_INVALID"));
+                setStatus("error");
+              }
               return;
             }
+            if (!cancelled) setStatus("ready");
+            return;
           }
         }
       }
 
-      const code = searchParams.get("code");
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
+      if (material.code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(material.code);
         cleanUrl(window.location.pathname, new URLSearchParams(window.location.search));
 
         if (!error) {
@@ -99,18 +138,28 @@ export function ResetPasswordSessionGate({
             data: { user: sessionUser },
           } = await supabase.auth.getUser();
           if (sessionUser) {
+            if (
+              expectedEmail &&
+              normalizeEmail(sessionUser.email) &&
+              normalizeEmail(sessionUser.email) !== expectedEmail
+            ) {
+              await supabase.auth.signOut({ scope: "local" });
+              if (!cancelled) {
+                setErrorMessage(getAuthErrorMessage("RESET_LINK_INVALID"));
+                setStatus("error");
+              }
+              return;
+            }
             if (!cancelled) setStatus("ready");
             return;
           }
         }
       }
 
-      const tokenHash = searchParams.get("token_hash");
-      const type = searchParams.get("type");
-      if (tokenHash && type) {
+      if (material.tokenHash && material.type) {
         const { error } = await supabase.auth.verifyOtp({
-          token_hash: tokenHash,
-          type: type as EmailOtpType,
+          token_hash: material.tokenHash,
+          type: material.type as EmailOtpType,
         });
         cleanUrl(window.location.pathname, new URLSearchParams(window.location.search));
 
@@ -119,10 +168,62 @@ export function ResetPasswordSessionGate({
             data: { user: sessionUser },
           } = await supabase.auth.getUser();
           if (sessionUser) {
+            if (
+              expectedEmail &&
+              normalizeEmail(sessionUser.email) &&
+              normalizeEmail(sessionUser.email) !== expectedEmail
+            ) {
+              await supabase.auth.signOut({ scope: "local" });
+              if (!cancelled) {
+                setErrorMessage(getAuthErrorMessage("RESET_LINK_INVALID"));
+                setStatus("error");
+              }
+              return;
+            }
             if (!cancelled) setStatus("ready");
             return;
           }
         }
+      }
+
+      // No link material: allow an already-authenticated recovery session
+      // (e.g. redirected from /auth/callback with cookies already set).
+      if (!hasLinkMaterial && existingUser) {
+        if (
+          expectedEmail &&
+          normalizeEmail(existingUser.email) &&
+          normalizeEmail(existingUser.email) !== expectedEmail
+        ) {
+          await supabase.auth.signOut({ scope: "local" });
+          if (!cancelled) {
+            setErrorMessage(getAuthErrorMessage("RESET_LINK_INVALID"));
+            setStatus("error");
+          }
+          return;
+        }
+        if (!cancelled) setStatus("ready");
+        return;
+      }
+
+      // Re-check after exchanges in case callback already planted cookies.
+      const {
+        data: { user: finalUser },
+      } = await supabase.auth.getUser();
+      if (finalUser) {
+        if (
+          expectedEmail &&
+          normalizeEmail(finalUser.email) &&
+          normalizeEmail(finalUser.email) !== expectedEmail
+        ) {
+          await supabase.auth.signOut({ scope: "local" });
+          if (!cancelled) {
+            setErrorMessage(getAuthErrorMessage("RESET_LINK_INVALID"));
+            setStatus("error");
+          }
+          return;
+        }
+        if (!cancelled) setStatus("ready");
+        return;
       }
 
       if (!cancelled) {
@@ -140,9 +241,9 @@ export function ResetPasswordSessionGate({
 
   if (status === "loading") {
     return (
-      <div className="flex flex-col items-center gap-3 py-10">
+      <div className="flex flex-col gap-3 items-center py-10">
         <LoadingSpinner />
-        <p className="text-sm text-muted-foreground">Verifying your reset link...</p>
+        <p className="text-sm text-muted-foreground">Verifying your secure link…</p>
       </div>
     );
   }
@@ -151,9 +252,9 @@ export function ResetPasswordSessionGate({
     return (
       <div className="space-y-6">
         <div className="space-y-2 text-center">
-          <h2 className="text-lg font-semibold tracking-tight">Reset link expired</h2>
+          <h2 className="text-lg font-semibold tracking-tight">Link expired or invalid</h2>
           <p className="text-sm text-muted-foreground">
-            Request a new link to continue setting your password.
+            Request a new invitation or reset link to continue setting your password.
           </p>
         </div>
 

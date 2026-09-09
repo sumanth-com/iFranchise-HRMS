@@ -291,7 +291,7 @@ export function LoginForm() {
 
       {showPasswordUpdatedMessage ? (
         <AuthNotice variant="success" title="Password updated">
-          Password reset successfully. You can now sign in with your new password.
+          Password updated successfully. You can now sign in with your email and new password.
         </AuthNotice>
       ) : null}
 

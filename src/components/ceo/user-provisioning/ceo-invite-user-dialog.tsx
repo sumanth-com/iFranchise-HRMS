@@ -580,7 +580,7 @@ export function CeoInviteUserDialog({
                 </Button>
                 <Button type="submit" disabled={isPending || !inviteServiceReady}>
                   {isPending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-                  Send invitation
+                  {isPending ? "Sending invitation..." : "Send invitation"}
                 </Button>
               </div>
             </form>
@@ -782,7 +782,7 @@ export function CeoInviteUserDialog({
                   ) : (
                     <Send className="size-4" />
                   )}
-                  Invite User
+                  {isPending ? "Sending invitation..." : "Invite User"}
                 </Button>
               </div>
             </form>
@@ -954,7 +954,7 @@ export function CeoInviteUserDialog({
                   ) : (
                     <Send className="size-4" />
                   )}
-                  Send Invitation
+                  {isPending ? "Sending invitation..." : "Send Invitation"}
                 </Button>
               </div>
             </form>

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckCircle2, Eye, EyeOff, Lock, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, Loader2, Lock, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import { AuthNotice } from "@/components/auth/auth-notice";
@@ -34,7 +34,6 @@ export function ResetPasswordForm() {
   const [formError, setFormError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [signInHref, setSignInHref] = useState<string | null>(null);
   const isInviteSetup = searchParams.get("invite") === "1";
   const invitedEmail = searchParams.get("email");
   const invitedName = searchParams.get("name");
@@ -56,6 +55,8 @@ export function ResetPasswordForm() {
     const formData = new FormData();
     formData.set("password", data.password);
     formData.set("confirmPassword", data.confirmPassword);
+    if (invitedEmail) formData.set("email", invitedEmail.trim().toLowerCase());
+    if (isInviteSetup) formData.set("invite", "1");
 
     startTransition(async () => {
       try {
@@ -63,48 +64,20 @@ export function ResetPasswordForm() {
 
         if (!result.success) {
           setFormError(resolveUserFacingAuthMessage(result.error, "NETWORK_ERROR"));
+          toast.error(
+            resolveUserFacingAuthMessage(result.error, "NETWORK_ERROR"),
+          );
           return;
         }
 
-        if (isInviteSetup) {
-          toast.success("Password created successfully");
-          setSignInHref(result.redirectTo);
-          return;
-        }
-
-        toast.success("Password reset successfully");
+        toast.success("Password updated successfully. You can now sign in.");
         router.replace(result.redirectTo);
       } catch {
         setFormError(resolveUserFacingAuthMessage("NETWORK_ERROR"));
+        toast.error(resolveUserFacingAuthMessage("NETWORK_ERROR"));
       }
     });
   });
-
-  if (signInHref) {
-    return (
-      <div className="flex flex-col gap-6">
-        <div className="space-y-2 text-center">
-          <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
-            <CheckCircle2 className="size-6" />
-          </div>
-          <h1 className="text-[1.75rem] font-semibold tracking-tight text-foreground">
-            {isInviteSetup ? "Account activated" : "Password updated"}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Your account is ready. Sign in with your email and the password you just created.
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
-          Password saved successfully.
-        </div>
-
-        <Link href={signInHref} className={cn(buttonVariants(), submitClass)}>
-          Sign in
-        </Link>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -235,14 +208,17 @@ export function ResetPasswordForm() {
           ) : null}
         </div>
 
-        <Button type="submit" className={submitClass} disabled={isPending}>
-          {isPending
-            ? isInviteSetup
-              ? "Creating..."
-              : "Updating..."
-            : isInviteSetup
-              ? "Create password & activate"
-              : "Update password"}
+        <Button type="submit" className={cn(submitClass, "gap-2")} disabled={isPending}>
+          {isPending ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Saving password...
+            </>
+          ) : isInviteSetup ? (
+            "Create password & activate"
+          ) : (
+            "Update password"
+          )}
         </Button>
 
         <Link

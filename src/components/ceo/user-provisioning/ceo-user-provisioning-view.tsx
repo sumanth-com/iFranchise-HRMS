@@ -1,7 +1,7 @@
 "use client";
 
 import { UserRoundPlus } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -85,6 +85,7 @@ export function CeoUserProvisioningView({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [busyEmployeeId, setBusyEmployeeId] = useState<string | null>(null);
+  const busyActionRef = useRef(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{
     action: ProvisioningConfirmAction;
@@ -169,7 +170,9 @@ export function CeoUserProvisioningView({
     >,
     user: CeoProvisioningUser,
   ) {
+    if (busyActionRef.current) return;
     const runner = MUTATION_ACTIONS[action];
+    busyActionRef.current = true;
     setBusyEmployeeId(user.employeeId);
     try {
       const result = await runner(user.employeeId);
@@ -186,6 +189,7 @@ export function CeoUserProvisioningView({
 
       await refreshModuleData(pageParams);
     } finally {
+      busyActionRef.current = false;
       setBusyEmployeeId(null);
     }
   }
@@ -319,6 +323,7 @@ export function CeoUserProvisioningView({
         employeeId={selectedEmployeeId}
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
+        busyEmployeeId={busyEmployeeId}
         onAction={(action, detail) => requestAction(action, detail.user)}
       />
     </div>

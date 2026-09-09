@@ -29,6 +29,7 @@ type CeoProvisioningDrawerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAction: (action: ProvisioningRowAction, detail: CeoProvisioningUserDetail) => void;
+  busyEmployeeId?: string | null;
 };
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -51,10 +52,12 @@ export function CeoProvisioningDrawer({
   open,
   onOpenChange,
   onAction,
+  busyEmployeeId = null,
 }: CeoProvisioningDrawerProps) {
   const [detail, setDetail] = useState<CeoProvisioningUserDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const isActionBusy = Boolean(employeeId && busyEmployeeId === employeeId);
 
   useEffect(() => {
     if (!open || !employeeId) {
@@ -206,10 +209,15 @@ export function CeoProvisioningDrawer({
                       variant="outline"
                       size="sm"
                       className="gap-1.5"
+                      disabled={isActionBusy}
                       onClick={() => onAction("resend", detail)}
                     >
-                      <RotateCw className="size-3.5" />
-                      Send Invite
+                      {isActionBusy ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <RotateCw className="size-3.5" />
+                      )}
+                      {isActionBusy ? "Sending invitation..." : "Send Invite"}
                     </Button>
                   ) : null}
                   {showResend ? (
@@ -218,10 +226,15 @@ export function CeoProvisioningDrawer({
                       variant="outline"
                       size="sm"
                       className="gap-1.5"
+                      disabled={isActionBusy}
                       onClick={() => onAction("resend", detail)}
                     >
-                      <RotateCw className="size-3.5" />
-                      Resend Invite
+                      {isActionBusy ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <RotateCw className="size-3.5" />
+                      )}
+                      {isActionBusy ? "Resending invitation..." : "Resend Invite"}
                     </Button>
                   ) : null}
                   {showReactivate ? (
@@ -230,9 +243,14 @@ export function CeoProvisioningDrawer({
                       variant="outline"
                       size="sm"
                       className="gap-1.5"
+                      disabled={isActionBusy}
                       onClick={() => onAction("reactivate", detail)}
                     >
-                      <Power className="size-3.5" />
+                      {isActionBusy ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Power className="size-3.5" />
+                      )}
                       Reactivate user
                     </Button>
                   ) : null}
@@ -242,6 +260,7 @@ export function CeoProvisioningDrawer({
                       variant="outline"
                       size="sm"
                       className="gap-1.5 text-destructive hover:text-destructive"
+                      disabled={isActionBusy}
                       onClick={() => onAction("cancel", detail)}
                     >
                       <ShieldX className="size-3.5" />
@@ -254,6 +273,7 @@ export function CeoProvisioningDrawer({
                       variant="outline"
                       size="sm"
                       className="gap-1.5 text-destructive hover:text-destructive"
+                      disabled={isActionBusy}
                       onClick={() => onAction("delete", detail)}
                     >
                       <Trash2 className="size-3.5" />
@@ -266,6 +286,7 @@ export function CeoProvisioningDrawer({
                       variant="outline"
                       size="sm"
                       className="gap-1.5 text-destructive hover:text-destructive"
+                      disabled={isActionBusy}
                       onClick={() => onAction("deactivate", detail)}
                     >
                       <Ban className="size-3.5" />

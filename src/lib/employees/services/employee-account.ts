@@ -395,11 +395,14 @@ async function adminLookupInvitedRoleId(employeeId: string) {
 
 async function findAuthUserIdByEmail(email: string) {
   const admin = createAdminClient();
+  const normalized = email.trim().toLowerCase();
   let page = 1;
   while (page <= 20) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 500 });
     if (error) break;
-    const match = data.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    const match = data.users.find(
+      (u) => u.email?.trim().toLowerCase() === normalized,
+    );
     if (match) return match.id;
     if (data.users.length < 500) break;
     page++;
@@ -422,15 +425,16 @@ export async function findAndDeleteStaleAuthUser(email: string) {
 async function sendSupabaseInvite(employee: EmployeeAccountRow, roleId?: string | null) {
   const admin = createAdminClient();
   const inviteContext = await loadInviteEmailContext(employee.id, roleId);
+  const inviteEmail = employee.email.trim().toLowerCase();
 
-  const { data, error } = await admin.auth.admin.inviteUserByEmail(employee.email, {
+  const { data, error } = await admin.auth.admin.inviteUserByEmail(inviteEmail, {
     redirectTo: getPasswordResetRedirectTo(true),
     data: {
       employee_id: employee.id,
       employee_code: employee.employee_code,
       full_name: inviteContext.fullName,
       employee_name: inviteContext.greetingName,
-      company_email: employee.email,
+      company_email: inviteEmail,
       department_name: inviteContext.departmentName,
       designation_name: inviteContext.designationName,
       employment_type_name: inviteContext.employmentTypeName,
@@ -453,17 +457,17 @@ async function sendSupabaseInvite(employee: EmployeeAccountRow, roleId?: string 
     message.includes("user already");
 
   if (alreadyExists) {
-    const existingUserId = await findAuthUserIdByEmail(employee.email);
+    const existingUserId = await findAuthUserIdByEmail(inviteEmail);
     if (existingUserId) {
       await admin.auth.admin.deleteUser(existingUserId);
-      const retry = await admin.auth.admin.inviteUserByEmail(employee.email, {
+      const retry = await admin.auth.admin.inviteUserByEmail(inviteEmail, {
         redirectTo: getPasswordResetRedirectTo(true),
         data: {
           employee_id: employee.id,
           employee_code: employee.employee_code,
           full_name: inviteContext.fullName,
           employee_name: inviteContext.greetingName,
-          company_email: employee.email,
+          company_email: inviteEmail,
           organization_id: employee.organization_id,
         },
       });
@@ -1566,9 +1570,11 @@ export async function validateInvitationForUser(
   _supabase: AuthSupabaseClient,
   userId: string,
   email: string,
+  options?: { deactivateOnExpiry?: boolean },
 ): Promise<{ valid: true } | { valid: false; reason: "expired" | "invalid" }> {
   const admin = createAdminClient();
-  const normalizedEmail = email.trim();
+  const normalizedEmail = email.trim().toLowerCase();
+  const deactivateOnExpiry = options?.deactivateOnExpiry !== false;
 
   type InvitationEmployeeRow = {
     id: string;
@@ -1607,7 +1613,7 @@ export async function validateInvitationForUser(
       .from("employees")
       .select(selectInvitationFields)
       .ilike("email", normalizedEmail)
-      .eq("account_status", "invitation_pending")
+      .in("account_status", ["invitation_pending", "invited", "draft"])
       .is("deleted_at", null)
       .maybeSingle();
 
@@ -1653,21 +1659,23 @@ export async function validateInvitationForUser(
 
   const expiresAt = Date.parse(employee.invitation_expires_at);
   if (Number.isNaN(expiresAt) || expiresAt < Date.now()) {
-    await admin
-      .schema("hrms")
-      .from("employees")
-      .update({ account_status: "inactive", updated_at: new Date().toISOString() })
-      .eq("id", employee.id);
-    await admin
-      .schema("hrms")
-      .from("employee_invitations")
-      .update({
-        status: "expired",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("employee_id", employee.id)
-      .eq("status", "pending")
-      .is("deleted_at", null);
+    if (deactivateOnExpiry) {
+      await admin
+        .schema("hrms")
+        .from("employees")
+        .update({ account_status: "inactive", updated_at: new Date().toISOString() })
+        .eq("id", employee.id);
+      await admin
+        .schema("hrms")
+        .from("employee_invitations")
+        .update({
+          status: "expired",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("employee_id", employee.id)
+        .eq("status", "pending")
+        .is("deleted_at", null);
+    }
     return { valid: false, reason: "expired" };
   }
 
@@ -1680,7 +1688,10 @@ export async function acceptInvitationOnPasswordSet(
   email: string,
 ) {
   const admin = createAdminClient();
-  const { data: employee, error } = await admin
+  const normalizedEmail = email.trim().toLowerCase();
+  const now = new Date().toISOString();
+
+  const { data: byUserId, error } = await admin
     .schema("hrms")
     .from("employees")
     .select("id, organization_id, account_status, employee_code, first_name, last_name")
@@ -1692,16 +1703,16 @@ export async function acceptInvitationOnPasswordSet(
       userId,
       message: error.message,
     });
-    return;
   }
+
+  let employee = byUserId;
 
   if (!employee) {
     const { data: byEmail, error: byEmailError } = await admin
       .schema("hrms")
       .from("employees")
       .select("id, organization_id, account_status, employee_code, first_name, last_name")
-      .ilike("email", email.trim())
-      .eq("account_status", "invitation_pending")
+      .ilike("email", normalizedEmail)
       .is("deleted_at", null)
       .maybeSingle();
 
@@ -1714,29 +1725,56 @@ export async function acceptInvitationOnPasswordSet(
       return;
     }
 
-    await admin
+    employee = byEmail;
+  }
+
+  // Password was already verified for this Auth user. Link + accept with the
+  // admin client so RLS cannot silently skip the status update.
+  // Never promote a deliberately deactivated account via forgot-password alone.
+  let shouldAcceptInvite = ["invitation_pending", "invited", "draft"].includes(
+    String(employee.account_status ?? ""),
+  );
+
+  if (employee.account_status === "inactive") {
+    const { data: inviteRow } = await admin
       .schema("hrms")
-      .from("employees")
-      .update({ user_id: userId, updated_at: new Date().toISOString() })
-      .eq("id", byEmail.id);
+      .from("employee_invitations")
+      .select("id")
+      .eq("employee_id", employee.id)
+      .in("status", ["pending", "expired"])
+      .is("deleted_at", null)
+      .limit(1)
+      .maybeSingle();
+    shouldAcceptInvite = Boolean(inviteRow);
+  }
 
-    if (byEmail.account_status !== "invitation_pending") return;
+  const employeeUpdate = shouldAcceptInvite
+    ? {
+        user_id: userId,
+        account_status: "invitation_accepted" as const,
+        updated_at: now,
+      }
+    : {
+        user_id: userId,
+        updated_at: now,
+      };
 
-    const validation = await validateInvitationForUser(supabase, userId, email);
-    if (!validation.valid) {
-      throw new Error(
-        validation.reason === "expired"
-          ? "This invitation has expired. Contact HR for a new invitation."
-          : "This invitation link is invalid.",
-      );
-    }
+  const { error: statusError } = await admin
+    .schema("hrms")
+    .from("employees")
+    .update(employeeUpdate)
+    .eq("id", employee.id)
+    .is("deleted_at", null);
 
-    const now = new Date().toISOString();
-    await updateEmployeeAccountWithClient(supabase, byEmail.id, {
-      account_status: "invitation_accepted",
-      updated_at: now,
+  if (statusError) {
+    console.error("[acceptInvitationOnPasswordSet] status update failed", {
+      employeeId: employee.id,
+      message: statusError.message,
     });
+    throw new Error(statusError.message);
+  }
 
+  if (shouldAcceptInvite) {
     await admin
       .schema("hrms")
       .from("employee_invitations")
@@ -1745,53 +1783,22 @@ export async function acceptInvitationOnPasswordSet(
         accepted_at: now,
         updated_at: now,
       })
-      .eq("employee_id", byEmail.id)
-      .eq("status", "pending")
+      .eq("employee_id", employee.id)
+      .in("status", ["pending", "expired"])
       .is("deleted_at", null);
 
-    return;
+    await writeApplicationAudit(supabase, {
+      organizationId: employee.organization_id,
+      module: "employees",
+      action: "invitation_accepted",
+      description: `Invitation accepted by ${normalizedEmail}`,
+      recordId: employee.id,
+      priority: "medium",
+      metadata: {
+        employeeId: employee.id,
+        employeeCode: employee.employee_code,
+        email: normalizedEmail,
+      },
+    });
   }
-
-  if (employee.account_status !== "invitation_pending") return;
-
-  const validation = await validateInvitationForUser(supabase, userId, email);
-  if (!validation.valid) {
-    throw new Error(
-      validation.reason === "expired"
-        ? "This invitation has expired. Contact HR for a new invitation."
-        : "This invitation link is invalid.",
-    );
-  }
-
-  const now = new Date().toISOString();
-  await updateEmployeeAccountWithClient(supabase, employee.id, {
-    account_status: "invitation_accepted",
-    updated_at: now,
-  });
-
-  await admin
-    .schema("hrms")
-    .from("employee_invitations")
-    .update({
-      status: "accepted",
-      accepted_at: now,
-      updated_at: now,
-    })
-    .eq("employee_id", employee.id)
-    .eq("status", "pending")
-    .is("deleted_at", null);
-
-  await writeApplicationAudit(supabase, {
-    organizationId: employee.organization_id,
-    module: "employees",
-    action: "invitation_accepted",
-    description: `Invitation accepted by ${email}`,
-    recordId: employee.id,
-    priority: "medium",
-    metadata: {
-      employeeId: employee.id,
-      employeeCode: employee.employee_code,
-      email,
-    },
-  });
 }
