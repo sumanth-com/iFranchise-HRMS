@@ -69,17 +69,18 @@ export function LeaveBalanceSummaryCards({
         {cards.map((card) => {
           const isActive = selectedCode?.toUpperCase() === card.key;
           const cardClassName = cn(
-            "relative z-10 flex h-full min-h-[8.25rem] w-full min-w-0 max-w-none flex-col justify-between gap-3 overflow-hidden rounded-2xl border bg-white px-5 py-5 text-left shadow-sm outline-none pointer-events-auto",
+            "relative z-10 flex h-full min-h-[8.25rem] w-full min-w-0 max-w-none flex-col justify-between gap-3 overflow-hidden rounded-2xl border bg-card px-5 py-5 text-left shadow-sm outline-none pointer-events-auto",
             "border-border/70",
             selectable &&
-              "cursor-pointer transition-[border-color,box-shadow] duration-200 ease-out hover:border-violet-300/70 hover:shadow-sm focus-visible:border-violet-400/60 focus-visible:ring-2 focus-visible:ring-violet-400/20 focus-visible:ring-offset-0",
-            isActive && "border-violet-400/70 shadow-sm",
+              "cursor-pointer transition-[border-color,box-shadow,background-color] duration-200 ease-out hover:border-violet-300/70 hover:bg-muted/40 hover:shadow-sm focus-visible:border-violet-400/60 focus-visible:ring-2 focus-visible:ring-violet-400/20 focus-visible:ring-offset-0 dark:hover:border-violet-400/40 dark:hover:bg-muted/30",
+            isActive &&
+              "border-violet-400/70 bg-violet-500/[0.06] shadow-sm dark:border-violet-400/50 dark:bg-violet-500/10",
           );
 
           const content = (
             <>
               <div className="flex items-start justify-between gap-2">
-                <p className="truncate whitespace-nowrap text-[11px] font-medium leading-none text-foreground/90 dark:text-white">
+                <p className="truncate whitespace-nowrap text-[11px] font-medium leading-none text-muted-foreground">
                   {card.label}
                 </p>
                 <span
@@ -100,7 +101,7 @@ export function LeaveBalanceSummaryCards({
                 >
                   {card.value}
                 </p>
-                <p className="mt-1.5 truncate text-[11px] leading-4 text-foreground/80 dark:text-white/90">
+                <p className="mt-1.5 truncate text-[11px] leading-4 text-muted-foreground">
                   {card.key === "OH"
                     ? "Available this year"
                     : LEAVE_BALANCE_AVAILABLE_CAPTION}
