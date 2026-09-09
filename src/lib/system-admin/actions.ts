@@ -18,10 +18,15 @@ import { writeSystemAudit } from "@/lib/system-admin/services/audit-helper";
 import { WEBHOOK_EVENTS, type WebhookEvent } from "@/lib/public-api/constants";
 import {
   getBackupDownloadPayload,
-  listBackupJobs,
+  getBackupOperationsSnapshot,
   runBackupJob,
-  type BackupType,
+  updateBackupSchedulePreferences,
 } from "@/lib/system-admin/services/backup-service";
+import {
+  toFriendlyBackupError,
+  type BackupScheduleFrequency,
+  type BackupType,
+} from "@/lib/system-admin/services/backup-types";
 import { getDatabaseHealthDetail } from "@/lib/system-admin/services/database-health-service";
 import {
   getEmailServiceSnapshot,
@@ -34,15 +39,15 @@ import {
   importEmployeesCsv,
   listImportJobs,
   restoreFromBackupJson,
-  type ExportModule,
 } from "@/lib/system-admin/services/import-export-service";
+import type { ExportModule } from "@/lib/system-admin/services/import-export-types";
 import {
   integrationProviderLabel,
   listSystemIntegrations,
   setIntegrationStatus,
   syncIntegration,
-  type IntegrationProvider,
 } from "@/lib/system-admin/services/integrations-service";
+import type { IntegrationProvider } from "@/lib/system-admin/services/integration-types";
 import {
   createStorageSignedUrl,
   deleteStorageObject,
@@ -225,7 +230,7 @@ export async function createApiKeyAction(input: CreateSystemApiKeyInput) {
     await writeSystemAudit(supabase, profile, {
       action: "api_key_created",
       description: `API key created: ${input.name}`,
-      recordId: result.id,
+      recordId: result.key.id,
       priority: "high",
       metadata: {
         environment: input.environment,
@@ -233,7 +238,6 @@ export async function createApiKeyAction(input: CreateSystemApiKeyInput) {
         rateLimitTier: input.rateLimitTier,
       },
     });
-    revalidateSystemAdmin();
     return { success: true as const, data: result };
   } catch (error) {
     return {
@@ -254,7 +258,6 @@ export async function revokeApiKeyAction(keyId: string) {
       recordId: keyId,
       priority: "high",
     });
-    revalidateSystemAdmin();
     return { success: true as const };
   } catch (error) {
     return {
@@ -275,7 +278,6 @@ export async function deleteApiKeyAction(keyId: string) {
       recordId: keyId,
       priority: "high",
     });
-    revalidateSystemAdmin();
     return { success: true as const };
   } catch (error) {
     return {
@@ -296,7 +298,6 @@ export async function rotateApiKeyAction(keyId: string) {
       recordId: keyId,
       priority: "high",
     });
-    revalidateSystemAdmin();
     return { success: true as const, data };
   } catch (error) {
     return {
@@ -365,7 +366,6 @@ export async function updateApiSettingsAction(input: {
       priority: "high",
       metadata: input,
     });
-    revalidateSystemAdmin();
     return { success: true as const, data };
   } catch (error) {
     return {
@@ -399,7 +399,6 @@ export async function createWebhookAction(input: {
       priority: "high",
       metadata: { events },
     });
-    revalidateSystemAdmin();
     return { success: true as const, data: result };
   } catch (error) {
     return {
@@ -434,7 +433,6 @@ export async function updateWebhookAction(input: {
       recordId: input.webhookId,
       priority: "high",
     });
-    revalidateSystemAdmin();
     return { success: true as const };
   } catch (error) {
     return {
@@ -456,7 +454,6 @@ export async function deleteWebhookAction(webhookId: string) {
       recordId: webhookId,
       priority: "high",
     });
-    revalidateSystemAdmin();
     return { success: true as const };
   } catch (error) {
     return {
@@ -493,12 +490,26 @@ export async function runBackupAction(backupType: BackupType, format: "json" | "
       priority: "high",
       metadata: { backupType, format, recordCount: data.recordCount },
     });
-    revalidateSystemAdmin();
-    return { success: true as const, data };
+    const snapshot = await getBackupOperationsSnapshot(
+      supabase,
+      profile.employee.organizationId,
+    );
+    return { success: true as const, data, snapshot };
   } catch (error) {
+    const technicalMessage =
+      error &&
+      typeof error === "object" &&
+      "technicalMessage" in error &&
+      typeof (error as { technicalMessage?: unknown }).technicalMessage === "string"
+        ? (error as { technicalMessage: string }).technicalMessage
+        : error instanceof Error
+          ? error.message
+          : "Backup failed";
+    console.error("[backup] runBackupAction failed:", technicalMessage);
     return {
       success: false as const,
-      message: error instanceof Error ? error.message : "Backup failed",
+      message: toFriendlyBackupError(technicalMessage),
+      technicalMessage,
     };
   }
 }
@@ -531,12 +542,38 @@ export async function listBackupsAction() {
   try {
     const profile = await requireSuperAdminProfile();
     const supabase = await createClient();
-    const data = await listBackupJobs(supabase, profile.employee.organizationId);
+    const data = await getBackupOperationsSnapshot(
+      supabase,
+      profile.employee.organizationId,
+    );
     return { success: true as const, data };
   } catch (error) {
     return {
       success: false as const,
       message: error instanceof Error ? error.message : "Failed to load backups",
+    };
+  }
+}
+
+export async function updateBackupScheduleAction(input: {
+  frequency: BackupScheduleFrequency;
+  retentionDays: number;
+}) {
+  try {
+    const profile = await requireSuperAdminProfile();
+    const supabase = await createClient();
+    const data = await updateBackupSchedulePreferences(supabase, profile, input);
+    await writeSystemAudit(supabase, profile, {
+      action: "backup_schedule_updated",
+      description: `Backup schedule set to ${input.frequency}; retention ${input.retentionDays} days`,
+      priority: "medium",
+      metadata: input,
+    });
+    return { success: true as const, data };
+  } catch (error) {
+    return {
+      success: false as const,
+      message: error instanceof Error ? error.message : "Failed to update backup schedule",
     };
   }
 }
@@ -553,7 +590,6 @@ export async function restoreBackupAction(jobId: string) {
       priority: "critical",
       metadata: data,
     });
-    revalidateSystemAdmin();
     return { success: true as const, data };
   } catch (error) {
     return {
@@ -599,7 +635,6 @@ export async function importEmployeesAction(csvContent: string) {
       priority: "high",
       metadata: data,
     });
-    revalidateSystemAdmin();
     return { success: true as const, data };
   } catch (error) {
     return {
@@ -639,7 +674,6 @@ export async function sendTestEmailAction(toEmail: string) {
         smtpConfigured: true,
       });
     }
-    revalidateSystemAdmin();
     return { success: result.success as boolean, message: result.message };
   } catch (error) {
     return {
@@ -658,7 +692,6 @@ export async function retryFailedEmailsAction() {
       action: "email_retry",
       description: `Retried ${count} failed emails`,
     });
-    revalidateSystemAdmin();
     return { success: true as const, data: count };
   } catch (error) {
     return {
@@ -783,7 +816,6 @@ export async function deleteStorageObjectAction(bucket: string, objectPath: stri
       description: `Deleted ${bucket}/${objectPath}`,
       priority: "high",
     });
-    revalidateSystemAdmin();
     return { success: true as const };
   } catch (error) {
     return {

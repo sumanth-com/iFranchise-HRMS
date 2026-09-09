@@ -11,7 +11,6 @@ import { resolveEmployeeFromRouteRef } from "@/lib/employees/services/employee-r
 import { buildEmployeeModuleRoutes } from "@/lib/employees/constants";
 import { buildEmployeeRouteRef, isEmployeeUuid } from "@/lib/employees/routing";
 import { requireServerPermission } from "@/lib/permissions/server";
-import { requireSuperAdminProfile } from "@/lib/system-admin/guards";
 import { SYSTEM_ADMIN_ROUTES } from "@/lib/system-admin/constants";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +24,6 @@ type EmployeeEditPageProps = {
 export default async function SuperAdminEmployeeEditPage({
   params,
 }: EmployeeEditPageProps) {
-  await requireSuperAdminProfile();
   const profile = await requireServerPermission("employee.edit");
   const { employeeRef } = await params;
   const supabase = await createClient();

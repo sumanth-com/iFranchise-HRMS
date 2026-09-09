@@ -3,8 +3,8 @@
 import {
   selfAttendancePunchAction,
   selfAttendanceUpdateCheckoutAction,
-  revalidateSelfAttendancePaths,
 } from "@/lib/attendance/actions/self-attendance-punch-actions";
+import { revalidateSelfAttendancePaths } from "@/lib/attendance/self-attendance-revalidate";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { getEmployeeDashboardData } from "@/lib/employee/services/employee-dashboard-queries";
 import { requestManagerAttendanceRegularization } from "@/lib/manager/services/manager-self-attendance-service";

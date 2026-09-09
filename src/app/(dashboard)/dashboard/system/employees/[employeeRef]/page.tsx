@@ -6,7 +6,6 @@ import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { getEmployeeDetailBundleAction } from "@/lib/employees/actions";
 import { buildEmployeeModuleRoutes } from "@/lib/employees/constants";
 import { buildEmployeeRouteRef, isEmployeeUuid } from "@/lib/employees/routing";
-import { requireSuperAdminProfile } from "@/lib/system-admin/guards";
 import { SYSTEM_ADMIN_ROUTES } from "@/lib/system-admin/constants";
 
 const SYSTEM_EMPLOYEE_LIST = SYSTEM_ADMIN_ROUTES.employees;
@@ -21,7 +20,6 @@ export default async function SuperAdminEmployeeDetailPage({
   params,
   searchParams,
 }: EmployeeDetailPageProps) {
-  await requireSuperAdminProfile();
   const { employeeRef } = await params;
   const rawSearchParams = await searchParams;
   const bundle = await getEmployeeDetailBundleAction(employeeRef, rawSearchParams);

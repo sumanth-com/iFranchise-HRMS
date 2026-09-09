@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   Bell,
   Building2,
   CalendarCheck,
@@ -8,7 +9,7 @@ import {
   LaptopMinimal,
   LayoutDashboard,
   Plug,
-  ScrollText,
+  Receipt,
   Settings,
   Shield,
   ShieldCheck,
@@ -68,6 +69,14 @@ export const SYSTEM_ADMIN_NAV_ITEMS: NavigationItem[] = [
     section: "Self-service",
     roles: ["super_admin"],
     permissions: ["payroll.view", "payslip.view"],
+  },
+  {
+    title: "Reimbursements",
+    href: SYSTEM_ADMIN_ROUTES.reimbursements,
+    icon: Receipt,
+    section: "Self-service",
+    roles: ["super_admin"],
+    permissions: ["reimbursement.view", "reimbursement.create"],
   },
   {
     title: "Documents",
@@ -165,12 +174,12 @@ export const SYSTEM_ADMIN_NAV_ITEMS: NavigationItem[] = [
     permissions: ["system.admin.access", "organization.view", "branch.view", "department.view"],
   },
   {
-    title: "Audit Trail",
-    href: `${SYSTEM_ADMIN_ROUTES.audit}/logs`,
-    icon: ScrollText,
+    title: "Reports",
+    href: `${SYSTEM_ADMIN_ROUTES.reports}/attendance`,
+    icon: BarChart3,
     section: "System Administration",
     roles: ["super_admin"],
-    permissions: ["system.admin.access", "audit.view"],
+    permissions: ["system.admin.access", "reports.view"],
   },
   {
     title: "Security",
@@ -181,7 +190,7 @@ export const SYSTEM_ADMIN_NAV_ITEMS: NavigationItem[] = [
     permissions: ["system.admin.access", "audit.view"],
   },
   {
-    title: "System / Integrations",
+    title: "Infrastructure",
     href: SYSTEM_ADMIN_ROUTES.integrations,
     icon: Plug,
     section: "System Administration",

@@ -1,6 +1,12 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import {
+  ChevronRight,
+  FileText,
+  Folder,
+  HardDrive,
+  Loader2,
+} from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -14,18 +20,13 @@ import {
   SystemPanel,
 } from "@/components/system-admin/system-module-frame";
 import {
-  downloadBackupAction,
   exportModuleAction,
-  getDatabaseHealthAction,
   getEmailSnapshotAction,
   getEnvironmentSnapshotAction,
-  listBackupsAction,
   listImportJobsAction,
   listIntegrationsAction,
   listStorageObjectsAction,
-  restoreBackupAction,
   retryFailedEmailsAction,
-  runBackupAction,
   sendTestEmailAction,
   signStorageObjectAction,
   syncIntegrationAction,
@@ -38,14 +39,19 @@ import {
   importEmployeesAction,
 } from "@/lib/system-admin/actions";
 import type { SystemSettings } from "@/lib/system-admin/services/system-settings";
-import type { DatabaseHealthSnapshot } from "@/lib/system-admin/services/database-health-service";
 import type { EmailServiceSnapshot } from "@/lib/system-admin/services/email-service";
 import type { EnvironmentSnapshot } from "@/lib/system-admin/services/environment-service";
-import type { SystemIntegrationRow } from "@/lib/system-admin/services/integrations-service";
-import type { BackupJobRow } from "@/lib/system-admin/services/backup-service";
-import type { ImportJobRow } from "@/lib/system-admin/services/import-export-service";
-import type { StorageBucketSnapshot } from "@/lib/system-admin/services/storage-service";
+import type { SystemIntegrationRow } from "@/lib/system-admin/services/integration-types";
+import type { ImportJobRow } from "@/lib/system-admin/services/import-export-types";
+import type { StorageBucketSnapshot } from "@/lib/system-admin/services/storage-types";
 import { cn } from "@/lib/utils";
+
+function formatStorageSize(sizeBytes: number | null | undefined) {
+  if (!sizeBytes || sizeBytes <= 0) return null;
+  if (sizeBytes < 1024) return `${sizeBytes} B`;
+  if (sizeBytes < 1024 * 1024) return `${(sizeBytes / 1024).toFixed(1)} KB`;
+  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 const DEFAULT_FLAGS = [
   "beta_portal",
@@ -56,81 +62,8 @@ const DEFAULT_FLAGS = [
 ];
 
 export { SystemDashboardLive } from "@/components/system-admin/system-dashboard-live";
-
-export function DatabaseHealthPanel({ initial }: { initial: DatabaseHealthSnapshot }) {
-  const [data, setData] = useState(initial);
-  const [isPending, startTransition] = useTransition();
-
-  const refresh = () =>
-    startTransition(async () => {
-      const res = await getDatabaseHealthAction();
-      if (res.success) setData(res.data);
-      else toast.error(res.message);
-    });
-
-  return (
-    <SystemModuleFrame title="Database Health" description="Connection status, table counts, and issues">
-      <div className="flex h-full min-h-0 flex-col gap-3">
-        <div className="grid shrink-0 gap-2 sm:grid-cols-2 xl:grid-cols-4">
-          <SystemMetric
-            label="Status"
-            value={data.connected ? "Connected" : "Down"}
-            variant={data.connected ? "success" : "danger"}
-          />
-          <SystemMetric label="Response" value={`${data.responseTimeMs}ms`} />
-          <SystemMetric label="Total Records" value={data.totalRecords.toLocaleString()} />
-          <div className="flex items-end">
-            <Button
-              size="sm"
-              variant="outline"
-              className="w-full"
-              disabled={isPending}
-              onClick={refresh}
-            >
-              {isPending ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : null}
-              Recheck
-            </Button>
-          </div>
-        </div>
-        <div className="grid min-h-0 flex-1 gap-3 overflow-hidden lg:grid-cols-2">
-          <SystemPanel title="Tables" className="min-h-0" bodyClassName="p-0">
-            {data.tables.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-muted-foreground">No tables listed.</p>
-            ) : (
-              <ul className="divide-y">
-                {data.tables.map((t) => (
-                  <li key={t.table} className="flex justify-between gap-3 px-4 py-2 text-sm">
-                    <span className="truncate">{t.table}</span>
-                    <span className="tabular-nums text-muted-foreground">
-                      {t.count.toLocaleString()}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </SystemPanel>
-          <SystemPanel title="Issues & Fixes" className="min-h-0" bodyClassName="p-0">
-            {data.issues.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-emerald-600">No issues detected</p>
-            ) : (
-              <ul className="divide-y">
-                {data.issues.map((issue, i) => (
-                  <li key={i} className="space-y-1 px-4 py-3 text-sm">
-                    <p className="text-xs font-semibold tracking-wide text-amber-600 uppercase">
-                      {issue.severity}
-                    </p>
-                    <p>{issue.cause}</p>
-                    <p className="text-xs text-muted-foreground">{issue.suggestedFix}</p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </SystemPanel>
-        </div>
-      </div>
-    </SystemModuleFrame>
-  );
-}
+export { BackupPanel } from "@/components/system-admin/backup-restore-panel";
+export { DatabaseHealthPanel } from "@/components/system-admin/database-monitoring-panel";
 
 export function StorageManagerPanel({
   buckets: initialBuckets,
@@ -152,139 +85,250 @@ export function StorageManagerPanel({
     }>
   >([]);
   const [isPending, startTransition] = useTransition();
+  const [hasLoaded, setHasLoaded] = useState(false);
+
+  const selectedBucketMeta = buckets.find((bucket) => bucket.id === selectedBucket);
+  const folderCount = objects.filter((item) => item.isFolder).length;
+  const fileCount = objects.length - folderCount;
 
   const loadObjects = (bucket: string, folderPrefix = prefix) =>
     startTransition(async () => {
       const res = await listStorageObjectsAction(bucket, folderPrefix);
-      if (res.success) setObjects(res.data);
-      else toast.error(res.message);
+      if (res.success) {
+        setObjects(res.data);
+        setHasLoaded(true);
+      } else {
+        toast.error(res.message);
+      }
     });
 
   useEffect(() => {
     if (selectedBucket) {
       setPrefix("");
       setPathLabels({});
+      setHasLoaded(false);
       loadObjects(selectedBucket, "");
     }
+    // Intentionally reload only when the selected bucket changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBucket]);
 
   const breadcrumbParts = prefix ? prefix.split("/").filter(Boolean) : [];
 
   return (
-    <SystemModuleFrame title="Storage Manager" description="Browse organization files by folder">
-      <div className="grid h-full min-h-0 gap-3 overflow-hidden lg:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)]">
-        <SystemPanel title="Buckets" className="min-h-0" bodyClassName="p-0">
-          {buckets.length === 0 ? (
-            <p className="px-4 py-8 text-center text-sm text-muted-foreground">No buckets found.</p>
-          ) : (
-            <ul className="divide-y">
-              {buckets.map((b) => (
-                <li key={b.id}>
-                  <button
-                    type="button"
-                    className={cn(
-                      "flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-sm hover:bg-muted/60",
-                      selectedBucket === b.id && "bg-muted",
-                    )}
-                    onClick={() => setSelectedBucket(b.id)}
-                  >
-                    <span className="truncate font-medium">{b.name}</span>
-                    <span className="tabular-nums text-xs text-muted-foreground">{b.fileCount}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </SystemPanel>
-        <SystemPanel title="Files" className="min-h-0">
-          <div className="mb-3 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-            <button
-              type="button"
-              className="hover:text-foreground"
-              onClick={() => {
-                setPrefix("");
-                loadObjects(selectedBucket, "");
-              }}
-            >
-              Organization
-            </button>
-            {breadcrumbParts.map((part, index) => {
-              const pathTo = breadcrumbParts.slice(0, index + 1).join("/");
-              return (
-                <span key={pathTo} className="flex items-center gap-1">
-                  <span>/</span>
-                  <button
-                    type="button"
-                    className="hover:text-foreground"
-                    onClick={() => {
-                      setPrefix(pathTo);
-                      loadObjects(selectedBucket, pathTo);
-                    }}
-                  >
-                    {objects.find((o) => o.relativePath === pathTo)?.displayName ??
-                      pathLabels[pathTo] ??
-                      "Folder"}
-                  </button>
-                </span>
-              );
-            })}
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
+      <div className="grid shrink-0 gap-2 sm:grid-cols-3">
+        <SystemMetric label="Buckets" value={buckets.length} />
+        <SystemMetric
+          label="Objects in bucket"
+          value={selectedBucketMeta?.fileCount ?? 0}
+        />
+        <SystemMetric
+          label="Current folder"
+          value={hasLoaded ? `${folderCount} folders · ${fileCount} files` : "—"}
+        />
+      </div>
+
+      <div className="grid min-h-0 flex-1 gap-3 overflow-hidden lg:grid-cols-[minmax(14rem,17rem)_minmax(0,1fr)]">
+        <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
+          <div className="shrink-0 border-b px-4 py-3">
+            <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+              Buckets
+            </p>
+            <p className="mt-0.5 text-sm font-medium">Object storage</p>
           </div>
-          {objects.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">No items in this folder</p>
-          ) : (
-            <ul className="space-y-2">
-              {objects.map((o) => (
-                <li
-                  key={o.path}
-                  className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{o.displayName}</p>
-                    {!o.isFolder && o.sizeBytes ? (
-                      <p className="text-[11px] text-muted-foreground">
-                        {(o.sizeBytes / 1024).toFixed(1)} KB
-                      </p>
-                    ) : null}
-                  </div>
-                  {o.isFolder ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={isPending}
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {buckets.length === 0 ? (
+              <div className="flex min-h-[12rem] flex-col items-center justify-center gap-2 px-4 py-8 text-center">
+                <HardDrive className="size-8 text-muted-foreground/50" />
+                <p className="text-sm text-muted-foreground">No storage buckets found.</p>
+              </div>
+            ) : (
+              <ul className="space-y-0.5 p-2">
+                {buckets.map((bucket) => {
+                  const isActive = selectedBucket === bucket.id;
+                  return (
+                    <li key={bucket.id}>
+                      <button
+                        type="button"
+                        className={cn(
+                          "flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm transition-colors",
+                          isActive
+                            ? "bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-sm"
+                            : "hover:bg-muted/70",
+                        )}
+                        onClick={() => setSelectedBucket(bucket.id)}
+                      >
+                        <HardDrive
+                          className={cn(
+                            "size-4 shrink-0",
+                            isActive ? "text-white/90" : "text-muted-foreground",
+                          )}
+                        />
+                        <span className="min-w-0 flex-1 truncate font-medium">{bucket.name}</span>
+                        <span
+                          className={cn(
+                            "tabular-nums text-xs",
+                            isActive ? "text-white/80" : "text-muted-foreground",
+                          )}
+                        >
+                          {bucket.fileCount}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
+          <div className="shrink-0 space-y-3 border-b px-4 py-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                  Browser
+                </p>
+                <p className="mt-0.5 truncate text-sm font-medium">
+                  {selectedBucketMeta?.name ?? "Select a bucket"}
+                </p>
+              </div>
+              {isPending ? (
+                <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Loading
+                </span>
+              ) : null}
+            </div>
+
+            <nav
+              className="flex flex-wrap items-center gap-1 text-xs"
+              aria-label="Storage path"
+            >
+              <button
+                type="button"
+                className="rounded-md px-1.5 py-0.5 font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                onClick={() => {
+                  setPrefix("");
+                  loadObjects(selectedBucket, "");
+                }}
+              >
+                Root
+              </button>
+              {breadcrumbParts.map((part, index) => {
+                const pathTo = breadcrumbParts.slice(0, index + 1).join("/");
+                const isLast = index === breadcrumbParts.length - 1;
+                return (
+                  <span key={pathTo} className="flex items-center gap-1">
+                    <ChevronRight className="size-3.5 text-muted-foreground/70" />
+                    <button
+                      type="button"
+                      disabled={isLast}
+                      className={cn(
+                        "rounded-md px-1.5 py-0.5 font-medium",
+                        isLast
+                          ? "text-foreground"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                      )}
                       onClick={() => {
-                        setPathLabels((prev) => ({
-                          ...prev,
-                          [o.relativePath]: o.displayName,
-                        }));
-                        setPrefix(o.relativePath);
-                        loadObjects(selectedBucket, o.relativePath);
+                        setPrefix(pathTo);
+                        loadObjects(selectedBucket, pathTo);
                       }}
                     >
-                      Open
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={isPending}
-                      onClick={() =>
-                        startTransition(async () => {
-                          const res = await signStorageObjectAction(selectedBucket, o.path);
-                          if (res.success) window.open(res.data, "_blank");
-                          else toast.error(res.message);
-                        })
-                      }
+                      {pathLabels[pathTo] ?? part}
+                    </button>
+                  </span>
+                );
+              })}
+            </nav>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {!selectedBucket ? (
+              <div className="flex min-h-[14rem] flex-col items-center justify-center gap-2 px-4 py-10 text-center">
+                <HardDrive className="size-9 text-muted-foreground/40" />
+                <p className="text-sm font-medium">Select a bucket</p>
+                <p className="max-w-sm text-xs text-muted-foreground">
+                  Choose a storage bucket from the left to browse folders and files.
+                </p>
+              </div>
+            ) : !hasLoaded && isPending ? (
+              <div className="flex min-h-[14rem] items-center justify-center px-4 py-10">
+                <Loader2 className="size-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : objects.length === 0 ? (
+              <div className="flex min-h-[14rem] flex-col items-center justify-center gap-2 px-4 py-10 text-center">
+                <Folder className="size-9 text-muted-foreground/40" />
+                <p className="text-sm font-medium">This folder is empty</p>
+                <p className="max-w-sm text-xs text-muted-foreground">
+                  No files or subfolders are available at this path.
+                </p>
+              </div>
+            ) : (
+              <ul className="divide-y">
+                {objects.map((item) => {
+                  const sizeLabel = formatStorageSize(item.sizeBytes);
+                  return (
+                    <li
+                      key={item.path}
+                      className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-muted/40"
                     >
-                      Open
-                    </Button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </SystemPanel>
+                      <span
+                        className={cn(
+                          "flex size-9 shrink-0 items-center justify-center rounded-lg",
+                          item.isFolder
+                            ? "bg-amber-500/10 text-amber-700"
+                            : "bg-blue-500/10 text-blue-700",
+                        )}
+                      >
+                        {item.isFolder ? (
+                          <Folder className="size-4" />
+                        ) : (
+                          <FileText className="size-4" />
+                        )}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{item.displayName}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {item.isFolder ? "Folder" : sizeLabel ?? "File"}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={item.isFolder ? "outline" : "ghost"}
+                        disabled={isPending}
+                        onClick={() => {
+                          if (item.isFolder) {
+                            setPathLabels((prev) => ({
+                              ...prev,
+                              [item.relativePath]: item.displayName,
+                            }));
+                            setPrefix(item.relativePath);
+                            loadObjects(selectedBucket, item.relativePath);
+                            return;
+                          }
+                          startTransition(async () => {
+                            const res = await signStorageObjectAction(
+                              selectedBucket,
+                              item.path,
+                            );
+                            if (res.success) window.open(res.data, "_blank");
+                            else toast.error(res.message);
+                          });
+                        }}
+                      >
+                        {item.isFolder ? "Open" : "View"}
+                      </Button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
       </div>
-    </SystemModuleFrame>
+    </div>
   );
 }
 
@@ -295,8 +339,8 @@ export function EmailServicesPanel({ snapshot: initial }: { snapshot: EmailServi
 
   return (
     <SystemModuleFrame
-      title="Email Services"
-      description="SMTP connection status, delivery metrics, and recent mail logs"
+      title="Email / SMTP"
+      description="Delivery status, test mail, and recent outbound logs"
     >
       <div className="flex h-full min-h-0 flex-col gap-3">
         <div className="grid shrink-0 gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -610,105 +654,6 @@ export function MaintenancePanel({ settings }: { settings: SystemSettings }) {
             })}>{settings.emergencyShutdown ? "Disable" : "Enable"}</Button>
           </div>
         </div>
-      </div>
-    </SystemModuleFrame>
-  );
-}
-
-export function BackupPanel({ jobs: initial }: { jobs: BackupJobRow[] }) {
-  const [jobs, setJobs] = useState(initial);
-  const [isPending, startTransition] = useTransition();
-
-  const reload = () => startTransition(async () => {
-    const res = await listBackupsAction();
-    if (res.success) setJobs(res.data);
-  });
-
-  return (
-    <SystemModuleFrame title="Backup & Restore" description="Export and restore organization data">
-      <div className="flex h-full min-h-0 flex-col gap-3">
-        <div className="flex shrink-0 flex-wrap gap-2">
-          {(["full", "employees", "payroll", "audit_logs"] as const).map((type) => (
-            <Button
-              key={type}
-              size="sm"
-              variant="outline"
-              disabled={isPending}
-              onClick={() =>
-                startTransition(async () => {
-                  const res = await runBackupAction(type, "json");
-                  if (res.success) {
-                    toast.success(`Backup ${type} completed`);
-                    reload();
-                  } else toast.error(res.message);
-                })
-              }
-            >
-              {type.replace("_", " ")} JSON
-            </Button>
-          ))}
-        </div>
-        <SystemPanel title="Backup Jobs" className="min-h-0 flex-1" bodyClassName="p-0">
-          {jobs.length === 0 ? (
-            <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-              No backup jobs yet.
-            </p>
-          ) : (
-            <ul className="divide-y">
-              {jobs.map((job) => (
-                <li
-                  key={job.id}
-                  className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm"
-                >
-                  <div className="min-w-0">
-                    <p className="font-medium capitalize">
-                      {job.backupType.replace("_", " ")} · {job.format}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {job.status} · {job.recordCount ?? 0} rows
-                    </p>
-                  </div>
-                  {job.status === "completed" ? (
-                    <div className="flex gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() =>
-                          startTransition(async () => {
-                            const res = await downloadBackupAction(job.id);
-                            if (res.success) {
-                              downloadBase64(
-                                res.data.filename,
-                                res.data.mimeType,
-                                res.data.contentBase64,
-                              );
-                            } else toast.error(res.message);
-                          })
-                        }
-                      >
-                        Download
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() =>
-                          startTransition(async () => {
-                            const res = await restoreBackupAction(job.id);
-                            if (res.success) {
-                              toast.success(`Restored ${res.data.recordCount} records`);
-                            } else toast.error(res.message);
-                          })
-                        }
-                      >
-                        Restore
-                      </Button>
-                    </div>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
-        </SystemPanel>
       </div>
     </SystemModuleFrame>
   );

@@ -1,27 +1,15 @@
+import "server-only";
+
 import { EMPLOYEE_STORAGE_BUCKETS } from "@/lib/employees/constants";
 import { ASSET_IMAGE_BUCKET } from "@/lib/assets/constants";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertOrganizationStoragePath } from "@/lib/security/storage-path";
+import type {
+  StorageBucketSnapshot,
+  StorageObjectRow,
+} from "@/lib/system-admin/services/storage-types";
 
-export type StorageBucketSnapshot = {
-  id: string;
-  name: string;
-  public: boolean;
-  fileCount: number;
-  estimatedObjects: number;
-};
-
-export type StorageObjectRow = {
-  /** Full path in bucket (e.g. orgId/employeeId/file.pdf) */
-  path: string;
-  /** Path relative to organization root for navigation */
-  relativePath: string;
-  displayName: string;
-  isFolder: boolean;
-  updatedAt: string | null;
-  sizeBytes: number | null;
-  mimeType: string | null;
-};
+export type { StorageBucketSnapshot, StorageObjectRow };
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

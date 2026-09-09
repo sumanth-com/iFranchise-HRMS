@@ -35,8 +35,9 @@ export function PortalSwitcher() {
   const { activePortal, setActivePortal } = useActivePortal();
   const pathname = usePathname();
 
-  // Portal list is permission-driven (not "every employee gets Employee Portal").
-  // Super Admin without explicit portal.*.access only sees Super Admin Portal.
+  // Permission-driven only — no role/email shortcuts in the UI.
+  // Super Admin is system-only unless explicit portal.*.access grants exist
+  // (e.g. it@ifranchise.in via it_multi_portal_access).
   const availablePortals = PORTAL_SWITCH_LINKS.filter((portal) =>
     hasPermission(permissionCodes, PORTAL_PERMISSION_MAP[portal.portal]),
   );

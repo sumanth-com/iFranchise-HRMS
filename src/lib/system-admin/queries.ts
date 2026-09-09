@@ -13,8 +13,6 @@ export type SystemDashboardStats = {
   storageObjectEstimate: number;
   auditEvents24h: number;
   securityAlerts24h: number;
-  recentRoleChanges: Array<{ id: string; description: string; occurredAt: string }>;
-  recentAuditEvents: Array<{ id: string; description: string; action: string; occurredAt: string }>;
   recentErrors: Array<{ id: string; description: string; occurredAt: string }>;
   smtpConfigured: boolean;
   emailStatus: string;
@@ -59,8 +57,6 @@ export async function getSystemDashboardStats(
     activeUsersResult,
     auditCountResult,
     securityAlertsResult,
-    recentRoleChangesResult,
-    recentAuditResult,
     recentErrorsResult,
     loginsTodayResult,
     failedLoginsResult,
@@ -100,31 +96,12 @@ export async function getSystemDashboardStats(
       .from("audit_logs")
       .select("id, description, occurred_at")
       .eq("organization_id", organizationId)
-      .in("action", ["role_changed", "role_assigned", "portal_changed", "role_change"])
-      .is("deleted_at", null)
-      .is("archived_at", null)
-      .order("occurred_at", { ascending: false })
-      .limit(6),
-    supabase
-      .schema("hrms")
-      .from("audit_logs")
-      .select("id, description, action, occurred_at")
-      .eq("organization_id", organizationId)
-      .is("deleted_at", null)
-      .is("archived_at", null)
-      .order("occurred_at", { ascending: false })
-      .limit(10),
-    supabase
-      .schema("hrms")
-      .from("audit_logs")
-      .select("id, description, occurred_at")
-      .eq("organization_id", organizationId)
       .eq("event_status", "failed")
       .gte("occurred_at", since24h)
       .is("deleted_at", null)
       .is("archived_at", null)
       .order("occurred_at", { ascending: false })
-      .limit(8),
+      .limit(12),
     supabase
       .schema("hrms")
       .from("audit_logs")
@@ -217,17 +194,6 @@ export async function getSystemDashboardStats(
     storageObjectEstimate,
     auditEvents24h: auditCountResult.count ?? 0,
     securityAlerts24h,
-    recentRoleChanges: (recentRoleChangesResult.data ?? []).map((row) => ({
-      id: row.id as string,
-      description: (row.description as string) ?? "",
-      occurredAt: row.occurred_at as string,
-    })),
-    recentAuditEvents: (recentAuditResult.data ?? []).map((row) => ({
-      id: row.id as string,
-      description: (row.description as string) ?? "",
-      action: (row.action as string) ?? "",
-      occurredAt: row.occurred_at as string,
-    })),
     recentErrors: (recentErrorsResult.data ?? []).map((row) => ({
       id: row.id as string,
       description: (row.description as string) ?? "",

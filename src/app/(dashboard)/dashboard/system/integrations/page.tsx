@@ -1,41 +1,81 @@
+import { Suspense } from "react";
+
+import { ModulePageSkeleton } from "@/components/layout/module-page-skeleton";
 import { SystemIntegrationsHub } from "@/components/system-admin/system-integrations-hub";
-import { siteConfig } from "@/config/site";
+import {
+  loadInfrastructureTabAction,
+} from "@/lib/system-admin/infrastructure-actions";
+import type { InfrastructureTabId } from "@/lib/system-admin/infrastructure-types";
 import { requireSuperAdminProfile } from "@/lib/system-admin/guards";
-import { getApiManagementSnapshot } from "@/lib/system-admin/services/api-management-queries";
-import { listBackupJobs } from "@/lib/system-admin/services/backup-service";
-import { getDatabaseHealthDetail } from "@/lib/system-admin/services/database-health-service";
-import { getEmailServiceSnapshot } from "@/lib/system-admin/services/email-service";
-import { listSystemIntegrations } from "@/lib/system-admin/services/integrations-service";
-import { listStorageBuckets } from "@/lib/system-admin/services/storage-service";
-import { createClient } from "@/lib/supabase/server";
+import type { ApiSectionId } from "@/components/system-admin/api-management-hub";
 
-export default async function SuperAdminIntegrationsPage() {
-  const profile = await requireSuperAdminProfile();
-  const supabase = await createClient();
-  const orgId = profile.employee.organizationId;
+const TAB_IDS = new Set<InfrastructureTabId>([
+  "email",
+  "storage",
+  "api",
+  "backup",
+  "database",
+]);
 
-  const [email, buckets, integrations, apiManagement, backupJobs, database] =
-    await Promise.all([
-      getEmailServiceSnapshot(supabase, orgId),
-      listStorageBuckets(orgId),
-      listSystemIntegrations(supabase, orgId),
-      getApiManagementSnapshot(supabase, orgId),
-      listBackupJobs(supabase, orgId),
-      getDatabaseHealthDetail(supabase, orgId),
-    ]);
+const API_SECTION_IDS = new Set<ApiSectionId>([
+  "overview",
+  "keys",
+  "docs",
+  "usage",
+  "webhooks",
+  "settings",
+]);
+
+function parseTab(value: string | string[] | undefined): InfrastructureTabId {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (raw && TAB_IDS.has(raw as InfrastructureTabId)) {
+    return raw as InfrastructureTabId;
+  }
+  return "email";
+}
+
+function parseApiSection(value: string | string[] | undefined): ApiSectionId {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (raw && API_SECTION_IDS.has(raw as ApiSectionId)) {
+    return raw as ApiSectionId;
+  }
+  return "overview";
+}
+
+async function InfrastructureShell({
+  tab,
+  apiSection,
+}: {
+  tab: InfrastructureTabId;
+  apiSection: ApiSectionId;
+}) {
+  await requireSuperAdminProfile();
+  const initial = await loadInfrastructureTabAction(tab);
+
+  return (
+    <SystemIntegrationsHub
+      initialTab={tab}
+      initialApiSection={apiSection}
+      initialResult={initial.success ? initial : null}
+      initialError={initial.success ? null : initial.message}
+    />
+  );
+}
+
+export default async function SuperAdminIntegrationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const tab = parseTab(params.tab);
+  const apiSection = parseApiSection(params.api);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <SystemIntegrationsHub
-        email={email}
-        buckets={buckets}
-        organizationId={orgId}
-        integrations={integrations}
-        apiManagement={apiManagement}
-        origin={siteConfig.url}
-        backupJobs={backupJobs}
-        database={database}
-      />
+      <Suspense fallback={<ModulePageSkeleton />}>
+        <InfrastructureShell tab={tab} apiSection={apiSection} />
+      </Suspense>
     </div>
   );
 }

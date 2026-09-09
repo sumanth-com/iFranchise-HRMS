@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { revalidateSelfAttendancePaths } from "@/lib/attendance/actions/self-attendance-punch-actions";
+import { revalidateSelfAttendancePaths } from "@/lib/attendance/self-attendance-revalidate";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { createClient } from "@/lib/supabase/server";
 import { toUserFriendlyError } from "@/lib/errors/user-messages";

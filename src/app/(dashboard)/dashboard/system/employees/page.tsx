@@ -7,7 +7,7 @@ import { PageScroll } from "@/components/common/sticky-layout";
 import { createClient } from "@/lib/supabase/server";
 import { requireServerPermission } from "@/lib/permissions/server";
 import {
-  getDepartments,
+  getOccupiedDepartments,
   getEmployeeLookups,
   listEmployees,
 } from "@/lib/employees/services/employee-queries";
@@ -17,10 +17,7 @@ import {
 } from "@/lib/employees/employment-category";
 import { employeeListParamsSchema } from "@/lib/validations/employee";
 import { hasPermission } from "@/lib/permissions/utils";
-import { requireSuperAdminProfile } from "@/lib/system-admin/guards";
 import { SYSTEM_ADMIN_ROUTES } from "@/lib/system-admin/constants";
-import { ErrorState } from "@/components/common/error-state";
-import { safeServerCallWithError } from "@/lib/errors/safe-server";
 
 const SYSTEM_EMPLOYEE_LIST = SYSTEM_ADMIN_ROUTES.employees;
 
@@ -43,22 +40,81 @@ function parseEmploymentCategory(
   return DEFAULT_EMPLOYMENT_CATEGORY_FILTER;
 }
 
+/**
+ * Super Admin employees list — same data path and UI as HR Employees.
+ * System layout already enforces Super Admin; page gates on employee.view.
+ */
 export default async function SuperAdminEmployeesPage({
   searchParams,
 }: EmployeesPageProps) {
-  await requireSuperAdminProfile();
   const profile = await requireServerPermission("employee.view");
   const supabase = await createClient();
   const rawParams = await searchParams;
 
-  const departments = await getDepartments(
-    supabase,
-    profile.employee.organizationId,
-  );
-
   const legacyDepartmentId = firstString(rawParams.departmentId);
   const legacyBranchId = firstString(rawParams.branchId);
   const rawDepartment = firstString(rawParams.department);
+  const needsLegacyCleanup =
+    Boolean(legacyDepartmentId) || Boolean(legacyBranchId) || Boolean(rawDepartment);
+
+  if (!needsLegacyCleanup) {
+    const params = employeeListParamsSchema.parse({
+      page: rawParams.page,
+      pageSize: rawParams.pageSize,
+      search: firstString(rawParams.search),
+      sortBy: rawParams.sortBy,
+      sortOrder: rawParams.sortOrder,
+      department: rawDepartment,
+      employmentStatus: firstString(rawParams.employmentStatus),
+      accountStatus: firstString(rawParams.accountStatus),
+      employmentCategory: parseEmploymentCategory(
+        firstString(rawParams.employmentCategory),
+      ),
+    });
+
+    const [departments, lookups, result] = await Promise.all([
+      getOccupiedDepartments(supabase, profile.employee.organizationId),
+      getEmployeeLookups(supabase, profile.employee.organizationId),
+      listEmployees(supabase, profile, params),
+    ]);
+
+    return (
+      <PageScroll>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Employees</h1>
+            <p className="text-sm text-muted-foreground">
+              Manage employee records, employment details, and related information.
+            </p>
+          </div>
+          <Suspense fallback={<PageSkeleton />}>
+            <EmployeeTable
+              employees={result.data}
+              total={result.total}
+              page={result.page}
+              pageSize={result.pageSize}
+              search={params.search ?? ""}
+              sortBy={params.sortBy}
+              sortOrder={params.sortOrder}
+              department={params.department}
+              employmentStatus={params.employmentStatus}
+              employmentCategory={params.employmentCategory}
+              departments={departments}
+              employmentTypes={lookups.employmentTypes}
+              canEdit={hasPermission(profile.permissionCodes, "employee.edit")}
+              canDelete={hasPermission(profile.permissionCodes, "employee.delete")}
+              routesBasePath={SYSTEM_EMPLOYEE_LIST}
+            />
+          </Suspense>
+        </div>
+      </PageScroll>
+    );
+  }
+
+  const departments = await getOccupiedDepartments(
+    supabase,
+    profile.employee.organizationId,
+  );
 
   let departmentCode =
     rawDepartment &&
@@ -97,9 +153,7 @@ export default async function SuperAdminEmployeesPage({
     if (departmentCode) cleaned.set("department", departmentCode);
 
     const query = cleaned.toString();
-    redirect(
-      query ? `${SYSTEM_EMPLOYEE_LIST}?${query}` : SYSTEM_EMPLOYEE_LIST,
-    );
+    redirect(query ? `${SYSTEM_EMPLOYEE_LIST}?${query}` : SYSTEM_EMPLOYEE_LIST);
   }
 
   const params = employeeListParamsSchema.parse({
@@ -111,24 +165,15 @@ export default async function SuperAdminEmployeesPage({
     department: departmentCode,
     employmentStatus: firstString(rawParams.employmentStatus),
     accountStatus: firstString(rawParams.accountStatus),
-    employmentCategory: parseEmploymentCategory(firstString(rawParams.employmentCategory)),
+    employmentCategory: parseEmploymentCategory(
+      firstString(rawParams.employmentCategory),
+    ),
   });
 
-  const [lookups, listResult] = await Promise.all([
+  const [lookups, result] = await Promise.all([
     getEmployeeLookups(supabase, profile.employee.organizationId),
-    safeServerCallWithError(
-      () => listEmployees(supabase, profile, params),
-      {
-        data: [],
-        total: 0,
-        page: params.page ?? 1,
-        pageSize: params.pageSize ?? 20,
-      },
-      "[system/employees] listEmployees",
-    ),
+    listEmployees(supabase, profile, params),
   ]);
-
-  const { data: result, error: listError } = listResult;
 
   return (
     <PageScroll>
@@ -136,37 +181,29 @@ export default async function SuperAdminEmployeesPage({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Employees</h1>
           <p className="text-sm text-muted-foreground">
-            Administrative visibility and account intervention. HR remains the
-            primary operational owner of day-to-day employee management.
+            Manage employee records, employment details, and related information.
           </p>
         </div>
 
-        {listError ? (
-          <ErrorState
-            title="Unable to load employees"
-            description={listError}
+        <Suspense fallback={<PageSkeleton />}>
+          <EmployeeTable
+            employees={result.data}
+            total={result.total}
+            page={result.page}
+            pageSize={result.pageSize}
+            search={params.search ?? ""}
+            sortBy={params.sortBy}
+            sortOrder={params.sortOrder}
+            department={departmentCode}
+            employmentStatus={params.employmentStatus}
+            employmentCategory={params.employmentCategory}
+            departments={departments}
+            employmentTypes={lookups.employmentTypes}
+            canEdit={hasPermission(profile.permissionCodes, "employee.edit")}
+            canDelete={hasPermission(profile.permissionCodes, "employee.delete")}
+            routesBasePath={SYSTEM_EMPLOYEE_LIST}
           />
-        ) : (
-          <Suspense fallback={<PageSkeleton />}>
-            <EmployeeTable
-              employees={result.data}
-              total={result.total}
-              page={result.page}
-              pageSize={result.pageSize}
-              search={params.search ?? ""}
-              sortBy={params.sortBy}
-              sortOrder={params.sortOrder}
-              department={departmentCode}
-              employmentStatus={params.employmentStatus}
-              employmentCategory={params.employmentCategory}
-              departments={departments}
-              employmentTypes={lookups.employmentTypes}
-              canEdit={hasPermission(profile.permissionCodes, "employee.edit")}
-              canDelete={false}
-              routesBasePath={SYSTEM_EMPLOYEE_LIST}
-            />
-          </Suspense>
-        )}
+        </Suspense>
       </div>
     </PageScroll>
   );

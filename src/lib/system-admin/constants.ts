@@ -7,6 +7,7 @@ export const SYSTEM_ADMIN_ROUTES = {
   attendanceLocation: (attendanceId: string) =>
     `/dashboard/system/attendance/location/${attendanceId}`,
   payroll: "/dashboard/system/payroll",
+  reimbursements: "/dashboard/system/reimbursements",
   documents: "/dashboard/system/documents",
   leave: "/dashboard/system/leave",
   goals: "/dashboard/system/goals",
@@ -15,6 +16,7 @@ export const SYSTEM_ADMIN_ROUTES = {
   notificationsCenter: "/dashboard/system/notifications/center",
   notificationsHistory: "/dashboard/system/notifications/history",
   settings: "/dashboard/system/settings",
+  reports: "/dashboard/system/reports",
   hrOverview: "/dashboard/system/hr-overview",
   employees: "/dashboard/system/employees",
   organization: "/dashboard/system/organization",

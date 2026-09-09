@@ -1,5 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
-import { revalidateSelfAttendancePaths } from "@/lib/attendance/actions/self-attendance-punch-actions";
+import { revalidateSelfAttendancePaths } from "@/lib/attendance/self-attendance-revalidate";
 import {
   computeLateMinutes,
   computeWorkHours,

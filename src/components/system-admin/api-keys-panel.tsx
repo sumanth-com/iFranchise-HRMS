@@ -28,7 +28,6 @@ import { Label } from "@/components/ui/label";
 import {
   createApiKeyAction,
   deleteApiKeyAction,
-  listApiKeysAction,
   revokeApiKeyAction,
   rotateApiKeyAction,
 } from "@/lib/system-admin/actions";
@@ -133,12 +132,14 @@ function ApiKeyRevealDialog({
 
 export function ApiKeysPanel({
   keys: initial,
+  onKeysChange,
   autoOpenCreate = false,
 }: {
   keys: SystemApiKeyRow[];
+  onKeysChange?: (keys: SystemApiKeyRow[]) => void;
   autoOpenCreate?: boolean;
 }) {
-  const [keys, setKeys] = useState(initial);
+  const [keys, setKeysState] = useState(initial);
   const [isPending, startTransition] = useTransition();
   const [createOpen, setCreateOpen] = useState(autoOpenCreate);
   const [name, setName] = useState("");
@@ -154,16 +155,17 @@ export function ApiKeysPanel({
   const [revokeTarget, setRevokeTarget] = useState<SystemApiKeyRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SystemApiKeyRow | null>(null);
 
-  useEffect(() => {
-    setKeys(initial);
-  }, [initial]);
-
-  function reload() {
-    startTransition(async () => {
-      const result = await listApiKeysAction();
-      if (result.success) setKeys(result.data);
+  function setKeys(next: SystemApiKeyRow[] | ((current: SystemApiKeyRow[]) => SystemApiKeyRow[])) {
+    setKeysState((current) => {
+      const resolved = typeof next === "function" ? next(current) : next;
+      onKeysChange?.(resolved);
+      return resolved;
     });
   }
+
+  useEffect(() => {
+    setKeysState(initial);
+  }, [initial]);
 
   function toggleScope(scope: PublicApiScope) {
     setScopes((current) =>
@@ -180,9 +182,10 @@ export function ApiKeysPanel({
       toast.error("Select at least one scope");
       return;
     }
+    const pendingName = name.trim();
     startTransition(async () => {
       const result = await createApiKeyAction({
-        name: name.trim(),
+        name: pendingName,
         description: description.trim() || null,
         environment,
         scopes,
@@ -196,11 +199,12 @@ export function ApiKeysPanel({
         toast.error(result.message);
         return;
       }
+      setKeys((current) => [result.data.key, ...current]);
       setCreateOpen(false);
       setName("");
       setDescription("");
-      setReveal({ name: name.trim(), rawKey: result.data.rawKey });
-      reload();
+      setReveal({ name: pendingName, rawKey: result.data.rawKey });
+      toast.success("API key created");
     });
   }
 
@@ -279,8 +283,22 @@ export function ApiKeysPanel({
                             toast.error(result.message);
                             return;
                           }
+                          setKeys((current) =>
+                            current.map((item) =>
+                              item.id === key.id
+                                ? {
+                                    ...item,
+                                    keyPrefix: result.data.prefix,
+                                    usageCount: 0,
+                                    lastUsedAt: null,
+                                    lastUsedIp: null,
+                                    status: "active",
+                                  }
+                                : item,
+                            ),
+                          );
                           setReveal({ name: key.name, rawKey: result.data.rawKey });
-                          reload();
+                          toast.success("API key rotated");
                         })
                       }
                     >
@@ -407,7 +425,7 @@ export function ApiKeysPanel({
                       className={cn(
                         "rounded-full border px-2.5 py-1 text-xs",
                         scopes.includes(scope)
-                          ? "border-primary bg-primary text-primary-foreground"
+                          ? "border-transparent bg-gradient-to-r from-blue-600 to-violet-600 text-white"
                           : "text-muted-foreground hover:bg-muted",
                       )}
                     >
@@ -482,63 +500,94 @@ export function ApiKeysPanel({
       <Modal
         open={Boolean(revokeTarget)}
         onOpenChange={(open) => (open ? undefined : setRevokeTarget(null))}
-        title="Revoke API key"
-        description="Applications using this key will immediately lose API access. This cannot be undone."
+        title="Revoke this API key?"
+        description="Connected systems using this key will lose access immediately. You cannot undo revocation."
+        showCancel={false}
         footer={
-          <Button
-            variant="destructive"
-            disabled={isPending}
-            onClick={() => {
-              if (!revokeTarget) return;
-              startTransition(async () => {
-                const result = await revokeApiKeyAction(revokeTarget.id);
-                if (!result.success) {
-                  toast.error(result.message);
-                  return;
-                }
-                toast.success("API key revoked");
+          <>
+            <Button variant="outline" disabled={isPending} onClick={() => setRevokeTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={isPending}
+              onClick={() => {
+                if (!revokeTarget) return;
+                const target = revokeTarget;
                 setRevokeTarget(null);
-                reload();
-              });
-            }}
-          >
-            Revoke key
-          </Button>
+                setKeys((current) =>
+                  current.map((item) =>
+                    item.id === target.id ? { ...item, status: "revoked" } : item,
+                  ),
+                );
+                startTransition(async () => {
+                  const result = await revokeApiKeyAction(target.id);
+                  if (!result.success) {
+                    setKeys((current) =>
+                      current.map((item) =>
+                        item.id === target.id ? { ...item, status: target.status } : item,
+                      ),
+                    );
+                    toast.error(result.message);
+                    return;
+                  }
+                  toast.success("API key revoked");
+                });
+              }}
+            >
+              {isPending ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              Revoke key
+            </Button>
+          </>
         }
       >
         <p className="text-sm">
-          Revoke <span className="font-medium">{revokeTarget?.name}</span> ({revokeTarget?.keyPrefix}…)?
+          Revoke <span className="font-medium">{revokeTarget?.name}</span> (
+          <span className="font-mono text-xs">{revokeTarget?.keyPrefix}…</span>)?
         </p>
       </Modal>
 
       <Modal
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => (open ? undefined : setDeleteTarget(null))}
-        title="Delete API key"
-        description="The key will be revoked and hidden from the list."
+        title="Permanently delete API key?"
+        description="The key is revoked and removed from this list. Applications using it will fail authentication."
+        showCancel={false}
         footer={
-          <Button
-            variant="destructive"
-            disabled={isPending}
-            onClick={() => {
-              if (!deleteTarget) return;
-              startTransition(async () => {
-                const result = await deleteApiKeyAction(deleteTarget.id);
-                if (!result.success) {
-                  toast.error(result.message);
-                  return;
-                }
-                toast.success("API key deleted");
+          <>
+            <Button variant="outline" disabled={isPending} onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={isPending}
+              onClick={() => {
+                if (!deleteTarget) return;
+                const target = deleteTarget;
+                const previous = keys;
                 setDeleteTarget(null);
-                reload();
-              });
-            }}
-          >
-            Delete
-          </Button>
+                setKeys((current) => current.filter((item) => item.id !== target.id));
+                startTransition(async () => {
+                  const result = await deleteApiKeyAction(target.id);
+                  if (!result.success) {
+                    setKeys(previous);
+                    toast.error(result.message);
+                    return;
+                  }
+                  toast.success("API key deleted");
+                });
+              }}
+            >
+              {isPending ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              Delete permanently
+            </Button>
+          </>
         }
       >
-        <p className="text-sm">Delete {deleteTarget?.name}?</p>
+        <p className="text-sm">
+          Delete <span className="font-medium">{deleteTarget?.name}</span>? This cannot be undone from
+          the UI.
+        </p>
       </Modal>
 
       <ApiKeyRevealDialog

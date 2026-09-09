@@ -8,7 +8,7 @@ import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 import type { PayslipDetail } from "@/types/payroll";
 
-export type EmployeePayrollActionResult =
+type EmployeePayrollActionResult =
   | { success: true }
   | { success: false; message: string };
 

@@ -12,6 +12,7 @@ import {
 } from "@/lib/manager/services/team-reports-queries";
 import { getManagerTeamScope } from "@/lib/manager/services/team-queries";
 import { REPORTS_ROUTES } from "@/lib/reports/constants";
+import { SYSTEM_ADMIN_ROUTES } from "@/lib/system-admin/constants";
 import { runReport } from "@/lib/reports/services/reports-queries";
 import {
   createReportSchedule,
@@ -53,6 +54,14 @@ function revalidateReports() {
     MANAGER_ROUTES.reportsExit,
     MANAGER_ROUTES.reportsHr,
   ].forEach((path) => revalidatePath(path));
+  revalidatePath(SYSTEM_ADMIN_ROUTES.reports);
+  revalidatePath(`${SYSTEM_ADMIN_ROUTES.reports}/attendance`);
+  revalidatePath(`${SYSTEM_ADMIN_ROUTES.reports}/leave`);
+  revalidatePath(`${SYSTEM_ADMIN_ROUTES.reports}/payroll`);
+  revalidatePath(`${SYSTEM_ADMIN_ROUTES.reports}/performance`);
+  revalidatePath(`${SYSTEM_ADMIN_ROUTES.reports}/recruitment`);
+  revalidatePath(`${SYSTEM_ADMIN_ROUTES.reports}/assets`);
+  revalidatePath(`${SYSTEM_ADMIN_ROUTES.reports}/exit`);
 }
 
 async function scopedReportFilters(

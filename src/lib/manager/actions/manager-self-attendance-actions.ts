@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidateSelfAttendancePaths } from "@/lib/attendance/actions/self-attendance-punch-actions";
+import { revalidateSelfAttendancePaths } from "@/lib/attendance/self-attendance-revalidate";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import {
   getManagerProfilePageData,

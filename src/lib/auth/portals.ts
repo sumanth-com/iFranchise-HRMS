@@ -145,6 +145,8 @@ export function resolvePrimaryPortal(
 /**
  * Post-login route: assigned role wins over inherited permissions and DB fallbacks.
  * Super Admin without explicit business portal grants lands on the system portal.
+ * Explicit portal.*.access (e.g. IT multi-portal role) enables switcher + path access
+ * but does not change the Super Admin login home.
  */
 export function getPortalRedirectPath(
   permissionCodes: Iterable<string>,

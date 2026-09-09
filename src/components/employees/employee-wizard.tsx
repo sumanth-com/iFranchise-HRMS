@@ -26,6 +26,7 @@ import {
   DESIGNATION_OTHER_VALUE,
   EMPLOYEE_ROUTES,
   WIZARD_STEPS,
+  buildEmployeeModuleRoutes,
 } from "@/lib/employees/constants";
 import { sortEmploymentTypeOptions } from "@/lib/employees/employment-type-display";
 import { COUNTRIES, INDIAN_STATES, STATE_DISTRICTS } from "@/lib/geo/india";
@@ -51,14 +52,19 @@ type EmployeeWizardProps = {
     hrApprovers?: LookupOption[];
     documentTypes: LookupOption[];
   };
+  /** When set (e.g. Super Admin employees base), redirects stay in that portal. */
+  routesBasePath?: string;
 };
 
 type WizardDocument = EmployeeWizardInputValidated["documents"][number] & {
   id: string;
 };
 
-export function EmployeeWizard({ lookups }: EmployeeWizardProps) {
+export function EmployeeWizard({ lookups, routesBasePath }: EmployeeWizardProps) {
   const router = useRouter();
+  const routes = routesBasePath
+    ? buildEmployeeModuleRoutes(routesBasePath)
+    : EMPLOYEE_ROUTES;
   const [step, setStep] = useState(1);
   const [isPending, startTransition] = useTransition();
   const [documents, setDocuments] = useState<WizardDocument[]>([]);
@@ -205,7 +211,7 @@ export function EmployeeWizard({ lookups }: EmployeeWizardProps) {
       }
 
       toast.success("Employee created successfully");
-      router.push(EMPLOYEE_ROUTES.detail(result.data));
+      router.push(routes.detail(result.data));
       router.refresh();
     });
   };

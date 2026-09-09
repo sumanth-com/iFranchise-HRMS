@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { revalidateSelfAttendancePaths } from "@/lib/attendance/actions/self-attendance-punch-actions";
+import { revalidateSelfAttendancePaths } from "@/lib/attendance/self-attendance-revalidate";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { reviewTeamAttendanceCorrection, getTeamAttendanceDetailBundle } from "@/lib/manager/services/attendance-correction-service";
 import { getManagerTeamScope } from "@/lib/manager/services/team-queries";

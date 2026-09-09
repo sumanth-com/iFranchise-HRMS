@@ -2,25 +2,11 @@ import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { isTransientAuthFailure } from "@/lib/supabase/auth-failure";
+import { createBoundedFetch } from "@/lib/supabase/bounded-fetch";
 import { getSupabaseAnonKey, getSupabaseUrl, hasSupabaseEnv } from "@/lib/supabase/env";
 
 /** Bound fetch timeout for Supabase auth in middleware (allows token refresh to complete cleanly). */
 export const MIDDLEWARE_SUPABASE_FETCH_TIMEOUT_MS = 15_000;
-
-function createBoundedFetch(timeoutMs: number): typeof fetch {
-  return (input, init = {}) => {
-    const timeoutSignal = AbortSignal.timeout(timeoutMs);
-    const signal =
-      init.signal && typeof AbortSignal.any === "function"
-        ? AbortSignal.any([init.signal, timeoutSignal])
-        : timeoutSignal;
-
-    return fetch(input, {
-      ...init,
-      signal,
-    });
-  };
-}
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });

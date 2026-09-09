@@ -94,6 +94,7 @@ import {
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { HR_HUB_ROUTES } from "@/lib/dashboard/hr-hub-routes";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
+import { SYSTEM_ADMIN_ROUTES } from "@/lib/system-admin/constants";
 import { createSignedStorageUrl } from "@/lib/storage/signed-url";
 import { assertOrganizationStoragePath } from "@/lib/security/storage-path";
 
@@ -101,6 +102,7 @@ function revalidateReimbursementViews() {
   revalidatePath(EMPLOYEE_ROUTES.reimbursements);
   revalidatePath(HR_HUB_ROUTES.myReimbursements);
   revalidatePath(MANAGER_ROUTES.reimbursements);
+  revalidatePath(SYSTEM_ADMIN_ROUTES.reimbursements);
   revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS.reimbursements));
   revalidatePath(`${CEO_ROUTES.payroll}/${TEAM_PAYROLL_SECTIONS.reimbursements}`);
   revalidatePath(PAYROLL_ROUTES.reimbursements);

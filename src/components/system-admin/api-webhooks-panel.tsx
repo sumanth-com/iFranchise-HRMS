@@ -1,7 +1,7 @@
 "use client";
 
 import { format, parseISO } from "date-fns";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/common/button";
@@ -22,7 +22,7 @@ import {
 } from "@/lib/public-api/constants";
 import type { SystemWebhookRow, WebhookDeliveryRow } from "@/lib/public-api/webhook-types";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, Copy } from "lucide-react";
+import { AlertTriangle, Copy, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -36,19 +36,36 @@ export function ApiWebhooksPanel({
   webhooks: initialWebhooks,
   deliveries: initialDeliveries,
   enabled,
+  onWebhooksChange,
 }: {
   webhooks: SystemWebhookRow[];
   deliveries: WebhookDeliveryRow[];
   enabled: boolean;
+  onWebhooksChange?: (webhooks: SystemWebhookRow[]) => void;
 }) {
-  const [webhooks, setWebhooks] = useState(initialWebhooks);
+  const [webhooks, setWebhooksState] = useState(initialWebhooks);
   const [deliveries] = useState(initialDeliveries);
   const [createOpen, setCreateOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<SystemWebhookRow | null>(null);
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [events, setEvents] = useState<WebhookEvent[]>(["employee.created", "employee.updated"]);
   const [secret, setSecret] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  function setWebhooks(
+    next: SystemWebhookRow[] | ((current: SystemWebhookRow[]) => SystemWebhookRow[]),
+  ) {
+    setWebhooksState((current) => {
+      const resolved = typeof next === "function" ? next(current) : next;
+      onWebhooksChange?.(resolved);
+      return resolved;
+    });
+  }
+
+  useEffect(() => {
+    setWebhooksState(initialWebhooks);
+  }, [initialWebhooks]);
 
   function toggleEvent(event: WebhookEvent) {
     setEvents((current) =>
@@ -111,23 +128,30 @@ export function ApiWebhooksPanel({
                     size="sm"
                     variant="ghost"
                     disabled={isPending}
-                    onClick={() =>
+                    onClick={() => {
+                      const previous = hook.isActive;
+                      setWebhooks((current) =>
+                        current.map((item) =>
+                          item.id === hook.id ? { ...item, isActive: !item.isActive } : item,
+                        ),
+                      );
                       startTransition(async () => {
                         const result = await updateWebhookAction({
                           webhookId: hook.id,
-                          isActive: !hook.isActive,
+                          isActive: !previous,
                         });
                         if (!result.success) {
+                          setWebhooks((current) =>
+                            current.map((item) =>
+                              item.id === hook.id ? { ...item, isActive: previous } : item,
+                            ),
+                          );
                           toast.error(result.message);
                           return;
                         }
-                        setWebhooks((current) =>
-                          current.map((item) =>
-                            item.id === hook.id ? { ...item, isActive: !item.isActive } : item,
-                          ),
-                        );
-                      })
-                    }
+                        toast.success(previous ? "Webhook disabled" : "Webhook enabled");
+                      });
+                    }}
                   >
                     {hook.isActive ? "Disable" : "Enable"}
                   </Button>
@@ -136,16 +160,7 @@ export function ApiWebhooksPanel({
                     variant="ghost"
                     className="text-red-600"
                     disabled={isPending}
-                    onClick={() =>
-                      startTransition(async () => {
-                        const result = await deleteWebhookAction(hook.id);
-                        if (!result.success) {
-                          toast.error(result.message);
-                          return;
-                        }
-                        setWebhooks((current) => current.filter((item) => item.id !== hook.id));
-                      })
-                    }
+                    onClick={() => setDeleteTarget(hook)}
                   >
                     Delete
                   </Button>
@@ -216,9 +231,11 @@ export function ApiWebhooksPanel({
                   },
                   ...current,
                 ]);
+                toast.success("Webhook created");
               })
             }
           >
+            {isPending ? <Loader2 className="size-3.5 animate-spin" /> : null}
             Create webhook
           </Button>
         }
@@ -245,9 +262,9 @@ export function ApiWebhooksPanel({
                   type="button"
                   onClick={() => toggleEvent(event)}
                   className={cn(
-                    "rounded-full border px-2.5 py-1 text-xs",
+                    "rounded-full border px-2.5 py-1 text-xs transition-colors",
                     events.includes(event)
-                      ? "border-primary bg-primary text-primary-foreground"
+                      ? "border-transparent bg-gradient-to-r from-blue-600 to-violet-600 text-white"
                       : "text-muted-foreground hover:bg-muted",
                   )}
                 >
@@ -257,6 +274,48 @@ export function ApiWebhooksPanel({
             </div>
           </div>
         </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => (open ? undefined : setDeleteTarget(null))}
+        title="Delete this webhook?"
+        description="Outbound events will stop for this endpoint. This cannot be undone from the UI."
+        showCancel={false}
+        footer={
+          <>
+            <Button variant="outline" disabled={isPending} onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={isPending}
+              onClick={() => {
+                if (!deleteTarget) return;
+                const target = deleteTarget;
+                const previous = webhooks;
+                setDeleteTarget(null);
+                setWebhooks((current) => current.filter((item) => item.id !== target.id));
+                startTransition(async () => {
+                  const result = await deleteWebhookAction(target.id);
+                  if (!result.success) {
+                    setWebhooks(previous);
+                    toast.error(result.message);
+                    return;
+                  }
+                  toast.success("Webhook deleted");
+                });
+              }}
+            >
+              {isPending ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              Delete permanently
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm">
+          Delete <span className="font-medium">{deleteTarget?.name}</span>?
+        </p>
       </Modal>
 
       <Dialog open={Boolean(secret)} onOpenChange={(open) => (open ? undefined : setSecret(null))}>

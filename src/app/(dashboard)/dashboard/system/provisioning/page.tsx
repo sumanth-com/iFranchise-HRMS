@@ -4,7 +4,6 @@ import { CeoUserProvisioningView } from "@/components/ceo/user-provisioning/ceo-
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { getCeoUserProvisioningModuleData } from "@/lib/ceo/actions/ceo-user-provisioning-actions";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
-import { requireSuperAdminProfile } from "@/lib/system-admin/guards";
 import { USER_PROVISIONING_VIEW_PERMISSIONS } from "@/lib/user-provisioning/constants";
 import { ceoProvisioningListParamsSchema } from "@/lib/validations/ceo-user-provisioning";
 
@@ -16,10 +15,10 @@ function firstString(value: string | string[] | undefined) {
   return typeof value === "string" ? value : undefined;
 }
 
+/** System layout already requires Super Admin; match HR provisioning data/UI. */
 export default async function SuperAdminUserProvisioningPage({
   searchParams,
 }: SuperAdminUserProvisioningPageProps) {
-  await requireSuperAdminProfile();
   await requireServerAnyPermission([...USER_PROVISIONING_VIEW_PERMISSIONS]);
   const rawParams = await searchParams;
 

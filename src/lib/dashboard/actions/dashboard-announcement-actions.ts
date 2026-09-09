@@ -127,5 +127,3 @@ export async function setDashboardAnnouncementPublishedAction(
     return { success: false, message: friendlyError(error) };
   }
 }
-
-export { canManageDashboardAnnouncements };

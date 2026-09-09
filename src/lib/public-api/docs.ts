@@ -1,6 +1,10 @@
 export type ApiDocSectionId =
   | "overview"
   | "authentication"
+  | "base-url"
+  | "versioning"
+  | "headers"
+  | "response-format"
   | "employees"
   | "departments"
   | "attendance"
@@ -10,8 +14,7 @@ export type ApiDocSectionId =
   | "performance"
   | "webhooks"
   | "errors"
-  | "rate-limits"
-  | "changelog";
+  | "rate-limits";
 
 export type ApiDocEndpoint = {
   method: "GET" | "POST" | "PATCH" | "DELETE";
@@ -48,11 +51,21 @@ const LIST_PARAMS: ApiDocEndpoint["parameters"] = [
   { name: "order", in: "query", description: "`asc` or `desc`" },
 ];
 
-export const API_DOC_NAV: Array<{ id: ApiDocSectionId; title: string; children?: ApiDocSectionId[] }> = [
+export const API_DOC_NAV: Array<{
+  id: ApiDocSectionId | "endpoints";
+  title: string;
+  children?: ApiDocSectionId[];
+}> = [
   { id: "overview", title: "Overview" },
   { id: "authentication", title: "Authentication" },
+  { id: "base-url", title: "Base URL" },
+  { id: "versioning", title: "API versioning" },
+  { id: "headers", title: "Request headers" },
+  { id: "response-format", title: "Response format" },
+  { id: "errors", title: "Error handling" },
+  { id: "rate-limits", title: "Rate limits" },
   {
-    id: "employees",
+    id: "endpoints",
     title: "Endpoints",
     children: [
       "employees",
@@ -65,9 +78,6 @@ export const API_DOC_NAV: Array<{ id: ApiDocSectionId; title: string; children?:
     ],
   },
   { id: "webhooks", title: "Webhooks" },
-  { id: "errors", title: "Errors" },
-  { id: "rate-limits", title: "Rate Limits" },
-  { id: "changelog", title: "Changelog" },
 ];
 
 export const API_DOC_SECTIONS: ApiDocSection[] = [
@@ -75,23 +85,79 @@ export const API_DOC_SECTIONS: ApiDocSection[] = [
     id: "overview",
     title: "Overview",
     intro:
-      "The HRMS public API lets CRM and other internal systems read authorized organization data over HTTPS.",
+      "The iFranchise HRMS Public API exposes read-only organization data over HTTPS for CRM and internal system integrations.",
     body: [
-      "Current version: v1. Future versions can coexist at /api/v2 without breaking v1 clients.",
-      "Base URL: {origin}/api/v1",
-      "All responses are JSON. Every response includes X-Request-ID for tracing.",
-      "Write endpoints are not published yet. Write scopes can be assigned so keys are ready when those routes ship.",
+      "Only implemented v1 routes are documented here. Write HTTP routes are not published yet.",
+      "Machine clients authenticate with organization-scoped API keys issued in Super Admin → Infrastructure → API → API Keys.",
+      "OpenAPI machine-readable spec: GET {origin}/api/v1/openapi.json",
+      "Live status for a valid key (no extra scope beyond authentication):",
+      `curl -H "Authorization: Bearer $HRMS_API_KEY" "{origin}/api/v1"`,
+      `{
+  "data": {
+    "name": "iFranchise HRMS API",
+    "version": "v1",
+    "environment": "production",
+    "keyPrefix": "hrms_live_ab12",
+    "scopes": ["employees:read", "departments:read"],
+    "documentation": "/dashboard/system/integrations?tab=api&api=docs"
+  },
+  "requestId": "uuid"
+}`,
     ],
   },
   {
     id: "authentication",
     title: "Authentication",
-    intro: "Authenticate every request with a Bearer API key issued in Super Admin → System / Integrations → API.",
+    intro: "Authenticate every request with a Bearer API key.",
     body: [
-      "Header: Authorization: Bearer hrms_...",
+      "Authorization: Bearer hrms_...",
       "Keys are shown once at creation. The server stores only a SHA-256 hash and a non-secret prefix.",
       "Revoked, expired, IP-restricted, or disabled-environment keys are rejected with 401 or 403.",
-      "Never put API keys in NEXT_PUBLIC_* variables or frontend source.",
+      "Never put API keys in NEXT_PUBLIC_* variables or browser source.",
+    ],
+  },
+  {
+    id: "base-url",
+    title: "Base URL",
+    intro: "All v1 resources are served under a single HTTPS base path.",
+    body: [
+      "{origin}/api/v1",
+      "Example: {origin}/api/v1/employees",
+      "Replace {origin} with your deployed HRMS host (local development is typically http://localhost:3000).",
+    ],
+  },
+  {
+    id: "versioning",
+    title: "API versioning",
+    intro: "The path segment encodes the API version.",
+    body: [
+      "Current version: v1",
+      "Future major versions can ship as /api/v2 without changing existing /api/v1 clients.",
+      "Clients should pin to /api/v1 and treat undocumented fields as optional.",
+    ],
+  },
+  {
+    id: "headers",
+    title: "Request headers",
+    intro: "Required and recommended headers for every call.",
+    body: [
+      "Authorization: Bearer <API_KEY>  (required)",
+      "Accept: application/json  (recommended)",
+      "Content-Type: application/json  (required for future write routes)",
+      "Successful responses include X-Request-Id for tracing in Usage & Logs.",
+    ],
+  },
+  {
+    id: "response-format",
+    title: "Response format",
+    intro: "Successful list and item responses use a consistent JSON envelope.",
+    body: [
+      `{
+  "data": { /* resource or { items, page, pageSize, total } */ },
+  "requestId": "uuid"
+}`,
+      "List endpoints paginate with page / pageSize and return total matching rows.",
+      "Sensitive fields (salary, bank details, payslip files, review comments) are intentionally omitted.",
     ],
   },
   {
@@ -122,8 +188,15 @@ export const API_DOC_SECTIONS: ApiDocSection[] = [
         "firstName": "Asha",
         "lastName": "Rao",
         "email": "asha@company.com",
+        "phone": null,
         "employmentStatus": "active",
-        "department": { "id": "uuid", "name": "HR", "code": "HR" }
+        "dateOfJoining": "2024-01-15",
+        "department": { "id": "uuid", "name": "HR", "code": "HR" },
+        "branch": { "id": "uuid", "name": "HQ", "code": "HQ" },
+        "designation": { "id": "uuid", "title": "HR Executive" },
+        "reportingManagerId": null,
+        "createdAt": "2024-01-15T08:00:00.000Z",
+        "updatedAt": "2026-08-01T10:00:00.000Z"
       }
     ],
     "page": 1,
@@ -149,7 +222,15 @@ export const API_DOC_SECTIONS: ApiDocSection[] = [
     "firstName": "Asha",
     "lastName": "Rao",
     "email": "asha@company.com",
-    "employmentStatus": "active"
+    "phone": null,
+    "employmentStatus": "active",
+    "dateOfJoining": "2024-01-15",
+    "department": { "id": "uuid", "name": "HR", "code": "HR" },
+    "branch": { "id": "uuid", "name": "HQ", "code": "HQ" },
+    "designation": { "id": "uuid", "title": "HR Executive" },
+    "reportingManagerId": null,
+    "createdAt": "2024-01-15T08:00:00.000Z",
+    "updatedAt": "2026-08-01T10:00:00.000Z"
   },
   "requestId": "uuid"
 }`,
@@ -172,7 +253,16 @@ export const API_DOC_SECTIONS: ApiDocSection[] = [
         requestExample: `curl -H "Authorization: Bearer $HRMS_API_KEY" "{origin}/api/v1/departments"`,
         responseExample: `{
   "data": {
-    "items": [{ "id": "uuid", "name": "HR", "code": "HR", "status": "active" }],
+    "items": [{
+      "id": "uuid",
+      "name": "HR",
+      "code": "HR",
+      "description": null,
+      "parentDepartmentId": null,
+      "status": "active",
+      "branch": { "id": "uuid", "name": "HQ", "code": "HQ" },
+      "createdAt": "2024-01-01T00:00:00.000Z"
+    }],
     "page": 1,
     "pageSize": 25,
     "total": 1
@@ -207,8 +297,12 @@ export const API_DOC_SECTIONS: ApiDocSection[] = [
       "id": "uuid",
       "employeeId": "uuid",
       "date": "2026-08-17",
+      "checkInAt": "2026-08-17T03:30:00.000Z",
+      "checkOutAt": "2026-08-17T12:30:00.000Z",
       "status": "present",
-      "workHours": 8
+      "workHours": 8,
+      "overtimeHours": 0,
+      "createdAt": "2026-08-17T03:30:00.000Z"
     }],
     "page": 1,
     "pageSize": 25,
@@ -224,7 +318,7 @@ export const API_DOC_SECTIONS: ApiDocSection[] = [
     id: "leave",
     title: "Leave",
     group: "endpoints",
-    intro: "Leave requests. Reasons may be omitted from future tighter payloads; today status and dates are returned.",
+    intro: "Leave requests. Reason text is not exposed; status, type, and dates are returned.",
     endpoints: [
       {
         method: "GET",
@@ -242,10 +336,16 @@ export const API_DOC_SECTIONS: ApiDocSection[] = [
     "items": [{
       "id": "uuid",
       "employeeId": "uuid",
+      "employeeCode": "IFR-001",
+      "employeeName": "Asha Rao",
+      "leaveType": "Casual Leave",
+      "leaveTypeCode": "CL",
       "startDate": "2026-08-20",
       "endDate": "2026-08-21",
       "totalDays": 2,
-      "status": "approved"
+      "isHalfDay": false,
+      "status": "approved",
+      "createdAt": "2026-08-10T09:00:00.000Z"
     }],
     "page": 1,
     "pageSize": 25,
@@ -276,7 +376,9 @@ export const API_DOC_SECTIONS: ApiDocSection[] = [
       "id": "uuid",
       "payrollMonth": "2026-08-01",
       "status": "processed",
-      "processedAt": "2026-08-05T10:00:00.000Z"
+      "processedAt": "2026-08-05T10:00:00.000Z",
+      "approvedAt": "2026-08-05T11:00:00.000Z",
+      "createdAt": "2026-08-01T00:00:00.000Z"
     }],
     "page": 1,
     "pageSize": 25,
@@ -307,7 +409,11 @@ export const API_DOC_SECTIONS: ApiDocSection[] = [
       "id": "uuid",
       "assetCode": "LAP-014",
       "name": "MacBook Pro",
-      "status": "assigned"
+      "status": "assigned",
+      "officeLocation": "HQ",
+      "departmentId": "uuid",
+      "currentAssignmentId": "uuid",
+      "createdAt": "2025-03-01T00:00:00.000Z"
     }],
     "page": 1,
     "pageSize": 25,
@@ -338,7 +444,9 @@ export const API_DOC_SECTIONS: ApiDocSection[] = [
       "id": "uuid",
       "employeeId": "uuid",
       "status": "approved",
-      "cycleId": "uuid"
+      "cycleId": "uuid",
+      "createdAt": "2026-01-10T00:00:00.000Z",
+      "updatedAt": "2026-02-01T00:00:00.000Z"
     }],
     "page": 1,
     "pageSize": 25,
@@ -363,7 +471,7 @@ export const API_DOC_SECTIONS: ApiDocSection[] = [
   },
   {
     id: "errors",
-    title: "Errors",
+    title: "Error handling",
     intro: "Errors use a stable JSON envelope. Internal exception text is never returned to API clients.",
     body: [
       `{
@@ -373,27 +481,17 @@ export const API_DOC_SECTIONS: ApiDocSection[] = [
     "requestId": "uuid"
   }
 }`,
-      "Trace the same requestId in Super Admin → API → Usage / Logs.",
+      "Trace the same requestId in Super Admin → Infrastructure → API → Usage & Logs.",
     ],
   },
   {
     id: "rate-limits",
-    title: "Rate Limits",
+    title: "Rate limits",
     intro: "Each key has a per-minute limit. Standard is 60, high volume is 300, or a custom value set on the key.",
     body: [
-      "429 Too Many Requests is returned when the limit is exceeded.",
-      "Headers: X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After.",
-      "Limits are enforced from usage logs so they remain effective across Vercel instances.",
-    ],
-  },
-  {
-    id: "changelog",
-    title: "Changelog",
-    intro: "v1 — Initial public API.",
-    body: [
-      "GET /api/v1 — API status for a valid key.",
-      "GET employees, departments, attendance, leave, payroll (metadata), assets, performance (status).",
-      "API keys, usage logs, webhooks, and settings in Super Admin.",
+      "HTTP 429 is returned when the limit is exceeded.",
+      "Response headers: X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After.",
+      "Limits are enforced from usage logs so they remain effective across instances.",
     ],
   },
 ];

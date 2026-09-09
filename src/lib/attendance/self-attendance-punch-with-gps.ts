@@ -5,8 +5,8 @@ import { toast } from "sonner";
 import {
   selfAttendancePunchAction,
   selfAttendanceUpdateCheckoutAction,
-  type SelfAttendancePunchResult,
 } from "@/lib/attendance/actions/self-attendance-punch-actions";
+import type { SelfAttendancePunchResult } from "@/lib/attendance/self-attendance-punch-types";
 import {
   fetchEmployeeLocation,
   type PunchGeolocationResult,

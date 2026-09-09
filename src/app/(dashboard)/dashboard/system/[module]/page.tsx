@@ -18,7 +18,7 @@ import { SYSTEM_MODULE_LINKS } from "@/config/system-admin-navigation";
 import { requireSuperAdminProfile } from "@/lib/system-admin/guards";
 import { siteConfig } from "@/config/site";
 import { getApiManagementSnapshot } from "@/lib/system-admin/services/api-management-queries";
-import { listBackupJobs } from "@/lib/system-admin/services/backup-service";
+import { getBackupOperationsSnapshot } from "@/lib/system-admin/services/backup-service";
 import { getDatabaseHealthDetail } from "@/lib/system-admin/services/database-health-service";
 import { getEmailServiceSnapshot } from "@/lib/system-admin/services/email-service";
 import { getEnvironmentSnapshot } from "@/lib/system-admin/services/environment-service";
@@ -154,7 +154,7 @@ export default async function SystemModulePage({ params }: SystemModulePageProps
   if (module === "database") {
     const data = await getDatabaseHealthDetail(supabase, orgId);
     return (
-      <div className="h-full min-h-0 overflow-hidden">
+      <div className="h-full min-h-0 overflow-hidden p-4 md:p-5">
         <DatabaseHealthPanel initial={data} />
       </div>
     );
@@ -233,10 +233,10 @@ export default async function SystemModulePage({ params }: SystemModulePageProps
   }
 
   if (module === "backup") {
-    const jobs = await listBackupJobs(supabase, orgId);
+    const backup = await getBackupOperationsSnapshot(supabase, orgId);
     return (
-      <div className="h-full min-h-0 overflow-hidden">
-        <BackupPanel jobs={jobs} />
+      <div className="h-full min-h-0 overflow-hidden p-4 md:p-5">
+        <BackupPanel initial={backup} />
       </div>
     );
   }

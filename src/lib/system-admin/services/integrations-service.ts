@@ -1,40 +1,18 @@
+import "server-only";
+
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  integrationProviderLabel,
+  type IntegrationProvider,
+  type SystemIntegrationRow,
+} from "@/lib/system-admin/services/integration-types";
 
-export type IntegrationProvider =
-  | "microsoft365"
-  | "google_workspace"
-  | "slack"
-  | "teams"
-  | "zoom"
-  | "webhook"
-  | "rest_api"
-  | "zapier";
-
-export type SystemIntegrationRow = {
-  id: string;
-  provider: IntegrationProvider;
-  label: string;
-  status: "available" | "connected" | "disconnected" | "error" | "syncing";
-  configured: boolean;
-  lastSyncAt: string | null;
-  lastError: string | null;
+export {
+  integrationProviderLabel,
+  type IntegrationProvider,
+  type SystemIntegrationRow,
 };
-
-const PROVIDER_LABELS: Record<IntegrationProvider, string> = {
-  microsoft365: "Microsoft 365",
-  google_workspace: "Google Workspace",
-  slack: "Slack",
-  teams: "Microsoft Teams",
-  zoom: "Zoom",
-  webhook: "Webhooks",
-  rest_api: "REST API",
-  zapier: "Zapier",
-};
-
-export function integrationProviderLabel(provider: string): string {
-  return PROVIDER_LABELS[provider as IntegrationProvider] ?? provider;
-}
 
 /** True only when real credentials exist in config — empty `{}` is not a connection. */
 export function hasIntegrationCredentials(config: unknown): boolean {
@@ -122,7 +100,7 @@ export async function listSystemIntegrations(
     return {
       id: row.id as string,
       provider: row.provider as IntegrationProvider,
-      label: PROVIDER_LABELS[row.provider as IntegrationProvider] ?? (row.provider as string),
+      label: integrationProviderLabel(row.provider as string),
       status,
       configured,
       lastSyncAt: configured ? ((row.last_sync_at as string | null) ?? null) : null,

@@ -12,7 +12,7 @@ import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
 import { createClient } from "@/lib/supabase/server";
 
-export type AttendanceLocationActionResult =
+type AttendanceLocationActionResult =
   | { success: true; data: AttendanceLocationDetails }
   | { success: false; message: string; code: "not_found" | "forbidden" | "error" };
 

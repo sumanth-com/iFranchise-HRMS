@@ -116,7 +116,7 @@ export async function createSystemApiKey(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   input: CreateSystemApiKeyInput,
-): Promise<{ id: string; rawKey: string; prefix: string }> {
+): Promise<{ rawKey: string; key: SystemApiKeyRow }> {
   const generated = generateApiKey();
   const scopes = [...new Set(input.scopes.filter(isPublicApiScope))];
   if (scopes.length === 0) {
@@ -144,12 +144,15 @@ export async function createSystemApiKey(
       created_by: profile.userId,
       created_by_employee_id: profile.employee.id,
     })
-    .select("id")
+    .select(KEY_SELECT)
     .single();
 
   if (error || !data) throw new Error(error?.message ?? "Failed to create API key");
 
-  return { id: data.id as string, rawKey: generated.rawKey, prefix: generated.prefix };
+  return {
+    rawKey: generated.rawKey,
+    key: mapRow(data as Record<string, unknown>),
+  };
 }
 
 export async function revokeSystemApiKey(
@@ -193,7 +196,7 @@ export async function rotateSystemApiKey(
   supabase: AuthSupabaseClient,
   profile: UserProfile,
   keyId: string,
-): Promise<{ rawKey: string; prefix: string }> {
+): Promise<{ rawKey: string; prefix: string; keyId: string }> {
   const existing = await getSystemApiKey(
     supabase,
     profile.employee.organizationId,
@@ -222,5 +225,5 @@ export async function rotateSystemApiKey(
     .is("deleted_at", null);
 
   if (error) throw new Error(error.message);
-  return { rawKey: generated.rawKey, prefix: generated.prefix };
+  return { rawKey: generated.rawKey, prefix: generated.prefix, keyId };
 }

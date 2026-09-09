@@ -4,7 +4,6 @@ import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
 import { HrDashboard } from "@/components/dashboard/hr-dashboard";
 import { getHrDashboardData } from "@/lib/dashboard/services/hr-overview-queries";
 import { requireServerAnyPermission } from "@/lib/permissions/server";
-import { requireSuperAdminProfile } from "@/lib/system-admin/guards";
 import { createClient } from "@/lib/supabase/server";
 import type { HrDashboardData } from "@/types/dashboard";
 
@@ -61,7 +60,6 @@ const EMPTY_DASHBOARD: HrDashboardData = {
 };
 
 async function SuperAdminHrOverviewContent() {
-  await requireSuperAdminProfile();
   const profile = await requireServerAnyPermission(["employee.view"]);
   const supabase = await createClient();
 

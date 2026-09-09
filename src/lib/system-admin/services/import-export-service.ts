@@ -1,31 +1,15 @@
+import "server-only";
+
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { UserProfile } from "@/types/auth";
+import {
+  EXPORT_MODULES,
+  type ExportModule,
+  type ImportJobRow,
+} from "@/lib/system-admin/services/import-export-types";
 
-export type ImportJobRow = {
-  id: string;
-  module: string;
-  format: string;
-  status: string;
-  recordCount: number | null;
-  successCount: number | null;
-  errorCount: number | null;
-  createdAt: string;
-  completedAt: string | null;
-};
-
-export const EXPORT_MODULES = [
-  "employees",
-  "departments",
-  "roles",
-  "attendance",
-  "leave",
-  "assets",
-  "payroll",
-  "performance",
-] as const;
-
-export type ExportModule = (typeof EXPORT_MODULES)[number];
+export { EXPORT_MODULES, type ExportModule, type ImportJobRow };
 
 const MODULE_TABLE: Record<ExportModule, string> = {
   employees: "employees",
