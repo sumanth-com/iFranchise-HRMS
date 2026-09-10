@@ -18,6 +18,7 @@ import {
 const SELF_ATTENDANCE_PUNCH_PERMISSIONS = [
   PORTAL_PERMISSIONS.hr,
   PORTAL_PERMISSIONS.employee,
+  PORTAL_PERMISSIONS.accountant,
   PORTAL_PERMISSIONS.manager,
   "attendance.view",
 ] as const;

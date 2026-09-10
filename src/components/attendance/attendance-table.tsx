@@ -19,13 +19,13 @@ import {
   CalendarDays,
   XCircle,
 } from "lucide-react";
-import Link from "next/link";
 import { toast } from "sonner";
 
 import {
   AttendanceRegularizationViewDialog,
   AttendanceViewDialog,
 } from "@/components/attendance/attendance-record-dialogs";
+import { AttendanceLocationDialog } from "@/components/attendance/attendance-location-dialog";
 import { ManualAttendanceStatusDialog } from "@/components/attendance/manual-attendance-status-dialog";
 import { AttendanceStatusBadge } from "@/components/attendance/attendance-status-badge";
 import { Button } from "@/components/common/button";
@@ -56,8 +56,8 @@ import {
   ATTENDANCE_STATUS_LABELS,
   SELF_ATTENDANCE_ROUTES,
 } from "@/lib/attendance/constants";
-import { attendanceLocationHref } from "@/lib/attendance/services/attendance-location";
 import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils";
+import type { AttendanceLocationPointKind } from "@/lib/attendance/services/attendance-location";
 import { FILTER_ANY_VALUE } from "@/lib/manager/filter-select";
 import type {
   AttendanceListItem,
@@ -139,6 +139,7 @@ function formatDateRangeLabel(
 
 type AttendanceColumnMeta = {
   align?: "left" | "center";
+  sticky?: "id" | "name";
 };
 
 const TABLE_HEAD_ROW_CLASS =
@@ -147,6 +148,34 @@ const TABLE_HEAD_CELL_BASE =
   "h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white";
 const TABLE_DATA_CELL_BASE = "whitespace-nowrap px-4 py-3 align-middle";
 const TABLE_ACTIONS_CELL_CLASS = "min-w-36 px-2 py-3 text-center align-middle";
+const STICKY_ID_WIDTH = "min-w-[8.75rem] w-[8.75rem]";
+const STICKY_NAME_WIDTH = "min-w-[12.5rem] w-[12.5rem]";
+const STICKY_ID_LEFT = "left-0";
+const STICKY_NAME_LEFT = "left-[8.75rem]";
+const STICKY_HEADER_ID_CLASS = cn(
+  TABLE_HEAD_CELL_BASE,
+  "sticky top-0 z-40 border-r border-white/15 bg-blue-600 shadow-[1px_0_0_rgba(255,255,255,0.12)]",
+  STICKY_ID_LEFT,
+  STICKY_ID_WIDTH,
+);
+const STICKY_HEADER_NAME_CLASS = cn(
+  TABLE_HEAD_CELL_BASE,
+  "sticky top-0 z-40 border-r border-white/15 bg-blue-600 shadow-[1px_0_0_rgba(255,255,255,0.12)]",
+  STICKY_NAME_LEFT,
+  STICKY_NAME_WIDTH,
+);
+const STICKY_BODY_ID_CLASS = cn(
+  TABLE_DATA_CELL_BASE,
+  "sticky z-20 border-r border-input/40 bg-white shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:bg-input dark:group-hover:bg-input/80",
+  STICKY_ID_LEFT,
+  STICKY_ID_WIDTH,
+);
+const STICKY_BODY_NAME_CLASS = cn(
+  TABLE_DATA_CELL_BASE,
+  "sticky z-20 border-r border-input/40 bg-white shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:bg-input dark:group-hover:bg-input/80",
+  STICKY_NAME_LEFT,
+  STICKY_NAME_WIDTH,
+);
 
 const FILTER_CONTROL_CLASS =
   "h-10 w-full min-w-0 gap-2 rounded-lg border-border/80 bg-white font-semibold text-foreground dark:bg-input [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-muted-foreground";
@@ -194,6 +223,10 @@ export function AttendanceTable({
   const [deleteTarget, setDeleteTarget] = useState<AttendanceListItem | null>(null);
   const [viewId, setViewId] = useState<string | null>(null);
   const [manualTarget, setManualTarget] = useState<AttendanceListItem | null>(null);
+  const [locationTarget, setLocationTarget] = useState<{
+    attendanceId: string;
+    point: AttendanceLocationPointKind;
+  } | null>(null);
   const [isReviewing, setIsReviewing] = useState(false);
   const lastNavigatedQueryRef = useRef<string | null>(null);
   const navigationLockRef = useRef(false);
@@ -386,15 +419,15 @@ export function AttendanceTable({
       {
         id: "employeeCode",
         accessorKey: "employeeCode",
-        header: "Employee Code",
-        meta: { align: "left" } satisfies AttendanceColumnMeta,
+        header: "Employee ID",
+        meta: { align: "left", sticky: "id" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => row.original.employeeCode,
       },
       {
         id: "employeeName",
         accessorKey: "employeeName",
         header: "Employee Name",
-        meta: { align: "left" } satisfies AttendanceColumnMeta,
+        meta: { align: "left", sticky: "name" } satisfies AttendanceColumnMeta,
         cell: ({ row }) => (
           <span className="font-medium tracking-normal not-italic">
             {row.original.employeeName}
@@ -466,7 +499,7 @@ export function AttendanceTable({
           // Prefer check-in when both exist; location page can switch to check-out.
           const locationPoint = hasCheckInLocation ? "check_in" : "check_out";
           const locationTitle = hasCheckInLocation && hasCheckOutLocation
-            ? "View location (opens check-in; switch to check-out on the page)"
+            ? "View location"
             : hasCheckOutLocation
               ? "View check-out location"
               : "View check-in location";
@@ -483,21 +516,21 @@ export function AttendanceTable({
                 <Eye className="size-4" />
               </Button>
               {hasLocation ? (
-                <Link
-                  href={attendanceLocationHref(
-                    locationBasePath,
-                    row.original.id,
-                    locationPoint,
-                  )}
-                  className={cn(
-                    "inline-flex size-8 items-center justify-center rounded-lg text-violet-700 hover:bg-muted",
-                  )}
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
                   aria-label={locationTitle}
                   title={locationTitle}
-                  onClick={(event) => event.stopPropagation()}
+                  className="text-violet-700"
+                  onClick={() =>
+                    setLocationTarget({
+                      attendanceId: row.original.id,
+                      point: locationPoint,
+                    })
+                  }
                 >
                   <MapPin className="size-4" />
-                </Link>
+                </Button>
               ) : null}
               {showManualStatusAction ? (
                 <Button
@@ -565,7 +598,6 @@ export function AttendanceTable({
       canCreate,
       canDelete,
       isReviewing,
-      locationBasePath,
       openAttendanceRecord,
       showManualStatusAction,
       teamRegularizationMode,
@@ -798,12 +830,18 @@ export function AttendanceTable({
                   const meta = header.column.columnDef.meta as AttendanceColumnMeta | undefined;
                   const isActions = header.column.id === "actions";
                   const isCenter = meta?.align === "center";
+                  const stickyClass =
+                    meta?.sticky === "id"
+                      ? STICKY_HEADER_ID_CLASS
+                      : meta?.sticky === "name"
+                        ? STICKY_HEADER_NAME_CLASS
+                        : null;
 
                   return (
                     <TableHead
                       key={header.id}
                       className={cn(
-                        TABLE_HEAD_CELL_BASE,
+                        stickyClass ?? TABLE_HEAD_CELL_BASE,
                         isActions && TABLE_ACTIONS_CELL_CLASS,
                         isCenter && "text-center",
                       )}
@@ -833,19 +871,26 @@ export function AttendanceTable({
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-white/5"
+                  className="group cursor-pointer hover:bg-zinc-50 dark:hover:bg-white/5"
                   onClick={() => openRecord(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => {
                     const meta = cell.column.columnDef.meta as AttendanceColumnMeta | undefined;
                     const isActions = cell.column.id === "actions";
                     const isCenter = meta?.align === "center";
+                    const stickyClass =
+                      meta?.sticky === "id"
+                        ? STICKY_BODY_ID_CLASS
+                        : meta?.sticky === "name"
+                          ? STICKY_BODY_NAME_CLASS
+                          : null;
 
                     return (
                       <TableCell
                         key={cell.id}
                         className={cn(
-                          isActions ? TABLE_ACTIONS_CELL_CLASS : TABLE_DATA_CELL_BASE,
+                          stickyClass ??
+                            (isActions ? TABLE_ACTIONS_CELL_CLASS : TABLE_DATA_CELL_BASE),
                           isCenter && "text-center",
                         )}
                         onClick={
@@ -887,8 +932,21 @@ export function AttendanceTable({
             if (!open) setViewId(null);
           }}
           locationBasePath={locationBasePath}
+          onOpenLocation={(attendanceId, point) => {
+            setViewId(null);
+            setLocationTarget({ attendanceId, point });
+          }}
         />
       )}
+
+      <AttendanceLocationDialog
+        attendanceId={locationTarget?.attendanceId ?? null}
+        preferredPoint={locationTarget?.point ?? null}
+        open={Boolean(locationTarget)}
+        onOpenChange={(open) => {
+          if (!open) setLocationTarget(null);
+        }}
+      />
 
       <ManualAttendanceStatusDialog
         record={manualTarget}

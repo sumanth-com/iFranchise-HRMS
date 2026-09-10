@@ -72,6 +72,7 @@ import {
   type PayrollCalculationResult,
   type SalaryStructureRow,
 } from "@/lib/payroll/services/payroll-calculator";
+import { applyOfficialHolidaysToAttendanceSummary } from "@/lib/payroll/services/payroll-attendance-holidays";
 import {
   generatePayslipNumber,
   formatPayrollMonth,
@@ -597,32 +598,61 @@ async function getAttendanceSummary(
 
   const summary = emptyAttendanceSummary();
   const occupiedDates: string[] = [];
+  const statusByDate = new Map<string, string | null | undefined>();
   let organizationId: string | null = null;
+  let joiningDate: string | null = null;
 
   for (const row of data ?? []) {
+    const date = String(row.attendance_date).slice(0, 10);
+    statusByDate.set(date, row.attendance_status);
     applyAttendanceStatus(summary, row.attendance_status, Number(row.overtime_hours ?? 0));
     if (occupiedAttendanceDate(row.attendance_status)) {
-      occupiedDates.push(String(row.attendance_date).slice(0, 10));
+      occupiedDates.push(date);
     }
     if (!organizationId && row.organization_id) {
       organizationId = String(row.organization_id);
     }
   }
 
-  if (!organizationId) {
+  if (!organizationId || joiningDate == null) {
     const { data: employee } = await supabase
       .schema("hrms")
       .from("employees")
-      .select("organization_id")
+      .select("organization_id, date_of_joining")
       .eq("id", employeeId)
       .maybeSingle();
-    organizationId = employee?.organization_id ? String(employee.organization_id) : null;
+    if (!organizationId) {
+      organizationId = employee?.organization_id ? String(employee.organization_id) : null;
+    }
+    joiningDate = employee?.date_of_joining
+      ? String(employee.date_of_joining).slice(0, 10)
+      : null;
   }
+
+  // Declared official holidays use the full month calendar (Excel pre-fills H for
+  // known holidays). Punch-based statuses still stop at queryEnd above.
+  const holidayCreditEnd =
+    applicable.kind === "future" ? queryEnd : monthRange.endDate;
 
   const [leaveSummary, officialHolidays] = await Promise.all([
     getLeaveMonthSummary(supabase, employeeId, month, year, { asOfDate: options?.asOfDate }),
-    loadOfficialHolidayDates(supabase, organizationId, monthRange.startDate, queryEnd),
+    loadOfficialHolidayDates(
+      supabase,
+      organizationId,
+      monthRange.startDate,
+      holidayCreditEnd,
+    ),
   ]);
+
+  const holidayPeriodStart =
+    joiningDate && joiningDate > monthRange.startDate ? joiningDate : monthRange.startDate;
+  applyOfficialHolidaysToAttendanceSummary(summary, {
+    officialHolidayDates: officialHolidays,
+    statusByDate,
+    periodStart: holidayPeriodStart,
+    periodEnd: holidayCreditEnd,
+  });
+
   applyPeriodSandwichLop(
     summary,
     occupiedDates,
@@ -908,53 +938,74 @@ async function loadPayrollPeriodFacts(
   const structureRank = new Map<string, string>();
   const occupiedByEmployee = new Map<string, string[]>();
   const organizationByEmployee = new Map<string, string>();
+  const statusByEmployeeDate = new Map<string, Map<string, string | null | undefined>>();
+  const joiningByEmployee = new Map<string, string | null>();
 
   for (let i = 0; i < employeeIds.length; i += QUERY_IN_CHUNK) {
     const chunk = employeeIds.slice(i, i + QUERY_IN_CHUNK);
 
-    const [structuresResult, attendanceResult, leaveResult, bonusesResult] = await Promise.all([
-      admin
-        .schema("hrms")
-        .from("salary_structures")
-        .select("*")
-        .in("employee_id", chunk)
-        .lte("effective_from", monthRange.endDate)
-        .is("deleted_at", null)
-        .or(`effective_to.is.null,effective_to.gte.${monthDate}`),
-      admin
-        .schema("hrms")
-        .from("attendance")
-        .select("employee_id, organization_id, attendance_date, attendance_status, overtime_hours")
-        .in("employee_id", chunk)
-        .gte("attendance_date", queryStart)
-        .lte("attendance_date", queryEnd)
-        .is("deleted_at", null),
-      admin
-        .schema("hrms")
-        .from("leave_requests")
-        .select(
-          "employee_id, total_days, duration_breakdown, leave_types!inner(code, is_paid)",
-        )
-        .in("employee_id", chunk)
-        .eq("leave_status", "approved")
-        .lte("start_date", queryEnd)
-        .gte("end_date", queryStart)
-        .is("deleted_at", null),
-      admin
-        .schema("hrms")
-        .from("employee_bonuses")
-        .select("employee_id, amount, bonus_type, bonus_month")
-        .in("employee_id", chunk)
-        .in("bonus_status", ["pending", "approved"])
-        .eq("bonus_month", monthDate)
-        .is("payroll_id", null)
-        .is("deleted_at", null),
-    ]);
+    const [structuresResult, attendanceResult, leaveResult, bonusesResult, employeesResult] =
+      await Promise.all([
+        admin
+          .schema("hrms")
+          .from("salary_structures")
+          .select("*")
+          .in("employee_id", chunk)
+          .lte("effective_from", monthRange.endDate)
+          .is("deleted_at", null)
+          .or(`effective_to.is.null,effective_to.gte.${monthDate}`),
+        admin
+          .schema("hrms")
+          .from("attendance")
+          .select("employee_id, organization_id, attendance_date, attendance_status, overtime_hours")
+          .in("employee_id", chunk)
+          .gte("attendance_date", queryStart)
+          .lte("attendance_date", queryEnd)
+          .is("deleted_at", null),
+        admin
+          .schema("hrms")
+          .from("leave_requests")
+          .select(
+            "employee_id, total_days, duration_breakdown, leave_types!inner(code, is_paid)",
+          )
+          .in("employee_id", chunk)
+          .eq("leave_status", "approved")
+          .lte("start_date", queryEnd)
+          .gte("end_date", queryStart)
+          .is("deleted_at", null),
+        admin
+          .schema("hrms")
+          .from("employee_bonuses")
+          .select("employee_id, amount, bonus_type, bonus_month")
+          .in("employee_id", chunk)
+          .in("bonus_status", ["pending", "approved"])
+          .eq("bonus_month", monthDate)
+          .is("payroll_id", null)
+          .is("deleted_at", null),
+        admin
+          .schema("hrms")
+          .from("employees")
+          .select("id, organization_id, date_of_joining")
+          .in("id", chunk)
+          .is("deleted_at", null),
+      ]);
 
     if (structuresResult.error) throw new Error(structuresResult.error.message);
     if (attendanceResult.error) throw new Error(attendanceResult.error.message);
     if (leaveResult.error) throw new Error(leaveResult.error.message);
     if (bonusesResult.error) throw new Error(bonusesResult.error.message);
+    if (employeesResult.error) throw new Error(employeesResult.error.message);
+
+    for (const row of employeesResult.data ?? []) {
+      const employeeId = String(row.id);
+      joiningByEmployee.set(
+        employeeId,
+        row.date_of_joining ? String(row.date_of_joining).slice(0, 10) : null,
+      );
+      if (row.organization_id && !organizationByEmployee.has(employeeId)) {
+        organizationByEmployee.set(employeeId, String(row.organization_id));
+      }
+    }
 
     for (const row of structuresResult.data ?? []) {
       const employeeId = String(row.employee_id);
@@ -970,13 +1021,20 @@ async function loadPayrollPeriodFacts(
     for (const row of attendanceResult.data ?? []) {
       const summary = attendanceByEmployee.get(row.employee_id);
       if (!summary) continue;
+      const date = String(row.attendance_date).slice(0, 10);
+      let statusMap = statusByEmployeeDate.get(row.employee_id);
+      if (!statusMap) {
+        statusMap = new Map();
+        statusByEmployeeDate.set(row.employee_id, statusMap);
+      }
+      statusMap.set(date, row.attendance_status);
       applyAttendanceStatus(summary, row.attendance_status, Number(row.overtime_hours ?? 0));
       if (row.organization_id) {
         organizationByEmployee.set(row.employee_id, String(row.organization_id));
       }
       if (occupiedAttendanceDate(row.attendance_status)) {
         const dates = occupiedByEmployee.get(row.employee_id) ?? [];
-        dates.push(String(row.attendance_date).slice(0, 10));
+        dates.push(date);
         occupiedByEmployee.set(row.employee_id, dates);
       }
     }
@@ -1043,12 +1101,19 @@ async function loadPayrollPeriodFacts(
   }
 
   const holidayDatesByOrg = new Map<string, string[]>();
-  const organizationIds = [...new Set(organizationByEmployee.values())];
+  const organizationIds = [
+    ...new Set(
+      [...organizationByEmployee.values(), ...(organizationId ? [organizationId] : [])],
+    ),
+  ];
+  // Declared official holidays for the full payroll month (not limited to as-of punch window).
+  const holidayCreditEnd =
+    applicable.kind === "future" ? queryEnd : monthRange.endDate;
   await Promise.all(
     organizationIds.map(async (orgId) => {
       holidayDatesByOrg.set(
         orgId,
-        await loadOfficialHolidayDates(admin, orgId, queryStart, queryEnd),
+        await loadOfficialHolidayDates(admin, orgId, queryStart, holidayCreditEnd),
       );
     }),
   );
@@ -1057,11 +1122,21 @@ async function loadPayrollPeriodFacts(
     const summary = attendanceByEmployee.get(employeeId);
     if (!summary) continue;
     const orgId = organizationByEmployee.get(employeeId);
+    const officialHolidays = orgId ? (holidayDatesByOrg.get(orgId) ?? []) : [];
+    const joiningDate = joiningByEmployee.get(employeeId) ?? null;
+    const holidayPeriodStart =
+      joiningDate && joiningDate > queryStart ? joiningDate : queryStart;
+    applyOfficialHolidaysToAttendanceSummary(summary, {
+      officialHolidayDates: officialHolidays,
+      statusByDate: statusByEmployeeDate.get(employeeId) ?? new Map(),
+      periodStart: holidayPeriodStart,
+      periodEnd: holidayCreditEnd,
+    });
     applyPeriodSandwichLop(
       summary,
       occupiedByEmployee.get(employeeId) ?? [],
       leaveByEmployee.get(employeeId)?.sandwichDates,
-      orgId ? (holidayDatesByOrg.get(orgId) ?? []) : [],
+      officialHolidays,
     );
   }
 

@@ -24,6 +24,7 @@ import {
   teamPayrollSectionDescription,
   teamPayrollSectionTitleForPortal,
   TEAM_PAYROLL_SECTIONS,
+  usesTeamPayrollRunLabel,
   type TeamPayrollSection,
 } from "@/lib/payroll/constants";
 import type { EmployeePayrollData } from "@/types/employee-payroll";
@@ -257,7 +258,7 @@ export function HrPayrollHubView({
   hiddenSections = [],
 }: Props) {
   const pathname = usePathname();
-  const isCeoPortal = pathname.startsWith("/ceo");
+  const useTeamPayrollLabel = usesTeamPayrollRunLabel(teamBasePath);
   const activeSection =
     initialSection === "team" && canViewTeam ? "team" : "my";
   const isTeamView = activeSection === "team";
@@ -275,9 +276,11 @@ export function HrPayrollHubView({
 
   const sectionHelp = isTeamView ? SECTION_HELP[teamPayrollSection] : undefined;
   const sectionTitle = isTeamView
-    ? teamPayrollSectionTitleForPortal(teamPayrollSection, { ceoPortal: isCeoPortal })
+    ? teamPayrollSectionTitleForPortal(teamPayrollSection, {
+        teamPayrollLabel: useTeamPayrollLabel,
+      })
     : "Payroll";
-  const localizedSectionHelp = sectionHelp && isCeoPortal
+  const localizedSectionHelp = sectionHelp && useTeamPayrollLabel
     ? {
         ...sectionHelp,
         title: sectionHelp.title.replace(/Company Payroll/g, "Team Payroll"),

@@ -29,4 +29,9 @@ export const PORTAL_MANUALS: Record<PortalVariant, PortalManual> = {
     description: MANUAL_DESCRIPTION,
     sections: CEO_PORTAL_MANUAL,
   },
+  accountant: {
+    title: "Accountant Portal manual",
+    description: MANUAL_DESCRIPTION,
+    sections: EMPLOYEE_PORTAL_MANUAL,
+  },
 };

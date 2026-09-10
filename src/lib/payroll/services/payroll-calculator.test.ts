@@ -2,16 +2,21 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { DEFAULT_LEAVE_CALENDAR } from "@/lib/leave/services/leave-calendar-engine";
-import { monthlyGrossPerDay } from "@/lib/payroll/salary-structure-period";
 import {
   calculateEmployeePayroll,
+  computeExcelPaidWorkingDays,
+  EXCEL_PAYROLL_DAY_DENOMINATOR,
   normalizePayrollCalculationResult,
+  resolveProfessionalTaxForMonthlySalary,
 } from "@/lib/payroll/services/payroll-calculator";
-import { roundCurrency } from "@/lib/payroll/services/payroll-utils";
+import {
+  resolveFinalPayableAmount,
+  roundCurrency,
+} from "@/lib/payroll/services/payroll-utils";
 
 const closedSeptember2026 = new Date("2026-10-15");
-
 const closedAugust2026 = new Date("2026-09-15");
+const openSeptember10 = new Date("2026-09-10");
 
 const emptyAttendance = {
   presentDays: 31,
@@ -23,6 +28,340 @@ const emptyAttendance = {
   overtimeHours: 0,
   lateDays: 0,
 };
+
+function structure(gross: number, overrides?: Partial<{
+  id: string;
+  employee_id: string;
+  components: Record<string, unknown>;
+}>) {
+  const basic = roundCurrency(gross * 0.5);
+  const hra = roundCurrency(gross * 0.25);
+  const lta = roundCurrency(gross * 0.1);
+  const special = roundCurrency(gross - basic - hra - lta);
+  return {
+    id: overrides?.id ?? "struct",
+    employee_id: overrides?.employee_id ?? "emp",
+    basic_salary: basic,
+    hra_amount: hra,
+    transport_allowance: lta,
+    other_allowances: special,
+    tax_deduction: 0,
+    other_deductions: 0,
+    gross_salary: gross,
+    net_salary: gross,
+    components: {
+      specialAllowance: special,
+      pf: 0,
+      esi: 0,
+      professionalTax: 0,
+      incomeTax: 0,
+      ...(overrides?.components ?? {}),
+    },
+  };
+}
+
+describe("payroll calculator — Excel source of truth", () => {
+  it("always uses salary / 30 as the daily rate", () => {
+    const result = calculateEmployeePayroll({
+      month: 9,
+      year: 2026,
+      asOfDate: openSeptember10,
+      calendar: DEFAULT_LEAVE_CALENDAR,
+      salaryStructure: structure(25_000),
+      attendance: {
+        presentDays: 9,
+        absentDays: 0,
+        halfDays: 0,
+        onLeaveDays: 0,
+        weekOffDays: 0,
+        holidayDays: 4,
+        overtimeHours: 0,
+        lateDays: 0,
+      },
+      leaveSummary: { lopDays: 0, paidLeaveDays: 0 },
+      bonuses: [],
+      reimbursements: [],
+    });
+
+    assert.equal(result.breakdown.attendance.workingDays, EXCEL_PAYROLL_DAY_DENOMINATOR);
+    assert.equal(result.breakdown.attendance.dailyRate, roundCurrency(25_000 / 30));
+  });
+
+  it("counts holidays as paid days and does not add week_off", () => {
+    const paid = computeExcelPaidWorkingDays(
+      {
+        presentDays: 9,
+        absentDays: 0,
+        halfDays: 0,
+        onLeaveDays: 0,
+        weekOffDays: 4,
+        holidayDays: 4,
+        overtimeHours: 0,
+        lateDays: 0,
+      },
+      { lopDays: 0, paidLeaveDays: 0 },
+    );
+    assert.equal(paid, 13);
+  });
+
+  it("counts CL/EL (paid leave) in total working days", () => {
+    const paid = computeExcelPaidWorkingDays(
+      {
+        presentDays: 7,
+        absentDays: 0,
+        halfDays: 0,
+        onLeaveDays: 1,
+        weekOffDays: 0,
+        holidayDays: 5,
+        overtimeHours: 0,
+        lateDays: 0,
+      },
+      { lopDays: 0, paidLeaveDays: 1 },
+    );
+    assert.equal(paid, 13);
+  });
+
+  it("excludes LOP, Absent, and week_off from paid days", () => {
+    const paid = computeExcelPaidWorkingDays(
+      {
+        presentDays: 8,
+        absentDays: 2,
+        halfDays: 0,
+        onLeaveDays: 0,
+        weekOffDays: 4,
+        holidayDays: 4,
+        overtimeHours: 0,
+        lateDays: 0,
+      },
+      { lopDays: 1, paidLeaveDays: 0 },
+    );
+    assert.equal(paid, 12);
+  });
+
+  it("applies PT: >=25000 → 200, <25000 → 0 (Feb → 300)", () => {
+    assert.equal(resolveProfessionalTaxForMonthlySalary(24_999, 9), 0);
+    assert.equal(resolveProfessionalTaxForMonthlySalary(25_000, 9), 200);
+    assert.equal(resolveProfessionalTaxForMonthlySalary(50_000, 2), 300);
+  });
+
+  it("matches Excel Om: 25000/30*13 - 200 = 10633.33", () => {
+    const result = calculateEmployeePayroll({
+      month: 9,
+      year: 2026,
+      asOfDate: openSeptember10,
+      salaryStructure: structure(25_000),
+      attendance: {
+        presentDays: 9,
+        absentDays: 0,
+        halfDays: 0,
+        onLeaveDays: 0,
+        weekOffDays: 0,
+        holidayDays: 4,
+        overtimeHours: 0,
+        lateDays: 0,
+      },
+      leaveSummary: { lopDays: 0, paidLeaveDays: 0 },
+      bonuses: [],
+      reimbursements: [],
+    });
+    assert.equal(result.breakdown.attendance.paidDays, 13);
+    assert.equal(result.grossSalary, roundCurrency((25_000 / 30) * 13));
+    assert.equal(result.netSalary, roundCurrency((25_000 / 30) * 13 - 200));
+    assert.equal(result.netSalary, 10_633.33);
+  });
+
+  it("matches Excel Akshita: 7000/30*13 = 3033.33", () => {
+    const result = calculateEmployeePayroll({
+      month: 9,
+      year: 2026,
+      asOfDate: openSeptember10,
+      salaryStructure: structure(7_000),
+      attendance: {
+        presentDays: 9,
+        absentDays: 0,
+        halfDays: 0,
+        onLeaveDays: 0,
+        weekOffDays: 0,
+        holidayDays: 4,
+        overtimeHours: 0,
+        lateDays: 0,
+      },
+      leaveSummary: { lopDays: 0, paidLeaveDays: 0 },
+      bonuses: [],
+      reimbursements: [],
+    });
+    assert.equal(result.netSalary, 3_033.33);
+    assert.equal(
+      result.breakdown.deductions.find((line) => line.code === "pt"),
+      undefined,
+    );
+  });
+
+  it("matches Excel Ekta: 25000/30*13 - 200 = 10633.33", () => {
+    const result = calculateEmployeePayroll({
+      month: 9,
+      year: 2026,
+      asOfDate: openSeptember10,
+      salaryStructure: structure(25_000),
+      attendance: {
+        presentDays: 7,
+        absentDays: 0,
+        halfDays: 0,
+        onLeaveDays: 0,
+        weekOffDays: 0,
+        holidayDays: 5,
+        overtimeHours: 0,
+        lateDays: 0,
+      },
+      leaveSummary: { lopDays: 0, paidLeaveDays: 1 },
+      bonuses: [],
+      reimbursements: [],
+    });
+    assert.equal(result.breakdown.attendance.paidDays, 13);
+    assert.equal(result.netSalary, 10_633.33);
+  });
+
+  it("matches Excel Diksha: 50000/30*12 - 200 = 19800", () => {
+    const result = calculateEmployeePayroll({
+      month: 9,
+      year: 2026,
+      asOfDate: openSeptember10,
+      salaryStructure: structure(50_000),
+      attendance: {
+        presentDays: 8,
+        absentDays: 0,
+        halfDays: 0,
+        onLeaveDays: 0,
+        weekOffDays: 0,
+        holidayDays: 4,
+        overtimeHours: 0,
+        lateDays: 0,
+      },
+      leaveSummary: { lopDays: 1, paidLeaveDays: 0 },
+      bonuses: [],
+      reimbursements: [],
+    });
+    assert.equal(result.breakdown.attendance.paidDays, 12);
+    assert.equal(result.netSalary, 19_800);
+  });
+
+  it("matches Excel Vivek: 54166.67/30*13 - 200 = 23272.22", () => {
+    const result = calculateEmployeePayroll({
+      month: 9,
+      year: 2026,
+      asOfDate: openSeptember10,
+      salaryStructure: structure(54_166.67),
+      attendance: {
+        presentDays: 9,
+        absentDays: 0,
+        halfDays: 0,
+        onLeaveDays: 0,
+        weekOffDays: 0,
+        holidayDays: 4,
+        overtimeHours: 0,
+        lateDays: 0,
+      },
+      leaveSummary: { lopDays: 0, paidLeaveDays: 0 },
+      bonuses: [],
+      reimbursements: [],
+    });
+    assert.equal(result.netSalary, 23_272.22);
+  });
+
+  it("aggregates reimbursements once and adds them only on final payout", () => {
+    const result = calculateEmployeePayroll({
+      month: 9,
+      year: 2026,
+      asOfDate: openSeptember10,
+      salaryStructure: structure(12_000),
+      attendance: {
+        presentDays: 7,
+        absentDays: 0,
+        halfDays: 1,
+        onLeaveDays: 0,
+        weekOffDays: 0,
+        holidayDays: 0,
+        overtimeHours: 0,
+        lateDays: 0,
+      },
+      leaveSummary: { lopDays: 0, paidLeaveDays: 0 },
+      bonuses: [],
+      reimbursements: [
+        { amount: 400, category: "travel" },
+        { amount: 200, category: "food" },
+      ],
+    });
+
+    const reimbLines = result.breakdown.earnings.filter((line) =>
+      String(line.code).toLowerCase().includes("reimb"),
+    );
+    assert.equal(reimbLines.length, 1);
+    assert.equal(reimbLines[0]?.amount, 600);
+    // Net is salary only (3000); reimbursement not inside net.
+    assert.equal(result.breakdown.attendance.paidDays, 7.5);
+    assert.equal(result.netSalary, 3_000);
+    const finalPayable = resolveFinalPayableAmount(
+      result.netSalary,
+      result.breakdown,
+      result.totalAllowances,
+    );
+    assert.equal(finalPayable, 3_600);
+  });
+
+  it("does not use portal access / activation dates — only joiningDate for period bounds", () => {
+    const joinedMidMonth = calculateEmployeePayroll({
+      month: 9,
+      year: 2026,
+      asOfDate: openSeptember10,
+      joiningDate: "2026-09-09",
+      salaryStructure: structure(12_000),
+      attendance: {
+        presentDays: 2,
+        absentDays: 0,
+        halfDays: 0,
+        onLeaveDays: 0,
+        weekOffDays: 0,
+        holidayDays: 0,
+        overtimeHours: 0,
+        lateDays: 0,
+      },
+      leaveSummary: { lopDays: 0, paidLeaveDays: 0 },
+      bonuses: [],
+      reimbursements: [],
+    });
+    // Rate is still /30; paid days come from attendance counts only.
+    assert.equal(joinedMidMonth.breakdown.attendance.dailyRate, 400);
+    assert.equal(joinedMidMonth.grossSalary, 800);
+    assert.equal(joinedMidMonth.netSalary, 800);
+  });
+
+  it("ignores workingDaysCalculation overrides for the daily-rate denominator", () => {
+    const result = calculateEmployeePayroll({
+      month: 9,
+      year: 2026,
+      asOfDate: closedSeptember2026,
+      salaryStructure: structure(30_000),
+      attendance: {
+        presentDays: 20,
+        absentDays: 0,
+        halfDays: 0,
+        onLeaveDays: 0,
+        weekOffDays: 8,
+        holidayDays: 2,
+        overtimeHours: 0,
+        lateDays: 0,
+      },
+      leaveSummary: { lopDays: 0, paidLeaveDays: 0 },
+      bonuses: [],
+      reimbursements: [],
+      settings: { workingDaysCalculation: "working_days" },
+    });
+    assert.equal(result.breakdown.attendance.dailyRate, 1_000);
+    // week_off excluded; only P+H = 22
+    assert.equal(result.breakdown.attendance.paidDays, 22);
+    assert.equal(result.grossSalary, 22_000);
+  });
+});
 
 describe("payroll calculator", () => {
   it("embeds applicable structure amounts in the breakdown snapshot", () => {
@@ -58,43 +397,32 @@ describe("payroll calculator", () => {
 
     assert.ok(result.breakdown.salaryStructureSnapshot);
     assert.equal(result.breakdown.salaryStructureSnapshot?.salaryStructureId, "struct-1");
-    assert.equal(result.breakdown.salaryStructureSnapshot?.basicSalary, 13_500);
-    assert.equal(result.grossSalary, 27_000);
-    assert.equal(result.netSalary, 27_000);
-    const earningCodes = result.breakdown.earnings.map((line) => line.code);
-    assert.deepEqual(earningCodes, ["basic", "hra", "transport", "special_allowance"]);
+    assert.equal(result.breakdown.attendance.dailyRate, 900);
   });
 
-  it("prorates gross by payable days and shows LOP at daily rate", () => {
+  it("prorates gross by Excel paid days and shows LOP at daily rate", () => {
     const result = calculateEmployeePayroll({
       month: 9,
       year: 2026,
       asOfDate: closedSeptember2026,
-      salaryStructure: {
+      salaryStructure: structure(30_000, {
         id: "struct-2",
-        employee_id: "emp-2",
-        basic_salary: 15000,
-        hra_amount: 7500,
-        transport_allowance: 3000,
-        other_allowances: 0,
-        tax_deduction: 0,
-        other_deductions: 0,
-        gross_salary: 30000,
-        net_salary: 30000,
-        components: {
-          specialAllowance: 4500,
-          medical: 0,
-          pf: 0,
-          esi: 0,
-          professionalTax: 200,
-          incomeTax: 300,
-        },
+        components: { incomeTax: 300 },
+      }),
+      attendance: {
+        presentDays: 22,
+        absentDays: 0,
+        halfDays: 0,
+        onLeaveDays: 2,
+        weekOffDays: 0,
+        holidayDays: 0,
+        overtimeHours: 0,
+        lateDays: 0,
       },
-      attendance: { ...emptyAttendance, presentDays: 22, absentDays: 0, onLeaveDays: 2 },
       leaveSummary: { lopDays: 2, paidLeaveDays: 3 },
       bonuses: [],
       reimbursements: [],
-      settings: { workingDaysCalculation: "fixed_30", lossOfPayDeduction: true },
+      settings: { lossOfPayDeduction: true },
     });
 
     const lop = result.breakdown.deductions.find((line) => line.code === "lop");
@@ -104,51 +432,6 @@ describe("payroll calculator", () => {
     assert.equal(lop?.amount, 2_000);
     assert.equal(result.totalDeductions, 500);
     assert.equal(result.netSalary, 24_500);
-    assert.equal(result.breakdown.attendance.paidLeaveDays, 3);
-  });
-
-  it("uses daily rate × payable days for the user-specified payroll example", () => {
-    const result = calculateEmployeePayroll({
-      month: 8,
-      year: 2026,
-      asOfDate: closedAugust2026,
-      salaryStructure: {
-        id: "struct-example",
-        employee_id: "emp-example",
-        basic_salary: 15000,
-        hra_amount: 7500,
-        transport_allowance: 3000,
-        other_allowances: 4500,
-        tax_deduction: 0,
-        other_deductions: 0,
-        gross_salary: 30000,
-        net_salary: 30000,
-        components: {},
-      },
-      attendance: {
-        presentDays: 18,
-        absentDays: 0,
-        halfDays: 0,
-        onLeaveDays: 2,
-        weekOffDays: 8,
-        holidayDays: 0,
-        overtimeHours: 0,
-        lateDays: 0,
-      },
-      leaveSummary: { lopDays: 2, paidLeaveDays: 2 },
-      bonuses: [],
-      reimbursements: [],
-      settings: { workingDaysCalculation: "working_days", lossOfPayDeduction: true },
-    });
-
-    const perDay = monthlyGrossPerDay(30_000, result.breakdown.attendance.workingDays);
-    assert.equal(result.breakdown.attendance.paidDays, 20);
-    assert.equal(result.grossSalary, roundCurrency((20 * 30_000) / result.breakdown.attendance.workingDays));
-    assert.equal(result.breakdown.attendance.dailyRate, perDay);
-    assert.equal(
-      result.breakdown.deductions.find((line) => line.code === "lop")?.amount,
-      roundCurrency((2 * 30_000) / result.breakdown.attendance.workingDays),
-    );
   });
 
   it("does not invent salary when no structure is configured", () => {
@@ -172,20 +455,17 @@ describe("payroll calculator", () => {
       month: 8,
       year: 2026,
       asOfDate: closedAugust2026,
-      salaryStructure: {
-        id: "struct-3",
-        employee_id: "emp-3",
-        basic_salary: 20000,
-        hra_amount: 0,
-        transport_allowance: 0,
-        other_allowances: 0,
-        tax_deduction: 0,
-        other_deductions: 0,
-        gross_salary: 20000,
-        net_salary: 20000,
-        components: {},
+      salaryStructure: structure(20_000, { id: "struct-3" }),
+      attendance: {
+        presentDays: 22,
+        absentDays: 0,
+        halfDays: 0,
+        onLeaveDays: 5,
+        weekOffDays: 4,
+        holidayDays: 3,
+        overtimeHours: 0,
+        lateDays: 0,
       },
-      attendance: { ...emptyAttendance, presentDays: 22, onLeaveDays: 5, absentDays: 0 },
       leaveSummary: { lopDays: 0, paidLeaveDays: 5 },
       bonuses: [],
       reimbursements: [],
@@ -193,9 +473,9 @@ describe("payroll calculator", () => {
 
     const lop = result.breakdown.deductions.find((line) => line.code === "lop");
     assert.equal(lop, undefined);
-    const expectedGross = roundCurrency((27 * 20_000) / 31);
-    assert.equal(result.grossSalary, expectedGross);
-    assert.equal(result.netSalary, expectedGross);
+    // P(22)+H(3)+CL/EL(5) = 30; week_off ignored
+    assert.equal(result.breakdown.attendance.paidDays, 30);
+    assert.equal(result.grossSalary, 20_000);
   });
 
   it("adds half-day LOP after three late entries in the month", () => {
@@ -203,19 +483,7 @@ describe("payroll calculator", () => {
       month: 9,
       year: 2026,
       asOfDate: closedSeptember2026,
-      salaryStructure: {
-        id: "struct-4",
-        employee_id: "emp-4",
-        basic_salary: 15000,
-        hra_amount: 7500,
-        transport_allowance: 3000,
-        other_allowances: 4500,
-        tax_deduction: 0,
-        other_deductions: 0,
-        gross_salary: 30000,
-        net_salary: 30000,
-        components: {},
-      },
+      salaryStructure: structure(30_000, { id: "struct-4" }),
       attendance: { ...emptyAttendance, lateDays: 3 },
       leaveSummary: { lopDays: 0, paidLeaveDays: 0 },
       bonuses: [],
@@ -232,55 +500,38 @@ describe("payroll calculator", () => {
       month: 9,
       year: 2026,
       asOfDate: closedSeptember2026,
-      salaryStructure: {
+      salaryStructure: structure(30_000, {
         id: "struct-5",
-        employee_id: "emp-5",
-        basic_salary: 15000,
-        hra_amount: 7500,
-        transport_allowance: 3000,
-        other_allowances: 4500,
-        tax_deduction: 0,
-        other_deductions: 0,
-        gross_salary: 30000,
-        net_salary: 30000,
-        components: {
-          professionalTax: 200,
-          incomeTax: 300,
-        },
+        components: { incomeTax: 300 },
+      }),
+      attendance: {
+        presentDays: 0,
+        absentDays: 30,
+        halfDays: 0,
+        onLeaveDays: 0,
+        weekOffDays: 0,
+        holidayDays: 0,
+        overtimeHours: 0,
+        lateDays: 0,
       },
-      attendance: { ...emptyAttendance, presentDays: 0, absentDays: 30 },
       leaveSummary: { lopDays: 0, paidLeaveDays: 0 },
       bonuses: [],
       reimbursements: [],
-      settings: { workingDaysCalculation: "fixed_30", lossOfPayDeduction: true },
+      settings: { lossOfPayDeduction: true },
     });
 
     assert.equal(result.grossSalary, 0);
     assert.equal(result.netSalary, 0);
-    assert.equal(result.totalDeductions, 0);
-    assert.equal(result.netSalary, result.grossSalary - result.totalDeductions);
     assert.ok(result.netSalary >= 0);
   });
 
-  it("caps working and paid days to the elapsed current month", () => {
+  it("uses Excel /30 rate even for the open current month", () => {
     const result = calculateEmployeePayroll({
       month: 9,
       year: 2026,
       asOfDate: new Date("2026-09-04"),
       calendar: DEFAULT_LEAVE_CALENDAR,
-      salaryStructure: {
-        id: "struct-current",
-        employee_id: "emp-current",
-        basic_salary: 15000,
-        hra_amount: 7500,
-        transport_allowance: 3000,
-        other_allowances: 4500,
-        tax_deduction: 0,
-        other_deductions: 0,
-        gross_salary: 30000,
-        net_salary: 30000,
-        components: {},
-      },
+      salaryStructure: structure(30_000, { id: "struct-current" }),
       attendance: {
         presentDays: 3,
         absentDays: 0,
@@ -294,16 +545,12 @@ describe("payroll calculator", () => {
       leaveSummary: { lopDays: 0, paidLeaveDays: 0 },
       bonuses: [],
       reimbursements: [],
-      settings: { workingDaysCalculation: "fixed_30", lossOfPayDeduction: true },
     });
 
-    const fullMonthWorkingDays = 25;
-    const perDay = roundCurrency(30_000 / fullMonthWorkingDays);
-
-    assert.equal(result.breakdown.attendance.workingDays, 4);
+    assert.equal(result.breakdown.attendance.workingDays, 30);
     assert.equal(result.breakdown.attendance.paidDays, 3);
-    assert.equal(result.breakdown.attendance.dailyRate, perDay);
-    assert.equal(result.grossSalary, roundCurrency(perDay * 3));
+    assert.equal(result.breakdown.attendance.dailyRate, 1_000);
+    assert.equal(result.grossSalary, 3_000);
   });
 
   it("shows zero attendance for a future payroll month", () => {
@@ -312,24 +559,11 @@ describe("payroll calculator", () => {
       year: 2026,
       asOfDate: new Date("2026-09-04"),
       calendar: DEFAULT_LEAVE_CALENDAR,
-      salaryStructure: {
-        id: "struct-future",
-        employee_id: "emp-future",
-        basic_salary: 15000,
-        hra_amount: 7500,
-        transport_allowance: 3000,
-        other_allowances: 4500,
-        tax_deduction: 0,
-        other_deductions: 0,
-        gross_salary: 30000,
-        net_salary: 30000,
-        components: {},
-      },
+      salaryStructure: structure(30_000, { id: "struct-future" }),
       attendance: emptyAttendance,
       leaveSummary: { lopDays: 0, paidLeaveDays: 0 },
       bonuses: [],
       reimbursements: [],
-      settings: { workingDaysCalculation: "fixed_30", lossOfPayDeduction: true },
     });
 
     assert.equal(result.breakdown.attendance.workingDays, 0);
@@ -375,26 +609,7 @@ describe("payroll calculator", () => {
       month: 9,
       year: 2026,
       asOfDate: closedSeptember2026,
-      salaryStructure: {
-        id: "struct-reimb",
-        employee_id: "emp-reimb",
-        basic_salary: 15000,
-        hra_amount: 7500,
-        transport_allowance: 3000,
-        other_allowances: 4500,
-        tax_deduction: 0,
-        other_deductions: 0,
-        gross_salary: 30000,
-        net_salary: 30000,
-        components: {
-          specialAllowance: 4500,
-          medical: 0,
-          pf: 0,
-          esi: 0,
-          professionalTax: 0,
-          incomeTax: 0,
-        },
-      },
+      salaryStructure: structure(30_000, { id: "struct-reimb" }),
       attendance: emptyAttendance,
       leaveLopDays: 0,
       bonuses: [],

@@ -9,15 +9,12 @@ import type { WorkingDaysCalculation } from "@/types/payroll-settings";
 import type { LeaveCalendarContext } from "@/lib/leave/services/leave-calendar-engine";
 import {
   calendarDaysInYearMonth,
-  monthlyGrossPerDay,
 } from "@/lib/payroll/salary-structure-period";
 import {
   countPayrollEligibleWorkingDays,
-  resolveFullMonthPayrollWorkingDays,
   resolvePayrollApplicablePeriod,
   type PayrollApplicablePeriod,
 } from "@/lib/payroll/payroll-period";
-import { getMonthDateRange } from "@/lib/payroll/services/payroll-utils";
 import {
   buildStandardEarningsLines,
   resolveSalaryBreakdownFromStructure,
@@ -310,7 +307,22 @@ export function resolvePayrollWorkingDays(
   return resolveClosedPayrollWorkingDays(month, year, attendance, calculation);
 }
 
-/** Denominator for daily rate — full month when the period is still open. */
+/**
+ * Excel / company payroll: daily rate denominator is always 30.
+ * Never use calendar working days, weekdays-only, or eligible-day counts.
+ */
+export const EXCEL_PAYROLL_DAY_DENOMINATOR = 30;
+
+/** Karnataka PT slabs used by the Excel September payroll sheet (Feb adjustment from policy). */
+export function resolveProfessionalTaxForMonthlySalary(
+  monthlyGrossSalary: number,
+  month: number,
+): number {
+  if (!(monthlyGrossSalary >= 25_000)) return 0;
+  return month === 2 ? 300 : 200;
+}
+
+/** Denominator for daily rate — always Salary / 30 (Excel source of truth). */
 function resolveDailyRateWorkingDays(
   month: number,
   year: number,
@@ -323,6 +335,9 @@ function resolveDailyRateWorkingDays(
     joiningDate?: string | null;
   },
 ): number {
+  void attendance;
+  void calculation;
+  void options?.calendar;
   const period =
     options?.period ??
     resolvePayrollApplicablePeriod(month, year, {
@@ -334,23 +349,32 @@ function resolveDailyRateWorkingDays(
     return 0;
   }
 
-  if (period.isClosed) {
-    return Math.max(
-      1,
-      resolvePayrollWorkingDays(month, year, attendance, calculation, options),
-    );
-  }
+  return EXCEL_PAYROLL_DAY_DENOMINATOR;
+}
 
-  if (options?.calendar) {
-    return Math.max(
-      1,
-      resolveFullMonthPayrollWorkingDays(month, year, options.calendar, {
-        joiningDate: options.joiningDate,
-      }),
-    );
-  }
-
-  return Math.max(1, resolveClosedPayrollWorkingDays(month, year, attendance, calculation));
+/**
+ * Excel total paid working days (exact):
+ * Present + Holiday + CL + EL
+ *
+ * LOP and Absent are excluded.
+ * week_off is NOT added.
+ * Holiday includes explicit attendance "holiday" marks and official company
+ * holidays applied from hrms.holidays (is_optional = false) in payroll facts.
+ * Half-days count as 0.5 present-equivalent.
+ * Paid leave (CL/EL) comes from approved leave summary (or on_leave fallback).
+ */
+export function computeExcelPaidWorkingDays(
+  attendance: AttendanceSummary,
+  leave: LeaveMonthSummary,
+): number {
+  const paidLeaveDays =
+    leave.paidLeaveDays > 0 ? leave.paidLeaveDays : attendance.onLeaveDays;
+  return roundCurrency(
+    attendance.presentDays +
+      attendance.halfDays * 0.5 +
+      attendance.holidayDays +
+      paidLeaveDays,
+  );
 }
 
 function computePresentPaidDays(
@@ -361,9 +385,7 @@ function computePresentPaidDays(
   if (period.kind === "future" || period.periodStart > period.periodEnd) {
     return 0;
   }
-  return roundCurrency(
-    attendance.presentDays + attendance.halfDays * 0.5 + leave.paidLeaveDays,
-  );
+  return computeExcelPaidWorkingDays(attendance, leave);
 }
 
 function proratePayrollComponentAmount(amount: number, factor: number): number {
@@ -484,18 +506,10 @@ export function calculateEmployeePayroll(
     today: input.asOfDate,
     joiningDate: input.joiningDate,
   });
-  const displayWorkingDays = resolvePayrollWorkingDays(
-    month,
-    year,
-    attendance,
-    input.settings?.workingDaysCalculation,
-    {
-      period,
-      calendar: input.calendar,
-      asOfDate: input.asOfDate,
-      joiningDate: input.joiningDate,
-    },
-  );
+  const displayWorkingDays =
+    period.kind === "future" || period.periodStart > period.periodEnd
+      ? 0
+      : EXCEL_PAYROLL_DAY_DENOMINATOR;
   const lopDays = resolveLopDays({
     attendance,
     leaveLopDays: leave.lopDays,
@@ -592,17 +606,19 @@ export function calculateEmployeePayroll(
   const hra = split.hra;
   const lta = split.lta;
   const specialAllowance = split.special;
+  const salaryGross = roundCurrency(basic + hra + lta + specialAllowance);
 
   const statutory = input.settings?.salaryComponents;
   const pf = statutory?.pf === false ? 0 : (components.pf ?? 0);
   const esi = statutory?.esi === false ? 0 : (components.esi ?? 0);
   const professionalTax =
-    statutory?.professionalTax === false ? 0 : (components.professionalTax ?? 0);
+    statutory?.professionalTax === false
+      ? 0
+      : resolveProfessionalTaxForMonthlySalary(salaryGross, month);
   const structureTds =
     statutory?.incomeTax === false ? 0 : (components.incomeTax ?? 0);
   const structureOtherDeduction = components.other ?? 0;
 
-  const salaryGross = roundCurrency(basic + hra + lta + specialAllowance);
   const rawPerDay = workingDaysForRate > 0 ? salaryGross / workingDaysForRate : 0;
   const perDay = roundCurrency(rawPerDay);
   const payableGross = roundCurrency(rawPerDay * payableDays);
@@ -766,9 +782,9 @@ export function calculateEmployeePayroll(
       reimbursementBreakdown:
         reimbursementBreakdown.length > 0 ? reimbursementBreakdown : undefined,
       notes: [
-        `Daily rate ₹${roundCurrency(perDay).toLocaleString("en-IN")} × ${payableDays} payable day(s).`,
+        `Daily rate ₹${roundCurrency(perDay).toLocaleString("en-IN")} (monthly ÷ ${EXCEL_PAYROLL_DAY_DENOMINATOR}) × ${payableDays} paid day(s) [P+H+CL+EL].`,
         lopDays > 0
-          ? `LOP deduction ₹${roundCurrency(lopDeduction).toLocaleString("en-IN")} (${lopDays} day(s) at daily rate).`
+          ? `LOP excluded from paid days (₹${roundCurrency(lopDeduction).toLocaleString("en-IN")} at daily rate for ${lopDays} day(s)).`
           : null,
       ].filter(Boolean) as string[],
     },

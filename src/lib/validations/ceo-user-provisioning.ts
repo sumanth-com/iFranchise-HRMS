@@ -19,7 +19,7 @@ export const ceoProvisioningListParamsSchema = paginationSchema.extend({
   roleCode: z.string().trim().optional(),
   departmentId: z.string().uuid().optional(),
   branchId: z.string().uuid().optional(),
-  portalKey: z.enum(["hr", "ceo", "manager", "employee"]).optional(),
+  portalKey: z.enum(["hr", "ceo", "manager", "accountant", "employee"]).optional(),
   employmentTypeId: z.string().uuid().optional(),
   invitationStatus: invitationStatusSchema.optional(),
 });

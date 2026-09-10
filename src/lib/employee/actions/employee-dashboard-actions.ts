@@ -13,11 +13,16 @@ import { createClient } from "@/lib/supabase/server";
 import { managerAttendanceRegularizationSchema } from "@/lib/validations/manager-self-attendance";
 import type { EmployeeAttendanceActionResult, EmployeeDashboardData } from "@/types/employee-dashboard";
 
-const ATTENDANCE_PERMISSIONS = [PORTAL_PERMISSIONS.employee, "attendance.view"];
+const ATTENDANCE_PERMISSIONS = [
+  PORTAL_PERMISSIONS.employee,
+  PORTAL_PERMISSIONS.accountant,
+  "attendance.view",
+];
 
 export async function getEmployeeDashboardAction(): Promise<EmployeeDashboardData> {
   const profile = await requireServerAnyPermission([
     PORTAL_PERMISSIONS.employee,
+    PORTAL_PERMISSIONS.accountant,
     "employee_profile.view",
   ]);
   const supabase = await createClient();

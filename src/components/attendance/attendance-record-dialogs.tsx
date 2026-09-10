@@ -11,6 +11,7 @@ import {
   getAttendanceDetailAction,
 } from "@/lib/attendance/actions";
 import { formatAttendanceTime } from "@/lib/attendance/services/attendance-utils";
+import type { AttendanceLocationPointKind } from "@/lib/attendance/services/attendance-location";
 import type {
   AttendanceCorrectionDetail,
   AttendanceDetail,
@@ -35,6 +36,11 @@ type AttendanceViewDialogProps = {
   onEdit?: (attendance: AttendanceDetail) => void;
   /** Portal path for GPS location links (e.g. /dashboard/attendance or /ceo/attendance). */
   locationBasePath?: string;
+  /** Prefer in-page location popup over navigating to the location route. */
+  onOpenLocation?: (
+    attendanceId: string,
+    point: AttendanceLocationPointKind,
+  ) => void;
 };
 
 export function AttendanceViewDialog({
@@ -44,6 +50,7 @@ export function AttendanceViewDialog({
   canEdit = false,
   onEdit,
   locationBasePath,
+  onOpenLocation,
 }: AttendanceViewDialogProps) {
   const [detail, setDetail] = useState<AttendanceDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -87,6 +94,7 @@ export function AttendanceViewDialog({
           canEdit={canEdit}
           compact
           locationBasePath={locationBasePath}
+          onOpenLocation={onOpenLocation}
           onEdit={
             onEdit
               ? () => {

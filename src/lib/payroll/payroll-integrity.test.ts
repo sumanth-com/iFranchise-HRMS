@@ -214,12 +214,12 @@ describe("statutory deductions from salary structure", () => {
     },
   };
   const attendance = {
-    presentDays: 22,
+    presentDays: 26,
     absentDays: 0,
     halfDays: 0,
     onLeaveDays: 0,
     weekOffDays: 4,
-    holidayDays: 0,
+    holidayDays: 4,
     overtimeHours: 0,
     lateDays: 0,
   };
@@ -228,6 +228,7 @@ describe("statutory deductions from salary structure", () => {
     const result = calculateEmployeePayroll({
       month: 9,
       year: 2026,
+      asOfDate: new Date("2026-10-15"),
       salaryStructure: structure,
       attendance,
       bonuses: [],
@@ -241,24 +242,28 @@ describe("statutory deductions from salary structure", () => {
         },
       },
     });
+    assert.equal(result.breakdown.attendance.paidDays, 30);
     assert.equal(result.breakdown.deductions.find((line) => line.code === "pt")?.amount, 200);
     assert.equal(
       result.breakdown.deductions.find((line) => line.code === "income_tax")?.amount,
       100,
     );
-    assert.equal(result.netSalary, 24700);
+    assert.equal(result.netSalary, 24_700);
   });
 
   it("does not invent statutory amounts when the structure has zeros", () => {
     const result = calculateEmployeePayroll({
       month: 9,
       year: 2026,
+      asOfDate: new Date("2026-10-15"),
       salaryStructure: { ...structure, components: { pf: 0, esi: 0, professionalTax: 0, incomeTax: 0 }, net_salary: 25000 },
       attendance,
       bonuses: [],
       reimbursements: [],
     });
     assert.equal(result.breakdown.deductions.find((line) => line.code === "pf"), undefined);
-    assert.equal(result.netSalary, 25000);
+    // PT is derived from monthly salary (≥25k → 200), not structure zeros
+    assert.equal(result.breakdown.deductions.find((line) => line.code === "pt")?.amount, 200);
+    assert.equal(result.netSalary, 24_800);
   });
 });

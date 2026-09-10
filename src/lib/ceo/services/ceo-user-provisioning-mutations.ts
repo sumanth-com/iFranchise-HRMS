@@ -190,7 +190,7 @@ export async function inviteExistingEmployeeToPortal(
     .schema("hrms")
     .from("employees")
     .select(
-      "id, employee_code, first_name, last_name, email, user_id, account_status, first_login_at",
+      "id, employee_code, first_name, last_name, email, user_id, account_status, first_login_at, date_of_joining",
     )
     .eq("id", input.employeeId)
     .eq("organization_id", organizationId)
@@ -228,12 +228,18 @@ export async function inviteExistingEmployeeToPortal(
 
   const fullName = `${employee.first_name} ${employee.last_name}`.trim();
   const email = (input.companyEmail?.trim().toLowerCase() || employee.email).toLowerCase();
+  const accessGrantedOn = new Date().toISOString().slice(0, 10);
+  const joiningDate = employee.date_of_joining
+    ? String(employee.date_of_joining).slice(0, 10)
+    : null;
 
   await audit(
     supabase,
     profile,
     "invitation_sent",
-    `Invited existing employee ${fullName} (${employee.employee_code}) as ${ROLE_LABELS[role.code] ?? role.name}`,
+    `Portal/Role access granted on ${accessGrantedOn}: invited existing employee ${fullName} (${employee.employee_code}) as ${ROLE_LABELS[role.code] ?? role.name}${
+      joiningDate ? ` (employee joined on ${joiningDate})` : ""
+    }`,
     input.employeeId,
     {
       employeeId: input.employeeId,
@@ -241,6 +247,8 @@ export async function inviteExistingEmployeeToPortal(
       email,
       roleCode: role.code,
       existingEmployee: true,
+      portalAccessGrantedAt: new Date().toISOString(),
+      dateOfJoining: joiningDate,
     },
     "high",
   );
@@ -263,9 +271,13 @@ export async function changePendingProvisioningRole(
     supabase,
     profile,
     "role_assigned",
-    `Updated pending invite role to ${ROLE_LABELS[role.code] ?? role.name}`,
+    `Portal/Role access granted on ${new Date().toISOString().slice(0, 10)}: updated pending invite role to ${ROLE_LABELS[role.code] ?? role.name}`,
     input.employeeId,
-    { employeeId: input.employeeId, roleCode: role.code },
+    {
+      employeeId: input.employeeId,
+      roleCode: role.code,
+      portalAccessGrantedAt: new Date().toISOString(),
+    },
   );
 }
 

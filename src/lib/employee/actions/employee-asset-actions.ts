@@ -46,6 +46,7 @@ const returnRequestSchema = z.object({
 function revalidateEmployeeAssets() {
   revalidatePath(EMPLOYEE_ROUTES.assets);
   revalidatePath(MANAGER_ROUTES.assets);
+  revalidatePath("/accountant/assets");
   revalidatePath("/dashboard/assets");
   revalidatePath("/dashboard/assets/team");
 }
@@ -54,6 +55,7 @@ export async function employeeReportAssetIssueAction(input: unknown) {
   try {
     const profile = await requireServerAnyPermission([
       PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.accountant,
       PORTAL_PERMISSIONS.manager,
       "asset.view",
     ]);
@@ -74,6 +76,7 @@ export async function employeeRequestAssetReplacementAction(input: unknown) {
   try {
     const profile = await requireServerAnyPermission([
       PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.accountant,
       PORTAL_PERMISSIONS.manager,
       "asset.view",
     ]);
@@ -94,6 +97,7 @@ export async function employeeUpdateAssetStatusAction(input: unknown) {
   try {
     const profile = await requireServerAnyPermission([
       PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.accountant,
       PORTAL_PERMISSIONS.manager,
       "asset.view",
     ]);
@@ -114,6 +118,7 @@ export async function employeeRequestAssetReturnAction(input: unknown) {
   try {
     const profile = await requireServerAnyPermission([
       PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.accountant,
       PORTAL_PERMISSIONS.manager,
       "asset.view",
     ]);
@@ -134,6 +139,7 @@ export async function employeeUpdateAssetRequestAction(input: unknown) {
   try {
     const profile = await requireServerAnyPermission([
       PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.accountant,
       PORTAL_PERMISSIONS.manager,
       "asset.view",
     ]);
@@ -183,6 +189,7 @@ export async function employeeDeleteAssetRequestAction(maintenanceId: string) {
   try {
     const profile = await requireServerAnyPermission([
       PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.accountant,
       PORTAL_PERMISSIONS.manager,
       "asset.view",
     ]);

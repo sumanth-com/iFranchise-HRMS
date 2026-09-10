@@ -8,6 +8,7 @@ import type { PortalVariant } from "@/providers/auth-provider";
 export function getPortalVariantFromHome(portalHome: string): PortalVariant {
   if (portalHome.startsWith("/manager")) return "manager";
   if (portalHome.startsWith("/ceo")) return "ceo";
+  if (portalHome.startsWith("/accountant")) return "accountant";
   if (portalHome === "/employee" || portalHome.startsWith("/employee/")) return "employee";
   if (portalHome === "/" || isHrPortalPath(portalHome)) return "hr";
   return "hr";
@@ -25,6 +26,8 @@ export function getPortalHelpHref(portalHome: string): string {
       return "/manager/help";
     case "ceo":
       return "/ceo/help";
+    case "accountant":
+      return "/accountant/help";
     case "employee":
       return EMPLOYEE_ROUTES.help;
     default:
@@ -44,6 +47,8 @@ export function getPortalSettingsHref(portalHome: string): string {
       return MANAGER_ROUTES.settings;
     case "ceo":
       return CEO_ROUTES.settings;
+    case "accountant":
+      return "/accountant/settings";
     case "employee":
       return EMPLOYEE_ROUTES.settings;
     default:

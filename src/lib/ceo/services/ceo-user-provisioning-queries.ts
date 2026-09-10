@@ -50,7 +50,8 @@ const ROLE_PRIORITY: Record<string, number> = {
   hr_admin: 3,
   hr_executive: 4,
   manager: 5,
-  employee: 6,
+  accountant: 6,
+  employee: 7,
 };
 
 function rolePriority(code: string) {
@@ -58,7 +59,13 @@ function rolePriority(code: string) {
 }
 
 function normalizePortalKey(value: string | null | undefined) {
-  if (value === "hr" || value === "ceo" || value === "manager" || value === "employee") {
+  if (
+    value === "hr" ||
+    value === "ceo" ||
+    value === "manager" ||
+    value === "accountant" ||
+    value === "employee"
+  ) {
     return value;
   }
   return null;
@@ -756,6 +763,7 @@ export async function getCeoProvisioningLookups(
     { id: "ceo", label: "Executive Portal" },
     { id: "hr", label: "HR Portal" },
     { id: "manager", label: "Manager Portal" },
+    { id: "accountant", label: "Accountant Portal" },
     { id: "employee", label: "Self-Service Portal" },
   ];
 
@@ -826,6 +834,12 @@ async function getRolePermissionCodes(
 
 function buildTimeline(user: NormalizedExecutiveUser): CeoProvisioningTimelineEntry[] {
   const entries: CeoProvisioningTimelineEntry[] = [];
+  if (user.joiningDate) {
+    entries.push({
+      label: "Employee joined",
+      timestamp: `${String(user.joiningDate).slice(0, 10)}T00:00:00.000Z`,
+    });
+  }
   if (user.invitationSentAt)
     entries.push({ label: "Invitation sent", timestamp: user.invitationSentAt });
   if (user.invitationCancelledAt)
@@ -833,7 +847,7 @@ function buildTimeline(user: NormalizedExecutiveUser): CeoProvisioningTimelineEn
   if (user.firstLoginAt)
     entries.push({ label: "First login", timestamp: user.firstLoginAt });
   if (user.acceptedAt)
-    entries.push({ label: "Account activated", timestamp: user.acceptedAt });
+    entries.push({ label: "Portal/Role access granted", timestamp: user.acceptedAt });
   if (user.lastActivityAt)
     entries.push({ label: "Last activity", timestamp: user.lastActivityAt });
 

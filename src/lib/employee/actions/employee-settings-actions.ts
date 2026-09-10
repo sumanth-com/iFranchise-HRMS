@@ -29,7 +29,7 @@ const changePasswordSchema = z
 
 export async function employeeChangePasswordAction(input: unknown) {
   try {
-    const profile = await requireServerAnyPermission([PORTAL_PERMISSIONS.employee]);
+    const profile = await requireServerAnyPermission([PORTAL_PERMISSIONS.employee, PORTAL_PERMISSIONS.accountant]);
     const parsed = changePasswordSchema.parse(input);
     const supabase = await createClient();
 

@@ -148,7 +148,7 @@ export function CeoProvisioningDrawer({
             </div>
 
             <section className="rounded-xl border p-4">
-              <h3 className="text-sm font-semibold">Invitation Timeline</h3>
+              <h3 className="text-sm font-semibold">Joining & access timeline</h3>
               {detail.timeline.length === 0 ? (
                 <p className="mt-2 text-sm text-muted-foreground">No activity recorded yet.</p>
               ) : (

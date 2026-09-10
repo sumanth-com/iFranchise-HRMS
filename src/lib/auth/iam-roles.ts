@@ -16,11 +16,18 @@ const PORTAL_LABELS: Record<PortalKey, string> = {
   hr: "HR Portal",
   ceo: "Executive Portal",
   manager: "Manager Portal",
+  accountant: "Accountant Portal",
   employee: "Employee Portal",
 };
 
 function normalizePortalKey(value: string | null | undefined): PortalKey | null {
-  if (value === "hr" || value === "ceo" || value === "manager" || value === "employee") {
+  if (
+    value === "hr" ||
+    value === "ceo" ||
+    value === "manager" ||
+    value === "accountant" ||
+    value === "employee"
+  ) {
     return value;
   }
   return null;

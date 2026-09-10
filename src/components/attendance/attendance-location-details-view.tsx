@@ -177,7 +177,7 @@ export function AttendanceLocationDetailsView({
       <section className="rounded-xl border bg-card px-4 py-3.5 shadow-sm sm:px-5">
         <div className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
           <InfoCell label="Employee" value={data.employeeName} />
-          <InfoCell label="Employee code" value={data.employeeCode || "—"} />
+          <InfoCell label="Employee ID" value={data.employeeCode || "—"} />
           <InfoCell
             label="Status"
             value={<AttendanceStatusBadge status={data.attendanceStatus} />}

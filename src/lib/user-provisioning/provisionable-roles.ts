@@ -19,6 +19,7 @@ const PORTAL_LABELS: Record<PortalKey, string> = {
   hr: "HR Portal",
   ceo: "Executive Portal",
   manager: "Manager Portal",
+  accountant: "Accountant Portal",
   employee: "Self-Service Portal",
 };
 
@@ -26,11 +27,18 @@ const PORTAL_DEPARTMENT_HINTS: Record<PortalKey, string> = {
   hr: "Human Resources",
   ceo: "Executive Leadership",
   manager: "Operations",
+  accountant: "Finance",
   employee: "Workforce",
 };
 
 function normalizePortalKey(value: string | null | undefined): PortalKey | null {
-  if (value === "hr" || value === "ceo" || value === "manager" || value === "employee") {
+  if (
+    value === "hr" ||
+    value === "ceo" ||
+    value === "manager" ||
+    value === "accountant" ||
+    value === "employee"
+  ) {
     return value;
   }
   return null;
@@ -45,6 +53,7 @@ export const USER_PROVISIONING_INVITE_ROLE_CODES = [
   "co_founder",
   "hr_admin",
   "manager",
+  "accountant",
   "employee",
 ] as const;
 
@@ -71,7 +80,8 @@ const INVITE_ROLE_SORT_ORDER: Record<string, number> = {
   co_founder: 1,
   hr_admin: 2,
   manager: 3,
-  employee: 4,
+  accountant: 4,
+  employee: 5,
 };
 
 export function isUserProvisioningInviteRoleCode(code: string): boolean {
@@ -258,6 +268,8 @@ export function derivePortalFromRoleCode(code: string): PortalKey | null {
       return "hr";
     case "manager":
       return "manager";
+    case "accountant":
+      return "accountant";
     case "employee":
       return "employee";
     default:

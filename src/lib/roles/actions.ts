@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { clearPermissionCacheCookie } from "@/lib/auth/permission-cache";
 import { ROLES_ROUTES, SYSTEM_ROLES_ROUTES } from "@/lib/roles/constants";
 import {
   assignUserRole,
@@ -44,6 +45,11 @@ function revalidateRoles() {
   for (const route of Object.values(SYSTEM_ROLES_ROUTES)) {
     revalidatePath(route);
   }
+}
+
+/** Clear this session's permission cookie after role/assignment changes. */
+async function invalidateSessionPermissionCache() {
+  await clearPermissionCacheCookie();
 }
 
 export async function saveRoleAction(
@@ -90,6 +96,7 @@ export async function saveRolePermissionsAction(
     const supabase = await createClient();
     const parsed = rolePermissionsSchema.parse(input);
     await saveRolePermissions(supabase, profile, parsed);
+    await invalidateSessionPermissionCache();
     revalidateRoles();
     return { success: true, data: undefined };
   } catch (error) {
@@ -112,6 +119,7 @@ export async function assignUserRoleAction(
     const supabase = await createClient();
     const parsed = assignUserRoleSchema.parse(input);
     const id = await assignUserRole(supabase, profile, parsed);
+    await invalidateSessionPermissionCache();
     revalidateRoles();
     return { success: true, data: id };
   } catch (error) {
@@ -134,6 +142,7 @@ export async function changeUserRoleAction(
     ]);
     const supabase = await createClient();
     await changeUserRole(supabase, profile, userRoleId, newRoleId);
+    await invalidateSessionPermissionCache();
     revalidateRoles();
     return { success: true, data: undefined };
   } catch (error) {
@@ -156,6 +165,7 @@ export async function removeUserRoleAction(
     const supabase = await createClient();
     removeUserRoleSchema.parse({ userRoleId });
     await removeUserRole(supabase, profile, userRoleId);
+    await invalidateSessionPermissionCache();
     revalidateRoles();
     return { success: true, data: undefined };
   } catch (error) {
@@ -178,6 +188,7 @@ export async function changeEmployeeRoleAction(
     ]);
     const supabase = await createClient();
     await changeEmployeeRole(supabase, profile, employeeId, newRoleId);
+    await invalidateSessionPermissionCache();
     revalidateRoles();
     return { success: true, data: undefined };
   } catch (error) {

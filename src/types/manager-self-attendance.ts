@@ -16,6 +16,8 @@ export type ManagerTodayAttendance = {
   attendanceStatus: AttendanceStatus | null;
   checkInAt: string | null;
   checkOutAt: string | null;
+  /** Completed seconds from earlier sessions today (before the current open session). */
+  priorCompletedSeconds: number;
   workHours: number;
   overtimeHours: number;
   lateMinutes: number;

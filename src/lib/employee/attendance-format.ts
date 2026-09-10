@@ -16,6 +16,21 @@ export function formatWorkingDuration(seconds: number) {
   return `${hours}h ${minutes}m`;
 }
 
+/**
+ * Live open-session label. Shows seconds under 1 hour so the counter
+ * visibly advances every second / minute instead of sitting on "0h 0m".
+ */
+export function formatLiveWorkingDuration(seconds: number) {
+  const safe = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const secs = safe % 60;
+  if (hours === 0) {
+    return `${minutes}m ${String(secs).padStart(2, "0")}s`;
+  }
+  return `${hours}h ${minutes}m`;
+}
+
 /** Minutes late -> "45m", "1 Hour", "1 hr 1m", "3 hr 7m", etc. */
 export function formatLateByLabel(totalMinutes: number) {
   const safe = Math.max(0, Math.floor(totalMinutes));
@@ -29,17 +44,25 @@ export function formatLateByLabel(totalMinutes: number) {
 }
 
 /**
- * Working seconds from check-in → checkout (or `now` while still checked in).
+ * Working seconds from check-in → checkout (or `now` while still checked in),
+ * plus any completed prior sessions from the same day.
  * Wall-clock only — no idle / activity detection.
  */
 export function elapsedWorkingSeconds(
   checkInAt: string | null,
   checkOutAt: string | null,
   now: Date = new Date(),
+  priorCompletedSeconds = 0,
 ) {
-  if (!checkInAt) return 0;
+  const prior = Math.max(0, Math.floor(priorCompletedSeconds));
+  if (!checkInAt) return prior;
   const end = checkOutAt ? parseISO(checkOutAt) : now;
-  return Math.max(0, differenceInSeconds(end, parseISO(checkInAt)));
+  const current = Math.max(0, differenceInSeconds(end, parseISO(checkInAt)));
+  // When checked out, prefer prior if it already includes this session total.
+  if (checkOutAt && prior > 0) {
+    return Math.max(prior, current);
+  }
+  return prior + current;
 }
 
 /** Decimal hours from check-in → checkout. Open sessions are 0 until checkout. */

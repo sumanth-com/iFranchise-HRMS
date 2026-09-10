@@ -11,6 +11,7 @@ const PORTAL_LABELS: Record<PortalKey, string> = {
   hr: "HR Portal",
   ceo: "CEO Portal",
   manager: "Manager Portal",
+  accountant: "Accountant Portal",
   employee: "Employee Portal",
 };
 
@@ -21,6 +22,7 @@ const ROLE_PORTAL_HINTS: Record<string, PortalKey> = {
   co_founder: "ceo",
   ceo: "ceo",
   manager: "manager",
+  accountant: "accountant",
   employee: "employee",
 };
 
@@ -33,7 +35,15 @@ function humanizeAction(action: string) {
 }
 
 function portalFromKey(key: string | null | undefined): PortalKey | null {
-  if (key === "hr" || key === "ceo" || key === "manager" || key === "employee") return key;
+  if (
+    key === "hr" ||
+    key === "ceo" ||
+    key === "manager" ||
+    key === "accountant" ||
+    key === "employee"
+  ) {
+    return key;
+  }
   return null;
 }
 

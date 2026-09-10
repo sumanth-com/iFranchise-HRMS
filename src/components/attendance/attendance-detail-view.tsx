@@ -7,7 +7,10 @@ import { MapPin, Pencil } from "lucide-react";
 import { AttendanceStatusBadge } from "@/components/attendance/attendance-status-badge";
 import { Button, buttonVariants } from "@/components/common/button";
 import { ATTENDANCE_ROUTES, SELF_ATTENDANCE_ROUTES } from "@/lib/attendance/constants";
-import { attendanceLocationHref } from "@/lib/attendance/services/attendance-location";
+import {
+  attendanceLocationHref,
+  type AttendanceLocationPointKind,
+} from "@/lib/attendance/services/attendance-location";
 import { formatAttendanceTime, toDisplayAttendanceNotes } from "@/lib/attendance/services/attendance-utils";
 import type { AttendanceDetail } from "@/types/attendance";
 import { cn } from "@/lib/utils";
@@ -19,6 +22,11 @@ type AttendanceDetailViewProps = {
   onEdit?: () => void;
   /** Portal-specific base path for GPS location links (defaults to HR self attendance). */
   locationBasePath?: string;
+  /** When set, location opens in-page (e.g. team attendance popup) instead of navigating away. */
+  onOpenLocation?: (
+    attendanceId: string,
+    point: AttendanceLocationPointKind,
+  ) => void;
 };
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -48,6 +56,7 @@ export function AttendanceDetailView({
   compact = false,
   onEdit,
   locationBasePath = SELF_ATTENDANCE_ROUTES.list,
+  onOpenLocation,
 }: AttendanceDetailViewProps) {
   const heading = compact ? (
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -107,7 +116,7 @@ export function AttendanceDetailView({
             <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               Employee Information
             </h2>
-            <DetailRow label="Employee Code" value={attendance.employeeCode} />
+            <DetailRow label="Employee ID" value={attendance.employeeCode} />
             <DetailRow label="Employee Name" value={attendance.employeeName} />
             <DetailRow label="Email" value={attendance.employeeEmail ?? "—"} />
             <DetailRow
@@ -162,30 +171,56 @@ export function AttendanceDetailView({
                 value={
                   <div className="flex flex-col items-end gap-1.5">
                     {attendance.hasCheckInLocation ? (
-                      <Link
-                        href={attendanceLocationHref(
-                          locationBasePath,
-                          attendance.id,
-                          "check_in",
-                        )}
-                        className="inline-flex items-center gap-1.5 text-violet-700 hover:underline"
-                      >
-                        <MapPin className="size-3.5" />
-                        Check-in location
-                      </Link>
+                      onOpenLocation ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onOpenLocation(attendance.id, "check_in")
+                          }
+                          className="inline-flex items-center gap-1.5 text-violet-700 hover:underline"
+                        >
+                          <MapPin className="size-3.5" />
+                          Check-in location
+                        </button>
+                      ) : (
+                        <Link
+                          href={attendanceLocationHref(
+                            locationBasePath,
+                            attendance.id,
+                            "check_in",
+                          )}
+                          className="inline-flex items-center gap-1.5 text-violet-700 hover:underline"
+                        >
+                          <MapPin className="size-3.5" />
+                          Check-in location
+                        </Link>
+                      )
                     ) : null}
                     {attendance.hasCheckOutLocation ? (
-                      <Link
-                        href={attendanceLocationHref(
-                          locationBasePath,
-                          attendance.id,
-                          "check_out",
-                        )}
-                        className="inline-flex items-center gap-1.5 text-violet-700 hover:underline"
-                      >
-                        <MapPin className="size-3.5" />
-                        Check-out location
-                      </Link>
+                      onOpenLocation ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onOpenLocation(attendance.id, "check_out")
+                          }
+                          className="inline-flex items-center gap-1.5 text-violet-700 hover:underline"
+                        >
+                          <MapPin className="size-3.5" />
+                          Check-out location
+                        </button>
+                      ) : (
+                        <Link
+                          href={attendanceLocationHref(
+                            locationBasePath,
+                            attendance.id,
+                            "check_out",
+                          )}
+                          className="inline-flex items-center gap-1.5 text-violet-700 hover:underline"
+                        >
+                          <MapPin className="size-3.5" />
+                          Check-out location
+                        </Link>
+                      )
                     ) : null}
                   </div>
                 }

@@ -51,6 +51,9 @@ const MODULE_PREFIX_MAPPINGS: Record<string, string> = {
 
   // Manager Teammates
   "/manager/team": "/manager/team",
+
+  // Accountant Team Payroll (all section tabs highlight Team Payroll nav)
+  "/accountant/payroll": "/accountant/payroll/run",
 };
 
 function navItemPath(href: string | null | undefined) {

@@ -24,6 +24,7 @@ import {
 } from "@/lib/employee/birthday-utils";
 import { useLiveWorkingSeconds } from "@/hooks/use-live-working-seconds";
 import {
+  formatLiveWorkingDuration,
   formatWorkingDuration,
 } from "@/lib/employee/attendance-format";
 import { cn } from "@/lib/utils";
@@ -69,6 +70,18 @@ function preferToday(
   if (!secondary) return primary;
   if (punchRank(primary) > punchRank(secondary)) return primary;
   if (punchRank(secondary) > punchRank(primary)) return secondary;
+
+  const primaryIn = primary.checkInAt ? Date.parse(primary.checkInAt) : 0;
+  const secondaryIn = secondary.checkInAt ? Date.parse(secondary.checkInAt) : 0;
+  if (primaryIn !== secondaryIn) {
+    return primaryIn >= secondaryIn ? primary : secondary;
+  }
+  const primaryPrior = primary.priorCompletedSeconds ?? 0;
+  const secondaryPrior = secondary.priorCompletedSeconds ?? 0;
+  if (primaryPrior !== secondaryPrior) {
+    return primaryPrior >= secondaryPrior ? primary : secondary;
+  }
+
   const primaryScore =
     (primary.attendanceId ? 1 : 0) +
     (primary.hasCheckInLocation ? 1 : 0) +
@@ -214,9 +227,17 @@ export function AttendanceTodayPunchCard({
     }
   }, [baseToday, optimisticToday]);
 
-  const elapsedSeconds = useLiveWorkingSeconds(today.checkInAt, today.checkOutAt);
+  const elapsedSeconds = useLiveWorkingSeconds(
+    today.checkInAt,
+    today.checkOutAt,
+    today.priorCompletedSeconds ?? 0,
+  );
+  // Prefer optimistic/local elapsed so Check In never shows 0h while already punched.
+  const workingSeconds = Math.max(elapsedSeconds, live?.workingSeconds ?? 0);
   const workingHoursLabel =
-    live?.workingHoursLabel ?? formatWorkingDuration(elapsedSeconds);
+    today.checkInAt && !today.checkOutAt
+      ? formatLiveWorkingDuration(workingSeconds)
+      : formatWorkingDuration(workingSeconds);
 
   useEffect(() => {
     if (dialog?.kind !== "check_in" && dialog?.kind !== "check_out") return;

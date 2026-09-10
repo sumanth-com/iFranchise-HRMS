@@ -42,6 +42,7 @@ export async function getAttendanceLocationAction(
     const profile = await requireServerAnyPermission([
       "attendance.view",
       PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.accountant,
       PORTAL_PERMISSIONS.manager,
       PORTAL_PERMISSIONS.hr,
       PORTAL_PERMISSIONS.ceo,

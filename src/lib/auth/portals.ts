@@ -4,13 +4,14 @@ import { HR_PORTAL_HOME } from "@/lib/auth/portal-paths";
 import { SYSTEM_ADMIN_PERMISSION, SYSTEM_ADMIN_ROUTES } from "@/lib/system-admin/constants";
 import { isSystemAdminPath } from "@/lib/system-admin/paths";
 
-export type PortalKey = "hr" | "ceo" | "manager" | "employee";
+export type PortalKey = "hr" | "ceo" | "manager" | "accountant" | "employee";
 
 /** Canonical portal entry routes (database `roles.portal_route` uses these values). */
 export const PORTAL_ROUTES: Record<PortalKey, string> = {
   hr: HR_PORTAL_HOME,
   ceo: "/ceo",
   manager: "/manager",
+  accountant: "/accountant",
   employee: "/employee",
 };
 
@@ -21,10 +22,11 @@ export const PORTAL_PERMISSIONS: Record<PortalKey, string> = {
   hr: "portal.hr.access",
   ceo: "portal.ceo.access",
   manager: "portal.manager.access",
+  accountant: "portal.accountant.access",
   employee: "portal.employee.access",
 };
 
-const PORTAL_PRIORITY: PortalKey[] = ["hr", "ceo", "manager", "employee"];
+const PORTAL_PRIORITY: PortalKey[] = ["hr", "ceo", "manager", "accountant", "employee"];
 
 /** Highest-privilege role code wins for portal home routing. */
 export const ROLE_CODE_PORTAL_PRIORITY = [
@@ -35,6 +37,7 @@ export const ROLE_CODE_PORTAL_PRIORITY = [
   "co_founder",
   "ceo",
   "manager",
+  "accountant",
   "employee",
 ] as const;
 
@@ -46,6 +49,7 @@ const FALLBACK_ROLE_PORTALS: Record<string, PortalKey> = {
   co_founder: "ceo",
   ceo: "ceo",
   manager: "manager",
+  accountant: "accountant",
   employee: "employee",
 };
 

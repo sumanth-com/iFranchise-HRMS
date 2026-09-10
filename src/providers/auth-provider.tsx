@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -18,10 +19,12 @@ import { logoutAction } from "@/lib/auth/actions";
 import { getAuthErrorMessage } from "@/lib/auth/errors";
 import { getSidebarNavigation } from "@/lib/auth/navigation";
 import { ceoNavItems } from "@/config/ceo-navigation";
+import { accountantNavItems } from "@/config/accountant-navigation";
 import { employeeNavItems } from "@/config/employee-navigation";
 import { mainNavItems, type NavItem } from "@/config/navigation";
 import { managerNavItems } from "@/config/manager-navigation";
 import type { NavigationItem } from "@/lib/auth/navigation";
+import { ACCOUNTANT_ROUTES } from "@/lib/accountant/constants";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
@@ -54,7 +57,7 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export type PortalVariant = "hr" | "manager" | "ceo" | "employee";
+export type PortalVariant = "hr" | "manager" | "ceo" | "accountant" | "employee";
 
 const PORTAL_CONFIG: Record<
   PortalVariant,
@@ -74,6 +77,11 @@ const PORTAL_CONFIG: Record<
     navItems: ceoNavItems,
     home: CEO_ROUTES.home,
     label: "Executive Portal",
+  },
+  accountant: {
+    navItems: accountantNavItems,
+    home: ACCOUNTANT_ROUTES.home,
+    label: "Accountant Portal",
   },
   employee: {
     navItems: employeeNavItems,
@@ -148,8 +156,37 @@ export function AuthProvider({
   }, [performSignOut]);
 
   const refreshProfile = useCallback(async () => {
+    const { refreshSessionPermissionsAction } = await import(
+      "@/lib/auth/actions"
+    );
+    await refreshSessionPermissionsAction();
     router.refresh();
   }, [router]);
+
+  // Re-resolve portal.*.access after role grants without waiting for cookie TTL
+  // or requiring the portal switcher (which stays hidden when only one portal is cached).
+  const lastPermissionSyncAt = useRef(0);
+  useEffect(() => {
+    const syncIfStale = () => {
+      const now = Date.now();
+      if (now - lastPermissionSyncAt.current < 45_000) return;
+      lastPermissionSyncAt.current = now;
+      void refreshProfile();
+    };
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") syncIfStale();
+    };
+
+    const initial = window.setTimeout(syncIfStale, 2_000);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", syncIfStale);
+    return () => {
+      window.clearTimeout(initial);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", syncIfStale);
+    };
+  }, [refreshProfile]);
 
   useEffect(() => {
     const {

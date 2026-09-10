@@ -20,7 +20,12 @@ export async function requireCeoPortal() {
   return requireServerPermission(PORTAL_PERMISSIONS.ceo);
 }
 
-/** View loaders/actions used by CEO and manager HR UIs. */
+/** View loaders/actions used by CEO, manager, and accountant finance UIs. */
 export function ceoOrViewPermission(viewCode: string) {
-  return [viewCode, PORTAL_PERMISSIONS.ceo, PORTAL_PERMISSIONS.manager];
+  return [
+    viewCode,
+    PORTAL_PERMISSIONS.ceo,
+    PORTAL_PERMISSIONS.manager,
+    PORTAL_PERMISSIONS.accountant,
+  ];
 }

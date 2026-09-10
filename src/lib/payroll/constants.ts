@@ -315,7 +315,7 @@ export const PAYROLL_SUMMARY_LABELS = {
   netPayroll: "Net Payroll",
 } as const;
 
-const PAYROLL_VIEW = ["payroll.view"];
+const PAYROLL_VIEW = ["payroll.view", "payroll.view_all"];
 const PAYROLL_CREATE = ["payroll.create", "payroll.generate"];
 const PAYROLL_EDIT = ["payroll.edit", "payroll.process"];
 const PAYROLL_RUN = [
@@ -325,19 +325,29 @@ const PAYROLL_RUN = [
   PORTAL_PERMISSIONS.ceo,
 ];
 const PAYROLL_APPROVE = ["payroll.approve"];
-const PAYROLL_DOWNLOAD = ["payroll.download", "payslip.generate", "payslip.view"];
+const PAYROLL_DOWNLOAD = [
+  "payroll.download",
+  "payroll.export",
+  "payslip.generate",
+  "payslip.view",
+  "payslips.view",
+  "payslips.download",
+];
 const SALARY_VIEW = ["salary.view", "salary_structure.view"];
 const SALARY_EDIT = ["salary.edit", "salary_structure.edit", "salary_structure.create"];
-const BONUS_VIEW = ["bonus.view", "payroll.view"];
-const BONUS_CREATE = ["bonus.create", "payroll.create", "payroll.generate"];
-const BONUS_APPROVE = ["bonus.approve", "payroll.approve"];
-const REIMBURSEMENT_VIEW = ["reimbursement.view", "payroll.view"];
-const REIMBURSEMENT_CREATE = [
-  "reimbursement.create",
-  "payroll.create",
-  "payroll.generate",
+const BONUS_VIEW = ["bonus.view", "payroll.view", "payroll.view_all"];
+const BONUS_CREATE = ["bonus.create"];
+const BONUS_APPROVE = ["bonus.approve"];
+const REIMBURSEMENT_VIEW = [
+  "reimbursement.view",
+  "reimbursements.view",
+  "payroll.view",
+  "payroll.view_all",
 ];
-const REIMBURSEMENT_APPROVE = ["reimbursement.approve", "payroll.approve"];
+/** Org claim create for others — dedicated reimbursement.create only (not payroll.create). */
+const REIMBURSEMENT_CREATE = ["reimbursement.create"];
+/** Claim approval is HR/CEO — not unlocked by payroll.approve (finance payroll step). */
+const REIMBURSEMENT_APPROVE = ["reimbursement.approve", PORTAL_PERMISSIONS.ceo];
 
 export function canViewPayroll(codes: string[]) {
   return hasAnyPermission(codes, PAYROLL_VIEW);
@@ -449,12 +459,22 @@ export function isCeoTeamPayrollBasePath(basePath: string): boolean {
   return basePath.startsWith("/ceo/payroll");
 }
 
+/** CEO / Accountant use "Team Payroll" for the run section; HR keeps "Company Payroll". */
+export function usesTeamPayrollRunLabel(basePath: string): boolean {
+  return (
+    basePath.startsWith("/ceo/payroll") ||
+    basePath.startsWith("/accountant/payroll")
+  );
+}
+
 /** CEO portal uses "Team Payroll" for the run section; HR keeps "Company Payroll". */
 export function teamPayrollSectionTitleForPortal(
   section: TeamPayrollSection,
-  options?: { ceoPortal?: boolean },
+  options?: { ceoPortal?: boolean; teamPayrollLabel?: boolean },
 ): string {
-  if (section === TEAM_PAYROLL_SECTIONS.run && options?.ceoPortal) {
+  const useTeamLabel =
+    options?.teamPayrollLabel === true || options?.ceoPortal === true;
+  if (section === TEAM_PAYROLL_SECTIONS.run && useTeamLabel) {
     return "Team Payroll";
   }
   return TEAM_PAYROLL_SECTION_TITLES[section];

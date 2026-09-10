@@ -126,6 +126,15 @@ export async function idleSessionLogoutAction(): Promise<void> {
   redirect(AUTH_ROUTES.login);
 }
 
+/**
+ * Drop the signed permission cookie so the next layout/RSC load resolves
+ * roles and portal.*.access from the database (not a stale 5-minute cache).
+ */
+export async function refreshSessionPermissionsAction(): Promise<{ success: true }> {
+  await clearPermissionCacheCookie();
+  return { success: true };
+}
+
 export async function loginAction(
   formData: FormData,
 ): Promise<AuthActionResult> {

@@ -39,14 +39,25 @@ export async function loadModuleReportsPage(
   module: ReportModuleKey,
   searchParams: Promise<Record<string, string | string[] | undefined>>,
 ) {
-  const profile = await requireServerAnyPermission(ceoOrViewPermission("reports.view"));
+  const profile = await requireServerAnyPermission([
+    ...ceoOrViewPermission("reports.view"),
+    "payroll_reports.view",
+  ]);
   const supabase = await createClient();
   const raw = await searchParams;
   const isCeo = profile.permissionCodes.includes(PORTAL_PERMISSIONS.ceo);
   const isManager = isManagerOnlyProfile(profile);
+  const isAccountant = profile.permissionCodes.includes(PORTAL_PERMISSIONS.accountant);
   const permissionCodes =
-    isCeo || isManager
-      ? [...new Set([...profile.permissionCodes, "reports.view", "reports.export"])]
+    isCeo || isManager || isAccountant
+      ? [
+          ...new Set([
+            ...profile.permissionCodes,
+            "reports.view",
+            "reports.export",
+            ...(isAccountant ? (["payroll_reports.view", "payroll_reports.export"] as const) : []),
+          ]),
+        ]
       : profile.permissionCodes;
 
   const definitions = REPORT_DEFINITIONS.filter((d) => {

@@ -4,6 +4,7 @@ import { AppNavLink as Link } from "@/components/layout/app-nav-link";
 import { CircleHelp, KeyRound, Mail } from "lucide-react";
 
 import { PortalManualCard } from "@/components/layout/portal-manual-card";
+import { ACCOUNTANT_ROUTES } from "@/lib/accountant/constants";
 import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { PORTAL_MANUALS } from "@/lib/help/portal-manuals";
@@ -237,6 +238,51 @@ const PORTAL_HELP: Record<PortalVariant, PortalHelpConfig> = {
       {
         q: "Where can I learn every module?",
         a: "Open Portal manual on this Help page, pick a module, and read what it is, why it helps, and what’s inside — no extra links.",
+      },
+    ],
+  },
+  accountant: {
+    badge: "Accountant Portal Help",
+    title: "How can we help?",
+    description:
+      "Quick answers for the Finance Dashboard, Team Payroll, reports, and your self-service tools.",
+    settingsHref: ACCOUNTANT_ROUTES.settings,
+    steps: [
+      {
+        title: "Open Finance Dashboard",
+        detail:
+          "Use Administration → Finance Dashboard for period KPIs, pending actions, and payroll overview.",
+      },
+      {
+        title: "Work in Team Payroll",
+        detail:
+          "Open Administration → Team Payroll for runs, salary structure, reimbursements, payslips, and employee accounts.",
+      },
+      {
+        title: "Export finance reports",
+        detail: "Open Administration → Reports for payroll exports where permitted.",
+      },
+    ],
+    faqs: [
+      {
+        q: "Can I approve leave or hire employees?",
+        a: "No. The Accountant Portal is finance-focused. HR owns hiring, provisioning, and leave approvals.",
+      },
+      {
+        q: "Can I change salary structures?",
+        a: "Salary records are read-only for accounting. Structure edits stay with HR unless you are granted explicit edit permissions.",
+      },
+      {
+        q: "Where do I see my own leave and attendance?",
+        a: "Use Self-service in the Accountant sidebar, or switch to the Employee Portal.",
+      },
+      {
+        q: "How do I reset my password?",
+        a: "Settings → Account & security → Reset password (max 3 emails per day).",
+      },
+      {
+        q: "Who do I contact for help?",
+        a: `Email ${HR_EMAIL} for payroll access, documents, or account issues.`,
       },
     ],
   },

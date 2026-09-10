@@ -11,13 +11,20 @@ import {
 } from "react";
 import { usePathname } from "next/navigation";
 
-export type ActivePortal = "system" | "hr" | "ceo" | "manager" | "employee";
+export type ActivePortal =
+  | "system"
+  | "hr"
+  | "ceo"
+  | "manager"
+  | "accountant"
+  | "employee";
 
 const STORAGE_KEY = "ifranchise-active-portal";
 
 function inferPortalFromPath(pathname: string): ActivePortal {
   if (pathname.startsWith("/ceo")) return "ceo";
   if (pathname.startsWith("/manager")) return "manager";
+  if (pathname.startsWith("/accountant")) return "accountant";
   if (pathname.startsWith("/employee")) return "employee";
   if (
     pathname === "/dashboard/system" ||
@@ -75,6 +82,7 @@ export function ActivePortalProvider({ children }: { children: ReactNode }) {
     if (
       pathname.startsWith("/ceo") ||
       pathname.startsWith("/manager") ||
+      pathname.startsWith("/accountant") ||
       pathname.startsWith("/employee")
     ) {
       const inferred = inferPortalFromPath(pathname);
@@ -89,6 +97,7 @@ export function ActivePortalProvider({ children }: { children: ReactNode }) {
       stored === "hr" ||
       stored === "ceo" ||
       stored === "manager" ||
+      stored === "accountant" ||
       stored === "employee"
     ) {
       setActivePortalState(stored);

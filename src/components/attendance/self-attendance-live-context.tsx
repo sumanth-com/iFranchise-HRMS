@@ -14,6 +14,7 @@ import { useLiveWorkingSeconds } from "@/hooks/use-live-working-seconds";
 import {
   averageApplicableWorkingHours,
   averageApplicableWorkingSeconds,
+  formatLiveWorkingDuration,
   formatWorkingDuration,
 } from "@/lib/employee/attendance-format";
 import type {
@@ -40,6 +41,18 @@ function preferFresherToday(
   }
   if (punchRank(server) > punchRank(local)) return server;
   if (punchRank(local) > punchRank(server)) return local;
+
+  // Same punch lifecycle: prefer newer check-in / higher multi-session prior.
+  const serverIn = server.checkInAt ? Date.parse(server.checkInAt) : 0;
+  const localIn = local.checkInAt ? Date.parse(local.checkInAt) : 0;
+  if (serverIn !== localIn) {
+    return serverIn >= localIn ? server : local;
+  }
+  const serverPrior = server.priorCompletedSeconds ?? 0;
+  const localPrior = local.priorCompletedSeconds ?? 0;
+  if (serverPrior !== localPrior) {
+    return serverPrior >= localPrior ? server : local;
+  }
 
   const serverScore =
     (server.attendanceId ? 1 : 0) +
@@ -102,7 +115,11 @@ export function SelfAttendanceLiveProvider({
     setToday((local) => preferFresherToday(local, serverToday));
   }, [serverToday]);
 
-  const workingSeconds = useLiveWorkingSeconds(today.checkInAt, today.checkOutAt);
+  const workingSeconds = useLiveWorkingSeconds(
+    today.checkInAt,
+    today.checkOutAt,
+    today.priorCompletedSeconds ?? 0,
+  );
   const calendarDays = useMemo(
     () => overlayTodayOnCalendar(serverCalendarDays, today),
     [serverCalendarDays, today],
@@ -123,18 +140,29 @@ export function SelfAttendanceLiveProvider({
     [calendarDays, today.checkOutAt, workingSeconds],
   );
 
+  const isOpenSession = Boolean(today.checkInAt && !today.checkOutAt);
   const value = useMemo<SelfAttendanceLiveValue>(
     () => ({
       today,
       calendarDays,
       workingSeconds,
-      workingHoursLabel: formatWorkingDuration(workingSeconds),
+      workingHoursLabel: isOpenSession
+        ? formatLiveWorkingDuration(workingSeconds)
+        : formatWorkingDuration(workingSeconds),
       averageWorkingHours,
       averageWorkingSeconds,
       applyToday: setToday,
       refreshInBackground: () => router.refresh(),
     }),
-    [today, calendarDays, workingSeconds, averageWorkingHours, averageWorkingSeconds, router],
+    [
+      today,
+      calendarDays,
+      workingSeconds,
+      isOpenSession,
+      averageWorkingHours,
+      averageWorkingSeconds,
+      router,
+    ],
   );
 
   return (

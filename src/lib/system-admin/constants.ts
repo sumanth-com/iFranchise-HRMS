@@ -75,6 +75,7 @@ export const PORTAL_SWITCH_LINKS = [
   { label: "HR Portal", href: "/dashboard", portal: "hr" },
   { label: "Executive Portal", href: "/ceo", portal: "ceo" },
   { label: "Manager Portal", href: "/manager", portal: "manager" },
+  { label: "Accountant Portal", href: "/accountant", portal: "accountant" },
   { label: "Employee Portal", href: "/employee", portal: "employee" },
 ] as const;
 

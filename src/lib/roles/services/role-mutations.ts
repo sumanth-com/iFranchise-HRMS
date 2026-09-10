@@ -560,7 +560,7 @@ export async function assignUserRole(
     await syncUserAuthRoleMetadata(employee.user_id, orgId, role.code);
     await writeRolesAudit(supabase, profile, {
       action: "user_role_assigned",
-      description: `Assigned “${role.name}” to user ${employee.user_id}`,
+      description: `Portal/Role access granted on ${new Date().toISOString().slice(0, 10)}: assigned “${role.name}” to employee ${employee.id}`,
       recordId: existing.id,
       metadata: {
         roleId: role.id,
@@ -569,6 +569,7 @@ export async function assignUserRole(
         employeeId: employee.id,
         portalKey: role.portal_key,
         portalRoute: role.portal_route,
+        portalAccessGrantedAt: new Date().toISOString(),
       },
     });
     return existing.id;
@@ -593,7 +594,7 @@ export async function assignUserRole(
   await syncUserAuthRoleMetadata(employee.user_id, orgId, role.code);
   await writeRolesAudit(supabase, profile, {
     action: "user_role_assigned",
-    description: `Assigned “${role.name}” to user ${employee.user_id}`,
+    description: `Portal/Role access granted on ${new Date().toISOString().slice(0, 10)}: assigned “${role.name}” to employee ${employee.id}`,
     recordId: data.id,
     metadata: {
       roleId: role.id,
@@ -602,6 +603,7 @@ export async function assignUserRole(
       employeeId: employee.id,
       portalKey: role.portal_key,
       portalRoute: role.portal_route,
+      portalAccessGrantedAt: new Date().toISOString(),
     },
   });
   return data.id;

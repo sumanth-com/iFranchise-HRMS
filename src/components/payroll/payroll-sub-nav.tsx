@@ -9,6 +9,7 @@ import {
   SELF_PAYROLL_ROUTES,
   TEAM_PAYROLL_SECTIONS,
   teamPayrollSectionTitleForPortal,
+  usesTeamPayrollRunLabel,
   type TeamPayrollSection,
 } from "@/lib/payroll/constants";
 import { cn } from "@/lib/utils";
@@ -23,7 +24,7 @@ export function PayrollSubNav({
   hiddenSections = [],
 }: PayrollSubNavProps) {
   const pathname = usePathname();
-  const isCeoPortal = basePath.startsWith("/ceo");
+  const useTeamPayrollLabel = usesTeamPayrollRunLabel(basePath);
   const isTeamPayroll = pathname === basePath || pathname.startsWith(`${basePath}/`);
   const activeSection = isTeamPayroll
     ? pathname === basePath
@@ -56,7 +57,9 @@ export function PayrollSubNav({
               )}
             >
               {item.section === TEAM_PAYROLL_SECTIONS.run
-                ? teamPayrollSectionTitleForPortal(item.section, { ceoPortal: isCeoPortal })
+                ? teamPayrollSectionTitleForPortal(item.section, {
+                    teamPayrollLabel: useTeamPayrollLabel,
+                  })
                 : item.title}
             </Link>
           );

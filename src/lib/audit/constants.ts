@@ -1,5 +1,6 @@
 import { hasAnyPermission, hasPermission } from "@/lib/permissions/utils";
 import { buildAuditLogRef } from "@/lib/audit/display";
+import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import type { UserProfile } from "@/types/auth";
 import type { AuditModule } from "@/types/audit";
 
@@ -51,7 +52,7 @@ export const AUDIT_SUB_NAV = [
   { title: "Retention", href: AUDIT_ROUTES.settings, admin: true },
 ] as const;
 
-export const AUDIT_VIEW_PERMISSIONS = ["audit.view"] as const;
+export const AUDIT_VIEW_PERMISSIONS = ["audit.view", "payroll_audit.view"] as const;
 export const AUDIT_EXPORT_PERMISSIONS = ["audit.export"] as const;
 
 export const AUDIT_MODULES: { value: AuditModule; label: string }[] = [
@@ -114,7 +115,7 @@ export const HR_AUDIT_MODULES: AuditModule[] = [
 ];
 
 export function canViewAudit(codes: string[]) {
-  return hasPermission(codes, "audit.view");
+  return hasAnyPermission(codes, [...AUDIT_VIEW_PERMISSIONS]);
 }
 
 export function canExportAudit(codes: string[]) {
@@ -128,6 +129,17 @@ export function isSuperAdmin(profile: Pick<UserProfile, "roles">) {
 export function getAuditModuleScope(profile: UserProfile): AuditModule[] | null {
   if (!canViewAudit(profile.permissionCodes)) return [];
   if (isSuperAdmin(profile)) return null;
+  // Accountant sees payroll audit only (even if they also hold audit.view).
+  if (
+    profile.roles.some((role) => role.code === "accountant") ||
+    (hasPermission(profile.permissionCodes, "payroll_audit.view") &&
+      !hasPermission(profile.permissionCodes, PORTAL_PERMISSIONS.hr) &&
+      !profile.roles.some((role) =>
+        ["hr_admin", "hr_executive", "ceo", "founder", "co_founder"].includes(role.code),
+      ))
+  ) {
+    return ["payroll"];
+  }
   return HR_AUDIT_MODULES;
 }
 

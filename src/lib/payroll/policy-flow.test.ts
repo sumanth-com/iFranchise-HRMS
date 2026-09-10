@@ -13,6 +13,7 @@ import {
 } from "@/lib/leave/services/leave-policy-engine";
 import { monthlyGrossPerDay } from "@/lib/payroll/salary-structure-period";
 import { calculateEmployeePayroll } from "@/lib/payroll/services/payroll-calculator";
+import { roundCurrency } from "@/lib/payroll/services/payroll-utils";
 
 const closedSeptember2026 = new Date("2026-10-15");
 
@@ -36,13 +37,14 @@ const structure = {
   components: {},
 };
 
+/** Excel-style: only P + H (+ paid leave) count; week_off is ignored. */
 const presentMonth = {
-  presentDays: 26,
+  presentDays: 22,
   absentDays: 0,
   halfDays: 0,
   onLeaveDays: 0,
-  weekOffDays: 4,
-  holidayDays: 0,
+  weekOffDays: 8,
+  holidayDays: 8,
   overtimeHours: 0,
   lateDays: 0,
 };
@@ -68,17 +70,19 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
       year: 2026,
       asOfDate: closedSeptember2026,
       salaryStructure: structure,
-      attendance: { ...presentMonth, onLeaveDays: 1 },
+      attendance: { ...presentMonth, presentDays: 21, onLeaveDays: 1 },
       leaveSummary: { lopDays: 0, paidLeaveDays: split.paidDays },
       bonuses: [],
       reimbursements: [],
     });
     assert.equal(payroll.breakdown.deductions.some((line) => line.code === "lop"), false);
-    assert.equal(payroll.grossSalary, 27_000);
-    assert.equal(payroll.netSalary, 27_000);
+    // 21 present + 8 holiday + 1 paid leave = 30
+    assert.equal(payroll.breakdown.attendance.paidDays, 30);
+    assert.equal(payroll.grossSalary, 30_000);
+    assert.equal(payroll.netSalary, 29_800); // PT 200
   });
 
-  it("deducts LOP using salary-structure per-day (monthly gross ÷ calendar days)", () => {
+  it("deducts LOP using salary-structure per-day (monthly gross ÷ 30)", () => {
     const perDay = monthlyGrossPerDay(30_000, 30);
     assert.equal(perDay, 1_000);
 
@@ -91,12 +95,11 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
       leaveSummary: { lopDays: 2, paidLeaveDays: 0 },
       bonuses: [],
       reimbursements: [],
-      settings: { workingDaysCalculation: "calendar_days", lossOfPayDeduction: true },
+      settings: { lossOfPayDeduction: true },
     });
     const lop = payroll.breakdown.deductions.find((line) => line.code === "lop");
     assert.equal(lop?.amount, 2_000);
-    assert.equal(payroll.grossSalary, 26_000);
-    assert.equal(payroll.netSalary, 26_000);
+    assert.equal(payroll.breakdown.attendance.dailyRate, 1_000);
   });
 
   it("deducts exactly half the per-day amount for half-day LOP", () => {
@@ -122,7 +125,7 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
       leaveSummary: { lopDays: split.lopDays, paidLeaveDays: 0 },
       bonuses: [],
       reimbursements: [],
-      settings: { workingDaysCalculation: "calendar_days", lossOfPayDeduction: true },
+      settings: { lossOfPayDeduction: true },
     });
     const lop = payroll.breakdown.deductions.find((line) => line.code === "lop");
     assert.equal(lop?.amount, 500);
@@ -138,7 +141,7 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
       leaveSummary: { lopDays: 0, paidLeaveDays: 0 },
       bonuses: [],
       reimbursements: [],
-      settings: { workingDaysCalculation: "calendar_days", lossOfPayDeduction: true },
+      settings: { lossOfPayDeduction: true },
     });
     const lop = payroll.breakdown.deductions.find((line) => line.code === "lop");
     assert.equal(payroll.breakdown.attendance.lopDays, 0.5);
@@ -163,18 +166,21 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
       salaryStructure: structure,
       attendance: {
         ...presentMonth,
+        presentDays: 20,
         absentDays: 2,
         sandwichLopDays: extraSandwichLopDays(["2026-09-19", "2026-09-21"], [], september),
       },
       leaveSummary: { lopDays: 0, paidLeaveDays: 0 },
       bonuses: [],
       reimbursements: [],
-      settings: { workingDaysCalculation: "calendar_days", lossOfPayDeduction: true },
+      settings: { lossOfPayDeduction: true },
     });
     const lop = payroll.breakdown.deductions.find((line) => line.code === "lop");
     assert.equal(payroll.breakdown.attendance.lopDays, 3);
     assert.equal(lop?.amount, 3_000);
-    assert.equal(payroll.grossSalary, 26_000);
+    // 20 present + 8 holiday = 28 (week_off ignored)
+    assert.equal(payroll.grossSalary, 28_000);
+    assert.equal(payroll.netSalary, 27_800);
   });
 
   it("does not double-count sandwich days already included in leave LOP", () => {
@@ -201,14 +207,24 @@ describe("attendance → leave → LOP → salary structure → payroll", () => 
         gross_salary: 13_500,
         net_salary: 13_500,
       },
-      attendance: presentMonth,
+      attendance: {
+        presentDays: 25,
+        absentDays: 0,
+        halfDays: 0,
+        onLeaveDays: 0,
+        weekOffDays: 0,
+        holidayDays: 0,
+        overtimeHours: 0,
+        lateDays: 0,
+      },
       leaveSummary: { lopDays: 1, paidLeaveDays: 0 },
       bonuses: [],
       reimbursements: [],
-      settings: { workingDaysCalculation: "calendar_days", lossOfPayDeduction: true },
+      settings: { lossOfPayDeduction: true },
     });
     const lop = payroll.breakdown.deductions.find((line) => line.code === "lop");
     assert.equal(lop?.amount, 450);
-    assert.equal(payroll.grossSalary, 11_700);
+    assert.equal(payroll.grossSalary, roundCurrency((25 * 13_500) / 30));
+    assert.equal(payroll.netSalary, payroll.grossSalary); // below PT threshold
   });
 });

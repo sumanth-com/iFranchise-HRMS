@@ -106,6 +106,8 @@ function revalidateReimbursementViews() {
   revalidatePath(SYSTEM_ADMIN_ROUTES.reimbursements);
   revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS.reimbursements));
   revalidatePath(`${CEO_ROUTES.payroll}/${TEAM_PAYROLL_SECTIONS.reimbursements}`);
+  revalidatePath(`/accountant/payroll/${TEAM_PAYROLL_SECTIONS.reimbursements}`);
+  revalidatePath(`/accountant/payroll/${TEAM_PAYROLL_SECTIONS.run}`);
   revalidatePath(PAYROLL_ROUTES.reimbursements);
   // Team Payroll Reimb. column / payslips must refresh after approve/delete.
   revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS.run));
@@ -152,6 +154,8 @@ function revalidateEmployeePayrollViews() {
   revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS.reimbursements));
   revalidatePath("/employee/payroll");
   revalidatePath("/manager/payroll");
+  revalidatePath("/accountant/payroll");
+  revalidatePath("/accountant/finance");
   revalidatePath("/dashboard/system/payroll");
 }
 
@@ -162,6 +166,8 @@ function revalidatePayrollPaths() {
   revalidatePath(PAYROLL_ROUTES.payslips);
   revalidatePath(SELF_PAYROLL_ROUTES.list);
   revalidatePath(CEO_ROUTES.payroll);
+  revalidatePath("/accountant/payroll");
+  revalidatePath("/accountant/finance");
 }
 
 export async function previewPayrollRunAction(
@@ -538,11 +544,7 @@ export async function createBonusAction(
   input: unknown,
 ): Promise<PayrollActionResult<string>> {
   try {
-    const profile = await requireServerAnyPermission([
-      "bonus.create",
-      "payroll.create",
-      "payroll.generate",
-    ]);
+    const profile = await requireServerAnyPermission(["bonus.create"]);
     const supabase = await getAuthenticatedSupabase();
     const parsed = bonusFormSchema.parse(input);
     const id = await createBonus(supabase, profile, parsed);
@@ -559,10 +561,7 @@ export async function createBonusAction(
 
 export async function approveBonusAction(bonusId: string): Promise<PayrollActionResult> {
   try {
-    const profile = await requireServerAnyPermission([
-      "bonus.approve",
-      "payroll.approve",
-    ]);
+    const profile = await requireServerAnyPermission(["bonus.approve"]);
     const supabase = await getAuthenticatedSupabase();
     await approveBonus(supabase, profile, bonusId);
     revalidatePath(PAYROLL_ROUTES.bonuses);
@@ -580,10 +579,7 @@ export async function createReimbursementAction(
   input: unknown,
 ): Promise<PayrollActionResult<string>> {
   try {
-    const profile = await requireServerAnyPermission([
-      "reimbursement.create",
-      "payroll.create",
-    ]);
+    const profile = await requireServerAnyPermission(["reimbursement.create"]);
     const supabase = await getAuthenticatedSupabase();
     const parsed = reimbursementFormSchema.parse(input);
     const id = await createReimbursement(supabase, profile, {
@@ -608,6 +604,7 @@ export async function submitOwnReimbursementClaimAction(
     const profile = await requireServerAnyPermission([
       "reimbursement.create",
       PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.accountant,
       PORTAL_PERMISSIONS.manager,
       PORTAL_PERMISSIONS.hr,
       SYSTEM_ADMIN_PERMISSION,
@@ -639,8 +636,8 @@ export async function approveReimbursementAction(
   try {
     const profile = await requireServerAnyPermission([
       "reimbursement.approve",
-      "payroll.approve",
       PORTAL_PERMISSIONS.ceo,
+      PORTAL_PERMISSIONS.hr,
     ]);
     const supabase = await getAuthenticatedSupabase();
     const parsed =
@@ -670,8 +667,8 @@ export async function rejectReimbursementAction(
   try {
     const profile = await requireServerAnyPermission([
       "reimbursement.approve",
-      "payroll.approve",
       PORTAL_PERMISSIONS.ceo,
+      PORTAL_PERMISSIONS.hr,
     ]);
     const supabase = await getAuthenticatedSupabase();
     const parsed = reimbursementDecisionSchema.parse(input);
@@ -698,7 +695,6 @@ export async function deleteReimbursementAction(
   try {
     const profile = await requireServerAnyPermission([
       "reimbursement.approve",
-      "payroll.approve",
       PORTAL_PERMISSIONS.ceo,
       PORTAL_PERMISSIONS.hr,
     ]);
@@ -724,6 +720,7 @@ export async function updateOwnPendingReimbursementAction(
     const profile = await requireServerAnyPermission([
       "reimbursement.create",
       PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.accountant,
       PORTAL_PERMISSIONS.manager,
       PORTAL_PERMISSIONS.hr,
       SYSTEM_ADMIN_PERMISSION,
@@ -750,6 +747,7 @@ export async function cancelOwnPendingReimbursementAction(
     const profile = await requireServerAnyPermission([
       "reimbursement.create",
       PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.accountant,
       PORTAL_PERMISSIONS.manager,
       PORTAL_PERMISSIONS.hr,
       SYSTEM_ADMIN_PERMISSION,
@@ -774,8 +772,8 @@ export async function uploadReimbursementAttachmentAction(
   try {
     const profile = await requireServerAnyPermission([
       "reimbursement.create",
-      "payroll.create",
       PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.accountant,
       PORTAL_PERMISSIONS.manager,
       PORTAL_PERMISSIONS.hr,
       SYSTEM_ADMIN_PERMISSION,
@@ -811,7 +809,6 @@ export async function uploadReimbursementAttachmentAction(
     if (targetEmployeeId !== profile.employee.id) {
       const canUploadForOthers =
         profile.permissionCodes.includes("reimbursement.create") ||
-        profile.permissionCodes.includes("payroll.create") ||
         profile.permissionCodes.includes(PORTAL_PERMISSIONS.hr) ||
         profile.permissionCodes.includes(SYSTEM_ADMIN_PERMISSION);
       if (!canUploadForOthers) {
@@ -856,20 +853,25 @@ export async function getReimbursementAttachmentUrlAction(
   try {
     const profile = await requireServerAnyPermission([
       "reimbursement.view",
+      "reimbursements.view",
+      "reimbursements.view_attachments",
       "payroll.view",
+      "payroll.view_all",
       PORTAL_PERMISSIONS.employee,
       PORTAL_PERMISSIONS.manager,
       PORTAL_PERMISSIONS.ceo,
       PORTAL_PERMISSIONS.hr,
+      PORTAL_PERMISSIONS.accountant,
       ...ceoOrViewPermission("payroll.view"),
     ]);
     assertOrganizationStoragePath(path, profile.employee.organizationId);
     // Employees may only open attachments under their own folder.
     const isOrgApprover =
       profile.permissionCodes.includes("reimbursement.approve") ||
-      profile.permissionCodes.includes("payroll.approve") ||
+      profile.permissionCodes.includes("reimbursements.view_attachments") ||
       profile.permissionCodes.includes(PORTAL_PERMISSIONS.ceo) ||
       profile.permissionCodes.includes(PORTAL_PERMISSIONS.hr) ||
+      profile.permissionCodes.includes(PORTAL_PERMISSIONS.accountant) ||
       profile.permissionCodes.includes(SYSTEM_ADMIN_PERMISSION);
     if (!isOrgApprover) {
       const ownPrefix = `${profile.employee.organizationId}/reimbursements/${profile.employee.id}/`;
@@ -1057,7 +1059,6 @@ export async function savePayrollSettingsAction(
       "settings.edit",
       "settings.manage",
       "payroll.edit",
-      "payroll.approve",
     ]);
     const supabase = await getAuthenticatedSupabase();
     const parsed = payrollSettingsSchema.parse(input);
@@ -1078,10 +1079,7 @@ export async function uploadBonusAttachmentAction(
   formData: FormData,
 ): Promise<PayrollActionResult<string>> {
   try {
-    const profile = await requireServerAnyPermission([
-      "bonus.create",
-      "payroll.create",
-    ]);
+    const profile = await requireServerAnyPermission(["bonus.create"]);
     const file = formData.get("file");
     if (!(file instanceof File)) {
       return { success: false, message: "No file provided" };

@@ -7,7 +7,10 @@ import { EmployeeStatCard } from "@/components/employee/dashboard/employee-modul
 import { useOptionalSelfAttendanceLive } from "@/components/attendance/self-attendance-live-context";
 import { useLiveWorkingSeconds } from "@/hooks/use-live-working-seconds";
 import { ATTENDANCE_STATUS_LABELS } from "@/lib/attendance/constants";
-import { formatWorkingDuration } from "@/lib/employee/attendance-format";
+import {
+  formatLiveWorkingDuration,
+  formatWorkingDuration,
+} from "@/lib/employee/attendance-format";
 import {
   EMPLOYEE_DASHBOARD_KPI_LINKS,
   EMPLOYEE_ROUTES,
@@ -15,6 +18,7 @@ import {
 } from "@/lib/employee/constants";
 import { formatLeaveDayCount } from "@/lib/leave/services/leave-usage";
 import { MANAGER_ROUTES, MANAGER_SELF_SERVICE_DASHBOARD_KPI_LINKS } from "@/lib/manager/constants";
+import { ACCOUNTANT_DASHBOARD_KPI_LINKS, ACCOUNTANT_ROUTES } from "@/lib/accountant/constants";
 import {
   SUPER_ADMIN_SELF_SERVICE_DASHBOARD_KPI_LINKS,
   SYSTEM_ADMIN_ROUTES,
@@ -45,6 +49,9 @@ function resolveKpiLinks(pathname: string) {
   if (pathname.startsWith(MANAGER_ROUTES.home)) {
     return MANAGER_SELF_SERVICE_DASHBOARD_KPI_LINKS;
   }
+  if (pathname.startsWith(ACCOUNTANT_ROUTES.home)) {
+    return ACCOUNTANT_DASHBOARD_KPI_LINKS;
+  }
   if (pathname === SYSTEM_ADMIN_ROUTES.home || pathname.startsWith(`${SYSTEM_ADMIN_ROUTES.home}/`)) {
     return SUPER_ADMIN_SELF_SERVICE_DASHBOARD_KPI_LINKS;
   }
@@ -57,15 +64,26 @@ export function EmployeeDashboardKpiCards({
   hideLeaveBalance = false,
 }: {
   kpis: EmployeeDashboardKpis;
-  today: Pick<ManagerTodayAttendance, "checkInAt" | "checkOutAt">;
+  today: Pick<
+    ManagerTodayAttendance,
+    "checkInAt" | "checkOutAt" | "priorCompletedSeconds"
+  >;
   hideLeaveBalance?: boolean;
 }) {
   const pathname = usePathname();
   const links = resolveKpiLinks(pathname);
   const live = useOptionalSelfAttendanceLive();
   const todayPunch = live?.today ?? today;
-  const fallbackSeconds = useLiveWorkingSeconds(todayPunch.checkInAt, todayPunch.checkOutAt);
-  const workingSeconds = live?.workingSeconds ?? fallbackSeconds;
+  const fallbackSeconds = useLiveWorkingSeconds(
+    todayPunch.checkInAt,
+    todayPunch.checkOutAt,
+    todayPunch.priorCompletedSeconds ?? 0,
+  );
+  const workingSeconds = Math.max(live?.workingSeconds ?? 0, fallbackSeconds);
+  const openSession = Boolean(todayPunch.checkInAt && !todayPunch.checkOutAt);
+  const workingHoursLabel = openSession
+    ? formatLiveWorkingDuration(workingSeconds)
+    : formatWorkingDuration(workingSeconds);
   const kpisForLabel = live
     ? {
         ...kpis,
@@ -95,7 +113,7 @@ export function EmployeeDashboardKpiCards({
       />
       <EmployeeStatCard
         label="Working Hours Today"
-        value={live?.workingHoursLabel ?? formatWorkingDuration(workingSeconds)}
+        value={workingHoursLabel}
         hint="Duration"
         icon={Timer}
         accent="text-sky-600 dark:text-sky-400"

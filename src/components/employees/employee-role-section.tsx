@@ -13,6 +13,7 @@ import { changeEmployeeRoleAction } from "@/lib/roles/actions";
 import { canAssignUserRole } from "@/lib/roles/constants";
 import type { EmployeeRoleAssignment } from "@/lib/roles/services/role-queries";
 import type { LookupOption } from "@/types/employee";
+import { useAuth } from "@/providers/auth-provider";
 
 export function EmployeeRoleSection({
   employeeId,
@@ -26,6 +27,7 @@ export function EmployeeRoleSection({
   permissionCodes: string[];
 }) {
   const router = useRouter();
+  const { refreshProfile } = useAuth();
   const [isPending, startTransition] = useTransition();
   const [selectedRoleId, setSelectedRoleId] = useState(assignment?.roleId ?? "");
   const canChangeRole = canAssignUserRole(permissionCodes);
@@ -87,7 +89,10 @@ export function EmployeeRoleSection({
                 toast.error(result.message);
                 return;
               }
-              toast.success("Role updated. Portal and permissions will apply on next login.");
+              toast.success(
+                "Role updated. Portal access refreshes on the next page load or portal switcher open.",
+              );
+              await refreshProfile();
               router.refresh();
             });
           }}

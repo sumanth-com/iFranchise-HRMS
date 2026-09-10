@@ -36,6 +36,7 @@ import type {
 async function requireEmployeeProfile() {
   return requireServerAnyPermission([
     PORTAL_PERMISSIONS.employee,
+    PORTAL_PERMISSIONS.accountant,
     PORTAL_PERMISSIONS.manager,
     PORTAL_PERMISSIONS.hr,
     PORTAL_PERMISSIONS.ceo,

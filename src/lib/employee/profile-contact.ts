@@ -145,6 +145,7 @@ export function canEditSelfProfileContactDetails(permissionCodes: string[]): boo
     hasPermission(permissionCodes, "employee.edit") ||
     hasPermission(permissionCodes, "employee_profile.edit") ||
     hasPermission(permissionCodes, PORTAL_PERMISSIONS.employee) ||
+    hasPermission(permissionCodes, PORTAL_PERMISSIONS.accountant) ||
     hasPermission(permissionCodes, PORTAL_PERMISSIONS.manager) ||
     hasPermission(permissionCodes, PORTAL_PERMISSIONS.ceo) ||
     hasPermission(permissionCodes, PORTAL_PERMISSIONS.hr)

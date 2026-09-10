@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, LayoutGrid } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -10,23 +11,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { getPortalSwitcherStateAction } from "@/lib/system-admin/portal-switcher-actions";
 import {
-  PORTAL_SWITCH_LINKS,
-  resolveActivePortalSwitchLink,
-  SYSTEM_ADMIN_PERMISSION,
-} from "@/lib/system-admin/constants";
-import { hasPermission } from "@/lib/permissions/utils";
+  filterPortalSwitchLinks,
+  type PortalSwitchLink,
+} from "@/lib/system-admin/portal-switch";
+import { resolveActivePortalSwitchLink } from "@/lib/system-admin/constants";
 import { useActivePortal } from "@/providers/active-portal-provider";
 import { useAuth } from "@/providers/auth-provider";
 import { cn } from "@/lib/utils";
-
-const PORTAL_PERMISSION_MAP: Record<string, string> = {
-  system: SYSTEM_ADMIN_PERMISSION,
-  hr: "portal.hr.access",
-  ceo: "portal.ceo.access",
-  manager: "portal.manager.access",
-  employee: "portal.employee.access",
-};
 
 /** Client-only portal switcher — loaded without SSR to avoid hydration mismatches. */
 export function PortalSwitcher() {
@@ -34,13 +27,34 @@ export function PortalSwitcher() {
   const { permissionCodes } = useAuth();
   const { activePortal, setActivePortal } = useActivePortal();
   const pathname = usePathname();
+  const refreshingRef = useRef(false);
 
-  // Permission-driven only — no role/email shortcuts in the UI.
-  // Super Admin is system-only unless explicit portal.*.access grants exist
-  // (e.g. it@ifranchise.in via it_multi_portal_access).
-  const availablePortals = PORTAL_SWITCH_LINKS.filter((portal) =>
-    hasPermission(permissionCodes, PORTAL_PERMISSION_MAP[portal.portal]),
+  // Seed from AuthProvider, then replace with live RPC (cookie-bypass) state.
+  const [availablePortals, setAvailablePortals] = useState<PortalSwitchLink[]>(
+    () => filterPortalSwitchLinks(permissionCodes),
   );
+
+  const syncFromServer = useCallback(async () => {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
+    try {
+      const result = await getPortalSwitcherStateAction();
+      if (result.success) {
+        setAvailablePortals(result.portals);
+      }
+    } finally {
+      refreshingRef.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    setAvailablePortals(filterPortalSwitchLinks(permissionCodes));
+  }, [permissionCodes]);
+
+  // Always resolve from DB on mount so stale permission cookies cannot hide portals.
+  useEffect(() => {
+    void syncFromServer();
+  }, [syncFromServer]);
 
   // Hide completely when there is nothing to switch between.
   if (availablePortals.length <= 1) {
@@ -55,7 +69,11 @@ export function PortalSwitcher() {
   const label = activePortalLink?.label ?? "Portals";
 
   return (
-    <DropdownMenu>
+    <DropdownMenu
+      onOpenChange={(open) => {
+        if (open) void syncFromServer();
+      }}
+    >
       <DropdownMenuTrigger
         render={
           <Button

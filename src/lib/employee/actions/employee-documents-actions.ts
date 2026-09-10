@@ -44,6 +44,7 @@ const uploadMetaSchema = z.object({
 
 function revalidate() {
   revalidatePath(EMPLOYEE_ROUTES.documents);
+  revalidatePath("/accountant/documents");
   revalidatePath(SELF_DOCUMENTS_ROUTES.list);
 }
 
@@ -68,6 +69,7 @@ export async function employeeUploadDocumentAction(formData: FormData) {
   try {
     const profile = await requireServerAnyPermission([
       PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.accountant,
       "documents.upload",
     ]);
     const supabase = await createClient();
@@ -194,6 +196,7 @@ export async function employeeRenameDocumentAction(documentId: string, title: st
   try {
     const profile = await requireServerAnyPermission([
       PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.accountant,
       "documents.upload",
     ]);
     const supabase = await createClient();
@@ -212,6 +215,7 @@ export async function employeeDeleteDocumentAction(documentId: string) {
   try {
     const profile = await requireServerAnyPermission([
       PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.accountant,
       "documents.upload",
     ]);
     const supabase = await createClient();
@@ -228,7 +232,11 @@ export async function employeeDeleteDocumentAction(documentId: string) {
 
 export async function employeeGetDocumentUrlAction(storagePath: string) {
   try {
-    const profile = await requireServerAnyPermission([PORTAL_PERMISSIONS.employee, "documents.view"]);
+    const profile = await requireServerAnyPermission([
+      PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.accountant,
+      "documents.view",
+    ]);
     const supabase = await createClient();
 
     assertOrganizationStoragePath(storagePath, profile.employee.organizationId);
@@ -271,6 +279,7 @@ export async function employeeDownloadDocumentAction(storagePath: string, fileNa
   try {
     const profile = await requireServerAnyPermission([
       PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.accountant,
       "documents.view",
     ]);
     const supabase = await createClient();

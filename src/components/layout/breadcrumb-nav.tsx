@@ -788,6 +788,94 @@ function buildBreadcrumbItems(
     return items;
   }
 
+  if (segments[0] === "accountant") {
+    const items: BreadcrumbItemConfig[] = [
+      { label: "Accountant", href: "/accountant" },
+    ];
+
+    if (!segments[1]) {
+      items.push({ label: "Dashboard", href: "/accountant" });
+      return items;
+    }
+
+    if (segments[1] === "finance") {
+      items.push({ label: "Finance Dashboard", href: "/accountant/finance" });
+      return items;
+    }
+
+    if (segments[1] === "payroll") {
+      const section = parseTeamPayrollSection(segments[2]);
+      const subsectionLabels: Record<TeamPayrollSection, string> = {
+        run: "Team Payroll",
+        "salary-structures": "Salary Structure",
+        bonuses: "Bonuses",
+        reimbursements: "Reimbursements",
+        payslips: "Payslips",
+        "employee-accounts": "Employee Accounts",
+        settings: "Settings",
+      };
+
+      items.push({
+        label: "Team Payroll",
+        href: "/accountant/payroll/run",
+      });
+      if (segments[2] && section !== TEAM_PAYROLL_SECTIONS.run) {
+        items.push({
+          label: subsectionLabels[section],
+          href: pathname,
+        });
+      }
+      return items;
+    }
+
+    const sectionLabels: Record<string, string> = {
+      profile: "My Profile",
+      attendance: "Attendance",
+      leave: "Leave",
+      documents: "Documents",
+      assets: "Assets",
+      goals: "My Goals",
+      notifications: "Notifications",
+      settings: "Settings",
+      reports: "Reports",
+      help: "Help",
+      audit: "Audit",
+    };
+
+    items.push({
+      label: sectionLabels[segments[1]] ?? formatSegment(segments[1]),
+      href: `/accountant/${segments[1]}`,
+    });
+
+    if (segments[1] === "reports" && segments[2]) {
+      items.push({
+        label: formatSegment(segments[2]),
+        href: pathname,
+      });
+    }
+
+    if (segments[1] === "attendance" && segments[2] === "policy") {
+      items.push({ label: "Attendance Policy", href: pathname });
+    }
+
+    if (segments[1] === "attendance" && segments[2] === "location") {
+      items.push({ label: "Location", href: pathname });
+    }
+
+    if (segments[1] === "leave" && segments[2] === "policy") {
+      items.push({ label: "Leave Policy", href: pathname });
+    }
+
+    if (segments[1] === "audit" && segments[2]) {
+      items.push({
+        label: formatSegment(segments[2]),
+        href: pathname,
+      });
+    }
+
+    return items;
+  }
+
   if (segments[0] === "dashboard" && segments[1] === "recruitment" && segments[2] === "onboarding") {
     const items: BreadcrumbItemConfig[] = [
       { label: "Dashboard", href: HR_PORTAL_HOME },

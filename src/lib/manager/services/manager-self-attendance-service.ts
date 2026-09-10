@@ -75,6 +75,7 @@ type AttendanceRow = {
   attendance_status: AttendanceStatus;
   work_hours: number | string;
   overtime_hours: number | string;
+  prior_work_seconds?: number | string | null;
   notes: string | null;
   check_in_latitude?: number | string | null;
   check_in_longitude?: number | string | null;
@@ -83,7 +84,7 @@ type AttendanceRow = {
 };
 
 const ATTENDANCE_SELF_SELECT =
-  "id, attendance_date, check_in_at, check_out_at, attendance_status, work_hours, overtime_hours, notes, check_in_latitude, check_in_longitude, check_out_latitude, check_out_longitude";
+  "id, attendance_date, check_in_at, check_out_at, attendance_status, work_hours, overtime_hours, prior_work_seconds, notes, check_in_latitude, check_in_longitude, check_out_latitude, check_out_longitude";
 
 
 type CorrectionRow = {
@@ -239,6 +240,14 @@ function buildTodayPanel(
   const workHours = row
     ? Number(row.work_hours ?? 0)
     : computeWorkHours(checkInAt, checkOutAt);
+  const storedPrior = Math.max(0, Math.floor(Number(row?.prior_work_seconds ?? 0)));
+  // While checked out, prior_work_seconds (or work_hours) holds the day total across sessions.
+  // While checked in, prior_work_seconds holds completed earlier sessions only.
+  const priorCompletedSeconds = checkOutAt
+    ? storedPrior > 0
+      ? storedPrior
+      : Math.max(0, Math.round(workHours * 3600))
+    : storedPrior;
   const lateMinutes = computeLateMinutes(checkInAt, attendanceDate, rules.lateAfter);
   const overtimeHours = row
     ? Number(row.overtime_hours ?? 0)
@@ -259,6 +268,13 @@ function buildTodayPanel(
     notes: row?.notes,
   });
 
+  const workingSeconds = elapsedWorkingSeconds(
+    checkInAt,
+    checkOutAt,
+    new Date(),
+    priorCompletedSeconds,
+  );
+
   return {
     attendanceId: row?.id ?? null,
     attendanceDate,
@@ -266,14 +282,13 @@ function buildTodayPanel(
     attendanceStatus,
     checkInAt,
     checkOutAt,
+    priorCompletedSeconds,
     workHours,
     overtimeHours,
     lateMinutes,
     isLocked: false,
     lockMessage: null,
-    workingDurationLabel: formatWorkingDuration(
-      elapsedWorkingSeconds(checkInAt, checkOutAt),
-    ),
+    workingDurationLabel: formatWorkingDuration(workingSeconds),
     hasCheckInLocation: locationFlags.hasCheckInLocation,
     hasCheckOutLocation: locationFlags.hasCheckOutLocation,
   };
@@ -1125,6 +1140,7 @@ async function loadTodayAfterPunch(
     const today = await getSelfTodayAttendance(supabase, profile);
     if (geo.type === "in" && result.check_in_at && !today.checkInAt) {
       // Defensive: never return a panel that hides Check Out after a successful in punch.
+      // Keep any multi-session prior already loaded on `today`.
       return buildTodayPanel(
         {
           id: result.id,
@@ -1134,6 +1150,7 @@ async function loadTodayAfterPunch(
           attendance_status: result.attendance_status,
           work_hours: result.work_hours,
           overtime_hours: result.overtime_hours,
+          prior_work_seconds: today.priorCompletedSeconds ?? 0,
           notes: null,
           check_in_latitude: geo.expectedSaved ? geo.latitude : null,
           check_in_longitude: geo.expectedSaved ? geo.longitude : null,
@@ -1147,6 +1164,18 @@ async function loadTodayAfterPunch(
     return today;
   } catch (error) {
     console.error("[loadTodayAfterPunch] fallback to RPC payload", error);
+    // Best-effort prior from the pre-punch row when the re-read fails.
+    let priorWorkSeconds = 0;
+    try {
+      const row = await getAttendanceForDate(
+        supabase,
+        profile.employee.id,
+        getTodayDateString(),
+      );
+      priorWorkSeconds = Math.max(0, Math.floor(Number(row?.prior_work_seconds ?? 0)));
+    } catch {
+      priorWorkSeconds = 0;
+    }
     return buildTodayPanel(
       {
         id: result.id,
@@ -1156,6 +1185,7 @@ async function loadTodayAfterPunch(
         attendance_status: result.attendance_status,
         work_hours: result.work_hours,
         overtime_hours: result.overtime_hours,
+        prior_work_seconds: priorWorkSeconds,
         notes: null,
         check_in_latitude:
           geo.type === "in" && geo.expectedSaved ? geo.latitude : null,
@@ -1220,15 +1250,40 @@ export async function punchManagerAttendance(
   let overtimeHours = 0;
 
   if (input.type === "in") {
-    if (existing?.check_in_at) {
+    if (existing?.check_in_at && !existing.check_out_at) {
       throw new Error("You have already checked in today.");
+    }
+    // Re-check-in after checkout: roll finished session into prior_work_seconds, then open a new session.
+    if (existing?.check_in_at && existing.check_out_at) {
+      const sessionSeconds = elapsedWorkingSeconds(
+        existing.check_in_at,
+        existing.check_out_at,
+      );
+      const storedPrior = Math.max(0, Math.floor(Number(existing.prior_work_seconds ?? 0)));
+      const fromHours = Math.max(0, Math.round(Number(existing.work_hours ?? 0) * 3600));
+      const priorTotal = Math.max(storedPrior, fromHours, sessionSeconds);
+      const { error: priorError } = await supabase
+        .schema("hrms")
+        .from("attendance")
+        .update({
+          prior_work_seconds: priorTotal,
+          check_in_at: null,
+          check_out_at: null,
+          updated_at: nowIso,
+          updated_by: profile.userId,
+        })
+        .eq("id", existing.id)
+        .eq("employee_id", employeeId);
+      if (priorError) throw new Error(priorError.message);
     }
     status = resolvePunchStatus(nowIso, null, today, rules);
   } else if (existing?.check_in_at) {
     if (parseISO(nowIso).getTime() < parseISO(existing.check_in_at).getTime()) {
       throw new Error("Checkout cannot be before check-in.");
     }
-    workHours = computeWorkHours(existing.check_in_at, nowIso);
+    const prior = Math.max(0, Math.floor(Number(existing.prior_work_seconds ?? 0)));
+    const currentSeconds = elapsedWorkingSeconds(existing.check_in_at, nowIso);
+    workHours = Math.round(((prior + currentSeconds) / 3600) * 100) / 100;
     overtimeHours = computeOvertimeHours(workHours, rules);
     status = resolvePunchStatus(
       existing.check_in_at,
@@ -1264,6 +1319,29 @@ export async function punchManagerAttendance(
   const result = data as SelfPunchRpcResult | null;
   if (!result?.id) {
     throw new Error("Failed to update attendance");
+  }
+
+  // Persist multi-session day total after checkout (RPC may only store work_hours).
+  if (input.type === "out") {
+    const prior = Math.max(0, Math.floor(Number(existing?.prior_work_seconds ?? 0)));
+    const currentSeconds = existing?.check_in_at
+      ? elapsedWorkingSeconds(existing.check_in_at, result.check_out_at ?? nowIso)
+      : 0;
+    const totalSeconds = Math.max(
+      prior + currentSeconds,
+      Math.round(Number(result.work_hours ?? workHours) * 3600),
+    );
+    await supabase
+      .schema("hrms")
+      .from("attendance")
+      .update({
+        prior_work_seconds: totalSeconds,
+        work_hours: Math.round((totalSeconds / 3600) * 100) / 100,
+        updated_at: nowIso,
+        updated_by: profile.userId,
+      })
+      .eq("id", result.id)
+      .eq("employee_id", employeeId);
   }
 
   // RPC always resolves the employee from auth.uid() — reject mismatches.
@@ -1469,7 +1547,10 @@ export async function updateManagerCheckout(
     supabase,
     profile.employee.organizationId,
   );
-  const workHours = computeWorkHours(existing.check_in_at, checkOutAt);
+  const prior = Math.max(0, Math.floor(Number(existing.prior_work_seconds ?? 0)));
+  const currentSeconds = elapsedWorkingSeconds(existing.check_in_at, checkOutAt);
+  const totalSeconds = prior + currentSeconds;
+  const workHours = Math.round((totalSeconds / 3600) * 100) / 100;
   const overtimeHours = computeOvertimeHours(workHours, rules);
   const status = resolvePunchStatus(
     existing.check_in_at,
@@ -1484,6 +1565,7 @@ export async function updateManagerCheckout(
     .update({
       check_out_at: checkOutAt,
       work_hours: workHours,
+      prior_work_seconds: totalSeconds,
       overtime_hours: overtimeHours,
       attendance_status: status,
       updated_by: profile.userId,

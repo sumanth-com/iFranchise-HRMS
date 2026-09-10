@@ -10,6 +10,7 @@ export const EXECUTIVE_ROLE_CODES = [
   "hr_admin",
   "hr_executive",
   "manager",
+  "accountant",
   "employee",
 ] as const;
 
@@ -22,6 +23,7 @@ export const ROLE_LABELS: Record<string, string> = {
   hr_admin: "HR Admin",
   hr_executive: "HR Executive",
   manager: "Manager",
+  accountant: "Accountant",
   employee: "Employee",
   super_admin: "Super Admin",
 };

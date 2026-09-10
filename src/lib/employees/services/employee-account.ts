@@ -36,6 +36,7 @@ type EmployeeAccountRow = {
   employment_status?: string;
   account_status: EmployeeAccountStatus;
   first_login_at: string | null;
+  date_of_joining?: string | null;
   deleted_at: string | null;
 };
 
@@ -68,7 +69,7 @@ async function getEmployeeAccountRow(
     .schema("hrms")
     .from("employees")
     .select(
-      "id, organization_id, user_id, employee_code, first_name, last_name, email, employment_status, account_status, first_login_at, deleted_at",
+      "id, organization_id, user_id, employee_code, first_name, last_name, email, employment_status, account_status, first_login_at, date_of_joining, deleted_at",
     )
     .eq("id", employeeId)
     .eq("organization_id", organizationId)
@@ -588,13 +589,19 @@ export async function activateEmployeeAccountFromOnboarding(
     profile,
     updatedEmployee,
     "account_activated",
-    `Onboarding account activated for ${fullName(updatedEmployee)} (${updatedEmployee.employee_code}) as ${assignedRole.name}`,
+    `Portal/Role access granted on ${now.slice(0, 10)} via onboarding for ${fullName(updatedEmployee)} (${updatedEmployee.employee_code}) as ${assignedRole.name}${
+      employee.date_of_joining
+        ? ` (employee joined on ${String(employee.date_of_joining).slice(0, 10)})`
+        : ""
+    }`,
     {
       roleId,
       roleCode: assignedRole.code,
       roleName: assignedRole.name,
       portalRoute: assignedRole.portalRoute,
       portalLabel: assignedRole.portalLabel,
+      portalAccessGrantedAt: now,
+      dateOfJoining: employee.date_of_joining ?? null,
     },
   );
 
@@ -602,7 +609,7 @@ export async function activateEmployeeAccountFromOnboarding(
     organizationId: employee.organization_id,
     module: "security",
     action: "role_assigned",
-    description: `Role ${assignedRole.name} assigned during onboarding activation for ${normalizedEmail}`,
+    description: `Portal/Role access granted on ${now.slice(0, 10)}: role ${assignedRole.name} assigned during onboarding activation for ${normalizedEmail}`,
     recordId: employee.id,
     priority: "medium",
     metadata: {
@@ -610,6 +617,8 @@ export async function activateEmployeeAccountFromOnboarding(
       roleId,
       roleCode: assignedRole.code,
       portalRoute: assignedRole.portalRoute,
+      portalAccessGrantedAt: now,
+      dateOfJoining: employee.date_of_joining ?? null,
     },
   });
 }
@@ -885,7 +894,7 @@ export async function sendEmployeeInvitation(
     organizationId: employee.organization_id,
     module: "security",
     action: "role_assigned",
-    description: `Role ${assignedRole.name} assigned during invitation for ${employee.email}`,
+    description: `Portal/Role access granted on ${now.slice(0, 10)}: role ${assignedRole.name} assigned during invitation for ${employee.email}`,
     recordId: employee.id,
     priority: "medium",
     metadata: {
@@ -893,19 +902,23 @@ export async function sendEmployeeInvitation(
       roleId,
       roleCode: assignedRole.code,
       portalRoute: assignedRole.portalRoute,
+      portalAccessGrantedAt: now,
+      dateOfJoining: employee.date_of_joining ?? null,
     },
   });
   await writeApplicationAudit(supabase, {
     organizationId: employee.organization_id,
     module: "security",
     action: "portal_assigned",
-    description: `Portal ${assignedRole.portalLabel} assigned for ${employee.email}`,
+    description: `Portal/Role access granted on ${now.slice(0, 10)}: portal ${assignedRole.portalLabel} for ${employee.email}`,
     recordId: employee.id,
     priority: "medium",
     metadata: {
       employeeId: employee.id,
       portalRoute: assignedRole.portalRoute,
       portalLabel: assignedRole.portalLabel,
+      portalAccessGrantedAt: now,
+      dateOfJoining: employee.date_of_joining ?? null,
     },
   });
 }
@@ -1442,8 +1455,9 @@ export async function recordEmployeeSuccessfulLogin(
 
   if (error || !employee || employee.deleted_at) return;
 
-  const employeeRow = employee as EmployeeAccountRow & { date_of_joining: string | null };
+  const employeeRow = employee as EmployeeAccountRow;
   const now = new Date().toISOString();
+  const accessGrantedOn = now.slice(0, 10);
   const isFirstLogin = !employeeRow.first_login_at;
   const shouldActivate =
     employeeRow.account_status === "invited" ||
@@ -1460,9 +1474,8 @@ export async function recordEmployeeSuccessfulLogin(
     updates.account_activated_at = now;
     updates.invitation_token = null;
     updates.invitation_expires_at = null;
-    if (!employeeRow.date_of_joining) {
-      updates.date_of_joining = now.slice(0, 10);
-    }
+    // Never invent or overwrite employment joining date from portal access / first login.
+    // Access lifecycle uses invitation_sent_at / first_login_at / account_activated_at only.
   }
 
   await updateEmployeeAccountWithClient(supabase, employeeRow.id, updates);
@@ -1509,13 +1522,19 @@ export async function recordEmployeeSuccessfulLogin(
       organizationId: employeeRow.organization_id,
       module: "employees",
       action: "account_activated",
-      description: `Invitation accepted and account activated for ${email}`,
+      description: `Portal/Role access granted on ${accessGrantedOn} for ${email}${
+        employeeRow.date_of_joining
+          ? ` (employee joined on ${String(employeeRow.date_of_joining).slice(0, 10)})`
+          : ""
+      }`,
       recordId: employeeRow.id,
       priority: "medium",
       metadata: {
         employeeId: employeeRow.id,
         employeeCode: employeeRow.employee_code,
         email,
+        portalAccessGrantedAt: now,
+        dateOfJoining: employeeRow.date_of_joining ?? null,
       },
     });
 

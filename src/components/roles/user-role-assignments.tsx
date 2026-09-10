@@ -63,6 +63,7 @@ function portalLabel(row: Pick<UserRoleAssignment, "roleCode" | "portalKey">) {
   if (row.portalKey === "hr") return "HR Portal";
   if (row.portalKey === "ceo") return "CEO Portal";
   if (row.portalKey === "manager") return "Manager Portal";
+  if (row.portalKey === "accountant") return "Accountant Portal";
   if (row.portalKey === "employee") return "Employee Portal";
   return "—";
 }

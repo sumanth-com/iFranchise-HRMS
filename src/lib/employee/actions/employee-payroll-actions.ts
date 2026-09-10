@@ -21,6 +21,7 @@ export async function getEmployeePayslipDetailAction(
 ): Promise<PayslipDetail | null> {
   const profile = await requireServerAnyPermission([
     PORTAL_PERMISSIONS.employee,
+    PORTAL_PERMISSIONS.accountant,
     "payslip.view",
   ]);
   const supabase = await createClient();
@@ -34,6 +35,7 @@ export async function emailMyPayslipAction(
   try {
     const profile = await requireServerAnyPermission([
       PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.accountant,
       "payslip.view",
     ]);
     const supabase = await createClient();
