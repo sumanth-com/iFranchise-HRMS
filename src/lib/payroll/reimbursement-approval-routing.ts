@@ -37,9 +37,8 @@ export function isHrReimbursementActor(profile: UserProfile): boolean {
 }
 
 /**
- * Active org employees whose claims belong in the CEO reimbursement queue.
- * Directory-hidden system identities (e.g. IT Team) stay in the HR workforce
- * queue even if they hold an admin role — they are not HR/Admin claimants.
+ * Active org employees whose claims belong in the CEO reimbursement queue
+ * (HR Admin / HR Executive / Super Admin claimants, including IT Team).
  */
 export async function listHrReimbursementApplicantEmployeeIds(
   organizationId: string,

@@ -34,13 +34,26 @@ describe("payroll integrity eligibility", () => {
     );
   });
 
-  it("rejects directory-excluded employees", () => {
+  it("includes the IT Team employee in payroll eligibility", () => {
     assert.equal(
       isPayrollEligibleEmployee({
         ...visible,
         employee_code: "IF2026000",
         first_name: "IT",
         last_name: "Team",
+        email: "it@ifranchise.in",
+      }),
+      true,
+    );
+  });
+
+  it("rejects other directory-excluded employees", () => {
+    assert.equal(
+      isPayrollEligibleEmployee({
+        ...visible,
+        employee_code: "IF-MGR-001",
+        first_name: "Marketing",
+        last_name: "Manager",
       }),
       false,
     );
@@ -90,10 +103,11 @@ describe("payroll integrity totals and finalization checks", () => {
           employee: {
             ...visible,
             id: "hidden",
-            employee_code: "IF2026000",
-            first_name: "IT",
-            last_name: "Team",
-            email: "it@ifranchise.in",
+            employee_code: "IF-MGR-001",
+            first_name: "Marketing",
+            last_name: "Manager",
+            email: "hidden.manager@ifranchise.in",
+            designationTitle: "Marketing Manager",
           },
         },
       ],

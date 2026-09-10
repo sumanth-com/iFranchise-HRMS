@@ -11,7 +11,7 @@ import {
   useReactTable,
   type ColumnDef,
 } from "@tanstack/react-table";
-import { CheckCircle2, Eye, Loader2, Paperclip, Plus, XCircle } from "lucide-react";
+import { CheckCircle2, Eye, Loader2, Paperclip, Plus, Trash2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import type { z } from "zod";
 
@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -41,13 +42,21 @@ import {
 import {
   approveReimbursementAction,
   createReimbursementAction,
+  deleteReimbursementAction,
   getReimbursementAttachmentUrlAction,
   rejectReimbursementAction,
+  uploadReimbursementAttachmentAction,
 } from "@/lib/payroll/actions";
 import {
   EMPLOYEE_REIMBURSEMENT_CATEGORIES,
+  REIMBURSEMENT_ACCEPT_ATTR,
   REIMBURSEMENT_CATEGORY_LABELS,
+  REIMBURSEMENT_FILE_HINT,
+  REIMBURSEMENT_MAX_FILES,
   REIMBURSEMENT_STATUS_LABELS,
+  isAllowedReimbursementExtension,
+  isAllowedReimbursementMimeType,
+  validateReimbursementAttachmentFile,
 } from "@/lib/payroll/constants";
 import { formatCurrency } from "@/lib/payroll/services/payroll-utils";
 import { getHrmsYearSelectItems } from "@/lib/date/hrms-year";
@@ -56,6 +65,16 @@ import type { ReimbursementItem } from "@/types/payroll";
 import type { LookupOption } from "@/types/employee";
 
 type DecisionMode = "approve" | "reject" | "view";
+
+function canDeleteReimbursementRow(item: ReimbursementItem): boolean {
+  const status = item.reimbursementStatus;
+  return status !== "paid";
+}
+
+function fileBaseName(path: string) {
+  const segment = path.split("/").pop() ?? path;
+  return segment.replace(/^[0-9a-f-]{36}-/i, "");
+}
 
 function attachmentPathsFor(item: ReimbursementItem): string[] {
   if (item.receiptPaths?.length) return item.receiptPaths;
@@ -96,6 +115,8 @@ export function ReimbursementForm({
 }: ReimbursementFormProps) {
   const isDialog = variant === "dialog";
   const [isPending, startTransition] = useTransition();
+  const [uploading, setUploading] = useState(false);
+  const [attachments, setAttachments] = useState<Array<{ path: string; name: string }>>([]);
 
   const form = useForm<z.input<typeof reimbursementFormSchema>>({
     resolver: zodResolver(reimbursementFormSchema),
@@ -103,10 +124,74 @@ export function ReimbursementForm({
   });
 
   const gridClass = isDialog ? "grid gap-3 md:grid-cols-2" : "grid gap-4 md:grid-cols-2";
+  const selectedEmployeeId = form.watch("employeeId");
+
+  async function handleFilesSelected(fileList: FileList | null) {
+    if (!fileList?.length) return;
+    if (!selectedEmployeeId) {
+      toast.error("Select an employee before uploading receipts.");
+      return;
+    }
+    const remaining = REIMBURSEMENT_MAX_FILES - attachments.length;
+    if (remaining <= 0) {
+      toast.error(`You can attach up to ${REIMBURSEMENT_MAX_FILES} files.`);
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const next = [...attachments];
+      for (const file of Array.from(fileList).slice(0, remaining)) {
+        try {
+          validateReimbursementAttachmentFile({
+            fileName: file.name,
+            fileSize: file.size,
+            mimeType: file.type,
+          });
+        } catch (validationError) {
+          toast.error(
+            validationError instanceof Error
+              ? validationError.message
+              : "Unsupported file. Upload an image or PDF up to 5 MB.",
+          );
+          continue;
+        }
+        if (
+          !isAllowedReimbursementExtension(file.name) ||
+          !isAllowedReimbursementMimeType(file.type)
+        ) {
+          toast.error("Unsupported file type.");
+          continue;
+        }
+        const formData = new FormData();
+        formData.set("file", file);
+        formData.set("employeeId", selectedEmployeeId);
+        const result = await uploadReimbursementAttachmentAction(formData);
+        if (!result.success || !result.data) {
+          toast.error(
+            (!result.success && result.message) || "Upload failed",
+          );
+          continue;
+        }
+        next.push({ path: result.data, name: file.name });
+      }
+      setAttachments(next);
+      form.setValue(
+        "receiptPaths",
+        next.map((item) => item.path),
+        { shouldValidate: true },
+      );
+    } finally {
+      setUploading(false);
+    }
+  }
 
   function handleSubmit(values: z.input<typeof reimbursementFormSchema>) {
     startTransition(async () => {
-      const result = await createReimbursementAction(values);
+      const result = await createReimbursementAction({
+        ...values,
+        receiptPaths: attachments.map((item) => item.path),
+      });
       if (!result.success) {
         toast.error(result.message || "Submit failed");
         return;
@@ -114,6 +199,7 @@ export function ReimbursementForm({
 
       toast.success("Claim submitted");
       form.reset(EMPTY_REIMBURSEMENT_VALUES);
+      setAttachments([]);
       onSuccess?.();
     });
   }
@@ -134,10 +220,13 @@ export function ReimbursementForm({
           <EmployeeSelect
             employees={employees}
             value={form.watch("employeeId")}
-            onValueChange={(value) =>
-              form.setValue("employeeId", value, { shouldValidate: true })
-            }
-            disabled={isPending}
+            onValueChange={(value) => {
+              form.setValue("employeeId", value, { shouldValidate: true });
+              // Paths are employee-scoped — clear if employee changes.
+              setAttachments([]);
+              form.setValue("receiptPaths", [], { shouldValidate: true });
+            }}
+            disabled={isPending || uploading}
           />
         </Field>
         <Field label="Category">
@@ -151,7 +240,7 @@ export function ReimbursementForm({
                 { shouldValidate: true },
               )
             }
-            disabled={isPending}
+            disabled={isPending || uploading}
           />
         </Field>
         <Field label="Amount">
@@ -159,34 +248,94 @@ export function ReimbursementForm({
             type="number"
             min={0}
             step="0.01"
-            disabled={isPending}
+            disabled={isPending || uploading}
             {...form.register("amount")}
           />
         </Field>
         <Field label="Expense date">
-          <Input type="date" disabled={isPending} {...form.register("expenseDate")} />
+          <Input
+            type="date"
+            disabled={isPending || uploading}
+            {...form.register("expenseDate")}
+          />
         </Field>
         <Field label="Description" className="md:col-span-2">
           <Input
-            disabled={isPending}
+            disabled={isPending || uploading}
             placeholder="Brief description of the expense"
             {...form.register("description")}
           />
+        </Field>
+        <Field label="Receipts / attachments" className="md:col-span-2">
+          <div className="space-y-2">
+            <Input
+              type="file"
+              accept={REIMBURSEMENT_ACCEPT_ATTR}
+              multiple
+              disabled={isPending || uploading || !selectedEmployeeId}
+              onChange={(event) => {
+                void handleFilesSelected(event.target.files);
+                event.target.value = "";
+              }}
+            />
+            <p className="text-xs text-muted-foreground">{REIMBURSEMENT_FILE_HINT}</p>
+            {attachments.length > 0 ? (
+              <ul className="space-y-1.5">
+                {attachments.map((file) => (
+                  <li
+                    key={file.path}
+                    className="flex items-center justify-between gap-2 rounded-md border border-input px-2.5 py-1.5 text-sm"
+                  >
+                    <span className="truncate">{file.name || fileBaseName(file.path)}</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2"
+                      disabled={isPending || uploading}
+                      onClick={() => {
+                        const next = attachments.filter((item) => item.path !== file.path);
+                        setAttachments(next);
+                        form.setValue(
+                          "receiptPaths",
+                          next.map((item) => item.path),
+                          { shouldValidate: true },
+                        );
+                      }}
+                    >
+                      Remove
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {uploading ? (
+              <p className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="size-3.5 animate-spin" />
+                Uploading…
+              </p>
+            ) : null}
+          </div>
         </Field>
       </div>
 
       {isDialog ? (
         <div className="flex flex-wrap items-center justify-end gap-2 border-t pt-4">
-          <Button type="button" variant="outline" disabled={isPending} onClick={onCancel}>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isPending || uploading}
+            onClick={onCancel}
+          >
             Cancel
           </Button>
-          <Button type="submit" disabled={isPending} className="gap-1.5">
+          <Button type="submit" disabled={isPending || uploading} className="gap-1.5">
             {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
             Submit claim
           </Button>
         </div>
       ) : (
-        <Button type="submit" disabled={isPending} className="gap-1.5">
+        <Button type="submit" disabled={isPending || uploading} className="gap-1.5">
           {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
           Submit claim
         </Button>
@@ -202,6 +351,7 @@ type ReimbursementTableProps = {
   pageSize: number;
   employees: LookupOption[];
   canApprove: boolean;
+  canDelete?: boolean;
   canCreate?: boolean;
 };
 
@@ -212,6 +362,7 @@ export function ReimbursementTable({
   pageSize,
   employees,
   canApprove,
+  canDelete = false,
   canCreate = false,
 }: ReimbursementTableProps) {
   const router = useRouter();
@@ -219,13 +370,21 @@ export function ReimbursementTable({
   const { setHeaderActions } = useTeamPayrollHeaderActions();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [rows, setRows] = useState(records);
   const [decisionRow, setDecisionRow] = useState<ReimbursementItem | null>(null);
   const [decisionMode, setDecisionMode] = useState<DecisionMode>("view");
   const [remarks, setRemarks] = useState("");
   const [openingPath, setOpeningPath] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ReimbursementItem | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setRows(records);
+  }, [records]);
 
   const now = new Date();
-  const [monthFilter, setMonthFilter] = useState(String(now.getMonth() + 1));
+  // Default to all months so pending/historical claims are visible without hunting.
+  const [monthFilter, setMonthFilter] = useState("all");
   const [yearFilter, setYearFilter] = useState(String(now.getFullYear()));
   const [employeeFilter, setEmployeeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -246,7 +405,7 @@ export function ReimbursementTable({
   );
 
   const filteredRecords = useMemo(() => {
-    return records.filter((r) => {
+    return rows.filter((r) => {
       const d = new Date(r.expenseDate);
       if (monthFilter && monthFilter !== "all" && d.getMonth() + 1 !== Number(monthFilter)) return false;
       if (yearFilter && yearFilter !== "all" && d.getFullYear() !== Number(yearFilter)) return false;
@@ -254,7 +413,7 @@ export function ReimbursementTable({
       if (statusFilter !== "all" && r.reimbursementStatus !== statusFilter) return false;
       return true;
     });
-  }, [records, monthFilter, yearFilter, employeeFilter, statusFilter]);
+  }, [rows, monthFilter, yearFilter, employeeFilter, statusFilter]);
 
   const updateParams = useCallback(
     (updates: Record<string, string | undefined>) => {
@@ -304,9 +463,10 @@ export function ReimbursementTable({
   }
 
   function confirmDecision() {
-    if (!decisionRow || decisionMode === "view") return;
+    if (!decisionRow || decisionMode === "view" || isPending) return;
+    const targetId = decisionRow.id;
     const payload = {
-      reimbursementId: decisionRow.id,
+      reimbursementId: targetId,
       remarks: remarks.trim() || null,
     };
     startTransition(async () => {
@@ -318,11 +478,38 @@ export function ReimbursementTable({
         toast.error(result.message || "Action failed");
         return;
       }
+      const nextStatus = decisionMode === "approve" ? "approved" : "rejected";
+      setRows((prev) =>
+        prev.map((row) =>
+          row.id === targetId
+            ? { ...row, reimbursementStatus: nextStatus as ReimbursementItem["reimbursementStatus"] }
+            : row,
+        ),
+      );
       toast.success(
         decisionMode === "approve" ? "Claim approved" : "Claim rejected",
       );
       closeDecision();
-      router.refresh();
+    });
+  }
+
+  function confirmDelete() {
+    if (!deleteTarget || deletingId) return;
+    const targetId = deleteTarget.id;
+    setDeletingId(targetId);
+    startTransition(async () => {
+      try {
+        const result = await deleteReimbursementAction(targetId);
+        if (!result.success) {
+          toast.error(result.message || "Delete failed");
+          return;
+        }
+        setRows((prev) => prev.filter((row) => row.id !== targetId));
+        setDeleteTarget(null);
+        toast.success("Claim deleted");
+      } finally {
+        setDeletingId(null);
+      }
     });
   }
 
@@ -365,7 +552,7 @@ export function ReimbursementTable({
       },
       {
         accessorKey: "category",
-        header: "Type",
+        header: "Category",
         cell: ({ row }) => REIMBURSEMENT_CATEGORY_LABELS[row.original.category],
       },
       {
@@ -407,9 +594,11 @@ export function ReimbursementTable({
       },
       {
         id: "actions",
-        header: () => <span className="sr-only">Actions</span>,
+        header: "Actions",
         cell: ({ row }) => {
           const pending = row.original.reimbursementStatus === "pending";
+          const deletable = canDelete && canDeleteReimbursementRow(row.original);
+          const isDeleting = deletingId === row.original.id;
           return (
             <div className="flex items-center justify-end gap-1.5">
               <Button
@@ -429,7 +618,7 @@ export function ReimbursementTable({
                     size="sm"
                     variant="outline"
                     className="h-8 gap-1.5"
-                    disabled={isPending}
+                    disabled={isPending || Boolean(deletingId)}
                     onClick={() => openDecision(row.original, "approve")}
                   >
                     <CheckCircle2 className="size-3.5" />
@@ -440,7 +629,7 @@ export function ReimbursementTable({
                     size="sm"
                     variant="outline"
                     className="h-8 gap-1.5 text-destructive hover:text-destructive"
-                    disabled={isPending}
+                    disabled={isPending || Boolean(deletingId)}
                     onClick={() => openDecision(row.original, "reject")}
                   >
                     <XCircle className="size-3.5" />
@@ -448,12 +637,29 @@ export function ReimbursementTable({
                   </Button>
                 </>
               ) : null}
+              {deletable ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1.5 text-destructive hover:text-destructive"
+                  disabled={isPending || Boolean(deletingId)}
+                  onClick={() => setDeleteTarget(row.original)}
+                >
+                  {isDeleting ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="size-3.5" />
+                  )}
+                  Delete
+                </Button>
+              ) : null}
             </div>
           );
         },
       },
     ],
-    [canApprove, isPending, openDecision],
+    [canApprove, canDelete, deletingId, isPending, openDecision],
   );
 
   const table = useReactTable({ data: filteredRecords, columns, getCoreRowModel: getCoreRowModel() });
@@ -499,11 +705,11 @@ export function ReimbursementTable({
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
         {filteredRecords.length === 0 ? (
           <EmptyState
-            title="No expense claims yet"
+            title="No reimbursement claims yet"
             description={
               canCreate
-                ? "Submit an expense claim for an employee. Approved claims are paid in the monthly payroll run."
-                : "Expense claims will appear here once they are submitted."
+                ? "Submit a reimbursement claim for an employee. Approved claims are paid in the monthly payroll run."
+                : "Reimbursement claims will appear here once they are submitted."
             }
             className="border-0 py-14"
           />
@@ -722,6 +928,44 @@ export function ReimbursementTable({
                 </Button>
               </>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open && !deletingId) setDeleteTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete reimbursement?</DialogTitle>
+            <DialogDescription>
+              {deleteTarget
+                ? `Remove ${formatCurrency(deleteTarget.amount)} claim for ${deleteTarget.employeeName}. This cannot be undone.`
+                : "Remove this reimbursement claim."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={Boolean(deletingId)}
+              onClick={() => setDeleteTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              className="gap-1.5"
+              disabled={Boolean(deletingId)}
+              onClick={confirmDelete}
+            >
+              {deletingId ? <Loader2 className="size-4 animate-spin" /> : null}
+              Delete claim
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

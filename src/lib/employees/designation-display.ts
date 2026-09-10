@@ -27,7 +27,7 @@ const DESIGNATION_BY_TITLE: Record<string, string> = {
 };
 
 const DESIGNATION_BY_EMPLOYEE_CODE: Record<string, string> = {
-  IF2026000: "Chief Executive Officer",
+  IF2026000: "Super Admin",
   IF2026009: "Web Development Intern",
   "IF-PENDING-SA": "Web Development Intern",
 };
@@ -50,7 +50,7 @@ function designationForPerson(person?: DesignationDisplayPerson): string | null 
     fullName === "itteam" ||
     fullName.startsWith("it team")
   ) {
-    return "Chief Executive Officer";
+    return "Super Admin";
   }
 
   if (fullName.includes("gangaram") && fullName.includes("reddy")) {

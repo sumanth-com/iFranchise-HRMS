@@ -26,7 +26,7 @@ export function normalizeEmployeeEmail(email: string | null | undefined): string
 /** True when the work email is on the explicit app-hidden allowlist. */
 export function isAppHiddenEmployeeEmail(email: string | null | undefined): boolean {
   const normalized = normalizeEmployeeEmail(email);
-  if (!normalized || normalized === "it@ifranchise.in") return false;
+  if (!normalized) return false;
   return APP_HIDDEN_EMAIL_SET.has(normalized);
 }
 

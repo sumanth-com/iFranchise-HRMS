@@ -236,6 +236,7 @@ function isMonthlyExtraEarningLine(line: PayrollBreakdownLine): boolean {
     code === "bonus" ||
     code.startsWith("hr_") ||
     code.startsWith("reimb_") ||
+    code === "reimbursement" ||
     code === "overtime" ||
     code === "claims" ||
     code === "hr_additional_earning"
@@ -361,6 +362,7 @@ const EARNING_LINE_ORDER = [
   "hr_incentive",
   "overtime",
   "claims",
+  "reimbursement",
   "hr_reimbursement",
   "other_allowances",
   "hr_additional_earning",
@@ -374,7 +376,9 @@ export function normalizePayslipComponentLabel(line: PayrollBreakdownLine): stri
   const code = line.code.toLowerCase();
   if (PAYSLIP_COMPONENT_LABELS[code]) return PAYSLIP_COMPONENT_LABELS[code];
   if (code.startsWith("bonus")) return line.label?.trim() || "Bonus";
-  if (code.startsWith("reimb")) return line.label?.trim() || "Reimbursement";
+  if (code === "reimbursement" || code.startsWith("reimb") || code === "hr_reimbursement") {
+    return "Reimbursement";
+  }
   const trimmed = line.label?.trim();
   if (!trimmed) return line.code;
   // Expand common leave/abbreviation leftovers if any appear in labels
@@ -451,6 +455,43 @@ function isReimbursementEarningLine(line: PayrollBreakdownLine): boolean {
     code === "hr_reimbursement" ||
     label.includes("reimbursement")
   );
+}
+
+/**
+ * Payslip / display: collapse every reimbursement earning into a single "Reimbursement" line
+ * so category rows never appear as duplicate payroll entries.
+ */
+export function collapseReimbursementEarningLines(
+  lines: PayrollBreakdownLine[],
+): PayrollBreakdownLine[] {
+  const reimbursementLines: PayrollBreakdownLine[] = [];
+  const otherLines: PayrollBreakdownLine[] = [];
+
+  for (const line of lines) {
+    if (Number(line.amount) <= 0) continue;
+    if (isReimbursementEarningLine(line)) {
+      reimbursementLines.push(line);
+    } else {
+      otherLines.push(line);
+    }
+  }
+
+  if (reimbursementLines.length === 0) return otherLines;
+
+  const total = roundCurrency(
+    reimbursementLines.reduce((sum, line) => sum + Number(line.amount || 0), 0),
+  );
+  if (total <= 0) return otherLines;
+
+  return [
+    ...otherLines,
+    {
+      code: "reimbursement",
+      label: "Reimbursement",
+      amount: total,
+      type: "earning",
+    },
+  ];
 }
 
 /** Full monthly salary from structure or Excel — not attendance-adjusted. */
@@ -683,11 +724,13 @@ export function getPayslipEarningsLines(input: {
   const sourceEarnings = payslipEarningsSource(input.earnings, input.hrAdjustments);
 
   if (input.grossSalary > 0 || sourceEarnings.length > 0) {
-    return deriveStandardEarningsForDisplay({
-      earnings: sourceEarnings,
-      grossSalary: input.grossSalary,
-      employmentType: input.employmentType,
-    });
+    return collapseReimbursementEarningLines(
+      deriveStandardEarningsForDisplay({
+        earnings: sourceEarnings,
+        grossSalary: input.grossSalary,
+        employmentType: input.employmentType,
+      }),
+    );
   }
 
   const fallback: PayrollBreakdownLine[] = [];
@@ -708,13 +751,17 @@ export function getPayslipEarningsLines(input: {
     });
   }
   if (fallback.length === 0 && input.grossSalary > 0) {
-    return deriveStandardEarningsForDisplay({
-      earnings: [],
-      grossSalary: input.grossSalary,
-      employmentType: input.employmentType,
-    });
+    return collapseReimbursementEarningLines(
+      deriveStandardEarningsForDisplay({
+        earnings: [],
+        grossSalary: input.grossSalary,
+        employmentType: input.employmentType,
+      }),
+    );
   }
-  return fallback.map(toPayslipLine).filter((line) => line.amount > 0);
+  return collapseReimbursementEarningLines(
+    fallback.map(toPayslipLine).filter((line) => line.amount > 0),
+  );
 }
 
 export function resolvePayslipDisplayTotals(input: {

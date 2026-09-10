@@ -369,4 +369,51 @@ describe("payroll calculator", () => {
     assert.equal(normalized.totalDeductions, 5000);
     assert.equal(normalized.netSalary, normalized.grossSalary - normalized.totalDeductions);
   });
+
+  it("emits a single aggregated reimbursement earning line", () => {
+    const result = calculateEmployeePayroll({
+      month: 9,
+      year: 2026,
+      asOfDate: closedSeptember2026,
+      salaryStructure: {
+        id: "struct-reimb",
+        employee_id: "emp-reimb",
+        basic_salary: 15000,
+        hra_amount: 7500,
+        transport_allowance: 3000,
+        other_allowances: 4500,
+        tax_deduction: 0,
+        other_deductions: 0,
+        gross_salary: 30000,
+        net_salary: 30000,
+        components: {
+          specialAllowance: 4500,
+          medical: 0,
+          pf: 0,
+          esi: 0,
+          professionalTax: 0,
+          incomeTax: 0,
+        },
+      },
+      attendance: emptyAttendance,
+      leaveLopDays: 0,
+      bonuses: [],
+      reimbursements: [
+        { amount: 500, category: "food" },
+        { amount: 150.76, category: "other" },
+      ],
+    });
+
+    const reimbursementLines = result.breakdown.earnings.filter((line) =>
+      line.label.toLowerCase().includes("reimbursement"),
+    );
+    assert.equal(reimbursementLines.length, 1);
+    assert.equal(reimbursementLines[0]?.code, "reimbursement");
+    assert.equal(reimbursementLines[0]?.amount, 650.76);
+    assert.ok(result.totalAllowances >= 650.76);
+    assert.deepEqual(result.breakdown.reimbursementBreakdown, [
+      { category: "food", amount: 500 },
+      { category: "other", amount: 150.76 },
+    ]);
+  });
 });

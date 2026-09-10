@@ -1,4 +1,5 @@
 import type { AuthSupabaseClient } from "@/lib/auth/profile-loader";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   canRewritePayrollHeader,
   dedupePayrollEmployees,
@@ -60,6 +61,10 @@ import type {
   EmployeePayrollRunBreakdown,
 } from "@/types/payroll";
 import {
+  listApprovedReimbursementsForPeriod,
+  toCalculatorReimbursementRows,
+} from "@/lib/payroll/services/approved-reimbursements";
+import {
   calculateEmployeePayroll,
   normalizePayrollCalculationResult,
   type AttendanceSummary,
@@ -78,7 +83,11 @@ import {
   resolvePayrollReimbursement,
 } from "@/lib/payroll/services/payroll-utils";
 import { isRowLevelSecurityError } from "@/lib/errors/user-messages";
-import { PAYROLL_ROUTES } from "@/lib/payroll/constants";
+import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
+import {
+  assertReimbursementReceiptPaths,
+  PAYROLL_ROUTES,
+} from "@/lib/payroll/constants";
 import { getPayrollSettings } from "@/lib/payroll/services/payroll-settings";
 import { notifyEmployee } from "@/lib/notifications/services/notification-service";
 import type { PayrollRunInput } from "@/lib/validations/payroll";
@@ -164,11 +173,14 @@ function actorUserId(profile: UserProfile): string | null {
 }
 
 async function getActiveEmployees(
-  supabase: AuthSupabaseClient,
+  _supabase: AuthSupabaseClient,
   organizationId: string,
   periodEnd?: string,
 ) {
-  const { data, error } = await supabase
+  // Use service role so eligible employees (including IT Team) are never
+  // omitted from payroll because of caller RLS/visibility quirks.
+  const admin = createAdminClient();
+  const { data, error } = await admin
     .schema("hrms")
     .from("employees")
     .select(
@@ -854,8 +866,9 @@ async function loadPayrollPeriodFacts(
   employeeIds: string[],
   month: number,
   year: number,
-  options?: { asOfDate?: Date },
+  options?: { asOfDate?: Date; organizationId?: string },
 ) {
+  const admin = createAdminClient();
   const structuresByEmployee = new Map<string, SalaryStructureRow>();
   const attendanceByEmployee = new Map<string, AttendanceSummary>();
   const leaveByEmployee = new Map<string, LeaveMonthSummary>();
@@ -899,14 +912,8 @@ async function loadPayrollPeriodFacts(
   for (let i = 0; i < employeeIds.length; i += QUERY_IN_CHUNK) {
     const chunk = employeeIds.slice(i, i + QUERY_IN_CHUNK);
 
-    const [
-      structuresResult,
-      attendanceResult,
-      leaveResult,
-      bonusesResult,
-      reimbursementsResult,
-    ] = await Promise.all([
-      supabase
+    const [structuresResult, attendanceResult, leaveResult, bonusesResult] = await Promise.all([
+      admin
         .schema("hrms")
         .from("salary_structures")
         .select("*")
@@ -914,7 +921,7 @@ async function loadPayrollPeriodFacts(
         .lte("effective_from", monthRange.endDate)
         .is("deleted_at", null)
         .or(`effective_to.is.null,effective_to.gte.${monthDate}`),
-      supabase
+      admin
         .schema("hrms")
         .from("attendance")
         .select("employee_id, organization_id, attendance_date, attendance_status, overtime_hours")
@@ -922,7 +929,7 @@ async function loadPayrollPeriodFacts(
         .gte("attendance_date", queryStart)
         .lte("attendance_date", queryEnd)
         .is("deleted_at", null),
-      supabase
+      admin
         .schema("hrms")
         .from("leave_requests")
         .select(
@@ -933,7 +940,7 @@ async function loadPayrollPeriodFacts(
         .lte("start_date", queryEnd)
         .gte("end_date", queryStart)
         .is("deleted_at", null),
-      supabase
+      admin
         .schema("hrms")
         .from("employee_bonuses")
         .select("employee_id, amount, bonus_type, bonus_month")
@@ -942,23 +949,12 @@ async function loadPayrollPeriodFacts(
         .eq("bonus_month", monthDate)
         .is("payroll_id", null)
         .is("deleted_at", null),
-      supabase
-        .schema("hrms")
-        .from("employee_reimbursements")
-        .select("employee_id, amount, category, expense_date")
-        .in("employee_id", chunk)
-        .in("reimbursement_status", ["approved"])
-        .is("payroll_id", null)
-        .is("deleted_at", null)
-        .gte("expense_date", queryStart)
-        .lte("expense_date", queryEnd),
     ]);
 
     if (structuresResult.error) throw new Error(structuresResult.error.message);
     if (attendanceResult.error) throw new Error(attendanceResult.error.message);
     if (leaveResult.error) throw new Error(leaveResult.error.message);
     if (bonusesResult.error) throw new Error(bonusesResult.error.message);
-    if (reimbursementsResult.error) throw new Error(reimbursementsResult.error.message);
 
     for (const row of structuresResult.data ?? []) {
       const employeeId = String(row.employee_id);
@@ -998,6 +994,7 @@ async function loadPayrollPeriodFacts(
       list.push(row);
       leaveRowsByEmployee.set(row.employee_id, list);
     }
+
     for (const [employeeId, rows] of leaveRowsByEmployee) {
       leaveByEmployee.set(
         employeeId,
@@ -1012,22 +1009,46 @@ async function loadPayrollPeriodFacts(
         bonus_type: row.bonus_type,
       });
     }
+  }
 
-    for (const row of reimbursementsResult.data ?? []) {
-      reimbursementsByEmployee.get(row.employee_id)?.push({
-        amount: row.amount,
-        category: row.category,
-      });
+  // Canonical approved reimbursement source (full payroll month by expense_date).
+  let organizationId = options?.organizationId;
+  if (!organizationId) {
+    organizationId = [...organizationByEmployee.values()][0];
+  }
+  if (!organizationId && employeeIds[0]) {
+    const { data: employeeOrg } = await admin
+      .schema("hrms")
+      .from("employees")
+      .select("organization_id")
+      .eq("id", employeeIds[0])
+      .maybeSingle();
+    organizationId = employeeOrg?.organization_id
+      ? String(employeeOrg.organization_id)
+      : undefined;
+  }
+
+  if (organizationId) {
+    const claims = await listApprovedReimbursementsForPeriod(supabase, {
+      organizationId,
+      employeeIds,
+      month,
+      year,
+    });
+    for (const claim of claims) {
+      reimbursementsByEmployee.get(claim.employeeId)?.push(
+        ...toCalculatorReimbursementRows([claim]),
+      );
     }
   }
 
   const holidayDatesByOrg = new Map<string, string[]>();
   const organizationIds = [...new Set(organizationByEmployee.values())];
   await Promise.all(
-    organizationIds.map(async (organizationId) => {
+    organizationIds.map(async (orgId) => {
       holidayDatesByOrg.set(
-        organizationId,
-        await loadOfficialHolidayDates(supabase, organizationId, queryStart, queryEnd),
+        orgId,
+        await loadOfficialHolidayDates(admin, orgId, queryStart, queryEnd),
       );
     }),
   );
@@ -1035,12 +1056,12 @@ async function loadPayrollPeriodFacts(
   for (const employeeId of employeeIds) {
     const summary = attendanceByEmployee.get(employeeId);
     if (!summary) continue;
-    const organizationId = organizationByEmployee.get(employeeId);
+    const orgId = organizationByEmployee.get(employeeId);
     applyPeriodSandwichLop(
       summary,
       occupiedByEmployee.get(employeeId) ?? [],
       leaveByEmployee.get(employeeId)?.sandwichDates,
-      organizationId ? (holidayDatesByOrg.get(organizationId) ?? []) : [],
+      orgId ? (holidayDatesByOrg.get(orgId) ?? []) : [],
     );
   }
 
@@ -1052,6 +1073,7 @@ async function loadPayrollPeriodFacts(
     reimbursementsByEmployee,
   };
 }
+
 
 function monthKey(value: string | null | undefined): string {
   return String(value ?? "").slice(0, 7);
@@ -1090,7 +1112,7 @@ async function getPayableReimbursements(
   supabase: AuthSupabaseClient,
   employeeId: string,
   ranges: Array<{ startDate: string; endDate: string }>,
-  options?: { includeAttached?: boolean },
+  options?: { includeAttached?: boolean; organizationId?: string },
 ) {
   const uniqueRanges = ranges.filter(
     (range, index, all) =>
@@ -1099,6 +1121,36 @@ async function getPayableReimbursements(
       ) === index,
   );
   if (uniqueRanges.length === 0) return [];
+
+  // Prefer the shared period helper when a single calendar month is requested.
+  if (uniqueRanges.length === 1 && options?.includeAttached) {
+    const start = uniqueRanges[0].startDate;
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(start);
+    if (match) {
+      const year = Number(match[1]);
+      const month = Number(match[2]);
+      let organizationId = options.organizationId;
+      if (!organizationId) {
+        const admin = createAdminClient();
+        const { data } = await admin
+          .schema("hrms")
+          .from("employees")
+          .select("organization_id")
+          .eq("id", employeeId)
+          .maybeSingle();
+        organizationId = data?.organization_id ? String(data.organization_id) : undefined;
+      }
+      if (organizationId) {
+        const claims = await listApprovedReimbursementsForPeriod(supabase, {
+          organizationId,
+          employeeId,
+          month,
+          year,
+        });
+        return toCalculatorReimbursementRows(claims);
+      }
+    }
+  }
 
   let query = supabase
     .schema("hrms")
@@ -1120,6 +1172,267 @@ async function getPayableReimbursements(
       (range) => row.expense_date >= range.startDate && row.expense_date <= range.endDate,
     ),
   );
+}
+
+/**
+ * Recalculate unlocked payroll lines for an employee after reimbursement
+ * approve / reject / delete so Team Payroll Reimb. updates without a manual rerun.
+ */
+export async function syncPayrollAfterReimbursementChange(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: { employeeId: string; expenseDate: string },
+): Promise<void> {
+  const expenseDate = String(input.expenseDate).slice(0, 10);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(expenseDate);
+  if (!match) {
+    await refreshDraftPayrollItemsForEmployee(supabase, profile, input.employeeId);
+    return;
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  await refreshEmployeePayrollItemForMonth(supabase, profile, {
+    employeeId: input.employeeId,
+    month,
+    year,
+  });
+}
+
+async function refreshEmployeePayrollItemForMonth(
+  _supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  input: { employeeId: string; month: number; year: number },
+): Promise<void> {
+  const organizationId = profile.employee.organizationId;
+  const { employeeId, month, year } = input;
+  const payrollMonth = getPayrollMonthDate(month, year);
+  const admin = createAdminClient();
+
+  const { data: targetEmployee, error: targetError } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select(
+      "id, employee_code, first_name, last_name, email, date_of_joining, app_hidden_at, deleted_at, designations:designation_id (title)",
+    )
+    .eq("id", employeeId)
+    .maybeSingle();
+  if (targetError) throw new Error(targetError.message);
+  const mappedTarget = payrollEmployeeFromJoin(targetEmployee);
+  const periodEnd = getMonthDateRange(month, year).endDate;
+  if (!isPayrollEligibleEmployee(mappedTarget, periodEnd)) return;
+
+  const { data: payroll, error } = await admin
+    .schema("hrms")
+    .from("payrolls")
+    .select("id, payroll_month, payroll_status, is_locked, total_gross, total_deductions, total_net, notes")
+    .eq("organization_id", organizationId)
+    .eq("payroll_month", payrollMonth)
+    .in("payroll_status", [...RECALCULABLE_PAYROLL_STATUSES])
+    .eq("is_locked", false)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!payroll) return;
+
+  const mayCreateItems = canRewritePayrollHeader({
+    payrollStatus: payroll.payroll_status,
+    isLocked: payroll.is_locked,
+    payrollMonth: payroll.payroll_month,
+  });
+  if (!mayCreateItems) return;
+
+  const payrollSettings = await getPayrollSettings(admin, organizationId);
+  const calcSettings = calcSettingsFromPayroll(payrollSettings);
+  const asOfDate = new Date();
+  const calendar = await loadPayrollCalendarContext(
+    admin,
+    organizationId,
+    month,
+    year,
+    asOfDate,
+  );
+
+  const [salaryStructure, attendance, leaveSummary, bonuses, reimbursements] =
+    await Promise.all([
+      getEffectiveSalaryStructure(admin, employeeId, month, year),
+      getAttendanceSummary(admin, employeeId, month, year, { asOfDate }),
+      getLeaveMonthSummary(admin, employeeId, month, year, { asOfDate }),
+      getPayableBonuses(admin, employeeId, [getPayrollMonthDate(month, year)], {
+        includeAttached: true,
+      }),
+      getPayableReimbursements(admin, employeeId, [getMonthDateRange(month, year)], {
+        includeAttached: true,
+        organizationId,
+      }),
+    ]);
+
+  const { data: existingItem } = await admin
+    .schema("hrms")
+    .from("payroll_items")
+    .select("id, breakdown")
+    .eq("payroll_id", payroll.id)
+    .eq("employee_id", employeeId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  const existingBreakdown = existingItem?.breakdown as PayrollBreakdown | null;
+  const existingAdjustments = existingBreakdown?.hrAdjustments;
+  const existingLifecycle = existingBreakdown?.payrollLifecycle;
+  if (existingLifecycle?.itemStatus === "sent" || existingLifecycle?.itemStatus === "locked") {
+    return;
+  }
+
+  const calc = calculateEmployeePayroll({
+    month,
+    year,
+    salaryStructure: toSalaryStructureRow(salaryStructure as Record<string, unknown> | null),
+    attendance,
+    leaveSummary,
+    bonuses,
+    reimbursements,
+    settings: calcSettings,
+    adjustments: existingAdjustments,
+    asOfDate,
+    joiningDate: mappedTarget?.date_of_joining ?? null,
+    calendar,
+  });
+
+  const actorId = actorUserId(profile);
+  const amounts = payrollItemAmountFields(calc);
+  const merged = applyPreservedHrAdjustmentsToItem(amounts, existingBreakdown);
+
+  if (existingItem) {
+    const { error: updateError } = await admin
+      .schema("hrms")
+      .from("payroll_items")
+      .update({
+        salary_structure_id: salaryStructure?.id ?? null,
+        basic_salary: amounts.basic_salary,
+        total_deductions: amounts.total_deductions,
+        gross_salary: amounts.gross_salary,
+        net_salary: amounts.net_salary,
+        total_allowances: merged.total_allowances,
+        breakdown: merged.breakdown,
+        updated_by: actorId,
+      })
+      .eq("id", existingItem.id);
+    if (updateError) throwPayrollItemPersistenceError(updateError);
+  } else if (calc.grossSalary > 0 || calc.totalAllowances > 0 || calc.netSalary > 0) {
+    const { error: insertError } = await admin.schema("hrms").from("payroll_items").insert({
+      payroll_id: payroll.id,
+      employee_id: employeeId,
+      salary_structure_id: salaryStructure?.id ?? null,
+      ...amounts,
+      created_by: actorId,
+      updated_by: actorId,
+    });
+    if (insertError && insertError.code !== "23505") {
+      throwPayrollItemPersistenceError(insertError);
+    }
+  }
+
+  await admin
+    .schema("hrms")
+    .from("employee_reimbursements")
+    .update({ payroll_id: payroll.id, updated_by: actorId })
+    .eq("employee_id", employeeId)
+    .eq("organization_id", organizationId)
+    .eq("reimbursement_status", "approved")
+    .is("payroll_id", null)
+    .is("deleted_at", null)
+    .gte("expense_date", getMonthDateRange(month, year).startDate)
+    .lte("expense_date", getMonthDateRange(month, year).endDate);
+
+  await persistPayrollHeaderFromValidItems(admin, profile, payroll);
+
+  try {
+    await generatePayslips(admin, profile, payroll.id);
+  } catch (payslipError) {
+    if (!isRowLevelSecurityError(payslipError)) {
+      console.error("[payroll] generatePayslips after reimbursement sync failed:", payslipError);
+    }
+  }
+}
+
+
+export async function deleteReimbursement(
+  supabase: AuthSupabaseClient,
+  profile: UserProfile,
+  reimbursementId: string,
+): Promise<void> {
+  const organizationId = profile.employee.organizationId;
+  const admin = createAdminClient();
+
+  const { data: existing, error: loadError } = await admin
+    .schema("hrms")
+    .from("employee_reimbursements")
+    .select(
+      "id, employee_id, reimbursement_status, payroll_id, expense_date, organization_id, amount",
+    )
+    .eq("id", reimbursementId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (loadError) throw new Error(loadError.message);
+  if (!existing) throw new Error("Reimbursement request not found.");
+
+  const status = String(existing.reimbursement_status);
+  if (status === "paid") {
+    throw new Error("Paid reimbursements cannot be deleted.");
+  }
+
+  // Same CEO/HR queue rules as approve/reject (portal access ≠ employee visibility).
+  await assertReimbursementDecisionAccess(profile, existing.employee_id);
+
+  if (existing.payroll_id) {
+    const { data: payroll, error: payrollError } = await admin
+      .schema("hrms")
+      .from("payrolls")
+      .select("id, is_locked, payroll_status")
+      .eq("id", existing.payroll_id)
+      .eq("organization_id", organizationId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (payrollError) throw new Error(payrollError.message);
+    if (
+      payroll &&
+      (payroll.is_locked ||
+        payroll.payroll_status === "paid" ||
+        payroll.payroll_status === "approved")
+    ) {
+      throw new Error(
+        "This reimbursement is locked in a finalized payroll run and cannot be deleted.",
+      );
+    }
+  }
+
+  // Soft-delete via service role after access checks — CEO/HR user RLS must not block reviewers.
+  const { data: deleted, error } = await admin
+    .schema("hrms")
+    .from("employee_reimbursements")
+    .update({
+      deleted_at: new Date().toISOString(),
+      updated_by: profile.userId,
+    })
+    .eq("id", reimbursementId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null)
+    .select("id, employee_id, expense_date")
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!deleted) throw new Error("Reimbursement was already deleted.");
+
+  try {
+    await syncPayrollAfterReimbursementChange(supabase, profile, {
+      employeeId: String(deleted.employee_id),
+      expenseDate: String(deleted.expense_date ?? existing.expense_date),
+    });
+  } catch (syncError) {
+    console.error("[payroll] sync after reimbursement delete failed:", syncError);
+  }
 }
 
 export async function buildPayrollPreview(
@@ -1144,7 +1457,7 @@ export async function buildPayrollPreview(
     employees.map((employee) => employee.id),
     month,
     year,
-    { asOfDate },
+    { asOfDate, organizationId },
   );
 
   const items = employees.map((employee) => {
@@ -1543,12 +1856,13 @@ async function refreshPayrollRunCalculations(
   const preview = await buildPayrollPreview(supabase, profile, input);
   const actorId = actorUserId(profile);
 
-  const { data: existingItems, error: itemsError } = await supabase
+  // Include soft-deleted rows: unique(payroll_id, employee_id) still blocks inserts.
+  const adminForItems = createAdminClient();
+  const { data: existingItems, error: itemsError } = await adminForItems
     .schema("hrms")
     .from("payroll_items")
-    .select("id, employee_id, breakdown")
-    .eq("payroll_id", payrollId)
-    .is("deleted_at", null);
+    .select("id, employee_id, breakdown, deleted_at")
+    .eq("payroll_id", payrollId);
 
   if (itemsError) throw new Error(itemsError.message);
 
@@ -1572,7 +1886,8 @@ async function refreshPayrollRunCalculations(
   for (const item of preview.items) {
     const existing = existingByEmployee.get(item.employeeId);
     const existingBreakdown = existing?.breakdown as PayrollBreakdown | null | undefined;
-    if (isImmutablePayrollItem(existingBreakdown)) continue;
+    // Soft-deleted rows must be restorable even if previously marked sent/locked.
+    if (existing && !existing.deleted_at && isImmutablePayrollItem(existingBreakdown)) continue;
 
     const amounts = payrollItemAmountFields({
       basicSalary: item.basicSalary,
@@ -1585,7 +1900,7 @@ async function refreshPayrollRunCalculations(
     const merged = applyPreservedHrAdjustmentsToItem(amounts, existingBreakdown);
 
     if (existing) {
-      const { error: updateError } = await supabase
+      const { error: updateError } = await adminForItems
         .schema("hrms")
         .from("payroll_items")
         .update({
@@ -1596,6 +1911,7 @@ async function refreshPayrollRunCalculations(
           net_salary: amounts.net_salary,
           total_allowances: merged.total_allowances,
           breakdown: merged.breakdown,
+          deleted_at: null,
           updated_by: actorId,
         })
         .eq("id", existing.id);
@@ -1605,9 +1921,8 @@ async function refreshPayrollRunCalculations(
       continue;
     }
 
-    if (!item.hasSalaryStructure && item.grossSalary <= 0) continue;
-
-    const { error: insertError } = await supabase.schema("hrms").from("payroll_items").insert({
+    // Always include eligible employees — missing salary shows as zero/config state.
+    const { error: insertError } = await adminForItems.schema("hrms").from("payroll_items").insert({
       payroll_id: payrollId,
       employee_id: item.employeeId,
       salary_structure_id: item.salaryStructureId ?? null,
@@ -1656,11 +1971,16 @@ export async function ensureCompanyPayrollRun(
     return generatePayrollRun(supabase, profile, input);
   }
 
-  if (!canRecalculatePayrollRun(existing)) {
-    return existing.id;
+  if (canRecalculatePayrollRun(existing)) {
+    await refreshPayrollRunCalculations(supabase, profile, existing.id, input, existing);
   }
 
-  await refreshPayrollRunCalculations(supabase, profile, existing.id, input, existing);
+  // Always pull in newly eligible employees (e.g. IT Team) for unlocked runs,
+  // even when full recalculation is skipped or an insert was previously missed.
+  if (!existing.is_locked) {
+    await syncActiveEmployeesIntoPayrollRun(supabase, profile, existing.id);
+  }
+
   return existing.id;
 }
 
@@ -2161,14 +2481,32 @@ function applyPreservedHrAdjustmentsToItem(
   const bonus = roundCurrency(Math.max(0, adj.bonus ?? 0));
   const incentive = roundCurrency(Math.max(0, adj.incentive ?? 0));
   const reimbursements = roundCurrency(Math.max(0, adj.reimbursements ?? 0));
-  const previousReimb = resolvePayrollReimbursement(
+
+  // Keep approved claim reimbursements (code reimbursement / reimb_*) in allowances.
+  // Only replace the manual HR reimbursement adjustment portion.
+  const claimReimbursement = roundCurrency(
+    (amounts.breakdown.earnings ?? [])
+      .filter((line) => {
+        const code = line.code.toLowerCase();
+        return (
+          code === "reimbursement" ||
+          code.startsWith("reimb_") ||
+          (line.label.toLowerCase().includes("reimbursement") &&
+            !MANUAL_HR_EARNING_CODES.has(line.code))
+        );
+      })
+      .reduce((sum, line) => sum + Number(line.amount || 0), 0),
+  );
+  const previousTotalReimb = resolvePayrollReimbursement(
     amounts.breakdown,
     amounts.total_allowances,
   );
   const structuralAllowances = roundCurrency(
-    Math.max(0, amounts.total_allowances - previousReimb),
+    Math.max(0, amounts.total_allowances - previousTotalReimb),
   );
-  const nextTotalAllowances = roundCurrency(structuralAllowances + reimbursements);
+  const nextTotalAllowances = roundCurrency(
+    structuralAllowances + claimReimbursement + reimbursements,
+  );
 
   return {
     total_allowances: nextTotalAllowances,
@@ -3263,12 +3601,42 @@ export async function createReimbursement(
   },
 ): Promise<string> {
   const receiptPaths = (input.receiptPaths ?? []).filter(Boolean).slice(0, 5);
-  const { data, error } = await supabase
+  assertReimbursementReceiptPaths({
+    organizationId: profile.employee.organizationId,
+    employeeId: input.employeeId,
+    paths: receiptPaths,
+  });
+
+  // Own claims always use the authenticated employee id (never name matching).
+  const targetEmployeeId = input.employeeId;
+  if (targetEmployeeId !== profile.employee.id) {
+    const canCreateForOthers =
+      profile.permissionCodes.includes("reimbursement.create") ||
+      profile.permissionCodes.includes("payroll.create") ||
+      profile.permissionCodes.includes(PORTAL_PERMISSIONS.hr);
+    if (!canCreateForOthers) {
+      throw new Error("You can only submit reimbursement claims for yourself.");
+    }
+  }
+
+  const admin = createAdminClient();
+  const { data: employee, error: employeeError } = await admin
+    .schema("hrms")
+    .from("employees")
+    .select("id, organization_id, deleted_at")
+    .eq("id", targetEmployeeId)
+    .eq("organization_id", profile.employee.organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (employeeError) throw new Error(employeeError.message);
+  if (!employee) throw new Error("Employee not found.");
+
+  const { data, error } = await admin
     .schema("hrms")
     .from("employee_reimbursements")
     .insert({
       organization_id: profile.employee.organizationId,
-      employee_id: input.employeeId,
+      employee_id: targetEmployeeId,
       category: input.category,
       amount: input.amount,
       expense_date: input.expenseDate,
@@ -3287,17 +3655,20 @@ export async function createReimbursement(
 }
 
 export async function approveReimbursement(
-  supabase: AuthSupabaseClient,
+  _supabase: AuthSupabaseClient,
   profile: UserProfile,
   reimbursementId: string,
   remarks?: string | null,
 ): Promise<void> {
-  const { data: existing, error: loadError } = await supabase
+  const organizationId = profile.employee.organizationId;
+  const admin = createAdminClient();
+
+  const { data: existing, error: loadError } = await admin
     .schema("hrms")
     .from("employee_reimbursements")
-    .select("id, employee_id, reimbursement_status, payroll_id, organization_id")
+    .select("id, employee_id, reimbursement_status, payroll_id, organization_id, expense_date")
     .eq("id", reimbursementId)
-    .eq("organization_id", profile.employee.organizationId)
+    .eq("organization_id", organizationId)
     .is("deleted_at", null)
     .maybeSingle();
 
@@ -3312,7 +3683,7 @@ export async function approveReimbursement(
 
   await assertReimbursementDecisionAccess(profile, existing.employee_id);
 
-  const { error } = await supabase
+  const { error } = await admin
     .schema("hrms")
     .from("employee_reimbursements")
     .update({
@@ -3324,24 +3695,36 @@ export async function approveReimbursement(
       updated_by: profile.userId,
     })
     .eq("id", reimbursementId)
-    .eq("organization_id", profile.employee.organizationId)
+    .eq("organization_id", organizationId)
     .eq("reimbursement_status", "pending");
 
   if (error) throw new Error(error.message);
+
+  try {
+    await syncPayrollAfterReimbursementChange(_supabase, profile, {
+      employeeId: String(existing.employee_id),
+      expenseDate: String(existing.expense_date),
+    });
+  } catch (syncError) {
+    console.error("[payroll] sync after reimbursement approve failed:", syncError);
+  }
 }
 
 export async function rejectReimbursement(
-  supabase: AuthSupabaseClient,
+  _supabase: AuthSupabaseClient,
   profile: UserProfile,
   reimbursementId: string,
   remarks?: string | null,
 ): Promise<void> {
-  const { data: existing, error: loadError } = await supabase
+  const organizationId = profile.employee.organizationId;
+  const admin = createAdminClient();
+
+  const { data: existing, error: loadError } = await admin
     .schema("hrms")
     .from("employee_reimbursements")
-    .select("id, employee_id, reimbursement_status, payroll_id, organization_id")
+    .select("id, employee_id, reimbursement_status, payroll_id, organization_id, expense_date")
     .eq("id", reimbursementId)
-    .eq("organization_id", profile.employee.organizationId)
+    .eq("organization_id", organizationId)
     .is("deleted_at", null)
     .maybeSingle();
 
@@ -3357,7 +3740,7 @@ export async function rejectReimbursement(
   await assertReimbursementDecisionAccess(profile, existing.employee_id);
 
   const trimmed = remarks?.trim() || null;
-  const { error } = await supabase
+  const { error } = await admin
     .schema("hrms")
     .from("employee_reimbursements")
     .update({
@@ -3369,10 +3752,19 @@ export async function rejectReimbursement(
       updated_by: profile.userId,
     })
     .eq("id", reimbursementId)
-    .eq("organization_id", profile.employee.organizationId)
+    .eq("organization_id", organizationId)
     .eq("reimbursement_status", "pending");
 
   if (error) throw new Error(error.message);
+
+  try {
+    await syncPayrollAfterReimbursementChange(_supabase, profile, {
+      employeeId: String(existing.employee_id),
+      expenseDate: String(existing.expense_date),
+    });
+  } catch (syncError) {
+    console.error("[payroll] sync after reimbursement reject failed:", syncError);
+  }
 }
 
 async function assertReimbursementDecisionAccess(
@@ -3537,7 +3929,8 @@ export async function syncActiveEmployeesIntoPayrollRun(
   payrollId: string,
 ): Promise<void> {
   const organizationId = profile.employee.organizationId;
-  const { data: payroll, error } = await supabase
+  const admin = createAdminClient();
+  const { data: payroll, error } = await admin
     .schema("hrms")
     .from("payrolls")
     .select("id, organization_id, payroll_month, payroll_status, is_locked, total_gross, total_deductions, total_net, notes")
@@ -3555,19 +3948,28 @@ export async function syncActiveEmployeesIntoPayrollRun(
   const periodEnd = getMonthDateRange(month, year).endDate;
 
   const [{ data: existingItems, error: itemsError }, employees] = await Promise.all([
-    supabase
+    admin
       .schema("hrms")
       .from("payroll_items")
-      .select("employee_id")
-      .eq("payroll_id", payrollId)
-      .is("deleted_at", null),
+      .select("id, employee_id, deleted_at")
+      .eq("payroll_id", payrollId),
     getActiveEmployees(supabase, organizationId, periodEnd),
   ]);
 
   if (itemsError) throw new Error(itemsError.message);
 
-  const existingIds = new Set((existingItems ?? []).map((row) => row.employee_id));
-  const missing = employees.filter((employee) => !existingIds.has(employee.id));
+  const activeIds = new Set<string>();
+  const softDeletedByEmployee = new Map<string, string>();
+  for (const row of existingItems ?? []) {
+    const employeeId = String(row.employee_id);
+    if (row.deleted_at) {
+      softDeletedByEmployee.set(employeeId, String(row.id));
+    } else {
+      activeIds.add(employeeId);
+    }
+  }
+
+  const missing = employees.filter((employee) => !activeIds.has(employee.id));
   if (missing.length === 0) return;
 
   const payrollSettings = await getPayrollSettings(supabase, organizationId);
@@ -3584,12 +3986,13 @@ export async function syncActiveEmployeesIntoPayrollRun(
     missing.map((employee) => employee.id),
     month,
     year,
-    { asOfDate },
+    { asOfDate, organizationId },
   );
   const actorId = actorUserId(profile);
   const calcSettings = calcSettingsFromPayroll(payrollSettings);
 
-  const rows = missing.map((employee) => {
+  const insertRows: Array<Record<string, unknown>> = [];
+  for (const employee of missing) {
     const salaryStructure = facts.structuresByEmployee.get(employee.id) ?? null;
     const calc = calculateEmployeePayroll({
       month,
@@ -3604,27 +4007,55 @@ export async function syncActiveEmployeesIntoPayrollRun(
       joiningDate: (employee.date_of_joining as string | null) ?? null,
       calendar,
     });
-    return {
+    const amounts = payrollItemAmountFields(calc);
+    const softDeletedId = softDeletedByEmployee.get(employee.id);
+    if (softDeletedId) {
+      // Unique (payroll_id, employee_id) still holds soft-deleted rows — restore them.
+      const { error: restoreError } = await admin
+        .schema("hrms")
+        .from("payroll_items")
+        .update({
+          salary_structure_id: salaryStructure?.id ?? null,
+          ...amounts,
+          deleted_at: null,
+          updated_by: actorId,
+        })
+        .eq("id", softDeletedId);
+      if (restoreError) throwPayrollItemPersistenceError(restoreError);
+      continue;
+    }
+
+    insertRows.push({
       payroll_id: payrollId,
       employee_id: employee.id,
       salary_structure_id: salaryStructure?.id ?? null,
-      ...payrollItemAmountFields(calc),
+      ...amounts,
       created_by: actorId,
       updated_by: actorId,
-    };
-  });
-
-  const { error: insertError } = await supabase.schema("hrms").from("payroll_items").insert(rows);
-  if (
-    insertError &&
-    insertError.code !== "23505" &&
-    !isRowLevelSecurityError(insertError)
-  ) {
-    throwPayrollItemPersistenceError(insertError);
+    });
   }
 
-  await persistPayrollHeaderFromValidItems(supabase, profile, payroll);
-  await generatePayslips(supabase, profile, payrollId);
+  if (insertRows.length > 0) {
+    const { error: insertError } = await admin.schema("hrms").from("payroll_items").insert(insertRows);
+    if (insertError && insertError.code !== "23505") {
+      throwPayrollItemPersistenceError(insertError);
+    }
+  }
+
+  try {
+    await persistPayrollHeaderFromValidItems(supabase, profile, payroll);
+  } catch (headerError) {
+    if (!isRowLevelSecurityError(headerError)) throw headerError;
+  }
+
+  try {
+    await generatePayslips(supabase, profile, payrollId);
+  } catch (payslipError) {
+    // New employees must still appear in the run even if payslip generation fails.
+    if (!isRowLevelSecurityError(payslipError)) {
+      console.error("[payroll] generatePayslips after sync failed:", payslipError);
+    }
+  }
 }
 
 export async function getPayrollRunById(
@@ -3633,8 +4064,16 @@ export async function getPayrollRunById(
   payrollId: string,
 ): Promise<PayrollDetail | null> {
   const organizationId = profile.employee.organizationId;
+  const admin = createAdminClient();
 
-  const { data: payroll, error } = await supabase
+  // Keep unlocked runs aligned with current eligible employees (includes IT Team).
+  try {
+    await syncActiveEmployeesIntoPayrollRun(supabase, profile, payrollId);
+  } catch (error) {
+    console.error("[payroll] syncActiveEmployeesIntoPayrollRun failed:", error);
+  }
+
+  const { data: payroll, error } = await admin
     .schema("hrms")
     .from("payrolls")
     .select("*")
@@ -3648,7 +4087,7 @@ export async function getPayrollRunById(
 
   const [{ data: items, error: itemsError }, { data: approvals, error: approvalsError }] =
     await Promise.all([
-      supabase
+      admin
         .schema("hrms")
         .from("payroll_items")
         .select(
@@ -3680,7 +4119,7 @@ export async function getPayrollRunById(
         .eq("payroll_id", payrollId)
         .is("deleted_at", null)
         .order("created_at", { ascending: true }),
-      supabase
+      admin
         .schema("hrms")
         .from("payroll_approvals")
         .select(
@@ -3757,6 +4196,7 @@ export async function getPayrollRunById(
         employeeName: employee
           ? `${employee.first_name} ${employee.last_name}`
           : "",
+        employeeEmail: (employee as { email?: string | null } | null)?.email ?? null,
         departmentName: department?.name ?? null,
         designationTitle: mappedEmployee?.designationTitle ?? null,
         employmentTypeName: employmentType?.name ?? null,

@@ -473,7 +473,7 @@ export function EmployeeReimbursementsView({
 
         {records.length === 0 ? (
           <EmptyState
-            title="No reimbursements yet"
+            title="No reimbursement claims yet"
             description={
               canCreate
                 ? "Submit your first expense claim using the form above."

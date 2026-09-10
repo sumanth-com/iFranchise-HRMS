@@ -48,6 +48,7 @@ type EmployeeTableRow = {
   payrollItemId?: string;
   name: string;
   code: string;
+  email?: string | null;
   department: string | null;
   designationTitle?: string | null;
   employmentTypeName?: string | null;
@@ -319,6 +320,7 @@ export function PayrollRunForm({
       payrollItemId: item.id,
       name: item.employeeName,
       code: item.employeeCode,
+      email: item.employeeEmail ?? null,
       department: item.departmentName,
       designationTitle: item.designationTitle,
       employmentTypeName: item.employmentTypeName,
@@ -654,7 +656,8 @@ function EmployeePayrollTable({
         return false;
       }
       if (!term) return true;
-      const haystack = `${row.name} ${row.code} ${departmentLabel}`.toLowerCase();
+      const haystack =
+        `${row.name} ${row.code} ${row.email ?? ""} ${departmentLabel}`.toLowerCase();
       return haystack.includes(term);
     });
   }, [departmentFilter, employeeSearch, rows]);

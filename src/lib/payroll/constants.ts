@@ -186,20 +186,17 @@ export const REIMBURSEMENT_ALLOWED_MIME_TYPES = [
   "image/jpg",
   "image/pjpeg",
   "image/png",
+  "image/x-png",
   "image/webp",
   "image/gif",
-  "image/bmp",
-  "image/x-ms-bmp",
-  "image/tiff",
-  "image/tif",
   "image/heic",
   "image/heif",
   "image/avif",
-  "image/x-png",
 ] as const;
 
 /**
  * Extensions without leading dots — matches `validateUploadFile` / `extensionFromFileName`.
+ * Kept in sync with storage.buckets.allowed_mime_types for employee-documents.
  */
 export const REIMBURSEMENT_ALLOWED_EXTENSIONS = [
   "pdf",
@@ -209,30 +206,53 @@ export const REIMBURSEMENT_ALLOWED_EXTENSIONS = [
   "png",
   "webp",
   "gif",
-  "bmp",
-  "tif",
-  "tiff",
   "heic",
   "heif",
   "avif",
 ] as const;
 
 export const REIMBURSEMENT_ACCEPT_ATTR = [
-  "image/*",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/heic",
+  "image/heif",
+  "image/avif",
   "application/pdf",
   ...REIMBURSEMENT_ALLOWED_EXTENSIONS.map((ext) => `.${ext}`),
 ].join(",");
 
 export const REIMBURSEMENT_FILE_HINT =
-  "Images (JPG, PNG, WebP, GIF, …) or PDF · up to 5 MB each · max 5 files";
+  "PDF or image (JPG, PNG, WebP, GIF, HEIC) · up to 5 MB each · max 5 files";
 
 export function isAllowedReimbursementMimeType(mimeType?: string | null): boolean {
   const mime = (mimeType ?? "").trim().toLowerCase();
   if (!mime) return true;
   if (mime === "application/octet-stream") return true;
-  if (mime === "application/pdf") return true;
-  if (mime.startsWith("image/")) return true;
   return (REIMBURSEMENT_ALLOWED_MIME_TYPES as readonly string[]).includes(mime);
+}
+
+export function reimbursementReceiptPathPrefix(
+  organizationId: string,
+  employeeId: string,
+): string {
+  return `${organizationId}/reimbursements/${employeeId}/`;
+}
+
+export function assertReimbursementReceiptPaths(input: {
+  organizationId: string;
+  employeeId: string;
+  paths: string[];
+}): void {
+  const prefix = reimbursementReceiptPathPrefix(input.organizationId, input.employeeId);
+  for (const raw of input.paths) {
+    const path = String(raw ?? "").trim();
+    if (!path) continue;
+    if (!path.startsWith(prefix) || path.includes("..")) {
+      throw new Error("One or more receipt files do not belong to this employee.");
+    }
+  }
 }
 
 export function isAllowedReimbursementExtension(fileName: string): boolean {
@@ -373,6 +393,15 @@ export function canCreateReimbursement(codes: string[]) {
 
 export function canApproveReimbursement(codes: string[]) {
   return hasAnyPermission(codes, REIMBURSEMENT_APPROVE);
+}
+
+/** HR/CEO reviewers may soft-delete claims that are not locked in paid payroll. */
+export function canDeleteReimbursement(codes: string[]) {
+  return hasAnyPermission(codes, [
+    ...REIMBURSEMENT_APPROVE,
+    PORTAL_PERMISSIONS.ceo,
+    PORTAL_PERMISSIONS.hr,
+  ]);
 }
 
 const BANK_ACCOUNT_VIEW = ["bank_account.view", "payroll.view"];

@@ -89,6 +89,8 @@ export type PayrollBreakdown = {
     lopDeductionAmount?: number;
   };
   notes?: string[];
+  /** Category rollup for the single Reimbursement earning line (display detail only). */
+  reimbursementBreakdown?: Array<{ category: string; amount: number }>;
   hrAdjustments?: HrPayrollAdjustments;
   payrollLifecycle?: {
     itemStatus: PayrollItemLifecycleStatus;
@@ -181,6 +183,7 @@ export type PayrollItemDetail = {
   employeeId: string;
   employeeCode: string;
   employeeName: string;
+  employeeEmail?: string | null;
   departmentName: string | null;
   designationTitle?: string | null;
   employmentTypeName?: string | null;

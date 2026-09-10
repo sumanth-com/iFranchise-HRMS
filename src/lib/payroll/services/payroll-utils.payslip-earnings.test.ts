@@ -157,7 +157,64 @@ describe("getPayslipEarningsLines display mapping", () => {
     assert.equal(earnings.reduce((sum, line) => sum + line.amount, 0), 14_250);
     assert.ok(earnings.some((line) => line.code === "hr_bonus"));
     assert.ok(earnings.some((line) => line.code === "hr_incentive"));
-    assert.ok(earnings.some((line) => line.code === "hr_reimbursement"));
+    const reimbursementLines = earnings.filter((line) =>
+      line.code === "reimbursement" || line.label.toLowerCase().includes("reimbursement"),
+    );
+    assert.equal(reimbursementLines.length, 1);
+    assert.equal(reimbursementLines[0]?.amount, 750);
+    assert.equal(reimbursementLines[0]?.label, "Reimbursement");
+  });
+
+  it("aggregates multiple reimbursement category lines into one payslip earning", () => {
+    const earnings = getPayslipEarningsLines({
+      earnings: [
+        { code: "basic", label: "Basic Salary", amount: 1_250, type: "earning" },
+        { code: "hra", label: "HRA", amount: 625, type: "earning" },
+        { code: "transport", label: "LTA", amount: 250, type: "earning" },
+        { code: "special_allowance", label: "Special Allowance", amount: 375, type: "earning" },
+        { code: "reimb_food", label: "Reimbursement (food)", amount: 500, type: "earning" },
+        { code: "reimb_other", label: "Reimbursement (other)", amount: 150.76, type: "earning" },
+      ],
+      basicSalary: 1_250,
+      totalAllowances: 650.76,
+      grossSalary: 2_500,
+    });
+
+    const reimbursementLines = earnings.filter((line) =>
+      line.label.toLowerCase().includes("reimbursement"),
+    );
+    assert.equal(reimbursementLines.length, 1);
+    assert.equal(reimbursementLines[0]?.code, "reimbursement");
+    assert.equal(reimbursementLines[0]?.amount, 650.76);
+
+    const totals = resolvePayslipDisplayTotals({
+      breakdown: {
+        earnings: [
+          { code: "basic", label: "Basic Salary", amount: 1_250, type: "earning" },
+          { code: "hra", label: "HRA", amount: 625, type: "earning" },
+          { code: "transport", label: "LTA", amount: 250, type: "earning" },
+          { code: "special_allowance", label: "Special Allowance", amount: 375, type: "earning" },
+          { code: "reimb_food", label: "Reimbursement (food)", amount: 500, type: "earning" },
+          { code: "reimb_other", label: "Reimbursement (other)", amount: 150.76, type: "earning" },
+        ],
+        deductions: [],
+        attendance: {
+          workingDays: 30,
+          presentDays: 30,
+          absentDays: 0,
+          lopDays: 0,
+          leaveLopDays: 0,
+          overtimeHours: 0,
+        },
+      },
+      basicSalary: 1_250,
+      totalAllowances: 650.76,
+      grossSalary: 2_500,
+      totalDeductions: 0,
+    });
+
+    assert.equal(totals.grossEarnings, 3_150.76);
+    assert.equal(totals.netPay, 3_150.76);
   });
 
   it("derives payslip gross and net pay from all displayed earning lines", () => {

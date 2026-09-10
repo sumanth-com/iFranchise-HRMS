@@ -6,8 +6,9 @@ type PostgresErrorShape = {
 
 const DUPLICATE_PAYROLL_ITEM =
   /payroll_items_unique_per_employee|duplicate key value violates unique constraint/i;
+// Match RLS only — do not treat check/unique/FK "new row violates …" as RLS.
 const RLS_VIOLATION =
-  /row-level security policy|new row violates|violat(es|ing) row-level|42501/i;
+  /row-level security policy|violat(es|ing) row-level security|42501/i;
 const DUPLICATE_KEY = /duplicate key value violates unique constraint/i;
 
 export function isRowLevelSecurityError(error: unknown): boolean {

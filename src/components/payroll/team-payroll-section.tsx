@@ -33,6 +33,7 @@ import {
   ensureCompanyPayrollRun,
   getPayrollRunById,
   previewPayrollRun,
+  syncActiveEmployeesIntoPayrollRun,
 } from "@/lib/payroll/services/payroll-mutations";
 import { formatPayrollMonth } from "@/lib/payroll/services/payroll-utils";
 import { toUserFriendlyError } from "@/lib/errors/user-messages";
@@ -94,6 +95,12 @@ async function loadCompanyPayrollInitialPanel(params: {
       pageSize: 1,
     });
     if (runs.data[0]) {
+      // Even view-only loads must sync newly eligible employees into the run.
+      try {
+        await syncActiveEmployeesIntoPayrollRun(supabase, profile, runs.data[0].id);
+      } catch (error) {
+        console.error("[payroll] sync on view-only load failed:", error);
+      }
       const detail = await getPayrollRunById(supabase, profile, runs.data[0].id);
       if (detail) return { kind: "run", data: detail, mode: "existing" };
     }
@@ -260,6 +267,10 @@ export async function TeamPayrollSection({
         pageSize={result.pageSize}
         employees={lookups.employees}
         canApprove={
+          canApproveReimbursementOverride ??
+          canApproveReimbursement(profile.permissionCodes)
+        }
+        canDelete={
           canApproveReimbursementOverride ??
           canApproveReimbursement(profile.permissionCodes)
         }

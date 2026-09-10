@@ -7,6 +7,7 @@ import { CEO_ROUTES } from "@/lib/ceo/constants";
 import { ceoOrViewPermission } from "@/lib/ceo/read-only-permissions";
 import { PORTAL_PERMISSIONS } from "@/lib/auth/portals";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { toUserFriendlyError } from "@/lib/errors/user-messages";
 import {
   requireServerAnyPermission,
@@ -25,6 +26,7 @@ import {
   createReimbursement,
   createSalaryRevision,
   createSalaryStructure,
+  deleteReimbursement,
   deleteSalaryStructure,
   updateSalaryStructure,
   emailPayslip,
@@ -50,7 +52,6 @@ import {
 import {
   getPayrollLookups,
   getPayrollSummary,
-  getReimbursementSummary,
   listBonuses,
   listPayrollRuns,
   listPayslips,
@@ -94,7 +95,7 @@ import {
 import { EMPLOYEE_ROUTES } from "@/lib/employee/constants";
 import { HR_HUB_ROUTES } from "@/lib/dashboard/hr-hub-routes";
 import { MANAGER_ROUTES } from "@/lib/manager/constants";
-import { SYSTEM_ADMIN_ROUTES } from "@/lib/system-admin/constants";
+import { SYSTEM_ADMIN_PERMISSION, SYSTEM_ADMIN_ROUTES } from "@/lib/system-admin/constants";
 import { createSignedStorageUrl } from "@/lib/storage/signed-url";
 import { assertOrganizationStoragePath } from "@/lib/security/storage-path";
 
@@ -106,6 +107,13 @@ function revalidateReimbursementViews() {
   revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS.reimbursements));
   revalidatePath(`${CEO_ROUTES.payroll}/${TEAM_PAYROLL_SECTIONS.reimbursements}`);
   revalidatePath(PAYROLL_ROUTES.reimbursements);
+  // Team Payroll Reimb. column / payslips must refresh after approve/delete.
+  revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS.run));
+  revalidatePath(`${CEO_ROUTES.payroll}/${TEAM_PAYROLL_SECTIONS.run}`);
+  revalidatePath(payrollTeamSectionPath(TEAM_PAYROLL_SECTIONS.payslips));
+  revalidatePath(`${CEO_ROUTES.payroll}/${TEAM_PAYROLL_SECTIONS.payslips}`);
+  revalidatePath(PAYROLL_ROUTES.run);
+  revalidatePath(PAYROLL_ROUTES.payslips);
 }
 import { payrollSettingsSchema } from "@/lib/validations/payroll-settings";
 import type {
@@ -602,6 +610,7 @@ export async function submitOwnReimbursementClaimAction(
       PORTAL_PERMISSIONS.employee,
       PORTAL_PERMISSIONS.manager,
       PORTAL_PERMISSIONS.hr,
+      SYSTEM_ADMIN_PERMISSION,
     ]);
     const supabase = await getAuthenticatedSupabase();
     const parsed = employeeReimbursementClaimSchema.parse(input);
@@ -683,6 +692,31 @@ export async function rejectReimbursementAction(
   }
 }
 
+export async function deleteReimbursementAction(
+  reimbursementId: string,
+): Promise<PayrollActionResult> {
+  try {
+    const profile = await requireServerAnyPermission([
+      "reimbursement.approve",
+      "payroll.approve",
+      PORTAL_PERMISSIONS.ceo,
+      PORTAL_PERMISSIONS.hr,
+    ]);
+    const supabase = await getAuthenticatedSupabase();
+    const id = String(reimbursementId ?? "").trim();
+    if (!id) throw new Error("Reimbursement id is required.");
+    await deleteReimbursement(supabase, profile, id);
+    revalidateReimbursementViews();
+    revalidateEmployeePayrollViews();
+    return { success: true, data: undefined };
+  } catch (error) {
+    return {
+      success: false,
+      message: toUserFriendlyError(error, "Failed to delete reimbursement"),
+    };
+  }
+}
+
 export async function updateOwnPendingReimbursementAction(
   input: unknown,
 ): Promise<PayrollActionResult> {
@@ -692,6 +726,7 @@ export async function updateOwnPendingReimbursementAction(
       PORTAL_PERMISSIONS.employee,
       PORTAL_PERMISSIONS.manager,
       PORTAL_PERMISSIONS.hr,
+      SYSTEM_ADMIN_PERMISSION,
     ]);
     const supabase = await getAuthenticatedSupabase();
     const parsed = reimbursementUpdatePendingSchema.parse(input);
@@ -717,6 +752,7 @@ export async function cancelOwnPendingReimbursementAction(
       PORTAL_PERMISSIONS.employee,
       PORTAL_PERMISSIONS.manager,
       PORTAL_PERMISSIONS.hr,
+      SYSTEM_ADMIN_PERMISSION,
     ]);
     const supabase = await getAuthenticatedSupabase();
     await cancelPendingReimbursement(supabase, profile, reimbursementId, {
@@ -742,6 +778,7 @@ export async function uploadReimbursementAttachmentAction(
       PORTAL_PERMISSIONS.employee,
       PORTAL_PERMISSIONS.manager,
       PORTAL_PERMISSIONS.hr,
+      SYSTEM_ADMIN_PERMISSION,
     ]);
     const file = formData.get("file");
     if (!(file instanceof File)) {
@@ -764,20 +801,46 @@ export async function uploadReimbursementAttachmentAction(
       };
     }
 
-    const supabase = await getAuthenticatedSupabase();
+    // Optional target employee for HR on-behalf uploads (must be same org).
+    const targetEmployeeIdRaw = formData.get("employeeId");
+    const targetEmployeeId =
+      typeof targetEmployeeIdRaw === "string" && targetEmployeeIdRaw.trim()
+        ? targetEmployeeIdRaw.trim()
+        : profile.employee.id;
+
+    if (targetEmployeeId !== profile.employee.id) {
+      const canUploadForOthers =
+        profile.permissionCodes.includes("reimbursement.create") ||
+        profile.permissionCodes.includes("payroll.create") ||
+        profile.permissionCodes.includes(PORTAL_PERMISSIONS.hr) ||
+        profile.permissionCodes.includes(SYSTEM_ADMIN_PERMISSION);
+      if (!canUploadForOthers) {
+        return { success: false, message: "You can only upload receipts for your own claims." };
+      }
+    }
+
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const storagePath = `${profile.employee.organizationId}/reimbursements/${profile.employee.id}/${crypto.randomUUID()}-${sanitizedName}`;
+    const storagePath = `${profile.employee.organizationId}/reimbursements/${targetEmployeeId}/${crypto.randomUUID()}-${sanitizedName}`;
     assertOrganizationStoragePath(storagePath, profile.employee.organizationId);
 
-    const { error } = await supabase.storage
-      .from(REIMBURSEMENT_STORAGE_BUCKET)
-      .upload(storagePath, file, {
-        cacheControl: "3600",
-        upsert: false,
-        contentType: file.type || undefined,
-      });
+    // Service role after authz — managers/employees without documents.upload still succeed.
+    const admin = createAdminClient();
+    const { error } = await admin.storage.from(REIMBURSEMENT_STORAGE_BUCKET).upload(storagePath, file, {
+      cacheControl: "3600",
+      upsert: false,
+      contentType: file.type || undefined,
+    });
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      const message = error.message || "Failed to upload attachment";
+      if (/mime|type|not supported|invalid/i.test(message)) {
+        return {
+          success: false,
+          message: "Unsupported file type. Use PDF, JPG, PNG, WebP, GIF, or HEIC (max 5 MB).",
+        };
+      }
+      throw new Error(message);
+    }
     return { success: true, data: storagePath };
   } catch (error) {
     return {
@@ -795,7 +858,9 @@ export async function getReimbursementAttachmentUrlAction(
       "reimbursement.view",
       "payroll.view",
       PORTAL_PERMISSIONS.employee,
+      PORTAL_PERMISSIONS.manager,
       PORTAL_PERMISSIONS.ceo,
+      PORTAL_PERMISSIONS.hr,
       ...ceoOrViewPermission("payroll.view"),
     ]);
     assertOrganizationStoragePath(path, profile.employee.organizationId);
@@ -804,7 +869,8 @@ export async function getReimbursementAttachmentUrlAction(
       profile.permissionCodes.includes("reimbursement.approve") ||
       profile.permissionCodes.includes("payroll.approve") ||
       profile.permissionCodes.includes(PORTAL_PERMISSIONS.ceo) ||
-      profile.permissionCodes.includes(PORTAL_PERMISSIONS.hr);
+      profile.permissionCodes.includes(PORTAL_PERMISSIONS.hr) ||
+      profile.permissionCodes.includes(SYSTEM_ADMIN_PERMISSION);
     if (!isOrgApprover) {
       const ownPrefix = `${profile.employee.organizationId}/reimbursements/${profile.employee.id}/`;
       if (!path.startsWith(ownPrefix)) {
@@ -812,9 +878,10 @@ export async function getReimbursementAttachmentUrlAction(
       }
     }
 
-    const supabase = await getAuthenticatedSupabase();
+    // Sign with service role after access checks so CEO/HR can open claimant receipts.
+    const admin = createAdminClient();
     const url = await createSignedStorageUrl(
-      supabase,
+      admin,
       REIMBURSEMENT_STORAGE_BUCKET,
       path,
     );

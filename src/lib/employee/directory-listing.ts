@@ -1,5 +1,6 @@
 export const DIRECTORY_HIDDEN_EMPLOYEE_CODES = new Set([
-  "IF2026000",
+  // IF2026000 (it@ifranchise.in / IT Team) is a real Super Admin employee and
+  // must appear in payroll, reimbursements, and people lists — do not hide it.
   "IF-MGR-001",
   "IF2026016",
 ]);
@@ -45,14 +46,6 @@ export function isHiddenFromEmployeeDirectory(
 
   const fullName = directoryFullName(person);
   if (!fullName) return false;
-
-  if (
-    fullName === "it team" ||
-    fullName === "itteam" ||
-    fullName.startsWith("it team")
-  ) {
-    return true;
-  }
 
   if (fullName === "marketing manager") {
     return true;

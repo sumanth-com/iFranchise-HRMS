@@ -517,20 +517,42 @@ export function calculateEmployeePayroll(
     },
   );
 
-  const extraEarnings = [
-    ...bonuses.map((bonus) => ({
+  const bonusEarnings = bonuses
+    .map((bonus) => ({
       code: `bonus_${bonus.bonus_type}`,
       label: `Bonus (${bonus.bonus_type})`,
       amount: roundCurrency(num(bonus.amount)),
       type: "earning" as const,
-    })),
-    ...reimbursements.map((reimbursement) => ({
-      code: `reimb_${reimbursement.category}`,
-      label: `Reimbursement (${reimbursement.category})`,
-      amount: roundCurrency(num(reimbursement.amount)),
-      type: "earning" as const,
-    })),
-  ].filter((line) => line.amount > 0);
+    }))
+    .filter((line) => line.amount > 0);
+
+  // One aggregated reimbursement earning line — never per-category duplicates.
+  const claimReimbursementTotal = roundCurrency(
+    reimbursements.reduce((sum, claim) => sum + num(claim.amount), 0),
+  );
+  const reimbursementBreakdown = Object.entries(
+    reimbursements.reduce<Record<string, number>>((acc, claim) => {
+      const category = String(claim.category || "other");
+      acc[category] = roundCurrency((acc[category] ?? 0) + num(claim.amount));
+      return acc;
+    }, {}),
+  )
+    .filter(([, amount]) => amount > 0)
+    .map(([category, amount]) => ({ category, amount }));
+
+  const reimbursementEarnings =
+    claimReimbursementTotal > 0
+      ? [
+          {
+            code: "reimbursement",
+            label: "Reimbursement",
+            amount: claimReimbursementTotal,
+            type: "earning" as const,
+          },
+        ]
+      : [];
+
+  const extraEarnings = [...bonusEarnings, ...reimbursementEarnings];
 
   if (!salaryStructure) {
     const reimbTotal = sumReimbursementLines(extraEarnings);
@@ -556,6 +578,8 @@ export function calculateEmployeePayroll(
         notes: extraEarnings.length
           ? ["No salary structure configured. Totals include bonuses and expense claims."]
           : ["No salary structure configured"],
+        reimbursementBreakdown:
+          reimbursementBreakdown.length > 0 ? reimbursementBreakdown : undefined,
         hrAdjustments: adjustments,
         payrollLifecycle: { itemStatus: "draft" },
       },
@@ -739,6 +763,8 @@ export function calculateEmployeePayroll(
       },
       hrAdjustments: adjustments,
       payrollLifecycle: { itemStatus: lifecycleStatus },
+      reimbursementBreakdown:
+        reimbursementBreakdown.length > 0 ? reimbursementBreakdown : undefined,
       notes: [
         `Daily rate ₹${roundCurrency(perDay).toLocaleString("en-IN")} × ${payableDays} payable day(s).`,
         lopDays > 0
