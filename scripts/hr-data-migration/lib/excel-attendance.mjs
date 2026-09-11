@@ -19,7 +19,8 @@ export const ATTENDANCE_STATUS_MAP = {
   HD: "holiday",
   NH: "holiday",
   HO: "holiday",
-  H: "week_off",
+  // Excel "H" means Holiday (including Sundays marked H on the attendance sheet).
+  H: "holiday",
 };
 
 export const MONTH_SHEETS = [
@@ -99,20 +100,12 @@ function normalizeSummaryKey(label) {
   return map[raw] ?? null;
 }
 
-function weekdayFromIso(iso) {
-  const [year, month, day] = iso.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-}
-
 export function mapAttendanceCode(raw, isoDate) {
+  void isoDate;
   const sourceCode = cellToString(raw).toUpperCase().replace(/\s+/g, "");
   if (!sourceCode) return { sourceCode: "", mappedStatus: null, unknown: false, skip: true };
   if (/^\d+(\.\d+)?$/.test(sourceCode)) {
     return { sourceCode, mappedStatus: null, unknown: false, skip: true };
-  }
-  if (sourceCode === "H") {
-    const mappedStatus = weekdayFromIso(isoDate) === 0 ? "week_off" : "holiday";
-    return { sourceCode, mappedStatus, unknown: false, skip: false };
   }
   const mappedStatus = ATTENDANCE_STATUS_MAP[sourceCode] ?? null;
   return {

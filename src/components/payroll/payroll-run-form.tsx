@@ -29,6 +29,7 @@ import { getMonthSelectItems, getYearSelectItems } from "@/components/payroll/se
 import { directoryDepartmentLabel } from "@/lib/employee/directory-listing";
 import { fetchPayrollDetailAction } from "@/lib/payroll/actions";
 import { toUserFriendlyError } from "@/lib/errors/user-messages";
+import { resolvePayrollApplicablePeriod } from "@/lib/payroll/payroll-period";
 import {
   formatCurrency,
   formatPayrollMonth,
@@ -53,7 +54,11 @@ type EmployeeTableRow = {
   designationTitle?: string | null;
   employmentTypeName?: string | null;
   workingDays: number;
+  presentDays: number;
   paidDays: number;
+  holidayDays: number;
+  clDays: number;
+  elDays: number;
   monthlySalary: number;
   attendanceEarnings: number;
   deductions: number;
@@ -103,6 +108,33 @@ function formatPayrollRunError(error: unknown): string {
 
 function formatOptionalPayrollAmount(value: number): string {
   return value > 0 ? formatCurrency(value) : "—";
+}
+
+/** Open current-month as-of label for Team Payroll (no hardcoded month dates). */
+function resolveOpenPayrollAsOfLabel(month: number, year: number): string | null {
+  if (!(month >= 1 && month <= 12) || !Number.isFinite(year)) return null;
+  const period = resolvePayrollApplicablePeriod(month, year);
+  if (period.kind !== "current" || period.isClosed) return null;
+  const [y, m, d] = period.periodEnd.split("-").map(Number);
+  const formatted = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  return `As of ${formatted} · today`;
+}
+
+function attendanceFactsFromBreakdown(breakdown: PayrollBreakdown) {
+  const attendance = breakdown.attendance;
+  return {
+    presentDays: attendance.presentDays,
+    paidDays: attendance.paidDays ?? attendance.presentDays,
+    holidayDays: attendance.holidayCount ?? 0,
+    clDays: attendance.clDays ?? 0,
+    elDays: attendance.elDays ?? 0,
+    lopDays: attendance.lopDays,
+  };
 }
 
 function stickyCellClass(isHeader = false) {
@@ -209,6 +241,9 @@ export function PayrollRunForm({
   const monthNumber = hasPeriod ? Number(month) : 0;
   const yearNumber = hasPeriod ? Number(year) : 0;
   const periodLabel = hasPeriod ? formatPayrollMonth(monthNumber, yearNumber) : "";
+  const openMonthAsOfLabel = hasPeriod
+    ? resolveOpenPayrollAsOfLabel(monthNumber, yearNumber)
+    : null;
 
   function updatePeriod(nextMonth: string, nextYear: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -278,6 +313,7 @@ export function PayrollRunForm({
       item.basicSalary,
       item.totalDeductions,
     );
+    const attendance = attendanceFactsFromBreakdown(item.breakdown);
     return {
       id: item.employeeId,
       name: item.employeeName,
@@ -286,7 +322,11 @@ export function PayrollRunForm({
       designationTitle: item.designationTitle,
       employmentTypeName: item.employmentTypeName,
       workingDays: item.breakdown.attendance.workingDays,
-      paidDays: item.breakdown.attendance.paidDays ?? item.breakdown.attendance.presentDays,
+      presentDays: attendance.presentDays,
+      paidDays: attendance.paidDays,
+      holidayDays: attendance.holidayDays,
+      clDays: attendance.clDays,
+      elDays: attendance.elDays,
       monthlySalary: amounts.monthlySalary,
       attendanceEarnings: amounts.attendanceEarnings,
       deductions: amounts.deductions,
@@ -295,7 +335,7 @@ export function PayrollRunForm({
       incentive: amounts.incentive,
       reimbursement: amounts.reimbursement,
       finalPayable: amounts.finalPayable,
-      lopDays: item.breakdown.attendance.lopDays,
+      lopDays: attendance.lopDays,
       breakdown: item.breakdown,
       basicSalary: item.basicSalary,
       totalAllowances: item.totalAllowances,
@@ -315,6 +355,7 @@ export function PayrollRunForm({
       item.basicSalary,
       item.totalDeductions,
     );
+    const attendance = attendanceFactsFromBreakdown(item.breakdown);
     return {
       id: item.employeeId,
       payrollItemId: item.id,
@@ -325,7 +366,11 @@ export function PayrollRunForm({
       designationTitle: item.designationTitle,
       employmentTypeName: item.employmentTypeName,
       workingDays: item.breakdown.attendance.workingDays,
-      paidDays: item.breakdown.attendance.paidDays ?? item.breakdown.attendance.presentDays,
+      presentDays: attendance.presentDays,
+      paidDays: attendance.paidDays,
+      holidayDays: attendance.holidayDays,
+      clDays: attendance.clDays,
+      elDays: attendance.elDays,
       monthlySalary: amounts.monthlySalary,
       attendanceEarnings: amounts.attendanceEarnings,
       deductions: amounts.deductions,
@@ -334,7 +379,7 @@ export function PayrollRunForm({
       incentive: amounts.incentive,
       reimbursement: amounts.reimbursement,
       finalPayable: amounts.finalPayable,
-      lopDays: item.breakdown.attendance.lopDays,
+      lopDays: attendance.lopDays,
       breakdown: item.breakdown,
       basicSalary: item.basicSalary,
       totalAllowances: item.totalAllowances,
@@ -355,6 +400,22 @@ export function PayrollRunForm({
     }
     return [];
   }, [panel]);
+
+  const editDialogTarget = useMemo(() => {
+    if (!editTarget?.payrollItemId) return null;
+    return {
+      payrollItemId: editTarget.payrollItemId,
+      employeeName: editTarget.name,
+      employeeCode: editTarget.code,
+      currentBonus: editTarget.bonus,
+      currentIncentive: editTarget.incentive,
+      currentReimbursement: editTarget.reimbursement,
+      netPay: editTarget.net,
+      periodLabel,
+      payslipSent: editTarget.payslipSent,
+      adjustments: editTarget.adjustments,
+    };
+  }, [editTarget, periodLabel]);
 
   const departmentItems = useMemo(() => {
     const names = new Set<string>();
@@ -434,10 +495,18 @@ export function PayrollRunForm({
       {!isPending && panel.kind === "preview" ? (
         <div className="space-y-4">
           <div>
-            <h3 className="text-sm font-semibold">Payroll for {periodLabel}</h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-semibold">Payroll for {periodLabel}</h3>
+              {openMonthAsOfLabel ? (
+                <span className="inline-flex items-center rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-100">
+                  {openMonthAsOfLabel}
+                </span>
+              ) : null}
+            </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              Amounts below are calculated from salary structure, attendance, and leave for this
-              period.
+              {openMonthAsOfLabel
+                ? "Open month: attendance, Sundays, and holidays count only through today. Future dates are not included yet."
+                : "Amounts below are calculated from salary structure, attendance, and leave for this period."}
             </p>
           </div>
 
@@ -465,10 +534,16 @@ export function PayrollRunForm({
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-sm font-semibold">Payroll for {periodLabel}</h3>
                 <PayrollStatusBadge status={panel.data.payrollStatus} />
+                {openMonthAsOfLabel ? (
+                  <span className="inline-flex items-center rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-100">
+                    {openMonthAsOfLabel}
+                  </span>
+                ) : null}
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                Amounts are calculated from salary structure, attendance, and leave for this
-                period.
+                {openMonthAsOfLabel
+                  ? "Open month: attendance, Sundays, and holidays count only through today. Future dates are not included yet."
+                  : "Amounts are calculated from salary structure, attendance, and leave for this period."}
               </p>
             </div>
           </div>
@@ -498,57 +573,82 @@ export function PayrollRunForm({
       />
       <PayrollEditDialog
         key={editTarget?.payrollItemId ?? "edit"}
-        target={
-          editTarget?.payrollItemId
-            ? {
-                payrollItemId: editTarget.payrollItemId,
-                employeeName: editTarget.name,
-                employeeCode: editTarget.code,
-                currentBonus: editTarget.bonus,
-                currentIncentive: editTarget.incentive,
-                currentReimbursement: editTarget.reimbursement,
-                netPay: editTarget.net,
-                periodLabel,
-                payslipSent: editTarget.payslipSent,
-                adjustments: editTarget.adjustments,
-              }
-            : null
-        }
+        target={editDialogTarget}
         open={Boolean(editTarget)}
-        onOpenChange={(open) => {
-          if (!open) setEditTarget(null);
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setEditTarget(null);
         }}
         onSaved={(saved) => {
-          if (panel.kind === "run" && editTarget?.payrollItemId) {
-            const payrollItemId = editTarget.payrollItemId;
-            setPanelOverride({
-              kind: "run",
-              mode: panel.mode,
-              data: {
-                ...panel.data,
-                items: panel.data.items.map((item) => {
-                  if (item.id !== payrollItemId) return item;
-                  const previousReimb = editTarget.reimbursement ?? 0;
-                  const structuralAllowances = Math.max(0, item.totalAllowances - previousReimb);
-                  return {
-                    ...item,
-                    totalAllowances: roundCurrency(structuralAllowances + saved.reimbursement),
-                    breakdown: {
-                      ...item.breakdown,
-                      hrAdjustments: {
-                        ...item.breakdown.hrAdjustments,
-                        bonus: saved.bonus,
-                        incentive: saved.incentive,
-                        reimbursements: saved.reimbursement,
-                        itemStatus: "reviewed" as const,
-                      },
+          if (panel.kind !== "run" || !editTarget?.payrollItemId) return;
+          const payrollItemId = editTarget.payrollItemId;
+          const payrollId = panel.data.id;
+          const mode = panel.mode;
+          setPanelOverride({
+            kind: "run",
+            mode,
+            data: {
+              ...panel.data,
+              items: panel.data.items.map((item) => {
+                if (item.id !== payrollItemId) return item;
+                const previousReimb = editTarget.reimbursement ?? 0;
+                const structuralAllowances = Math.max(0, item.totalAllowances - previousReimb);
+                const nextAllowances = roundCurrency(structuralAllowances + saved.reimbursement);
+                const earnings = (item.breakdown.earnings ?? []).filter((line) => {
+                  const code = line.code.toLowerCase();
+                  return (
+                    code !== "hr_bonus" &&
+                    code !== "hr_incentive" &&
+                    code !== "hr_reimbursement"
+                  );
+                });
+                if (saved.bonus > 0) {
+                  earnings.push({
+                    code: "hr_bonus",
+                    label: "Bonus (HR adjustment)",
+                    amount: saved.bonus,
+                    type: "earning",
+                  });
+                }
+                if (saved.incentive > 0) {
+                  earnings.push({
+                    code: "hr_incentive",
+                    label: "Incentive",
+                    amount: saved.incentive,
+                    type: "earning",
+                  });
+                }
+                if (saved.reimbursement > 0) {
+                  earnings.push({
+                    code: "hr_reimbursement",
+                    label: "Reimbursement (HR adjustment)",
+                    amount: saved.reimbursement,
+                    type: "earning",
+                  });
+                }
+                return {
+                  ...item,
+                  totalAllowances: nextAllowances,
+                  breakdown: {
+                    ...item.breakdown,
+                    earnings,
+                    hrAdjustments: {
+                      ...item.breakdown.hrAdjustments,
+                      bonus: saved.bonus,
+                      incentive: saved.incentive,
+                      reimbursements: saved.reimbursement,
+                      itemStatus: "reviewed" as const,
                     },
-                  };
-                }),
-              },
-            });
-            void fetchRunDetail(panel.data.id, panel.mode, ++loadSeq.current, periodLabel);
-          }
+                    payrollLifecycle: {
+                      ...item.breakdown.payrollLifecycle,
+                      itemStatus: "reviewed" as const,
+                    },
+                  },
+                };
+              }),
+            },
+          });
+          setEditTarget(null);
+          void fetchRunDetail(payrollId, mode, ++loadSeq.current, periodLabel);
         }}
       />
     </div>
@@ -674,20 +774,20 @@ function EmployeePayrollTable({
 
   return (
     <div className="max-h-[min(32rem,calc(100dvh-18rem))] overflow-auto rounded-lg border border-input bg-white dark:bg-input">
-      <table className="w-full min-w-[72rem] bg-white text-sm dark:bg-input">
+      <table className="w-full min-w-[78rem] bg-white text-sm dark:bg-input">
         <thead className="sticky top-0 z-30 bg-blue-600 bg-gradient-to-r from-blue-600 to-violet-600 text-left text-white shadow-[0_1px_0_rgba(255,255,255,0.12)]">
           <tr>
             <th className={cn("left-0 z-40 h-11 min-w-[16rem] whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white", stickyCellClass(true))}>Employee</th>
             <th className={cn("left-[16rem] z-40 h-11 min-w-[10rem] whitespace-nowrap px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white", stickyCellClass(true))}>Department</th>
             <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Present / Paid</th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">LOP days</th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Holiday</th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">CL</th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">EL</th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">LOP</th>
             <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Monthly salary</th>
             <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Attendance earnings</th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Deductions</th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Net salary</th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Bonus</th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Incentive</th>
-            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Reimb.</th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">PT / Deductions</th>
+            <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Reimbursement</th>
             <th className="h-11 whitespace-nowrap bg-transparent px-4 py-3 align-middle text-xs font-semibold uppercase tracking-wide text-white">Final payable</th>
             <th className={cn(TABLE_HEADER_CELL_CLASS, "sticky right-0 z-40 bg-blue-600 text-right")}>Actions</th>
           </tr>
@@ -707,14 +807,16 @@ function EmployeePayrollTable({
                 </div>
               </td>
               <td className={cn("left-[16rem] min-w-[10rem] border-r border-input/40 px-3 py-2.5 shadow-[1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:group-hover:bg-input/80", stickyCellClass())}>{row.department ?? "—"}</td>
-              <td className="px-3 py-2.5 tabular-nums">{row.paidDays}</td>
+              <td className="px-3 py-2.5 tabular-nums" title={`Paid working days: ${row.paidDays}`}>
+                {row.presentDays}
+              </td>
+              <td className="px-3 py-2.5 tabular-nums">{row.holidayDays}</td>
+              <td className="px-3 py-2.5 tabular-nums">{row.clDays}</td>
+              <td className="px-3 py-2.5 tabular-nums">{row.elDays}</td>
               <td className="px-3 py-2.5 tabular-nums">{row.lopDays}</td>
               <td className="px-3 py-2.5 tabular-nums">{formatCurrency(row.monthlySalary)}</td>
               <td className="px-3 py-2.5 tabular-nums">{formatCurrency(row.attendanceEarnings)}</td>
               <td className="px-3 py-2.5 tabular-nums">{formatCurrency(row.deductions)}</td>
-              <td className="px-3 py-2.5 tabular-nums">{formatCurrency(row.net)}</td>
-              <td className="px-3 py-2.5 tabular-nums">{formatOptionalPayrollAmount(row.bonus)}</td>
-              <td className="px-3 py-2.5 tabular-nums">{formatOptionalPayrollAmount(row.incentive)}</td>
               <td className="px-3 py-2.5 tabular-nums">{formatOptionalPayrollAmount(row.reimbursement)}</td>
               <td className="px-3 py-2.5 tabular-nums font-medium">{formatCurrency(row.finalPayable)}</td>
               <td className="sticky right-0 z-20 bg-white px-3 py-2.5 text-right shadow-[-1px_0_0_rgba(0,0,0,0.04)] group-hover:bg-zinc-50 dark:bg-input dark:group-hover:bg-input/80">

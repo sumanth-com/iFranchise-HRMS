@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 
 import {
   applyOfficialHolidaysToAttendanceSummary,
+  applySundayHolidaysToAttendanceSummary,
+  listSundaysInRange,
   shouldPreserveAttendanceOverOfficialHoliday,
 } from "@/lib/payroll/services/payroll-attendance-holidays";
 import {
@@ -99,6 +101,24 @@ describe("official holiday attendance facts", () => {
     assert.equal(summary.weekOffDays, 0);
   });
 
+  it("does not double-count when an official holiday falls on a Sunday", () => {
+    const summary = emptySummary();
+    const statusByDate = new Map<string, string | null | undefined>();
+    applyOfficialHolidaysToAttendanceSummary(summary, {
+      officialHolidayDates: ["2026-09-06"],
+      statusByDate,
+      periodStart: "2026-09-01",
+      periodEnd: "2026-09-30",
+    });
+    applySundayHolidaysToAttendanceSummary(summary, {
+      statusByDate,
+      periodStart: "2026-09-01",
+      periodEnd: "2026-09-30",
+    });
+    // Sep 6 once + Sep 13, 20, 27 = 4
+    assert.equal(summary.holidayDays, 4);
+  });
+
   it("does not invent Saturday/Sunday holidays outside the official list", () => {
     const summary = {
       ...emptySummary(),
@@ -116,6 +136,138 @@ describe("official holiday attendance facts", () => {
     });
     assert.equal(summary.holidayDays, 0);
     assert.equal(summary.weekOffDays, 1);
+  });
+
+  it("credits Sundays as Holiday (H) within the as-of window without hardcoding dates", () => {
+    assert.deepEqual(listSundaysInRange("2026-09-01", "2026-09-30"), [
+      "2026-09-06",
+      "2026-09-13",
+      "2026-09-20",
+      "2026-09-27",
+    ]);
+    assert.deepEqual(listSundaysInRange("2026-09-01", "2026-09-11"), ["2026-09-06"]);
+    assert.deepEqual(listSundaysInRange("2026-10-01", "2026-10-31"), [
+      "2026-10-04",
+      "2026-10-11",
+      "2026-10-18",
+      "2026-10-25",
+    ]);
+
+    const summary = {
+      ...emptySummary(),
+      presentDays: 9,
+      weekOffDays: 1,
+    };
+    applySundayHolidaysToAttendanceSummary(summary, {
+      statusByDate: new Map([["2026-09-06", "week_off"]]),
+      periodStart: "2026-09-01",
+      periodEnd: "2026-09-11",
+    });
+    assert.equal(summary.weekOffDays, 0);
+    assert.equal(summary.holidayDays, 1);
+    assert.equal(
+      computeExcelPaidWorkingDays(
+        { ...summary, overtimeHours: 0, lateDays: 0 },
+        { lopDays: 0, paidLeaveDays: 0 },
+      ),
+      10,
+    );
+  });
+
+  it("does not credit future Sundays beyond as-of, and never double-counts holiday rows", () => {
+    const summary = {
+      ...emptySummary(),
+      presentDays: 9,
+      holidayDays: 1,
+    };
+    const statusByDate = new Map([["2026-09-06", "holiday"]]);
+    applySundayHolidaysToAttendanceSummary(summary, {
+      statusByDate,
+      periodStart: "2026-09-01",
+      periodEnd: "2026-09-11",
+    });
+    assert.equal(summary.holidayDays, 1);
+
+    applySundayHolidaysToAttendanceSummary(summary, {
+      statusByDate,
+      periodStart: "2026-09-01",
+      periodEnd: "2026-09-30",
+    });
+    // Sep 6 already holiday; +3 remaining Sundays in September
+    assert.equal(summary.holidayDays, 4);
+  });
+
+  it("matches Excel Om when 9P + 4 Sundays are in range: 25000/30*13 - 200", () => {
+    const summary = {
+      ...emptySummary(),
+      presentDays: 9,
+    };
+    applySundayHolidaysToAttendanceSummary(summary, {
+      statusByDate: new Map(),
+      periodStart: "2026-09-01",
+      periodEnd: "2026-09-30",
+    });
+    assert.equal(summary.holidayDays, 4);
+    assert.equal(
+      computeExcelPaidWorkingDays(
+        { ...summary, overtimeHours: 0, lateDays: 0 },
+        { lopDays: 0, paidLeaveDays: 0 },
+      ),
+      13,
+    );
+
+    const result = calculateEmployeePayroll({
+      month: 9,
+      year: 2026,
+      asOfDate: new Date("2026-09-30"),
+      calendar: DEFAULT_LEAVE_CALENDAR,
+      salaryStructure: structure(25_000),
+      attendance: { ...summary, overtimeHours: 0, lateDays: 0 },
+      leaveSummary: { lopDays: 0, paidLeaveDays: 0 },
+      bonuses: [],
+      reimbursements: [],
+    });
+    assert.equal(result.grossSalary, 10_833.33);
+    assert.equal(result.totalDeductions, 200);
+    assert.equal(result.netSalary, 10_633.33);
+    assert.equal(
+      resolveFinalPayableAmount(result.netSalary, result.breakdown, result.totalAllowances),
+      10_633.33,
+    );
+    assert.equal(EXCEL_PAYROLL_DAY_DENOMINATOR, 30);
+  });
+
+  it("does not credit official holidays after the as-of period end", () => {
+    const summary = {
+      ...emptySummary(),
+      presentDays: 9,
+      holidayDays: 1,
+    };
+    applyOfficialHolidaysToAttendanceSummary(summary, {
+      officialHolidayDates: ["2026-09-14"],
+      statusByDate: new Map([["2026-09-06", "holiday"]]),
+      periodStart: "2026-09-01",
+      periodEnd: "2026-09-11",
+    });
+    assert.equal(summary.holidayDays, 1);
+    assert.equal(
+      computeExcelPaidWorkingDays(
+        { ...summary, overtimeHours: 0, lateDays: 0 },
+        { lopDays: 0, paidLeaveDays: 0 },
+      ),
+      10,
+    );
+  });
+
+  it("respects joining date — Sundays before join are ignored", () => {
+    const summary = emptySummary();
+    applySundayHolidaysToAttendanceSummary(summary, {
+      statusByDate: new Map(),
+      periodStart: "2026-09-10",
+      periodEnd: "2026-09-30",
+    });
+    // Sep 13, 20, 27 only (Sep 6 before join)
+    assert.equal(summary.holidayDays, 3);
   });
 
   it("does not double-count when attendance is already holiday or present", () => {

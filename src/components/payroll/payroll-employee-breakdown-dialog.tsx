@@ -148,16 +148,22 @@ export function PayrollEmployeeBreakdownDialog({
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Attendance summary
                   </h3>
-                  <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6">
-                    <StatTile label="Working days" value={String(attendance.workingDays)} />
+                  <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-7">
                     <StatTile label="Present" value={String(attendance.presentDays)} />
+                    <StatTile label="Holiday" value={String(attendance.holidayCount ?? 0)} />
+                    <StatTile label="CL" value={String(attendance.clDays ?? 0)} />
+                    <StatTile label="EL" value={String(attendance.elDays ?? 0)} />
+                    <StatTile label="LOP" value={String(attendance.lopDays)} />
                     <StatTile
-                      label="Paid leave"
-                      value={String(attendance.paidLeaveDays ?? attendance.leaveDays ?? 0)}
+                      label="Paid days"
+                      value={String(
+                        attendance.paidDays ??
+                          attendance.presentDays +
+                            (attendance.holidayCount ?? 0) +
+                            (attendance.paidLeaveDays ?? attendance.leaveDays ?? 0),
+                      )}
                     />
-                    <StatTile label="LOP days" value={String(attendance.lopDays)} />
-                    <StatTile label="Holidays" value={String(attendance.holidayCount ?? 0)} />
-                    <StatTile label="Weekly offs" value={String(attendance.weekOffDays ?? 0)} />
+                    <StatTile label="Working days" value={String(attendance.workingDays)} />
                   </div>
                 </section>
               ) : null}

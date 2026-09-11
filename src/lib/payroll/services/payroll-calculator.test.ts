@@ -121,6 +121,35 @@ describe("payroll calculator — Excel source of truth", () => {
     assert.equal(paid, 13);
   });
 
+  it("surfaces CL/EL on attendance breakdown without changing paid-day formula", () => {
+    const result = calculateEmployeePayroll({
+      month: 9,
+      year: 2026,
+      asOfDate: new Date("2026-09-11"),
+      calendar: DEFAULT_LEAVE_CALENDAR,
+      salaryStructure: structure(25_000),
+      attendance: {
+        presentDays: 9,
+        absentDays: 0,
+        halfDays: 0,
+        onLeaveDays: 0,
+        weekOffDays: 0,
+        holidayDays: 1,
+        overtimeHours: 0,
+        lateDays: 0,
+      },
+      leaveSummary: { lopDays: 0, paidLeaveDays: 2, clDays: 1, elDays: 1 },
+      bonuses: [],
+      reimbursements: [],
+    });
+    assert.equal(result.breakdown.attendance.presentDays, 9);
+    assert.equal(result.breakdown.attendance.holidayCount, 1);
+    assert.equal(result.breakdown.attendance.clDays, 1);
+    assert.equal(result.breakdown.attendance.elDays, 1);
+    assert.equal(result.breakdown.attendance.paidDays, 12);
+    assert.equal(result.grossSalary, roundCurrency((25_000 / 30) * 12));
+  });
+
   it("excludes LOP, Absent, and week_off from paid days", () => {
     const paid = computeExcelPaidWorkingDays(
       {

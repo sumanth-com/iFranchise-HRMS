@@ -70,7 +70,10 @@ import {
   type PayrollCalculationResult,
   type SalaryStructureRow,
 } from "@/lib/payroll/services/payroll-calculator";
-import { applyOfficialHolidaysToAttendanceSummary } from "@/lib/payroll/services/payroll-attendance-holidays";
+import {
+  applyOfficialHolidaysToAttendanceSummary,
+  applySundayHolidaysToAttendanceSummary,
+} from "@/lib/payroll/services/payroll-attendance-holidays";
 import {
   generatePayslipNumber,
   formatPayrollMonth,
@@ -627,10 +630,9 @@ async function getAttendanceSummary(
       : null;
   }
 
-  // Declared official holidays use the full month calendar (Excel pre-fills H for
-  // known holidays). Punch-based statuses still stop at queryEnd above.
-  const holidayCreditEnd =
-    applicable.kind === "future" ? queryEnd : monthRange.endDate;
+  // Official holidays credit only through the applicable as-of window (open month =
+  // through today). Punch-based statuses already stop at queryEnd above.
+  const holidayCreditEnd = queryEnd;
 
   const [leaveSummary, officialHolidays] = await Promise.all([
     getLeaveMonthSummary(supabase, employeeId, month, year, { asOfDate: options?.asOfDate }),
@@ -646,6 +648,12 @@ async function getAttendanceSummary(
     joiningDate && joiningDate > monthRange.startDate ? joiningDate : monthRange.startDate;
   applyOfficialHolidaysToAttendanceSummary(summary, {
     officialHolidayDates: officialHolidays,
+    statusByDate,
+    periodStart: holidayPeriodStart,
+    periodEnd: holidayCreditEnd,
+  });
+  // Excel: Sundays are paid Holiday (H). Credit only through as-of; no future Sundays.
+  applySundayHolidaysToAttendanceSummary(summary, {
     statusByDate,
     periodStart: holidayPeriodStart,
     periodEnd: holidayCreditEnd,
@@ -697,6 +705,30 @@ async function getLeaveMonthSummary(
 
 type LeavePeriodBounds = { periodStart: string; periodEnd: string };
 
+type LeaveSummaryAcc = Required<
+  Pick<LeaveMonthSummary, "lopDays" | "paidLeaveDays" | "clDays" | "elDays">
+> & { sandwichDates: string[] };
+
+function emptyLeaveSummaryAcc(): LeaveSummaryAcc {
+  return { lopDays: 0, paidLeaveDays: 0, clDays: 0, elDays: 0, sandwichDates: [] };
+}
+
+/** Split paid leave into CL/EL for Team Payroll display only (formula still uses paidLeaveDays). */
+function addPaidLeaveByType(
+  sum: LeaveSummaryAcc,
+  leaveCode: string | undefined,
+  paid: number,
+): Pick<LeaveSummaryAcc, "clDays" | "elDays" | "paidLeaveDays"> {
+  const code = String(leaveCode ?? "").trim().toUpperCase();
+  const clDays = sum.clDays + (code === "CL" ? paid : 0);
+  const elDays = sum.elDays + (code === "EL" ? paid : 0);
+  return {
+    paidLeaveDays: sum.paidLeaveDays + paid,
+    clDays,
+    elDays,
+  };
+}
+
 function summarizeLeaveRows(
   rows: Array<{
     start_date?: string | null;
@@ -721,7 +753,7 @@ function summarizeLeaveRows(
       const breakdown = row.duration_breakdown;
       const total = Number(row.total_days) || 0;
       let sandwichDates = [
-        ...(sum.sandwichDates ?? []),
+        ...sum.sandwichDates,
         ...sandwichDatesFromBreakdown(breakdown),
       ];
 
@@ -749,7 +781,7 @@ function summarizeLeaveRows(
         }
         return {
           lopDays: sum.lopDays + lop,
-          paidLeaveDays: sum.paidLeaveDays + paid,
+          ...addPaidLeaveByType(sum, leaveType?.code, paid),
           sandwichDates,
         };
       }
@@ -792,12 +824,14 @@ function summarizeLeaveRows(
             return {
               lopDays: sum.lopDays + periodTotal,
               paidLeaveDays: sum.paidLeaveDays,
+              clDays: sum.clDays,
+              elDays: sum.elDays,
               sandwichDates,
             };
           }
           return {
             lopDays: sum.lopDays + fullLop * scale,
-            paidLeaveDays: sum.paidLeaveDays + fullPaid * scale,
+            ...addPaidLeaveByType(sum, leaveType?.code, fullPaid * scale),
             sandwichDates,
           };
         }
@@ -807,6 +841,8 @@ function summarizeLeaveRows(
         return {
           lopDays: sum.lopDays + total,
           paidLeaveDays: sum.paidLeaveDays,
+          clDays: sum.clDays,
+          elDays: sum.elDays,
           sandwichDates,
         };
       }
@@ -815,11 +851,11 @@ function summarizeLeaveRows(
         typeof breakdown?.paidDays === "number" ? breakdown.paidDays : Math.max(0, total - lop);
       return {
         lopDays: sum.lopDays + lop,
-        paidLeaveDays: sum.paidLeaveDays + paid,
+        ...addPaidLeaveByType(sum, leaveType?.code, paid),
         sandwichDates,
       };
     },
-    { lopDays: 0, paidLeaveDays: 0, sandwichDates: [] as string[] },
+    emptyLeaveSummaryAcc(),
   );
 }
 
@@ -1104,9 +1140,9 @@ async function loadPayrollPeriodFacts(
       [...organizationByEmployee.values(), ...(organizationId ? [organizationId] : [])],
     ),
   ];
-  // Declared official holidays for the full payroll month (not limited to as-of punch window).
-  const holidayCreditEnd =
-    applicable.kind === "future" ? queryEnd : monthRange.endDate;
+  // Official holidays credit only through the applicable as-of window (open month =
+  // through today). Do not invent future H days before they occur.
+  const holidayCreditEnd = queryEnd;
   await Promise.all(
     organizationIds.map(async (orgId) => {
       holidayDatesByOrg.set(
@@ -1126,6 +1162,12 @@ async function loadPayrollPeriodFacts(
       joiningDate && joiningDate > queryStart ? joiningDate : queryStart;
     applyOfficialHolidaysToAttendanceSummary(summary, {
       officialHolidayDates: officialHolidays,
+      statusByDate: statusByEmployeeDate.get(employeeId) ?? new Map(),
+      periodStart: holidayPeriodStart,
+      periodEnd: holidayCreditEnd,
+    });
+    // Excel: Sundays are paid Holiday (H). Credit only through as-of; no future Sundays.
+    applySundayHolidaysToAttendanceSummary(summary, {
       statusByDate: statusByEmployeeDate.get(employeeId) ?? new Map(),
       periodStart: holidayPeriodStart,
       periodEnd: holidayCreditEnd,

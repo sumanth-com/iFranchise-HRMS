@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -34,6 +34,30 @@ type PayrollLineTarget = {
   currentReimbursement?: number;
 };
 
+/** Keep draft strings editable (empty / trailing '.') without forcing 0 into the input. */
+function sanitizeAmountDraft(raw: string): string {
+  const cleaned = raw.replace(/[^\d.]/g, "");
+  if (!cleaned) return "";
+  const firstDot = cleaned.indexOf(".");
+  if (firstDot === -1) return cleaned.replace(/^0+(?=\d)/, "") || "0";
+  const whole = cleaned.slice(0, firstDot).replace(/^0+(?=\d)/, "") || "0";
+  const fraction = cleaned.slice(firstDot + 1).replace(/\./g, "").slice(0, 2);
+  return `${whole}.${fraction}`;
+}
+
+function parseAmountDraft(raw: string): number {
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === ".") return 0;
+  const value = Number(trimmed);
+  if (!Number.isFinite(value) || value < 0) return 0;
+  return roundCurrency(value);
+}
+
+function amountToDraft(value: number | null | undefined): string {
+  const amount = roundCurrency(Math.max(0, Number(value) || 0));
+  return String(amount);
+}
+
 export function PayrollEditDialog({
   target,
   open,
@@ -54,31 +78,58 @@ export function PayrollEditDialog({
   const [bonus, setBonus] = useState("0");
   const [incentive, setIncentive] = useState("0");
   const [reimbursements, setReimbursements] = useState("0");
+  const draftRef = useRef({ bonus: "0", incentive: "0", reimbursements: "0" });
+  const seededItemIdRef = useRef<string | null>(null);
 
+  draftRef.current = { bonus, incentive, reimbursements };
+
+  // Seed once per open/item. Do not depend on `target` identity — parent often
+  // passes a fresh object each render, which previously reset sibling fields.
   useEffect(() => {
-    if (!open || !target) return;
+    if (!open || !target?.payrollItemId) {
+      if (!open) seededItemIdRef.current = null;
+      return;
+    }
+    if (seededItemIdRef.current === target.payrollItemId) return;
+    seededItemIdRef.current = target.payrollItemId;
+
     const adj = target.adjustments;
-    setBonus(String(target.currentBonus ?? adj?.bonus ?? 0));
-    setIncentive(String(target.currentIncentive ?? adj?.incentive ?? 0));
-    setReimbursements(String(target.currentReimbursement ?? adj?.reimbursements ?? 0));
+    const nextBonus = amountToDraft(target.currentBonus ?? adj?.bonus ?? 0);
+    const nextIncentive = amountToDraft(target.currentIncentive ?? adj?.incentive ?? 0);
+    const nextReimbursement = amountToDraft(
+      target.currentReimbursement ?? adj?.reimbursements ?? 0,
+    );
+    setBonus(nextBonus);
+    setIncentive(nextIncentive);
+    setReimbursements(nextReimbursement);
+    draftRef.current = {
+      bonus: nextBonus,
+      incentive: nextIncentive,
+      reimbursements: nextReimbursement,
+    };
     setConfirmReopen(false);
   }, [open, target]);
 
-  const bonusPreview = Math.max(0, Number(bonus) || 0);
-  const incentivePreview = Math.max(0, Number(incentive) || 0);
-  const reimbursementPreview = Math.max(0, Number(reimbursements) || 0);
+  const bonusPreview = parseAmountDraft(bonus);
+  const incentivePreview = parseAmountDraft(incentive);
+  const reimbursementPreview = parseAmountDraft(reimbursements);
   const finalPayablePreview = roundCurrency(
     (target?.netPay ?? 0) + bonusPreview + incentivePreview + reimbursementPreview,
   );
 
   function handleSave() {
     if (!target) return;
+    const draft = draftRef.current;
+    const bonusAmount = parseAmountDraft(draft.bonus);
+    const incentiveAmount = parseAmountDraft(draft.incentive);
+    const reimbursementAmount = parseAmountDraft(draft.reimbursements);
+
     startTransition(async () => {
       const result = await updatePayrollItemAdjustmentsAction({
         payrollItemId: target.payrollItemId,
-        bonus: bonusPreview,
-        incentive: incentivePreview,
-        reimbursements: reimbursementPreview,
+        bonus: bonusAmount,
+        incentive: incentiveAmount,
+        reimbursements: reimbursementAmount,
         additionalEarnings: 0,
         additionalDeductions: 0,
         tdsOverride: null,
@@ -91,12 +142,12 @@ export function PayrollEditDialog({
         return;
       }
       toast.success("Payroll changes saved");
-      onOpenChange(false);
       onSaved({
-        bonus: bonusPreview,
-        incentive: incentivePreview,
-        reimbursement: reimbursementPreview,
+        bonus: bonusAmount,
+        incentive: incentiveAmount,
+        reimbursement: reimbursementAmount,
       });
+      onOpenChange(false);
     });
   }
 
@@ -117,12 +168,22 @@ export function PayrollEditDialog({
             are not changed.
           </p>
           <div className="grid gap-3">
-            <Field label="Bonus" value={bonus} onChange={setBonus} disabled={isPending} />
-            <Field label="Incentive" value={incentive} onChange={setIncentive} disabled={isPending} />
+            <Field
+              label="Bonus"
+              value={bonus}
+              onChange={(value) => setBonus(sanitizeAmountDraft(value))}
+              disabled={isPending}
+            />
+            <Field
+              label="Incentive"
+              value={incentive}
+              onChange={(value) => setIncentive(sanitizeAmountDraft(value))}
+              disabled={isPending}
+            />
             <Field
               label="Reimbursement"
               value={reimbursements}
-              onChange={setReimbursements}
+              onChange={(value) => setReimbursements(sanitizeAmountDraft(value))}
               disabled={isPending}
             />
           </div>
@@ -247,7 +308,9 @@ function Field({
     <div className="space-y-1.5">
       <Label>{label}</Label>
       <Input
+        type="text"
         inputMode="decimal"
+        autoComplete="off"
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}

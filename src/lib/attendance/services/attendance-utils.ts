@@ -224,8 +224,16 @@ function isInternalAttendanceNoteSegment(part: string): boolean {
   if (/^geo:/i.test(normalized)) return true;
   if (/^sheet[\s_-]*(screenshot[\s_-]*)?sync/i.test(normalized)) return true;
   if (/screenshot[\s_-]*sync/i.test(normalized)) return true;
+  // e.g. excel-sept-2026-sheet-sync, excel-2026-09-sheet-sync
+  if (/sheet[\s_-]*sync/i.test(normalized)) return true;
+  if (/^excel[\s_-][\w.-]*sync$/i.test(normalized)) return true;
+  if (/^excel[\s_-]\d{4}([\s_-]\d{2})?[\w.-]*$/i.test(normalized)) return true;
   if (/kept[\s_-]*real[\s_-]*punch/i.test(normalized)) return true;
   if (/^migration[\s_-]/i.test(normalized)) return true;
+  if (/^(job|batch|source)[\s_-]?id[:\s_-]/i.test(normalized)) return true;
+  if (/^(sync|import|migration)[\s_-](job|batch|id|run)[\w_-]*$/i.test(normalized)) {
+    return true;
+  }
   return false;
 }
 

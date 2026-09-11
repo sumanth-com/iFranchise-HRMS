@@ -80,6 +80,10 @@ export type PayrollBreakdown = {
     paidDays?: number;
     holidayCount?: number;
     paidLeaveDays?: number;
+    /** Casual leave days in the as-of window (display; part of paidLeaveDays). */
+    clDays?: number;
+    /** Earned leave days in the as-of window (display; part of paidLeaveDays). */
+    elDays?: number;
     weekOffDays?: number;
     /** Daily rate = monthly structure gross ÷ payroll working days. */
     dailyRate?: number;

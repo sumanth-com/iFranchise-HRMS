@@ -50,6 +50,10 @@ export type AttendanceSummary = {
 export type LeaveMonthSummary = {
   lopDays: number;
   paidLeaveDays: number;
+  /** Display split of paid leave (CL); included in paidLeaveDays for the formula. */
+  clDays?: number;
+  /** Display split of paid leave (EL); included in paidLeaveDays for the formula. */
+  elDays?: number;
   sandwichDates?: string[];
 };
 
@@ -357,9 +361,11 @@ function resolveDailyRateWorkingDays(
  * Present + Holiday + CL + EL
  *
  * LOP and Absent are excluded.
- * week_off is NOT added.
- * Holiday includes explicit attendance "holiday" marks and official company
- * holidays applied from hrms.holidays (is_optional = false) in payroll facts.
+ * week_off is NOT added (Saturdays/other offs stay unpaid unless reclassified).
+ * Holiday includes:
+ * - explicit attendance "holiday" marks
+ * - Sundays in the as-of window (Excel marks Sundays as H)
+ * - official company holidays (is_optional=false) in the as-of window
  * Half-days count as 0.5 present-equivalent.
  * Paid leave (CL/EL) comes from approved leave summary (or on_leave fallback).
  */
@@ -456,6 +462,8 @@ function emptyAttendanceBreakdown(
     leaveDays: attendance.onLeaveDays,
     paidDays: computePresentPaidDays(attendance, leave, period),
     paidLeaveDays: leave.paidLeaveDays,
+    clDays: leave.clDays ?? 0,
+    elDays: leave.elDays ?? 0,
     holidayCount: attendance.holidayDays,
     weekOffDays: attendance.weekOffDays,
     dailyRate: options?.dailyRate,
