@@ -8,6 +8,11 @@ describe("toDisplayAttendanceNotes", () => {
     assert.equal(toDisplayAttendanceNotes("excel-sept-2026-sheet-sync"), null);
     assert.equal(toDisplayAttendanceNotes("excel-2026-09-sheet-sync"), null);
     assert.equal(toDisplayAttendanceNotes("Excel Sept 2026 Sheet Sync"), null);
+    assert.equal(toDisplayAttendanceNotes("cleared-blank-excel-day"), null);
+    assert.equal(
+      toDisplayAttendanceNotes("excel-sept-2026-sheet-sync|cleared-blank-excel-day"),
+      null,
+    );
   });
 
   it("hides provenance / import metadata tags", () => {

@@ -5,8 +5,10 @@ import type { CorrectionStatus } from "@/types/manager-attendance";
 import {
   computeLateMinutes,
   parseAttendanceRules,
+  toDisplayAttendanceNotes,
 } from "@/lib/attendance/services/attendance-utils";
 import { resolveAttendanceLocationFlags } from "@/lib/attendance/services/attendance-location";
+import { completedWorkHoursFromPunches } from "@/lib/employee/attendance-format";
 import { formatCleanEmployeeName } from "@/lib/employees/parse-employee-name";
 
 type AttendanceDetailRow = {
@@ -20,6 +22,7 @@ type AttendanceDetailRow = {
   attendance_status: AttendanceStatus;
   work_hours: number | string;
   overtime_hours: number | string;
+  prior_work_seconds?: number | string | null;
   notes: string | null;
   check_in_latitude: number | string | null;
   check_in_longitude: number | string | null;
@@ -129,6 +132,7 @@ export async function getAttendanceById(
         attendance_status,
         work_hours,
         overtime_hours,
+        prior_work_seconds,
         notes,
         check_in_latitude,
         check_in_longitude,
@@ -201,14 +205,17 @@ export async function getAttendanceById(
     checkInAt: row.check_in_at,
     checkOutAt: row.check_out_at,
     attendanceStatus: row.attendance_status,
-    workHours: Number(row.work_hours ?? 0),
+    workHours: completedWorkHoursFromPunches(row.check_in_at, row.check_out_at, {
+      storedWorkHours: Number(row.work_hours ?? 0),
+      priorWorkSeconds: Number(row.prior_work_seconds ?? 0),
+    }),
     overtimeHours: Number(row.overtime_hours ?? 0),
     lateMinutes: computeLateMinutes(
       row.check_in_at,
       row.attendance_date,
       rules.lateAfter,
     ),
-    notes: row.notes,
+    notes: toDisplayAttendanceNotes(row.notes),
     hasCheckInLocation: locationFlags.hasCheckInLocation,
     hasCheckOutLocation: locationFlags.hasCheckOutLocation,
     createdAt: row.created_at,

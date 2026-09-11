@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   averageApplicableWorkingHours,
+  completedWorkHoursFromPunches,
   elapsedWorkingSeconds,
   formatLiveWorkingDuration,
   formatWorkingDuration,
@@ -74,6 +75,41 @@ describe("workHoursFromCheckInOut", () => {
       9,
     );
     assert.equal(workHoursFromCheckInOut("2026-09-02T10:00:00.000Z", null), 0);
+  });
+});
+
+describe("completedWorkHoursFromPunches", () => {
+  it("uses check-in to check-out for 09:59–15:33 IST (= 5h 34m)", () => {
+    // 09:59 IST = 04:29 UTC, 15:33 IST = 10:03 UTC
+    const hours = completedWorkHoursFromPunches(
+      "2026-09-11T04:29:00.000Z",
+      "2026-09-11T10:03:00.000Z",
+      { storedWorkHours: 13.23, priorWorkSeconds: 0 },
+    );
+    assert.equal(hours, 5.57);
+    assert.equal(formatWorkingDuration(Math.round(hours * 3600)), "5h 34m");
+  });
+
+  it("ignores stale stored work_hours when punches exist and prior is empty", () => {
+    assert.equal(
+      completedWorkHoursFromPunches(
+        "2026-09-11T04:29:00.000Z",
+        "2026-09-11T10:03:00.000Z",
+        { storedWorkHours: 13.23, priorWorkSeconds: 0 },
+      ),
+      5.57,
+    );
+  });
+
+  it("keeps explicit multi-session prior day total when larger than current session", () => {
+    assert.equal(
+      completedWorkHoursFromPunches(
+        "2026-09-11T08:30:00.000Z",
+        "2026-09-11T10:30:00.000Z",
+        { storedWorkHours: 2, priorWorkSeconds: 6 * 3600 },
+      ),
+      6,
+    );
   });
 });
 

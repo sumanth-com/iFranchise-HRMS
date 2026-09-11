@@ -234,6 +234,10 @@ function isInternalAttendanceNoteSegment(part: string): boolean {
   if (/^(sync|import|migration)[\s_-](job|batch|id|run)[\w_-]*$/i.test(normalized)) {
     return true;
   }
+  // Excel sync cleanup / blank-day markers (e.g. cleared-blank-excel-day)
+  if (/cleared[\s_-].*excel/i.test(normalized)) return true;
+  if (/blank[\s_-]*excel[\s_-]*day/i.test(normalized)) return true;
+  if (/^cleared[\s_-][\w.-]+$/i.test(normalized)) return true;
   return false;
 }
 

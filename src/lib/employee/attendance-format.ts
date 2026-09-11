@@ -76,6 +76,62 @@ export function workHoursFromCheckInOut(
   return Math.round((seconds / 3600) * 100) / 100;
 }
 
+/**
+ * Employee-facing completed hours from actual punch timestamps.
+ *
+ * - Same-day / overnight: difference of stored ISO timestamps (UTC-safe).
+ * - Multi-session: use prior_work_seconds when it is an explicit day total (> 0).
+ * - Never invent duration from stale stored work_hours when both punches exist
+ *   and prior_work_seconds is empty (common after Excel sync / re-punch).
+ */
+export function completedWorkHoursFromPunches(
+  checkInAt: string | null | undefined,
+  checkOutAt: string | null | undefined,
+  options?: {
+    storedWorkHours?: number | null;
+    priorWorkSeconds?: number | null;
+  },
+): number {
+  if (!checkInAt) return 0;
+  if (!checkOutAt) {
+    const stored = Number(options?.storedWorkHours ?? 0);
+    return Number.isFinite(stored) && stored > 0 ? Math.round(stored * 100) / 100 : 0;
+  }
+
+  const sessionHours = workHoursFromCheckInOut(checkInAt, checkOutAt);
+  const priorSec = Math.max(0, Math.floor(Number(options?.priorWorkSeconds ?? 0)));
+  if (priorSec > 0) {
+    const priorHours = Math.round((priorSec / 3600) * 100) / 100;
+    return Math.max(priorHours, sessionHours);
+  }
+  return sessionHours;
+}
+
+/** Seconds variant of {@link completedWorkHoursFromPunches} for duration labels. */
+export function completedWorkingSecondsFromPunches(
+  checkInAt: string | null | undefined,
+  checkOutAt: string | null | undefined,
+  options?: {
+    storedWorkHours?: number | null;
+    priorWorkSeconds?: number | null;
+  },
+): number {
+  if (!checkInAt) return 0;
+  if (!checkOutAt) {
+    const prior = Math.max(0, Math.floor(Number(options?.priorWorkSeconds ?? 0)));
+    if (prior > 0) return prior;
+    const stored = Number(options?.storedWorkHours ?? 0);
+    return Number.isFinite(stored) && stored > 0
+      ? Math.max(0, Math.round(stored * 3600))
+      : 0;
+  }
+
+  const sessionSeconds = elapsedWorkingSeconds(checkInAt, checkOutAt);
+  const priorSec = Math.max(0, Math.floor(Number(options?.priorWorkSeconds ?? 0)));
+  if (priorSec > 0) return Math.max(priorSec, sessionSeconds);
+  return sessionSeconds;
+}
+
 export type ApplicableWorkingDay = {
   inMonth: boolean;
   isFuture: boolean;

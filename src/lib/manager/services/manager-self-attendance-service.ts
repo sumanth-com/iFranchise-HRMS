@@ -1,4 +1,10 @@
-import { averageApplicableWorkingHours, elapsedWorkingSeconds, formatWorkingDuration } from "@/lib/employee/attendance-format";
+import {
+  averageApplicableWorkingHours,
+  completedWorkHoursFromPunches,
+  completedWorkingSecondsFromPunches,
+  elapsedWorkingSeconds,
+  formatWorkingDuration,
+} from "@/lib/employee/attendance-format";
 import {
   addDays,
   eachDayOfInterval,
@@ -237,17 +243,21 @@ function buildTodayPanel(
   const checkInAt = row?.check_in_at ?? null;
   const checkOutAt = row?.check_out_at ?? null;
   const punchState = resolvePunchState(checkInAt, checkOutAt);
-  const workHours = row
-    ? Number(row.work_hours ?? 0)
-    : computeWorkHours(checkInAt, checkOutAt);
   const storedPrior = Math.max(0, Math.floor(Number(row?.prior_work_seconds ?? 0)));
-  // While checked out, prior_work_seconds (or work_hours) holds the day total across sessions.
-  // While checked in, prior_work_seconds holds completed earlier sessions only.
-  const priorCompletedSeconds = checkOutAt
-    ? storedPrior > 0
-      ? storedPrior
-      : Math.max(0, Math.round(workHours * 3600))
-    : storedPrior;
+  const priorCompletedSeconds = completedWorkingSecondsFromPunches(
+    checkInAt,
+    checkOutAt,
+    {
+      storedWorkHours: row ? Number(row.work_hours ?? 0) : 0,
+      priorWorkSeconds: storedPrior,
+    },
+  );
+  const workHours = checkOutAt
+    ? completedWorkHoursFromPunches(checkInAt, checkOutAt, {
+        storedWorkHours: row ? Number(row.work_hours ?? 0) : 0,
+        priorWorkSeconds: storedPrior,
+      })
+    : Number(row?.work_hours ?? 0);
   const lateMinutes = computeLateMinutes(checkInAt, attendanceDate, rules.lateAfter);
   const overtimeHours = row
     ? Number(row.overtime_hours ?? 0)
@@ -272,7 +282,7 @@ function buildTodayPanel(
     checkInAt,
     checkOutAt,
     new Date(),
-    priorCompletedSeconds,
+    checkOutAt ? priorCompletedSeconds : storedPrior,
   );
 
   return {
@@ -282,7 +292,7 @@ function buildTodayPanel(
     attendanceStatus,
     checkInAt,
     checkOutAt,
-    priorCompletedSeconds,
+    priorCompletedSeconds: checkOutAt ? priorCompletedSeconds : storedPrior,
     workHours,
     overtimeHours,
     lateMinutes,
@@ -557,7 +567,12 @@ function buildCalendarDays(input: {
       attendanceId: attendance?.id ?? null,
       checkInAt: attendance?.check_in_at ?? null,
       checkOutAt: attendance?.check_out_at ?? null,
-      workHours: attendance ? Number(attendance.work_hours ?? 0) : 0,
+      workHours: attendance
+        ? completedWorkHoursFromPunches(attendance.check_in_at, attendance.check_out_at, {
+            storedWorkHours: Number(attendance.work_hours ?? 0),
+            priorWorkSeconds: Number(attendance.prior_work_seconds ?? 0),
+          })
+        : 0,
       holidayName,
       leaveTypeName,
     };
@@ -737,7 +752,12 @@ function buildHistoryRows(input: {
       attendanceStatus: status,
       checkInAt: attendance?.check_in_at ?? null,
       checkOutAt: attendance?.check_out_at ?? null,
-      workHours: attendance ? Number(attendance.work_hours ?? 0) : 0,
+      workHours: attendance
+        ? completedWorkHoursFromPunches(attendance.check_in_at, attendance.check_out_at, {
+            storedWorkHours: Number(attendance.work_hours ?? 0),
+            priorWorkSeconds: Number(attendance.prior_work_seconds ?? 0),
+          })
+        : 0,
       lateMinutes,
       overtimeHours: attendance ? Number(attendance.overtime_hours ?? 0) : 0,
       remarks,
